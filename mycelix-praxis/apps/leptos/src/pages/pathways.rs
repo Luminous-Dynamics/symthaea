@@ -8,7 +8,7 @@
 
 use leptos::prelude::*;
 
-use crate::curriculum::{caps_graph, use_progress, ProgressStatus};
+use crate::curriculum::{curriculum_graph, use_progress, ProgressStatus};
 
 /// All subjects that have post-secondary nodes, with display names and descriptions.
 const PATHWAYS: &[(&str, &str, &str)] = &[
@@ -41,7 +41,7 @@ const PATHWAYS: &[(&str, &str, &str)] = &[
     ("IT Support", "IT Support", "Hardware, networking, help desk"),
     ("Hospitality", "Hospitality", "Food safety, restaurant service, management"),
     // Legal
-    ("Legal Awareness", "Legal Awareness", "SA Constitution, employment law, consumer rights, tax, POPIA, business registration"),
+    ("Legal Awareness", "Legal Awareness", "Constitutional law, employment law, consumer rights, tax, data privacy, business registration"),
 ];
 
 /// Returns a CSS class suffix for the pathway category based on subject name.
@@ -73,7 +73,7 @@ pub fn PathwaysPage() -> impl IntoView {
     let progress = use_progress();
 
     view! {
-        <div class="caps-skill-map">
+        <div class="praxis-skill-map">
             <a href="/" class="refuge-back-link">"\u{2190} Home"</a>
             <h1 style="font-size: 1.5rem; margin: 1rem 0 0.5rem">"Career Pathways"</h1>
             <p style="color: var(--text-secondary); margin-bottom: 1.5rem; line-height: 1.6">
@@ -86,7 +86,7 @@ pub fn PathwaysPage() -> impl IntoView {
                     view! {
                         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0.75rem">
                             {PATHWAYS.iter().map(|(subject, display_name, desc)| {
-                                let graph = caps_graph();
+                                let graph = curriculum_graph();
                                 let p = progress.get();
                                 let subj = subject.to_string();
                                 let count = graph.nodes.iter()
@@ -128,7 +128,7 @@ pub fn PathwaysPage() -> impl IntoView {
                 }
 
                 Some(ref subject) => {
-                    let graph = caps_graph();
+                    let graph = curriculum_graph();
                     let p = progress.get();
                     let subj = subject.clone();
 
@@ -178,7 +178,7 @@ pub fn PathwaysPage() -> impl IntoView {
     }
 }
 
-fn render_level(label: &'static str, nodes: &[&crate::curriculum::CapsNode], progress: &crate::curriculum::ProgressStore) -> impl IntoView {
+fn render_level(label: &'static str, nodes: &[&crate::curriculum::CurriculumNode], progress: &crate::curriculum::ProgressStore) -> impl IntoView {
     if nodes.is_empty() {
         return view! { <span></span> }.into_any();
     }

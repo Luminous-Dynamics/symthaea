@@ -91,7 +91,7 @@ pub fn FallacyDetector(node_id: String) -> impl IntoView {
                              else { "The ability to detect fallacies grows with practice. Try again!" }}
                         </p>
                         <button
-                            class="caps-filter-btn active"
+                            class="praxis-filter-btn active"
                             on:click=move |_| {
                                 set_current_q.set(0);
                                 set_score.set(0);
@@ -157,7 +157,7 @@ pub fn FallacyDetector(node_id: String) -> impl IntoView {
                                 {explanation}
                             </div>
                             <button
-                                class="caps-filter-btn active"
+                                class="praxis-filter-btn active"
                                 style="font-size: 0.8rem"
                                 on:click=move |_| {
                                     set_current_q.update(|q| *q += 1);

@@ -30,7 +30,14 @@ pub enum MotorSafetyLevel {
 
 impl MotorSafetyLevel {
     /// Determine safety level from current Phi value.
+    ///
+    /// Non-finite inputs (NaN, Inf, -Inf) map to `Red` (emergency stop).
+    /// This is intentional: if the consciousness measurement is corrupt,
+    /// the safest response is full motor shutdown.
     pub fn from_phi(phi: f64) -> Self {
+        if !phi.is_finite() {
+            return Self::Red;
+        }
         if phi > 0.6 {
             Self::Green
         } else if phi > 0.3 {
@@ -348,6 +355,19 @@ mod tests {
         // Clamping: values outside [0,1] are clamped
         assert!((grounding_from_prediction_error(-0.5) - 1.0).abs() < f32::EPSILON);
         assert!((grounding_from_prediction_error(1.5) - 0.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_from_phi_non_finite_returns_red() {
+        assert_eq!(MotorSafetyLevel::from_phi(f64::NAN), MotorSafetyLevel::Red);
+        assert_eq!(MotorSafetyLevel::from_phi(f64::INFINITY), MotorSafetyLevel::Red);
+        assert_eq!(MotorSafetyLevel::from_phi(f64::NEG_INFINITY), MotorSafetyLevel::Red);
+    }
+
+    #[test]
+    fn test_from_phi_negative_returns_red() {
+        assert_eq!(MotorSafetyLevel::from_phi(-1.0), MotorSafetyLevel::Red);
+        assert_eq!(MotorSafetyLevel::from_phi(-100.0), MotorSafetyLevel::Red);
     }
 
     #[test]

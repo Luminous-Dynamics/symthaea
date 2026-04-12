@@ -335,7 +335,7 @@ pub fn TodaysPlan() -> impl IntoView {
 
             // Weakest topics (top 3)
             let weakest = p.weakest_topics(3);
-            let graph = crate::curriculum::caps_graph();
+            let graph = crate::curriculum::curriculum_graph();
 
             // Unstarted high-value topics
             let mut unstarted: Vec<(&str, &str, u16)> = graph.nodes.iter()
@@ -478,7 +478,7 @@ pub fn LearningVelocity() -> impl IntoView {
 
             let mastered = p.mastered_count();
             let studying = p.studying_count();
-            let total = crate::curriculum::caps_graph().nodes.len();
+            let total = crate::curriculum::curriculum_graph().nodes.len();
             let hours = t.hours_studied();
             let streak = t.current_streak();
             let days_studied = t.study_days.len();
@@ -547,7 +547,7 @@ pub fn ExamPrediction() -> impl IntoView {
     view! {
         {move || {
             let p = progress.get();
-            let graph = crate::curriculum::caps_graph();
+            let graph = crate::curriculum::curriculum_graph();
 
             let mut p1_earned = 0.0_f64;
             let mut p1_total = 0u16;

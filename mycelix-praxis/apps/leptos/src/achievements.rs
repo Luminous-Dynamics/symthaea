@@ -7,7 +7,7 @@
 
 use leptos::prelude::*;
 
-use crate::curriculum::{caps_graph, use_progress, ProgressStatus};
+use crate::curriculum::{curriculum_graph, use_progress, ProgressStatus};
 use crate::study_tracker::use_tracker;
 
 /// A learning milestone.

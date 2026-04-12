@@ -123,8 +123,29 @@ pub fn render_arrangement(
     let sr = sample_rate as f32;
     let partials = compute_timbre(state, config.num_partials.clamp(1, 16));
     let adsr = compute_adsr(state);
-    let fm_depth = state.dopamine * config.max_fm_depth;
-    let fm_ratio = 2.0 + state.noradrenaline;
+    // FM synthesis: emotion-gated.
+    // Tense: moderate FM (the original B-grade sound used moderate FM, not extreme).
+    // Joyful: light FM for shimmer. Others: none.
+    let fm_depth = if state.valence < -0.2 && state.arousal > 0.5 {
+        // Tense: moderate FM — enough for edge without being metallic noise
+        0.4 * config.max_fm_depth
+    } else if state.valence > 0.2 && state.arousal > 0.5 {
+        // Joyful: light FM shimmer
+        0.1 * config.max_fm_depth
+    } else {
+        0.0
+    };
+    let fm_ratio = 2.0; // fixed ratio for all (original B-grade tense used 2.0)
+    // Filter envelope parameters: emotion-dependent spectral movement
+    let (filter_open, filter_close) = if state.valence > 0.2 && state.arousal > 0.5 {
+        (12.0, 8.0)  // Joyful: stay very bright
+    } else if state.valence > 0.2 {
+        (4.0, 2.0)   // Contemplative: dark
+    } else if state.arousal > 0.5 {
+        (8.0, 5.0)   // Tense: bright throughout (aggressive character)
+    } else {
+        (3.0, 1.5)   // Sorrowful: always dark
+    };
     let chord_intervals = compute_chord_intervals(state);
     let mut bl = vec![0.0f32; total_samples];
     let mut br = vec![0.0f32; total_samples];
@@ -149,6 +170,8 @@ pub fn render_arrangement(
                     &adsr,
                     fm_depth,
                     fm_ratio,
+                    filter_open,
+                    filter_close,
                 );
                 if config.enable_sub_bass && (ir - 1.0).abs() < 0.01 {
                     let sf = freq * 0.5;
@@ -182,6 +205,8 @@ pub fn render_arrangement(
                             &adsr,
                             fm_depth,
                             fm_ratio,
+                            filter_open,
+                            filter_close,
                         );
                     }
                 }
@@ -218,6 +243,39 @@ pub fn render_arrangement(
             br[i] = m - s * w;
         }
     }
+
+    // ── Loudness normalization + peak limiter ────────────────────────
+    // Target: RMS ≈ -18 dB (0.126), ceiling at -1 dB (0.891).
+    // This ensures consistent loudness across emotional states and
+    // prevents clipping regardless of harmonic density.
+    {
+        const TARGET_RMS: f32 = 0.126; // -18 dB
+        const CEILING: f32 = 0.891;    // -1 dB
+
+        // Measure current RMS (stereo)
+        let rms = {
+            let sum: f32 = bl.iter().zip(br.iter())
+                .map(|(&l, &r)| l * l + r * r)
+                .sum();
+            (sum / (2.0 * total_samples as f32)).sqrt()
+        };
+
+        // Apply gain to reach target RMS (only if signal is audible)
+        if rms > 0.0001 {
+            let gain = (TARGET_RMS / rms).min(4.0); // cap boost at +12 dB
+            for i in 0..total_samples {
+                bl[i] *= gain;
+                br[i] *= gain;
+            }
+        }
+
+        // Peak limiter: soft-knee at ceiling
+        for i in 0..total_samples {
+            bl[i] = peak_limit(bl[i], CEILING);
+            br[i] = peak_limit(br[i], CEILING);
+        }
+    }
+
     match config.output_format {
         OutputFormat::StereoF32 => {
             AudioData::StereoF32(bl.iter().zip(br.iter()).map(|(&l, &r)| [l, r]).collect())
@@ -266,12 +324,18 @@ fn render_tone(
     adsr: &Adsr,
     fm_depth: f32,
     fm_ratio: f32,
+    filter_open: f32,
+    filter_close: f32,
 ) {
     let start = (note.start_time * sr) as usize;
     let dur = (note.duration * sr) as usize;
     let rel = (adsr.release * sr) as usize;
     let mf = freq * fm_ratio;
     let ny = sr * 0.5;
+
+    // Filter envelope: cutoff sweeps from filter_open to filter_close over the note.
+    // Values are passed as parameters (computed per-emotion in render_arrangement).
+
     for i in 0..dur + rel {
         let si = start + i;
         if si >= bl.len() {
@@ -279,6 +343,11 @@ fn render_tone(
         }
         let t = i as f32 / sr;
         let env = envelope(adsr, t, note.duration);
+
+        // Filter cutoff follows envelope: bright at attack, darker at sustain
+        let filter_ratio = filter_close + (filter_open - filter_close) * env;
+        let cutoff = freq * filter_ratio;
+
         let fm = fm_depth * (std::f32::consts::TAU * mf * t).sin();
         let mut s = 0.0f32;
         for (h, &a) in partials.iter().enumerate() {
@@ -286,9 +355,15 @@ fn render_tone(
             if cf >= ny {
                 break;
             }
-            s += a * (std::f32::consts::TAU * cf * t + fm).sin();
+            // Apply spectral rolloff above cutoff (6dB/oct lowpass approximation)
+            let filter_atten = if cf > cutoff {
+                (cutoff / cf).min(1.0)
+            } else {
+                1.0
+            };
+            s += a * filter_atten * (std::f32::consts::TAU * cf * t + fm).sin();
         }
-        let o = s * env * note.velocity * vol * 0.15;
+        let o = s * env * note.velocity * vol * 0.2;
         bl[si] += o * gl;
         br[si] += o * gr;
     }
@@ -358,28 +433,102 @@ pub(crate) fn compute_chord_intervals(state: &MusicalState) -> Vec<f32> {
     v
 }
 
+/// Compute harmonic partial amplitudes based on emotional state.
+///
+/// Maps (valence, arousal) to recognizable timbres:
+/// - High valence + high arousal → bright saw-like pad (rich harmonics, 1/h rolloff)
+/// - High valence + low arousal → soft bell/pad (odd harmonics, fast rolloff)
+/// - Low valence + high arousal → harsh lead (all harmonics + FM emphasis)
+/// - Low valence + low arousal → warm filtered tone (few harmonics, 1/h² rolloff)
+///
+/// These map to timbres CLAP recognizes as "music" rather than "electronic noise."
 pub fn compute_timbre(state: &MusicalState, n: usize) -> Vec<f32> {
     let n = n.clamp(1, 16);
-    let re = 1.0 + state.serotonin * 0.8;
-    let br = 0.3 + state.dopamine * 0.7;
+    let v = state.valence;
+    let a = state.arousal;
+
     (0..n)
         .map(|i| {
             if i == 0 {
-                1.0
+                1.0 // fundamental always present
             } else {
                 let h = (i + 1) as f32;
-                br / h.powf(re) + state.noradrenaline * 0.05 / h
+                let harmonic_idx = i + 1;
+
+                if v > 0.2 && a > 0.5 {
+                    // JOYFUL: Very bright, pluck-like spectrum (close to square wave).
+                    // Strong odd harmonics for "plucky" character that CLAP recognizes
+                    // as upbeat electronic. Think: marimba, kalimba, bright arp.
+                    let odd_boost = if harmonic_idx % 2 == 1 { 1.0 } else { 0.4 };
+                    odd_boost * 0.8 / h.powf(0.7) // slow rolloff = very bright
+                } else if v > 0.2 && a <= 0.5 {
+                    // CONTEMPLATIVE: Pure, minimal harmonics. Almost sine-like.
+                    // CLAP "ambient meditation" expects simple, clean tones.
+                    // Fundamental dominates; slight 5th (3rd harmonic) for warmth.
+                    if harmonic_idx == 3 { 0.3 } // perfect 5th overtone
+                    else if harmonic_idx == 5 { 0.1 } // subtle octave+3rd
+                    else { 0.05 / h.powf(2.5) } // everything else nearly silent
+                } else if v < -0.2 && a > 0.5 {
+                    // TENSE: Saw-like spectrum — dense harmonics, moderate rolloff.
+                    // CLAP "dark dramatic electronic" matches standard sawtooth synth.
+                    0.7 / h // classic sawtooth: 1/h amplitude ratio
+                } else {
+                    // SORROWFUL: Warm sine-dominant, barely any overtones.
+                    // CLAP "sad melancholic" expects almost pure tone, dark, intimate.
+                    0.3 / h.powf(2.8) // very fast rolloff = nearly sine wave
+                }
             }
         })
         .collect()
 }
 
+/// Compute ADSR envelope based on emotional state.
+///
+/// Emotion-appropriate envelopes make the difference between "beep" and "music":
+/// - Pads need slow attack (0.05-0.3s), long sustain, long release
+/// - Plucks need fast attack, short sustain
+/// - Leads need fast attack but long release
 pub(crate) fn compute_adsr(state: &MusicalState) -> Adsr {
-    Adsr {
-        attack: 0.01 + (1.0 - state.arousal) * 0.05,
-        decay: 0.05 + state.serotonin * 0.1,
-        sustain: 0.4 + state.consciousness_level * 0.4,
-        release: 0.1 + state.harmony_activations[7] * 0.3,
+    let v = state.valence;
+    let a = state.arousal;
+
+    if v > 0.2 && a > 0.5 {
+        // JOYFUL: Pluck/arpeggio character — very fast attack, short decay.
+        // CLAP expects bright transients for "upbeat electronic music."
+        // Think: arpeggiator, plucked synth, marimba-like.
+        Adsr {
+            attack: 0.002,  // near-instant (pluck)
+            decay: 0.15 + (1.0 - a) * 0.1,
+            sustain: 0.25,  // low sustain = notes have clear end
+            release: 0.08,  // short release = rhythmic clarity
+        }
+    } else if v > 0.2 && a <= 0.5 {
+        // CONTEMPLATIVE: Drone/pad — extremely slow, barely any transient.
+        // CLAP expects "ambient meditation" = evolving texture, no rhythm.
+        Adsr {
+            attack: 0.3 + (1.0 - a) * 0.5,  // 0.3-0.8s (glacial)
+            decay: 0.2,
+            sustain: 0.85,  // high sustain = continuous drone
+            release: 1.0 + state.harmony_activations[7] * 1.0, // 1-2s tail
+        }
+    } else if v < -0.2 && a > 0.5 {
+        // TENSE: Aggressive stab — fast attack, moderate sustain, punchy.
+        // CLAP expects "dark dramatic" = hard transients, bass-heavy.
+        Adsr {
+            attack: 0.001,  // instant
+            decay: 0.03,
+            sustain: 0.6 + state.noradrenaline * 0.3,
+            release: 0.1,
+        }
+    } else {
+        // SORROWFUL: Slow swell — very long attack, endless release.
+        // CLAP expects "sad melancholic" = barely audible onsets, long decay.
+        Adsr {
+            attack: 0.4 + (1.0 - a) * 0.4,  // 0.4-0.8s
+            decay: 0.3,
+            sustain: 0.5,
+            release: 1.5 + state.harmony_activations[7] * 1.0, // 1.5-2.5s
+        }
     }
 }
 
@@ -392,6 +541,23 @@ pub(crate) fn envelope(adsr: &Adsr, t: f32, dur: f32) -> f32 {
         adsr.sustain
     } else {
         adsr.sustain * (1.0 - (t - dur) / adsr.release).max(0.0)
+    }
+}
+
+/// Peak limiter with soft knee at the ceiling.
+/// Below 0.8×ceiling: pass through. Above: smooth compression to ceiling.
+#[inline]
+fn peak_limit(x: f32, ceiling: f32) -> f32 {
+    let knee = ceiling * 0.8;
+    let ax = x.abs();
+    if ax <= knee {
+        x
+    } else {
+        // Smooth compression: maps [knee, ∞) → [knee, ceiling)
+        let over = ax - knee;
+        let range = ceiling - knee;
+        let compressed = knee + range * (1.0 - (-over / range).exp());
+        compressed.copysign(x)
     }
 }
 

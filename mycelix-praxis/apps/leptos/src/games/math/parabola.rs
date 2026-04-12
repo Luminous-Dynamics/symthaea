@@ -313,10 +313,10 @@ pub fn ParabolaExplorer(node_id: String) -> impl IntoView {
                                 </div>
                                 <div class="game-challenge-instruction">{instruction}</div>
                                 <div class="game-challenge-actions">
-                                    <button class="caps-filter-btn active" on:click=move |_| check()>
+                                    <button class="praxis-filter-btn active" on:click=move |_| check()>
                                         "Check"
                                     </button>
-                                    <button class="caps-filter-btn" on:click=move |_| reset()>
+                                    <button class="praxis-filter-btn" on:click=move |_| reset()>
                                         "Reset"
                                     </button>
                                 </div>

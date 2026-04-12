@@ -4,7 +4,7 @@
 
 use leptos::prelude::*;
 
-use crate::curriculum::caps_graph;
+use crate::curriculum::curriculum_graph;
 
 /// Search bar component — renders in the navbar or as a standalone widget.
 #[component]
@@ -18,7 +18,7 @@ pub fn SearchBar() -> impl IntoView {
             return vec![];
         }
         let q_lower = q.to_lowercase();
-        let graph = caps_graph();
+        let graph = curriculum_graph();
         let mut matches: Vec<(String, String, String, String)> = graph
             .nodes
             .iter()

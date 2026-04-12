@@ -206,7 +206,7 @@ pub fn UnitCircleExplorer(node_id: String) -> impl IntoView {
                                 <div class="game-challenge-number">"Challenge "{idx + 1}" of 5"</div>
                                 <div class="game-challenge-instruction">{instruction}</div>
                                 <div class="game-challenge-actions">
-                                    <button class="caps-filter-btn active" on:click=move |_| check()>"Check"</button>
+                                    <button class="praxis-filter-btn active" on:click=move |_| check()>"Check"</button>
                                 </div>
                                 <div class="game-challenge-hint">{hint}</div>
                             </div>

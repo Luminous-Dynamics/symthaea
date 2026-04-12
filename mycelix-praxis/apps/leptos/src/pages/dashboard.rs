@@ -14,7 +14,7 @@ use mycelix_leptos_core::{SovereignRadar, SovereignRadarSize};
 use crate::adaptivity_provider::use_adaptivity;
 use crate::cognitive_adaptivity::*;
 use crate::components::suggestion_overlay::{SuggestionOverlay, CognitiveStateMirror};
-use crate::curriculum::{caps_graph, use_progress, ProgressStatus};
+use crate::curriculum::{curriculum_graph, use_progress, ProgressStatus};
 use crate::holochain::use_holochain;
 
 // ---------------------------------------------------------------------------
@@ -132,7 +132,7 @@ fn real_due_reviews(progress: &crate::curriculum::ProgressStore) -> DueReviews {
 }
 
 fn real_skills(progress: &crate::curriculum::ProgressStore) -> Vec<SkillMastery> {
-    let graph = caps_graph();
+    let graph = curriculum_graph();
     let mut subjects: std::collections::HashMap<String, (f32, usize)> = std::collections::HashMap::new();
     for n in &graph.nodes {
         let bkt = progress.bkt(&n.id);
@@ -165,7 +165,7 @@ fn real_skills(progress: &crate::curriculum::ProgressStore) -> Vec<SkillMastery>
 
 fn real_recommendations(progress: &crate::curriculum::ProgressStore) -> Vec<Recommendation> {
     let weakest = progress.weakest_topics(3);
-    let graph = caps_graph();
+    let graph = curriculum_graph();
     if weakest.is_empty() {
         // New user — suggest starting points
         vec![
@@ -245,7 +245,7 @@ pub fn DashboardPage() -> impl IntoView {
             <crate::study_tracker::ExamCountdown />
 
             // CAPS Progress Overview
-            <CapsProgressCard />
+            <ProgressCard />
 
             // Pending TEND — economic value from learning
             <PendingTendCard />
@@ -266,7 +266,7 @@ pub fn DashboardPage() -> impl IntoView {
             // Start Session — links to highest priority topic
             {move || {
                 let p = progress.get();
-                let graph = caps_graph();
+                let graph = curriculum_graph();
 
                 // Find best topic: highest exam weight, not mastered, prerequisites met
                 let mut best: Option<(String, String, u16)> = None;
@@ -355,7 +355,7 @@ pub fn DashboardPage() -> impl IntoView {
                     <SovereignRadar size=SovereignRadarSize::Small />
                 </div>
             </div>
-            <CapsRecommendationsSection />
+            <CurriculumRecommendationsSection />
         </div>
     }
 }
@@ -991,9 +991,9 @@ fn CardLoading() -> impl IntoView {
 // ---------------------------------------------------------------------------
 
 #[component]
-fn CapsProgressCard() -> impl IntoView {
+fn ProgressCard() -> impl IntoView {
     let progress = use_progress();
-    let graph = caps_graph();
+    let graph = curriculum_graph();
 
     let math_mastery = Memo::new(move |_| {
         let p = progress.get();
@@ -1034,7 +1034,7 @@ fn CapsProgressCard() -> impl IntoView {
     view! {
         <div class="dash-card" style="grid-column: 1 / -1">
             <h3>"Your Learning Progress"</h3>
-            <div class="caps-matric-grid">
+            <div class="praxis-progress-grid">
                 // Overall
                 <div>
                     <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.25rem">"Overall"</div>
@@ -1096,7 +1096,7 @@ fn CapsProgressCard() -> impl IntoView {
                                 view! {
                                     <a href=href style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid var(--border); text-decoration: none; color: var(--text)">
                                         <span style="font-size: 0.9rem">{title}</span>
-                                        <span class="caps-badge caps-badge-exam">{marks}"m"</span>
+                                        <span class="praxis-badge praxis-badge-exam">{marks}"m"</span>
                                     </a>
                                 }
                             }).collect::<Vec<_>>()}
@@ -1113,9 +1113,9 @@ fn CapsProgressCard() -> impl IntoView {
 // ---------------------------------------------------------------------------
 
 #[component]
-fn CapsRecommendationsSection() -> impl IntoView {
+fn CurriculumRecommendationsSection() -> impl IntoView {
     let progress = use_progress();
-    let graph = caps_graph();
+    let graph = curriculum_graph();
 
     let recommendations = Memo::new(move |_| {
         let p = progress.get();
@@ -1164,7 +1164,7 @@ fn CapsRecommendationsSection() -> impl IntoView {
                                     <div style="font-size: 0.8rem; color: var(--text-secondary)">{subdomain}</div>
                                 </div>
                                 {if marks > 0 {
-                                    view! { <span class="caps-badge caps-badge-exam">{marks}"m"</span> }.into_any()
+                                    view! { <span class="praxis-badge praxis-badge-exam">{marks}"m"</span> }.into_any()
                                 } else {
                                     view! { <span></span> }.into_any()
                                 }}
@@ -1191,7 +1191,7 @@ fn MasteryHeatMap() -> impl IntoView {
             <h3>"Mastery Map"</h3>
             {move || {
                 let p = progress.get();
-                let graph = caps_graph();
+                let graph = curriculum_graph();
 
                 let gr12: Vec<_> = graph.nodes.iter()
                     .filter(|n| n.grade_levels.first().map(|g| g == "Grade12").unwrap_or(false))
@@ -1242,7 +1242,7 @@ fn ShareProgress() -> impl IntoView {
         let p = progress.get();
         let t = tracker.get();
         let prof = profile.get();
-        let graph = caps_graph();
+        let graph = curriculum_graph();
         let mastered = p.mastered_count();
         let total = graph.nodes.len();
         let pct = if total > 0 { mastered * 100 / total } else { 0 };
@@ -1346,7 +1346,7 @@ fn SubjectMasteryBreakdown() -> impl IntoView {
             <h3>"Subject Mastery"</h3>
             {move || {
                 let p = progress.get();
-                let graph = caps_graph();
+                let graph = curriculum_graph();
 
                 let mut subjects: std::collections::HashMap<String, (usize, usize)> = std::collections::HashMap::new();
                 for n in &graph.nodes {

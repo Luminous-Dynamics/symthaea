@@ -147,16 +147,16 @@ pub fn AcidBaseExplorer(node_id: String) -> impl IntoView {
 
             // Type toggles
             <div style="display: flex; gap: 0.5rem; justify-content: center; margin-bottom: 1rem">
-                <div class="caps-filter-group">
-                    <button class=move || if is_acid.get() { "caps-filter-btn active" } else { "caps-filter-btn" }
+                <div class="praxis-filter-group">
+                    <button class=move || if is_acid.get() { "praxis-filter-btn active" } else { "praxis-filter-btn" }
                         on:click=move |_| set_is_acid.set(true)>"Acid"</button>
-                    <button class=move || if !is_acid.get() { "caps-filter-btn active" } else { "caps-filter-btn" }
+                    <button class=move || if !is_acid.get() { "praxis-filter-btn active" } else { "praxis-filter-btn" }
                         on:click=move |_| set_is_acid.set(false)>"Base"</button>
                 </div>
-                <div class="caps-filter-group">
-                    <button class=move || if is_strong.get() { "caps-filter-btn active" } else { "caps-filter-btn" }
+                <div class="praxis-filter-group">
+                    <button class=move || if is_strong.get() { "praxis-filter-btn active" } else { "praxis-filter-btn" }
                         on:click=move |_| set_is_strong.set(true)>"Strong"</button>
-                    <button class=move || if !is_strong.get() { "caps-filter-btn active" } else { "caps-filter-btn" }
+                    <button class=move || if !is_strong.get() { "praxis-filter-btn active" } else { "praxis-filter-btn" }
                         on:click=move |_| set_is_strong.set(false)>"Weak"</button>
                 </div>
             </div>
@@ -231,7 +231,7 @@ pub fn AcidBaseExplorer(node_id: String) -> impl IntoView {
                                 <div class="game-challenge-number">"Challenge "{idx + 1}" of 4"</div>
                                 <div class="game-challenge-instruction">{instructions[idx]}</div>
                                 <div class="game-challenge-actions">
-                                    <button class="caps-filter-btn active" on:click=move |_| check()>"Check"</button>
+                                    <button class="praxis-filter-btn active" on:click=move |_| check()>"Check"</button>
                                 </div>
                                 <div class="game-challenge-hint">{hints[idx]}</div>
                                 {move || {

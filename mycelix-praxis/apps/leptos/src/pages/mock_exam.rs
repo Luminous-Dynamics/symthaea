@@ -11,7 +11,7 @@ use serde::Deserialize;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 
-use crate::curriculum::{caps_graph, use_progress, use_set_progress};
+use crate::curriculum::{curriculum_graph, use_progress, use_set_progress};
 use crate::katex::render_math_html;
 
 // ============================================================
@@ -109,7 +109,7 @@ pub fn MockExamPage() -> impl IntoView {
                 ExamProblem { question: "Calculate: \u{03a3}(k=1 to 20) of (3k + 1)".into(), answer: "= 3\u{00b7}(20)(21)/2 + 20 = 630 + 20 = 650".into(), difficulty_permille: 500, topic_title: "Sequences".into(), topic_id: "CAPS.Mathematics.Gr12.P1.SEQ".into(), marks: 5 },
                 ExamProblem { question: "A geometric series has $a = 8$ and $r = \\frac{1}{2}$. Calculate $S_\\infty$.".into(), answer: "$S_\\infty = \\frac{a}{1-r} = \\frac{8}{1-0.5} = 16$".into(), difficulty_permille: 400, topic_title: "Sequences".into(), topic_id: "CAPS.Mathematics.Gr12.P1.SEQ".into(), marks: 4 },
                 // FINANCE (25m)
-                ExamProblem { question: "Naledi invests R45 000 at 9.5% p.a. compounded monthly. How much after 6 years?".into(), answer: "A = 45000(1 + 0.095/12)\u{2077}\u{00b2} = R79 167.34".into(), difficulty_permille: 300, topic_title: "Finance".into(), topic_id: "CAPS.Mathematics.Gr12.P1.FIN".into(), marks: 4 },
+                ExamProblem { question: "Alex invests 45,000 at 9.5% p.a. compounded monthly. How much after 6 years?".into(), answer: "A = 45000(1 + 0.095/12)\u{2077}\u{00b2} = R79 167.34".into(), difficulty_permille: 300, topic_title: "Finance".into(), topic_id: "CAPS.Mathematics.Gr12.P1.FIN".into(), marks: 4 },
                 ExamProblem { question: "Calculate the monthly repayment on a R600 000 home loan at 11% p.a. compounded monthly over 20 years.".into(), answer: "R6 191.77. Use PV annuity: x = 600000 \u{00d7} 0.11/12 / (1 \u{2212} (1+0.11/12)\u{207b}\u{00b2}\u{2074}\u{2070})".into(), difficulty_permille: 600, topic_title: "Finance".into(), topic_id: "CAPS.Mathematics.Gr12.P1.FIN".into(), marks: 6 },
                 ExamProblem { question: "A sinking fund requires R500 000 in 10 years. Interest: 8% p.a. compounded monthly. Find the monthly payment.".into(), answer: "R2 729.85. FV annuity: x = 500000 \u{00d7} (0.08/12) / ((1+0.08/12)\u{00b9}\u{00b2}\u{2070} \u{2212} 1)".into(), difficulty_permille: 500, topic_title: "Finance".into(), topic_id: "CAPS.Mathematics.Gr12.P1.FIN".into(), marks: 5 },
                 // FUNCTIONS (25m)
@@ -222,7 +222,7 @@ pub fn MockExamPage() -> impl IntoView {
     let secs = move || time_left.get() % 60;
 
     view! {
-        <div class="caps-skill-map">
+        <div class="praxis-skill-map">
             <a href="/exam-prep" class="refuge-back-link">"\u{2190} Back to Exam Prep"</a>
             <h1 style="font-size: 1.5rem; margin: 1rem 0 0.5rem">"Mock Exam"</h1>
 
@@ -231,17 +231,17 @@ pub fn MockExamPage() -> impl IntoView {
                     view! {
                         <div style="max-width: 500px">
                             <p style="color: var(--text-secondary); margin-bottom: 1.5rem; line-height: 1.6">
-                                "Practice under exam conditions. Problems are drawn from Grade 12 topics weighted by NSC marks."
+                                "Practice under exam conditions. Problems are drawn from Grade 12 topics weighted by exam marks."
                             </p>
 
                             // Paper selection
                             <div style="display: flex; gap: 0.75rem; margin-bottom: 1rem">
                                 <button
-                                    class=move || if paper.get() == ExamPaper::Paper1 { "caps-filter-btn active" } else { "caps-filter-btn" }
+                                    class=move || if paper.get() == ExamPaper::Paper1 { "praxis-filter-btn active" } else { "praxis-filter-btn" }
                                     on:click=move |_| set_paper.set(ExamPaper::Paper1)
                                 >"Paper 1 (Algebra, Calculus, Finance)"</button>
                                 <button
-                                    class=move || if paper.get() == ExamPaper::Paper2 { "caps-filter-btn active" } else { "caps-filter-btn" }
+                                    class=move || if paper.get() == ExamPaper::Paper2 { "praxis-filter-btn active" } else { "praxis-filter-btn" }
                                     on:click=move |_| set_paper.set(ExamPaper::Paper2)
                                 >"Paper 2 (Geometry, Trig, Stats)"</button>
                             </div>
@@ -249,11 +249,11 @@ pub fn MockExamPage() -> impl IntoView {
                             // Duration selection
                             <div style="display: flex; gap: 0.75rem; margin-bottom: 1.5rem">
                                 <button
-                                    class=move || if quick_mode.get() { "caps-filter-btn active" } else { "caps-filter-btn" }
+                                    class=move || if quick_mode.get() { "praxis-filter-btn active" } else { "praxis-filter-btn" }
                                     on:click=move |_| set_quick_mode.set(true)
                                 >"Quick (30 min, 10 Qs)"</button>
                                 <button
-                                    class=move || if !quick_mode.get() { "caps-filter-btn active" } else { "caps-filter-btn" }
+                                    class=move || if !quick_mode.get() { "praxis-filter-btn active" } else { "praxis-filter-btn" }
                                     on:click=move |_| set_quick_mode.set(false)
                                 >"Full Exam (3 hrs, 25 Qs)"</button>
                             </div>
@@ -315,12 +315,12 @@ pub fn MockExamPage() -> impl IntoView {
                                 let ans_html = render_math_html(&ans);
                                 let tid = topic_id.clone();
                                 view! {
-                                    <div class="caps-problem-a" style="margin-top: 1rem"
+                                    <div class="praxis-problem-a" style="margin-top: 1rem"
                                         inner_html=ans_html
                                     ></div>
                                     <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem">
                                         <button
-                                            class="caps-filter-btn"
+                                            class="praxis-filter-btn"
                                             style="font-size: 0.8rem; border-color: var(--mastery-green); color: var(--mastery-green)"
                                             on:click=move |_| {
                                                 set_answers.update(|a| { if idx < a.len() { a[idx] = Some(true); } });
@@ -330,7 +330,7 @@ pub fn MockExamPage() -> impl IntoView {
                                             }
                                         >"Correct"</button>
                                         <button
-                                            class="caps-filter-btn"
+                                            class="praxis-filter-btn"
                                             style="font-size: 0.8rem"
                                             on:click=move |_| {
                                                 set_answers.update(|a| { if idx < a.len() { a[idx] = Some(false); } });
@@ -347,7 +347,7 @@ pub fn MockExamPage() -> impl IntoView {
                             } else {
                                 view! {
                                     <button
-                                        class="caps-filter-btn active"
+                                        class="praxis-filter-btn active"
                                         style="margin-top: 1rem"
                                         on:click=move |_| set_revealed.set(true)
                                     >"Show Answer"</button>
@@ -439,10 +439,10 @@ pub fn MockExamPage() -> impl IntoView {
                             </div>
 
                             <div style="display: flex; gap: 0.75rem; justify-content: center; margin-top: 1.5rem">
-                                <button class="caps-filter-btn active" on:click=move |_| set_state.set(ExamState::Setup)>
+                                <button class="praxis-filter-btn active" on:click=move |_| set_state.set(ExamState::Setup)>
                                     "Try Another"
                                 </button>
-                                <a href="/exam-prep" class="caps-filter-btn" style="text-decoration: none">"Back to Exam Prep"</a>
+                                <a href="/exam-prep" class="praxis-filter-btn" style="text-decoration: none">"Back to Exam Prep"</a>
                             </div>
                         </div>
                     }.into_any()

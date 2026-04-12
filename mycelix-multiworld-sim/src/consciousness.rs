@@ -245,7 +245,7 @@ impl ConsciousnessEngine {
             // be maximally committed to ALL frameworks. Trade-offs are irreducible.
             let eth_sum = agent.ethics.deontological + agent.ethics.consequentialist
                 + agent.ethics.virtue_care + agent.ethics.relational;
-            if eth_sum > 2.1 {
+            if eth_sum > 2.05 {
                 let scale = 2.0 / eth_sum;
                 agent.ethics.deontological = (agent.ethics.deontological * scale).max(0.05);
                 agent.ethics.consequentialist = (agent.ethics.consequentialist * scale).max(0.05);
@@ -620,6 +620,7 @@ pub fn tick_consciousness_all_worlds(
     current_tick: u32,
     pharma_boost: f64,
     trust_weighted_governance: bool,
+    rng: &mut crate::stochastic::StochasticEngine,
 ) {
     use crate::agent;
     use crate::red_team;
@@ -725,6 +726,167 @@ pub fn tick_consciousness_all_worlds(
                 c.care_activation *= scale;
                 c.harmonic_alignment *= scale;
                 c.epistemic_confidence *= scale;
+            }
+        }
+    }
+
+    // ── Ethical dynamics: per-world moral psychology + diffusion ──────────────
+    // This runs AFTER the consciousness growth loop because ethics modulate
+    // consciousness dimensions (coupling below) and benefit from stable phi.
+    for world in worlds.iter_mut() {
+        // Pre-compute community-level stats for social moral emotions.
+        let community_mean_trauma: f64 = {
+            let living: Vec<_> = world.agents.iter().filter(|a| a.is_alive()).collect();
+            let n = living.len().max(1) as f64;
+            if living.is_empty() { 0.0 }
+            else { living.iter().map(|a| a.trauma_level).sum::<f64>() / n }
+        };
+        let community_mean_ethics: [f64; 4] = {
+            let living: Vec<_> = world.agents.iter().filter(|a| a.is_alive()).collect();
+            let n = living.len().max(1) as f64;
+            if living.is_empty() { [0.5; 4] }
+            else { [
+                living.iter().map(|a| a.ethics.deontological).sum::<f64>() / n,
+                living.iter().map(|a| a.ethics.consequentialist).sum::<f64>() / n,
+                living.iter().map(|a| a.ethics.virtue_care).sum::<f64>() / n,
+                living.iter().map(|a| a.ethics.relational).sum::<f64>() / n,
+            ]}
+        };
+
+        for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
+            // Age drift: elders develop virtue/care and relational wisdom (Tornstam 1989).
+            let age_in_years = if current_tick > agent.birth_tick {
+                (current_tick - agent.birth_tick) as f64 / 12.0
+            } else { 0.0 };
+            if age_in_years > 50.0 {
+                agent.ethics.virtue_care = (agent.ethics.virtue_care + 0.0001).min(1.0);
+                agent.ethics.relational = (agent.ethics.relational + 0.0001).min(1.0);
+            }
+
+            // Ethics-consciousness coupling: each framework builds a different dimension.
+            agent.consciousness.care_activation =
+                (agent.consciousness.care_activation + agent.ethics.virtue_care * 0.0007).min(1.0);
+            agent.consciousness.harmonic_alignment =
+                (agent.consciousness.harmonic_alignment + agent.ethics.relational * 0.0007).min(1.0);
+            agent.consciousness.coherence =
+                (agent.consciousness.coherence + agent.ethics.deontological * 0.0005).min(1.0);
+            agent.consciousness.epistemic_confidence =
+                (agent.consciousness.epistemic_confidence + agent.ethics.consequentialist * 0.0005).min(1.0);
+
+            // Ethics-needs coupling: symmetric dead-zone coupling prevents one-directional
+            // drift in moderate conditions. Each variable has a HIGH trigger (dim rises),
+            // LOW trigger (dim falls), and NEUTRAL zone (no change).
+            // Berlin (1969) value pluralism: stability in moderate conditions is natural.
+            let nd = 0.00015;
+            // Stress: high → deontological (need rules); low → virtue (safety enables care)
+            let stress_d = if agent.needs.allostatic_load > 0.6 { nd }
+                else if agent.needs.allostatic_load < 0.2 { -nd * 0.3 }
+                else { 0.0 };
+            agent.ethics.modify_with_sacred_resistance(0, stress_d); // deontological
+            // Social: high satiation → relational; isolated → relational falls
+            let social_d = if agent.needs.social_satiation > 0.7 { nd }
+                else if agent.needs.social_satiation < 0.3 { -nd * 0.5 }
+                else { 0.0 };
+            agent.ethics.modify_with_sacred_resistance(3, social_d); // relational
+            // Engagement: zero-sum — high → virtue up + conseq down; low → conseq up + virtue down
+            if agent.needs.engagement > 0.7 {
+                agent.ethics.modify_with_sacred_resistance(2, nd);        // virtue up
+                agent.ethics.modify_with_sacred_resistance(1, -nd * 0.4); // conseq slightly down
+            } else if agent.needs.engagement < 0.3 {
+                agent.ethics.modify_with_sacred_resistance(1, nd);        // conseq up
+                agent.ethics.modify_with_sacred_resistance(2, -nd * 0.4); // virtue slightly down
+            }
+            // Neutral zone [0.3, 0.7]: no engagement-driven pressure
+
+            // Ethics normalization: prevent all-dimensions inflation.
+            // Berlin (1969): genuine ethical tensions make maximal commitment impossible.
+            let eth_sum = agent.ethics.deontological + agent.ethics.consequentialist
+                + agent.ethics.virtue_care + agent.ethics.relational;
+            if eth_sum > 2.05 {
+                let scale = 2.0 / eth_sum;
+                agent.ethics.deontological = (agent.ethics.deontological * scale).max(0.05);
+                agent.ethics.consequentialist = (agent.ethics.consequentialist * scale).max(0.05);
+                agent.ethics.virtue_care = (agent.ethics.virtue_care * scale).max(0.05);
+                agent.ethics.relational = (agent.ethics.relational * scale).max(0.05);
+            }
+
+            // ── Guilt ────────────────────────────────────────────────────────
+            // Survivor conscience: virtue/care agents feel guilty witnessing suffering.
+            let survivor_guilt = agent.ethics.virtue_care * community_mean_trauma * 0.005;
+            // Hypocrisy gap: stress-driven pragmatism vs stated values.
+            let revealed = agent.ethics.revealed(agent.needs.allostatic_load);
+            let hypocrisy_gap: f64 = agent.ethics.as_vec().iter()
+                .zip(revealed.as_vec().iter())
+                .map(|(s, r)| (s - r).abs())
+                .sum::<f64>();
+            agent.needs.affect.guilt = (agent.needs.affect.guilt * 0.98
+                + survivor_guilt + hypocrisy_gap * 0.15).min(1.0);
+            // Guilt self-corrects consequentialist drift.
+            if agent.needs.affect.guilt > 0.2 {
+                let correction = agent.needs.affect.guilt * 0.0008;
+                agent.ethics.consequentialist = (agent.ethics.consequentialist - correction).max(0.05);
+            }
+
+            // ── Moral injury (harm) ──────────────────────────────────────────
+            // Severe hypocrisy (> 0.4 gap) causes lasting moral injury; heals 5× faster.
+            if hypocrisy_gap > 0.4 {
+                agent.needs.affect.harm = (agent.needs.affect.harm + 0.001).min(1.0);
+            } else {
+                agent.needs.affect.harm = (agent.needs.affect.harm - 0.005).max(0.0);
+            }
+
+            // ── Outrage ──────────────────────────────────────────────────────
+            // Moral outrage: principled resistance when community leans heavily consequentialist
+            // while the agent retains virtue/deontological commitments.
+            // Works in converged societies (no sacred-dim comparison needed).
+            // "My community rationalizes everything — I cannot accept this." (Graham 2011).
+            let community_conseq = community_mean_ethics[1];
+            let agent_non_conseq = agent.ethics.virtue_care + agent.ethics.deontological;
+            // community_pressure: how far above neutral (0.5) the community is
+            let community_pressure = (community_conseq - 0.5).max(0.0);
+            // moral_resistance: agent's combined non-consequentialist commitment above 0.5
+            let moral_resistance = (agent_non_conseq - 0.5).max(0.0);
+            if community_pressure > 0.1 && moral_resistance > 0.05 {
+                let outrage_rise = community_pressure * moral_resistance * 0.012;
+                agent.needs.affect.outrage = (agent.needs.affect.outrage + outrage_rise).min(1.0);
+            } else {
+                agent.needs.affect.outrage = (agent.needs.affect.outrage * 0.985).max(0.0);
+            }
+        }
+
+        // ── Ethical diffusion: social contact spreads ethics ─────────────────
+        // 10% of agents per tick contact a random neighbor and blend ethics.
+        // Rate 0.005 (was 0.02) to preserve diversity in large populations.
+        {
+            let living_indices: Vec<usize> = world.agents.iter().enumerate()
+                .filter(|(_, a)| a.is_alive())
+                .map(|(i, _)| i)
+                .collect();
+            let n_contacts = (living_indices.len() as f64 * 0.10).ceil() as usize;
+            for _ in 0..n_contacts {
+                if living_indices.len() < 2 { break; }
+                let ai = living_indices[(rng.next_u64() as usize) % living_indices.len()];
+                let bi = living_indices[(rng.next_u64() as usize) % living_indices.len()];
+                if ai == bi { continue; }
+                let tier_mult = |tier: u8| -> f64 {
+                    match tier { 4 => 5.0, 3 => 2.0, 2 => 1.0, _ => 0.3 }
+                };
+                let transmit_a = tier_mult(world.agents[ai].consciousness.tier());
+                let transmit_b = tier_mult(world.agents[bi].consciousness.tier());
+                let absorb_a = 1.0 + world.agents[ai].coordination_understanding * 0.5;
+                let absorb_b = 1.0 + world.agents[bi].coordination_understanding * 0.5;
+                let blend_a = 0.005 * absorb_a * transmit_b;
+                let blend_b = 0.005 * absorb_b * transmit_a;
+                let ea = world.agents[ai].ethics.as_vec();
+                let eb = world.agents[bi].ethics.as_vec();
+                world.agents[ai].ethics.deontological += (eb[0] - ea[0]) * blend_a;
+                world.agents[ai].ethics.consequentialist += (eb[1] - ea[1]) * blend_a;
+                world.agents[ai].ethics.virtue_care += (eb[2] - ea[2]) * blend_a;
+                world.agents[ai].ethics.relational += (eb[3] - ea[3]) * blend_a;
+                world.agents[bi].ethics.deontological += (ea[0] - eb[0]) * blend_b;
+                world.agents[bi].ethics.consequentialist += (ea[1] - eb[1]) * blend_b;
+                world.agents[bi].ethics.virtue_care += (ea[2] - eb[2]) * blend_b;
+                world.agents[bi].ethics.relational += (ea[3] - eb[3]) * blend_b;
             }
         }
     }

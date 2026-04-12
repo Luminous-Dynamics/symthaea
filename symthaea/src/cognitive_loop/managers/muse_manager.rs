@@ -165,6 +165,11 @@ pub struct MuseManager {
     injected_energy_ratio: f64,
     injected_safety_level: u8,
 
+    // ── Aesthetic identity ─────────────────────────────────────────────
+    /// Long-term harmony bias from AestheticTracker: which harmonies correlate
+    /// with beautiful output. Blended into harmony_activations each cycle.
+    injected_harmony_bias: [f32; 8],
+
     // ── Peer distress ─────────────────────────────────────────────────
     peer_distress: Option<PeerDistressState>,
 
@@ -187,6 +192,10 @@ pub struct MuseManager {
     pending_exports: std::collections::VecDeque<CompositionExport>,
     /// Monotonic export counter for title generation.
     export_count: u64,
+
+    // ── Motif persistence ──────────────────────────────────────────────
+    /// Path to save motif memory on shutdown.
+    motif_save_path: std::path::PathBuf,
 
     // ── Telemetry ─────────────────────────────────────────────────────
     underruns: u64,
@@ -221,6 +230,7 @@ impl MuseManager {
             injected_substrate_feasibility: 1.0,
             injected_energy_ratio: 0.0,
             injected_safety_level: SAFETY_GREEN,
+            injected_harmony_bias: [0.0; 8],
             peer_distress: None,
             #[cfg(feature = "muse-live")]
             live_output: symthaea_muse::live_output::LiveMuseOutput::new(config).ok(),
@@ -229,6 +239,7 @@ impl MuseManager {
             export_target_samples,
             pending_exports: std::collections::VecDeque::new(),
             export_count: 0,
+            motif_save_path: std::path::PathBuf::from(".claude/motif_memory.json"),
             underruns: 0,
         }
     }
@@ -256,6 +267,15 @@ impl MuseManager {
     /// Inject safety level (0=Green, 1=Yellow, 2=Orange, 3=Red).
     pub fn inject_safety(&mut self, level: u8) {
         self.injected_safety_level = level;
+    }
+
+    /// Inject the long-term harmony bias from AestheticTracker.
+    ///
+    /// Called each cycle from the cognitive loop. The bias is blended into
+    /// harmony_activations in `map_snapshot_to_musical_state()`, gently pulling
+    /// generation toward historically beautiful harmonies.
+    pub fn inject_harmony_bias(&mut self, bias: &[f32; 8]) {
+        self.injected_harmony_bias = *bias;
     }
 
     /// Inject peer distress state for empathic sonification.
@@ -291,6 +311,37 @@ impl MuseManager {
         self.pending_exports.len()
     }
 
+    /// Snapshot motif memory for cross-session persistence.
+    pub fn motif_snapshot(&self) -> symthaea_muse::motif_memory::MotifSnapshot {
+        self.synth.motif_snapshot()
+    }
+
+    /// Restore motif memory from a saved snapshot.
+    pub fn restore_motif(&mut self, snapshot: &symthaea_muse::motif_memory::MotifSnapshot) {
+        self.synth.restore_motif(snapshot);
+    }
+
+    /// Set the path where motif memory will be saved on drop.
+    pub fn set_motif_save_path(&mut self, path: std::path::PathBuf) {
+        self.motif_save_path = path;
+    }
+
+    /// Persist motif memory to disk.
+    pub fn save_motifs(&self) {
+        let snapshot = self.motif_snapshot();
+        if !snapshot.is_empty() {
+            if let Err(e) = snapshot.save(&self.motif_save_path) {
+                log::warn!("[muse] failed to save motif memory: {e}");
+            } else {
+                log::debug!(
+                    "[muse] saved {} motif phrases to {:?}",
+                    snapshot.phrases.len(),
+                    self.motif_save_path,
+                );
+            }
+        }
+    }
+
     /// Get current telemetry.
     pub fn telemetry(&self) -> MuseTelemetry {
         MuseTelemetry {
@@ -323,6 +374,16 @@ impl MuseManager {
         if harmony_activations.iter().all(|&a| a < 0.05) {
             let baseline = (snapshot.unified_psi as f32 * 0.4).max(0.1);
             harmony_activations = [baseline; 8];
+        }
+
+        // Blend in long-term harmony bias from AestheticTracker.
+        // Alpha 0.15: cognitive state still dominates (85%), but the system's
+        // aesthetic identity gently pulls generation toward historically
+        // beautiful harmonies. This is how Symthaea develops a signature sound.
+        const HARMONY_BIAS_ALPHA: f32 = 0.15;
+        for i in 0..8 {
+            harmony_activations[i] = harmony_activations[i] * (1.0 - HARMONY_BIAS_ALPHA)
+                + self.injected_harmony_bias[i] * HARMONY_BIAS_ALPHA;
         }
 
         MusicalState {
@@ -429,6 +490,12 @@ impl MuseManager {
 impl Default for MuseManager {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl Drop for MuseManager {
+    fn drop(&mut self) {
+        self.save_motifs();
     }
 }
 

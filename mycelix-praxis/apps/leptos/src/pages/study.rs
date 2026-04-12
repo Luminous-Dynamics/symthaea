@@ -14,7 +14,7 @@ use serde::Deserialize;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 
-use crate::curriculum::{caps_graph, use_progress, use_set_progress, ProgressStatus, BktState};
+use crate::curriculum::{curriculum_graph, use_progress, use_set_progress, ProgressStatus, BktState};
 use crate::games;
 use crate::social_proof;
 use crate::persistence;
@@ -109,7 +109,7 @@ async fn fetch_lesson(node_id: &str) -> Result<NodeContent, String> {
     let filename = format!("{}.json", id_lower.replace('/', "_"));
 
     // Determine subject-grade dir
-    let graph = caps_graph();
+    let graph = curriculum_graph();
     let node_meta = graph.node(node_id);
     let grade_level = node_meta.and_then(|n| n.grade_levels.first().cloned());
 
@@ -119,7 +119,7 @@ async fn fetch_lesson(node_id: &str) -> Result<NodeContent, String> {
             let subject_dir = node_meta
                 .map(|n| n.subject_area.to_lowercase().replace(' ', "-").replace('&', "and"))
                 .unwrap_or_else(|| "general".into());
-            format!("/caps/generated/{}/{}", subject_dir, filename)
+            format!("/curriculum/generated/{}/{}", subject_dir, filename)
         }
         _ => {
             // K-12: existing logic
@@ -131,7 +131,7 @@ async fn fetch_lesson(node_id: &str) -> Result<NodeContent, String> {
             } else {
                 format!("math-{}", grade_num)
             };
-            format!("/caps/generated/{}/{}", subject_dir, filename)
+            format!("/curriculum/generated/{}/{}", subject_dir, filename)
         }
     };
 
@@ -162,7 +162,7 @@ async fn fetch_lesson(node_id: &str) -> Result<NodeContent, String> {
 pub fn StudyPage(node_id: String) -> impl IntoView {
     let progress = use_progress();
     let set_progress = use_set_progress();
-    let graph = caps_graph();
+    let graph = curriculum_graph();
 
     let node = graph.node(&node_id).cloned();
     let (active_tab, set_active_tab) = signal("explanation");
@@ -194,7 +194,7 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
     let node_id_for_status2 = node_id.clone();
 
     view! {
-        <div class="caps-skill-map study-refuge">
+        <div class="praxis-skill-map study-refuge">
             // Pomodoro timer (ambient, at top)
             <crate::study_tracker::PomodoroTimer />
 
@@ -206,12 +206,12 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
             // Header
             <div style="margin: 1rem 0">
                 <h1 style="font-size: 1.5rem; margin-bottom: 0.5rem">{title}</h1>
-                <div class="caps-detail-meta">
-                    <span class="caps-badge caps-badge-grade">{grade_label}</span>
-                    <span class="caps-badge caps-badge-bloom">{bloom}</span>
-                    <span class="caps-badge caps-badge-hours">{hours}"h estimated"</span>
+                <div class="praxis-detail-meta">
+                    <span class="praxis-badge praxis-badge-grade">{grade_label}</span>
+                    <span class="praxis-badge praxis-badge-bloom">{bloom}</span>
+                    <span class="praxis-badge praxis-badge-hours">{hours}"h estimated"</span>
                     {exam_weight.map(|ew| view! {
-                        <span class="caps-badge caps-badge-exam">
+                        <span class="praxis-badge praxis-badge-exam">
                             "Paper "{ew.paper}": "{ew.marks}"/" {ew.total_paper_marks}" marks ("{format!("{:.0}", ew.percentage)}"%)"
                         </span>
                     })}
@@ -224,7 +224,7 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
                     let tip = insight.examiner_tip;
                     view! {
                         <div style="margin-top: 0.75rem; padding: 0.6rem 0.75rem; border-left: 3px solid var(--info); background: rgba(59, 130, 246, 0.05); border-radius: 0 6px 6px 0; font-size: 0.8rem; line-height: 1.5">
-                            <span style="color: var(--info); font-weight: 600">"NSC 2025: "</span>
+                            <span style="color: var(--info); font-weight: 600">"Exam insight: "</span>
                             <span style="color: var(--text-secondary)">{pct}"% of candidates found this challenging. "</span>
                             <span style="color: var(--text-tertiary); font-style: italic">{tip}</span>
                         </div>
@@ -233,7 +233,7 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
             </div>
 
             // Status
-            <div class="caps-status-btns">
+            <div class="praxis-status-btns">
                 {
                     let id_ns = node_id_for_status.clone();
                     let id_s = node_id_for_status.clone();
@@ -244,7 +244,7 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
                         <button
                             class=move || {
                                 let s = progress.get().get(&id_ns).status;
-                                if s == ProgressStatus::NotStarted { "caps-status-btn active-not-started" } else { "caps-status-btn" }
+                                if s == ProgressStatus::NotStarted { "praxis-status-btn active-not-started" } else { "praxis-status-btn" }
                             }
                             on:click={
                                 let id = node_id.clone();
@@ -254,7 +254,7 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
                         <button
                             class=move || {
                                 let s = progress.get().get(&id_s).status;
-                                if s == ProgressStatus::Studying { "caps-status-btn active-studying" } else { "caps-status-btn" }
+                                if s == ProgressStatus::Studying { "praxis-status-btn active-studying" } else { "praxis-status-btn" }
                             }
                             on:click={
                                 let id = id_s2.clone();
@@ -264,7 +264,7 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
                         <button
                             class=move || {
                                 let s = progress.get().get(&id_m).status;
-                                if s == ProgressStatus::Mastered { "caps-status-btn active-mastered" } else { "caps-status-btn" }
+                                if s == ProgressStatus::Mastered { "praxis-status-btn active-mastered" } else { "praxis-status-btn" }
                             }
                             on:click={
                                 let id = id_m2.clone();
@@ -276,24 +276,24 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
             </div>
 
             // Tabs
-            <div class="caps-tabs" style="max-width: 600px">
-                <button class=move || if active_tab.get() == "explanation" { "caps-tab active" } else { "caps-tab" }
+            <div class="praxis-tabs" style="max-width: 600px">
+                <button class=move || if active_tab.get() == "explanation" { "praxis-tab active" } else { "praxis-tab" }
                     on:click=move |_| set_active_tab.set("explanation")>"Learn"</button>
-                <button class=move || if active_tab.get() == "examples" { "caps-tab active" } else { "caps-tab" }
+                <button class=move || if active_tab.get() == "examples" { "praxis-tab active" } else { "praxis-tab" }
                     on:click=move |_| set_active_tab.set("examples")>"Examples"</button>
-                <button class=move || if active_tab.get() == "practice" { "caps-tab active" } else { "caps-tab" }
+                <button class=move || if active_tab.get() == "practice" { "praxis-tab active" } else { "praxis-tab" }
                     on:click=move |_| set_active_tab.set("practice")>"Practice"</button>
-                <button class=move || if active_tab.get() == "pitfalls" { "caps-tab active" } else { "caps-tab" }
+                <button class=move || if active_tab.get() == "pitfalls" { "praxis-tab active" } else { "praxis-tab" }
                     on:click=move |_| set_active_tab.set("pitfalls")>"Pitfalls"</button>
-                <button class=move || if active_tab.get() == "connections" { "caps-tab active" } else { "caps-tab" }
+                <button class=move || if active_tab.get() == "connections" { "praxis-tab active" } else { "praxis-tab" }
                     on:click=move |_| set_active_tab.set("connections")
                     style="color: var(--info)"
                 >"Connections"</button>
-                <button class=move || if active_tab.get() == "notes" { "caps-tab active" } else { "caps-tab" }
+                <button class=move || if active_tab.get() == "notes" { "praxis-tab active" } else { "praxis-tab" }
                     on:click=move |_| set_active_tab.set("notes")>"Notes"</button>
                 {if games::has_game(&node_id_for_status) {
                     view! {
-                        <button class=move || if active_tab.get() == "explore" { "caps-tab active" } else { "caps-tab" }
+                        <button class=move || if active_tab.get() == "explore" { "praxis-tab active" } else { "praxis-tab" }
                             on:click=move |_| set_active_tab.set("explore")
                             style="color: var(--success)"
                         >"Explore"</button>
@@ -325,13 +325,13 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
                                 view! {
                                     // Explanation tab
                                     <div style=move || if active_tab.get() == "explanation" { "display: block" } else { "display: none" }>
-                                        <div class="caps-detail" style="margin-bottom: 1rem">
+                                        <div class="praxis-detail" style="margin-bottom: 1rem">
                                             <p style="font-size: 0.95rem; line-height: 1.8">{explanation.clone()}</p>
                                         </div>
 
                                         {if !vocab.is_empty() {
                                             view! {
-                                                <div class="caps-detail">
+                                                <div class="praxis-detail">
                                                     <h3 style="font-size: 0.9rem; font-weight: 700; margin-bottom: 0.75rem; color: var(--text-secondary)">"Key Vocabulary"</h3>
                                                     {vocab.iter().map(|v| {
                                                         let term = v.term.clone();
@@ -357,18 +357,18 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
                                             let answer = ex.answer.clone();
                                             let steps = ex.steps.clone();
                                             view! {
-                                                <div class="caps-example">
-                                                    <div class="caps-example-problem">"Example "{i + 1}": "{problem}</div>
+                                                <div class="praxis-example">
+                                                    <div class="praxis-example-problem">"Example "{i + 1}": "{problem}</div>
                                                     {steps.iter().map(|s| {
                                                         let instr = s.instruction.clone();
                                                         let result = s.result.clone();
                                                         view! {
-                                                            <div class="caps-example-step">
+                                                            <div class="praxis-example-step">
                                                                 <strong>{instr}</strong>" \u{2192} "{result}
                                                             </div>
                                                         }
                                                     }).collect::<Vec<_>>()}
-                                                    <div class="caps-example-answer">{answer}</div>
+                                                    <div class="praxis-example-answer">{answer}</div>
                                                 </div>
                                             }
                                         }).collect::<Vec<_>>()}
@@ -416,12 +416,12 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
                                             let nid_correct = node_id_for_status.clone();
                                             let nid_wrong = node_id_for_status.clone();
                                             view! {
-                                                <div class="caps-problem" style="cursor: pointer">
-                                                    <div class="caps-problem-q">{i + 1}". "{question}</div>
-                                                    <div class="caps-problem-meta">{diff}" | "{bloom_level}</div>
+                                                <div class="praxis-problem" style="cursor: pointer">
+                                                    <div class="praxis-problem-q">{i + 1}". "{question}</div>
+                                                    <div class="praxis-problem-meta">{diff}" | "{bloom_level}</div>
                                                     {move || if revealed.get() {
                                                         view! {
-                                                            <div class="caps-problem-a" style="margin-top: 0.5rem">
+                                                            <div class="praxis-problem-a" style="margin-top: 0.5rem">
                                                                 "Answer: "{answer.clone()}
                                                             </div>
                                                             <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem">
@@ -437,7 +437,7 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
                                                                     view! {
                                                                         <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem">
                                                                             <button
-                                                                                class="caps-filter-btn"
+                                                                                class="praxis-filter-btn"
                                                                                 style="font-size: 0.75rem; border-color: var(--mastery-green); color: var(--mastery-green)"
                                                                                 on:click=move |_| {
                                                                                     set_progress.update(|p| p.record_response(&nc, true));
@@ -445,7 +445,7 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
                                                                                 }
                                                                             >"I got this right"</button>
                                                                             <button
-                                                                                class="caps-filter-btn"
+                                                                                class="praxis-filter-btn"
                                                                                 style="font-size: 0.75rem; opacity: 0.7"
                                                                                 on:click=move |_| {
                                                                                     set_progress.update(|p| p.record_response(&nw, false));
@@ -469,14 +469,14 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
                                                         view! {
                                                             <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem">
                                                                 <button
-                                                                    class="caps-filter-btn active"
+                                                                    class="praxis-filter-btn active"
                                                                     style="font-size: 0.75rem"
                                                                     on:click=move |_| set_revealed.set(true)
                                                                 >"Reveal Answer"</button>
                                                                 {if hints_available {
                                                                     view! {
                                                                         <button
-                                                                            class="caps-filter-btn"
+                                                                            class="praxis-filter-btn"
                                                                             style="font-size: 0.75rem"
                                                                             on:click=move |_| set_show_hint.set(true)
                                                                         >"Hint"</button>
@@ -512,11 +512,11 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
                                                     let corr = m.correction.clone();
                                                     let why = m.why_students_think_this.clone();
                                                     view! {
-                                                        <div class="caps-misconception">
-                                                            <div class="caps-misconception-wrong">{mc}</div>
-                                                            <div class="caps-misconception-right">{corr}</div>
+                                                        <div class="praxis-misconception">
+                                                            <div class="praxis-misconception-wrong">{mc}</div>
+                                                            <div class="praxis-misconception-right">{corr}</div>
                                                             {if !why.is_empty() {
-                                                                view! { <div class="caps-misconception-why">{why}</div> }.into_any()
+                                                                view! { <div class="praxis-misconception-why">{why}</div> }.into_any()
                                                             } else {
                                                                 view! { <span></span> }.into_any()
                                                             }}
@@ -536,11 +536,11 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
                                     // Connections tab — cross-subject links
                                     <div style=move || if active_tab.get() == "connections" { "display: block" } else { "display: none" }>
                                         {
-                                            let graph = caps_graph();
+                                            let graph = curriculum_graph();
                                             let neighbors = graph.cross_subject_neighbors(&node_id);
                                             if neighbors.is_empty() {
                                                 view! {
-                                                    <div class="caps-detail">
+                                                    <div class="praxis-detail">
                                                         <p style="color: var(--text-secondary); font-size: 0.9rem">
                                                             "No cross-subject connections mapped for this topic yet. "
                                                             "Connections show where knowledge from one subject applies in another."
@@ -549,7 +549,7 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
                                                 }.into_any()
                                             } else {
                                                 view! {
-                                                    <div class="caps-detail">
+                                                    <div class="praxis-detail">
                                                         <h3 style="font-size: 0.9rem; font-weight: 700; margin-bottom: 0.75rem; color: var(--text-secondary)">"Connected Across Subjects"</h3>
                                                         <p style="font-size: 0.75rem; color: var(--text-tertiary); margin-bottom: 1rem">"This topic connects to knowledge in other subjects — tap to explore."</p>
                                                         {neighbors.iter().map(|(neighbor, edge)| {
@@ -562,7 +562,7 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
                                                             view! {
                                                                 <a href=href class="connection-card">
                                                                     <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem">
-                                                                        <span class="caps-badge" style="background: var(--info); color: var(--text-on-primary); font-size: 0.65rem">{subject}</span>
+                                                                        <span class="praxis-badge" style="background: var(--info); color: var(--text-on-primary); font-size: 0.65rem">{subject}</span>
                                                                         <span style="font-size: 0.65rem; color: var(--text-tertiary)">{grade}</span>
                                                                         <span style="font-size: 0.6rem; color: var(--text-tertiary); font-style: italic">{edge_type}</span>
                                                                     </div>
@@ -586,7 +586,7 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
                                             let notes_key_save = notes_key.clone();
 
                                             view! {
-                                                <div class="caps-detail">
+                                                <div class="praxis-detail">
                                                     <h3 style="font-size: 0.9rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--text-secondary)">"Your Notes"</h3>
                                                     <p style="font-size: 0.75rem; color: var(--text-tertiary); margin-bottom: 0.75rem">"Write anything that helps you remember. Saved automatically."</p>
                                                     <textarea
@@ -609,7 +609,7 @@ pub fn StudyPage(node_id: String) -> impl IntoView {
                                 let desc = description.clone();
                                 let sub = subdomain.clone();
                                 view! {
-                                    <div class="caps-detail" style="margin-top: 1rem">
+                                    <div class="praxis-detail" style="margin-top: 1rem">
                                         <div style="padding: 0.75rem; background: var(--soil-sandy); border-radius: 8px; margin-bottom: 1rem">
                                             <div style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.25rem">
                                                 "This lesson is still growing"

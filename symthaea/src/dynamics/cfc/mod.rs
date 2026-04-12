@@ -18,11 +18,11 @@
 //! - `network` - Multi-layer CfC network with BPTT and SPSA training
 //! - `phi_gated` - Phi-gated attention utilities for IIT integration
 
-mod cell;
+pub(crate) mod cell;
 mod gradients;
-mod network;
+pub(crate) mod network;
 mod phi_gated;
-mod types;
+pub(crate) mod types;
 
 #[cfg(test)]
 #[path = "tests.rs"]

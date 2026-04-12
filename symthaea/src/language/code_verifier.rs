@@ -80,6 +80,10 @@ pub struct VerificationResult {
     pub warnings: Vec<CodeDiagnostic>,
     /// Number of entities extracted from generated code
     pub entity_count: usize,
+    /// Phase 5: Pre-compilation type/borrow warnings from static analysis.
+    /// These are heuristic — not guaranteed correct — but catch common errors
+    /// before running `cargo check`.
+    pub type_warnings: Vec<String>,
 }
 
 impl VerificationResult {
@@ -214,6 +218,7 @@ impl CodeVerifier {
             syntax_errors,
             warnings,
             entity_count,
+            type_warnings: Vec::new(), // Populated by caller via validate_types()
         }
     }
 
@@ -421,6 +426,7 @@ mod tests {
             syntax_errors: Vec::new(),
             warnings: Vec::new(),
             entity_count: 5,
+            type_warnings: Vec::new(),
         };
 
         let summary = result.summary();

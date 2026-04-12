@@ -4,7 +4,7 @@
 
 use leptos::prelude::*;
 
-use crate::curriculum::{caps_graph, CapsGraph, CapsNode, ProgressStatus, ProgressStore, use_progress};
+use crate::curriculum::{curriculum_graph, CurriculumGraph, CurriculumNode, ProgressStatus, ProgressStore, use_progress};
 
 #[derive(Clone, Copy, PartialEq)]
 enum StewardshipTrack {
@@ -46,8 +46,8 @@ fn course_number(id: &str) -> u32 {
     id.split('-').nth(1).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0)
 }
 
-fn track_nodes(graph: &'static CapsGraph, prefix: &str) -> Vec<&'static CapsNode> {
-    let mut nodes: Vec<&CapsNode> = graph.nodes.iter().filter(|n| n.id.starts_with(prefix)).collect();
+fn track_nodes(graph: &'static CurriculumGraph, prefix: &str) -> Vec<&'static CurriculumNode> {
+    let mut nodes: Vec<&CurriculumNode> = graph.nodes.iter().filter(|n| n.id.starts_with(prefix)).collect();
     nodes.sort_by(|a, b| {
         course_number(&a.id)
             .cmp(&course_number(&b.id))
@@ -56,7 +56,7 @@ fn track_nodes(graph: &'static CapsGraph, prefix: &str) -> Vec<&'static CapsNode
     nodes
 }
 
-fn group_by_level(nodes: &[&'static CapsNode]) -> Vec<(&'static str, Vec<&'static CapsNode>)> {
+fn group_by_level(nodes: &[&'static CurriculumNode]) -> Vec<(&'static str, Vec<&'static CurriculumNode>)> {
     let mut undergraduate = Vec::new();
     let mut graduate = Vec::new();
     let mut doctoral = Vec::new();
@@ -87,7 +87,7 @@ fn group_by_level(nodes: &[&'static CapsNode]) -> Vec<(&'static str, Vec<&'stati
     grouped
 }
 
-fn progress_counts(nodes: &[&CapsNode], progress: &ProgressStore) -> (usize, usize, usize) {
+fn progress_counts(nodes: &[&CurriculumNode], progress: &ProgressStore) -> (usize, usize, usize) {
     let mastered = nodes
         .iter()
         .filter(|n| progress.get(&n.id).status == ProgressStatus::Mastered)
@@ -103,13 +103,13 @@ fn progress_counts(nodes: &[&CapsNode], progress: &ProgressStore) -> (usize, usi
 #[component]
 pub fn StewardshipPage() -> impl IntoView {
     let progress = use_progress();
-    let graph = caps_graph();
+    let graph = curriculum_graph();
     let mycelix_nodes = track_nodes(graph, "MYC-");
     let symthaea_nodes = track_nodes(graph, "SYM-");
     let (active_track, set_active_track) = signal(StewardshipTrack::Mycelix);
 
     view! {
-        <div class="caps-skill-map">
+        <div class="praxis-skill-map">
             <a href="/" class="refuge-back-link">"\u{2190} Home"</a>
             <h1 style="font-size: 1.6rem; margin: 1rem 0 0.5rem">"Stewardship"</h1>
             <p style="color: var(--text-secondary); margin-bottom: 1.5rem; line-height: 1.6; max-width: 820px">
@@ -157,9 +157,9 @@ pub fn StewardshipPage() -> impl IntoView {
 }
 
 fn render_track(
-    graph: &'static CapsGraph,
+    graph: &'static CurriculumGraph,
     track: StewardshipTrack,
-    nodes: Vec<&'static CapsNode>,
+    nodes: Vec<&'static CurriculumNode>,
     progress: ReadSignal<ProgressStore>,
 ) -> impl IntoView {
     let grouped = group_by_level(&nodes);

@@ -151,7 +151,7 @@ pub fn StatsExplorer(node_id: String) -> impl IntoView {
                                 <div class="game-challenge-number">"Challenge "{idx + 1}" of "{total_challenges}</div>
                                 <div class="game-challenge-instruction">{instructions[idx]}</div>
                                 <div class="game-challenge-actions">
-                                    <button class="caps-filter-btn active" on:click=move |_| check()>"Check"</button>
+                                    <button class="praxis-filter-btn active" on:click=move |_| check()>"Check"</button>
                                 </div>
                                 <div class="game-challenge-hint">{hints[idx]}</div>
                             </div>

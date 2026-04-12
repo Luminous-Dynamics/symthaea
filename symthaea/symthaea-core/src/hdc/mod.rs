@@ -414,6 +414,8 @@ pub mod geometric_algebra {
 
 // ── Conjecture Engine — The Ramanujan Protocol ───────────────────────────────
 pub mod conjecture_engine; // Automated conjecture generation via symbolic regression + verification
+pub mod autodiff; // Reverse-mode automatic differentiation (Wengert tape) for exact gradients
+pub mod sparse_matrix; // Compressed Sparse Row (CSR) matrix for PDE solvers and graph Laplacians
 
 // ── Geometric Complexity Theory (Phase 8 — P vs NP probe) ────────────────────
 pub mod gct; // Permanent vs determinant orbit complexity, Kronecker coefficients, GCT obstruction conjecture

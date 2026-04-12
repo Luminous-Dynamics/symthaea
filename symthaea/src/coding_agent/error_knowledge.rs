@@ -20,8 +20,10 @@
 
 use std::collections::HashMap;
 
+use serde::{Deserialize, Serialize};
+
 /// A recorded fact about a compiler error and the strategy that fixed it.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CodeErrorFact {
     /// Rust error code (e.g., "E0308", "E0277")
     pub error_code: String,
@@ -40,7 +42,7 @@ pub struct CodeErrorFact {
 }
 
 /// Coarse error categories for similarity matching.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ErrorCategory {
     TypeMismatch,
     MissingImport,
@@ -85,7 +87,7 @@ impl ErrorCategory {
 }
 
 /// A fix strategy with its success statistics.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FixStrategyStats {
     /// Strategy description (e.g., "add .into()", "add use statement")
     pub strategy: String,
@@ -121,6 +123,13 @@ impl FixStrategyStats {
         // Bayesian: (successes + 1) / (attempts + 2)
         self.success_rate = (self.compile_successes as f32 + 1.0) / (self.attempts as f32 + 2.0);
     }
+}
+
+/// Serializable snapshot of the knowledge graph for persistence.
+#[derive(Serialize, Deserialize)]
+struct KnowledgeSnapshot {
+    facts: Vec<CodeErrorFact>,
+    total_facts: u64,
 }
 
 /// In-memory knowledge graph of error patterns → fix strategies.
@@ -251,6 +260,84 @@ impl CodeErrorKnowledge {
         self.by_category.clear();
         self.facts.clear();
         self.total_facts = 0;
+    }
+
+    // =========================================================================
+    // Persistence — save/load to JSON for cross-session knowledge retention
+    // =========================================================================
+
+    /// Save knowledge to a JSON file. Creates parent directories if needed.
+    pub fn save_to_json(&self, path: &std::path::Path) -> anyhow::Result<()> {
+        let snapshot = KnowledgeSnapshot {
+            facts: self.facts.clone(),
+            total_facts: self.total_facts,
+        };
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let json = serde_json::to_string_pretty(&snapshot)?;
+        std::fs::write(path, json)?;
+        Ok(())
+    }
+
+    /// Load knowledge from a JSON file, replaying all facts to rebuild indices.
+    pub fn load_from_json(path: &std::path::Path) -> anyhow::Result<Self> {
+        let json = std::fs::read_to_string(path)?;
+        let snapshot: KnowledgeSnapshot = serde_json::from_str(&json)?;
+
+        let mut knowledge = Self::new();
+        for fact in snapshot.facts {
+            knowledge.record_fix(fact);
+        }
+        // Restore total_facts counter (may be higher than facts.len() due to ring buffer)
+        knowledge.total_facts = snapshot.total_facts;
+        Ok(knowledge)
+    }
+
+    /// Default persistence path for error knowledge.
+    pub fn default_path() -> std::path::PathBuf {
+        if let Ok(data_dir) = std::env::var("SYMTHAEA_DATA_DIR") {
+            std::path::PathBuf::from(data_dir).join("error-knowledge.json")
+        } else if let Ok(home) = std::env::var("HOME") {
+            std::path::PathBuf::from(home)
+                .join(".local/share/symthaea/error-knowledge.json")
+        } else {
+            std::path::PathBuf::from("error-knowledge.json")
+        }
+    }
+
+    /// Save to the default path. Creates directories as needed.
+    pub fn persist(&self) -> anyhow::Result<()> {
+        self.save_to_json(&Self::default_path())
+    }
+
+    /// Load from the default path if it exists. Returns empty knowledge if not found.
+    pub fn load_or_default() -> Self {
+        let path = Self::default_path();
+        if path.exists() {
+            match Self::load_from_json(&path) {
+                Ok(k) => {
+                    #[cfg(debug_assertions)]
+                    eprintln!(
+                        "[CodeErrorKnowledge] Loaded {} facts from {}",
+                        k.facts.len(),
+                        path.display()
+                    );
+                    k
+                }
+                Err(_e) => {
+                    #[cfg(debug_assertions)]
+                    eprintln!(
+                        "[CodeErrorKnowledge] Failed to load from {}: {}",
+                        path.display(),
+                        _e
+                    );
+                    Self::new()
+                }
+            }
+        } else {
+            Self::new()
+        }
     }
 }
 

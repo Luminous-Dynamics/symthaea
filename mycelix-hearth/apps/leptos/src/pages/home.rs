@@ -43,6 +43,20 @@ pub fn HomePage() -> impl IntoView {
                                         .map(|h| h.name.clone())
                                         .unwrap_or_else(|| "No Hearth".into())}
                                 </h1>
+                                // Family motto — if set in preferences
+                                {move || {
+                                    let prefs = crate::hearth_prefs::use_hearth_prefs();
+                                    let motto = prefs.motto.get();
+                                    if motto.is_empty() {
+                                        None
+                                    } else {
+                                        Some(view! {
+                                            <p class="home-motto" style="font-style: italic; color: var(--text-secondary); letter-spacing: 0.08em; font-size: 0.95rem; margin-top: -0.5rem; opacity: 0.8;">
+                                                {motto}
+                                            </p>
+                                        })
+                                    }
+                                }}
                             </header>
 
                             // The kinship web IS the dashboard

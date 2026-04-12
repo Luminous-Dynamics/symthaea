@@ -1,6 +1,6 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Skill Map page — CAPS curriculum graph visualization.
+//! Skill Map page — curriculum knowledge graph visualization.
 //!
 //! Displays the student's progress through the South African CAPS
 //! Mathematics and Physical Sciences curriculum as an interactive
@@ -9,8 +9,8 @@
 use leptos::prelude::*;
 
 use crate::curriculum::{
-    caps_graph, display_subject, use_grade, use_progress, use_set_grade, use_set_progress,
-    use_set_subject, use_subject, CapsNode, Grade, ProgressStatus, Subject,
+    curriculum_graph, display_subject, use_grade, use_progress, use_set_grade, use_set_progress,
+    use_set_subject, use_subject, CurriculumNode, Grade, ProgressStatus, Subject,
 };
 
 // ============================================================
@@ -65,7 +65,7 @@ pub fn SkillMapPage() -> impl IntoView {
 
     // Derived: filtered nodes for current subject + grade
     let filtered_nodes = Memo::new(move |_| {
-        let graph = caps_graph();
+        let graph = curriculum_graph();
         let s = subject.get().as_str().to_string();
         let g = grade.get().as_str().to_string();
         graph.nodes_for(&s, &g).into_iter().cloned().collect::<Vec<_>>()
@@ -73,7 +73,7 @@ pub fn SkillMapPage() -> impl IntoView {
 
     // Recommended next node (FEP pulse target)
     let recommended_id = Memo::new(move |_| {
-        let graph = caps_graph();
+        let graph = curriculum_graph();
         let p = progress.get();
         let mastered: std::collections::HashSet<String> = p
             .nodes
@@ -86,7 +86,7 @@ pub fn SkillMapPage() -> impl IntoView {
 
     // Progress summary
     let progress_summary = Memo::new(move |_| {
-        let graph = caps_graph();
+        let graph = curriculum_graph();
         let p = progress.get();
         let total = graph.nodes.len();
         let mastered = p.mastered_count();
@@ -95,9 +95,9 @@ pub fn SkillMapPage() -> impl IntoView {
     });
 
     view! {
-        <div class="caps-skill-map">
+        <div class="praxis-skill-map">
             // Progress summary — organic growth circle
-            <div class="caps-progress-summary indlela-progress">
+            <div class="praxis-progress-summary indlela-progress">
                 {move || {
                     let (total, mastered, studying) = progress_summary.get();
                     let pct = if total > 0 { mastered * 100 / total } else { 0 };
@@ -144,11 +144,11 @@ pub fn SkillMapPage() -> impl IntoView {
             </div>
 
             // Filters
-            <div class="caps-filters">
+            <div class="praxis-filters">
                 // Subject filter — dynamically generated from graph
-                <div class="caps-filter-group" style="overflow-x: auto; flex-wrap: nowrap">
+                <div class="praxis-filter-group" style="overflow-x: auto; flex-wrap: nowrap">
                     {
-                        let graph = caps_graph();
+                        let graph = curriculum_graph();
                         // Show top subjects (those with most nodes)
                         let mut subject_counts: Vec<(String, usize)> = graph.subjects().iter()
                             .map(|s| (s.to_string(), graph.nodes.iter().filter(|n| n.subject_area == *s).count()))
@@ -161,7 +161,7 @@ pub fn SkillMapPage() -> impl IntoView {
                             let label = if display.chars().count() > 20 { format!("{}...", display.chars().take(18).collect::<String>()) } else { display };
                             view! {
                                 <button
-                                    class=move || if subject.get() == s_for_check { "caps-filter-btn active" } else { "caps-filter-btn" }
+                                    class=move || if subject.get() == s_for_check { "praxis-filter-btn active" } else { "praxis-filter-btn" }
                                     on:click=move |_| set_subject.set(s_for_click.clone())
                                     style="flex-shrink: 0"
                                 >{label}" ("{count}")"</button>
@@ -170,27 +170,27 @@ pub fn SkillMapPage() -> impl IntoView {
                     }
                 </div>
                 // K-12 grades
-                <div class="caps-filter-group">
+                <div class="praxis-filter-group">
                     {Grade::k12().iter().map(|g| {
                         let g = *g;
                         let label = g.label();
                         view! {
                             <button
-                                class=move || if grade.get() == g { "caps-filter-btn active" } else { "caps-filter-btn" }
+                                class=move || if grade.get() == g { "praxis-filter-btn active" } else { "praxis-filter-btn" }
                                 on:click=move |_| set_grade.set(g)
                             >{label}</button>
                         }
                     }).collect::<Vec<_>>()}
                 </div>
                 // Post-secondary
-                <div class="caps-filter-group" style="border-top: 1px solid var(--border); padding-top: 0.5rem; margin-top: 0.25rem">
-                    <span style="font-size: 0.7rem; color: var(--text-tertiary); margin-right: 0.5rem">"Beyond Matric:"</span>
+                <div class="praxis-filter-group" style="border-top: 1px solid var(--border); padding-top: 0.5rem; margin-top: 0.25rem">
+                    <span style="font-size: 0.7rem; color: var(--text-tertiary); margin-right: 0.5rem">"Post-secondary:"</span>
                     {Grade::post_secondary().iter().map(|g| {
                         let g = *g;
                         let label = g.label();
                         view! {
                             <button
-                                class=move || if grade.get() == g { "caps-filter-btn active" } else { "caps-filter-btn" }
+                                class=move || if grade.get() == g { "praxis-filter-btn active" } else { "praxis-filter-btn" }
                                 on:click=move |_| set_grade.set(g)
                             >{label}</button>
                         }
@@ -200,7 +200,7 @@ pub fn SkillMapPage() -> impl IntoView {
 
             // Knowledge Constellation — SVG graph visualization
             {move || {
-                let graph = caps_graph();
+                let graph = curriculum_graph();
                 let nodes = filtered_nodes.get();
                 let p = progress.get();
                 let node_count = nodes.len();
@@ -369,7 +369,7 @@ pub fn SkillMapPage() -> impl IntoView {
             {move || {
                 let sel_id = selected_id.get();
                 sel_id.and_then(|id| {
-                    let graph = caps_graph();
+                    let graph = curriculum_graph();
                     graph.node(&id).cloned()
                 }).map(|node| {
                     view! {
@@ -390,7 +390,7 @@ pub fn SkillMapPage() -> impl IntoView {
 
 #[component]
 fn NodeDetail(
-    node: CapsNode,
+    node: CurriculumNode,
     on_close: impl Fn() + 'static,
 ) -> impl IntoView {
     let progress = use_progress();
@@ -408,7 +408,7 @@ fn NodeDetail(
 
     // Prerequisites
     let prereqs = {
-        let graph = caps_graph();
+        let graph = curriculum_graph();
         graph.prereqs_for(&node_id).iter().filter_map(|pid| {
             graph.node(pid).map(|n| (n.id.clone(), n.title.clone()))
         }).collect::<Vec<_>>()
@@ -427,14 +427,14 @@ fn NodeDetail(
     let hours = node.estimated_hours;
 
     view! {
-        <div class="caps-detail">
-            <div class="caps-detail-header">
-                <div class="caps-detail-title">{title.clone()}</div>
-                <button class="caps-detail-close" aria-label="Close detail panel" on:click=move |_| on_close()>"\u{00D7}"</button>
+        <div class="praxis-detail">
+            <div class="praxis-detail-header">
+                <div class="praxis-detail-title">{title.clone()}</div>
+                <button class="praxis-detail-close" aria-label="Close detail panel" on:click=move |_| on_close()>"\u{00D7}"</button>
             </div>
 
             // Status buttons (with celebration on Mastered)
-            <div class="caps-status-btns">
+            <div class="praxis-status-btns">
                 {
                     let id = node_id.clone();
                     let id2 = node_id.clone();
@@ -444,21 +444,21 @@ fn NodeDetail(
                     let set_celebration_topic = expect_context::<WriteSignal<String>>();
                     view! {
                         <button
-                            class=move || if status.get() == ProgressStatus::NotStarted { "caps-status-btn active-not-started" } else { "caps-status-btn" }
+                            class=move || if status.get() == ProgressStatus::NotStarted { "praxis-status-btn active-not-started" } else { "praxis-status-btn" }
                             on:click={
                                 let id = id.clone();
                                 move |_| set_progress.update(|p| p.set_status(&id, ProgressStatus::NotStarted))
                             }
                         >"Not Started"</button>
                         <button
-                            class=move || if status.get() == ProgressStatus::Studying { "caps-status-btn active-studying" } else { "caps-status-btn" }
+                            class=move || if status.get() == ProgressStatus::Studying { "praxis-status-btn active-studying" } else { "praxis-status-btn" }
                             on:click={
                                 let id = id2.clone();
                                 move |_| set_progress.update(|p| p.set_status(&id, ProgressStatus::Studying))
                             }
                         >"Studying"</button>
                         <button
-                            class=move || if status.get() == ProgressStatus::Mastered { "caps-status-btn active-mastered" } else { "caps-status-btn" }
+                            class=move || if status.get() == ProgressStatus::Mastered { "praxis-status-btn active-mastered" } else { "praxis-status-btn" }
                             on:click={
                                 let id = id3.clone();
                                 let t = title_for_celebrate.clone();
@@ -478,11 +478,11 @@ fn NodeDetail(
             </div>
 
             // Meta badges
-            <div class="caps-detail-meta">
-                <span class="caps-badge caps-badge-grade">{grade_label.clone()}</span>
-                {exam_html.map(|eh| view! { <span class="caps-badge caps-badge-exam">{eh}</span> })}
-                <span class="caps-badge caps-badge-bloom">{bloom.clone()}</span>
-                <span class="caps-badge caps-badge-hours">{hours}"h estimated"</span>
+            <div class="praxis-detail-meta">
+                <span class="praxis-badge praxis-badge-grade">{grade_label.clone()}</span>
+                {exam_html.map(|eh| view! { <span class="praxis-badge praxis-badge-exam">{eh}</span> })}
+                <span class="praxis-badge praxis-badge-bloom">{bloom.clone()}</span>
+                <span class="praxis-badge praxis-badge-hours">{hours}"h estimated"</span>
             </div>
 
             // Action buttons
@@ -494,17 +494,17 @@ fn NodeDetail(
             </div>
 
             // Tabs
-            <div class="caps-tabs">
+            <div class="praxis-tabs">
                 <button
-                    class=move || if active_tab.get() == "learn" { "caps-tab active" } else { "caps-tab" }
+                    class=move || if active_tab.get() == "learn" { "praxis-tab active" } else { "praxis-tab" }
                     on:click=move |_| set_active_tab.set("learn")
                 >"Learn"</button>
                 <button
-                    class=move || if active_tab.get() == "prereqs" { "caps-tab active" } else { "caps-tab" }
+                    class=move || if active_tab.get() == "prereqs" { "praxis-tab active" } else { "praxis-tab" }
                     on:click=move |_| set_active_tab.set("prereqs")
                 >"Prerequisites"</button>
                 <button
-                    class=move || if active_tab.get() == "resources" { "caps-tab active" } else { "caps-tab" }
+                    class=move || if active_tab.get() == "resources" { "praxis-tab active" } else { "praxis-tab" }
                     on:click=move |_| set_active_tab.set("resources")
                 >"Resources"</button>
             </div>
@@ -540,12 +540,12 @@ fn NodeDetail(
             </div>
 
             <div style=move || if active_tab.get() == "resources" { "display: block" } else { "display: none" }>
-                <div class="caps-resources">
+                <div class="praxis-resources">
                     {resources.iter().map(|r| {
                         let url = r.url.clone();
                         let title = r.title.clone();
                         view! {
-                            <a class="caps-resource-link" href={url} target="_blank" rel="noopener">{title}</a>
+                            <a class="praxis-resource-link" href={url} target="_blank" rel="noopener">{title}</a>
                         }
                     }).collect::<Vec<_>>()}
                 </div>

@@ -32,11 +32,14 @@ const TOLERANCE: f32 = 0.05;
 // Established from the initial production implementation (Apr 2026).
 // Run `print_creative_benchmark` to regenerate.
 
-const BASELINE_MELODIC_COHERENCE: f32 = 0.35;
-const BASELINE_RHYTHMIC_REGULARITY: f32 = 0.25;
-const BASELINE_EMOTIONAL_ALIGNMENT: f32 = 0.35;
-const BASELINE_FORM_COMPLIANCE: f32 = 0.10;
-const BASELINE_COMPOSITE: f32 = 0.28;
+// Measured 2026-04-11 (post-rhythm+sparsity fix):
+//   melodic=0.755, rhythm=0.933, emotion=0.463, form=0.606, composite=0.704
+// Baselines set ~15% below measured to absorb cross-platform + stochastic variance.
+const BASELINE_MELODIC_COHERENCE: f32 = 0.64;
+const BASELINE_RHYTHMIC_REGULARITY: f32 = 0.78;
+const BASELINE_EMOTIONAL_ALIGNMENT: f32 = 0.38;
+const BASELINE_FORM_COMPLIANCE: f32 = 0.50;
+const BASELINE_COMPOSITE: f32 = 0.59;
 
 // ─── Standard benchmark config ────────────────────────────────────────────────
 
@@ -107,11 +110,13 @@ fn neural_melody_regression() {
     };
     let result = creative_bench::run_benchmark(&config, &MusicalState::default());
 
-    // Neural mode should meet at least the same composite floor.
+    // Neural mode has its own baseline (lower than classic due to CfC timing).
+    const NEURAL_BASELINE_COMPOSITE: f32 = 0.35;
     assert!(
-        result.mean_composite >= BASELINE_COMPOSITE - TOLERANCE,
-        "neural melody composite REGRESSION: {:.3}\n{}",
+        result.mean_composite >= NEURAL_BASELINE_COMPOSITE - TOLERANCE,
+        "neural melody composite REGRESSION: {:.3} < {:.3}\n{}",
         result.mean_composite,
+        NEURAL_BASELINE_COMPOSITE - TOLERANCE,
         result.report(),
     );
 }

@@ -53,12 +53,16 @@ pub fn ContentRouter() -> impl IntoView {
                 view! { <CompareView query=query.clone() /> }.into_any()
             }
             PageView::FullPageIframe { url } => {
+                let url_display = url.clone();
                 view! {
-                    <iframe
-                        class="fullpage-iframe"
-                        src=url.clone()
-                        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-                    ></iframe>
+                    <div class="fullpage-container">
+                        <iframe
+                            class="fullpage-iframe"
+                            src=url.clone()
+                            sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                        ></iframe>
+                        <EpistemicDrawer url=url_display />
+                    </div>
                 }.into_any()
             }
             PageView::Settings => {
@@ -197,20 +201,20 @@ fn SearchResultsPage(query: String, results: Vec<SearchResult>) -> impl IntoView
             </Show>
 
             {if weak_results {
+                let q = query.clone();
                 view! {
-                    <div class="no-strong-matches">
-                        <p>"No strong matches found for "<strong>{query.clone()}</strong>"."</p>
-                        <p>"The knowledge base doesn't contain claims closely related to this query. "
-                           "Try more specific terms like:"</p>
-                        <ul>
-                            <li><strong>"ocean acidification"</strong></li>
-                            <li><strong>"consciousness"</strong></li>
-                            <li><strong>"rust programming"</strong></li>
-                            <li><strong>"quantum physics"</strong></li>
-                        </ul>
-                        <p style="margin-top: 12px; font-size: 13px; color: var(--content-text-secondary);">
-                            "Showing best approximate matches below:"
-                        </p>
+                    <div class="no-knowledge-banner">
+                        <div class="no-knowledge-icon">"\u{1F50D}"</div>
+                        <div class="no-knowledge-text">
+                            <p class="no-knowledge-title">
+                                "Prism has no verified knowledge about "<strong>{q.clone()}</strong>"."
+                            </p>
+                            <p class="no-knowledge-detail">
+                                "The epistemic knowledge base ("{total_claims}" claims) doesn't contain "
+                                "strong matches for this query. Results below are approximate matches "
+                                "and external sources \u{2014} treat them as unverified."
+                            </p>
+                        </div>
                     </div>
                 }.into_any()
             } else {
@@ -271,5 +275,118 @@ fn BookmarksPage() -> impl IntoView {
                 }
             }}
         </div>
+    }
+}
+
+/// Floating epistemic panel that appears alongside the Full Page iframe.
+/// Shows consciousness state, epistemic confidence, and knowledge base matches
+/// for the current URL — without replacing the page content.
+#[component]
+fn EpistemicDrawer(url: String) -> impl IntoView {
+    let state = expect_context::<BrowserState>();
+    let (drawer_open, set_drawer_open) = signal(false);
+
+    // Search knowledge base for claims related to the URL's domain/topic
+    let search_engine = expect_context::<StoredValue<Option<SearchEngine>>>();
+    let url_query = url.clone();
+    let related_claims = search_engine.with_value(|opt| {
+        if let Some(engine) = opt {
+            // Extract host + path keywords for search
+            let query = url::Url::parse(&url_query).ok()
+                .map(|u| {
+                    let host = u.host_str().unwrap_or("").replace("www.", "").replace(".com", "").replace(".org", "");
+                    let path = u.path().replace('/', " ").replace('-', " ").replace('_', " ");
+                    format!("{} {}", host, path)
+                })
+                .unwrap_or_default();
+            if query.len() > 3 {
+                engine.search(&query, 5)
+            } else {
+                vec![]
+            }
+        } else {
+            vec![]
+        }
+    });
+
+    let has_claims = !related_claims.is_empty();
+    let claim_count = related_claims.len();
+
+    view! {
+        // Toggle button - always visible
+        <button
+            class=move || if drawer_open.get() { "drawer-toggle open" } else { "drawer-toggle" }
+            on:click=move |_| set_drawer_open.set(!drawer_open.get())
+            title="Epistemic Analysis"
+            attr:aria-label="Toggle epistemic panel"
+        >
+            {move || if drawer_open.get() { "\u{00BB}" } else {
+                if has_claims { "\u{03A8}" } else { "\u{03A8}" }
+            }}
+        </button>
+
+        // Drawer panel
+        <Show when=move || drawer_open.get()>
+            <div class="epistemic-drawer">
+                <div class="drawer-header">
+                    <span class="drawer-title">"Epistemic Analysis"</span>
+                    <button class="drawer-close" on:click=move |_| set_drawer_open.set(false)>"\u{00D7}"</button>
+                </div>
+
+                // Consciousness state
+                <div class="drawer-section">
+                    <div class="drawer-label">"Consciousness"</div>
+                    <div class="drawer-value">
+                        <span class="spore-psi">{move || format!("\u{03A8} {:.0}%", state.consciousness.get() * 100.0)}</span>
+                        <span class="drawer-conf">{move || format!("Confidence: {:.0}%", state.epistemic_confidence.get() * 100.0)}</span>
+                    </div>
+                </div>
+
+                // Related knowledge
+                <div class="drawer-section">
+                    <div class="drawer-label">{claim_count}" related claims"</div>
+                    {if has_claims {
+                        view! {
+                            <div class="drawer-claims">
+                                {related_claims.into_iter().map(|r| {
+                                    let e_class = match r.empirical_level {
+                                        prism_common::EmpiricalLevel::E4 => "e-badge e4",
+                                        prism_common::EmpiricalLevel::E3 => "e-badge e3",
+                                        prism_common::EmpiricalLevel::E2 => "e-badge e2",
+                                        prism_common::EmpiricalLevel::E1 => "e-badge e1",
+                                        prism_common::EmpiricalLevel::E0 => "e-badge e0",
+                                    };
+                                    let e_label = match r.empirical_level {
+                                        prism_common::EmpiricalLevel::E4 => "E4",
+                                        prism_common::EmpiricalLevel::E3 => "E3",
+                                        prism_common::EmpiricalLevel::E2 => "E2",
+                                        prism_common::EmpiricalLevel::E1 => "E1",
+                                        prism_common::EmpiricalLevel::E0 => "E0",
+                                    };
+                                    let sim = (r.query_similarity * 100.0) as u32;
+                                    let snippet: String = r.content.chars().take(120).collect();
+                                    view! {
+                                        <div class="drawer-claim">
+                                            <span class=e_class>{e_label}</span>
+                                            <span class="drawer-sim">{sim}"%"</span>
+                                            <p class="drawer-claim-text">{snippet}</p>
+                                        </div>
+                                    }
+                                }).collect_view()}
+                            </div>
+                        }.into_any()
+                    } else {
+                        view! {
+                            <p class="drawer-empty">"No claims in the knowledge base match this page."</p>
+                        }.into_any()
+                    }}
+                </div>
+
+                <p class="drawer-disclaimer">
+                    "Epistemic analysis based on curated knowledge base. "
+                    "Full Page mode allows scripts and cookies."
+                </p>
+            </div>
+        </Show>
     }
 }

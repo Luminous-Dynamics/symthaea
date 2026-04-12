@@ -837,7 +837,7 @@ impl CognitiveLoopService {
                 },
             };
 
-            #[cfg(feature = "humanoid")]
+            #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
             let embodiment_bridge_init = {
                 use super::motor_bridge::EmbodimentPlatform;
                 match config.embodiment_platform {
@@ -966,11 +966,11 @@ impl CognitiveLoopService {
                 Some(pain_sender),
                 thermal_bridge_instance,
                 Some(thermal_sender),
-                #[cfg(feature = "humanoid")]
+                #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
                 embodiment_bridge_init,
-                #[cfg(feature = "humanoid")]
+                #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
                 None,
-                #[cfg(feature = "humanoid")]
+                #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
                 super::motor_bridge::EmbodimentTelemetry::default(),
             )
         };
@@ -1640,6 +1640,8 @@ impl CognitiveLoopService {
             cfc_input_buffer: ndarray::Array1::zeros(cfc_input_dim),
             #[cfg(feature = "mathematics")]
             math_service: super::math_service::MathService::new(),
+            #[cfg(feature = "mathematics")]
+            conjecture_engine: symthaea_core::hdc::conjecture_engine::ConjectureEngine::new(),
             #[cfg(feature = "epistemic_auditor")]
             epistemic_auditor: None, // initialized below after struct construction
             // Defense / Immune System

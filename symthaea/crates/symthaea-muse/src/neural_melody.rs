@@ -190,20 +190,43 @@ impl NeuralMelody {
             let output = self.network.output();
             let (pitch_sel, velocity, onset) = self.decode_frame(&output);
 
-            // onset > 0.4 means we produce a note (network decides phrase boundaries)
-            if onset > 0.4 {
+            // Onset threshold: network decides phrase boundaries.
+            // Lower threshold for low-energy states so contemplative music still
+            // has notes. Guarantee at least 6 notes by progressively lowering
+            // the threshold as we run out of time without enough notes.
+            let time_remaining_frac = 1.0 - (time / max_time).min(1.0);
+            let note_deficit = if notes.len() < 6 && time_remaining_frac < 0.5 {
+                (6 - notes.len()) as f32 / 6.0 // 0→1 as deficit grows
+            } else {
+                0.0
+            };
+            let onset_threshold = (0.4 - note_deficit * 0.3).max(0.1);
+
+            if onset > onset_threshold {
                 let freq = snap_to_scale(pitch_sel, scale);
 
                 let dur = beat_duration * (0.5 + onset * 0.5);
+                // Quantize onset AND advance to 8th-note grid
+                let grid = beat_duration * 0.5;
+                let grid_time = if grid > 0.01 {
+                    (time / grid).round() * grid
+                } else {
+                    time
+                };
+                let grid_steps = if grid > 0.01 {
+                    (dur / grid).round().max(1.0)
+                } else {
+                    1.0
+                };
                 notes.push(Note {
                     frequency: freq,
-                    start_time: time,
-                    duration: dur.min(max_time - time),
+                    start_time: grid_time,
+                    duration: dur.min(max_time - grid_time),
                     velocity,
                 });
 
                 pitch_selector = pitch_sel;
-                time += dur;
+                time = grid_time + grid_steps * grid;
             } else {
                 // Rest / phrase boundary
                 time += dt;

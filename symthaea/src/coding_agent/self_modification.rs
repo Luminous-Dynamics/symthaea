@@ -31,12 +31,14 @@
 
 use std::collections::HashMap;
 
+use serde::{Deserialize, Serialize};
+
 /// A self-generated fix rule produced by analyzing error patterns.
 ///
 /// This is the atomic unit of self-modification: a learned transformation
 /// that the system invented to handle a class of errors it previously
 /// couldn't fix.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GeneratedFixRule {
     /// Unique rule identifier
     pub id: String,
@@ -696,6 +698,88 @@ impl FixRuleGenerator {
             self.stats.consciousness_gates,
             self.stats.calibration_gates,
         )
+    }
+}
+
+// =========================================================================
+// Persistence — save/load promoted rules for cross-session retention
+// =========================================================================
+
+impl FixRuleGenerator {
+    /// Save all promoted (proven) rules to a JSON file.
+    ///
+    /// Only saves promoted rules — demoted and unproven rules are not worth
+    /// persisting since they haven't demonstrated value.
+    pub fn save_promoted_rules(&self, path: &std::path::Path) -> anyhow::Result<()> {
+        let promoted: Vec<&GeneratedFixRule> = self
+            .rules
+            .values()
+            .filter(|r| r.promoted && !r.demoted)
+            .collect();
+
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let json = serde_json::to_string_pretty(&promoted)?;
+        std::fs::write(path, json)?;
+        Ok(())
+    }
+
+    /// Load promoted rules from a JSON file and register them.
+    pub fn load_promoted_rules(&mut self, path: &std::path::Path) -> anyhow::Result<usize> {
+        let json = std::fs::read_to_string(path)?;
+        let rules: Vec<GeneratedFixRule> = serde_json::from_str(&json)?;
+        let count = rules.len();
+        for rule in rules {
+            self.rules.insert(rule.id.clone(), rule);
+        }
+        Ok(count)
+    }
+
+    /// Default persistence path for fix rules.
+    pub fn default_rules_path() -> std::path::PathBuf {
+        if let Ok(data_dir) = std::env::var("SYMTHAEA_DATA_DIR") {
+            std::path::PathBuf::from(data_dir).join("fix-rules.json")
+        } else if let Ok(home) = std::env::var("HOME") {
+            std::path::PathBuf::from(home)
+                .join(".local/share/symthaea/fix-rules.json")
+        } else {
+            std::path::PathBuf::from("fix-rules.json")
+        }
+    }
+
+    /// Save promoted rules to default path.
+    pub fn persist_rules(&self) -> anyhow::Result<()> {
+        self.save_promoted_rules(&Self::default_rules_path())
+    }
+
+    /// Load rules from default path if it exists.
+    pub fn load_persisted_rules(&mut self) -> usize {
+        let path = Self::default_rules_path();
+        if path.exists() {
+            match self.load_promoted_rules(&path) {
+                Ok(count) => {
+                    #[cfg(debug_assertions)]
+                    eprintln!(
+                        "[FixRuleGenerator] Loaded {} promoted rules from {}",
+                        count,
+                        path.display()
+                    );
+                    count
+                }
+                Err(_e) => {
+                    #[cfg(debug_assertions)]
+                    eprintln!(
+                        "[FixRuleGenerator] Failed to load rules from {}: {}",
+                        path.display(),
+                        _e
+                    );
+                    0
+                }
+            }
+        } else {
+            0
+        }
     }
 }
 

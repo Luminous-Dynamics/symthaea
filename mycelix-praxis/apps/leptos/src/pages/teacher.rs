@@ -47,13 +47,13 @@ struct ClassStats {
 // ---------------------------------------------------------------------------
 
 fn skill_names() -> Vec<String> {
-    crate::curriculum::caps_graph().subjects().iter().take(6).map(|s| {
+    crate::curriculum::curriculum_graph().subjects().iter().take(6).map(|s| {
         if s.len() > 8 { format!("{}...", &s[..6]) } else { s.to_string() }
     }).collect()
 }
 
 fn skill_full_names() -> Vec<String> {
-    crate::curriculum::caps_graph().subjects().iter().take(6).map(|s| s.to_string()).collect()
+    crate::curriculum::curriculum_graph().subjects().iter().take(6).map(|s| s.to_string()).collect()
 }
 
 fn real_students() -> Vec<StudentMastery> {
@@ -63,7 +63,7 @@ fn real_students() -> Vec<StudentMastery> {
     let name = profile.map(|p| p.name).unwrap_or_else(|| "Student".into());
     let name_static: &'static str = Box::leak(name.into_boxed_str());
 
-    let graph = crate::curriculum::caps_graph();
+    let graph = crate::curriculum::curriculum_graph();
     // Compute mastery per top subject (matching SKILL_NAMES)
     let top_subjects: Vec<String> = graph.subjects().iter().take(6).map(|s| s.to_string()).collect();
     let skills: Vec<u16> = top_subjects.iter().map(|subj| {
@@ -97,7 +97,7 @@ fn real_at_risk() -> Vec<AtRiskAlert> {
     let weakest = progress.weakest_topics(1);
     if let Some((id, pct)) = weakest.first() {
         if *pct < 0.3 {
-            let title = crate::curriculum::caps_graph().node(id)
+            let title = crate::curriculum::curriculum_graph().node(id)
                 .map(|n| n.title.as_str()).unwrap_or("Unknown");
             let title_static: &'static str = Box::leak(title.to_string().into_boxed_str());
             let reason: &'static str = Box::leak(
@@ -125,7 +125,7 @@ fn real_at_risk() -> Vec<AtRiskAlert> {
 fn real_class_stats() -> ClassStats {
     let progress = crate::persistence::load::<crate::curriculum::ProgressStore>("praxis_progress")
         .unwrap_or_default();
-    let graph = crate::curriculum::caps_graph();
+    let graph = crate::curriculum::curriculum_graph();
     let total_nodes = graph.nodes.len();
     let mastered = progress.mastered_count();
     let studying = progress.studying_count();

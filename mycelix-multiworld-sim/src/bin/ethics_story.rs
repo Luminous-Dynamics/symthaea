@@ -75,11 +75,10 @@ fn main() {
     println!("║  ETHICS TRAJECTORY                                   ║");
     println!("╚══════════════════════════════════════════════════════╝\n");
 
-    println!("snapshot,world,pop,deont,conseq,virtue,relat,dominant,diversity,institutional_deont,institutional_relat");
+    println!("snapshot,pop,deont,conseq,virtue,relat,dominant,diversity");
     for snap in &report.epoch_snapshots {
-        println!("yr{:.0},{},{},{:.3},{:.3},{:.3},{:.3},{},{:.3},{:.3},{:.3}",
+        println!("yr{:.0},{},{:.3},{:.3},{:.3},{:.3},{},{:.3}",
             snap.tick as f64 / 12.0,
-            "aggregate",
             snap.total_population,
             snap.ethics_mean[0], snap.ethics_mean[1],
             snap.ethics_mean[2], snap.ethics_mean[3],
@@ -88,7 +87,6 @@ fn main() {
                 .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
                 .map(|(i, _)| i).unwrap_or(0)],
             snap.ethics_diversity,
-            0.0, 0.0, // institutional placeholder
         );
     }
 

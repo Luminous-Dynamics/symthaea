@@ -119,6 +119,58 @@ pub enum GamelanTuning {
     Slendro,
 }
 
+/// Select a tuning system from the current emotional and consciousness state.
+///
+/// Maps the valence-arousal quadrant to culturally meaningful scale families:
+///
+/// | Quadrant            | Tuning                | Character                    |
+/// |---------------------|-----------------------|------------------------------|
+/// | +V +A (joy)         | Raga Desh             | Joyful, rain imagery         |
+/// | +V −A (serenity)    | Gamelan Slendro       | Contemplative, meditative    |
+/// | −V +A (tension)     | Maqam Hijaz           | Dramatic, augmented 2nd      |
+/// | −V −A (sorrow)      | Maqam Saba            | Sorrowful, half-flat cascade |
+/// | High consciousness  | Just Intonation       | Pure harmonic ratios         |
+/// | Default / moderate  | 12TET                 | Standard Western tuning      |
+///
+/// The consciousness_level acts as a gate: when Ψ > 0.7, Just Intonation is
+/// chosen regardless of emotion — the system "hears" pure intervals. At very
+/// low consciousness (< 0.2), 12TET is always used (safe fallback).
+///
+/// References:
+/// - Balkwill & Thompson (1999): cross-cultural emotional cues in music
+/// - Castellano, Bharucha & Krumhansl (1984): tonal hierarchies across cultures
+/// - Fritz et al. (2009): universal recognition of basic emotions in music
+pub fn select_tuning_system(state: &MusicalState) -> TuningSystem {
+    // High consciousness → pure harmonics (Just Intonation)
+    if state.consciousness_level > 0.7 {
+        return TuningSystem::JustIntonation;
+    }
+    // Very low consciousness → safe 12TET fallback
+    if state.consciousness_level < 0.2 {
+        return TuningSystem::TwelveTET;
+    }
+    // Use valence-arousal quadrant for cultural selection
+    let v = state.valence;
+    let a = state.arousal;
+
+    if v > 0.2 && a > 0.5 {
+        // Joyful, high-energy: Raga Desh (rain raga, celebratory pentatonic)
+        TuningSystem::Raga { raga: RagaMode::Desh }
+    } else if v > 0.2 && a <= 0.5 {
+        // Serene, peaceful: Gamelan Slendro (5-note equidistant, contemplative)
+        TuningSystem::Gamelan { tuning: GamelanTuning::Slendro }
+    } else if v < -0.2 && a > 0.5 {
+        // Tense, dramatic: Maqam Hijaz (augmented 2nd, intense)
+        TuningSystem::Maqamat { maqam: MaqamMode::Hijaz }
+    } else if v < -0.2 && a <= 0.5 {
+        // Sorrowful, subdued: Maqam Saba (half-flat intervals, grief)
+        TuningSystem::Maqamat { maqam: MaqamMode::Saba }
+    } else {
+        // Neutral zone: standard Western tuning
+        TuningSystem::TwelveTET
+    }
+}
+
 /// Build a scale from the current harmony activations using a specific tuning system.
 ///
 /// This is the culturally-extended version of `build_scale()`. The root frequency
@@ -561,6 +613,50 @@ mod tests {
             let scale = build_scale_with_tuning(&state, system);
             assert!(!scale.is_empty(), "{system:?} produced empty scale");
         }
+    }
+
+    #[test]
+    fn select_tuning_high_consciousness_is_just() {
+        let state = MusicalState { consciousness_level: 0.8, ..Default::default() };
+        assert_eq!(select_tuning_system(&state), TuningSystem::JustIntonation);
+    }
+
+    #[test]
+    fn select_tuning_low_consciousness_is_tet() {
+        let state = MusicalState { consciousness_level: 0.1, ..Default::default() };
+        assert_eq!(select_tuning_system(&state), TuningSystem::TwelveTET);
+    }
+
+    #[test]
+    fn select_tuning_joyful_is_raga_desh() {
+        let state = MusicalState {
+            valence: 0.6, arousal: 0.7, consciousness_level: 0.5, ..Default::default()
+        };
+        assert!(matches!(select_tuning_system(&state), TuningSystem::Raga { raga: RagaMode::Desh }));
+    }
+
+    #[test]
+    fn select_tuning_tense_is_maqam_hijaz() {
+        let state = MusicalState {
+            valence: -0.5, arousal: 0.8, consciousness_level: 0.5, ..Default::default()
+        };
+        assert!(matches!(select_tuning_system(&state), TuningSystem::Maqamat { maqam: MaqamMode::Hijaz }));
+    }
+
+    #[test]
+    fn select_tuning_serene_is_gamelan() {
+        let state = MusicalState {
+            valence: 0.4, arousal: 0.2, consciousness_level: 0.5, ..Default::default()
+        };
+        assert!(matches!(select_tuning_system(&state), TuningSystem::Gamelan { tuning: GamelanTuning::Slendro }));
+    }
+
+    #[test]
+    fn select_tuning_sorrowful_is_maqam_saba() {
+        let state = MusicalState {
+            valence: -0.6, arousal: 0.2, consciousness_level: 0.5, ..Default::default()
+        };
+        assert!(matches!(select_tuning_system(&state), TuningSystem::Maqamat { maqam: MaqamMode::Saba }));
     }
 
     #[test]

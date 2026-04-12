@@ -341,6 +341,10 @@ pub mod learned_encoding;
 #[cfg(feature = "code_generation")]
 pub mod code_encoder;
 
+/// Semantic encoder with synonym-aware programming concept codebook.
+#[cfg(feature = "code_generation")]
+pub mod code_semantic_encoder;
+
 /// Algebraic operations on code hypervectors (similarity, analogy, compose).
 #[cfg(feature = "code_generation")]
 pub mod code_algebra;

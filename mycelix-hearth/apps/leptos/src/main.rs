@@ -9,6 +9,7 @@ mod circadian;
 mod components;
 pub mod hearth_actions;
 mod hearth_context;
+pub mod hearth_prefs;
 pub mod mock_data;
 mod onboarding;
 pub mod record_bridge;

@@ -254,7 +254,7 @@ pub mod math_service;
 #[cfg(feature = "nurture")]
 pub mod nurture_bridge;
 
-#[cfg(feature = "humanoid")]
+#[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
 pub mod motor_bridge;
 
 #[cfg(feature = "safety-agents")]
@@ -909,6 +909,14 @@ pub struct CognitiveLoopService {
     /// Tracks telemetry and stores solved-problem episodes for analogical retrieval.
     #[cfg(feature = "mathematics")]
     math_service: math_service::MathService,
+
+    /// Conjecture Engine: automated mathematical conjecture generation via symbolic
+    /// regression (Ramanujan Protocol). Discovers closed-form formulas from numerical
+    /// sequences, verifies them by bounded induction, and self-corrects structural
+    /// tautologies. Features: GP + Nelder-Mead/L-BFGS, Pareto-optimal selection,
+    /// OEIS lookup, FFT periodicity, Bayesian confidence, sensitivity analysis.
+    #[cfg(feature = "mathematics")]
+    conjecture_engine: symthaea_core::hdc::conjecture_engine::ConjectureEngine,
 
     /// Epistemic Auditor: DuckDB-backed consciousness telemetry audit trail.
     #[cfg(feature = "epistemic_auditor")]

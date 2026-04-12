@@ -19,7 +19,7 @@ html {
 
 /* Consciousness-driven spacing — more breathing room when stressed */
 .feature-grid { gap: calc(1.5rem * var(--consciousness-density)); }
-.caps-detail { padding: calc(1.5rem * var(--consciousness-density)); }
+.praxis-detail { padding: calc(1.5rem * var(--consciousness-density)); }
 .game-sliders { gap: calc(0.75rem * var(--consciousness-density)); }
 
 :root, [data-theme="dark"] {
@@ -399,7 +399,7 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     margin-bottom: 0.75rem;
 }
 
-.caps-matric-grid {
+.praxis-progress-grid {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
     gap: 1.5rem;
@@ -407,7 +407,7 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
 }
 
 @media (max-width: 480px) {
-    .caps-matric-grid {
+    .praxis-progress-grid {
         grid-template-columns: 1fr 1fr;
         gap: 1rem;
     }
@@ -3835,7 +3835,7 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
    CAPS Skill Map — SVG Graph + Enhanced Layout
    =========================================================================== */
 
-.caps-skill-map {
+.praxis-skill-map {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
@@ -3843,16 +3843,16 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     min-width: 0;
     overflow: hidden;
 }
-.caps-skill-map * { min-width: 0; }
+.praxis-skill-map * { min-width: 0; }
 
-.caps-filters {
+.praxis-filters {
     display: flex;
     gap: 0.75rem;
     flex-wrap: wrap;
     align-items: center;
 }
 
-.caps-filter-group {
+.praxis-filter-group {
     display: flex;
     flex-wrap: wrap;
     gap: 0.25rem;
@@ -3862,7 +3862,7 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     border: 1px solid var(--border);
 }
 
-.caps-filter-btn {
+.praxis-filter-btn {
     padding: 6px 14px;
     border: none;
     border-radius: 6px;
@@ -3875,10 +3875,10 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     font-family: inherit;
 }
 
-.caps-filter-btn:hover { color: var(--text); }
-.caps-filter-btn.active { background: var(--primary); color: var(--text-on-primary); }
+.praxis-filter-btn:hover { color: var(--text); }
+.praxis-filter-btn.active { background: var(--primary); color: var(--text-on-primary); }
 
-.caps-graph-container {
+.praxis-graph-container {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 12px;
@@ -3887,20 +3887,20 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     position: relative;
 }
 
-.caps-graph-container svg {
+.praxis-graph-container svg {
     width: 100%;
     height: 100%;
 }
 
-.caps-graph-container svg text {
+.praxis-graph-container svg text {
     fill: var(--text);
     font-family: inherit;
 }
 
-.caps-node-group { cursor: pointer; }
-.caps-node-group:hover .caps-node-rect { stroke: var(--primary); stroke-width: 2; }
+.praxis-node-group { cursor: pointer; }
+.praxis-node-group:hover .praxis-node-rect { stroke: var(--primary); stroke-width: 2; }
 
-.caps-node-rect {
+.praxis-node-rect {
     rx: 8;
     ry: 8;
     fill: var(--surface);
@@ -3909,27 +3909,27 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     transition: stroke 0.15s;
 }
 
-.caps-node-rect.mastery-gold { stroke: var(--mastery-gold); stroke-width: 2; }
-.caps-node-rect.mastery-green { stroke: var(--mastery-green); stroke-width: 2; }
-.caps-node-rect.mastery-yellow { stroke: var(--mastery-yellow); stroke-width: 1.5; }
-.caps-node-rect.mastery-red { stroke: var(--mastery-red); stroke-width: 1.5; }
-.caps-node-rect.mastery-locked { stroke: var(--mastery-locked); opacity: 0.5; }
-.caps-node-rect.selected { stroke: var(--primary); stroke-width: 3; fill: var(--bg-raised); }
+.praxis-node-rect.mastery-gold { stroke: var(--mastery-gold); stroke-width: 2; }
+.praxis-node-rect.mastery-green { stroke: var(--mastery-green); stroke-width: 2; }
+.praxis-node-rect.mastery-yellow { stroke: var(--mastery-yellow); stroke-width: 1.5; }
+.praxis-node-rect.mastery-red { stroke: var(--mastery-red); stroke-width: 1.5; }
+.praxis-node-rect.mastery-locked { stroke: var(--mastery-locked); opacity: 0.5; }
+.praxis-node-rect.selected { stroke: var(--primary); stroke-width: 3; fill: var(--bg-raised); }
 
-.caps-edge {
+.praxis-edge {
     stroke: var(--border);
     stroke-width: 1.5;
     fill: none;
     opacity: 0.4;
 }
 
-.caps-edge.completed {
+.praxis-edge.completed {
     stroke: var(--success);
     opacity: 0.6;
 }
 
 /* Node detail panel */
-.caps-detail {
+.praxis-detail {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 12px;
@@ -3939,15 +3939,15 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     overflow-wrap: break-word;
 }
 
-.caps-detail-header {
+.praxis-detail-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
     margin-bottom: 1rem;
 }
 
-.caps-detail-title { font-size: 1.25rem; font-weight: 700; }
-.caps-detail-close {
+.praxis-detail-title { font-size: 1.25rem; font-weight: 700; }
+.praxis-detail-close {
     background: none;
     border: none;
     color: var(--text-secondary);
@@ -3956,7 +3956,7 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     padding: 4px 8px;
 }
 
-.caps-detail-meta {
+.praxis-detail-meta {
     display: flex;
     gap: 0.5rem;
     flex-wrap: wrap;
@@ -3965,7 +3965,7 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     overflow: hidden;
 }
 
-.caps-badge {
+.praxis-badge {
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -3979,18 +3979,18 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     max-width: 100%;
 }
 
-.caps-badge-grade { background: var(--primary-subtle); color: var(--primary); }
-.caps-badge-exam { background: rgba(14, 212, 168, 0.15); color: #38f5cc; }
-.caps-badge-bloom { background: rgba(59, 130, 246, 0.15); color: var(--info); }
-.caps-badge-hours { background: rgba(34, 197, 94, 0.15); color: var(--success); }
+.praxis-badge-grade { background: var(--primary-subtle); color: var(--primary); }
+.praxis-badge-exam { background: rgba(14, 212, 168, 0.15); color: #38f5cc; }
+.praxis-badge-bloom { background: rgba(59, 130, 246, 0.15); color: var(--info); }
+.praxis-badge-hours { background: rgba(34, 197, 94, 0.15); color: var(--success); }
 
-.caps-status-btns {
+.praxis-status-btns {
     display: flex;
     gap: 6px;
     margin-bottom: 1rem;
 }
 
-.caps-status-btn {
+.praxis-status-btn {
     padding: 5px 14px;
     border-radius: 6px;
     border: 1px solid var(--border);
@@ -4003,11 +4003,11 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     font-family: inherit;
 }
 
-.caps-status-btn.active-not-started { border-color: var(--text-tertiary); color: var(--text); }
-.caps-status-btn.active-studying { border-color: var(--warning); color: var(--warning); background: rgba(245, 158, 11, 0.1); }
-.caps-status-btn.active-mastered { border-color: var(--success); color: var(--success); background: rgba(34, 197, 94, 0.1); }
+.praxis-status-btn.active-not-started { border-color: var(--text-tertiary); color: var(--text); }
+.praxis-status-btn.active-studying { border-color: var(--warning); color: var(--warning); background: rgba(245, 158, 11, 0.1); }
+.praxis-status-btn.active-mastered { border-color: var(--success); color: var(--success); background: rgba(34, 197, 94, 0.1); }
 
-.caps-tabs {
+.praxis-tabs {
     display: flex;
     gap: 2px;
     margin-bottom: 1rem;
@@ -4018,9 +4018,9 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
 }
-.caps-tabs::-webkit-scrollbar { display: none; }
+.praxis-tabs::-webkit-scrollbar { display: none; }
 
-.caps-tab {
+.praxis-tab {
     flex: 0 0 auto;
     padding: 7px 14px;
     text-align: center;
@@ -4036,11 +4036,11 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     white-space: nowrap;
 }
 
-.caps-tab:hover { color: var(--text-secondary); }
-.caps-tab.active { background: var(--primary); color: var(--text-on-primary); }
+.praxis-tab:hover { color: var(--text-secondary); }
+.praxis-tab.active { background: var(--primary); color: var(--text-on-primary); }
 
-.caps-tab-content { display: none; }
-.caps-tab-content.active { display: block; }
+.praxis-tab-content { display: none; }
+.praxis-tab-content.active { display: block; }
 
 /* Progress bar */
 .progress-bar {
@@ -4065,13 +4065,13 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
 .progress-bar-fill.success { background: var(--success); }
 
 /* Resource links */
-.caps-resources {
+.praxis-resources {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
 }
 
-.caps-resource-link {
+.praxis-resource-link {
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -4084,22 +4084,22 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     transition: all 0.15s;
 }
 
-.caps-resource-link:hover {
+.praxis-resource-link:hover {
     background: rgba(59, 130, 246, 0.1);
     border-color: var(--info);
 }
 
 /* Worked examples */
-.caps-example {
+.praxis-example {
     background: var(--bg-raised);
     border-radius: 8px;
     padding: 1rem;
     margin-bottom: 0.75rem;
 }
 
-.caps-example-problem { font-weight: 600; margin-bottom: 0.5rem; }
+.praxis-example-problem { font-weight: 600; margin-bottom: 0.5rem; }
 
-.caps-example-step {
+.praxis-example-step {
     font-size: 0.85rem;
     color: var(--text-secondary);
     padding: 3px 0 3px 12px;
@@ -4107,22 +4107,22 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     margin: 3px 0;
 }
 
-.caps-example-answer { font-weight: 600; color: var(--success); margin-top: 0.5rem; }
+.praxis-example-answer { font-weight: 600; color: var(--success); margin-top: 0.5rem; }
 
 /* Practice problems */
-.caps-problem {
+.praxis-problem {
     background: var(--bg-raised);
     border-radius: 8px;
     padding: 1rem;
     margin-bottom: 0.5rem;
 }
 
-.caps-problem-q { font-weight: 500; margin-bottom: 0.25rem; }
-.caps-problem-a { color: var(--success); font-size: 0.85rem; }
-.caps-problem-meta { font-size: 0.75rem; color: var(--text-tertiary); margin-top: 0.25rem; }
+.praxis-problem-q { font-weight: 500; margin-bottom: 0.25rem; }
+.praxis-problem-a { color: var(--success); font-size: 0.85rem; }
+.praxis-problem-meta { font-size: 0.75rem; color: var(--text-tertiary); margin-top: 0.25rem; }
 
 /* Flashcards */
-.caps-flashcard {
+.praxis-flashcard {
     display: flex;
     gap: 12px;
     background: var(--bg-raised);
@@ -4132,8 +4132,8 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     cursor: pointer;
 }
 
-.caps-flashcard-front { flex: 1; font-size: 0.85rem; }
-.caps-flashcard-back {
+.praxis-flashcard-front { flex: 1; font-size: 0.85rem; }
+.praxis-flashcard-back {
     flex: 1;
     font-size: 0.85rem;
     color: var(--success);
@@ -4141,10 +4141,10 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     transition: filter 0.3s;
 }
 
-.caps-flashcard:hover .caps-flashcard-back { filter: none; }
+.praxis-flashcard:hover .praxis-flashcard-back { filter: none; }
 
 /* Misconception alerts */
-.caps-misconception {
+.praxis-misconception {
     background: rgba(239, 68, 68, 0.05);
     border: 1px solid rgba(239, 68, 68, 0.2);
     border-radius: 8px;
@@ -4152,16 +4152,16 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     margin-bottom: 0.5rem;
 }
 
-.caps-misconception-wrong { color: var(--error); font-weight: 600; font-size: 0.85rem; }
-.caps-misconception-right { color: var(--success); font-weight: 600; font-size: 0.85rem; margin-top: 0.25rem; }
-.caps-misconception-why { color: var(--text-secondary); font-style: italic; font-size: 0.85rem; margin-top: 0.25rem; }
+.praxis-misconception-wrong { color: var(--error); font-weight: 600; font-size: 0.85rem; }
+.praxis-misconception-right { color: var(--success); font-weight: 600; font-size: 0.85rem; margin-top: 0.25rem; }
+.praxis-misconception-why { color: var(--text-secondary); font-style: italic; font-size: 0.85rem; margin-top: 0.25rem; }
 
 /* Lesson content typography */
 .lesson-body { line-height: 1.8; font-size: 0.95rem; }
 .lesson-body p + p { margin-top: 1.25em; }
-.caps-detail p { word-wrap: break-word; overflow-wrap: break-word; }
-.caps-example-step { line-height: 1.8; }
-.caps-problem-q { line-height: 1.7; }
+.praxis-detail p { word-wrap: break-word; overflow-wrap: break-word; }
+.praxis-example-step { line-height: 1.8; }
+.praxis-problem-q { line-height: 1.7; }
 
 /* Time-of-day color modulation */
 [data-time="morning"] { --primary: #6366f1; } /* cooler violet */
@@ -4282,12 +4282,12 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
 }
 
 /* Prerequisite list */
-.caps-prereq-link {
+.praxis-prereq-link {
     color: var(--info);
     text-decoration: none;
     cursor: pointer;
 }
-.caps-prereq-link:hover { text-decoration: underline; }
+.praxis-prereq-link:hover { text-decoration: underline; }
 
 /* ===========================================================================
    Educational Games
@@ -4512,7 +4512,7 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
 }
 
-.caps-status-btn.just-mastered {
+.praxis-status-btn.just-mastered {
     animation: mastery-glow 1.5s ease-out;
     border-color: var(--success) !important;
     color: var(--success) !important;
@@ -4606,7 +4606,7 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
 }
 
 /* Constellation = Prospect: the wide view */
-.caps-skill-map:not(.study-refuge) .constellation-container {
+.praxis-skill-map:not(.study-refuge) .constellation-container {
     animation: prospect-reveal 0.6s ease-out;
 }
 
@@ -4620,13 +4620,13 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
    =========================================================================== */
 
 /* Practice problems — organic feel, no harsh reds */
-.caps-problem {
+.praxis-problem {
     border-left: 3px solid var(--border);
     transition: border-color 0.4s, background 0.4s;
 }
 
 /* Revealed answer — subtle earth-tone acknowledgment, not red/green binary */
-.caps-problem-a {
+.praxis-problem-a {
     color: var(--text);
     padding: 0.5rem 0.75rem;
     background: var(--soil-rich);
@@ -4635,7 +4635,7 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
 }
 
 /* Difficulty labels — organic terrain metaphors */
-.caps-problem-meta {
+.praxis-problem-meta {
     font-size: 0.75rem;
     color: var(--text-tertiary);
     font-style: italic;
@@ -4643,13 +4643,13 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
 }
 
 /* Misconceptions — weathered texture, not alarming red */
-.caps-misconception {
+.praxis-misconception {
     border: 1px solid var(--weathering);
     border-radius: 8px;
     background: linear-gradient(135deg, transparent 0%, var(--soil-sandy) 100%);
 }
 
-.caps-misconception-wrong {
+.praxis-misconception-wrong {
     color: var(--text-secondary);
     opacity: 0.8;
     text-decoration: line-through;
@@ -5158,25 +5158,25 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
         max-width: 100%;
     }
 
-    .caps-filters { gap: 0.5rem; }
-    .caps-filter-btn { padding: 5px 10px; font-size: 0.75rem; }
+    .praxis-filters { gap: 0.5rem; }
+    .praxis-filter-btn { padding: 5px 10px; font-size: 0.75rem; }
     .landing-title { font-size: 2rem; }
     .role-cards { grid-template-columns: 1fr; }
     .feature-grid { grid-template-columns: 1fr; }
-    .caps-detail-meta { gap: 0.5rem; }
+    .praxis-detail-meta { gap: 0.5rem; }
 }
 
 @media (max-width: 480px) {
     main { padding: 0.75rem; padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0)); }
-    .caps-detail { padding: 1rem; }
-    .caps-tabs { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
-    .caps-tab { white-space: nowrap; min-width: 0; flex-shrink: 0; }
-    .caps-filter-btn { font-size: 0.75rem; padding: 0.25rem 0.5rem; }
+    .praxis-detail { padding: 1rem; }
+    .praxis-tabs { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
+    .praxis-tab { white-space: nowrap; min-width: 0; flex-shrink: 0; }
+    .praxis-filter-btn { font-size: 0.75rem; padding: 0.25rem 0.5rem; }
     h1 { font-size: 1.25rem; }
     h2 { font-size: 1.1rem; }
 
     /* Fix text overflow on study pages */
-    .caps-detail p, .lesson-body p { word-wrap: break-word; overflow-wrap: break-word; }
+    .praxis-detail p, .lesson-body p { word-wrap: break-word; overflow-wrap: break-word; }
 
     /* Review page fixes */
     .topic-selector { padding: 1rem 0.5rem; }
@@ -5188,15 +5188,15 @@ h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
     .source-meta { font-size: 0.7rem; }
 
     /* Exam prep fixes */
-    .caps-badge-exam { font-size: 0.6rem; padding: 1px 5px; }
-    .caps-skill-map > p { font-size: 0.8rem; word-wrap: break-word; overflow-wrap: break-word; }
+    .praxis-badge-exam { font-size: 0.6rem; padding: 1px 5px; }
+    .praxis-skill-map > p { font-size: 0.8rem; word-wrap: break-word; overflow-wrap: break-word; }
 }
 
 @media (max-width: 360px) {
     main { padding: 0.5rem; padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0)); }
-    .caps-badge { font-size: 0.65rem; padding: 2px 6px; }
-    .caps-filter-btn { padding: 4px 8px; font-size: 0.7rem; }
-    .caps-matric-grid { grid-template-columns: 1fr !important; }
+    .praxis-badge { font-size: 0.65rem; padding: 2px 6px; }
+    .praxis-filter-btn { padding: 4px 8px; font-size: 0.7rem; }
+    .praxis-progress-grid { grid-template-columns: 1fr !important; }
 }
 
 /* ===========================================================================

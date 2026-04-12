@@ -59,8 +59,31 @@ pub struct CodeOrchestrator {
     /// captured from successful generations for Broca SSM training.
     /// The flywheel: LLM teaches native → native improves → less LLM needed.
     distillation_buffer: Vec<DistillationCapture>,
+    /// Sequencer training buffer: (purpose, plan_actions) pairs captured from
+    /// successful generations. When this reaches `sequencer_retrain_threshold`,
+    /// the CfC sequencer can be retrained to handle these patterns natively.
+    sequencer_training_buffer: Vec<SequencerTrainingCapture>,
+    /// Number of captures before triggering sequencer retraining
+    sequencer_retrain_threshold: usize,
     /// Certificates issued for accepted code
     certificates: Vec<CodeCertificate>,
+}
+
+/// A captured (purpose, plan_actions) pair for CfC sequencer training.
+///
+/// When an LLM fallback succeeds, we analyze its output to infer what
+/// plan the native sequencer should have produced. This closes the loop:
+/// LLM generates → capture plan → retrain sequencer → native handles it next time.
+#[derive(Debug, Clone)]
+pub struct SequencerTrainingCapture {
+    /// The purpose/intent text
+    pub purpose: String,
+    /// Inferred plan actions the sequencer should learn
+    pub target_actions: Vec<crate::dynamics::cfc_code_sequencer::PlanAction>,
+    /// Quality of the generation (0.0-1.0)
+    pub quality: f32,
+    /// Which backend produced the successful output
+    pub backend: String,
 }
 
 /// A captured (intent, code, quality) triple for Broca SSM training.
@@ -144,6 +167,8 @@ impl CodeOrchestrator {
             energy_spent: 0.0,
             attempt_history: Vec::new(),
             distillation_buffer: Vec::new(),
+            sequencer_training_buffer: Vec::new(),
+            sequencer_retrain_threshold: 50,
             certificates: Vec::new(),
         }
     }
@@ -282,6 +307,138 @@ impl CodeOrchestrator {
             backend: backend.to_string(),
             name: request.name.clone(),
         });
+
+        // === Flywheel: also capture for sequencer training ===
+        // Infer the plan actions the CfC sequencer should have produced
+        // based on the structure of the successful output.
+        let target_actions = Self::infer_plan_from_source(source);
+        self.sequencer_training_buffer.push(SequencerTrainingCapture {
+            purpose: request.purpose.clone(),
+            target_actions,
+            quality,
+            backend: backend.to_string(),
+        });
+    }
+
+    /// Infer PlanAction sequence from generated source code.
+    ///
+    /// Analyzes the code structure to determine what plan steps the
+    /// sequencer should learn to produce for similar inputs.
+    fn infer_plan_from_source(source: &str) -> Vec<crate::dynamics::cfc_code_sequencer::PlanAction> {
+        use crate::dynamics::cfc_code_sequencer::PlanAction;
+
+        let mut actions = Vec::new();
+
+        // Detect structural elements present in the code
+        if source.contains("struct ") {
+            actions.push(PlanAction::DefineStruct);
+        }
+        if source.contains("enum ") {
+            actions.push(PlanAction::DefineEnum);
+        }
+        if source.contains("trait ") {
+            actions.push(PlanAction::DefineTrait);
+        }
+        if source.contains("fn ") {
+            actions.push(PlanAction::DefineFunction);
+
+            // Count parameters
+            if let Some(paren_start) = source.find('(') {
+                if let Some(paren_end) = source[paren_start..].find(')') {
+                    let params = &source[paren_start + 1..paren_start + paren_end];
+                    let param_count = if params.trim().is_empty() {
+                        0
+                    } else {
+                        params.split(',').count()
+                    };
+                    for _ in 0..param_count {
+                        actions.push(PlanAction::AddParameter);
+                    }
+                }
+            }
+
+            // Return type
+            if source.contains("->") {
+                actions.push(PlanAction::SetReturnType);
+            }
+        }
+        if source.contains("impl ") {
+            actions.push(PlanAction::ImplTrait);
+        }
+        if source.contains("use ") {
+            actions.push(PlanAction::AddImport);
+        }
+        if source.contains("Result<") || source.contains("Result ")
+            || source.contains(".map_err(") || source.contains("?;")
+        {
+            actions.push(PlanAction::AddErrorHandling);
+        }
+        if source.contains("///") || source.contains("//!") {
+            actions.push(PlanAction::AddDocumentation);
+        }
+
+        // Phase 4: detect new action types
+        if source.contains("match ") {
+            actions.push(PlanAction::MatchExpression);
+        }
+        if source.contains("for ") && source.contains(" in ") {
+            actions.push(PlanAction::ForLoop);
+        }
+        if source.contains(".iter()") || source.contains(".into_iter()") {
+            actions.push(PlanAction::IteratorChain);
+        }
+        if source.contains("|") && (source.contains("||") || source.contains("| ")) {
+            // Simple heuristic for closures — avoid false positives from logical OR
+            if source.contains(".map(|") || source.contains(".filter(|")
+                || source.contains(".for_each(|") || source.contains("= |")
+            {
+                actions.push(PlanAction::ClosureDefine);
+            }
+        }
+        if source.contains("?;") || source.contains("?)") {
+            actions.push(PlanAction::ErrorPropagation);
+        }
+        if source.contains("<T") || source.contains("<T>") || source.contains("<T:") {
+            actions.push(PlanAction::GenericParam);
+        }
+        if source.contains("'a") || source.contains("'static") {
+            actions.push(PlanAction::LifetimeAnnotation);
+        }
+        if source.contains("#[derive(") {
+            actions.push(PlanAction::DeriveAttribute);
+        }
+        if source.contains("#[test]") || source.contains("#[cfg(test)]") {
+            actions.push(PlanAction::TestModule);
+        }
+        if source.contains("const ") {
+            actions.push(PlanAction::ConstDefinition);
+        }
+        if source.contains("type ") && source.contains(" = ") {
+            actions.push(PlanAction::TypeAlias);
+        }
+
+        // Ensure at least DefineFunction
+        if actions.is_empty() {
+            actions.push(PlanAction::DefineFunction);
+        }
+        actions.push(PlanAction::Complete);
+
+        actions
+    }
+
+    /// Get the sequencer training buffer for retraining.
+    pub fn sequencer_training_buffer(&self) -> &[SequencerTrainingCapture] {
+        &self.sequencer_training_buffer
+    }
+
+    /// Take the sequencer training buffer (drains it for consumption by the trainer).
+    pub fn take_sequencer_training_buffer(&mut self) -> Vec<SequencerTrainingCapture> {
+        std::mem::take(&mut self.sequencer_training_buffer)
+    }
+
+    /// Check if the sequencer training buffer has reached the retrain threshold.
+    pub fn should_retrain_sequencer(&self) -> bool {
+        self.sequencer_training_buffer.len() >= self.sequencer_retrain_threshold
     }
 
     /// Generate a CodeCertificate for verified code.
@@ -632,7 +789,7 @@ impl CodeSynthesisBackend for CodeOrchestrator {
         SynthesisResponse {
             source: generated.source.clone(),
             backend_name: "CodeOrchestrator".to_string(),
-            confidence: generated.phi,
+            confidence: generated.phi_score,
             epistemic_status: to_trait_epistemic(generated.epistemic_status),
             verification: Vec::new(),
             accepted: !generated.source.is_empty()

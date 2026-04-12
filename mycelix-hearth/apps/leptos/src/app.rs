@@ -45,6 +45,7 @@ fn AppInner() -> impl IntoView {
     provide_toast_context();
     provide_homeostasis_context(2, "--homeostasis");
     provide_hearth_context();
+    crate::hearth_prefs::provide_hearth_prefs();
 
     // Action dispatch layer (real zome calls when connected, mock when not)
     crate::hearth_actions::provide_hearth_actions();
@@ -69,6 +70,7 @@ fn AppInner() -> impl IntoView {
                 <Routes fallback=|| view! { <p class="not-found">"you’ve wandered off the path"</p> }>
                     <Route path=path!("/") view=HomePage />
                     <Route path=path!("/found") view=crate::pages::found::FoundingCeremony />
+                    <Route path=path!("/settings") view=crate::pages::settings::SettingsPage />
                     <Route path=path!("/kinship") view=KinshipPage />
                     <Route path=path!("/care") view=CarePage />
                     <Route path=path!("/decisions") view=DecisionsPage />

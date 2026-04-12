@@ -26,7 +26,8 @@
 //! ```
 
 use crate::consciousness::recursive_improvement::world_prediction::{
-    OutcomeCategory, PredictionDomain, WorldActionContext, WorldPrediction,
+    OutcomeCategory, PredictionDomain, ResolutionAuthority, ResolutionContract,
+    WorldActionContext, WorldPrediction,
 };
 
 /// Bridge between code generation and MAGI world predictions.
@@ -124,18 +125,23 @@ impl MagiCodeBridge {
         raw_confidence: f64,
         claim: &str,
     ) -> String {
-        let action_context = WorldActionContext {
-            action_type: "compile".to_string(),
-            action_args: vec![request_name.to_string(), backend.to_string()],
-            pre_state_summary: format!("Generating {} via {}", request_name, backend),
-            expected_post_state: "Code compiles and passes tests".to_string(),
-        };
+        let action_context = WorldActionContext::new(
+            "compile",
+            format!("Generate {} via {} — code should compile and pass tests", request_name, backend),
+        );
 
+        let resolution_contract = ResolutionContract::new(
+            "compile",
+            ResolutionAuthority::ExitCode {
+                success_codes: vec![0],
+            },
+        );
         let prediction = WorldPrediction::new(
             claim,
             OutcomeCategory::Success,
             raw_confidence,
             action_context,
+            resolution_contract,
         );
 
         let prediction_id = prediction.id.clone();

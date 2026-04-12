@@ -172,7 +172,7 @@ impl CodePrimitiveEvolver {
     /// - Whether decoded code passes tests
     pub fn evolve<F>(&mut self, fitness_fn: F) -> CodeEvolutionResult
     where
-        F: Fn(&ContinuousHV) -> f64 + Copy,
+        F: Fn(&ContinuousHV) -> f64 + Clone,
     {
         let result = self.evolver.evolve(fitness_fn);
 

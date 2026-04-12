@@ -1,8 +1,8 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! CAPS curriculum data loader and reactive state provider.
+//! Curriculum data loader and reactive state provider.
 //!
-//! Embeds the unified Matric graph JSON at compile time via `include_str!`.
+//! Embeds the unified curriculum graph JSON at compile time via `include_str!`.
 //! Parses lazily on first access and provides reactive Leptos signals for
 //! subject/grade filtering and progress tracking.
 
@@ -19,14 +19,14 @@ use crate::persistence;
 
 const CAPS_JSON: &str = include_str!("../../../examples/curriculum/caps/caps-unified-matric.json");
 
-static CAPS_GRAPH: OnceLock<CapsGraph> = OnceLock::new();
+static CAPS_GRAPH: OnceLock<CurriculumGraph> = OnceLock::new();
 
 /// Get the parsed CAPS graph (lazily initialized).
-pub fn caps_graph() -> &'static CapsGraph {
+pub fn curriculum_graph() -> &'static CurriculumGraph {
     CAPS_GRAPH.get_or_init(|| {
-        let raw: RawCapsDocument = serde_json::from_str(CAPS_JSON)
+        let raw: RawCurriculumDocument = serde_json::from_str(CAPS_JSON)
             .expect("embedded CAPS JSON must be valid");
-        CapsGraph::from_raw(raw)
+        CurriculumGraph::from_raw(raw)
     })
 }
 
@@ -35,10 +35,10 @@ pub fn caps_graph() -> &'static CapsGraph {
 // ============================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct RawCapsDocument {
+struct RawCurriculumDocument {
     metadata: RawMetadata,
-    nodes: Vec<CapsNode>,
-    edges: Vec<CapsEdge>,
+    nodes: Vec<CurriculumNode>,
+    edges: Vec<CurriculumEdge>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -48,7 +48,7 @@ struct RawMetadata {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct CapsNode {
+pub struct CurriculumNode {
     pub id: String,
     pub title: String,
     pub description: String,
@@ -87,7 +87,7 @@ pub struct SupplementaryResource {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct CapsEdge {
+pub struct CurriculumEdge {
     #[serde(alias = "source")]
     pub from: String,
     #[serde(alias = "target")]
@@ -101,9 +101,9 @@ pub struct CapsEdge {
 }
 
 /// Parsed and indexed curriculum graph.
-pub struct CapsGraph {
-    pub nodes: Vec<CapsNode>,
-    pub edges: Vec<CapsEdge>,
+pub struct CurriculumGraph {
+    pub nodes: Vec<CurriculumNode>,
+    pub edges: Vec<CurriculumEdge>,
     pub by_id: HashMap<String, usize>,         // node id -> index
     pub by_subject_grade: HashMap<(String, String), Vec<usize>>, // (subject, grade) -> indices
     pub prerequisites: HashMap<String, Vec<String>>, // node id -> prerequisite node ids
@@ -112,8 +112,8 @@ pub struct CapsGraph {
     pub cross_subject: HashMap<String, Vec<usize>>,  // node id -> edge indices
 }
 
-impl CapsGraph {
-    fn from_raw(raw: RawCapsDocument) -> Self {
+impl CurriculumGraph {
+    fn from_raw(raw: RawCurriculumDocument) -> Self {
         let mut by_id = HashMap::new();
         let mut by_subject_grade: HashMap<(String, String), Vec<usize>> = HashMap::new();
         let mut prerequisites: HashMap<String, Vec<String>> = HashMap::new();
@@ -154,7 +154,7 @@ impl CapsGraph {
             }
         }
 
-        CapsGraph {
+        CurriculumGraph {
             nodes,
             edges: raw.edges,
             by_id,
@@ -166,7 +166,7 @@ impl CapsGraph {
     }
 
     /// Get nodes for a subject + grade combination.
-    pub fn nodes_for(&self, subject: &str, grade: &str) -> Vec<&CapsNode> {
+    pub fn nodes_for(&self, subject: &str, grade: &str) -> Vec<&CurriculumNode> {
         self.by_subject_grade
             .get(&(subject.to_string(), grade.to_string()))
             .map(|indices| indices.iter().map(|&i| &self.nodes[i]).collect())
@@ -182,13 +182,13 @@ impl CapsGraph {
     }
 
     /// Get a node by ID.
-    pub fn node(&self, id: &str) -> Option<&CapsNode> {
+    pub fn node(&self, id: &str) -> Option<&CurriculumNode> {
         self.by_id.get(id).map(|&i| &self.nodes[i])
     }
 
     /// Get cross-subject connections for a node (AppliedIn/RelatedTo edges).
     /// Returns (neighbor_node, edge, is_outgoing) tuples.
-    pub fn cross_subject_neighbors(&self, node_id: &str) -> Vec<(&CapsNode, &CapsEdge)> {
+    pub fn cross_subject_neighbors(&self, node_id: &str) -> Vec<(&CurriculumNode, &CurriculumEdge)> {
         self.cross_subject
             .get(node_id)
             .map(|edge_indices| {
@@ -392,8 +392,8 @@ impl ProgressStore {
     }
 
     /// Mastery permille for a subject (0-1000).
-    pub fn subject_mastery(&self, graph: &CapsGraph, subject: &str) -> u16 {
-        let nodes: Vec<&CapsNode> = graph.nodes.iter().filter(|n| n.subject_area == subject).collect();
+    pub fn subject_mastery(&self, graph: &CurriculumGraph, subject: &str) -> u16 {
+        let nodes: Vec<&CurriculumNode> = graph.nodes.iter().filter(|n| n.subject_area == subject).collect();
         if nodes.is_empty() { return 0; }
         let total: u32 = nodes.iter().map(|n| self.get(&n.id).mastery_permille as u32).sum();
         (total / nodes.len() as u32) as u16
@@ -552,7 +552,7 @@ impl Subject {
     }
 
     /// Get all unique subjects from the graph.
-    pub fn all_from_graph(graph: &CapsGraph) -> Vec<Subject> {
+    pub fn all_from_graph(graph: &CurriculumGraph) -> Vec<Subject> {
         let mut subjects: Vec<String> = graph.subjects().iter().map(|s| s.to_string()).collect();
         subjects.sort();
         subjects.into_iter().map(Subject).collect()
@@ -631,7 +631,7 @@ impl Grade {
 /// Provide curriculum context. Call once at app root.
 pub fn provide_curriculum_context() {
     // Force parse on startup
-    let _ = caps_graph();
+    let _ = curriculum_graph();
 
     let initial_progress = persistence::load::<ProgressStore>(PROGRESS_KEY)
         .unwrap_or_default();

@@ -25,10 +25,10 @@ use crate::curriculum::display_subject;
 
 #[derive(Clone, Debug, PartialEq)]
 enum CardSource {
-    MatricMath,
-    MatricPhysics,
-    MatricChemistry,
-    Grade9Foundations,
+    CoreMath,
+    CorePhysics,
+    CoreChemistry,
+    Foundations,
     DynamicSubject(String), // Generated from curriculum graph for any subject
 }
 
@@ -83,7 +83,7 @@ struct DynamicFlashcard {
 fn generate_dynamic_cards(subject: &str) -> Vec<MockFlashcard> {
     // We can't return MockFlashcard (static refs) from dynamic data,
     // so we'll use a leaked string approach for compatibility
-    let graph = crate::curriculum::caps_graph();
+    let graph = crate::curriculum::curriculum_graph();
     let progress = crate::persistence::load::<crate::curriculum::ProgressStore>("praxis_progress")
         .unwrap_or_default();
 
@@ -126,7 +126,7 @@ fn generate_dynamic_cards(subject: &str) -> Vec<MockFlashcard> {
     cards
 }
 
-/// Generate flashcards for CAPS Matric Mathematics.
+/// Generate flashcards for Core Mathematics.
 fn generate_curriculum_cards() -> Vec<MockFlashcard> {
     vec![
         // Algebra
@@ -159,7 +159,7 @@ fn generate_curriculum_cards() -> Vec<MockFlashcard> {
     ]
 }
 
-/// Generate flashcards for CAPS Matric Physics (Paper 1).
+/// Generate flashcards for Core Physics (Paper 1).
 fn generate_science_cards() -> Vec<MockFlashcard> {
     vec![
         // Momentum
@@ -179,7 +179,7 @@ fn generate_science_cards() -> Vec<MockFlashcard> {
     ]
 }
 
-/// Generate flashcards for CAPS Matric Chemistry (Paper 2).
+/// Generate flashcards for Core Chemistry (Paper 2).
 fn generate_chemistry_cards() -> Vec<MockFlashcard> {
     vec![
         // Organic Chemistry
@@ -323,10 +323,10 @@ pub fn ReviewPage() -> impl IntoView {
         let adaptivity = adaptivity.clone();
         move |source: CardSource| {
             let deck = match &source {
-                CardSource::MatricMath => generate_curriculum_cards(),
-                CardSource::MatricPhysics => generate_science_cards(),
-                CardSource::MatricChemistry => generate_chemistry_cards(),
-                CardSource::Grade9Foundations => generate_foundations_cards(),
+                CardSource::CoreMath => generate_curriculum_cards(),
+                CardSource::CorePhysics => generate_science_cards(),
+                CardSource::CoreChemistry => generate_chemistry_cards(),
+                CardSource::Foundations => generate_foundations_cards(),
                 CardSource::DynamicSubject(subject) => generate_dynamic_cards(subject),
             };
             cards.set_value(deck);
@@ -442,19 +442,19 @@ pub fn ReviewPage() -> impl IntoView {
                 if card_source.get().is_none() {
                     let select_math = {
                         let select_source = select_source.clone();
-                        move |_| select_source(CardSource::MatricMath)
+                        move |_| select_source(CardSource::CoreMath)
                     };
                     let select_physics = {
                         let select_source = select_source.clone();
-                        move |_| select_source(CardSource::MatricPhysics)
+                        move |_| select_source(CardSource::CorePhysics)
                     };
                     let select_chem = {
                         let select_source = select_source.clone();
-                        move |_| select_source(CardSource::MatricChemistry)
+                        move |_| select_source(CardSource::CoreChemistry)
                     };
                     let select_foundations = {
                         let select_source = select_source.clone();
-                        move |_| select_source(CardSource::Grade9Foundations)
+                        move |_| select_source(CardSource::Foundations)
                     };
                     return view! {
                         <div class="topic-selector">
@@ -463,17 +463,17 @@ pub fn ReviewPage() -> impl IntoView {
                             <div class="source-cards">
                                 <button class="source-card source-math" on:click=select_math>
                                     <span class="source-icon">"\u{1f4d0}"</span>
-                                    <span class="source-label">"Matric Maths"</span>
+                                    <span class="source-label">"Core Maths"</span>
                                     <span class="source-meta">"17 cards"</span>
                                 </button>
                                 <button class="source-card source-science" on:click=select_physics>
                                     <span class="source-icon">"\u{269b}\u{fe0f}"</span>
-                                    <span class="source-label">"Matric Physics"</span>
+                                    <span class="source-label">"Core Physics"</span>
                                     <span class="source-meta">"9 cards"</span>
                                 </button>
                                 <button class="source-card source-science" on:click=select_chem>
                                     <span class="source-icon">"\u{2697}\u{fe0f}"</span>
-                                    <span class="source-label">"Matric Chemistry"</span>
+                                    <span class="source-label">"Core Chemistry"</span>
                                     <span class="source-meta">"10 cards"</span>
                                 </button>
                                 <button class="source-card" on:click=select_foundations style="border-color: var(--grade-9)">
@@ -486,7 +486,7 @@ pub fn ReviewPage() -> impl IntoView {
                             <h3 style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 1.5rem; margin-bottom: 0.75rem">"More Subjects"</h3>
                             <div class="source-cards" style="gap: 0.5rem">
                                 {
-                                    let graph = crate::curriculum::caps_graph();
+                                    let graph = crate::curriculum::curriculum_graph();
                                     let mut subjects: Vec<(String, usize)> = graph.subjects().iter()
                                         .filter(|s| !["Mathematics", "PhysicalSciences", "NaturalSciences"].contains(s))
                                         .map(|s| {

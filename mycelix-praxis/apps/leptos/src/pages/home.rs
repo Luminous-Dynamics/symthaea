@@ -15,7 +15,7 @@ use wasm_bindgen::JsCast;
 
 use crate::adaptivity_provider::use_adaptivity;
 use crate::cognitive_adaptivity::*;
-use crate::curriculum::{use_progress, caps_graph};
+use crate::curriculum::{use_progress, curriculum_graph};
 use crate::role::{use_set_role, UserRole};
 use crate::student_profile::{use_profile, use_set_profile};
 
@@ -176,7 +176,7 @@ fn MentorGreeting(
             {if is_first_visit {
                 // Find a good first topic based on the student's grade
                 let grade = profile.get_untracked().grade;
-                let graph = caps_graph();
+                let graph = curriculum_graph();
                 let grade_str = format!("Grade{}", grade);
                 let first_topic = graph.nodes.iter()
                     .filter(|n| n.grade_levels.first().map(|g| g == &grade_str).unwrap_or(false))
@@ -226,7 +226,7 @@ fn MentorGreeting(
                     let due_cards = p.srs_cards.values().filter(|c| now >= c.next_review_ms).count();
                     let weakest = p.weakest_topics(1);
                     let weakest_topic = weakest.first().map(|(id, pct)| {
-                        let title = caps_graph().node(id).map(|n| n.title.clone()).unwrap_or_default();
+                        let title = curriculum_graph().node(id).map(|n| n.title.clone()).unwrap_or_default();
                         (id.clone(), title, *pct)
                     });
 

@@ -3,6 +3,7 @@
 
 mod home;
 pub mod found;
+pub mod settings;
 mod kinship;
 mod care;
 mod decisions;

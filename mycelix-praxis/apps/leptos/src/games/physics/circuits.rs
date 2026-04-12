@@ -95,11 +95,11 @@ pub fn CircuitExplorer(node_id: String) -> impl IntoView {
             // Circuit type toggle
             <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; justify-content: center">
                 <button
-                    class=move || if series.get() { "caps-filter-btn active" } else { "caps-filter-btn" }
+                    class=move || if series.get() { "praxis-filter-btn active" } else { "praxis-filter-btn" }
                     on:click=move |_| set_series.set(true)
                 >"Series"</button>
                 <button
-                    class=move || if !series.get() { "caps-filter-btn active" } else { "caps-filter-btn" }
+                    class=move || if !series.get() { "praxis-filter-btn active" } else { "praxis-filter-btn" }
                     on:click=move |_| set_series.set(false)
                 >"Parallel"</button>
             </div>
@@ -254,7 +254,7 @@ pub fn CircuitExplorer(node_id: String) -> impl IntoView {
                                 <div class="game-challenge-number">"Challenge "{idx + 1}" of 4"</div>
                                 <div class="game-challenge-instruction">{instructions[idx]}</div>
                                 <div class="game-challenge-actions">
-                                    <button class="caps-filter-btn active" on:click=move |_| check()>"Check"</button>
+                                    <button class="praxis-filter-btn active" on:click=move |_| check()>"Check"</button>
                                 </div>
                                 <div class="game-challenge-hint">{hints[idx]}</div>
                             </div>

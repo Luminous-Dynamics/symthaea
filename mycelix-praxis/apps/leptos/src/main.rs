@@ -13,6 +13,7 @@ mod consciousness;
 mod consciousness_ui;
 mod curriculum;
 mod games;
+mod graph_cache;
 mod holochain;
 mod i18n;
 mod katex;

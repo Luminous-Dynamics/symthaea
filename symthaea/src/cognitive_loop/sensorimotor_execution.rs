@@ -27,7 +27,7 @@
 use super::motor_rendering_manager;
 use super::vision_sensory_manager;
 
-/// Groups 6 sensorimotor subsystems (+ 3 feature-gated humanoid fields).
+/// Groups 6 sensorimotor subsystems (+ 3 feature-gated embodiment fields).
 ///
 /// Extracted from `CognitiveLoopService` to reduce its field count
 /// and provide a cohesive sensorimotor execution boundary.
@@ -58,15 +58,15 @@ pub(crate) struct SensoriMotorExecution {
     /// Embodiment bridge: physical motor control with proprioceptive feedback.
     /// When `Some`, each cycle steps the bridge, blending proprioceptive HV
     /// into the next cycle's perception at `embodiment_blend_weight`.
-    #[cfg(feature = "humanoid")]
+    #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
     pub embodiment_bridge: Option<Box<dyn super::motor_bridge::EmbodimentBridge>>,
 
     /// Last proprioceptive HV from the embodiment bridge.
-    #[cfg(feature = "humanoid")]
+    #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
     pub last_proprioceptive_hv: Option<symthaea_core::hdc::ContinuousHV>,
 
     /// Embodiment telemetry from the most recent step.
-    #[cfg(feature = "humanoid")]
+    #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
     pub embodiment_telemetry: super::motor_bridge::EmbodimentTelemetry,
 }
 
@@ -82,13 +82,13 @@ impl SensoriMotorExecution {
         pain_tx: Option<crate::infrastructure::somatic_error_bridge::PainSender>,
         thermal_bridge: crate::infrastructure::thermal_bridge::ThermalBridge,
         thermal_tx: Option<crate::infrastructure::thermal_bridge::ThermalSender>,
-        #[cfg(feature = "humanoid")] embodiment_bridge: Option<
+        #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))] embodiment_bridge: Option<
             Box<dyn super::motor_bridge::EmbodimentBridge>,
         >,
-        #[cfg(feature = "humanoid")] last_proprioceptive_hv: Option<
+        #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))] last_proprioceptive_hv: Option<
             symthaea_core::hdc::ContinuousHV,
         >,
-        #[cfg(feature = "humanoid")] embodiment_telemetry: super::motor_bridge::EmbodimentTelemetry,
+        #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))] embodiment_telemetry: super::motor_bridge::EmbodimentTelemetry,
     ) -> Self {
         Self {
             vision_sensory,
@@ -97,11 +97,11 @@ impl SensoriMotorExecution {
             pain_tx,
             thermal_bridge,
             thermal_tx,
-            #[cfg(feature = "humanoid")]
+            #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
             embodiment_bridge,
-            #[cfg(feature = "humanoid")]
+            #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
             last_proprioceptive_hv,
-            #[cfg(feature = "humanoid")]
+            #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
             embodiment_telemetry,
         }
     }

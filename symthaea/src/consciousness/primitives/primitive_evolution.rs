@@ -338,7 +338,7 @@ impl PrimitiveEvolver {
     /// Run full evolution
     pub fn evolve<F>(&mut self, fitness_fn: F) -> EvolutionResult
     where
-        F: Fn(&ContinuousHV) -> f64 + Copy,
+        F: Fn(&ContinuousHV) -> f64 + Clone,
     {
         self.stats.total_evolutions += 1;
 
@@ -355,7 +355,7 @@ impl PrimitiveEvolver {
         let mut stagnation = 0;
 
         for _ in 0..self.config.generations {
-            self.evolve_generation(fitness_fn);
+            self.evolve_generation(&fitness_fn);
 
             let current_best = self
                 .population

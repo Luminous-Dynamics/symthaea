@@ -93,6 +93,8 @@ pub enum CivEventType {
     EthicalFork,
     /// Ethics shift: population mean ethical orientation drifted significantly from founding.
     EthicsShift,
+    /// Moral revival: accumulated outrage + guilt triggered a collective return to virtue/duty.
+    MoralRevival,
 }
 
 impl CivEvent {

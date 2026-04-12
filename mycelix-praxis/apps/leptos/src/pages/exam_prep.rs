@@ -8,14 +8,14 @@
 
 use leptos::prelude::*;
 
-use crate::curriculum::{caps_graph, use_progress, use_set_progress, ProgressStatus};
+use crate::curriculum::{curriculum_graph, use_progress, use_set_progress, ProgressStatus};
 use crate::student_profile::use_profile;
 
 #[component]
 pub fn ExamPrepPage() -> impl IntoView {
     let progress = use_progress();
     let set_progress = use_set_progress();
-    let graph = caps_graph();
+    let graph = curriculum_graph();
     let profile = use_profile();
 
     // Use exam date from student profile if available, otherwise default
@@ -64,12 +64,12 @@ pub fn ExamPrepPage() -> impl IntoView {
     });
 
     view! {
-        <div class="caps-skill-map">
+        <div class="praxis-skill-map">
             <a href="/dashboard" style="color: var(--primary); text-decoration: none; font-size: 0.85rem">
                 "\u{2190} Back to Dashboard"
             </a>
 
-            <h1 style="font-size: 1.5rem; margin: 1rem 0 0.5rem">"NSC Exam Preparation"</h1>
+            <h1 style="font-size: 1.5rem; margin: 1rem 0 0.5rem">"Exam Preparation"</h1>
             <p style="color: var(--text-secondary); margin-bottom: 1rem">
                 "Topics ranked by priority: exam weight \u{00D7} (1 \u{2212} mastery)"
             </p>
@@ -81,7 +81,7 @@ pub fn ExamPrepPage() -> impl IntoView {
 
             // Summary cards
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem">
-                <div class="caps-detail" style="text-align: center">
+                <div class="praxis-detail" style="text-align: center">
                     <div style="font-size: 0.8rem; color: var(--subject-math)">"Mathematics"</div>
                     {move || {
                         let (total, mastered) = math_stats.get();
@@ -91,7 +91,7 @@ pub fn ExamPrepPage() -> impl IntoView {
                         }
                     }}
                 </div>
-                <div class="caps-detail" style="text-align: center">
+                <div class="praxis-detail" style="text-align: center">
                     <div style="font-size: 0.8rem; color: var(--subject-physics)">"Physical Sciences"</div>
                     {move || {
                         let (total, mastered) = phys_stats.get();
@@ -104,7 +104,7 @@ pub fn ExamPrepPage() -> impl IntoView {
             </div>
 
             // Study schedule config
-            <div class="caps-detail" style="margin-bottom: 1.5rem">
+            <div class="praxis-detail" style="margin-bottom: 1.5rem">
                 <h3 style="font-size: 1rem; margin-bottom: 1rem">"Study Schedule"</h3>
                 <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 1rem">
                     <div>
@@ -131,7 +131,7 @@ pub fn ExamPrepPage() -> impl IntoView {
                     </div>
                 </div>
                 <button
-                    class="caps-filter-btn active"
+                    class="praxis-filter-btn active"
                     on:click=move |_| set_show_schedule.update(|v| *v = !*v)
                 >
                     {move || if show_schedule.get() { "Hide Schedule" } else { "Generate Schedule" }}
@@ -195,7 +195,7 @@ pub fn ExamPrepPage() -> impl IntoView {
                                         <a href=href style="flex: 1; color: var(--text); text-decoration: none">{title}</a>
                                         <span style="width: 40px; text-align: right; color: var(--text-secondary)">{hrs}"h"</span>
                                         {if marks > 0 {
-                                            view! { <span class="caps-badge caps-badge-exam" style="margin-left: 0.5rem">{marks}"m"</span> }.into_any()
+                                            view! { <span class="praxis-badge praxis-badge-exam" style="margin-left: 0.5rem">{marks}"m"</span> }.into_any()
                                         } else {
                                             view! { <span></span> }.into_any()
                                         }}
@@ -240,10 +240,10 @@ pub fn ExamPrepPage() -> impl IntoView {
                                 "P" {paper}
                             </span>
                             <span style="width: 60px; text-align: right">
-                                <span class="caps-badge caps-badge-exam">{marks}</span>
+                                <span class="praxis-badge praxis-badge-exam">{marks}</span>
                             </span>
                             <button
-                                class=format!("caps-status-btn {}", if status == ProgressStatus::Mastered { "active-mastered" } else { "" })
+                                class=format!("praxis-status-btn {}", if status == ProgressStatus::Mastered { "active-mastered" } else { "" })
                                 style="width: 80px; font-size: 0.7rem"
                                 on:click=move |_| {
                                     let new_status = if status == ProgressStatus::Mastered {

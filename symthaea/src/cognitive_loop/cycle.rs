@@ -274,8 +274,8 @@ impl CognitiveLoopService {
         // PHASE 2.5: EMBODIMENT
         // Motor output → physics sim → proprioceptive HV → next cycle blend
         // Science: Lakoff & Johnson (1999) embodied cognition, Varela (1991) enactivism
+        // Platform-agnostic: works for all 10 robotics platforms via EmbodimentBridge trait.
         // ═══════════════════════════════════════════════════════════════════
-        #[cfg(feature = "humanoid")]
         {
             let cycle_num = self.stats.total_cycles as usize;
             let interval = self.config.embodiment_step_interval.max(1);
@@ -436,7 +436,7 @@ impl CognitiveLoopService {
             );
 
             // ── Gate 5: Embodiment motor halt carry-forward ──────────────
-            #[cfg(feature = "humanoid")]
+            // Platform-agnostic: applies to all 10 robotics platforms.
             if let Some(ref mut bridge) = self.sensorimotor.embodiment_bridge {
                 use crate::cognitive_loop::motor_bridge::MotorSafetyLevel;
                 if safety_result.motor_halt {

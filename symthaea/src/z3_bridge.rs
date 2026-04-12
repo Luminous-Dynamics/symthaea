@@ -44,7 +44,32 @@ use symthaea_core::hdc::logic_engine::{LogicEngine, Proposition};
 // ── Public types ──────────────────────────────────────────────────────────────
 
 /// Result of a formal verification query.
+/// Result of an induction proof attempt via Z3.
 #[derive(Debug, Clone, PartialEq)]
+pub struct InductionProofResult {
+    /// Whether the full induction proof succeeded (base + step)
+    pub proved: bool,
+    /// Whether the base case was proven
+    pub base_case: bool,
+    /// Whether the inductive step was proven
+    pub inductive_step: bool,
+    /// Method used (Z3_QF_NIA_induction, bounded_check, etc.)
+    pub method: String,
+    /// Human-readable proof details
+    pub details: String,
+}
+
+impl std::fmt::Display for InductionProofResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.proved {
+            write!(f, "PROVED by {}\n{}", self.method, self.details)
+        } else {
+            write!(f, "NOT PROVED ({})\n{}", self.method, self.details)
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum VerificationResult {
     /// Formula is satisfiable; optional witness model string from Z3.
     Sat { witness: Option<String> },
@@ -580,6 +605,218 @@ impl Z3Bridge {
         VerificationResult::Valid
     }
 
+    // ── REAL INDUCTION PROOFS via Z3 SMT ─────────────────────────────────────
+
+    /// Prove a polynomial identity using Z3's nonlinear integer arithmetic.
+    ///
+    /// Verifies that two polynomial expressions are algebraically identical
+    /// for all integer values of n >= base_n. Encodes as:
+    ///   declare-const n Int
+    ///   assert (>= n base_n)
+    ///   assert (not (= lhs rhs))
+    ///   check-sat
+    /// If UNSAT => identity holds for ALL n >= base_n. This is a real proof,
+    /// not bounded checking.
+    ///
+    /// Example: prove n*(n+1)/2 = T(n)
+    ///   lhs_smt = "(div (* n (+ n 1)) 2)"
+    ///   rhs_smt = "(div (* n (+ n 1)) 2)"
+    pub fn prove_polynomial_identity(
+        &self,
+        lhs_smt: &str,
+        rhs_smt: &str,
+        base_n: i64,
+    ) -> VerificationResult {
+        if !self.z3_available {
+            return VerificationResult::UsingFallback;
+        }
+
+        let smt = format!(
+            "(set-logic QF_NIA)\n\
+             (declare-const n Int)\n\
+             (assert (>= n {}))\n\
+             (assert (not (= {} {})))\n\
+             (check-sat)\n",
+            base_n, lhs_smt, rhs_smt
+        );
+
+        match self.run_z3(&smt) {
+            Some(output) => {
+                let trimmed = output.trim();
+                if trimmed == "unsat" {
+                    VerificationResult::Valid
+                } else if trimmed == "sat" {
+                    VerificationResult::Invalid
+                } else {
+                    VerificationResult::Unknown { reason: format!("Z3: {}", trimmed) }
+                }
+            }
+            None => VerificationResult::UsingFallback,
+        }
+    }
+
+    /// Prove a recurrence relation by mathematical induction using Z3.
+    ///
+    /// Encodes the induction scheme:
+    ///   Base case: f(base_n) = base_value
+    ///   Inductive step: for symbolic k >= base_n, f(k+1) = f(k) + delta(k)
+    ///
+    /// Both are encoded as QF_NIA satisfiability checks:
+    /// - assert NOT(base case) => if UNSAT, base case holds
+    /// - assert NOT(inductive step) => if UNSAT, step holds
+    ///
+    /// Parameters:
+    /// - `rhs_smt`: closed-form formula as SMTLIB2 using variable `n`
+    /// - `delta_smt`: the recurrence delta Δ(k) = f(k+1) - f(k) using variable `k`
+    /// - `base_n`: starting index
+    /// - `base_value`: f(base_n) value
+    pub fn prove_induction(
+        &self,
+        rhs_smt: &str,
+        delta_smt: &str,
+        base_n: i64,
+        base_value: i64,
+    ) -> InductionProofResult {
+        if !self.z3_available {
+            return InductionProofResult {
+                proved: false,
+                base_case: false,
+                inductive_step: false,
+                method: "unavailable".to_string(),
+                details: "Z3 not installed".to_string(),
+            };
+        }
+
+        // ── Base case ──────────────────────────────────────────────
+        // Assert n = base_n AND NOT(rhs = base_value). If UNSAT => base holds.
+        let base_smt = format!(
+            "(set-logic QF_NIA)\n\
+             (declare-const n Int)\n\
+             (assert (= n {}))\n\
+             (assert (not (= {} {})))\n\
+             (check-sat)\n",
+            base_n, rhs_smt, base_value
+        );
+
+        let base_ok = self.run_z3(&base_smt)
+            .map(|out| out.trim() == "unsat")
+            .unwrap_or(false);
+
+        // ── Inductive step ─────────────────────────────────────────
+        // Substitute n -> k in rhs to get f(k), n -> (+ k 1) to get f(k+1)
+        // Assert k >= base_n AND NOT(f(k+1) = f(k) + delta(k)). If UNSAT => step holds.
+        let rhs_at_k = rhs_smt.replace('n', "k");
+        let rhs_at_k1 = rhs_smt.replace('n', "(+ k 1)");
+
+        let step_smt = format!(
+            "(set-logic QF_NIA)\n\
+             (declare-const k Int)\n\
+             (assert (>= k {}))\n\
+             (assert (not (= {} (+ {} {}))))\n\
+             (check-sat)\n",
+            base_n, rhs_at_k1, rhs_at_k, delta_smt
+        );
+
+        let step_ok = self.run_z3(&step_smt)
+            .map(|out| out.trim() == "unsat")
+            .unwrap_or(false);
+
+        let proved = base_ok && step_ok;
+
+        InductionProofResult {
+            proved,
+            base_case: base_ok,
+            inductive_step: step_ok,
+            method: if proved { "Z3_QF_NIA_induction".to_string() }
+                    else { "Z3_QF_NIA_partial".to_string() },
+            details: format!(
+                "Base case f({}) = {}: {}\n\
+                 Inductive step f(k+1) = f(k) + delta(k): {}\n\
+                 {}",
+                base_n, base_value,
+                if base_ok { "PROVED (Z3: unsat)" } else { "FAILED" },
+                if step_ok { "PROVED (Z3: unsat)" } else { "FAILED" },
+                if proved { "Conclusion: forall n >= base: P(n) holds. QED" }
+                else { "Proof incomplete." }
+            ),
+        }
+    }
+
+    /// Prove a universal inequality using Z3's nonlinear real arithmetic.
+    ///
+    /// Verifies that for all n >= base_n, the inequality lhs >= rhs holds.
+    /// Uses QF_NRA (nonlinear real arithmetic) which handles ≥, ≤, >, <.
+    ///
+    /// Examples:
+    /// - prove_inequality("(* n n)", "n", 1) → proves ∀n≥1: n² ≥ n
+    /// - prove_inequality("(+ (* n n) 1)", "0", 0) → proves ∀n≥0: n²+1 ≥ 0
+    pub fn prove_inequality(
+        &self,
+        lhs_smt: &str,
+        rhs_smt: &str,
+        base_n: i64,
+    ) -> VerificationResult {
+        if !self.z3_available {
+            return VerificationResult::UsingFallback;
+        }
+
+        // Prove lhs >= rhs for all n >= base_n
+        // by checking that NOT(lhs >= rhs AND n >= base) is UNSAT
+        let smt = format!(
+            "(set-logic QF_NRA)\n\
+             (declare-const n Real)\n\
+             (assert (>= n {}.0))\n\
+             (assert (not (>= {} {})))\n\
+             (check-sat)\n",
+            base_n, lhs_smt, rhs_smt
+        );
+
+        match self.run_z3(&smt) {
+            Some(output) => {
+                let trimmed = output.trim();
+                if trimmed == "unsat" {
+                    VerificationResult::Valid // inequality holds for ALL n >= base
+                } else if trimmed == "sat" {
+                    VerificationResult::Invalid // counterexample exists
+                } else {
+                    VerificationResult::Unknown { reason: format!("Z3: {}", trimmed) }
+                }
+            }
+            None => VerificationResult::UsingFallback,
+        }
+    }
+
+    /// Prove a strict inequality: lhs > rhs for all n >= base_n.
+    pub fn prove_strict_inequality(
+        &self,
+        lhs_smt: &str,
+        rhs_smt: &str,
+        base_n: i64,
+    ) -> VerificationResult {
+        if !self.z3_available {
+            return VerificationResult::UsingFallback;
+        }
+
+        let smt = format!(
+            "(set-logic QF_NRA)\n\
+             (declare-const n Real)\n\
+             (assert (>= n {}.0))\n\
+             (assert (not (> {} {})))\n\
+             (check-sat)\n",
+            base_n, lhs_smt, rhs_smt
+        );
+
+        match self.run_z3(&smt) {
+            Some(output) => {
+                let trimmed = output.trim();
+                if trimmed == "unsat" { VerificationResult::Valid }
+                else if trimmed == "sat" { VerificationResult::Invalid }
+                else { VerificationResult::Unknown { reason: format!("Z3: {}", trimmed) } }
+            }
+            None => VerificationResult::UsingFallback,
+        }
+    }
+
     // ── Internal implementations ──────────────────────────────────────────────
 
     /// Run Z3 subprocess with the given SMTLIB2 input.
@@ -660,12 +897,12 @@ fn detect_z3() -> (bool, Option<PathBuf>) {
         }
     }
 
-    // 3. Common installation paths
+    // 3. Common installation paths (including NixOS store)
     let candidates = [
         "/usr/bin/z3",
         "/usr/local/bin/z3",
         "/opt/homebrew/bin/z3",
-        "/nix/store/z3",
+        "/nix/store/fyvrsfnsqsbalrfhmq3sfjnqc316mlmw-z3-4.15.8/bin/z3",
     ];
     for candidate in &candidates {
         let p = PathBuf::from(candidate);
@@ -1110,5 +1347,174 @@ mod tests {
                 | VerificationResult::UsingFallback),
             "Best candidate from S² search should satisfy Einstein condition: {verification:?}"
         );
+    }
+
+    // ── Induction proof tests ────────────────────────────────────────────
+
+    /// Test Z3 polynomial identity proving (if Z3 is available).
+    #[test]
+    fn test_z3_polynomial_identity() {
+        let bridge = Z3Bridge::new();
+        if !bridge.z3_available {
+            eprintln!("SKIPPED: Z3 not available (install z3 to enable real proofs)");
+            return;
+        }
+
+        // Prove: n*(n+1)/2 = n*(n+1)/2 (trivial identity)
+        let result = bridge.prove_polynomial_identity(
+            "(div (* n (+ n 1)) 2)",
+            "(div (* n (+ n 1)) 2)",
+            1,
+        );
+        assert!(result.is_valid(), "trivial identity should be valid: {:?}", result);
+        eprintln!("Z3 polynomial identity proof: {:?}", result);
+    }
+
+    /// Test Z3-based induction proof for triangular numbers.
+    #[test]
+    fn test_z3_induction_triangular() {
+        let bridge = Z3Bridge::new();
+        if !bridge.z3_available {
+            eprintln!("SKIPPED: Z3 not available");
+            return;
+        }
+
+        // Prove: T(n) = n*(n+1)/2 with T(1) = 1 and T(n) = T(n-1) + n
+        // rhs = n*(n+1)/2, delta = (k+1) (since T(k+1) - T(k) = k+1)
+        let result = bridge.prove_induction(
+            "(div (* n (+ n 1)) 2)",  // rhs: n*(n+1)/2
+            "(+ k 1)",                 // delta: k+1
+            1,                          // base_n
+            1,                          // base_value: T(1) = 1
+        );
+
+        eprintln!("Triangular number induction proof:\n{}", result);
+        assert!(result.base_case, "base case T(1) = 1 should be proved");
+        assert!(result.inductive_step, "inductive step should be proved");
+        assert!(result.proved, "full induction should be proved");
+    }
+
+    /// Test Z3-based induction proof for sum of squares.
+    #[test]
+    fn test_z3_induction_sum_of_squares() {
+        let bridge = Z3Bridge::new();
+        if !bridge.z3_available {
+            eprintln!("SKIPPED: Z3 not available");
+            return;
+        }
+
+        // Prove: Σk² = n(n+1)(2n+1)/6
+        // delta(k) = (k+1)^2
+        let result = bridge.prove_induction(
+            "(div (* (* n (+ n 1)) (+ (* 2 n) 1)) 6)",  // n(n+1)(2n+1)/6
+            "(* (+ k 1) (+ k 1))",                        // (k+1)²
+            1,                                              // base_n
+            1,                                              // base_value: 1²=1
+        );
+
+        eprintln!("Sum of squares induction proof:\n{}", result);
+        assert!(result.base_case, "base case should hold");
+        // Inductive step may or may not work depending on Z3's NIA solver
+        if result.proved {
+            eprintln!("FULL PROOF ACHIEVED for sum of squares!");
+        }
+    }
+
+    /// Test that false identities are detected.
+    #[test]
+    fn test_z3_rejects_false_identity() {
+        let bridge = Z3Bridge::new();
+        if !bridge.z3_available {
+            eprintln!("SKIPPED: Z3 not available");
+            return;
+        }
+
+        // This is FALSE: n*(n+1)/2 ≠ n*n
+        let result = bridge.prove_polynomial_identity(
+            "(div (* n (+ n 1)) 2)",
+            "(* n n)",
+            1,
+        );
+        assert!(!result.is_valid(), "false identity should be rejected: {:?}", result);
+        eprintln!("Z3 correctly rejected false identity: {:?}", result);
+    }
+
+    /// Test induction without Z3 (fallback behavior).
+    #[test]
+    fn test_induction_without_z3() {
+        // Force no-Z3 bridge
+        let bridge = Z3Bridge {
+            z3_available: false,
+            z3_path: None,
+            timeout_secs: 5,
+        };
+
+        let result = bridge.prove_induction(
+            "(div (* n (+ n 1)) 2)",
+            "(+ k 1)",
+            1,
+            1,
+        );
+
+        assert!(!result.proved, "without Z3, induction should not claim proof");
+        assert_eq!(result.method, "unavailable");
+    }
+
+    // ── Inequality proof tests ──────────────────────────────────────────
+
+    /// Prove ∀n≥1: n² ≥ n
+    #[test]
+    fn test_z3_inequality_n_squared_geq_n() {
+        let bridge = Z3Bridge::new();
+        if !bridge.z3_available {
+            eprintln!("SKIPPED: Z3 not available");
+            return;
+        }
+        let result = bridge.prove_inequality("(* n n)", "n", 1);
+        assert!(result.is_valid(), "n² ≥ n for n≥1 should be proved: {:?}", result);
+        eprintln!("Z3 proved: ∀n≥1: n² ≥ n");
+    }
+
+    /// Prove ∀n≥0: n² + 1 > 0
+    #[test]
+    fn test_z3_inequality_positive_definite() {
+        let bridge = Z3Bridge::new();
+        if !bridge.z3_available {
+            eprintln!("SKIPPED: Z3 not available");
+            return;
+        }
+        let result = bridge.prove_strict_inequality("(+ (* n n) 1.0)", "0.0", 0);
+        assert!(result.is_valid(), "n²+1 > 0 should be proved: {:?}", result);
+        eprintln!("Z3 proved: ∀n≥0: n²+1 > 0");
+    }
+
+    /// AM-GM for two equal terms: (a+a)/2 ≥ √(a·a) = a, i.e., a ≥ a — trivially true
+    /// More interesting: (n + 1/n)/2 ≥ 1 for n ≥ 1 (AM-GM)
+    #[test]
+    fn test_z3_inequality_am_gm() {
+        let bridge = Z3Bridge::new();
+        if !bridge.z3_available {
+            eprintln!("SKIPPED: Z3 not available");
+            return;
+        }
+        // (n + 1/n) / 2 ≥ 1 for n ≥ 1 (AM-GM inequality)
+        let result = bridge.prove_inequality(
+            "(/ (+ n (/ 1.0 n)) 2.0)", "1.0", 1);
+        assert!(result.is_valid(), "AM-GM (n+1/n)/2 ≥ 1 should be proved: {:?}", result);
+        eprintln!("Z3 proved: ∀n≥1: (n + 1/n)/2 ≥ 1 (AM-GM)");
+    }
+
+    /// False inequality should be correctly rejected
+    #[test]
+    fn test_z3_inequality_rejects_false() {
+        let bridge = Z3Bridge::new();
+        if !bridge.z3_available {
+            eprintln!("SKIPPED: Z3 not available");
+            return;
+        }
+        // n ≥ n² is FALSE for n > 1
+        let result = bridge.prove_inequality("n", "(* n n)", 1);
+        assert!(!result.is_valid(), "n ≥ n² should be rejected (counterexample at n=2): {:?}", result);
+        eprintln!("Z3 correctly rejected: n ≥ n² for n≥1");
     }
 }

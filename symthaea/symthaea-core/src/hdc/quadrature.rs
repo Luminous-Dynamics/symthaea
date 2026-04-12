@@ -634,6 +634,186 @@ impl QuadratureEngine {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// GAUSS-KRONROD G7-K15 ADAPTIVE QUADRATURE
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Gauss-Kronrod G7-K15 quadrature result.
+#[derive(Debug, Clone)]
+pub struct GaussKronrodResult {
+    /// Integral estimate (K15 value)
+    pub value: f64,
+    /// Error estimate |K15 - G7|
+    pub error: f64,
+    /// Total function evaluations
+    pub evaluations: usize,
+    /// Number of subintervals used
+    pub intervals: usize,
+}
+
+/// Gauss-Kronrod 7-15 nodes and weights (from QUADPACK).
+/// K15 uses 15 nodes; G7 uses the 7 odd-indexed nodes.
+/// This is the standard adaptive quadrature workhorse.
+fn gk15_nodes_weights() -> (&'static [f64], &'static [f64], &'static [f64]) {
+    // K15 nodes (symmetric, positive half only — negate for other half)
+    static NODES: [f64; 8] = [
+        0.0,
+        0.207_784_955_007_898_47,
+        0.405_845_151_377_397_17,
+        0.586_087_235_467_691_13,
+        0.741_531_185_599_394_44,
+        0.864_864_423_359_769_07,
+        0.949_107_912_342_758_52,
+        0.991_455_371_120_812_64,
+    ];
+
+    // K15 weights (15-point Kronrod)
+    static WGK: [f64; 8] = [
+        0.209_482_141_084_727_83,
+        0.204_432_940_075_298_89,
+        0.190_350_578_064_785_41,
+        0.169_004_726_639_267_00,
+        0.140_653_259_715_525_92,
+        0.104_790_010_322_250_18,
+        0.063_092_092_629_978_55,
+        0.022_935_322_010_529_22,
+    ];
+
+    // G7 weights (7-point Gauss, only at odd-indexed K15 nodes)
+    static WG: [f64; 4] = [
+        0.417_959_183_673_469_39,
+        0.381_830_050_505_118_94,
+        0.279_705_391_489_276_67,
+        0.129_484_966_168_869_69,
+    ];
+
+    (&NODES, &WGK, &WG)
+}
+
+/// Single-interval Gauss-Kronrod G7-K15 quadrature.
+/// Returns (k15_value, g7_value, error_estimate).
+fn gk15_single<F: Fn(f64) -> f64>(f: &F, a: f64, b: f64) -> (f64, f64, f64) {
+    let (nodes, wgk, wg) = gk15_nodes_weights();
+    let center = 0.5 * (a + b);
+    let half_length = 0.5 * (b - a);
+
+    let f_center = f(center);
+    let mut result_kronrod = f_center * wgk[0];
+    let mut result_gauss = f_center * wg[0]; // center node is shared with G7
+
+    // G7 uses nodes at K15 indices {0, 2, 4, 6} (even indices = the Gauss points)
+    // K15 adds nodes at indices {1, 3, 5, 7} (odd indices = Kronrod extensions)
+    let mut g_idx = 1usize; // next G7 weight index (0 was used for center)
+
+    for i in 1..8 {
+        let x = half_length * nodes[i];
+        let fval1 = f(center - x);
+        let fval2 = f(center + x);
+        let fsum = fval1 + fval2;
+
+        result_kronrod += fsum * wgk[i];
+
+        // Even K15 indices (2, 4, 6) correspond to G7 nodes
+        if i % 2 == 0 && g_idx < wg.len() {
+            result_gauss += fsum * wg[g_idx];
+            g_idx += 1;
+        }
+    }
+
+    let k15 = result_kronrod * half_length;
+    let g7 = result_gauss * half_length;
+    let err = (k15 - g7).abs();
+
+    (k15, g7, err)
+}
+
+/// Adaptive Gauss-Kronrod G7-K15 quadrature (QUADPACK-style).
+///
+/// Recursively subdivides intervals where the G7-K15 error estimate exceeds
+/// the local tolerance. This is the standard algorithm used by QUADPACK's
+/// DQAG routine, scipy.integrate.quad, and Mathematica's NIntegrate.
+///
+/// Parameters:
+/// - `f`: integrand
+/// - `a`, `b`: integration bounds
+/// - `abs_tol`: absolute tolerance
+/// - `rel_tol`: relative tolerance
+/// - `max_subdivisions`: maximum number of interval subdivisions
+pub fn gauss_kronrod_adaptive<F: Fn(f64) -> f64>(
+    f: &F,
+    a: f64,
+    b: f64,
+    abs_tol: f64,
+    rel_tol: f64,
+    max_subdivisions: usize,
+) -> GaussKronrodResult {
+    let mut total_value = 0.0;
+    let mut total_error = 0.0;
+    let mut total_evals = 0;
+    let mut intervals = 0;
+
+    // Priority queue of intervals: (error, a, b, value)
+    let mut heap: Vec<(f64, f64, f64, f64)> = Vec::new();
+
+    // Initial evaluation
+    let (val, _, err) = gk15_single(f, a, b);
+    total_value = val;
+    total_error = err;
+    total_evals = 15;
+    intervals = 1;
+
+    if err <= abs_tol.max(rel_tol * val.abs()) || max_subdivisions == 0 {
+        return GaussKronrodResult { value: total_value, error: total_error, evaluations: total_evals, intervals };
+    }
+
+    // Push initial interval for subdivision
+    heap.push((err, a, b, val));
+
+    for _ in 0..max_subdivisions {
+        if heap.is_empty() { break; }
+
+        // Find interval with largest error
+        let max_idx = heap.iter().enumerate()
+            .max_by(|(_, a), (_, b)| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|(i, _)| i)
+            .unwrap_or(0);
+
+        let (old_err, ia, ib, old_val) = heap.swap_remove(max_idx);
+        let mid = 0.5 * (ia + ib);
+
+        // Subdivide
+        let (val_left, _, err_left) = gk15_single(f, ia, mid);
+        let (val_right, _, err_right) = gk15_single(f, mid, ib);
+        total_evals += 30; // 15 per sub-interval
+
+        // Update totals
+        total_value += (val_left + val_right) - old_val;
+        total_error += (err_left + err_right) - old_err;
+        intervals += 1;
+
+        // Push sub-intervals if they still need subdivision
+        let local_tol = abs_tol * (ib - ia) / (b - a); // distribute tolerance proportionally
+        if err_left > local_tol.max(rel_tol * val_left.abs()) {
+            heap.push((err_left, ia, mid, val_left));
+        }
+        if err_right > local_tol.max(rel_tol * val_right.abs()) {
+            heap.push((err_right, mid, ib, val_right));
+        }
+
+        // Check global convergence
+        if total_error.abs() <= abs_tol.max(rel_tol * total_value.abs()) {
+            break;
+        }
+    }
+
+    GaussKronrodResult {
+        value: total_value,
+        error: total_error.abs(),
+        evaluations: total_evals,
+        intervals,
+    }
+}
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -1006,5 +1186,151 @@ mod tests {
     #[should_panic(expected = "not available for n=6")]
     fn gauss_legendre_unsupported_n_panics() {
         gauss_legendre_nodes_weights(6);
+    }
+
+    // ── Gauss-Kronrod G7-K15 tests ──────────────────────────────────────
+
+    #[test]
+    fn test_gk15_polynomial_exact() {
+        // G-K 15-point should exactly integrate polynomials up to degree 29
+        // Test with x^4 on [0,1]: exact = 1/5 = 0.2
+        let result = gauss_kronrod_adaptive(&|x: f64| x.powi(4), 0.0, 1.0, 1e-14, 1e-14, 0);
+        assert!((result.value - 0.2).abs() < 1e-10,
+            "G-K 15 should exactly integrate x^4: got {}", result.value);
+    }
+
+    #[test]
+    fn test_gk15_exp_integral() {
+        // ∫₀¹ exp(x) dx = e - 1 ≈ 1.71828
+        let expected = std::f64::consts::E - 1.0;
+        let result = gauss_kronrod_adaptive(&|x: f64| x.exp(), 0.0, 1.0, 1e-12, 1e-12, 10);
+        assert!((result.value - expected).abs() < 1e-10,
+            "∫exp(x) from 0 to 1 = e-1: got {}, error {}", result.value, result.error);
+    }
+
+    #[test]
+    fn test_gk15_sin_integral() {
+        // ∫₀^π sin(x) dx = 2
+        let result = gauss_kronrod_adaptive(
+            &|x: f64| x.sin(), 0.0, std::f64::consts::PI, 1e-12, 1e-12, 10);
+        assert!((result.value - 2.0).abs() < 1e-8,
+            "∫sin(x) from 0 to π = 2: got {}", result.value);
+    }
+
+    #[test]
+    fn test_gk15_gaussian_integral() {
+        // ∫₋₅⁵ exp(-x²) dx ≈ √π ≈ 1.7724538509
+        let expected = std::f64::consts::PI.sqrt();
+        let result = gauss_kronrod_adaptive(
+            &|x: f64| (-x * x).exp(), -5.0, 5.0, 1e-10, 1e-10, 50);
+        assert!((result.value - expected).abs() < 1e-6,
+            "∫exp(-x²) ≈ √π: got {}, expected {}", result.value, expected);
+    }
+
+    #[test]
+    fn test_gk15_oscillatory() {
+        // ∫₀^{2π} sin(10x) dx = 0 (by symmetry)
+        let result = gauss_kronrod_adaptive(
+            &|x: f64| (10.0 * x).sin(), 0.0, 2.0 * std::f64::consts::PI, 1e-10, 1e-10, 100);
+        assert!(result.value.abs() < 1e-6,
+            "∫sin(10x) over full period = 0: got {}", result.value);
+    }
+
+    // ── Physics validation tests (known constants) ──────────────────────
+
+    /// Hydrogen atom ground state energy from Bohr model.
+    /// E₁ = -m_e * e⁴ / (2ℏ²) = -13.6 eV
+    #[test]
+    fn test_physics_hydrogen_ground_state() {
+        let m_e: f64 = 9.109_383_7015e-31;  // kg
+        let e_charge: f64 = 1.602_176_634e-19;  // C
+        let hbar: f64 = 1.054_571_817e-34;  // J·s
+        let eps0: f64 = 8.854_187_8128e-12; // F/m
+        let ev: f64 = 1.602_176_634e-19;  // J per eV
+
+        // E₁ = -m_e * e⁴ / (2 * (4πε₀)² * ℏ²)
+        let e1_joules = -m_e * e_charge.powi(4) /
+            (2.0 * (4.0 * std::f64::consts::PI * eps0).powi(2) * hbar.powi(2));
+        let e1_ev = e1_joules / ev;
+
+        assert!((e1_ev - (-13.6)).abs() < 0.1,
+            "Hydrogen ground state should be -13.6 eV, got {:.1} eV", e1_ev);
+    }
+
+    /// Bohr radius: a₀ = 4πε₀ℏ² / (m_e * e²) ≈ 0.529 Å
+    #[test]
+    fn test_physics_bohr_radius() {
+        let m_e: f64 = 9.109_383_7015e-31;
+        let e_charge: f64 = 1.602_176_634e-19;
+        let hbar: f64 = 1.054_571_817e-34;
+        let eps0: f64 = 8.854_187_8128e-12;
+
+        let a0 = 4.0 * std::f64::consts::PI * eps0 * hbar.powi(2) / (m_e * e_charge.powi(2));
+        let a0_angstrom = a0 * 1e10;
+
+        assert!((a0_angstrom - 0.529).abs() < 0.001,
+            "Bohr radius should be 0.529 Å, got {:.4} Å", a0_angstrom);
+    }
+
+    /// Fine structure constant: α = e²/(4πε₀ℏc) ≈ 1/137.036
+    #[test]
+    fn test_physics_fine_structure_constant() {
+        let e_charge: f64 = 1.602_176_634e-19;
+        let hbar: f64 = 1.054_571_817e-34;
+        let eps0: f64 = 8.854_187_8128e-12;
+        let c: f64 = 2.997_924_58e8;
+
+        let alpha = e_charge.powi(2) / (4.0 * std::f64::consts::PI * eps0 * hbar * c);
+        let alpha_inv = 1.0 / alpha;
+
+        assert!((alpha_inv - 137.036).abs() < 0.01,
+            "1/α should be 137.036, got {:.3}", alpha_inv);
+    }
+
+    /// Wien's displacement law: λ_max * T = b ≈ 2.898 × 10⁻³ m·K
+    #[test]
+    fn test_physics_wien_displacement() {
+        let h: f64 = 6.626_070_15e-34;
+        let c: f64 = 2.997_924_58e8;
+        let k_b: f64 = 1.380_649e-23;
+
+        // Wien's constant b = hc/(k_B * x) where x ≈ 4.965 is the root of
+        // x*e^x/(e^x - 1) = 5 → x ≈ 4.96511
+        let x_wien = 4.965_114_231_74;
+        let b = h * c / (k_b * x_wien);
+
+        assert!((b * 1e3 - 2.898).abs() < 0.001,
+            "Wien constant should be 2.898e-3 m·K, got {:.6e}", b);
+    }
+
+    /// Harmonic oscillator: ω = √(k/m), zero-point energy = ℏω/2
+    #[test]
+    fn test_physics_harmonic_oscillator() {
+        let hbar: f64 = 1.054_571_817e-34;
+        let k_spring: f64 = 100.0; // N/m
+        let mass: f64 = 1.0; // kg
+
+        let omega = (k_spring / mass).sqrt();
+        let e_zero = 0.5 * hbar * omega;
+
+        // ω = 10 rad/s, E₀ = 5.27e-34 J
+        assert!((omega - 10.0).abs() < 1e-10, "ω = √(k/m) = 10, got {}", omega);
+        assert!((e_zero - 5.272_859_085e-34).abs() < 1e-37,
+            "Zero-point energy ℏω/2 = 5.27e-34 J, got {:.3e}", e_zero);
+    }
+
+    /// Stefan-Boltzmann: P = σT⁴ where σ = 2π⁵k⁴/(15h³c²)
+    #[test]
+    fn test_physics_stefan_boltzmann() {
+        let h: f64 = 6.626_070_15e-34;
+        let c: f64 = 2.997_924_58e8;
+        let k_b: f64 = 1.380_649e-23;
+        let pi = std::f64::consts::PI;
+
+        let sigma = 2.0 * pi.powi(5) * k_b.powi(4) / (15.0 * h.powi(3) * c.powi(2));
+
+        // σ ≈ 5.670 × 10⁻⁸ W/(m²·K⁴)
+        assert!((sigma * 1e8 - 5.670).abs() < 0.01,
+            "Stefan-Boltzmann constant should be 5.670e-8, got {:.4e}", sigma);
     }
 }

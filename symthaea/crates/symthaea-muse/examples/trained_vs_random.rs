@@ -13,7 +13,7 @@
 
 use std::path::Path;
 use symthaea_muse::critic::evaluate_composition;
-use symthaea_muse::export::{export_wav, ExportFormat};
+use symthaea_muse::export::write_wav;
 use symthaea_muse::rhythm::compute_tempo;
 use symthaea_muse::{compose, MelodyMode, MuseConfig, MusicalState};
 
@@ -112,10 +112,9 @@ fn main() {
         classic
             .to_midi_file(&midi_dir.join(format!("{name}_classic.mid")), tempo_c)
             .ok();
-        export_wav(
+        write_wav(
+            &audio_dir.join(format!("trained_{name}_classic.wav")).to_string_lossy(),
             &classic,
-            &audio_dir.join(format!("trained_{name}_classic.wav")),
-            ExportFormat::WavF32,
         )
         .ok();
 
@@ -126,10 +125,9 @@ fn main() {
         neural
             .to_midi_file(&midi_dir.join(format!("{name}_neural.mid")), tempo_n)
             .ok();
-        export_wav(
+        write_wav(
+            &audio_dir.join(format!("trained_{name}_neural.wav")).to_string_lossy(),
             &neural,
-            &audio_dir.join(format!("trained_{name}_neural.wav")),
-            ExportFormat::WavF32,
         )
         .ok();
 

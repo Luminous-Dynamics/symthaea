@@ -7,13 +7,14 @@
 //! and decides when to replay vs generate new material.
 
 use crate::{MusicalState, Note};
+use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
 const MAX_PHRASES: usize = 8;
 const MAX_PHRASE_LEN: usize = 12;
 
 /// A recorded melodic phrase.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Phrase {
     pub notes: Vec<Note>,
     pub play_count: usize,
@@ -207,6 +208,67 @@ impl MotifMemory {
         self.current_phrase.clear();
         self.replay_queue.clear();
         self.notes_since_phrase_start = 0;
+    }
+
+    /// Snapshot the stored phrases for persistence.
+    ///
+    /// Only the phrases themselves are saved — the current in-progress phrase,
+    /// replay queue, and counters are ephemeral and restart fresh each session.
+    pub fn to_snapshot(&self) -> MotifSnapshot {
+        MotifSnapshot {
+            phrases: self.phrases.iter().cloned().collect(),
+        }
+    }
+
+    /// Restore phrases from a snapshot (e.g., loaded from disk).
+    ///
+    /// Phrases are pre-loaded so Symthaea starts with its musical vocabulary
+    /// from the previous session. Play counts are preserved so frequently
+    /// repeated phrases continue to be favored.
+    pub fn from_snapshot(snapshot: &MotifSnapshot) -> Self {
+        let mut mem = Self::new();
+        for phrase in &snapshot.phrases {
+            mem.phrases.push_back(phrase.clone());
+        }
+        // Cap at MAX_PHRASES if the snapshot is somehow larger
+        while mem.phrases.len() > MAX_PHRASES {
+            mem.phrases.pop_front();
+        }
+        mem
+    }
+}
+
+/// Serializable snapshot of motif memory for cross-session persistence.
+///
+/// Saved alongside aesthetic memory so Symthaea's musical phrases survive restarts.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MotifSnapshot {
+    pub phrases: Vec<Phrase>,
+}
+
+impl MotifSnapshot {
+    /// Load from a JSON file, returning empty on any failure.
+    pub fn load(path: &std::path::Path) -> Self {
+        std::fs::read_to_string(path)
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_else(|| Self {
+                phrases: Vec::new(),
+            })
+    }
+
+    /// Save to a JSON file.
+    pub fn save(&self, path: &std::path::Path) -> Result<(), String> {
+        let json = serde_json::to_string_pretty(self).map_err(|e| e.to_string())?;
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).ok();
+        }
+        std::fs::write(path, json).map_err(|e| e.to_string())
+    }
+
+    /// True if no phrases are stored.
+    pub fn is_empty(&self) -> bool {
+        self.phrases.is_empty()
     }
 }
 

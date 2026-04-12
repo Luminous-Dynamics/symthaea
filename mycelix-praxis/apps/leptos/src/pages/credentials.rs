@@ -43,7 +43,7 @@ pub struct CredentialView {
 fn real_credentials() -> Vec<CredentialView> {
     let progress = crate::persistence::load::<crate::curriculum::ProgressStore>("praxis_progress")
         .unwrap_or_default();
-    let graph = crate::curriculum::caps_graph();
+    let graph = crate::curriculum::curriculum_graph();
 
     let mut creds = Vec::new();
     let mut cred_num = 0u32;

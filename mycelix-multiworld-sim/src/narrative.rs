@@ -492,6 +492,11 @@ impl NarrativeEngine {
                  desc.clone(),
                  "Competing moral frameworks tore at the colony's consensus — governance ground to a halt".into(),
                  "The question was no longer what to do, but who we are".to_string())
+            } else if desc.contains("MORAL REVIVAL") {
+                (3,
+                 desc.clone(),
+                 "The grief and anger that had long simmered finally broke through — the community could no longer ignore what it had become".into(),
+                 "Something old and necessary returned: the sense that how we treat each other is not negotiable".to_string())
             } else {
                 continue; // Skip events we don't narrate
             };
@@ -511,7 +516,7 @@ impl NarrativeEngine {
                 let role = if desc.contains("PROJECT") { "engineer" }
                     else if desc.contains("EXPLORATION") { "scientist" }
                     else if desc.contains("INDEPENDENCE") { "leader" }
-                    else if desc.contains("MORAL DILEMMA") || desc.contains("ETHICAL") { "ethicist" }
+                    else if desc.contains("MORAL DILEMMA") || desc.contains("ETHICAL") || desc.contains("MORAL REVIVAL") { "ethicist" }
                     else { "citizen" };
                 Some(generate_character_name(world_name, role, (year / 25.0) as u16))
             } else { None };

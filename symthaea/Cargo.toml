@@ -1025,6 +1025,10 @@ name = "benchmark_humaneval_verified"
 required-features = ["code_generation"]
 
 [[example]]
+name = "benchmark_exercism"
+required-features = ["code_generation"]
+
+[[example]]
 name = "causal_tower_test"
 required-features = ["unstable-examples"]
 
@@ -1651,5 +1655,9 @@ inherits = "release"
 # serde_derive =1.0.228. holochain_serialized_bytes pins serde =1.0.219
 # (→ serde_derive =1.0.219). This local crate re-exports serde, bridging
 # the gap until holochain releases a serde_core-compatible version.
+[[example]]
+name = "debug_exercism"
+required-features = ["code_generation"]
+
 [patch.crates-io]
 serde_core = { path = "crates/serde-core-shim" }

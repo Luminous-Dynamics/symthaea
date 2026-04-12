@@ -335,6 +335,72 @@ impl Graph {
         }
         true
     }
+
+    // ── Spectral Graph Theory ───────────────────────────────────────────
+
+    /// Compute the graph Laplacian matrix L = D - A.
+    ///
+    /// D = degree matrix (diagonal), A = adjacency matrix.
+    /// Returns L as a dense Vec<Vec<f64>> (use sparse for large graphs).
+    pub fn laplacian_matrix(&self) -> Vec<Vec<f64>> {
+        let mut l = vec![vec![0.0; self.n]; self.n];
+        for u in 0..self.n {
+            let mut degree = 0.0;
+            for &(v, w) in &self.adj[u] {
+                l[u][v] -= w; // off-diagonal: -A_{uv}
+                degree += w;
+            }
+            l[u][u] = degree; // diagonal: D_{uu}
+        }
+        l
+    }
+
+    /// Compute eigenvalues of the graph Laplacian (sorted ascending).
+    ///
+    /// Uses the linear algebra module's eigendecomposition.
+    /// Returns all n eigenvalues: λ₁ = 0 ≤ λ₂ ≤ ... ≤ λₙ.
+    ///
+    /// Key spectral quantities:
+    /// - λ₁ = 0 always (connected component count = multiplicity of 0)
+    /// - λ₂ = algebraic connectivity (Fiedler value) — measures connectivity
+    /// - λₙ = spectral radius — upper bound on diameter
+    pub fn laplacian_eigenvalues(&self) -> Vec<f64> {
+        let l = self.laplacian_matrix();
+        let flat: Vec<f64> = l.iter().flat_map(|row| row.iter().copied()).collect();
+        let mat = super::linear_algebra::HdcMatrix::new(flat, self.n, self.n);
+        let (mut eigenvalues, _, _) = mat.eigen_symmetric();
+        eigenvalues.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        eigenvalues
+    }
+
+    /// Algebraic connectivity (Fiedler value): second-smallest eigenvalue λ₂.
+    ///
+    /// - λ₂ = 0 means the graph is disconnected
+    /// - λ₂ > 0 means the graph is connected
+    /// - Larger λ₂ = more robust connectivity
+    /// - Related to Cheeger constant: h(G) ≥ λ₂ / 2 (Cheeger inequality)
+    pub fn algebraic_connectivity(&self) -> f64 {
+        let evals = self.laplacian_eigenvalues();
+        if evals.len() >= 2 { evals[1] } else { 0.0 }
+    }
+
+    /// Spectral gap: λ₂ (difference between first two distinct eigenvalues).
+    /// Large spectral gap → rapid mixing, strong expansion.
+    pub fn spectral_gap(&self) -> f64 {
+        self.algebraic_connectivity()
+    }
+
+    /// Cheeger constant lower bound: h(G) ≥ λ₂ / 2.
+    /// Measures the bottleneck of the graph (min cut / max balance).
+    pub fn cheeger_lower_bound(&self) -> f64 {
+        self.algebraic_connectivity() / 2.0
+    }
+
+    /// Number of connected components (= multiplicity of eigenvalue 0).
+    pub fn num_components_spectral(&self) -> usize {
+        let evals = self.laplacian_eigenvalues();
+        evals.iter().filter(|&&e| e.abs() < 1e-6).count()
+    }
 }
 
 // ─── Dijkstra Helper ─────────────────────────────────────────────────────────
@@ -716,5 +782,76 @@ mod tests {
         assert_eq!(Combinatorics::derangements(3), 2);
         assert_eq!(Combinatorics::derangements(4), 9);
         assert_eq!(Combinatorics::derangements(5), 44);
+    }
+
+    // ── Spectral graph theory tests ─────────────────────────────────────
+
+    #[test]
+    fn test_laplacian_complete_graph() {
+        // K₃ (complete graph on 3 vertices): L = [[2,-1,-1],[-1,2,-1],[-1,-1,2]]
+        let mut g = Graph::new(3, false);
+        g.add_edge(0, 1);
+        g.add_edge(1, 2);
+        g.add_edge(0, 2);
+        let l = g.laplacian_matrix();
+        assert!((l[0][0] - 2.0).abs() < 1e-10);
+        assert!((l[0][1] - (-1.0)).abs() < 1e-10);
+        assert!((l[1][2] - (-1.0)).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_laplacian_eigenvalues_path() {
+        // Path graph P₄: 0-1-2-3
+        // Eigenvalues: 0, 2-√2, 2, 2+√2
+        let mut g = Graph::new(4, false);
+        g.add_edge(0, 1);
+        g.add_edge(1, 2);
+        g.add_edge(2, 3);
+        let evals = g.laplacian_eigenvalues();
+        assert_eq!(evals.len(), 4);
+        assert!(evals[0].abs() < 1e-6, "smallest eigenvalue should be 0, got {}", evals[0]);
+        assert!(evals[1] > 0.2, "λ₂ should be > 0 (connected): {}", evals[1]);
+    }
+
+    #[test]
+    fn test_algebraic_connectivity_connected() {
+        // Complete graph K₅: λ₂ = 5 (all non-zero eigenvalues = n)
+        let mut g = Graph::new(5, false);
+        for i in 0..5 {
+            for j in (i + 1)..5 {
+                g.add_edge(i, j);
+            }
+        }
+        let ac = g.algebraic_connectivity();
+        assert!((ac - 5.0).abs() < 0.1, "K₅ algebraic connectivity should be 5, got {}", ac);
+    }
+
+    #[test]
+    fn test_algebraic_connectivity_disconnected() {
+        // Two isolated components: {0,1}, {2,3}
+        let mut g = Graph::new(4, false);
+        g.add_edge(0, 1);
+        g.add_edge(2, 3);
+        let ac = g.algebraic_connectivity();
+        assert!(ac < 1e-6, "disconnected graph should have λ₂ ≈ 0, got {}", ac);
+    }
+
+    #[test]
+    fn test_num_components_spectral() {
+        // Three components: {0,1}, {2}, {3,4}
+        let mut g = Graph::new(5, false);
+        g.add_edge(0, 1);
+        g.add_edge(3, 4);
+        let nc = g.num_components_spectral();
+        assert_eq!(nc, 3, "should have 3 components, got {}", nc);
+    }
+
+    #[test]
+    fn test_cheeger_bound() {
+        // Complete graph has high Cheeger bound
+        let mut g = Graph::new(4, false);
+        for i in 0..4 { for j in (i+1)..4 { g.add_edge(i, j); } }
+        let ch = g.cheeger_lower_bound();
+        assert!(ch > 1.0, "K₄ should have high Cheeger bound: {}", ch);
     }
 }

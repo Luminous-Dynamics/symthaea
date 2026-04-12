@@ -228,6 +228,8 @@ pub struct MultiWorldSimulator {
     founding_ethics: std::collections::HashMap<u32, [f64; 4]>,
     /// Previous ethics std-dev per world (for synthesis detection).
     prev_ethics_stddev: std::collections::HashMap<u32, f64>,
+    /// Last tick at which a moral revival occurred per world (cooldown tracking).
+    last_moral_revival: std::collections::HashMap<u32, u32>,
 }
 
 impl MultiWorldSimulator {
@@ -278,6 +280,7 @@ impl MultiWorldSimulator {
             csv_recorder: None,
             founding_ethics: std::collections::HashMap::new(),
             prev_ethics_stddev: std::collections::HashMap::new(),
+            last_moral_revival: std::collections::HashMap::new(),
         }
     }
 
@@ -2327,6 +2330,7 @@ impl MultiWorldSimulator {
             self.current_tick,
             self.config.policy.pharma_boost,
             self.config.policy.trust_weighted_governance,
+            &mut self.rng,
         );
     }
 
@@ -2509,6 +2513,110 @@ impl MultiWorldSimulator {
                             desc,
                         ));
                     }
+                }
+            }
+        }
+
+        // ── 4. Moral Revival Detection (every 24 ticks = 2 years) ───────────
+        // When accumulated outrage + guilt crosses thresholds, the community
+        // undergoes a collective moral awakening: virtue and duty surge back.
+        // Cooldown: 120 ticks (10 years) per world.
+        if tick % 24 == 0 {
+            const OUTRAGE_THRESHOLD: f64 = 0.10;
+            const GUILT_THRESHOLD: f64 = 0.03;
+            const REVIVAL_COOLDOWN: u32 = 120;
+            const MAX_REVIVAL_BOOST: f64 = 0.08; // maximum virtue/deont boost per revival
+
+            let narrator_names = [
+                "Amara Osei", "Yuki Tanaka", "Lena Kovač", "Omar Ndoye",
+                "Priya Rajan", "Seren Williams", "Mateo Cruz", "Freya Lindqvist",
+            ];
+
+            let mut revival_queue: Vec<(u32, String, f64, f64)> = Vec::new();
+
+            for world in &self.worlds {
+                if world.population() <= 50 {
+                    continue;
+                }
+
+                let last_revival = self.last_moral_revival.get(&world.id).copied().unwrap_or(0);
+                if tick.saturating_sub(last_revival) < REVIVAL_COOLDOWN {
+                    continue; // cooldown active
+                }
+
+                let living: Vec<_> = world.agents.iter().filter(|a| a.is_alive()).collect();
+                if living.is_empty() {
+                    continue;
+                }
+
+                let n = living.len() as f64;
+                let mean_outrage = living.iter().map(|a| a.needs.affect.outrage).sum::<f64>() / n;
+                let mean_guilt   = living.iter().map(|a| a.needs.affect.guilt).sum::<f64>() / n;
+
+                if mean_outrage > OUTRAGE_THRESHOLD && mean_guilt > GUILT_THRESHOLD {
+                    // Scale revival strength: how far above threshold are we?
+                    let outrage_excess = (mean_outrage - OUTRAGE_THRESHOLD).min(0.30);
+                    let guilt_excess   = (mean_guilt   - GUILT_THRESHOLD  ).min(0.20);
+                    let revival_strength = (outrage_excess * 0.6 + guilt_excess * 0.4)
+                        .clamp(0.005, MAX_REVIVAL_BOOST);
+
+                    revival_queue.push((world.id, world.name.clone(), revival_strength, mean_outrage));
+                }
+            }
+
+            for (world_id, world_name, revival_strength, mean_outrage) in revival_queue {
+                self.last_moral_revival.insert(world_id, tick);
+
+                // Apply revival to all living agents in this world
+                if let Some(world) = self.worlds.iter_mut().find(|w| w.id == world_id) {
+                    let rng_seed = (tick ^ world_id) as usize % narrator_names.len();
+                    let narrator = narrator_names[rng_seed];
+
+                    for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
+                        // Boost virtue_care and deontological — the two care-oriented dimensions
+                        agent.ethics.virtue_care = (agent.ethics.virtue_care
+                            + revival_strength * 1.0)
+                            .min(0.95);
+                        agent.ethics.deontological = (agent.ethics.deontological
+                            + revival_strength * 0.6)
+                            .min(0.95);
+                        // Drain some outrage (the revival is channeling it into action)
+                        agent.needs.affect.outrage =
+                            (agent.needs.affect.outrage * 0.60).max(0.0);
+
+                        // Normalize: keep sum ≤ 2.05
+                        let sum = agent.ethics.deontological
+                            + agent.ethics.consequentialist
+                            + agent.ethics.virtue_care
+                            + agent.ethics.relational;
+                        if sum > 2.05 {
+                            let scale = 2.05 / sum;
+                            agent.ethics.deontological    *= scale;
+                            agent.ethics.consequentialist *= scale;
+                            agent.ethics.virtue_care      *= scale;
+                            agent.ethics.relational       *= scale;
+                        }
+                    }
+
+                    let mean = agent::EthicalOrientation::mean_of(&world.agents);
+                    let desc = format!(
+                        "{}: MORAL REVIVAL — {narrator} and others sparked a moral awakening \
+                        (outrage {:.2}). Virtue +{:.3}, duty renewed. New ethics: \
+                        deont={:.2} conseq={:.2} virtue={:.2} relat={:.2}",
+                        world_name,
+                        mean_outrage,
+                        revival_strength,
+                        mean.deontological,
+                        mean.consequentialist,
+                        mean.virtue_care,
+                        mean.relational,
+                    );
+                    self.events.push(CivEvent::new(
+                        tick,
+                        Some(world_id),
+                        CivEventType::MoralRevival,
+                        desc,
+                    ));
                 }
             }
         }
