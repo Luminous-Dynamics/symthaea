@@ -43,10 +43,10 @@ fn main() {
     cfg.enable_object_binding = true;
     cfg.enable_temporal_binding = true;
 
-    let width = 128u32;
-    let height = 128u32;
+    let width = 64u32;
+    let height = 64u32;
     let mut manifold = VisionManifold::new(cfg, width, height);
-    manifold.enable_object_memory(32);
+    manifold.enable_object_memory(16);
     manifold.enable_working_memory(4);
     manifold.enable_scene_graph();
     manifold.enable_scene_memory(16);
@@ -144,6 +144,29 @@ fn main() {
                 edge.relation,
                 edge.object_id,
                 edge.relation_hv.norm(),
+            );
+        }
+    }
+
+    // Broca bridge: scene description as relational triples
+    let descriptions = manifold.describe_scene();
+    if !descriptions.is_empty() {
+        println!("\n=== Scene Description (Broca bridge) ===");
+        for (subj, rel, obj) in descriptions.iter().take(8) {
+            println!("  \"{subj}\" {rel} \"{obj}\"");
+        }
+    }
+
+    // Dream replay: consolidate scene memories
+    let replays = manifold.dream_replay(0.1, 3);
+    if !replays.is_empty() {
+        println!("\n=== Dream Replay ({} memories consolidated) ===", replays.len());
+        for (i, replay) in replays.iter().enumerate() {
+            println!(
+                "  Memory {}: norm={:.3}, sim_to_current={:.3}",
+                i,
+                replay.norm(),
+                replay.similarity(manifold.state()),
             );
         }
     }
