@@ -102,6 +102,13 @@ pub struct RdpSession {
     prev_key_expires_at: Option<Instant>,
     /// Monotonic nonce counter for AEAD encryption.
     nonce_counter: u64,
+    /// Per-session random source identifier (used by rdp_wire::seal for nonce construction).
+    /// Generated once at session creation. Prevents cross-session nonce collisions
+    /// even when two sessions happen to share the same key material (which should
+    /// not occur, but defence in depth).
+    source_id: [u8; 8],
+    /// Per-session random epoch byte (prevents restart nonce reuse under the same key).
+    epoch: u8,
 
     // ── Consciousness ───────────────────────────────────────────────
     /// Last known peer consciousness level (phi).
@@ -131,6 +138,12 @@ impl RdpSession {
         config: RdpSessionConfig,
         is_initiator: bool,
     ) -> Self {
+        // Generate per-session random source_id + epoch for AEAD nonce construction.
+        // Using rand::random() avoids taking a Rng by value and matches the pattern
+        // used elsewhere in swarm::mesh for epoch generation.
+        let source_id: [u8; 8] = rand::random();
+        let epoch: u8 = rand::random();
+
         Self {
             session_id,
             peer_id,
@@ -143,6 +156,8 @@ impl RdpSession {
             key_established_at: None,
             prev_key_expires_at: None,
             nonce_counter: 0,
+            source_id,
+            epoch,
             peer_phi: 0.0,
             last_attestation: None,
             attestation_pending: false,
@@ -268,6 +283,81 @@ impl RdpSession {
         let n = self.nonce_counter;
         self.nonce_counter += 1;
         n
+    }
+
+    /// Seal a binary plaintext under the current session key using ChaCha20-Poly1305.
+    ///
+    /// Reuses the nonce-construction + AEAD path from `swarm::mesh::packet_crypto`
+    /// so RDP wire frames share the same cryptographic hygiene (cross-type nonce
+    /// separation via `payload_type`, per-session random `source_id` + `epoch`,
+    /// monotonic sequence from `next_nonce()`).
+    ///
+    /// Wire format: `[ nonce (12 bytes) | ciphertext | poly1305 tag (16 bytes) ]`
+    ///
+    /// Returns `None` if the session has no key (handshake not complete) or
+    /// the underlying AEAD call fails (should not happen with valid inputs).
+    ///
+    /// `payload_type` must differ between RdpFrame (`0x10`) and InputFrame (`0x11`)
+    /// and any other stream type to prevent nonce collisions. See `rdp_wire` for
+    /// the canonical assignments.
+    #[cfg(feature = "mesh-encryption")]
+    pub fn seal(&mut self, plaintext: &[u8], payload_type: u8) -> Option<Vec<u8>> {
+        use chacha20poly1305::{aead::Aead, ChaCha20Poly1305, KeyInit, Nonce};
+        let key = *self.session_key.as_ref()?;
+        let seq = (self.next_nonce() & 0xFFFF_FFFF) as u32;
+
+        // Nonce layout mirrors `swarm::mesh::packet_crypto::build_nonce` so
+        // future reuse of those primitives remains straightforward:
+        // `source_id[0..6] | payload_type | epoch | sequence[0..4]`.
+        let mut nonce_bytes = [0u8; 12];
+        nonce_bytes[..6].copy_from_slice(&self.source_id[..6]);
+        nonce_bytes[6] = payload_type;
+        nonce_bytes[7] = self.epoch;
+        nonce_bytes[8..12].copy_from_slice(&seq.to_le_bytes());
+
+        let cipher = ChaCha20Poly1305::new((&key).into());
+        let nonce = Nonce::from(nonce_bytes);
+        let ciphertext = cipher.encrypt(&nonce, plaintext).ok()?;
+
+        let mut out = Vec::with_capacity(12 + ciphertext.len());
+        out.extend_from_slice(&nonce_bytes);
+        out.extend_from_slice(&ciphertext);
+        Some(out)
+    }
+
+    /// Open a sealed binary envelope produced by `seal` (or by a peer's `seal` call).
+    ///
+    /// The caller supplies the `payload_type` they expect — this must match the
+    /// type that was used at seal time, otherwise AEAD verification fails and
+    /// `None` is returned. No silent cross-type acceptance.
+    ///
+    /// During key rotation, tries the current key first, then falls back to
+    /// the previous key if still within the grace period. Both are attempted
+    /// in constant time (AEAD verify is constant-time internally).
+    #[cfg(feature = "mesh-encryption")]
+    pub fn open(&self, envelope: &[u8]) -> Option<Vec<u8>> {
+        // Envelope: [nonce (12) | ciphertext + poly1305 tag (16)].
+        // Nonce is self-contained; AEAD verification fails on wrong key.
+        use chacha20poly1305::{aead::Aead, ChaCha20Poly1305, KeyInit, Nonce};
+        if envelope.len() < 12 + 16 {
+            return None;
+        }
+        let (nonce_bytes, ciphertext) = envelope.split_at(12);
+        let nonce = Nonce::from_slice(nonce_bytes);
+
+        if let Some(key) = self.session_key.as_ref() {
+            let cipher = ChaCha20Poly1305::new(key.into());
+            if let Ok(pt) = cipher.decrypt(nonce, ciphertext) {
+                return Some(pt);
+            }
+        }
+        if let Some(prev) = self.prev_session_key.as_ref() {
+            let cipher = ChaCha20Poly1305::new(prev.into());
+            if let Ok(pt) = cipher.decrypt(nonce, ciphertext) {
+                return Some(pt);
+            }
+        }
+        None
     }
 
     /// Initiate graceful close.

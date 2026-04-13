@@ -237,16 +237,31 @@ impl HolonRdpViewer {
 }
 
 /// WebSocket message envelope for RDP over Holon.
+///
+/// Two parallel paths are supported:
+///
+/// - **JSON variants** (`Frame`, `Input`, `Control`) — serialized as text via
+///   `serde_json` over `Message::Text`. Used by the dev-inspect path and the
+///   initial `phone_rdp_share` MVP measurement proxy. These are not encrypted;
+///   they are for local debug only and must not be used on a network.
+/// - **Binary variants** (`FrameBin`, `InputBin`) — carry a `Vec<u8>` produced
+///   by `rdp_wire::seal_frame`/`seal_input`, which applies bincode + ChaCha20-
+///   Poly1305 via the session key. These are the real wire path and travel
+///   over `Message::Binary`. **Everything on an actual network uses these.**
+///
+/// The dispatch side of `holon_ws_handler` routes `Message::Binary` to
+/// `FrameBin`/`InputBin` and `Message::Text` to the JSON variants (plus the
+/// existing `SomaMessage` telemetry path).
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum HolonRdpMessage {
-    /// RDP frame (screen data).
+    /// RDP frame (screen data) — JSON debug path.
     #[serde(rename = "rdp_frame")]
     Frame {
         /// JSON-serialized RdpFrame.
         data: String,
     },
-    /// Input events (touch/keyboard from viewer to phone).
+    /// Input events (touch/keyboard from viewer to phone) — JSON debug path.
     #[serde(rename = "rdp_input")]
     Input {
         /// JSON-serialized InputFrame.
@@ -256,6 +271,22 @@ pub enum HolonRdpMessage {
     #[serde(rename = "rdp_control")]
     Control {
         action: String, // "start", "stop", "request_full"
+    },
+    /// Sealed binary RDP frame — the real wire path. Opaque bytes produced by
+    /// `rdp_wire::seal_frame` and consumed by `rdp_wire::open_frame`. This
+    /// variant is intended for out-of-band binary WebSocket framing, not JSON
+    /// text framing — but `Serialize`/`Deserialize` are derived for symmetry
+    /// with the rest of the enum (base64-encoded when forced into JSON).
+    #[serde(rename = "rdp_frame_bin")]
+    FrameBin {
+        /// Sealed bytes: `[nonce (12) | bincode(RdpFrame) + poly1305 tag (16)]`.
+        data: Vec<u8>,
+    },
+    /// Sealed binary input frame (reverse path from viewer to server).
+    #[serde(rename = "rdp_input_bin")]
+    InputBin {
+        /// Sealed bytes: `[nonce (12) | bincode(InputFrame) + poly1305 tag (16)]`.
+        data: Vec<u8>,
     },
 }
 

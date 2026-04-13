@@ -260,6 +260,60 @@ impl Default for RdpSessionConfig {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// Binary encoding (bincode) — compact wire format for PQC-sealed transport
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Error type for binary frame codec operations.
+#[derive(Debug)]
+pub enum FrameCodecError {
+    /// bincode serialization failure (should not happen with valid input).
+    Encode(bincode::Error),
+    /// bincode deserialization failure (malformed input).
+    Decode(bincode::Error),
+}
+
+impl std::fmt::Display for FrameCodecError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Encode(e) => write!(f, "RdpFrame encode failed: {e}"),
+            Self::Decode(e) => write!(f, "RdpFrame decode failed: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for FrameCodecError {}
+
+impl RdpFrame {
+    /// Serialize this frame to a compact binary envelope using bincode.
+    ///
+    /// The binary path is ~3-5× smaller than `serde_json::to_vec(&self)`
+    /// and is the wire format consumed by `rdp_wire::seal_frame()` before
+    /// ChaCha20-Poly1305 sealing. Tests + dev-inspect paths still use JSON.
+    pub fn to_bin(&self) -> Result<Vec<u8>, FrameCodecError> {
+        bincode::serialize(self).map_err(FrameCodecError::Encode)
+    }
+
+    /// Deserialize a binary envelope back into an `RdpFrame`.
+    ///
+    /// Fails on truncation, byte corruption, or version skew between peers.
+    pub fn from_bin(bytes: &[u8]) -> Result<Self, FrameCodecError> {
+        bincode::deserialize(bytes).map_err(FrameCodecError::Decode)
+    }
+}
+
+impl InputFrame {
+    /// Serialize an InputFrame (viewer → server reverse path) to binary.
+    pub fn to_bin(&self) -> Result<Vec<u8>, FrameCodecError> {
+        bincode::serialize(self).map_err(FrameCodecError::Encode)
+    }
+
+    /// Deserialize an InputFrame from a binary envelope.
+    pub fn from_bin(bytes: &[u8]) -> Result<Self, FrameCodecError> {
+        bincode::deserialize(bytes).map_err(FrameCodecError::Decode)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -299,6 +353,87 @@ mod tests {
         };
         let json = serde_json::to_string(&hello).unwrap();
         assert!(json.contains("soma-pixel8"));
+    }
+
+    #[test]
+    fn test_frame_binary_roundtrip_and_size() {
+        // Realistic delta frame: 32 patches of 64 i8 values each.
+        let patches: Vec<DeltaPatch> = (0..32)
+            .map(|i| DeltaPatch {
+                index: i as u16,
+                surprise: (i as f32) / 32.0,
+                values: (0..64).map(|j| ((i + j) as i8).wrapping_mul(3)).collect(),
+            })
+            .collect();
+        let frame = RdpFrame::Delta(DeltaFrame {
+            frame_id: 42,
+            base_frame_id: 41,
+            timestamp_ms: 1_700_000_000_000,
+            patches,
+            consciousness_level: 0.65,
+        });
+
+        let bin = frame.to_bin().expect("bincode encode");
+        let json = serde_json::to_vec(&frame).expect("json encode");
+
+        // Binary must beat JSON by a meaningful margin. Observed ratio on
+        // dense i8 patch arrays is ~3.0× (see `integration_rdp_wire` for the
+        // sealed-envelope measurement with AEAD overhead included).
+        let ratio = json.len() as f64 / bin.len().max(1) as f64;
+        assert!(
+            ratio >= 2.5,
+            "bincode should be ≥2.5× smaller than JSON: bin={} json={} ratio={:.3}",
+            bin.len(),
+            json.len(),
+            ratio,
+        );
+
+        // Round-trip equality on the decoded frame.
+        let decoded = RdpFrame::from_bin(&bin).expect("bincode decode");
+        match decoded {
+            RdpFrame::Delta(d) => {
+                assert_eq!(d.frame_id, 42);
+                assert_eq!(d.base_frame_id, 41);
+                assert_eq!(d.patches.len(), 32);
+                assert_eq!(d.patches[5].index, 5);
+                assert_eq!(d.patches[5].values.len(), 64);
+                assert!((d.consciousness_level - 0.65).abs() < 1e-6);
+            }
+            _ => panic!("Expected Delta frame after binary round-trip"),
+        }
+    }
+
+    #[test]
+    fn test_input_frame_binary_roundtrip() {
+        let input = InputFrame {
+            sequence: 7,
+            timestamp_ms: 1_700_000_000_500,
+            events: vec![
+                InputEvent::Pointer {
+                    x: 0.5,
+                    y: 0.5,
+                    button: 1,
+                    pressed: true,
+                },
+                InputEvent::Touch {
+                    index: 0,
+                    x: 0.3,
+                    y: 0.7,
+                    phase: 0,
+                    pressure: 0.8,
+                },
+            ],
+        };
+        let bin = input.to_bin().expect("bincode encode");
+        let decoded = InputFrame::from_bin(&bin).expect("bincode decode");
+        assert_eq!(decoded.sequence, 7);
+        assert_eq!(decoded.events.len(), 2);
+    }
+
+    #[test]
+    fn test_from_bin_rejects_garbage() {
+        let bad = [0xFFu8; 8];
+        assert!(RdpFrame::from_bin(&bad).is_err());
     }
 
     #[test]

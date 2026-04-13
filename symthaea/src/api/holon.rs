@@ -48,6 +48,15 @@ pub struct HolonHttpState {
     pub iroh_active: std::sync::atomic::AtomicBool,
     /// Latest collective QOL summary JSON (updated by consciousness loop).
     pub telemetry_json: std::sync::Mutex<String>,
+    /// Sealed outbound RDP frames (desktop/server → viewer/phone). Opaque bytes
+    /// produced by `swarm::rdp_wire::seal_frame`. The WS handler drains this
+    /// queue every tick and pushes each entry as `Message::Binary` to connected
+    /// viewers. No encryption work is done here — bytes are forwarded as-is.
+    pub rdp_outbound: std::sync::Mutex<std::collections::VecDeque<Vec<u8>>>,
+    /// Sealed inbound RDP input frames (viewer → server). Each entry is an
+    /// opaque ciphertext the endpoint will pass to `swarm::rdp_wire::open_input`.
+    /// The WS handler pushes to this queue on `Message::Binary` receive.
+    pub rdp_inbound: std::sync::Mutex<std::collections::VecDeque<Vec<u8>>>,
 }
 
 impl HolonHttpState {
@@ -60,7 +69,51 @@ impl HolonHttpState {
             peer_count: std::sync::atomic::AtomicU32::new(0),
             iroh_active: std::sync::atomic::AtomicBool::new(false),
             telemetry_json: std::sync::Mutex::new("{}".to_string()),
+            rdp_outbound: std::sync::Mutex::new(std::collections::VecDeque::new()),
+            rdp_inbound: std::sync::Mutex::new(std::collections::VecDeque::new()),
         }
+    }
+
+    /// Push a sealed RDP frame (typically a `FrameBin` produced by
+    /// `swarm::rdp_wire::seal_frame`) onto the outbound queue for WS delivery.
+    /// Bounded at 512 entries; oldest entries are dropped under pressure so
+    /// producers never block on a slow viewer.
+    pub fn push_rdp_outbound(&self, sealed: Vec<u8>) {
+        if let Ok(mut q) = self.rdp_outbound.lock() {
+            if q.len() >= 512 {
+                q.pop_front();
+            }
+            q.push_back(sealed);
+        }
+    }
+
+    /// Drain all pending sealed RDP frames for WS delivery. Returns the bytes
+    /// in FIFO order.
+    pub fn drain_rdp_outbound(&self) -> Vec<Vec<u8>> {
+        self.rdp_outbound
+            .lock()
+            .map(|mut q| q.drain(..).collect())
+            .unwrap_or_default()
+    }
+
+    /// Push a sealed inbound RDP input frame (from a viewer over WS) onto the
+    /// inbound queue. The consciousness loop (or phone-side consumer) drains
+    /// this and calls `swarm::rdp_wire::open_input` to recover `InputFrame`s.
+    pub fn push_rdp_inbound(&self, sealed: Vec<u8>) {
+        if let Ok(mut q) = self.rdp_inbound.lock() {
+            if q.len() >= 512 {
+                q.pop_front();
+            }
+            q.push_back(sealed);
+        }
+    }
+
+    /// Drain all pending sealed inbound RDP input frames.
+    pub fn drain_rdp_inbound(&self) -> Vec<Vec<u8>> {
+        self.rdp_inbound
+            .lock()
+            .map(|mut q| q.drain(..).collect())
+            .unwrap_or_default()
     }
 
     pub fn new_with_auth_token(
@@ -394,6 +447,17 @@ async fn holon_ws_handler(mut socket: WebSocket, state: SharedHolonState) {
                         break;
                     }
                 }
+
+                // Drain sealed RDP frames and push each as Message::Binary.
+                // The bytes are opaque ciphertext produced by `rdp_wire::seal_frame`
+                // at the endpoint that holds the session key — this handler is a
+                // pure forwarder and does zero crypto work.
+                let rdp_frames = state.drain_rdp_outbound();
+                for sealed in rdp_frames {
+                    if socket.send(Message::Binary(sealed.into())).await.is_err() {
+                        break;
+                    }
+                }
             }
             msg = socket.recv() => {
                 match msg {
@@ -410,8 +474,14 @@ async fn holon_ws_handler(mut socket: WebSocket, state: SharedHolonState) {
                             let _ = state.inbound_tx.send((device_id, soma_msg));
                         }
                     }
+                    Some(Ok(Message::Binary(bytes))) => {
+                        // Sealed RDP input (viewer → server reverse path). Opaque
+                        // ciphertext; the endpoint that holds the session key will
+                        // verify + decode it. Forward as-is onto the inbound queue.
+                        state.push_rdp_inbound(bytes.to_vec());
+                    }
                     Some(Ok(Message::Close(_))) | None => break,
-                    _ => {} // Ignore ping/pong/binary
+                    _ => {} // Ignore ping/pong
                 }
             }
         }
@@ -846,5 +916,79 @@ async fn holon_search(
             sources: vec![],
             status: "web_research_module_not_enabled".to_string(),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fresh_state() -> SharedHolonState {
+        let (tx, _rx) = std::sync::mpsc::channel::<(String, SomaMessage)>();
+        Arc::new(HolonHttpState::new(tx))
+    }
+
+    #[test]
+    fn rdp_outbound_push_drain_fifo() {
+        let state = fresh_state();
+        state.push_rdp_outbound(vec![1, 2, 3]);
+        state.push_rdp_outbound(vec![4, 5]);
+        state.push_rdp_outbound(vec![6]);
+
+        let drained = state.drain_rdp_outbound();
+        assert_eq!(drained.len(), 3);
+        assert_eq!(drained[0], vec![1, 2, 3]);
+        assert_eq!(drained[1], vec![4, 5]);
+        assert_eq!(drained[2], vec![6]);
+
+        // Second drain returns empty.
+        assert!(state.drain_rdp_outbound().is_empty());
+    }
+
+    #[test]
+    fn rdp_outbound_caps_at_512() {
+        let state = fresh_state();
+        // Push 600 frames; queue should cap at 512 with the oldest 88 dropped.
+        for i in 0..600u16 {
+            state.push_rdp_outbound(vec![i as u8, (i >> 8) as u8]);
+        }
+        let drained = state.drain_rdp_outbound();
+        assert_eq!(drained.len(), 512);
+        // First surviving frame should be index 88 (0..88 were dropped).
+        let first = &drained[0];
+        assert_eq!(first[0] as u16 | ((first[1] as u16) << 8), 88);
+        let last = &drained[511];
+        assert_eq!(last[0] as u16 | ((last[1] as u16) << 8), 599);
+    }
+
+    #[test]
+    fn rdp_inbound_push_drain_fifo() {
+        let state = fresh_state();
+        state.push_rdp_inbound(vec![0x10, 0x20]);
+        state.push_rdp_inbound(vec![0x30]);
+        let drained = state.drain_rdp_inbound();
+        assert_eq!(drained.len(), 2);
+        assert_eq!(drained[0], vec![0x10, 0x20]);
+        assert_eq!(drained[1], vec![0x30]);
+        assert!(state.drain_rdp_inbound().is_empty());
+    }
+
+    #[test]
+    fn rdp_outbound_and_inbound_are_independent() {
+        let state = fresh_state();
+        state.push_rdp_outbound(vec![1]);
+        state.push_rdp_inbound(vec![2]);
+        // Draining outbound must not affect inbound and vice versa.
+        let out = state.drain_rdp_outbound();
+        assert_eq!(out, vec![vec![1u8]]);
+        let inb = state.drain_rdp_inbound();
+        assert_eq!(inb, vec![vec![2u8]]);
+    }
+
+    #[test]
+    fn rdp_empty_drain_returns_empty_vec() {
+        let state = fresh_state();
+        assert!(state.drain_rdp_outbound().is_empty());
+        assert!(state.drain_rdp_inbound().is_empty());
     }
 }

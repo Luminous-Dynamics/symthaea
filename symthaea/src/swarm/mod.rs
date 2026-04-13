@@ -121,6 +121,8 @@ pub mod rdp_file_transfer;
 pub mod rdp_governance;
 /// Soma↔Holon RDP bridge for phone remote support.
 pub mod rdp_holon_bridge;
+/// Binary wire envelope for RDP (bincode + ChaCha20-Poly1305 via packet_crypto).
+pub mod rdp_wire;
 /// Input injection (X11 XTest, Wayland virtual input, logging/noop).
 pub mod rdp_input;
 /// PQC-secured remote display protocol.
