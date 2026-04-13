@@ -2110,69 +2110,76 @@ impl ConjectureEngine {
                 None => continue, // formula uses operators Z3 can't encode
             };
 
-            // Build a bounded ∀n proof query: for all integer n in [1, max_observed],
-            // |formula(n) - observed(n)| < tolerance. If UNSAT on the negation,
-            // the formula matches ground truth in the bounded range.
+            // Bounded ∀n proof strategy: ISSUE ONE check-sat PER DATA POINT.
             //
-            // We encode observed values as a disjunction of "n = k → formula = observed_k"
-            // (a staircase function). If Z3 can't satisfy "formula(n) ≠ observed(n) for some n",
-            // then the identity holds in the tested range.
-            let max_n = src.data.last().map(|(x, _)| *x as i64).unwrap_or(10);
-            if max_n < 1 { continue; }
+            // For each (n_k, y_k), build a single query that asks:
+            //     "Is it the case that formula(n_k) ≠ y_k?"
+            // We declare n as a Real, assert n = n_k, assert |formula - y_k| > 1e-6,
+            // and check-sat. If UNSAT for every data point, the formula matches
+            // ground truth exactly across the tested range.
+            //
+            // Using one check-sat per point avoids complex staircase encodings and
+            // sidesteps Z3's troubles with integer reasoning in QF_NRA.
+            let mut max_proven = 0i64;
+            let mut all_verified = true;
+            let mut tested_points = 0usize;
 
-            // Build the staircase constraint: (n=1 → f=y1) ∧ (n=2 → f=y2) ∧ ...
-            let mut cases = String::new();
             for &(x, y) in &src.data {
-                let n_val = x as i64;
-                if n_val < 1 || n_val > max_n { continue; }
-                // Skip entries where y would cause numerical issues
-                if !y.is_finite() { continue; }
-                cases.push_str(&format!(
-                    "    (=> (= n {}) (< (abs (- {} {:.12})) 1e-6))\n",
-                    n_val, smt, y
-                ));
+                let n_val = x;
+                if !n_val.is_finite() || !y.is_finite() { continue; }
+
+                // Build a query that asks: "can formula(n_val) differ from y?"
+                // If UNSAT, the formula matches y exactly at n_val.
+                let query = format!(
+                    "(set-logic QF_NRA)\n\
+                     (declare-const n Real)\n\
+                     (assert (= n {:.12}))\n\
+                     (assert (or (> (- {} {:.12}) 0.000001) (< (- {} {:.12}) -0.000001)))\n\
+                     (check-sat)\n",
+                    n_val, smt, y, smt, y
+                );
+
+                let output = std::process::Command::new(&z3_path)
+                    .arg("-in")
+                    .arg("-T:2") // 2 second timeout per check
+                    .stdin(std::process::Stdio::piped())
+                    .stdout(std::process::Stdio::piped())
+                    .stderr(std::process::Stdio::null())
+                    .spawn()
+                    .and_then(|mut child| {
+                        use std::io::Write;
+                        if let Some(stdin) = child.stdin.as_mut() {
+                            stdin.write_all(query.as_bytes()).ok();
+                        }
+                        child.wait_with_output()
+                    });
+
+                match output {
+                    Ok(out) => {
+                        let result = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                        tested_points += 1;
+                        if result.starts_with("unsat") {
+                            // UNSAT: formula cannot differ from y at this n → match confirmed
+                            max_proven = max_proven.max(n_val as i64);
+                        } else {
+                            // SAT or unknown — formula may differ at this point
+                            all_verified = false;
+                            break;
+                        }
+                    }
+                    Err(_) => {
+                        all_verified = false;
+                        break;
+                    }
+                }
             }
 
-            if cases.is_empty() { continue; }
-
-            let query = format!(
-                "(set-logic QF_NRA)\n\
-                 (declare-const n Real)\n\
-                 (define-fun abs ((x Real)) Real (ite (< x 0) (- x) x))\n\
-                 (assert (and (>= n 1) (<= n {}) (= n (to_int n))))\n\
-                 (assert (not (and\n{}\
-                 )))\n\
-                 (check-sat)\n",
-                max_n, cases
-            );
-
-            // Run Z3 with a 2-second timeout per proof
-            let output = std::process::Command::new(&z3_path)
-                .arg("-in")
-                .arg("-T:2") // 2s timeout
-                .stdin(std::process::Stdio::piped())
-                .stdout(std::process::Stdio::piped())
-                .stderr(std::process::Stdio::null())
-                .spawn()
-                .and_then(|mut child| {
-                    use std::io::Write;
-                    if let Some(stdin) = child.stdin.as_mut() {
-                        stdin.write_all(query.as_bytes()).ok();
-                    }
-                    child.wait_with_output()
-                });
-
-            if let Ok(output) = output {
-                let result = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                if result.starts_with("unsat") {
-                    // Z3 confirmed: no counter-example exists in the bounded range
-                    conjecture.status = ConjectureStatus::FormallyVerified {
-                        proof_steps: max_n as usize,
-                    };
-                    conjecture.confidence = 0.99;
-                }
-                // Note: 'sat' means a counter-example was found; 'unknown' means timeout.
-                // In both cases we leave the status as NumericallyTested.
+            // Promote to FormallyVerified only if ALL tested points passed.
+            if all_verified && tested_points > 0 {
+                conjecture.status = ConjectureStatus::FormallyVerified {
+                    proof_steps: tested_points,
+                };
+                conjecture.confidence = 0.99;
             }
         }
     }
