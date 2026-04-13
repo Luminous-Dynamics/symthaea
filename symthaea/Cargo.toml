@@ -514,6 +514,7 @@ egui = { version = "0.33", optional = true }
 # The holon-viewer feature pulls egui + eframe + tokio-tungstenite together
 # so the viewer example can compile as a single feature-gated unit.
 tokio-tungstenite = { version = "0.24", optional = true }
+futures-util = { version = "0.3", optional = true }  # SinkExt/StreamExt for tokio-tungstenite split()
 
 # IPC Protocol Enhancements
 rmp-serde = { workspace = true }  # MessagePack binary protocol (A1)
@@ -547,7 +548,7 @@ gui = ["eframe", "egui"]                    # symthaea-gui binary
 demo = ["clap", "ctrlc"]                    # Demo binaries (CLI args + signal handling)
 full = ["service", "shell", "gui", "demo"]  # All binaries
 api_module = ["axum", "tower-http"]         # HTTP API binary + module
-holon-viewer = ["eframe", "egui", "dep:tokio-tungstenite", "mesh-encryption", "api_module"]  # Phase I.A.2 egui desktop viewer for Holon RDP binary wire
+holon-viewer = ["eframe", "egui", "dep:tokio-tungstenite", "dep:futures-util", "mesh-encryption", "api_module"]  # Phase I.A.2 egui desktop viewer for Holon RDP binary wire
 
 # ── Sovereign RDP ──────────────────────────────────────────────────
 rdp = []                                   # Core RDP protocol + codec + session
