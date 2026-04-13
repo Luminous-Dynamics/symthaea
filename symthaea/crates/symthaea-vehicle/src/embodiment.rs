@@ -16,6 +16,25 @@ pub use symthaea_core::embodiment::{
     MotorSafetyLevel, SafeFallback, GROUNDING_SENSORIMOTOR,
 };
 
+/// Multi-stage emergency fallback for vehicles.
+///
+/// Mirrors real ADAS handover protocols (ISO 21448 SOTIF):
+///   1. Maintain course briefly (allow human takeover detection)
+///   2. Gradual deceleration (50% brake, smooth steering hold)
+///   3. Emergency brake (full force)
+///   4. Post-stop (parking brake, hazards on)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VehicleFallbackStage {
+    /// Stage 1: Maintain course (50 cycles ~100ms for human takeover).
+    MaintainCourse,
+    /// Stage 2: Gradual deceleration (50% brake) + steering hold.
+    GradualDeceleration,
+    /// Stage 3: Full emergency brake.
+    EmergencyBrake,
+    /// Stage 4: Stopped, parking brake engaged.
+    PostStop,
+}
+
 /// Vehicle embodiment bridge.
 pub struct VehicleEmbodiment {
     controller: VehicleController,
@@ -31,6 +50,10 @@ pub struct VehicleEmbodiment {
     last_safe_steering: f32,
     /// Cycles since safe fallback activated (for taper schedule).
     fallback_cycles: u32,
+    /// Multi-stage fallback state.
+    fallback_stage: VehicleFallbackStage,
+    /// Cycles in current fallback stage.
+    fallback_cycles_in_stage: u32,
 }
 
 impl VehicleEmbodiment {
@@ -48,7 +71,54 @@ impl VehicleEmbodiment {
             last_prediction_error: 0.0,
             last_safe_steering: 0.0,
             fallback_cycles: 0,
+            fallback_stage: VehicleFallbackStage::MaintainCourse,
+            fallback_cycles_in_stage: 0,
         }
+    }
+
+    /// Advance the multi-stage fallback state machine based on speed and time.
+    fn update_fallback_stage(&mut self) {
+        let speed = self.simulator.state().speed;
+        match self.fallback_stage {
+            VehicleFallbackStage::MaintainCourse => {
+                // 50 cycles (~100ms) to allow human/external takeover detection
+                if self.fallback_cycles_in_stage > 50 {
+                    self.fallback_stage = VehicleFallbackStage::GradualDeceleration;
+                    self.fallback_cycles_in_stage = 0;
+                }
+            }
+            VehicleFallbackStage::GradualDeceleration => {
+                // If speed still high after 200 cycles, escalate to emergency
+                if speed > 5.0 && self.fallback_cycles_in_stage > 200 {
+                    self.fallback_stage = VehicleFallbackStage::EmergencyBrake;
+                    self.fallback_cycles_in_stage = 0;
+                }
+                // If speed is low enough → can stop with parking brake
+                if speed < 0.5 {
+                    self.fallback_stage = VehicleFallbackStage::PostStop;
+                    self.fallback_cycles_in_stage = 0;
+                }
+            }
+            VehicleFallbackStage::EmergencyBrake => {
+                if speed < 0.5 {
+                    self.fallback_stage = VehicleFallbackStage::PostStop;
+                    self.fallback_cycles_in_stage = 0;
+                }
+            }
+            VehicleFallbackStage::PostStop => {
+                // Stay here until safety clears
+            }
+        }
+    }
+
+    fn reset_fallback_stage(&mut self) {
+        self.fallback_stage = VehicleFallbackStage::MaintainCourse;
+        self.fallback_cycles_in_stage = 0;
+    }
+
+    /// Current vehicle fallback stage (for telemetry/testing).
+    pub fn fallback_stage(&self) -> VehicleFallbackStage {
+        self.fallback_stage
     }
 
     pub fn set_safety_override(&mut self, level: MotorSafetyLevel) {
@@ -75,26 +145,52 @@ impl VehicleEmbodiment {
             self.fallback_cycles = 0;
         }
 
-        // ── SAFE FALLBACK for Red tier ──────────────────────────────
-        // Vehicle carrying humans at speed: minimum-safe behavior is
-        // "emergency brake + lane hold via smooth steering taper".
-        // DO NOT zero out all forces — that would mean no brakes.
+        // ── MULTI-STAGE SAFE FALLBACK for Red tier ──────────────────
+        // ISO 21448 SOTIF-aligned tiered emergency procedure:
+        //   Stage 1: MaintainCourse (allow human takeover ~100ms)
+        //   Stage 2: GradualDeceleration (50% brake)
+        //   Stage 3: EmergencyBrake (full force if speed still high)
+        //   Stage 4: PostStop (parking brake engaged)
         if matches!(self.current_safety, MotorSafetyLevel::Red) {
             self.fallback_cycles += 1;
-            // Smooth steering taper: interpolate from last_safe_steering to 0
-            // over ~50 cycles (~100ms at 500Hz). Prevents sudden lane departure.
-            const TAPER_CYCLES: f32 = 50.0;
+            self.fallback_cycles_in_stage += 1;
+            self.update_fallback_stage();
+
+            // Smooth steering taper across ALL stages — never snap the wheel
+            const TAPER_CYCLES: f32 = 100.0;
             let taper_t = (self.fallback_cycles as f32 / TAPER_CYCLES).min(1.0);
             cmd.steering = self.last_safe_steering * (1.0 - taper_t);
-            // Full brake immediately (emergency stop)
-            cmd.brake = 1.0;
-            // Zero throttle
-            cmd.throttle = 0.0;
-        } else if gain < 1.0 {
-            // Yellow/Orange: scaled authority but preserve agency
-            cmd.steering *= gain;
-            cmd.throttle *= gain;
-            // Brake is already commanded; don't reduce it.
+
+            match self.fallback_stage {
+                VehicleFallbackStage::MaintainCourse => {
+                    // Just hold what we were doing, but stop accelerating
+                    cmd.throttle = 0.0;
+                    // Light brake to start slowing (engine braking equivalent)
+                    cmd.brake = 0.1;
+                }
+                VehicleFallbackStage::GradualDeceleration => {
+                    cmd.throttle = 0.0;
+                    cmd.brake = 0.5; // 50% brake — passenger comfort
+                }
+                VehicleFallbackStage::EmergencyBrake => {
+                    cmd.throttle = 0.0;
+                    cmd.brake = 1.0; // Full force
+                }
+                VehicleFallbackStage::PostStop => {
+                    cmd.throttle = 0.0;
+                    cmd.brake = 1.0; // Hold the brake (parking brake equivalent)
+                    cmd.steering = 0.0; // Centered
+                }
+            }
+        } else {
+            // Not in Red — reset state machine and allow normal operation
+            self.reset_fallback_stage();
+            self.fallback_cycles = 0;
+            if gain < 1.0 {
+                // Yellow/Orange: scaled authority but preserve agency
+                cmd.steering *= gain;
+                cmd.throttle *= gain;
+            }
         }
 
         self.last_control_effort = cmd.control_effort();
@@ -142,6 +238,8 @@ impl VehicleEmbodiment {
         self.last_prediction_error = 0.0;
         self.last_safe_steering = 0.0;
         self.fallback_cycles = 0;
+        self.fallback_stage = VehicleFallbackStage::MaintainCourse;
+        self.fallback_cycles_in_stage = 0;
     }
 
     pub fn safety_level(&self) -> MotorSafetyLevel {
@@ -195,7 +293,7 @@ impl SafeFallback for VehicleEmbodiment {
     fn current_safety_level(&self) -> MotorSafetyLevel { self.current_safety }
     fn safe_fallback_priority(&self) -> u8 { 10 } // Critical: human-carrying, at speed
     fn safe_fallback_description(&self) -> &'static str {
-        "Full brake + zero throttle + smooth 50-cycle steering taper to centered"
+        "Multi-stage: MaintainCourse → GradualDeceleration → EmergencyBrake → PostStop"
     }
     fn safe_fallback_latency_cycles(&self) -> u32 { 1 } // Immediate
 }
