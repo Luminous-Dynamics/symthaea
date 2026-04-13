@@ -994,6 +994,10 @@ name = "flight_integration"
 required-features = ["flight"]
 
 [[example]]
+name = "cross_platform_coherence"
+required-features = ["manipulator", "helicopter", "flight", "vehicle", "auv"]
+
+[[example]]
 name = "transfer_flight_to_humanoid"
 required-features = ["flight", "humanoid"]
 
