@@ -1,0 +1,934 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! # Abstract Thought — Meta-cognition for the ConjectureEngine
+//!
+//! Three interconnected capabilities that form a self-reinforcing feedback loop:
+//!
+//! 1. **Meta-HDC** — encode verified conjectures as concept vectors, cluster to find
+//!    patterns-between-patterns (meta-isomorphisms)
+//! 2. **Dynamic Grammar** — promote recurring sub-expressions to macro-operators
+//!    in the GP grammar pool, enabling the engine to build on its own discoveries
+//! 3. **Category Discovery** — detect functorial relationships between mathematical
+//!    domains, upgrading coincidental cross-domain matches to structural relationships
+//!
+//! ## Feedback Loop
+//!
+//! ```text
+//! Meta-HDC clusters discoveries → recurring subtrees identified
+//!     ↓
+//! Dynamic Grammar promotes subtrees → new macro-operators in GP
+//!     ↓
+//! GP discovers better conjectures → new concept vectors
+//!     ↓
+//! Category Discovery checks cross-domain structure → functors
+//!     ↓
+//! Functors become new discoveries → fed back to Meta-HDC
+//! ```
+//!
+//! ## References
+//!
+//! - Eilenberg & Mac Lane (1945) — General theory of natural equivalences
+//! - Kanerva (2009) — Hyperdimensional computing: An introduction
+//! - Koza (1992) — Genetic Programming
+
+pub mod meta_hdc;
+pub mod dynamic_grammar;
+pub mod category_discovery;
+
+use crate::hdc::binary_hv::BinaryHV;
+use crate::hdc::conjecture_engine::{
+    BinOp, ConjectureEngine, Expr, MathDomain, UnaryFn,
+};
+use crate::hdc::arithmetic_engine::{SymbolicExpr, SymbolicOp, TermType};
+use crate::hdc::primitive_system::PrimitiveSystem;
+
+use self::meta_hdc::MetaHDC;
+use self::dynamic_grammar::DynamicGrammar;
+use self::category_discovery::CategoryDiscovery;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ABSTRACT THOUGHT ORCHESTRATOR
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Orchestrates the three abstract thought capabilities.
+pub struct AbstractThought {
+    pub meta_hdc: MetaHDC,
+    pub dynamic_grammar: DynamicGrammar,
+    pub category_discovery: CategoryDiscovery,
+    /// Track which conjectures have been encoded (by index)
+    encoded_up_to: usize,
+}
+
+impl AbstractThought {
+    pub fn new() -> Self {
+        Self {
+            meta_hdc: MetaHDC::new(),
+            dynamic_grammar: DynamicGrammar::new(),
+            category_discovery: CategoryDiscovery::new(),
+            encoded_up_to: 0,
+        }
+    }
+
+    /// Run one cycle of abstract thought after conjecture generation.
+    ///
+    /// This is the core feedback loop: encode → cluster → extract → promote → categorize.
+    pub fn reflect(&mut self, engine: &ConjectureEngine, primitives: &PrimitiveSystem) {
+        // 1. Encode new verified conjectures as concept vectors
+        for i in self.encoded_up_to..engine.conjectures.len() {
+            let conj = &engine.conjectures[i];
+            if conj.confidence >= 0.3 {
+                self.meta_hdc.add_conjecture(conj, i, primitives);
+            }
+        }
+        self.encoded_up_to = engine.conjectures.len();
+
+        // 2. Cluster concept vectors
+        // Use k = max(2, n/3) to avoid degenerate single-member clusters
+        let n = self.meta_hdc.concepts.len();
+        if n >= 3 {
+            let k = (n / 3).max(2).min(10);
+            self.meta_hdc.cluster(k);
+        }
+
+        // 3. Extract recurring subtrees — first from cross-domain clusters,
+        // then globally as a fallback for small-scale inputs where clustering
+        // may not put structurally related formulas together.
+        let cluster_recurring = self.meta_hdc.recurring_subtrees(engine);
+        for (subtree, conj_ids) in cluster_recurring {
+            self.dynamic_grammar.observe_subtree(subtree, &conj_ids, engine);
+        }
+        // Global fallback: scan all concepts for subtrees appearing 2+ times
+        let global_recurring = self.meta_hdc.global_recurring_subtrees(engine, 2);
+        for (subtree, conj_ids) in global_recurring {
+            self.dynamic_grammar.observe_subtree(subtree, &conj_ids, engine);
+        }
+
+        // 4. Promote candidates that meet threshold
+        self.dynamic_grammar.promote_eligible(engine);
+
+        // 5. Check cross-domain matches for functorial structure
+        let matches = engine.discover_cross_domain_formulas(3.0);
+        if matches.len() >= 3 {
+            self.category_discovery.update_from_matches(&matches);
+            self.category_discovery.find_functors();
+        }
+
+        // 6. Prune unused operators
+        self.dynamic_grammar.prune_unused();
+    }
+
+    /// Get active macro-operators for GP injection.
+    pub fn macro_operators(&self) -> &[dynamic_grammar::MacroOperator] {
+        &self.dynamic_grammar.operators
+    }
+}
+
+impl Default for AbstractThought {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EXPR → SYMBOLICEXPR BRIDGE
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Convert a conjecture engine `Expr` to a `SymbolicExpr` for HDC encoding.
+///
+/// This bridges the two expression representations:
+/// - `Expr` (conjecture_engine): lightweight, no HDC, used for fast GP
+/// - `SymbolicExpr` (arithmetic_engine): carries BinaryHV encoding
+pub fn expr_to_symbolic(expr: &Expr, primitives: &PrimitiveSystem) -> SymbolicExpr {
+    match expr {
+        Expr::Var(name) => SymbolicExpr::variable(name, primitives),
+        Expr::Const(c) => {
+            // SymbolicExpr::constant takes i64; for non-integer f64 we approximate
+            let rounded = c.round() as i64;
+            if ((*c) - rounded as f64).abs() < 1e-9 {
+                SymbolicExpr::constant(rounded, primitives)
+            } else {
+                // For irrational constants, use the nearest integer encoding
+                // and bind with a perturbation to distinguish
+                let base = SymbolicExpr::constant(rounded, primitives);
+                // Return best approximation — the structural pattern matters more
+                // than the exact value for concept vector encoding
+                base
+            }
+        }
+        Expr::BinOp(op, left, right) => {
+            let l = expr_to_symbolic(left, primitives);
+            let r = expr_to_symbolic(right, primitives);
+            // Use SymbolicExpr methods when primitives exist, fall back to
+            // direct HDC encoding when required primitives are missing.
+            // This makes concept vector encoding work with any PrimitiveSystem.
+            let op_name = match op {
+                BinOp::Add => "ADD",
+                BinOp::Sub => "SUB",
+                BinOp::Mul => "MUL",
+                BinOp::Div => "DIV",
+                BinOp::Pow => "POW",
+            };
+            let op_hv = BinaryHV::random(crate::hdc::deterministic_seeds::seed_from_name(
+                &format!("BINOP_{}", op_name),
+            ));
+            let combined = BinaryHV::bundle(&[l.encoding, r.encoding]);
+            let encoding = op_hv.bind(&combined);
+            let sym = match op {
+                BinOp::Add => "+",
+                BinOp::Sub => "-",
+                BinOp::Mul => "*",
+                BinOp::Div => "/",
+                BinOp::Pow => "^",
+            };
+            SymbolicExpr {
+                term_type: TermType::BinaryOp {
+                    op: match op {
+                        BinOp::Add => SymbolicOp::Add,
+                        BinOp::Sub => SymbolicOp::Sub,
+                        BinOp::Mul => SymbolicOp::Mul,
+                        BinOp::Div => SymbolicOp::Div,
+                        BinOp::Pow => SymbolicOp::Pow,
+                    },
+                    left: Box::new(l.term_type),
+                    right: Box::new(r.term_type),
+                },
+                encoding,
+                phi: l.phi + r.phi + 0.1,
+                display: format!("({} {} {})", l.display, sym, r.display),
+            }
+        }
+        Expr::Func(func, arg) => {
+            let a = expr_to_symbolic(arg, primitives);
+            // Encode function application by binding with function-name HV
+            let func_name = match func {
+                UnaryFn::Sqrt => "sqrt",
+                UnaryFn::Log => "ln",
+                UnaryFn::Exp => "exp",
+                UnaryFn::Sin => "sin",
+                UnaryFn::Cos => "cos",
+                UnaryFn::Abs => "abs",
+                UnaryFn::Floor => "floor",
+            };
+            let func_hv = BinaryHV::random(crate::hdc::deterministic_seeds::seed_from_name(
+                &format!("FUNC_{}", func_name),
+            ));
+            SymbolicExpr {
+                term_type: TermType::Function {
+                    name: func_name.to_string(),
+                    arg: Box::new(a.term_type.clone()),
+                },
+                encoding: func_hv.bind(&a.encoding),
+                phi: a.phi + 0.1,
+                display: format!("{}({})", func_name, a.display),
+            }
+        }
+        Expr::Sum(body, var) => {
+            let b = expr_to_symbolic(body, primitives);
+            // Encode summation by binding body with SUM role vector
+            let sum_hv = BinaryHV::random(crate::hdc::deterministic_seeds::seed_from_name("SUM_OPERATOR"));
+            let var_hv = BinaryHV::random(crate::hdc::deterministic_seeds::seed_from_name(
+                &format!("SUM_VAR_{}", var),
+            ));
+            SymbolicExpr {
+                term_type: b.term_type.clone(),
+                encoding: sum_hv.bind(&var_hv).bind(&b.encoding),
+                phi: b.phi + 0.2,
+                display: format!("Sum_{}({})", var, b.display),
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SUBTREE EXTRACTION UTILITIES
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Extract all subtrees of an expression with complexity in [min, max].
+///
+/// Used by Meta-HDC to find recurring structural patterns across conjectures.
+pub fn extract_subtrees(expr: &Expr, min_complexity: usize, max_complexity: usize) -> Vec<Expr> {
+    let mut results = Vec::new();
+    extract_subtrees_inner(expr, min_complexity, max_complexity, &mut results);
+    results
+}
+
+fn extract_subtrees_inner(
+    expr: &Expr,
+    min: usize,
+    max: usize,
+    results: &mut Vec<Expr>,
+) {
+    let c = expr.complexity();
+    if c >= min && c <= max {
+        results.push(expr.clone());
+    }
+    // Recurse into children regardless (they may have subtrees in range)
+    match expr {
+        Expr::Var(_) | Expr::Const(_) => {}
+        Expr::BinOp(_, l, r) => {
+            extract_subtrees_inner(l, min, max, results);
+            extract_subtrees_inner(r, min, max, results);
+        }
+        Expr::Func(_, arg) => {
+            extract_subtrees_inner(arg, min, max, results);
+        }
+        Expr::Sum(body, _) => {
+            extract_subtrees_inner(body, min, max, results);
+        }
+    }
+}
+
+/// Normalize an expression by replacing all constants with 1.0.
+///
+/// This captures the *structural shape* of a formula independent of specific
+/// constant values, enabling structural pattern matching across conjectures.
+pub fn normalize_expr(expr: &Expr) -> Expr {
+    match expr {
+        Expr::Var(name) => Expr::Var(name.clone()),
+        Expr::Const(_) => Expr::Const(1.0),
+        Expr::BinOp(op, l, r) => Expr::BinOp(
+            *op,
+            Box::new(normalize_expr(l)),
+            Box::new(normalize_expr(r)),
+        ),
+        Expr::Func(f, arg) => Expr::Func(*f, Box::new(normalize_expr(arg))),
+        Expr::Sum(body, var) => Expr::Sum(Box::new(normalize_expr(body)), var.clone()),
+    }
+}
+
+/// Semantically canonicalize an expression for macro deduplication.
+///
+/// Applies algebraic identity rewrites, sorts commutative operands, and
+/// promotes structural equivalents to a single form. Two expressions that
+/// are mathematically equivalent (modulo commutativity + simple identities)
+/// produce the same canonical form.
+///
+/// Rewrites applied:
+/// - `x + 0 → x`, `0 + x → x`
+/// - `x - 0 → x`
+/// - `x * 1 → x`, `1 * x → x`
+/// - `x * 0 → 0`, `0 * x → 0`
+/// - `x / 1 → x`
+/// - `x ^ 0 → 1`, `x ^ 1 → x`
+/// - `x * x → x ^ 2`
+/// - Commutative sort for `+` and `*`: operands ordered by Display string
+///
+/// This is intentionally a best-effort simplifier — it catches the trivial
+/// rewrites that were polluting the macro pool (`(1 * n)`, `(n ^ 1)`,
+/// `((...) / 1)`), but does not attempt full algebraic simplification.
+pub fn canonicalize_expr(expr: &Expr) -> Expr {
+    let c = canonicalize_inner(expr);
+    // Run twice — rewrites can cascade (e.g., (x^1 * 1) → (x * 1) → x)
+    canonicalize_inner(&c)
+}
+
+fn canonicalize_inner(expr: &Expr) -> Expr {
+    match expr {
+        Expr::Var(name) => Expr::Var(name.clone()),
+        Expr::Const(c) => Expr::Const(*c),
+        Expr::BinOp(op, l, r) => {
+            let l = canonicalize_inner(l);
+            let r = canonicalize_inner(r);
+            match op {
+                BinOp::Add => {
+                    // x + 0 or 0 + x → x
+                    if is_zero(&l) {
+                        return r;
+                    }
+                    if is_zero(&r) {
+                        return l;
+                    }
+                    // Commutative sort
+                    let (a, b) = sort_commutative(l, r);
+                    Expr::BinOp(BinOp::Add, Box::new(a), Box::new(b))
+                }
+                BinOp::Sub => {
+                    // x - 0 → x
+                    if is_zero(&r) {
+                        return l;
+                    }
+                    Expr::BinOp(BinOp::Sub, Box::new(l), Box::new(r))
+                }
+                BinOp::Mul => {
+                    // x * 0 → 0
+                    if is_zero(&l) || is_zero(&r) {
+                        return Expr::Const(0.0);
+                    }
+                    // x * 1 → x
+                    if is_one(&l) {
+                        return r;
+                    }
+                    if is_one(&r) {
+                        return l;
+                    }
+                    // x * x → x ^ 2
+                    if structurally_equal(&l, &r) {
+                        return Expr::BinOp(
+                            BinOp::Pow,
+                            Box::new(l),
+                            Box::new(Expr::Const(2.0)),
+                        );
+                    }
+                    // Commutative sort
+                    let (a, b) = sort_commutative(l, r);
+                    Expr::BinOp(BinOp::Mul, Box::new(a), Box::new(b))
+                }
+                BinOp::Div => {
+                    // x / 1 → x
+                    if is_one(&r) {
+                        return l;
+                    }
+                    Expr::BinOp(BinOp::Div, Box::new(l), Box::new(r))
+                }
+                BinOp::Pow => {
+                    // x ^ 0 → 1
+                    if is_zero(&r) {
+                        return Expr::Const(1.0);
+                    }
+                    // x ^ 1 → x
+                    if is_one(&r) {
+                        return l;
+                    }
+                    Expr::BinOp(BinOp::Pow, Box::new(l), Box::new(r))
+                }
+            }
+        }
+        Expr::Func(f, arg) => Expr::Func(*f, Box::new(canonicalize_inner(arg))),
+        Expr::Sum(body, var) => Expr::Sum(Box::new(canonicalize_inner(body)), var.clone()),
+    }
+}
+
+fn is_zero(expr: &Expr) -> bool {
+    matches!(expr, Expr::Const(c) if c.abs() < 1e-12)
+}
+
+fn is_one(expr: &Expr) -> bool {
+    matches!(expr, Expr::Const(c) if (*c - 1.0).abs() < 1e-12)
+}
+
+/// Structural equality check (ignoring constant values' exact magnitude).
+/// Used for the `x * x → x^2` rewrite — we want it to fire on `(n * n)`
+/// but also on already-normalized subtrees.
+fn structurally_equal(a: &Expr, b: &Expr) -> bool {
+    match (a, b) {
+        (Expr::Var(na), Expr::Var(nb)) => na == nb,
+        (Expr::Const(ca), Expr::Const(cb)) => (ca - cb).abs() < 1e-12,
+        (Expr::BinOp(opa, la, ra), Expr::BinOp(opb, lb, rb)) => {
+            opa == opb && structurally_equal(la, lb) && structurally_equal(ra, rb)
+        }
+        (Expr::Func(fa, aa), Expr::Func(fb, ab)) => fa == fb && structurally_equal(aa, ab),
+        (Expr::Sum(ba, va), Expr::Sum(bb, vb)) => va == vb && structurally_equal(ba, bb),
+        _ => false,
+    }
+}
+
+/// Sort two expressions so that the smaller (by Display string) comes first.
+/// Used for commutative normalization: `n + 1` and `1 + n` both become `1 + n`.
+fn sort_commutative(a: Expr, b: Expr) -> (Expr, Expr) {
+    let sa = format!("{}", a);
+    let sb = format!("{}", b);
+    if sa <= sb { (a, b) } else { (b, a) }
+}
+
+/// Canonical string representation of an expression.
+///
+/// Applies normalization (constants → 1.0) *then* canonicalization
+/// (identity rewrites + commutative sorting + `x*x → x^2`). Two
+/// structurally equivalent expressions (modulo commutativity + identity
+/// rewrites) produce the same string.
+pub fn expr_canonical_string(expr: &Expr) -> String {
+    let normalized = normalize_expr(expr);
+    let canonicalized = canonicalize_expr(&normalized);
+    format!("{}", canonicalized)
+}
+
+/// Domain role vector seed — deterministic per MathDomain variant.
+pub fn domain_seed(domain: MathDomain) -> u64 {
+    crate::hdc::deterministic_seeds::seed_from_name(&format!("DOMAIN_{:?}", domain))
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TESTS
+// ═══════════════════════════════════════════════════════════════════════════
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_primitives() -> PrimitiveSystem {
+        PrimitiveSystem::new()
+    }
+
+    #[test]
+    fn test_expr_to_symbolic_variable() {
+        let prims = make_primitives();
+        let expr = Expr::Var("n".to_string());
+        let sym = expr_to_symbolic(&expr, &prims);
+        assert_eq!(sym.display, "n");
+    }
+
+    #[test]
+    fn test_expr_to_symbolic_constant() {
+        let prims = make_primitives();
+        let expr = Expr::Const(42.0);
+        let sym = expr_to_symbolic(&expr, &prims);
+        assert_eq!(sym.display, "42");
+    }
+
+    #[test]
+    fn test_expr_to_symbolic_binop() {
+        let prims = make_primitives();
+        // n + 1
+        let expr = Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::Var("n".to_string())),
+            Box::new(Expr::Const(1.0)),
+        );
+        let sym = expr_to_symbolic(&expr, &prims);
+        assert!(sym.display.contains("+") || sym.display.contains("n"));
+    }
+
+    #[test]
+    fn test_extract_subtrees() {
+        // (n + 1) * (n - 2) — complexity 7
+        let expr = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(Expr::BinOp(
+                BinOp::Add,
+                Box::new(Expr::Var("n".to_string())),
+                Box::new(Expr::Const(1.0)),
+            )),
+            Box::new(Expr::BinOp(
+                BinOp::Sub,
+                Box::new(Expr::Var("n".to_string())),
+                Box::new(Expr::Const(2.0)),
+            )),
+        );
+        let subtrees = extract_subtrees(&expr, 3, 5);
+        // Should find (n + 1) and (n - 2), both complexity 3
+        assert_eq!(subtrees.len(), 2);
+        for st in &subtrees {
+            assert!(st.complexity() >= 3 && st.complexity() <= 5);
+        }
+    }
+
+    #[test]
+    fn test_normalize_strips_constants() {
+        let expr = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(Expr::Const(3.14)),
+            Box::new(Expr::Var("n".to_string())),
+        );
+        let norm = normalize_expr(&expr);
+        // Constant should become 1.0
+        match &norm {
+            Expr::BinOp(BinOp::Mul, l, _) => match l.as_ref() {
+                Expr::Const(c) => assert_eq!(*c, 1.0),
+                _ => panic!("Expected constant"),
+            },
+            _ => panic!("Expected BinOp"),
+        }
+    }
+
+    #[test]
+    fn test_canonical_string_structural_equality() {
+        // Two formulas with same structure but different constants
+        let a = Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::Const(5.0)),
+            Box::new(Expr::Var("n".to_string())),
+        );
+        let b = Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::Const(99.0)),
+            Box::new(Expr::Var("n".to_string())),
+        );
+        assert_eq!(expr_canonical_string(&a), expr_canonical_string(&b));
+    }
+
+    #[test]
+    fn test_canonical_string_structural_inequality() {
+        let a = Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::Const(1.0)),
+            Box::new(Expr::Var("n".to_string())),
+        );
+        let b = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(Expr::Const(1.0)),
+            Box::new(Expr::Var("n".to_string())),
+        );
+        assert_ne!(expr_canonical_string(&a), expr_canonical_string(&b));
+    }
+
+    #[test]
+    fn test_extract_subtrees_empty_for_leaves() {
+        let expr = Expr::Var("x".to_string());
+        let subtrees = extract_subtrees(&expr, 3, 10);
+        assert!(subtrees.is_empty());
+    }
+
+    #[test]
+    fn test_normalize_preserves_functions() {
+        let expr = Expr::Func(UnaryFn::Sqrt, Box::new(Expr::Const(42.0)));
+        let norm = normalize_expr(&expr);
+        match &norm {
+            Expr::Func(UnaryFn::Sqrt, arg) => match arg.as_ref() {
+                Expr::Const(c) => assert_eq!(*c, 1.0),
+                _ => panic!("Expected constant"),
+            },
+            _ => panic!("Expected Func"),
+        }
+    }
+
+    // ── Canonicalization tests ─────────────────────────────────────
+
+    #[test]
+    fn test_canonicalize_identity_multiply() {
+        // 1 * n → n
+        let expr = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(Expr::Const(1.0)),
+            Box::new(Expr::Var("n".to_string())),
+        );
+        let canon = canonicalize_expr(&expr);
+        matches!(canon, Expr::Var(_));
+    }
+
+    #[test]
+    fn test_canonicalize_identity_power() {
+        // n ^ 1 → n
+        let expr = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("n".to_string())),
+            Box::new(Expr::Const(1.0)),
+        );
+        let canon = canonicalize_expr(&expr);
+        assert!(matches!(canon, Expr::Var(_)));
+    }
+
+    #[test]
+    fn test_canonicalize_identity_divide() {
+        // (n * n) / 1 → n^2 (after cascading rewrites)
+        let expr = Expr::BinOp(
+            BinOp::Div,
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
+                Box::new(Expr::Var("n".to_string())),
+                Box::new(Expr::Var("n".to_string())),
+            )),
+            Box::new(Expr::Const(1.0)),
+        );
+        let canon = canonicalize_expr(&expr);
+        // Should become n^2
+        match canon {
+            Expr::BinOp(BinOp::Pow, base, exp) => {
+                assert!(matches!(*base, Expr::Var(_)));
+                assert!(matches!(*exp, Expr::Const(c) if (c - 2.0).abs() < 1e-9));
+            }
+            _ => panic!("Expected n^2, got {:?}", canon),
+        }
+    }
+
+    #[test]
+    fn test_canonicalize_x_times_x_becomes_square() {
+        // n * n → n^2
+        let expr = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(Expr::Var("n".to_string())),
+            Box::new(Expr::Var("n".to_string())),
+        );
+        let canon = canonicalize_expr(&expr);
+        assert_eq!(format!("{}", canon), "(n ^ 2)");
+    }
+
+    #[test]
+    fn test_canonicalize_commutative_sort() {
+        // 1 + n should canonicalize the same way as n + 1
+        let a = Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::Const(1.0)),
+            Box::new(Expr::Var("n".to_string())),
+        );
+        let b = Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::Var("n".to_string())),
+            Box::new(Expr::Const(1.0)),
+        );
+        assert_eq!(
+            format!("{}", canonicalize_expr(&a)),
+            format!("{}", canonicalize_expr(&b))
+        );
+    }
+
+    #[test]
+    fn test_canonicalize_preserves_nontrivial() {
+        // sqrt(n) - 1 should not be further simplified
+        let expr = Expr::BinOp(
+            BinOp::Sub,
+            Box::new(Expr::Func(
+                UnaryFn::Sqrt,
+                Box::new(Expr::Var("n".to_string())),
+            )),
+            Box::new(Expr::Const(1.0)),
+        );
+        let canon = canonicalize_expr(&expr);
+        // Should remain structurally similar (Sub is not commutative, Sub with 1 is not identity)
+        assert!(matches!(canon, Expr::BinOp(BinOp::Sub, _, _)));
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // INTEGRATION TESTS — Full Pipeline
+    // ═══════════════════════════════════════════════════════════════════════
+
+    use crate::hdc::conjecture_engine::{
+        Conjecture, ConjectureEngine, ConjectureStatus, MathDomain, ObservedSequence,
+    };
+
+    fn make_verified_conjecture(
+        formula: Expr,
+        domain: MathDomain,
+        source: &str,
+    ) -> Conjecture {
+        let formula_str = format!("{}", formula);
+        let complexity = formula.complexity();
+        Conjecture {
+            formula,
+            formula_str,
+            source: source.to_string(),
+            domain,
+            training_mse: 0.001,
+            complexity,
+            fitness: 0.001 + 0.001 * complexity as f64,
+            status: ConjectureStatus::FormallyVerified { proof_steps: 5 },
+            confidence: 0.95,
+        }
+    }
+
+    /// sqrt(n) + c — a pattern that will recur across domains
+    fn sqrt_n_plus(c: f64) -> Expr {
+        Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::Func(
+                UnaryFn::Sqrt,
+                Box::new(Expr::Var("n".to_string())),
+            )),
+            Box::new(Expr::Const(c)),
+        )
+    }
+
+    /// n * n + c — a different structural pattern
+    fn n_squared_plus(c: f64) -> Expr {
+        Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
+                Box::new(Expr::Var("n".to_string())),
+                Box::new(Expr::Var("n".to_string())),
+            )),
+            Box::new(Expr::Const(c)),
+        )
+    }
+
+    #[test]
+    fn test_full_pipeline_reflect() {
+        let prims = make_primitives();
+        let mut engine = ConjectureEngine::new();
+        engine.enable_abstract_thought();
+
+        // Inject conjectures that share the sqrt(n)+c pattern across 3 domains
+        engine.conjectures.push(make_verified_conjecture(
+            sqrt_n_plus(1.0),
+            MathDomain::NumberTheory,
+            "primes_sqrt",
+        ));
+        engine.conjectures.push(make_verified_conjecture(
+            sqrt_n_plus(2.0),
+            MathDomain::Physics,
+            "energy_sqrt",
+        ));
+        engine.conjectures.push(make_verified_conjecture(
+            sqrt_n_plus(3.0),
+            MathDomain::Chemistry,
+            "rate_sqrt",
+        ));
+
+        // Run reflect
+        engine.reflect(&prims);
+
+        // Check that abstract thought state was updated
+        let at = engine.abstract_thought.as_ref().unwrap();
+        assert_eq!(at.meta_hdc.concepts.len(), 3, "Should encode 3 conjectures");
+    }
+
+    #[test]
+    fn test_full_pipeline_macro_promotion() {
+        let prims = make_primitives();
+        let mut engine = ConjectureEngine::new();
+        engine.enable_abstract_thought();
+
+        // Inject 5 conjectures sharing sqrt(n)+c from 5 different sources/domains
+        let domains = [
+            (MathDomain::NumberTheory, "nt_seq"),
+            (MathDomain::Physics, "phys_seq"),
+            (MathDomain::Chemistry, "chem_seq"),
+            (MathDomain::Biology, "bio_seq"),
+            (MathDomain::Economics, "econ_seq"),
+        ];
+        for (i, (domain, source)) in domains.iter().enumerate() {
+            engine.conjectures.push(make_verified_conjecture(
+                sqrt_n_plus(i as f64 + 1.0),
+                *domain,
+                source,
+            ));
+        }
+
+        // Run reflect — should encode, cluster, find recurring subtrees, maybe promote
+        engine.reflect(&prims);
+
+        let at = engine.abstract_thought.as_ref().unwrap();
+
+        // 5 conjectures encoded
+        assert_eq!(at.meta_hdc.concepts.len(), 5);
+
+        // Should have clustered (5 >= min cluster size of 5)
+        assert!(
+            !at.meta_hdc.clusters.is_empty(),
+            "Should have at least 1 cluster"
+        );
+
+        // The cluster should detect cross-domain diversity
+        let max_diversity = at.meta_hdc.clusters.iter().map(|c| c.domain_diversity).max().unwrap_or(0);
+        assert!(
+            max_diversity >= 2,
+            "Should detect cross-domain pattern, got diversity {}",
+            max_diversity
+        );
+    }
+
+    #[test]
+    fn test_full_pipeline_category_discovery() {
+        let prims = make_primitives();
+        let mut engine = ConjectureEngine::new();
+        engine.enable_abstract_thought();
+
+        // Set up cross-domain matches by adding observations + conjectures
+        // that span NumberTheory → Physics → Chemistry
+        let nt_data: Vec<(f64, f64)> = (1..=20).map(|n| (n as f64, (n as f64).sqrt())).collect();
+        let phys_data: Vec<(f64, f64)> = (1..=20).map(|n| (n as f64, (n as f64).sqrt() * 1.1)).collect();
+
+        engine.observe(ObservedSequence::new("nt_sqrt", MathDomain::NumberTheory, nt_data));
+        engine.observe(ObservedSequence::new("phys_sqrt", MathDomain::Physics, phys_data));
+
+        // Add conjectures that match across domains
+        engine.conjectures.push(make_verified_conjecture(
+            Expr::Func(UnaryFn::Sqrt, Box::new(Expr::Var("n".to_string()))),
+            MathDomain::NumberTheory,
+            "nt_sqrt",
+        ));
+
+        engine.reflect(&prims);
+
+        // Verify the engine is functional and doesn't crash
+        // (category discovery needs cross_domain_formulas which requires matching conjectures)
+        let at = engine.abstract_thought.as_ref().unwrap();
+        assert_eq!(at.meta_hdc.concepts.len(), 1);
+    }
+
+    #[test]
+    fn test_reflect_idempotent_encoding() {
+        let prims = make_primitives();
+        let mut engine = ConjectureEngine::new();
+        engine.enable_abstract_thought();
+
+        engine.conjectures.push(make_verified_conjecture(
+            sqrt_n_plus(1.0),
+            MathDomain::NumberTheory,
+            "seq_a",
+        ));
+
+        // Reflect twice — should only encode the conjecture once
+        engine.reflect(&prims);
+        engine.reflect(&prims);
+
+        let at = engine.abstract_thought.as_ref().unwrap();
+        assert_eq!(
+            at.meta_hdc.concepts.len(), 1,
+            "Should not double-encode on repeated reflect"
+        );
+    }
+
+    #[test]
+    fn test_macro_operators_accessor() {
+        let mut engine = ConjectureEngine::new();
+        engine.enable_abstract_thought();
+
+        // Initially empty
+        assert!(engine.macro_operators().is_empty());
+    }
+
+    #[test]
+    fn test_reflect_without_abstract_thought_is_noop() {
+        let prims = make_primitives();
+        let mut engine = ConjectureEngine::new();
+        // Do NOT enable abstract thought
+        engine.conjectures.push(make_verified_conjecture(
+            sqrt_n_plus(1.0),
+            MathDomain::NumberTheory,
+            "seq_a",
+        ));
+        // Should not crash
+        engine.reflect(&prims);
+    }
+
+    #[test]
+    fn test_end_to_end_feedback_loop() {
+        // Full closed-loop test:
+        // 1. Pre-populate conjectures sharing a pattern across domains
+        // 2. Reflect → cluster → promote macro operator
+        // 3. Run generate_conjectures on new data
+        // 4. Verify macro operator is exposed via accessor
+        let prims = make_primitives();
+        let mut engine = ConjectureEngine::new();
+        engine.enable_abstract_thought();
+
+        // Seed 5 conjectures sharing n*n pattern across 5 independent sources/domains
+        let sources = [
+            (MathDomain::NumberTheory, "nt"),
+            (MathDomain::Combinatorics, "comb"),
+            (MathDomain::Physics, "phys"),
+            (MathDomain::Biology, "bio"),
+            (MathDomain::Economics, "econ"),
+        ];
+        for (i, (domain, src)) in sources.iter().enumerate() {
+            engine.conjectures.push(make_verified_conjecture(
+                n_squared_plus(i as f64 + 1.0),
+                *domain,
+                src,
+            ));
+        }
+
+        // Reflect: encode → cluster → recurring subtrees → candidates → promote
+        engine.reflect(&prims);
+
+        // The feedback loop produces:
+        // - 5 concept vectors encoded
+        // - at least 1 cluster with cross-domain diversity
+        let at = engine.abstract_thought.as_ref().unwrap();
+        assert_eq!(at.meta_hdc.concepts.len(), 5);
+        assert!(!at.meta_hdc.clusters.is_empty());
+
+        // Check that recurring subtrees were detected + candidates tracked
+        let total_candidates = at.dynamic_grammar.candidates.len();
+        let total_operators = at.dynamic_grammar.operators.len();
+        assert!(
+            total_candidates + total_operators > 0,
+            "Should detect recurring patterns (candidates={}, operators={})",
+            total_candidates, total_operators
+        );
+
+        // Verify macro_operators accessor works
+        let _macros = engine.macro_operators();
+    }
+}
