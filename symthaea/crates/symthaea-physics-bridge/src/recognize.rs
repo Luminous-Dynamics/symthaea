@@ -21,15 +21,23 @@
 //! When Symthaea autonomously discovers `E = ½v² - 1/r`, this module answers:
 //! *"I've seen this before — it's Kepler's orbital energy, similarity 97%."*
 //!
-//! ## Lossy conversion
+//! ## Encoding conventions
 //!
-//! Not every `Expr` variant maps cleanly to an `EquationNode`. Specifically:
-//! - `Expr::Func(Sin/Cos/Log)` have no direct `EquationNode` equivalent. They
-//!   are encoded as `EquationNode::Field { name: "sin"/"cos"/"ln", ... }` with
-//!   the argument as a product factor. This preserves structural similarity
-//!   for catalog search but loses semantic fidelity for exact proofs.
-//! - `Expr::Sum` (Σ) is converted to a single `EquationNode::Field { name: "Σ" }`
-//!   wrapping the body. Again, structural but not semantic.
+//! The physics-bridge catalog represents scalar variables as
+//! [`EquationNode::Constant`] nodes (not `Field`), and represents trig/log
+//! expressions as single-atom constants like `"sin(θ)"` or `"ln(Q)"`. This
+//! module mirrors those conventions so that discovered formulas actually match
+//! catalog entries in skeleton mode:
+//!
+//! - `Expr::Var(name)` → `EquationNode::Constant { name }`
+//! - `Expr::Func(Sin, arg)` → `EquationNode::Constant { name: "sin(<arg>)" }`
+//! - `Expr::Func(Cos, arg)` → `EquationNode::Constant { name: "cos(<arg>)" }`
+//! - `Expr::Func(Log, arg)` → `EquationNode::Constant { name: "ln(<arg>)" }`
+//!
+//! This is lossy for deep structural matching inside trig arguments, but it
+//! matches how the catalog actually encodes these functions. Recognition
+//! accuracy is substantially higher with this convention than with `Field`
+//! or `Product` encodings.
 //!
 //! For exact symbolic proofs, use the ConjectureEngine's own Z3 bridge.
 //! This module is for **fast catalog recognition**, not formal verification.
@@ -38,8 +46,8 @@ use symthaea_core::hdc::conjecture_engine::{BinOp, Expr, UnaryFn};
 
 use crate::query::PhysicsSearchEngine;
 use crate::types::{
-    DiffOperator, DimensionalSignature, EquationNode, MetricSignature, PhysicsDomain,
-    PhysicsEquation, SearchResult, SymmetryDescriptor, TensorDescriptor,
+    DiffOperator, DimensionalSignature, EquationNode, PhysicsDomain, PhysicsEquation,
+    SearchResult, SymmetryDescriptor,
 };
 
 /// Convert a ConjectureEngine [`Expr`] into a physics-bridge [`EquationNode`].
@@ -49,10 +57,12 @@ use crate::types::{
 /// some mappings are lossy — see module docs).
 pub fn expr_to_equation_node(expr: &Expr) -> EquationNode {
     match expr {
-        Expr::Var(name) => EquationNode::Field {
-            name: name.clone(),
-            tensor: scalar_descriptor(),
-        },
+        // IMPORTANT: ConjectureEngine variables (n, r, x, v, etc.) are named
+        // scalars — they are not tensor fields. The catalog's existing entries
+        // (Rydberg, Newton's laws, etc.) encode scalar variables as Constant
+        // nodes, not Field nodes. Using Constant here is what makes recognition
+        // actually match existing catalog entries in skeleton mode.
+        Expr::Var(name) => EquationNode::Constant { name: name.clone() },
         Expr::Const(c) => EquationNode::Scalar(*c),
         Expr::BinOp(BinOp::Add, l, r) => {
             // Flatten nested Add into a single Sum(vec![])
@@ -100,43 +110,25 @@ pub fn expr_to_equation_node(expr: &Expr) -> EquationNode {
         Expr::Func(UnaryFn::Exp, arg) => {
             EquationNode::Exponential(Box::new(expr_to_equation_node(arg)))
         }
-        // Lossy: trig and log are encoded as named scalar fields with the
-        // argument as a co-factor. Catalog search still matches structurally.
-        Expr::Func(UnaryFn::Sin, arg) => EquationNode::Product(vec![
-            EquationNode::Field {
-                name: "sin".to_string(),
-                tensor: scalar_descriptor(),
-            },
-            expr_to_equation_node(arg),
-        ]),
-        Expr::Func(UnaryFn::Cos, arg) => EquationNode::Product(vec![
-            EquationNode::Field {
-                name: "cos".to_string(),
-                tensor: scalar_descriptor(),
-            },
-            expr_to_equation_node(arg),
-        ]),
-        Expr::Func(UnaryFn::Log, arg) => EquationNode::Product(vec![
-            EquationNode::Field {
-                name: "ln".to_string(),
-                tensor: scalar_descriptor(),
-            },
-            expr_to_equation_node(arg),
-        ]),
-        Expr::Func(UnaryFn::Abs, arg) => EquationNode::Product(vec![
-            EquationNode::Field {
-                name: "abs".to_string(),
-                tensor: scalar_descriptor(),
-            },
-            expr_to_equation_node(arg),
-        ]),
-        Expr::Func(UnaryFn::Floor, arg) => EquationNode::Product(vec![
-            EquationNode::Field {
-                name: "floor".to_string(),
-                tensor: scalar_descriptor(),
-            },
-            expr_to_equation_node(arg),
-        ]),
+        // Lossy: trig/log/abs/floor are encoded as single-atom Constant nodes
+        // matching the catalog's convention (e.g. "sin(θ)", "ln(Q)"). This loses
+        // the internal argument structure for semantic matching, but aligns with
+        // how the physics-bridge catalog actually encodes these functions.
+        Expr::Func(UnaryFn::Sin, arg) => EquationNode::Constant {
+            name: format!("sin({})", arg),
+        },
+        Expr::Func(UnaryFn::Cos, arg) => EquationNode::Constant {
+            name: format!("cos({})", arg),
+        },
+        Expr::Func(UnaryFn::Log, arg) => EquationNode::Constant {
+            name: format!("ln({})", arg),
+        },
+        Expr::Func(UnaryFn::Abs, arg) => EquationNode::Constant {
+            name: format!("abs({})", arg),
+        },
+        Expr::Func(UnaryFn::Floor, arg) => EquationNode::Constant {
+            name: format!("floor({})", arg),
+        },
         Expr::Sum(body, _var) => {
             // Σ operator as an integral-like differential operator wrapping the body
             EquationNode::DiffOp {
@@ -165,9 +157,6 @@ fn flatten_mul(expr: &Expr, out: &mut Vec<EquationNode>) {
     }
 }
 
-fn scalar_descriptor() -> TensorDescriptor {
-    TensorDescriptor::scalar(MetricSignature::Euclidean(3))
-}
 
 /// A full recognition report for a discovered formula.
 #[derive(Debug, Clone)]
@@ -219,7 +208,18 @@ pub fn recognize_expr(
     expr: &Expr,
     name: &str,
 ) -> RecognitionReport {
-    let ast = expr_to_equation_node(expr);
+    let rhs = expr_to_equation_node(expr);
+    // IMPORTANT: Catalog entries are stored as Equals(lhs, rhs) trees because
+    // they represent equations (F = ma, E = ½v² − 1/r, etc.). A bare RHS
+    // skeleton won't match those at the top level. Wrap the discovered formula
+    // in a generic Equals(Constant("result"), rhs) so both sides use the
+    // Equals root node. The `result` constant name is irrelevant in skeleton
+    // mode (constants are interchangeable), and it carries no bits that would
+    // contaminate the structural comparison.
+    let ast = EquationNode::Equals(
+        Box::new(EquationNode::Constant { name: "result".into() }),
+        Box::new(rhs),
+    );
     let query = PhysicsEquation {
         name: name.to_string(),
         domain: PhysicsDomain::ClassicalMechanics,
@@ -249,7 +249,7 @@ mod tests {
     use super::*;
     use symthaea_core::hdc::conjecture_engine::{BinOp, Expr};
 
-    /// A simple polynomial `n² + n` should convert to a Sum of a Power and a Field.
+    /// A simple polynomial `n² + n` should convert to a Sum of a Power and a Constant.
     #[test]
     fn test_expr_to_equation_node_polynomial() {
         let expr = Expr::BinOp(
@@ -266,7 +266,7 @@ mod tests {
             EquationNode::Sum(terms) => {
                 assert_eq!(terms.len(), 2, "should flatten to two terms");
                 assert!(matches!(terms[0], EquationNode::Power { .. }));
-                assert!(matches!(terms[1], EquationNode::Field { .. }));
+                assert!(matches!(terms[1], EquationNode::Constant { .. }));
             }
             _ => panic!("expected Sum, got {:?}", node),
         }
@@ -408,22 +408,34 @@ mod tests {
         assert!(!report.all_results.is_empty());
     }
 
-    /// Convert trig functions without panic.
+    /// Convert trig functions to single-atom catalog-matching Constants.
     #[test]
-    fn test_trig_conversion_lossy_but_safe() {
+    fn test_trig_conversion_catalog_matching() {
         let sin_x = Expr::Func(UnaryFn::Sin, Box::new(Expr::Var("x".into())));
         let node = expr_to_equation_node(&sin_x);
-        // Encoded as Product of "sin" field and x
+        // Encoded as single Constant("sin(x)") matching catalog convention
         match node {
-            EquationNode::Product(factors) => {
-                assert_eq!(factors.len(), 2);
-                if let EquationNode::Field { name, .. } = &factors[0] {
-                    assert_eq!(name, "sin");
-                } else {
-                    panic!("first factor should be sin field");
-                }
+            EquationNode::Constant { name } => {
+                assert_eq!(name, "sin(x)", "should be single-atom constant");
             }
-            _ => panic!("expected Product for sin(x), got {:?}", node),
+            _ => panic!("expected Constant for sin(x), got {:?}", node),
+        }
+
+        // Also verify nested argument is rendered via Display
+        let sin_n_plus_1 = Expr::Func(
+            UnaryFn::Sin,
+            Box::new(Expr::BinOp(
+                BinOp::Add,
+                Box::new(Expr::Var("n".into())),
+                Box::new(Expr::Const(1.0)),
+            )),
+        );
+        let node2 = expr_to_equation_node(&sin_n_plus_1);
+        if let EquationNode::Constant { name } = node2 {
+            assert!(name.starts_with("sin"), "should be sin(...): {}", name);
+        } else {
+            panic!("expected Constant");
         }
     }
+
 }

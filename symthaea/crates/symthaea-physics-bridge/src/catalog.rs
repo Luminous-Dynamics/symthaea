@@ -259,6 +259,15 @@ fn build_all_equations() -> Vec<PhysicsEquation> {
     eqs.push(arrhenius_equation());
     eqs.push(hubble_law());
 
+    // ── Phase A4: Orbital Mechanics + Hydrogen Spectrum ──
+    // Fills the gap between Kepler's third law (periods) and Rydberg (wavelengths)
+    // with the direct ENERGY forms that autonomous discovery actually produces.
+    eqs.push(hydrogen_energy_levels());
+    eqs.push(kepler_orbital_energy());
+    eqs.push(gravitational_potential_energy());
+    eqs.push(harmonic_oscillator_energy());
+    eqs.push(inverse_square_force());
+
     // ── Phase 1B: Expand to 150 ──
     // Classical Mechanics
     eqs.push(simple_eq(
@@ -4314,6 +4323,173 @@ fn rydberg_formula() -> PhysicsEquation {
         ),
         symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(3)], false),
         dimensions: DimensionalSignature::INVERSE_LENGTH,
+        tensor: None,
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PHASE A4: Orbital Mechanics + Hydrogen Spectrum
+// ═══════════════════════════════════════════════════════════════════════════
+// These entries fill the gap between Kepler's third law (periods) and the
+// Rydberg wavelength formula with the direct ENERGY forms that autonomous
+// discovery from numerical data actually produces.
+
+/// Hydrogen energy levels (Bohr model energy form): E_n = -13.6 eV / n²
+///
+/// The autonomous discoverer converges on this form when fed hydrogen spectral
+/// data or the Bohr-model ionization energies. Distinct from the Rydberg
+/// wavelength formula `1/λ = R(1/n₁² - 1/n₂²)` because it's the energy of a
+/// single orbital, not the transition wavelength between two.
+fn hydrogen_energy_levels() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Hydrogen Energy Levels".to_string(),
+        domain: PhysicsDomain::QuantumMechanics,
+        ast: make_equals(
+            make_const("E_n"),
+            make_product(vec![
+                EquationNode::Negate(Box::new(make_const("R_H"))),
+                EquationNode::Power {
+                    base: Box::new(make_const("n")),
+                    exponent: Box::new(EquationNode::Scalar(-2.0)),
+                },
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(3)], false),
+        dimensions: DimensionalSignature::ENERGY,
+        tensor: None,
+    }
+}
+
+/// Kepler orbital total energy: E = ½mv² - GMm/r
+///
+/// The conserved total mechanical energy for two-body gravitational orbits.
+/// Shape: kinetic (positive quadratic in velocity) minus potential (negative
+/// inverse distance). This is the Sum-of-(Product, Negate-of-Product) that
+/// the Kepler two-body autonomous discovery produces.
+fn kepler_orbital_energy() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Kepler Orbital Energy".to_string(),
+        domain: PhysicsDomain::ClassicalMechanics,
+        ast: make_equals(
+            make_const("E"),
+            make_sum(vec![
+                // ½ m v²
+                make_product(vec![
+                    EquationNode::Scalar(0.5),
+                    make_const("m"),
+                    EquationNode::Power {
+                        base: Box::new(make_const("v")),
+                        exponent: Box::new(EquationNode::Scalar(2.0)),
+                    },
+                ]),
+                // -GMm/r
+                EquationNode::Negate(Box::new(make_product(vec![
+                    make_const("G"),
+                    make_const("M"),
+                    make_const("m"),
+                    EquationNode::Power {
+                        base: Box::new(make_const("r")),
+                        exponent: Box::new(EquationNode::Scalar(-1.0)),
+                    },
+                ]))),
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::from_lie_groups(
+            // SO(4) captures the Kepler hidden symmetry (Laplace-Runge-Lenz)
+            vec![LieGroup::SO(4)],
+            false,
+        ),
+        dimensions: DimensionalSignature::ENERGY,
+        tensor: None,
+    }
+}
+
+/// Gravitational potential energy: U = -GMm/r
+///
+/// The pure inverse-distance potential. Discovery engines that see only
+/// potential-energy data (not kinetic) will converge on this form.
+fn gravitational_potential_energy() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Gravitational Potential Energy".to_string(),
+        domain: PhysicsDomain::ClassicalMechanics,
+        ast: make_equals(
+            make_const("U"),
+            EquationNode::Negate(Box::new(make_product(vec![
+                make_const("G"),
+                make_const("M"),
+                make_const("m"),
+                EquationNode::Power {
+                    base: Box::new(make_const("r")),
+                    exponent: Box::new(EquationNode::Scalar(-1.0)),
+                },
+            ]))),
+        ),
+        symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(3)], false),
+        dimensions: DimensionalSignature::ENERGY,
+        tensor: None,
+    }
+}
+
+/// Harmonic oscillator total energy: E = ½kx² + ½mv²
+///
+/// Shape: Sum of two quadratic kinetic/potential terms — the canonical
+/// `x² + v²` invariant the engine discovers for the harmonic oscillator.
+fn harmonic_oscillator_energy() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Harmonic Oscillator Energy".to_string(),
+        domain: PhysicsDomain::ClassicalMechanics,
+        ast: make_equals(
+            make_const("E"),
+            make_sum(vec![
+                // ½ k x²
+                make_product(vec![
+                    EquationNode::Scalar(0.5),
+                    make_const("k"),
+                    EquationNode::Power {
+                        base: Box::new(make_const("x")),
+                        exponent: Box::new(EquationNode::Scalar(2.0)),
+                    },
+                ]),
+                // ½ m v²
+                make_product(vec![
+                    EquationNode::Scalar(0.5),
+                    make_const("m"),
+                    EquationNode::Power {
+                        base: Box::new(make_const("v")),
+                        exponent: Box::new(EquationNode::Scalar(2.0)),
+                    },
+                ]),
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(2)], false),
+        dimensions: DimensionalSignature::ENERGY,
+        tensor: None,
+    }
+}
+
+/// Inverse-square force law (general form): F = k/r²
+///
+/// The universal shape of Coulomb, Newton gravity, and the Yukawa limit.
+/// Distinct from the specific Newton gravity and Coulomb entries because
+/// it's domain-agnostic — discovery engines that find `f(r) ~ 1/r²` in
+/// unknown contexts (e.g., unknown force fields in simulation data) should
+/// match here even when the specific constant hasn't been named.
+fn inverse_square_force() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Inverse Square Force Law".to_string(),
+        domain: PhysicsDomain::ClassicalMechanics,
+        ast: make_equals(
+            make_const("F"),
+            make_product(vec![
+                make_const("k"),
+                EquationNode::Power {
+                    base: Box::new(make_const("r")),
+                    exponent: Box::new(EquationNode::Scalar(-2.0)),
+                },
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(3)], false),
+        dimensions: DimensionalSignature::FORCE,
         tensor: None,
     }
 }
