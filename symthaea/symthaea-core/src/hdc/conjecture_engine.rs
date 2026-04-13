@@ -4125,6 +4125,34 @@ pub fn discover_invariants_autonomous(
         }
     }
 
+    // Pre-compute several distinct "off-trajectory" test points for the
+    // non-triviality filter. We use both the trajectory samples themselves
+    // (so disguised constants like 0^(non-constant)→0 are caught) AND a few
+    // independently-perturbed states so the filter rejects expressions that
+    // are constant at every realistic state, not just at the trajectory.
+    let nt_test_points: Vec<Vec<f64>> = {
+        let mut points = Vec::with_capacity(8);
+        // 4 trajectory snapshots
+        for i in [0, sampled.len() / 4, sampled.len() / 2, sampled.len() - 1] {
+            if i < sampled.len() { points.push(sampled[i].clone()); }
+        }
+        // 4 synthetic perturbations of the initial state
+        let perturbations: [&[f64]; 4] = [
+            &[1.7, 0.4, 0.6, 0.9][..],
+            &[0.2, 1.5, 0.7, 0.3][..],
+            &[1.1, 1.1, 1.1, 1.1][..],
+            &[0.5, 0.5, 0.5, 0.5][..],
+        ];
+        for p in &perturbations {
+            let mut state = vec![0.0; ndim];
+            for i in 0..ndim {
+                state[i] = p.get(i).copied().unwrap_or(1.0);
+            }
+            points.push(state);
+        }
+        points
+    };
+
     for _gen in 0..generations {
         // Evaluate fitness (variance) for each individual
         let fitnesses: Vec<f64> = population.iter()
@@ -4132,13 +4160,33 @@ pub fn discover_invariants_autonomous(
                 if expr.complexity() > max_complexity { return f64::MAX; }
                 // Minimum complexity: trivial expressions (constants, single vars) get huge penalty
                 if expr.complexity() < 3 { return f64::MAX; }
-                // Check non-triviality: must differ at two test points
-                let v0 = expr.eval(&var_names.iter().enumerate()
-                    .map(|(i, n)| (*n, if i == 0 { 1.0 } else { 0.5 })).collect::<Vec<_>>());
-                let v1 = expr.eval(&var_names.iter().enumerate()
-                    .map(|(i, n)| (*n, if i == 0 { 0.3 } else { 0.9 })).collect::<Vec<_>>());
-                if !v0.is_finite() || !v1.is_finite() { return f64::MAX; }
-                if (v0 - v1).abs() < 1e-10 * v0.abs().max(1.0) { return f64::MAX; } // constant
+
+                // Non-triviality: evaluate at MANY independent test points and
+                // check that the formula produces meaningfully different values.
+                // This catches disguised constants like 0^(non-constant) which
+                // evaluate to 0 (or 1) at every real data point even though the
+                // AST has variables in the exponent.
+                let mut values = Vec::with_capacity(nt_test_points.len());
+                for state in &nt_test_points {
+                    let bindings: Vec<(&str, f64)> = var_names.iter()
+                        .zip(state.iter())
+                        .map(|(name, val)| (*name, *val))
+                        .collect();
+                    let v = expr.eval(&bindings);
+                    if !v.is_finite() { return f64::MAX; }
+                    values.push(v);
+                }
+                // Compute spread: relative std-dev across test points
+                let mean = values.iter().sum::<f64>() / values.len() as f64;
+                let var = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>()
+                    / values.len() as f64;
+                let spread = var.sqrt();
+                let scale = mean.abs().max(1e-6);
+                if spread / scale < 1e-6 {
+                    // Effectively constant across test points → reject as trivial
+                    return f64::MAX;
+                }
+
                 let var = compute_trajectory_variance(expr, &sampled, var_names);
                 var
             })
