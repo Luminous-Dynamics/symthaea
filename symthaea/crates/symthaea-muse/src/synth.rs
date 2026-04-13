@@ -372,7 +372,17 @@ fn render_tone(
             } else {
                 1.0
             };
-            s += a * filter_atten * (std::f32::consts::TAU * cf * t + fm).sin();
+            // PER-PARTIAL ENVELOPE: upper partials decay faster than fundamentals.
+            // Real instruments (piano, strings, wind) have this physics: higher
+            // harmonics dissipate energy faster due to string stiffness, air
+            // absorption, body filtering. The fundamental rings; harmonics fade.
+            //
+            // Decay rate scales with partial index: partial N decays ~N× faster
+            // than fundamental. At t=1s, partial 8 is at 0.37× its initial
+            // amplitude while fundamental is still near 1.0.
+            let partial_decay = (-t * 0.8 * (h as f32).sqrt()).exp();
+            s += a * filter_atten * partial_decay
+                * (std::f32::consts::TAU * cf * t + fm).sin();
         }
         let o = s * env * note.velocity * vol * 0.2;
         bl[si] += o * gl;
