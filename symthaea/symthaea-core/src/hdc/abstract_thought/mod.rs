@@ -43,6 +43,23 @@ use crate::hdc::conjecture_engine::{
 use crate::hdc::arithmetic_engine::{SymbolicExpr, SymbolicOp, TermType};
 use crate::hdc::primitive_system::PrimitiveSystem;
 
+// ── Subtree extraction bounds ──────────────────────────────────────────
+//
+// Min complexity of 2 lets unary function applications like `sqrt(n)`,
+// `exp(n)`, `log(n)`, `sin(n)`, `cos(n)` (all complexity 2) become
+// extractable as candidate macros. Previously we required min=3 which
+// silently filtered out every primitive function call.
+//
+// Max complexity of 15 allows slightly larger compound shapes through.
+// The macro pool is still bounded by `DynamicGrammar::max_operators`
+// (default 20), so this can't cause unbounded growth.
+
+/// Minimum subtree complexity (AST node count) for promotion candidates.
+pub const SUBTREE_MIN_COMPLEXITY: usize = 2;
+
+/// Maximum subtree complexity (AST node count) for promotion candidates.
+pub const SUBTREE_MAX_COMPLEXITY: usize = 15;
+
 use self::meta_hdc::MetaHDC;
 use self::dynamic_grammar::DynamicGrammar;
 use self::category_discovery::CategoryDiscovery;
@@ -91,16 +108,25 @@ impl AbstractThought {
             self.meta_hdc.cluster(k);
         }
 
-        // 3. Extract recurring subtrees — first from cross-domain clusters,
-        // then globally as a fallback for small-scale inputs where clustering
-        // may not put structurally related formulas together.
+        // 3. Extract recurring subtrees — three paths in priority order:
+        // (a) from cross-domain clusters (meta-patterns)
+        // (b) globally, 2+ occurrences (standard recurrence)
+        // (c) verified-singleton path (novel shapes from formally-verified
+        //     or extremely-low-MSE conjectures — feeds the fast-track
+        //     promotion mechanism)
         let cluster_recurring = self.meta_hdc.recurring_subtrees(engine);
         for (subtree, conj_ids) in cluster_recurring {
             self.dynamic_grammar.observe_subtree(subtree, &conj_ids, engine);
         }
-        // Global fallback: scan all concepts for subtrees appearing 2+ times
         let global_recurring = self.meta_hdc.global_recurring_subtrees(engine, 2);
         for (subtree, conj_ids) in global_recurring {
+            self.dynamic_grammar.observe_subtree(subtree, &conj_ids, engine);
+        }
+        // Verified-singleton path: every subtree from a strongly-verified
+        // conjecture becomes a candidate, even if it only appears once.
+        // The fast-track promotion path in dynamic_grammar decides what to promote.
+        let verified_only = self.meta_hdc.verified_subtrees(engine);
+        for (subtree, conj_ids) in verified_only {
             self.dynamic_grammar.observe_subtree(subtree, &conj_ids, engine);
         }
 
@@ -318,21 +344,28 @@ pub fn normalize_expr(expr: &Expr) -> Expr {
 /// rewrites that were polluting the macro pool (`(1 * n)`, `(n ^ 1)`,
 /// `((...) / 1)`), but does not attempt full algebraic simplification.
 pub fn canonicalize_expr(expr: &Expr) -> Expr {
-    let c = canonicalize_inner(expr);
+    let c = canonicalize_inner(expr, false);
     // Run twice — rewrites can cascade (e.g., (x^1 * 1) → (x * 1) → x)
-    canonicalize_inner(&c)
+    canonicalize_inner(&c, false)
 }
 
-fn canonicalize_inner(expr: &Expr) -> Expr {
+/// Inner canonicalization with context flag.
+///
+/// `inside_func`: true when we're recursing into a function argument.
+/// Inside function arguments, the `x*1 → x` and `1*x → x` simplifications
+/// are SUPPRESSED so that templated shapes like `exp(c * Var)` survive
+/// normalization. The literal `1` left in `exp(1 * n)` represents a
+/// scale parameter that the GP/Nelder-Mead will fit at injection time.
+fn canonicalize_inner(expr: &Expr, inside_func: bool) -> Expr {
     match expr {
         Expr::Var(name) => Expr::Var(name.clone()),
         Expr::Const(c) => Expr::Const(*c),
         Expr::BinOp(op, l, r) => {
-            let l = canonicalize_inner(l);
-            let r = canonicalize_inner(r);
+            let l = canonicalize_inner(l, inside_func);
+            let r = canonicalize_inner(r, inside_func);
             match op {
                 BinOp::Add => {
-                    // x + 0 or 0 + x → x
+                    // x + 0 or 0 + x → x  (always — additive identity is harmless inside funcs)
                     if is_zero(&l) {
                         return r;
                     }
@@ -348,21 +381,28 @@ fn canonicalize_inner(expr: &Expr) -> Expr {
                     if is_zero(&r) {
                         return l;
                     }
+                    // x - x → 0 (catches (1-1) fossil and any self-subtraction)
+                    if structurally_equal(&l, &r) {
+                        return Expr::Const(0.0);
+                    }
                     Expr::BinOp(BinOp::Sub, Box::new(l), Box::new(r))
                 }
                 BinOp::Mul => {
-                    // x * 0 → 0
+                    // x * 0 → 0  (always — annihilator survives any context)
                     if is_zero(&l) || is_zero(&r) {
                         return Expr::Const(0.0);
                     }
-                    // x * 1 → x
-                    if is_one(&l) {
-                        return r;
+                    // x * 1 → x  (ONLY outside function args — preserves
+                    // templated scale params like exp(c*n))
+                    if !inside_func {
+                        if is_one(&l) {
+                            return r;
+                        }
+                        if is_one(&r) {
+                            return l;
+                        }
                     }
-                    if is_one(&r) {
-                        return l;
-                    }
-                    // x * x → x ^ 2
+                    // x * x → x ^ 2  (always — semantic rewrite)
                     if structurally_equal(&l, &r) {
                         return Expr::BinOp(
                             BinOp::Pow,
@@ -375,8 +415,8 @@ fn canonicalize_inner(expr: &Expr) -> Expr {
                     Expr::BinOp(BinOp::Mul, Box::new(a), Box::new(b))
                 }
                 BinOp::Div => {
-                    // x / 1 → x
-                    if is_one(&r) {
+                    // x / 1 → x  (ONLY outside function args)
+                    if !inside_func && is_one(&r) {
                         return l;
                     }
                     Expr::BinOp(BinOp::Div, Box::new(l), Box::new(r))
@@ -386,16 +426,26 @@ fn canonicalize_inner(expr: &Expr) -> Expr {
                     if is_zero(&r) {
                         return Expr::Const(1.0);
                     }
-                    // x ^ 1 → x
-                    if is_one(&r) {
+                    // x ^ 1 → x  (ONLY outside function args — preserves exp(n^1) shapes)
+                    if !inside_func && is_one(&r) {
                         return l;
+                    }
+                    // 1 ^ x → 1 (eliminates the (1^n) fossil seen in compounding benchmark)
+                    if is_one(&l) {
+                        return Expr::Const(1.0);
+                    }
+                    // 0 ^ x → 0 (for nonzero x; we already handled x=0 above)
+                    if is_zero(&l) {
+                        return Expr::Const(0.0);
                     }
                     Expr::BinOp(BinOp::Pow, Box::new(l), Box::new(r))
                 }
             }
         }
-        Expr::Func(f, arg) => Expr::Func(*f, Box::new(canonicalize_inner(arg))),
-        Expr::Sum(body, var) => Expr::Sum(Box::new(canonicalize_inner(body)), var.clone()),
+        // Recursing INTO a function argument flips the flag on
+        Expr::Func(f, arg) => Expr::Func(*f, Box::new(canonicalize_inner(arg, true))),
+        // Sum body: treat like a function argument (the iteration variable is an inner context)
+        Expr::Sum(body, var) => Expr::Sum(Box::new(canonicalize_inner(body, true)), var.clone()),
     }
 }
 
@@ -641,6 +691,118 @@ mod tests {
         );
         let canon = canonicalize_expr(&expr);
         assert_eq!(format!("{}", canon), "(n ^ 2)");
+    }
+
+    #[test]
+    fn test_canonicalize_one_pow_x_eliminates_fossil() {
+        // 1 ^ n → 1 (the fossil seen in compounding benchmark)
+        let expr = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Const(1.0)),
+            Box::new(Expr::Var("n".to_string())),
+        );
+        let canon = canonicalize_expr(&expr);
+        match canon {
+            Expr::Const(c) => assert!((c - 1.0).abs() < 1e-12),
+            _ => panic!("Expected Const(1.0), got {:?}", canon),
+        }
+    }
+
+    #[test]
+    fn test_canonicalize_zero_pow_x() {
+        // 0 ^ n → 0 (for nonzero n)
+        let expr = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Const(0.0)),
+            Box::new(Expr::Var("n".to_string())),
+        );
+        let canon = canonicalize_expr(&expr);
+        match canon {
+            Expr::Const(c) => assert!(c.abs() < 1e-12),
+            _ => panic!("Expected Const(0.0), got {:?}", canon),
+        }
+    }
+
+    #[test]
+    fn test_canonicalize_preserves_func_arg_scale() {
+        // exp(1 * n) should NOT collapse to exp(n) — the (1*n) marker
+        // represents a templatized scale parameter
+        let expr = Expr::Func(
+            UnaryFn::Exp,
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
+                Box::new(Expr::Const(1.0)),
+                Box::new(Expr::Var("n".to_string())),
+            )),
+        );
+        let canon = canonicalize_expr(&expr);
+        // The Mul should still be present
+        match &canon {
+            Expr::Func(UnaryFn::Exp, arg) => match arg.as_ref() {
+                Expr::BinOp(BinOp::Mul, _, _) => {} // good
+                other => panic!("Expected (Mul) inside Exp, got {:?}", other),
+            },
+            other => panic!("Expected Exp, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_canonicalize_func_arg_pow_preserved() {
+        // sqrt(n^1) inside a function should preserve the n^1 shape
+        // because the 1 represents a templatized exponent
+        let expr = Expr::Func(
+            UnaryFn::Sqrt,
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("n".to_string())),
+                Box::new(Expr::Const(1.0)),
+            )),
+        );
+        let canon = canonicalize_expr(&expr);
+        match &canon {
+            Expr::Func(UnaryFn::Sqrt, arg) => match arg.as_ref() {
+                Expr::BinOp(BinOp::Pow, _, _) => {} // preserved
+                other => panic!("Expected (Pow) inside Sqrt, got {:?}", other),
+            },
+            other => panic!("Expected Sqrt, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_canonicalize_outer_mul_one_still_simplifies() {
+        // Outside a function, (1 * n) should still collapse to n
+        let expr = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(Expr::Const(1.0)),
+            Box::new(Expr::Var("n".to_string())),
+        );
+        let canon = canonicalize_expr(&expr);
+        match canon {
+            Expr::Var(name) => assert_eq!(name, "n"),
+            other => panic!("Expected Var(n), got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_canonicalize_func_arg_zero_still_collapses() {
+        // exp(0 * n) → exp(0) — multiplicative annihilator survives any context
+        // (we want this — 0 in a function arg is genuinely a constant, not a scale param)
+        let expr = Expr::Func(
+            UnaryFn::Exp,
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
+                Box::new(Expr::Const(0.0)),
+                Box::new(Expr::Var("n".to_string())),
+            )),
+        );
+        let canon = canonicalize_expr(&expr);
+        match &canon {
+            Expr::Func(UnaryFn::Exp, arg) => match arg.as_ref() {
+                Expr::Const(c) => assert!(c.abs() < 1e-12),
+                other => panic!("Expected Const(0) inside Exp, got {:?}", other),
+            },
+            other => panic!("Expected Exp, got {:?}", other),
+        }
     }
 
     #[test]

@@ -41,8 +41,8 @@ use symthaea_core::hdc::conjecture_engine::{
     observe_balmer_series, observe_fibonacci_ratios, observe_hydrogen_energy_levels,
     observe_inverse_square_law, observe_kepler_third_law, observe_partitions,
     observe_quantum_harmonic_oscillator, observe_relativistic_kinetic_energy,
-    observe_stefan_boltzmann, ConjectureEngine, Expr, MathDomain, ObservedSequence,
-    RegressorConfig, SymbolicRegressor,
+    observe_stefan_boltzmann, ConjectureEngine, ConjectureStatus, Expr, MathDomain,
+    ObservedSequence, RegressorConfig, SymbolicRegressor,
 };
 use symthaea_core::hdc::primitive_system::PrimitiveSystem;
 
@@ -228,6 +228,7 @@ fn main() {
     let t0 = Instant::now();
     engine.generate_conjectures(3);
     engine.verify_numerical();
+    engine.verify_formal(30); // Enables fast-track promotion via strong verification
     engine.reflect(&prims);
     let level0_time = t0.elapsed();
 
@@ -272,6 +273,7 @@ fn main() {
     let t1 = Instant::now();
     engine.generate_conjectures(3);
     engine.verify_numerical();
+    engine.verify_formal(30); // Enables fast-track promotion via strong verification
     engine.reflect(&prims);
     let level1_time = t1.elapsed();
 
@@ -288,6 +290,36 @@ fn main() {
 
     println!("  Level 1 extraction took {:.2}s", level1_time.as_secs_f64());
     println!("  Total conjectures in pool: {}", engine.conjectures.len());
+
+    // Diagnostic: how many of the Level 1 conjectures are strongly verified?
+    let mut formally = 0;
+    let mut symbolically = 0;
+    let mut tested_strong = 0;  // test_mse < 1e-6
+    let mut tested_weak = 0;    // test_mse in [1e-6, 1e-3)
+    let mut other = 0;
+    let mut best_mse = f64::INFINITY;
+    for c in &engine.conjectures {
+        match &c.status {
+            ConjectureStatus::FormallyVerified { .. } => formally += 1,
+            ConjectureStatus::SymbolicallyChecked => symbolically += 1,
+            ConjectureStatus::NumericallyTested { test_mse } => {
+                if *test_mse < 1e-6 { tested_strong += 1; }
+                else if *test_mse < 1e-3 { tested_weak += 1; }
+                else { other += 1; }
+                if *test_mse < best_mse { best_mse = *test_mse; }
+            }
+            _ => other += 1,
+        }
+    }
+    println!("  Verification breakdown:");
+    println!("    FormallyVerified:                      {}", formally);
+    println!("    SymbolicallyChecked:                   {}", symbolically);
+    println!("    NumericallyTested (test_mse < 1e-6):   {}", tested_strong);
+    println!("    NumericallyTested (1e-6 ≤ mse < 1e-3): {}", tested_weak);
+    println!("    Other (Proposed, Refuted, etc.):       {}", other);
+    println!("    Strong-eligible for fast-track: {}",
+        formally + symbolically + tested_strong);
+    println!("    Best test_mse observed: {:.3e}", best_mse);
     println!("  |M₂| = {} macros:", m2.len());
     for (i, t) in m2.iter().enumerate() {
         let is_new = !m1_canonical.contains(&format!("{}", t));

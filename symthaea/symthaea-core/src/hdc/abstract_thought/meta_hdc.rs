@@ -326,7 +326,7 @@ impl MetaHDC {
                     continue;
                 }
                 let formula = &engine.conjectures[conj_idx].formula;
-                let subtrees = extract_subtrees(formula, 3, 10);
+                let subtrees = extract_subtrees(formula, crate::hdc::abstract_thought::SUBTREE_MIN_COMPLEXITY, crate::hdc::abstract_thought::SUBTREE_MAX_COMPLEXITY);
 
                 // Track unique patterns per conjecture (count once per conjecture)
                 let mut seen_in_this_conj = HashSet::new();
@@ -375,7 +375,7 @@ impl MetaHDC {
                 continue;
             }
             let formula = &engine.conjectures[concept.conjecture_idx].formula;
-            let subtrees = extract_subtrees(formula, 3, 10);
+            let subtrees = extract_subtrees(formula, crate::hdc::abstract_thought::SUBTREE_MIN_COMPLEXITY, crate::hdc::abstract_thought::SUBTREE_MAX_COMPLEXITY);
 
             // Count each unique pattern once per conjecture
             let mut seen_in_this_conj = HashSet::new();
@@ -399,6 +399,67 @@ impl MetaHDC {
                 pattern_exprs.remove(&canonical).map(|expr| (expr, ids))
             })
             .collect()
+    }
+
+    /// Extract subtrees from "strong-evidence" conjectures regardless of
+    /// occurrence count. This is the extraction path for the fast-track
+    /// promotion mechanism: a single high-quality novel shape should
+    /// become a candidate even if it appears in exactly one conjecture.
+    ///
+    /// "Strong evidence" here is broader than strict formal verification —
+    /// see comments in `dynamic_grammar::is_strongly_verified`. This path
+    /// exists because formally verifying transcendental approximations is
+    /// nearly impossible, but those approximations contain the most novel
+    /// structural shapes (sqrt, exp, log, sin, cos compositions).
+    ///
+    /// Returns (normalized subtree, single-element conjecture ID vector)
+    /// so the result is directly compatible with `observe_subtree`.
+    pub fn verified_subtrees(
+        &self,
+        engine: &ConjectureEngine,
+    ) -> Vec<(Expr, Vec<usize>)> {
+        use crate::hdc::conjecture_engine::ConjectureStatus;
+        let mut results = Vec::new();
+
+        for concept in &self.concepts {
+            let conj_idx = concept.conjecture_idx;
+            if conj_idx >= engine.conjectures.len() {
+                continue;
+            }
+            let conj = &engine.conjectures[conj_idx];
+
+            // Match is_strongly_verified in dynamic_grammar.rs — duplicated
+            // here because cross-module imports get awkward.
+            let strongly_verified = match &conj.status {
+                ConjectureStatus::FormallyVerified { .. } => true,
+                ConjectureStatus::SymbolicallyChecked => true,
+                ConjectureStatus::NumericallyTested { test_mse } => *test_mse < 1e-2,
+                _ => false,
+            };
+            if !strongly_verified {
+                continue;
+            }
+
+            let subtrees = extract_subtrees(
+                &conj.formula,
+                crate::hdc::abstract_thought::SUBTREE_MIN_COMPLEXITY,
+                crate::hdc::abstract_thought::SUBTREE_MAX_COMPLEXITY,
+            );
+
+            // Dedup within this conjecture so the same pattern doesn't
+            // contribute multiple candidates from one formula
+            let mut seen_canonical = HashSet::new();
+            for st in subtrees {
+                let normalized = crate::hdc::abstract_thought::normalize_expr(&st);
+                let canonical =
+                    crate::hdc::abstract_thought::expr_canonical_string(&normalized);
+                if seen_canonical.insert(canonical) {
+                    results.push((normalized, vec![conj_idx]));
+                }
+            }
+        }
+
+        results
     }
 
     /// Find concept vectors most similar to a query vector.
