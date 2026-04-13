@@ -112,7 +112,7 @@ fn main() {
     #[cfg(feature = "flight")]
     {
         let start = Instant::now();
-        use symthaea_flight::simulator::{FlightPhysicsSimulator, SimplePhysicsSimulator};
+        use symthaea_flight::simulator::{PhysicsSimulator, SimplePhysicsSimulator};
         use symthaea_flight::types::QuadrotorCommand;
 
         let mut sim = SimplePhysicsSimulator::new();
