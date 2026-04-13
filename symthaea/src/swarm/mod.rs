@@ -123,6 +123,8 @@ pub mod rdp_governance;
 pub mod rdp_holon_bridge;
 /// Binary wire envelope for RDP (bincode + ChaCha20-Poly1305 via packet_crypto).
 pub mod rdp_wire;
+/// Sliding-window replay protection for AEAD-sealed streams (RDP + future mesh).
+pub mod replay_window;
 /// Input injection (X11 XTest, Wayland virtual input, logging/noop).
 pub mod rdp_input;
 /// PQC-secured remote display protocol.

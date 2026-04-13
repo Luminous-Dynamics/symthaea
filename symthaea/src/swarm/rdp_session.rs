@@ -109,6 +109,11 @@ pub struct RdpSession {
     source_id: [u8; 8],
     /// Per-session random epoch byte (prevents restart nonce reuse under the same key).
     epoch: u8,
+    /// Sliding-window replay protection for inbound sealed envelopes (mutated
+    /// by `open()` on each accepted message). Shared primitive — see
+    /// `swarm::replay_window::ReplayWindow`.
+    #[cfg(feature = "mesh-encryption")]
+    replay_window: super::replay_window::ReplayWindow,
 
     // ── Consciousness ───────────────────────────────────────────────
     /// Last known peer consciousness level (phi).
@@ -158,6 +163,8 @@ impl RdpSession {
             nonce_counter: 0,
             source_id,
             epoch,
+            #[cfg(feature = "mesh-encryption")]
+            replay_window: super::replay_window::ReplayWindow::new(),
             peer_phi: 0.0,
             last_attestation: None,
             attestation_pending: false,
@@ -279,9 +286,22 @@ impl RdpSession {
     }
 
     /// Allocate the next nonce for AEAD encryption.
+    ///
+    /// Uses `wrapping_add` to match the project convention (see
+    /// `peer_registry.rs:242`, `rdp_codec.rs:318`, etc.) and to avoid a
+    /// debug-build panic on overflow. In release builds the previous
+    /// `+= 1` form silently wrapped, which is the same observable
+    /// behavior as `wrapping_add`; the change makes the wrap explicit
+    /// and prevents debug crashes.
+    ///
+    /// Note: u64 monotonic counter at 50 Hz wraps in ~5.8 billion years.
+    /// At 30 fps RDP frame rate, the low 32 bits used in the AEAD nonce
+    /// wrap in ~4.5 years of continuous operation. Real session lifetime
+    /// is governed by `KEY_ROTATION_GRACE_SECS` rekey cadence (typically
+    /// 30 minutes), so wraparound is not a security concern in practice.
     pub fn next_nonce(&mut self) -> u64 {
         let n = self.nonce_counter;
-        self.nonce_counter += 1;
+        self.nonce_counter = self.nonce_counter.wrapping_add(1);
         n
     }
 
@@ -327,37 +347,80 @@ impl RdpSession {
 
     /// Open a sealed binary envelope produced by `seal` (or by a peer's `seal` call).
     ///
-    /// The caller supplies the `payload_type` they expect — this must match the
-    /// type that was used at seal time, otherwise AEAD verification fails and
-    /// `None` is returned. No silent cross-type acceptance.
+    /// Performs three checks in order:
     ///
-    /// During key rotation, tries the current key first, then falls back to
-    /// the previous key if still within the grace period. Both are attempted
-    /// in constant time (AEAD verify is constant-time internally).
+    /// 1. **Length**: envelope must be ≥ 28 bytes (12 nonce + 16 tag).
+    /// 2. **AEAD verify**: ChaCha20-Poly1305 decrypt against the current
+    ///    session key, falling back to the previous key during the
+    ///    rekey grace period.
+    /// 3. **Replay window**: the sequence number embedded in the nonce
+    ///    (positions 8..12, little-endian u32) must be either strictly
+    ///    higher than any previously accepted sequence for the same
+    ///    `(source_id, payload_type)` stream, OR within the 64-message
+    ///    sliding window AND not previously seen.
+    ///
+    /// Returns `None` on any failure. Mutates `self` to advance the replay
+    /// window when a message is accepted.
+    ///
+    /// **Mutability note**: this used to be `&self` before the replay
+    /// window was added in Phase I.A.5 Track 2.2. Callers must update to
+    /// pass `&mut session`.
     #[cfg(feature = "mesh-encryption")]
-    pub fn open(&self, envelope: &[u8]) -> Option<Vec<u8>> {
-        // Envelope: [nonce (12) | ciphertext + poly1305 tag (16)].
-        // Nonce is self-contained; AEAD verification fails on wrong key.
+    pub fn open(&mut self, envelope: &[u8]) -> Option<Vec<u8>> {
         use chacha20poly1305::{aead::Aead, ChaCha20Poly1305, KeyInit, Nonce};
+
+        // (1) length check
         if envelope.len() < 12 + 16 {
             return None;
         }
         let (nonce_bytes, ciphertext) = envelope.split_at(12);
         let nonce = Nonce::from_slice(nonce_bytes);
 
-        if let Some(key) = self.session_key.as_ref() {
+        // (2) AEAD verify with current key, then prev_session_key fallback.
+        let plaintext = if let Some(key) = self.session_key.as_ref() {
             let cipher = ChaCha20Poly1305::new(key.into());
             if let Ok(pt) = cipher.decrypt(nonce, ciphertext) {
-                return Some(pt);
+                Some(pt)
+            } else if let Some(prev) = self.prev_session_key.as_ref() {
+                let cipher = ChaCha20Poly1305::new(prev.into());
+                cipher.decrypt(nonce, ciphertext).ok()
+            } else {
+                None
             }
-        }
-        if let Some(prev) = self.prev_session_key.as_ref() {
+        } else if let Some(prev) = self.prev_session_key.as_ref() {
             let cipher = ChaCha20Poly1305::new(prev.into());
-            if let Ok(pt) = cipher.decrypt(nonce, ciphertext) {
-                return Some(pt);
-            }
+            cipher.decrypt(nonce, ciphertext).ok()
+        } else {
+            None
+        }?;
+
+        // (3) Replay window: extract source_id (high 6 bytes of nonce
+        // bytes 0..6, padded to u64) and payload_type (nonce byte 6) and
+        // sequence (nonce bytes 8..12). Note: the seal path puts source_id
+        // in nonce[0..6] (6 bytes), so we read those 6 bytes into the low
+        // 48 bits of a u64 stream key. epoch (nonce[7]) is not part of
+        // the replay window key — different epochs are different sessions
+        // semantically, but a rekey within the same session does not
+        // change source_id, so the window correctly persists across
+        // rekey for the same logical stream.
+        let mut source_id_u64 = 0u64;
+        for (i, b) in nonce_bytes[..6].iter().enumerate() {
+            source_id_u64 |= (*b as u64) << (i * 8);
         }
-        None
+        let payload_type = nonce_bytes[6];
+        let seq = u32::from_le_bytes([
+            nonce_bytes[8],
+            nonce_bytes[9],
+            nonce_bytes[10],
+            nonce_bytes[11],
+        ]) as u64;
+
+        if !self.replay_window.accept((source_id_u64, payload_type), seq) {
+            // AEAD passed but the message is a replay or too old. Drop.
+            return None;
+        }
+
+        Some(plaintext)
     }
 
     /// Initiate graceful close.
@@ -719,6 +782,18 @@ mod tests {
         assert_eq!(s.next_nonce(), 0);
         assert_eq!(s.next_nonce(), 1);
         assert_eq!(s.next_nonce(), 2);
+    }
+
+    #[test]
+    fn test_nonce_counter_wraparound() {
+        // Verify wrapping_add behavior at u64::MAX. This used to be a
+        // debug-build panic before the wrapping_add fix.
+        let mut s = RdpSession::new("s1".into(), "peer1".into(), default_config(), true);
+        // Manually seed the counter just below the boundary.
+        s.nonce_counter = u64::MAX;
+        assert_eq!(s.next_nonce(), u64::MAX);
+        assert_eq!(s.next_nonce(), 0); // wrapped
+        assert_eq!(s.next_nonce(), 1);
     }
 
     #[test]

@@ -101,7 +101,11 @@ pub fn seal_frame(frame: &RdpFrame, session: &mut RdpSession) -> Result<Vec<u8>,
 }
 
 /// Open a sealed envelope produced by [`seal_frame`] and decode the `RdpFrame`.
-pub fn open_frame(bytes: &[u8], session: &RdpSession) -> Result<RdpFrame, WireError> {
+///
+/// Mutates `session` to advance the replay window on accepted messages.
+/// Returns `Err(WireError::OpenFailed)` for AEAD failure, replay duplicate,
+/// or out-of-window sequence.
+pub fn open_frame(bytes: &[u8], session: &mut RdpSession) -> Result<RdpFrame, WireError> {
     let plaintext = session.open(bytes).ok_or(WireError::OpenFailed)?;
     let frame = RdpFrame::from_bin(&plaintext)?;
     Ok(frame)
@@ -116,7 +120,10 @@ pub fn seal_input(input: &InputFrame, session: &mut RdpSession) -> Result<Vec<u8
 }
 
 /// Open a sealed input envelope produced by [`seal_input`].
-pub fn open_input(bytes: &[u8], session: &RdpSession) -> Result<InputFrame, WireError> {
+///
+/// Mutates `session` to advance the replay window. See [`open_frame`] for
+/// the full set of failure conditions.
+pub fn open_input(bytes: &[u8], session: &mut RdpSession) -> Result<InputFrame, WireError> {
     let plaintext = session.open(bytes).ok_or(WireError::OpenFailed)?;
     let input = InputFrame::from_bin(&plaintext)?;
     Ok(input)
@@ -170,15 +177,14 @@ mod tests {
     #[test]
     fn seal_open_frame_roundtrip() {
         let mut sender = test_session(0xAB);
-        let receiver = {
-            let mut s = test_session(0xAB);
-            // Not used as sender — just needs the same key.
-            s
-        };
+        let mut receiver = test_session(0xAB);
+        // Sender and receiver share the same key but have independent
+        // source_id/epoch — receiver's replay window will accept any first
+        // sequence from the sender's stream.
 
         let frame = sample_delta_frame();
         let sealed = seal_frame(&frame, &mut sender).expect("seal");
-        let opened = open_frame(&sealed, &receiver).expect("open");
+        let opened = open_frame(&sealed, &mut receiver).expect("open");
 
         match opened {
             RdpFrame::Delta(d) => {
@@ -193,11 +199,11 @@ mod tests {
     #[test]
     fn seal_open_input_roundtrip() {
         let mut sender = test_session(0xCD);
-        let receiver = test_session(0xCD);
+        let mut receiver = test_session(0xCD);
 
         let input = sample_input_frame();
         let sealed = seal_input(&input, &mut sender).expect("seal");
-        let opened = open_input(&sealed, &receiver).expect("open");
+        let opened = open_input(&sealed, &mut receiver).expect("open");
         assert_eq!(opened.sequence, 3);
         assert_eq!(opened.events.len(), 1);
     }
@@ -205,24 +211,47 @@ mod tests {
     #[test]
     fn wrong_key_fails_to_open() {
         let mut sender = test_session(0x11);
-        let wrong = test_session(0x22);
+        let mut wrong = test_session(0x22);
 
         let frame = sample_delta_frame();
         let sealed = seal_frame(&frame, &mut sender).expect("seal");
-        let opened = open_frame(&sealed, &wrong);
+        let opened = open_frame(&sealed, &mut wrong);
         assert!(opened.is_err(), "open with wrong key must fail");
     }
 
     #[test]
     fn truncated_ciphertext_fails_gracefully() {
         let mut sender = test_session(0x77);
-        let receiver = test_session(0x77);
+        let mut receiver = test_session(0x77);
 
         let frame = sample_delta_frame();
         let mut sealed = seal_frame(&frame, &mut sender).expect("seal");
         sealed.truncate(5); // Below nonce + tag size.
-        let opened = open_frame(&sealed, &receiver);
+        let opened = open_frame(&sealed, &mut receiver);
         assert!(opened.is_err());
+    }
+
+    #[test]
+    fn replay_attack_rejected() {
+        // Phase I.A.5 Track 2.2 acceptance test: same envelope opened twice
+        // succeeds the first time, fails the second time with the replay
+        // window primitive intercepting at step 3 of open().
+        let mut sender = test_session(0x88);
+        let mut receiver = test_session(0x88);
+
+        let frame = sample_delta_frame();
+        let sealed = seal_frame(&frame, &mut sender).expect("seal");
+
+        // First open succeeds.
+        let first = open_frame(&sealed, &mut receiver);
+        assert!(first.is_ok(), "first open should succeed");
+
+        // Replay (same envelope, same nonce, same sequence) must fail.
+        let replayed = open_frame(&sealed, &mut receiver);
+        assert!(
+            replayed.is_err(),
+            "replayed envelope must be rejected by the sliding window"
+        );
     }
 
     #[test]
