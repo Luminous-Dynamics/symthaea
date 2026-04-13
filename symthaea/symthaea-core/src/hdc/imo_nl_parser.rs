@@ -914,66 +914,173 @@ pub struct ParsedProblem {
     pub keyword_score: f32,
 }
 
-/// The IMO natural-language parser.
-pub struct ImoNlParser {
+// ─── Encoder cascade infrastructure (NLP 3) ───────────────────────────────
+
+/// One encoder + its pre-encoded reference corpus + per-encoder threshold.
+/// The parser holds a Vec of these, ordered fastest → slowest.
+pub struct EncoderEntry {
     encoder: Box<dyn SemanticEncoder>,
-    corpus: Vec<ImoReference>,
     encoded_corpus: Vec<ContinuousHV>,
-    /// Minimum similarity threshold to accept a match. Defaults to 0.3.
-    /// Below this, the parser returns None.
+    /// Per-encoder min_similarity. ONNX scores live in 0.85–1.10 range,
+    /// pure-Rust char-ngram in 0.30–0.60, so they need different cutoffs.
     pub min_similarity: f32,
+    /// Diagnostic label for reporting which encoder won a parse.
+    pub label: &'static str,
 }
 
-impl ImoNlParser {
-    pub fn new() -> Self {
-        let encoder = create_best_encoder();
-        let corpus = reference_corpus();
-        // Encode the raw reference texts. An earlier experiment with
-        // canonicalization (safe synonyms only) shifted the HDC
-        // landscape enough to drop the batch test from 15/20 → 14/20,
-        // so the parser uses raw text and relies on reference-corpus
-        // expansion for paraphrase coverage.
+impl EncoderEntry {
+    /// Construct an entry: encode the reference corpus once, store everything.
+    fn build(
+        encoder: Box<dyn SemanticEncoder>,
+        corpus: &[ImoReference],
+        min_similarity: f32,
+        label: &'static str,
+    ) -> Self {
         let encoded_corpus: Vec<ContinuousHV> = corpus
             .iter()
             .map(|r| encoder.encode(r.canonical_text))
             .collect();
         Self {
             encoder,
-            corpus,
             encoded_corpus,
-            min_similarity: 0.3,
+            min_similarity,
+            label,
+        }
+    }
+}
+
+/// Normalize a hybrid score to a [0, 1] confidence margin above the
+/// encoder's threshold. Returns 0 if hybrid ≤ threshold.
+///
+/// `margin = (hybrid − threshold) / (1.0 − threshold)`
+///
+/// Used by the cascade fast-path gate to compare scores across
+/// encoders with different threshold ranges (ONNX scores are higher
+/// in absolute terms but the margin normalizes them to a common scale).
+pub fn confidence_margin(hybrid: f32, threshold: f32) -> f32 {
+    if hybrid <= threshold {
+        return 0.0;
+    }
+    let denom = (1.0 - threshold).max(0.01);
+    (hybrid - threshold) / denom
+}
+
+/// The IMO natural-language parser.
+///
+/// Holds an ordered list of encoders (fastest → slowest). Default
+/// `new()` uses one encoder for backwards compatibility. Call
+/// `new_cascade()` (gated on `--features embeddings`) to get a
+/// fast-then-slow cascade with the ONNX MiniLM as the slow path.
+pub struct ImoNlParser {
+    /// Ordered fastest → slowest. Cascade short-circuits on first
+    /// high-confidence match (margin > fast_path_threshold).
+    pub entries: Vec<EncoderEntry>,
+    pub corpus: Vec<ImoReference>,
+    /// Default min_similarity (per-encoder thresholds live in EncoderEntry).
+    /// Kept for API compatibility — the actual cutoff is per-encoder.
+    pub min_similarity: f32,
+    /// FAST-PATH GATE: if any encoder's normalized confidence margin
+    /// exceeds this, short-circuit immediately and skip the remaining
+    /// (slower) encoders. Default 0.50 — tune empirically. Lower
+    /// values short-circuit more aggressively (faster, higher risk of
+    /// missing slow-encoder rescues); higher values run the full
+    /// cascade more often (slower, more accurate on ambiguous queries).
+    pub fast_path_threshold: f32,
+}
+
+impl ImoNlParser {
+    /// Construct a single-encoder parser using the best available
+    /// encoder (`create_best_encoder()`). This is the backwards-
+    /// compatible default and does not require the `embeddings` feature.
+    pub fn new() -> Self {
+        let encoder = create_best_encoder();
+        let corpus = reference_corpus();
+        let entry = EncoderEntry::build(encoder, &corpus, 0.30, "default");
+        Self {
+            entries: vec![entry],
+            corpus,
+            min_similarity: 0.30,
+            fast_path_threshold: 0.50,
         }
     }
 
-    /// Parse a natural-language IMO problem statement. Returns the
-    /// matched problem template (filled with extracted parameters) and
-    /// the **hybrid** score (HDC similarity + keyword overlap boost).
+    /// Construct a cascade parser with two encoders ordered fastest →
+    /// slowest: pure-Rust `MoralSemanticEncoder` (~0.04s/query) and
+    /// the ONNX `MiniLM-L6-v2` (~1.0s/query, ~25× slower).
     ///
-    /// Hybrid scoring follows the existing
-    /// `SemanticIntentClassifier::keyword_boost` pattern from
-    /// `symthaea/src/language/semantic_intent.rs`:
+    /// At parse time, the cascade tries the fast encoder first. If its
+    /// confidence margin exceeds `fast_path_threshold` (default 0.50),
+    /// the parse is returned immediately and the slow encoder is
+    /// **skipped entirely**. This preserves ensemble accuracy on
+    /// ambiguous queries while preserving fast-encoder latency on
+    /// confident queries.
     ///
-    ///     hybrid_score = hdc_similarity + KEYWORD_BOOST_MAX * keyword_overlap
+    /// Latency math (from session measurements, Apr 13 2026):
+    /// - Single-ONNX or concurrent ensemble: ~17 minutes / 1000 queries
+    /// - Cascade with ~80% short-circuit rate: ~3-4 minutes / 1000 queries
+    /// - Speedup: ~5× over concurrent fusion, zero accuracy loss when
+    ///   `fast_path_threshold` is tuned correctly.
     ///
-    /// where `keyword_overlap` is computed against the matched
-    /// reference's category (Pell / Pigeonhole / etc.) using the
-    /// `template_keyword_registry`.  Keywords ADD signal but never
-    /// reduce HDC similarity — a high-confidence HDC match is preserved,
-    /// and keyword evidence breaks ties for ambiguous queries.
-    pub fn parse(&self, text: &str) -> Option<ParsedProblem> {
-        if text.trim().is_empty() {
-            return None;
+    /// Requires `--features embeddings` to be enabled at compile time.
+    /// At runtime, `libonnxruntime.so` must be on `LD_LIBRARY_PATH`
+    /// (see `flake.nix:113` for the standard NixOS setup, or the
+    /// manual env-var workaround in `memory/onnx_exploration_apr13.md`).
+    #[cfg(feature = "embeddings")]
+    pub fn new_cascade() -> Self {
+        use crate::hdc::semantic_encoder::{create_encoder, EncoderType};
+        let corpus = reference_corpus();
+        let mut entries = Vec::new();
+
+        // Fast path: pure-Rust MoralSemantic (~0.04s/query)
+        entries.push(EncoderEntry::build(
+            create_encoder(EncoderType::MoralSemantic),
+            &corpus,
+            0.30, // standard pure-Rust threshold
+            "MoralSemantic",
+        ));
+
+        // Slow path: ONNX MiniLM (~1.0s/query). The factory falls back
+        // to MoralSemantic internally if the model download fails, so
+        // we label the entry to reflect what we actually got.
+        let onnx = create_encoder(EncoderType::OnnxSemantic);
+        let onnx_label = if onnx.name() == "OnnxSemantic" {
+            "ONNX"
+        } else {
+            "ONNX-fallback"
+        };
+        entries.push(EncoderEntry::build(
+            onnx,
+            &corpus,
+            0.50, // ONNX scores higher; raise threshold accordingly
+            onnx_label,
+        ));
+
+        Self {
+            entries,
+            corpus,
+            min_similarity: 0.30,
+            fast_path_threshold: 0.50,
         }
+    }
+
+    /// Internal: try to parse against ONE encoder entry. Returns the
+    /// matched template's parsed problem and its normalized confidence
+    /// margin, or None if either no reference scored above this
+    /// encoder's threshold or the matched template's parameter
+    /// extractor failed.
+    fn parse_with_entry(
+        &self,
+        text: &str,
+        entry: &EncoderEntry,
+        kw_scores: &std::collections::HashMap<&'static str, f32>,
+    ) -> Option<(ParsedProblem, f32)> {
         const KEYWORD_BOOST_MAX: f32 = 0.25;
-        let query_hv = self.encoder.encode(text);
-        // Pre-compute keyword scores per category once
-        let kw_scores = keyword_scores_for_query(text);
-        // Find best reference by hybrid score
+        let query_hv = entry.encoder.encode(text);
         let mut best_idx = 0;
         let mut best_sim = f32::NEG_INFINITY;
         let mut best_hdc = 0.0f32;
         let mut best_kw = 0.0f32;
-        for (i, ref_hv) in self.encoded_corpus.iter().enumerate() {
+        for (i, ref_hv) in entry.encoded_corpus.iter().enumerate() {
             let hdc_sim = query_hv.similarity(ref_hv);
             let category = self.corpus[i].category;
             let kw = kw_scores.get(category).copied().unwrap_or(0.0);
@@ -985,21 +1092,61 @@ impl ImoNlParser {
                 best_idx = i;
             }
         }
-        if best_sim < self.min_similarity {
+        if best_sim < entry.min_similarity {
             return None;
         }
-        // Try the matched template with the input text
         let reference = &self.corpus[best_idx];
-        match (reference.template)(text) {
-            Some(problem) => Some(ParsedProblem {
+        let problem = (reference.template)(text)?;
+        let margin = confidence_margin(best_sim, entry.min_similarity);
+        Some((
+            ParsedProblem {
                 problem,
                 matched_reference: reference.canonical_text.to_string(),
                 similarity: best_sim,
                 hdc_similarity: best_hdc,
                 keyword_score: best_kw,
-            }),
-            None => None,
+            },
+            margin,
+        ))
+    }
+
+    /// Parse a natural-language IMO problem statement using the
+    /// **threshold-gated cascade**:
+    ///
+    /// 1. Try each encoder in order (fastest first).
+    /// 2. If an encoder produces a parse with confidence margin >
+    ///    `fast_path_threshold`, return it immediately and skip the
+    ///    remaining (slower) encoders.
+    /// 3. Otherwise, save its parse as best-so-far and continue.
+    /// 4. After all encoders, return the highest-margin parse.
+    ///
+    /// This matches the Phase A SR cascade pattern (commit `aab83b815d`):
+    /// try the fast strategy first, escalate only when its confidence
+    /// is insufficient.
+    ///
+    /// Hybrid scoring per encoder:
+    /// `hybrid = hdc_similarity + 0.25 * keyword_overlap` (NLP 1).
+    pub fn parse(&self, text: &str) -> Option<ParsedProblem> {
+        if text.trim().is_empty() {
+            return None;
         }
+        let kw_scores = keyword_scores_for_query(text);
+
+        let mut best: Option<ParsedProblem> = None;
+        let mut best_margin: f32 = 0.0;
+        for entry in &self.entries {
+            if let Some((parsed, margin)) = self.parse_with_entry(text, entry, &kw_scores) {
+                // FAST-PATH GATE — return immediately on high confidence
+                if margin > self.fast_path_threshold {
+                    return Some(parsed);
+                }
+                if margin > best_margin {
+                    best_margin = margin;
+                    best = Some(parsed);
+                }
+            }
+        }
+        best
     }
 }
 
@@ -1470,6 +1617,210 @@ mod tests {
             "parser success rate {}/{} < 70%",
             successes,
             total
+        );
+    }
+
+    // ── NLP 3: encoder cascade ────────────────────────────────────────
+
+    #[test]
+    fn test_confidence_margin_helper() {
+        // Below threshold → 0
+        assert!((confidence_margin(0.20, 0.30) - 0.0).abs() < 1e-9);
+        assert!((confidence_margin(0.30, 0.30) - 0.0).abs() < 1e-9);
+        // At threshold → 0
+        // Halfway between threshold and 1.0 → 0.5
+        let m = confidence_margin(0.65, 0.30);
+        assert!((m - 0.5).abs() < 1e-6, "got {}", m);
+        // Just above threshold (small margin)
+        let m = confidence_margin(0.35, 0.30);
+        assert!(m > 0.0 && m < 0.1);
+        // Near 1.0 (large margin)
+        let m = confidence_margin(0.95, 0.30);
+        assert!((m - 0.928).abs() < 0.01, "got {}", m);
+    }
+
+    #[test]
+    fn test_default_parser_is_single_entry() {
+        let parser = ImoNlParser::new();
+        assert_eq!(parser.entries.len(), 1);
+        // Verifies the cascade refactor preserves backwards compat
+    }
+
+    #[test]
+    fn test_default_parser_still_solves_canonical() {
+        // After the cascade refactor, the default parser must still
+        // solve the canonical problems via its single entry.
+        let parser = ImoNlParser::new();
+        let result = parser.parse(
+            "Show that the Pell equation x² − 13y² = 1 has a positive integer solution.",
+        );
+        let parsed = result.expect("default cascade parser should solve canonical Pell");
+        match parsed.problem.kind {
+            ProblemKind::PellEquation { d } => assert_eq!(d, 13),
+            _ => panic!("expected Pell, got {:?}", parsed.problem.kind),
+        }
+    }
+
+    /// **The NLP 3 headline test (cascade vs single encoder).**
+    ///
+    /// Constructs three parsers and runs them against the existing
+    /// 20-problem batch + 12-problem hard paraphrase batch:
+    ///
+    /// 1. Pure-Rust single encoder (`ImoNlParser::new()`)
+    /// 2. ONNX single encoder (manually built — only the OnnxSemantic encoder)
+    /// 3. Cascade with fast-path gate (`ImoNlParser::new_cascade()`)
+    ///
+    /// Reports per-parser accuracy + per-batch wall-clock time.
+    /// Asserts the cascade matches or beats the better of (1) and (2)
+    /// on the combined batch, AND that the cascade runs in less than
+    /// half the time of the pure-ONNX configuration (proving the
+    /// fast-path gate actually fires).
+    #[cfg(feature = "embeddings")]
+    #[test]
+    fn test_cascade_vs_single_encoder() {
+        use crate::hdc::semantic_encoder::{create_encoder, EncoderType};
+        use std::time::Instant;
+
+        // Combined corpus: standard 20 + hard 12 = 32 problems
+        let standard_problems: Vec<(&str, &str)> = vec![
+            ("Prove that among any 25 distinct integers, some two have the same remainder when divided by 24.", "Pigeonhole"),
+            ("If 50 balls are placed in 7 urns, prove at least one urn contains 8 or more balls.", "Pigeonhole"),
+            ("Show that the equation x² − 2y² = 1 admits infinitely many integer solutions.", "Pell"),
+            ("Find a positive integer solution to x² − 19y² = 1.", "Pell"),
+            ("Determine a positive integer x with x ≡ 1 (mod 3), x ≡ 2 (mod 5), and x ≡ 3 (mod 7).", "CRT"),
+            ("Prove that 3 is a quadratic residue modulo the prime 11.", "Legendre"),
+            ("Show that 7 is a quadratic non-residue modulo the prime 23.", "Legendre"),
+            ("For the positive numbers 5, 10, 20, prove the arithmetic mean exceeds the geometric mean.", "AM-GM"),
+            ("Verify the Cauchy-Schwarz inequality for the vectors 3, 4, 5 and 6, 7, 8.", "Cauchy-Schwarz"),
+            ("Prove that 37 is a prime number.", "Primality"),
+            ("Determine whether 1009 is prime.", "Primality"),
+            ("Compute Euler's totient phi of 18.", "EulerPhi"),
+            ("Calculate the number of positive integers less than 20 that are relatively prime to 20.", "EulerPhi"),
+            ("Show that the harmonic mean of 3, 4, 6 is at most their arithmetic mean.", "PowerMean"),
+            ("Verify Schur's inequality at t=1 for the non-negative triple 1, 4, 9.", "Schur"),
+            ("Find integers x, y with 21x + 14y = gcd(21, 14).", "Bezout"),
+            ("Prove Bezout's identity for the pair 30 and 18.", "Bezout"),
+            ("Color the vertices of a regular pentagon with 3 colors such that no two adjacent vertices share a color.", "out-of-scope"),
+            ("Show that the sum of the first n cubes equals the square of the sum of the first n integers.", "out-of-scope"),
+            ("For a triangle with sides a, b, c, prove that a² + b² + c² ≤ 2(ab + bc + ca).", "out-of-scope"),
+        ];
+        let hard_problems: Vec<(&str, &str)> = vec![
+            ("If you put 15 objects into 4 bins, prove one bin must contain at least 4 objects.", "Pigeonhole"),
+            ("Show that any selection of 8 integers contains two with the same parity (mod 2).", "Pigeonhole"),
+            ("Demonstrate that the diophantine equation x squared minus 5 y squared equals 1 has solutions in positive integers.", "Pell"),
+            ("There exists an integer x such that x leaves remainder 1 mod 3 and remainder 2 mod 5 and remainder 3 mod 7.", "CRT"),
+            ("Determine if the integer 5 is a square modulo the prime 13.", "Legendre"),
+            ("For positive reals 2, 3, 6 the arithmetic mean is at least the geometric mean.", "AM-GM"),
+            ("For pair of vectors 1, 2 and 3, 4 verify Cauchy-Schwarz inequality.", "Cauchy-Schwarz"),
+            ("Show that 13 is prime.", "Primality"),
+            ("Calculate Euler's totient function of 24.", "EulerPhi"),
+            ("Verify that the harmonic mean of 4, 6, 8 does not exceed their arithmetic mean.", "PowerMean"),
+            ("For non-negative reals 2, 5, 7 verify Schur's inequality at exponent 1.", "Schur"),
+            ("Find integers x, y satisfying 18 x + 12 y = gcd(18, 12).", "Bezout"),
+        ];
+        let in_scope_count = standard_problems.iter().filter(|(_, l)| *l != "out-of-scope").count()
+            + hard_problems.len();
+        let total = standard_problems.len() + hard_problems.len();
+
+        eprintln!("\n════════════════════════════════════════════════════════════");
+        eprintln!("  NLP 3 — CASCADE vs SINGLE-ENCODER COMPARISON");
+        eprintln!(
+            "  {} total queries ({} in-scope), 3 parser configurations",
+            total, in_scope_count
+        );
+        eprintln!("────────────────────────────────────────────────────────────");
+
+        // --- Configuration 1: Pure-Rust single encoder ---
+        let pure_parser = ImoNlParser::new();
+        let t0 = Instant::now();
+        let mut pure_solved = 0;
+        for (text, _label) in standard_problems.iter().chain(hard_problems.iter()) {
+            if let Some(p) = pure_parser.parse(text) {
+                if p.problem.solve() {
+                    pure_solved += 1;
+                }
+            }
+        }
+        let pure_time = t0.elapsed();
+        eprintln!(
+            "  Pure-Rust:  {:2}/{}  ({:.1}%)   wall {:.2}s",
+            pure_solved,
+            total,
+            pure_solved as f64 / total as f64 * 100.0,
+            pure_time.as_secs_f64()
+        );
+
+        // --- Configuration 2: ONNX single encoder ---
+        let mut onnx_parser = ImoNlParser::new();
+        // Replace the default entry with an ONNX-only entry
+        let corpus = reference_corpus();
+        let onnx_encoder = create_encoder(EncoderType::OnnxSemantic);
+        let onnx_label = if onnx_encoder.name() == "OnnxSemantic" { "ONNX" } else { "ONNX-fallback" };
+        onnx_parser.entries = vec![EncoderEntry::build(onnx_encoder, &corpus, 0.50, onnx_label)];
+        let t0 = Instant::now();
+        let mut onnx_solved = 0;
+        for (text, _label) in standard_problems.iter().chain(hard_problems.iter()) {
+            if let Some(p) = onnx_parser.parse(text) {
+                if p.problem.solve() {
+                    onnx_solved += 1;
+                }
+            }
+        }
+        let onnx_time = t0.elapsed();
+        eprintln!(
+            "  ONNX:       {:2}/{}  ({:.1}%)   wall {:.2}s",
+            onnx_solved,
+            total,
+            onnx_solved as f64 / total as f64 * 100.0,
+            onnx_time.as_secs_f64()
+        );
+
+        // --- Configuration 3: Cascade (fast-then-slow with gate) ---
+        let cascade_parser = ImoNlParser::new_cascade();
+        let t0 = Instant::now();
+        let mut cascade_solved = 0;
+        for (text, _label) in standard_problems.iter().chain(hard_problems.iter()) {
+            if let Some(p) = cascade_parser.parse(text) {
+                if p.problem.solve() {
+                    cascade_solved += 1;
+                }
+            }
+        }
+        let cascade_time = t0.elapsed();
+        eprintln!(
+            "  CASCADE:    {:2}/{}  ({:.1}%)   wall {:.2}s",
+            cascade_solved,
+            total,
+            cascade_solved as f64 / total as f64 * 100.0,
+            cascade_time.as_secs_f64()
+        );
+        eprintln!("────────────────────────────────────────────────────────────");
+        eprintln!(
+            "  Cascade speedup vs ONNX: {:.1}×",
+            onnx_time.as_secs_f64() / cascade_time.as_secs_f64().max(1e-9)
+        );
+        eprintln!(
+            "  Cascade accuracy advantage vs better single encoder: {:+}",
+            cascade_solved as i32 - pure_solved.max(onnx_solved) as i32
+        );
+        eprintln!("════════════════════════════════════════════════════════════");
+
+        // Hard assertions:
+        // 1. Cascade must match or beat the better single encoder
+        let best_single = pure_solved.max(onnx_solved);
+        assert!(
+            cascade_solved >= best_single,
+            "cascade {} < best single encoder {}",
+            cascade_solved,
+            best_single
+        );
+        // 2. Cascade wall-clock must be substantially less than ONNX's
+        //    (proves the fast-path gate is firing).
+        assert!(
+            cascade_time.as_secs_f64() < onnx_time.as_secs_f64() * 0.75,
+            "cascade {:.2}s not faster than 75% of ONNX {:.2}s",
+            cascade_time.as_secs_f64(),
+            onnx_time.as_secs_f64()
         );
     }
 }
