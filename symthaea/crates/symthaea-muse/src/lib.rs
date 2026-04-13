@@ -42,6 +42,7 @@ pub mod midi;
 pub mod midi_loader;
 pub mod neural_melody;
 pub mod notation;
+pub mod training_pairs;
 pub mod pitch;
 pub mod rhythm;
 pub mod stream;
