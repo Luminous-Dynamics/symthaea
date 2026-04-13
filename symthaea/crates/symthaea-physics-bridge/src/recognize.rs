@@ -91,19 +91,43 @@ pub fn expr_to_equation_node(expr: &Expr) -> EquationNode {
             }
         }
         Expr::BinOp(BinOp::Div, l, r) => {
-            // a / b  →  a * b^(-1)
-            EquationNode::Product(vec![
-                expr_to_equation_node(l),
+            // a / b → a * b^(-1)
+            //
+            // Special case: a / b^k → a * b^(-k) (avoid Power-of-Power nesting
+            // which would never match catalog entries that use a single Power
+            // with negative exponent, e.g. -13.6/n² → -13.6 * n^(-2)).
+            let denom_node = if let Expr::BinOp(BinOp::Pow, base, exp) = r.as_ref() {
+                if let Expr::Const(k) = exp.as_ref() {
+                    EquationNode::Power {
+                        base: Box::new(expr_to_equation_node(base)),
+                        exponent: Box::new(EquationNode::Scalar(-k)),
+                    }
+                } else {
+                    EquationNode::Power {
+                        base: Box::new(expr_to_equation_node(r)),
+                        exponent: Box::new(EquationNode::Scalar(-1.0)),
+                    }
+                }
+            } else {
                 EquationNode::Power {
                     base: Box::new(expr_to_equation_node(r)),
                     exponent: Box::new(EquationNode::Scalar(-1.0)),
-                },
-            ])
+                }
+            };
+            EquationNode::Product(vec![expr_to_equation_node(l), denom_node])
         }
-        Expr::BinOp(BinOp::Pow, base, exp) => EquationNode::Power {
-            base: Box::new(expr_to_equation_node(base)),
-            exponent: Box::new(expr_to_equation_node(exp)),
-        },
+        Expr::BinOp(BinOp::Pow, base, exp) => {
+            // For constant exponents, emit Power(base, Scalar(k)) to match
+            // catalog entries that store explicit numeric exponents.
+            let exp_node = match exp.as_ref() {
+                Expr::Const(k) => EquationNode::Scalar(*k),
+                _ => expr_to_equation_node(exp),
+            };
+            EquationNode::Power {
+                base: Box::new(expr_to_equation_node(base)),
+                exponent: Box::new(exp_node),
+            }
+        }
         Expr::Func(UnaryFn::Sqrt, arg) => {
             EquationNode::Sqrt(Box::new(expr_to_equation_node(arg)))
         }
