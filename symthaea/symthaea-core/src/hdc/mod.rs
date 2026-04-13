@@ -377,6 +377,7 @@ pub mod inequalities;
 pub mod sr_tactic;
 pub mod combinatorial;
 pub mod sr_symreg;
+pub mod imo_benchmark;
 pub mod numeric_tower; // Unified numeric tower (N -> Z -> Q -> R) with auto-promotion
 pub mod optimization; // Optimization: gradient descent, Nelder-Mead, L-BFGS
 #[cfg(feature = "parallel")]
