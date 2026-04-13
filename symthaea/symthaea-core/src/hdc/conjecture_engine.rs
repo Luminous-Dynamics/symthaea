@@ -4034,24 +4034,49 @@ fn mutate_multivar(expr: &Expr, rng: &mut u64, depth: usize, var_names: &[&str])
 /// Compute variance of an expression evaluated along trajectory states.
 /// Low variance = potential conservation law.
 fn compute_trajectory_variance(expr: &Expr, trajectory: &[Vec<f64>], var_names: &[&str]) -> f64 {
-    let values: Vec<f64> = trajectory.iter()
-        .map(|state| {
-            let bindings: Vec<(&str, f64)> = var_names.iter()
-                .zip(state.iter())
-                .map(|(name, val)| (*name, *val))
-                .collect();
-            expr.eval(&bindings)
-        })
-        .filter(|v| v.is_finite())
-        .collect();
+    // Evaluate the formula at every trajectory state. We track NaN/Inf
+    // values explicitly because filtering them out (the previous
+    // behavior) can hide a subtle bug: a formula that's only valid in
+    // part of the state space (e.g. log(x) when x crosses zero) gets a
+    // deceptively low variance score from the surviving evaluations,
+    // while in reality it's a partial discovery that the GP shouldn't
+    // promote.
+    let mut values = Vec::with_capacity(trajectory.len());
+    let mut nan_count = 0usize;
+    for state in trajectory {
+        let bindings: Vec<(&str, f64)> = var_names.iter()
+            .zip(state.iter())
+            .map(|(name, val)| (*name, *val))
+            .collect();
+        let v = expr.eval(&bindings);
+        if v.is_finite() {
+            values.push(v);
+        } else {
+            nan_count += 1;
+        }
+    }
 
-    if values.len() < 10 { return f64::MAX; }
+    let total = trajectory.len();
+    if total == 0 || values.len() < 10 { return f64::MAX; }
+
+    // PENALTY: if more than 25% of trajectory points evaluate to NaN/Inf,
+    // the formula is only valid on a subset of the state space — it's
+    // not a genuine global invariant. Reject it.
+    if nan_count * 4 > total {
+        return f64::MAX;
+    }
 
     let mean = values.iter().sum::<f64>() / values.len() as f64;
     if !mean.is_finite() || mean.abs() > 1e15 { return f64::MAX; }
 
     let var = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
-    if !var.is_finite() { f64::MAX } else { var }
+    if !var.is_finite() { return f64::MAX; }
+
+    // Soft penalty for partial validity: even when nan_count is below 25%,
+    // multiply the variance by (1 + 4·nan_fraction) so a formula with 10%
+    // NaN scores 1.4× worse than a formula with 0% NaN.
+    let nan_fraction = nan_count as f64 / total as f64;
+    var * (1.0 + 4.0 * nan_fraction)
 }
 
 /// A conservation law discovered autonomously by GP variance minimization.
@@ -4337,6 +4362,59 @@ fn build_invariant_templates(var_names: &[&str]) -> Vec<Expr> {
         templates.push(Expr::BinOp(BinOp::Sub,
             Box::new(Expr::BinOp(BinOp::Mul, Box::new(Expr::Const(0.5)), Box::new(v2))),
             Box::new(Expr::BinOp(BinOp::Div, Box::new(Expr::Const(1.0)), Box::new(r)))));
+    }
+
+    // ── Logarithmic / transcendental skeletons ──────────────────────
+    //
+    // Conserved quantities in ecological, statistical-mechanical, and
+    // information-theoretic systems often involve `x - ln(x)` style terms
+    // (Lotka-Volterra, free energy, KL divergence). The pure GP random
+    // generation can reach Log/Sin/Cos but rarely combines them into the
+    // right additive structure within a reasonable budget. Seeding the
+    // Lotka-Volterra-style invariant directly gives the GP a starting
+    // point that crossover and constant tuning can polish.
+    //
+    // For each variable v: x - ln(x)
+    // For each pair (a, b): a - ln(a) + b - ln(b)  (Lotka-Volterra invariant)
+    // For each pair (a, b): ln(a) + ln(b) = ln(a·b)
+    // For each pair (a, b): ln(a/b)  (log ratio)
+    // For each pair (a, b): a·ln(a) + b·ln(b)  (entropy-like)
+    for v in var_names {
+        // x - ln(x)  (single-variable Lotka skeleton)
+        templates.push(Expr::BinOp(BinOp::Sub,
+            Box::new(Expr::Var(v.to_string())),
+            Box::new(Expr::Func(UnaryFn::Log, Box::new(Expr::Var(v.to_string()))))));
+    }
+    if ndim >= 2 {
+        let (a, b) = (var_names[0], var_names[1]);
+        // a - ln(a) + b - ln(b)  (Lotka-Volterra first integral)
+        templates.push(Expr::BinOp(BinOp::Add,
+            Box::new(Expr::BinOp(BinOp::Sub,
+                Box::new(Expr::Var(a.into())),
+                Box::new(Expr::Func(UnaryFn::Log, Box::new(Expr::Var(a.into())))))),
+            Box::new(Expr::BinOp(BinOp::Sub,
+                Box::new(Expr::Var(b.into())),
+                Box::new(Expr::Func(UnaryFn::Log, Box::new(Expr::Var(b.into())))))),
+        ));
+        // ln(a) + ln(b)  (log product)
+        templates.push(Expr::BinOp(BinOp::Add,
+            Box::new(Expr::Func(UnaryFn::Log, Box::new(Expr::Var(a.into())))),
+            Box::new(Expr::Func(UnaryFn::Log, Box::new(Expr::Var(b.into())))),
+        ));
+        // ln(a) - ln(b) = ln(a/b)  (log ratio)
+        templates.push(Expr::BinOp(BinOp::Sub,
+            Box::new(Expr::Func(UnaryFn::Log, Box::new(Expr::Var(a.into())))),
+            Box::new(Expr::Func(UnaryFn::Log, Box::new(Expr::Var(b.into())))),
+        ));
+        // a·ln(a) + b·ln(b)  (entropy-like, for stat mech free energy)
+        templates.push(Expr::BinOp(BinOp::Add,
+            Box::new(Expr::BinOp(BinOp::Mul,
+                Box::new(Expr::Var(a.into())),
+                Box::new(Expr::Func(UnaryFn::Log, Box::new(Expr::Var(a.into())))))),
+            Box::new(Expr::BinOp(BinOp::Mul,
+                Box::new(Expr::Var(b.into())),
+                Box::new(Expr::Func(UnaryFn::Log, Box::new(Expr::Var(b.into())))))),
+        ));
     }
 
     // Individual variables and simple products
