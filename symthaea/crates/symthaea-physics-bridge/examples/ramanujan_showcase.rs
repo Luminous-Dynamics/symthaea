@@ -28,7 +28,9 @@ use symthaea_core::hdc::conjecture_engine::{
     discover_invariants_autonomous, expr_to_latex, AutonomousInvariant, ConjectureEngine,
     ConjectureStatus, MathDomain, ObservedSequence, RegressorConfig, SymExpr,
 };
-use symthaea_physics_bridge::{recognize_expr, PhysicsSearchEngine};
+use symthaea_physics_bridge::{
+    recognize_expr, recognize_expr_with_units, DimensionalSignature, PhysicsSearchEngine, UnitMap,
+};
 
 // ───────────────────────────────────────────────────────────────────────────
 // CANONICAL PROBLEMS — the autonomous physicist's test suite
@@ -149,6 +151,7 @@ fn run_problem(
     initial_state: &[f64],
     var_names: &[&str],
     dynamics: &[(&str, SymExpr)],
+    var_units: &UnitMap,
     t_max: f64,
     dt: f64,
     config: RegressorConfig,
@@ -187,8 +190,10 @@ fn run_problem(
         };
         println!("  ⏵ Status:   {}", z3_status);
 
-        // Recognition against the physics catalog
-        let report = recognize_expr(bridge, &inv.formula, name);
+        // Recognition against the physics catalog — uses the new units-aware
+        // path, which feeds dimensional inference into the search query and
+        // breaks the structural-similarity plateau when units are provided.
+        let report = recognize_expr_with_units(bridge, &inv.formula, name, var_units);
         let headline = report.headline();
         println!("  ⏵ Match:    {}", headline);
         if let Some(ref top) = report.best_match {
@@ -346,6 +351,32 @@ fn main() {
         ..RegressorConfig::default()
     };
 
+    // ─── Per-problem unit annotations (drives dimensional inference) ───
+    //
+    // These let the recognition layer score discoveries against catalog
+    // entries with matching SI dimensions, breaking the 0.70 structural
+    // plateau by adding the dimensional axis to the multi-aspect scoring.
+    //
+    // For natural-units systems (harmonic oscillator, Kepler with GM=1),
+    // the raw formula won't be dimensionally consistent, so inference
+    // returns Inconsistent and falls back to DIMENSIONLESS — graceful
+    // degradation, no errors.
+
+    let mut harmonic_units = UnitMap::new();
+    harmonic_units.insert("x".to_string(), DimensionalSignature::LENGTH);
+    harmonic_units.insert("v".to_string(), DimensionalSignature::VELOCITY);
+
+    let mut lv_units = UnitMap::new();
+    // Lotka-Volterra: x and y are populations (dimensionless counts)
+    lv_units.insert("x".to_string(), DimensionalSignature::DIMENSIONLESS);
+    lv_units.insert("y".to_string(), DimensionalSignature::DIMENSIONLESS);
+
+    let mut kepler_units = UnitMap::new();
+    kepler_units.insert("x".to_string(), DimensionalSignature::LENGTH);
+    kepler_units.insert("y".to_string(), DimensionalSignature::LENGTH);
+    kepler_units.insert("vx".to_string(), DimensionalSignature::VELOCITY);
+    kepler_units.insert("vy".to_string(), DimensionalSignature::VELOCITY);
+
     // ─── Problem 1: Harmonic Oscillator ───
     results.push(run_problem(
         &bridge,
@@ -355,6 +386,7 @@ fn main() {
         &[1.0, 0.0],
         &["x", "v"],
         &harmonic_dynamics(),
+        &harmonic_units,
         20.0,
         0.01,
         default_config.clone(),
@@ -369,6 +401,7 @@ fn main() {
         &[2.0, 1.0],
         &["x", "y"],
         &lotka_volterra_dynamics(),
+        &lv_units,
         30.0,
         0.005,
         transcendental_config,
@@ -383,6 +416,7 @@ fn main() {
         &[1.0, 0.0, 0.0, 0.8],
         &["x", "y", "vx", "vy"],
         &kepler_dynamics(),
+        &kepler_units,
         20.0,
         0.001,
         default_config,
