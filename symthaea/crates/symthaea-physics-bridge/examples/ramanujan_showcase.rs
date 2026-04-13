@@ -1,0 +1,458 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//
+//! # Ramanujan Protocol — Discovery Showcase
+//!
+//! End-to-end demonstration of the Automated Physicist:
+//!
+//!   ODE → autonomous discovery → symbolic proof → physics catalog recognition →
+//!         paper-ready LaTeX table
+//!
+//! This example composes Tier 1 (Z3 bridge, LaTeX converter, physics recognition)
+//! and Tier 2 (catalog expansion, discovery report generator) into a single
+//! deliverable: the headline figure for the Ramanujan Protocol paper.
+//!
+//! Run with:
+//! ```bash
+//! cargo run -p symthaea-physics-bridge --example ramanujan_showcase --release
+//! ```
+//!
+//! Output:
+//! - Live discovery progress for each canonical problem
+//! - Per-problem recognition annotation against the 128-equation catalog
+//! - Per-problem Z3 verification status
+//! - One combined LaTeX table ready to paste into papers/latex/ramanujan-protocol/
+
+use symthaea_core::hdc::conjecture_engine::{
+    discover_invariants_autonomous, expr_to_latex, AutonomousInvariant, ConjectureEngine,
+    ConjectureStatus, MathDomain, ObservedSequence, RegressorConfig, SymExpr,
+};
+use symthaea_physics_bridge::{recognize_expr, PhysicsSearchEngine};
+
+// ───────────────────────────────────────────────────────────────────────────
+// CANONICAL PROBLEMS — the autonomous physicist's test suite
+// ───────────────────────────────────────────────────────────────────────────
+
+/// Harmonic oscillator: dx/dt = v, dv/dt = -x
+/// Conserved: E = x² + v²
+fn harmonic_rhs(s: &[f64], _t: f64) -> Vec<f64> {
+    vec![s[1], -s[0]]
+}
+
+fn harmonic_dynamics() -> Vec<(&'static str, SymExpr)> {
+    vec![
+        ("x", SymExpr::Var("v".into())),
+        ("v", SymExpr::Neg(Box::new(SymExpr::Var("x".into())))),
+    ]
+}
+
+/// Lotka-Volterra: dx/dt = x(1-y), dy/dt = y(x-1)
+/// Conserved: V = x - ln(x) + y - ln(y)  (transcendental!)
+fn lotka_volterra_rhs(s: &[f64], _t: f64) -> Vec<f64> {
+    let (x, y) = (s[0], s[1]);
+    vec![x * (1.0 - y), y * (x - 1.0)]
+}
+
+fn lotka_volterra_dynamics() -> Vec<(&'static str, SymExpr)> {
+    vec![
+        (
+            "x",
+            SymExpr::Add(
+                Box::new(SymExpr::Var("x".into())),
+                Box::new(SymExpr::Neg(Box::new(SymExpr::Mul(
+                    Box::new(SymExpr::Var("x".into())),
+                    Box::new(SymExpr::Var("y".into())),
+                )))),
+            ),
+        ),
+        (
+            "y",
+            SymExpr::Add(
+                Box::new(SymExpr::Mul(
+                    Box::new(SymExpr::Var("x".into())),
+                    Box::new(SymExpr::Var("y".into())),
+                )),
+                Box::new(SymExpr::Neg(Box::new(SymExpr::Var("y".into())))),
+            ),
+        ),
+    ]
+}
+
+/// Kepler two-body (4D): [x, y, vx, vy]
+/// dx/dt = vx, dy/dt = vy
+/// dvx/dt = -x/r³, dvy/dt = -y/r³  where r = √(x²+y²)
+/// Conserved: E = ½(vx² + vy²) - 1/r AND L = x·vy - y·vx
+fn kepler_rhs(s: &[f64], _t: f64) -> Vec<f64> {
+    let (x, y, vx, vy) = (s[0], s[1], s[2], s[3]);
+    let r2 = x * x + y * y;
+    let r3 = r2 * r2.sqrt();
+    if r3 < 1e-15 {
+        return vec![vx, vy, 0.0, 0.0];
+    }
+    vec![vx, vy, -x / r3, -y / r3]
+}
+
+fn kepler_dynamics() -> Vec<(&'static str, SymExpr)> {
+    let r2 = || {
+        SymExpr::Add(
+            Box::new(SymExpr::Pow(
+                Box::new(SymExpr::Var("x".into())),
+                2.0,
+            )),
+            Box::new(SymExpr::Pow(
+                Box::new(SymExpr::Var("y".into())),
+                2.0,
+            )),
+        )
+    };
+    vec![
+        ("x", SymExpr::Var("vx".into())),
+        ("y", SymExpr::Var("vy".into())),
+        (
+            "vx",
+            SymExpr::Mul(
+                Box::new(SymExpr::Neg(Box::new(SymExpr::Var("x".into())))),
+                Box::new(SymExpr::Pow(Box::new(r2()), -1.5)),
+            ),
+        ),
+        (
+            "vy",
+            SymExpr::Mul(
+                Box::new(SymExpr::Neg(Box::new(SymExpr::Var("y".into())))),
+                Box::new(SymExpr::Pow(Box::new(r2()), -1.5)),
+            ),
+        ),
+    ]
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// DISCOVERY PIPELINE — one problem end-to-end
+// ───────────────────────────────────────────────────────────────────────────
+
+/// Run autonomous discovery on a single ODE system and produce a fully
+/// annotated result for the showcase table.
+struct DiscoveryResult {
+    name: String,
+    domain: String,
+    best: Option<AutonomousInvariant>,
+    z3_status: String,
+    recognition_headline: String,
+    latex_formula: String,
+}
+
+fn run_problem(
+    bridge: &PhysicsSearchEngine,
+    name: &str,
+    domain: &str,
+    rhs: fn(&[f64], f64) -> Vec<f64>,
+    initial_state: &[f64],
+    var_names: &[&str],
+    dynamics: &[(&str, SymExpr)],
+    t_max: f64,
+    dt: f64,
+    config: RegressorConfig,
+) -> DiscoveryResult {
+    println!("\n╭──────────────────────────────────────────────────────────────────╮");
+    println!("│ {:65}│", name);
+    println!("╰──────────────────────────────────────────────────────────────────╯");
+
+    print!("  ⏵ Discovering invariants ... ");
+    let invariants = discover_invariants_autonomous(
+        rhs,
+        initial_state,
+        var_names,
+        Some(dynamics),
+        &config,
+        t_max,
+        dt,
+    );
+    println!("{} candidates", invariants.len());
+
+    let best = invariants.into_iter().next();
+
+    if let Some(ref inv) = best {
+        println!("  ⏵ Best:    {}", inv.formula_str);
+        println!("  ⏵ Variance: {:.2e}", inv.variance);
+
+        // Z3 status (already determined inside discover_invariants_autonomous when
+        // dynamics were provided — symbolically_proven means the chain rule proof
+        // succeeded against the supplied dynamics)
+        let z3_status = if inv.symbolically_proven {
+            "PROVEN ✓".to_string()
+        } else if inv.variance < 1e-6 {
+            "Numerical".to_string()
+        } else {
+            "Approximate".to_string()
+        };
+        println!("  ⏵ Status:   {}", z3_status);
+
+        // Recognition against the physics catalog
+        let report = recognize_expr(bridge, &inv.formula, name);
+        let headline = report.headline();
+        println!("  ⏵ Match:    {}", headline);
+        if let Some(ref top) = report.best_match {
+            println!(
+                "    └ {} ({:?}) score={:.3}",
+                top,
+                report.best_domain.unwrap(),
+                report.best_score
+            );
+        }
+
+        // Paper-ready LaTeX
+        let latex = expr_to_latex(&inv.formula);
+        println!("  ⏵ LaTeX:    ${}$", latex);
+
+        DiscoveryResult {
+            name: name.to_string(),
+            domain: domain.to_string(),
+            best: Some(inv.clone()),
+            z3_status,
+            recognition_headline: headline,
+            latex_formula: latex,
+        }
+    } else {
+        println!("  ⚠  No invariant found");
+        DiscoveryResult {
+            name: name.to_string(),
+            domain: domain.to_string(),
+            best: None,
+            z3_status: "—".to_string(),
+            recognition_headline: "no candidates produced".to_string(),
+            latex_formula: "\\text{none}".to_string(),
+        }
+    }
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// COMBINED LATEX TABLE — paper-ready output
+// ───────────────────────────────────────────────────────────────────────────
+
+fn emit_combined_latex_table(results: &[DiscoveryResult], catalog_size: usize) -> String {
+    let mut out = String::new();
+    out.push_str("\n\n");
+    out.push_str("% ═════════════════════════════════════════════════════════════════════\n");
+    out.push_str("% AUTOMATED PHYSICIST — Ramanujan Protocol headline figure\n");
+    out.push_str("% Generated by symthaea-physics-bridge/examples/ramanujan_showcase.rs\n");
+    out.push_str("% Paste directly into papers/latex/ramanujan-protocol/main.tex\n");
+    out.push_str("% ═════════════════════════════════════════════════════════════════════\n");
+    out.push_str("\\begin{table}[htbp]\n");
+    out.push_str("\\centering\n");
+    out.push_str("\\caption{Autonomous conservation-law discovery across canonical dynamical systems. ");
+    out.push_str("Each row reports an invariant discovered with zero human guidance from the differential ");
+    out.push_str("equations alone, the trajectory variance of the discovered quantity, the symbolic ");
+    out.push_str(&format!(
+        "verification status (chain rule + Z3), and the closest match in the {}-equation physics catalog.}}\n",
+        catalog_size
+    ));
+    out.push_str("\\label{tab:ramanujan_showcase}\n");
+    out.push_str("\\begin{tabular}{lllll}\n");
+    out.push_str("\\toprule\n");
+    out.push_str("System & Domain & Discovered Invariant & Verification & Catalog Match \\\\\n");
+    out.push_str("\\midrule\n");
+
+    for r in results {
+        let var_str = match &r.best {
+            Some(inv) => format!("(var {:.1e})", inv.variance),
+            None => "—".to_string(),
+        };
+
+        let status_cell = match (&r.best, r.z3_status.contains("PROVEN")) {
+            (Some(_), true) => "\\textbf{PROVEN}",
+            (Some(_), false) => "Numeric",
+            (None, _) => "—",
+        };
+
+        // Sanitize headline for LaTeX — escape underscores, %, etc.
+        let headline_clean = sanitize_for_latex(&r.recognition_headline);
+        let truncated = if headline_clean.len() > 50 {
+            format!("{}...", &headline_clean[..47])
+        } else {
+            headline_clean
+        };
+
+        out.push_str(&format!(
+            "{} & {} & ${}$ {} & {} & {} \\\\\n",
+            sanitize_for_latex(&r.name),
+            r.domain,
+            r.latex_formula,
+            var_str,
+            status_cell,
+            truncated,
+        ));
+    }
+
+    out.push_str("\\bottomrule\n");
+    out.push_str("\\end{tabular}\n");
+    out.push_str("\\end{table}\n");
+    out
+}
+
+fn sanitize_for_latex(s: &str) -> String {
+    s.replace('_', "\\_")
+        .replace('&', "\\&")
+        .replace('%', "\\%")
+        .replace('$', "\\$")
+        .replace('#', "\\#")
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// MAIN
+// ───────────────────────────────────────────────────────────────────────────
+
+fn main() {
+    println!("\n╔══════════════════════════════════════════════════════════════════╗");
+    println!("║                                                                  ║");
+    println!("║         RAMANUJAN PROTOCOL — AUTOMATED PHYSICIST SHOWCASE        ║");
+    println!("║                                                                  ║");
+    println!("║  Tier 1A (Z3) + Tier 1B (Recognition) + Tier 1C (LaTeX) +        ║");
+    println!("║  Tier 2A (Catalog) + Tier 2B (Reports) — end-to-end demo         ║");
+    println!("║                                                                  ║");
+    println!("╚══════════════════════════════════════════════════════════════════╝");
+
+    println!("\nInitializing physics catalog...");
+    let bridge = PhysicsSearchEngine::new();
+    println!(
+        "Catalog loaded: {} equations across all physics domains.",
+        bridge.catalog_size()
+    );
+
+    let mut results = Vec::new();
+
+    // Default GP config — sufficient for polynomial invariants (harmonic, Kepler)
+    let default_config = RegressorConfig {
+        population_size: 250,
+        generations: 80,
+        max_depth: 4,
+        max_complexity: 12,
+        lambda: 0.001,
+        mutation_rate: 0.4,
+        seed: 42,
+        ..RegressorConfig::default()
+    };
+
+    // Higher-budget config — needed for transcendental invariants (Lotka-Volterra
+    // requires discovering the form `x - ln(x) + y - ln(y)`, which has 4 terms
+    // with logarithms — much harder than polynomial conservation laws).
+    let transcendental_config = RegressorConfig {
+        population_size: 500,
+        generations: 200,
+        max_depth: 5,
+        max_complexity: 20,
+        lambda: 0.0005,
+        mutation_rate: 0.4,
+        seed: 42,
+        ..RegressorConfig::default()
+    };
+
+    // ─── Problem 1: Harmonic Oscillator ───
+    results.push(run_problem(
+        &bridge,
+        "Harmonic Oscillator",
+        "Classical Mechanics",
+        harmonic_rhs,
+        &[1.0, 0.0],
+        &["x", "v"],
+        &harmonic_dynamics(),
+        20.0,
+        0.01,
+        default_config.clone(),
+    ));
+
+    // ─── Problem 2: Lotka-Volterra (transcendental invariant) ───
+    results.push(run_problem(
+        &bridge,
+        "Lotka-Volterra Predator-Prey",
+        "Ecology / Stat Mech",
+        lotka_volterra_rhs,
+        &[2.0, 1.0],
+        &["x", "y"],
+        &lotka_volterra_dynamics(),
+        30.0,
+        0.005,
+        transcendental_config,
+    ));
+
+    // ─── Problem 3: Kepler Two-Body (4D system) ───
+    results.push(run_problem(
+        &bridge,
+        "Kepler Two-Body",
+        "Orbital Mechanics",
+        kepler_rhs,
+        &[1.0, 0.0, 0.0, 0.8],
+        &["x", "y", "vx", "vy"],
+        &kepler_dynamics(),
+        20.0,
+        0.001,
+        default_config,
+    ));
+
+    // ─── Sequence-based discovery: Triangular numbers (with Z3 path) ───
+    println!("\n╭──────────────────────────────────────────────────────────────────╮");
+    println!("│ {:65}│", "Triangular Numbers (sequence + Z3 formal verification)");
+    println!("╰──────────────────────────────────────────────────────────────────╯");
+
+    let mut seq_engine = ConjectureEngine::with_config(RegressorConfig {
+        population_size: 200,
+        generations: 60,
+        max_depth: 4,
+        max_complexity: 12,
+        seed: 42,
+        ..RegressorConfig::default()
+    });
+    let triangular_data: Vec<(f64, f64)> = (1..=10)
+        .map(|n| (n as f64, (n * (n + 1) / 2) as f64))
+        .collect();
+    seq_engine.observe(ObservedSequence::new(
+        "triangular(n)",
+        MathDomain::Combinatorics,
+        triangular_data,
+    ));
+    seq_engine.generate_conjectures(3);
+    seq_engine.verify_numerical();
+    seq_engine.auto_prove_via_z3();
+
+    if let Some(best) = seq_engine.best_for("triangular(n)") {
+        let z3_str = match best.status {
+            ConjectureStatus::FormallyVerified { proof_steps } => {
+                format!("Z3 PROVEN ({} steps) ✓", proof_steps)
+            }
+            ConjectureStatus::NumericallyTested { .. } => "Numeric".to_string(),
+            _ => format!("{:?}", best.status),
+        };
+        let latex = expr_to_latex(&best.formula);
+        let report = recognize_expr(&bridge, &best.formula, "triangular(n)");
+        println!("  ⏵ Best:    {}", best.formula_str);
+        println!("  ⏵ MSE:     {:.2e}", best.training_mse);
+        println!("  ⏵ Status:  {}", z3_str);
+        println!("  ⏵ Match:   {}", report.headline());
+        println!("  ⏵ LaTeX:   ${}$", latex);
+
+        results.push(DiscoveryResult {
+            name: "Triangular Numbers".to_string(),
+            domain: "Combinatorics".to_string(),
+            best: None, // sequence-based, doesn't fit AutonomousInvariant struct
+            z3_status: z3_str,
+            recognition_headline: report.headline(),
+            latex_formula: latex,
+        });
+    }
+
+    // ─── Combined paper-ready table ───
+    println!("\n\n╔══════════════════════════════════════════════════════════════════╗");
+    println!("║                                                                  ║");
+    println!("║                  PAPER-READY LATEX TABLE                         ║");
+    println!("║                                                                  ║");
+    println!("╚══════════════════════════════════════════════════════════════════╝");
+
+    let latex_table = emit_combined_latex_table(&results, bridge.catalog_size());
+    println!("{}", latex_table);
+
+    println!("\n──────────────────────────────────────────────────────────────────────");
+    println!(" SHOWCASE COMPLETE: {} problems, {} catalog matches, all results above.",
+        results.len(),
+        results.iter().filter(|r| !r.recognition_headline.contains("NO KNOWN")).count(),
+    );
+    println!("──────────────────────────────────────────────────────────────────────");
+}

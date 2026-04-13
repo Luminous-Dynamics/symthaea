@@ -523,6 +523,7 @@ pub struct Conjecture {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /// Configuration for the symbolic regression search.
+#[derive(Debug, Clone)]
 pub struct RegressorConfig {
     /// Population size (number of candidate formulas)
     pub population_size: usize,
