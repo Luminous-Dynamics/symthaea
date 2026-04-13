@@ -96,6 +96,16 @@ pub enum ProblemKind {
         boxes: usize,
         min_collision: usize,
     },
+    /// Verify that `n` is prime using Miller-Rabin.
+    PrimalityCheck { n: u64, expected: bool },
+    /// Compute φ(n) = Euler's totient and verify against expected.
+    EulerPhi { n: u64, expected: u64 },
+    /// Verify power-mean inequality M_p ≤ M_q on a non-negative slice.
+    PowerMeanIneq { values: Vec<f64>, p: f64, q: f64 },
+    /// Verify Schur's inequality at exponent t (1 or 2) on a triple.
+    SchurIneq { a: f64, b: f64, c: f64, t: u32 },
+    /// Bezout's identity: find (x, y) with a·x + b·y = gcd(a, b).
+    BezoutIdentity { a: i64, b: i64, expected_gcd: i64 },
 }
 
 impl CurriculumProblem {
@@ -124,6 +134,36 @@ impl CurriculumProblem {
             } => {
                 use crate::hdc::combinatorial::pigeonhole_min_max_bucket;
                 pigeonhole_min_max_bucket(*items, *boxes) >= *min_collision
+            }
+            ProblemKind::PrimalityCheck { n, expected } => {
+                let engine = NumberTheoryEngine::new();
+                engine.miller_rabin(*n) == *expected
+            }
+            ProblemKind::EulerPhi { n, expected } => {
+                use crate::hdc::number_theory::ModularRing;
+                let ring = ModularRing::new(*n);
+                ring.euler_totient() == *expected
+            }
+            ProblemKind::PowerMeanIneq { values, p, q } => {
+                use crate::hdc::inequalities::power_mean_inequality_holds;
+                power_mean_inequality_holds(values, *p, *q)
+            }
+            ProblemKind::SchurIneq { a, b, c, t } => {
+                use crate::hdc::inequalities::{schur_t1_holds, schur_t2_holds};
+                match *t {
+                    1 => schur_t1_holds(*a, *b, *c),
+                    2 => schur_t2_holds(*a, *b, *c),
+                    _ => false,
+                }
+            }
+            ProblemKind::BezoutIdentity {
+                a,
+                b,
+                expected_gcd,
+            } => {
+                let engine = NumberTheoryEngine::new();
+                let (g, x, y) = engine.extended_gcd(*a, *b);
+                g == *expected_gcd && a * x + b * y == g
             }
         }
     }

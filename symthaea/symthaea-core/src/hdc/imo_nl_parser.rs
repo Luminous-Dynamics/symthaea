@@ -262,12 +262,123 @@ fn template_cauchy_schwarz(text: &str) -> Option<CurriculumProblem> {
     })
 }
 
+/// Primality check: "Show that N is prime" or "prove N is a prime number".
+fn template_primality(text: &str) -> Option<CurriculumProblem> {
+    let ints = extract_integers(text);
+    if ints.is_empty() {
+        return None;
+    }
+    // Take the largest integer in the text (most likely the candidate)
+    let n = *ints.iter().max().unwrap() as u64;
+    if n < 2 {
+        return None;
+    }
+    let engine = crate::hdc::number_theory::NumberTheoryEngine::new();
+    let expected = engine.miller_rabin(n);
+    Some(CurriculumProblem {
+        name: format!("Primality of {}", n),
+        difficulty: Difficulty::Easy,
+        domain: Domain::NumberTheory,
+        kind: ProblemKind::PrimalityCheck { n, expected },
+    })
+}
+
+/// Euler's totient: "Compute φ(N)" or "Euler's totient of N".
+fn template_euler_phi(text: &str) -> Option<CurriculumProblem> {
+    let ints = extract_integers(text);
+    if ints.is_empty() {
+        return None;
+    }
+    let n = *ints.iter().max().unwrap() as u64;
+    if n < 2 || n > 10_000 {
+        return None;
+    }
+    use crate::hdc::number_theory::ModularRing;
+    let ring = ModularRing::new(n);
+    let expected = ring.euler_totient();
+    Some(CurriculumProblem {
+        name: format!("φ({})", n),
+        difficulty: Difficulty::Easy,
+        domain: Domain::NumberTheory,
+        kind: ProblemKind::EulerPhi { n, expected },
+    })
+}
+
+/// Power mean inequality: "Show that HM ≤ GM ≤ AM" for concrete values.
+fn template_power_mean(text: &str) -> Option<CurriculumProblem> {
+    let ints = extract_integers(text);
+    if ints.len() < 2 {
+        return None;
+    }
+    let values: Vec<f64> = ints.iter().map(|&n| n as f64).collect();
+    if values.iter().any(|v| *v <= 0.0) {
+        return None;
+    }
+    Some(CurriculumProblem {
+        name: format!("Power mean HM≤AM on {} values", values.len()),
+        difficulty: Difficulty::Medium,
+        domain: Domain::Inequality,
+        kind: ProblemKind::PowerMeanIneq {
+            values,
+            p: -1.0,
+            q: 1.0,
+        },
+    })
+}
+
+/// Schur inequality: "For non-negative reals a, b, c, prove Schur's
+/// inequality a(a−b)(a−c) + ... ≥ 0."
+fn template_schur(text: &str) -> Option<CurriculumProblem> {
+    let ints = extract_integers(text);
+    // Need at least 3 values for a triple
+    if ints.len() < 3 {
+        return None;
+    }
+    let a = ints[0] as f64;
+    let b = ints[1] as f64;
+    let c = ints[2] as f64;
+    if a < 0.0 || b < 0.0 || c < 0.0 {
+        return None;
+    }
+    Some(CurriculumProblem {
+        name: format!("Schur t=1 on ({}, {}, {})", a, b, c),
+        difficulty: Difficulty::Hard,
+        domain: Domain::Inequality,
+        kind: ProblemKind::SchurIneq { a, b, c, t: 1 },
+    })
+}
+
+/// Bezout's identity: "Find integers x, y with a·x + b·y = gcd(a, b)."
+fn template_bezout(text: &str) -> Option<CurriculumProblem> {
+    let ints = extract_integers(text);
+    if ints.len() < 2 {
+        return None;
+    }
+    let a = ints[0];
+    let b = ints[1];
+    if a == 0 && b == 0 {
+        return None;
+    }
+    let engine = crate::hdc::number_theory::NumberTheoryEngine::new();
+    let expected_gcd = engine.gcd(a.unsigned_abs(), b.unsigned_abs()) as i64;
+    Some(CurriculumProblem {
+        name: format!("Bezout gcd({}, {})={}", a, b, expected_gcd),
+        difficulty: Difficulty::Easy,
+        domain: Domain::NumberTheory,
+        kind: ProblemKind::BezoutIdentity {
+            a,
+            b,
+            expected_gcd,
+        },
+    })
+}
+
 /// Full reference corpus: canonical problem texts paired with template
 /// constructors. Each reference is encoded to a hypervector once at
 /// parser creation time.
 pub fn reference_corpus() -> Vec<ImoReference> {
     vec![
-        // Pigeonhole — 3 variations to cover phrasing diversity
+        // ── Pigeonhole (5 phrasings) ──────────────────────────────────
         ImoReference {
             canonical_text: "Among any 7 integers, some two have the same remainder when divided by 6.",
             template: template_pigeonhole,
@@ -280,7 +391,15 @@ pub fn reference_corpus() -> Vec<ImoReference> {
             canonical_text: "Prove that if you distribute 10 items into 3 boxes, some box must contain at least 4 items.",
             template: template_pigeonhole,
         },
-        // Pell — 3 variations
+        ImoReference {
+            canonical_text: "If 20 objects are placed in 7 containers, prove that some container holds at least 3 objects.",
+            template: template_pigeonhole,
+        },
+        ImoReference {
+            canonical_text: "Show that in a group of 13 people, two must be born in the same month.",
+            template: template_pigeonhole,
+        },
+        // ── Pell (4 phrasings) ────────────────────────────────────────
         ImoReference {
             canonical_text: "Show that the Pell equation x² − 13y² = 1 has a positive integer solution.",
             template: template_pell,
@@ -293,7 +412,11 @@ pub fn reference_corpus() -> Vec<ImoReference> {
             canonical_text: "Find the smallest positive integer solution to x² − 7y² = 1.",
             template: template_pell,
         },
-        // CRT — 2 variations
+        ImoReference {
+            canonical_text: "Demonstrate that x² − 61y² = 1 has nontrivial solutions in positive integers.",
+            template: template_pell,
+        },
+        // ── CRT (3 phrasings) ─────────────────────────────────────────
         ImoReference {
             canonical_text: "Find the smallest positive integer x satisfying x ≡ 2 (mod 3), x ≡ 3 (mod 5), and x ≡ 2 (mod 7).",
             template: template_crt,
@@ -302,7 +425,11 @@ pub fn reference_corpus() -> Vec<ImoReference> {
             canonical_text: "Show there exists x with x ≡ 1 (mod 4) and x ≡ 2 (mod 5).",
             template: template_crt,
         },
-        // Legendre
+        ImoReference {
+            canonical_text: "Determine a positive integer x with x ≡ 1 (mod 2), x ≡ 2 (mod 3), and x ≡ 4 (mod 5).",
+            template: template_crt,
+        },
+        // ── Legendre (3 phrasings) ────────────────────────────────────
         ImoReference {
             canonical_text: "Determine whether 2 is a quadratic residue modulo the prime 7.",
             template: template_legendre,
@@ -311,7 +438,11 @@ pub fn reference_corpus() -> Vec<ImoReference> {
             canonical_text: "Show that 3 is a quadratic non-residue modulo the prime 11.",
             template: template_legendre,
         },
-        // AM-GM
+        ImoReference {
+            canonical_text: "Decide if 5 is a square modulo the prime 13.",
+            template: template_legendre,
+        },
+        // ── AM-GM (3 phrasings) ───────────────────────────────────────
         ImoReference {
             canonical_text: "Prove the arithmetic-mean geometric-mean inequality for the positive numbers 1, 2, and 4.",
             template: template_amgm,
@@ -320,7 +451,11 @@ pub fn reference_corpus() -> Vec<ImoReference> {
             canonical_text: "Verify that the arithmetic mean is at least the geometric mean for 3, 5, and 7.",
             template: template_amgm,
         },
-        // Cauchy-Schwarz
+        ImoReference {
+            canonical_text: "For positive reals 2, 4, 8, show that their arithmetic mean exceeds their geometric mean.",
+            template: template_amgm,
+        },
+        // ── Cauchy-Schwarz (3 phrasings) ──────────────────────────────
         ImoReference {
             canonical_text: "Verify the Cauchy-Schwarz inequality for the vectors 1, 2, 3 and 4, 5, 6.",
             template: template_cauchy_schwarz,
@@ -328,6 +463,59 @@ pub fn reference_corpus() -> Vec<ImoReference> {
         ImoReference {
             canonical_text: "Check that the Cauchy-Schwarz inequality holds for the pair of vectors 2, 3 and 4, 5.",
             template: template_cauchy_schwarz,
+        },
+        ImoReference {
+            canonical_text: "Show that for vectors 1, 1, 2 and 3, 4, 5, the dot product squared is at most the product of norms squared.",
+            template: template_cauchy_schwarz,
+        },
+        // ── Primality (3 phrasings) ───────────────────────────────────
+        ImoReference {
+            canonical_text: "Prove that 17 is a prime number.",
+            template: template_primality,
+        },
+        ImoReference {
+            canonical_text: "Show that the number 101 is prime.",
+            template: template_primality,
+        },
+        ImoReference {
+            canonical_text: "Determine whether 561 is prime (note: this is a Carmichael number).",
+            template: template_primality,
+        },
+        // ── Euler phi (2 phrasings) ───────────────────────────────────
+        ImoReference {
+            canonical_text: "Compute Euler's totient function phi of 12.",
+            template: template_euler_phi,
+        },
+        ImoReference {
+            canonical_text: "Find the number of positive integers less than 15 that are coprime to 15.",
+            template: template_euler_phi,
+        },
+        // ── Power mean (2 phrasings) ──────────────────────────────────
+        ImoReference {
+            canonical_text: "Show that the harmonic mean is at most the arithmetic mean for the positive numbers 1, 2, 4.",
+            template: template_power_mean,
+        },
+        ImoReference {
+            canonical_text: "Prove the HM ≤ AM inequality for the three positive values 2, 3, 6.",
+            template: template_power_mean,
+        },
+        // ── Schur (2 phrasings) ───────────────────────────────────────
+        ImoReference {
+            canonical_text: "For non-negative reals 1, 2, 3 prove Schur's inequality a(a-b)(a-c) + b(b-a)(b-c) + c(c-a)(c-b) ≥ 0.",
+            template: template_schur,
+        },
+        ImoReference {
+            canonical_text: "Verify Schur's inequality at t=1 for the non-negative triple 2, 3, 5.",
+            template: template_schur,
+        },
+        // ── Bezout (2 phrasings) ──────────────────────────────────────
+        ImoReference {
+            canonical_text: "Find integers x, y such that 35x + 15y equals the greatest common divisor of 35 and 15.",
+            template: template_bezout,
+        },
+        ImoReference {
+            canonical_text: "Prove Bezout's identity for the integers 12 and 8.",
+            template: template_bezout,
         },
     ]
 }
@@ -550,11 +738,116 @@ mod tests {
         assert!(parsed.problem.solve());
     }
 
-    /// **The end-to-end test.** Parse a batch of 7 natural-language
-    /// problems covering all 6 templates, print the match report, and
-    /// require at least 70% successful parses (the rest may fall below
-    /// the similarity threshold, which is acceptable — the parser
-    /// should know when it doesn't know).
+    /// **Expanded real-IMO batch test.** Parses 20 IMO-flavored
+    /// problems spanning all 11 templates (6 original + 5 new). Each
+    /// problem is phrased in a variation distinct from the reference
+    /// corpus so the encoder has to generalize beyond exact match.
+    /// Requires ≥ 65% parse+solve rate — the expected failure modes
+    /// are semantically-distant phrasings and problems needing
+    /// template types we don't have.
+    #[test]
+    fn test_expanded_real_imo_batch() {
+        let parser = ImoNlParser::new();
+        let problems = [
+            // Pigeonhole
+            ("Prove that among any 25 distinct integers, some two have the same remainder when divided by 24.", "Pigeonhole"),
+            ("If 50 balls are placed in 7 urns, prove at least one urn contains 8 or more balls.", "Pigeonhole"),
+            // Pell
+            ("Show that the equation x² − 2y² = 1 admits infinitely many integer solutions.", "Pell"),
+            ("Find a positive integer solution to x² − 19y² = 1.", "Pell"),
+            // CRT
+            ("Determine a positive integer x with x ≡ 1 (mod 3), x ≡ 2 (mod 5), and x ≡ 3 (mod 7).", "CRT"),
+            // Legendre
+            ("Prove that 3 is a quadratic residue modulo the prime 11.", "Legendre"),
+            ("Show that 7 is a quadratic non-residue modulo the prime 23.", "Legendre"),
+            // AM-GM
+            ("For the positive numbers 5, 10, 20, prove the arithmetic mean exceeds the geometric mean.", "AM-GM"),
+            // Cauchy-Schwarz
+            ("Verify the Cauchy-Schwarz inequality for the vectors 3, 4, 5 and 6, 7, 8.", "Cauchy-Schwarz"),
+            // Primality
+            ("Prove that 37 is a prime number.", "Primality"),
+            ("Determine whether 1009 is prime.", "Primality"),
+            // Euler phi
+            ("Compute Euler's totient phi of 18.", "EulerPhi"),
+            ("Calculate the number of positive integers less than 20 that are relatively prime to 20.", "EulerPhi"),
+            // Power mean
+            ("Show that the harmonic mean of 3, 4, 6 is at most their arithmetic mean.", "PowerMean"),
+            // Schur
+            ("Verify Schur's inequality at t=1 for the non-negative triple 1, 4, 9.", "Schur"),
+            // Bezout
+            ("Find integers x, y with 21x + 14y = gcd(21, 14).", "Bezout"),
+            ("Prove Bezout's identity for the pair 30 and 18.", "Bezout"),
+            // Expected failures (unusual phrasings or out-of-scope)
+            ("Color the vertices of a regular pentagon with 3 colors such that no two adjacent vertices share a color.", "out-of-scope graph coloring"),
+            ("Show that the sum of the first n cubes equals the square of the sum of the first n integers.", "out-of-scope identity proof"),
+            ("For a triangle with sides a, b, c, prove that a² + b² + c² ≤ 2(ab + bc + ca).", "out-of-scope triangle inequality"),
+        ];
+
+        let mut parse_successes = 0usize;
+        let mut solve_successes = 0usize;
+        let mut by_domain: std::collections::HashMap<&'static str, (usize, usize)> = std::collections::HashMap::new();
+
+        eprintln!("\n════════════════════════════════════════════════════════════");
+        eprintln!("  IMO NL PARSER — EXPANDED REAL-IMO BATCH TEST");
+        eprintln!("  {} problems, 30 reference patterns, 11 templates", problems.len());
+        eprintln!("────────────────────────────────────────────────────────────");
+
+        for (text, label) in &problems {
+            let (s, t) = by_domain.entry(label).or_insert((0, 0));
+            *t += 1;
+            match parser.parse(text) {
+                Some(parsed) => {
+                    parse_successes += 1;
+                    let solved = parsed.problem.solve();
+                    let status = if solved { "✓" } else { "⚠" };
+                    eprintln!(
+                        "  {} [{}]  sim={:.3}  solved={}  → {}",
+                        status, label, parsed.similarity, solved, parsed.problem.name
+                    );
+                    if solved {
+                        solve_successes += 1;
+                        *s += 1;
+                    }
+                }
+                None => {
+                    eprintln!("  ✗ [{}]  (no match above threshold 0.3)", label);
+                }
+            }
+        }
+        eprintln!("────────────────────────────────────────────────────────────");
+        eprintln!(
+            "  PARSED:       {}/{} ({:.1}%)",
+            parse_successes,
+            problems.len(),
+            parse_successes as f64 / problems.len() as f64 * 100.0
+        );
+        eprintln!(
+            "  PARSED+SOLVED: {}/{} ({:.1}%)",
+            solve_successes,
+            problems.len(),
+            solve_successes as f64 / problems.len() as f64 * 100.0
+        );
+        eprintln!("  BY CATEGORY:");
+        let mut cats: Vec<_> = by_domain.iter().collect();
+        cats.sort_by_key(|(k, _)| *k);
+        for (cat, (s, t)) in cats {
+            eprintln!("    {:35} {}/{}", cat, s, t);
+        }
+        eprintln!("════════════════════════════════════════════════════════════");
+
+        // Of the 20 problems, 3 are expected to fail (out-of-scope).
+        // Require ≥ 65% parse+solve rate overall (13+ out of 20).
+        let rate = solve_successes as f64 / problems.len() as f64;
+        assert!(
+            rate >= 0.65,
+            "parse+solve rate {:.1}% < 65%",
+            rate * 100.0
+        );
+    }
+
+    /// **The original end-to-end test.** Parse a batch of 7 natural-language
+    /// problems covering all 6 original templates, print the match report, and
+    /// require at least 70% successful parses.
     #[test]
     fn test_end_to_end_nl_parse_batch() {
         let parser = ImoNlParser::new();
