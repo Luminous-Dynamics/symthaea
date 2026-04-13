@@ -353,6 +353,40 @@ pub fn expr_to_latex(expr: &Expr) -> String {
     render(expr)
 }
 
+/// Escape LaTeX special characters so source names and annotations render safely
+/// inside a `\\begin{tabular}` environment.
+pub fn latex_escape(input: &str) -> String {
+    let mut out = String::with_capacity(input.len() + 8);
+    for ch in input.chars() {
+        match ch {
+            '\\' => out.push_str("\\textbackslash{}"),
+            '&' => out.push_str("\\&"),
+            '%' => out.push_str("\\%"),
+            '$' => out.push_str("\\$"),
+            '#' => out.push_str("\\#"),
+            '_' => out.push_str("\\_"),
+            '{' => out.push_str("\\{"),
+            '}' => out.push_str("\\}"),
+            '~' => out.push_str("\\textasciitilde{}"),
+            '^' => out.push_str("\\textasciicircum{}"),
+            _ => out.push(ch),
+        }
+    }
+    out
+}
+
+/// Truncate a string to `max_len` characters, appending "…" if it was cut.
+/// Counts chars (not bytes) so Unicode is handled correctly.
+fn truncate(s: &str, max_len: usize) -> String {
+    let count = s.chars().count();
+    if count <= max_len {
+        s.to_string()
+    } else {
+        let truncated: String = s.chars().take(max_len.saturating_sub(1)).collect();
+        format!("{}…", truncated)
+    }
+}
+
 /// Generate a random expression tree of bounded depth.
 pub fn random_expr(rng: &mut u64, max_depth: usize) -> Expr {
     *rng = lcg_step(*rng);
@@ -538,6 +572,11 @@ pub struct SymbolicRegressor {
     /// Per-generation best fitness (lower = better). Collected during `fit()`.
     /// Enables cold-vs-primed convergence comparison and "generations-to-ε" analysis.
     fitness_history: Vec<f64>,
+    /// Macro-subtree appearance counts in top-k formulas at end of `fit()`.
+    /// Key: canonical string of a seed macro. Value: how many top-k formulas
+    /// contained a subtree matching that macro. Used for causal analysis
+    /// in the macro acceleration benchmark.
+    macro_usage: std::collections::HashMap<String, u64>,
 }
 
 impl SymbolicRegressor {
@@ -552,6 +591,7 @@ impl SymbolicRegressor {
             rng,
             seed_macros: Vec::new(),
             fitness_history: Vec::new(),
+            macro_usage: std::collections::HashMap::new(),
         }
     }
 
@@ -561,6 +601,15 @@ impl SymbolicRegressor {
     /// generation's evaluation. Use for convergence analysis and cold-vs-primed comparison.
     pub fn fitness_history(&self) -> &[f64] {
         &self.fitness_history
+    }
+
+    /// Access macro usage counts from the most recent `fit()` call.
+    ///
+    /// Returns a map from each seed macro's canonical string to the number
+    /// of top-k formulas where a structurally matching subtree appeared.
+    /// Zero means no top-k formula contained that macro's pattern.
+    pub fn macro_usage(&self) -> &std::collections::HashMap<String, u64> {
+        &self.macro_usage
     }
 
     /// Inject macro-operator templates into the initial population.
@@ -575,8 +624,14 @@ impl SymbolicRegressor {
     /// Run symbolic regression on observed data.
     /// Returns the top-k conjectures sorted by fitness (lower = better).
     pub fn fit(&mut self, seq: &ObservedSequence, top_k: usize) -> Vec<Conjecture> {
-        // Clear history at the start of each fit — each call is independent
+        // Clear history and usage at the start of each fit — each call is independent
         self.fitness_history.clear();
+        self.macro_usage.clear();
+        // Pre-seed macro_usage keys so 0 counts are visible (not absent)
+        for macro_expr in &self.seed_macros {
+            let canonical = format!("{}", macro_expr);
+            self.macro_usage.entry(canonical).or_insert(0);
+        }
         let (train, _test) = seq.train_test_split();
 
         // ── Log-space pre-transform ──────────────────────────────────
@@ -776,6 +831,26 @@ impl SymbolicRegressor {
             })
             .collect();
 
+        // ── Macro usage tracking (abstract thought causal analysis) ──
+        // For each top-k formula that will be returned, check whether any
+        // of the seed macros appear as a structural subtree. Counts are
+        // exposed via `macro_usage()` for cold-vs-primed causal analysis.
+        if !self.seed_macros.is_empty() {
+            let top_indices: Vec<usize> = results.iter()
+                .take(top_k)
+                .map(|(_, _, i)| *i)
+                .collect();
+            for &idx in &top_indices {
+                let expr = &self.population[idx];
+                for macro_expr in &self.seed_macros {
+                    if contains_structural_match(expr, macro_expr) {
+                        let key = format!("{}", macro_expr);
+                        *self.macro_usage.entry(key).or_insert(0) += 1;
+                    }
+                }
+            }
+        }
+
         results.iter()
             .take(top_k)
             .filter(|(fit, _, _)| fit.is_finite() && *fit < 1e10)
@@ -808,6 +883,40 @@ impl SymbolicRegressor {
             }
         }
         best_idx
+    }
+}
+
+/// Check whether a candidate expression contains any subtree structurally
+/// matching the template. Structural match ignores constant *values* (two
+/// `Const` nodes are considered equal regardless of magnitude) but requires
+/// identical variable names and operator types. This catches cases like
+/// "does `-14.139 / n^2.108` contain a match for the `(1 / n^2)` template?"
+/// — yes, because the structural shape `Const / n^Const` matches.
+fn contains_structural_match(haystack: &Expr, needle: &Expr) -> bool {
+    if shape_equal(haystack, needle) {
+        return true;
+    }
+    match haystack {
+        Expr::Var(_) | Expr::Const(_) => false,
+        Expr::BinOp(_, l, r) => contains_structural_match(l, needle) || contains_structural_match(r, needle),
+        Expr::Func(_, arg) => contains_structural_match(arg, needle),
+        Expr::Sum(body, _) => contains_structural_match(body, needle),
+    }
+}
+
+/// Structural equality modulo constant values. `Const(3.14) == Const(0.5)`
+/// because both are constants — but `Var("n") != Var("m")` and
+/// `BinOp(Add, ..) != BinOp(Mul, ..)`.
+fn shape_equal(a: &Expr, b: &Expr) -> bool {
+    match (a, b) {
+        (Expr::Var(na), Expr::Var(nb)) => na == nb,
+        (Expr::Const(_), Expr::Const(_)) => true, // any constant matches any constant
+        (Expr::BinOp(opa, la, ra), Expr::BinOp(opb, lb, rb)) => {
+            opa == opb && shape_equal(la, lb) && shape_equal(ra, rb)
+        }
+        (Expr::Func(fa, aa), Expr::Func(fb, ab)) => fa == fb && shape_equal(aa, ab),
+        (Expr::Sum(ba, va), Expr::Sum(bb, vb)) => va == vb && shape_equal(ba, bb),
+        _ => false,
     }
 }
 
@@ -2212,6 +2321,161 @@ impl ConjectureEngine {
         lines.join("\n")
     }
 
+    /// Emit a paper-ready LaTeX table of the best conjecture per source.
+    ///
+    /// Produces a `tabular` environment with columns:
+    ///   Sequence | Discovered Formula | MSE | Status
+    ///
+    /// The formula column uses [`expr_to_latex`] for publication-quality output.
+    /// The status column renders the [`ConjectureStatus`] as a short tag:
+    ///   Formal, Numeric, Proposed, or Refuted.
+    ///
+    /// Optional `annotations` parameter allows callers to provide per-source
+    /// recognition headlines (from symthaea-physics-bridge::recognize_expr) that
+    /// get appended as a fifth "Recognition" column. symthaea-core has zero
+    /// dependency on physics-bridge — the annotation map is supplied by whatever
+    /// downstream code is generating the report.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let bridge_engine = PhysicsSearchEngine::new();
+    /// let mut annotations = HashMap::new();
+    /// for conj in &engine.conjectures {
+    ///     let report = recognize_expr(&bridge_engine, &conj.formula, &conj.source);
+    ///     annotations.insert(conj.source.clone(), report.headline());
+    /// }
+    /// let latex = engine.discovery_report_latex(Some(&annotations));
+    /// println!("{}", latex);
+    /// ```
+    pub fn discovery_report_latex(
+        &self,
+        annotations: Option<&std::collections::HashMap<String, String>>,
+    ) -> String {
+        let mut out = String::new();
+
+        // Collect unique sources and pick the best conjecture for each
+        let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        let mut rows: Vec<&Conjecture> = Vec::new();
+        for c in &self.conjectures {
+            if seen.insert(c.source.as_str()) {
+                if let Some(best) = self.best_for(&c.source) {
+                    rows.push(best);
+                }
+            }
+        }
+
+        let has_annotations = annotations.map(|m| !m.is_empty()).unwrap_or(false);
+        let col_spec = if has_annotations { "llrll" } else { "llrl" };
+
+        out.push_str("\\begin{table}[htbp]\n");
+        out.push_str("\\centering\n");
+        out.push_str("\\caption{Autonomous discoveries from the Ramanujan Protocol conjecture engine.}\n");
+        out.push_str("\\label{tab:ramanujan_discoveries}\n");
+        out.push_str(&format!("\\begin{{tabular}}{{{}}}\n", col_spec));
+        out.push_str("\\toprule\n");
+        if has_annotations {
+            out.push_str("Sequence & Discovered Formula & MSE & Status & Recognition \\\\\n");
+        } else {
+            out.push_str("Sequence & Discovered Formula & MSE & Status \\\\\n");
+        }
+        out.push_str("\\midrule\n");
+
+        for c in &rows {
+            let formula_latex = expr_to_latex(&c.formula);
+            let status_tag = match &c.status {
+                ConjectureStatus::FormallyVerified { .. } => "\\textbf{Formal}",
+                ConjectureStatus::NumericallyTested { .. } => "Numeric",
+                ConjectureStatus::SymbolicallyChecked => "Symbolic",
+                ConjectureStatus::Refuted { .. } => "Refuted",
+                ConjectureStatus::Proposed => "Proposed",
+            };
+
+            // Sanitize source name for LaTeX (escape underscores, etc.)
+            let sanitized_source = latex_escape(&c.source);
+
+            let mse_display = if c.training_mse < 1e-10 {
+                format!("$< 10^{{-10}}$")
+            } else if c.training_mse < 1.0 {
+                format!("${:.2e}$", c.training_mse)
+            } else {
+                format!("${:.3}$", c.training_mse)
+            };
+
+            if has_annotations {
+                let ann = annotations
+                    .and_then(|m| m.get(&c.source))
+                    .cloned()
+                    .unwrap_or_else(|| "--".to_string());
+                let sanitized_ann = latex_escape(&ann);
+                out.push_str(&format!(
+                    "{} & ${}$ & {} & {} & {} \\\\\n",
+                    sanitized_source, formula_latex, mse_display, status_tag, sanitized_ann
+                ));
+            } else {
+                out.push_str(&format!(
+                    "{} & ${}$ & {} & {} \\\\\n",
+                    sanitized_source, formula_latex, mse_display, status_tag
+                ));
+            }
+        }
+
+        out.push_str("\\bottomrule\n");
+        out.push_str("\\end{tabular}\n");
+        out.push_str("\\end{table}\n");
+
+        out
+    }
+
+    /// Emit a plain-text summary of the best conjecture per source with optional
+    /// recognition annotations, ready for console display.
+    pub fn discovery_report_text(
+        &self,
+        annotations: Option<&std::collections::HashMap<String, String>>,
+    ) -> String {
+        let mut out = String::new();
+
+        let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        let mut rows: Vec<&Conjecture> = Vec::new();
+        for c in &self.conjectures {
+            if seen.insert(c.source.as_str()) {
+                if let Some(best) = self.best_for(&c.source) {
+                    rows.push(best);
+                }
+            }
+        }
+
+        out.push_str("╔══════════════════════════════════════════════════════════════════════╗\n");
+        out.push_str("║              RAMANUJAN PROTOCOL — DISCOVERY REPORT                   ║\n");
+        out.push_str("╠══════════════════════════════════════════════════════════════════════╣\n");
+
+        for c in &rows {
+            let status_tag = match &c.status {
+                ConjectureStatus::FormallyVerified { proof_steps } =>
+                    format!("FORMAL ✓ ({} steps)", proof_steps),
+                ConjectureStatus::NumericallyTested { .. } => "Numeric".to_string(),
+                ConjectureStatus::SymbolicallyChecked => "Symbolic".to_string(),
+                ConjectureStatus::Refuted { .. } => "REFUTED".to_string(),
+                ConjectureStatus::Proposed => "Proposed".to_string(),
+            };
+
+            out.push_str(&format!(
+                "║ {:35} │ MSE {:.2e} │ {}\n",
+                truncate(&c.source, 35),
+                c.training_mse,
+                status_tag
+            ));
+            out.push_str(&format!("║   {}\n", c.formula_str));
+            if let Some(anns) = annotations {
+                if let Some(headline) = anns.get(&c.source) {
+                    out.push_str(&format!("║   {}\n", headline));
+                }
+            }
+        }
+
+        out.push_str("╚══════════════════════════════════════════════════════════════════════╝\n");
+        out
+    }
+
     // ═══════════════════════════════════════════════════════════════════════
     // CROSS-DOMAIN FORMULA MATCHING
     // ═══════════════════════════════════════════════════════════════════════
@@ -2995,6 +3259,27 @@ pub fn observe_stefan_boltzmann(n_temps: usize) -> ObservedSequence {
         })
         .collect();
     ObservedSequence::new("stefan_boltzmann_P(T)", MathDomain::Physics, data)
+}
+
+/// Observe relativistic kinetic energy: KE = mc²(γ − 1) where γ = 1/√(1 − v²/c²).
+///
+/// In natural units (m = c = 1), this reduces to `KE(v) = 1/√(1 − v²) − 1`,
+/// a transcendental function that requires nested sqrt + subtraction + reciprocal.
+/// This is deliberately harder than the simple power-law targets — we avoid
+/// the relativistic limit v→1 to keep values finite but still sample deep into
+/// the nonlinear regime. Used as the "stress test" target in the macro
+/// acceleration benchmark.
+pub fn observe_relativistic_kinetic_energy(n_samples: usize) -> ObservedSequence {
+    // Sample velocities from 0.1c to 0.95c (avoiding 0 and the γ singularity)
+    let data: Vec<(f64, f64)> = (1..=n_samples)
+        .map(|i| {
+            let v = 0.1 + 0.85 * (i as f64) / (n_samples as f64);
+            let gamma = 1.0 / (1.0 - v * v).sqrt();
+            let ke = gamma - 1.0;
+            (v, ke)
+        })
+        .collect();
+    ObservedSequence::new("relativistic_KE(v)", MathDomain::Physics, data)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -7069,5 +7354,123 @@ mod tests {
         assert!(latex.contains("\\frac"));
         assert!(latex.contains("r^{3}"));
         assert!(latex.contains("-100"));
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // TIER 2B: discovery_report_latex + discovery_report_text
+    // ════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_latex_escape_special_chars() {
+        assert_eq!(latex_escape("a_b"), "a\\_b");
+        assert_eq!(latex_escape("rate & count"), "rate \\& count");
+        assert_eq!(latex_escape("50%"), "50\\%");
+        assert_eq!(latex_escape("x^2"), "x\\textasciicircum{}2");
+        assert_eq!(latex_escape("plain text"), "plain text"); // no changes
+    }
+
+    #[test]
+    fn test_discovery_report_latex_basic() {
+        let mut engine = ConjectureEngine::with_config(RegressorConfig {
+            population_size: 100,
+            generations: 40,
+            max_depth: 3,
+            max_complexity: 10,
+            lambda: 0.001,
+            seed: 42,
+            ..RegressorConfig::default()
+        });
+
+        // Feed triangular numbers
+        let data: Vec<(f64, f64)> = (1..=10)
+            .map(|n| (n as f64, (n * (n + 1) / 2) as f64))
+            .collect();
+        engine.observe(ObservedSequence::new(
+            "triangular(n)", MathDomain::Combinatorics, data));
+        engine.generate_conjectures(3);
+        engine.verify_numerical();
+
+        let latex = engine.discovery_report_latex(None);
+        eprintln!("\n═══ LATEX REPORT SAMPLE ═══\n{}", latex);
+
+        // Structure checks
+        assert!(latex.contains("\\begin{table}"));
+        assert!(latex.contains("\\end{table}"));
+        assert!(latex.contains("\\begin{tabular}"));
+        assert!(latex.contains("\\toprule"));
+        assert!(latex.contains("\\bottomrule"));
+        assert!(latex.contains("triangular"));
+        // Source name with parens should be preserved (parens don't need escaping)
+        // Underscores in source names get escaped:
+        let sanitized = latex_escape("triangular(n)");
+        assert!(latex.contains(&sanitized));
+    }
+
+    #[test]
+    fn test_discovery_report_latex_with_annotations() {
+        let mut engine = ConjectureEngine::with_config(RegressorConfig {
+            population_size: 80,
+            generations: 30,
+            max_depth: 3,
+            max_complexity: 8,
+            seed: 42,
+            ..RegressorConfig::default()
+        });
+        let data: Vec<(f64, f64)> = (1..=10)
+            .map(|n| (n as f64, (n * (n + 1) / 2) as f64))
+            .collect();
+        engine.observe(ObservedSequence::new(
+            "T(n)", MathDomain::Combinatorics, data));
+        engine.generate_conjectures(3);
+        engine.verify_numerical();
+
+        let mut annotations = std::collections::HashMap::new();
+        annotations.insert(
+            "T(n)".to_string(),
+            "↳ MATCHES 'Triangular Numbers' (99% similarity)".to_string(),
+        );
+
+        let latex = engine.discovery_report_latex(Some(&annotations));
+        eprintln!("\n═══ LATEX WITH ANNOTATIONS ═══\n{}", latex);
+
+        assert!(latex.contains("Recognition"));
+        assert!(latex.contains("MATCHES"));
+        // Check the annotation column made it into a tabular row
+        assert!(latex.contains("Triangular Numbers"));
+    }
+
+    #[test]
+    fn test_discovery_report_text_basic() {
+        let mut engine = ConjectureEngine::with_config(RegressorConfig {
+            population_size: 80,
+            generations: 30,
+            max_depth: 3,
+            max_complexity: 8,
+            seed: 42,
+            ..RegressorConfig::default()
+        });
+        let data: Vec<(f64, f64)> = (1..=10)
+            .map(|n| (n as f64, (n * (n + 1) / 2) as f64))
+            .collect();
+        engine.observe(ObservedSequence::new(
+            "triangles", MathDomain::Combinatorics, data));
+        engine.generate_conjectures(3);
+        engine.verify_numerical();
+
+        let text = engine.discovery_report_text(None);
+        eprintln!("\n{}", text);
+
+        assert!(text.contains("RAMANUJAN PROTOCOL"));
+        assert!(text.contains("triangles"));
+        assert!(text.contains("╔"));
+        assert!(text.contains("╚"));
+    }
+
+    #[test]
+    fn test_truncate_handles_unicode() {
+        assert_eq!(truncate("hello", 10), "hello");
+        assert_eq!(truncate("hello world", 5), "hell…");
+        // Multi-byte char
+        assert_eq!(truncate("αβγδε", 3), "αβ…");
     }
 }
