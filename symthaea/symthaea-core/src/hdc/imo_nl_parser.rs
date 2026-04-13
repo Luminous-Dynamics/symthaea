@@ -1620,9 +1620,12 @@ mod tests {
         eprintln!("  SUCCESS: {}/{} parsed + solved", successes, total);
         eprintln!("════════════════════════════════════════════════════════════");
 
+        // Measured: 6/7 = 85.7% (the "Pigeonhole rephrased" entry is a
+        // known miss for the weak pure-Rust encoder). Floor at 0.85
+        // forces exactly 6/7 — any new miss is a real regression.
         assert!(
-            successes as f64 / total as f64 >= 0.7,
-            "parser success rate {}/{} < 70%",
+            successes as f64 / total as f64 >= 0.85,
+            "parser success rate {}/{} < 85% — regression vs 6/7 measured baseline",
             successes,
             total
         );
