@@ -13,7 +13,7 @@ use crate::types::VehicleConfig;
 
 pub use symthaea_core::embodiment::{
     grounding_from_prediction_error, grounding_label, EmbodimentResult, EmbodimentTelemetry,
-    MotorSafetyLevel, GROUNDING_SENSORIMOTOR,
+    MotorSafetyLevel, SafeFallback, GROUNDING_SENSORIMOTOR,
 };
 
 /// Vehicle embodiment bridge.
@@ -27,6 +27,10 @@ pub struct VehicleEmbodiment {
     safety_override: Option<MotorSafetyLevel>,
     last_control_effort: f32,
     last_prediction_error: f32,
+    /// Last commanded steering angle (held through safe fallback with taper).
+    last_safe_steering: f32,
+    /// Cycles since safe fallback activated (for taper schedule).
+    fallback_cycles: u32,
 }
 
 impl VehicleEmbodiment {
@@ -42,6 +46,8 @@ impl VehicleEmbodiment {
             safety_override: None,
             last_control_effort: 0.0,
             last_prediction_error: 0.0,
+            last_safe_steering: 0.0,
+            fallback_cycles: 0,
         }
     }
 
@@ -62,10 +68,33 @@ impl VehicleEmbodiment {
         let gain = self.current_safety.motor_gain();
 
         let mut cmd = self.controller.forward(thought_hv, dt);
-        if gain < 1.0 {
+
+        // Record the last safe steering during normal operation
+        if matches!(self.current_safety, MotorSafetyLevel::Green | MotorSafetyLevel::Yellow) {
+            self.last_safe_steering = cmd.steering;
+            self.fallback_cycles = 0;
+        }
+
+        // ── SAFE FALLBACK for Red tier ──────────────────────────────
+        // Vehicle carrying humans at speed: minimum-safe behavior is
+        // "emergency brake + lane hold via smooth steering taper".
+        // DO NOT zero out all forces — that would mean no brakes.
+        if matches!(self.current_safety, MotorSafetyLevel::Red) {
+            self.fallback_cycles += 1;
+            // Smooth steering taper: interpolate from last_safe_steering to 0
+            // over ~50 cycles (~100ms at 500Hz). Prevents sudden lane departure.
+            const TAPER_CYCLES: f32 = 50.0;
+            let taper_t = (self.fallback_cycles as f32 / TAPER_CYCLES).min(1.0);
+            cmd.steering = self.last_safe_steering * (1.0 - taper_t);
+            // Full brake immediately (emergency stop)
+            cmd.brake = 1.0;
+            // Zero throttle
+            cmd.throttle = 0.0;
+        } else if gain < 1.0 {
+            // Yellow/Orange: scaled authority but preserve agency
             cmd.steering *= gain;
             cmd.throttle *= gain;
-            cmd.brake = if gain == 0.0 { 1.0 } else { cmd.brake }; // Emergency brake on Red
+            // Brake is already commanded; don't reduce it.
         }
 
         self.last_control_effort = cmd.control_effort();
@@ -111,6 +140,8 @@ impl VehicleEmbodiment {
         self.safety_override = None;
         self.last_control_effort = 0.0;
         self.last_prediction_error = 0.0;
+        self.last_safe_steering = 0.0;
+        self.fallback_cycles = 0;
     }
 
     pub fn safety_level(&self) -> MotorSafetyLevel {
@@ -147,6 +178,26 @@ impl symthaea_core::embodiment::EmbodimentBridge for VehicleEmbodiment {
     fn num_actuators(&self) -> usize { 3 }
     fn total_steps(&self) -> usize { self.total_steps() }
     fn telemetry(&self) -> EmbodimentTelemetry { self.telemetry() }
+}
+
+/// SafeFallback guarantees for the Vehicle platform.
+///
+/// When consciousness degrades to Red, the vehicle executes:
+///   1. Full brake (1.0) — maximum deceleration immediately
+///   2. Zero throttle — stop accelerating
+///   3. Smooth steering taper — last_safe_steering → 0 over 50 cycles
+///
+/// This prevents the two failure modes of naive "zero force":
+///   - No brakes at highway speed (catastrophic)
+///   - Sudden steering snap causing lane departure
+impl SafeFallback for VehicleEmbodiment {
+    fn platform_name(&self) -> &'static str { "vehicle" }
+    fn current_safety_level(&self) -> MotorSafetyLevel { self.current_safety }
+    fn safe_fallback_priority(&self) -> u8 { 10 } // Critical: human-carrying, at speed
+    fn safe_fallback_description(&self) -> &'static str {
+        "Full brake + zero throttle + smooth 50-cycle steering taper to centered"
+    }
+    fn safe_fallback_latency_cycles(&self) -> u32 { 1 } // Immediate
 }
 
 #[cfg(test)]
