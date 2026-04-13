@@ -4072,11 +4072,24 @@ fn compute_trajectory_variance(expr: &Expr, trajectory: &[Vec<f64>], var_names: 
     let var = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
     if !var.is_finite() { return f64::MAX; }
 
+    // SCALE-INVARIANT FITNESS: use squared coefficient of variation (var / mean²)
+    // instead of raw variance. Raw variance rewards degenerate near-zero artifacts
+    // like `sin(π)^(π*x)` (where `sin(π)≈1.22e-16`, so values are ~1e-100 with
+    // absolute variance ~1e-200 that beats any real invariant's ~1e-24). Normalizing
+    // by mean² measures how conserved the quantity is *relative to its own magnitude*.
+    //
+    // We use `mean².max(1.0)` as the denominator so that legitimate invariants with
+    // mean near zero (e.g. angular momentum starting at zero) aren't falsely penalized
+    // — they just fall back to raw variance, which is fine because "near zero and
+    // staying near zero" IS a good invariant.
+    let normalizer = (mean * mean).max(1.0);
+    let normalized_var = var / normalizer;
+
     // Soft penalty for partial validity: even when nan_count is below 25%,
     // multiply the variance by (1 + 4·nan_fraction) so a formula with 10%
     // NaN scores 1.4× worse than a formula with 0% NaN.
     let nan_fraction = nan_count as f64 / total as f64;
-    var * (1.0 + 4.0 * nan_fraction)
+    normalized_var * (1.0 + 4.0 * nan_fraction)
 }
 
 /// A conservation law discovered autonomously by GP variance minimization.
@@ -4253,9 +4266,41 @@ pub fn discover_invariants_autonomous(
         population = new_pop;
     }
 
-    // Step 3: Collect best candidates, deduplicate by fingerprint
+    // Step 3: Collect best candidates, deduplicate by fingerprint.
+    //
+    // IMPORTANT: we must re-apply the non-triviality filter here. Otherwise
+    // constant expressions (`1`, `sin(π)^0`, `(e/e)`, etc.) evaluate to the
+    // same value at every trajectory point and score variance *exactly 0*,
+    // dominating the top of the sort and drowning out real invariants like
+    // `x - ln(x) + y - ln(y)` whose variance is ~1e-24 but nonzero. The
+    // GP-loop fitness function already rejects these via a spread check —
+    // we need the same gate here.
     let mut scored: Vec<(usize, f64, f64)> = population.iter().enumerate()
         .map(|(i, expr)| {
+            // Constants are not invariants of the dynamics — they're invariants
+            // of nothing. Reject via simplify-to-Const check.
+            if matches!(simplify(expr), Expr::Const(_)) {
+                return (i, f64::MAX, 0.0);
+            }
+            // Non-triviality spread check (same as GP-loop fitness).
+            let mut nt_vals = Vec::with_capacity(nt_test_points.len());
+            for state in &nt_test_points {
+                let bindings: Vec<(&str, f64)> = var_names.iter()
+                    .zip(state.iter())
+                    .map(|(name, val)| (*name, *val))
+                    .collect();
+                let v = expr.eval(&bindings);
+                if !v.is_finite() { return (i, f64::MAX, 0.0); }
+                nt_vals.push(v);
+            }
+            let nt_mean = nt_vals.iter().sum::<f64>() / nt_vals.len() as f64;
+            let nt_spread = (nt_vals.iter().map(|v| (v - nt_mean).powi(2)).sum::<f64>()
+                / nt_vals.len() as f64).sqrt();
+            let nt_scale = nt_mean.abs().max(1e-6);
+            if nt_spread / nt_scale < 1e-6 {
+                return (i, f64::MAX, 0.0);
+            }
+
             let var = compute_trajectory_variance(expr, &sampled, var_names);
             let mean = {
                 let vals: Vec<f64> = sampled.iter()
@@ -7486,6 +7531,75 @@ mod tests {
         assert!(latex.contains("\\ln"));
         assert!(latex.contains("x"));
         assert!(latex.contains("y"));
+    }
+
+    #[test]
+    fn test_lv_template_trajectory_variance_direct() {
+        // Build the exact Lotka-Volterra invariant template.
+        let expr = Expr::BinOp(BinOp::Add,
+            Box::new(Expr::BinOp(BinOp::Sub,
+                Box::new(Expr::Var("x".into())),
+                Box::new(Expr::Func(UnaryFn::Log, Box::new(Expr::Var("x".into())))))),
+            Box::new(Expr::BinOp(BinOp::Sub,
+                Box::new(Expr::Var("y".into())),
+                Box::new(Expr::Func(UnaryFn::Log, Box::new(Expr::Var("y".into())))))));
+
+        // Integrate LV trajectory: dx = x(1-y), dy = y(x-1), start (2, 1)
+        fn rhs(s: &[f64], _t: f64) -> Vec<f64> {
+            vec![s[0] * (1.0 - s[1]), s[1] * (s[0] - 1.0)]
+        }
+        let (_t, states) = rk45_trajectory(rhs, &[2.0, 1.0], 30.0, 0.005);
+        eprintln!("LV trajectory: {} states", states.len());
+        assert!(states.len() > 100);
+
+        // Sample like discover_invariants_autonomous does.
+        let n_samples = 200.min(states.len());
+        let step = states.len() / n_samples.max(1);
+        let sampled: Vec<Vec<f64>> = states.iter().step_by(step.max(1)).take(n_samples).cloned().collect();
+
+        let var = compute_trajectory_variance(&expr, &sampled, &["x", "y"]);
+        eprintln!("LV template variance: {:.3e}", var);
+        eprintln!("Complexity: {}", expr.complexity());
+        assert!(var.is_finite(), "variance should be finite, got {}", var);
+        assert!(var < 1e-6, "LV invariant should have near-zero variance, got {}", var);
+    }
+
+    #[test]
+    fn test_lv_autonomous_discovery_direct() {
+        fn rhs(s: &[f64], _t: f64) -> Vec<f64> {
+            vec![s[0] * (1.0 - s[1]), s[1] * (s[0] - 1.0)]
+        }
+        let config = RegressorConfig {
+            population_size: 500,
+            generations: 200,
+            max_depth: 5,
+            max_complexity: 20,
+            lambda: 0.0005,
+            mutation_rate: 0.4,
+            seed: 42,
+            ..RegressorConfig::default()
+        };
+        let results = discover_invariants_autonomous(
+            rhs,
+            &[2.0, 1.0],
+            &["x", "y"],
+            None,
+            &config,
+            30.0,
+            0.005,
+        );
+        eprintln!("LV autonomous discovery: {} candidates", results.len());
+        for (i, r) in results.iter().take(5).enumerate() {
+            eprintln!("  #{}: variance={:.3e} complexity={} formula={}",
+                i, r.variance, r.complexity, r.formula_str);
+        }
+        assert!(!results.is_empty(), "LV discovery returned zero candidates — templates aren't surviving");
+        // The top result should contain log structure (x - ln(x) + y - ln(y) or equivalent).
+        let top = &results[0].formula_str;
+        assert!(top.contains("ln(x)") && top.contains("ln(y)"),
+            "top result should be the LV log invariant, got: {}", top);
+        assert!(results[0].variance < 1e-15,
+            "top variance should be near-zero for a perfect invariant, got: {}", results[0].variance);
     }
 
     #[test]
