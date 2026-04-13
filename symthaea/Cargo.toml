@@ -93,6 +93,8 @@ members = [
     "crates/symthaea-hdc-store",
     "crates/symthaea-mycelix-conductor",
     "crates/symthaea-epistemic-types",
+    # Phase 1 spike for MSP / IT-ops wedge. See memory/project_msp_wedge.md.
+    "crates/symthaea-logparse",
     # DRM/KMS boot animation — needs Linux DRM headers; not in default-members.
     "crates/symthaea-quicken-fb",
     # Leptos CSR web frontend — WASM target, not in default-members.
@@ -976,6 +978,13 @@ required-features = ["humanoid"]
 [[test]]
 name = "embodiment_integration"
 required-features = ["humanoid"]
+
+[[test]]
+name = "safe_fallback_scorecard"
+required-features = [
+    "vehicle", "helicopter", "flight", "surgical",
+    "exoskeleton", "auv", "quadruped", "manipulator", "orbital",
+]
 
 [[example]]
 name = "helicopter_phi_benchmark"
