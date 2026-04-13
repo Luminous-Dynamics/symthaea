@@ -1328,13 +1328,16 @@ mod tests {
         );
         eprintln!("════════════════════════════════════════════════════════════");
 
-        // Hybrid classifier should help the parser hit ≥ 75% on this
-        // deliberately harder set. With keyword boost at MAX 0.10, even
-        // borderline HDC matches (~0.25) can clear the 0.30 threshold.
+        // Hybrid classifier (NLP 1, commit 9073c8e393) measured 10/12 =
+        // 83.3% on this hard-paraphrase set with pure-Rust MoralSemantic
+        // + 0.25 keyword boost. We assert ≥ 75% (9/12) to catch
+        // regressions with a small noise margin. If this ever fails,
+        // check whether template keyword lists or the hybrid score
+        // formula changed.
         let rate = parse_successes as f64 / problems.len() as f64;
         assert!(
-            rate >= 0.5,
-            "hybrid classifier on hard paraphrases: {:.1}% < 50%",
+            rate >= 0.75,
+            "hybrid classifier on hard paraphrases: {:.1}% < 75% — regression vs measured 83.3% baseline",
             rate * 100.0
         );
     }
@@ -1559,12 +1562,17 @@ mod tests {
         }
         eprintln!("════════════════════════════════════════════════════════════");
 
-        // Of the 20 problems, 3 are expected to fail (out-of-scope).
-        // Require ≥ 65% parse+solve rate overall (13+ out of 20).
+        // Of the 20 problems, 3 are deliberately out-of-scope. Current
+        // measured accuracy (NLP 1 hybrid keyword classifier, pure-Rust
+        // MoralSemantic encoder, commit 1327fd628a) is 17/20 = 85%. We
+        // assert ≥ 80% (16/20) to catch regressions with a small noise
+        // margin. If this ever fails, check whether a recent change to
+        // `reference_corpus`, keyword registry, or `MoralSemanticEncoder`
+        // lowered discrimination on the canonical-phrasing set.
         let rate = solve_successes as f64 / problems.len() as f64;
         assert!(
-            rate >= 0.65,
-            "parse+solve rate {:.1}% < 65%",
+            rate >= 0.80,
+            "parse+solve rate {:.1}% < 80% — regression vs measured 85% baseline",
             rate * 100.0
         );
     }
