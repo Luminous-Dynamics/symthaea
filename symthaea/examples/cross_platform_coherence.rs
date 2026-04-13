@@ -16,7 +16,6 @@
 #![cfg(all(
     feature = "manipulator",
     feature = "helicopter",
-    feature = "flight",
     feature = "vehicle",
     feature = "auv",
 ))]
@@ -93,8 +92,8 @@ fn main() {
 
         let mut sim = SimpleHelicopterSimulator::new();
         let base_cmd = HelicopterCommand {
-            collective: 0.7, cyclic_roll: 0.1, cyclic_pitch: 0.1,
-            pedal: 0.0, tail_rotor: 0.5, throttle: 0.8,
+            collective: 0.7, cyclic_lon: 0.1, cyclic_lat: 0.1,
+            pedal: 0.0, thrust: 0.8, tail_rotor: 0.5,
         };
 
         let mut efforts = Vec::new();
@@ -103,51 +102,19 @@ fn main() {
             let gain = MotorSafetyLevel::from_phi(phi).motor_gain();
             let mut scaled = base_cmd;
             scaled.collective *= gain;
-            scaled.cyclic_roll *= gain;
-            scaled.cyclic_pitch *= gain;
-            scaled.throttle *= gain;
+            scaled.cyclic_lon *= gain;
+            scaled.cyclic_lat *= gain;
+            scaled.thrust *= gain;
             let mut total = 0.0f32;
             for _ in 0..steps_per_phi {
                 sim.step(&scaled, 0.002);
-                total += (scaled.collective.abs() + scaled.throttle.abs()) / 2.0;
+                total += (scaled.collective.abs() + scaled.thrust.abs()) / 2.0;
                 if !sim.state().is_finite() { all_finite = false; }
             }
             efforts.push(total / steps_per_phi as f32);
         }
         responses.push(PlatformResponse {
             name: "Helicopter".to_string(),
-            efforts,
-            stable_at_all: all_finite,
-        });
-    }
-
-    // ──────────────────────────────────────────────────────────────
-    // Flight (Quadrotor)
-    // ──────────────────────────────────────────────────────────────
-    {
-        use symthaea_core::embodiment::MotorSafetyLevel;
-        use symthaea_flight::simulator::{PhysicsSimulator, SimplePhysicsSimulator};
-        use symthaea_flight::types::QuadrotorCommand;
-
-        let mut sim = SimplePhysicsSimulator::new();
-        let base_cmd = QuadrotorCommand::hover();
-
-        let mut efforts = Vec::new();
-        let mut all_finite = true;
-        for &phi in &phi_sweep {
-            let gain = MotorSafetyLevel::from_phi(phi).motor_gain();
-            let mut scaled = base_cmd;
-            scaled.thrust *= gain;
-            let mut total = 0.0f32;
-            for _ in 0..steps_per_phi {
-                sim.step(&scaled, 0.002);
-                total += scaled.thrust.abs();
-                if !sim.state().is_finite() { all_finite = false; }
-            }
-            efforts.push(total / steps_per_phi as f32);
-        }
-        responses.push(PlatformResponse {
-            name: "Flight (Quadrotor)".to_string(),
             efforts,
             stable_at_all: all_finite,
         });
@@ -197,22 +164,19 @@ fn main() {
         use symthaea_auv::types::AuvCommand;
 
         let mut sim = SimpleAuvSimulator::new();
-        let base_cmd = AuvCommand {
-            thruster_rpm: [50.0, 50.0, 50.0, 50.0, 50.0, 50.0, 50.0, 50.0],
-        };
+        let mut base_cmd = AuvCommand::zero();
+        for t in &mut base_cmd.thrusters { *t = 0.5; }
 
         let mut efforts = Vec::new();
         let mut all_finite = true;
         for &phi in &phi_sweep {
-            let gain = MotorSafetyLevel::from_phi(phi).motor_gain() as f64;
+            let gain = MotorSafetyLevel::from_phi(phi).motor_gain();
             let mut scaled = base_cmd;
-            for r in &mut scaled.thruster_rpm {
-                *r *= gain;
-            }
+            for t in &mut scaled.thrusters { *t *= gain; }
             let mut total = 0.0f32;
             for _ in 0..steps_per_phi {
                 sim.step(&scaled, 0.002);
-                total += (scaled.thruster_rpm.iter().map(|r| r.abs()).sum::<f64>() / 8.0) as f32;
+                total += scaled.thrusters.iter().map(|t| t.abs()).sum::<f32>() / 8.0;
                 if !sim.state().is_finite() { all_finite = false; }
             }
             efforts.push(total / steps_per_phi as f32);
