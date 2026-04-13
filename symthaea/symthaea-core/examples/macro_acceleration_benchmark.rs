@@ -303,6 +303,43 @@ fn main() {
     // ────────────────────────────────────────────────────────────────
     // PHASE 2: Physics targets — cold vs primed
     // ────────────────────────────────────────────────────────────────
+    //
+    // The last two targets are trig-structured — added specifically to test
+    // whether the non-polynomial macros extracted by surgery round 1 (e.g.
+    // `sin((1/n))`) actually transfer to function-containing targets.
+    // If primed beats cold on these AND the sin/cos macros appear in winning
+    // formulas, we have causal evidence that the non-polynomial extraction
+    // pipeline produced real value, not just prettier pool counts.
+
+    // Custom target: 1 / (sin(0.1*n) + 2) — has reciprocal-of-sin structure
+    // that could benefit from the sin((1/n)) macro via GP recombination.
+    let recip_sin_data: Vec<(f64, f64)> = (1..=20)
+        .map(|i| {
+            let n = i as f64;
+            let v = 1.0 / ((0.1 * n).sin() + 2.0);
+            (n, v)
+        })
+        .collect();
+    let recip_sin_target = ObservedSequence::new(
+        "recip_sin(n)",
+        MathDomain::Physics,
+        recip_sin_data,
+    );
+
+    // Custom target: simple sine wave sin(0.3*n) — tests whether the sin()
+    // primitive, once in the macro pool, accelerates direct sine discovery.
+    let sine_wave_data: Vec<(f64, f64)> = (1..=20)
+        .map(|i| {
+            let n = i as f64;
+            (n, (0.3 * n).sin())
+        })
+        .collect();
+    let sine_wave_target = ObservedSequence::new(
+        "sine_wave(n)",
+        MathDomain::Physics,
+        sine_wave_data,
+    );
+
     let targets: Vec<(&str, ObservedSequence)> = vec![
         ("Kepler 3rd law (T ∝ r^1.5)",      observe_kepler_third_law(15)),
         ("Stefan-Boltzmann (P ∝ T^4)",      observe_stefan_boltzmann(15)),
@@ -310,6 +347,8 @@ fn main() {
         ("Quantum HO (E = n + 1/2)",        observe_quantum_harmonic_oscillator(20)),
         ("Inverse square (F ∝ 1/r²)",       observe_inverse_square_law(20)),
         ("Relativistic KE (γ − 1)",         observe_relativistic_kinetic_energy(20)),
+        ("Reciprocal sine 1/(sin(0.1n)+2)", recip_sin_target),
+        ("Sine wave sin(0.3n)",             sine_wave_target),
     ];
 
     println!("\n━━━ Phase 2: Cold vs Primed on {} physics targets ━━━", targets.len());
