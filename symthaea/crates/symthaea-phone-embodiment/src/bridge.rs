@@ -132,6 +132,40 @@ impl PhoneBridge {
         Ok(tel)
     }
 
+    /// Capture a screenshot, observe through the vision manifold, AND return the
+    /// full-resolution RGBA frame for downstream consumers (e.g., SomaRdpServer).
+    ///
+    /// Unlike `capture_and_observe`, this keeps the native-resolution pixels alive
+    /// so they can be fed into a remote-desktop codec. The vision manifold still
+    /// runs on the downsampled target resolution — this method does both in one pass.
+    pub fn capture_and_observe_rgba(
+        &mut self,
+        dt: f32,
+    ) -> Result<(symthaea_vision_manifold::VisionTelemetry, Vec<u8>, u32, u32), String> {
+        let png_bytes = self.adb.screenshot()?;
+        let img = image::load_from_memory(&png_bytes)
+            .map_err(|e| format!("Image decode failed: {e}"))?;
+
+        let (w, h) = img.dimensions();
+        self.screen_w = w;
+        self.screen_h = h;
+
+        // Downsample copy for vision manifold (RGB).
+        let resized = img.resize_exact(
+            self.target_w,
+            self.target_h,
+            image::imageops::FilterType::Triangle,
+        );
+        let rgb_pixels: Vec<u8> = resized.to_rgb8().into_raw();
+        let tel = self
+            .vision
+            .observe_frame(&rgb_pixels, self.target_w, self.target_h, 3, dt);
+
+        // Native-resolution RGBA copy for RDP codec.
+        let rgba_pixels: Vec<u8> = img.to_rgba8().into_raw();
+        Ok((tel, rgba_pixels, w, h))
+    }
+
     /// Map a vision grid position to phone screen coordinates.
     ///
     /// Converts from the 8×8 grid (at 64×64) to native screen pixels.
@@ -489,6 +523,11 @@ impl PhoneBridge {
     /// Access the underlying vision manifold.
     pub fn vision(&self) -> &VisionManifold {
         &self.vision
+    }
+
+    /// Mutable access to the vision manifold (for dream_replay, reset, etc.).
+    pub fn vision_mut(&mut self) -> &mut VisionManifold {
+        &mut self.vision
     }
 
     /// Access the ADB device.
