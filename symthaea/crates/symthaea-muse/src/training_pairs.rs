@@ -251,6 +251,45 @@ pub fn save_pairs(pairs: &[TrainingPair], path: &std::path::Path) -> std::io::Re
     Ok(())
 }
 
+/// Load training pairs from a `.pairs.bin` file written by `save_pairs`.
+///
+/// Returns `(state_fields, mel_frames)` where:
+/// - `state_fields[i]` is a 17-element Vec<f32> (see `save_pairs` layout).
+/// - `mel_frames[i]` is an `n_mels`-element Vec<f32>.
+///
+/// This flat form avoids reconstructing `MusicalState` structs and is the
+/// shape training code actually consumes (state vector → mel vector regression).
+pub fn load_pairs(
+    path: &std::path::Path,
+) -> std::io::Result<(Vec<[f32; 17]>, Vec<Vec<f32>>)> {
+    use std::io::Read;
+    let mut file = std::fs::File::open(path)?;
+    let mut header = [0u8; 8];
+    file.read_exact(&mut header)?;
+    let count = u32::from_le_bytes(header[0..4].try_into().unwrap()) as usize;
+    let mel_dim = u32::from_le_bytes(header[4..8].try_into().unwrap()) as usize;
+
+    let mut states = Vec::with_capacity(count);
+    let mut mels = Vec::with_capacity(count);
+    let pair_bytes = 17 * 4 + mel_dim * 4;
+    let mut buf = vec![0u8; pair_bytes];
+
+    for _ in 0..count {
+        file.read_exact(&mut buf)?;
+        let mut state = [0f32; 17];
+        for (i, chunk) in buf[..17 * 4].chunks_exact(4).enumerate() {
+            state[i] = f32::from_le_bytes(chunk.try_into().unwrap());
+        }
+        let mut mel = Vec::with_capacity(mel_dim);
+        for chunk in buf[17 * 4..].chunks_exact(4) {
+            mel.push(f32::from_le_bytes(chunk.try_into().unwrap()));
+        }
+        states.push(state);
+        mels.push(mel);
+    }
+    Ok((states, mels))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -318,6 +357,16 @@ mod tests {
 
         let metadata = std::fs::metadata(&tmpfile).unwrap();
         assert!(metadata.len() > 0);
+
+        let (states, mels) = load_pairs(&tmpfile).unwrap();
+        assert_eq!(states.len(), pairs.len());
+        assert_eq!(mels.len(), pairs.len());
+        assert_eq!(mels[0].len(), config.mel.n_mels);
+        // State field 0 is consciousness_level — should round-trip exactly
+        assert_eq!(states[0][0], pairs[0].state.consciousness_level);
+        // Mel frame should round-trip
+        assert_eq!(mels[0][0], pairs[0].mel_frame[0]);
+
         std::fs::remove_file(&tmpfile).ok();
     }
 }
