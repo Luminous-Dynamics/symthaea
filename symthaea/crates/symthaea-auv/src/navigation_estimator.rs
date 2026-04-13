@@ -10,8 +10,9 @@
 #[derive(Debug, Clone, Copy, Default)]
 pub struct AuvNavigationEstimate {
     pub position_m: [f64; 3],
-    pub velocity_m_per_s: [f64; 3],
+    pub velocity_mps: [f64; 3],
     pub position_sigma_m: f64,
+    pub update_count: u64,
 }
 
 /// Simple position estimator with dead-reckoning and uncertainty growth.
@@ -60,8 +61,9 @@ impl AuvNavigationEstimator {
     pub fn estimate(&self) -> AuvNavigationEstimate {
         AuvNavigationEstimate {
             position_m: self.position,
-            velocity_m_per_s: self.velocity,
+            velocity_mps: self.velocity,
             position_sigma_m: self.sigma,
+            update_count: self.measurement_count as u64,
         }
     }
 
