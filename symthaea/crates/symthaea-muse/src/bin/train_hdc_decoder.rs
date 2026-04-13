@@ -108,10 +108,21 @@ fn main() {
     println!("  hidden:     {}", args.hidden);
     println!("  lr:         {}", args.lr);
 
-    // Split into train / val (last 10% held out)
-    let split = (files.len() * 9 / 10).max(1);
-    let train_files: Vec<PathBuf> = files[..split].to_vec();
-    let val_files: Vec<PathBuf> = files[split..].to_vec();
+    // Random 90/10 train/val split (deterministic from seed).
+    // Chronological split biases val toward the newest year's recording gear,
+    // which produces misleading val_mse dominated by dataset shift.
+    let mut split_seed = 0xC0DE_u64;
+    let mut shuffled_files = files.clone();
+    for i in (1..shuffled_files.len()).rev() {
+        split_seed ^= split_seed << 13;
+        split_seed ^= split_seed >> 7;
+        split_seed ^= split_seed << 17;
+        let j = (split_seed as usize) % (i + 1);
+        shuffled_files.swap(i, j);
+    }
+    let split = (shuffled_files.len() * 9 / 10).max(1);
+    let train_files: Vec<PathBuf> = shuffled_files[..split].to_vec();
+    let val_files: Vec<PathBuf> = shuffled_files[split..].to_vec();
     println!("  train files: {}", train_files.len());
     println!("  val files:   {}", val_files.len());
 
