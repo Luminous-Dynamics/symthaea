@@ -208,7 +208,7 @@ fn seal_open_latency_under_50ms() {
     let seal_us = t0.elapsed().as_micros();
 
     let t1 = Instant::now();
-    let _opened = open_frame(&sealed, &receiver_session).expect("open");
+    let _opened = open_frame(&sealed, &mut receiver_session).expect("open");
     let open_us = t1.elapsed().as_micros();
 
     assert!(
