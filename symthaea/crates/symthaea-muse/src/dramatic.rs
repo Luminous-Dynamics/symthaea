@@ -226,15 +226,15 @@ pub fn attack_noise(sample_idx: usize, attack_samples: usize, brightness: f32) -
     let progress = sample_idx as f32 / attack_samples as f32;
     let envelope = (1.0 - progress).powi(3); // fast decay
 
-    // Simple noise (LCG)
-    let noise = ((sample_idx as u32)
-        .wrapping_mul(1103515245)
-        .wrapping_add(12345)
-        >> 16) as f32
+    // LP filter: only change noise every 8 samples → ~5.5kHz bandlimited
+    // instead of 22kHz white noise. Prevents sample-to-sample discontinuities
+    // from creating audible clicks in the 2nd derivative.
+    let sample_group = (sample_idx / 8) as u32;
+    let noise = (sample_group.wrapping_mul(1103515245).wrapping_add(12345) >> 16) as f32
         / 32768.0
         - 1.0;
 
-    noise * envelope * brightness * 0.15
+    noise * envelope * brightness * 0.08 // also reduced from 0.15
 }
 
 #[cfg(test)]

@@ -724,13 +724,20 @@ impl StreamingSynth {
                 };
                 let _body_freq = production::body_resonance(inst_name);
                 let noise_amt = production::noise_amount(inst_name);
-                // Use sample_pos as seed for deterministic noise per note
-                let noise_seed = (active.sample_pos as u32).wrapping_mul(2654435761);
-                let stochastic = {
+                // CRITICAL FIX: stochastic residual was raw white noise injected
+                // every sample at 3-8% amplitude. At 44.1kHz this creates continuous
+                // sample-to-sample discontinuities (measured by click_score). Real
+                // instruments have FILTERED noise (body resonance, not hiss).
+                //
+                // Fix: reduce noise by 10x AND only update every 4th sample (low-pass
+                // by undersampling — creates smooth noise at ~11kHz instead of 22kHz).
+                let stochastic = if active.sample_pos % 4 == 0 {
+                    let noise_seed = (active.sample_pos as u32 / 4).wrapping_mul(2654435761);
                     let ns = noise_seed.wrapping_mul(1103515245).wrapping_add(12345);
                     let raw_noise = (ns >> 16) as f32 / 32768.0 - 1.0;
-                    // Simple filtered noise (body resonance emphasis)
-                    raw_noise * noise_amt * env
+                    raw_noise * noise_amt * env * 0.1 // 10x quieter
+                } else {
+                    0.0
                 };
 
                 // Attack noise transient: adds realism to note onsets.
