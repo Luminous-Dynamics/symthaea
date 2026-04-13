@@ -509,6 +509,12 @@ ratatui = { version = "0.29", optional = true }
 eframe = { version = "0.33", optional = true }
 egui = { version = "0.33", optional = true }
 
+# WebSocket client dependencies (optional) - for holon_rdp_viewer (Phase I.A.2)
+# tokio-tungstenite: same version as symthaea-scan workspace member.
+# The holon-viewer feature pulls egui + eframe + tokio-tungstenite together
+# so the viewer example can compile as a single feature-gated unit.
+tokio-tungstenite = { version = "0.24", optional = true }
+
 # IPC Protocol Enhancements
 rmp-serde = { workspace = true }  # MessagePack binary protocol (A1)
 
@@ -541,6 +547,7 @@ gui = ["eframe", "egui"]                    # symthaea-gui binary
 demo = ["clap", "ctrlc"]                    # Demo binaries (CLI args + signal handling)
 full = ["service", "shell", "gui", "demo"]  # All binaries
 api_module = ["axum", "tower-http"]         # HTTP API binary + module
+holon-viewer = ["eframe", "egui", "dep:tokio-tungstenite", "mesh-encryption", "api_module"]  # Phase I.A.2 egui desktop viewer for Holon RDP binary wire
 
 # ── Sovereign RDP ──────────────────────────────────────────────────
 rdp = []                                   # Core RDP protocol + codec + session
