@@ -36,6 +36,7 @@ pub mod fingerprint;
 pub mod form;
 #[cfg(feature = "muse-live")]
 pub mod live_output;
+pub mod mel_extractor;
 pub mod melody;
 pub mod midi;
 pub mod midi_loader;
