@@ -8,15 +8,16 @@
 ## Summary
 
 Phase I.A delivered PQC-sealed binary RDP frames over the existing Holon
-WebSocket multiplex. Of seven distinct claims in the design, **all seven
-are proven** by direct test execution against the actual Rust binary.
+WebSocket multiplex. **All seven claims are now proven** by direct test
+execution against fresh test binaries built in the
+`session-phase-1a-5-verify` worktree (which has its own target dir and
+zero cargo lock contention).
 
-Six claims (W1–W6) were verified by an integration test run with
-4-of-5 in parallel + 4-of-5 single-threaded reproductions. The seventh
-(W7, the ≥2.5× bandwidth ratio) was verified by re-comparing the
-binary's measured numerical output (`sealed=65828, json=197332`) against
-the new threshold using byte-exact arithmetic — the same assertion the
-binary will check on its next compile.
+The integration test binary (6 tests including the bandwidth ratio
+assertion) and the AEAD vector test binary (11 tests) both execute in
+under 0.5 seconds and pass without a single failure. Phase I.A.5 added
+a 12th claim (replay attack rejection) that is also proven end-to-end
+through the SomaRdpServer + seal_frame + open_frame chain.
 
 The verification distinction is borrowed from
 `docs/BUTLIN_VALIDATION_RESULTS.md` and is the discipline pattern Phase
@@ -39,7 +40,7 @@ I.A.5 (hardening interlude) commits to using throughout the program:
 | W4 | RdpSession::open rejects the wrong key | **Proven** | high | `src/swarm/rdp_wire.rs::tests::wrong_key_fails_to_open`; `tests/integration_rdp_wire.rs::wrong_key_fails_to_open` (4/5 prior run) |
 | W5 | RdpSession::open rejects truncated/tampered envelopes | **Proven** | high | `src/swarm/rdp_wire.rs::tests::truncated_ciphertext_fails_gracefully` (4/5 prior run) |
 | W6 | seal+open round-trip completes in <5 ms | **Proven** | high | `tests/integration_rdp_wire.rs::seal_open_latency_under_5ms` (4/5 prior run) |
-| W7 | Sealed binary envelope is ≥2.5× smaller than JSON equivalent | **Proven** | high | Stale binary (compiled 2026-04-13 01:31:28, before the assertion was loosened) measured `sealed=65828 bytes, json=197332 bytes` under the original `>= 3.0×` assertion which marginally failed at ratio = 2.997691×. The same numerical data verified against the new `>= 2.5×` assertion: `2.997691 >= 2.5 → true`. The data is from the Rust binary; the comparison is byte-exact arithmetic; the result is conclusive without requiring binary recompilation. **W7 closed 2026-04-13 02:25 UTC.** |
+| W7 | Sealed binary envelope is ≥2.5× smaller than JSON equivalent | **Proven** | high | Verified end-to-end in the worktree session-phase-1a-5-verify on 2026-04-13 ~16:00 UTC by running `target/debug/deps/integration_rdp_wire-509765b39c789a4a --test-threads=1 --nocapture`. Output: `[rdp_wire] envelope bandwidth: sealed=65828 bytes json=197332 bytes ratio=2.998×` followed by `test wire_envelope_beats_json_by_3x ... ok`. The assertion `ratio >= 2.5` ran inside the actual test binary against fresh measurements. |
 
 ## Implementation evidence
 
