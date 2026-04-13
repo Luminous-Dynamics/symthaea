@@ -10,6 +10,7 @@
 //! changing the metric code.
 
 use crate::encoder::{cosine, Hdv};
+use hdbscan::{DistanceMetric, Hdbscan, HdbscanHyperParams};
 use std::collections::HashMap;
 
 /// A cluster assignment: one label per hypervector in input order.
@@ -49,6 +50,46 @@ pub fn purity(cluster_labels: &[i32], ground_truth: &[&str]) -> f32 {
         return f32::NAN;
     }
     correct as f32 / total as f32
+}
+
+/// Run HDBSCAN over a set of bipolar hypervectors.
+///
+/// **Distance metric**: Euclidean on the i8→f64 conversion. For bipolar
+/// {-1,+1} vectors of fixed dimension D:
+///
+///   ‖a − b‖² = 2·(D − dot(a,b)) = 2·D·(1 − cos(a,b))
+///
+/// so Euclidean distance is a monotonic function of cosine distance, and
+/// HDBSCAN's density estimates transfer without modification.
+///
+/// Returns per-point cluster labels. `-1` is the HDBSCAN convention for
+/// noise/unassigned points — `purity()` already handles these correctly.
+///
+/// **Parameter choice**: `min_cluster_size` defaults to `max(5, n/100)` —
+/// this is a first-pass heuristic. Phase 1 benchmark should sweep it and
+/// report the best-purity configuration.
+pub fn hdbscan_cluster(
+    points: &[Hdv],
+    min_cluster_size: Option<usize>,
+) -> Result<ClusterLabels, String> {
+    if points.is_empty() {
+        return Ok(Vec::new());
+    }
+    let data: Vec<Vec<f64>> = points
+        .iter()
+        .map(|hv| hv.iter().map(|&x| x as f64).collect())
+        .collect();
+
+    let n = points.len();
+    let min_cluster = min_cluster_size.unwrap_or_else(|| (n / 100).max(5));
+
+    let params = HdbscanHyperParams::builder()
+        .min_cluster_size(min_cluster)
+        .dist_metric(DistanceMetric::Euclidean)
+        .build();
+
+    let clusterer = Hdbscan::new(&data, params);
+    clusterer.cluster().map_err(|e| format!("hdbscan: {e:?}"))
 }
 
 /// Brute-force nearest-centroid assignment.

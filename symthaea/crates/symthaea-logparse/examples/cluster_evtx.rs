@@ -1,6 +1,12 @@
-//! Phase 1 benchmark runner (skeleton).
+//! Phase 1 benchmark runner.
 //!
-//! Usage (once a labeled corpus is staged):
+//! Two modes:
+//!
+//!   # Synthetic mode (works today, pipeline sanity only):
+//!   cargo run -p symthaea-logparse --example cluster_evtx -- --synthetic
+//!
+//!   # Real corpus mode (the actual Phase 1 kill criterion — requires a
+//!   # labeled .evtx corpus to be staged):
 //!   cargo run -p symthaea-logparse --example cluster_evtx -- /path/to/corpus/
 //!
 //! Expected corpus layout:
@@ -10,42 +16,101 @@
 //!     <file2>.evtx
 //!     ...
 //!
-//! What this does:
-//!   1. Parse every .evtx file, attach the corpus label to every event
-//!   2. Encode each event to a 16,384D hypervector
-//!   3. (STUB) Run clustering — currently just nearest-centroid against
-//!      per-label centroids as a sanity baseline
-//!   4. Compute cluster purity against the ground-truth labels
-//!   5. Print result. If purity >= 0.50, Phase 1 kill criterion is passed.
-//!
-//! TODO (next session):
-//!   - Swap nearest-centroid for real HDBSCAN (linfa-clustering or the
-//!     `hdbscan` crate)
-//!   - Add the DFIR.training corpus staging script
-//!   - Record per-provider purity breakdown (which event classes cluster
-//!     well, which don't — this tells us whether the encoder needs more
-//!     role channels)
+//! Synthetic mode does NOT validate the thesis — it just runs the full
+//! pipeline against fixtures designed to be separable. Use it to confirm the
+//! encoder + HDBSCAN wire together correctly before pointing real data at it.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use symthaea_logparse::encoder::{bundle, encode, Hdv};
-use symthaea_logparse::{cluster, evtx_source, LogEvent};
+use symthaea_logparse::cluster::{hdbscan_cluster, purity};
+use symthaea_logparse::encoder::{encode, Hdv};
+use symthaea_logparse::fixtures::generate_synthetic_corpus;
+use symthaea_logparse::{evtx_source, LogEvent};
+
+const KILL_CRITERION: f32 = 0.50;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let corpus_dir = std::env::args()
-        .nth(1)
-        .ok_or("usage: cluster_evtx <corpus_dir>")?;
-    let corpus_dir = PathBuf::from(corpus_dir);
+    let arg = std::env::args().nth(1).ok_or(
+        "usage:\n  cluster_evtx --synthetic\n  cluster_evtx <corpus_dir>",
+    )?;
 
-    // Load labels.csv (filename,label)
+    let (events, mode_label) = if arg == "--synthetic" {
+        let corpus = generate_synthetic_corpus(40, 0xC0FFEE);
+        println!("[synthetic] generated {} events", corpus.len());
+        (corpus, "synthetic (pipeline sanity only)")
+    } else {
+        let corpus_dir = PathBuf::from(&arg);
+        let events = load_real_corpus(&corpus_dir)?;
+        (events, "real corpus")
+    };
+
+    if events.is_empty() {
+        eprintln!("no events to cluster");
+        return Ok(());
+    }
+
+    let hvs: Vec<Hdv> = events.iter().map(encode).collect();
+    let gt: Vec<String> = events
+        .iter()
+        .map(|e| e.label.clone().unwrap_or_else(|| "<unlabeled>".into()))
+        .collect();
+    let gt_refs: Vec<&str> = gt.iter().map(|s| s.as_str()).collect();
+
+    println!("[cluster] running HDBSCAN on {} × 16384D hypervectors...", hvs.len());
+    let min_cluster = (hvs.len() / 20).max(5);
+    let labels = hdbscan_cluster(&hvs, Some(min_cluster))?;
+
+    let noise = labels.iter().filter(|&&c| c == -1).count();
+    let distinct: std::collections::HashSet<_> =
+        labels.iter().filter(|&&c| c != -1).collect();
+    let p = purity(&labels, &gt_refs);
+
+    println!("\n=== Phase 1 result ({mode_label}) ===");
+    println!("events:          {}", hvs.len());
+    println!("ground-truth:    {} classes", count_classes(&gt));
+    println!("min_cluster:     {min_cluster}");
+    println!("clusters found:  {}", distinct.len());
+    println!("noise points:    {}/{}", noise, hvs.len());
+    println!("purity:          {p:.3}");
+    if arg == "--synthetic" {
+        println!(
+            "\nNOTE: synthetic mode does NOT validate the thesis. Real corpus \
+             required for Phase 1 kill-criterion evaluation."
+        );
+    } else {
+        let verdict = if p >= KILL_CRITERION { "PASS" } else { "FAIL" };
+        println!("\nkill criterion (>= {KILL_CRITERION:.2}): {verdict}");
+    }
+
+    // Per-class recall breakdown — useful for diagnosing which event families
+    // the encoder struggles with.
+    println!("\n=== Per-class breakdown ===");
+    let mut class_stats: HashMap<&str, (usize, usize)> = HashMap::new(); // (total, assigned)
+    for (lbl, &c) in gt_refs.iter().zip(labels.iter()) {
+        let entry = class_stats.entry(*lbl).or_insert((0, 0));
+        entry.0 += 1;
+        if c != -1 {
+            entry.1 += 1;
+        }
+    }
+    let mut class_vec: Vec<_> = class_stats.into_iter().collect();
+    class_vec.sort_by_key(|(k, _)| *k);
+    for (k, (total, assigned)) in class_vec {
+        let pct = 100.0 * assigned as f32 / total as f32;
+        println!("  {k:<20}  {assigned:>4}/{total:<4}  ({pct:.0}% assigned)");
+    }
+
+    Ok(())
+}
+
+fn load_real_corpus(corpus_dir: &PathBuf) -> Result<Vec<LogEvent>, Box<dyn std::error::Error>> {
     let labels_path = corpus_dir.join("labels.csv");
     if !labels_path.exists() {
-        eprintln!(
-            "No labels.csv in {}. Phase 1 spike needs a labeled corpus. \
-             See memory/project_msp_wedge.md for DFIR.training staging plan.",
+        return Err(format!(
+            "No labels.csv in {}. See memory/project_msp_wedge.md.",
             corpus_dir.display()
-        );
-        return Ok(());
+        )
+        .into());
     }
     let labels_csv = std::fs::read_to_string(&labels_path)?;
     let mut file_labels: HashMap<String, String> = HashMap::new();
@@ -55,72 +120,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // Parse + encode every file.
-    let mut all_events: Vec<LogEvent> = Vec::new();
-    let mut all_hvs: Vec<Hdv> = Vec::new();
-    let mut gt: Vec<String> = Vec::new();
-
-    for entry in std::fs::read_dir(&corpus_dir)? {
+    let mut events = Vec::new();
+    for entry in std::fs::read_dir(corpus_dir)? {
         let entry = entry?;
         let path = entry.path();
         if path.extension().and_then(|s| s.to_str()) != Some("evtx") {
             continue;
         }
-        let fname = path
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .to_string();
+        let fname = path.file_name().unwrap().to_string_lossy().to_string();
         let Some(label) = file_labels.get(&fname) else {
             eprintln!("skip {fname}: no label");
             continue;
         };
-
-        let events = evtx_source::parse_evtx_file(&path)?;
-        println!("{fname}: {} events, label={label}", events.len());
-
-        for mut ev in events {
+        let parsed = evtx_source::parse_evtx_file(&path)?;
+        println!("{fname}: {} events, label={label}", parsed.len());
+        for mut ev in parsed {
             ev.label = Some(label.clone());
-            all_hvs.push(encode(&ev));
-            gt.push(label.clone());
-            all_events.push(ev);
+            events.push(ev);
         }
     }
+    Ok(events)
+}
 
-    if all_events.is_empty() {
-        eprintln!("no events parsed");
-        return Ok(());
-    }
-
-    // Nearest-centroid baseline: build one centroid per ground-truth label
-    // by bundling all HVs of that class.
-    let mut by_label: HashMap<&str, Vec<Hdv>> = HashMap::new();
-    for (hv, gt) in all_hvs.iter().zip(gt.iter()) {
-        by_label.entry(gt.as_str()).or_default().push(hv.clone());
-    }
-    let labels_in_order: Vec<&str> = by_label.keys().copied().collect();
-    let centroids: Vec<Hdv> = labels_in_order
-        .iter()
-        .map(|l| bundle(&by_label[*l]))
-        .collect();
-
-    let assignments = cluster::nearest_centroid(&all_hvs, &centroids);
-    // Map assignments back to predicted labels, then to i32 buckets for purity.
-    let gt_refs: Vec<&str> = gt.iter().map(|s| s.as_str()).collect();
-    let purity = cluster::purity(&assignments, &gt_refs);
-
-    println!("\n=== Phase 1 spike result ===");
-    println!("events:    {}", all_events.len());
-    println!("classes:   {}", labels_in_order.len());
-    println!("purity:    {purity:.3}");
-    println!(
-        "kill criterion (>= 0.50): {}",
-        if purity >= 0.50 { "PASS" } else { "FAIL" }
-    );
-    println!(
-        "\nNote: this is the nearest-centroid BASELINE, not HDBSCAN. \
-         The real spike is the centroid-free clustering run — TODO."
-    );
-
-    Ok(())
+fn count_classes(gt: &[String]) -> usize {
+    let set: std::collections::HashSet<&str> = gt.iter().map(|s| s.as_str()).collect();
+    set.len()
 }

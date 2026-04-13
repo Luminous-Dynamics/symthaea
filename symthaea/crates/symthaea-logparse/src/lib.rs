@@ -21,6 +21,7 @@ pub mod evtx_source;
 pub mod syslog_source;
 pub mod encoder;
 pub mod cluster;
+pub mod fixtures;
 
 pub use event::{LogEvent, Severity, Source};
 

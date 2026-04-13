@@ -21,11 +21,12 @@ evtx = "0.8"
 # Syslog RFC5424 / RFC3164 parser.
 syslog_loose = "0.21"
 
+# HDBSCAN over the 16,384D hypervectors. Pure Rust, takes Vec<Vec<f64>>
+# directly — no ndarray dance. We keep this as a normal dep so integration
+# tests and the example can share the cluster pipeline.
+hdbscan = "0.12"
+
 [dev-dependencies]
-# HDBSCAN for clustering the 16,384D hypervectors. Pulled in as a dev-dep
-# because Phase 1 is an examples/benchmarks crate, not a production dep yet.
-# If the spike graduates, we move this to [dependencies].
-# NOTE: swap for `linfa-clustering` if the `hdbscan` crate is stale at build time.
 
 [features]
 default = []
