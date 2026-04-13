@@ -63,7 +63,24 @@ pub fn expr_to_equation_node(expr: &Expr) -> EquationNode {
         // nodes, not Field nodes. Using Constant here is what makes recognition
         // actually match existing catalog entries in skeleton mode.
         Expr::Var(name) => EquationNode::Constant { name: name.clone() },
-        Expr::Const(c) => EquationNode::Scalar(*c),
+        // Numeric literals: catalog entries encode physical constants like
+        // -13.6 → Negate(Constant("R_H")) — they use Constant nodes, not Scalar.
+        // Match this convention so leaves bind to the same role vector
+        // (node_const) in skeleton mode. We synthesize a name from the value
+        // so full-encoding mode remains distinguishable across literals.
+        // Negative literals get wrapped in Negate to mirror the catalog's
+        // "named negative coefficient" convention.
+        Expr::Const(c) => {
+            if *c < 0.0 {
+                EquationNode::Negate(Box::new(EquationNode::Constant {
+                    name: format!("c_{:.4}", -c),
+                }))
+            } else {
+                EquationNode::Constant {
+                    name: format!("c_{:.4}", c),
+                }
+            }
+        }
         Expr::BinOp(BinOp::Add, l, r) => {
             // Flatten nested Add into a single Sum(vec![])
             let mut terms = Vec::new();
@@ -305,10 +322,13 @@ mod tests {
             Box::new(Expr::Var("r".into())),
         );
         let node = expr_to_equation_node(&expr);
+        // 1/r → Product([Constant("c_1.0000"), Power(Constant("r"), Scalar(-1))])
+        // Numeric literals now encode as Constant nodes (not Scalar) to match
+        // the catalog convention; see expr_to_equation_node for rationale.
         match node {
             EquationNode::Product(factors) => {
                 assert_eq!(factors.len(), 2);
-                assert!(matches!(factors[0], EquationNode::Scalar(_)));
+                assert!(matches!(factors[0], EquationNode::Constant { .. }));
                 assert!(matches!(factors[1], EquationNode::Power { .. }));
             }
             _ => panic!("expected Product, got {:?}", node),
