@@ -44,10 +44,12 @@
 
 use symthaea_core::hdc::conjecture_engine::{BinOp, Expr, UnaryFn};
 
+use crate::dimensional_inference::{infer_dimensions, UnitMap};
 use crate::query::PhysicsSearchEngine;
+#[allow(unused_imports)] // DimensionalSignature is used in rustdoc links
+use crate::types::DimensionalSignature;
 use crate::types::{
-    DiffOperator, DimensionalSignature, EquationNode, PhysicsDomain, PhysicsEquation,
-    SearchResult, SymmetryDescriptor,
+    DiffOperator, EquationNode, PhysicsDomain, PhysicsEquation, SearchResult, SymmetryDescriptor,
 };
 
 /// Convert a ConjectureEngine [`Expr`] into a physics-bridge [`EquationNode`].
@@ -235,38 +237,72 @@ impl RecognitionReport {
     }
 }
 
-/// Recognize a discovered [`Expr`] against the physics catalog.
+/// Recognize a discovered [`Expr`] against the physics catalog (units-free).
 ///
-/// Builds a minimal [`PhysicsEquation`] wrapper (domain defaulted to
-/// [`PhysicsDomain::ClassicalMechanics`], symmetries empty) and runs the full
-/// multi-aspect search. Returns the top 5 catalog matches with structural,
-/// symmetry, dimensional, and full-similarity breakdowns.
-///
-/// The novelty threshold is 0.40 — formulas with no catalog neighbor above this
-/// score are flagged as `is_novel = true`.
+/// Convenience wrapper around [`recognize_expr_with_units`] with an empty
+/// unit map, leaving the dimensional axis inert. Use this when the caller
+/// has no unit annotations available; otherwise prefer the units-aware
+/// version, which can lift recognition scores past the structural plateau.
 pub fn recognize_expr(
     engine: &PhysicsSearchEngine,
     expr: &Expr,
     name: &str,
 ) -> RecognitionReport {
+    recognize_expr_with_units(engine, expr, name, &UnitMap::new())
+}
+
+/// Recognize a discovered [`Expr`] against the physics catalog, with
+/// per-variable unit annotations driving dimensional inference.
+///
+/// This is the **plateau-breaker**. The bridge's similarity scoring uses a
+/// weighted sum over four axes:
+/// ```text
+/// score = 0.4·structural + 0.3·symmetry + 0.2·dimensional + 0.1·full
+/// ```
+///
+/// Without unit annotations, the dimensional axis is inert (queries always
+/// have `DIMENSIONLESS` dims, which encode to the zero hypervector and score
+/// ≈0 against any non-dimensionless catalog entry). Structural matches alone
+/// cap recognition at ~0.70 within the polynomial-with-negation family.
+///
+/// With unit annotations, [`infer_dimensions`] walks the discovered formula
+/// and propagates SI dimensions from each variable. The resulting
+/// [`DimensionalSignature`] populates the query's `dimensions` field, and the
+/// dimensional axis can finally discriminate within the structural cluster:
+/// the right entry gains +0.20 to its score while wrong entries gain nothing.
+///
+/// Variables not present in `var_units` are treated as dimensionless. If the
+/// discovered formula is dimensionally inconsistent (e.g. raw `½v² - 1/r`
+/// without natural-units `GM=1` baked in), the inference falls back to
+/// `DIMENSIONLESS` and the dimensional axis stays inert for that query —
+/// graceful degradation, no errors.
+pub fn recognize_expr_with_units(
+    engine: &PhysicsSearchEngine,
+    expr: &Expr,
+    name: &str,
+    var_units: &UnitMap,
+) -> RecognitionReport {
     let rhs = expr_to_equation_node(expr);
-    // IMPORTANT: Catalog entries are stored as Equals(lhs, rhs) trees because
-    // they represent equations (F = ma, E = ½v² − 1/r, etc.). A bare RHS
-    // skeleton won't match those at the top level. Wrap the discovered formula
-    // in a generic Equals(Constant("result"), rhs) so both sides use the
-    // Equals root node. The `result` constant name is irrelevant in skeleton
-    // mode (constants are interchangeable), and it carries no bits that would
-    // contaminate the structural comparison.
+    // Wrap discovered formula in Equals(Constant("result"), rhs) so the
+    // top-level node type matches catalog entries (which are all stored as
+    // Equals trees). See the recognize.rs module docs for full rationale.
     let ast = EquationNode::Equals(
         Box::new(EquationNode::Constant { name: "result".into() }),
         Box::new(rhs),
     );
+
+    // Infer dimensions from the discovered formula and the unit annotations.
+    // Falls back to DIMENSIONLESS on inconsistency (the formula is still
+    // structurally meaningful even if its raw units don't propagate cleanly
+    // — e.g. natural-units expressions).
+    let dimensions = infer_dimensions(expr, var_units).or_dimensionless();
+
     let query = PhysicsEquation {
         name: name.to_string(),
         domain: PhysicsDomain::ClassicalMechanics,
         ast,
         symmetries: SymmetryDescriptor::none(),
-        dimensions: DimensionalSignature::DIMENSIONLESS,
+        dimensions,
         tensor: None,
     };
 
