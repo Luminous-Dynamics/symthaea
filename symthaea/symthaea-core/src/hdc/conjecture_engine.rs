@@ -1899,15 +1899,35 @@ impl ConjectureEngine {
         for seq in &observations {
             // ── Phase 0: Recurrence detection (fast, exact) ──────────
             // Check for simple recurrences BEFORE expensive GP search.
-            // If found, record it as a high-confidence conjecture.
+            // If found, attempt to translate into a closed-form Expr via
+            // solve_recurrence(); if that succeeds, store the closed form.
+            // Otherwise fall back to the recurrence description (note that
+            // the fallback formula is NOT directly evaluable — it's a string
+            // hint for downstream display).
             if let Some(rec) = detect_recurrence(&seq.data) {
+                let (formula, formula_str, complexity) =
+                    if let Some(closed) = solve_recurrence(&rec, &seq.data) {
+                        // Closed form recovered — use it directly.
+                        let cs = format!("{}", closed);
+                        let comp = closed.complexity();
+                        (closed, cs, comp)
+                    } else {
+                        // Keep the recurrence description as a hint, but
+                        // flag the formula as non-evaluable by packaging it
+                        // as a Var node whose name begins with "rec:". This
+                        // is unusual but backwards-compatible with existing
+                        // downstream code that only reads formula_str.
+                        let placeholder = Expr::Var(format!("rec:{}", rec.formula));
+                        (placeholder, rec.formula.clone(), rec.order + 1)
+                    };
+
                 self.conjectures.push(Conjecture {
-                    formula: Expr::Var(rec.formula.clone()),
-                    formula_str: rec.formula.clone(),
+                    formula,
+                    formula_str,
                     source: seq.name.clone(),
                     domain: seq.domain,
                     training_mse: rec.max_residual,
-                    complexity: rec.order + 1,
+                    complexity,
                     fitness: rec.max_residual,
                     status: if rec.max_residual < 1e-10 {
                         ConjectureStatus::NumericallyTested { test_mse: 0.0 }
