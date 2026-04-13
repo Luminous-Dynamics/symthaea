@@ -2,59 +2,35 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Holon RDP Viewer — egui desktop client for the Phase I.A binary wire.
 //!
-//! **Status**: Phase I.A.2 scaffold (2026-04-13). Compiles as a stub; the
-//! three coupled pieces (egui window, tokio-tungstenite client, PQC
-//! handshake) are TODOs that must land together in one focused session.
+//! ## Status — Phase I.A.2 execution in progress
 //!
-//! ## The three pieces that must land together
+//! **Piece 1 (egui window shell)**: ✅ this file. Creates an eframe window
+//! that owns a `HolonRdpViewer` and blits its `FrameBuffer` to an
+//! `egui::TextureHandle` on every `update()`. Exposes a "Load test
+//! pattern" button that injects a synthetic `FullFrame` so Piece 1 is
+//! runnable and visually verifiable before Piece 2 wires in a real
+//! WebSocket source.
 //!
-//! Phase I.A.2 is NOT three independent sub-tasks. These three pieces are
-//! tightly coupled and will fail in confusing ways if split:
+//! **Piece 2 (tokio-tungstenite WS client)**: ⏳ next commit. Replaces
+//! the synthetic pattern with a live stream from `ws://localhost:7778`.
 //!
-//! 1. **egui window + TextureHandle blit.** Owns the `FrameBuffer` from
-//!    `swarm::rdp_holon_bridge::HolonRdpViewer`, repaints on frame arrival,
-//!    forwards mouse/keyboard events to the reverse path.
+//! **Piece 3 (PQC handshake unblock)**: ⏳ later commit. Swaps the
+//! placeholder `[0x42; 32]` session key for a real KEM-derived key.
+//! Blocked on `service.rs:844` TODO. Safe for localhost deployment
+//! until then.
 //!
-//! 2. **`tokio-tungstenite` client.** Connects to `ws://localhost:7778/holon/ws`
-//!    (the existing Holon WebSocket), receives binary `Message::Binary`
-//!    frames which are sealed `FrameBin` envelopes, forwards them to the
-//!    `open_frame` → `HolonRdpViewer.apply_frame` chain. On the reverse
-//!    path, takes the egui mouse/keyboard → `InputFrame` → `seal_input` →
-//!    `Message::Binary`.
+//! ## Three pieces must land together (documented in scaffold commit)
 //!
-//! 3. **PQC handshake (Phase I.A.5 Track 2.5 — DEFERRED).** Currently
-//!    `RdpSession` needs a 32-byte session key injected via
-//!    `on_handshake_complete([u8; 32])`. The real handshake goes through
-//!    `src/swarm/service.rs::run_handshake_for_peer` which has a TODO at
-//!    line 844 (`TODO(blocked:bidirectional-kem)`). The viewer scaffold
-//!    uses a placeholder fixed key to unblock the egui+WS work; the real
-//!    PQC handshake lands as the third piece once the other two compile.
+//! See the commit message on `c40b218081` and the worktree commit
+//! `2c535fd2fc` for the coupling argument. Splitting these three pieces
+//! across independent sessions would force the tests to be written twice
+//! and leave a half-secured wire on disk.
 //!
-//! Why they can't split:
-//! - The egui window needs a live `Arc<Mutex<HolonRdpViewer>>` that the WS
-//!   client updates. Split them and you can't test either.
-//! - The WS client needs a sealed envelope to open. Without the handshake
-//!   producing a real key, you can only test with placeholder keys — which
-//!   the previous Phase I.A.5 work already did.
-//! - The handshake state machine is two-sided. Testing it needs real
-//!   initiator + responder both running, which is what the WS client
-//!   supplies.
-//!
-//! ## Usage (planned)
+//! ## Usage
 //!
 //! ```bash
-//! # Start the Holon WS server (phone/soma side sealing frames)
-//! cargo run --release --bin symthaea-holon --features api_module,mesh-encryption,phone
-//!
-//! # In another terminal, start the viewer (desktop side)
 //! cargo run --release --example holon_rdp_viewer --features holon-viewer
 //! ```
-//!
-//! ## References
-//!
-//! - Phase I.A delivery: `docs/phase_1a_verification.md` (commit c15995b3ff)
-//! - Phase I.A.5 hardening: Tracks 2.1–3.2 all committed to main
-//! - Plan: `plans/shiny-wibbling-quail.md` Phase I.A.2
 
 #[cfg(not(feature = "holon-viewer"))]
 fn main() {
@@ -69,74 +45,218 @@ fn main() {
 }
 
 #[cfg(feature = "holon-viewer")]
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // ═══════════════════════════════════════════════════════════════════
-    // PIECE 3 — PQC handshake (skeleton only; real flow lands with Track 2.5)
-    // ═══════════════════════════════════════════════════════════════════
-    //
-    // TODO(phase-1a-2): replace the placeholder key with a real
-    // PqcSessionKey derived via `src/swarm/service.rs::run_handshake_for_peer`
-    // once the bidirectional KEM exchange at service.rs:844 is unblocked.
-    //
-    // For the scaffold, the viewer and server must agree on a placeholder
-    // key out-of-band. This is NOT SAFE for any real network deployment —
-    // it only unblocks the egui + WS plumbing work.
-    let _placeholder_session_key: [u8; 32] = [0x42; 32];
+fn main() -> eframe::Result<()> {
+    use eframe::egui;
 
-    // ═══════════════════════════════════════════════════════════════════
-    // PIECE 1 — egui window (skeleton only)
-    // ═══════════════════════════════════════════════════════════════════
-    //
-    // TODO(phase-1a-2):
-    //   - Construct an `eframe::NativeOptions` with initial window size
-    //     matching the phone's native screen (default 1008×2244).
-    //   - Implement an `eframe::App` that owns:
-    //       * `Arc<Mutex<HolonRdpViewer>>` — from `swarm::rdp_holon_bridge`
-    //       * An `egui::TextureHandle` for the FrameBuffer blit
-    //       * A tokio runtime handle for the WS client task
-    //   - On `update()`:
-    //       * Drain any newly-applied frames from the viewer
-    //       * Upload the FrameBuffer contents to the texture
-    //       * Show the texture with `ui.image()`
-    //       * Handle `egui::Event::PointerButton` and forward as
-    //         `InputEvent::Pointer` to the reverse-path sender
-    //       * Handle `egui::Event::Key` and forward as `InputEvent::Key`
-    //
-    // Design reference: `crates/symthaea-muse/` uses egui and can be
-    // consulted for the NativeOptions + App pattern that already works
-    // on NixOS/Wayland.
+    // Default viewer resolution matches the Pixel 8 Pro native screen at
+    // the 128×128 vision manifold target times the 64-pixel codec tile size
+    // — 128 * 64 = 8192 is far larger than the phone, so we use the actual
+    // Pixel resolution 1008×2244 which gives ~16×35 tile grid at 64-pixel
+    // tiles.
+    const PHONE_W: u32 = 1008;
+    const PHONE_H: u32 = 2244;
+    const TILE_COLS: u16 = 16; // 1008 / 64 = 15.75 → 16
+    const TILE_ROWS: u16 = 35; // 2244 / 64 = 35.06 → 35 (rounds down, last row may clip)
 
-    // ═══════════════════════════════════════════════════════════════════
-    // PIECE 2 — tokio-tungstenite WebSocket client (skeleton only)
-    // ═══════════════════════════════════════════════════════════════════
-    //
-    // TODO(phase-1a-2):
-    //   - Spawn a tokio task that connects to `ws://localhost:7778/holon/ws`
-    //     via `tokio_tungstenite::connect_async`.
-    //   - On `Message::Binary` receive:
-    //       * Pass to `rdp_wire::open_frame(&bytes, &mut receiver_session)`
-    //       * Feed the resulting `RdpFrame` to `viewer.apply_frame(&frame)`
-    //       * Signal repaint to the egui event loop
-    //   - On reverse-path (viewer → server):
-    //       * Take `InputFrame` from the egui event handler
-    //       * Call `rdp_wire::seal_input(&input, &mut sender_session)`
-    //       * Send as `Message::Binary` over the WS
-    //
-    // Note: the tokio runtime and the egui event loop must communicate
-    // via a bounded channel (tokio::sync::mpsc::channel). The egui side
-    // runs synchronously on the main thread; the tokio side runs on
-    // background workers. Do not block the egui event loop on WS I/O.
+    let native_options = eframe::NativeOptions {
+        viewport: egui::ViewportBuilder::default()
+            // Scale down 2× for desktop display (phone is 1008×2244, that's taller
+            // than most monitors) — the texture blit will downscale on upload.
+            .with_inner_size([540.0, 1200.0])
+            .with_min_inner_size([400.0, 600.0])
+            .with_title("Holon RDP Viewer — Phase I.A.2 Piece 1"),
+        ..Default::default()
+    };
 
-    eprintln!(
-        "Phase I.A.2 scaffold — holon_rdp_viewer is a skeleton.\n\
-         \n\
-         The three coupled pieces (egui window + WS client + PQC handshake)\n\
-         are not yet implemented. This stub compiles under the `holon-viewer`\n\
-         feature but does nothing at runtime. See the TODOs in this file\n\
-         for the next-session execution plan.\n\
-         \n\
-         Placeholder session key prepared: {} bytes (unused)\n",
-        _placeholder_session_key.len()
-    );
-    Ok(())
+    eframe::run_native(
+        "Holon RDP Viewer",
+        native_options,
+        Box::new(|_cc| Ok(Box::new(HolonViewerApp::new(PHONE_W, PHONE_H, TILE_COLS, TILE_ROWS)))),
+    )
+}
+
+#[cfg(feature = "holon-viewer")]
+struct HolonViewerApp {
+    /// The RDP frame buffer — receives `apply_full_frame`/`apply_delta_frame`
+    /// from either the test-pattern injector (Piece 1) or the WS client
+    /// (Piece 2, next commit).
+    viewer: symthaea::swarm::rdp_holon_bridge::HolonRdpViewer,
+    /// egui texture handle that holds the uploaded FrameBuffer pixels.
+    /// Re-uploaded on every update() when the buffer has new content.
+    texture: Option<eframe::egui::TextureHandle>,
+    /// Last `frames_received` we observed on the viewer — used to detect
+    /// when a new frame has arrived and the texture needs refreshing.
+    last_frames_seen: u64,
+    /// Cached width and height of the frame buffer for texture sizing.
+    width: u32,
+    height: u32,
+    /// Test pattern seed so repeated clicks produce visibly different
+    /// patterns (Piece 1 only — Piece 2 removes this).
+    test_seed: u8,
+    /// Human-readable status line shown in the UI.
+    status: String,
+}
+
+#[cfg(feature = "holon-viewer")]
+impl HolonViewerApp {
+    fn new(width: u32, height: u32, tile_cols: u16, tile_rows: u16) -> Self {
+        use symthaea::swarm::rdp_holon_bridge::HolonRdpViewer;
+        let mut viewer = HolonRdpViewer::new(width, height, tile_cols, tile_rows);
+        viewer.start();
+        Self {
+            viewer,
+            texture: None,
+            last_frames_seen: 0,
+            width,
+            height,
+            test_seed: 0,
+            status: format!(
+                "Piece 1 ready. Frame buffer: {width}×{height}, tile grid: {tile_cols}×{tile_rows}. Click 'Load test pattern' to verify the blit path."
+            ),
+        }
+    }
+
+    /// Inject a synthetic `FullFrame` into the viewer's `FrameBuffer`.
+    ///
+    /// This exercises the same `HolonRdpViewer::apply_frame` code path that
+    /// Piece 2 will drive from real WebSocket frames, just with a locally
+    /// constructed `RdpFrame::Full` whose patches are deterministic
+    /// gradients based on `self.test_seed`. Lets us visually verify the
+    /// full Piece 1 stack (RdpFrame → FrameBuffer → egui texture → screen)
+    /// before any network code exists.
+    fn load_test_pattern(&mut self) {
+        use symthaea::swarm::rdp_codec::TILE_SIZE;
+        use symthaea::swarm::rdp_protocol::{FullFrame, QuantizedPatch, RdpFrame};
+
+        let cols = self.viewer.frame_buffer.tile_cols as usize;
+        let rows = self.viewer.frame_buffer.tile_rows as usize;
+        let tile_size = TILE_SIZE;
+        let seed = self.test_seed;
+
+        // Build tile_cols × tile_rows patches. Each patch is a gradient
+        // that varies spatially so adjacent tiles look distinct after
+        // the per-tile i8 dequantization in `FrameBuffer::apply_full_frame`.
+        let patches: Vec<QuantizedPatch> = (0..(cols * rows))
+            .map(|idx| {
+                let tile_x = (idx % cols) as u8;
+                let tile_y = (idx / cols) as u8;
+                let values: Vec<i8> = (0..(tile_size * tile_size))
+                    .map(|p| {
+                        let px = (p % tile_size) as u8;
+                        let py = (p / tile_size) as u8;
+                        // Gradient that wraps through i8 range — gives
+                        // visible tile boundaries and shifts with seed.
+                        let v = tile_x
+                            .wrapping_add(tile_y.wrapping_mul(3))
+                            .wrapping_add(px.wrapping_mul(2))
+                            .wrapping_add(py)
+                            .wrapping_add(seed);
+                        // Map u8 0..255 → i8 -128..127 so apply_full_frame
+                        // treats it as a valid quantized patch.
+                        (v as i16 - 128) as i8
+                    })
+                    .collect();
+                QuantizedPatch { values }
+            })
+            .collect();
+
+        let full = FullFrame {
+            frame_id: self.last_frames_seen + 1,
+            timestamp_ms: 0,
+            patch_cols: cols as u16,
+            patch_rows: rows as u16,
+            patches,
+            consciousness_level: 0.65,
+            harmony: "test-pattern".into(),
+        };
+
+        let frame = RdpFrame::Full(full);
+        let applied = self.viewer.apply_frame(&frame);
+        if applied {
+            self.test_seed = self.test_seed.wrapping_add(7);
+            self.status = format!(
+                "Test pattern loaded. frame_id={}, frames_received={}, seed={}",
+                self.last_frames_seen + 1,
+                self.viewer.frames_received,
+                self.test_seed
+            );
+        } else {
+            self.status = "apply_frame returned false — check viewer state".into();
+        }
+    }
+
+    /// Refresh the egui texture from the viewer's frame buffer.
+    ///
+    /// Called from `update()` whenever `frames_received` has advanced.
+    /// Uses `egui::ColorImage::from_rgba_unmultiplied` to wrap the RGBA
+    /// bytes produced by `FrameBuffer::as_rgba()`, then uploads via
+    /// `Context::load_texture` (or re-uploads the existing handle).
+    fn refresh_texture(&mut self, ctx: &eframe::egui::Context) {
+        use eframe::egui::{ColorImage, TextureOptions};
+
+        let rgba = self.viewer.frame_buffer.as_rgba();
+        let image = ColorImage::from_rgba_unmultiplied(
+            [self.width as usize, self.height as usize],
+            rgba,
+        );
+
+        match self.texture.as_mut() {
+            Some(handle) => handle.set(image, TextureOptions::default()),
+            None => {
+                self.texture = Some(ctx.load_texture(
+                    "holon_frame",
+                    image,
+                    TextureOptions::default(),
+                ));
+            }
+        }
+    }
+}
+
+#[cfg(feature = "holon-viewer")]
+impl eframe::App for HolonViewerApp {
+    fn update(&mut self, ctx: &eframe::egui::Context, _frame: &mut eframe::Frame) {
+        use eframe::egui;
+
+        // Detect new frames and refresh the texture.
+        if self.viewer.frames_received != self.last_frames_seen {
+            self.last_frames_seen = self.viewer.frames_received;
+            self.refresh_texture(ctx);
+        }
+
+        egui::TopBottomPanel::top("top").show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                ui.heading("Holon RDP Viewer");
+                ui.separator();
+                ui.label(format!(
+                    "{}×{} · frames={}",
+                    self.width, self.height, self.viewer.frames_received
+                ));
+                if ui.button("Load test pattern").clicked() {
+                    self.load_test_pattern();
+                }
+            });
+            ui.label(&self.status);
+        });
+
+        egui::CentralPanel::default().show(ctx, |ui| {
+            match self.texture.as_ref() {
+                Some(texture) => {
+                    // Fit the phone-resolution texture into the available
+                    // panel by preserving aspect ratio.
+                    let available = ui.available_size();
+                    let aspect = self.width as f32 / self.height as f32;
+                    let w = available.x.min(available.y * aspect);
+                    let h = w / aspect;
+                    ui.image((texture.id(), egui::vec2(w, h)));
+                }
+                None => {
+                    ui.vertical_centered(|ui| {
+                        ui.add_space(20.0);
+                        ui.label("(no frame received yet — click 'Load test pattern')");
+                    });
+                }
+            }
+        });
+    }
 }
