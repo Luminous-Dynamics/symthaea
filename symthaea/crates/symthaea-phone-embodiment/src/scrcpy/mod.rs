@@ -2,17 +2,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! scrcpy-server lifecycle + binary framing parser + HEVC decode.
 //!
-//! This module is gated behind the `scrcpy` feature. It owns the full
-//! lifecycle of a scrcpy-server v2.4 instance running on the device:
+//! This module is gated behind the `scrcpy` feature.
+//!
+//! Submodules:
+//! - [`wire`] — pure binary-framing parser for scrcpy v2.4's wire protocol
+//!   (device meta, video header, per-frame headers). No I/O — operates on
+//!   `&[u8]` slices so it can be tested with handcrafted byte sequences.
+//!
+//! `mod.rs` itself owns the lifecycle layer:
 //!
 //! 1. **SHA-verified push** of the vendored JAR to `/data/local/tmp`
 //! 2. **`adb reverse` tunnel** binding `localabstract:scrcpy` to a host TCP port
 //! 3. **`app_process` spawn** of the server with the v1.4-decided codec
 //!    (HEVC via `c2.exynos.hevc.encoder` — the Pixel 8 Pro hardware encoder)
 //! 4. **Drop-based cleanup** of both the server process and the reverse tunnel
-//!
-//! The binary framing parser (Phase I.B.3) and HEVC decoder (Phase I.B.3)
-//! land in this same module — see `ScrcpyStream` below.
 //!
 //! # Codec decision
 //!
@@ -21,6 +24,8 @@
 //! H.264 and HEVC. AV1 is software-only on this device, which is untenable
 //! at 30 fps. HEVC HW gives ~50% better compression than H.264 — close
 //! enough to AV1's 30-40% that the USB 2.0 budget relief survives.
+
+pub mod wire;
 
 use std::io;
 use std::path::{Path, PathBuf};
