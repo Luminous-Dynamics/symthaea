@@ -506,6 +506,22 @@ pub use symthaea_manipulator as manipulator;
 #[cfg(feature = "auv")]
 pub use symthaea_auv as auv;
 
+// Exoskeleton: wearable consciousness-coupled assistive device
+#[cfg(feature = "exoskeleton")]
+pub use symthaea_exoskeleton as exoskeleton;
+
+// Surgical: highest-stakes consciousness-coupled surgical robot
+#[cfg(feature = "surgical")]
+pub use symthaea_surgical as surgical;
+
+// Quadruped: legged locomotion with phi-gated gait selection
+#[cfg(feature = "quadruped")]
+pub use symthaea_quadruped as quadruped;
+
+// Orbital: spacecraft with NASA-standard safe-mode fallback
+#[cfg(feature = "orbital")]
+pub use symthaea_orbital as orbital;
+
 // Meta: Self-analysis, code quality metrics, active inference exploration, dream synthesis
 #[cfg(feature = "code_generation")]
 pub mod meta;
@@ -542,6 +558,11 @@ pub mod knowledge;
 // Dual-mode: subprocess z3 binary (SMTLIB2) when available, internal DPLL fallback always.
 // Domain-specific verifiers for ODE solutions, Einstein condition, CSP solutions.
 pub mod z3_bridge;
+
+// Phase 5: Curriculum generator with Z3-verified lemmas. Generates formal
+// lemma statements from the IMO curriculum and verifies them via z3_bridge.
+// JSON-persisted catalog for human inspection + downstream proof-checker reuse.
+pub mod curriculum_generator;
 
 // Proof State: goal trees, tactic engine, proof search (Phase 5 math plan)
 // ProofTree struct with goal stack, tactic application, backtracking search.

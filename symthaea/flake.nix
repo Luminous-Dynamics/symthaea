@@ -112,6 +112,12 @@
           # Note: ort crate uses load-dynamic, so we need the shared lib
           onnxruntime
 
+          # Z3 SMT solver — z3_bridge.rs spawns this binary for formal
+          # verification of curriculum lemmas (Phase 5). Falls back to
+          # internal DPLL if not present, so listing this here makes
+          # the full Phase 5 verification path available in the dev shell.
+          z3
+
           # MuJoCo 3.3.7 physics engine (for symthaea-flight mujoco feature)
           mujoco337
           glfw
