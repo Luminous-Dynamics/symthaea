@@ -32,6 +32,12 @@ pub mod bridge;
 pub mod actions;
 pub mod task;
 
+/// scrcpy-server lifecycle, binary framing, HEVC decode.
+/// Gated behind the `scrcpy` feature; requires `nix develop` with ffmpeg
+/// for the first build (HEVC decoder via `ffmpeg-next`/pkg-config).
+#[cfg(feature = "scrcpy")]
+pub mod scrcpy;
+
 pub use actions::PhoneAction;
 pub use bridge::PhoneBridge;
 pub use task::{Task, TaskStep, StepTarget, StepAction};
