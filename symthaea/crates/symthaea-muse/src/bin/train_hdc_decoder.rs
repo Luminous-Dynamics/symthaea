@@ -43,6 +43,9 @@ struct Args {
     lr: f32,
     max_files: Option<usize>,
     log_every: usize,
+    /// Half-window for temporal context. 0 = no context (17D input),
+    /// 2 = 5-frame window (85D input), etc.
+    context: usize,
 }
 
 fn parse_args() -> Args {
@@ -59,6 +62,7 @@ fn parse_args() -> Args {
     let mut lr = 1e-3;
     let mut max_files = None;
     let mut log_every = 50_000;
+    let mut context = 0usize;
 
     let mut i = 0;
     while i < args.len() {
@@ -68,11 +72,26 @@ fn parse_args() -> Args {
             "--lr" => { lr = args[i+1].parse().unwrap(); i += 2; }
             "--max-files" => { max_files = Some(args[i+1].parse().unwrap()); i += 2; }
             "--log-every" => { log_every = args[i+1].parse().unwrap(); i += 2; }
+            "--context" => { context = args[i+1].parse().unwrap(); i += 2; }
             other => { eprintln!("Unknown arg: {other}"); std::process::exit(1); }
         }
     }
 
-    Args { pairs_dir, ckpt_path, epochs, hidden, lr, max_files, log_every }
+    Args { pairs_dir, ckpt_path, epochs, hidden, lr, max_files, log_every, context }
+}
+
+/// Build a temporal-context input vector: concatenate normalized states
+/// from [t - ctx ..= t + ctx]. Frames outside the file clamp to the nearest
+/// valid frame (replicate-boundary, standard for time-series).
+fn build_context_input(states: &[[f32; 17]], t: usize, ctx: usize) -> Vec<f32> {
+    let window = 2 * ctx + 1;
+    let mut out = Vec::with_capacity(window * 17);
+    for k in 0..window {
+        let idx = (t as isize + k as isize - ctx as isize)
+            .clamp(0, states.len() as isize - 1) as usize;
+        out.extend_from_slice(&normalize_state(&states[idx]));
+    }
+    out
 }
 
 fn find_bin_files(dir: &Path) -> Vec<PathBuf> {
@@ -129,7 +148,10 @@ fn main() {
     // Probe the first file to get mel_dim
     let (probe_states, probe_mels) = load_pairs(&train_files[0]).expect("load first file");
     let n_mels = probe_mels[0].len();
-    let state_dim = probe_states[0].len();
+    let base_state_dim = probe_states[0].len();
+    let context_window = 2 * args.context + 1;
+    let state_dim = base_state_dim * context_window;
+    println!("  base_state: {}  context_half: {}  window: {}", base_state_dim, args.context, context_window);
     println!("  state_dim:  {}", state_dim);
     println!("  n_mels:     {}", n_mels);
 
@@ -190,8 +212,8 @@ fn main() {
             }
 
             for &i in &idx {
-                let normalized = normalize_state(&states[i]);
-                let loss = decoder.step(&normalized, &mels[i]);
+                let input = build_context_input(&states, i, args.context);
+                let loss = decoder.step(&input, &mels[i]);
                 window_loss += loss;
                 window_count += 1;
                 global_step += 1;
@@ -214,9 +236,9 @@ fn main() {
         let mut val_count = 0usize;
         for vpath in &val_files {
             if let Ok((vs, vm)) = load_pairs(vpath) {
-                for (s, m) in vs.iter().zip(vm.iter()) {
-                    let normalized = normalize_state(s);
-                    let pred = decoder.predict(&normalized);
+                for (i, m) in vm.iter().enumerate() {
+                    let input = build_context_input(&vs, i, args.context);
+                    let pred = decoder.predict(&input);
                     let mut e = 0.0;
                     for j in 0..n_mels {
                         let d = pred[j] - m[j];
