@@ -184,6 +184,25 @@ impl CurriculumProblem {
             }
         }
     }
+
+    /// Return the canonical closed-form answer for problems whose
+    /// answer is a textual description (currently: functional
+    /// equations). Returns `None` for problem kinds whose answer is
+    /// expressed as numbers or booleans inside the `solve()` boolean
+    /// (those are validated by `solve()` returning true, not by an
+    /// answer string).
+    ///
+    /// Downstream consumers (paper writeups, the conjecture engine,
+    /// curriculum reports) use this to display the actual closed form
+    /// produced by the IMO solver instead of the bare success bit.
+    pub fn canonical_answer(&self) -> Option<String> {
+        match &self.kind {
+            ProblemKind::FunctionalEquationFindAll { kind } => {
+                Some(kind.canonical_form().to_string())
+            }
+            _ => None,
+        }
+    }
 }
 
 // ─── Generators ─────────────────────────────────────────────────────────────

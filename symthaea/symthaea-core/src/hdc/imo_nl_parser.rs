@@ -723,34 +723,86 @@ fn template_bezout(text: &str) -> Option<CurriculumProblem> {
 /// substrings rather than a full parse — IMO functional-equation problems
 /// almost always cite the equation verbatim, so substring matching is
 /// reliable for the canonical five families.
-fn template_functional_equation(text: &str) -> Option<CurriculumProblem> {
+/// Canonical variable names commonly used in IMO functional-equation
+/// problems. The detector iterates over all ordered pairs of distinct
+/// letters from this set so that "f(a+b) = f(a) + f(b)" matches just
+/// as well as "f(x+y) = f(x) + f(y)".
+const FE_VAR_LETTERS: &[char] = &['x', 'y', 'a', 'b', 'u', 'v', 'm', 'n', 's', 't', 'p', 'q'];
+
+/// Build the substring patterns for one canonical functional equation
+/// specialized to a particular pair of variable letters.
+fn fe_pattern_pair(v1: char, v2: char, op_lhs: char, op_rhs: char) -> (String, String) {
+    let lhs = format!("f({}{}{})", v1, op_lhs, v2);
+    let rhs = format!("f({}){}f({})", v1, op_rhs, v2);
+    (lhs, rhs)
+}
+
+/// Check whether `canon` contains a `lhs=rhs` pattern for any pair of
+/// distinct variable letters from `FE_VAR_LETTERS`.
+fn fe_canon_has_law(canon: &str, op_lhs: char, op_rhs: char) -> bool {
+    for &v1 in FE_VAR_LETTERS {
+        for &v2 in FE_VAR_LETTERS {
+            if v1 == v2 {
+                continue;
+            }
+            let (lhs, rhs) = fe_pattern_pair(v1, v2, op_lhs, op_rhs);
+            if canon.contains(&lhs) && canon.contains(&rhs) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Check whether `canon` contains an involution pattern `f(f(x)) = x`
+/// for any single variable letter.
+fn fe_canon_has_involution(canon: &str) -> bool {
+    for &v in FE_VAR_LETTERS {
+        let pat = format!("f(f({}))={}", v, v);
+        if canon.contains(&pat) {
+            return true;
+        }
+    }
+    false
+}
+
+pub fn template_functional_equation(text: &str) -> Option<CurriculumProblem> {
     use crate::hdc::functional_equations::EquationKind;
     let lower = text.to_ascii_lowercase();
     // Canonicalize the math: collapse "·" / " times " / juxtaposition
     // to "*", strip ALL whitespace so "f(x) + f(y)" matches "f(x)+f(y)",
-    // and normalize the "f(xy)" shorthand to "f(x*y)".
-    let mut canon: String = lower
-        .replace("·", "*")
-        .replace(" times ", "*")
-        .replace("f(xy)", "f(x*y)")
-        .replace("f(yx)", "f(x*y)");
+    // and normalize the "f(xy)" shorthand to "f(x*y)" for every variable
+    // pair (e.g. "f(ab)" → "f(a*b)").
+    let mut canon: String = lower.replace("·", "*").replace(" times ", "*");
     canon.retain(|c| !c.is_whitespace());
-    // After whitespace removal, juxtaposed `f(x)f(y)` becomes
-    // `f(x)f(y)` (already collapsed) — make multiplication explicit.
-    let canon = canon
-        .replace("f(x)f(y)", "f(x)*f(y)")
-        .replace("f(y)f(x)", "f(x)*f(y)");
+    // Generate "f(xy)" → "f(x*y)" replacements for every (v1,v2) pair
+    // and "f(x)f(y)" → "f(x)*f(y)" for every pair (juxtaposition is
+    // multiplication in math notation).
+    for &v1 in FE_VAR_LETTERS {
+        for &v2 in FE_VAR_LETTERS {
+            if v1 == v2 {
+                continue;
+            }
+            let juxt_arg = format!("f({}{})", v1, v2);
+            let mul_arg = format!("f({}*{})", v1, v2);
+            canon = canon.replace(&juxt_arg, &mul_arg);
+            let juxt_call = format!("f({})f({})", v1, v2);
+            let mul_call = format!("f({})*f({})", v1, v2);
+            canon = canon.replace(&juxt_call, &mul_call);
+        }
+    }
     // Detect by ordered priority: exponential before Cauchy because
     // exponential's RHS is a product of two `f(_)` calls (more specific).
-    let kind = if canon.contains("f(x+y)") && canon.contains("f(x)*f(y)") {
+    // Each pattern is checked across all variable-pair specializations.
+    let kind = if fe_canon_has_law(&canon, '+', '*') {
         EquationKind::Exponential
-    } else if canon.contains("f(x*y)") && canon.contains("f(x)+f(y)") {
+    } else if fe_canon_has_law(&canon, '*', '+') {
         EquationKind::Logarithmic
-    } else if canon.contains("f(x*y)") && canon.contains("f(x)*f(y)") {
+    } else if fe_canon_has_law(&canon, '*', '*') {
         EquationKind::Multiplicative
-    } else if canon.contains("f(x+y)") && canon.contains("f(x)+f(y)") {
+    } else if fe_canon_has_law(&canon, '+', '+') {
         EquationKind::CauchyAdditive
-    } else if canon.contains("f(f(x))") && canon.contains("=x") {
+    } else if fe_canon_has_involution(&canon) {
         EquationKind::Involution
     } else {
         return None;
@@ -1817,6 +1869,129 @@ mod tests {
     fn test_template_functional_equation_unrecognized_returns_none() {
         // No canonical form keyword present.
         assert!(template_functional_equation("Prove that 7 is prime.").is_none());
+    }
+
+    #[test]
+    fn test_template_functional_equation_alternate_variables() {
+        // Every IMO functional equation problem uses different variable
+        // letters. The detector must accept (a, b), (u, v), (m, n), etc.,
+        // not just (x, y).
+        use crate::hdc::functional_equations::EquationKind;
+        let cases: Vec<(&str, EquationKind)> = vec![
+            (
+                "Find all f: R → R such that f(a+b) = f(a) + f(b).",
+                EquationKind::CauchyAdditive,
+            ),
+            (
+                "Determine all functions f satisfying f(u+v) = f(u)f(v).",
+                EquationKind::Exponential,
+            ),
+            (
+                "Find all f with f(m*n) = f(m) + f(n) for positive m, n.",
+                EquationKind::Logarithmic,
+            ),
+            (
+                "Find all f: R → R such that f(s*t) = f(s)f(t).",
+                EquationKind::Multiplicative,
+            ),
+            (
+                "Find all f satisfying f(f(p)) = p for every real p.",
+                EquationKind::Involution,
+            ),
+        ];
+        for (text, expected) in cases {
+            let parsed = template_functional_equation(text)
+                .unwrap_or_else(|| panic!("alt-var text should match: {}", text));
+            match parsed.kind {
+                ProblemKind::FunctionalEquationFindAll { kind } => {
+                    assert_eq!(
+                        kind, expected,
+                        "wrong kind for text {:?}: got {:?}, expected {:?}",
+                        text, kind, expected
+                    );
+                }
+                _ => panic!("wrong ProblemKind for {}", text),
+            }
+        }
+    }
+
+    #[test]
+    fn test_canonical_answer_returns_form_string() {
+        // Phase 3C accessor: solve() returns true AND canonical_answer()
+        // returns a non-empty form string for functional equation problems.
+        let parsed = template_functional_equation(
+            "Find all functions f: R → R such that f(x+y) = f(x) + f(y).",
+        )
+        .expect("Cauchy form should match");
+        assert!(parsed.solve());
+        let answer = parsed.canonical_answer().expect("canonical answer present");
+        assert!(answer.contains("c"), "answer should mention constant c, got: {}", answer);
+        // A non-functional-equation problem returns None
+        let pell = template_pell("Show that x² − 13y² = 1 has a solution.")
+            .expect("Pell template should match");
+        assert!(pell.canonical_answer().is_none());
+    }
+
+    #[test]
+    fn test_functional_equation_hard_paraphrases() {
+        // Robustness sweep: 8 deliberately non-canonical phrasings. The
+        // detector must still route each to the correct EquationKind.
+        // This is the functional-equation analogue of
+        // test_hybrid_classifier_hard_paraphrases.
+        use crate::hdc::functional_equations::EquationKind;
+        let cases: Vec<(&str, EquationKind)> = vec![
+            (
+                "Determine every continuous f: R → R for which f(a+b) = f(a) + f(b) on all real a, b.",
+                EquationKind::CauchyAdditive,
+            ),
+            (
+                "Show that any function satisfying f(u+v) = f(u)*f(v) must be exponential.",
+                EquationKind::Exponential,
+            ),
+            (
+                "Identify all f: R → R obeying the relation f(x*y) = f(x)*f(y) on positive reals.",
+                EquationKind::Multiplicative,
+            ),
+            (
+                "Classify the functions f satisfying f(p*q) = f(p) + f(q) for positive p, q.",
+                EquationKind::Logarithmic,
+            ),
+            (
+                "Prove or disprove: the only continuous functions with f(f(s)) = s are involutions.",
+                EquationKind::Involution,
+            ),
+            (
+                "Find every f for which f(m+n) is exactly f(m) + f(n).",
+                EquationKind::CauchyAdditive,
+            ),
+            (
+                "Suppose f: R → R satisfies f(u*v) = f(u)*f(v). Determine f.",
+                EquationKind::Multiplicative,
+            ),
+            (
+                "Find all f with f(f(t)) = t.",
+                EquationKind::Involution,
+            ),
+        ];
+        let mut hits = 0usize;
+        let total = cases.len();
+        for (text, expected) in &cases {
+            match template_functional_equation(text) {
+                Some(p) => match p.kind {
+                    ProblemKind::FunctionalEquationFindAll { kind } if kind == *expected => {
+                        hits += 1;
+                    }
+                    other => eprintln!("  ✗ {} → {:?} (expected {:?})", text, other, expected),
+                },
+                None => eprintln!("  ✗ {} → no match", text),
+            }
+        }
+        assert!(
+            hits == total,
+            "functional equation hard paraphrases: {}/{} routed correctly",
+            hits,
+            total
+        );
     }
 
     #[test]

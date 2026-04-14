@@ -382,6 +382,111 @@ pub fn problem_10_schur_numerical() -> (BenchProblem, BenchResult) {
     }
 }
 
+// ─── Problems 11-14: Functional equations (Phase 3C) ────────────────────────
+//
+// Each problem feeds a natural-language statement through
+// `template_functional_equation` (the parser-level detector for the IMO NL
+// pipeline) and verifies that the resulting `CurriculumProblem`
+//
+//   1. has the expected `EquationKind`,
+//   2. solves to true via the curriculum dispatch, and
+//   3. produces a non-empty canonical_answer() string.
+//
+// This is the end-to-end existence proof for Phase 3C: NL text → cascade
+// detector → tactic-grade problem → solved + answer formatted.
+
+fn fe_solve_check(
+    name: &'static str,
+    difficulty: Difficulty,
+    description: &'static str,
+    text: &str,
+    expected_kind: crate::hdc::functional_equations::EquationKind,
+) -> (BenchProblem, BenchResult) {
+    use crate::hdc::curriculum::ProblemKind;
+    use crate::hdc::imo_nl_parser::template_functional_equation;
+    let p = BenchProblem {
+        name,
+        difficulty,
+        domain: "Functional Equations",
+        description,
+    };
+    let parsed = match template_functional_equation(text) {
+        Some(q) => q,
+        None => {
+            return (
+                p,
+                BenchResult::Unsolved(format!("template did not match: \"{}\"", text)),
+            );
+        }
+    };
+    match &parsed.kind {
+        ProblemKind::FunctionalEquationFindAll { kind } if *kind == expected_kind => {}
+        ProblemKind::FunctionalEquationFindAll { kind } => {
+            return (
+                p,
+                BenchResult::Unsolved(format!("expected {:?}, got {:?}", expected_kind, kind)),
+            );
+        }
+        other => {
+            return (
+                p,
+                BenchResult::Unsolved(format!("wrong ProblemKind: {:?}", other)),
+            );
+        }
+    }
+    if !parsed.solve() {
+        return (p, BenchResult::Unsolved("solve() returned false".into()));
+    }
+    match parsed.canonical_answer() {
+        Some(ans) if !ans.is_empty() => (p, BenchResult::Solved),
+        _ => (p, BenchResult::Unsolved("no canonical_answer".into())),
+    }
+}
+
+pub fn problem_11_cauchy_additive() -> (BenchProblem, BenchResult) {
+    use crate::hdc::functional_equations::EquationKind;
+    fe_solve_check(
+        "Cauchy additive (continuous case)",
+        Difficulty::Trivial,
+        "Find all f: R → R with f(x+y) = f(x) + f(y).",
+        "Find all functions f: R → R such that f(x+y) = f(x) + f(y) for all real x, y.",
+        EquationKind::CauchyAdditive,
+    )
+}
+
+pub fn problem_12_multiplicative() -> (BenchProblem, BenchResult) {
+    use crate::hdc::functional_equations::EquationKind;
+    fe_solve_check(
+        "Multiplicative on positives",
+        Difficulty::Easy,
+        "Find all f: R → R with f(xy) = f(x)f(y) for positive reals.",
+        "Find all functions f: R → R such that f(xy) = f(x)f(y) for all positive x, y.",
+        EquationKind::Multiplicative,
+    )
+}
+
+pub fn problem_13_exponential_paraphrased() -> (BenchProblem, BenchResult) {
+    use crate::hdc::functional_equations::EquationKind;
+    fe_solve_check(
+        "Exponential law (alternate variables)",
+        Difficulty::Medium,
+        "Determine all f satisfying f(a+b) = f(a)f(b) — uses (a, b) instead of (x, y).",
+        "Determine all functions f satisfying f(a+b) = f(a)f(b) for every real a, b.",
+        EquationKind::Exponential,
+    )
+}
+
+pub fn problem_14_involution_paraphrased() -> (BenchProblem, BenchResult) {
+    use crate::hdc::functional_equations::EquationKind;
+    fe_solve_check(
+        "Involution (alternate variable)",
+        Difficulty::Hard,
+        "Find all f with f(f(t)) = t — uses t instead of x.",
+        "Find all functions f: R → R such that f(f(t)) = t for every real t.",
+        EquationKind::Involution,
+    )
+}
+
 // ─── The benchmark runner ───────────────────────────────────────────────────
 
 pub fn run_benchmark() -> Vec<(BenchProblem, BenchResult)> {
@@ -396,6 +501,10 @@ pub fn run_benchmark() -> Vec<(BenchProblem, BenchResult)> {
         problem_08_chip_firing(),
         problem_09_triangle_centers(),
         problem_10_schur_numerical(),
+        problem_11_cauchy_additive(),
+        problem_12_multiplicative(),
+        problem_13_exponential_paraphrased(),
+        problem_14_involution_paraphrased(),
     ]
 }
 
@@ -415,7 +524,7 @@ mod tests {
 
         eprintln!("\n════════════════════════════════════════════════════════════");
         eprintln!("  IMO BENCHMARK — WHAT CAN THE PRIMITIVE LIBRARY SOLVE?");
-        eprintln!("  {} problems across 4 difficulty tiers × 4 domains", results.len());
+        eprintln!("  {} problems across 4 difficulty tiers × 5 domains", results.len());
         eprintln!("════════════════════════════════════════════════════════════");
 
         let mut by_difficulty: std::collections::HashMap<Difficulty, (usize, usize)> =
@@ -491,12 +600,34 @@ mod tests {
         // Sanity check: every problem runs to a definite result, no
         // panics or infinite loops.
         let results = run_benchmark();
-        assert_eq!(results.len(), 10);
+        assert_eq!(results.len(), 14);
         for (prob, res) in &results {
             assert!(
                 matches!(res, BenchResult::Solved | BenchResult::Unsolved(_)),
                 "problem {} returned unexpected result",
                 prob.name
+            );
+        }
+    }
+
+    /// Phase 3C-specific assertion: all four functional equation
+    /// problems must solve. This is the falsification test for the
+    /// new domain — if any of them fails, either the parser detector
+    /// regressed or the curriculum dispatch broke.
+    #[test]
+    fn test_benchmark_functional_equation_domain_all_solved() {
+        let results = run_benchmark();
+        let fe: Vec<_> = results
+            .iter()
+            .filter(|(p, _)| p.domain == "Functional Equations")
+            .collect();
+        assert_eq!(fe.len(), 4, "expected 4 functional equation problems");
+        for (prob, res) in &fe {
+            assert!(
+                res.is_solved(),
+                "functional equation problem '{}' failed: {:?}",
+                prob.name,
+                res
             );
         }
     }
