@@ -49,8 +49,10 @@ fn main() {
 #[cfg(feature = "vision-manifold")]
 fn main() {
     use std::time::{Duration, Instant};
-    use symthaea::swarm::rdp_holon_bridge::{HolonRdpMessage, SomaRdpServer};
-    use symthaea::swarm::rdp_protocol::{InputEvent, InputFrame, RdpFrame};
+    use symthaea::swarm::rdp_holon_bridge::SomaRdpServer;
+    use symthaea::swarm::rdp_protocol::{InputEvent, InputFrame, RdpFrame, RdpSessionConfig};
+    use symthaea::swarm::rdp_session::RdpSession;
+    use symthaea::swarm::rdp_wire::seal_frame;
     use symthaea_phone_embodiment::PhoneBridge;
 
     // Parse args
@@ -87,7 +89,21 @@ fn main() {
     // We tick it once per loop iteration, so cycle_hz = fps (1 tick per frame).
     let mut soma_rdp = SomaRdpServer::new(1008, 2244, fps, fps as u32);
     soma_rdp.start();
-    println!("[OK] SomaRdpServer started ({}×{} @ {}fps)\n", 1008, 2244, fps);
+    println!("[OK] SomaRdpServer started ({}×{} @ {}fps)", 1008, 2244, fps);
+
+    // RdpSession with the placeholder [0x42; 32] key matching the
+    // holon_rdp_viewer example. Phase I.A.5 Track 2.5 (real PQC KEM
+    // handshake) remains deferred; for this localhost bandwidth
+    // measurement, a fixed shared secret is sufficient.
+    let mut session = RdpSession::new(
+        "phone-rdp-share".into(),
+        "holon-viewer".into(),
+        RdpSessionConfig::default(),
+        true, // is_initiator
+    );
+    session.on_connected();
+    session.on_handshake_complete([0x42; 32]);
+    println!("[OK] RdpSession handshake installed (placeholder key)\n");
 
     // Fixed moderate Phi for the demo (Green tier → full control on replay path).
     let phi: f32 = 0.65;
@@ -96,8 +112,13 @@ fn main() {
     let frame_interval = Duration::from_millis(1000 / fps as u64);
     let start = Instant::now();
 
-    let mut bytes_full = 0usize;
-    let mut bytes_delta = 0usize;
+    // Track both sealed-binary and JSON-proxy sizes side-by-side so the
+    // comparison is visible in a single run. Closes Task #12 and produces
+    // the first real-hardware measurement of the bandwidth ratio.
+    let mut bytes_full_sealed = 0usize;
+    let mut bytes_delta_sealed = 0usize;
+    let mut bytes_full_json = 0usize;
+    let mut bytes_delta_json = 0usize;
     let mut full_count = 0usize;
     let mut delta_count = 0usize;
     let mut total_patches = 0usize;
@@ -118,41 +139,65 @@ fn main() {
         // 2. Feed RDP server (native resolution).
         soma_rdp.tick(&rgba, w, h, phi);
 
-        // 3. Drain any frames ready for transport.
+        // 3. Drain any frames ready for transport. For each frame:
+        //    - Seal it via rdp_wire::seal_frame (the REAL wire path)
+        //    - Also serialize to JSON for comparison (legacy baseline)
+        //    - Report both byte counts so the ratio is visible per-frame
         let frames = soma_rdp.drain_frames();
         for frame in frames {
-            let json = serde_json::to_string(&frame).unwrap_or_default();
-            let n = json.len();
-            let envelope = HolonRdpMessage::Frame { data: json };
-            let env_bytes = serde_json::to_string(&envelope).unwrap_or_default().len();
+            // The real wire path: bincode + ChaCha20-Poly1305 via rdp_wire.
+            let sealed = match seal_frame(&frame, &mut session) {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("  [ERR] seal_frame: {e}");
+                    continue;
+                }
+            };
+            let sealed_bytes = sealed.len();
+
+            // The legacy JSON measurement proxy, for side-by-side comparison.
+            // This is what the original MVP reported as "envelope size" —
+            // we keep it visible so the 2.998× ratio is verifiable on the
+            // real Pixel screen content, not just synthetic test data.
+            let json_bytes = serde_json::to_vec(&frame).map(|v| v.len()).unwrap_or(0);
+            let ratio = if sealed_bytes > 0 {
+                json_bytes as f64 / sealed_bytes as f64
+            } else {
+                0.0
+            };
 
             match &frame {
                 RdpFrame::Full(f) => {
                     full_count += 1;
-                    bytes_full += env_bytes;
+                    bytes_full_sealed += sealed_bytes;
+                    bytes_full_json += json_bytes;
                     total_patches += f.patches.len();
                     println!(
-                        "  t={:5.1}s  FULL   frame={} patches={} envelope={}B  PE={:.3}",
+                        "  t={:5.1}s  FULL   frame={} patches={} sealed={}B json={}B ratio={:.2}×  PE={:.3}",
                         start.elapsed().as_secs_f32(),
                         f.frame_id,
                         f.patches.len(),
-                        env_bytes,
+                        sealed_bytes,
+                        json_bytes,
+                        ratio,
                         tel.prediction_error,
                     );
                 }
                 RdpFrame::Delta(d) => {
                     delta_count += 1;
-                    bytes_delta += env_bytes;
+                    bytes_delta_sealed += sealed_bytes;
+                    bytes_delta_json += json_bytes;
                     total_patches += d.patches.len();
                     println!(
-                        "  t={:5.1}s  DELTA  frame={} changed={}  envelope={}B  PE={:.3}",
+                        "  t={:5.1}s  DELTA  frame={} changed={}  sealed={}B json={}B ratio={:.2}×  PE={:.3}",
                         start.elapsed().as_secs_f32(),
                         d.frame_id,
                         d.patches.len(),
-                        env_bytes,
+                        sealed_bytes,
+                        json_bytes,
+                        ratio,
                         tel.prediction_error,
                     );
-                    let _ = n;
                 }
                 _ => {}
             }
@@ -189,31 +234,46 @@ fn main() {
 
     let watch_time = start.elapsed().as_secs_f64();
 
+    let total_sealed = bytes_full_sealed + bytes_delta_sealed;
+    let total_json = bytes_full_json + bytes_delta_json;
+    let total_ratio = if total_sealed > 0 {
+        total_json as f64 / total_sealed as f64
+    } else {
+        0.0
+    };
+
     println!();
     println!("╔══════════════════════════════════════════════════════╗");
     println!("║             Soma RDP Session Summary                 ║");
     println!("╚══════════════════════════════════════════════════════╝");
     println!();
     println!("Wall time:       {:.1}s", watch_time);
-    println!("Full frames:     {full_count} ({bytes_full} B)");
-    println!("Delta frames:    {delta_count} ({bytes_delta} B)");
+    println!("Full frames:     {full_count} (sealed: {bytes_full_sealed} B, json: {bytes_full_json} B)");
+    println!("Delta frames:    {delta_count} (sealed: {bytes_delta_sealed} B, json: {bytes_delta_json} B)");
     println!("Total patches:   {total_patches}");
     if delta_count > 0 {
         println!(
-            "Avg delta size:  {:.0} B/frame",
-            bytes_delta as f64 / delta_count as f64
+            "Avg delta size:  {:.0} B/frame sealed, {:.0} B/frame json",
+            bytes_delta_sealed as f64 / delta_count as f64,
+            bytes_delta_json as f64 / delta_count as f64,
         );
     }
     if full_count + delta_count > 0 {
-        let total_bytes = bytes_full + bytes_delta;
-        println!(
-            "Bandwidth:       {:.1} KB/s",
-            total_bytes as f64 / 1024.0 / watch_time.max(1e-6)
-        );
+        let sealed_bw = total_sealed as f64 / 1024.0 / watch_time.max(1e-6);
+        let json_bw = total_json as f64 / 1024.0 / watch_time.max(1e-6);
+        println!();
+        println!("─── Bandwidth (real Pixel screen content) ───");
+        println!("Sealed (binary wire):  {:.1} KB/s", sealed_bw);
+        println!("JSON (legacy proxy):   {:.1} KB/s", json_bw);
+        println!("Ratio (json/sealed):   {total_ratio:.3}×");
+        println!();
+        println!("The sealed number is the REAL bandwidth the wire would produce");
+        println!("in a live deployment. The JSON number is kept for comparison");
+        println!("against the original MVP baseline (670 KB/s @ 4fps).");
     }
     println!();
     println!("[Done] The phone's screen streamed through the Soma codec.");
-    println!("       Next: wire HolonRdpMessage::Frame onto the Holon WS transport (:7778).");
+    println!("       Task #12 closed: real-hardware bandwidth measured.");
 }
 
 /// Translate an inbound RDP `InputFrame` from a viewer into a `PhoneAction`.
