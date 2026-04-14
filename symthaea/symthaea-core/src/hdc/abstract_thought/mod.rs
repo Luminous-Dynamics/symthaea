@@ -305,14 +305,44 @@ fn extract_subtrees_inner(
     }
 }
 
-/// Normalize an expression by replacing all constants with 1.0.
+/// Normalize an expression by replacing all constants with 1.0 — **except**
+/// exponents of `Pow` nodes, which are structural, not coefficients.
 ///
 /// This captures the *structural shape* of a formula independent of specific
 /// constant values, enabling structural pattern matching across conjectures.
+///
+/// ## Why `Pow` exponents are special
+///
+/// A literal `Pow(Var, Const(2))` represents a quadratic shape;
+/// `Pow(Var, Const(3))` represents a cubic shape. Collapsing both to
+/// `Pow(Var, Const(1))` (which evaluates to the plain Var) destroys the
+/// fundamental distinction between power-law classes. This was the root
+/// cause of the Stage 1 curriculum-transfer failure: the macro extracted
+/// from `1/sqrt(n² + 1)` got canonicalized to `1/sqrt((n^1) + 1)` which
+/// evaluates to `1/sqrt(n + 1)` — a linear-inside-sqrt shape, completely
+/// different from the quadratic distance kernel. When re-seeded into
+/// the GP, the mutation loop had to guess the right exponent from
+/// scratch, effectively making the macro worse than useless.
+///
+/// With this fix, `Pow(Var, Const(k))` preserves `k` literally. Additive
+/// and multiplicative constants (which ARE tunable parameters) still get
+/// normalized to 1.0 as before.
 pub fn normalize_expr(expr: &Expr) -> Expr {
     match expr {
         Expr::Var(name) => Expr::Var(name.clone()),
         Expr::Const(_) => Expr::Const(1.0),
+        Expr::BinOp(BinOp::Pow, base, exp) => {
+            // Preserve a literal constant exponent as-is. The base still
+            // normalizes recursively (a base of `2*n` still collapses to
+            // `1*n` so the underlying shape matches across queries).
+            // Non-constant exponents (e.g. `n^(1+k)`) recurse normally
+            // because they're genuinely structural holes, not fixed powers.
+            let new_exp: Expr = match exp.as_ref() {
+                Expr::Const(_) => (**exp).clone(),
+                _ => normalize_expr(exp),
+            };
+            Expr::BinOp(BinOp::Pow, Box::new(normalize_expr(base)), Box::new(new_exp))
+        }
         Expr::BinOp(op, l, r) => Expr::BinOp(
             *op,
             Box::new(normalize_expr(l)),
@@ -630,6 +660,65 @@ mod tests {
             },
             _ => panic!("Expected Func"),
         }
+    }
+
+    #[test]
+    fn test_normalize_preserves_pow_exponents() {
+        // Regression: `Pow(Var, Const(2))` must stay as `Pow(Var, Const(2))`,
+        // NOT become `Pow(Var, Const(1))`. The exponent is structural — it
+        // distinguishes linear from quadratic from cubic shapes — and
+        // collapsing it destroys the very generalization we want macros to
+        // carry. This test pins the fix from Move 13 in place.
+        let expr = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("n".to_string())),
+            Box::new(Expr::Const(2.0)),
+        );
+        let norm = normalize_expr(&expr);
+        match &norm {
+            Expr::BinOp(BinOp::Pow, base, exp) => {
+                assert!(matches!(base.as_ref(), Expr::Var(_)));
+                match exp.as_ref() {
+                    Expr::Const(c) => assert_eq!(*c, 2.0,
+                        "Pow exponent must be preserved; got {}", c),
+                    _ => panic!("Expected constant exponent"),
+                }
+            }
+            _ => panic!("Expected Pow BinOp, got {:?}", norm),
+        }
+    }
+
+    #[test]
+    fn test_normalize_preserves_distance_kernel_shape() {
+        // End-to-end shape preservation: `1 / sqrt(n² + 1)` should normalize
+        // to `1 / sqrt(n² + 1)` (Pow exponent preserved) rather than
+        // `1 / sqrt(n + 1)` (exponent collapsed to 1 = identity).
+        let expr = Expr::BinOp(
+            BinOp::Div,
+            Box::new(Expr::Const(1.0)),
+            Box::new(Expr::Func(
+                UnaryFn::Sqrt,
+                Box::new(Expr::BinOp(
+                    BinOp::Add,
+                    Box::new(Expr::BinOp(
+                        BinOp::Pow,
+                        Box::new(Expr::Var("n".to_string())),
+                        Box::new(Expr::Const(2.0)),
+                    )),
+                    Box::new(Expr::Const(1.0)),
+                )),
+            )),
+        );
+        let norm = normalize_expr(&expr);
+        // Evaluate at n=3: target is 1/sqrt(10) ≈ 0.316.
+        // If the exponent had been collapsed to 1, we'd get 1/sqrt(4) = 0.5.
+        let val = norm.eval(&[("n", 3.0)]);
+        assert!(
+            (val - 0.316227766).abs() < 1e-6,
+            "distance-kernel shape should evaluate to ~0.316 at n=3, got {} — \
+             indicates Pow exponent was collapsed to 1",
+            val
+        );
     }
 
     // ── Canonicalization tests ─────────────────────────────────────

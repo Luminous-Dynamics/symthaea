@@ -118,6 +118,30 @@ fn distance_kernel_1d_sequence(max_n: usize) -> ObservedSequence {
     ObservedSequence::new("distance_kernel_1d(n)", MathDomain::Physics, data)
 }
 
+/// STAGE 1 CURRICULUM TRANSFER TEST: unseen distance-kernel variant.
+///
+/// Target: `f(n) = 1 / sqrt(n² + 4)`. Same structural class as the Level 0
+/// training target `1 / sqrt(n² + 1)`, but with a different offset constant.
+/// The macro extracted from Level 0 has a generalized `n^placeholder` and
+/// (after constant tuning during GP) a placeholder offset — so an M₁-primed
+/// run should specialize it to the new constant faster than a cold run
+/// that has to assemble `sqrt(Add(Pow, Const))` from leaves.
+///
+/// Success criterion: `M₁_mse < cold_mse` by a meaningful margin. If the
+/// macro-primed run converges to the correct shape faster, curriculum
+/// transfer works for the distance-kernel class. If the two tie, the
+/// macro is present but not being meaningfully re-specialized (possible
+/// sign that the `n^1` canonicalization dropped the exponent information).
+fn distance_kernel_variant_sequence(max_n: usize) -> ObservedSequence {
+    let data: Vec<(f64, f64)> = (1..=max_n)
+        .map(|i| {
+            let n = i as f64;
+            (n, 1.0 / (n * n + 4.0).sqrt())
+        })
+        .collect();
+    ObservedSequence::new("distance_kernel_variant(n)", MathDomain::Physics, data)
+}
+
 /// Custom: damped exponential target. Exercises the `Exp` primitive —
 /// we want Level 1 to produce conjectures containing exp(k*n) subtrees
 /// so M₂ can potentially extract them.
@@ -419,10 +443,15 @@ fn main() {
 
     // Level 2 targets chosen to be structurally varied
     let level2_targets: Vec<(&str, ObservedSequence)> = vec![
-        ("Stefan-Boltzmann (P ∝ T^4)",      observe_stefan_boltzmann(15)),
-        ("Kepler 3rd law (T ∝ r^1.5)",      observe_kepler_third_law(15)),
-        ("Inverse square (F ∝ 1/r²)",       observe_inverse_square_law(20)),
-        ("Quantum HO (E = n + 1/2)",        observe_quantum_harmonic_oscillator(20)),
+        ("Stefan-Boltzmann (P ∝ T^4)",        observe_stefan_boltzmann(15)),
+        ("Kepler 3rd law (T ∝ r^1.5)",        observe_kepler_third_law(15)),
+        ("Inverse square (F ∝ 1/r²)",         observe_inverse_square_law(20)),
+        ("Quantum HO (E = n + 1/2)",          observe_quantum_harmonic_oscillator(20)),
+        // Stage 1 curriculum transfer probe: different-constant distance
+        // kernel. Cold should struggle to assemble `sqrt(Add(Pow, Const))`
+        // from leaves; M₁/M₂ should benefit from the promoted distance-
+        // kernel macros. Success = M₁_mse materially < cold_mse.
+        ("Distance kernel variant (1/√(n²+4))", distance_kernel_variant_sequence(20)),
     ];
 
     #[allow(clippy::type_complexity)]

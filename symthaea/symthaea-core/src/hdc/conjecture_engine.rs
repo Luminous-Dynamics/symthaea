@@ -692,6 +692,18 @@ impl SymbolicRegressor {
         // Inject learned macro-operators discovered across previous runs.
         // Each macro replaces a slot in the post-template region of the population.
         // Skipped entirely when `disable_macro_seeds` is set (cold benchmark mode).
+        //
+        // IMPORTANT: we seed the FIRST copy of each macro verbatim and apply
+        // mild mutation (depth ≥ 2) only to subsequent copies. The previous
+        // code called `template.mutate(&mut rng, 0)` on every slot, but
+        // `mutate(rng, 0)` has `p = 1/(1+0) = 1.0` → it ALWAYS replaces the
+        // entire tree with `random_expr(rng, 2)`. That meant the macro
+        // seeding was effectively "replace a population slot with a fresh
+        // small random expression" — the macro itself was never placed.
+        // Cold runs (which skip this loop and keep their template-library
+        // slots) actually got MORE informative seeds than macro-primed runs,
+        // which explains why the distance-kernel-variant curriculum-transfer
+        // test showed `cold_mse < M₁_mse` for a shape the macro should help.
         if !self.seed_macros.is_empty() && !self.config.disable_macro_seeds {
             let macro_seed_count = (self.config.population_size / 8).min(self.seed_macros.len() * 2);
             let macro_start = seed_count;
@@ -702,9 +714,18 @@ impl SymbolicRegressor {
                 }
                 self.rng = lcg_step(self.rng);
                 let macro_idx = self.rng as usize % self.seed_macros.len();
-                // Instantiate: mutate once to fill placeholder constants with random values
                 let template = &self.seed_macros[macro_idx];
-                self.population[slot] = template.mutate(&mut self.rng, 0);
+                // First |macros| slots: seed VERBATIM. The macro is an
+                // abstracted shape (possibly with canonicalized n^1
+                // placeholders), and the GP's per-generation mutation loop
+                // will re-specialize the exponents and constants via
+                // random subtree replacement. Subsequent slots get a mild
+                // mutation (depth 2 = 33% replace rate) to diversify.
+                self.population[slot] = if i < self.seed_macros.len() {
+                    template.clone()
+                } else {
+                    template.mutate(&mut self.rng, 2)
+                };
             }
         }
 
