@@ -1,6 +1,6 @@
 # Holon-Soma Roadmap
 
-**Version**: 1.4 (2026-04-14)
+**Version**: 1.5 (2026-04-14)
 **Scope**: The PQC-sealed binary RDP wire connecting a Symthaea cognitive
 loop to a physical embodiment (starting with the Pixel 8 Pro), and the
 research program that rides on top of it.
@@ -135,7 +135,63 @@ WS server on `:7778`, see the Pixel screen render in an egui window.
 Piece 3 would swap the `[0x42; 32]` placeholder for a real KEM-derived
 key — blocked on the broadcast-sealing restructure.
 
-### Phase I.B — Persistent capture 📋 NEXT (~6-10 hours)
+### Phase I.B — Persistent capture ✅ CLOSED (2026-04-14)
+
+**Status**: All 8 subtasks complete. 11 of 12 core claims **Proven**;
+1 claim (sustain ≥25.5 fps mean) **Asserted** with documented
+empirical ceiling of ~23 fps peak / ~16 fps mean on single-CPU HEVC
+software decode. Path to true 30 fps is GPU-accelerated decode,
+deferred to a future Phase I.D.
+
+**Worktree**: `.claude/worktrees/session-phase-1b-scrcpy`
+**Branch**: `worktree-session-phase-1b-scrcpy`
+**Verification doc**: `symthaea/docs/phase_1b_verification.md` (in
+worktree; will sync to main on merge)
+**Codec probe doc**: `symthaea/docs/phase_1b_codec_probe.md` (in
+worktree; the live probe that pivoted v1.3 AV1 → v1.4 HEVC)
+
+**Subtask completion log**:
+
+| Subtask | Commit (worktree) | Outcome |
+|---|---|---|
+| I.B.0 codec ladder probe | `b2bd2aaccd` | HW HEVC + H.264 confirmed; AV1 software-only on Android 16 → roadmap pivot |
+| I.B.1 vendor scrcpy-server v2.4 + SHA | `9135867d71` | 124 KB JAR, SHA pinned against upstream `SHA256SUMS.txt` |
+| I.B.2 lifecycle (push/start/reverse/drop) | `aa10625dca` | RAII `ScrcpyHandle` cleans up server child + reverse tunnel |
+| (flake) ffmpeg_7 + libclang + bindgen | `61e8a8031a` | Default dev shell now builds the `scrcpy` feature |
+| I.B.3a wire parser | `98942053ec` | 16 unit tests, pure data, no I/O |
+| I.B.3b ffmpeg-next HEVC decoder | `580df62e78` | Once-guarded init, lazy swscale cache, drain loop |
+| I.B.4a `ScrcpyCaptureStream` connector | `bf07f9df26` | End-to-end vertical, 6 unit tests |
+| I.B.4b `StreamingPhoneBridge` wrapper | `3e08637b29` | Send/Sync wrapper pattern, keeps `PhoneBridge` `EmbodimentBridge`-compatible |
+| I.B.5 recorded asset + offline test | `7496a7df61` | 124 KB real Pixel HEVC, end-to-end decode in 0.14s on every build |
+| I.B.6 sustain harness + 4 quirk fixes | `a7e9a9aa36` | 470+ frames decoded on live device; `control=true`, `send_dummy_byte`, `display_buffer`, keyframe-interval-15s all caught and fixed |
+| I.B.7 verification doc + chaos test | `d43e45dfbd` | 12 core + 8 auxiliary claims documented; software-only crash test proven (no physical USB unplug — user's tether is their only internet) |
+
+**Final test count**: 34 passing in 0.14s under `cargo test
+-p symthaea-phone-embodiment --features scrcpy --lib -- scrcpy::
+streaming_bridge::`. ~1500 LOC, 2 examples, 1 vendored JAR, 1 recorded
+asset, 2 verification docs.
+
+**Empirical sustain data** (canonical run, YouTube playing at 720p):
+
+```
+473 frames in 30.00 s
+mean fps           : 15.77
+peak window fps    : 23.27
+wire (HEVC) bytes  : 12 127 KB (404.2 KB/s)
+decode p50         : 34 ms (right at the 33 ms 30-fps ceiling)
+decode p95         : 105 ms
+decode p99         : 147 ms
+read timeouts      : 16 over 30 s
+```
+
+**Path to Proven for B12** (true 30 fps sustained), enumerated in the
+verification doc and unblocked by Phase I.D: GPU-accelerated HEVC
+decode via vaapi/vdpau/nvdec, lower max_size, frame-dropping policy,
+async decode off the cognitive-loop thread.
+
+**Original I.B planning section preserved below for traceability**:
+
+### Phase I.B — Persistent capture (original plan, ~6-10 hours)
 
 **Goal**: Remove the 250 ms ADB polling ceiling. Unlock 30-60 fps
 capture with ~30 ms latency. Generate the first real-fps data for
@@ -766,6 +822,25 @@ infrastructure.
 
 ## Change log
 
+- **1.5** (2026-04-14, later same day): **Phase I.B CLOSED.** All 8
+  subtasks complete on `worktree-session-phase-1b-scrcpy`. 11 of 12
+  core claims Proven; B12 (sustain ≥25.5 fps mean) Asserted with a
+  documented empirical ceiling of ~16 fps mean / ~23 fps peak on
+  single-CPU HEVC software decode. ~1500 LOC, 34 tests passing in
+  0.14s, 2 examples, 1 vendored JAR, 1 recorded asset, 2 verification
+  docs. Live device validation against Pixel 8 Pro Tensor G3 with
+  c2.exynos.hevc.encoder. Eight scrcpy v2.4 quirks discovered and
+  documented: control=true multi-socket trap, accepted-socket
+  O_NONBLOCK inheritance, 100 ms read timeout too tight, send_dummy_byte
+  audio-only, display_buffer v3+ only, 15-second default keyframe
+  interval, Type::Frame vs Type::Slice threading, adb reverse
+  direction (host listens, server connects). Phase I.B section in
+  this doc updated with the per-subtask completion log + canonical
+  sustain data + path-to-Proven enumeration. Software-only chaos
+  test proven (pkill scrcpy-server mid-stream, harness gracefully
+  degrades). Physical-USB chaos tests deferred — user's laptop has
+  no WiFi card and uses Pixel USB tether as only internet (saved to
+  memory at memory/user_usb_tether.md).
 - **1.4** (2026-04-14, later same day): post-probe codec pivot.
   - Phase I.B.0 codec ladder probe executed against live Pixel 8 Pro
     (Android 16). list_encoders enumeration falsified the v1.2/v1.3
