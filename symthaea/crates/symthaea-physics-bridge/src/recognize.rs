@@ -46,6 +46,7 @@ use symthaea_core::hdc::conjecture_engine::{BinOp, Expr, UnaryFn};
 
 use crate::dimensional_inference::{infer_dimensions, UnitMap};
 use crate::query::PhysicsSearchEngine;
+use crate::symmetry_inference::infer_symmetry;
 #[allow(unused_imports)] // DimensionalSignature is used in rustdoc links
 use crate::types::DimensionalSignature;
 use crate::types::{
@@ -297,11 +298,19 @@ pub fn recognize_expr_with_units(
     // — e.g. natural-units expressions).
     let dimensions = infer_dimensions(expr, var_units).or_dimensionless();
 
+    // Infer symmetry from the expression shape. Narrow but high-value: this
+    // detects sum-of-squares (→ SO(n)) and 2D antisymmetric cross products
+    // (→ SO(2)) and returns `none()` for everything else. When the query's
+    // symmetry is `none()`, catalog entries claiming SO(n) suffer a ~0.20
+    // penalty on the symmetry axis; this inference lets the query's symmetry
+    // match its catalog cousin directly for the showcase invariants.
+    let symmetries = infer_symmetry(expr);
+
     let query = PhysicsEquation {
         name: name.to_string(),
         domain: PhysicsDomain::ClassicalMechanics,
         ast,
-        symmetries: SymmetryDescriptor::none(),
+        symmetries,
         dimensions,
         tensor: None,
     };

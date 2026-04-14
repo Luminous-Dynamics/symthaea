@@ -4506,15 +4506,11 @@ fn harmonic_oscillator_invariant() -> PhysicsEquation {
                 },
             ]),
         ),
-        // NOTE: we deliberately use `none()` here, NOT SO(2), even though the
-        // harmonic oscillator is physically SO(2)-symmetric. The recognition
-        // query (`recognize_expr_with_units`) hardcodes `SymmetryDescriptor::none()`
-        // because it has no symmetry inference from Expr yet. A catalog entry
-        // that claims more symmetry than the query drops by 0.3·(1.0 − 0.32)
-        // ≈ 0.20 on the symmetry axis — enough to push a perfect structural
-        // match out of the top 100. Once symmetry inference lands, this can
-        // upgrade to SO(2).
-        symmetries: SymmetryDescriptor::none(),
+        // SO(2) is the physical rotational symmetry of the (x, v) phase plane.
+        // The recognition query now infers this from the `x² + v²` shape via
+        // `symmetry_inference::infer_symmetry`, so both sides align on the
+        // symmetry axis.
+        symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(2)], false),
         dimensions: DimensionalSignature::DIMENSIONLESS,
         tensor: None,
     }
@@ -4590,11 +4586,10 @@ fn angular_momentum_2d_cartesian() -> PhysicsEquation {
                 ]))),
             ]),
         ),
-        // See the note on `harmonic_oscillator_invariant`: we intentionally
-        // use `none()` here to stay consistent with the recognition query's
-        // symmetry descriptor. Upgrade to SO(2) once symmetry inference from
-        // Expr lands in `recognize_expr_with_units`.
-        symmetries: SymmetryDescriptor::none(),
+        // SO(2) is the rotational symmetry of 2D Cartesian angular momentum.
+        // Recognition infers this from the `a·b - c·d` antisymmetric cross
+        // product shape via `symmetry_inference::infer_symmetry`.
+        symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(2)], false),
         dimensions: DimensionalSignature {
             mass: 0,
             length: 2,
