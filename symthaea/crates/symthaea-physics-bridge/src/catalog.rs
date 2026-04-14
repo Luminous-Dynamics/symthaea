@@ -16,9 +16,37 @@ use crate::dimensional::DimensionalEncoder;
 use crate::equation_ast::{
     make_const, make_diffop, make_equals, make_field, make_product, make_sum, EquationEncoder,
 };
+use crate::recognize::expr_to_equation_node;
 use crate::symmetry::SymmetryEncoder;
 use crate::types::*;
+use symthaea_core::hdc::conjecture_engine::{BinOp, Expr, UnaryFn};
 use symthaea_core::hdc::ContinuousHV;
+
+/// Build a complete catalog entry `ast` (LHS + RHS wrapped in Equals) from a
+/// ConjectureEngine `Expr`, routing through the same `expr_to_equation_node`
+/// conversion that autonomous discovery uses at recognition time.
+///
+/// This eliminates the entire class of invisible structural-mismatch bugs
+/// where a hand-constructed catalog AST differs in subtle ways (nested vs
+/// flat Sum, `Const(-0.5)` vs `Negate(Const(0.5))`, literal naming
+/// conventions) from whatever the discovery path produces.
+///
+/// The caller supplies a unique `lhs_name` — we deliberately avoid sharing
+/// a single LHS token (like `"result"`) across all dogfooded entries,
+/// because that would inject a common HV component into every entry's
+/// full encoding and create false 99% matches between unrelated entries
+/// whose RHS share any atomic structure. Per-entry unique names keep the
+/// full axis honest: its job is to tiebreak among otherwise-identical
+/// skeletons, not to dominate.
+///
+/// **Use this** for any catalog entry whose canonical form is an invariant
+/// the ConjectureEngine is expected to rediscover autonomously.
+fn expr_to_catalog_ast(lhs_name: &str, expr: &Expr) -> EquationNode {
+    make_equals(
+        EquationNode::Constant { name: lhs_name.to_string() },
+        expr_to_equation_node(expr),
+    )
+}
 
 /// A single catalog entry with pre-computed HVs.
 pub struct CatalogEntry {
@@ -4491,26 +4519,16 @@ fn harmonic_oscillator_energy() -> PhysicsEquation {
 /// raw `x² + v²` query when `x` is length and `v` is velocity, so the two
 /// align along the dimensional axis.
 fn harmonic_oscillator_invariant() -> PhysicsEquation {
+    // Dogfood via expr_to_catalog_ast so the catalog shape is guaranteed
+    // identical to what autonomous discovery produces for this invariant.
+    let v = |n: &str| Expr::Var(n.into());
+    let pow2 = |e: Expr| Expr::BinOp(BinOp::Pow, Box::new(e), Box::new(Expr::Const(2.0)));
+    let add = |a: Expr, b: Expr| Expr::BinOp(BinOp::Add, Box::new(a), Box::new(b));
+    let expr = add(pow2(v("x")), pow2(v("v")));
     PhysicsEquation {
         name: "Harmonic Oscillator Invariant".to_string(),
         domain: PhysicsDomain::ClassicalMechanics,
-        ast: make_equals(
-            make_const("E"),
-            make_sum(vec![
-                EquationNode::Power {
-                    base: Box::new(make_const("x")),
-                    exponent: Box::new(EquationNode::Scalar(2.0)),
-                },
-                EquationNode::Power {
-                    base: Box::new(make_const("v")),
-                    exponent: Box::new(EquationNode::Scalar(2.0)),
-                },
-            ]),
-        ),
-        // SO(2) is the physical rotational symmetry of the (x, v) phase plane.
-        // The recognition query now infers this from the `x² + v²` shape via
-        // `symmetry_inference::infer_symmetry`, so both sides align on the
-        // symmetry axis.
+        ast: expr_to_catalog_ast("E", &expr),
         symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(2)], false),
         dimensions: DimensionalSignature::DIMENSIONLESS,
         tensor: None,
@@ -4528,33 +4546,18 @@ fn harmonic_oscillator_invariant() -> PhysicsEquation {
 /// Dimensions: DIMENSIONLESS — populations are counts and `ln` requires a
 /// dimensionless argument, so the entire expression is dimensionless.
 fn lotka_volterra_invariant() -> PhysicsEquation {
+    // Dogfood via expr_to_catalog_ast. The Expr is the exact form produced
+    // by the Lotka-Volterra template seed in `build_invariant_templates`:
+    //     (x - ln(x)) + (y - ln(y))
+    let v = |n: &str| Expr::Var(n.into());
+    let ln = |e: Expr| Expr::Func(UnaryFn::Log, Box::new(e));
+    let sub = |a: Expr, b: Expr| Expr::BinOp(BinOp::Sub, Box::new(a), Box::new(b));
+    let add = |a: Expr, b: Expr| Expr::BinOp(BinOp::Add, Box::new(a), Box::new(b));
+    let expr = add(sub(v("x"), ln(v("x"))), sub(v("y"), ln(v("y"))));
     PhysicsEquation {
         name: "Lotka-Volterra Invariant".to_string(),
         domain: PhysicsDomain::Biophysics,
-        // Encoded as a nested 2-level Sum to mirror the exact AST shape the
-        // recognition bridge produces for `((x - ln(x)) + (y - ln(y)))`.
-        // `expr_to_equation_node` flattens `Add` but NOT across `Sub`, so the
-        // two `Sub` subterms each become their own 2-element Sum before the
-        // outer Add is flattened — yielding `Sum([Sum[x, -ln(x)], Sum[y, -ln(y)]])`
-        // rather than a flat 4-element Sum. A flat-4 catalog shape structurally
-        // scores ~0.92 against this query; the nested shape scores 1.00.
-        ast: make_equals(
-            make_const("V"),
-            make_sum(vec![
-                make_sum(vec![
-                    make_const("x"),
-                    EquationNode::Negate(Box::new(EquationNode::Constant {
-                        name: "ln(x)".to_string(),
-                    })),
-                ]),
-                make_sum(vec![
-                    make_const("y"),
-                    EquationNode::Negate(Box::new(EquationNode::Constant {
-                        name: "ln(y)".to_string(),
-                    })),
-                ]),
-            ]),
-        ),
+        ast: expr_to_catalog_ast("V", &expr),
         symmetries: SymmetryDescriptor::none(),
         dimensions: DimensionalSignature::DIMENSIONLESS,
         tensor: None,
@@ -4574,22 +4577,15 @@ fn lotka_volterra_invariant() -> PhysicsEquation {
 /// the equation (unit mass convention), the remaining dimensions are
 /// `[L² T⁻¹]`.
 fn angular_momentum_2d_cartesian() -> PhysicsEquation {
+    // Dogfood via expr_to_catalog_ast. Expr: x·vy - y·vx.
+    let v = |n: &str| Expr::Var(n.into());
+    let mul = |a: Expr, b: Expr| Expr::BinOp(BinOp::Mul, Box::new(a), Box::new(b));
+    let sub = |a: Expr, b: Expr| Expr::BinOp(BinOp::Sub, Box::new(a), Box::new(b));
+    let expr = sub(mul(v("x"), v("vy")), mul(v("y"), v("vx")));
     PhysicsEquation {
         name: "Angular Momentum (2D Cartesian)".to_string(),
         domain: PhysicsDomain::ClassicalMechanics,
-        ast: make_equals(
-            make_const("L_z"),
-            make_sum(vec![
-                make_product(vec![make_const("x"), make_const("vy")]),
-                EquationNode::Negate(Box::new(make_product(vec![
-                    make_const("y"),
-                    make_const("vx"),
-                ]))),
-            ]),
-        ),
-        // SO(2) is the rotational symmetry of 2D Cartesian angular momentum.
-        // Recognition infers this from the `a·b - c·d` antisymmetric cross
-        // product shape via `symmetry_inference::infer_symmetry`.
+        ast: expr_to_catalog_ast("L_z", &expr),
         symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(2)], false),
         dimensions: DimensionalSignature {
             mass: 0,
@@ -4608,58 +4604,52 @@ fn angular_momentum_2d_cartesian() -> PhysicsEquation {
 ///
 /// The canonical 4D chaotic Hamiltonian from stellar dynamics (Hénon &
 /// Heiles 1964). Energy is the only first integral — there is no second
-/// isolating integral in the chaotic regime. This entry exists so that
-/// autonomous conservation-law discovery on Hénon-Heiles routes directly
-/// to its true catalog cousin instead of matching nearest-neighbor noise.
+/// isolating integral in the chaotic regime.
 ///
-/// Shape must mirror what `recognize_expr_with_units` produces from the
-/// discovered Expr: a flat `Sum` of four terms after `flatten_add`
-/// recurses through the nested `Add` wrapping.
+/// Built from an `Expr` via `rhs_from_expr` so the catalog AST is
+/// guaranteed to exactly match what autonomous discovery produces. The
+/// earlier hand-constructed version used `Constant { name: "c_0.5000" }`
+/// but the discovery path emits `Constant { name: "c_0.5000" }` via a
+/// slightly different Product/Sum flattening order, and the shapes didn't
+/// align — so queries for the discovered HH form routed to the nearest
+/// nuclear-physics neighbor instead of this entry.
 fn henon_heiles_hamiltonian() -> PhysicsEquation {
-    // Match `recognize.rs`'s literal-encoding convention: positive constants
-    // become `Constant { name: "c_<value>" }` (format `{:.4}`) and negative
-    // constants become `Negate(Constant { name: "c_<|value|>" })`. The
-    // discovered 0.5 → "c_0.5000" and -0.3333... → Negate("c_0.3333").
-    let half = EquationNode::Constant { name: "c_0.5000".to_string() };
-    let neg_third = EquationNode::Negate(Box::new(EquationNode::Constant {
-        name: "c_0.3333".to_string(),
-    }));
-    let pow = |name: &str, k: f64| EquationNode::Power {
-        base: Box::new(make_const(name)),
-        exponent: Box::new(EquationNode::Scalar(k)),
-    };
-    // 0.5 · (px² + py²)
-    let half_p2 = EquationNode::Product(vec![
-        half.clone(),
-        EquationNode::Sum(vec![pow("px", 2.0), pow("py", 2.0)]),
-    ]);
-    // 0.5 · (x² + y²)
-    let half_q2 = EquationNode::Product(vec![
-        half,
-        EquationNode::Sum(vec![pow("x", 2.0), pow("y", 2.0)]),
-    ]);
-    // x² · y
-    let coupling = EquationNode::Product(vec![pow("x", 2.0), make_const("y")]);
-    // -1/3 · y³
-    let cubic = EquationNode::Product(vec![neg_third, pow("y", 3.0)]);
+    // Construct the exact Expr tree the GP produces when the HH template
+    // seed wins. This mirrors `build_invariant_templates` in the
+    // ConjectureEngine 4D branch.
+    let v = |n: &str| Expr::Var(n.into());
+    let pow2 = |e: Expr| Expr::BinOp(BinOp::Pow, Box::new(e), Box::new(Expr::Const(2.0)));
+    let pow3 = |e: Expr| Expr::BinOp(BinOp::Pow, Box::new(e), Box::new(Expr::Const(3.0)));
+    let mul = |a: Expr, b: Expr| Expr::BinOp(BinOp::Mul, Box::new(a), Box::new(b));
+    let add = |a: Expr, b: Expr| Expr::BinOp(BinOp::Add, Box::new(a), Box::new(b));
+
+    let half_p2 = mul(Expr::Const(0.5), add(pow2(v("px")), pow2(v("py"))));
+    let half_q2 = mul(Expr::Const(0.5), add(pow2(v("x")), pow2(v("y"))));
+    let coupling = mul(pow2(v("x")), v("y"));
+    let cubic = mul(Expr::Const(-1.0 / 3.0), pow3(v("y")));
+
+    // ((((half_p2 + half_q2) + coupling) + cubic)
+    let hh_expr = add(add(add(half_p2, half_q2), coupling), cubic);
 
     PhysicsEquation {
         name: "Hénon-Heiles Hamiltonian".to_string(),
         domain: PhysicsDomain::ClassicalMechanics,
-        ast: make_equals(
-            make_const("H"),
-            EquationNode::Sum(vec![half_p2, half_q2, coupling, cubic]),
-        ),
+        ast: expr_to_catalog_ast("H", &hh_expr),
         // No continuous rotational symmetry — the cubic cross-coupling
-        // `x²y - y³/3` breaks rotational invariance. The `symmetry_inference`
-        // heuristic will return `none()` for a sum containing cubic terms
-        // (it only matches pure sum-of-squares), so this aligns with the
-        // query.
+        // `x²y − y³/3` breaks rotational invariance. `symmetry_inference`
+        // returns `none()` for a sum containing cubic terms (it only
+        // matches pure sum-of-squares), which aligns with this entry.
         symmetries: SymmetryDescriptor::none(),
         dimensions: DimensionalSignature::DIMENSIONLESS,
         tensor: None,
     }
 }
+
+// Keep silencing unused-import warning in the rare case UnaryFn isn't
+// referenced elsewhere in catalog.rs — it's imported for future catalog
+// entries that use transcendental functions.
+#[allow(dead_code)]
+fn _unused_unary(_: UnaryFn) {}
 
 /// Inverse-square force law (general form): F = k/r²
 ///

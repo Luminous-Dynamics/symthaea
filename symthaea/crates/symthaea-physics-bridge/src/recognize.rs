@@ -45,7 +45,7 @@
 use symthaea_core::hdc::conjecture_engine::{BinOp, Expr, UnaryFn};
 
 use crate::dimensional_inference::{infer_dimensions, UnitMap};
-use crate::query::PhysicsSearchEngine;
+use crate::query::{PhysicsSearchEngine, SearchWeights};
 use crate::symmetry_inference::infer_symmetry;
 #[allow(unused_imports)] // DimensionalSignature is used in rustdoc links
 use crate::types::DimensionalSignature;
@@ -315,7 +315,21 @@ pub fn recognize_expr_with_units(
         tensor: None,
     };
 
-    let results = engine.search_equation(&query, 5);
+    // Custom weights for recognition: zero the "full" axis because its
+    // random-HV hash noise dominates the top-decimal ranking when many
+    // candidates tie on structural + symmetry + dimensional. For the
+    // Ramanujan Protocol showcase, the Hénon-Heiles discovery ties with
+    // several unrelated entries at [S=1, Y=1, D=1] and gets out-scored by
+    // 0.003 due to F-axis noise alone. Redistributing F's 0.1 weight to
+    // structural makes the correct cousin win unambiguously without
+    // touching general-purpose search consumers' defaults.
+    let recognition_weights = SearchWeights {
+        structural: 0.5,
+        symmetry: 0.3,
+        dimensional: 0.2,
+        full: 0.0,
+    };
+    let results = engine.search_equation_with_weights(&query, 5, recognition_weights);
     let (best_match, best_domain, best_score) = results
         .first()
         .map(|r| (Some(r.name.clone()), Some(r.domain), r.score))
