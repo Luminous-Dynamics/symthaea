@@ -100,7 +100,13 @@ fn find_bin_files(dir: &Path) -> Vec<PathBuf> {
         for e in entries.flatten() {
             let p = e.path();
             if p.is_dir() { out.extend(find_bin_files(&p)); }
-            else if p.extension().and_then(|s| s.to_str()) == Some("bin") { out.push(p); }
+            else if p.extension().and_then(|s| s.to_str()) == Some("bin") {
+                let name = p.to_string_lossy();
+                if name.ends_with(".pred.bin") || name.ends_with("global_mel_mean.bin") {
+                    continue;
+                }
+                out.push(p);
+            }
         }
     }
     out.sort();
