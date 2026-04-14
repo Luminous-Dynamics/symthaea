@@ -1,6 +1,6 @@
 # Holon-Soma Roadmap
 
-**Version**: 1.0 (2026-04-14)
+**Version**: 1.1 (2026-04-14)
 **Scope**: The PQC-sealed binary RDP wire connecting a Symthaea cognitive
 loop to a physical embodiment (starting with the Pixel 8 Pro), and the
 research program that rides on top of it.
@@ -135,34 +135,87 @@ WS server on `:7778`, see the Pixel screen render in an egui window.
 Piece 3 would swap the `[0x42; 32]` placeholder for a real KEM-derived
 key — blocked on the broadcast-sealing restructure.
 
-### Phase I.B — scrcpy persistent capture 📋 NEXT (~3-5 hours)
+### Phase I.B — Persistent capture 📋 NEXT (~6-10 hours)
 
 **Goal**: Remove the 250 ms ADB polling ceiling. Unlock 30-60 fps
 capture with ~30 ms latency. Generate the first real-fps data for
 every downstream phase.
 
-**Approach**: Push `scrcpy-server.jar` via `adb push`, run it as a
-shell process via `app_process`, open an ADB reverse tunnel for the
-H.264 NAL output stream, decode via `openh264` (Cisco BSD-2, small,
-no system dep).
+**Plan A vs Plan B** (decided 2026-04-14 after 30-min evaluation):
+
+| Option | Pros | Cons | Verdict |
+|---|---|---|---|
+| **A. scrcpy-server.jar** | Designed for live mirroring; reconnect-safe; no duration limit; continuous NAL stream; `--video-codec=h264` flag forces codec | Vendor a JAR, pin SHA, lifecycle mgmt, reverse tunnel | **CHOSEN** |
+| B. `adb exec-out screenrecord --output-format=h264 -` | No JAR, no reverse tunnel, native Android | **180 s hard limit** (blocks 10-min soak); defaults to H.265 on Pixel 8 Pro (no flag to force h264 reliably); stdout streaming undertested | Rejected on duration limit |
+
+Plan A wins because the 180 s screenrecord limit is a hard blocker
+for the soak test and for Phase III's multi-minute task trials.
+
+**Codec decision**: **Force H.264** via scrcpy's `--video-codec=h264`
+arg. Pixel 8 Pro's default is H.265 (HEVC), which `openh264` does
+**not** decode. Alternative was to adopt `ffmpeg-next` for H.265 —
+rejected because of system libavcodec dep + larger binary + NixOS
+build friction. If scrcpy rejects h264 on this device for any
+reason, the fallback is `ffmpeg-next` behind a feature flag — add a
+test for this at the start of Phase I.B.
+
+**Approach**: Fetch the pinned scrcpy-server.jar (from scrcpy v2.4
+GitHub release, SHA256 pinned in-tree), `adb push` it to
+`/data/local/tmp/scrcpy-server.jar`, run it via `app_process`, open
+`adb reverse localabstract:scrcpy tcp:<local>`, connect a local
+tokio TCP listener, parse the scrcpy binary framing (metadata header
++ per-frame length-prefixed H.264 NAL), decode via `openh264` 0.6
+(Cisco BSD-2 prebuilt binary, no system dep).
 
 **New files**:
-- `crates/symthaea-phone-embodiment/src/scrcpy.rs` (~300 LOC)
-- `crates/symthaea-phone-embodiment/vendor/scrcpy-server.jar` + `.sha256`
+- `crates/symthaea-phone-embodiment/src/scrcpy.rs` (~400 LOC — revised up from 300)
+- `crates/symthaea-phone-embodiment/vendor/scrcpy-server-v2.4.jar` + `.sha256`
+- `crates/symthaea-phone-embodiment/vendor/README.md` (provenance + rebuild instructions)
+- `crates/symthaea-phone-embodiment/tests/data/sample.h264` (~50 KB recorded NAL asset for offline decode tests)
 
 **Modified files**:
-- `crates/symthaea-phone-embodiment/src/adb.rs` — `push_scrcpy_server`, `start_scrcpy`
-- `crates/symthaea-phone-embodiment/src/bridge.rs` — `capture_stream`, `tick_rgba`
-- `examples/phone_rdp_share.rs` — swap `capture_and_observe_rgba` for the persistent stream path
+- `crates/symthaea-phone-embodiment/src/adb.rs` — `push_scrcpy_server`, `start_scrcpy`, `reverse_tunnel`, `stop_scrcpy`
+- `crates/symthaea-phone-embodiment/src/bridge.rs` — `capture_stream`, `tick_rgba` async variants
+- `crates/symthaea-phone-embodiment/Cargo.toml` — `scrcpy` feature + `openh264 = "0.6"` optional dep
+- `examples/phone_rdp_share.rs` — swap `capture_and_observe_rgba` for the persistent stream path when `scrcpy` feature is on
 
-**New dep**: `openh264 = "0.6"` (prefer over `ffmpeg-next` — smaller, no system dep)
+**Feature gating**: Keep the existing ADB-polling capture path
+alive as the default. scrcpy goes behind a new `scrcpy` feature so
+the diagnostic polling path stays available for troubleshooting,
+and so sessions without a device can still build-test the crate.
+
+**New dep**: `openh264 = "0.6"` (optional, gated by `scrcpy`
+feature) — prefer over `ffmpeg-next` for the reasons above.
+
+**Soak observability** (NEW — previously missing): the 10-minute
+soak must emit a metrics line every 10 s with:
+- sealed bytes/sec (rolling 10 s mean)
+- seal+open latency p50 / p99 (microseconds)
+- broadcast queue depth (current + peak)
+- replay-reject count (cumulative)
+- scrcpy-server restarts (cumulative, should be 0)
+- decoded frames / dropped frames (cumulative)
+
+Without this, the soak only measures end-state ("no crash"), not
+the trajectory. Degrading wires fail slowly.
 
 **Verification**:
-1. Unit tests with recorded NAL asset
-2. `phone_rdp_share --features scrcpy` sustains 30 fps for 60 s
-3. 10-minute soak: no memory growth, no scrcpy-server crash, <0.1% dropped
+1. Unit tests with recorded NAL asset (`sample.h264`) — decodes to expected RGBA without a device
+2. Codec detection test — fails loudly if the device serves H.265 despite the h264 flag
+3. `phone_rdp_share --features scrcpy` sustains ≥30 fps for 60 s on the live Pixel
+4. 10-minute soak: live metrics line every 10 s; end state shows ≥30 fps sustained, 0 crashes, 0 restarts, <0.1% dropped, stable memory
 
-**Estimated effort**: 3-5 hours in a fresh worktree.
+**Estimated effort**: **6-10 hours** in a fresh worktree. Breakdown:
+- 1 h: JAR vendor + SHA pin + adb lifecycle (push, run, reverse, stop)
+- 2-3 h: scrcpy binary framing parser + openh264 integration (first C-lib integration point, expect friction)
+- 1 h: async bridge + feature gate wiring
+- 1 h: unit tests with recorded NAL
+- 1-2 h: live fps verification + soak harness + observability metrics
+- 1 h: retries, flake-fixing, documentation
+
+Retrospective Rule #1 was "don't under-estimate." 3-5 hours from
+v1.0 was optimistic for a first C-library integration with a vendor
+JAR lifecycle. 6-10 hours is honest.
 
 **Why this phase unblocks everything**: without real fps, all bandwidth
 measurements are synthetic or polling-limited. Phase II can't test
@@ -178,7 +231,14 @@ WS and modulates which tiles the phone codec prioritizes. Combined with
 the codec compression ladder, fits 30 fps heavy-activity content within
 ~25% of the USB 2.0 budget.
 
-**Two parallel tracks**:
+**Track ordering (revised)**: Track B.1 (LZ4 wrap) **blocks** Track A.
+You don't know whether attention gating is needed until you measure
+real-content 30 fps sealed+LZ4'd frame size against the USB 2.0
+budget. If LZ4 alone fits under 25% of the 35 MB/s ceiling, the
+entire attention backchannel becomes optional polish, not a
+prerequisite. Measure first, then decide.
+
+**Two tracks** (sequenced, not parallel):
 
 **Track A — Attention backchannel** (~days):
 1. Desktop `HolonViewerApp` exports `VisionManifold::saliency_map()` as
@@ -229,8 +289,24 @@ Provenance verifiable via `git log papers/preregistration.md`.
 - **n**: 20 trials × 6 Φ levels × 3 tasks = 360 runs
 - **DVs**: bandwidth (bytes/s), task success rate, PE mean + max, WM saturation, latency
 - **Hypothesis**: bandwidth decreases monotonically with Φ; task success stays ≥95% at Φ ≥ 0.35; PE knee around Φ=0.25
-- **Test**: paired t-test, α=0.01, effect size ≥ 0.5
+- **Test**: paired t-test, α=0.05 (revised from 0.01), effect size ≥ 0.5
 - **All four outcomes publishable** — confirm direction + magnitude / direction only / null / wrong direction
+
+**Power analysis (NEW, v1.1)**: paired t-test with n=20 per cell, α=0.05,
+one-tailed → 80% power at Cohen's d ≈ 0.58. At the v1.0 α=0.01 threshold
+the same n required d ≈ 0.78 — a very large effect, and any subtler
+structure would have been invisible. Relaxing to α=0.05 is the
+honest move for a first-pass exploratory study. The pre-registration
+document must be updated to match (amendment, not silent revision —
+leave the v1.0 freeze intact and add a dated amendment below it).
+
+**Analysis script freeze (NEW, v1.1)**: PR-001 currently freezes the
+hypothesis but not the analysis code path. Before the first trial
+runs, `scripts/phi_sweep_analysis.py` must be committed with the
+exact pandas/scipy calls, random seed for trial ordering, outlier
+policy, and plot-generation code. The analysis script hash goes
+into the preregistration amendment. This closes the
+garden-of-forking-paths loophole.
 
 **New files**:
 - `benches/phi_sweep.rs` — Criterion harness driving the 360-run matrix
@@ -263,6 +339,27 @@ Phase III completion.
 - `examples/split_cognition.rs` (new): spawn both instances, record PE traces per condition
 - `tests/integration_markov_blanket.rs` (new): three-condition regression test on a recorded trace
 
+**Hidden hard problem — clock synchronization (NEW, v1.1)**:
+`RemoteRdpEmbodiment` looks like a normal `EmbodimentBridge`
+implementation, but PE (prediction error) is clock-sensitive: the
+desktop's cognitive loop stamps predictions at desktop-time t₀ and
+compares against phone observations that carry phone-time t₁.
+Network latency + clock skew + frame buffering create a variable
+delta that will contaminate the PE signal unless explicitly
+modeled. Options:
+1. **Phone-time canonical**: desktop adjusts its own PE window to
+   phone timestamps, tolerates extra jitter on cognitive-loop side
+2. **NTP-style offset estimation**: periodic round-trip pings
+   estimate skew, subtract from every frame
+3. **Sequence-number only**: ignore wall clock, compare by frame
+   sequence number, accept that task-latency metrics become
+   per-hop not end-to-end
+
+Pick one before writing `RemoteRdpEmbodiment`. This is the likely
+Phase IV blocker and the design decision most impactful on the
+experimental validity of the Markov blanket test. Recommendation:
+option 2 (NTP-style) — cheapest to implement, most honest.
+
 **All three outcomes publishable**:
 - Confirmed: operational proof of distributed cognition across a network
 - Null: coupled/decoupled indistinguishable; Markov blanket framing falsified
@@ -276,8 +373,18 @@ Phase III completion.
 pull the day's phone scene memories and counterfactually replay them
 through the vision manifold to consolidate into episodic memory.
 
-**Gate**: Only proceeds if Phase IV produces a positive Markov blanket
-result. A null Phase IV cancels Phase V.
+**Gate (revised, v1.1)**: Phase V splits into two independent sub-phases:
+- **V.a — Cross-body memory consolidation**: does NOT depend on the
+  Markov blanket result. Memory consolidation is a separate claim
+  from unified agency; you can dream on yesterday's phone traces
+  whether or not phone+desktop form a single blanket. Proceeds
+  regardless of Phase IV outcome.
+- **V.b — Unified-agency dreaming**: claims about consciousness
+  unity across bodies during dream replay. Gated on a positive
+  Phase IV.
+
+The v1.0 gate conflated these two questions. Decoupling lets V.a
+deliver even if Phase IV nulls.
 
 **Measurement**: does next-day phone task latency improve after dreaming
 on prior-day traces? Paired test: same task twice, once after
@@ -308,6 +415,86 @@ changes the sequencing:
 measurement. It's now required to hit Phase II's 30 fps target on USB
 2.0 without saturating the bus (and thereby degrading the user's
 laptop internet via RNDIS tethering contention).
+
+---
+
+## PQC architectural fork (NEW, v1.1)
+
+Track 2.5's "4-6 hours, deferred" hid the fact that a real ML-KEM
+handshake forces a design choice with downstream consequences. Pick
+before Phase II, not after.
+
+**Option α — Broadcast-sealing + per-viewer unwrap layer**:
+- Keep `HolonHttpState`'s one-key-for-all-viewers model
+- Add a per-viewer wrap: each WS connection gets its own KEM-derived
+  wrapping key, unwraps the broadcast payload on arrival
+- **Pros**: minimal change to encode path, O(1) sealing regardless
+  of viewer count, attention backchannel naturally fan-ins
+- **Cons**: double-encryption per frame (inner session key + outer
+  per-viewer wrap), slightly higher latency, slightly more complex
+  replay-window accounting
+
+**Option β — Per-connection sealed streams**:
+- Each WS connection runs its own `RdpSession` with its own KEM key
+- Broadcast becomes "seal N times, dispatch N times"
+- **Pros**: clean, correct, standard model, no double-encryption
+- **Cons**: O(viewers) sealing cost per frame, harder to add
+  attention backchannel (which has fan-in semantics), larger
+  memory footprint per viewer
+
+**Recommendation**: **Option α**. Sealing cost matters more than
+crypto purity at 30 fps. Attention backchannel fan-in is natural
+under broadcast semantics. Implement as the first task of Phase II,
+not as "Track 2.5 unblock" — its outcome gates every downstream
+wire change.
+
+---
+
+## Failure-mode inventory (NEW, v1.1)
+
+Every production wire fails in predictable ways. Phase I.B is the
+right time to add handlers — earlier is speculative, later is a
+retrofit.
+
+| Failure | Current behavior | Phase I.B target |
+|---|---|---|
+| Network partition (WiFi drop) | WS closes, viewer freezes | Viewer auto-reconnects with exponential backoff (100 ms → 5 s cap), flags stale frames in UI |
+| ADB USB disconnect | scrcpy-server exits, bridge returns error | Detect, log, wait, `adb wait-for-device`, restart scrcpy-server, resume stream |
+| Phone battery death mid-session | Wire goes silent | Detect by 3 s of no frames; soak harness reports as "phone offline" not "wire broken" |
+| Desktop crash + viewer reconnect | New viewer joins mid-stream | Server replays `VecDeque(512)` catch-up buffer; viewer discards frames until first keyframe; document `VecDeque` horizon (**16 s at 30 fps**) in code + user-facing docs |
+| Clock skew between phone and desktop | PE contaminated (Phase IV) | Option 2 NTP-style offset estimation in `RemoteRdpEmbodiment` (see Phase IV clock-sync section) |
+| Out-of-order frame delivery | Replay window correctly rejects as attack | For UX, frames arriving out-of-order inside the 64-slot window are ignored silently; document that this is a security/liveness tradeoff |
+| scrcpy-server OOM-killed on device | Stream stops | Detect, restart up to 3× in 60 s, then surface error |
+| openh264 decode error on corrupt NAL | Decoder panics / returns garbage | Catch at `scrcpy.rs` boundary; drop frame; log; continue (never propagate panic to cognitive loop) |
+
+**Add to Phase I.B soak verification**: chaos-test the first three
+rows by physically unplugging USB mid-stream and confirming recovery.
+
+---
+
+## Mycelix hApp integration (NEW, v1.1 — gap acknowledged)
+
+This roadmap is point-to-point: desktop Symthaea ↔ Pixel 8 Pro over
+direct WebSocket. But the monorepo is Mycelix-oriented, with
+`mycelix-civic/zomes/robotics-dispatch` already implementing
+`RoboticAsset`, `DispatchOrder`, and `TelemetryReport` with 24 h
+authority expiry. The Holon wire does **not** currently plug into
+this zome.
+
+**Intent** (not scheduled): after Phase II closes, the Holon wire
+becomes one concrete instance of a `robotics-dispatch` asset. A
+phone-embodiment is a `RoboticAsset` with a `DispatchOrder`
+carrying authority; telemetry flows back as `TelemetryReport`.
+This gives the wire holochain-native authorization, audit, and
+multi-operator semantics for free.
+
+**Deferred because**: Phase I.B and Phase II deliver the
+substrate; Phase III + IV deliver the research results; neither
+needs the dispatch bridge. Phase II.5 would be the natural
+insertion point — after compression is working, before attention
+backchannel gets deeply entangled with WS broadcast semantics. Add
+to plan after Phase II measurement pins down the WS protocol
+surface.
 
 ---
 
@@ -380,6 +567,27 @@ infrastructure.
 
 ## Change log
 
+- **1.1** (2026-04-14, later same day): critical-review refinements.
+  - Phase I.B: Plan A/B decision (scrcpy wins on 180 s screenrecord
+    limit), H.264 codec forcing (Pixel 8 Pro defaults to H.265,
+    openh264 doesn't decode H.265), effort re-estimate 3-5 h → 6-10 h,
+    new soak observability bullet (p50/p99 latency, queue depth,
+    replay rejects, restarts), LOC estimate 300 → 400, feature gating
+    keeps ADB-polling as fallback.
+  - Phase II: Track B.1 (LZ4) **blocks** Track A, not parallel.
+  - Phase III: α=0.01 → α=0.05 with honest power analysis
+    (d≈0.58 for 80% power at n=20), analysis-script freeze requirement.
+  - Phase IV: clock-sync named as the hidden hard problem, three
+    options documented, NTP-style recommended.
+  - Phase V: gate decoupled — V.a (cross-body memory consolidation)
+    proceeds regardless of Phase IV; V.b (unified-agency dreaming)
+    still gated.
+  - New section: PQC architectural fork (α broadcast+unwrap vs
+    β per-connection); α recommended, pick before Phase II.
+  - New section: failure-mode inventory (8 rows) with Phase I.B
+    chaos-test additions.
+  - New section: Mycelix hApp integration gap — `robotics-dispatch`
+    zome as the natural Phase II.5 insertion.
 - **1.0** (2026-04-14): initial roadmap, extracted from
   `plans/shiny-wibbling-quail.md` working plan + Phase I.A delivery
   + Phase I.A.5 retrospective + 2026-04-14 USB measurement findings.
