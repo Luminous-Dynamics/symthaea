@@ -1,6 +1,6 @@
 # Holon-Soma Roadmap
 
-**Version**: 1.2 (2026-04-14)
+**Version**: 1.3 (2026-04-14)
 **Scope**: The PQC-sealed binary RDP wire connecting a Symthaea cognitive
 loop to a physical embodiment (starting with the Pixel 8 Pro), and the
 research program that rides on top of it.
@@ -189,6 +189,25 @@ AV1), decode via `rav1d` on a rayon-spread thread pool (AV1
 decoding parallelizes well across cores — desktop Ryzen/Intel can
 handle 4K60 AV1 in software).
 
+**Zero-latency encoder tuning (v1.3)**: default the scrcpy
+`app_process` invocation with glass-to-glass latency flags:
+- `--display-buffer=0` — no device-side frame buffering
+- `--max-fps=30` — lock encoder pacing to match cognitive loop (not
+  29.97 or 60, exactly 30)
+- `--video-codec-options=...` — force fastest AV1 profile. **Value
+  needs probe validation**: AV1 MediaCodec profile integers are
+  device-specific; `profile=0` (the speculative v1.3 suggestion) may
+  map to AV1ProfileMain8 on Tensor G3 but could reject on other
+  builds. The codec ladder probe (I.B.0) must also probe
+  video-codec-options with and without the tuning bundle and log
+  the working combination.
+
+For a cybernetic loop we optimize glass-to-glass latency over
+perceptual quality. Rationale: Symthaea does not need cinema-grade
+fidelity; it needs the freshest possible frame at cognitive-cycle
+time. Every millisecond of device buffering is a millisecond of PE
+contamination in Phase IV.
+
 **New files**:
 - `crates/symthaea-phone-embodiment/src/scrcpy.rs` (~400 LOC — revised up from 300)
 - `crates/symthaea-phone-embodiment/vendor/scrcpy-server-v2.4.jar` + `.sha256`
@@ -258,7 +277,70 @@ trials per condition which at 4 fps takes all day. Phase IV's Markov
 blanket test needs stable-state PE which requires the codec to be
 running at its design rate.
 
-### Phase II — Attention backchannel + codec compression 📋 (~1 week after I.B)
+### Phase I.C — QUIC transport swap 📋 NEW v1.3 (~1-2 days after I.B)
+
+**Goal**: Eliminate TCP head-of-line blocking on the Holon wire.
+Move video frames to unreliable QUIC datagrams while keeping
+control messages (handshake, InputFrame, AttentionMap) on reliable
+QUIC streams.
+
+**Why this matters**: the current wire runs WebSockets over TCP via
+`tokio-tungstenite`. TCP guarantees in-order delivery, which means
+a single dropped packet halts the entire stream until retransmit —
+Head-of-Line blocking. Over local USB RNDIS this is rare, but over
+any real WiFi or WAN deployment (and eventually over the open
+internet for Phase IV split-cognition) HoL creates unpredictable
+frame stutter that contaminates both UX and PE measurement.
+
+**QUIC fixes this cleanly**:
+- Video frames → unreliable datagrams. Dropped frame? Next frame
+  ships immediately, no waiting. Frame loss becomes visible as a
+  measurable metric, not invisible as a stall.
+- PQC handshake → reliable stream. Exactly-once delivery, still
+  ordered.
+- Input events → reliable stream. Exactly-once delivery, ordered.
+- Attention backchannel (Phase II) → reliable stream at 5 Hz.
+
+**Crate**: `quinn` (pure Rust, `rustls`-based, production-grade).
+Zero new C deps. Supports both stream and datagram APIs natively.
+
+**Why I.C and not bundled into I.B**: swapping transport AND
+capture in the same phase triples the debugging surface. The
+v1.1 failure-mode inventory becomes twice as hard to validate if
+both layers are new. Scrcpy first, prove the AV1 stack works over
+the existing WS wire, then swap transport under it with the
+capture layer as a known-good.
+
+**Replay window implications**: QUIC datagrams are unordered by
+design. The `ReplayWindow` primitive already handles out-of-order
+within the 64-slot sliding window (per `(source_id, payload_type)`)
+— this design choice pays off here. Document the interaction
+explicitly in the Phase I.C verification doc.
+
+**Architectural work**:
+- New `swarm::quic_transport` module wrapping `quinn::Endpoint`
+- `seal_frame` / `open_frame` unchanged — they already return
+  opaque `Vec<u8>`, the transport layer is below them
+- `holon_rdp_viewer` gets a `--transport=quic|ws` flag for A/B
+  comparison during migration
+- Server binds both WS (legacy) and QUIC (new) during the
+  transition window; one-shot WS removal once QUIC parity proven
+
+**New dep**: `quinn = "0.11"` + `rustls = "0.23"`
+
+**Verification**:
+1. Localhost A/B: same scrcpy stream pushed through WS and QUIC
+   simultaneously; compare end-to-end latency p50/p99
+2. Induced packet loss test: `tc qdisc` 1% loss, measure frame
+   stall behavior (WS stalls, QUIC drops-and-continues)
+3. 10-min soak over QUIC with observability metrics from Phase I.B
+4. Migration cutover: run with `--transport=ws` for a session, then
+   `--transport=quic`, confirm identical functional behavior
+
+**Estimated effort**: 1-2 days. Quinn is well-documented, the wire
+above it is unchanged.
+
+### Phase II — Attention backchannel + codec compression 📋 (~1 week after I.C)
 
 **Goal**: Desktop Symthaea's saliency map flows backward through the
 WS and modulates which tiles the phone codec prioritizes. Combined with
@@ -307,6 +389,71 @@ prerequisite. Measure first, then decide.
 1. Headless: synthetic attention (top half = 1.0, bottom = 0.0), verify only top-half tiles in outbound `DeltaFrame.patches`
 2. Live: stare at top of phone screen, scroll bottom — bottom dropped/coarsened, top crisp
 3. ≥40% bandwidth reduction for focal-attention scenarios on the same trace
+
+### Phase II.5 — Compressed-domain perception 🔬 NEW v1.3 RESEARCH (~2-3 weeks, parallelizable with III)
+
+**Goal**: feed AV1 motion vectors and residuals directly into
+Symthaea's vision manifold, skipping the RGBA decode step for
+motion-surprise computation.
+
+**The observation**: the Pixel 8 Pro's hardware AV1 encoder already
+computed per-block motion vectors and residual energy as part of
+encoding each frame. Desktop Symthaea then decodes to RGBA and
+runs its own motion estimation on the reconstructed pixels — which
+is computationally redundant AND less accurate than the HW
+encoder's estimates (the HW encoder sees the true previous frame
+before quantization; the desktop sees the quantized reconstruction).
+
+**The idea**: extract motion vectors from the AV1 bitstream and
+feed them directly to `VisionManifold::apply_motion_field()`.
+Symthaea learns which screen regions moved from the encoder's
+metadata, not from its own recomputation. The HDC motion-surprise
+channel becomes effectively free — the phone silicon is doing the
+work.
+
+**Honest caveats** (this is research, not production):
+
+1. **`rav1d` does not expose motion vectors in its stable API.**
+   `dav1d` internals compute them but the public Rust crate surface
+   treats frames as opaque. Options:
+   - Patch `rav1d` to expose an "expose decode metadata" callback
+     (upstreamable? maybe — dav1d has a `--frame-metadata` debug
+     output, so the data path exists internally)
+   - Fork `rav1d` in-tree, carry the patch until upstream accepts
+   - Use `dav1d-sys` directly and call into the C API, which has
+     slightly more expose-able internals (but reintroduces the C
+     dep friction that the v1.2 AV1 pivot was meant to eliminate)
+2. **Motion vectors are per-block, quantized, and encoder-biased.**
+   They tell you "this 16×16 block probably moved like (dx,dy)"
+   not "this object moved." Object-level motion is still
+   downstream inference work.
+3. **Residual energy is decoded post-IDCT.** Extracting it means
+   tapping the decoder mid-pipeline, which is even less exposed
+   than MVs.
+
+**Research plan** (not production):
+- **Week 1**: Verify dav1d internally computes and stores the MVs
+  we'd want. Build a `dav1d-debug-probe` example.
+- **Week 2**: Upstream (or fork) a `metadata_callback` to rav1d.
+  Prototype feeding MV data into a new `VisionManifold` channel.
+- **Week 3**: A/B bench: motion-surprise from pixel decode vs
+  motion-surprise from AV1 MVs, measured against a labeled motion
+  ground truth on a recorded trace. Publish the comparison.
+
+**Parallelizable with Phase III**: the Φ-sweep doesn't touch the
+vision pipeline internals, so a second session can work on II.5
+while the Phase III benchmark harness runs.
+
+**Publishable outcome**: if the MV-fed motion-surprise signal
+correlates with pixel-computed motion-surprise at ≥0.8 Pearson, this
+is a real result worth writing up. If it doesn't correlate,
+that's a publishable negative — "HW encoder motion vectors are
+insufficient proxies for cognitive motion-surprise signals."
+
+**Risk of scope-creep**: this phase is easy to let balloon. Hard
+cap: if `rav1d` MV extraction isn't working after week 1, abandon
+to Phase III. The cognitive loop's pixel-space motion pipeline is
+already fast enough for the program's core claims.
 
 ### Phase III — Bandwidth-Quality-Φ sweep 🔒 PRE-REGISTERED (~days after II)
 
@@ -601,6 +748,25 @@ infrastructure.
 
 ## Change log
 
+- **1.3** (2026-04-14, later same day): three architecture additions.
+  - Phase I.B: zero-latency encoder tuning folded in
+    (`--display-buffer=0`, `--max-fps=30`, probe-validated
+    `--video-codec-options`). Glass-to-glass latency over cinematic
+    quality — Symthaea needs the freshest frame at cognitive-cycle
+    time, not the prettiest.
+  - **New Phase I.C**: QUIC transport swap via `quinn`. WebSocket
+    over TCP has head-of-line blocking; a single dropped packet
+    halts the stream until retransmit. QUIC unreliable datagrams
+    for video + reliable streams for control (handshake, input,
+    attention) eliminates HoL without sacrificing security. Scoped
+    as 1-2 days, scheduled after Phase I.B so capture and transport
+    aren't debugged simultaneously.
+  - **New Phase II.5**: compressed-domain perception (research).
+    Extract AV1 motion vectors from `rav1d` directly into the HDC
+    vision manifold, offloading low-level motion estimation onto
+    the Pixel's hardware encoder. Honest caveats: rav1d's stable
+    API doesn't expose MVs, would require upstream patch or fork,
+    3-week research budget with a hard cap.
 - **1.2** (2026-04-14, later same day): AV1 + rav1d pivot for Phase I.B.
   - Codec: force AV1 via scrcpy `--video-codec=av1` (Pixel 8 Pro
     ships a hardware AV1 encoder in Tensor G3; AV1 is 30-40% smaller
