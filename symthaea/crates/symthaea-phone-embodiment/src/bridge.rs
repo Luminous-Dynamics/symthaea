@@ -525,6 +525,20 @@ impl PhoneBridge {
         &self.vision
     }
 
+    /// Override the bridge's idea of the device's native screen size.
+    /// Used by [`crate::streaming_bridge::StreamingPhoneBridge`] when the
+    /// scrcpy stream's video header reports different dimensions than the
+    /// caller initially supplied (rotation, encoder downscale).
+    pub fn set_screen_dimensions(&mut self, width: u32, height: u32) {
+        self.screen_w = width;
+        self.screen_h = height;
+    }
+
+    /// Vision manifold's downsampled target dimensions (e.g. 64×64).
+    pub fn vision_target_dims(&self) -> (u32, u32) {
+        (self.target_w, self.target_h)
+    }
+
     /// Mutable access to the vision manifold (for dream_replay, reset, etc.).
     pub fn vision_mut(&mut self) -> &mut VisionManifold {
         &mut self.vision
