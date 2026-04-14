@@ -1,6 +1,6 @@
 # Holon-Soma Roadmap
 
-**Version**: 1.3 (2026-04-14)
+**Version**: 1.4 (2026-04-14)
 **Scope**: The PQC-sealed binary RDP wire connecting a Symthaea cognitive
 loop to a physical embodiment (starting with the Pixel 8 Pro), and the
 research program that rides on top of it.
@@ -151,32 +151,50 @@ every downstream phase.
 Plan A wins because the 180 s screenrecord limit is a hard blocker
 for the soak test and for Phase III's multi-minute task trials.
 
-**Codec decision (v1.2 pivot — AV1 over H.264)**: **Request AV1**
-via scrcpy's `--video-codec=av1`. Pixel 8 Pro's Tensor G3 ships a
-**hardware AV1 encoder** — one of the few production phones that
-does. AV1 at the same perceptual quality is 30-40% smaller than
-H.264, which directly relieves the USB 2.0 budget pressure that
-motivated the Phase II compression ladder in the first place.
+**Codec decision (v1.4 — HEVC primary after probe falsified the v1.2 AV1 pivot)**:
+**Request HEVC** via scrcpy's `--video-codec=h265`, target the hardware
+encoder `c2.exynos.hevc.encoder`.
 
-Decoder pivot: drop `openh264` in favor of **`rav1d`**, the
-pure-Rust port of VideoLAN `dav1d` sponsored by ISRG. Zero C
-bindings, zero system dep, zero NixOS build-script friction —
-just `cargo add rav1d`. The v1.1 roadmap was already uneasy about
-`openh264`'s C-lib integration; `rav1d` makes that concern vanish.
+The v1.2/v1.3 plan assumed Pixel 8 Pro exposed a hardware AV1
+encoder via MediaCodec. **The Phase I.B.0 codec ladder probe
+falsified this on Android 16**: only `c2.google.av1.encoder` and
+`c2.android.av1.encoder` are enumerated for AV1 — both software.
+The hardware encoders on this device are H.264 (`c2.exynos.h264`)
+and HEVC (`c2.exynos.hevc`). See `docs/phase_1b_codec_probe.md`
+in the worktree for raw probe output.
 
-**Codec fallback ladder** (if device or scrcpy rejects AV1 for
-any reason — first successful rung wins):
-1. **AV1** via `rav1d` ← preferred
-2. **H.265 (HEVC)** via `ffmpeg-next` behind a `hevc-fallback`
-   feature flag (system libavcodec dep acceptable at the fallback
-   tier, not the default)
-3. **H.264** via `openh264` behind an `h264-fallback` feature flag
-   (last resort — full v1.1 plan survives as fallback #2)
+Software AV1 at 30 fps on a phone is untenable: battery drain,
+thermal throttling, won't sustain target rate, contaminates Phase
+IV PE measurement with thermally-modulated latency.
 
-First task in the worktree is a codec-probe test: spin up scrcpy
-with each flag in turn, confirm which rungs the Pixel 8 Pro + the
-installed scrcpy-server support, log the decision, proceed with the
-highest-ranked working codec.
+HEVC HW retains most of AV1's compression advantage (~50% smaller
+than H.264 vs AV1's 30-40%) without requiring HW that doesn't
+exist on this device. USB 2.0 budget relief survives the pivot.
+
+Decoder pivot: `rav1d` (AV1-only) → **`ffmpeg-next`** (HEVC + many).
+The v1.2 concern about C-library friction was specifically about
+`openh264`'s Cisco-binary download build script. `ffmpeg-next` uses
+standard pkg-config to find the system `ffmpeg`, which is a
+first-class package on NixOS. First build must run inside `nix
+develop` with `ffmpeg` in the shell; documented in Phase I.B.4.
+
+`rav1d` survives in the codebase as an optional dep behind the
+`av1-research` feature, used by Phase II.5's compressed-domain
+perception research.
+
+**Codec fallback ladder (v1.4, post-probe)**:
+1. **HEVC** via `c2.exynos.hevc.encoder` + `ffmpeg-next` ← primary
+2. **H.264** via `c2.exynos.h264.encoder` + `openh264` (or
+   `ffmpeg-next` if already linked) behind `h264-fallback` feature —
+   used if HEVC decode unavailable for any reason
+3. **AV1 SW** via `c2.google.av1.encoder` + `rav1d` behind
+   `av1-research` feature — research-tier only, for tethered
+   battery-insensitive bench runs (Phase II.5)
+
+The codec ladder probe (I.B.0) was executed 2026-04-14; results in
+`docs/phase_1b_codec_probe.md` (worktree). Probe is now part of
+the Phase I.B startup sequence so any future device or Android
+update is caught immediately.
 
 **Approach**: Fetch the pinned scrcpy-server.jar (from scrcpy v2.4
 GitHub release, SHA256 pinned in-tree — v2.4 is the first release
@@ -748,6 +766,29 @@ infrastructure.
 
 ## Change log
 
+- **1.4** (2026-04-14, later same day): post-probe codec pivot.
+  - Phase I.B.0 codec ladder probe executed against live Pixel 8 Pro
+    (Android 16). list_encoders enumeration falsified the v1.2/v1.3
+    AV1-via-HW assumption: only software AV1 encoders exist on this
+    device. Hardware encoders are H.264 and HEVC.
+  - **Codec primary: AV1 → HEVC.** HW HEVC encode on Tensor G3
+    retains most of AV1's compression advantage (~50% vs H.264, vs
+    AV1's 30-40%) without requiring HW that doesn't exist on this
+    device. USB 2.0 budget relief survives the pivot.
+  - **Decoder primary: rav1d → ffmpeg-next.** Concern about C-lib
+    friction was specific to openh264's Cisco-binary build script;
+    ffmpeg-next is standard pkg-config + first-class on NixOS. First
+    build runs inside `nix develop` with ffmpeg in the shell.
+  - rav1d survives in the codebase as optional dep (`av1-research`
+    feature) for Phase II.5 compressed-domain perception research.
+    Cost/benefit of II.5 actually IMPROVES under SW-only AV1 because
+    the redundant encode work becomes more expensive — the
+    motivation to extract motion vectors instead of recomputing on
+    pixels strengthens.
+  - Probe is now a Phase I.B startup task, not a one-time check.
+    Future device or Android updates trigger re-probe.
+  - Probe results documented in `docs/phase_1b_codec_probe.md`
+    (worktree, will sync to main when Phase I.B closes).
 - **1.3** (2026-04-14, later same day): three architecture additions.
   - Phase I.B: zero-latency encoder tuning folded in
     (`--display-buffer=0`, `--max-fps=30`, probe-validated
