@@ -471,12 +471,10 @@ fn emit_combined_latex_table(results: &[DiscoveryResult], catalog_size: usize) -
         };
 
         // Sanitize headline for LaTeX — escape underscores, %, etc.
+        // No truncation: the paper table needs the full catalog match text.
+        // If the resulting row is too wide for the page, the paper should
+        // use `sidewaystable` or `\resizebox`, not lose data.
         let headline_clean = sanitize_for_latex(&r.recognition_headline);
-        let truncated = if headline_clean.len() > 50 {
-            format!("{}...", &headline_clean[..47])
-        } else {
-            headline_clean
-        };
 
         out.push_str(&format!(
             "{} & {} & ${}$ {} & {} & {} \\\\\n",
@@ -485,7 +483,7 @@ fn emit_combined_latex_table(results: &[DiscoveryResult], catalog_size: usize) -
             r.latex_formula,
             var_str,
             status_cell,
-            truncated,
+            headline_clean,
         ));
     }
 
