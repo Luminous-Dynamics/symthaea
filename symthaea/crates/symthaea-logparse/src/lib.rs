@@ -22,6 +22,7 @@ pub mod syslog_source;
 pub mod encoder;
 pub mod cluster;
 pub mod fixtures;
+pub mod probe;
 
 pub use event::{LogEvent, Severity, Source};
 

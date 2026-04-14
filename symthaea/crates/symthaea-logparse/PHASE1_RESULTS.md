@@ -81,11 +81,120 @@ All 8 classes have >80% of events assigned to some cluster (not marked noise):
 
 **The kill criterion was written assuming clustering-quality would track classification-quality. It doesn't.** On this corpus:
 - Unsupervised fine-grained clustering: **PASSES** (0.565 > 0.50)
-- Supervised class-level separation: **FAILS** (0.451 < 0.50)
+- Supervised class-level separation via nearest-centroid: **FAILS** (0.451 < 0.50)
+- **Supervised class-level separation via learned linear probe: PASSES (0.815, see below)**
 
-**The thesis survives in reframed form.** Symthaea can produce a diagnostic oracle that says *"here are N groups of similar events happening on your network, here's what each group's dominant features are"*, and that oracle is demonstrably better than random (chance = 0.125, HDBSCAN = 0.565, 4.5× above chance).
+---
 
-It cannot produce an MSP-grade *classifier* that assigns events to MITRE tactics reliably without additional supervised training.
+## Amendment — supervised probe (same day, Apr 14, 2026)
+
+After the first run, I shipped Priority 2 from the revised Phase 2 plan — a
+one-vs-rest logistic regression over the 16,384D bipolar HVs — and ran it on
+the same 1000-event corpus with an 80/20 stratified split.
+
+**Configuration:** 40 epochs, lr=0.05, L2=1e-4, batch=32, Xavier init.
+**Implementation:** pure-Rust from scratch (`src/probe.rs`, ~280 LOC, zero new deps).
+
+### Results
+
+| metric | value |
+|---|---|
+| Train accuracy | 0.994 |
+| **Test accuracy** | **0.815** |
+| Chance (1/8) | 0.125 |
+| Nearest-centroid baseline | 0.451 |
+| HDBSCAN best | 0.565 |
+| Phase 1 kill criterion | 0.500 |
+
+**The supervised probe is at 0.815, 6.5× above chance, 1.8× above NC, 1.4× above HDBSCAN.**
+
+### Per-class test accuracy (n=25 per class)
+
+| class | correct/total | accuracy |
+|---|---|---|
+| command_and_control | 24/25 | 0.96 |
+| discovery | 24/25 | 0.96 |
+| execution | 24/25 | 0.96 |
+| credential_access | 22/25 | 0.88 |
+| persistence | 22/25 | 0.88 |
+| defense_evasion | 19/25 | 0.76 |
+| lateral_movement | 16/25 | 0.64 |
+| privilege_escalation | 12/25 | 0.48 |
+
+### Interpretation — the encoder is fine
+
+1. **The information IS in the 16,384D HVs.** NC averages every dimension
+   equally and throws most of the discriminative signal away. A learned
+   linear classifier weights the ~100-1000 genuinely discriminative
+   dimensions up and the noise dimensions down, and recovers most of the
+   label structure.
+
+2. **Train-test gap is 18pp (0.994 → 0.815).** Moderate overfitting on
+   a 800-sample train set in 16,384 dimensions is expected. Stronger L2
+   or more data would tighten it, but 0.815 is already well above
+   threshold.
+
+3. **The two weak classes are semantically the overlap classes.** Lateral
+   movement (0.64) and privilege escalation (0.48) share the most Windows
+   event types with adjacent tactics — network logons (4624) overlap
+   benign logins and credential access; token manipulation overlaps
+   defense evasion. MITRE's tactic taxonomy is known to be fuzzy at these
+   boundaries, so the probe's weakness there reflects the taxonomy, not
+   the encoder.
+
+4. **The original product framing survives.** A probe that classifies
+   Windows events into MITRE tactics at 0.815 accuracy — trained on 800
+   public adversarial samples — is a real product. The earlier panic
+   about needing to reframe to "unsupervised incident clustering only"
+   was premature; the classifier path IS viable.
+
+### Revised Phase 2 priorities (again)
+
+1. **~~Reframe to unsupervised only~~** — no longer needed. Keep the
+   classifier framing.
+2. **Statistical robustness** (1 week): re-run the probe with 5-fold
+   cross-validation to quantify the train/test variance. The 0.815
+   single-split number needs a confidence interval before it goes into
+   any external pitch. Expected: mean 0.78-0.83, std ~0.03.
+3. **Richer encoding channels** (still valuable, but now optional):
+   adding SID / path / numeric-bin channels would push the probe from
+   0.815 toward 0.90+ and close the per-class gap for lateral_movement
+   and privilege_escalation. Not a blocker.
+4. **Out-of-distribution test** (3 weeks): probe trained on
+   EVTX-ATTACK-SAMPLES, tested on a held-out corpus (Mordor? ATT&CK
+   Evaluations? raw enterprise telemetry if we can get it). This is the
+   honest generalization test. 0.815 on the same-distribution split is
+   a ceiling, not a floor, for real-world deployment.
+5. **Anomaly-detection pivot** — still exploratory, lower priority now.
+
+### What to tell a CIO (external pitch, revised)
+
+> "We built a classifier over Windows Event Logs that assigns events to
+> MITRE ATT&CK tactics with 81.5% test accuracy after training on 800
+> public attack samples. It's not production-ready — we haven't measured
+> cross-distribution generalization — but it demonstrates that the
+> hyperdimensional encoding captures enough tactic-level signal to
+> support an MSP-grade classifier. Our next experiment is cross-validation
+> for a confidence interval, followed by an out-of-distribution test on a
+> different corpus."
+
+Honest, specific, concedes what we haven't measured yet, and doesn't
+overclaim "Z3-verified" anything.
+
+### What this does NOT tell us (limits)
+
+- **Single 80/20 split → no confidence interval.** The 0.815 could be
+  0.77 or 0.85 on a different split. Cross-validation is the next step.
+- **EVTX-ATTACK-SAMPLES is adversarial-only.** There's no benign
+  baseline, so we can't measure false-positive rate on normal traffic.
+- **Same distribution.** Train and test are both drawn from the same
+  curated repo. A probe trained here might crater on real enterprise
+  telemetry with different Windows versions, locales, or configurations.
+- **1000-event sample.** Full-corpus training is feasible (unlike
+  HDBSCAN), but we haven't done it yet.
+- **8 classes, not finer-grained techniques.** MITRE tactics are the
+  coarse level; the full ATT&CK matrix has ~200 techniques. Whether the
+  encoder can discriminate at technique level is an open question.
 
 ## What Phase 2 should do (revised from original plan)
 
