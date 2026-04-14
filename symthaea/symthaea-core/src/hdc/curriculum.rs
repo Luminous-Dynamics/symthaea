@@ -203,6 +203,26 @@ impl CurriculumProblem {
             _ => None,
         }
     }
+
+    /// Structured uniqueness-proof witness for problems whose answer
+    /// is a textual canonical form. Returns `None` for problem kinds
+    /// that don't have a uniqueness argument to express. The witness
+    /// is a multi-line outline (ASSUMPTIONS / STEPS / CONCLUSION) that
+    /// downstream proof checkers (Z3, Lean, Coq) can use as the
+    /// skeleton of a formal proof.
+    pub fn uniqueness_witness(&self) -> Option<String> {
+        match &self.kind {
+            ProblemKind::FunctionalEquationFindAll { kind } => {
+                let w = kind.uniqueness_witness();
+                if w.is_empty() {
+                    None
+                } else {
+                    Some(w)
+                }
+            }
+            _ => None,
+        }
+    }
 }
 
 // ─── Generators ─────────────────────────────────────────────────────────────

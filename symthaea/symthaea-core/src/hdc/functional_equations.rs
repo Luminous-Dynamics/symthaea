@@ -80,6 +80,92 @@ impl EquationKind {
             EquationKind::Unknown => "(unknown / no canonical fit)",
         }
     }
+
+    /// Structured uniqueness-proof outline for the canonical form.
+    /// Returns a multi-line string that a downstream proof checker
+    /// (Z3, Lean, Coq) or human reviewer can use as the skeleton of
+    /// a uniqueness argument: assumptions, key steps, conclusion.
+    ///
+    /// This is **not** a verified proof — it's a structured witness.
+    /// The IMO solver produces this as part of its answer; an external
+    /// system can then decide whether to formalize each step.
+    ///
+    /// For families with no canonical form (`Unknown`) the witness
+    /// is empty.
+    pub fn uniqueness_witness(self) -> String {
+        match self {
+            EquationKind::Constant => "\
+ASSUMPTIONS: none
+STEPS:
+  1. f(x) − f(y) = 0 for all x, y in the sample set.
+  2. Hence f is constant.
+CONCLUSION: f(x) = c where c = f(0)."
+                .to_string(),
+            EquationKind::Identity => "\
+ASSUMPTIONS: f sampled with f(x) = x for all sample inputs.
+STEPS:
+  1. f(0) = 0 (substitute x=y=0 into Cauchy: 2f(0)=f(0)).
+  2. f(1) = 1 by sampling.
+  3. f(x) = c·x with c = f(1) = 1 by Cauchy's continuous-solution theorem.
+CONCLUSION: f(x) = x (Identity is Cauchy with c=1)."
+                .to_string(),
+            EquationKind::CauchyAdditive => "\
+ASSUMPTIONS: f: R → R continuous, f(x+y) = f(x) + f(y) for all real x, y.
+STEPS:
+  1. f(0) = 0    (substitute x = y = 0 ⇒ f(0) = 2f(0))
+  2. f(−x) = −f(x)    (substitute y = −x)
+  3. f(nx) = n·f(x) for all integers n    (induction)
+  4. f(x/n) = f(x)/n for all positive integers n
+  5. f(qx) = q·f(x) for all rationals q
+  6. By continuity, f(rx) = r·f(x) for all reals r.
+  7. Set x = 1 ⇒ f(r) = r·f(1) for all r. Let c = f(1).
+CONCLUSION: f(x) = c·x where c = f(1).
+NOTE: Without continuity, pathological Hamel-basis solutions exist."
+                .to_string(),
+            EquationKind::Multiplicative => "\
+ASSUMPTIONS: f: R⁺ → R⁺ continuous, f(x·y) = f(x)·f(y) for x, y > 0.
+STEPS:
+  1. f(1) = 1    (substitute x = y = 1 ⇒ f(1) = f(1)²; positivity rules out 0)
+  2. Let g(t) = log f(e^t). Then g(s+t) = g(s) + g(t)    (Cauchy on g)
+  3. By Cauchy's theorem, g(t) = c·t for some constant c.
+  4. Hence log f(e^t) = c·t ⇒ f(e^t) = e^(c·t) ⇒ f(x) = x^c.
+CONCLUSION: f(x) = x^c where c = log f(e) / 1."
+                .to_string(),
+            EquationKind::Exponential => "\
+ASSUMPTIONS: f: R → R continuous, f(x+y) = f(x)·f(y) for all real x, y.
+STEPS:
+  1. f(0) = f(0)²    ⇒ f(0) ∈ {0, 1}.
+  2. If f(0) = 0 then f(x) = f(x)·f(0) = 0 (trivial; usually excluded).
+  3. Assume f(0) = 1. Then f(x)·f(−x) = f(0) = 1 ⇒ f never vanishes.
+  4. Set g(x) = log f(x). Then g(x+y) = g(x) + g(y)    (Cauchy on g)
+  5. By Cauchy's theorem, g(x) = c·x ⇒ f(x) = e^(c·x) = a^x where a = e^c.
+CONCLUSION: f(x) = a^x with a = f(1)."
+                .to_string(),
+            EquationKind::Logarithmic => "\
+ASSUMPTIONS: f: R⁺ → R continuous, f(x·y) = f(x) + f(y) for x, y > 0.
+STEPS:
+  1. f(1) = 0    (substitute x = y = 1 ⇒ f(1) = 2f(1))
+  2. Let g(t) = f(e^t). Then g(s+t) = g(s) + g(t)    (Cauchy on g)
+  3. By Cauchy's theorem, g(t) = c·t ⇒ f(e^t) = c·t ⇒ f(x) = c·log(x).
+CONCLUSION: f(x) = c·log(x) where c = f(e)."
+                .to_string(),
+            EquationKind::Involution => "\
+ASSUMPTIONS: f: R → R, f(f(x)) = x for all real x.
+STEPS:
+  1. f is its own inverse: f⁻¹ = f.
+  2. f is a bijection R → R.
+  3. The set of involutions on R is uncountable; common examples:
+       a. f(x) = x                (identity)
+       b. f(x) = a − x for any a  (reflection about a/2)
+       c. f(x) = a / x for x ≠ 0  (reciprocal scaled)
+       d. piecewise swaps, e.g. f swaps two intervals
+  4. Continuity narrows the set: continuous involutions on R are
+     either x ↦ x or x ↦ a − x for some real a.
+CONCLUSION: f is an involution; under continuity, f(x) = x or f(x) = a − x."
+                .to_string(),
+            EquationKind::Unknown => String::new(),
+        }
+    }
 }
 
 /// Convenience: build a sample set for one of the canonical families
@@ -679,6 +765,54 @@ mod tests {
         // f(x) = x² on {1, 2, 3, ...}: f(2)=4, f(4)=16 ≠ 2 ⇒ residual > 0
         let s = vec![(1.0, 1.0), (2.0, 4.0), (4.0, 16.0), (16.0, 256.0)];
         assert!(involution_residual(&s) > 1.0);
+    }
+
+    // ── Uniqueness witness ──
+
+    #[test]
+    fn test_uniqueness_witness_present_for_known_families() {
+        for k in [
+            EquationKind::Constant,
+            EquationKind::Identity,
+            EquationKind::CauchyAdditive,
+            EquationKind::Multiplicative,
+            EquationKind::Exponential,
+            EquationKind::Logarithmic,
+            EquationKind::Involution,
+        ] {
+            let w = k.uniqueness_witness();
+            assert!(!w.is_empty(), "{:?} should have a witness", k);
+            assert!(
+                w.contains("ASSUMPTIONS") && w.contains("STEPS") && w.contains("CONCLUSION"),
+                "{:?} witness must have ASSUMPTIONS/STEPS/CONCLUSION sections",
+                k
+            );
+        }
+    }
+
+    #[test]
+    fn test_uniqueness_witness_unknown_is_empty() {
+        assert!(EquationKind::Unknown.uniqueness_witness().is_empty());
+    }
+
+    #[test]
+    fn test_uniqueness_witness_cauchy_mentions_continuity() {
+        // Cauchy's continuous-solution theorem is the load-bearing
+        // assumption — the witness must reference it explicitly so
+        // a downstream proof checker knows what's being assumed.
+        let w = EquationKind::CauchyAdditive.uniqueness_witness();
+        assert!(w.contains("continuous"), "Cauchy witness must mention continuity assumption");
+        assert!(w.contains("Hamel"), "Cauchy witness must call out the pathological-solutions caveat");
+    }
+
+    #[test]
+    fn test_uniqueness_witness_exponential_handles_zero_branch() {
+        // The exponential law f(x+y) = f(x)f(y) admits f ≡ 0 as a
+        // trivial solution; the witness must enumerate this branch
+        // before deriving the canonical f(x) = a^x.
+        let w = EquationKind::Exponential.uniqueness_witness();
+        assert!(w.contains("f(0) = 0"), "Exponential witness must address the f≡0 branch");
+        assert!(w.contains("a^x") || w.contains("e^"));
     }
 
     #[test]

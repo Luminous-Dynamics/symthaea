@@ -1872,6 +1872,110 @@ mod tests {
     }
 
     #[test]
+    fn test_template_functional_equation_no_false_positives() {
+        // Robustness #1: out-of-scope text that mentions f(...) but
+        // doesn't actually express a canonical functional equation
+        // must NOT route to FunctionalEquationFindAll. The detector
+        // requires both LHS and RHS substrings, so partial mentions
+        // (one side only, or unrelated f(x+y) usage) must return None.
+        let cases = [
+            // Mentions f but not as a functional equation
+            "Show that 7 is prime.",
+            "Compute φ(18) where φ is Euler's totient.",
+            "Find integers x, y with 3x + 5y = 1.",
+            // Mentions f(x+y) but not in equation form (no matching RHS)
+            "Differentiate f(x+y) with respect to x.",
+            "The function f(x+y) appears in the integrand.",
+            // Mentions f(x)+f(y) but not f(x+y) on the LHS
+            "The Riemann sum f(x)+f(y)+f(z) approximates the integral.",
+            // Polynomial f(x+y) — looks like a functional equation but isn't
+            "Let f be the polynomial x²+1; compute f(x+y) − f(x) − f(y).",
+        ];
+        for text in &cases {
+            let result = template_functional_equation(text);
+            assert!(
+                result.is_none(),
+                "out-of-scope text {:?} unexpectedly routed to FunctionalEquationFindAll: {:?}",
+                text,
+                result.map(|p| p.name)
+            );
+        }
+    }
+
+    #[test]
+    fn test_known_unsolvable_problems_return_none_or_unsolved() {
+        // Failure catalog (option #2): catalogue problems we *know*
+        // the current pipeline can't solve so future work has a
+        // concrete list of targets. The assertion is that they fail
+        // gracefully (return None or produce an Unsolved result),
+        // not that they crash. When one of these starts succeeding,
+        // delete it from the list and ship the new capability.
+        let parser = ImoNlParser::new();
+        let unsolvable = [
+            // Auxiliary geometry construction — not in the synthetic
+            // geometry primitives.
+            "Let ABC be a triangle. Construct the Fermat point of triangle ABC.",
+            // Irrationality proof — needs algebraic-number reasoning,
+            // not in the primitive library.
+            "Prove that the cube root of two is irrational.",
+            // Infinitary functional equation — outside the five
+            // canonical families (the equation has an additive-shift
+            // form, not Cauchy/multiplicative/exp/log/involution).
+            "Find all functions g such that g(g(t)) plus g(t) equals two t plus three for all positive integers.",
+            // Combinatorial game with backward induction — Phase 4
+            // covers invariants/monovariants but not full game trees.
+            "Two players alternately remove pebbles from a heap; whoever takes the last pebble loses. Determine the winning strategy.",
+        ];
+        for text in &unsolvable {
+            match parser.parse(text) {
+                None => {} // graceful no-match
+                Some(p) => {
+                    // If parser routes it somewhere, solve() should
+                    // honestly return false (we don't have the
+                    // primitive). A surprise success here means we
+                    // gained a capability and the catalog needs an update.
+                    let solved = p.problem.solve();
+                    assert!(
+                        !solved,
+                        "FAILURE CATALOG REGRESSION (good news!): \"{}\" \
+                         was previously unsolvable but now solves as {}. \
+                         Update the failure catalog test.",
+                        text, p.problem.name
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_curriculum_uniqueness_witness_present_for_functional_equations() {
+        // Phase 3C #3 accessor: every functional equation problem
+        // produced by the parser must have a non-empty uniqueness
+        // witness with the standard ASSUMPTIONS/STEPS/CONCLUSION
+        // structure. This is the contract downstream proof checkers
+        // (Z3, Lean) rely on.
+        let parsed = template_functional_equation(
+            "Find all functions f: R → R such that f(x+y) = f(x) + f(y).",
+        )
+        .expect("Cauchy form should match");
+        let witness = parsed
+            .uniqueness_witness()
+            .expect("functional equation problem must produce a witness");
+        for tag in ["ASSUMPTIONS", "STEPS", "CONCLUSION"] {
+            assert!(
+                witness.contains(tag),
+                "witness missing '{}' section: {}",
+                tag,
+                witness
+            );
+        }
+        // Non-functional-equation problems return None
+        let pell = template_pell("Show that x² − 13y² = 1 has a solution.")
+            .expect("Pell template should match");
+        assert!(pell.uniqueness_witness().is_none());
+    }
+
+    #[test]
     fn test_template_functional_equation_alternate_variables() {
         // Every IMO functional equation problem uses different variable
         // letters. The detector must accept (a, b), (u, v), (m, n), etc.,
