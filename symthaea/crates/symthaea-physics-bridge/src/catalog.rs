@@ -306,6 +306,23 @@ fn build_all_equations() -> Vec<PhysicsEquation> {
     eqs.push(angular_momentum_2d_cartesian());
     eqs.push(henon_heiles_hamiltonian());
 
+    // ── Combinatorics (Mathematics domain) ──
+    // These give sequence-discovery targets a direct catalog home instead of
+    // routing to nearest-neighbor nuclear physics. Closes the Ramanujan
+    // Protocol showcase's last weak match (triangular → Coulomb Screening 0.70).
+    //
+    // NOTE: Sum of Cubes (`n²(n+1)²/4`) was tried but removed — its shape
+    // was too generic and produced false-positive matches at 99% against
+    // any discovered formula containing nested power-of-variable subtrees
+    // (e.g. PCR3BP's garbage `cos(y/e)^(x³)`). Its function `sum_of_cubes()`
+    // is kept for reference but no longer pushed. If the similarity metric
+    // is ever tightened to weight top-level operator agreement more heavily,
+    // it can be re-added.
+    eqs.push(triangular_numbers());
+    eqs.push(square_pyramidal_numbers());
+    eqs.push(tetrahedral_numbers());
+    eqs.push(harmonic_numbers());
+
     // ── Phase 1B: Expand to 150 ──
     // Classical Mechanics
     eqs.push(simple_eq(
@@ -4639,6 +4656,166 @@ fn henon_heiles_hamiltonian() -> PhysicsEquation {
         // `x²y − y³/3` breaks rotational invariance. `symmetry_inference`
         // returns `none()` for a sum containing cubic terms (it only
         // matches pure sum-of-squares), which aligns with this entry.
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COMBINATORICS — Ramanujan Showcase routing fix
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// The Ramanujan Protocol showcase discovers triangular numbers `n(n+1)/2` as
+// a Z3-proven closed form, but until these entries existed the nearest
+// neighbor in the catalog was "Coulomb Screening Enhancement" (similarity
+// ~0.70) — a nonsense match because there were zero combinatorics entries
+// in a 216-equation catalog dominated by physics.
+//
+// These five entries give canonical combinatorial sequences a direct
+// catalog home in the `Mathematics` domain. They're constructed via
+// `expr_to_catalog_ast` so the AST shape exactly matches what autonomous
+// discovery produces for each closed form.
+
+/// Triangular numbers: `T(n) = n(n+1)/2`
+///
+/// The 1st order polygonal number. Canonical closed form for Σk from 1 to n.
+/// Discovered as `(n * (n + 1)) / 2` by the ConjectureEngine's recurrence
+/// solver, so the AST is built from that exact shape.
+fn triangular_numbers() -> PhysicsEquation {
+    let v = |n: &str| Expr::Var(n.into());
+    let mul = |a: Expr, b: Expr| Expr::BinOp(BinOp::Mul, Box::new(a), Box::new(b));
+    let add = |a: Expr, b: Expr| Expr::BinOp(BinOp::Add, Box::new(a), Box::new(b));
+    let div = |a: Expr, b: Expr| Expr::BinOp(BinOp::Div, Box::new(a), Box::new(b));
+
+    // (n * (n + 1)) / 2 — exact shape produced by solve_recurrence
+    let expr = div(mul(v("n"), add(v("n"), Expr::Const(1.0))), Expr::Const(2.0));
+
+    PhysicsEquation {
+        name: "Triangular Numbers".to_string(),
+        domain: PhysicsDomain::Mathematics,
+        ast: expr_to_catalog_ast("T", &expr),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    }
+}
+
+/// Square pyramidal numbers: `P(n) = n(n+1)(2n+1)/6`
+///
+/// Σk² from 1 to n. Classic stepping stone in combinatorial identities;
+/// the natural closed form for sum-of-squares sequences. Built from the
+/// exact factored shape that GP recurrence solving produces.
+fn square_pyramidal_numbers() -> PhysicsEquation {
+    let v = |n: &str| Expr::Var(n.into());
+    let mul = |a: Expr, b: Expr| Expr::BinOp(BinOp::Mul, Box::new(a), Box::new(b));
+    let add = |a: Expr, b: Expr| Expr::BinOp(BinOp::Add, Box::new(a), Box::new(b));
+    let div = |a: Expr, b: Expr| Expr::BinOp(BinOp::Div, Box::new(a), Box::new(b));
+
+    // (n * (n + 1) * (2n + 1)) / 6
+    let two_n_plus_1 = add(mul(Expr::Const(2.0), v("n")), Expr::Const(1.0));
+    let expr = div(
+        mul(mul(v("n"), add(v("n"), Expr::Const(1.0))), two_n_plus_1),
+        Expr::Const(6.0),
+    );
+
+    PhysicsEquation {
+        name: "Square Pyramidal Numbers".to_string(),
+        domain: PhysicsDomain::Mathematics,
+        ast: expr_to_catalog_ast("P", &expr),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    }
+}
+
+/// Tetrahedral numbers: `Te(n) = n(n+1)(n+2)/6`
+///
+/// Σ T(k) from 1 to n — the 3D analogue of triangular numbers. Included
+/// because sequences like pyramid counts and layer sums naturally produce
+/// this shape, and it's structurally distinct from square pyramidal
+/// (different factor ordering).
+fn tetrahedral_numbers() -> PhysicsEquation {
+    let v = |n: &str| Expr::Var(n.into());
+    let mul = |a: Expr, b: Expr| Expr::BinOp(BinOp::Mul, Box::new(a), Box::new(b));
+    let add = |a: Expr, b: Expr| Expr::BinOp(BinOp::Add, Box::new(a), Box::new(b));
+    let div = |a: Expr, b: Expr| Expr::BinOp(BinOp::Div, Box::new(a), Box::new(b));
+
+    // n(n+1)(n+2) / 6
+    let expr = div(
+        mul(
+            mul(v("n"), add(v("n"), Expr::Const(1.0))),
+            add(v("n"), Expr::Const(2.0)),
+        ),
+        Expr::Const(6.0),
+    );
+
+    PhysicsEquation {
+        name: "Tetrahedral Numbers".to_string(),
+        domain: PhysicsDomain::Mathematics,
+        ast: expr_to_catalog_ast("Te", &expr),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    }
+}
+
+/// Sum of cubes: `Σk³ = (n(n+1)/2)² = T(n)²`
+///
+/// The famous Nicomachus identity — sum of the first n cubes equals the
+/// square of the nth triangular number. Stored in its explicit closed form
+/// `n²(n+1)²/4`.
+///
+/// **Currently not registered in the catalog list** because its AST shape
+/// is too generic for the similarity metric — it scored 99% matches against
+/// arbitrary formulas containing nested power-of-variable subtrees (e.g.
+/// `cos(y/e)^(x³)` from PCR3BP's garbage output). Kept as a reference
+/// implementation for future re-addition once the similarity metric
+/// weights top-level operator agreement more heavily.
+#[allow(dead_code)]
+fn sum_of_cubes() -> PhysicsEquation {
+    let v = |n: &str| Expr::Var(n.into());
+    let pow2 = |e: Expr| Expr::BinOp(BinOp::Pow, Box::new(e), Box::new(Expr::Const(2.0)));
+    let mul = |a: Expr, b: Expr| Expr::BinOp(BinOp::Mul, Box::new(a), Box::new(b));
+    let add = |a: Expr, b: Expr| Expr::BinOp(BinOp::Add, Box::new(a), Box::new(b));
+    let div = |a: Expr, b: Expr| Expr::BinOp(BinOp::Div, Box::new(a), Box::new(b));
+
+    // n² * (n+1)² / 4
+    let expr = div(
+        mul(pow2(v("n")), pow2(add(v("n"), Expr::Const(1.0)))),
+        Expr::Const(4.0),
+    );
+
+    PhysicsEquation {
+        name: "Sum of Cubes (Nicomachus)".to_string(),
+        domain: PhysicsDomain::Mathematics,
+        ast: expr_to_catalog_ast("C", &expr),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    }
+}
+
+/// Harmonic numbers: `H(n) ≈ ln(n) + γ`
+///
+/// Asymptotic closed form for the partial sums of the harmonic series.
+/// Stored as the log approximation (the exact H(n) has no elementary
+/// closed form) because that's what GP regression converges to on the
+/// harmonic sequence — the `ln(n) + 0.577...` shape.
+///
+/// Constant named for the Euler-Mascheroni constant γ ≈ 0.5772.
+fn harmonic_numbers() -> PhysicsEquation {
+    let v = |n: &str| Expr::Var(n.into());
+    let ln = |e: Expr| Expr::Func(UnaryFn::Log, Box::new(e));
+    let add = |a: Expr, b: Expr| Expr::BinOp(BinOp::Add, Box::new(a), Box::new(b));
+
+    // ln(n) + γ  (γ as literal 0.5772156649)
+    let expr = add(ln(v("n")), Expr::Const(0.577_215_664_901_532_9));
+
+    PhysicsEquation {
+        name: "Harmonic Numbers (asymptotic)".to_string(),
+        domain: PhysicsDomain::Mathematics,
+        ast: expr_to_catalog_ast("H", &expr),
         symmetries: SymmetryDescriptor::none(),
         dimensions: DimensionalSignature::DIMENSIONLESS,
         tensor: None,
