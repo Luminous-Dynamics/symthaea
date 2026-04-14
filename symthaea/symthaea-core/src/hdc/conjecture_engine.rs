@@ -2030,6 +2030,56 @@ impl ConjectureEngine {
         self.observations.push(seq);
     }
 
+    /// Ingest autonomously-discovered invariants from `discover_invariants_autonomous`
+    /// into the conjecture pool so downstream reflection (subtree extraction,
+    /// macro promotion) can act on them.
+    ///
+    /// This is the **multivariate bridge**: `discover_invariants_autonomous`
+    /// handles k-dimensional state spaces (Kepler 4D, Hénon-Heiles 4D, PCR3BP
+    /// 4D), but its results live in a separate `AutonomousInvariant` type
+    /// that the abstract_thought extraction pipeline doesn't know about.
+    /// This method bridges the two worlds so a macro pool that was previously
+    /// 1D-only (via `ObservedSequence`) can now accumulate multivariate
+    /// distance kernels, cross-products, and Hamiltonian skeletons extracted
+    /// from trajectory-based discoveries.
+    ///
+    /// For each invariant, status is assigned based on whether it was
+    /// symbolically proven via the chain-rule path:
+    /// - `symbolically_proven == true` → `ConjectureStatus::FormallyVerified`
+    ///    (eligible for fast-track macro promotion)
+    /// - else → `ConjectureStatus::NumericallyTested` with `test_mse = variance`
+    ///   (standard numerical-tier macro extraction applies)
+    ///
+    /// The `source` field is set to the caller-provided tag so later
+    /// filtering (e.g. "what macros did the Kepler discovery contribute?")
+    /// remains possible.
+    pub fn ingest_autonomous_invariants(
+        &mut self,
+        source_tag: &str,
+        domain: MathDomain,
+        invariants: &[AutonomousInvariant],
+    ) {
+        for inv in invariants {
+            let fitness = inv.variance + self.config.lambda * inv.complexity as f64;
+            let status = if inv.symbolically_proven {
+                ConjectureStatus::FormallyVerified { proof_steps: 0 }
+            } else {
+                ConjectureStatus::NumericallyTested { test_mse: inv.variance }
+            };
+            self.conjectures.push(Conjecture {
+                formula: inv.formula.clone(),
+                formula_str: inv.formula_str.clone(),
+                source: source_tag.to_string(),
+                domain,
+                training_mse: inv.variance,
+                complexity: inv.complexity,
+                fitness,
+                status,
+                confidence: if inv.symbolically_proven { 0.99 } else { 0.6 },
+            });
+        }
+    }
+
     /// Run symbolic regression on all observations. Returns new conjectures.
     pub fn generate_conjectures(&mut self, top_k_per_sequence: usize) -> &[Conjecture] {
         let observations = self.observations.clone();
@@ -7947,6 +7997,100 @@ mod tests {
         assert!(results[0].variance < 1e-20,
             "top variance should be near machine epsilon for a true invariant, got {}",
             results[0].variance);
+    }
+
+    #[cfg(feature = "abstract_thought")]
+    #[test]
+    fn test_multivariate_macro_bridge_kepler() {
+        // Stage 2 MVP: wire `discover_invariants_autonomous` to the
+        // abstract_thought extraction pipeline. Runs Kepler autonomous
+        // discovery, ingests the invariants as conjectures, reflects, and
+        // asserts that at least one macro containing multiple variables
+        // (i.e. genuinely multivariate, not a 1D reduction) lands in M₁.
+        //
+        // Success criterion: ≥1 macro whose template references at least
+        // TWO distinct variable names from {x, y, vx, vy}. Such a macro is
+        // irreducibly multivariate and would be architecturally unreachable
+        // via the 1D `ObservedSequence` path. If this passes, the multivariate
+        // macro pool is functional — the architectural unblock for Ceiling B
+        // (2D distance kernels, Jacobi integrals, etc.) has landed.
+        use super::super::primitive_system::PrimitiveSystem;
+
+        fn kepler_rhs(s: &[f64], _t: f64) -> Vec<f64> {
+            let (x, y, vx, vy) = (s[0], s[1], s[2], s[3]);
+            let r2 = x * x + y * y;
+            let r3 = r2 * r2.sqrt();
+            if r3 < 1e-15 { return vec![vx, vy, 0.0, 0.0]; }
+            vec![vx, vy, -x / r3, -y / r3]
+        }
+
+        let config = RegressorConfig {
+            population_size: 500,
+            generations: 150,
+            max_depth: 5,
+            max_complexity: 25,
+            lambda: 0.0005,
+            mutation_rate: 0.4,
+            seed: 42,
+            ..RegressorConfig::default()
+        };
+
+        // 1. Run autonomous multivariate discovery on Kepler
+        let invariants = discover_invariants_autonomous(
+            kepler_rhs,
+            &[1.0, 0.0, 0.0, 0.8],
+            &["x", "y", "vx", "vy"],
+            None,
+            &config,
+            20.0,
+            0.001,
+        );
+        assert!(!invariants.is_empty(), "Kepler discovery should find invariants");
+
+        // 2. Ingest into the ConjectureEngine's pool and reflect
+        let mut engine = ConjectureEngine::new();
+        engine.enable_abstract_thought();
+        engine.ingest_autonomous_invariants("kepler_autonomous", MathDomain::Physics, &invariants);
+
+        let prims = PrimitiveSystem::new();
+        engine.reflect(&prims);
+
+        // 3. Inspect macro pool for multivariate shapes
+        let macros = engine.macro_operators();
+        eprintln!("Multivariate bridge test — {} macros in pool:", macros.len());
+        for (i, m) in macros.iter().enumerate() {
+            eprintln!("  {}. {}", i + 1, m.template);
+        }
+
+        // Count variable names referenced in each macro's template
+        fn collect_vars(expr: &Expr, out: &mut std::collections::HashSet<String>) {
+            match expr {
+                Expr::Var(name) => { out.insert(name.clone()); }
+                Expr::Const(_) => {}
+                Expr::BinOp(_, l, r) => { collect_vars(l, out); collect_vars(r, out); }
+                Expr::Func(_, arg) => collect_vars(arg, out),
+                Expr::Sum(body, _) => collect_vars(body, out),
+            }
+        }
+
+        let kepler_vars: std::collections::HashSet<&'static str> =
+            ["x", "y", "vx", "vy"].iter().copied().collect();
+        let mut multivariate_macros = 0;
+        for m in macros {
+            let mut vars = std::collections::HashSet::new();
+            collect_vars(&m.template, &mut vars);
+            let kepler_var_count = vars.iter().filter(|v| kepler_vars.contains(v.as_str())).count();
+            if kepler_var_count >= 2 {
+                multivariate_macros += 1;
+                eprintln!("  ✓ multivariate: {} (uses {} vars)", m.template, kepler_var_count);
+            }
+        }
+
+        assert!(
+            multivariate_macros >= 1,
+            "expected at least 1 multivariate macro (using ≥2 distinct Kepler vars), got {}",
+            multivariate_macros
+        );
     }
 
     #[test]
