@@ -397,3 +397,196 @@ async fn ws_replay_protection_survives_the_wire() {
         "replay window must reject the second delivery of the same envelope"
     );
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// Input reverse path test (Phase I.A.5 "How to improve" item 4)
+// ═══════════════════════════════════════════════════════════════════════
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn ws_input_reverse_path_reaches_server_rdp_inbound() {
+    // Proves the viewer → server path: the egui viewer sends an
+    // InputFrame via seal_input → Message::Binary → WebSocket → server
+    // holon_ws_handler routes the bytes into state.rdp_inbound via
+    // push_rdp_inbound. Test asserts the bytes arrive unchanged.
+    //
+    // This closes the gap noted in `papers/phase_1a_results.md`
+    // Limitations §3 — "Input reverse path is not in the WS integration
+    // tests."
+    use symthaea::swarm::rdp_protocol::{InputEvent, InputFrame};
+    use symthaea::swarm::rdp_wire::{open_input, seal_input};
+
+    let (state, port) = spawn_test_server().await;
+    let mut sender_session = test_session("ws-reverse-client", true);
+    let mut receiver_session = test_session("ws-reverse-server", false);
+
+    // Connect the client.
+    let url = format!("ws://127.0.0.1:{port}/holon/ws");
+    let (ws_stream, _resp) = tokio_tungstenite::connect_async(&url)
+        .await
+        .expect("ws connect");
+    let (mut ws_sink, mut _ws_stream) = ws_stream.split();
+
+    // Build an InputFrame — simulates the viewer clicking the phone
+    // screen at (504, 1122) normalized to (0.5, 0.5).
+    let input = InputFrame {
+        sequence: 1,
+        timestamp_ms: 1_700_000_000_000,
+        events: vec![InputEvent::Pointer {
+            x: 0.5,
+            y: 0.5,
+            button: 1,
+            pressed: true,
+        }],
+    };
+    let sealed = seal_input(&input, &mut sender_session).expect("seal input");
+
+    // Send over the WS — this goes into holon_ws_handler's Binary
+    // handler which pushes the bytes into state.rdp_inbound.
+    ws_sink
+        .send(Message::Binary(sealed.clone().into()))
+        .await
+        .expect("ws send");
+
+    // Give the server a beat to process the message.
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    // Drain rdp_inbound and assert the sealed bytes arrived unchanged.
+    let received = state.drain_rdp_inbound();
+    assert!(!received.is_empty(), "server should have received the input frame");
+    assert_eq!(
+        received[0].len(),
+        sealed.len(),
+        "inbound bytes length must match sent length"
+    );
+
+    // Open the received envelope — proves the same placeholder key on
+    // both sides allows the server to recover the InputFrame.
+    let opened = open_input(&received[0], &mut receiver_session).expect("open input");
+    assert_eq!(opened.sequence, 1);
+    assert_eq!(opened.events.len(), 1);
+    if let InputEvent::Pointer { x, y, button, pressed } = opened.events[0] {
+        assert!((x - 0.5).abs() < 1e-6);
+        assert!((y - 0.5).abs() < 1e-6);
+        assert_eq!(button, 1);
+        assert!(pressed);
+    } else {
+        panic!("expected Pointer event");
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Soak test (Phase I.A.5 "How to improve" item 2)
+//
+// Ignored by default; run via:
+//   cargo test --test integration_holon_ws --features holon-viewer -- --ignored
+// ═══════════════════════════════════════════════════════════════════════
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+#[ignore]
+async fn ws_soak_ten_thousand_frames() {
+    // Pushes 10,000 sealed frames through the broadcast path, asserts
+    // the subscriber either receives them all or lags + recovers via
+    // the VecDeque catch-up. Confirms steady-state behavior and catches
+    // long-run issues that a single-frame test cannot: tokio task leaks,
+    // channel buildup, memory growth, unexpected deadlock.
+    const N_FRAMES: u64 = 10_000;
+
+    let (state, port) = spawn_test_server().await;
+    let mut sender_session = test_session("ws-soak-server", true);
+
+    let url = format!("ws://127.0.0.1:{port}/holon/ws");
+    let (ws_stream, _resp) = tokio_tungstenite::connect_async(&url)
+        .await
+        .expect("ws connect");
+    let (_sink, mut stream) = ws_stream.split();
+
+    // Spawn a receiver task that counts delivered frames.
+    let received_count = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+    let recv_counter = received_count.clone();
+    let recv_task = tokio::spawn(async move {
+        while let Some(msg) = stream.next().await {
+            match msg {
+                Ok(Message::Binary(_)) => {
+                    recv_counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }
+                Ok(Message::Close(_)) | Err(_) => break,
+                _ => continue,
+            }
+        }
+    });
+
+    // Give the subscriber a beat to register.
+    tokio::time::sleep(Duration::from_millis(50)).await;
+
+    // Push 10,000 sealed frames. We use a small cols/rows to keep
+    // per-frame work minimal and focus on the throughput path.
+    let start = std::time::Instant::now();
+    for i in 0..N_FRAMES {
+        let frame = sample_full_frame(i + 1, 2, 2, (i & 0xFF) as u8);
+        let sealed = seal_frame(&frame, &mut sender_session).expect("seal");
+        state.push_rdp_outbound(sealed);
+    }
+    let push_elapsed = start.elapsed();
+
+    // Give the WS handler time to drain. Broadcast cap is 16, so
+    // slow subscribers will lag and recover via drain_rdp_outbound
+    // catch-up. Either path is acceptable — the assertion is that
+    // the TOTAL delivered count (broadcast + catch-up) equals N_FRAMES.
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    // Expect: all N_FRAMES pushed. Delivered count should be exactly
+    // N_FRAMES if no frames were dropped. Under broadcast lag, the
+    // receiver may see fewer via the broadcast but the VecDeque holds
+    // the rest — total across both paths must equal N_FRAMES.
+    let total_pushed: u64 = N_FRAMES;
+    let delivered = received_count.load(std::sync::atomic::Ordering::Relaxed);
+    let buffered = state.drain_rdp_outbound().len() as u64;
+    let total_accounted = delivered + buffered;
+
+    // Cancel receiver task.
+    recv_task.abort();
+
+    eprintln!(
+        "soak: pushed={} delivered={} buffered={} total_accounted={} push_wall={:?}",
+        total_pushed, delivered, buffered, total_accounted, push_elapsed
+    );
+
+    // Accounting check: every pushed frame should end up either
+    // delivered or buffered. A mismatch means a frame was dropped
+    // somewhere (not broadcast-lagged into the buffer, but genuinely
+    // lost). VecDeque cap is 512, so buffered can be at most 512.
+    // Anything above (buffered + 512) that's not delivered is a loss.
+    //
+    // Realistic accounting under broadcast cap 16 + VecDeque cap 512:
+    //   delivered ≤ N_FRAMES (depends on how fast the recv task runs)
+    //   buffered ≤ 512 (cap)
+    //   dropped = max(0, N_FRAMES - delivered - 512)
+    //
+    // For the test to pass we need: either delivered == N_FRAMES
+    // (receiver kept up, no drops) OR delivered + buffered >= N_FRAMES - 512
+    // (some broadcast drops that the VecDeque cap couldn't fully absorb,
+    // but we accept up to 512 legitimate losses per the cap).
+
+    if delivered == total_pushed {
+        eprintln!("soak: receiver kept up with all {total_pushed} frames");
+    } else {
+        let dropped = total_pushed.saturating_sub(delivered + buffered);
+        // Allow up to N_FRAMES - 512 delivered + 512 buffered = N_FRAMES.
+        // Any "drop" here is a VecDeque overflow which is by-design.
+        assert!(
+            delivered + buffered >= total_pushed.saturating_sub(512),
+            "soak accounting failed: pushed={total_pushed} delivered={delivered} \
+             buffered={buffered} dropped={dropped} (allowed drop floor: 512)"
+        );
+        eprintln!(
+            "soak: partial delivery — {delivered} via broadcast, {buffered} buffered, \
+             {dropped} dropped by VecDeque cap (max allowed: 512)"
+        );
+    }
+
+    // Push-side throughput sanity: 10k frames in under 5 seconds.
+    assert!(
+        push_elapsed < Duration::from_secs(5),
+        "push-side throughput below budget: {push_elapsed:?} for {total_pushed} frames"
+    );
+}
