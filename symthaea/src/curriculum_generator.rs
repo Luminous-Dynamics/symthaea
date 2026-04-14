@@ -234,25 +234,7 @@ pub fn generate_pigeonhole_lemmas(bridge: &Z3Bridge) -> Vec<VerifiedLemma> {
                 "Pigeonhole: distributing {} items into {} boxes forces some box to contain ≥ {} items.",
                 n, k, min_collision
             );
-            let (verdict, mode) = if bridge.z3_available {
-                // The encoder asserts the NEGATION of the goal, so an
-                // unsat result means the lemma is proved. Convert to
-                // LemmaVerdict::Valid.
-                let raw = bridge.verify_satisfiable(&smtlib2);
-                match raw {
-                    VerificationResult::Unsat { .. } => (LemmaVerdict::Valid, "z3"),
-                    VerificationResult::Sat { .. } => (LemmaVerdict::Invalid, "z3"),
-                    other => LemmaVerdict::from_bridge(other),
-                }
-            } else {
-                (
-                    LemmaVerdict::Skipped {
-                        reason: "z3 binary required (run inside nix develop or install pkgs.z3)"
-                            .into(),
-                    },
-                    "skipped",
-                )
-            };
+            let (verdict, mode) = run_negation_check(bridge, &smtlib2);
             VerifiedLemma {
                 id: format!("L3.{}", idx),
                 statement,
@@ -265,18 +247,178 @@ pub fn generate_pigeonhole_lemmas(bridge: &Z3Bridge) -> Vec<VerifiedLemma> {
         .collect()
 }
 
-// ─── L1, L2, L4, L5 stubs (for commits 2-3) ────────────────────────────────
+// ─── L1: AM-GM lemmas at small n ───────────────────────────────────────────
+//
+// Encoding: for n ∈ {2, 3, 4}, encode AM-GM in its **squared/cubed/quartic
+// form** to avoid sqrt:
+//   n=2:  ((a+b)/2)²    ≥  a·b              ⇔  (a+b)²    ≥  4·a·b
+//   n=3:  ((a+b+c)/3)³  ≥  a·b·c            ⇔  (a+b+c)³  ≥  27·a·b·c
+//   n=4:  ((a+b+c+d)/4)⁴ ≥ a·b·c·d           ⇔  (a+b+c+d)⁴ ≥ 256·a·b·c·d
+//
+// Each is a polynomial inequality in QF_NRA. Z3 handles them directly.
+// The encoder asserts the negation; an unsat result means the lemma is
+// proved.
 
-pub fn generate_amgm_lemmas(_bridge: &Z3Bridge) -> Vec<VerifiedLemma> {
-    vec![placeholder("L1.0", "AM-GM at n=2,3,4 — implemented in commit 2")]
+/// SMTLIB2 variable name for the i-th AM-GM input (lowercase letter).
+fn amgm_var(i: usize) -> char {
+    (b'a' + i as u8) as char
 }
 
-pub fn generate_cauchy_schwarz_lemmas(_bridge: &Z3Bridge) -> Vec<VerifiedLemma> {
-    vec![placeholder(
-        "L2.0",
-        "Cauchy-Schwarz at n=2,3 — implemented in commit 2",
-    )]
+/// Build `(* x x x ... x)` repeated `times` times, or `1` for `times == 0`.
+fn smt_pow(expr: &str, times: usize) -> String {
+    if times == 0 {
+        "1".to_string()
+    } else if times == 1 {
+        expr.to_string()
+    } else {
+        let body: Vec<&str> = std::iter::repeat(expr).take(times).collect();
+        format!("(* {})", body.join(" "))
+    }
 }
+
+/// SMTLIB2 source asserting the negation of "AM_n^n ≥ n^n · prod" on
+/// non-negative reals. Z3 is expected to return `unsat`.
+pub fn encode_amgm(n: usize) -> String {
+    assert!((2..=4).contains(&n), "encode_amgm: n must be in 2..=4");
+    let mut s = String::new();
+    s.push_str(&format!(
+        "; AM-GM at n={}: (sum)^{} >= {}^{} * prod for non-negative reals.\n",
+        n, n, n, n
+    ));
+    s.push_str("(set-logic QF_NRA)\n");
+    for i in 0..n {
+        s.push_str(&format!("(declare-const {} Real)\n", amgm_var(i)));
+        s.push_str(&format!("(assert (>= {} 0))\n", amgm_var(i)));
+    }
+    // sum = (+ a b ...)
+    let sum: Vec<String> = (0..n).map(|i| amgm_var(i).to_string()).collect();
+    let sum_expr = format!("(+ {})", sum.join(" "));
+    // prod = (* a b ...)
+    let prod_expr = format!("(* {})", sum.join(" "));
+    // sum^n
+    let sum_pow = smt_pow(&sum_expr, n);
+    // n^n constant
+    let n_pow_n = (n as u64).pow(n as u32);
+    // Negation of the lemma: (sum)^n < n^n * prod
+    s.push_str(&format!(
+        "(assert (not (>= {} (* {} {}))))\n",
+        sum_pow, n_pow_n, prod_expr
+    ));
+    s.push_str("(check-sat)\n");
+    s
+}
+
+/// Generate the v1 AM-GM lemmas at n ∈ {2, 3, 4}.
+pub fn generate_amgm_lemmas(bridge: &Z3Bridge) -> Vec<VerifiedLemma> {
+    [2usize, 3, 4]
+        .into_iter()
+        .enumerate()
+        .map(|(idx, n)| {
+            let smtlib2 = encode_amgm(n);
+            let statement = format!(
+                "AM-GM at n={}: ((Σxᵢ)/{})^{} ≥ Πxᵢ for non-negative xᵢ.",
+                n, n, n
+            );
+            let (verdict, mode) = run_negation_check(bridge, &smtlib2);
+            VerifiedLemma {
+                id: format!("L1.{}", idx),
+                statement,
+                smtlib2,
+                verdict,
+                witness: None,
+                mode: mode.to_string(),
+            }
+        })
+        .collect()
+}
+
+// ─── L2: Cauchy-Schwarz lemmas at small n ──────────────────────────────────
+//
+// Encoding: for vectors a, b ∈ R^n with n ∈ {2, 3}, the inequality
+//   (Σ aᵢbᵢ)² ≤ (Σ aᵢ²)(Σ bᵢ²)
+// is a polynomial inequality in 2n variables. Asserting the negation
+// produces an unsat formula that Z3 handles trivially in QF_NRA — this
+// is the classical "discriminant ≥ 0" form of Cauchy-Schwarz.
+
+/// SMTLIB2 source asserting the negation of (Σaᵢbᵢ)² ≤ (Σaᵢ²)(Σbᵢ²).
+pub fn encode_cauchy_schwarz(n: usize) -> String {
+    assert!((2..=3).contains(&n), "encode_cauchy_schwarz: n must be in 2..=3");
+    let mut s = String::new();
+    s.push_str(&format!(
+        "; Cauchy-Schwarz at n={}: (Σaᵢbᵢ)² ≤ (Σaᵢ²)(Σbᵢ²) on real vectors.\n",
+        n
+    ));
+    s.push_str("(set-logic QF_NRA)\n");
+    for i in 0..n {
+        s.push_str(&format!("(declare-const a{} Real)\n", i));
+        s.push_str(&format!("(declare-const b{} Real)\n", i));
+    }
+    // dot = Σ aᵢbᵢ
+    let dot_terms: Vec<String> = (0..n).map(|i| format!("(* a{} b{})", i, i)).collect();
+    let dot = format!("(+ {})", dot_terms.join(" "));
+    // |a|² = Σ aᵢ²
+    let a2_terms: Vec<String> = (0..n).map(|i| format!("(* a{} a{})", i, i)).collect();
+    let a_sq = format!("(+ {})", a2_terms.join(" "));
+    // |b|² = Σ bᵢ²
+    let b2_terms: Vec<String> = (0..n).map(|i| format!("(* b{} b{})", i, i)).collect();
+    let b_sq = format!("(+ {})", b2_terms.join(" "));
+    // (dot)² ≤ |a|² · |b|²  ⇔  (dot)² - |a|²·|b|² ≤ 0
+    // Negation: (dot)² > |a|²·|b|²
+    s.push_str(&format!(
+        "(assert (> (* {} {}) (* {} {})))\n",
+        dot, dot, a_sq, b_sq
+    ));
+    s.push_str("(check-sat)\n");
+    s
+}
+
+/// Generate the v1 Cauchy-Schwarz lemmas at n ∈ {2, 3}.
+pub fn generate_cauchy_schwarz_lemmas(bridge: &Z3Bridge) -> Vec<VerifiedLemma> {
+    [2usize, 3]
+        .into_iter()
+        .enumerate()
+        .map(|(idx, n)| {
+            let smtlib2 = encode_cauchy_schwarz(n);
+            let statement = format!(
+                "Cauchy-Schwarz at n={}: (Σ aᵢbᵢ)² ≤ (Σ aᵢ²)(Σ bᵢ²) for real vectors.",
+                n
+            );
+            let (verdict, mode) = run_negation_check(bridge, &smtlib2);
+            VerifiedLemma {
+                id: format!("L2.{}", idx),
+                statement,
+                smtlib2,
+                verdict,
+                witness: None,
+                mode: mode.to_string(),
+            }
+        })
+        .collect()
+}
+
+/// Shared bridge-call helper for lemmas whose smtlib2 asserts the
+/// **negation** of the goal: an unsat result means the goal is valid.
+/// Converts a SAT result into `Invalid` (the encoder produced a
+/// counterexample to a claim we believed was a theorem — surface as a
+/// real bug). Skips when no z3 binary is available.
+fn run_negation_check(bridge: &Z3Bridge, smtlib2: &str) -> (LemmaVerdict, &'static str) {
+    if !bridge.z3_available {
+        return (
+            LemmaVerdict::Skipped {
+                reason: "z3 binary required (run inside nix develop or install pkgs.z3)".into(),
+            },
+            "skipped",
+        );
+    }
+    let raw = bridge.verify_satisfiable(smtlib2);
+    match raw {
+        VerificationResult::Unsat { .. } => (LemmaVerdict::Valid, "z3"),
+        VerificationResult::Sat { .. } => (LemmaVerdict::Invalid, "z3"),
+        other => LemmaVerdict::from_bridge(other),
+    }
+}
+
+// ─── L4, L5 stubs (for commit 3) ───────────────────────────────────────────
 
 pub fn generate_pell_lemmas(_bridge: &Z3Bridge) -> Vec<VerifiedLemma> {
     vec![placeholder(
@@ -391,6 +533,98 @@ mod tests {
         assert!(s.contains("(check-sat)"));
     }
 
+    // ── L1: AM-GM encoder + skip-branch ──
+
+    #[test]
+    fn test_encode_amgm_2_contains_polynomial_form() {
+        let s = encode_amgm(2);
+        // Two non-negativity declarations
+        assert!(s.contains("(declare-const a Real)"));
+        assert!(s.contains("(declare-const b Real)"));
+        assert!(s.contains("(assert (>= a 0))"));
+        assert!(s.contains("(assert (>= b 0))"));
+        // n=2 ⇒ (a+b)^2 ≥ 4·a·b. Negation: (a+b)^2 < 4ab.
+        // smt_pow uses repeated multiplication: "(* (+ a b) (+ a b))".
+        assert!(s.contains("(* (+ a b) (+ a b))"));
+        assert!(s.contains("4"));
+        assert!(s.contains("(check-sat)"));
+    }
+
+    #[test]
+    fn test_encode_amgm_4_has_quartic_form() {
+        let s = encode_amgm(4);
+        // 256 = 4^4, the constant on the RHS
+        assert!(
+            s.contains("256"),
+            "n=4 lemma must use 4^4 = 256 as the rescaling constant"
+        );
+        // Four variable declarations
+        for v in ['a', 'b', 'c', 'd'] {
+            assert!(
+                s.contains(&format!("(declare-const {} Real)", v)),
+                "missing variable {}",
+                v
+            );
+        }
+    }
+
+    #[test]
+    fn test_amgm_lemmas_skip_when_no_z3() {
+        let bridge = test_bridge_no_z3();
+        let lemmas = generate_amgm_lemmas(&bridge);
+        assert_eq!(lemmas.len(), 3, "expected 3 AM-GM lemmas (n=2,3,4)");
+        for l in &lemmas {
+            assert!(
+                matches!(l.verdict, LemmaVerdict::Skipped { .. }),
+                "lemma {} should be Skipped without z3",
+                l.id
+            );
+            assert!(!l.smtlib2.is_empty());
+            assert!(l.smtlib2.contains("QF_NRA"));
+            assert!(l.smtlib2.contains("(check-sat)"));
+        }
+    }
+
+    // ── L2: Cauchy-Schwarz encoder + skip-branch ──
+
+    #[test]
+    fn test_encode_cauchy_schwarz_2_contains_dot_product() {
+        let s = encode_cauchy_schwarz(2);
+        // Four variables
+        for v in ["a0", "a1", "b0", "b1"] {
+            assert!(
+                s.contains(&format!("(declare-const {} Real)", v)),
+                "missing {}",
+                v
+            );
+        }
+        // dot product term
+        assert!(s.contains("(* a0 b0)"));
+        assert!(s.contains("(* a1 b1)"));
+        // |a|² and |b|² terms
+        assert!(s.contains("(* a0 a0)"));
+        assert!(s.contains("(* b0 b0)"));
+    }
+
+    #[test]
+    fn test_encode_cauchy_schwarz_3_has_six_variables() {
+        let s = encode_cauchy_schwarz(3);
+        for v in ["a0", "a1", "a2", "b0", "b1", "b2"] {
+            assert!(s.contains(&format!("(declare-const {} Real)", v)));
+        }
+    }
+
+    #[test]
+    fn test_cauchy_schwarz_lemmas_skip_when_no_z3() {
+        let bridge = test_bridge_no_z3();
+        let lemmas = generate_cauchy_schwarz_lemmas(&bridge);
+        assert_eq!(lemmas.len(), 2, "expected 2 Cauchy-Schwarz lemmas (n=2,3)");
+        for l in &lemmas {
+            assert!(matches!(l.verdict, LemmaVerdict::Skipped { .. }));
+            assert!(l.smtlib2.contains("QF_NRA"));
+        }
+    }
+
     #[test]
     fn test_pigeonhole_lemmas_skip_when_no_z3() {
         // With z3_available=false (the test fixture), every pigeonhole
@@ -424,15 +658,20 @@ mod tests {
     fn test_generate_all_lemmas_returns_at_least_one_per_class() {
         let bridge = test_bridge_no_z3();
         let all = generate_all_lemmas(&bridge);
-        // 4 pigeonhole + 1 placeholder each for L1/L2/L4/L5
-        assert_eq!(all.len(), 8, "expected 8 lemmas in v1 (4 real + 4 stubs)");
+        // 4 pigeonhole + 3 AM-GM + 2 Cauchy-Schwarz + 1 Pell stub + 1 functional eq stub
+        assert_eq!(all.len(), 11, "expected 11 lemmas in commit 2 (10 real + 2 stubs)");
         // L3 should be the first 4
         assert!(all[0].id.starts_with("L3."));
         assert!(all[3].id.starts_with("L3."));
+        // L1 next: 3 AM-GM lemmas
         assert_eq!(all[4].id, "L1.0");
-        assert_eq!(all[5].id, "L2.0");
-        assert_eq!(all[6].id, "L4.0");
-        assert_eq!(all[7].id, "L5.0");
+        assert_eq!(all[6].id, "L1.2");
+        // L2 next: 2 Cauchy-Schwarz lemmas
+        assert_eq!(all[7].id, "L2.0");
+        assert_eq!(all[8].id, "L2.1");
+        // L4, L5 still stubs (commit 3)
+        assert_eq!(all[9].id, "L4.0");
+        assert_eq!(all[10].id, "L5.0");
     }
 
     #[test]
