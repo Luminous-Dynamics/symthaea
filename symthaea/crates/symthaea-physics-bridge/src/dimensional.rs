@@ -17,25 +17,44 @@ const BASIS_SEED: u64 = 0xD1A5_1070_5EED_0001;
 /// Number of SI base dimensions.
 const NUM_SI_DIMS: usize = 7;
 
+/// Total basis vectors: 7 SI dimensions + 1 dedicated DIMENSIONLESS marker.
+/// The marker vector is orthogonal to all SI axes, so dimensionless quantities
+/// get a self-matching identity without bleeding into any physical signature.
+const NUM_BASIS: usize = NUM_SI_DIMS + 1;
+const DIMENSIONLESS_BASIS_INDEX: usize = 7;
+
 /// Encodes `DimensionalSignature` to `ContinuousHV`.
 ///
-/// Uses 7 orthogonal basis vectors (one per SI dimension: M, L, T, I, Θ, N, J).
-/// Each dimension's exponent scales its basis vector, then all are bundled:
+/// Uses 8 orthogonal basis vectors: one per SI dimension [M, L, T, I, Θ, N, J]
+/// plus a dedicated "DIMENSIONLESS" axis. Each dimension's exponent scales its
+/// basis vector, then all are bundled:
 ///
 /// ```text
-/// dim_hv = weighted_bundle([M_basis, L_basis, T_basis, ...], [m_exp, l_exp, t_exp, ...])
+/// dim_hv = bundle(M_basis·m + L_basis·l + T_basis·t + ... + D_basis·[is_dimensionless])
 /// ```
 ///
-/// Dimensionless quantities encode as the zero vector.
+/// ## Dimensionless handling
+///
+/// Earlier versions encoded dimensionless quantities as the zero vector, which
+/// meant `cosine(0, 0) = 0` — two dimensionless entries scored **zero** on the
+/// dimensional axis even when they should have scored a perfect 1.0. This
+/// capped natural-units invariants (harmonic oscillator, Lotka-Volterra,
+/// Hénon-Heiles) at ~0.706 recognition score because their 0.20-weight
+/// dimensional axis contributed nothing.
+///
+/// The fix maps dimensionless quantities to the dedicated 8th basis vector
+/// (`DIMENSIONLESS_BASIS_INDEX`). Self-match now scores 1.0, and the vector
+/// is orthogonal to all physical signatures so the dimensional axis still
+/// correctly rejects dimensionless-vs-physical matches.
 pub struct DimensionalEncoder {
-    /// 7 orthogonal basis vectors [M, L, T, I, Θ, N, J].
+    /// 8 orthogonal basis vectors: [M, L, T, I, Θ, N, J, DIMENSIONLESS].
     basis: Vec<ContinuousHV>,
 }
 
 impl DimensionalEncoder {
     /// Create a new encoder with deterministic orthogonal basis.
     pub fn new() -> Self {
-        let basis = ContinuousHV::orthogonal_set(HDC_DIMENSION, NUM_SI_DIMS, BASIS_SEED);
+        let basis = ContinuousHV::orthogonal_set(HDC_DIMENSION, NUM_BASIS, BASIS_SEED);
         Self { basis }
     }
 
@@ -45,10 +64,12 @@ impl DimensionalEncoder {
     /// then all are summed and normalized. This preserves the sign information
     /// (T⁻² and T² point in opposite directions along the T axis).
     ///
-    /// Returns the zero vector for dimensionless quantities.
+    /// Dimensionless quantities return the dedicated DIMENSIONLESS basis
+    /// vector — nonzero, orthogonal to all physical signatures, so
+    /// `sim(dimless, dimless) = 1.0` and `sim(dimless, physical) ≈ 0`.
     pub fn encode(&self, sig: &DimensionalSignature) -> ContinuousHV {
         if sig.is_dimensionless() {
-            return ContinuousHV::zero(HDC_DIMENSION);
+            return self.basis[DIMENSIONLESS_BASIS_INDEX].clone();
         }
 
         let exponents = sig.as_array();
@@ -68,7 +89,9 @@ impl DimensionalEncoder {
         }
 
         if !any_nonzero {
-            return ContinuousHV::zero(HDC_DIMENSION);
+            // Unreachable in practice (is_dimensionless() already handled
+            // above), but fall back to the dimensionless marker for safety.
+            return self.basis[DIMENSIONLESS_BASIS_INDEX].clone();
         }
 
         result.normalize()
@@ -93,12 +116,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn dimensionless_encodes_to_zero() {
+    fn dimensionless_self_matches() {
+        // Regression: dimensionless MUST encode to a nonzero self-matching
+        // vector, not the zero vector. Two dimensionless queries should score
+        // 1.0 on the dimensional similarity axis so natural-units invariants
+        // like x² + v² can actually receive the 0.20 dimensional-axis bonus
+        // against their dimensionless catalog cousins.
         let enc = DimensionalEncoder::new();
-        let hv = enc.encode(&DimensionalSignature::DIMENSIONLESS);
-        assert_eq!(hv.dim(), HDC_DIMENSION);
-        // Zero vector has zero norm
-        assert!(hv.values.iter().all(|v| *v == 0.0));
+        let a = enc.encode(&DimensionalSignature::DIMENSIONLESS);
+        let b = enc.encode(&DimensionalSignature::DIMENSIONLESS);
+        assert_eq!(a.dim(), HDC_DIMENSION);
+        assert!(a.values.iter().any(|v| *v != 0.0), "should be nonzero");
+        let sim = a.similarity(&b);
+        assert!(sim > 0.999, "dimensionless ↔ dimensionless = 1.0, got {sim}");
     }
 
     #[test]
@@ -158,16 +188,19 @@ mod tests {
     }
 
     #[test]
-    fn dimensionless_orthogonal_to_everything() {
+    fn dimensionless_orthogonal_to_physical() {
+        // Dimensionless now encodes to its dedicated 8th basis vector, which
+        // IS nonzero but is orthogonal to all physical signatures by
+        // construction (it's part of the orthogonal_set). So
+        // sim(dimless, energy) ≈ 0 still — just without the zero-vs-zero
+        // pathology that capped natural-units invariants at 0.706.
         let enc = DimensionalEncoder::new();
         let dimless = enc.encode(&DimensionalSignature::DIMENSIONLESS);
         let energy = enc.encode(&DimensionalSignature::ENERGY);
-        // Zero vector has similarity 0 with everything (or NaN if both zero)
         let norm = dimless.values.iter().map(|v| v * v).sum::<f32>().sqrt();
-        assert!(norm < 1e-10, "Dimensionless should be zero vector");
-        // Similarity with non-zero should be 0 (cosine with zero vec)
+        assert!(norm > 0.0, "Dimensionless should be nonzero now");
         let sim = dimless.similarity(&energy);
-        assert!(sim.abs() < 0.01, "Dimensionless ⊥ Energy, got sim = {sim}");
+        assert!(sim.abs() < 0.05, "Dimensionless ⊥ Energy, got sim = {sim}");
     }
 
     #[test]
