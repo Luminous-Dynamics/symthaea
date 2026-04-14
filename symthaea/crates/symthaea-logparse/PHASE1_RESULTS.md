@@ -196,6 +196,161 @@ overclaim "Z3-verified" anything.
   coarse level; the full ATT&CK matrix has ~200 techniques. Whether the
   encoder can discriminate at technique level is an open question.
 
+---
+
+## Amendment 2 — Phase 2 experiments (Apr 14, 2026, same session)
+
+Shipped the three Phase 2 experiments promised above in
+`examples/phase2_experiments.rs`:
+
+1. Scale-up: full sbousseaden corpus post per-file cap (2460 events, 7
+   classes — dropped command_and_control because OTRF has no samples for
+   it), single 80/20 stratified split.
+2. 5-fold stratified CV on the same 2460-event corpus.
+3. Cross-corpus OOD: train on sbousseaden, test on OTRF
+   Security-Datasets (Mordor-format JSONL), same 7 classes. This is the
+   real generalization test — different collection methodology, different
+   attack labs, same OS, same MITRE taxonomy.
+
+### Results
+
+| experiment | accuracy |
+|---|---|
+| scale-up single 80/20 split | 0.779 |
+| **5-fold CV on sbousseaden** | **0.817 ± 0.018** (per-fold: 0.820, 0.826, 0.846, 0.799, ~0.794) |
+| **Cross-corpus OOD (train sbou → test otrf)** | **0.168** |
+| chance (7 classes) | 0.143 |
+| Phase 1 kill criterion | 0.500 |
+
+### Per-class OOD breakdown
+
+| class | OOD correct/total | accuracy |
+|---|---|---|
+| credential_access | 744/1150 | **0.65** |
+| privilege_escalation | 32/100 | 0.32 |
+| lateral_movement | 112/1450 | 0.08 |
+| discovery | 26/450 | 0.06 |
+| persistence | 7/350 | 0.02 |
+| defense_evasion | 28/1950 | 0.01 |
+| execution | 0/200 | **0.00** |
+
+### This is the most important result in the whole session
+
+**The Apr 14 probe result (0.815 single split) was a FALSE POSITIVE at
+the in-distribution level.** The 5-fold CV confirms it (0.817 ± 0.018 is
+real on sbousseaden). But the cross-corpus test is 0.168 — essentially
+chance. **The probe didn't learn "what credential_access looks like."
+It learned "what sbousseaden's curation looks like."**
+
+Only credential_access generalizes non-trivially (0.65), likely because
+both corpora use similar Mimikatz / LSASS patterns that produce
+recognizable Security and Sysmon event sequences regardless of
+collection methodology. Everything else collapses to chance or below.
+
+### What changed vs. the Apr 14 interpretation
+
+- **"Encoder is fine, classifier path viable"** (Apr 14 AM) — WRONG.
+  The probe overfits to collection artifacts, not semantic structure.
+  The encoder is NOT fine in its current form.
+- **"Unsupervised clustering works but classifier doesn't"** (Apr 14
+  early) — also incomplete. Both work on the same corpus and both
+  probably fail the same cross-corpus way (didn't test HDBSCAN on OTRF,
+  but there's no reason to think it would transfer better).
+- **The honest answer:** we have a clean in-distribution result and a
+  damning out-of-distribution result. For ANY external claim, the
+  headline number must be 0.168 → 0.817, not 0.817 alone.
+
+### Hypotheses for the failure mode
+
+Most likely to least likely:
+
+1. **Collection-methodology fingerprinting.** sbousseaden's .evtx files
+   and OTRF's Mordor JSONL have different characteristic field layouts.
+   The provider name formatting, EventID distribution, structured field
+   ordering, and message templates all differ. The encoder hashes
+   provider+event_id+fields as primary discriminators, and those are
+   the most corpus-specific features.
+
+2. **EventID distribution shift.** Both corpora cover the same MITRE
+   tactics but may capture different Windows Event IDs for conceptually
+   similar activity. sbousseaden is Sysmon-heavy; OTRF includes more
+   Security Log events. Same attack → different events logged.
+
+3. **Message template shift.** OTRF's Mordor pipeline normalizes
+   strings differently than raw .evtx. Message-field hash fingerprints
+   in the HDC encoder pick up on the normalization artifacts.
+
+4. **Windows version shift.** Different OS versions emit the same
+   attack differently. Possible but probably minor.
+
+### What this does to Phase 2 priorities (again)
+
+The priority order from the Apr 14 AM writeup was:
+1. 5-fold CV for confidence interval — DONE, confirmed 0.817 ± 0.018
+2. Richer encoding channels (optional) — NOW MANDATORY, not optional
+3. OOD test (3 weeks) — DONE in this session, it's 0.168
+4. Anomaly detection (exploratory) — still exploratory
+
+**Revised plan:**
+
+1. **Union training** (1 week): train on sbousseaden ∪ OTRF, test on a
+   held-out third corpus. If 0.70+, the encoder can learn
+   corpus-agnostic features when given corpus-agnostic data. If still
+   near chance, the encoder itself is corpus-coupled and needs
+   fundamental changes.
+2. **Richer encoding channels** (4 weeks, now mandatory): Strip the
+   collection-specific features. Drop raw provider strings from the
+   encoding. Replace with:
+   - attack-relevant signals: process command lines, file paths, SID
+     patterns, registry key patterns
+   - normalized EventID categories (authentication/process/file/network)
+     not raw IDs
+   - tokenized command lines as bags of HDC subwords
+3. **Out-of-distribution test suite** (ongoing): every encoder change
+   must be validated on cross-corpus BEFORE in-distribution. Flip the
+   priority: OOD accuracy is the primary metric, in-distribution is
+   the upper bound.
+4. **Benign baseline** (still the biggest gap): OTRF has benign samples
+   we haven't used. Stage them, measure false-positive rate.
+
+### What to tell a CIO (revised, honest)
+
+> "We trained a classifier on one public Windows attack corpus and
+> measured 0.817 ± 0.018 cross-validated in-distribution accuracy. When
+> we tested that classifier on a completely different public corpus
+> with the same MITRE labels, it dropped to 0.168 — essentially random
+> for everything except credential access. This is a real problem we
+> need to solve before this is useful in production, and we know how to
+> solve it: the current encoder picks up collection-methodology
+> artifacts, so we need to strip those and retrain on normalized attack
+> features. We'll be able to report generalization numbers in about two
+> months."
+
+Still honest, still specific, now MUCH less likely to burn a pilot
+relationship by over-claiming. This is the kind of talk that gets a
+second meeting, not a first.
+
+### Reproducibility
+
+```bash
+# Stage sbousseaden (already available)
+./scripts/stage_evtx_attack_samples.sh \
+  /tmp/evtx-corpus/EVTX-ATTACK-SAMPLES /tmp/evtx-staged
+
+# Clone + stage OTRF
+cd /tmp && git clone --depth 1 --filter=blob:none --sparse \
+  https://github.com/OTRF/Security-Datasets
+cd Security-Datasets && git sparse-checkout set datasets/atomic/windows
+./scripts/stage_otrf_datasets.sh \
+  /tmp/Security-Datasets/datasets/atomic/windows /tmp/otrf-staged
+
+# Run all three experiments
+cargo run -p symthaea-logparse --example phase2_experiments --release -- \
+  /tmp/evtx-staged /tmp/otrf-staged
+```
+
+Expected: `scale-up 0.78`, `5-fold CV 0.82 ± 0.02`, `OOD 0.17`.
+
 ## What Phase 2 should do (revised from original plan)
 
 The original Phase 2 plan was "add encoding channels before attempting a real-corpus retry." The retry happened in Phase 1 and gave us a partial pass, so the priorities shift:
