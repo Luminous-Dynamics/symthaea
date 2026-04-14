@@ -276,6 +276,7 @@ fn build_all_equations() -> Vec<PhysicsEquation> {
     eqs.push(harmonic_oscillator_invariant());
     eqs.push(lotka_volterra_invariant());
     eqs.push(angular_momentum_2d_cartesian());
+    eqs.push(henon_heiles_hamiltonian());
 
     // ── Phase 1B: Expand to 150 ──
     // Classical Mechanics
@@ -4599,6 +4600,63 @@ fn angular_momentum_2d_cartesian() -> PhysicsEquation {
             amount: 0,
             luminous: 0,
         },
+        tensor: None,
+    }
+}
+
+/// Hénon-Heiles Hamiltonian: `H = ½(px² + py²) + ½(x² + y²) + x²y − (1/3)y³`
+///
+/// The canonical 4D chaotic Hamiltonian from stellar dynamics (Hénon &
+/// Heiles 1964). Energy is the only first integral — there is no second
+/// isolating integral in the chaotic regime. This entry exists so that
+/// autonomous conservation-law discovery on Hénon-Heiles routes directly
+/// to its true catalog cousin instead of matching nearest-neighbor noise.
+///
+/// Shape must mirror what `recognize_expr_with_units` produces from the
+/// discovered Expr: a flat `Sum` of four terms after `flatten_add`
+/// recurses through the nested `Add` wrapping.
+fn henon_heiles_hamiltonian() -> PhysicsEquation {
+    // Match `recognize.rs`'s literal-encoding convention: positive constants
+    // become `Constant { name: "c_<value>" }` (format `{:.4}`) and negative
+    // constants become `Negate(Constant { name: "c_<|value|>" })`. The
+    // discovered 0.5 → "c_0.5000" and -0.3333... → Negate("c_0.3333").
+    let half = EquationNode::Constant { name: "c_0.5000".to_string() };
+    let neg_third = EquationNode::Negate(Box::new(EquationNode::Constant {
+        name: "c_0.3333".to_string(),
+    }));
+    let pow = |name: &str, k: f64| EquationNode::Power {
+        base: Box::new(make_const(name)),
+        exponent: Box::new(EquationNode::Scalar(k)),
+    };
+    // 0.5 · (px² + py²)
+    let half_p2 = EquationNode::Product(vec![
+        half.clone(),
+        EquationNode::Sum(vec![pow("px", 2.0), pow("py", 2.0)]),
+    ]);
+    // 0.5 · (x² + y²)
+    let half_q2 = EquationNode::Product(vec![
+        half,
+        EquationNode::Sum(vec![pow("x", 2.0), pow("y", 2.0)]),
+    ]);
+    // x² · y
+    let coupling = EquationNode::Product(vec![pow("x", 2.0), make_const("y")]);
+    // -1/3 · y³
+    let cubic = EquationNode::Product(vec![neg_third, pow("y", 3.0)]);
+
+    PhysicsEquation {
+        name: "Hénon-Heiles Hamiltonian".to_string(),
+        domain: PhysicsDomain::ClassicalMechanics,
+        ast: make_equals(
+            make_const("H"),
+            EquationNode::Sum(vec![half_p2, half_q2, coupling, cubic]),
+        ),
+        // No continuous rotational symmetry — the cubic cross-coupling
+        // `x²y - y³/3` breaks rotational invariance. The `symmetry_inference`
+        // heuristic will return `none()` for a sum containing cubic terms
+        // (it only matches pure sum-of-squares), so this aligns with the
+        // query.
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
         tensor: None,
     }
 }

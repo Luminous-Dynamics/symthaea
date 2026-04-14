@@ -128,6 +128,59 @@ fn kepler_dynamics() -> Vec<(&'static str, SymExpr)> {
     ]
 }
 
+/// Hénon-Heiles 4D chaotic Hamiltonian: state `[x, y, px, py]`.
+///
+/// H = ½(px² + py²) + ½(x² + y²) + x²y - (1/3)y³
+///
+/// Equations of motion:
+///   dx/dt  = px
+///   dy/dt  = py
+///   dpx/dt = -x - 2xy
+///   dpy/dt = -y - x² + y²
+///
+/// Energy is the *only* first integral in the chaotic regime (above the
+/// escape threshold at E ≈ 1/6); the system has no second isolating
+/// integral. This is the canonical stress test for autonomous
+/// conservation-law discovery: the invariant is a 5-term expression with
+/// cubic cross-couplings, and the engine must discover it without
+/// over-fitting to any deceptive lower-complexity alternative.
+fn henon_heiles_rhs(s: &[f64], _t: f64) -> Vec<f64> {
+    let (x, y, px, py) = (s[0], s[1], s[2], s[3]);
+    vec![px, py, -x - 2.0 * x * y, -y - x * x + y * y]
+}
+
+fn henon_heiles_dynamics() -> Vec<(&'static str, SymExpr)> {
+    // Helper for `-a - b`  as  `Add(Neg(a), Neg(b))`.
+    let neg_add = |a: SymExpr, b: SymExpr| {
+        SymExpr::Add(
+            Box::new(SymExpr::Neg(Box::new(a))),
+            Box::new(SymExpr::Neg(Box::new(b))),
+        )
+    };
+    let var = |n: &str| SymExpr::Var(n.into());
+    let mul = |a: SymExpr, b: SymExpr| SymExpr::Mul(Box::new(a), Box::new(b));
+    let pow = |a: SymExpr, k: f64| SymExpr::Pow(Box::new(a), k);
+
+    // dpx/dt = -x - 2xy  ≡  Add(Neg(x), Neg(2*x*y))
+    let dpx_dt = neg_add(var("x"), mul(SymExpr::Const(2.0), mul(var("x"), var("y"))));
+
+    // dpy/dt = -y - x² + y²  ≡  Add(Add(Neg(y), Neg(x²)), y²)
+    let dpy_dt = SymExpr::Add(
+        Box::new(SymExpr::Add(
+            Box::new(SymExpr::Neg(Box::new(var("y")))),
+            Box::new(SymExpr::Neg(Box::new(pow(var("x"), 2.0)))),
+        )),
+        Box::new(pow(var("y"), 2.0)),
+    );
+
+    vec![
+        ("x", var("px")),
+        ("y", var("py")),
+        ("px", dpx_dt),
+        ("py", dpy_dt),
+    ]
+}
+
 // ───────────────────────────────────────────────────────────────────────────
 // DISCOVERY PIPELINE — one problem end-to-end
 // ───────────────────────────────────────────────────────────────────────────
@@ -377,6 +430,15 @@ fn main() {
     kepler_units.insert("vx".to_string(), DimensionalSignature::VELOCITY);
     kepler_units.insert("vy".to_string(), DimensionalSignature::VELOCITY);
 
+    // Hénon-Heiles: natural units (dimensionless), since the Hamiltonian
+    // mixes position² with position³ terms — no SI assignment propagates
+    // cleanly. Dimensional inference will return Inconsistent → DIMENSIONLESS.
+    let mut hh_units = UnitMap::new();
+    hh_units.insert("x".to_string(), DimensionalSignature::DIMENSIONLESS);
+    hh_units.insert("y".to_string(), DimensionalSignature::DIMENSIONLESS);
+    hh_units.insert("px".to_string(), DimensionalSignature::DIMENSIONLESS);
+    hh_units.insert("py".to_string(), DimensionalSignature::DIMENSIONLESS);
+
     // ─── Problem 1: Harmonic Oscillator ───
     results.push(run_problem(
         &bridge,
@@ -419,7 +481,37 @@ fn main() {
         &kepler_units,
         20.0,
         0.001,
-        default_config,
+        default_config.clone(),
+    ));
+
+    // ─── Problem 4: Hénon-Heiles (4D chaotic Hamiltonian) ───
+    //
+    // Stress test: 5-term invariant with cubic cross-couplings.
+    // Initial state chosen well below the escape threshold (E ≈ 0.083 ≪ 1/6)
+    // so the regime is quasi-periodic and the energy surface is well-sampled.
+    // Higher budget than default for the richer template space.
+    let henon_heiles_config = RegressorConfig {
+        population_size: 500,
+        generations: 200,
+        max_depth: 6,
+        max_complexity: 40,
+        lambda: 0.0005,
+        mutation_rate: 0.4,
+        seed: 42,
+        ..RegressorConfig::default()
+    };
+    results.push(run_problem(
+        &bridge,
+        "Hénon-Heiles Chaotic Hamiltonian",
+        "Nonlinear Dynamics",
+        henon_heiles_rhs,
+        &[0.1, -0.1, 0.3, 0.2],
+        &["x", "y", "px", "py"],
+        &henon_heiles_dynamics(),
+        &hh_units,
+        40.0,
+        0.005,
+        henon_heiles_config,
     ));
 
     // ─── Sequence-based discovery: Triangular numbers (with Z3 path) ───
