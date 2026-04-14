@@ -40,6 +40,26 @@ fn xorshift(state: &mut u64) -> u64 {
 /// the 5 classes. Events are interleaved (not grouped) so any clusterer that
 /// cheats on temporal order gets no advantage.
 pub fn generate_synthetic_corpus(n_per_class: usize, seed: u64) -> Vec<LogEvent> {
+    generate_noisy_corpus(n_per_class, seed, 0.0)
+}
+
+/// Generate a labeled synthetic corpus with class-boundary obfuscation.
+///
+/// `noise_level` ∈ [0.0, 1.0]:
+///   - 0.0 → clean classes (identical to `generate_synthetic_corpus`)
+///   - 0.5 → half the events per class have provider/event_id swapped with
+///           a randomly chosen other class (class-channel leakage)
+///   - 1.0 → every event is scrambled across classes — purity should
+///           approach chance (1/n_classes = 0.20 for 5 classes)
+///
+/// This is the ablation primitive. Real IT-ops data is not as clean as the
+/// 0.0 fixtures: the same Event ID 4624 appears in both benign and lateral-
+/// movement flows, service restarts overlap with ransomware-triggered
+/// service-control activity, etc. The noise sweep measures how much of the
+/// encoder's separation comes from *easy* channel differences vs. genuine
+/// multi-field composition.
+pub fn generate_noisy_corpus(n_per_class: usize, seed: u64, noise_level: f32) -> Vec<LogEvent> {
+    assert!((0.0..=1.0).contains(&noise_level));
     let mut state = seed.max(1);
     let classes: &[&dyn Fn(&mut u64, usize) -> LogEvent] = &[
         &gen_benign_login,
@@ -49,10 +69,34 @@ pub fn generate_synthetic_corpus(n_per_class: usize, seed: u64) -> Vec<LogEvent>
         &gen_network_outage,
     ];
 
-    let mut out = Vec::with_capacity(n_per_class * classes.len());
+    let n_classes = classes.len();
+    let mut out = Vec::with_capacity(n_per_class * n_classes);
     for i in 0..n_per_class {
-        for cls in classes {
-            out.push(cls(&mut state, i));
+        for (cls_idx, cls) in classes.iter().enumerate() {
+            let mut ev = cls(&mut state, i);
+
+            // Obfuscation: with probability `noise_level`, swap this event's
+            // provider + event_id with a randomly chosen other class's
+            // "discriminator" fields. Label stays the same — we are
+            // contaminating the features, not the ground truth.
+            let roll = (xorshift(&mut state) as f32 / u64::MAX as f32).abs();
+            if roll < noise_level {
+                let other = (xorshift(&mut state) as usize) % n_classes;
+                if other != cls_idx {
+                    // Generate a throwaway event of the OTHER class and steal
+                    // its discriminator fields.
+                    let donor = classes[other](&mut state, i);
+                    ev.provider = donor.provider;
+                    ev.event_id = donor.event_id;
+                    ev.component = donor.component;
+                    // Also steal a random subset of the donor's fields to
+                    // make the noise more than cosmetic.
+                    for (k, v) in donor.fields.into_iter().take(2) {
+                        ev.fields.insert(k, v);
+                    }
+                }
+            }
+            out.push(ev);
         }
     }
     out
@@ -161,6 +205,75 @@ fn gen_network_outage(state: &mut u64, _i: usize) -> LogEvent {
     ev.fields.insert("TargetAddress".into(), rand_ip(state));
     ev.label = Some("network_outage".into());
     ev
+}
+
+/// Full-event contamination ablation (v2). Stricter than `generate_noisy_corpus`.
+///
+/// At `noise_level`, each event is replaced with probability `noise_level`
+/// by a freshly-generated event of a random *other* class, keeping only the
+/// original ground-truth label. This is the honest adversarial test: can the
+/// encoder recover class signal when the features and the label have been
+/// deliberately decoupled?
+///
+/// Expected curve:
+///   - noise=0.0 → purity 1.000 (clean)
+///   - noise=0.5 → ~half the events are fully mislabeled at the feature
+///     level; purity should drop noticeably
+///   - noise=1.0 → every event's features point at a random other class;
+///     purity should approach chance (0.20 for 5 classes)
+///
+/// If purity stays high under v2, the encoder is somehow finding signal the
+/// synthetic data doesn't actually contain, which would mean a bug in the
+/// experiment, not a property of the encoder.
+pub fn generate_noisy_corpus_v2(n_per_class: usize, seed: u64, noise_level: f32) -> Vec<LogEvent> {
+    assert!((0.0..=1.0).contains(&noise_level));
+    let mut state = seed.max(1);
+    let classes: &[&dyn Fn(&mut u64, usize) -> LogEvent] = &[
+        &gen_benign_login,
+        &gen_lateral_movement,
+        &gen_service_restart,
+        &gen_ransomware,
+        &gen_network_outage,
+    ];
+    let class_names = [
+        "benign_login",
+        "lateral_movement",
+        "service_restart",
+        "ransomware",
+        "network_outage",
+    ];
+    let n_classes = classes.len();
+
+    let mut out = Vec::with_capacity(n_per_class * n_classes);
+    for i in 0..n_per_class {
+        for (cls_idx, cls) in classes.iter().enumerate() {
+            let mut ev = cls(&mut state, i);
+            let roll = (xorshift(&mut state) as f32 / u64::MAX as f32).abs();
+            if roll < noise_level {
+                // Pick a random OTHER class and generate a full event from it.
+                // The ground-truth label sticks with the original class.
+                let mut other = (xorshift(&mut state) as usize) % n_classes;
+                if other == cls_idx {
+                    other = (other + 1) % n_classes;
+                }
+                let donor = classes[other](&mut state, i);
+                ev = LogEvent {
+                    timestamp: donor.timestamp,
+                    source: donor.source,
+                    severity: donor.severity,
+                    component: donor.component,
+                    provider: donor.provider,
+                    event_id: donor.event_id,
+                    message: donor.message,
+                    fields: donor.fields,
+                    host: donor.host,
+                    label: Some(class_names[cls_idx].into()),
+                };
+            }
+            out.push(ev);
+        }
+    }
+    out
 }
 
 #[cfg(test)]
