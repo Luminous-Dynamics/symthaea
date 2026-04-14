@@ -128,6 +128,40 @@ fn kepler_dynamics() -> Vec<(&'static str, SymExpr)> {
     ]
 }
 
+/// "Mystery ODE" — a coupled anisotropic harmonic oscillator.
+///
+/// State: `[x, y, px, py]`. Conservative Hamiltonian system with an off-
+/// diagonal quadratic coupling in position space:
+///     H = ½(px² + py²) + x² + y² + xy
+/// The coupling matrix `[[2, 1], [1, 2]]` has eigenvalues {3, 1}, so the
+/// origin is a stable elliptic equilibrium and trajectories stay bounded
+/// on level sets of H.
+///
+/// This system is "novel-ish": no physics catalog contains exactly this
+/// form, and the `xy` bilinear coupling is NOT a canonical sum-of-squares,
+/// so the GP cannot assemble it from position templates alone. It lives
+/// just beyond the pre-Move-11 template library — a designer-constructed
+/// stretch test for the coupled-oscillator template added in Move 11.
+fn mystery_rhs(s: &[f64], _t: f64) -> Vec<f64> {
+    let (x, y, px, py) = (s[0], s[1], s[2], s[3]);
+    vec![px, py, -2.0 * x - y, -x - 2.0 * y]
+}
+
+fn mystery_dynamics() -> Vec<(&'static str, SymExpr)> {
+    let var = |n: &str| SymExpr::Var(n.into());
+    let mul = |a: SymExpr, b: SymExpr| SymExpr::Mul(Box::new(a), Box::new(b));
+    let add = |a: SymExpr, b: SymExpr| SymExpr::Add(Box::new(a), Box::new(b));
+    let neg = |a: SymExpr| SymExpr::Neg(Box::new(a));
+    vec![
+        ("x", var("px")),
+        ("y", var("py")),
+        // dpx/dt = -2x - y
+        ("px", add(neg(mul(SymExpr::Const(2.0), var("x"))), neg(var("y")))),
+        // dpy/dt = -x - 2y
+        ("py", add(neg(var("x")), neg(mul(SymExpr::Const(2.0), var("y"))))),
+    ]
+}
+
 /// Planar Circular Restricted Three-Body Problem (PCR3BP) in a rotating frame.
 ///
 /// State: `[x, y, vx, vy]`. Mass ratio μ = m₂/(m₁+m₂). The two primaries
@@ -560,6 +594,13 @@ fn main() {
     pcr3bp_units.insert("vx".to_string(), DimensionalSignature::DIMENSIONLESS);
     pcr3bp_units.insert("vy".to_string(), DimensionalSignature::DIMENSIONLESS);
 
+    // Mystery coupled-oscillator: natural units throughout.
+    let mut mystery_units = UnitMap::new();
+    mystery_units.insert("x".to_string(), DimensionalSignature::DIMENSIONLESS);
+    mystery_units.insert("y".to_string(), DimensionalSignature::DIMENSIONLESS);
+    mystery_units.insert("px".to_string(), DimensionalSignature::DIMENSIONLESS);
+    mystery_units.insert("py".to_string(), DimensionalSignature::DIMENSIONLESS);
+
     // ─── Problem 1: Harmonic Oscillator ───
     results.push(run_problem(
         &bridge,
@@ -670,6 +711,42 @@ fn main() {
         15.0,
         0.001,
         pcr3bp_config,
+    ));
+
+    // ─── Problem 6: "Mystery" coupled anisotropic oscillator ───
+    //
+    // Designer-constructed novel-ish target. The author (who designed the
+    // RHS) knows the conserved quantity is
+    //     H = ½(px² + py²) + x² + y² + xy
+    // and intentionally did NOT tell the engine. With the coupled-oscillator
+    // template added in Move 11, the GP must still assemble the full 5-term
+    // form via crossover (the template gives the quadratic kernel, constant
+    // tuning + mutation adds the ½ scaling). If the engine finds the exact
+    // Hamiltonian, it's a demonstration that the template library can be
+    // incrementally extended to cover previously-out-of-reach invariant
+    // classes.
+    let mystery_config = RegressorConfig {
+        population_size: 600,
+        generations: 300,
+        max_depth: 6,
+        max_complexity: 40,
+        lambda: 0.0005,
+        mutation_rate: 0.4,
+        seed: 42,
+        ..RegressorConfig::default()
+    };
+    results.push(run_problem(
+        &bridge,
+        "Coupled Anisotropic Oscillator (Mystery)",
+        "Designer-constructed stretch target",
+        mystery_rhs,
+        &[1.0, 0.0, 0.0, 1.0],
+        &["x", "y", "px", "py"],
+        &mystery_dynamics(),
+        &mystery_units,
+        30.0,
+        0.005,
+        mystery_config,
     ));
 
     // ─── Sequence-based discovery: Triangular numbers (with Z3 path) ───

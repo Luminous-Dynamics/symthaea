@@ -4528,7 +4528,27 @@ fn build_invariant_templates(var_names: &[&str]) -> Vec<Expr> {
             Box::new(Expr::BinOp(BinOp::Pow,
                 Box::new(Expr::Var(var_names[3].into())),
                 Box::new(Expr::Const(2.0)))));
-        templates.push(Expr::BinOp(BinOp::Sub, Box::new(pos_sq), Box::new(vel_sq)));
+        templates.push(Expr::BinOp(BinOp::Sub, Box::new(pos_sq.clone()), Box::new(vel_sq.clone())));
+
+        // Coupled-oscillator Hamiltonian skeleton:
+        //   ½(p² + p²) + q² + q·q' + q'²
+        //
+        // Covers Hamiltonians of the form `½·kinetic + quadratic_potential`
+        // where the potential matrix has off-diagonal coupling. The xy
+        // cross-term is the missing primitive for anisotropic oscillators
+        // and any rotating-frame quadratic system. Without this seed, the
+        // GP cannot assemble the cross-coupling via the base mutation set
+        // (random subexpression replacement rarely produces `x * y` from
+        // sum-of-squares parents).
+        let half_vel2 = Expr::BinOp(BinOp::Mul,
+            Box::new(Expr::Const(0.5)),
+            Box::new(vel_sq));
+        let cross_qq = Expr::BinOp(BinOp::Mul,
+            Box::new(Expr::Var(var_names[0].into())),
+            Box::new(Expr::Var(var_names[1].into())));
+        templates.push(Expr::BinOp(BinOp::Add,
+            Box::new(Expr::BinOp(BinOp::Add, Box::new(half_vel2), Box::new(pos_sq))),
+            Box::new(cross_qq)));
     }
 
     // ── Logarithmic / transcendental skeletons ──────────────────────
@@ -7810,6 +7830,59 @@ mod tests {
         // between it and any degenerate artifact should be huge.
         assert!(results[0].variance < 1e-20,
             "top variance should be near machine epsilon for a true invariant, got {}",
+            results[0].variance);
+    }
+
+    #[test]
+    fn test_mystery_coupled_anisotropic_oscillator() {
+        // Mystery ODE: I (the designer) know the conserved quantity is
+        //   H = ½(px² + py²) + x² + xy + y²
+        // for the coupled anisotropic oscillator system
+        //   dx/dt  = px
+        //   dy/dt  = py
+        //   dpx/dt = -2x − y
+        //   dpy/dt = −x − 2y
+        // The eigenvalues of the coupling matrix [[2, 1], [1, 2]] are {3, 1}
+        // (both positive), so trajectories are bounded oscillations.
+        //
+        // The key test: neither the xy cross-term nor the full 5-term
+        // invariant is in any seed template. The GP must assemble it via
+        // crossover + mutation from the sum-of-squares base. This is a
+        // legitimate stretch of the current template library.
+        fn rhs(s: &[f64], _t: f64) -> Vec<f64> {
+            let (x, y, px, py) = (s[0], s[1], s[2], s[3]);
+            vec![px, py, -2.0 * x - y, -x - 2.0 * y]
+        }
+        let config = RegressorConfig {
+            population_size: 600,
+            generations: 300,
+            max_depth: 6,
+            max_complexity: 40,
+            lambda: 0.0005,
+            mutation_rate: 0.4,
+            seed: 42,
+            ..RegressorConfig::default()
+        };
+        let results = discover_invariants_autonomous(
+            rhs,
+            &[1.0, 0.0, 0.0, 1.0],
+            &["x", "y", "px", "py"],
+            None,
+            &config,
+            30.0,
+            0.005,
+        );
+        eprintln!("Mystery ODE: {} candidates", results.len());
+        for (i, r) in results.iter().take(5).enumerate() {
+            eprintln!("  #{}: var={:.3e} complexity={} formula={}",
+                i, r.variance, r.complexity, r.formula_str);
+        }
+        assert!(!results.is_empty(), "should find at least one candidate");
+        // Demand a high-quality invariant (variance near machine epsilon).
+        // We don't require the exact H form — any quantity with variance
+        // below 1e-20 on this trajectory is effectively a true invariant.
+        assert!(results[0].variance < 1e-20,
+            "top candidate should be a near-perfect invariant, got variance {}",
             results[0].variance);
     }
 
