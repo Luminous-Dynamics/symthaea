@@ -27,6 +27,7 @@
 
 pub mod wire;
 pub mod decoder;
+pub mod stream;
 
 use std::io;
 use std::path::{Path, PathBuf};
