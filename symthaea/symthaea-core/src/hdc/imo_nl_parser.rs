@@ -277,6 +277,30 @@ pub fn template_keyword_registry() -> Vec<TemplateKeywords> {
             ],
             secondary: &["gcd"],
         },
+        TemplateKeywords {
+            category: "FunctionalEquation",
+            primary: &[
+                "find all f",
+                "find all functions",
+                "all functions f",
+                "f: r → r",
+                "f: r -> r",
+                "f(x+y)",
+                "f(x + y)",
+                "f(x*y)",
+                "f(xy)",
+                "f(x*y)",
+                "f(f(x))",
+                "f(x)+f(y)",
+                "f(x) + f(y)",
+                "f(x)f(y)",
+                "f(x)*f(y)",
+                "functional equation",
+                "satisfies f",
+                "such that f",
+            ],
+            secondary: &["function", "real", "reals", "satisfies", "such that"],
+        },
     ]
 }
 
@@ -692,6 +716,54 @@ fn template_bezout(text: &str) -> Option<CurriculumProblem> {
     })
 }
 
+/// Functional equation: "Find all f: R → R such that f(x+y) = f(x) + f(y)."
+/// Detects which canonical functional-equation form the text describes and
+/// constructs a `FunctionalEquationFindAll` problem with the matched
+/// `EquationKind`. The detector uses a tiny grammar over the signature
+/// substrings rather than a full parse — IMO functional-equation problems
+/// almost always cite the equation verbatim, so substring matching is
+/// reliable for the canonical five families.
+fn template_functional_equation(text: &str) -> Option<CurriculumProblem> {
+    use crate::hdc::functional_equations::EquationKind;
+    let lower = text.to_ascii_lowercase();
+    // Canonicalize the math: collapse "·" / " times " / juxtaposition
+    // to "*", strip ALL whitespace so "f(x) + f(y)" matches "f(x)+f(y)",
+    // and normalize the "f(xy)" shorthand to "f(x*y)".
+    let mut canon: String = lower
+        .replace("·", "*")
+        .replace(" times ", "*")
+        .replace("f(xy)", "f(x*y)")
+        .replace("f(yx)", "f(x*y)");
+    canon.retain(|c| !c.is_whitespace());
+    // After whitespace removal, juxtaposed `f(x)f(y)` becomes
+    // `f(x)f(y)` (already collapsed) — make multiplication explicit.
+    let canon = canon
+        .replace("f(x)f(y)", "f(x)*f(y)")
+        .replace("f(y)f(x)", "f(x)*f(y)");
+    // Detect by ordered priority: exponential before Cauchy because
+    // exponential's RHS is a product of two `f(_)` calls (more specific).
+    let kind = if canon.contains("f(x+y)") && canon.contains("f(x)*f(y)") {
+        EquationKind::Exponential
+    } else if canon.contains("f(x*y)") && canon.contains("f(x)+f(y)") {
+        EquationKind::Logarithmic
+    } else if canon.contains("f(x*y)") && canon.contains("f(x)*f(y)") {
+        EquationKind::Multiplicative
+    } else if canon.contains("f(x+y)") && canon.contains("f(x)+f(y)") {
+        EquationKind::CauchyAdditive
+    } else if canon.contains("f(f(x))") && canon.contains("=x") {
+        EquationKind::Involution
+    } else {
+        return None;
+    };
+    let name = format!("Functional equation: {}", kind.canonical_form());
+    Some(CurriculumProblem {
+        name,
+        difficulty: Difficulty::Hard,
+        domain: Domain::FunctionalEquation,
+        kind: ProblemKind::FunctionalEquationFindAll { kind },
+    })
+}
+
 /// Full reference corpus: canonical problem texts paired with template
 /// constructors. Each reference is encoded to a hypervector once at
 /// parser creation time.
@@ -892,6 +964,32 @@ pub fn reference_corpus() -> Vec<ImoReference> {
             canonical_text: "Prove Bezout's identity for the integers 12 and 8.",
             template: template_bezout,
             category: "Bezout",
+        },
+        // ── Functional equations (5 phrasings, one per canonical family) ─
+        ImoReference {
+            canonical_text: "Find all functions f: R → R such that f(x+y) = f(x) + f(y).",
+            template: template_functional_equation,
+            category: "FunctionalEquation",
+        },
+        ImoReference {
+            canonical_text: "Find all f: R → R satisfying f(x*y) = f(x)*f(y) for all positive x, y.",
+            template: template_functional_equation,
+            category: "FunctionalEquation",
+        },
+        ImoReference {
+            canonical_text: "Determine all functions f such that f(x+y) = f(x)*f(y) for all real x, y.",
+            template: template_functional_equation,
+            category: "FunctionalEquation",
+        },
+        ImoReference {
+            canonical_text: "Find all functions f: R → R with f(x*y) = f(x) + f(y) for positive x, y.",
+            template: template_functional_equation,
+            category: "FunctionalEquation",
+        },
+        ImoReference {
+            canonical_text: "Find all functions f: R → R such that f(f(x)) = x for all real x.",
+            template: template_functional_equation,
+            category: "FunctionalEquation",
         },
     ]
 }
@@ -1629,6 +1727,113 @@ mod tests {
             successes,
             total
         );
+    }
+
+    // ── Phase 3C: functional equation parser template ────────────────
+
+    #[test]
+    fn test_template_functional_equation_cauchy() {
+        let p = template_functional_equation(
+            "Find all functions f: R → R such that f(x+y) = f(x) + f(y) for all real x, y.",
+        )
+        .expect("Cauchy-form text should produce a problem");
+        use crate::hdc::functional_equations::EquationKind;
+        assert!(matches!(
+            p.kind,
+            ProblemKind::FunctionalEquationFindAll {
+                kind: EquationKind::CauchyAdditive
+            }
+        ));
+        assert!(p.solve());
+    }
+
+    #[test]
+    fn test_template_functional_equation_exponential_priority() {
+        // Exponential law f(x+y) = f(x)f(y) — the detector must pick
+        // Exponential, not CauchyAdditive, because the RHS is a product.
+        let p = template_functional_equation(
+            "Determine all functions f satisfying f(x+y) = f(x)f(y).",
+        )
+        .expect("exp-form text should produce a problem");
+        use crate::hdc::functional_equations::EquationKind;
+        assert!(matches!(
+            p.kind,
+            ProblemKind::FunctionalEquationFindAll {
+                kind: EquationKind::Exponential
+            }
+        ));
+        assert!(p.solve());
+    }
+
+    #[test]
+    fn test_template_functional_equation_multiplicative_via_xy() {
+        let p = template_functional_equation(
+            "Find all f: R → R such that f(xy) = f(x)f(y) for positive x, y.",
+        )
+        .expect("multiplicative-form text should produce a problem");
+        use crate::hdc::functional_equations::EquationKind;
+        assert!(matches!(
+            p.kind,
+            ProblemKind::FunctionalEquationFindAll {
+                kind: EquationKind::Multiplicative
+            }
+        ));
+        assert!(p.solve());
+    }
+
+    #[test]
+    fn test_template_functional_equation_logarithmic() {
+        let p = template_functional_equation(
+            "Find all f such that f(x*y) = f(x) + f(y) on positive reals.",
+        )
+        .expect("log-form text should produce a problem");
+        use crate::hdc::functional_equations::EquationKind;
+        assert!(matches!(
+            p.kind,
+            ProblemKind::FunctionalEquationFindAll {
+                kind: EquationKind::Logarithmic
+            }
+        ));
+        assert!(p.solve());
+    }
+
+    #[test]
+    fn test_template_functional_equation_involution() {
+        let p = template_functional_equation(
+            "Find all f: R → R with f(f(x)) = x for all real x.",
+        )
+        .expect("involution-form text should produce a problem");
+        use crate::hdc::functional_equations::EquationKind;
+        assert!(matches!(
+            p.kind,
+            ProblemKind::FunctionalEquationFindAll {
+                kind: EquationKind::Involution
+            }
+        ));
+        assert!(p.solve());
+    }
+
+    #[test]
+    fn test_template_functional_equation_unrecognized_returns_none() {
+        // No canonical form keyword present.
+        assert!(template_functional_equation("Prove that 7 is prime.").is_none());
+    }
+
+    #[test]
+    fn test_parse_functional_equation_via_full_parser() {
+        // End-to-end: HDC similarity + keyword classifier should route a
+        // novel Cauchy-form question to the functional equation template.
+        let parser = ImoNlParser::new();
+        let parsed = parser
+            .parse(
+                "Find all functions f: R → R such that f(x+y) = f(x) + f(y) for every real pair.",
+            )
+            .expect("full parser should match a functional equation reference");
+        assert!(parsed.problem.solve());
+        match parsed.problem.kind {
+            ProblemKind::FunctionalEquationFindAll { .. } => {}
+            other => panic!("expected FunctionalEquationFindAll, got {:?}", other),
+        }
     }
 
     // ── NLP 3: encoder cascade ────────────────────────────────────────

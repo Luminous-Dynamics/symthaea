@@ -63,6 +63,7 @@ pub enum Domain {
     NumberTheory,
     Inequality,
     Combinatorics,
+    FunctionalEquation,
 }
 
 // ─── Curriculum problem ────────────────────────────────────────────────────
@@ -106,6 +107,14 @@ pub enum ProblemKind {
     SchurIneq { a: f64, b: f64, c: f64, t: u32 },
     /// Bezout's identity: find (x, y) with a·x + b·y = gcd(a, b).
     BezoutIdentity { a: i64, b: i64, expected_gcd: i64 },
+    /// "Find all f: R → R such that <functional equation>." Solved by
+    /// returning the canonical family identifier; `solve()` succeeds iff
+    /// the requested family has a known canonical form (i.e., is not
+    /// `EquationKind::Unknown`). Continuous case is assumed; pathological
+    /// Hamel-basis solutions to Cauchy are not enumerated.
+    FunctionalEquationFindAll {
+        kind: crate::hdc::functional_equations::EquationKind,
+    },
 }
 
 impl CurriculumProblem {
@@ -164,6 +173,14 @@ impl CurriculumProblem {
                 let engine = NumberTheoryEngine::new();
                 let (g, x, y) = engine.extended_gcd(*a, *b);
                 g == *expected_gcd && a * x + b * y == g
+            }
+            ProblemKind::FunctionalEquationFindAll { kind } => {
+                use crate::hdc::functional_equations::EquationKind;
+                // Canonical answer is "known" for any family the
+                // classifier supports. `Unknown` means we don't have a
+                // canonical form, so the problem is unsolvable by the
+                // current engine.
+                !matches!(kind, EquationKind::Unknown)
             }
         }
     }
