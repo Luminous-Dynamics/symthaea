@@ -87,6 +87,37 @@ fn kinetic_energy_sequence(max_n: usize) -> ObservedSequence {
     ObservedSequence::new("kinetic_energy(n)", MathDomain::Physics, data)
 }
 
+/// STAGE 1 SPIKE: 1D gravitational-kernel training target.
+///
+/// `f(n) = 1 / sqrt(n² + 1)` is the restriction of the 2D Newtonian
+/// potential `1 / sqrt(x² + y²)` along the line y=1. It presents the
+/// target shape — `Func(Sqrt, Add(Pow(Var, 2), Const))` wrapped in a
+/// reciprocal — **cleanly** to the symbolic regressor.
+///
+/// This is the minimal experimental probe for Ceiling B (nonlocal spatial
+/// primitives). If the extraction pipeline is going to produce a
+/// distance-kernel macro from anywhere, it must produce it from this
+/// target — because no other training target in the benchmark contains
+/// that shape at all. The test is: after reflect(), does M₁ contain
+/// a subtree structurally matching `sqrt((n^2) + C)` or `1/sqrt((n^2) + C)`?
+///
+/// - If YES: Ceiling B is breakable for 1D distance kernels via the
+///   current pipeline. Next question becomes: does this macro propagate
+///   across distinct training targets as a reusable abstraction?
+/// - If NO: We learn exactly which filter rejects it (GP fit failure,
+///   normalization collapse, or occurrence-count threshold), which
+///   pins down whether the ceiling lives in SymbolicRegressor or in
+///   the MetaHDC extraction logic.
+fn distance_kernel_1d_sequence(max_n: usize) -> ObservedSequence {
+    let data: Vec<(f64, f64)> = (1..=max_n)
+        .map(|i| {
+            let n = i as f64;
+            (n, 1.0 / (n * n + 1.0).sqrt())
+        })
+        .collect();
+    ObservedSequence::new("distance_kernel_1d(n)", MathDomain::Physics, data)
+}
+
 /// Custom: damped exponential target. Exercises the `Exp` primitive —
 /// we want Level 1 to produce conjectures containing exp(k*n) subtrees
 /// so M₂ can potentially extract them.
@@ -224,6 +255,16 @@ fn main() {
     engine.observe(harmonic_sequence(25));
     engine.observe(observe_fibonacci_ratios(25));
     engine.observe(kinetic_energy_sequence(25));
+    // Stage 1.5 spike: 1D distance kernel regression probe. A persistent
+    // training target that exercises the transcendental-distance primitive
+    // path: `f(n) = 1/sqrt(n² + 1)`. With the hierarchical fitness ranking
+    // and the sqrt seed template in the Polynomial branch of
+    // `build_template_library`, the GP finds the exact fit and the
+    // extraction pipeline promotes `1/sqrt((n^k)+c)` shape macros to M₁.
+    // If this regresses in future, it means either the seed template was
+    // dropped, the hierarchical sort was broken, or normalization collapsed
+    // the shape — all of which we want to catch loudly.
+    engine.observe(distance_kernel_1d_sequence(25));
 
     let t0 = Instant::now();
     engine.generate_conjectures(3);
@@ -231,6 +272,40 @@ fn main() {
     engine.verify_formal(30); // Enables fast-track promotion via strong verification
     engine.reflect(&prims);
     let level0_time = t0.elapsed();
+
+    // Stage 1.5 regression probe: verify the hierarchical-fitness +
+    // sqrt-seed-template fix is still in place. The GP should produce at
+    // least one conjecture containing `sqrt` with near-perfect MSE for the
+    // distance_kernel_1d target. If the sqrt count is zero, either the
+    // template seeding was removed or the Occam fitness is again
+    // suppressing perfect fits.
+    let (dk_total, dk_sqrt, dk_best_mse) = {
+        let mut total = 0usize;
+        let mut sqrt_count = 0usize;
+        let mut best_mse = f64::MAX;
+        for c in engine.conjectures.iter() {
+            if c.source == "distance_kernel_1d(n)" {
+                total += 1;
+                let s = format!("{}", c.formula);
+                if s.contains("sqrt") {
+                    sqrt_count += 1;
+                }
+                if c.training_mse < best_mse {
+                    best_mse = c.training_mse;
+                }
+            }
+        }
+        (total, sqrt_count, best_mse)
+    };
+    println!(
+        "\n  ▼ distance_kernel probe: {} conjectures, {} contain sqrt, best MSE = {:.3e}",
+        dk_total, dk_sqrt, dk_best_mse
+    );
+    if dk_sqrt == 0 {
+        println!("    ⚠ REGRESSION: no sqrt-family conjectures — hierarchical fitness or template may have drifted");
+    } else {
+        println!("    ✓ distance-kernel primitive reachable");
+    }
 
     let m1: Vec<Expr> = engine
         .macro_operators()

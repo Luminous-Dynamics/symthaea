@@ -708,25 +708,52 @@ impl SymbolicRegressor {
             }
         }
 
+        // Near-perfect-fit threshold: candidates with MSE below this bar
+        // dominate the ranking over any imperfect fit, regardless of
+        // complexity. This prevents the Occam penalty from suppressing the
+        // exact answer in favor of a simpler approximation. Without this,
+        // a perfect-fit `1/sqrt(n² + 1)` (mse=0, complexity 8, fitness 0.008)
+        // loses to an approximate `0.794/n` (mse=1e-3, complexity 3, fitness
+        // 0.004) even though the former is the ground truth. The threshold
+        // is set well below what any reasonable approximation can achieve
+        // for a genuinely mismatched structural form.
+        const NEAR_PERFECT_MSE: f64 = 1e-10;
+
         for _gen in 0..self.config.generations {
-            // Evaluate fitness for entire population
-            let mut scored: Vec<(usize, f64)> = self.population.iter().enumerate()
+            // Evaluate fitness for entire population. We now track MSE AND
+            // scalar fitness separately so the ranking can apply hierarchical
+            // comparison: near-perfect fits always beat imperfect ones.
+            let mut scored: Vec<(usize, f64, f64)> = self.population.iter().enumerate()
                 .map(|(i, expr)| {
                     let mse = compute_mse(expr, &train);
                     let complexity = expr.complexity();
-                    let fitness = if mse.is_finite() && complexity <= self.config.max_complexity {
-                        mse + self.config.lambda * complexity as f64
+                    let (fitness, mse_kept) = if mse.is_finite() && complexity <= self.config.max_complexity {
+                        (mse + self.config.lambda * complexity as f64, mse)
                     } else {
-                        f64::MAX
+                        (f64::MAX, f64::MAX)
                     };
-                    (i, fitness)
+                    (i, fitness, mse_kept)
                 })
                 .collect();
 
-            scored.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+            // Hierarchical sort: candidates below NEAR_PERFECT_MSE dominate
+            // candidates above it. Within each tier, sort by scalar fitness
+            // (Occam-penalized). This lets a perfect-fit high-complexity
+            // template beat any imperfect fit regardless of simplicity, while
+            // preserving the Occam penalty as the Pareto tiebreaker for
+            // imperfect candidates (where it's actually informative).
+            scored.sort_by(|a, b| {
+                let a_perfect = a.2 < NEAR_PERFECT_MSE;
+                let b_perfect = b.2 < NEAR_PERFECT_MSE;
+                match (a_perfect, b_perfect) {
+                    (true, false) => std::cmp::Ordering::Less,
+                    (false, true) => std::cmp::Ordering::Greater,
+                    _ => a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal),
+                }
+            });
 
             // Record best fitness this generation (for benchmarking / convergence analysis)
-            if let Some(&(_, best_fit)) = scored.first() {
+            if let Some(&(_, best_fit, _)) = scored.first() {
                 self.fitness_history.push(best_fit);
             }
 
@@ -737,7 +764,7 @@ impl SymbolicRegressor {
             let mut unique_indices: Vec<usize> = Vec::new();
             let sample_points: Vec<f64> = train.iter().take(5).map(|(x, _)| *x).collect();
 
-            for &(idx, _fit) in &scored {
+            for &(idx, _fit, _mse) in &scored {
                 let fp = fingerprint_expr(&self.population[idx], &sample_points);
                 if !fingerprints.iter().any(|(f, _)| *f == fp) {
                     fingerprints.push((fp, idx));
@@ -806,7 +833,9 @@ impl SymbolicRegressor {
             self.population[idx] = optimized;
         }
 
-        // Final scoring and return top-k
+        // Final scoring and return top-k. Uses the same hierarchical rule as
+        // the GP loop: near-perfect fits dominate imperfect ones, Occam
+        // fitness is the tiebreaker within each tier.
         let mut results: Vec<(f64, f64, usize)> = self.population.iter().enumerate()
             .map(|(i, expr)| {
                 let mse = compute_mse(expr, &train);
@@ -820,7 +849,15 @@ impl SymbolicRegressor {
             })
             .collect();
 
-        results.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            let a_perfect = a.1 < NEAR_PERFECT_MSE;
+            let b_perfect = b.1 < NEAR_PERFECT_MSE;
+            match (a_perfect, b_perfect) {
+                (true, false) => std::cmp::Ordering::Less,
+                (false, true) => std::cmp::Ordering::Greater,
+                _ => a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal),
+            }
+        });
 
         // Deduplicate results by fingerprint (keep first = best fitness)
         let sample_pts: Vec<f64> = train.iter().take(5).map(|(x, _)| *x).collect();
@@ -872,15 +909,30 @@ impl SymbolicRegressor {
             .collect()
     }
 
-    fn tournament_select(&mut self, scored: &[(usize, f64)]) -> usize {
+    fn tournament_select(&mut self, scored: &[(usize, f64, f64)]) -> usize {
+        // Tournament selection uses the same hierarchical rule as the top-level
+        // sort: a near-perfect candidate (mse < NEAR_PERFECT_MSE) always beats
+        // an imperfect one, regardless of Occam-penalized fitness. Within each
+        // tier, lower fitness wins. This keeps the dominance relation
+        // consistent between `scored.sort_by` and tournament reproduction.
+        const NEAR_PERFECT_MSE: f64 = 1e-10;
         let mut best_idx = 0;
         let mut best_fit = f64::MAX;
+        let mut best_is_perfect = false;
         for _ in 0..self.config.tournament_size {
             self.rng = lcg_step(self.rng);
             let candidate = self.rng as usize % scored.len();
-            if scored[candidate].1 < best_fit {
-                best_fit = scored[candidate].1;
-                best_idx = scored[candidate].0;
+            let (cand_idx, cand_fit, cand_mse) = scored[candidate];
+            let cand_is_perfect = cand_mse < NEAR_PERFECT_MSE;
+            let wins = match (best_is_perfect, cand_is_perfect) {
+                (false, true) => true,                          // candidate dominates
+                (true, false) => false,                         // incumbent dominates
+                _ => cand_fit < best_fit,                       // same tier: Occam fitness
+            };
+            if wins {
+                best_fit = cand_fit;
+                best_idx = cand_idx;
+                best_is_perfect = cand_is_perfect;
             }
         }
         best_idx
@@ -1775,6 +1827,34 @@ fn build_template_library(growth: &GrowthClass) -> Vec<Expr> {
             templates.push(Expr::BinOp(BinOp::Div,
                 c(1.0),
                 Box::new(Expr::BinOp(BinOp::Pow, n(), c(1.5)))));
+
+            // Distance-kernel skeletons: `sqrt(n² + c)` and `1 / sqrt(n² + c)`
+            //
+            // Covers:
+            //   • 1D restrictions of 2D Newtonian potential `1/sqrt(x² + y²)`
+            //     along any line y = const.
+            //   • Relativistic momentum `sqrt(m² + p²)` (with roles swapped).
+            //   • Any rational function with a Pythagorean-distance denominator.
+            //
+            // Added after the Apr 14 Stage 1 spike (compounding_benchmark
+            // distance_kernel_1d target) revealed that without this seed
+            // template, the 1D SymbolicRegressor never generates `sqrt(Pow, 2)
+            // + Const` during random expression synthesis or crossover. It
+            // converges instead to polynomial 1/n approximations that fit
+            // acceptably (MSE ~1e-4) but contain no sqrt subtree, so the
+            // extraction pipeline has nothing to promote. Seeding the shape
+            // directly gives the GP a fair shot at the distance-kernel class
+            // and unblocks macro promotion of `sqrt(Add(Pow, Const))` subtrees.
+            templates.push(Expr::Func(UnaryFn::Sqrt,
+                Box::new(Expr::BinOp(BinOp::Add,
+                    Box::new(Expr::BinOp(BinOp::Pow, n(), c(2.0))),
+                    c(1.0)))));
+            templates.push(Expr::BinOp(BinOp::Div,
+                c(1.0),
+                Box::new(Expr::Func(UnaryFn::Sqrt,
+                    Box::new(Expr::BinOp(BinOp::Add,
+                        Box::new(Expr::BinOp(BinOp::Pow, n(), c(2.0))),
+                        c(1.0)))))));
         }
         GrowthClass::Exponential => {
             // a * exp(b * sqrt(n)) / (c * n) — Hardy-Ramanujan
