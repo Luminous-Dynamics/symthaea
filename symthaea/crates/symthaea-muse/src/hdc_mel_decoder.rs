@@ -62,6 +62,11 @@ pub struct MelDecoder {
     b1_m: Vec<f32>, b1_v: Vec<f32>,
     w2_m: Vec<f32>, w2_v: Vec<f32>,
     b2_m: Vec<f32>, b2_v: Vec<f32>,
+
+    // Persistent gradient buffers (reused across steps to avoid allocation).
+    dw1: Vec<f32>, db1: Vec<f32>,
+    dw2: Vec<f32>, db2: Vec<f32>,
+    da1: Vec<f32>, dz1: Vec<f32>,
 }
 
 impl MelDecoder {
@@ -86,10 +91,17 @@ impl MelDecoder {
         let w2_v = vec![0.0; cfg.hidden * cfg.n_mels];
         let b2_m = vec![0.0; cfg.n_mels];
         let b2_v = vec![0.0; cfg.n_mels];
+        let dw1 = vec![0.0; cfg.state_dim * cfg.hidden];
+        let db1 = vec![0.0; cfg.hidden];
+        let dw2 = vec![0.0; cfg.hidden * cfg.n_mels];
+        let db2 = vec![0.0; cfg.n_mels];
+        let da1 = vec![0.0; cfg.hidden];
+        let dz1 = vec![0.0; cfg.hidden];
         Self {
             cfg, w1, b1, w2, b2,
             use_adam: false, t: 0,
             w1_m, w1_v, b1_m, b1_v, w2_m, w2_v, b2_m, b2_v,
+            dw1, db1, dw2, db2, da1, dz1,
         }
     }
 
@@ -153,49 +165,44 @@ impl MelDecoder {
         }
         loss *= inv_m;
 
-        // Compute gradients into temporary buffers first (Adam needs them).
-        let mut da1 = vec![0.0f32; h];
-        let mut dw2 = vec![0.0f32; h * m];
-        let mut db2 = vec![0.0f32; m];
+        // Gradient buffers live on self and are reused. Clear da1 in place.
+        for i in 0..h { self.da1[i] = 0.0; }
         for i in 0..h {
             for j in 0..m {
                 let idx = i * m + j;
-                da1[i] += self.w2[idx] * dmel[j];
-                dw2[idx] = dmel[j] * a1[i];
+                self.da1[i] += self.w2[idx] * dmel[j];
+                self.dw2[idx] = dmel[j] * a1[i];
             }
         }
         for j in 0..m {
-            db2[j] = dmel[j];
+            self.db2[j] = dmel[j];
         }
 
         // ReLU backward
-        let mut dz1 = vec![0.0f32; h];
         for i in 0..h {
-            if z1[i] > 0.0 { dz1[i] = da1[i]; }
+            self.dz1[i] = if z1[i] > 0.0 { self.da1[i] } else { 0.0 };
         }
 
-        let mut dw1 = vec![0.0f32; s * h];
-        let mut db1 = vec![0.0f32; h];
         for i in 0..s {
             for j in 0..h {
-                dw1[i * h + j] = dz1[j] * state[i];
+                self.dw1[i * h + j] = self.dz1[j] * state[i];
             }
         }
         for j in 0..h {
-            db1[j] = dz1[j];
+            self.db1[j] = self.dz1[j];
         }
 
         if self.use_adam {
             self.t += 1;
-            adam_update(&mut self.w1, &mut self.w1_m, &mut self.w1_v, &dw1, lr, self.t);
-            adam_update(&mut self.b1, &mut self.b1_m, &mut self.b1_v, &db1, lr, self.t);
-            adam_update(&mut self.w2, &mut self.w2_m, &mut self.w2_v, &dw2, lr, self.t);
-            adam_update(&mut self.b2, &mut self.b2_m, &mut self.b2_v, &db2, lr, self.t);
+            adam_update(&mut self.w1, &mut self.w1_m, &mut self.w1_v, &self.dw1, lr, self.t);
+            adam_update(&mut self.b1, &mut self.b1_m, &mut self.b1_v, &self.db1, lr, self.t);
+            adam_update(&mut self.w2, &mut self.w2_m, &mut self.w2_v, &self.dw2, lr, self.t);
+            adam_update(&mut self.b2, &mut self.b2_m, &mut self.b2_v, &self.db2, lr, self.t);
         } else {
-            for i in 0..dw1.len() { self.w1[i] -= lr * dw1[i]; }
-            for i in 0..db1.len() { self.b1[i] -= lr * db1[i]; }
-            for i in 0..dw2.len() { self.w2[i] -= lr * dw2[i]; }
-            for i in 0..db2.len() { self.b2[i] -= lr * db2[i]; }
+            for i in 0..self.dw1.len() { self.w1[i] -= lr * self.dw1[i]; }
+            for i in 0..self.db1.len() { self.b1[i] -= lr * self.db1[i]; }
+            for i in 0..self.dw2.len() { self.w2[i] -= lr * self.dw2[i]; }
+            for i in 0..self.db2.len() { self.b2[i] -= lr * self.db2[i]; }
         }
 
         loss
@@ -252,10 +259,17 @@ impl MelDecoder {
         let w2_v = vec![0.0; hidden * n_mels];
         let b2_m = vec![0.0; n_mels];
         let b2_v = vec![0.0; n_mels];
+        let dw1 = vec![0.0; state_dim * hidden];
+        let db1 = vec![0.0; hidden];
+        let dw2 = vec![0.0; hidden * n_mels];
+        let db2 = vec![0.0; n_mels];
+        let da1 = vec![0.0; hidden];
+        let dz1 = vec![0.0; hidden];
         Ok(Self {
             cfg, w1, b1, w2, b2,
             use_adam: false, t: 0,
             w1_m, w1_v, b1_m, b1_v, w2_m, w2_v, b2_m, b2_v,
+            dw1, db1, dw2, db2, da1, dz1,
         })
     }
 }
