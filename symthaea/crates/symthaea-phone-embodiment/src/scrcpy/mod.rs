@@ -26,6 +26,7 @@
 //! enough to AV1's 30-40% that the USB 2.0 budget relief survives.
 
 pub mod wire;
+pub mod decoder;
 
 use std::io;
 use std::path::{Path, PathBuf};
