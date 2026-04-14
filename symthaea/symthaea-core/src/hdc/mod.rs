@@ -374,6 +374,7 @@ pub mod diophantine;
 pub mod synthetic_geometry;
 pub mod barycentric;
 pub mod inequalities;
+pub mod functional_equations;
 pub mod sr_tactic;
 pub mod combinatorial;
 pub mod sr_symreg;
