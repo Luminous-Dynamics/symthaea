@@ -112,6 +112,15 @@ impl ScrcpyOptions {
     }
 
     /// Render the `key=value` server arguments scrcpy v2.4 expects.
+    ///
+    /// Notes on what's NOT here:
+    /// - `display_buffer` was added in scrcpy v3+ and is rejected by v2.4
+    ///   (the server warns `Unknown server option: display_buffer`). The
+    ///   `display_buffer_zero` field on `ScrcpyOptions` is currently a
+    ///   no-op held for forward-compatibility when we upgrade to v3.
+    /// - `scid` is omitted, which makes the server default to scid=-1
+    ///   and bind the abstract socket as plain `scrcpy` (matching
+    ///   `DEVICE_ABSTRACT_SOCKET`).
     fn to_server_args(&self) -> Vec<String> {
         let mut args = vec![
             format!("video=true"),
@@ -119,16 +128,20 @@ impl ScrcpyOptions {
             format!("video_codec={}", self.codec.cli_name()),
             format!("max_fps={}", self.max_fps),
             format!("control=true"),
-            format!("send_device_meta=true"),
-            format!("send_frame_meta=true"),
-            // Use a tunnel_forward=false reverse-tunnel topology so we
-            // listen on the host side via `adb reverse`.
+            // tunnel_forward=false: HOST listens, scrcpy server connects
+            // via its local abstract socket which adb reverse bridges to
+            // our host listener. See `bind_host_listener` doc for the
+            // full topology diagram.
             format!("tunnel_forward=false"),
+            // NOTE: send_dummy_byte is intentionally omitted. In scrcpy
+            // v2.4 with audio=false, the dummy byte is NOT sent on the
+            // video socket (it's an audio-stream wake-up sentinel only),
+            // so reading it would consume the first real byte of the
+            // device-meta block.
             format!("log_level=info"),
         ];
-        if self.display_buffer_zero {
-            args.push("display_buffer=0".to_string());
-        }
+        // display_buffer is held but not emitted under v2.4 — see method doc.
+        let _ = self.display_buffer_zero;
         args.extend(self.extra_args.iter().cloned());
         args
     }
@@ -393,29 +406,76 @@ pub fn list_encoders(serial: &str, jar_path: &Path) -> Result<String, ScrcpyErro
     Ok(combined)
 }
 
-/// Wait briefly for the server to call `accept()` on the abstract socket
-/// after a `start_scrcpy`. Useful when the caller wants to be sure the
-/// tunnel is live before issuing the host-side TCP connect.
+/// Bind the host listener for the scrcpy reverse tunnel, **before**
+/// calling `start_scrcpy`. Returns the listening `TcpListener` plus
+/// the chosen port (which is also the port `ScrcpyOptions::tcp_port`
+/// must be set to before launching).
 ///
-/// Default timeout 1 second is generous for USB; LAN/WAN may need more.
+/// # Topology
+///
+/// scrcpy v2 with `tunnel_forward=false` uses this routing path:
+///
+/// ```text
+/// (HOST)                              (DEVICE)
+///   TcpListener bound on tcp:PORT        scrcpy-server runs
+///        ▲                                       │
+///        │                            LocalSocket.connect("scrcpy")
+///        │                                       │
+///        │      adb reverse                      ▼
+///        └──────────────────────  bridged abstract socket "scrcpy"
+/// ```
+///
+/// `adb reverse localabstract:scrcpy tcp:PORT` makes ADB bind the
+/// abstract socket on the device side and forward any connection that
+/// hits it to the host's `tcp:PORT` — so the scrcpy server's local
+/// `LocalSocket.connect("scrcpy")` call appears at the host listener
+/// as an incoming TCP connection.
+///
+/// **Field ordering matters**: callers must `bind_host_listener` BEFORE
+/// `start_scrcpy`, otherwise the server's connect attempt fires before
+/// our listener exists and the connection drops.
 #[cfg(feature = "scrcpy")]
-pub fn wait_for_server_ready(handle: &ScrcpyHandle, timeout: Duration) -> Result<(), ScrcpyError> {
-    use std::net::{SocketAddr, TcpStream};
-    let addr: SocketAddr = ([127, 0, 0, 1], handle.tcp_port).into();
+pub fn bind_host_listener(tcp_port: u16) -> Result<std::net::TcpListener, ScrcpyError> {
+    let listener = std::net::TcpListener::bind(("127.0.0.1", tcp_port))?;
+    Ok(listener)
+}
+
+/// Accept the incoming connection from the device-side scrcpy server
+/// after `start_scrcpy`. Returns the live `TcpStream`.
+///
+/// Earlier versions of this lifecycle had the host CONNECTING to a port
+/// that scrcpy was supposedly listening on. That was wrong — in v2 with
+/// `tunnel_forward=false`, the server CONNECTS via its abstract socket
+/// (which `adb reverse` bridges to our host listener). The host's job is
+/// to `accept()`, not `connect()`.
+///
+/// Default timeout 5 seconds is generous for USB; the device's JVM
+/// startup + JIT + MediaCodec init can take 1–2 seconds before the
+/// server actually issues its connect.
+#[cfg(feature = "scrcpy")]
+pub fn accept_from_server(
+    listener: &std::net::TcpListener,
+    timeout: Duration,
+) -> Result<std::net::TcpStream, ScrcpyError> {
+    listener.set_nonblocking(false)?;
+    // Apply the deadline by setting the listener-accepting socket's read
+    // timeout. TcpListener doesn't have set_accept_timeout in std, so we
+    // use a non-blocking poll loop.
     let deadline = std::time::Instant::now() + timeout;
+    listener.set_nonblocking(true)?;
     loop {
-        match TcpStream::connect_timeout(&addr, Duration::from_millis(100)) {
-            Ok(stream) => {
-                // Drop the connection — caller will open its own.
-                drop(stream);
-                return Ok(());
+        match listener.accept() {
+            Ok((stream, _addr)) => {
+                stream.set_nonblocking(false)?;
+                return Ok(stream);
             }
-            Err(_) if std::time::Instant::now() < deadline => {
+            Err(e)
+                if e.kind() == std::io::ErrorKind::WouldBlock
+                    && std::time::Instant::now() < deadline =>
+            {
                 std::thread::sleep(Duration::from_millis(50));
             }
-            Err(e) => {
-                return Err(ScrcpyError::Io(e));
-            }
+            Err(e) => return Err(ScrcpyError::Io(e)),
         }
     }
 }
@@ -430,14 +490,21 @@ mod tests {
         assert_eq!(opts.codec, VideoCodec::H265);
         assert_eq!(opts.max_fps, 30);
         assert_eq!(opts.tcp_port, 8400);
-        assert!(opts.display_buffer_zero);
+        assert!(opts.display_buffer_zero); // held but not emitted in v2.4
         assert!(!opts.audio);
         let args = opts.to_server_args();
         assert!(args.iter().any(|a| a == "video_codec=h265"));
         assert!(args.iter().any(|a| a == "max_fps=30"));
-        assert!(args.iter().any(|a| a == "display_buffer=0"));
         assert!(args.iter().any(|a| a == "audio=false"));
         assert!(args.iter().any(|a| a == "tunnel_forward=false"));
+        // display_buffer must NOT be emitted for v2.4 — the server warns
+        // "Unknown server option: display_buffer" and ignores it. Held
+        // for forward-compat with v3+ when we upgrade.
+        assert!(!args.iter().any(|a| a.starts_with("display_buffer")));
+        // send_dummy_byte must NOT be emitted in v2.4 with audio=false —
+        // the byte is only sent on the audio socket, never on video, so
+        // reading it would corrupt the device-meta block.
+        assert!(!args.iter().any(|a| a.starts_with("send_dummy_byte")));
     }
 
     #[test]

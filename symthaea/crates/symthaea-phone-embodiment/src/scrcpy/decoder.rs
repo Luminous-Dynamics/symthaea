@@ -282,6 +282,135 @@ mod tests {
         let _ = dec.decode_packet(&[], None);
     }
 
+    /// End-to-end offline decode test: feed the real recorded wire bytes
+    /// from `tests/data/sample.hevc.wire` through `wire::parse_frame_header`
+    /// and `HevcDecoder::decode_packet`, assert at least one decoded RGBA
+    /// frame comes out with the expected dimensions.
+    ///
+    /// The asset is captured from a live Pixel 8 Pro by
+    /// `examples/record_scrcpy_sample.rs`. Its layout matches what
+    /// `ScrcpyCaptureStream::next_frame` consumes from the wire, minus
+    /// the 64-byte device-meta block and 12-byte video header (which the
+    /// recorder strips before saving). Each entry is:
+    ///
+    /// ```text
+    /// [12-byte FrameHeader][packet_size bytes of HEVC NAL]
+    /// ```
+    ///
+    /// The asset contains 10 frames: 1 config (SPS/PPS), 1 keyframe, 8
+    /// P-frames. The decoder should produce ≥ 1 RGBA frame from the
+    /// keyframe + P-frames after the config packet primes it.
+    #[test]
+    fn end_to_end_decode_recorded_wire_asset() {
+        use crate::scrcpy::wire;
+
+        const ASSET: &[u8] =
+            include_bytes!("../../tests/data/sample.hevc.wire");
+
+        let mut dec = HevcDecoder::new().expect("HevcDecoder::new");
+        let mut cursor = 0usize;
+        let mut frames_in: usize = 0;
+        let mut frames_out: Vec<DecodedFrame> = Vec::new();
+        let mut config_count = 0;
+        let mut keyframe_count = 0;
+
+        while cursor + wire::FRAME_HEADER_LEN <= ASSET.len() {
+            let header = wire::parse_frame_header(&ASSET[cursor..])
+                .expect("parse_frame_header on asset");
+            cursor += wire::FRAME_HEADER_LEN;
+            let payload_end = cursor + header.packet_size as usize;
+            assert!(
+                payload_end <= ASSET.len(),
+                "packet_size {} overruns asset (cursor={cursor}, len={})",
+                header.packet_size,
+                ASSET.len()
+            );
+            let payload = &ASSET[cursor..payload_end];
+            cursor = payload_end;
+
+            if header.is_config() {
+                config_count += 1;
+            }
+            if header.is_key_frame() {
+                keyframe_count += 1;
+            }
+            frames_in += 1;
+
+            let produced = dec
+                .decode_packet(payload, header.pts_micros())
+                .expect("decode_packet on real HEVC bytes");
+            frames_out.extend(produced);
+        }
+
+        // Drain any frames left in the HEVC reorder buffer at EOS.
+        let flushed = dec.flush().expect("flush");
+        frames_out.extend(flushed);
+
+        // Sanity: we processed all 10 wire entries from the recorder run.
+        assert_eq!(
+            frames_in, 10,
+            "expected 10 wire frames in asset, got {frames_in}"
+        );
+        assert_eq!(
+            cursor,
+            ASSET.len(),
+            "decoder did not consume the entire asset"
+        );
+        assert!(
+            config_count >= 1,
+            "asset must contain at least one config packet (SPS/PPS), got {config_count}"
+        );
+        assert!(
+            keyframe_count >= 1,
+            "asset must contain at least one keyframe, got {keyframe_count}"
+        );
+
+        // The full vertical produced at least one decoded RGBA frame.
+        // We don't assert an exact count because HEVC's reorder buffer
+        // makes the in/out ratio variable, but the keyframe + at least
+        // some P-frames must round-trip.
+        assert!(
+            !frames_out.is_empty(),
+            "decoder produced 0 frames from {frames_in} input packets ({config_count} config, {keyframe_count} keyframe)"
+        );
+
+        // Every produced frame must be a coherent RGBA8 image.
+        for (i, f) in frames_out.iter().enumerate() {
+            assert!(
+                f.width > 0 && f.height > 0,
+                "frame {i} has zero dimensions: {}x{}",
+                f.width,
+                f.height
+            );
+            let expected = (f.width as usize) * (f.height as usize) * 4;
+            assert_eq!(
+                f.rgba.len(),
+                expected,
+                "frame {i} has {}-byte buffer, expected {expected} for {}x{} RGBA8",
+                f.rgba.len(),
+                f.width,
+                f.height
+            );
+            // PTS is sourced from the wire frame headers — the asset
+            // recorder shows non-zero PTS on every non-config packet, so
+            // we should see at least one Some(_) here.
+            // (Allowed to be None on config-derived frames if HEVC ever
+            // produces them, which it usually doesn't.)
+        }
+
+        // First decoded frame should match the encoder's output dimensions
+        // from the recorder: 328x720 (the device side picked these for
+        // max_size=720 on a portrait-oriented Pixel 8 Pro).
+        let f0 = &frames_out[0];
+        assert_eq!(
+            (f0.width, f0.height),
+            (328, 720),
+            "expected first decoded frame at 328x720 (recorded asset's encoder picked these); got {}x{}",
+            f0.width,
+            f0.height
+        );
+    }
+
     #[test]
     fn decoded_frame_struct_layout() {
         // Sanity check on the public DecodedFrame surface — we don't want

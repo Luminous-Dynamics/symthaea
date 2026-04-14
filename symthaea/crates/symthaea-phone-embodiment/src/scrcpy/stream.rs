@@ -46,7 +46,8 @@ use std::time::Duration;
 use super::decoder::{DecodeError, DecodedFrame, HevcDecoder};
 use super::wire::{self, FrameHeader, WireCodec, WireError};
 use super::{
-    start_scrcpy, wait_for_server_ready, ScrcpyError, ScrcpyHandle, ScrcpyOptions, VideoCodec,
+    accept_from_server, bind_host_listener, start_scrcpy, ScrcpyError, ScrcpyHandle,
+    ScrcpyOptions, VideoCodec,
 };
 
 /// Default read timeout for [`ScrcpyCaptureStream::next_frame`].
@@ -156,17 +157,24 @@ impl ScrcpyCaptureStream {
         opts: &ScrcpyOptions,
         read_timeout: Duration,
     ) -> Result<Self, StreamError> {
-        // 1. Spawn the device-side server (this also pushes the JAR with SHA
-        //    verification and opens the reverse tunnel).
+        // 1. Bind the HOST listener BEFORE starting the server. scrcpy v2
+        //    in tunnel_forward=false mode has the device-side server
+        //    *connect* to its local abstract socket, which adb reverse
+        //    bridges into our host listener. If we don't bind first, the
+        //    server's connect attempt fires before we're ready.
+        let listener = bind_host_listener(opts.tcp_port)?;
+        // 2. Spawn the device-side server (this pushes the JAR with SHA
+        //    verification, opens the reverse tunnel, then spawns the JVM).
         let handle = start_scrcpy(jar_path, opts)?;
-        // 2. Block briefly until the device side has called accept(). 1 s
-        //    is generous for USB; LAN/WAN deployments may need longer.
-        wait_for_server_ready(&handle, Duration::from_secs(2))?;
-        // 3. Connect to the host-side reverse-tunnel port.
-        let tcp_port = handle.tcp_port();
-        let mut tcp = TcpStream::connect(("127.0.0.1", tcp_port))?;
+        // 3. Wait for the server to call connect() on its local abstract
+        //    socket. Default 5s is generous for USB; LAN/WAN may need more.
+        let mut tcp = accept_from_server(&listener, Duration::from_secs(5))?;
         tcp.set_read_timeout(Some(read_timeout))?;
         tcp.set_nodelay(true)?;
+        // (No dummy-byte read: cybernetic_defaults intentionally omits
+        // send_dummy_byte because v2.4 only sends it on the audio socket,
+        // and we run with audio=false. Reading one here would shift the
+        // entire stream by 1 byte and corrupt the device-meta block.)
         // 4. Read the one-shot device-meta block (64 bytes).
         let mut dm_buf = [0u8; wire::DEVICE_NAME_LEN];
         tcp.read_exact(&mut dm_buf)?;
