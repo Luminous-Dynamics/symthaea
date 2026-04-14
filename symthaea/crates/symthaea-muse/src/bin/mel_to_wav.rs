@@ -54,15 +54,9 @@ fn mel_center_hz(n_mels: usize) -> Vec<f32> {
 fn load_mel_frames(path: &std::path::Path) -> std::io::Result<Vec<Vec<f32>>> {
     let mut f = std::fs::File::open(path)?;
     let name = path.to_string_lossy().to_string();
+    // .pairs.bin has a 17-float state block before each mel frame; any other
+    // .bin we treat as a flat (count, mel_dim, mel_frames) file.
     let is_pairs = name.ends_with(".pairs.bin");
-    let is_pred = name.ends_with(".pred.bin") || name.ends_with(".pairs.pred.bin");
-
-    if !(is_pairs || is_pred) {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "Expected .pairs.bin or .pred.bin",
-        ));
-    }
 
     let mut header = [0u8; 8];
     f.read_exact(&mut header)?;

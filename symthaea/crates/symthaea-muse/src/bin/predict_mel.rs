@@ -23,6 +23,18 @@ fn normalize_state(raw: &[f32; 17]) -> [f32; 17] {
     s
 }
 
+/// Build the same temporal context input the trainer uses.
+fn build_context_input(states: &[[f32; 17]], t: usize, ctx: usize) -> Vec<f32> {
+    let window = 2 * ctx + 1;
+    let mut out = Vec::with_capacity(window * 17);
+    for k in 0..window {
+        let idx = (t as isize + k as isize - ctx as isize)
+            .clamp(0, states.len() as isize - 1) as usize;
+        out.extend_from_slice(&normalize_state(&states[idx]));
+    }
+    out
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.len() < 2 {
@@ -38,8 +50,10 @@ fn main() {
     };
 
     let decoder = MelDecoder::load(&ckpt_path).expect("load checkpoint");
+    // Infer the context half-window from state_dim / 17.
+    let ctx = (decoder.cfg.state_dim / 17).saturating_sub(1) / 2;
     println!("Checkpoint: {}", ckpt_path.display());
-    println!("  state_dim: {}", decoder.cfg.state_dim);
+    println!("  state_dim: {}  (ctx half-window = {})", decoder.cfg.state_dim, ctx);
     println!("  hidden:    {}", decoder.cfg.hidden);
     println!("  n_mels:    {}", decoder.cfg.n_mels);
 
@@ -52,9 +66,9 @@ fn main() {
     let mut per_bin_sse = vec![0.0f64; n_mels];
     let mut preds: Vec<Vec<f32>> = Vec::with_capacity(states.len());
 
-    for (s, m) in states.iter().zip(mels.iter()) {
-        let norm = normalize_state(s);
-        let pred = decoder.predict(&norm);
+    for (i, m) in mels.iter().enumerate() {
+        let input = build_context_input(&states, i, ctx);
+        let pred = decoder.predict(&input);
         let mut frame_mse = 0.0f32;
         for j in 0..n_mels {
             let d = pred[j] - m[j];
