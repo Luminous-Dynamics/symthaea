@@ -59,6 +59,9 @@ pub enum EquationKind {
     Exponential,
     /// `f(x·y) = f(x) + f(y)` on positives ⇒ `f(x) = c·log_b(x)`.
     Logarithmic,
+    /// `f(f(x)) = x` (involution). Detected via direct verification on
+    /// samples whose images are also in the sample set.
+    Involution,
     /// None of the above fits within tolerance.
     Unknown,
 }
@@ -73,8 +76,55 @@ impl EquationKind {
             EquationKind::Multiplicative => "f(x) = x^c  [from f(xy)=f(x)f(y)]",
             EquationKind::Exponential => "f(x) = a^x  [from f(x+y)=f(x)f(y)]",
             EquationKind::Logarithmic => "f(x) = c·log(x)  [from f(xy)=f(x)+f(y)]",
+            EquationKind::Involution => "f(f(x)) = x  [involution]",
             EquationKind::Unknown => "(unknown / no canonical fit)",
         }
+    }
+}
+
+/// Convenience: build a sample set for one of the canonical families
+/// closed under the operations that family's verifier needs.
+///
+/// - `CauchyAdditive`, `Identity`, `Exponential`: sum-closed grid `0..=6`
+/// - `Multiplicative`, `Logarithmic`: product-closed positive grid
+///   `{1, 2, 3, 4, 6, 8, 12, 24}`
+/// - `Constant`, `Unknown`: a generic grid `0..=6`
+/// - `Involution`: `{-3, -2, -1, 0, 1, 2, 3}` so any `f(x)` whose image
+///   is in the set can be probed
+///
+/// Callers don't have to think about which closure property the verifier
+/// needs — pass the function and the family kind, get a usable sample set.
+pub fn sample_grid<F: Fn(f64) -> f64>(f: F, kind: EquationKind) -> Vec<(f64, f64)> {
+    let xs: Vec<f64> = match kind {
+        EquationKind::Multiplicative | EquationKind::Logarithmic => {
+            vec![1.0, 2.0, 3.0, 4.0, 6.0, 8.0, 12.0, 24.0]
+        }
+        EquationKind::Involution => vec![-3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 3.0],
+        _ => (0..=6).map(|i| i as f64).collect(),
+    };
+    xs.into_iter().map(|x| (x, f(x))).collect()
+}
+
+/// Verify the involution law `f(f(x)) ≈ x` on samples. For each sample
+/// `(x, fx)`, looks up `fx` as a key in the same sample set; if found,
+/// checks that the corresponding value equals `x`. Pairs whose `fx` is
+/// not in the sample set are skipped.
+pub fn involution_residual(samples: &[(f64, f64)]) -> f64 {
+    let mut max_resid = 0.0f64;
+    let mut tested = 0usize;
+    for &(x, fx) in samples {
+        if let Some(&(_, ffx)) = samples.iter().find(|(k, _)| (k - fx).abs() < FE_EPS) {
+            let resid = (ffx - x).abs();
+            if resid > max_resid {
+                max_resid = resid;
+            }
+            tested += 1;
+        }
+    }
+    if tested == 0 {
+        0.0
+    } else {
+        max_resid
     }
 }
 
@@ -387,6 +437,30 @@ pub fn classify(samples: &[(f64, f64)]) -> Classification {
         }
     }
 
+    // Involution: testable only if at least one sample's image lies in
+    // the sample set. We check it last so that linear/Cauchy fits (which
+    // also satisfy involution at f(x) = x and f(x) = -x) can win first if
+    // they're a perfect numerical fit. This means involution wins for
+    // genuinely non-linear involutions like f(x) = a/x or f(x) = a-x with
+    // a ≠ 0; trivial linear involutions classify as Cauchy/Identity.
+    let inv_resid = involution_residual(samples);
+    if inv_resid > 0.0 || samples.iter().any(|(x, fx)| (x - fx).abs() < FE_EPS) {
+        // Only credit involution if at least one pair was actually tested.
+        let inv_tested = samples
+            .iter()
+            .any(|(_, fx)| samples.iter().any(|(k, _)| (k - fx).abs() < FE_EPS));
+        if inv_tested {
+            let conf_inv = residual_to_confidence(inv_resid, scale);
+            if conf_inv > best.confidence {
+                best = Classification {
+                    kind: EquationKind::Involution,
+                    constant: f64::NAN,
+                    confidence: conf_inv,
+                };
+            }
+        }
+    }
+
     if best.confidence < 0.5 {
         return Classification::unknown();
     }
@@ -544,9 +618,83 @@ mod tests {
             EquationKind::Multiplicative,
             EquationKind::Exponential,
             EquationKind::Logarithmic,
+            EquationKind::Involution,
             EquationKind::Unknown,
         ] {
             assert!(!k.canonical_form().is_empty());
         }
+    }
+
+    // ── Sample grid helper ──
+
+    #[test]
+    fn test_sample_grid_cauchy_is_sum_closed() {
+        let s = sample_grid(|x| 4.0 * x, EquationKind::CauchyAdditive);
+        // 0..=6 ⇒ 7 entries
+        assert_eq!(s.len(), 7);
+        // Verifier should clear it without manual sample assembly.
+        assert!(cauchy_residual(&s) < FE_EPS);
+    }
+
+    #[test]
+    fn test_sample_grid_multiplicative_uses_product_closed_set() {
+        let s = sample_grid(|x| x.powi(3), EquationKind::Multiplicative);
+        assert_eq!(s.len(), 8);
+        assert!(multiplicative_residual(&s) < 1e-9);
+    }
+
+    #[test]
+    fn test_sample_grid_logarithmic_uses_product_closed_set() {
+        let s = sample_grid(|x| 2.0 * x.ln(), EquationKind::Logarithmic);
+        assert!(logarithmic_residual(&s) < 1e-9);
+    }
+
+    #[test]
+    fn test_sample_grid_round_trip_classify_exponential() {
+        let s = sample_grid(|x| 5f64.powf(x), EquationKind::Exponential);
+        let c = classify(&s);
+        assert_eq!(c.kind, EquationKind::Exponential);
+        assert!(approx(c.constant, 5.0, 1e-6));
+    }
+
+    // ── Involution ──
+
+    #[test]
+    fn test_involution_residual_negation_passes() {
+        // f(x) = -x is an involution. Sample on a symmetric set so
+        // images stay in the sample set.
+        let s = sample_grid(|x| -x, EquationKind::Involution);
+        assert!(involution_residual(&s) < FE_EPS);
+    }
+
+    #[test]
+    fn test_involution_residual_identity_passes() {
+        // f(x) = x is trivially an involution (f(f(x)) = x).
+        let s = sample_grid(|x| x, EquationKind::Involution);
+        assert!(involution_residual(&s) < FE_EPS);
+    }
+
+    #[test]
+    fn test_involution_residual_squaring_fails() {
+        // f(x) = x² on {1, 2, 3, ...}: f(2)=4, f(4)=16 ≠ 2 ⇒ residual > 0
+        let s = vec![(1.0, 1.0), (2.0, 4.0), (4.0, 16.0), (16.0, 256.0)];
+        assert!(involution_residual(&s) > 1.0);
+    }
+
+    #[test]
+    fn test_classify_negation_identifies_involution_or_linear() {
+        // f(x) = -x is BOTH a Cauchy linear (c = -1) AND an involution.
+        // The classifier should pick whichever fits best by confidence;
+        // since both fit perfectly, the Cauchy/linear path wins because
+        // it's checked before the involution path. Either kind is
+        // correct — just assert it's not Unknown.
+        let s = sample_grid(|x| -x, EquationKind::Involution);
+        let c = classify(&s);
+        assert_ne!(
+            c.kind,
+            EquationKind::Unknown,
+            "f(x) = -x should classify as some canonical family, got Unknown"
+        );
+        assert!(c.confidence > 0.999);
     }
 }

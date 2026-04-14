@@ -1017,6 +1017,7 @@ use crate::hdc::combinatorial::{
 };
 use crate::hdc::computational_geometry::Point2D;
 use crate::hdc::diophantine::pell_equation;
+use crate::hdc::functional_equations::{classify, Classification, EquationKind};
 use crate::hdc::inequalities::{
     amgm_holds, cauchy_schwarz_holds, jensen_convex_holds, power_mean_inequality_holds,
     schur_t1_holds, schur_t2_holds,
@@ -1391,6 +1392,42 @@ pub fn tactic_schur_check(_goal: &Goal, a: f64, b: f64, c: f64, t: u32) -> Tacti
         TacticResult::Closed
     } else {
         TacticResult::Failed(format!("Schur t={} violated at ({}, {}, {})", t, a, b, c))
+    }
+}
+
+// ─── Phase 3C: functional equation classification tactic ────────────────────
+//
+// Wraps `hdc::functional_equations::classify` for the IMO solver. Goal-form
+// problems like "find all f: R → R such that f(x+y) = f(x) + f(y)" supply
+// a sample set; this tactic returns `Closed` if classification matches the
+// expected family with high confidence, else `Failed` with the actual best
+// fit for diagnostics.
+
+/// Closes a functional-equation goal: given sampled `(x, f(x))` pairs and
+/// an `expected` family, succeed iff the classifier identifies that family
+/// with confidence ≥ 0.99. Lower confidences are reported in the failure
+/// message to aid debugging. The classifier IS the verification step —
+/// it's a numerical proof-of-fit, not a symbolic proof of uniqueness.
+pub fn tactic_classify_functional_equation(
+    _goal: &Goal,
+    samples: &[(f64, f64)],
+    expected: EquationKind,
+) -> TacticResult {
+    if samples.is_empty() {
+        return TacticResult::Failed("functional equation: empty sample set".into());
+    }
+    let Classification {
+        kind,
+        constant,
+        confidence,
+    } = classify(samples);
+    if kind == expected && confidence >= 0.99 {
+        TacticResult::Closed
+    } else {
+        TacticResult::Failed(format!(
+            "expected {:?}, got {:?} (constant={:.4}, confidence={:.3})",
+            expected, kind, constant, confidence
+        ))
     }
 }
 
@@ -2243,6 +2280,50 @@ mod tests {
         assert!(matches!(
             tactic_amgm_check(&goal, xs),
             TacticResult::Closed
+        ));
+    }
+
+    // ── Phase 3C functional equation classification tactic ─────────────
+
+    #[test]
+    fn test_tactic_classify_cauchy_linear() {
+        let goal = Goal::new(Expr::Const(0));
+        // f(x) = 5x sampled on a sum-closed grid 0..6.
+        let samples: Vec<(f64, f64)> = (0..=6).map(|i| (i as f64, 5.0 * i as f64)).collect();
+        assert!(matches!(
+            tactic_classify_functional_equation(&goal, &samples, EquationKind::CauchyAdditive),
+            TacticResult::Closed
+        ));
+    }
+
+    #[test]
+    fn test_tactic_classify_exponential() {
+        let goal = Goal::new(Expr::Const(0));
+        // f(x) = 3^x on 0..6 — verifies the exponential law f(x+y)=f(x)f(y).
+        let samples: Vec<(f64, f64)> = (0..=6).map(|i| (i as f64, 3f64.powi(i))).collect();
+        assert!(matches!(
+            tactic_classify_functional_equation(&goal, &samples, EquationKind::Exponential),
+            TacticResult::Closed
+        ));
+    }
+
+    #[test]
+    fn test_tactic_classify_wrong_family_fails() {
+        let goal = Goal::new(Expr::Const(0));
+        // Linear samples — Cauchy works, exponential doesn't.
+        let samples: Vec<(f64, f64)> = (0..=6).map(|i| (i as f64, 2.0 * i as f64)).collect();
+        assert!(matches!(
+            tactic_classify_functional_equation(&goal, &samples, EquationKind::Exponential),
+            TacticResult::Failed(_)
+        ));
+    }
+
+    #[test]
+    fn test_tactic_classify_empty_samples_fails() {
+        let goal = Goal::new(Expr::Const(0));
+        assert!(matches!(
+            tactic_classify_functional_equation(&goal, &[], EquationKind::CauchyAdditive),
+            TacticResult::Failed(_)
         ));
     }
 
