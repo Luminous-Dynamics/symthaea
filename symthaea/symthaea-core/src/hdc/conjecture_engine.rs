@@ -4498,6 +4498,37 @@ fn build_invariant_templates(var_names: &[&str]) -> Vec<Expr> {
                 Box::new(Expr::BinOp(BinOp::Add, Box::new(half_p2), Box::new(half_q2))),
                 Box::new(coupling))),
             Box::new(cubic)));
+
+        // Rotating-frame quasi-Jacobi skeleton:
+        //   (var_names[0]² + var_names[1]²) − (var_names[2]² + var_names[3]²)
+        //
+        // This is the "position² minus velocity²" sign signature characteristic
+        // of integrals in rotating frames — the Jacobi integral of the
+        // restricted 3-body problem, the Hamiltonian of any co-rotating system,
+        // etc. Unlike the Kepler `½v² - 1/r` energy template (which has an
+        // added kinetic energy and a subtracted potential), this template has
+        // a subtracted kinetic energy — the opposite sign convention.
+        //
+        // The full Jacobi integral requires additional `1/r₁ + 1/r₂` nonlocal
+        // terms that depend on problem-specific parameters (mass ratio, primary
+        // positions) and aren't captured here. The autonomous discoverer still
+        // has to assemble those via crossover + constant tuning. This template
+        // at least gives the GP the right quadratic skeleton to start from.
+        let pos_sq = Expr::BinOp(BinOp::Add,
+            Box::new(Expr::BinOp(BinOp::Pow,
+                Box::new(Expr::Var(var_names[0].into())),
+                Box::new(Expr::Const(2.0)))),
+            Box::new(Expr::BinOp(BinOp::Pow,
+                Box::new(Expr::Var(var_names[1].into())),
+                Box::new(Expr::Const(2.0)))));
+        let vel_sq = Expr::BinOp(BinOp::Add,
+            Box::new(Expr::BinOp(BinOp::Pow,
+                Box::new(Expr::Var(var_names[2].into())),
+                Box::new(Expr::Const(2.0)))),
+            Box::new(Expr::BinOp(BinOp::Pow,
+                Box::new(Expr::Var(var_names[3].into())),
+                Box::new(Expr::Const(2.0)))));
+        templates.push(Expr::BinOp(BinOp::Sub, Box::new(pos_sq), Box::new(vel_sq)));
     }
 
     // ── Logarithmic / transcendental skeletons ──────────────────────

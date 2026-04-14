@@ -128,6 +128,120 @@ fn kepler_dynamics() -> Vec<(&'static str, SymExpr)> {
     ]
 }
 
+/// Planar Circular Restricted Three-Body Problem (PCR3BP) in a rotating frame.
+///
+/// State: `[x, y, vx, vy]`. Mass ratio μ = m₂/(m₁+m₂). The two primaries
+/// sit at fixed positions (-μ, 0) and (1-μ, 0) in the co-rotating frame;
+/// the test particle moves under their gravity PLUS Coriolis and centrifugal
+/// forces from the rotation.
+///
+/// The equations of motion (unit angular velocity Ω = 1, G(m₁+m₂) = 1):
+///   dx/dt  = vx
+///   dy/dt  = vy
+///   dvx/dt = 2·vy + x − (1-μ)(x+μ)/r₁³ − μ(x-1+μ)/r₂³
+///   dvy/dt = -2·vx + y − (1-μ)·y/r₁³ − μ·y/r₂³
+/// where r₁ = √((x+μ)² + y²) and r₂ = √((x-1+μ)² + y²).
+///
+/// The only first integral is the **Jacobi integral**:
+///   C_J = (x² + y²) + 2·[(1-μ)/r₁ + μ/r₂] − (vx² + vy²)
+///
+/// Known since Jacobi (1836). Non-trivial structurally: unlike any of the
+/// other showcase invariants, C_J has a subtracted kinetic energy term
+/// (−v²) rather than the usual ½v² addition, reflecting the rotating-frame
+/// effective potential. None of our existing `build_invariant_templates`
+/// candidates match this shape — if the GP rediscovers it, that's a
+/// genuine "assemble from scratch via crossover" demonstration.
+fn pcr3bp_rhs(s: &[f64], _t: f64) -> Vec<f64> {
+    const MU: f64 = 0.01215; // Earth-Moon mass ratio (realistic benchmark)
+    let (x, y, vx, vy) = (s[0], s[1], s[2], s[3]);
+    let dx1 = x + MU;
+    let dx2 = x - 1.0 + MU;
+    let r1_sq = dx1 * dx1 + y * y;
+    let r2_sq = dx2 * dx2 + y * y;
+    if r1_sq < 1e-12 || r2_sq < 1e-12 {
+        return vec![vx, vy, 0.0, 0.0];
+    }
+    let r1_3 = r1_sq * r1_sq.sqrt();
+    let r2_3 = r2_sq * r2_sq.sqrt();
+    let ax = 2.0 * vy + x - (1.0 - MU) * dx1 / r1_3 - MU * dx2 / r2_3;
+    let ay = -2.0 * vx + y - (1.0 - MU) * y / r1_3 - MU * y / r2_3;
+    vec![vx, vy, ax, ay]
+}
+
+fn pcr3bp_dynamics() -> Vec<(&'static str, SymExpr)> {
+    // Dynamics with the Earth-Moon μ baked in. Note: the symbolic proof
+    // only needs the *structural* form; the engine's verify_conservation
+    // walks the chain rule using these rules. We encode the full RHS
+    // expression so dC_J/dt can collapse symbolically.
+    const MU: f64 = 0.01215;
+    let var = |n: &str| SymExpr::Var(n.into());
+    let mul = |a: SymExpr, b: SymExpr| SymExpr::Mul(Box::new(a), Box::new(b));
+    let add = |a: SymExpr, b: SymExpr| SymExpr::Add(Box::new(a), Box::new(b));
+    let neg = |a: SymExpr| SymExpr::Neg(Box::new(a));
+    let pow = |a: SymExpr, k: f64| SymExpr::Pow(Box::new(a), k);
+
+    // r₁² = (x + μ)² + y²
+    let r1_sq = || {
+        add(
+            pow(add(var("x"), SymExpr::Const(MU)), 2.0),
+            pow(var("y"), 2.0),
+        )
+    };
+    // r₂² = (x - 1 + μ)² + y²
+    let r2_sq = || {
+        add(
+            pow(add(var("x"), SymExpr::Const(MU - 1.0)), 2.0),
+            pow(var("y"), 2.0),
+        )
+    };
+    // dvx/dt = 2·vy + x − (1-μ)(x+μ)/r₁³ − μ(x-1+μ)/r₂³
+    let dvx_dt = add(
+        add(
+            mul(SymExpr::Const(2.0), var("vy")),
+            var("x"),
+        ),
+        add(
+            neg(mul(
+                mul(
+                    SymExpr::Const(1.0 - MU),
+                    add(var("x"), SymExpr::Const(MU)),
+                ),
+                pow(r1_sq(), -1.5),
+            )),
+            neg(mul(
+                mul(
+                    SymExpr::Const(MU),
+                    add(var("x"), SymExpr::Const(MU - 1.0)),
+                ),
+                pow(r2_sq(), -1.5),
+            )),
+        ),
+    );
+    // dvy/dt = -2·vx + y − (1-μ)·y/r₁³ − μ·y/r₂³
+    let dvy_dt = add(
+        add(
+            mul(SymExpr::Const(-2.0), var("vx")),
+            var("y"),
+        ),
+        add(
+            neg(mul(
+                mul(SymExpr::Const(1.0 - MU), var("y")),
+                pow(r1_sq(), -1.5),
+            )),
+            neg(mul(
+                mul(SymExpr::Const(MU), var("y")),
+                pow(r2_sq(), -1.5),
+            )),
+        ),
+    );
+    vec![
+        ("x", var("vx")),
+        ("y", var("vy")),
+        ("vx", dvx_dt),
+        ("vy", dvy_dt),
+    ]
+}
+
 /// Hénon-Heiles 4D chaotic Hamiltonian: state `[x, y, px, py]`.
 ///
 /// H = ½(px² + py²) + ½(x² + y²) + x²y - (1/3)y³
@@ -439,6 +553,13 @@ fn main() {
     hh_units.insert("px".to_string(), DimensionalSignature::DIMENSIONLESS);
     hh_units.insert("py".to_string(), DimensionalSignature::DIMENSIONLESS);
 
+    // PCR3BP: natural units in the rotating frame (Ω=1, G(m₁+m₂)=1).
+    let mut pcr3bp_units = UnitMap::new();
+    pcr3bp_units.insert("x".to_string(), DimensionalSignature::DIMENSIONLESS);
+    pcr3bp_units.insert("y".to_string(), DimensionalSignature::DIMENSIONLESS);
+    pcr3bp_units.insert("vx".to_string(), DimensionalSignature::DIMENSIONLESS);
+    pcr3bp_units.insert("vy".to_string(), DimensionalSignature::DIMENSIONLESS);
+
     // ─── Problem 1: Harmonic Oscillator ───
     results.push(run_problem(
         &bridge,
@@ -512,6 +633,43 @@ fn main() {
         40.0,
         0.005,
         henon_heiles_config,
+    ));
+
+    // ─── Problem 5: PCR3BP (planar circular restricted 3-body, rotating frame) ───
+    //
+    // The Jacobi integral `C_J = (x² + y²) + 2·[(1-μ)/r₁ + μ/r₂] − (vx² + vy²)`
+    // is the only known first integral. The GP has the `pos² − vel²` quasi-
+    // Jacobi skeleton template but must assemble the nonlocal `1/r₁ + 1/r₂`
+    // term via crossover. Honest novel-ish test: if the engine finds even
+    // a partial invariant with a pos²−vel² structure, that's a new class of
+    // invariant shape (subtracted kinetic energy in a rotating frame).
+    // Earth-Moon mass ratio μ = 0.01215. Initial state is an Earth-centered
+    // retrograde orbit with enough energy to librate but not escape — gives
+    // a richly varying trajectory where the Jacobi integral is strictly
+    // conserved but all its component terms (x², y², vx², vy², 1/r₁, 1/r₂)
+    // individually vary substantially.
+    let pcr3bp_config = RegressorConfig {
+        population_size: 600,
+        generations: 300,
+        max_depth: 6,
+        max_complexity: 40,
+        lambda: 0.0005,
+        mutation_rate: 0.4,
+        seed: 42,
+        ..RegressorConfig::default()
+    };
+    results.push(run_problem(
+        &bridge,
+        "PCR3BP Jacobi Integral",
+        "Celestial Mechanics (rotating frame)",
+        pcr3bp_rhs,
+        &[0.3, 0.0, 0.0, 1.4], // librating orbit around Earth primary
+        &["x", "y", "vx", "vy"],
+        &pcr3bp_dynamics(),
+        &pcr3bp_units,
+        15.0,
+        0.001,
+        pcr3bp_config,
     ));
 
     // ─── Sequence-based discovery: Triangular numbers (with Z3 path) ───
