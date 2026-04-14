@@ -204,3 +204,98 @@ be significantly lower than 430 KB/s.
 - Code: `examples/phone_rdp_share.rs` (commit `5e3b253647`)
 - Run log: saved to `/tmp/t12_live_run.log` at measurement time
 - Device: Pixel 8 Pro, serial `41201FDJG000UM`, confirmed via `adb devices`
+
+## Task #12 — extended hardware measurements (2026-04-14)
+
+After the initial Task #12 live run (10s, 2 codec'd frames), two
+follow-up runs produced more data:
+
+### Run 2: 60s static screen (no activity)
+
+```
+Wall time:       370.8s (60s requested, 6× ADB polling drift)
+Full frames:     1 (sealed: 2,363,980 B / json: 8,312,042 B)
+Delta frames:    1 (sealed: 2,367,428 B / json: 8,327,454 B)
+Sealed:          12.5 KB/s
+JSON:            43.8 KB/s
+Ratio:           3.517×
+```
+
+**Identical codec output to the 10s run (same 2 frames, same byte
+counts).** The `HybridCodec::detect_changes()` logic correctly
+emitted nothing for 60 seconds on a static screen — no changes,
+no frames. The ratio at 3.517× is the durable signal; the
+bandwidth in KB/s is meaningless when the denominator is wall time
+and the numerator is constant.
+
+### Run 3: 15s with active screen (background ADB swipes)
+
+```
+Wall time:       69.0s
+Full frames:     1 (sealed: 2,363,980 B / json: 8,312,132 B)
+Delta frames:    7 (sealed: 3,366,566 B total / json: 10,417,215 B total)
+Avg delta size:  480,938 B sealed, 1,488,174 B json
+Sealed:          81.1 KB/s
+JSON:            265.2 KB/s
+Ratio:           3.268×
+```
+
+**The meaningful dataset.** Background swipes via
+`adb shell input swipe 500 1500 500 500 200` at 1 Hz triggered
+real delta frames. Findings:
+
+1. **Real deltas are ~5× smaller than synthetic full-baseline deltas.**
+   Synthetic delta frame (baseline vs empty): 2.37 MB sealed.
+   Real swipe-triggered delta: 480 KB sealed. The change-detection
+   is correctly reducing the frame size by only transmitting actually-
+   changed tiles.
+
+2. **Ratio drops slightly for real deltas** (3.268× vs 3.517×). AEAD
+   overhead (28 B nonce + tag) becomes a larger fraction of smaller
+   payloads. Still well above the 2.5× floor asserted in
+   `integration_rdp_wire::wire_envelope_beats_json_by_3x`.
+
+3. **The real per-frame sealed size is 481 KB, not 2.4 MB.** This
+   changes the Phase II projection significantly. At 30 fps with
+   active content, sealed bandwidth would be ~14.4 MB/s — ~35% of
+   the USB 2.0 sustained ceiling (35 MB/s measured). Heavy activity
+   at 30 fps exceeds the USB 2.0 ceiling without further codec
+   compression.
+
+### USB 2.0 ceiling measurement (2026-04-14)
+
+Measured via `adb push`/`adb pull` of 200 MB random data on the
+same USB connection used for phone_rdp_share:
+
+| Direction | Rate |
+|---|---|
+| Laptop → Pixel (push) | 36.2 MB/s (~290 Mbps) |
+| Pixel → Laptop (pull) | 33.5 MB/s (~268 Mbps) |
+
+Sustained ~35 MB/s = 58% of USB 2.0's 480 Mbps theoretical. This
+is shared between ADB (Interface 0), RNDIS tethering (Interface 1/2),
+and CDC Data. Realistic ADB-only budget: ~25-30 MB/s with tethering
+active.
+
+### Revised Phase II bandwidth projection
+
+| Scenario | Per-frame sealed | @ 30 fps | % of 35 MB/s USB ceiling |
+|---|---|---|---|
+| Static screen | 0 (detect_changes returns empty) | 0 | 0% |
+| Light activity (measured) | ~480 KB delta | 14.4 MB/s | 41% |
+| Heavy activity (30 fps full deltas) | ~2.4 MB | 72 MB/s | **206% — exceeds ceiling** |
+
+**Heavy-activity 30 fps on the current codec would exceed USB 2.0.**
+The Phase II codec optimization ladder (LZ4 wrap for 2-3× reduction,
+sparse encoding for 5-10×) is no longer a nice-to-have — it's
+required to hit Phase II's 30 fps target on USB 2.0 without
+saturating the bus.
+
+**Recommended Phase II sequencing**:
+1. Phase I.B scrcpy first (unlocks 30 fps capture) — without it,
+   the 4 fps polling ceiling makes all of this academic
+2. Measure real-content sealed per-frame size with scrcpy
+3. LZ4 wrap before sealing (1 hour, uses existing `lz4_flex` dep)
+4. Measure again
+5. If still exceeding USB budget: sparse patch encoding
+6. Then attention backchannel (the original Phase II task)
