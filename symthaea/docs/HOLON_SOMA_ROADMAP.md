@@ -1,6 +1,6 @@
 # Holon-Soma Roadmap
 
-**Version**: 1.1 (2026-04-14)
+**Version**: 1.2 (2026-04-14)
 **Scope**: The PQC-sealed binary RDP wire connecting a Symthaea cognitive
 loop to a physical embodiment (starting with the Pixel 8 Pro), and the
 research program that rides on top of it.
@@ -151,32 +151,54 @@ every downstream phase.
 Plan A wins because the 180 s screenrecord limit is a hard blocker
 for the soak test and for Phase III's multi-minute task trials.
 
-**Codec decision**: **Force H.264** via scrcpy's `--video-codec=h264`
-arg. Pixel 8 Pro's default is H.265 (HEVC), which `openh264` does
-**not** decode. Alternative was to adopt `ffmpeg-next` for H.265 —
-rejected because of system libavcodec dep + larger binary + NixOS
-build friction. If scrcpy rejects h264 on this device for any
-reason, the fallback is `ffmpeg-next` behind a feature flag — add a
-test for this at the start of Phase I.B.
+**Codec decision (v1.2 pivot — AV1 over H.264)**: **Request AV1**
+via scrcpy's `--video-codec=av1`. Pixel 8 Pro's Tensor G3 ships a
+**hardware AV1 encoder** — one of the few production phones that
+does. AV1 at the same perceptual quality is 30-40% smaller than
+H.264, which directly relieves the USB 2.0 budget pressure that
+motivated the Phase II compression ladder in the first place.
+
+Decoder pivot: drop `openh264` in favor of **`rav1d`**, the
+pure-Rust port of VideoLAN `dav1d` sponsored by ISRG. Zero C
+bindings, zero system dep, zero NixOS build-script friction —
+just `cargo add rav1d`. The v1.1 roadmap was already uneasy about
+`openh264`'s C-lib integration; `rav1d` makes that concern vanish.
+
+**Codec fallback ladder** (if device or scrcpy rejects AV1 for
+any reason — first successful rung wins):
+1. **AV1** via `rav1d` ← preferred
+2. **H.265 (HEVC)** via `ffmpeg-next` behind a `hevc-fallback`
+   feature flag (system libavcodec dep acceptable at the fallback
+   tier, not the default)
+3. **H.264** via `openh264` behind an `h264-fallback` feature flag
+   (last resort — full v1.1 plan survives as fallback #2)
+
+First task in the worktree is a codec-probe test: spin up scrcpy
+with each flag in turn, confirm which rungs the Pixel 8 Pro + the
+installed scrcpy-server support, log the decision, proceed with the
+highest-ranked working codec.
 
 **Approach**: Fetch the pinned scrcpy-server.jar (from scrcpy v2.4
-GitHub release, SHA256 pinned in-tree), `adb push` it to
-`/data/local/tmp/scrcpy-server.jar`, run it via `app_process`, open
-`adb reverse localabstract:scrcpy tcp:<local>`, connect a local
-tokio TCP listener, parse the scrcpy binary framing (metadata header
-+ per-frame length-prefixed H.264 NAL), decode via `openh264` 0.6
-(Cisco BSD-2 prebuilt binary, no system dep).
+GitHub release, SHA256 pinned in-tree — v2.4 is the first release
+with stable AV1 support), `adb push` it to
+`/data/local/tmp/scrcpy-server.jar`, run it via `app_process` with
+`video_codec=av1`, open `adb reverse localabstract:scrcpy
+tcp:<local>`, connect a local tokio TCP listener, parse the scrcpy
+binary framing (metadata header + per-frame length-prefixed OBU for
+AV1), decode via `rav1d` on a rayon-spread thread pool (AV1
+decoding parallelizes well across cores — desktop Ryzen/Intel can
+handle 4K60 AV1 in software).
 
 **New files**:
 - `crates/symthaea-phone-embodiment/src/scrcpy.rs` (~400 LOC — revised up from 300)
 - `crates/symthaea-phone-embodiment/vendor/scrcpy-server-v2.4.jar` + `.sha256`
 - `crates/symthaea-phone-embodiment/vendor/README.md` (provenance + rebuild instructions)
-- `crates/symthaea-phone-embodiment/tests/data/sample.h264` (~50 KB recorded NAL asset for offline decode tests)
+- `crates/symthaea-phone-embodiment/tests/data/sample.av1` (~40 KB recorded OBU asset for offline decode tests; fallback `sample.hevc` + `sample.h264` optional for the respective feature builds)
 
 **Modified files**:
 - `crates/symthaea-phone-embodiment/src/adb.rs` — `push_scrcpy_server`, `start_scrcpy`, `reverse_tunnel`, `stop_scrcpy`
 - `crates/symthaea-phone-embodiment/src/bridge.rs` — `capture_stream`, `tick_rgba` async variants
-- `crates/symthaea-phone-embodiment/Cargo.toml` — `scrcpy` feature + `openh264 = "0.6"` optional dep
+- `crates/symthaea-phone-embodiment/Cargo.toml` — `scrcpy` feature + `rav1d` optional dep; `hevc-fallback` + `h264-fallback` feature gates for the ladder
 - `examples/phone_rdp_share.rs` — swap `capture_and_observe_rgba` for the persistent stream path when `scrcpy` feature is on
 
 **Feature gating**: Keep the existing ADB-polling capture path
@@ -184,8 +206,10 @@ alive as the default. scrcpy goes behind a new `scrcpy` feature so
 the diagnostic polling path stays available for troubleshooting,
 and so sessions without a device can still build-test the crate.
 
-**New dep**: `openh264 = "0.6"` (optional, gated by `scrcpy`
-feature) — prefer over `ffmpeg-next` for the reasons above.
+**New deps**:
+- `rav1d` (pure Rust, required at the `scrcpy` feature) — primary AV1 decoder
+- `ffmpeg-next` (optional, gated by `hevc-fallback`) — HEVC rung of the fallback ladder
+- `openh264 = "0.6"` (optional, gated by `h264-fallback`) — H.264 rung of the fallback ladder, last resort
 
 **Soak observability** (NEW — previously missing): the 10-minute
 soak must emit a metrics line every 10 s with:
@@ -200,22 +224,32 @@ Without this, the soak only measures end-state ("no crash"), not
 the trajectory. Degrading wires fail slowly.
 
 **Verification**:
-1. Unit tests with recorded NAL asset (`sample.h264`) — decodes to expected RGBA without a device
-2. Codec detection test — fails loudly if the device serves H.265 despite the h264 flag
-3. `phone_rdp_share --features scrcpy` sustains ≥30 fps for 60 s on the live Pixel
-4. 10-minute soak: live metrics line every 10 s; end state shows ≥30 fps sustained, 0 crashes, 0 restarts, <0.1% dropped, stable memory
+1. Codec ladder probe — first worktree task; logs which rung
+   (AV1/HEVC/H.264) the device actually supports and locks the
+   feature set for the rest of the session
+2. Unit tests with recorded asset — `sample.av1` (primary) plus
+   optional `sample.h264` / `sample.hevc` for fallback-flag builds
+   — decodes to expected RGBA without a device
+3. `phone_rdp_share --features scrcpy` sustains ≥30 fps for 60 s on the live Pixel via AV1
+4. AV1 vs H.264 bandwidth comparison on the same 60 s trace — expect 30-40% reduction; publish numbers in the Phase I.B verification doc
+5. 10-minute soak: live metrics line every 10 s; end state shows ≥30 fps sustained, 0 crashes, 0 restarts, <0.1% dropped, stable memory
 
-**Estimated effort**: **6-10 hours** in a fresh worktree. Breakdown:
+**Estimated effort**: **5-8 hours** in a fresh worktree (v1.2
+revised down from v1.1's 6-10 h because `rav1d` is pure-Rust and
+eliminates the C-integration time block). Breakdown:
+- 0.5 h: codec ladder probe + decision log
 - 1 h: JAR vendor + SHA pin + adb lifecycle (push, run, reverse, stop)
-- 2-3 h: scrcpy binary framing parser + openh264 integration (first C-lib integration point, expect friction)
+- 1.5-2 h: scrcpy binary framing parser + `rav1d` integration (pure Rust — expect little friction)
 - 1 h: async bridge + feature gate wiring
-- 1 h: unit tests with recorded NAL
+- 0.5-1 h: unit tests with recorded AV1 asset
 - 1-2 h: live fps verification + soak harness + observability metrics
-- 1 h: retries, flake-fixing, documentation
+- 0.5 h: retries, flake-fixing, documentation
 
-Retrospective Rule #1 was "don't under-estimate." 3-5 hours from
-v1.0 was optimistic for a first C-library integration with a vendor
-JAR lifecycle. 6-10 hours is honest.
+Retrospective Rule #1 was "don't under-estimate." v1.1's 6-10 h
+budgeted for C-library friction that v1.2's AV1+rav1d stack
+removes. If the codec probe surfaces a surprise (AV1 unsupported on
+this Android build) and forces fallback to H.265 or H.264, the
+budget reverts to v1.1's 6-10 h envelope.
 
 **Why this phase unblocks everything**: without real fps, all bandwidth
 measurements are synthetic or polling-limited. Phase II can't test
@@ -567,6 +601,24 @@ infrastructure.
 
 ## Change log
 
+- **1.2** (2026-04-14, later same day): AV1 + rav1d pivot for Phase I.B.
+  - Codec: force AV1 via scrcpy `--video-codec=av1` (Pixel 8 Pro
+    ships a hardware AV1 encoder in Tensor G3; AV1 is 30-40% smaller
+    than H.264 at equal perceptual quality, directly relieving the
+    USB 2.0 budget).
+  - Decoder: `openh264` (C library, NixOS build friction) → `rav1d`
+    (pure-Rust port of dav1d sponsored by ISRG, zero C bindings,
+    zero system dep, scales across cores).
+  - Fallback ladder: AV1 (primary) → HEVC via ffmpeg-next
+    (`hevc-fallback` feature) → H.264 via openh264 (`h264-fallback`
+    feature, last resort).
+  - First worktree task: codec ladder probe — log which rung the
+    device supports and lock feature set.
+  - New verification step: AV1 vs H.264 bandwidth comparison on the
+    same 60 s live trace; expect 30-40% reduction.
+  - Effort budget revised **6-10 h → 5-8 h** (rav1d eliminates the
+    v1.1 C-library integration block); reverts to v1.1's 6-10 h if
+    the probe forces fallback.
 - **1.1** (2026-04-14, later same day): critical-review refinements.
   - Phase I.B: Plan A/B decision (scrcpy wins on 180 s screenrecord
     limit), H.264 codec forcing (Pixel 8 Pro defaults to H.265,
