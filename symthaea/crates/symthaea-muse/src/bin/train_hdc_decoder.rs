@@ -46,6 +46,10 @@ struct Args {
     /// Half-window for temporal context. 0 = no context (17D input),
     /// 2 = 5-frame window (85D input), etc.
     context: usize,
+    adam: bool,
+    /// Path to global_mel_mean.bin (from mel_baseline). If set, targets are
+    /// centered by subtracting the mean — the decoder learns deviations.
+    global_mean: Option<PathBuf>,
 }
 
 fn parse_args() -> Args {
@@ -63,6 +67,8 @@ fn parse_args() -> Args {
     let mut max_files = None;
     let mut log_every = 50_000;
     let mut context = 0usize;
+    let mut adam = false;
+    let mut global_mean: Option<PathBuf> = None;
 
     let mut i = 0;
     while i < args.len() {
@@ -73,11 +79,28 @@ fn parse_args() -> Args {
             "--max-files" => { max_files = Some(args[i+1].parse().unwrap()); i += 2; }
             "--log-every" => { log_every = args[i+1].parse().unwrap(); i += 2; }
             "--context" => { context = args[i+1].parse().unwrap(); i += 2; }
+            "--adam" => { adam = true; i += 1; }
+            "--global-mean" => { global_mean = Some(PathBuf::from(&args[i+1])); i += 2; }
             other => { eprintln!("Unknown arg: {other}"); std::process::exit(1); }
         }
     }
 
-    Args { pairs_dir, ckpt_path, epochs, hidden, lr, max_files, log_every, context }
+    Args {
+        pairs_dir, ckpt_path, epochs, hidden, lr, max_files, log_every,
+        context, adam, global_mean,
+    }
+}
+
+/// Load a `global_mel_mean.bin` file: u32 n_mels, then n_mels f32s.
+fn load_global_mean(path: &std::path::Path) -> std::io::Result<Vec<f32>> {
+    use std::io::Read;
+    let mut f = std::fs::File::open(path)?;
+    let mut h = [0u8; 4];
+    f.read_exact(&mut h)?;
+    let n = u32::from_le_bytes(h) as usize;
+    let mut buf = vec![0u8; n * 4];
+    f.read_exact(&mut buf)?;
+    Ok(buf.chunks_exact(4).map(|c| f32::from_le_bytes(c.try_into().unwrap())).collect())
 }
 
 /// Build a temporal-context input vector: concatenate normalized states
@@ -169,6 +192,20 @@ fn main() {
         seed: 0xBADC0FFEE,
     };
     let mut decoder = MelDecoder::new(cfg);
+    if args.adam {
+        decoder.enable_adam();
+        println!("  optimizer:  Adam");
+    } else {
+        println!("  optimizer:  SGD");
+    }
+
+    // Optional mean-centering
+    let mean_vec: Option<Vec<f32>> = args.global_mean.as_ref().map(|p| {
+        let v = load_global_mean(p).expect("load global mean");
+        assert_eq!(v.len(), n_mels, "global mean n_mels mismatch");
+        println!("  centering:  global_mel_mean from {}", p.display());
+        v
+    });
 
     // Simple xorshift for shuffle indices
     let mut seed = 0xA11CE_u64;
@@ -219,7 +256,12 @@ fn main() {
 
             for &i in &idx {
                 let input = build_context_input(&states, i, args.context);
-                let loss = decoder.step(&input, &mels[i]);
+                let target: Vec<f32> = if let Some(mu) = &mean_vec {
+                    mels[i].iter().zip(mu).map(|(x, m)| x - m).collect()
+                } else {
+                    mels[i].clone()
+                };
+                let loss = decoder.step(&input, &target);
                 window_loss += loss;
                 window_count += 1;
                 global_step += 1;
@@ -245,9 +287,12 @@ fn main() {
                 for (i, m) in vm.iter().enumerate() {
                     let input = build_context_input(&vs, i, args.context);
                     let pred = decoder.predict(&input);
+                    // Add mean back for apples-to-apples comparison with
+                    // uncentered val_mse.
                     let mut e = 0.0;
                     for j in 0..n_mels {
-                        let d = pred[j] - m[j];
+                        let pred_full = if let Some(mu) = &mean_vec { pred[j] + mu[j] } else { pred[j] };
+                        let d = pred_full - m[j];
                         e += d * d;
                     }
                     val_loss += (e / n_mels as f32) as f64;
@@ -262,9 +307,13 @@ fn main() {
             std::fs::create_dir_all(parent).ok();
         }
         decoder.save(&args.ckpt_path).expect("save checkpoint");
+        // R² vs the 2.1538 global-mean baseline (hard-coded; true variance
+        // comes from mel_baseline). This gives a dimensionless quality score.
+        const GLOBAL_VAR: f64 = 2.1538;
+        let r2 = 1.0 - val_mse / GLOBAL_VAR;
         println!(
-            "  [epoch {} DONE] val_mse={:.4} ({} frames)  checkpoint → {}",
-            epoch, val_mse, val_count, args.ckpt_path.display()
+            "  [epoch {} DONE] val_mse={:.4}  R²={:.3}  ({} frames)  checkpoint → {}",
+            epoch, val_mse, r2, val_count, args.ckpt_path.display()
         );
     }
 

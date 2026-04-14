@@ -23,7 +23,7 @@
 use std::path::Path;
 
 /// Decoder hyperparameters.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct DecoderConfig {
     pub state_dim: usize,
     pub hidden: usize,
@@ -44,7 +44,8 @@ impl Default for DecoderConfig {
     }
 }
 
-/// Tiny MLP: state → hidden (ReLU) → mel. Manual forward/backward with SGD.
+/// Tiny MLP: state → hidden (ReLU) → mel. Manual forward/backward with SGD
+/// or Adam (set via `enable_adam`).
 pub struct MelDecoder {
     pub cfg: DecoderConfig,
     // Layer 1: state_dim × hidden
@@ -53,6 +54,14 @@ pub struct MelDecoder {
     // Layer 2: hidden × n_mels
     pub w2: Vec<f32>,
     pub b2: Vec<f32>,
+
+    // Adam state (used iff `use_adam`)
+    use_adam: bool,
+    t: u64,
+    w1_m: Vec<f32>, w1_v: Vec<f32>,
+    b1_m: Vec<f32>, b1_v: Vec<f32>,
+    w2_m: Vec<f32>, w2_v: Vec<f32>,
+    b2_m: Vec<f32>, b2_v: Vec<f32>,
 }
 
 impl MelDecoder {
@@ -69,8 +78,23 @@ impl MelDecoder {
             .collect();
         let b1 = vec![0.0; cfg.hidden];
         let b2 = vec![0.0; cfg.n_mels];
-        Self { cfg, w1, b1, w2, b2 }
+        let w1_m = vec![0.0; cfg.state_dim * cfg.hidden];
+        let w1_v = vec![0.0; cfg.state_dim * cfg.hidden];
+        let b1_m = vec![0.0; cfg.hidden];
+        let b1_v = vec![0.0; cfg.hidden];
+        let w2_m = vec![0.0; cfg.hidden * cfg.n_mels];
+        let w2_v = vec![0.0; cfg.hidden * cfg.n_mels];
+        let b2_m = vec![0.0; cfg.n_mels];
+        let b2_v = vec![0.0; cfg.n_mels];
+        Self {
+            cfg, w1, b1, w2, b2,
+            use_adam: false, t: 0,
+            w1_m, w1_v, b1_m, b1_v, w2_m, w2_v, b2_m, b2_v,
+        }
     }
+
+    /// Switch the optimizer to Adam. Call before `step()`.
+    pub fn enable_adam(&mut self) { self.use_adam = true; }
 
     /// Forward pass. Returns (hidden_pre_relu, hidden_post_relu, mel_pred).
     pub fn forward(&self, state: &[f32]) -> (Vec<f32>, Vec<f32>, Vec<f32>) {
@@ -129,35 +153,49 @@ impl MelDecoder {
         }
         loss *= inv_m;
 
-        // Backprop into W2, b2, and a1
+        // Compute gradients into temporary buffers first (Adam needs them).
         let mut da1 = vec![0.0f32; h];
+        let mut dw2 = vec![0.0f32; h * m];
+        let mut db2 = vec![0.0f32; m];
         for i in 0..h {
             for j in 0..m {
                 let idx = i * m + j;
                 da1[i] += self.w2[idx] * dmel[j];
-                self.w2[idx] -= lr * dmel[j] * a1[i];
+                dw2[idx] = dmel[j] * a1[i];
             }
         }
         for j in 0..m {
-            self.b2[j] -= lr * dmel[j];
+            db2[j] = dmel[j];
         }
 
         // ReLU backward
         let mut dz1 = vec![0.0f32; h];
         for i in 0..h {
-            if z1[i] > 0.0 {
-                dz1[i] = da1[i];
-            }
+            if z1[i] > 0.0 { dz1[i] = da1[i]; }
         }
 
-        // Backprop into W1, b1
+        let mut dw1 = vec![0.0f32; s * h];
+        let mut db1 = vec![0.0f32; h];
         for i in 0..s {
             for j in 0..h {
-                self.w1[i * h + j] -= lr * dz1[j] * state[i];
+                dw1[i * h + j] = dz1[j] * state[i];
             }
         }
         for j in 0..h {
-            self.b1[j] -= lr * dz1[j];
+            db1[j] = dz1[j];
+        }
+
+        if self.use_adam {
+            self.t += 1;
+            adam_update(&mut self.w1, &mut self.w1_m, &mut self.w1_v, &dw1, lr, self.t);
+            adam_update(&mut self.b1, &mut self.b1_m, &mut self.b1_v, &db1, lr, self.t);
+            adam_update(&mut self.w2, &mut self.w2_m, &mut self.w2_v, &dw2, lr, self.t);
+            adam_update(&mut self.b2, &mut self.b2_m, &mut self.b2_v, &db2, lr, self.t);
+        } else {
+            for i in 0..dw1.len() { self.w1[i] -= lr * dw1[i]; }
+            for i in 0..db1.len() { self.b1[i] -= lr * db1[i]; }
+            for i in 0..dw2.len() { self.w2[i] -= lr * dw2[i]; }
+            for i in 0..db2.len() { self.b2[i] -= lr * db2[i]; }
         }
 
         loss
@@ -206,7 +244,35 @@ impl MelDecoder {
         let b1 = read_vec(&mut f, hidden)?;
         let w2 = read_vec(&mut f, hidden * n_mels)?;
         let b2 = read_vec(&mut f, n_mels)?;
-        Ok(Self { cfg, w1, b1, w2, b2 })
+        let w1_m = vec![0.0; state_dim * hidden];
+        let w1_v = vec![0.0; state_dim * hidden];
+        let b1_m = vec![0.0; hidden];
+        let b1_v = vec![0.0; hidden];
+        let w2_m = vec![0.0; hidden * n_mels];
+        let w2_v = vec![0.0; hidden * n_mels];
+        let b2_m = vec![0.0; n_mels];
+        let b2_v = vec![0.0; n_mels];
+        Ok(Self {
+            cfg, w1, b1, w2, b2,
+            use_adam: false, t: 0,
+            w1_m, w1_v, b1_m, b1_v, w2_m, w2_v, b2_m, b2_v,
+        })
+    }
+}
+
+/// Adam optimizer update. β1=0.9, β2=0.999, ε=1e-8.
+fn adam_update(w: &mut [f32], m: &mut [f32], v: &mut [f32], g: &[f32], lr: f32, t: u64) {
+    let b1 = 0.9f32;
+    let b2 = 0.999f32;
+    let eps = 1e-8f32;
+    let bc1 = 1.0 - b1.powi(t as i32);
+    let bc2 = 1.0 - b2.powi(t as i32);
+    for i in 0..w.len() {
+        m[i] = b1 * m[i] + (1.0 - b1) * g[i];
+        v[i] = b2 * v[i] + (1.0 - b2) * g[i] * g[i];
+        let m_hat = m[i] / bc1;
+        let v_hat = v[i] / bc2;
+        w[i] -= lr * m_hat / (v_hat.sqrt() + eps);
     }
 }
 
@@ -260,6 +326,26 @@ mod tests {
         assert!(
             final_loss < initial * 0.01,
             "loss should drop 100x, initial={initial} final={final_loss}"
+        );
+    }
+
+    #[test]
+    fn adam_converges_faster_than_sgd_on_single_sample() {
+        let cfg = DecoderConfig { state_dim: 4, hidden: 16, n_mels: 8, lr: 0.01, seed: 1 };
+        let mut sgd = MelDecoder::new(cfg.clone());
+        let mut adam = MelDecoder::new(cfg);
+        adam.enable_adam();
+        let state = vec![0.3, -0.1, 0.7, 0.5];
+        let target = vec![-2.0, -1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5];
+        let mut sgd_loss = 0.0;
+        let mut adam_loss = 0.0;
+        for _ in 0..100 {
+            sgd_loss = sgd.step(&state, &target);
+            adam_loss = adam.step(&state, &target);
+        }
+        assert!(
+            adam_loss < sgd_loss,
+            "Adam should converge faster at same lr; sgd={sgd_loss} adam={adam_loss}"
         );
     }
 
