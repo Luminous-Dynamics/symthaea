@@ -122,11 +122,27 @@ struct CachedScaler {
 impl HevcDecoder {
     /// Build a fresh HEVC decoder. Cheap after the first call (ffmpeg
     /// init is guarded by a Once).
+    ///
+    /// Threading: configured for **slice-parallel** decoding via
+    /// `set_threading(Type::Slice, count=0)`. count=0 lets ffmpeg pick
+    /// `nproc` worker threads. `Type::Slice` parallelizes the work for
+    /// a SINGLE frame across cores, so the first decoded frame comes
+    /// out as soon as input is available — unlike `Type::Frame` which
+    /// pipelines multiple frames in parallel and needs more input
+    /// buffered before emitting anything (the I.B.6 sustain run caught
+    /// that variant producing 0 frames from a 12-packet burst).
+    /// Single-threaded default was ~100 ms per 720p frame on a 16-core
+    /// Ryzen, capping us at 10 fps. Slice-threaded is the right tradeoff
+    /// for a real-time consumer.
     pub fn new() -> Result<Self, DecodeError> {
         ensure_ffmpeg_initialized()?;
         let codec =
             ffmpeg::decoder::find(ffmpeg::codec::Id::HEVC).ok_or(DecodeError::HevcCodecNotFound)?;
-        let context = ffmpeg::codec::Context::new_with_codec(codec);
+        let mut context = ffmpeg::codec::Context::new_with_codec(codec);
+        context.set_threading(ffmpeg::codec::threading::Config {
+            kind: ffmpeg::codec::threading::Type::Slice,
+            count: 0,
+        });
         let decoder = context.decoder().video()?;
         Ok(Self {
             decoder,

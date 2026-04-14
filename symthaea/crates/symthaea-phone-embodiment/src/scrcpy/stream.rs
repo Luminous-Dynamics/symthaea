@@ -52,10 +52,14 @@ use super::{
 
 /// Default read timeout for [`ScrcpyCaptureStream::next_frame`].
 ///
-/// 100 ms is generous for a 30 fps stream (one frame every ~33 ms) and
-/// short enough that cognitive cycles can detect a stalled device within
-/// a couple of ticks.
-pub const DEFAULT_READ_TIMEOUT: Duration = Duration::from_millis(100);
+/// 500 ms is generous enough that a momentary device hiccup on USB
+/// doesn't trip a false timeout, while still short enough that a stalled
+/// device shows up within ~2 cognitive cycles. The original 100 ms was
+/// too tight: the recorder example empirically needed 500 ms to read
+/// back-to-back frame headers on the Pixel 8 Pro USB link without
+/// hitting `EWOULDBLOCK` on partial reads. Phase I.B.6 sustain run
+/// confirmed 100 ms produced 0 frames over 60 s.
+pub const DEFAULT_READ_TIMEOUT: Duration = Duration::from_millis(500);
 
 /// Errors flowing out of the end-to-end capture stream.
 #[derive(Debug)]
@@ -140,6 +144,14 @@ pub struct ScrcpyCaptureStream {
     /// Drained frames waiting for the caller. The decoder may produce
     /// multiple frames per input packet because of HEVC's reorder buffer.
     pending: VecDeque<DecodedFrame>,
+    /// Cumulative HEVC payload bytes pulled off the wire (header bytes
+    /// excluded). The Phase I.B.6 observability harness reads this for
+    /// its "sealed bytes/sec" metric — distinct from the size of the
+    /// decoded RGBA buffers, which is constant per frame.
+    wire_bytes_total: u64,
+    /// Cumulative wire-frame count (1 per packet read off TCP, distinct
+    /// from `DecodedFrame` count which depends on HEVC reorder buffer).
+    wire_packets_total: u64,
 }
 
 impl ScrcpyCaptureStream {
@@ -169,6 +181,16 @@ impl ScrcpyCaptureStream {
         // 3. Wait for the server to call connect() on its local abstract
         //    socket. Default 5s is generous for USB; LAN/WAN may need more.
         let mut tcp = accept_from_server(&listener, Duration::from_secs(5))?;
+        // Force blocking mode again — on Linux, accept() on a non-blocking
+        // listener (which `accept_from_server` uses internally for its
+        // poll-with-deadline implementation) can produce sockets that
+        // inherit `O_NONBLOCK` despite the caller setting it back to
+        // false on the listener. Belt and suspenders: re-assert blocking
+        // on the actual stream we're returning. Without this, every
+        // `read_exact` inside `next_frame` returns `WouldBlock`
+        // immediately and the harness spins at ~600k ops/sec collecting
+        // zero frames (Phase I.B.6 caught this on the first run).
+        tcp.set_nonblocking(false)?;
         tcp.set_read_timeout(Some(read_timeout))?;
         tcp.set_nodelay(true)?;
         // (No dummy-byte read: cybernetic_defaults intentionally omits
@@ -208,7 +230,23 @@ impl ScrcpyCaptureStream {
             device_meta,
             video_header,
             pending: VecDeque::new(),
+            wire_bytes_total: 0,
+            wire_packets_total: 0,
         })
+    }
+
+    /// Cumulative HEVC payload bytes read off the wire since launch.
+    /// The "sealed bytes/sec" metric in the v1.1 roadmap observability
+    /// spec is the derivative of this counter.
+    pub fn wire_bytes_total(&self) -> u64 {
+        self.wire_bytes_total
+    }
+
+    /// Cumulative wire-packet count (1 per scrcpy frame header read off
+    /// TCP, distinct from decoded frame count because the HEVC reorder
+    /// buffer can output 0..N frames per input packet).
+    pub fn wire_packets_total(&self) -> u64 {
+        self.wire_packets_total
     }
 
     /// Device name as sent in the initial 64-byte device-meta block.
@@ -273,7 +311,11 @@ impl ScrcpyCaptureStream {
         let header = wire::parse_frame_header(&hdr_buf)?;
         let mut payload = vec![0u8; header.packet_size as usize];
         match self.tcp.read_exact(&mut payload) {
-            Ok(()) => Ok(Some((header, payload))),
+            Ok(()) => {
+                self.wire_bytes_total += header.packet_size as u64;
+                self.wire_packets_total += 1;
+                Ok(Some((header, payload)))
+            }
             Err(e) if is_timeout_or_eof(&e) => Ok(None),
             Err(e) => Err(StreamError::Io(e)),
         }
@@ -357,9 +399,10 @@ mod tests {
     }
 
     #[test]
-    fn default_read_timeout_is_one_cognitive_cycle() {
-        // 100 ms is generous for 30 fps (one frame every ~33 ms) and short
-        // enough that a stalled device shows up within ~3 cycles.
-        assert_eq!(DEFAULT_READ_TIMEOUT, Duration::from_millis(100));
+    fn default_read_timeout_matches_recorder_empirical_value() {
+        // 500 ms — empirically validated by the recorder example and
+        // the Phase I.B.6 sustain run. 100 ms (the original guess) was
+        // too tight and produced 0 frames over 60 s on USB.
+        assert_eq!(DEFAULT_READ_TIMEOUT, Duration::from_millis(500));
     }
 }

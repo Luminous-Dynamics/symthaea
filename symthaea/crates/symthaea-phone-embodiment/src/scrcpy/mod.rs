@@ -127,7 +127,16 @@ impl ScrcpyOptions {
             format!("audio={}", self.audio),
             format!("video_codec={}", self.codec.cli_name()),
             format!("max_fps={}", self.max_fps),
-            format!("control=true"),
+            // control=false: scrcpy v2.4 with control=true opens an
+            // additional `control` LocalSocket alongside the video one,
+            // and waits for the host to accept BOTH. We only accept the
+            // video socket — leaving control on causes the server to
+            // close the connection after a short grace period (long
+            // enough for a 10-frame burst, too short for sustained
+            // capture). The phone-embodiment input path drives ADB
+            // shell commands directly, so we don't actually need the
+            // scrcpy control channel.
+            format!("control=false"),
             // tunnel_forward=false: HOST listens, scrcpy server connects
             // via its local abstract socket which adb reverse bridges to
             // our host listener. See `bind_host_listener` doc for the

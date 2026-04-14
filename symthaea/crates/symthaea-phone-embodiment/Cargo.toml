@@ -36,3 +36,7 @@ openh264 = { version = "0.6", optional = true }
 [[example]]
 name = "record_scrcpy_sample"
 required-features = ["scrcpy"]
+
+[[example]]
+name = "scrcpy_soak"
+required-features = ["scrcpy"]
