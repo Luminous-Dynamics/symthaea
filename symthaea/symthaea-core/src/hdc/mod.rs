@@ -333,14 +333,17 @@ pub mod simd_detect; // Unified SIMD feature detection (single source of truth f
 pub mod simd_ops; // SIMD intrinsics for BinaryHV (AVX-512/AVX2/SSE4.1/NEON)
 pub mod spectral_connectivity; // Algebraic connectivity (λ₂) calculator - NOT IIT Φ!
 pub mod tiered_phi; // Multi-tier Φ (integrated information) approximation
-pub mod transposed_bundle; // Transposed bit-plane accumulator for fast majority-vote bundle // Unified HyperdimensionalVector trait interface
-                           // Performance optimization modules:
+pub mod transposed_bundle; // Transposed bit-plane accumulator for fast majority-vote bundle
+
+// Performance optimization modules:
 pub mod algebraic_structures;
 pub mod arithmetic; // Modular arithmetic (re-exports arithmetic_engine)
 pub mod arithmetic_engine; // Revolutionary: True mathematical cognition via HDC
+pub mod barycentric;
 pub mod bootstrapping; // Cognitive bootstrapping - primitives to reasoning tasks
 pub mod calculus;
 pub mod celegans_connectome; // Revolutionary #100: C. elegans connectome validation (302 neurons)
+pub mod combinatorial;
 pub mod complex; // Complex number support (ℂ) with HDC encoding
 #[cfg(feature = "complex_cfc")]
 pub mod complex_cfc_neuron; // Complex-valued CfC neuron with native oscillation (Phase 3)
@@ -352,12 +355,18 @@ mod consciousness_fast_tests;
 pub mod constraint_solver; // CSP solver: AC-3, backtracking, N-Queens, graph coloring
 #[cfg(test)]
 mod cross_bridge_integration_tests;
+pub mod curriculum;
 pub mod differential_equations; // ODE/PDE solvers: RK4, shooting, heat eq, wave eq
+pub mod diophantine;
 pub mod fft; // Fast Fourier Transform: Cooley-Tukey radix-2, convolution
 pub mod foundations;
+pub mod functional_equations;
 pub mod graph_theory; // Graph algorithms: BFS, DFS, Dijkstra, MST, coloring, combinatorics
 pub mod hv_pool;
+pub mod imo_benchmark;
+pub mod imo_nl_parser;
 pub mod incremental_hv; // O(k) incremental bundling (10-100x faster for updates)
+pub mod inequalities;
 pub mod integer; // Integer arithmetic (ℤ) - extends natural numbers with sign
 pub mod linear_algebra; // General linear algebra: LU, QR, Cholesky, eigendecomposition, SVD
 pub mod liquid_holocell; // Atomic primitive unit: Liquid Holocell with dilation
@@ -370,24 +379,13 @@ pub mod math_bridge; // Unified math bridge (NumericTower + Complex → single A
 mod math_integration_tests;
 pub mod native_similarity; // O(1) XOR+popcount similarity search (consciousness-native)
 pub mod number_theory;
-pub mod diophantine;
-pub mod synthetic_geometry;
-pub mod barycentric;
-pub mod inequalities;
-pub mod functional_equations;
-pub mod sr_tactic;
-pub mod combinatorial;
-pub mod sr_symreg;
-pub mod imo_benchmark;
-pub mod polynomial;
-pub mod curriculum;
-pub mod imo_nl_parser;
 pub mod numeric_tower; // Unified numeric tower (N -> Z -> Q -> R) with auto-promotion
 pub mod optimization; // Optimization: gradient descent, Nelder-Mead, L-BFGS
 #[cfg(feature = "parallel")]
 pub mod parallel_hv; // Rayon parallel batch operations (7x faster on 8 cores)
 #[cfg(test)]
 mod phi_feedback_integration_tests;
+pub mod polynomial;
 pub mod power_flow; // DC Optimal Power Flow: B·θ=P solver, OPF, N-1 contingency, PTDF
 pub mod primitive_dashboard; // Real-time primitive usage monitoring
 pub mod primitive_system; // Ontological primitives system with 7 semantic domains
@@ -399,22 +397,25 @@ pub mod rational;
 pub mod real_arithmetic;
 pub mod root_finding; // Root finding: bisection, Newton-Raphson, Brent
 pub mod sparse_hv; // Sparse HDC for memory-efficient low-density vectors
+pub mod sr_symreg;
+pub mod sr_tactic;
 pub mod statistics; // Statistics & probability: distributions, hypothesis testing, Bayesian inference
+pub mod synthetic_geometry;
 
 // ── New Math Domains (April 2026) ────────────────────────────────────────────
 pub mod algebraic_combinatorics; // Symmetric functions, Schur polynomials, Young tableaux, RSK
-pub mod algebraic_geometry;      // Varieties, Bezout, elliptic curve group law, rational points
-pub mod category_theory;         // Functors, natural transformations, adjunctions, Yoneda, monads
-pub mod chemistry;               // Periodic table, stoichiometry, thermochemistry, kinetics
-pub mod combinatorics;           // Generating functions, Burnside/Polya, Stirling, Ramsey, matroids
-pub mod complex_analysis;        // Cauchy, residues, conformal maps, power series, Mobius transforms
-pub mod functional_analysis;     // Banach/Hilbert spaces, bounded operators, spectral theorem
-pub mod game_theory;             // Nash equilibria, minimax, Shapley, VCG, Sprague-Grundy
-pub mod information_geometry;    // Fisher info, natural gradient, KL divergence, stat manifolds
-pub mod lie_theory;              // Lie algebras, exponential map, root systems, representations
-pub mod measure_probability;     // Measure spaces, martingales, Brownian motion, Ito calculus
-pub mod polynomial_algebra;      // Groebner bases, Buchberger, ideal membership, resultants
-pub mod tactics;                 // Proof tactics: ring, omega, induct, norm_num, cases
+pub mod algebraic_geometry; // Varieties, Bezout, elliptic curve group law, rational points
+pub mod category_theory; // Functors, natural transformations, adjunctions, Yoneda, monads
+pub mod chemistry; // Periodic table, stoichiometry, thermochemistry, kinetics
+pub mod combinatorics; // Generating functions, Burnside/Polya, Stirling, Ramsey, matroids
+pub mod complex_analysis; // Cauchy, residues, conformal maps, power series, Mobius transforms
+pub mod functional_analysis; // Banach/Hilbert spaces, bounded operators, spectral theorem
+pub mod game_theory; // Nash equilibria, minimax, Shapley, VCG, Sprague-Grundy
+pub mod information_geometry; // Fisher info, natural gradient, KL divergence, stat manifolds
+pub mod lie_theory; // Lie algebras, exponential map, root systems, representations
+pub mod measure_probability; // Measure spaces, martingales, Brownian motion, Ito calculus
+pub mod polynomial_algebra; // Groebner bases, Buchberger, ideal membership, resultants
+pub mod tactics; // Proof tactics: ring, omega, induct, norm_num, cases
 
 // ── Geometric Algebra (via symtropy-math) ────────────────────────────────────
 // N-dimensional bivectors, rotors, transforms, collision shapes.
@@ -425,23 +426,23 @@ pub mod geometric_algebra {
 }
 
 // ── Conjecture Engine — The Ramanujan Protocol ───────────────────────────────
-pub mod conjecture_engine; // Automated conjecture generation via symbolic regression + verification
 #[cfg(feature = "abstract_thought")]
 pub mod abstract_thought; // Meta-HDC concept vectors, dynamic grammar generation, category theory discovery
 pub mod autodiff; // Reverse-mode automatic differentiation (Wengert tape) for exact gradients
-pub mod sparse_matrix; // Compressed Sparse Row (CSR) matrix for PDE solvers and graph Laplacians
-pub mod langlands; // Computational Langlands: elliptic curve L-functions, modular forms, modularity verification
+pub mod conjecture_engine; // Automated conjecture generation via symbolic regression + verification
 pub mod frontier_math; // Frontier mathematics: Montgomery pair correlation, Ramsey bounds, knot invariants, abc conjecture
-// pub mod topology_comparison; // TEMP: file removed by concurrent session
-// pub mod cross_domain_discovery; // TEMP: file removed by concurrent session
+pub mod langlands; // Computational Langlands: elliptic curve L-functions, modular forms, modularity verification
+pub mod sparse_matrix; // Compressed Sparse Row (CSR) matrix for PDE solvers and graph Laplacians
+                       // pub mod topology_comparison; // TEMP: file removed by concurrent session
+                       // pub mod cross_domain_discovery; // TEMP: file removed by concurrent session
 
 // ── Geometric Complexity Theory (Phase 8 — P vs NP probe) ────────────────────
 pub mod gct; // Permanent vs determinant orbit complexity, Kronecker coefficients, GCT obstruction conjecture
 
 // ── Einstein Manifold Search (Phase 6) ───────────────────────────────────────
+pub mod einstein_search; // HDC-guided moduli space search for exotic Einstein metrics on S⁴
+pub mod ricci_flow; // Normalized Ricci flow evolution, singularity detection, convergence
 pub mod riemannian_geometry; // MetricTensor, Riemann/Ricci tensors, Ricci flow, Einstein condition
-pub mod ricci_flow;          // Normalized Ricci flow evolution, singularity detection, convergence
-pub mod einstein_search;     // HDC-guided moduli space search for exotic Einstein metrics on S⁴
 pub mod ucl_cross_domain_frames; // UCL cross-domain semantic frames (TRADE, CONFLICT, FEEDBACK_LOOP, etc.) // Thread-local memory pools for BinaryHV/ContinuousHV (10-100x faster allocation)
 
 // Property-based tests for HDC invariants
@@ -465,9 +466,9 @@ pub mod consciousness_evaluator; // Consciousness evaluation
 pub mod consciousness_integration; // Complete consciousness pipeline
 pub mod hierarchical_bundle; // Per-region bundling with role-based binding for scalable aggregation
 pub mod substrate_composition; // Weighted substrate mixtures for hybrid analysis
-pub mod substrate_independence; // Substrate type definitions // Real-time consciousness monitoring
+pub mod substrate_independence; // Substrate type definitions
 pub mod substrate_validation; // Validation framework with evidence levels and feasibility gaps
-// pub mod topology_comparison; // TEMP: file removed by concurrent session
+                              // pub mod topology_comparison; // TEMP: file removed by concurrent session
 pub mod trajectory_accumulator; // Behavioral identity via temporal HDC binding
 
 // Track: Neural Validation — TRIBE v2 fMRI comparison (feature-gated)
@@ -482,9 +483,9 @@ pub mod hemodynamic; // HRF convolution for BOLD signal comparison
 pub mod deepnsm_integration; // DeepNSM corpus: 44K NSM explication triplets for grounding
 pub mod full_stack_consciousness; // Full stack: Understanding + ActiveInference + Memory + Counterfactuals
 pub mod grounded_understanding; // True understanding via semantic primes + embodiment
-pub mod unified_conscious_being;
+pub mod unified_conscious_being; // Complete unified being: A+B+C+D+E+F integration
 pub mod unified_understanding; // Complete understanding pipeline (predictive + narrative + ToM)
-pub mod universal_semantics; // Universal semantic primes (Wierzbicka) // Complete unified being: A+B+C+D+E+F integration
+pub mod universal_semantics; // Universal semantic primes (Wierzbicka)
                              // DISABLED: depends on crate::memory, crate::voice which don't exist in symthaea-core
                              // pub mod infrastructure_bridge;             // Bridge to real persistence (Hippocampus/UnifiedMind/Kokoro)
 pub mod causal_encoder; // Causal relation encoding
@@ -504,7 +505,7 @@ pub mod predictive_encoder; // Attention-modulated HDC encoding with LTC predict
 
 // Novel Algorithm Modules (Dec 2025)
 pub mod autodiff_phi; // Reverse-mode autodiff for consciousness optimization (Jan 2026)
-// pub mod cross_domain_discovery; // TEMP: file removed by concurrent session
+                      // pub mod cross_domain_discovery; // TEMP: file removed by concurrent session
 pub mod cross_modal_binding; // Cross-modal binding for multi-sensory integration
 pub mod differentiable_phi; // Soft-partitioned differentiable Φ for gradient optimization
 pub mod metacognitive_monitor; // Real-time consciousness monitoring with self-reflection
