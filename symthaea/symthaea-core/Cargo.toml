@@ -95,6 +95,10 @@ name = "hdc_benchmarks"
 harness = false
 
 [[bench]]
+name = "hdc_simd_compare"
+harness = false
+
+[[bench]]
 name = "hdc_ltc_learning"
 harness = false
 
