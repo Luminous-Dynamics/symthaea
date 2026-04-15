@@ -351,7 +351,7 @@ trials per condition which at 4 fps takes all day. Phase IV's Markov
 blanket test needs stable-state PE which requires the codec to be
 running at its design rate.
 
-### Phase I.C — QUIC transport swap 📋 NEW v1.3 (~1-2 days after I.B)
+### Phase I.C — QUIC transport swap 🚧 IN PROGRESS v1.5+ (~1-2 days after I.B)
 
 **Goal**: Eliminate TCP head-of-line blocking on the Holon wire.
 Move video frames to unreliable QUIC datagrams while keeping
@@ -410,6 +410,20 @@ explicitly in the Phase I.C verification doc.
 3. 10-min soak over QUIC with observability metrics from Phase I.B
 4. Migration cutover: run with `--transport=ws` for a session, then
    `--transport=quic`, confirm identical functional behavior
+
+**Current verification note (Apr 15, 2026)**: initial headless localhost
+transport parity is implemented and recorded in
+`docs/PHASE_1C_QUIC_TRANSPORT_VERIFICATION.md`. The synthetic 30-frame A/B
+run passed with WS p50 27.3 ms / p99 32.9 ms and QUIC p50 28.6 ms / p99
+83.3 ms, plus reverse input path verification for both transports. This is a
+functional parity checkpoint only. A follow-up live phone-content checkpoint
+using `PhoneBridge.capture_and_observe_rgba` found and fixed a QUIC
+datagram-only failure for oversized full frames by adding a reliable
+unidirectional-stream fallback. A deterministic QUIC datagram-loss smoke now
+proves drop-and-continue behavior for datagram-sized frames under injected
+loss, but the real `tc qdisc` packet-loss comparison remains open. The real
+scrcpy-stream A/B, kernel packet-loss test, 10-minute soak, and manual cutover
+remain open.
 
 **Estimated effort**: 1-2 days. Quinn is well-documented, the wire
 above it is unchanged.

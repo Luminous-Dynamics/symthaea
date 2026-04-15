@@ -1,0 +1,184 @@
+# Phase I.C QUIC Transport Verification
+
+Status: in progress
+Date: 2026-04-15
+
+This document records the first reproducible Phase I.C verification slice. It
+does not close Phase I.C; the roadmap still requires a real scrcpy-stream A/B,
+packet-loss testing, soak testing, and migration cutover validation.
+
+## Implemented Surface
+
+- `swarm::quic_transport` provides a Quinn/rustls QUIC transport for sealed
+  Holon RDP frames.
+- Outbound display frames move over QUIC unreliable datagrams with
+  fragmentation/reassembly.
+- Oversized sealed frames fall back to a reliable QUIC unidirectional stream.
+  This is required for full-frame/bootstrap delivery: live phone full frames
+  were large enough that datagram-only fragmentation timed out on localhost.
+- Viewer-to-Holon input events move over a reliable QUIC bidirectional stream.
+- `seal_frame` / `open_frame` remain unchanged; transport sees opaque sealed
+  bytes only.
+- `symthaea-holon` can bind both legacy HTTP/WebSocket and QUIC during the
+  migration window.
+- `holon_rdp_viewer` supports `--transport=ws|quic` for manual A/B.
+
+## Headless Verification
+
+Build command:
+
+```bash
+TMPDIR=/srv/luminous-dynamics/.phase1c-tmp \
+CARGO_TARGET_DIR=/srv/luminous-dynamics/.phase1c-target \
+RUSTFLAGS='-Awarnings' \
+RUSTC_WRAPPER= \
+SCCACHE_DISABLE=1 \
+cargo build --no-default-features \
+  --example holon_ws_smoke \
+  --example holon_quic_smoke \
+  --example holon_quic_loss_smoke \
+  --example holon_transport_ab \
+  --example holon_phone_transport_ab \
+  --features holon-viewer,phone \
+  --message-format short
+```
+
+Result:
+
+```text
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.55s
+```
+
+WebSocket parity smoke:
+
+```bash
+/srv/luminous-dynamics/.phase1c-target/debug/examples/holon_ws_smoke
+```
+
+Result:
+
+```text
+WS smoke passed via ws://127.0.0.1:43019/holon/ws
+```
+
+Synthetic 30-frame localhost A/B:
+
+```bash
+/srv/luminous-dynamics/.phase1c-target/debug/examples/holon_transport_ab
+```
+
+Result:
+
+```text
+WS   samples=30 p50=27266us p99=32941us max=39954us
+QUIC samples=30 p50=28613us p99=83328us max=88021us
+Reverse input path OK for WS and QUIC
+```
+
+Interpretation: this headless synthetic localhost run proves functional parity
+for sealed display-frame delivery and reverse sealed input delivery. Latency is
+not stable enough in this harness to claim performance superiority: this sample
+has comparable p50 but a worse QUIC p99/max. The next performance claim must
+come from the real scrcpy-stream A/B plus packet-loss testing.
+
+QUIC smoke regression after adding oversized-frame reliable fallback:
+
+```bash
+/srv/luminous-dynamics/.phase1c-target/debug/examples/holon_quic_smoke
+```
+
+Result:
+
+```text
+QUIC smoke passed via 127.0.0.1:34518 (connected (quic://127.0.0.1:34518))
+```
+
+Synthetic 10-frame regression after adding oversized-frame reliable fallback:
+
+```bash
+/srv/luminous-dynamics/.phase1c-target/debug/examples/holon_transport_ab --frames=10
+```
+
+Result:
+
+```text
+WS   samples=10 p50=31942us p99=33763us max=34768us
+QUIC samples=10 p50=36452us p99=47082us max=55146us
+Reverse input path OK for WS and QUIC
+```
+
+Deterministic QUIC datagram-loss smoke:
+
+```bash
+SYMTHAEA_QUIC_DROP_EVERY_N_DATAGRAM=3 \
+  /srv/luminous-dynamics/.phase1c-target/debug/examples/holon_quic_loss_smoke
+```
+
+Result:
+
+```text
+QUIC loss smoke passed via 127.0.0.1:57867: received [1, 2, 4, 5, 7, 8] (SYMTHAEA_QUIC_DROP_EVERY_N_DATAGRAM=3)
+```
+
+Default no-loss regression:
+
+```bash
+/srv/luminous-dynamics/.phase1c-target/debug/examples/holon_quic_loss_smoke
+```
+
+Result:
+
+```text
+QUIC loss smoke passed via 127.0.0.1:48785: received [1, 2, 3, 4, 5, 6, 7, 8, 9] (SYMTHAEA_QUIC_DROP_EVERY_N_DATAGRAM=0)
+```
+
+Interpretation: the deterministic drop hook proves the QUIC datagram path has
+the intended drop-and-continue behavior for datagram-sized display frames. It
+does not replace the roadmap's `tc qdisc` packet-loss test because it does not
+exercise kernel/network behavior or TCP/WebSocket head-of-line stalls.
+
+## Live Phone-Content Checkpoint
+
+The repository's `main` branch currently has the older ADB screenshot capture
+path, while the Phase I.B scrcpy implementation is still on
+`worktree-session-phase-1b-scrcpy`. To avoid blocking Phase I.C transport work
+on that branch merge, the live-content checkpoint uses:
+
+```text
+PhoneBridge.capture_and_observe_rgba -> SomaRdpServer -> sealed RdpFrame replay -> WS/QUIC
+```
+
+Command:
+
+```bash
+/srv/luminous-dynamics/.phase1c-target/debug/examples/holon_phone_transport_ab \
+  --duration 2 --fps 1 --serial 41201FDJG000UM
+```
+
+Result:
+
+```text
+Capturing live phone frames: serial=41201FDJG000UM duration=2s fps=1 nominal=1008x2244
+captured frame=1 source=1008x2244 prediction_error=0.000
+captured frame=2 source=1008x2244 prediction_error=0.008
+Captured 2 RDP frame(s); replaying transports...
+WS   samples=2 p50=1441246us p99=1441246us max=1480697us
+QUIC samples=2 p50=1378447us p99=1378447us max=1716470us
+Reverse input path OK for WS and QUIC
+Source: live PhoneBridge screenshot capture, not scrcpy
+```
+
+Interpretation: this proves that real phone-derived `SomaRdpServer` frames,
+including full-frame bootstrap payloads, now traverse both transports. The first
+attempt failed on QUIC with a frame timeout; the reliable fallback for oversized
+sealed frames fixed it. The latency numbers are dominated by huge screenshot
+full-frame payloads and are not representative of the target scrcpy stream.
+
+## Remaining Phase I.C Verification
+
+- Run the same scrcpy-derived stream through WS and QUIC simultaneously and
+  compare end-to-end latency p50/p99.
+- Induce packet loss with `tc qdisc` at 1% and compare stall behavior.
+- Run a 10-minute QUIC soak with Phase I.B observability metrics.
+- Perform manual migration cutover: `--transport=ws`, then `--transport=quic`,
+  and confirm functional parity.

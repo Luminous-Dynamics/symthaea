@@ -515,6 +515,10 @@ egui = { version = "0.33", optional = true }
 # so the viewer example can compile as a single feature-gated unit.
 tokio-tungstenite = { version = "0.24", optional = true }
 futures-util = { version = "0.3", optional = true }  # SinkExt/StreamExt for tokio-tungstenite split()
+bytes = { version = "1", optional = true }
+quinn = { version = "0.11", optional = true }
+rustls = { version = "0.23", optional = true }
+rcgen = { version = "0.13", optional = true }
 
 # IPC Protocol Enhancements
 rmp-serde = { workspace = true }  # MessagePack binary protocol (A1)
@@ -548,7 +552,8 @@ gui = ["eframe", "egui"]                    # symthaea-gui binary
 demo = ["clap", "ctrlc"]                    # Demo binaries (CLI args + signal handling)
 full = ["service", "shell", "gui", "demo"]  # All binaries
 api_module = ["axum", "tower-http"]         # HTTP API binary + module
-holon-viewer = ["eframe", "egui", "dep:tokio-tungstenite", "dep:futures-util", "mesh-encryption", "api_module"]  # Phase I.A.2 egui desktop viewer for Holon RDP binary wire
+holon-quic = ["api_module", "mesh-encryption", "dep:bytes", "dep:quinn", "dep:rustls", "dep:rcgen"]  # Phase I.C QUIC transport for Holon RDP
+holon-viewer = ["eframe", "egui", "dep:tokio-tungstenite", "dep:futures-util", "mesh-encryption", "holon-quic"]  # Phase I.A.2 viewer + Phase I.C transport A/B
 
 # ── Sovereign RDP ──────────────────────────────────────────────────
 rdp = []                                   # Core RDP protocol + codec + session

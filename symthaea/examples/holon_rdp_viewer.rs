@@ -15,6 +15,10 @@
 //! `tokio::sync::mpsc::UnboundedReceiver::try_recv` which works from a
 //! non-async context.
 //!
+//! **Phase I.C (QUIC transport A/B)**: ✅ `--transport=quic|ws`. QUIC uses
+//! unreliable datagrams for sealed RDP frames and a reliable QUIC stream for
+//! sealed input events while leaving the wire envelope unchanged.
+//!
 //! **Piece 3 (PQC handshake unblock)**: ⏳ deferred — placeholder key
 //! `[0x42; 32]` is safe for localhost development. Real KEM handshake
 //! lands when network deployment requires it (Phase I.B or later).
@@ -34,6 +38,14 @@
 //!    ├─ read task: ws_stream.next() → open_frame → frame_tx.send
 //!    │             + ctx.request_repaint()
 //!    └─ write task: input_rx.recv() → seal_input → ws_sink.send
+//!
+//!   or
+//!
+//!   quic thread (tokio Runtime, async)
+//!    ├─ connect("quic://127.0.0.1:7779")
+//!    ├─ read task: datagram reassembly → open_frame → frame_tx.send
+//!    │             + ctx.request_repaint()
+//!    └─ write task: input_rx.recv() → seal_input → reliable stream write
 //! ```
 //!
 //! ## Usage
@@ -47,8 +59,8 @@
 //! cargo run --release --example holon_rdp_viewer --features holon-viewer
 //! ```
 //!
-//! The viewer connects to `ws://localhost:7778/holon/ws` by default; pass
-//! `--url ws://host:port/path` to override.
+//! The viewer defaults to `--transport=ws --url ws://localhost:7778/holon/ws`.
+//! For Phase I.C A/B, use `--transport=quic --url quic://127.0.0.1:7779`.
 
 #[cfg(not(feature = "holon-viewer"))]
 fn main() {
@@ -66,15 +78,29 @@ fn main() {
 fn main() -> eframe::Result<()> {
     use eframe::egui;
 
-    // Default to localhost:7778 (the Holon WS server port from CLAUDE.md).
-    // Accept --url to override for remote deployments.
+    // Default to WS on localhost:7778. Phase I.C adds `--transport=quic`
+    // for direct A/B against the new QUIC path.
     let args: Vec<String> = std::env::args().collect();
+    let transport = args
+        .iter()
+        .position(|a| a == "--transport")
+        .and_then(|i| args.get(i + 1))
+        .map(|value| value.to_lowercase())
+        .unwrap_or_else(|| "ws".to_string());
     let url = args
         .iter()
         .position(|a| a == "--url")
         .and_then(|i| args.get(i + 1))
         .cloned()
-        .unwrap_or_else(|| "ws://localhost:7778/holon/ws".to_string());
+        .unwrap_or_else(|| match transport.as_str() {
+            "quic" => "quic://127.0.0.1:7779".to_string(),
+            _ => "ws://localhost:7778/holon/ws".to_string(),
+        });
+
+    let transport = match transport.as_str() {
+        "quic" => ViewerTransport::Quic,
+        _ => ViewerTransport::Ws,
+    };
 
     const PHONE_W: u32 = 1008;
     const PHONE_H: u32 = 2244;
@@ -98,11 +124,19 @@ fn main() -> eframe::Result<()> {
                 PHONE_H,
                 TILE_COLS,
                 TILE_ROWS,
+                transport,
                 url.clone(),
                 cc.egui_ctx.clone(),
             )))
         }),
     )
+}
+
+#[cfg(feature = "holon-viewer")]
+#[derive(Clone, Copy, Debug)]
+enum ViewerTransport {
+    Ws,
+    Quic,
 }
 
 #[cfg(feature = "holon-viewer")]
@@ -126,13 +160,9 @@ struct HolonViewerApp {
     test_seed: u8,
     /// Channel from the WS read task → egui update loop.
     /// `try_recv()` works synchronously; we drain on every update().
-    frame_rx: tokio::sync::mpsc::UnboundedReceiver<
-        symthaea::swarm::rdp_protocol::RdpFrame,
-    >,
+    frame_rx: tokio::sync::mpsc::UnboundedReceiver<symthaea::swarm::rdp_protocol::RdpFrame>,
     /// Channel from egui pointer events → WS write task.
-    input_tx: tokio::sync::mpsc::UnboundedSender<
-        symthaea::swarm::rdp_protocol::InputFrame,
-    >,
+    input_tx: tokio::sync::mpsc::UnboundedSender<symthaea::swarm::rdp_protocol::InputFrame>,
     /// Human-readable connection status shown in the UI.
     connection_status: std::sync::Arc<std::sync::Mutex<String>>,
     /// Monotonic sequence counter for outbound InputFrames.
@@ -151,7 +181,8 @@ impl HolonViewerApp {
         height: u32,
         tile_cols: u16,
         tile_rows: u16,
-        ws_url: String,
+        transport: ViewerTransport,
+        endpoint: String,
         ctx: eframe::egui::Context,
     ) -> Self {
         use std::sync::{Arc, Mutex};
@@ -194,7 +225,7 @@ impl HolonViewerApp {
             let connection_status = connection_status.clone();
             let ctx = ctx.clone();
             std::thread::Builder::new()
-                .name("holon-ws-client".into())
+                .name("holon-transport-client".into())
                 .spawn(move || {
                     let rt = match tokio::runtime::Builder::new_current_thread()
                         .enable_all()
@@ -208,14 +239,24 @@ impl HolonViewerApp {
                             return;
                         }
                     };
-                    rt.block_on(ws_client_task(
-                        ws_url,
-                        session,
-                        frame_tx,
-                        input_rx,
-                        connection_status,
-                        ctx,
-                    ));
+                    match transport {
+                        ViewerTransport::Ws => rt.block_on(ws_client_task(
+                            endpoint,
+                            session,
+                            frame_tx,
+                            input_rx,
+                            connection_status,
+                            ctx,
+                        )),
+                        ViewerTransport::Quic => rt.block_on(quic_client_task(
+                            endpoint,
+                            session,
+                            frame_tx,
+                            input_rx,
+                            connection_status,
+                            ctx,
+                        )),
+                    }
                 })
                 .ok()
         };
@@ -233,7 +274,8 @@ impl HolonViewerApp {
             connection_status,
             input_seq: 0,
             status: format!(
-                "Piece 1+2 ready. Frame buffer: {width}×{height}, tile grid: {tile_cols}×{tile_rows}. Connecting to WS..."
+                "Viewer ready. Frame buffer: {width}×{height}, tile grid: {tile_cols}×{tile_rows}. Connecting via {:?}...",
+                transport
             ),
             _ws_thread: ws_thread,
         }
@@ -297,19 +339,14 @@ impl HolonViewerApp {
         use eframe::egui::{ColorImage, TextureOptions};
 
         let rgba = self.viewer.frame_buffer.as_rgba();
-        let image = ColorImage::from_rgba_unmultiplied(
-            [self.width as usize, self.height as usize],
-            rgba,
-        );
+        let image =
+            ColorImage::from_rgba_unmultiplied([self.width as usize, self.height as usize], rgba);
 
         match self.texture.as_mut() {
             Some(handle) => handle.set(image, TextureOptions::default()),
             None => {
-                self.texture = Some(ctx.load_texture(
-                    "holon_frame",
-                    image,
-                    TextureOptions::default(),
-                ));
+                self.texture =
+                    Some(ctx.load_texture("holon_frame", image, TextureOptions::default()));
             }
         }
     }
@@ -377,10 +414,12 @@ impl eframe::App for HolonViewerApp {
                     let aspect = self.width as f32 / self.height as f32;
                     let w = available.x.min(available.y * aspect);
                     let h = w / aspect;
-                    Some(ui.add(
-                        egui::Image::new((texture.id(), egui::vec2(w, h)))
-                            .sense(egui::Sense::click_and_drag()),
-                    ))
+                    Some(
+                        ui.add(
+                            egui::Image::new((texture.id(), egui::vec2(w, h)))
+                                .sense(egui::Sense::click_and_drag()),
+                        ),
+                    )
                 }
                 None => {
                     ui.vertical_centered(|ui| {
@@ -453,9 +492,7 @@ async fn ws_client_task(
     url: String,
     session: std::sync::Arc<std::sync::Mutex<symthaea::swarm::rdp_session::RdpSession>>,
     frame_tx: tokio::sync::mpsc::UnboundedSender<symthaea::swarm::rdp_protocol::RdpFrame>,
-    mut input_rx: tokio::sync::mpsc::UnboundedReceiver<
-        symthaea::swarm::rdp_protocol::InputFrame,
-    >,
+    mut input_rx: tokio::sync::mpsc::UnboundedReceiver<symthaea::swarm::rdp_protocol::InputFrame>,
     connection_status: std::sync::Arc<std::sync::Mutex<String>>,
     ctx: eframe::egui::Context,
 ) {
@@ -574,5 +611,45 @@ async fn ws_client_task(
     tokio::select! {
         _ = read_task => {}
         _ = write_task => {}
+    }
+}
+
+#[cfg(feature = "holon-viewer")]
+async fn quic_client_task(
+    endpoint: String,
+    session: std::sync::Arc<std::sync::Mutex<symthaea::swarm::rdp_session::RdpSession>>,
+    frame_tx: tokio::sync::mpsc::UnboundedSender<symthaea::swarm::rdp_protocol::RdpFrame>,
+    input_rx: tokio::sync::mpsc::UnboundedReceiver<symthaea::swarm::rdp_protocol::InputFrame>,
+    connection_status: std::sync::Arc<std::sync::Mutex<String>>,
+    ctx: eframe::egui::Context,
+) {
+    use std::sync::Arc;
+
+    let (remote_addr, server_name) =
+        match symthaea::swarm::quic_transport::resolve_quic_endpoint(&endpoint, 7779).await {
+            Ok(value) => value,
+            Err(error) => {
+                if let Ok(mut status) = connection_status.lock() {
+                    *status = format!("invalid QUIC endpoint: {error}");
+                }
+                return;
+            }
+        };
+
+    let repaint: Arc<dyn Fn() + Send + Sync> = Arc::new(move || ctx.request_repaint());
+    if let Err(error) = symthaea::swarm::quic_transport::run_viewer_quic_client(
+        remote_addr,
+        &server_name,
+        session,
+        frame_tx,
+        input_rx,
+        connection_status.clone(),
+        repaint,
+    )
+    .await
+    {
+        if let Ok(mut status) = connection_status.lock() {
+            *status = format!("quic client failed: {error}");
+        }
     }
 }
