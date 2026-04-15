@@ -90,18 +90,8 @@ impl Poly {
     /// convolution directly on the stored coefficients (which are a_n/n!),
     /// so the result stores (a*b)_n / n!.
     pub fn egf_mul(&self, other: &Self) -> Self {
-        let max_deg = self
-            .terms
-            .iter()
-            .map(|&(d, _)| d)
-            .max()
-            .unwrap_or(0)
-            + other
-                .terms
-                .iter()
-                .map(|&(d, _)| d)
-                .max()
-                .unwrap_or(0);
+        let max_deg = self.terms.iter().map(|&(d, _)| d).max().unwrap_or(0)
+            + other.terms.iter().map(|&(d, _)| d).max().unwrap_or(0);
 
         let mut result = vec![0.0f64; max_deg + 1];
         let mut fa = vec![0.0f64; max_deg + 1];
@@ -297,8 +287,7 @@ pub fn stirling_first(n: usize, k: usize) -> i64 {
     table[0][0] = 1;
     for i in 1..=n {
         for j in 1..=k.min(i) {
-            table[i][j] =
-                table[i - 1][j - 1] - ((i as i64 - 1) * table[i - 1][j]);
+            table[i][j] = table[i - 1][j - 1] - ((i as i64 - 1) * table[i - 1][j]);
         }
     }
     table[n][k]
@@ -476,7 +465,9 @@ pub fn multinomial(n: u64, groups: &[u64]) -> u64 {
     let mut result = 1u64;
     let mut remaining = n;
     for &k in groups {
-        result = result.checked_mul(binomial(remaining, k)).unwrap_or(u64::MAX);
+        result = result
+            .checked_mul(binomial(remaining, k))
+            .unwrap_or(u64::MAX);
         remaining -= k;
     }
     result
@@ -544,7 +535,11 @@ pub fn moebius(n: u64) -> i64 {
     if m > 1 {
         num_factors += 1; // remaining prime factor
     }
-    if num_factors % 2 == 0 { 1 } else { -1 }
+    if num_factors % 2 == 0 {
+        1
+    } else {
+        -1
+    }
 }
 
 /// Rising factorial (Pochhammer symbol): x^{(n)} = x(x+1)(x+2)...(x+n-1).
@@ -709,8 +704,9 @@ impl UnionFind {
 
 /// Generalised inclusion-exclusion principle.
 ///
-/// Computes Σ_{S ⊆ {0..sets-1}} (-1)^|S| * f(S) where f receives the
-/// current subset as a sorted slice of element indices.
+/// Computes the union form:
+/// Σ_{∅≠S ⊆ {0..sets-1}} (-1)^(|S|+1) * f(S), where `f(S)` is the
+/// intersection size for the selected subset.
 ///
 /// # Arguments
 /// * `sets` — number of sets (universe size n; iterates over 2^n subsets)
@@ -725,9 +721,9 @@ where
     );
     let n = 1usize << sets;
     let mut total = 0i64;
-    for mask in 0..n {
+    for mask in 1..n {
         let subset: Vec<usize> = (0..sets).filter(|&i| mask & (1 << i) != 0).collect();
-        let sign = if subset.len() % 2 == 0 { 1i64 } else { -1i64 };
+        let sign = if subset.len() % 2 == 1 { 1i64 } else { -1i64 };
         total += sign * f(&subset);
     }
     total
@@ -841,7 +837,7 @@ mod tests {
     #[test]
     fn test_graphic_matroid_rank() {
         // K4: 4 vertices, 6 edges — spanning tree rank = 3
-        let edges = vec![(0,1),(0,2),(0,3),(1,2),(1,3),(2,3)];
+        let edges = vec![(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)];
         let m = GraphicMatroid::new(4, edges);
         let all: Vec<usize> = (0..6).collect();
         assert_eq!(m.rank(&all), 3);
@@ -850,7 +846,7 @@ mod tests {
     #[test]
     fn test_graphic_matroid_greedy_basis() {
         // Path graph: 4 vertices, 3 edges
-        let m = GraphicMatroid::new(4, vec![(0,1),(1,2),(2,3)]);
+        let m = GraphicMatroid::new(4, vec![(0, 1), (1, 2), (2, 3)]);
         let weights = [1.0, 2.0, 3.0];
         let basis = m.greedy_max_weight_basis(&weights);
         // All 3 edges form a spanning tree (no cycles possible in a path)
@@ -916,8 +912,8 @@ mod tests {
         // polya_count represents ONE permutation's contribution at a time.
         // Identity contribution: colors^3 = 8; two 3-cycle contributions: colors^1 = 2 each.
         // Average = (8 + 2 + 2) / 3 = 4
-        let id_contrib = polya_count(2, &[(1, 3)]);   // identity: 3 fixed-1-cycles → 2^3 = 8
-        let rot_contrib = polya_count(2, &[(3, 1)]);  // each rotation: 1 fixed-3-cycle → 2^1 = 2
+        let id_contrib = polya_count(2, &[(1, 3)]); // identity: 3 fixed-1-cycles → 2^3 = 8
+        let rot_contrib = polya_count(2, &[(3, 1)]); // each rotation: 1 fixed-3-cycle → 2^1 = 2
         let total = (id_contrib + 2 * rot_contrib) / 3;
         assert_eq!(total, 4);
     }
@@ -973,10 +969,10 @@ mod tests {
     #[test]
     fn test_moebius() {
         assert_eq!(moebius(1), 1);
-        assert_eq!(moebius(2), -1);  // prime
-        assert_eq!(moebius(3), -1);  // prime
-        assert_eq!(moebius(4), 0);   // 2²
-        assert_eq!(moebius(6), 1);   // 2×3 (two distinct primes)
+        assert_eq!(moebius(2), -1); // prime
+        assert_eq!(moebius(3), -1); // prime
+        assert_eq!(moebius(4), 0); // 2²
+        assert_eq!(moebius(6), 1); // 2×3 (two distinct primes)
         assert_eq!(moebius(30), -1); // 2×3×5 (three distinct primes)
     }
 
@@ -989,6 +985,9 @@ mod tests {
         // n_(n) = n!
         assert_eq!(falling_factorial(5, 5), 120);
         // C(n,k) = n_(k) / k!
-        assert_eq!(falling_factorial(10, 3) / falling_factorial(3, 3), binomial(10, 3));
+        assert_eq!(
+            falling_factorial(10, 3) / falling_factorial(3, 3),
+            binomial(10, 3)
+        );
     }
 }
