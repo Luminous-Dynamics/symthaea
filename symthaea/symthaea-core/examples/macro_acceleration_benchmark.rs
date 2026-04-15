@@ -37,11 +37,16 @@ use std::time::Instant;
 
 use std::collections::HashMap;
 
+use symthaea_core::hdc::abstract_thought::expr_signature;
+use symthaea_core::hdc::abstract_thought::macro_quality::{
+    evaluate_common_metrics, maybe_enforce, print_report, MacroQualityReport,
+    MacroQualityThresholds,
+};
 use symthaea_core::hdc::conjecture_engine::{
     observe_fibonacci_ratios, observe_hydrogen_energy_levels, observe_inverse_square_law,
     observe_kepler_third_law, observe_quantum_harmonic_oscillator,
-    observe_relativistic_kinetic_energy, observe_stefan_boltzmann,
-    ConjectureEngine, Expr, MathDomain, ObservedSequence, RegressorConfig, SymbolicRegressor,
+    observe_relativistic_kinetic_energy, observe_stefan_boltzmann, ConjectureEngine, Expr,
+    MathDomain, ObservedSequence, RegressorConfig, SeedSpecializationStats, SymbolicRegressor,
 };
 use symthaea_core::hdc::primitive_system::PrimitiveSystem;
 
@@ -70,9 +75,7 @@ const EPSILON: f64 = 1e-2;
 // ═══════════════════════════════════════════════════════════════════════════
 
 fn squares_sequence(max_n: usize) -> ObservedSequence {
-    let data: Vec<(f64, f64)> = (1..=max_n)
-        .map(|n| (n as f64, (n * n) as f64))
-        .collect();
+    let data: Vec<(f64, f64)> = (1..=max_n).map(|n| (n as f64, (n * n) as f64)).collect();
     ObservedSequence::new("squares(n)", MathDomain::NumberTheory, data)
 }
 
@@ -123,6 +126,7 @@ struct RunMetrics {
     /// Per-macro appearance counts in this run's top-k formulas.
     /// Key: macro canonical string. Value: count across top-k.
     macro_usage: HashMap<String, u64>,
+    seed_specialization: SeedSpecializationStats,
 }
 
 impl RunMetrics {
@@ -133,6 +137,7 @@ impl RunMetrics {
         wall_time_ms: u128,
         best_formula: String,
         macro_usage: HashMap<String, u64>,
+        seed_specialization: SeedSpecializationStats,
     ) -> Self {
         // Fitness = MSE + lambda * complexity, with lambda=0.001.
         // For ranking "when did we get a good fit" we approximate raw MSE
@@ -148,6 +153,7 @@ impl RunMetrics {
             wall_time_ms,
             best_formula,
             macro_usage,
+            seed_specialization,
         }
     }
 }
@@ -179,7 +185,8 @@ impl ConditionStats {
         };
         let mean_wall = (runs.iter().map(|r| r.wall_time_ms).sum::<u128>() as f64 / n) as u128;
         let mean_complexity = runs.iter().map(|r| r.final_complexity as f64).sum::<f64>() / n;
-        let sample = runs.iter()
+        let sample = runs
+            .iter()
             .min_by(|a, b| a.final_mse.partial_cmp(&b.final_mse).unwrap())
             .map(|r| r.best_formula.clone())
             .unwrap_or_default();
@@ -196,17 +203,20 @@ impl ConditionStats {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+struct ActivationSummary {
+    used_macros: usize,
+    total_macros: usize,
+    total_hits: u64,
+    activation_precision: f64,
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // RUN HARNESS
 // ═══════════════════════════════════════════════════════════════════════════
 
 /// Run `SymbolicRegressor` once on a target and collect metrics.
-fn run_once(
-    target: &ObservedSequence,
-    seed: u64,
-    macros: &[Expr],
-    cold: bool,
-) -> RunMetrics {
+fn run_once(target: &ObservedSequence, seed: u64, macros: &[Expr], cold: bool) -> RunMetrics {
     let config = RegressorConfig {
         population_size: POP_SIZE,
         generations: GENERATIONS,
@@ -234,6 +244,7 @@ fn run_once(
     };
 
     let macro_usage: HashMap<String, u64> = regressor.macro_usage().clone();
+    let seed_specialization = regressor.seed_specialization_stats().clone();
 
     RunMetrics::from_run(
         regressor.fitness_history(),
@@ -242,7 +253,196 @@ fn run_once(
         elapsed,
         formula_str,
         macro_usage,
+        seed_specialization,
     )
+}
+
+fn print_macro_pool_snapshot(engine: &ConjectureEngine, label: &str) {
+    let Some(metrics) = engine.macro_pool_metrics() else {
+        return;
+    };
+
+    println!("\n  Macro pool quality ({label}):");
+    println!(
+        "    cycle={}  operators={}  candidates={}  promoted={}  pruned={}  survival={:.0}%",
+        metrics.cycle,
+        metrics.total_operators,
+        metrics.total_candidates,
+        metrics.total_promoted,
+        metrics.total_pruned,
+        metrics.survival_rate * 100.0
+    );
+    println!(
+        "    tiers: formal={}  recurrent={}  quarantined={}",
+        metrics.formal_operators, metrics.recurrent_operators, metrics.quarantined_operators
+    );
+    println!(
+        "    engine-side usage: active_precision={:.0}%  mature_precision={:.0}%  avg_usage={:.2}  avg_sources={:.2}",
+        metrics.active_precision * 100.0,
+        metrics.mature_precision * 100.0,
+        metrics.avg_usage_count,
+        metrics.avg_source_count
+    );
+
+    if metrics.signature_stats.is_empty() {
+        println!("    signature coverage: (none)");
+    } else {
+        let mut signature_stats = metrics.signature_stats;
+        signature_stats.sort_by(|a, b| {
+            b.used_operator_count
+                .cmp(&a.used_operator_count)
+                .then_with(|| b.total_usage_count.cmp(&a.total_usage_count))
+                .then_with(|| b.operator_count.cmp(&a.operator_count))
+                .then_with(|| a.signature.cmp(&b.signature))
+        });
+
+        println!("    top signatures:");
+        for stat in signature_stats.iter().take(5) {
+            println!(
+                "      · {:<18} ops={} used={} hits={}",
+                stat.signature,
+                stat.operator_count,
+                stat.used_operator_count,
+                stat.total_usage_count
+            );
+        }
+    }
+
+    println!("    macro metadata:");
+    for op in engine.macro_operators().iter().take(8) {
+        let parent = op
+            .parent_formulas
+            .first()
+            .map(|s| s.as_str())
+            .unwrap_or("(none)");
+        println!(
+            "      · {} | sig={} tier={:?} sources={} usage={} arity={} cycle={} parent={}",
+            op.template,
+            op.signature,
+            op.promotion_tier,
+            op.source_count,
+            op.usage_count,
+            op.arity,
+            op.created_at,
+            parent
+        );
+    }
+}
+
+fn print_benchmark_macro_activation(
+    macros: &[Expr],
+    all_results: &[(&str, ConditionStats, ConditionStats, Vec<RunMetrics>)],
+) -> ActivationSummary {
+    let mut usage_by_macro: HashMap<String, u64> =
+        macros.iter().map(|expr| (format!("{}", expr), 0)).collect();
+    let mut usage_by_signature: HashMap<String, (usize, u64)> = HashMap::new();
+
+    for (_, _, _, primed_runs) in all_results {
+        for run in primed_runs {
+            for (canonical, count) in &run.macro_usage {
+                if let Some(total) = usage_by_macro.get_mut(canonical) {
+                    *total += *count;
+                }
+            }
+        }
+    }
+
+    let mut ranked_macros: Vec<(String, String, u64)> = macros
+        .iter()
+        .map(|expr| {
+            let canonical = format!("{}", expr);
+            let signature = expr_signature(expr);
+            let usage = usage_by_macro.get(&canonical).copied().unwrap_or(0);
+            (canonical, signature, usage)
+        })
+        .collect();
+    ranked_macros.sort_by(|a, b| {
+        b.2.cmp(&a.2)
+            .then_with(|| a.1.cmp(&b.1))
+            .then_with(|| a.0.cmp(&b.0))
+    });
+
+    for (_, signature, usage) in &ranked_macros {
+        let entry = usage_by_signature
+            .entry(signature.clone())
+            .or_insert((0, 0));
+        entry.0 += 1;
+        entry.1 += *usage;
+    }
+
+    let used_macros = ranked_macros
+        .iter()
+        .filter(|(_, _, usage)| *usage > 0)
+        .count();
+    let total_usage_count: u64 = ranked_macros.iter().map(|(_, _, usage)| usage).sum();
+    let active_precision = if ranked_macros.is_empty() {
+        0.0
+    } else {
+        used_macros as f64 / ranked_macros.len() as f64
+    };
+
+    let mut ranked_signatures: Vec<(String, usize, u64)> = usage_by_signature
+        .into_iter()
+        .map(|(signature, (operator_count, total_usage_count))| {
+            (signature, operator_count, total_usage_count)
+        })
+        .collect();
+    ranked_signatures.sort_by(|a, b| {
+        b.2.cmp(&a.2)
+            .then_with(|| b.1.cmp(&a.1))
+            .then_with(|| a.0.cmp(&b.0))
+    });
+
+    println!("\n  Seeded macro activation across primed benchmark runs:");
+    println!(
+        "    used_macros={} / {}  activation_precision={:.0}%  total_hits={}",
+        used_macros,
+        ranked_macros.len(),
+        active_precision * 100.0,
+        total_usage_count
+    );
+
+    println!("    top activated macros:");
+    for (canonical, signature, usage) in ranked_macros.iter().take(5) {
+        println!("      · {:<18} hits={:<4} {}", signature, usage, canonical);
+    }
+
+    if !ranked_signatures.is_empty() {
+        println!("    signature hit-rate:");
+        for (signature, operator_count, total_usage_count) in ranked_signatures.iter().take(5) {
+            println!(
+                "      · {:<18} ops={} hits={}",
+                signature, operator_count, total_usage_count
+            );
+        }
+    }
+
+    let mut scored = 0usize;
+    let mut seeded = 0usize;
+    let mut elapsed_ms = 0u128;
+    let mut exact = 0usize;
+    for (_, _, _, runs) in all_results {
+        for run in runs {
+            scored += run.seed_specialization.variants_scored;
+            seeded += run.seed_specialization.variants_seeded;
+            elapsed_ms += run.seed_specialization.elapsed_ms;
+            if run.seed_specialization.exact_fit_found {
+                exact += 1;
+            }
+        }
+    }
+    println!("    specialization budget:");
+    println!(
+        "      variants_scored={} variants_seeded={} exact_fit_runs={} elapsed={}ms",
+        scored, seeded, exact, elapsed_ms
+    );
+
+    ActivationSummary {
+        used_macros,
+        total_macros: ranked_macros.len(),
+        total_hits: total_usage_count,
+        activation_precision: active_precision,
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -255,8 +455,13 @@ fn main() {
     println!("║  Does abstract_thought's feedback loop actually compound?      ║");
     println!("╚════════════════════════════════════════════════════════════════╝");
     println!();
-    println!("Config: {} gens, pop {}, {} seeds per condition, ε < {:.0e}",
-        GENERATIONS, POP_SIZE, SEEDS.len(), EPSILON);
+    println!(
+        "Config: {} gens, pop {}, {} seeds per condition, ε < {:.0e}",
+        GENERATIONS,
+        POP_SIZE,
+        SEEDS.len(),
+        EPSILON
+    );
 
     // ────────────────────────────────────────────────────────────────
     // PHASE 1: Warmup — extract macros from simple sequences
@@ -279,19 +484,28 @@ fn main() {
     warmup_engine.reflect(&prims);
     let warmup_elapsed = warmup_start.elapsed();
 
-    let macros: Vec<Expr> = warmup_engine.macro_operators()
+    let macros: Vec<Expr> = warmup_engine
+        .macro_operators()
         .iter()
         .map(|op| op.template.clone())
         .collect();
 
     println!("  Warmup ran in {:.2}s", warmup_elapsed.as_secs_f64());
-    println!("  Conjectures generated: {}", warmup_engine.conjectures.len());
+    println!(
+        "  Conjectures generated: {}",
+        warmup_engine.conjectures.len()
+    );
     println!("  Macros extracted: {}", macros.len());
+    print_macro_pool_snapshot(&warmup_engine, "after warmup reflection");
     // Print the raw template (what the GP actually sees) — `op.canonical`
     // is further-collapsed for display purposes and can be misleading.
     for op in warmup_engine.macro_operators() {
-        println!("    · {}  (canonical label: {}, from {} conjectures)",
-            op.template, op.canonical, op.source_conjectures.len());
+        println!(
+            "    · {}  (canonical label: {}, from {} conjectures)",
+            op.template,
+            op.canonical,
+            op.source_conjectures.len()
+        );
     }
 
     if macros.is_empty() {
@@ -320,11 +534,8 @@ fn main() {
             (n, v)
         })
         .collect();
-    let recip_sin_target = ObservedSequence::new(
-        "recip_sin(n)",
-        MathDomain::Physics,
-        recip_sin_data,
-    );
+    let recip_sin_target =
+        ObservedSequence::new("recip_sin(n)", MathDomain::Physics, recip_sin_data);
 
     // Custom target: simple sine wave sin(0.3*n) — tests whether the sin()
     // primitive, once in the macro pool, accelerates direct sine discovery.
@@ -334,24 +545,30 @@ fn main() {
             (n, (0.3 * n).sin())
         })
         .collect();
-    let sine_wave_target = ObservedSequence::new(
-        "sine_wave(n)",
-        MathDomain::Physics,
-        sine_wave_data,
-    );
+    let sine_wave_target =
+        ObservedSequence::new("sine_wave(n)", MathDomain::Physics, sine_wave_data);
 
     let targets: Vec<(&str, ObservedSequence)> = vec![
-        ("Kepler 3rd law (T ∝ r^1.5)",      observe_kepler_third_law(15)),
-        ("Stefan-Boltzmann (P ∝ T^4)",      observe_stefan_boltzmann(15)),
-        ("Hydrogen E (E ∝ -1/n²)",          observe_hydrogen_energy_levels(20)),
-        ("Quantum HO (E = n + 1/2)",        observe_quantum_harmonic_oscillator(20)),
-        ("Inverse square (F ∝ 1/r²)",       observe_inverse_square_law(20)),
-        ("Relativistic KE (γ − 1)",         observe_relativistic_kinetic_energy(20)),
+        ("Kepler 3rd law (T ∝ r^1.5)", observe_kepler_third_law(15)),
+        ("Stefan-Boltzmann (P ∝ T^4)", observe_stefan_boltzmann(15)),
+        ("Hydrogen E (E ∝ -1/n²)", observe_hydrogen_energy_levels(20)),
+        (
+            "Quantum HO (E = n + 1/2)",
+            observe_quantum_harmonic_oscillator(20),
+        ),
+        ("Inverse square (F ∝ 1/r²)", observe_inverse_square_law(20)),
+        (
+            "Relativistic KE (γ − 1)",
+            observe_relativistic_kinetic_energy(20),
+        ),
         ("Reciprocal sine 1/(sin(0.1n)+2)", recip_sin_target),
-        ("Sine wave sin(0.3n)",             sine_wave_target),
+        ("Sine wave sin(0.3n)", sine_wave_target),
     ];
 
-    println!("\n━━━ Phase 2: Cold vs Primed on {} physics targets ━━━", targets.len());
+    println!(
+        "\n━━━ Phase 2: Cold vs Primed on {} physics targets ━━━",
+        targets.len()
+    );
 
     // Store raw runs so we can report per-target macro usage later
     let mut all_results: Vec<(&str, ConditionStats, ConditionStats, Vec<RunMetrics>)> = Vec::new();
@@ -360,32 +577,42 @@ fn main() {
         println!("\n  Target: {}", name);
 
         // Cold runs (no macros)
-        let cold_runs: Vec<RunMetrics> = SEEDS.iter()
+        let cold_runs: Vec<RunMetrics> = SEEDS
+            .iter()
             .map(|&s| run_once(target, s, &[], true))
             .collect();
 
         // Primed runs (with warmup macros)
-        let primed_runs: Vec<RunMetrics> = SEEDS.iter()
+        let primed_runs: Vec<RunMetrics> = SEEDS
+            .iter()
             .map(|&s| run_once(target, s, &macros, false))
             .collect();
 
         let cold_stats = ConditionStats::from_runs("cold", &cold_runs);
         let primed_stats = ConditionStats::from_runs("primed", &primed_runs);
 
-        println!("    cold:    mse={:.3e}  solved {}/{}  median_gens={}  wall={}ms",
+        println!(
+            "    cold:    mse={:.3e}  solved {}/{}  median_gens={}  wall={}ms",
             cold_stats.mean_final_mse,
-            cold_stats.solved_count, cold_stats.total_runs,
-            cold_stats.median_gens_to_epsilon
+            cold_stats.solved_count,
+            cold_stats.total_runs,
+            cold_stats
+                .median_gens_to_epsilon
                 .map(|g| format!("{:.0}", g))
                 .unwrap_or_else(|| "—".to_string()),
-            cold_stats.mean_wall_time_ms);
-        println!("    primed:  mse={:.3e}  solved {}/{}  median_gens={}  wall={}ms",
+            cold_stats.mean_wall_time_ms
+        );
+        println!(
+            "    primed:  mse={:.3e}  solved {}/{}  median_gens={}  wall={}ms",
             primed_stats.mean_final_mse,
-            primed_stats.solved_count, primed_stats.total_runs,
-            primed_stats.median_gens_to_epsilon
+            primed_stats.solved_count,
+            primed_stats.total_runs,
+            primed_stats
+                .median_gens_to_epsilon
                 .map(|g| format!("{:.0}", g))
                 .unwrap_or_else(|| "—".to_string()),
-            primed_stats.mean_wall_time_ms);
+            primed_stats.mean_wall_time_ms
+        );
         println!("    sample (cold):   {}", cold_stats.sample_formula);
         println!("    sample (primed): {}", primed_stats.sample_formula);
 
@@ -396,17 +623,19 @@ fn main() {
     // PHASE 3: Summary table
     // ────────────────────────────────────────────────────────────────
     println!("\n━━━ Summary ━━━");
-    println!("  {:<32}  {:>12}  {:>12}  {:>12}",
-        "target", "cold_mse", "primed_mse", "Δ_mse");
+    println!(
+        "  {:<32}  {:>12}  {:>12}  {:>12}",
+        "target", "cold_mse", "primed_mse", "Δ_mse"
+    );
     println!("  {}", "─".repeat(72));
 
     // Smarter classification: distinguish "both solved" (uninformative tie)
     // from "both failed" (uninformative tie) from "meaningful primed win"
     // from "noise-floor difference".
-    let mut uninformative_ties = 0;     // both solved or both garbage at similar MSE
+    let mut uninformative_ties = 0; // both solved or both garbage at similar MSE
     let mut meaningful_primed_wins = 0; // primed found a meaningfully better fit
-    let mut meaningful_cold_wins = 0;   // cold found a meaningfully better fit
-    let mut noise_floor = 0;            // both effectively zero
+    let mut meaningful_cold_wins = 0; // cold found a meaningfully better fit
+    let mut noise_floor = 0; // both effectively zero
 
     for (name, cold, primed, _) in &all_results {
         let delta = primed.mean_final_mse - cold.mean_final_mse;
@@ -426,27 +655,60 @@ fn main() {
             ("cold+", "  ✗C")
         };
         let _ = category;
-        println!("  {:<32}  {:>12.3e}  {:>12.3e}  {:>12.3e} {}",
-            name, cold.mean_final_mse, primed.mean_final_mse, delta, marker);
+        println!(
+            "  {:<32}  {:>12.3e}  {:>12.3e}  {:>12.3e} {}",
+            name, cold.mean_final_mse, primed.mean_final_mse, delta, marker
+        );
     }
 
     println!("\n  Verdict:");
-    println!("    Meaningful primed wins: {} / {}", meaningful_primed_wins, all_results.len());
-    println!("    Meaningful cold wins:   {} / {}", meaningful_cold_wins, all_results.len());
-    println!("    Noise-floor ties (both ≈ 0): {} / {}", noise_floor, all_results.len());
-    println!("    Uninformative ties (similar non-zero):  {} / {}", uninformative_ties, all_results.len());
+    println!(
+        "    Meaningful primed wins: {} / {}",
+        meaningful_primed_wins,
+        all_results.len()
+    );
+    println!(
+        "    Meaningful cold wins:   {} / {}",
+        meaningful_cold_wins,
+        all_results.len()
+    );
+    println!(
+        "    Noise-floor ties (both ≈ 0): {} / {}",
+        noise_floor,
+        all_results.len()
+    );
+    println!(
+        "    Uninformative ties (similar non-zero):  {} / {}",
+        uninformative_ties,
+        all_results.len()
+    );
     let informative = meaningful_primed_wins + meaningful_cold_wins;
-    println!("    Informative comparisons: {} / {}", informative, all_results.len());
+    println!(
+        "    Informative comparisons: {} / {}",
+        informative,
+        all_results.len()
+    );
 
     // Per-condition solved rates
     let cold_solved_total: usize = all_results.iter().map(|(_, c, _, _)| c.solved_count).sum();
     let primed_solved_total: usize = all_results.iter().map(|(_, _, p, _)| p.solved_count).sum();
     let total_runs = all_results.len() * SEEDS.len();
-    println!("\n    Solved rate (MSE < {:.0e} within {} gens):", EPSILON, GENERATIONS);
-    println!("      Cold:   {}/{} ({:.0}%)", cold_solved_total, total_runs,
-        100.0 * cold_solved_total as f64 / total_runs as f64);
-    println!("      Primed: {}/{} ({:.0}%)", primed_solved_total, total_runs,
-        100.0 * primed_solved_total as f64 / total_runs as f64);
+    println!(
+        "\n    Solved rate (MSE < {:.0e} within {} gens):",
+        EPSILON, GENERATIONS
+    );
+    println!(
+        "      Cold:   {}/{} ({:.0}%)",
+        cold_solved_total,
+        total_runs,
+        100.0 * cold_solved_total as f64 / total_runs as f64
+    );
+    println!(
+        "      Primed: {}/{} ({:.0}%)",
+        primed_solved_total,
+        total_runs,
+        100.0 * primed_solved_total as f64 / total_runs as f64
+    );
 
     println!("\n  Honest interpretation:");
     if informative == 0 {
@@ -454,17 +716,26 @@ fn main() {
         println!("      (noise-floor tie) or both conditions missed by similar amounts.");
         println!("      Benchmark inconclusive — need harder targets OR tighter budget.");
     } else if meaningful_primed_wins > 0 && meaningful_cold_wins == 0 {
-        println!("    ✓ Primed wins on every informative comparison ({}).", meaningful_primed_wins);
+        println!(
+            "    ✓ Primed wins on every informative comparison ({}).",
+            meaningful_primed_wins
+        );
         println!("    The feedback loop compounds: macros from simple warmup sequences");
         println!("    transferred to harder physics targets that the cold GP couldn't");
         println!("    find in the generation budget. This is the hypothesis confirmed.");
     } else if meaningful_cold_wins > 0 && meaningful_primed_wins == 0 {
-        println!("    ✗ Cold wins on every informative comparison ({}).", meaningful_cold_wins);
+        println!(
+            "    ✗ Cold wins on every informative comparison ({}).",
+            meaningful_cold_wins
+        );
         println!("    Macro injection HURTS — warmup macros are wasting population");
         println!("    slots on the target domain. The extracted abstractions don't");
         println!("    transfer.");
     } else {
-        println!("    ± Mixed results: primed wins {}, cold wins {}.", meaningful_primed_wins, meaningful_cold_wins);
+        println!(
+            "    ± Mixed results: primed wins {}, cold wins {}.",
+            meaningful_primed_wins, meaningful_cold_wins
+        );
         println!("    Macros help on some targets (those whose structure overlaps with");
         println!("    warmup patterns) and hurt on others. Partial compounding — the");
         println!("    question becomes WHICH abstractions transfer, not WHETHER they do.");
@@ -479,14 +750,18 @@ fn main() {
     // nothing else, we have a causal link, not just a correlation.
     println!("\n━━━ Macro Usage (Causal Analysis) ━━━");
     println!("  For each target, count how often each warmup macro appeared");
-    println!("  as a subtree in the top-3 primed formulas across {} RNG seeds.", SEEDS.len());
-    println!("  Max possible per macro per target = {} (seeds × top-k).", SEEDS.len() * 3);
+    println!(
+        "  as a subtree in the top-3 primed formulas across {} RNG seeds.",
+        SEEDS.len()
+    );
+    println!(
+        "  Max possible per macro per target = {} (seeds × top-k).",
+        SEEDS.len() * 3
+    );
     println!();
 
     // Collect all unique macro keys used
-    let mut macro_keys: Vec<String> = macros.iter()
-        .map(|m| format!("{}", m))
-        .collect();
+    let mut macro_keys: Vec<String> = macros.iter().map(|m| format!("{}", m)).collect();
     macro_keys.sort();
 
     // Print header
@@ -528,4 +803,48 @@ fn main() {
     println!("    · Zero counts = macro didn't contribute structurally to this target");
     println!("    · If primed beats cold AND non-zero usage on same row → causal link");
     println!("    · If primed beats cold BUT all zeros → primed won for other reasons");
+
+    let activation = print_benchmark_macro_activation(&macros, &all_results);
+
+    println!("\n━━━ Macro Pool Quality Gates ━━━");
+    let metrics = warmup_engine.macro_pool_metrics();
+    let mut report = MacroQualityReport::new();
+    report.push(
+        "macros_extracted",
+        !macros.is_empty(),
+        format!("macros={}", macros.len()),
+    );
+    for gate in
+        evaluate_common_metrics(metrics.as_ref(), &MacroQualityThresholds::one_dimensional()).gates
+    {
+        if gate.name != "has_used_macros" {
+            report.gates.push(gate);
+        }
+    }
+    report.push(
+        "activation_precision_min",
+        activation.activation_precision >= 0.50,
+        format!(
+            "used={}/{} hits={} precision={:.0}%",
+            activation.used_macros,
+            activation.total_macros,
+            activation.total_hits,
+            activation.activation_precision * 100.0
+        ),
+    );
+    report.push(
+        "primed_not_worse_overall",
+        meaningful_primed_wins >= meaningful_cold_wins,
+        format!(
+            "primed_wins={} cold_wins={}",
+            meaningful_primed_wins, meaningful_cold_wins
+        ),
+    );
+    report.push(
+        "cold_dominance_bounded",
+        meaningful_cold_wins <= 1,
+        format!("cold_wins={}", meaningful_cold_wins),
+    );
+    print_report(&report, "overall_macro_acceleration_quality");
+    maybe_enforce(&report);
 }

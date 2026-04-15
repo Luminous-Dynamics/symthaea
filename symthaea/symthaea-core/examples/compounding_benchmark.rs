@@ -37,12 +37,16 @@
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
+use symthaea_core::hdc::abstract_thought::macro_quality::{
+    evaluate_common_metrics, maybe_enforce, nonsemantic_constants, print_report,
+    MacroQualityReport, MacroQualityThresholds,
+};
 use symthaea_core::hdc::conjecture_engine::{
     observe_balmer_series, observe_fibonacci_ratios, observe_hydrogen_energy_levels,
     observe_inverse_square_law, observe_kepler_third_law, observe_partitions,
     observe_quantum_harmonic_oscillator, observe_relativistic_kinetic_energy,
     observe_stefan_boltzmann, ConjectureEngine, ConjectureStatus, Expr, MathDomain,
-    ObservedSequence, RegressorConfig, SymbolicRegressor,
+    ObservedSequence, RegressorConfig, SeedSpecializationStats, SymbolicRegressor,
 };
 use symthaea_core::hdc::primitive_system::PrimitiveSystem;
 
@@ -60,7 +64,9 @@ fn squares_sequence(max_n: usize) -> ObservedSequence {
 }
 
 fn cubes_sequence(max_n: usize) -> ObservedSequence {
-    let data: Vec<(f64, f64)> = (1..=max_n).map(|n| (n as f64, (n * n * n) as f64)).collect();
+    let data: Vec<(f64, f64)> = (1..=max_n)
+        .map(|n| (n as f64, (n * n * n) as f64))
+        .collect();
     ObservedSequence::new("cubes(n)", MathDomain::NumberTheory, data)
 }
 
@@ -83,7 +89,9 @@ fn harmonic_sequence(max_n: usize) -> ObservedSequence {
 }
 
 fn kinetic_energy_sequence(max_n: usize) -> ObservedSequence {
-    let data: Vec<(f64, f64)> = (1..=max_n).map(|n| (n as f64, 0.5 * (n * n) as f64)).collect();
+    let data: Vec<(f64, f64)> = (1..=max_n)
+        .map(|n| (n as f64, 0.5 * (n * n) as f64))
+        .collect();
     ObservedSequence::new("kinetic_energy(n)", MathDomain::Physics, data)
 }
 
@@ -174,6 +182,7 @@ struct RunMetrics {
     wall_time_ms: u128,
     best_formula: String,
     macro_usage: HashMap<String, u64>,
+    seed_specialization: SeedSpecializationStats,
 }
 
 #[derive(Debug, Clone)]
@@ -208,12 +217,7 @@ impl ConditionStats {
     }
 }
 
-fn run_once(
-    target: &ObservedSequence,
-    seed: u64,
-    macros: &[Expr],
-    cold: bool,
-) -> RunMetrics {
+fn run_once(target: &ObservedSequence, seed: u64, macros: &[Expr], cold: bool) -> RunMetrics {
     let config = RegressorConfig {
         population_size: POP_SIZE,
         generations: GENERATIONS,
@@ -241,6 +245,7 @@ fn run_once(
     };
 
     let macro_usage: HashMap<String, u64> = regressor.macro_usage().clone();
+    let seed_specialization = regressor.seed_specialization_stats().clone();
 
     RunMetrics {
         final_mse,
@@ -248,6 +253,79 @@ fn run_once(
         wall_time_ms: elapsed,
         best_formula: formula_str,
         macro_usage,
+        seed_specialization,
+    }
+}
+
+fn print_macro_pool_snapshot(engine: &ConjectureEngine, label: &str) {
+    let Some(metrics) = engine.macro_pool_metrics() else {
+        return;
+    };
+
+    println!("\n  ▼ Macro pool quality ({label})");
+    println!(
+        "    cycle={}  operators={}  candidates={}  promoted={}  pruned={}  survival={:.0}%",
+        metrics.cycle,
+        metrics.total_operators,
+        metrics.total_candidates,
+        metrics.total_promoted,
+        metrics.total_pruned,
+        metrics.survival_rate * 100.0
+    );
+    println!(
+        "    tiers: formal={}  recurrent={}  quarantined={}",
+        metrics.formal_operators, metrics.recurrent_operators, metrics.quarantined_operators
+    );
+    println!(
+        "    usage: active_precision={:.0}%  mature_precision={:.0}%  avg_usage={:.2}  avg_sources={:.2}",
+        metrics.active_precision * 100.0,
+        metrics.mature_precision * 100.0,
+        metrics.avg_usage_count,
+        metrics.avg_source_count
+    );
+
+    if metrics.signature_stats.is_empty() {
+        println!("    top signatures: (none)");
+    } else {
+        let mut signature_stats = metrics.signature_stats;
+        signature_stats.sort_by(|a, b| {
+            b.used_operator_count
+                .cmp(&a.used_operator_count)
+                .then_with(|| b.total_usage_count.cmp(&a.total_usage_count))
+                .then_with(|| b.operator_count.cmp(&a.operator_count))
+                .then_with(|| a.signature.cmp(&b.signature))
+        });
+
+        println!("    top signatures:");
+        for stat in signature_stats.iter().take(5) {
+            println!(
+                "      · {:<18} ops={} used={} hits={}",
+                stat.signature,
+                stat.operator_count,
+                stat.used_operator_count,
+                stat.total_usage_count
+            );
+        }
+    }
+
+    println!("    macro metadata:");
+    for op in engine.macro_operators().iter().take(8) {
+        let parent = op
+            .parent_formulas
+            .first()
+            .map(|s| s.as_str())
+            .unwrap_or("(none)");
+        println!(
+            "      · {} | sig={} tier={:?} sources={} usage={} arity={} cycle={} parent={}",
+            op.template,
+            op.signature,
+            op.promotion_tier,
+            op.source_count,
+            op.usage_count,
+            op.arity,
+            op.created_at,
+            parent
+        );
     }
 }
 
@@ -261,7 +339,12 @@ fn main() {
     println!("║  Does abstract_thought compound across iterations or saturate?   ║");
     println!("╚══════════════════════════════════════════════════════════════════╝");
     println!();
-    println!("  Config: {} gens, pop {}, {} seeds per condition", GENERATIONS, POP_SIZE, SEEDS.len());
+    println!(
+        "  Config: {} gens, pop {}, {} seeds per condition",
+        GENERATIONS,
+        POP_SIZE,
+        SEEDS.len()
+    );
     println!("  Levels: 0 (warmup) → 1 (extract M₂) → 2 (compare M₁ vs M₂)");
 
     let prims = PrimitiveSystem::new();
@@ -345,6 +428,7 @@ fn main() {
     println!("  Warmup took {:.2}s", level0_time.as_secs_f64());
     println!("  Conjectures generated: {}", engine.conjectures.len());
     println!("  |M₁| = {} macros:", m1.len());
+    print_macro_pool_snapshot(&engine, "after Level 0 reflection");
     for (i, t) in m1.iter().enumerate() {
         println!("    {}. {}", i + 1, t);
     }
@@ -362,12 +446,12 @@ fn main() {
     println!("  can potentially be extracted beyond what Level 0 produced.");
 
     // Add non-trivial sequences to the SAME engine so reflect() sees their conjectures.
-    engine.observe(observe_partitions(22));           // Hardy-Ramanujan: exp(√n)/n
-    engine.observe(observe_balmer_series(12));        // rational: 1/(A - B/n²)
+    engine.observe(observe_partitions(22)); // Hardy-Ramanujan: exp(√n)/n
+    engine.observe(observe_balmer_series(12)); // rational: 1/(A - B/n²)
     engine.observe(observe_hydrogen_energy_levels(20)); // -c/n²
     engine.observe(observe_relativistic_kinetic_energy(20)); // transcendental
-    engine.observe(damped_exponential_sequence(20));  // exp(-kt)
-    engine.observe(logistic_sequence(20));            // 1/(1+exp(-kx))
+    engine.observe(damped_exponential_sequence(20)); // exp(-kt)
+    engine.observe(logistic_sequence(20)); // 1/(1+exp(-kx))
 
     let t1 = Instant::now();
     engine.generate_conjectures(3);
@@ -387,14 +471,17 @@ fn main() {
         .map(|op| format!("{}", op.template))
         .collect();
 
-    println!("  Level 1 extraction took {:.2}s", level1_time.as_secs_f64());
+    println!(
+        "  Level 1 extraction took {:.2}s",
+        level1_time.as_secs_f64()
+    );
     println!("  Total conjectures in pool: {}", engine.conjectures.len());
 
     // Diagnostic: how many of the Level 1 conjectures are strongly verified?
     let mut formally = 0;
     let mut symbolically = 0;
-    let mut tested_strong = 0;  // test_mse < 1e-6
-    let mut tested_weak = 0;    // test_mse in [1e-6, 1e-3)
+    let mut tested_strong = 0; // test_mse < 1e-6
+    let mut tested_weak = 0; // test_mse in [1e-6, 1e-3)
     let mut other = 0;
     let mut best_mse = f64::INFINITY;
     for c in &engine.conjectures {
@@ -402,24 +489,39 @@ fn main() {
             ConjectureStatus::FormallyVerified { .. } => formally += 1,
             ConjectureStatus::SymbolicallyChecked => symbolically += 1,
             ConjectureStatus::NumericallyTested { test_mse } => {
-                if *test_mse < 1e-6 { tested_strong += 1; }
-                else if *test_mse < 1e-3 { tested_weak += 1; }
-                else { other += 1; }
-                if *test_mse < best_mse { best_mse = *test_mse; }
+                if *test_mse < 1e-6 {
+                    tested_strong += 1;
+                } else if *test_mse < 1e-3 {
+                    tested_weak += 1;
+                } else {
+                    other += 1;
+                }
+                if *test_mse < best_mse {
+                    best_mse = *test_mse;
+                }
             }
             _ => other += 1,
         }
     }
     println!("  Verification breakdown:");
     println!("    FormallyVerified:                      {}", formally);
-    println!("    SymbolicallyChecked:                   {}", symbolically);
-    println!("    NumericallyTested (test_mse < 1e-6):   {}", tested_strong);
+    println!(
+        "    SymbolicallyChecked:                   {}",
+        symbolically
+    );
+    println!(
+        "    NumericallyTested (test_mse < 1e-6):   {}",
+        tested_strong
+    );
     println!("    NumericallyTested (1e-6 ≤ mse < 1e-3): {}", tested_weak);
     println!("    Other (Proposed, Refuted, etc.):       {}", other);
-    println!("    Strong-eligible for fast-track: {}",
-        formally + symbolically + tested_strong);
+    println!(
+        "    Strong-eligible for fast-track: {}",
+        formally + symbolically + tested_strong
+    );
     println!("    Best test_mse observed: {:.3e}", best_mse);
     println!("  |M₂| = {} macros:", m2.len());
+    print_macro_pool_snapshot(&engine, "after Level 1 reflection");
     for (i, t) in m2.iter().enumerate() {
         let is_new = !m1_canonical.contains(&format!("{}", t));
         let marker = if is_new { "🆕" } else { "  " };
@@ -443,43 +545,64 @@ fn main() {
 
     // Level 2 targets chosen to be structurally varied
     let level2_targets: Vec<(&str, ObservedSequence)> = vec![
-        ("Stefan-Boltzmann (P ∝ T^4)",        observe_stefan_boltzmann(15)),
-        ("Kepler 3rd law (T ∝ r^1.5)",        observe_kepler_third_law(15)),
-        ("Inverse square (F ∝ 1/r²)",         observe_inverse_square_law(20)),
-        ("Quantum HO (E = n + 1/2)",          observe_quantum_harmonic_oscillator(20)),
+        ("Stefan-Boltzmann (P ∝ T^4)", observe_stefan_boltzmann(15)),
+        ("Kepler 3rd law (T ∝ r^1.5)", observe_kepler_third_law(15)),
+        ("Inverse square (F ∝ 1/r²)", observe_inverse_square_law(20)),
+        (
+            "Quantum HO (E = n + 1/2)",
+            observe_quantum_harmonic_oscillator(20),
+        ),
         // Stage 1 curriculum transfer probe: different-constant distance
         // kernel. Cold should struggle to assemble `sqrt(Add(Pow, Const))`
         // from leaves; M₁/M₂ should benefit from the promoted distance-
         // kernel macros. Success = M₁_mse materially < cold_mse.
-        ("Distance kernel variant (1/√(n²+4))", distance_kernel_variant_sequence(20)),
+        (
+            "Distance kernel variant (1/√(n²+4))",
+            distance_kernel_variant_sequence(20),
+        ),
     ];
 
     #[allow(clippy::type_complexity)]
     let mut level2_results: Vec<(
         &str,
-        ConditionStats, // cold
-        ConditionStats, // M₁
-        ConditionStats, // M₂
+        ConditionStats,  // cold
+        ConditionStats,  // M₁
+        ConditionStats,  // M₂
         Vec<RunMetrics>, // raw M₂ runs for macro usage
     )> = Vec::new();
 
     for (name, target) in &level2_targets {
         println!("\n  Target: {}", name);
 
-        let cold_runs: Vec<RunMetrics> = SEEDS.iter().map(|&s| run_once(target, s, &[], true)).collect();
-        let m1_runs: Vec<RunMetrics> = SEEDS.iter().map(|&s| run_once(target, s, &m1, false)).collect();
-        let m2_runs: Vec<RunMetrics> = SEEDS.iter().map(|&s| run_once(target, s, &m2, false)).collect();
+        let cold_runs: Vec<RunMetrics> = SEEDS
+            .iter()
+            .map(|&s| run_once(target, s, &[], true))
+            .collect();
+        let m1_runs: Vec<RunMetrics> = SEEDS
+            .iter()
+            .map(|&s| run_once(target, s, &m1, false))
+            .collect();
+        let m2_runs: Vec<RunMetrics> = SEEDS
+            .iter()
+            .map(|&s| run_once(target, s, &m2, false))
+            .collect();
 
         let cold_stats = ConditionStats::from_runs("cold", &cold_runs);
         let m1_stats = ConditionStats::from_runs("M₁  ", &m1_runs);
         let m2_stats = ConditionStats::from_runs("M₂  ", &m2_runs);
 
-        println!("    cold: mean_mse={:.3e}  median_mse={:.3e}",
-            cold_stats.mean_final_mse, cold_stats.median_final_mse);
-        println!("    M₁  : mean_mse={:.3e}  median_mse={:.3e}",
-            m1_stats.mean_final_mse, m1_stats.median_final_mse);
-        println!("    M₂  : mean_mse={:.3e}  median_mse={:.3e}",
-            m2_stats.mean_final_mse, m2_stats.median_final_mse);
+        println!(
+            "    cold: mean_mse={:.3e}  median_mse={:.3e}",
+            cold_stats.mean_final_mse, cold_stats.median_final_mse
+        );
+        println!(
+            "    M₁  : mean_mse={:.3e}  median_mse={:.3e}",
+            m1_stats.mean_final_mse, m1_stats.median_final_mse
+        );
+        println!(
+            "    M₂  : mean_mse={:.3e}  median_mse={:.3e}",
+            m2_stats.mean_final_mse, m2_stats.median_final_mse
+        );
         println!("    sample (cold): {}", cold_stats.sample_best_formula);
         println!("    sample (M₂  ): {}", m2_stats.sample_best_formula);
 
@@ -490,13 +613,15 @@ fn main() {
     // COMPOUNDING VERDICT
     // ════════════════════════════════════════════════════════════════
     println!("\n━━━ Summary Table: Cold vs M₁ vs M₂ ━━━");
-    println!("  {:<32}  {:>12}  {:>12}  {:>12}  {}",
-        "target", "cold_mse", "M₁_mse", "M₂_mse", "verdict");
+    println!(
+        "  {:<32}  {:>12}  {:>12}  {:>12}  {}",
+        "target", "cold_mse", "M₁_mse", "M₂_mse", "verdict"
+    );
     println!("  {}", "─".repeat(85));
 
-    let mut m2_strict_wins = 0;     // M₂ beats M₁ AND cold
-    let mut m1_equivalent = 0;       // M₁ ≈ M₂ (no compounding)
-    let mut m2_regressions = 0;      // M₂ worse than M₁ (drift!)
+    let mut m2_strict_wins = 0; // M₂ beats M₁ AND cold
+    let mut m1_equivalent = 0; // M₁ ≈ M₂ (no compounding)
+    let mut m2_regressions = 0; // M₂ worse than M₁ (drift!)
     let mut noise_floor = 0;
     let mut cold_dominates = 0;
 
@@ -512,8 +637,8 @@ fn main() {
         } else if cold.mean_final_mse < m1s.mean_final_mse.min(m2s.mean_final_mse) * 0.95 {
             cold_dominates += 1;
             "cold wins"
-        } else if (m2s.mean_final_mse - m1s.mean_final_mse).abs()
-            / m1s.mean_final_mse.max(1e-12) < 0.05
+        } else if (m2s.mean_final_mse - m1s.mean_final_mse).abs() / m1s.mean_final_mse.max(1e-12)
+            < 0.05
         {
             m1_equivalent += 1;
             "≈ M₁ = M₂ (saturation)"
@@ -525,21 +650,70 @@ fn main() {
             "⚠ M₂ < M₁ (drift!)"
         };
 
-        println!("  {:<32}  {:>12.3e}  {:>12.3e}  {:>12.3e}  {}",
-            name, cold.mean_final_mse, m1s.mean_final_mse, m2s.mean_final_mse, verdict);
+        println!(
+            "  {:<32}  {:>12.3e}  {:>12.3e}  {:>12.3e}  {}",
+            name, cold.mean_final_mse, m1s.mean_final_mse, m2s.mean_final_mse, verdict
+        );
     }
 
     println!("\n  Compounding verdict:");
-    println!("    Strict compound wins (M₂ > M₁): {} / {}", m2_strict_wins, level2_results.len());
-    println!("    Saturation (M₁ ≈ M₂):           {} / {}", m1_equivalent, level2_results.len());
-    println!("    Drift (M₂ < M₁):                {} / {}", m2_regressions, level2_results.len());
-    println!("    Noise-floor ties:               {} / {}", noise_floor, level2_results.len());
-    println!("    Cold dominates (macros hurt):   {} / {}", cold_dominates, level2_results.len());
+    println!(
+        "    Strict compound wins (M₂ > M₁): {} / {}",
+        m2_strict_wins,
+        level2_results.len()
+    );
+    println!(
+        "    Saturation (M₁ ≈ M₂):           {} / {}",
+        m1_equivalent,
+        level2_results.len()
+    );
+    println!(
+        "    Drift (M₂ < M₁):                {} / {}",
+        m2_regressions,
+        level2_results.len()
+    );
+    println!(
+        "    Noise-floor ties:               {} / {}",
+        noise_floor,
+        level2_results.len()
+    );
+    println!(
+        "    Cold dominates (macros hurt):   {} / {}",
+        cold_dominates,
+        level2_results.len()
+    );
 
     println!("\n  Pool growth:");
     println!("    |M₁| = {}", m1.len());
-    println!("    |M₂| = {}  (added: {}, dropped: {}, kept: {})",
-        m2.len(), added.len(), dropped.len(), kept);
+    println!(
+        "    |M₂| = {}  (added: {}, dropped: {}, kept: {})",
+        m2.len(),
+        added.len(),
+        dropped.len(),
+        kept
+    );
+    let mut specialization_scored = 0usize;
+    let mut specialization_seeded = 0usize;
+    let mut specialization_elapsed_ms = 0u128;
+    let mut specialization_exact_runs = 0usize;
+    for (_, _, _, _, m2_runs) in &level2_results {
+        for run in m2_runs {
+            specialization_scored += run.seed_specialization.variants_scored;
+            specialization_seeded += run.seed_specialization.variants_seeded;
+            specialization_elapsed_ms += run.seed_specialization.elapsed_ms;
+            if run.seed_specialization.exact_fit_found {
+                specialization_exact_runs += 1;
+            }
+        }
+    }
+    println!("  Specialization budget use (M₂ runs):");
+    println!(
+        "    variants_scored={} variants_seeded={} exact_fit_runs={} elapsed={}ms",
+        specialization_scored,
+        specialization_seeded,
+        specialization_exact_runs,
+        specialization_elapsed_ms
+    );
 
     println!("\n  Honest interpretation:");
     if added.is_empty() {
@@ -548,15 +722,29 @@ fn main() {
         println!("      or Level 1 conjectures don't contain novel recurring shapes.");
         println!("      This is the one-shot ceiling hypothesis confirmed.");
     } else if m2_strict_wins > 0 && m2_regressions == 0 {
-        println!("    ✓ COMPOUNDING: M₂ strictly contains new macros ({}), and", added.len());
-        println!("      on {} target(s) M₂ beats M₁. The architecture accumulates", m2_strict_wins);
+        println!(
+            "    ✓ COMPOUNDING: M₂ strictly contains new macros ({}), and",
+            added.len()
+        );
+        println!(
+            "      on {} target(s) M₂ beats M₁. The architecture accumulates",
+            m2_strict_wins
+        );
         println!("      useful abstractions across iterations.");
     } else if m2_regressions > 0 && m2_strict_wins == 0 {
-        println!("    ⚠ DRIFT: M₂ added {} macros but is WORSE than M₁ on {} target(s).", added.len(), m2_regressions);
+        println!(
+            "    ⚠ DRIFT: M₂ added {} macros but is WORSE than M₁ on {} target(s).",
+            added.len(),
+            m2_regressions
+        );
         println!("      The new macros are overfit / pollute the population. This is");
         println!("      the extraction-failure mode I was worried about.");
     } else {
-        println!("    ± MIXED: M₂ added {} macros. Some targets benefit ({}), some don't.", added.len(), m2_strict_wins);
+        println!(
+            "    ± MIXED: M₂ added {} macros. Some targets benefit ({}), some don't.",
+            added.len(),
+            m2_strict_wins
+        );
         println!("      Partial compounding — specific M₁→M₂ pairs transfer.");
     }
 
@@ -564,10 +752,10 @@ fn main() {
     // SAFEGUARD: Scan M₂ for overfit constants
     // ════════════════════════════════════════════════════════════════
     println!("\n━━━ Safeguard: overfit-constant scan of M₂ ━━━");
-    println!("  Any Const other than 0, 1, 2 suggests target-specific leakage.");
+    println!("  Any non-structural Const other than 0, 1, 2 suggests target-specific leakage.");
     let mut suspicious_constants = Vec::new();
     for (i, t) in m2.iter().enumerate() {
-        let bad_consts = collect_nonsemantic_constants(t);
+        let bad_consts = nonsemantic_constants(t);
         if !bad_consts.is_empty() {
             suspicious_constants.push((i, t.clone(), bad_consts));
         }
@@ -576,38 +764,44 @@ fn main() {
         println!("  ✓ All M₂ macro templates contain only semantic constants (0, 1, 2).");
         println!("    The normalization pipeline successfully stripped target-specific values.");
     } else {
-        println!("  ⚠ Found {} M₂ macro(s) with non-semantic constants:", suspicious_constants.len());
+        println!(
+            "  ⚠ Found {} M₂ macro(s) with non-semantic constants:",
+            suspicious_constants.len()
+        );
         for (i, t, cs) in &suspicious_constants {
             println!("    {}. {} (constants: {:?})", i + 1, t, cs);
         }
         println!("    This is evidence of overfit leakage into M₂.");
     }
-}
 
-/// Collect all constant values in an expression that are NOT semantic
-/// (i.e., not 0, 1, or 2). Used to detect overfit leakage.
-fn collect_nonsemantic_constants(expr: &Expr) -> Vec<f64> {
-    let mut result = Vec::new();
-    collect_nonsemantic_inner(expr, &mut result);
-    result
-}
-
-fn collect_nonsemantic_inner(expr: &Expr, out: &mut Vec<f64>) {
-    match expr {
-        Expr::Const(c) => {
-            let is_semantic = (*c - 0.0).abs() < 1e-12
-                || (*c - 1.0).abs() < 1e-12
-                || (*c - 2.0).abs() < 1e-12;
-            if !is_semantic {
-                out.push(*c);
-            }
-        }
-        Expr::Var(_) => {}
-        Expr::BinOp(_, l, r) => {
-            collect_nonsemantic_inner(l, out);
-            collect_nonsemantic_inner(r, out);
-        }
-        Expr::Func(_, arg) => collect_nonsemantic_inner(arg, out),
-        Expr::Sum(body, _) => collect_nonsemantic_inner(body, out),
+    println!("\n━━━ Macro Pool Quality Gates ━━━");
+    let metrics = engine.macro_pool_metrics();
+    let mut report = MacroQualityReport::new();
+    report.push(
+        "distance_kernel_reachable",
+        dk_sqrt > 0 && dk_best_mse < 1e-8,
+        format!("sqrt_count={} best_mse={:.3e}", dk_sqrt, dk_best_mse),
+    );
+    for gate in
+        evaluate_common_metrics(metrics.as_ref(), &MacroQualityThresholds::one_dimensional()).gates
+    {
+        report.gates.push(gate);
     }
+    report.push(
+        "no_nonsemantic_constants",
+        suspicious_constants.is_empty(),
+        format!("flagged={}", suspicious_constants.len()),
+    );
+    report.push(
+        "no_m2_drift",
+        m2_regressions == 0,
+        format!("drift_targets={}", m2_regressions),
+    );
+    report.push(
+        "cold_dominance_bounded",
+        cold_dominates <= 1,
+        format!("cold_dominates={}", cold_dominates),
+    );
+    print_report(&report, "overall_macro_pool_quality");
+    maybe_enforce(&report);
 }

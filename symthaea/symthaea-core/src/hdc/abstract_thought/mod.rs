@@ -32,15 +32,16 @@
 //! - Kanerva (2009) — Hyperdimensional computing: An introduction
 //! - Koza (1992) — Genetic Programming
 
-pub mod meta_hdc;
-pub mod dynamic_grammar;
 pub mod category_discovery;
+pub mod dynamic_grammar;
+pub mod macro_quality;
+pub mod meta_hdc;
 
-use crate::hdc::binary_hv::BinaryHV;
-use crate::hdc::conjecture_engine::{
-    BinOp, ConjectureEngine, Expr, MathDomain, UnaryFn,
-};
+use std::collections::HashSet;
+
 use crate::hdc::arithmetic_engine::{SymbolicExpr, SymbolicOp, TermType};
+use crate::hdc::binary_hv::BinaryHV;
+use crate::hdc::conjecture_engine::{BinOp, ConjectureEngine, Expr, MathDomain, UnaryFn};
 use crate::hdc::primitive_system::PrimitiveSystem;
 
 // ── Subtree extraction bounds ──────────────────────────────────────────
@@ -60,9 +61,9 @@ pub const SUBTREE_MIN_COMPLEXITY: usize = 2;
 /// Maximum subtree complexity (AST node count) for promotion candidates.
 pub const SUBTREE_MAX_COMPLEXITY: usize = 15;
 
-use self::meta_hdc::MetaHDC;
-use self::dynamic_grammar::DynamicGrammar;
 use self::category_discovery::CategoryDiscovery;
+use self::dynamic_grammar::DynamicGrammar;
+use self::meta_hdc::MetaHDC;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ABSTRACT THOUGHT ORCHESTRATOR
@@ -91,6 +92,8 @@ impl AbstractThought {
     ///
     /// This is the core feedback loop: encode → cluster → extract → promote → categorize.
     pub fn reflect(&mut self, engine: &ConjectureEngine, primitives: &PrimitiveSystem) {
+        self.dynamic_grammar.tick();
+
         // 1. Encode new verified conjectures as concept vectors
         for i in self.encoded_up_to..engine.conjectures.len() {
             let conj = &engine.conjectures[i];
@@ -116,18 +119,21 @@ impl AbstractThought {
         //     promotion mechanism)
         let cluster_recurring = self.meta_hdc.recurring_subtrees(engine);
         for (subtree, conj_ids) in cluster_recurring {
-            self.dynamic_grammar.observe_subtree(subtree, &conj_ids, engine);
+            self.dynamic_grammar
+                .observe_subtree(subtree, &conj_ids, engine);
         }
         let global_recurring = self.meta_hdc.global_recurring_subtrees(engine, 2);
         for (subtree, conj_ids) in global_recurring {
-            self.dynamic_grammar.observe_subtree(subtree, &conj_ids, engine);
+            self.dynamic_grammar
+                .observe_subtree(subtree, &conj_ids, engine);
         }
         // Verified-singleton path: every subtree from a strongly-verified
         // conjecture becomes a candidate, even if it only appears once.
         // The fast-track promotion path in dynamic_grammar decides what to promote.
         let verified_only = self.meta_hdc.verified_subtrees(engine);
         for (subtree, conj_ids) in verified_only {
-            self.dynamic_grammar.observe_subtree(subtree, &conj_ids, engine);
+            self.dynamic_grammar
+                .observe_subtree(subtree, &conj_ids, engine);
         }
 
         // 4. Promote candidates that meet threshold
@@ -147,6 +153,10 @@ impl AbstractThought {
     /// Get active macro-operators for GP injection.
     pub fn macro_operators(&self) -> &[dynamic_grammar::MacroOperator] {
         &self.dynamic_grammar.operators
+    }
+
+    pub fn macro_pool_metrics(&self) -> dynamic_grammar::MacroPoolMetrics {
+        self.dynamic_grammar.metrics()
     }
 }
 
@@ -252,7 +262,9 @@ pub fn expr_to_symbolic(expr: &Expr, primitives: &PrimitiveSystem) -> SymbolicEx
         Expr::Sum(body, var) => {
             let b = expr_to_symbolic(body, primitives);
             // Encode summation by binding body with SUM role vector
-            let sum_hv = BinaryHV::random(crate::hdc::deterministic_seeds::seed_from_name("SUM_OPERATOR"));
+            let sum_hv = BinaryHV::random(crate::hdc::deterministic_seeds::seed_from_name(
+                "SUM_OPERATOR",
+            ));
             let var_hv = BinaryHV::random(crate::hdc::deterministic_seeds::seed_from_name(
                 &format!("SUM_VAR_{}", var),
             ));
@@ -279,12 +291,7 @@ pub fn extract_subtrees(expr: &Expr, min_complexity: usize, max_complexity: usiz
     results
 }
 
-fn extract_subtrees_inner(
-    expr: &Expr,
-    min: usize,
-    max: usize,
-    results: &mut Vec<Expr>,
-) {
+fn extract_subtrees_inner(expr: &Expr, min: usize, max: usize, results: &mut Vec<Expr>) {
     let c = expr.complexity();
     if c >= min && c <= max {
         results.push(expr.clone());
@@ -338,10 +345,14 @@ pub fn normalize_expr(expr: &Expr) -> Expr {
             // Non-constant exponents (e.g. `n^(1+k)`) recurse normally
             // because they're genuinely structural holes, not fixed powers.
             let new_exp: Expr = match exp.as_ref() {
-                Expr::Const(_) => (**exp).clone(),
+                Expr::Const(c) => Expr::Const(normalize_pow_exponent(*c)),
                 _ => normalize_expr(exp),
             };
-            Expr::BinOp(BinOp::Pow, Box::new(normalize_expr(base)), Box::new(new_exp))
+            Expr::BinOp(
+                BinOp::Pow,
+                Box::new(normalize_expr(base)),
+                Box::new(new_exp),
+            )
         }
         Expr::BinOp(op, l, r) => Expr::BinOp(
             *op,
@@ -351,6 +362,25 @@ pub fn normalize_expr(expr: &Expr) -> Expr {
         Expr::Func(f, arg) => Expr::Func(*f, Box::new(normalize_expr(arg))),
         Expr::Sum(body, var) => Expr::Sum(Box::new(normalize_expr(body)), var.clone()),
     }
+}
+
+fn normalize_pow_exponent(exponent: f64) -> f64 {
+    if !exponent.is_finite() {
+        return exponent;
+    }
+
+    let rounded = exponent.round();
+    if (exponent - rounded).abs() < 1e-9 && rounded.abs() <= 64.0 {
+        return rounded;
+    }
+
+    let doubled = (exponent * 2.0).round();
+    let half_step = doubled / 2.0;
+    if (exponent - half_step).abs() < 1e-9 && half_step.abs() <= 64.0 {
+        return half_step;
+    }
+
+    exponent
 }
 
 /// Semantically canonicalize an expression for macro deduplication.
@@ -434,11 +464,7 @@ fn canonicalize_inner(expr: &Expr, inside_func: bool) -> Expr {
                     }
                     // x * x → x ^ 2  (always — semantic rewrite)
                     if structurally_equal(&l, &r) {
-                        return Expr::BinOp(
-                            BinOp::Pow,
-                            Box::new(l),
-                            Box::new(Expr::Const(2.0)),
-                        );
+                        return Expr::BinOp(BinOp::Pow, Box::new(l), Box::new(Expr::Const(2.0)));
                     }
                     // Commutative sort
                     let (a, b) = sort_commutative(l, r);
@@ -508,7 +534,11 @@ fn structurally_equal(a: &Expr, b: &Expr) -> bool {
 fn sort_commutative(a: Expr, b: Expr) -> (Expr, Expr) {
     let sa = format!("{}", a);
     let sb = format!("{}", b);
-    if sa <= sb { (a, b) } else { (b, a) }
+    if sa <= sb {
+        (a, b)
+    } else {
+        (b, a)
+    }
 }
 
 /// Canonical string representation of an expression.
@@ -521,6 +551,55 @@ pub fn expr_canonical_string(expr: &Expr) -> String {
     let normalized = normalize_expr(expr);
     let canonicalized = canonicalize_expr(&normalized);
     format!("{}", canonicalized)
+}
+
+/// Collect the distinct variable names referenced by an expression.
+pub fn expr_variables(expr: &Expr) -> Vec<String> {
+    let mut vars = HashSet::new();
+    collect_expr_variables(expr, &mut vars);
+    let mut vars: Vec<String> = vars.into_iter().collect();
+    vars.sort();
+    vars
+}
+
+fn collect_expr_variables(expr: &Expr, out: &mut HashSet<String>) {
+    match expr {
+        Expr::Var(name) => {
+            out.insert(name.clone());
+        }
+        Expr::Const(_) => {}
+        Expr::BinOp(_, l, r) => {
+            collect_expr_variables(l, out);
+            collect_expr_variables(r, out);
+        }
+        Expr::Func(_, arg) => collect_expr_variables(arg, out),
+        Expr::Sum(body, var) => {
+            out.insert(var.clone());
+            collect_expr_variables(body, out);
+        }
+    }
+}
+
+/// Canonical variable-signature key, e.g. `n` or `vx|vy|x|y`.
+pub fn expr_signature(expr: &Expr) -> String {
+    let vars = expr_variables(expr);
+    if vars.is_empty() {
+        "<const>".to_string()
+    } else {
+        vars.join("|")
+    }
+}
+
+/// Canonical signature key for an explicit variable set.
+pub fn signature_from_vars(var_names: &[&str]) -> String {
+    let mut vars: Vec<String> = var_names.iter().map(|name| (*name).to_string()).collect();
+    vars.sort();
+    vars.dedup();
+    if vars.is_empty() {
+        "<const>".to_string()
+    } else {
+        vars.join("|")
+    }
 }
 
 /// Domain role vector seed — deterministic per MathDomain variant.
@@ -679,11 +758,52 @@ mod tests {
             Expr::BinOp(BinOp::Pow, base, exp) => {
                 assert!(matches!(base.as_ref(), Expr::Var(_)));
                 match exp.as_ref() {
-                    Expr::Const(c) => assert_eq!(*c, 2.0,
-                        "Pow exponent must be preserved; got {}", c),
+                    Expr::Const(c) => {
+                        assert_eq!(*c, 2.0, "Pow exponent must be preserved; got {}", c)
+                    }
                     _ => panic!("Expected constant exponent"),
                 }
             }
+            _ => panic!("Expected Pow BinOp, got {:?}", norm),
+        }
+    }
+
+    #[test]
+    fn test_normalize_snaps_near_integer_pow_exponents() {
+        let expr = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("n".to_string())),
+            Box::new(Expr::Const(2.999999999999993)),
+        );
+        let norm = normalize_expr(&expr);
+        match &norm {
+            Expr::BinOp(BinOp::Pow, _, exp) => match exp.as_ref() {
+                Expr::Const(c) => assert_eq!(
+                    *c, 3.0,
+                    "near-integer Pow exponents should canonicalize exactly"
+                ),
+                _ => panic!("Expected constant exponent"),
+            },
+            _ => panic!("Expected Pow BinOp, got {:?}", norm),
+        }
+    }
+
+    #[test]
+    fn test_normalize_keeps_nonsemantic_pow_exponents_visible() {
+        let expr = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("n".to_string())),
+            Box::new(Expr::Const(2.976395)),
+        );
+        let norm = normalize_expr(&expr);
+        match &norm {
+            Expr::BinOp(BinOp::Pow, _, exp) => match exp.as_ref() {
+                Expr::Const(c) => assert!(
+                    (*c - 2.976395).abs() < 1e-12,
+                    "arbitrary fitted exponents should remain auditable"
+                ),
+                _ => panic!("Expected constant exponent"),
+            },
             _ => panic!("Expected Pow BinOp, got {:?}", norm),
         }
     }
@@ -937,11 +1057,7 @@ mod tests {
         Conjecture, ConjectureEngine, ConjectureStatus, MathDomain, ObservedSequence,
     };
 
-    fn make_verified_conjecture(
-        formula: Expr,
-        domain: MathDomain,
-        source: &str,
-    ) -> Conjecture {
+    fn make_verified_conjecture(formula: Expr, domain: MathDomain, source: &str) -> Conjecture {
         let formula_str = format!("{}", formula);
         let complexity = formula.complexity();
         Conjecture {
@@ -954,6 +1070,7 @@ mod tests {
             fitness: 0.001 + 0.001 * complexity as f64,
             status: ConjectureStatus::FormallyVerified { proof_steps: 5 },
             confidence: 0.95,
+            macro_promotion_tier: crate::hdc::conjecture_engine::MacroPromotionTier::Formal,
         }
     }
 
@@ -1050,7 +1167,13 @@ mod tests {
         );
 
         // The cluster should detect cross-domain diversity
-        let max_diversity = at.meta_hdc.clusters.iter().map(|c| c.domain_diversity).max().unwrap_or(0);
+        let max_diversity = at
+            .meta_hdc
+            .clusters
+            .iter()
+            .map(|c| c.domain_diversity)
+            .max()
+            .unwrap_or(0);
         assert!(
             max_diversity >= 2,
             "Should detect cross-domain pattern, got diversity {}",
@@ -1067,10 +1190,20 @@ mod tests {
         // Set up cross-domain matches by adding observations + conjectures
         // that span NumberTheory → Physics → Chemistry
         let nt_data: Vec<(f64, f64)> = (1..=20).map(|n| (n as f64, (n as f64).sqrt())).collect();
-        let phys_data: Vec<(f64, f64)> = (1..=20).map(|n| (n as f64, (n as f64).sqrt() * 1.1)).collect();
+        let phys_data: Vec<(f64, f64)> = (1..=20)
+            .map(|n| (n as f64, (n as f64).sqrt() * 1.1))
+            .collect();
 
-        engine.observe(ObservedSequence::new("nt_sqrt", MathDomain::NumberTheory, nt_data));
-        engine.observe(ObservedSequence::new("phys_sqrt", MathDomain::Physics, phys_data));
+        engine.observe(ObservedSequence::new(
+            "nt_sqrt",
+            MathDomain::NumberTheory,
+            nt_data,
+        ));
+        engine.observe(ObservedSequence::new(
+            "phys_sqrt",
+            MathDomain::Physics,
+            phys_data,
+        ));
 
         // Add conjectures that match across domains
         engine.conjectures.push(make_verified_conjecture(
@@ -1105,7 +1238,8 @@ mod tests {
 
         let at = engine.abstract_thought.as_ref().unwrap();
         assert_eq!(
-            at.meta_hdc.concepts.len(), 1,
+            at.meta_hdc.concepts.len(),
+            1,
             "Should not double-encode on repeated reflect"
         );
     }
@@ -1176,7 +1310,8 @@ mod tests {
         assert!(
             total_candidates + total_operators > 0,
             "Should detect recurring patterns (candidates={}, operators={})",
-            total_candidates, total_operators
+            total_candidates,
+            total_operators
         );
 
         // Verify macro_operators accessor works

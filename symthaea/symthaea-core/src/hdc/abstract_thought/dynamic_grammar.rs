@@ -13,23 +13,28 @@
 //! A subtree is promoted to macro-operator only when:
 //! 1. It appears in >= 3 conjectures (`min_occurrences`)
 //! 2. From >= 2 different source sequences (independence)
-//! 3. At least 1 occurrence is FormallyVerified or Z3-proven
+//! 3. At least 1 occurrence is verified strongly enough for the selected path
 //! 4. Current operator count < `max_operators` (20)
 //!
 //! ## Design
 //!
 //! This is the computational analogue of how humans invented integrals:
 //! a recurring complex pattern gets compressed into a single manipulable symbol.
+//! Promotion now carries explicit metadata so downstream GP can filter by
+//! variable signature and proof quality instead of treating the macro pool as
+//! one undifferentiated bag.
 //!
 //! ## References
 //!
 //! - Koza (1992) — Automatically Defined Functions in GP
 //! - Langdon & Poli (2002) — Foundations of Genetic Programming
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::hdc::binary_hv::BinaryHV;
-use crate::hdc::conjecture_engine::{ConjectureEngine, ConjectureStatus, Expr};
+use crate::hdc::conjecture_engine::{
+    BinOp, ConjectureEngine, ConjectureStatus, Expr, MacroPromotionTier,
+};
 use crate::hdc::deterministic_seeds::seed_from_name;
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -57,6 +62,16 @@ pub struct SubtreeCandidate {
     /// Used by the fast-track promotion path: a single formally-verified
     /// occurrence is sufficient to promote a unique novel shape.
     pub strongly_verified_count: usize,
+    /// Strongest promotion tier supported by the contributing conjectures.
+    pub promotion_tier: MacroPromotionTier,
+    /// Parent formulas that contributed this subtree.
+    pub parent_formulas: HashSet<String>,
+    /// Distinct variables referenced by this subtree.
+    pub vars_used: Vec<String>,
+    /// Number of distinct variables referenced by this subtree.
+    pub var_count: usize,
+    /// Canonical signature key for the subtree's variable set.
+    pub signature: String,
 }
 
 /// A promoted macro-operator added to the GP grammar.
@@ -70,12 +85,57 @@ pub struct MacroOperator {
     pub canonical: String,
     /// Number of constant placeholders (parameters to optimize during GP)
     pub arity: usize,
+    /// How this macro entered the pool.
+    pub promotion_tier: MacroPromotionTier,
     /// Source conjecture indices that justified promotion
     pub source_conjectures: Vec<usize>,
+    /// Human-readable parents that justified promotion.
+    pub parent_formulas: Vec<String>,
+    /// Distinct variables referenced by the macro.
+    pub vars_used: Vec<String>,
+    /// Number of distinct variables referenced by the macro.
+    pub var_count: usize,
+    /// Canonical signature key for the macro's variable set.
+    pub signature: String,
+    /// Number of independent sources that contributed this macro.
+    pub source_count: usize,
     /// How many times this operator appeared in top conjectures during GP runs
     pub usage_count: u64,
     /// Cycle when this operator was promoted
     pub created_at: u64,
+}
+
+/// Per-signature summary of the active macro pool.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SignatureMacroMetrics {
+    pub signature: String,
+    pub operator_count: usize,
+    pub used_operator_count: usize,
+    pub total_usage_count: u64,
+}
+
+/// Snapshot metrics for evaluating macro-pool quality.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MacroPoolMetrics {
+    pub cycle: u64,
+    pub total_operators: usize,
+    pub total_candidates: usize,
+    pub formal_operators: usize,
+    pub recurrent_operators: usize,
+    pub quarantined_operators: usize,
+    pub used_operators: usize,
+    pub unused_operators: usize,
+    pub mature_operators: usize,
+    pub mature_used_operators: usize,
+    pub total_usage_count: u64,
+    pub avg_usage_count: f64,
+    pub avg_source_count: f64,
+    pub active_precision: f64,
+    pub mature_precision: f64,
+    pub total_promoted: u64,
+    pub total_pruned: u64,
+    pub survival_rate: f64,
+    pub signature_stats: Vec<SignatureMacroMetrics>,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -98,6 +158,12 @@ pub struct DynamicGrammar {
     pub min_sources: usize,
     /// Monotonic cycle counter
     pub cycle: u64,
+    /// Signature-partitioned operator index for variable-aware retrieval.
+    operators_by_signature: HashMap<String, Vec<usize>>,
+    /// Lifetime count of promoted operators.
+    total_promoted: u64,
+    /// Lifetime count of pruned operators.
+    total_pruned: u64,
     /// Next operator ID
     next_id: usize,
 }
@@ -112,6 +178,9 @@ impl DynamicGrammar {
             min_verified: 1,
             min_sources: 2,
             cycle: 0,
+            operators_by_signature: HashMap::new(),
+            total_promoted: 0,
+            total_pruned: 0,
             next_id: 0,
         }
     }
@@ -142,9 +211,16 @@ impl DynamicGrammar {
         }
 
         let canonical = crate::hdc::abstract_thought::expr_canonical_string(&canon_expr);
+        let vars_used = crate::hdc::abstract_thought::expr_variables(&canon_expr);
+        let var_count = vars_used.len();
+        let signature = crate::hdc::abstract_thought::expr_signature(&canon_expr);
 
         // Check if already tracked
-        if let Some(existing) = self.candidates.iter_mut().find(|c| c.canonical == canonical) {
+        if let Some(existing) = self
+            .candidates
+            .iter_mut()
+            .find(|c| c.canonical == canonical)
+        {
             // Merge new occurrences
             for &id in conjecture_ids {
                 if !existing.occurrences.contains(&id) {
@@ -152,11 +228,21 @@ impl DynamicGrammar {
                     if id < engine.conjectures.len() {
                         let conj = &engine.conjectures[id];
                         existing.sources.insert(conj.source.clone());
-                        if is_verified(&conj.status) {
+                        existing.parent_formulas.insert(conj.formula_str.clone());
+                        if conj.macro_promotion_tier.allows_recurrent_promotion()
+                            && is_verified(&conj.status)
+                        {
                             existing.verified_count += 1;
+                            existing.promotion_tier = existing
+                                .promotion_tier
+                                .max(MacroPromotionTier::RecurrentNumerical);
                         }
-                        if is_strongly_verified(&conj.status) {
+                        if conj.macro_promotion_tier.allows_fast_track()
+                            && is_strongly_verified(&conj.status)
+                            && subtree_admits_fast_track(&canon_expr)
+                        {
                             existing.strongly_verified_count += 1;
+                            existing.promotion_tier = MacroPromotionTier::Formal;
                         }
                     }
                 }
@@ -173,15 +259,25 @@ impl DynamicGrammar {
         let mut sources = HashSet::new();
         let mut verified_count = 0;
         let mut strongly_verified_count = 0;
+        let mut parent_formulas = HashSet::new();
+        let mut promotion_tier = MacroPromotionTier::Quarantined;
         for &id in conjecture_ids {
             if id < engine.conjectures.len() {
                 let conj = &engine.conjectures[id];
                 sources.insert(conj.source.clone());
-                if is_verified(&conj.status) {
+                parent_formulas.insert(conj.formula_str.clone());
+                if conj.macro_promotion_tier.allows_recurrent_promotion()
+                    && is_verified(&conj.status)
+                {
                     verified_count += 1;
+                    promotion_tier = promotion_tier.max(MacroPromotionTier::RecurrentNumerical);
                 }
-                if is_strongly_verified(&conj.status) {
+                if conj.macro_promotion_tier.allows_fast_track()
+                    && is_strongly_verified(&conj.status)
+                    && subtree_admits_fast_track(&canon_expr)
+                {
                     strongly_verified_count += 1;
+                    promotion_tier = MacroPromotionTier::Formal;
                 }
             }
         }
@@ -196,6 +292,11 @@ impl DynamicGrammar {
             sources,
             verified_count,
             strongly_verified_count,
+            promotion_tier,
+            parent_formulas,
+            vars_used,
+            var_count,
+            signature,
         });
     }
 
@@ -236,17 +337,32 @@ impl DynamicGrammar {
                     self.next_id,
                     candidate.canonical.replace(' ', "_")
                 );
+                let promotion_tier = if fast_track_promote {
+                    MacroPromotionTier::Formal
+                } else {
+                    MacroPromotionTier::RecurrentNumerical
+                };
+                let mut parent_formulas: Vec<String> =
+                    candidate.parent_formulas.iter().cloned().collect();
+                parent_formulas.sort();
 
                 self.operators.push(MacroOperator {
                     name,
                     template: candidate.pattern.clone(),
                     canonical: candidate.canonical.clone(),
                     arity,
+                    promotion_tier,
                     source_conjectures: candidate.occurrences.clone(),
+                    parent_formulas,
+                    vars_used: candidate.vars_used.clone(),
+                    var_count: candidate.var_count,
+                    signature: candidate.signature.clone(),
+                    source_count: candidate.sources.len(),
                     usage_count: 0,
                     created_at: self.cycle,
                 });
                 self.next_id += 1;
+                self.total_promoted += 1;
                 promoted_indices.push(i);
             }
         }
@@ -255,19 +371,31 @@ impl DynamicGrammar {
         for i in promoted_indices.into_iter().rev() {
             self.candidates.swap_remove(i);
         }
+        if !self.operators.is_empty() {
+            self.rebuild_operator_index();
+        }
     }
 
     /// Prune macro-operators that have never been used.
     pub fn prune_unused(&mut self) {
+        let before = self.operators.len();
         self.operators.retain(|op| {
             // Keep operators that have been used, or are too new to judge
             op.usage_count > 0 || (self.cycle - op.created_at) < 10
         });
+        self.total_pruned += (before - self.operators.len()) as u64;
+        if self.operators.len() != before {
+            self.rebuild_operator_index();
+        }
     }
 
     /// Record that a macro-operator was used in a top conjecture.
     pub fn record_usage(&mut self, canonical: &str) {
-        if let Some(op) = self.operators.iter_mut().find(|op| op.canonical == canonical) {
+        if let Some(op) = self
+            .operators
+            .iter_mut()
+            .find(|op| op.canonical == canonical)
+        {
             op.usage_count += 1;
         }
     }
@@ -289,9 +417,7 @@ impl DynamicGrammar {
                 Box::new(Self::instantiate_macro(l, rng)),
                 Box::new(Self::instantiate_macro(r, rng)),
             ),
-            Expr::Func(f, arg) => {
-                Expr::Func(*f, Box::new(Self::instantiate_macro(arg, rng)))
-            }
+            Expr::Func(f, arg) => Expr::Func(*f, Box::new(Self::instantiate_macro(arg, rng))),
             Expr::Sum(body, var) => {
                 Expr::Sum(Box::new(Self::instantiate_macro(body, rng)), var.clone())
             }
@@ -301,6 +427,147 @@ impl DynamicGrammar {
     /// Advance the cycle counter.
     pub fn tick(&mut self) {
         self.cycle += 1;
+    }
+
+    /// Retrieve operators whose variable requirements are compatible with the
+    /// current problem's variable set.
+    pub fn operators_compatible_with_vars(&self, allowed_vars: &[&str]) -> Vec<&MacroOperator> {
+        let allowed: HashSet<&str> = allowed_vars.iter().copied().collect();
+        let mut operators = Vec::new();
+
+        if self.operators_by_signature.is_empty() {
+            for op in &self.operators {
+                if signature_is_compatible(&op.signature, &allowed) {
+                    operators.push(op);
+                }
+            }
+        } else {
+            for (signature, indices) in &self.operators_by_signature {
+                if !signature_is_compatible(signature, &allowed) {
+                    continue;
+                }
+                for &idx in indices {
+                    operators.push(&self.operators[idx]);
+                }
+            }
+        }
+
+        operators.sort_by(|a, b| {
+            b.promotion_tier
+                .cmp(&a.promotion_tier)
+                .then_with(|| b.usage_count.cmp(&a.usage_count))
+                .then_with(|| b.source_count.cmp(&a.source_count))
+                .then_with(|| b.var_count.cmp(&a.var_count))
+        });
+        operators
+    }
+
+    fn rebuild_operator_index(&mut self) {
+        self.operators_by_signature.clear();
+        for (idx, op) in self.operators.iter().enumerate() {
+            self.operators_by_signature
+                .entry(op.signature.clone())
+                .or_default()
+                .push(idx);
+        }
+    }
+
+    /// Snapshot macro-pool quality metrics for reporting and benchmarks.
+    pub fn metrics(&self) -> MacroPoolMetrics {
+        let total_operators = self.operators.len();
+        let used_operators = self
+            .operators
+            .iter()
+            .filter(|op| op.usage_count > 0)
+            .count();
+        let mature_operators = self
+            .operators
+            .iter()
+            .filter(|op| (self.cycle - op.created_at) >= 10)
+            .count();
+        let mature_used_operators = self
+            .operators
+            .iter()
+            .filter(|op| (self.cycle - op.created_at) >= 10 && op.usage_count > 0)
+            .count();
+        let total_usage_count = self.operators.iter().map(|op| op.usage_count).sum::<u64>();
+        let total_source_count = self
+            .operators
+            .iter()
+            .map(|op| op.source_count)
+            .sum::<usize>();
+
+        let mut signature_map: HashMap<String, SignatureMacroMetrics> = HashMap::new();
+        let mut formal_operators = 0usize;
+        let mut recurrent_operators = 0usize;
+        let mut quarantined_operators = 0usize;
+
+        for op in &self.operators {
+            match op.promotion_tier {
+                MacroPromotionTier::Formal => formal_operators += 1,
+                MacroPromotionTier::RecurrentNumerical => recurrent_operators += 1,
+                MacroPromotionTier::Quarantined => quarantined_operators += 1,
+            }
+
+            let entry = signature_map
+                .entry(op.signature.clone())
+                .or_insert_with(|| SignatureMacroMetrics {
+                    signature: op.signature.clone(),
+                    operator_count: 0,
+                    used_operator_count: 0,
+                    total_usage_count: 0,
+                });
+            entry.operator_count += 1;
+            if op.usage_count > 0 {
+                entry.used_operator_count += 1;
+            }
+            entry.total_usage_count += op.usage_count;
+        }
+
+        let mut signature_stats: Vec<SignatureMacroMetrics> = signature_map.into_values().collect();
+        signature_stats.sort_by(|a, b| a.signature.cmp(&b.signature));
+
+        MacroPoolMetrics {
+            cycle: self.cycle,
+            total_operators,
+            total_candidates: self.candidates.len(),
+            formal_operators,
+            recurrent_operators,
+            quarantined_operators,
+            used_operators,
+            unused_operators: total_operators.saturating_sub(used_operators),
+            mature_operators,
+            mature_used_operators,
+            total_usage_count,
+            avg_usage_count: if total_operators > 0 {
+                total_usage_count as f64 / total_operators as f64
+            } else {
+                0.0
+            },
+            avg_source_count: if total_operators > 0 {
+                total_source_count as f64 / total_operators as f64
+            } else {
+                0.0
+            },
+            active_precision: if total_operators > 0 {
+                used_operators as f64 / total_operators as f64
+            } else {
+                0.0
+            },
+            mature_precision: if mature_operators > 0 {
+                mature_used_operators as f64 / mature_operators as f64
+            } else {
+                0.0
+            },
+            total_promoted: self.total_promoted,
+            total_pruned: self.total_pruned,
+            survival_rate: if self.total_promoted > 0 {
+                total_operators as f64 / self.total_promoted as f64
+            } else {
+                0.0
+            },
+            signature_stats,
+        }
     }
 }
 
@@ -333,29 +600,55 @@ fn is_verified(status: &ConjectureStatus) -> bool {
 /// Accepts:
 /// - `FormallyVerified` — Z3 or tactic proof succeeded
 /// - `SymbolicallyChecked` — symbolic identity check passed
-/// - `NumericallyTested { test_mse < 1e-2 }` — reasonable numerical fit
 ///
-/// The `NumericallyTested` threshold is intentionally lenient (1e-2 not 1e-6)
-/// because:
-/// 1. `verify_formal` is too strict for transcendentals (Hardy-Ramanujan,
-///    exponential decay, logistic, etc.) — they almost never reach formal
-///    verification status
-/// 2. Strict-MSE thresholds (1e-6) only catch polynomial fits, which are
-///    structurally redundant with what warmup already extracts
-/// 3. The fast-track requires single occurrence + this gate; the gate's job
-///    is to filter total noise, not to perfection-test every candidate
-///
-/// Empirically: at 1e-6 the fast-track caught 19 conjectures all of which
-/// had subtrees already in M₁ (pure polynomial); at 1e-2 it should also
-/// catch transcendental approximations whose novel structural shapes are
-/// the actual abstraction we want.
+/// Numerical fits may still promote through the recurrence path, but never
+/// through singleton fast-track promotion.
 fn is_strongly_verified(status: &ConjectureStatus) -> bool {
     match status {
         ConjectureStatus::FormallyVerified { .. } => true,
         ConjectureStatus::SymbolicallyChecked => true,
-        ConjectureStatus::NumericallyTested { test_mse } => *test_mse < 1e-2,
         _ => false,
     }
+}
+
+fn subtree_admits_fast_track(expr: &Expr) -> bool {
+    !(contains_unary_fn(expr)
+        && crate::hdc::abstract_thought::expr_variables(expr).len() <= 1
+        && (expr.complexity() <= 4
+            || matches!(expr, Expr::Func(_, arg) if is_trivial_wrapper_arg(arg))))
+}
+
+fn contains_unary_fn(expr: &Expr) -> bool {
+    match expr {
+        Expr::Func(_, _) => true,
+        Expr::Var(_) | Expr::Const(_) => false,
+        Expr::BinOp(_, l, r) => contains_unary_fn(l) || contains_unary_fn(r),
+        Expr::Sum(body, _) => contains_unary_fn(body),
+    }
+}
+
+fn is_trivial_wrapper_arg(expr: &Expr) -> bool {
+    match expr {
+        Expr::Var(_) => true,
+        Expr::BinOp(BinOp::Mul, l, r) => {
+            (matches!(l.as_ref(), Expr::Const(_)) && is_trivial_wrapper_arg(r))
+                || (matches!(r.as_ref(), Expr::Const(_)) && is_trivial_wrapper_arg(l))
+        }
+        Expr::BinOp(BinOp::Div, l, r) => {
+            matches!(r.as_ref(), Expr::Const(_)) && is_trivial_wrapper_arg(l)
+        }
+        Expr::BinOp(BinOp::Pow, l, r) => {
+            matches!(r.as_ref(), Expr::Const(_)) && is_trivial_wrapper_arg(l)
+        }
+        _ => false,
+    }
+}
+
+fn signature_is_compatible(signature: &str, allowed: &HashSet<&str>) -> bool {
+    if signature == "<const>" {
+        return true;
+    }
+    signature.split('|').all(|var| allowed.contains(var))
 }
 
 /// Count Const nodes in an expression (macro-operator arity).
@@ -371,7 +664,9 @@ fn count_constants(expr: &Expr) -> usize {
 
 /// Simple LCG random number generator (matches conjecture_engine's lcg_step).
 fn lcg_step(state: u64) -> u64 {
-    state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407)
+    state
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -381,8 +676,8 @@ fn lcg_step(state: u64) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hdc::conjecture_engine::{BinOp, Conjecture, MathDomain, UnaryFn};
     use crate::hdc::abstract_thought::normalize_expr;
+    use crate::hdc::conjecture_engine::{BinOp, Conjecture, MathDomain, UnaryFn};
 
     fn make_conjecture(
         formula: Expr,
@@ -402,6 +697,7 @@ mod tests {
             fitness: 0.001 + 0.001 * complexity as f64,
             status,
             confidence: 0.95,
+            macro_promotion_tier: MacroPromotionTier::Formal,
         }
     }
 
@@ -411,6 +707,18 @@ mod tests {
             Box::new(Expr::Func(
                 UnaryFn::Sqrt,
                 Box::new(Expr::Var("n".to_string())),
+            )),
+            Box::new(Expr::Const(c)),
+        )
+    }
+
+    fn n_squared_plus_c(c: f64) -> Expr {
+        Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("n".to_string())),
+                Box::new(Expr::Const(2.0)),
             )),
             Box::new(Expr::Const(c)),
         )
@@ -458,7 +766,10 @@ mod tests {
         grammar.observe_subtree(subtree, &[0, 1], &engine);
         grammar.promote_eligible(&engine);
 
-        assert!(grammar.operators.is_empty(), "Should not promote with only 2 occurrences");
+        assert!(
+            grammar.operators.is_empty(),
+            "Should not promote with only 2 occurrences"
+        );
     }
 
     #[test]
@@ -521,50 +832,54 @@ mod tests {
     #[test]
     fn test_fast_track_promotes_single_formally_verified() {
         // The new fast-track path: a single FormallyVerified occurrence
-        // is sufficient to promote, regardless of source/occurrence count.
+        // is sufficient to promote a nontrivial admissible shape, regardless
+        // of source/occurrence count.
         let mut grammar = DynamicGrammar::new();
         let mut engine = ConjectureEngine::new();
 
         let c = make_conjecture(
-            sqrt_n_plus_c(1.0),
+            n_squared_plus_c(1.0),
             MathDomain::NumberTheory,
             "unique_seq",
             ConjectureStatus::FormallyVerified { proof_steps: 5 },
         );
         engine.conjectures.push(c);
 
-        let subtree = normalize_expr(&sqrt_n_plus_c(1.0));
+        let subtree = normalize_expr(&n_squared_plus_c(1.0));
         grammar.observe_subtree(subtree, &[0], &engine);
         grammar.promote_eligible(&engine);
 
         assert_eq!(
-            grammar.operators.len(), 1,
+            grammar.operators.len(),
+            1,
             "Single formally-verified conjecture should fast-track promote"
         );
     }
 
     #[test]
-    fn test_fast_track_triggers_on_extremely_low_mse() {
-        // NumericallyTested with test_mse < 1e-6 now triggers fast-track
-        // (pragmatic concession — verify_formal is too strict for transcendentals)
+    fn test_fast_track_rejects_extremely_low_mse() {
+        // Numeric fits, even extremely low-MSE fits, are not proof. They can
+        // only contribute through an explicitly non-quarantined recurrent path,
+        // never singleton fast-track promotion.
         let mut grammar = DynamicGrammar::new();
         let mut engine = ConjectureEngine::new();
 
         let c = make_conjecture(
-            sqrt_n_plus_c(1.0),
+            n_squared_plus_c(1.0),
             MathDomain::NumberTheory,
             "unique_seq",
             ConjectureStatus::NumericallyTested { test_mse: 1e-9 },
         );
         engine.conjectures.push(c);
 
-        let subtree = normalize_expr(&sqrt_n_plus_c(1.0));
+        let subtree = normalize_expr(&n_squared_plus_c(1.0));
         grammar.observe_subtree(subtree, &[0], &engine);
         grammar.promote_eligible(&engine);
 
         assert_eq!(
-            grammar.operators.len(), 1,
-            "NumericallyTested with test_mse < 1e-6 should fast-track promote"
+            grammar.operators.len(),
+            0,
+            "NumericallyTested singleton fits must not fast-track promote"
         );
     }
 
@@ -665,14 +980,23 @@ mod tests {
             template: Expr::Var("n".to_string()),
             canonical: "n".to_string(),
             arity: 0,
+            promotion_tier: MacroPromotionTier::Formal,
             source_conjectures: vec![0],
+            parent_formulas: vec!["n".to_string()],
+            vars_used: vec!["n".to_string()],
+            var_count: 1,
+            signature: "n".to_string(),
+            source_count: 1,
             usage_count: 0,
             created_at: 0,
         });
         grammar.cycle = 20; // Old enough to prune
 
         grammar.prune_unused();
-        assert!(grammar.operators.is_empty(), "Should prune unused old operator");
+        assert!(
+            grammar.operators.is_empty(),
+            "Should prune unused old operator"
+        );
     }
 
     #[test]
@@ -683,7 +1007,13 @@ mod tests {
             template: Expr::Var("n".to_string()),
             canonical: "n".to_string(),
             arity: 0,
+            promotion_tier: MacroPromotionTier::Formal,
             source_conjectures: vec![0],
+            parent_formulas: vec!["n".to_string()],
+            vars_used: vec!["n".to_string()],
+            var_count: 1,
+            signature: "n".to_string(),
+            source_count: 1,
             usage_count: 5,
             created_at: 0,
         });
@@ -701,7 +1031,13 @@ mod tests {
             template: Expr::Var("n".to_string()),
             canonical: "n".to_string(),
             arity: 0,
+            promotion_tier: MacroPromotionTier::Formal,
             source_conjectures: vec![0],
+            parent_formulas: vec!["n".to_string()],
+            vars_used: vec!["n".to_string()],
+            var_count: 1,
+            signature: "n".to_string(),
+            source_count: 1,
             usage_count: 0,
             created_at: 5,
         });
@@ -740,7 +1076,13 @@ mod tests {
             template: Expr::Var("n".to_string()),
             canonical: "n".to_string(),
             arity: 0,
+            promotion_tier: MacroPromotionTier::Formal,
             source_conjectures: vec![0],
+            parent_formulas: vec!["n".to_string()],
+            vars_used: vec!["n".to_string()],
+            var_count: 1,
+            signature: "n".to_string(),
+            source_count: 1,
             usage_count: 0,
             created_at: 0,
         });
@@ -770,6 +1112,70 @@ mod tests {
         grammar.observe_subtree(subtree, &[0], &engine); // Duplicate
 
         assert_eq!(grammar.candidates.len(), 1, "Should merge, not duplicate");
-        assert_eq!(grammar.candidates[0].occurrences.len(), 1, "Should not double-count");
+        assert_eq!(
+            grammar.candidates[0].occurrences.len(),
+            1,
+            "Should not double-count"
+        );
+    }
+
+    #[test]
+    fn test_metrics_capture_usage_and_signature_stats() {
+        let mut grammar = DynamicGrammar::new();
+        grammar.cycle = 20;
+        grammar.total_promoted = 3;
+        grammar.total_pruned = 1;
+
+        grammar.operators.push(MacroOperator {
+            name: "FORMAL_1D".to_string(),
+            template: Expr::Var("n".to_string()),
+            canonical: "n".to_string(),
+            arity: 0,
+            promotion_tier: MacroPromotionTier::Formal,
+            source_conjectures: vec![0],
+            parent_formulas: vec!["n".to_string()],
+            vars_used: vec!["n".to_string()],
+            var_count: 1,
+            signature: "n".to_string(),
+            source_count: 2,
+            usage_count: 3,
+            created_at: 0,
+        });
+        grammar.operators.push(MacroOperator {
+            name: "RECURRENT_4D".to_string(),
+            template: Expr::BinOp(
+                BinOp::Mul,
+                Box::new(Expr::Var("x".to_string())),
+                Box::new(Expr::Var("vy".to_string())),
+            ),
+            canonical: "(x * vy)".to_string(),
+            arity: 0,
+            promotion_tier: MacroPromotionTier::RecurrentNumerical,
+            source_conjectures: vec![1, 2],
+            parent_formulas: vec!["(x * vy)".to_string()],
+            vars_used: vec!["vy".to_string(), "x".to_string()],
+            var_count: 2,
+            signature: "vy|x".to_string(),
+            source_count: 3,
+            usage_count: 0,
+            created_at: 0,
+        });
+        grammar.rebuild_operator_index();
+
+        let metrics = grammar.metrics();
+        assert_eq!(metrics.total_operators, 2);
+        assert_eq!(metrics.formal_operators, 1);
+        assert_eq!(metrics.recurrent_operators, 1);
+        assert_eq!(metrics.used_operators, 1);
+        assert_eq!(metrics.mature_operators, 2);
+        assert_eq!(metrics.mature_used_operators, 1);
+        assert_eq!(metrics.total_promoted, 3);
+        assert_eq!(metrics.total_pruned, 1);
+        assert!((metrics.active_precision - 0.5).abs() < 1e-9);
+        assert!((metrics.mature_precision - 0.5).abs() < 1e-9);
+        assert!((metrics.survival_rate - (2.0 / 3.0)).abs() < 1e-9);
+        assert_eq!(metrics.signature_stats.len(), 2);
+        assert_eq!(metrics.signature_stats[0].signature, "n");
+        assert_eq!(metrics.signature_stats[0].used_operator_count, 1);
     }
 }

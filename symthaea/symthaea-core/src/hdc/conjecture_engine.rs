@@ -29,6 +29,7 @@
 //! - Udrescu & Tegmark (2020) — AI Feynman: symbolic regression with neural networks
 
 use std::fmt;
+use std::time::Instant;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // EXPRESSION TREES
@@ -65,7 +66,7 @@ pub enum BinOp {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnaryFn {
     Sqrt,
-    Log,  // natural log
+    Log, // natural log
     Exp,
     Sin,
     Cos,
@@ -77,12 +78,11 @@ impl Expr {
     /// Evaluate the expression with variable bindings.
     pub fn eval(&self, vars: &[(&str, f64)]) -> f64 {
         match self {
-            Expr::Var(name) => {
-                vars.iter()
-                    .find(|(n, _)| *n == name.as_str())
-                    .map(|(_, v)| *v)
-                    .unwrap_or(f64::NAN)
-            }
+            Expr::Var(name) => vars
+                .iter()
+                .find(|(n, _)| *n == name.as_str())
+                .map(|(_, v)| *v)
+                .unwrap_or(f64::NAN),
             Expr::Const(c) => *c,
             Expr::BinOp(op, left, right) => {
                 let l = left.eval(vars);
@@ -91,15 +91,33 @@ impl Expr {
                     BinOp::Add => l + r,
                     BinOp::Sub => l - r,
                     BinOp::Mul => l * r,
-                    BinOp::Div => if r.abs() > 1e-15 { l / r } else { f64::NAN },
+                    BinOp::Div => {
+                        if r.abs() > 1e-15 {
+                            l / r
+                        } else {
+                            f64::NAN
+                        }
+                    }
                     BinOp::Pow => l.powf(r),
                 }
             }
             Expr::Func(f, arg) => {
                 let x = arg.eval(vars);
                 match f {
-                    UnaryFn::Sqrt => if x >= 0.0 { x.sqrt() } else { f64::NAN },
-                    UnaryFn::Log => if x > 0.0 { x.ln() } else { f64::NAN },
+                    UnaryFn::Sqrt => {
+                        if x >= 0.0 {
+                            x.sqrt()
+                        } else {
+                            f64::NAN
+                        }
+                    }
+                    UnaryFn::Log => {
+                        if x > 0.0 {
+                            x.ln()
+                        } else {
+                            f64::NAN
+                        }
+                    }
                     UnaryFn::Exp => x.exp(),
                     UnaryFn::Sin => x.sin(),
                     UnaryFn::Cos => x.cos(),
@@ -109,7 +127,8 @@ impl Expr {
             }
             Expr::Sum(body, var_name) => {
                 // Σ_{k=1}^{n} body(k) — n comes from the "n" variable in vars
-                let n = vars.iter()
+                let n = vars
+                    .iter()
                     .find(|(name, _)| *name == "n")
                     .map(|(_, v)| *v as usize)
                     .unwrap_or(0);
@@ -120,7 +139,9 @@ impl Expr {
                     let mut inner_vars: Vec<(&str, f64)> = vars.to_vec();
                     inner_vars.push((var_name.as_str(), k as f64));
                     sum += body.eval(&inner_vars);
-                    if !sum.is_finite() { return f64::NAN; }
+                    if !sum.is_finite() {
+                        return f64::NAN;
+                    }
                 }
                 sum
             }
@@ -155,12 +176,8 @@ impl Expr {
                     Expr::BinOp(*op, l.clone(), Box::new(r.mutate(rng, depth + 1)))
                 }
             }
-            Expr::Func(f, arg) => {
-                Expr::Func(*f, Box::new(arg.mutate(rng, depth + 1)))
-            }
-            Expr::Sum(body, var) => {
-                Expr::Sum(Box::new(body.mutate(rng, depth + 1)), var.clone())
-            }
+            Expr::Func(f, arg) => Expr::Func(*f, Box::new(arg.mutate(rng, depth + 1))),
+            Expr::Sum(body, var) => Expr::Sum(Box::new(body.mutate(rng, depth + 1)), var.clone()),
         }
     }
 }
@@ -252,12 +269,24 @@ pub fn expr_to_latex(expr: &Expr) -> String {
         let e_const = std::f64::consts::E;
         let phi = (1.0 + 5.0_f64.sqrt()) / 2.0;
 
-        if (c - pi).abs() < 1e-10 { return "\\pi".to_string(); }
-        if (c + pi).abs() < 1e-10 { return "-\\pi".to_string(); }
-        if (c - e_const).abs() < 1e-10 { return "e".to_string(); }
-        if (c - phi).abs() < 1e-10 { return "\\varphi".to_string(); }
-        if (c - 1.0 / e_const).abs() < 1e-10 { return "e^{-1}".to_string(); }
-        if (c - std::f64::consts::SQRT_2).abs() < 1e-10 { return "\\sqrt{2}".to_string(); }
+        if (c - pi).abs() < 1e-10 {
+            return "\\pi".to_string();
+        }
+        if (c + pi).abs() < 1e-10 {
+            return "-\\pi".to_string();
+        }
+        if (c - e_const).abs() < 1e-10 {
+            return "e".to_string();
+        }
+        if (c - phi).abs() < 1e-10 {
+            return "\\varphi".to_string();
+        }
+        if (c - 1.0 / e_const).abs() < 1e-10 {
+            return "e^{-1}".to_string();
+        }
+        if (c - std::f64::consts::SQRT_2).abs() < 1e-10 {
+            return "\\sqrt{2}".to_string();
+        }
         if (c - 1.0 / std::f64::consts::PI.sqrt()).abs() < 1e-10 {
             return "\\frac{1}{\\sqrt{\\pi}}".to_string();
         }
@@ -300,7 +329,13 @@ pub fn expr_to_latex(expr: &Expr) -> String {
                     "mu" | "μ" => "\\mu".to_string(),
                     "sigma" | "σ" => "\\sigma".to_string(),
                     "tau" | "τ" => "\\tau".to_string(),
-                    s if s.len() > 1 && !s.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) => {
+                    s if s.len() > 1
+                        && !s
+                            .chars()
+                            .next()
+                            .map(|c| c.is_ascii_digit())
+                            .unwrap_or(false) =>
+                    {
                         // Multi-char variable like "vx", "py", "pr" — wrap in mathrm
                         format!("{}", s)
                     }
@@ -399,14 +434,21 @@ pub fn random_expr(rng: &mut u64, max_depth: usize) -> Expr {
             // Mathematical constants + small integers.
             // π, e, φ enable transcendental formula discovery (Hardy-Ramanujan, etc.)
             let constants = [
-                0.0, 1.0, 2.0, 3.0, 4.0, 0.5,
-                -1.0, -2.0, -0.5,                       // negative constants
-                std::f64::consts::PI,                   // π ≈ 3.14159
-                std::f64::consts::E,                    // e ≈ 2.71828
-                (1.0 + 5.0_f64.sqrt()) / 2.0,          // φ ≈ 1.61803
-                std::f64::consts::FRAC_1_SQRT_2,        // 1/√2 ≈ 0.70711
-                2.0 / 3.0,                              // 2/3
-                1.0 / std::f64::consts::E,              // 1/e ≈ 0.36788
+                0.0,
+                1.0,
+                2.0,
+                3.0,
+                4.0,
+                0.5,
+                -1.0,
+                -2.0,
+                -0.5,                            // negative constants
+                std::f64::consts::PI,            // π ≈ 3.14159
+                std::f64::consts::E,             // e ≈ 2.71828
+                (1.0 + 5.0_f64.sqrt()) / 2.0,    // φ ≈ 1.61803
+                std::f64::consts::FRAC_1_SQRT_2, // 1/√2 ≈ 0.70711
+                2.0 / 3.0,                       // 2/3
+                1.0 / std::f64::consts::E,       // 1/e ≈ 0.36788
             ];
             *rng = lcg_step(*rng);
             Expr::Const(constants[*rng as usize % constants.len()])
@@ -417,7 +459,10 @@ pub fn random_expr(rng: &mut u64, max_depth: usize) -> Expr {
             // Unary function
             let fns = [UnaryFn::Sqrt, UnaryFn::Log, UnaryFn::Exp, UnaryFn::Sin];
             *rng = lcg_step(*rng);
-            Expr::Func(fns[*rng as usize % fns.len()], Box::new(random_expr(rng, max_depth - 1)))
+            Expr::Func(
+                fns[*rng as usize % fns.len()],
+                Box::new(random_expr(rng, max_depth - 1)),
+            )
         } else {
             // Binary operation
             let ops = [BinOp::Add, BinOp::Sub, BinOp::Mul, BinOp::Div, BinOp::Pow];
@@ -466,7 +511,11 @@ pub struct ObservedSequence {
 
 impl ObservedSequence {
     pub fn new(name: &str, domain: MathDomain, data: Vec<(f64, f64)>) -> Self {
-        Self { name: name.to_string(), domain, data }
+        Self {
+            name: name.to_string(),
+            domain,
+            data,
+        }
     }
 
     /// Split into training (first 80%) and test (last 20%) sets.
@@ -495,6 +544,27 @@ pub enum ConjectureStatus {
     Refuted { counterexample: f64 },
 }
 
+/// Promotion policy controlling how a conjecture may contribute to the macro pool.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum MacroPromotionTier {
+    /// Never promote subtrees from this conjecture.
+    Quarantined,
+    /// May contribute only through recurrence across independent sources.
+    RecurrentNumerical,
+    /// May contribute through recurrence and fast-track singleton promotion.
+    Formal,
+}
+
+impl MacroPromotionTier {
+    pub fn allows_recurrent_promotion(self) -> bool {
+        !matches!(self, Self::Quarantined)
+    }
+
+    pub fn allows_fast_track(self) -> bool {
+        matches!(self, Self::Formal)
+    }
+}
+
 /// A mathematical conjecture discovered by symbolic regression.
 #[derive(Debug, Clone)]
 pub struct Conjecture {
@@ -516,6 +586,14 @@ pub struct Conjecture {
     pub status: ConjectureStatus,
     /// Bayesian confidence (updated through verification)
     pub confidence: f64,
+    /// How this conjecture may contribute to macro promotion.
+    pub macro_promotion_tier: MacroPromotionTier,
+}
+
+fn elevate_macro_promotion_tier(conjecture: &mut Conjecture, tier: MacroPromotionTier) {
+    if tier > conjecture.macro_promotion_tier {
+        conjecture.macro_promotion_tier = tier;
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -562,6 +640,14 @@ impl Default for RegressorConfig {
     }
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct SeedSpecializationStats {
+    pub variants_scored: usize,
+    pub variants_seeded: usize,
+    pub elapsed_ms: u128,
+    pub exact_fit_found: bool,
+}
+
 /// Grammar-guided symbolic regression via genetic programming.
 pub struct SymbolicRegressor {
     config: RegressorConfig,
@@ -578,6 +664,7 @@ pub struct SymbolicRegressor {
     /// contained a subtree matching that macro. Used for causal analysis
     /// in the macro acceleration benchmark.
     macro_usage: std::collections::HashMap<String, u64>,
+    seed_specialization_stats: SeedSpecializationStats,
 }
 
 impl SymbolicRegressor {
@@ -593,6 +680,7 @@ impl SymbolicRegressor {
             seed_macros: Vec::new(),
             fitness_history: Vec::new(),
             macro_usage: std::collections::HashMap::new(),
+            seed_specialization_stats: SeedSpecializationStats::default(),
         }
     }
 
@@ -613,6 +701,10 @@ impl SymbolicRegressor {
         &self.macro_usage
     }
 
+    pub fn seed_specialization_stats(&self) -> &SeedSpecializationStats {
+        &self.seed_specialization_stats
+    }
+
     /// Inject macro-operator templates into the initial population.
     ///
     /// Called by `ConjectureEngine::generate_conjectures` when abstract thought
@@ -628,9 +720,10 @@ impl SymbolicRegressor {
         // Clear history and usage at the start of each fit — each call is independent
         self.fitness_history.clear();
         self.macro_usage.clear();
+        self.seed_specialization_stats = SeedSpecializationStats::default();
         // Pre-seed macro_usage keys so 0 counts are visible (not absent)
         for macro_expr in &self.seed_macros {
-            let canonical = format!("{}", macro_expr);
+            let canonical = macro_usage_key(macro_expr);
             self.macro_usage.entry(canonical).or_insert(0);
         }
         let (train, _test) = seq.train_test_split();
@@ -642,14 +735,14 @@ impl SymbolicRegressor {
         let all_positive = train.iter().all(|(_, y)| *y > 0.0);
         let growth = if train.len() >= 2 && train[0].1.abs() > 1e-10 {
             (train.last().unwrap().1 / train[0].1).abs()
-        } else { 1.0 };
+        } else {
+            1.0
+        };
 
         if all_positive && growth > 50.0 {
-            let log_train: Vec<(f64, f64)> = train.iter()
-                .map(|(x, y)| (*x, y.ln()))
-                .collect();
-            let log_seq = ObservedSequence::new(
-                &format!("log({})", seq.name), seq.domain, log_train.clone());
+            let log_train: Vec<(f64, f64)> = train.iter().map(|(x, y)| (*x, y.ln())).collect();
+            let log_seq =
+                ObservedSequence::new(&format!("log({})", seq.name), seq.domain, log_train.clone());
 
             // Run a quick GP fit in log-space
             let mut log_regressor = SymbolicRegressor::new(RegressorConfig {
@@ -705,27 +798,63 @@ impl SymbolicRegressor {
         // which explains why the distance-kernel-variant curriculum-transfer
         // test showed `cold_mse < M₁_mse` for a shape the macro should help.
         if !self.seed_macros.is_empty() && !self.config.disable_macro_seeds {
-            let macro_seed_count = (self.config.population_size / 8).min(self.seed_macros.len() * 2);
+            let specialization_start = Instant::now();
+            let budget = SpecializationBudget::for_population(
+                self.config.population_size,
+                self.seed_macros.len(),
+            );
+            let mut specialized_variants = Vec::new();
+            let mut exact_fit_found = false;
+            for template in &self.seed_macros {
+                for variant in seed_macro_variants(template)
+                    .into_iter()
+                    .take(budget.max_variants_per_macro)
+                {
+                    if specialized_variants.len() >= budget.max_total_variants {
+                        break;
+                    }
+                    let optimized =
+                        specialize_seed_constants(&variant, &train, budget.optimization_iters);
+                    let mse = compute_mse(&optimized, &train);
+                    let complexity = optimized.complexity();
+                    if mse.is_finite() && complexity <= self.config.max_complexity {
+                        exact_fit_found |= mse < 1e-10;
+                        specialized_variants
+                            .push((mse + self.config.lambda * complexity as f64, optimized));
+                    }
+                }
+                if exact_fit_found && specialized_variants.len() >= self.seed_macros.len() {
+                    break;
+                }
+            }
+            specialized_variants
+                .sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+
+            let macro_seed_count =
+                (self.config.population_size / 6).min(specialized_variants.len().max(1));
+            self.seed_specialization_stats = SeedSpecializationStats {
+                variants_scored: specialized_variants.len(),
+                variants_seeded: macro_seed_count,
+                elapsed_ms: specialization_start.elapsed().as_millis(),
+                exact_fit_found,
+            };
             let macro_start = seed_count;
             for i in 0..macro_seed_count {
                 let slot = macro_start + i;
                 if slot >= self.population.len() {
                     break;
                 }
-                self.rng = lcg_step(self.rng);
-                let macro_idx = self.rng as usize % self.seed_macros.len();
-                let template = &self.seed_macros[macro_idx];
-                // First |macros| slots: seed VERBATIM. The macro is an
-                // abstracted shape (possibly with canonicalized n^1
-                // placeholders), and the GP's per-generation mutation loop
-                // will re-specialize the exponents and constants via
-                // random subtree replacement. Subsequent slots get a mild
-                // mutation (depth 2 = 33% replace rate) to diversify.
-                self.population[slot] = if i < self.seed_macros.len() {
-                    template.clone()
+                // Seed the best pre-specialized variants first. These variants
+                // are ephemeral: they improve generation-0 transfer without
+                // polluting the permanent macro grammar.
+                let seeded = if let Some((_, expr)) = specialized_variants.get(i) {
+                    expr.clone()
                 } else {
-                    template.mutate(&mut self.rng, 2)
+                    self.rng = lcg_step(self.rng);
+                    let macro_idx = self.rng as usize % self.seed_macros.len();
+                    self.seed_macros[macro_idx].mutate(&mut self.rng, 2)
                 };
+                self.population[slot] = seeded;
             }
         }
 
@@ -744,15 +873,19 @@ impl SymbolicRegressor {
             // Evaluate fitness for entire population. We now track MSE AND
             // scalar fitness separately so the ranking can apply hierarchical
             // comparison: near-perfect fits always beat imperfect ones.
-            let mut scored: Vec<(usize, f64, f64)> = self.population.iter().enumerate()
+            let mut scored: Vec<(usize, f64, f64)> = self
+                .population
+                .iter()
+                .enumerate()
                 .map(|(i, expr)| {
                     let mse = compute_mse(expr, &train);
                     let complexity = expr.complexity();
-                    let (fitness, mse_kept) = if mse.is_finite() && complexity <= self.config.max_complexity {
-                        (mse + self.config.lambda * complexity as f64, mse)
-                    } else {
-                        (f64::MAX, f64::MAX)
-                    };
+                    let (fitness, mse_kept) =
+                        if mse.is_finite() && complexity <= self.config.max_complexity {
+                            (mse + self.config.lambda * complexity as f64, mse)
+                        } else {
+                            (f64::MAX, f64::MAX)
+                        };
                     (i, fitness, mse_kept)
                 })
                 .collect();
@@ -795,7 +928,8 @@ impl SymbolicRegressor {
 
             // Elitism: keep top 10% of UNIQUE formulas
             let elite_count = (self.config.population_size / 10).min(unique_indices.len());
-            let elite: Vec<Expr> = unique_indices.iter()
+            let elite: Vec<Expr> = unique_indices
+                .iter()
                 .take(elite_count)
                 .map(|&i| self.population[i].clone())
                 .collect();
@@ -835,13 +969,18 @@ impl SymbolicRegressor {
         // After GP finds good tree structures, optimize the constants in
         // the top candidates by coordinate descent. This is the single
         // biggest quality improvement to any GP regressor (Eureqa does this).
-        let mut scored_pre: Vec<(f64, usize)> = self.population.iter().enumerate()
+        let mut scored_pre: Vec<(f64, usize)> = self
+            .population
+            .iter()
+            .enumerate()
             .map(|(i, expr)| {
                 let mse = compute_mse(expr, &train);
                 let c = expr.complexity();
                 let fit = if mse.is_finite() && c <= self.config.max_complexity {
                     mse + self.config.lambda * c as f64
-                } else { f64::MAX };
+                } else {
+                    f64::MAX
+                };
                 (fit, i)
             })
             .collect();
@@ -857,7 +996,10 @@ impl SymbolicRegressor {
         // Final scoring and return top-k. Uses the same hierarchical rule as
         // the GP loop: near-perfect fits dominate imperfect ones, Occam
         // fitness is the tiebreaker within each tier.
-        let mut results: Vec<(f64, f64, usize)> = self.population.iter().enumerate()
+        let mut results: Vec<(f64, f64, usize)> = self
+            .population
+            .iter()
+            .enumerate()
             .map(|(i, expr)| {
                 let mse = compute_mse(expr, &train);
                 let c = expr.complexity();
@@ -883,10 +1025,16 @@ impl SymbolicRegressor {
         // Deduplicate results by fingerprint (keep first = best fitness)
         let sample_pts: Vec<f64> = train.iter().take(5).map(|(x, _)| *x).collect();
         let mut seen_fps = Vec::new();
-        let results: Vec<_> = results.into_iter()
+        let results: Vec<_> = results
+            .into_iter()
             .filter(|(_, _, i)| {
                 let fp = fingerprint_expr(&self.population[*i], &sample_pts);
-                if seen_fps.contains(&fp) { false } else { seen_fps.push(fp); true }
+                if seen_fps.contains(&fp) {
+                    false
+                } else {
+                    seen_fps.push(fp);
+                    true
+                }
             })
             .collect();
 
@@ -895,22 +1043,21 @@ impl SymbolicRegressor {
         // of the seed macros appear as a structural subtree. Counts are
         // exposed via `macro_usage()` for cold-vs-primed causal analysis.
         if !self.seed_macros.is_empty() {
-            let top_indices: Vec<usize> = results.iter()
-                .take(top_k)
-                .map(|(_, _, i)| *i)
-                .collect();
+            let top_indices: Vec<usize> = results.iter().take(top_k).map(|(_, _, i)| *i).collect();
             for &idx in &top_indices {
                 let expr = &self.population[idx];
                 for macro_expr in &self.seed_macros {
                     if contains_structural_match(expr, macro_expr) {
                         let key = format!("{}", macro_expr);
+                        let key = macro_usage_key(macro_expr);
                         *self.macro_usage.entry(key).or_insert(0) += 1;
                     }
                 }
             }
         }
 
-        results.iter()
+        results
+            .iter()
             .take(top_k)
             .filter(|(fit, _, _)| fit.is_finite() && *fit < 1e10)
             .map(|(fitness, mse, i)| {
@@ -924,7 +1071,14 @@ impl SymbolicRegressor {
                     complexity: expr.complexity(),
                     fitness: *fitness,
                     status: ConjectureStatus::Proposed,
-                    confidence: if *mse < 1e-6 { 0.8 } else if *mse < 1.0 { 0.5 } else { 0.1 },
+                    confidence: if *mse < 1e-6 {
+                        0.8
+                    } else if *mse < 1.0 {
+                        0.5
+                    } else {
+                        0.1
+                    },
+                    macro_promotion_tier: MacroPromotionTier::RecurrentNumerical,
                 }
             })
             .collect()
@@ -946,9 +1100,9 @@ impl SymbolicRegressor {
             let (cand_idx, cand_fit, cand_mse) = scored[candidate];
             let cand_is_perfect = cand_mse < NEAR_PERFECT_MSE;
             let wins = match (best_is_perfect, cand_is_perfect) {
-                (false, true) => true,                          // candidate dominates
-                (true, false) => false,                         // incumbent dominates
-                _ => cand_fit < best_fit,                       // same tier: Occam fitness
+                (false, true) => true,    // candidate dominates
+                (true, false) => false,   // incumbent dominates
+                _ => cand_fit < best_fit, // same tier: Occam fitness
             };
             if wins {
                 best_fit = cand_fit;
@@ -972,9 +1126,37 @@ fn contains_structural_match(haystack: &Expr, needle: &Expr) -> bool {
     }
     match haystack {
         Expr::Var(_) | Expr::Const(_) => false,
-        Expr::BinOp(_, l, r) => contains_structural_match(l, needle) || contains_structural_match(r, needle),
+        Expr::BinOp(_, l, r) => {
+            contains_structural_match(l, needle) || contains_structural_match(r, needle)
+        }
         Expr::Func(_, arg) => contains_structural_match(arg, needle),
         Expr::Sum(body, _) => contains_structural_match(body, needle),
+    }
+}
+
+fn expr_uses_only_vars(expr: &Expr, allowed_vars: &[&str]) -> bool {
+    match expr {
+        Expr::Var(name) => allowed_vars.iter().any(|allowed| *allowed == name),
+        Expr::Const(_) => true,
+        Expr::BinOp(_, l, r) => {
+            expr_uses_only_vars(l, allowed_vars) && expr_uses_only_vars(r, allowed_vars)
+        }
+        Expr::Func(_, arg) => expr_uses_only_vars(arg, allowed_vars),
+        Expr::Sum(body, var) => {
+            allowed_vars.iter().any(|allowed| *allowed == var)
+                && expr_uses_only_vars(body, allowed_vars)
+        }
+    }
+}
+
+fn macro_usage_key(expr: &Expr) -> String {
+    #[cfg(feature = "abstract_thought")]
+    {
+        crate::hdc::abstract_thought::expr_canonical_string(expr)
+    }
+    #[cfg(not(feature = "abstract_thought"))]
+    {
+        format!("{}", expr)
     }
 }
 
@@ -994,12 +1176,236 @@ fn shape_equal(a: &Expr, b: &Expr) -> bool {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MacroRole {
+    PolynomialPower,
+    Reciprocal,
+    DistanceKernelCore,
+    AffineShift,
+    UnaryWrapped,
+    MultivariateInvariant,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct SpecializationBudget {
+    max_variants_per_macro: usize,
+    max_total_variants: usize,
+    optimization_iters: usize,
+}
+
+impl SpecializationBudget {
+    fn for_population(population_size: usize, macro_count: usize) -> Self {
+        Self {
+            max_variants_per_macro: 8,
+            max_total_variants: (population_size / 3)
+                .max(macro_count.saturating_mul(2))
+                .max(8),
+            optimization_iters: 100,
+        }
+    }
+}
+
+/// Build ephemeral seed variants from a promoted macro.
+///
+/// Permanent macro promotion stays strict. At injection time, however, we can
+/// safely derive local variants that are scored against the target before gen 0.
+/// This is especially important for distance kernels: a reusable `n²` or
+/// `n²+c` macro should be allowed to seed `sqrt(n²+c)` and `1/sqrt(n²+c)`
+/// candidates without permanently adding those wrappers to the grammar.
+fn seed_macro_variants(template: &Expr) -> Vec<Expr> {
+    let mut variants = Vec::new();
+    push_unique_variant(&mut variants, template.clone());
+
+    match classify_macro_role(template) {
+        MacroRole::PolynomialPower | MacroRole::DistanceKernelCore => {
+            push_distance_kernel_variants(&mut variants, template);
+        }
+        MacroRole::Reciprocal => {
+            push_unique_variant(
+                &mut variants,
+                Expr::BinOp(
+                    BinOp::Add,
+                    Box::new(template.clone()),
+                    Box::new(Expr::Const(1.0)),
+                ),
+            );
+            push_unique_variant(
+                &mut variants,
+                Expr::Func(
+                    UnaryFn::Sqrt,
+                    Box::new(Expr::BinOp(
+                        BinOp::Add,
+                        Box::new(template.clone()),
+                        Box::new(Expr::Const(1.0)),
+                    )),
+                ),
+            );
+        }
+        MacroRole::AffineShift | MacroRole::UnaryWrapped | MacroRole::Unknown => {}
+        MacroRole::MultivariateInvariant => {}
+    }
+
+    variants
+}
+
+fn classify_macro_role(expr: &Expr) -> MacroRole {
+    if expr_var_count(expr) > 1 {
+        return MacroRole::MultivariateInvariant;
+    }
+
+    match expr {
+        Expr::BinOp(BinOp::Pow, base, exp)
+            if matches!(base.as_ref(), Expr::Var(_)) && matches!(exp.as_ref(), Expr::Const(_)) =>
+        {
+            MacroRole::PolynomialPower
+        }
+        Expr::BinOp(BinOp::Div, l, r)
+            if matches!(l.as_ref(), Expr::Const(_)) && expr_uses_only_vars(r, &["n"]) =>
+        {
+            MacroRole::Reciprocal
+        }
+        Expr::BinOp(BinOp::Add | BinOp::Sub, l, r)
+            if is_polynomial_power(l) || is_polynomial_power(r) =>
+        {
+            MacroRole::DistanceKernelCore
+        }
+        Expr::BinOp(BinOp::Add | BinOp::Sub, _, _) => MacroRole::AffineShift,
+        Expr::Func(_, _) => MacroRole::UnaryWrapped,
+        _ => MacroRole::Unknown,
+    }
+}
+
+fn expr_var_count(expr: &Expr) -> usize {
+    let mut vars = Vec::<String>::new();
+    collect_expr_var_names(expr, &mut vars);
+    vars.sort();
+    vars.dedup();
+    vars.len()
+}
+
+fn collect_expr_var_names(expr: &Expr, vars: &mut Vec<String>) {
+    match expr {
+        Expr::Var(name) => vars.push(name.clone()),
+        Expr::Const(_) => {}
+        Expr::BinOp(_, l, r) => {
+            collect_expr_var_names(l, vars);
+            collect_expr_var_names(r, vars);
+        }
+        Expr::Func(_, arg) => collect_expr_var_names(arg, vars),
+        Expr::Sum(body, var) => {
+            vars.push(var.clone());
+            collect_expr_var_names(body, vars);
+        }
+    }
+}
+
+fn is_polynomial_power(expr: &Expr) -> bool {
+    matches!(
+        expr,
+        Expr::BinOp(BinOp::Pow, base, exp)
+            if matches!(base.as_ref(), Expr::Var(_)) && matches!(exp.as_ref(), Expr::Const(_))
+    )
+}
+
+fn push_distance_kernel_variants(variants: &mut Vec<Expr>, template: &Expr) {
+    if expr_uses_only_vars(template, &["n"]) {
+        push_unique_variant(
+            variants,
+            Expr::Func(UnaryFn::Sqrt, Box::new(template.clone())),
+        );
+        push_unique_variant(
+            variants,
+            Expr::BinOp(
+                BinOp::Div,
+                Box::new(Expr::Const(1.0)),
+                Box::new(template.clone()),
+            ),
+        );
+        push_unique_variant(
+            variants,
+            Expr::BinOp(
+                BinOp::Div,
+                Box::new(Expr::Const(1.0)),
+                Box::new(Expr::Func(UnaryFn::Sqrt, Box::new(template.clone()))),
+            ),
+        );
+
+        let shifted = Expr::BinOp(
+            BinOp::Add,
+            Box::new(template.clone()),
+            Box::new(Expr::Const(1.0)),
+        );
+        push_unique_variant(variants, shifted.clone());
+        push_unique_variant(
+            variants,
+            Expr::Func(UnaryFn::Sqrt, Box::new(shifted.clone())),
+        );
+        push_unique_variant(
+            variants,
+            Expr::BinOp(
+                BinOp::Div,
+                Box::new(Expr::Const(1.0)),
+                Box::new(Expr::Func(UnaryFn::Sqrt, Box::new(shifted))),
+            ),
+        );
+    }
+}
+
+fn push_unique_variant(variants: &mut Vec<Expr>, candidate: Expr) {
+    let key = macro_usage_key(&candidate);
+    if !variants.iter().any(|expr| macro_usage_key(expr) == key) {
+        variants.push(candidate);
+    }
+}
+
+/// Coarse coordinate search followed by Nelder-Mead for injected macros.
+///
+/// `optimize_constants` is intentionally local. For macro injection we want a
+/// wider but still cheap pre-gen0 search so placeholders like the `+c` in
+/// `1/sqrt(n²+c)` can jump from the canonical `1` to target-specific values
+/// such as `4` before GP selection starts.
+fn specialize_seed_constants(expr: &Expr, data: &[(f64, f64)], max_iter: usize) -> Expr {
+    let constants = collect_constants(expr);
+    if constants.is_empty() {
+        return expr.clone();
+    }
+
+    let mut best = expr.clone();
+    let mut best_mse = compute_mse(&best, data);
+    let grid = [
+        -10.0, -4.0, -3.0, -2.0, -1.0, -0.5, 0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 8.0, 10.0,
+    ];
+
+    for _ in 0..2 {
+        for i in 0..constants.len() {
+            let current = collect_constants(&best).get(i).copied().unwrap_or(1.0);
+            let mut candidates = grid.to_vec();
+            candidates.extend([
+                current,
+                current * 0.5,
+                current * 2.0,
+                current + 1.0,
+                current - 1.0,
+            ]);
+            for candidate in candidates {
+                let trial = replace_nth_constant(&best, i, candidate);
+                let mse = compute_mse(&trial, data);
+                if mse.is_finite() && mse < best_mse {
+                    best = trial;
+                    best_mse = mse;
+                }
+            }
+        }
+    }
+
+    optimize_constants(&best, data, max_iter)
+}
+
 /// Crossover: take left subtree from parent A, right from parent B.
 fn crossover(a: &Expr, b: &Expr, rng: &mut u64) -> Expr {
     match (a, b) {
-        (Expr::BinOp(op, l, _), Expr::BinOp(_, _, r)) => {
-            Expr::BinOp(*op, l.clone(), r.clone())
-        }
+        (Expr::BinOp(op, l, _), Expr::BinOp(_, _, r)) => Expr::BinOp(*op, l.clone(), r.clone()),
         (Expr::BinOp(op, l, r), _) => {
             *rng = lcg_step(*rng);
             if *rng % 2 == 0 {
@@ -1010,7 +1416,11 @@ fn crossover(a: &Expr, b: &Expr, rng: &mut u64) -> Expr {
         }
         _ => {
             *rng = lcg_step(*rng);
-            if *rng % 2 == 0 { a.clone() } else { b.clone() }
+            if *rng % 2 == 0 {
+                a.clone()
+            } else {
+                b.clone()
+            }
         }
     }
 }
@@ -1022,10 +1432,14 @@ fn crossover(a: &Expr, b: &Expr, rng: &mut u64) -> Expr {
 /// This is what PySR/Eureqa do: GP finds tree structure, optimizer fits constants.
 fn optimize_constants(expr: &Expr, data: &[(f64, f64)], max_iter: usize) -> Expr {
     let initial = collect_constants(expr);
-    if initial.is_empty() { return expr.clone(); }
+    if initial.is_empty() {
+        return expr.clone();
+    }
 
     let initial_mse = compute_mse(expr, data);
-    if initial_mse < 1e-10 { return expr.clone(); } // already exact
+    if initial_mse < 1e-10 {
+        return expr.clone();
+    } // already exact
 
     let n = initial.len();
 
@@ -1036,7 +1450,11 @@ fn optimize_constants(expr: &Expr, data: &[(f64, f64)], max_iter: usize) -> Expr
             trial = replace_nth_constant(&trial, i, val);
         }
         let mse = compute_mse(&trial, data);
-        if mse.is_finite() { mse } else { 1e30 }
+        if mse.is_finite() {
+            mse
+        } else {
+            1e30
+        }
     };
 
     // Nelder-Mead simplex optimization
@@ -1045,7 +1463,11 @@ fn optimize_constants(expr: &Expr, data: &[(f64, f64)], max_iter: usize) -> Expr
     simplex.push(initial.clone());
     for i in 0..n {
         let mut vertex = initial.clone();
-        let step = if vertex[i].abs() > 1e-10 { vertex[i] * 0.1 } else { 0.1 };
+        let step = if vertex[i].abs() > 1e-10 {
+            vertex[i] * 0.1
+        } else {
+            0.1
+        };
         vertex[i] += step;
         simplex.push(vertex);
     }
@@ -1057,26 +1479,36 @@ fn optimize_constants(expr: &Expr, data: &[(f64, f64)], max_iter: usize) -> Expr
     for _ in 0..max_iter {
         // Sort by objective value
         let mut order: Vec<usize> = (0..=n).collect();
-        order.sort_by(|&a, &b| values[a].partial_cmp(&values[b]).unwrap_or(std::cmp::Ordering::Equal));
+        order.sort_by(|&a, &b| {
+            values[a]
+                .partial_cmp(&values[b])
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         let best_val = values[order[0]];
         let worst_val = values[order[n]];
 
         // Convergence check
-        if (worst_val - best_val).abs() < 1e-14 { break; }
+        if (worst_val - best_val).abs() < 1e-14 {
+            break;
+        }
 
         // Centroid of all points except worst
         let mut centroid = vec![0.0; n];
         for &idx in &order[..n] {
-            for j in 0..n { centroid[j] += simplex[idx][j]; }
+            for j in 0..n {
+                centroid[j] += simplex[idx][j];
+            }
         }
-        for j in 0..n { centroid[j] /= n as f64; }
+        for j in 0..n {
+            centroid[j] /= n as f64;
+        }
 
         // Reflection
         let worst_idx = order[n];
-        let reflected: Vec<f64> = (0..n).map(|j|
-            centroid[j] + alpha * (centroid[j] - simplex[worst_idx][j])
-        ).collect();
+        let reflected: Vec<f64> = (0..n)
+            .map(|j| centroid[j] + alpha * (centroid[j] - simplex[worst_idx][j]))
+            .collect();
         let reflected_val = objective(&reflected);
 
         if reflected_val < values[order[n - 1]] && reflected_val >= best_val {
@@ -1085,9 +1517,9 @@ fn optimize_constants(expr: &Expr, data: &[(f64, f64)], max_iter: usize) -> Expr
             values[worst_idx] = reflected_val;
         } else if reflected_val < best_val {
             // Try expansion
-            let expanded: Vec<f64> = (0..n).map(|j|
-                centroid[j] + gamma * (reflected[j] - centroid[j])
-            ).collect();
+            let expanded: Vec<f64> = (0..n)
+                .map(|j| centroid[j] + gamma * (reflected[j] - centroid[j]))
+                .collect();
             let expanded_val = objective(&expanded);
             if expanded_val < reflected_val {
                 simplex[worst_idx] = expanded;
@@ -1098,9 +1530,9 @@ fn optimize_constants(expr: &Expr, data: &[(f64, f64)], max_iter: usize) -> Expr
             }
         } else {
             // Contraction
-            let contracted: Vec<f64> = (0..n).map(|j|
-                centroid[j] + rho * (simplex[worst_idx][j] - centroid[j])
-            ).collect();
+            let contracted: Vec<f64> = (0..n)
+                .map(|j| centroid[j] + rho * (simplex[worst_idx][j] - centroid[j]))
+                .collect();
             let contracted_val = objective(&contracted);
             if contracted_val < worst_val {
                 simplex[worst_idx] = contracted;
@@ -1110,8 +1542,8 @@ fn optimize_constants(expr: &Expr, data: &[(f64, f64)], max_iter: usize) -> Expr
                 let best_idx = order[0];
                 for &idx in &order[1..] {
                     for j in 0..n {
-                        simplex[idx][j] = simplex[best_idx][j] +
-                            sigma * (simplex[idx][j] - simplex[best_idx][j]);
+                        simplex[idx][j] =
+                            simplex[best_idx][j] + sigma * (simplex[idx][j] - simplex[best_idx][j]);
                     }
                     values[idx] = objective(&simplex[idx]);
                 }
@@ -1120,9 +1552,12 @@ fn optimize_constants(expr: &Expr, data: &[(f64, f64)], max_iter: usize) -> Expr
     }
 
     // Find best vertex and reconstruct expression
-    let best_idx = values.iter().enumerate()
+    let best_idx = values
+        .iter()
+        .enumerate()
         .min_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
-        .map(|(i, _)| i).unwrap_or(0);
+        .map(|(i, _)| i)
+        .unwrap_or(0);
 
     let best_params = &simplex[best_idx];
     if values[best_idx] < initial_mse {
@@ -1154,7 +1589,11 @@ pub fn simplify(expr: &Expr) -> Expr {
                 (_, Expr::Const(a), Expr::Const(b)) => {
                     let result = Expr::BinOp(*op, Box::new(sl.clone()), Box::new(sr.clone()));
                     let val = result.eval(&[]);
-                    if val.is_finite() { Expr::Const(val) } else { result }
+                    if val.is_finite() {
+                        Expr::Const(val)
+                    } else {
+                        result
+                    }
                 }
                 // x + 0 = x, 0 + x = x
                 (BinOp::Add, _, Expr::Const(c)) if *c == 0.0 => sl,
@@ -1174,11 +1613,11 @@ pub fn simplify(expr: &Expr) -> Expr {
                 // x ^ 0 = 1
                 (BinOp::Pow, _, Expr::Const(c)) if *c == 0.0 => Expr::Const(1.0),
                 // a / (b / c) = a * c / b
-                (BinOp::Div, _, Expr::BinOp(BinOp::Div, b, c)) => {
-                    simplify(&Expr::BinOp(BinOp::Div,
-                        Box::new(Expr::BinOp(BinOp::Mul, Box::new(sl), c.clone())),
-                        b.clone()))
-                }
+                (BinOp::Div, _, Expr::BinOp(BinOp::Div, b, c)) => simplify(&Expr::BinOp(
+                    BinOp::Div,
+                    Box::new(Expr::BinOp(BinOp::Mul, Box::new(sl), c.clone())),
+                    b.clone(),
+                )),
                 _ => Expr::BinOp(*op, Box::new(sl), Box::new(sr)),
             }
         }
@@ -1188,7 +1627,9 @@ pub fn simplify(expr: &Expr) -> Expr {
             if let Expr::Const(c) = &sa {
                 let result = Expr::Func(*f, Box::new(sa.clone()));
                 let val = result.eval(&[]);
-                if val.is_finite() { return Expr::Const(val); }
+                if val.is_finite() {
+                    return Expr::Const(val);
+                }
             }
             Expr::Func(*f, Box::new(sa))
         }
@@ -1206,7 +1647,9 @@ pub fn simplify(expr: &Expr) -> Expr {
 /// Tests: f(n) = a*f(n-1) + b, f(n) = a*f(n-1) + b*n, f(n) = f(n-1) + f(n-2)
 /// Returns the recurrence as a string if found, with coefficients.
 pub fn detect_recurrence(data: &[(f64, f64)]) -> Option<RecurrenceRelation> {
-    if data.len() < 4 { return None; }
+    if data.len() < 4 {
+        return None;
+    }
 
     let values: Vec<f64> = data.iter().map(|(_, y)| *y).collect();
 
@@ -1214,8 +1657,10 @@ pub fn detect_recurrence(data: &[(f64, f64)]) -> Option<RecurrenceRelation> {
     // Solve: y[i] = a*y[i-1] + b for a, b via least squares on pairs
     if values.len() >= 3 && values[0].abs() > 1e-15 {
         let n = values.len() - 1;
-        let mut sum_yy = 0.0; let mut sum_y = 0.0;
-        let mut sum_y1 = 0.0; let mut sum_yy1 = 0.0;
+        let mut sum_yy = 0.0;
+        let mut sum_y = 0.0;
+        let mut sum_y1 = 0.0;
+        let mut sum_yy1 = 0.0;
         let mut sum_1 = 0.0;
         for i in 1..=n {
             let y = values[i];
@@ -1232,9 +1677,9 @@ pub fn detect_recurrence(data: &[(f64, f64)]) -> Option<RecurrenceRelation> {
             let a = (sum_yy1 * sum_1 - sum_y * sum_y1) / det;
             let b = (sum_yy * sum_y - sum_yy1 * sum_y1) / det;
             // Verify: check residuals
-            let max_residual = (1..=n).map(|i| {
-                (values[i] - (a * values[i - 1] + b)).abs()
-            }).fold(0.0f64, f64::max);
+            let max_residual = (1..=n)
+                .map(|i| (values[i] - (a * values[i - 1] + b)).abs())
+                .fold(0.0f64, f64::max);
             if max_residual < values.iter().map(|v| v.abs()).sum::<f64>() * 1e-10 / n as f64 {
                 return Some(RecurrenceRelation {
                     formula: format!("f(n) = {:.6}*f(n-1) + {:.6}", a, b),
@@ -1248,9 +1693,9 @@ pub fn detect_recurrence(data: &[(f64, f64)]) -> Option<RecurrenceRelation> {
 
     // Test 2: f(n) = f(n-1) + f(n-2) (Fibonacci-type)
     if values.len() >= 4 {
-        let max_residual = (2..values.len()).map(|i| {
-            (values[i] - values[i - 1] - values[i - 2]).abs()
-        }).fold(0.0f64, f64::max);
+        let max_residual = (2..values.len())
+            .map(|i| (values[i] - values[i - 1] - values[i - 2]).abs())
+            .fold(0.0f64, f64::max);
         let scale = values.iter().map(|v| v.abs()).sum::<f64>() / values.len() as f64;
         if max_residual < scale * 1e-10 {
             return Some(RecurrenceRelation {
@@ -1264,10 +1709,12 @@ pub fn detect_recurrence(data: &[(f64, f64)]) -> Option<RecurrenceRelation> {
 
     // Test 3: f(n) = f(n-1) + n (triangular-type)
     if values.len() >= 3 {
-        let max_residual = (1..values.len()).map(|i| {
-            let n_val = data[i].0;
-            (values[i] - values[i - 1] - n_val).abs()
-        }).fold(0.0f64, f64::max);
+        let max_residual = (1..values.len())
+            .map(|i| {
+                let n_val = data[i].0;
+                (values[i] - values[i - 1] - n_val).abs()
+            })
+            .fold(0.0f64, f64::max);
         if max_residual < 1e-10 {
             return Some(RecurrenceRelation {
                 formula: "f(n) = f(n-1) + n".to_string(),
@@ -1301,7 +1748,9 @@ pub struct RecurrenceRelation {
 /// - **Linear with n-term**: f(n) = f(n-1) + k·n → triangular/quadratic
 /// - **Second-order homogeneous**: f(n) = a·f(n-1) + b·f(n-2) → Binet formula via characteristic roots
 pub fn solve_recurrence(rec: &RecurrenceRelation, data: &[(f64, f64)]) -> Option<Expr> {
-    if data.is_empty() { return None; }
+    if data.is_empty() {
+        return None;
+    }
 
     match rec.order {
         1 => {
@@ -1327,34 +1776,46 @@ pub fn solve_recurrence(rec: &RecurrenceRelation, data: &[(f64, f64)]) -> Option
                     // determined by the initial condition: C = v0 - T(n0).
                     // For (n0=1, v0=1): C = 1 - 1 = 0, so f(n) = n(n+1)/2 exactly.
                     // For (n0=0, v0=0): C = 0 - 0 = 0, same clean form.
-                    let tri_n = Expr::BinOp(BinOp::Div,
-                        Box::new(Expr::BinOp(BinOp::Mul,
+                    let tri_n = Expr::BinOp(
+                        BinOp::Div,
+                        Box::new(Expr::BinOp(
+                            BinOp::Mul,
                             Box::new(Expr::Var("n".into())),
-                            Box::new(Expr::BinOp(BinOp::Add,
+                            Box::new(Expr::BinOp(
+                                BinOp::Add,
                                 Box::new(Expr::Var("n".into())),
-                                Box::new(Expr::Const(1.0)))))),
-                        Box::new(Expr::Const(2.0)));
+                                Box::new(Expr::Const(1.0)),
+                            )),
+                        )),
+                        Box::new(Expr::Const(2.0)),
+                    );
                     let offset = v0 - n0 * (n0 + 1.0) / 2.0;
                     if offset.abs() < 1e-10 {
                         Some(tri_n)
                     } else {
-                        Some(Expr::BinOp(BinOp::Add,
+                        Some(Expr::BinOp(
+                            BinOp::Add,
                             Box::new(tri_n),
-                            Box::new(Expr::Const(offset))))
+                            Box::new(Expr::Const(offset)),
+                        ))
                     }
                 } else {
                     // f(n) = f(n-1) + b → arithmetic: f(n) = v0 + b·(n - n0)
                     //                                = (v0 - b·n0) + b·n
                     let intercept = v0 - b * n0;
-                    let bn = Expr::BinOp(BinOp::Mul,
+                    let bn = Expr::BinOp(
+                        BinOp::Mul,
                         Box::new(Expr::Const(b)),
-                        Box::new(Expr::Var("n".into())));
+                        Box::new(Expr::Var("n".into())),
+                    );
                     if intercept.abs() < 1e-10 {
                         Some(bn)
                     } else {
-                        Some(Expr::BinOp(BinOp::Add,
+                        Some(Expr::BinOp(
+                            BinOp::Add,
                             Box::new(Expr::Const(intercept)),
-                            Box::new(bn)))
+                            Box::new(bn),
+                        ))
                     }
                 }
             } else if b.abs() < 1e-10 {
@@ -1364,15 +1825,21 @@ pub fn solve_recurrence(rec: &RecurrenceRelation, data: &[(f64, f64)]) -> Option
                 let exp_node = if n0.abs() < 1e-10 {
                     Expr::Var("n".into())
                 } else {
-                    Expr::BinOp(BinOp::Sub,
+                    Expr::BinOp(
+                        BinOp::Sub,
                         Box::new(Expr::Var("n".into())),
-                        Box::new(Expr::Const(n0)))
+                        Box::new(Expr::Const(n0)),
+                    )
                 };
-                Some(Expr::BinOp(BinOp::Mul,
+                Some(Expr::BinOp(
+                    BinOp::Mul,
                     Box::new(Expr::Const(v0)),
-                    Box::new(Expr::BinOp(BinOp::Pow,
+                    Box::new(Expr::BinOp(
+                        BinOp::Pow,
                         Box::new(Expr::Const(a)),
-                        Box::new(exp_node)))))
+                        Box::new(exp_node),
+                    )),
+                ))
             } else {
                 None
             }
@@ -1383,17 +1850,23 @@ pub fn solve_recurrence(rec: &RecurrenceRelation, data: &[(f64, f64)]) -> Option
             let a = rec.coefficients.get(0).copied().unwrap_or(1.0);
             let b = rec.coefficients.get(1).copied().unwrap_or(1.0);
             let discriminant = a * a + 4.0 * b;
-            if discriminant < 0.0 { return None; }
+            if discriminant < 0.0 {
+                return None;
+            }
 
             let sqrt_d = discriminant.sqrt();
             let r1 = (a + sqrt_d) / 2.0;
             let r2 = (a - sqrt_d) / 2.0;
 
-            if (r1 - r2).abs() < 1e-10 { return None; } // repeated root — skip
+            if (r1 - r2).abs() < 1e-10 {
+                return None;
+            } // repeated root — skip
 
             // f(n) = c1·r1^n + c2·r2^n
             // Solve from f(data[0].0) and f(data[1].0)
-            if data.len() < 2 { return None; }
+            if data.len() < 2 {
+                return None;
+            }
             let n0 = data[0].0;
             let n1 = data[1].0;
             let f0 = data[0].1;
@@ -1405,23 +1878,35 @@ pub fn solve_recurrence(rec: &RecurrenceRelation, data: &[(f64, f64)]) -> Option
             let r2_n1 = r2.powf(n1);
 
             let det = r1_n0 * r2_n1 - r2_n0 * r1_n1;
-            if det.abs() < 1e-15 { return None; }
+            if det.abs() < 1e-15 {
+                return None;
+            }
 
             let c1 = (f0 * r2_n1 - f1 * r2_n0) / det;
             let c2 = (f1 * r1_n0 - f0 * r1_n1) / det;
 
             // Build: c1 * r1^n + c2 * r2^n (Binet-like formula)
-            Some(Expr::BinOp(BinOp::Add,
-                Box::new(Expr::BinOp(BinOp::Mul,
+            Some(Expr::BinOp(
+                BinOp::Add,
+                Box::new(Expr::BinOp(
+                    BinOp::Mul,
                     Box::new(Expr::Const(c1)),
-                    Box::new(Expr::BinOp(BinOp::Pow,
+                    Box::new(Expr::BinOp(
+                        BinOp::Pow,
                         Box::new(Expr::Const(r1)),
-                        Box::new(Expr::Var("n".into())))))),
-                Box::new(Expr::BinOp(BinOp::Mul,
+                        Box::new(Expr::Var("n".into())),
+                    )),
+                )),
+                Box::new(Expr::BinOp(
+                    BinOp::Mul,
                     Box::new(Expr::Const(c2)),
-                    Box::new(Expr::BinOp(BinOp::Pow,
+                    Box::new(Expr::BinOp(
+                        BinOp::Pow,
                         Box::new(Expr::Const(r2)),
-                        Box::new(Expr::Var("n".into()))))))))
+                        Box::new(Expr::Var("n".into())),
+                    )),
+                )),
+            ))
         }
         _ => None,
     }
@@ -1443,7 +1928,10 @@ pub struct BayesianConfidence {
 
 impl BayesianConfidence {
     pub fn new() -> Self {
-        Self { alpha: 1.0, beta: 1.0 } // uniform prior
+        Self {
+            alpha: 1.0,
+            beta: 1.0,
+        } // uniform prior
     }
 
     /// Posterior mean: α / (α + β).
@@ -1491,6 +1979,7 @@ impl ConjectureEngine {
                     if test_mse.is_finite() && test_mse < c.training_mse * 2.0 {
                         bc.record_success(1.0); // generalizes well
                         c.status = ConjectureStatus::NumericallyTested { test_mse };
+                        elevate_macro_promotion_tier(c, MacroPromotionTier::RecurrentNumerical);
                     } else if test_mse.is_finite() {
                         bc.record_failure(1.0); // overfitting
                     }
@@ -1503,11 +1992,14 @@ impl ConjectureEngine {
             let mut checked = 0;
             if let Some(seq) = observations.iter().find(|s| s.name == c.source) {
                 for &(x, y) in &seq.data {
-                    if (x as usize) < start_n || x > max_n as f64 { continue; }
+                    if (x as usize) < start_n || x > max_n as f64 {
+                        continue;
+                    }
                     let predicted = c.formula.eval(&[("n", x)]);
                     if !predicted.is_finite() || (predicted - y).abs() > y.abs() * 0.01 + 1e-10 {
                         all_match = false;
                         c.status = ConjectureStatus::Refuted { counterexample: x };
+                        c.macro_promotion_tier = MacroPromotionTier::Quarantined;
                         bc.record_failure(5.0);
                         break;
                     }
@@ -1516,7 +2008,10 @@ impl ConjectureEngine {
             }
             if all_match && checked > 10 {
                 bc.record_success(3.0); // passed formal-like check
-                c.status = ConjectureStatus::FormallyVerified { proof_steps: checked };
+                c.status = ConjectureStatus::FormallyVerified {
+                    proof_steps: checked,
+                };
+                elevate_macro_promotion_tier(c, MacroPromotionTier::Formal);
             }
 
             c.confidence = bc.mean();
@@ -1591,7 +2086,7 @@ fn identify_constant(val: f64) -> Option<String> {
         ("√3", 3.0_f64.sqrt()),
         ("1/√3", 1.0 / 3.0_f64.sqrt()),
         ("γ (Euler-Mascheroni)", 0.5772156649015329),
-        ("Catalan", 0.9159655941772190),   // Catalan's constant
+        ("Catalan", 0.9159655941772190),    // Catalan's constant
         ("Apéry ζ(3)", 1.2020569031595942), // Apéry's constant
     ];
     for (name, known) in candidates {
@@ -1646,31 +2141,42 @@ pub fn annotate_conjecture(conjecture: &Conjecture) -> String {
 /// Returns (growth_type, estimated_rate) to guide GP grammar.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum GrowthClass {
-    Constant,       // f(n) → c
-    Logarithmic,    // f(n) ~ ln(n)
-    Polynomial(f64),// f(n) ~ n^p (returns p)
-    Exponential,    // f(n) ~ a^n
-    SuperExponential,// f(n) ~ n! or faster
+    Constant,         // f(n) → c
+    Logarithmic,      // f(n) ~ ln(n)
+    Polynomial(f64),  // f(n) ~ n^p (returns p)
+    Exponential,      // f(n) ~ a^n
+    SuperExponential, // f(n) ~ n! or faster
 }
 
 pub fn analyze_growth(data: &[(f64, f64)]) -> GrowthClass {
-    if data.len() < 4 { return GrowthClass::Constant; }
+    if data.len() < 4 {
+        return GrowthClass::Constant;
+    }
 
     let values: Vec<f64> = data.iter().map(|(_, y)| *y).collect();
 
     // Check constant (variance < 1% of mean²)
     let mean = values.iter().sum::<f64>() / values.len() as f64;
     let var = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
-    if var < mean * mean * 0.01 { return GrowthClass::Constant; }
+    if var < mean * mean * 0.01 {
+        return GrowthClass::Constant;
+    }
 
     // Check convergent: second half has much less variance than first half
     // This catches sequences like fibonacci_ratio → φ
     let half = values.len() / 2;
     if half >= 3 {
         let mean1 = values[..half].iter().sum::<f64>() / half as f64;
-        let var1 = values[..half].iter().map(|v| (v - mean1).powi(2)).sum::<f64>() / half as f64;
+        let var1 = values[..half]
+            .iter()
+            .map(|v| (v - mean1).powi(2))
+            .sum::<f64>()
+            / half as f64;
         let mean2 = values[half..].iter().sum::<f64>() / (values.len() - half) as f64;
-        let var2 = values[half..].iter().map(|v| (v - mean2).powi(2)).sum::<f64>()
+        let var2 = values[half..]
+            .iter()
+            .map(|v| (v - mean2).powi(2))
+            .sum::<f64>()
             / (values.len() - half) as f64;
         if var2 < var1 * 0.1 && var2 < mean2 * mean2 * 0.01 {
             return GrowthClass::Constant; // converging — use constant templates
@@ -1678,7 +2184,8 @@ pub fn analyze_growth(data: &[(f64, f64)]) -> GrowthClass {
     }
 
     // Check growth rate via log-log regression
-    let positive: Vec<(f64, f64)> = data.iter()
+    let positive: Vec<(f64, f64)> = data
+        .iter()
         .filter(|(x, y)| *x > 0.0 && *y > 0.0)
         .map(|(x, y)| (x.ln(), y.ln()))
         .collect();
@@ -1694,12 +2201,19 @@ pub fn analyze_growth(data: &[(f64, f64)]) -> GrowthClass {
         if denom.abs() > 1e-10 {
             let p = (n * sxy - sx * sy) / denom;
             let r2 = {
-                let ss_res: f64 = positive.iter().map(|(x, y)| {
-                    let pred = p * x + (sy - p * sx) / n;
-                    (y - pred).powi(2)
-                }).sum();
+                let ss_res: f64 = positive
+                    .iter()
+                    .map(|(x, y)| {
+                        let pred = p * x + (sy - p * sx) / n;
+                        (y - pred).powi(2)
+                    })
+                    .sum();
                 let ss_tot: f64 = positive.iter().map(|(_, y)| (y - sy / n).powi(2)).sum();
-                if ss_tot > 1e-10 { 1.0 - ss_res / ss_tot } else { 0.0 }
+                if ss_tot > 1e-10 {
+                    1.0 - ss_res / ss_tot
+                } else {
+                    0.0
+                }
             };
 
             if r2 > 0.95 && p > 0.0 && p < 10.0 {
@@ -1709,7 +2223,8 @@ pub fn analyze_growth(data: &[(f64, f64)]) -> GrowthClass {
     }
 
     // Check exponential: log(y) linear in x
-    let log_linear: Vec<(f64, f64)> = data.iter()
+    let log_linear: Vec<(f64, f64)> = data
+        .iter()
         .filter(|(_, y)| *y > 0.0)
         .map(|(x, y)| (*x, y.ln()))
         .collect();
@@ -1724,12 +2239,19 @@ pub fn analyze_growth(data: &[(f64, f64)]) -> GrowthClass {
         if denom.abs() > 1e-10 {
             let slope = (n * sxy - sx * sy) / denom;
             let r2 = {
-                let ss_res: f64 = log_linear.iter().map(|(x, y)| {
-                    let pred = slope * x + (sy - slope * sx) / n;
-                    (y - pred).powi(2)
-                }).sum();
+                let ss_res: f64 = log_linear
+                    .iter()
+                    .map(|(x, y)| {
+                        let pred = slope * x + (sy - slope * sx) / n;
+                        (y - pred).powi(2)
+                    })
+                    .sum();
                 let ss_tot: f64 = log_linear.iter().map(|(_, y)| (y - sy / n).powi(2)).sum();
-                if ss_tot > 1e-10 { 1.0 - ss_res / ss_tot } else { 0.0 }
+                if ss_tot > 1e-10 {
+                    1.0 - ss_res / ss_tot
+                } else {
+                    0.0
+                }
             };
             if r2 > 0.95 && slope > 0.1 {
                 return GrowthClass::Exponential;
@@ -1738,8 +2260,15 @@ pub fn analyze_growth(data: &[(f64, f64)]) -> GrowthClass {
     }
 
     // Check super-exponential: ratios f(n)/f(n-1) growing
-    let ratios: Vec<f64> = values.windows(2)
-        .filter_map(|w| if w[0].abs() > 1e-10 { Some(w[1] / w[0]) } else { None })
+    let ratios: Vec<f64> = values
+        .windows(2)
+        .filter_map(|w| {
+            if w[0].abs() > 1e-10 {
+                Some(w[1] / w[0])
+            } else {
+                None
+            }
+        })
         .collect();
     if ratios.len() >= 3 {
         let ratio_growing = ratios.windows(2).filter(|w| w[1] > w[0] * 1.05).count();
@@ -1754,9 +2283,7 @@ pub fn analyze_growth(data: &[(f64, f64)]) -> GrowthClass {
 /// Compute difference sequence Δf(n) = f(n) - f(n-1) (#7).
 /// If Δf is simpler than f, discovering Δf first is more efficient.
 pub fn difference_sequence(data: &[(f64, f64)]) -> Vec<(f64, f64)> {
-    data.windows(2)
-        .map(|w| (w[1].0, w[1].1 - w[0].1))
-        .collect()
+    data.windows(2).map(|w| (w[1].0, w[1].1 - w[0].1)).collect()
 }
 
 /// Compute ratio sequence f(n)/f(n-1) (#8).
@@ -1766,7 +2293,9 @@ pub fn ratio_sequence(data: &[(f64, f64)]) -> Vec<(f64, f64)> {
         .filter_map(|w| {
             if w[0].1.abs() > 1e-10 {
                 Some((w[1].0, w[1].1 / w[0].1))
-            } else { None }
+            } else {
+                None
+            }
         })
         .collect()
 }
@@ -1782,14 +2311,27 @@ fn build_template_library(growth: &GrowthClass) -> Vec<Expr> {
     // Universal templates (always included)
     let mut templates = vec![
         // a*n + b (linear)
-        Expr::BinOp(BinOp::Add, Box::new(Expr::BinOp(BinOp::Mul, c(1.0), n())), c(0.0)),
+        Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::BinOp(BinOp::Mul, c(1.0), n())),
+            c(0.0),
+        ),
         // a*n^2 + b*n + c (quadratic)
-        Expr::BinOp(BinOp::Add,
-            Box::new(Expr::BinOp(BinOp::Mul, c(1.0),
-                Box::new(Expr::BinOp(BinOp::Pow, n(), c(2.0))))),
-            Box::new(Expr::BinOp(BinOp::Mul, c(1.0), n()))),
+        Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
+                c(1.0),
+                Box::new(Expr::BinOp(BinOp::Pow, n(), c(2.0))),
+            )),
+            Box::new(Expr::BinOp(BinOp::Mul, c(1.0), n())),
+        ),
         // a * n^b (power law)
-        Expr::BinOp(BinOp::Mul, c(1.0), Box::new(Expr::BinOp(BinOp::Pow, n(), c(1.5)))),
+        Expr::BinOp(
+            BinOp::Mul,
+            c(1.0),
+            Box::new(Expr::BinOp(BinOp::Pow, n(), c(1.5))),
+        ),
     ];
 
     match growth {
@@ -1799,55 +2341,89 @@ fn build_template_library(growth: &GrowthClass) -> Vec<Expr> {
             templates.push(Expr::Const(1.0 / std::f64::consts::E));
             // a - b/n^c (constant + convergent correction)
             // Discovers limits like M(n)/C(n) → 3√3/(2π) ≈ 0.827
-            templates.push(Expr::BinOp(BinOp::Sub,
+            templates.push(Expr::BinOp(
+                BinOp::Sub,
                 c(1.0),
-                Box::new(Expr::BinOp(BinOp::Div,
+                Box::new(Expr::BinOp(
+                    BinOp::Div,
                     c(1.0),
-                    Box::new(Expr::BinOp(BinOp::Pow, n(), c(0.5)))))));
+                    Box::new(Expr::BinOp(BinOp::Pow, n(), c(0.5))),
+                )),
+            ));
             // a - b/n (simpler 1/n correction)
-            templates.push(Expr::BinOp(BinOp::Sub,
+            templates.push(Expr::BinOp(
+                BinOp::Sub,
                 c(1.0),
-                Box::new(Expr::BinOp(BinOp::Div, c(1.0), n()))));
+                Box::new(Expr::BinOp(BinOp::Div, c(1.0), n())),
+            ));
             // a + b/sqrt(n) (convergent from below)
-            templates.push(Expr::BinOp(BinOp::Add,
+            templates.push(Expr::BinOp(
+                BinOp::Add,
                 c(1.0),
-                Box::new(Expr::BinOp(BinOp::Div,
+                Box::new(Expr::BinOp(
+                    BinOp::Div,
                     c(1.0),
-                    Box::new(Expr::Func(UnaryFn::Sqrt, n()))))));
+                    Box::new(Expr::Func(UnaryFn::Sqrt, n())),
+                )),
+            ));
         }
         GrowthClass::Logarithmic => {
             // a * ln(n) + b
-            templates.push(Expr::BinOp(BinOp::Add,
-                Box::new(Expr::BinOp(BinOp::Mul, c(1.0),
-                    Box::new(Expr::Func(UnaryFn::Log, n())))),
-                c(0.0)));
+            templates.push(Expr::BinOp(
+                BinOp::Add,
+                Box::new(Expr::BinOp(
+                    BinOp::Mul,
+                    c(1.0),
+                    Box::new(Expr::Func(UnaryFn::Log, n())),
+                )),
+                c(0.0),
+            ));
             // a * n / ln(n) (prime counting theorem form)
-            templates.push(Expr::BinOp(BinOp::Div,
+            templates.push(Expr::BinOp(
+                BinOp::Div,
                 Box::new(Expr::BinOp(BinOp::Mul, c(1.0), n())),
-                Box::new(Expr::Func(UnaryFn::Log, n()))));
+                Box::new(Expr::Func(UnaryFn::Log, n())),
+            ));
         }
         GrowthClass::Polynomial(p) => {
             // a * n^p (with the detected exponent)
-            templates.push(Expr::BinOp(BinOp::Mul, c(1.0),
-                Box::new(Expr::BinOp(BinOp::Pow, n(), c(*p)))));
-            // a * n^p / (b + n) (rational correction)
-            templates.push(Expr::BinOp(BinOp::Div,
-                Box::new(Expr::BinOp(BinOp::Mul, c(1.0),
-                    Box::new(Expr::BinOp(BinOp::Pow, n(), c(*p))))),
-                Box::new(Expr::BinOp(BinOp::Add, c(1.0), n()))));
-            // n * (n+1) / 2 (triangular template)
-            templates.push(Expr::BinOp(BinOp::Div,
-                Box::new(Expr::BinOp(BinOp::Mul, n(),
-                    Box::new(Expr::BinOp(BinOp::Add, n(), c(1.0))))),
-                c(2.0)));
-            // a / n^b (inverse power — hydrogen, Coulomb, gravity)
-            templates.push(Expr::BinOp(BinOp::Div,
-                c(-1.0),
-                Box::new(Expr::BinOp(BinOp::Pow, n(), c(2.0)))));
-            // a / n^b (general inverse power)
-            templates.push(Expr::BinOp(BinOp::Div,
+            templates.push(Expr::BinOp(
+                BinOp::Mul,
                 c(1.0),
-                Box::new(Expr::BinOp(BinOp::Pow, n(), c(1.5)))));
+                Box::new(Expr::BinOp(BinOp::Pow, n(), c(*p))),
+            ));
+            // a * n^p / (b + n) (rational correction)
+            templates.push(Expr::BinOp(
+                BinOp::Div,
+                Box::new(Expr::BinOp(
+                    BinOp::Mul,
+                    c(1.0),
+                    Box::new(Expr::BinOp(BinOp::Pow, n(), c(*p))),
+                )),
+                Box::new(Expr::BinOp(BinOp::Add, c(1.0), n())),
+            ));
+            // n * (n+1) / 2 (triangular template)
+            templates.push(Expr::BinOp(
+                BinOp::Div,
+                Box::new(Expr::BinOp(
+                    BinOp::Mul,
+                    n(),
+                    Box::new(Expr::BinOp(BinOp::Add, n(), c(1.0))),
+                )),
+                c(2.0),
+            ));
+            // a / n^b (inverse power — hydrogen, Coulomb, gravity)
+            templates.push(Expr::BinOp(
+                BinOp::Div,
+                c(-1.0),
+                Box::new(Expr::BinOp(BinOp::Pow, n(), c(2.0))),
+            ));
+            // a / n^b (general inverse power)
+            templates.push(Expr::BinOp(
+                BinOp::Div,
+                c(1.0),
+                Box::new(Expr::BinOp(BinOp::Pow, n(), c(1.5))),
+            ));
 
             // Distance-kernel skeletons: `sqrt(n² + c)` and `1 / sqrt(n² + c)`
             //
@@ -1866,52 +2442,94 @@ fn build_template_library(growth: &GrowthClass) -> Vec<Expr> {
             // extraction pipeline has nothing to promote. Seeding the shape
             // directly gives the GP a fair shot at the distance-kernel class
             // and unblocks macro promotion of `sqrt(Add(Pow, Const))` subtrees.
-            templates.push(Expr::Func(UnaryFn::Sqrt,
-                Box::new(Expr::BinOp(BinOp::Add,
+            templates.push(Expr::Func(
+                UnaryFn::Sqrt,
+                Box::new(Expr::BinOp(
+                    BinOp::Add,
                     Box::new(Expr::BinOp(BinOp::Pow, n(), c(2.0))),
-                    c(1.0)))));
-            templates.push(Expr::BinOp(BinOp::Div,
+                    c(1.0),
+                )),
+            ));
+            templates.push(Expr::BinOp(
+                BinOp::Div,
                 c(1.0),
-                Box::new(Expr::Func(UnaryFn::Sqrt,
-                    Box::new(Expr::BinOp(BinOp::Add,
+                Box::new(Expr::Func(
+                    UnaryFn::Sqrt,
+                    Box::new(Expr::BinOp(
+                        BinOp::Add,
                         Box::new(Expr::BinOp(BinOp::Pow, n(), c(2.0))),
-                        c(1.0)))))));
+                        c(1.0),
+                    )),
+                )),
+            ));
         }
         GrowthClass::Exponential => {
             // a * exp(b * sqrt(n)) / (c * n) — Hardy-Ramanujan
-            templates.push(Expr::BinOp(BinOp::Div,
-                Box::new(Expr::BinOp(BinOp::Mul, c(0.15),
-                    Box::new(Expr::Func(UnaryFn::Exp,
-                        Box::new(Expr::BinOp(BinOp::Mul, c(2.5),
-                            Box::new(Expr::Func(UnaryFn::Sqrt, n())))))))),
-                Box::new(Expr::BinOp(BinOp::Mul, c(1.0), n()))));
+            templates.push(Expr::BinOp(
+                BinOp::Div,
+                Box::new(Expr::BinOp(
+                    BinOp::Mul,
+                    c(0.15),
+                    Box::new(Expr::Func(
+                        UnaryFn::Exp,
+                        Box::new(Expr::BinOp(
+                            BinOp::Mul,
+                            c(2.5),
+                            Box::new(Expr::Func(UnaryFn::Sqrt, n())),
+                        )),
+                    )),
+                )),
+                Box::new(Expr::BinOp(BinOp::Mul, c(1.0), n())),
+            ));
             // a * b^n (geometric)
-            templates.push(Expr::BinOp(BinOp::Mul, c(1.0),
-                Box::new(Expr::BinOp(BinOp::Pow, c(2.0), n()))));
+            templates.push(Expr::BinOp(
+                BinOp::Mul,
+                c(1.0),
+                Box::new(Expr::BinOp(BinOp::Pow, c(2.0), n())),
+            ));
             // a * exp(b * n) (pure exponential)
-            templates.push(Expr::BinOp(BinOp::Mul, c(1.0),
-                Box::new(Expr::Func(UnaryFn::Exp,
-                    Box::new(Expr::BinOp(BinOp::Mul, c(0.5), n()))))));
+            templates.push(Expr::BinOp(
+                BinOp::Mul,
+                c(1.0),
+                Box::new(Expr::Func(
+                    UnaryFn::Exp,
+                    Box::new(Expr::BinOp(BinOp::Mul, c(0.5), n())),
+                )),
+            ));
             // C(2n,n)/(n+1) structure (Catalan-like)
-            templates.push(Expr::BinOp(BinOp::Div,
+            templates.push(Expr::BinOp(
+                BinOp::Div,
                 Box::new(Expr::BinOp(BinOp::Pow, c(4.0), n())),
-                Box::new(Expr::BinOp(BinOp::Mul,
-                    Box::new(Expr::Func(UnaryFn::Sqrt,
-                        Box::new(Expr::BinOp(BinOp::Mul, c(std::f64::consts::PI), n())))),
-                    Box::new(Expr::BinOp(BinOp::Add, n(), c(1.0)))))));
+                Box::new(Expr::BinOp(
+                    BinOp::Mul,
+                    Box::new(Expr::Func(
+                        UnaryFn::Sqrt,
+                        Box::new(Expr::BinOp(BinOp::Mul, c(std::f64::consts::PI), n())),
+                    )),
+                    Box::new(Expr::BinOp(BinOp::Add, n(), c(1.0))),
+                )),
+            ));
         }
         GrowthClass::SuperExponential => {
             // Stirling: sqrt(2*pi*n) * (n/e)^n
-            templates.push(Expr::BinOp(BinOp::Mul,
-                Box::new(Expr::Func(UnaryFn::Sqrt,
-                    Box::new(Expr::BinOp(BinOp::Mul, c(6.28), n())))),
-                Box::new(Expr::BinOp(BinOp::Pow,
+            templates.push(Expr::BinOp(
+                BinOp::Mul,
+                Box::new(Expr::Func(
+                    UnaryFn::Sqrt,
+                    Box::new(Expr::BinOp(BinOp::Mul, c(6.28), n())),
+                )),
+                Box::new(Expr::BinOp(
+                    BinOp::Pow,
                     Box::new(Expr::BinOp(BinOp::Div, n(), c(std::f64::consts::E))),
-                    n()))));
+                    n(),
+                )),
+            ));
             // a^n * n^b (mixed)
-            templates.push(Expr::BinOp(BinOp::Mul,
+            templates.push(Expr::BinOp(
+                BinOp::Mul,
                 Box::new(Expr::BinOp(BinOp::Pow, c(2.0), n())),
-                Box::new(Expr::BinOp(BinOp::Pow, n(), c(1.0)))));
+                Box::new(Expr::BinOp(BinOp::Pow, n(), c(1.0))),
+            ));
         }
     }
 
@@ -2025,6 +2643,44 @@ impl ConjectureEngine {
         }
     }
 
+    /// Snapshot metrics for the active macro pool.
+    #[cfg(feature = "abstract_thought")]
+    pub fn macro_pool_metrics(
+        &self,
+    ) -> Option<super::abstract_thought::dynamic_grammar::MacroPoolMetrics> {
+        self.abstract_thought
+            .as_ref()
+            .map(|at| at.macro_pool_metrics())
+    }
+
+    #[cfg(feature = "abstract_thought")]
+    fn compatible_macro_seeds_for_sequence(&self) -> Vec<Expr> {
+        self.abstract_thought
+            .as_ref()
+            .map(|at| {
+                at.dynamic_grammar
+                    .operators_compatible_with_vars(&["n"])
+                    .into_iter()
+                    .map(|op| op.template.clone())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    #[cfg(feature = "abstract_thought")]
+    pub fn autonomous_macro_templates_for_vars(&self, var_names: &[&str]) -> Vec<Expr> {
+        self.abstract_thought
+            .as_ref()
+            .map(|at| {
+                at.dynamic_grammar
+                    .operators_compatible_with_vars(var_names)
+                    .into_iter()
+                    .map(|op| op.template.clone())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
     /// Add an observed sequence to mine for patterns.
     pub fn observe(&mut self, seq: ObservedSequence) {
         self.observations.push(seq);
@@ -2048,7 +2704,9 @@ impl ConjectureEngine {
     /// - `symbolically_proven == true` → `ConjectureStatus::FormallyVerified`
     ///    (eligible for fast-track macro promotion)
     /// - else → `ConjectureStatus::NumericallyTested` with `test_mse = variance`
-    ///   (standard numerical-tier macro extraction applies)
+    ///   and `MacroPromotionTier::Quarantined`, so unproven trajectory fits
+    ///   cannot enter the permanent macro pool through either fast-track or
+    ///   recurrent promotion.
     ///
     /// The `source` field is set to the caller-provided tag so later
     /// filtering (e.g. "what macros did the Kepler discovery contribute?")
@@ -2064,7 +2722,9 @@ impl ConjectureEngine {
             let status = if inv.symbolically_proven {
                 ConjectureStatus::FormallyVerified { proof_steps: 0 }
             } else {
-                ConjectureStatus::NumericallyTested { test_mse: inv.variance }
+                ConjectureStatus::NumericallyTested {
+                    test_mse: inv.variance,
+                }
             };
             self.conjectures.push(Conjecture {
                 formula: inv.formula.clone(),
@@ -2076,8 +2736,49 @@ impl ConjectureEngine {
                 fitness,
                 status,
                 confidence: if inv.symbolically_proven { 0.99 } else { 0.6 },
+                macro_promotion_tier: if inv.symbolically_proven {
+                    MacroPromotionTier::Formal
+                } else {
+                    MacroPromotionTier::Quarantined
+                },
             });
         }
+    }
+
+    /// End-to-end autonomous discovery path with safe macro feedback.
+    ///
+    /// Pulls signature-compatible macros from the active grammar, seeds the
+    /// autonomous discoverer with them, then ingests the resulting invariants
+    /// back into the conjecture pool under `source_tag`.
+    pub fn discover_and_ingest_autonomous_invariants(
+        &mut self,
+        source_tag: &str,
+        domain: MathDomain,
+        rhs: fn(&[f64], f64) -> Vec<f64>,
+        initial_state: &[f64],
+        var_names: &[&str],
+        dynamics: Option<&[(&str, SymExpr)]>,
+        config: &RegressorConfig,
+        t_max: f64,
+        dt: f64,
+    ) -> Vec<AutonomousInvariant> {
+        #[cfg(feature = "abstract_thought")]
+        let extra_templates = self.autonomous_macro_templates_for_vars(var_names);
+        #[cfg(not(feature = "abstract_thought"))]
+        let extra_templates: Vec<Expr> = Vec::new();
+
+        let invariants = discover_invariants_autonomous_with_seed_templates(
+            rhs,
+            initial_state,
+            var_names,
+            dynamics,
+            config,
+            t_max,
+            dt,
+            &extra_templates,
+        );
+        self.ingest_autonomous_invariants(source_tag, domain, &invariants);
+        invariants
     }
 
     /// Run symbolic regression on all observations. Returns new conjectures.
@@ -2122,6 +2823,7 @@ impl ConjectureEngine {
                         ConjectureStatus::Proposed
                     },
                     confidence: if rec.max_residual < 1e-10 { 0.95 } else { 0.5 },
+                    macro_promotion_tier: MacroPromotionTier::RecurrentNumerical,
                 });
             }
 
@@ -2131,7 +2833,11 @@ impl ConjectureEngine {
             // ── Phase 0.7: Difference sequence analysis (#7) ─────────
             // If Δf is simpler, discover that first
             let diff_seq = difference_sequence(&seq.data);
-            let diff_growth = if diff_seq.len() >= 3 { analyze_growth(&diff_seq) } else { growth };
+            let diff_growth = if diff_seq.len() >= 3 {
+                analyze_growth(&diff_seq)
+            } else {
+                growth
+            };
             let diff_is_simple = match diff_growth {
                 GrowthClass::Constant => true,
                 GrowthClass::Polynomial(p) => p < 1.5,
@@ -2139,8 +2845,8 @@ impl ConjectureEngine {
             };
             if diff_is_simple {
                 // Δf is simple — try to discover it
-                let diff_obs = ObservedSequence::new(
-                    &format!("Δ({})", seq.name), seq.domain, diff_seq);
+                let diff_obs =
+                    ObservedSequence::new(&format!("Δ({})", seq.name), seq.domain, diff_seq);
                 let mut diff_reg = SymbolicRegressor::new(RegressorConfig {
                     seed: self.config.seed.wrapping_add(999),
                     population_size: self.config.population_size / 3,
@@ -2165,17 +2871,16 @@ impl ConjectureEngine {
 
             // ── Phase 1: GP symbolic regression (ensemble #10) ───────
             // Run with 3 seeds for diversity, collect best from each
-            let seeds = [self.config.seed, self.config.seed.wrapping_add(1234),
-                         self.config.seed.wrapping_add(5678)];
+            let seeds = [
+                self.config.seed,
+                self.config.seed.wrapping_add(1234),
+                self.config.seed.wrapping_add(5678),
+            ];
             // Gather macro-operator templates from abstract thought (if enabled).
             // These are learned sub-expressions that recur across past conjectures,
             // now injected as GP seeds to accelerate future discovery.
             #[cfg(feature = "abstract_thought")]
-            let macro_seeds: Vec<Expr> = self.abstract_thought.as_ref()
-                .map(|at| at.dynamic_grammar.operators.iter()
-                    .map(|op| op.template.clone())
-                    .collect())
-                .unwrap_or_default();
+            let macro_seeds: Vec<Expr> = self.compatible_macro_seeds_for_sequence();
             #[cfg(not(feature = "abstract_thought"))]
             let macro_seeds: Vec<Expr> = Vec::new();
 
@@ -2195,15 +2900,30 @@ impl ConjectureEngine {
                 if !macro_seeds.is_empty() {
                     regressor.set_seed_macros(macro_seeds.clone());
                 }
-                all_conjectures.extend(regressor.fit(seq, top_k_per_sequence));
+                let results = regressor.fit(seq, top_k_per_sequence);
+                #[cfg(feature = "abstract_thought")]
+                if let Some(at) = self.abstract_thought.as_mut() {
+                    for (canonical, count) in regressor.macro_usage() {
+                        for _ in 0..*count {
+                            at.dynamic_grammar.record_usage(canonical);
+                        }
+                    }
+                }
+                all_conjectures.extend(results);
             }
             // Deduplicate across ensemble runs
-            let sample_pts: Vec<f64> = seq.data.iter().take(5).map(|(x,_)| *x).collect();
+            let sample_pts: Vec<f64> = seq.data.iter().take(5).map(|(x, _)| *x).collect();
             let mut seen = Vec::new();
-            let new_conjectures: Vec<Conjecture> = all_conjectures.into_iter()
+            let new_conjectures: Vec<Conjecture> = all_conjectures
+                .into_iter()
                 .filter(|c| {
                     let fp = fingerprint_expr(&c.formula, &sample_pts);
-                    if seen.contains(&fp) { false } else { seen.push(fp); true }
+                    if seen.contains(&fp) {
+                        false
+                    } else {
+                        seen.push(fp);
+                        true
+                    }
                 })
                 .take(top_k_per_sequence * 2) // keep more from ensemble
                 .collect();
@@ -2218,7 +2938,9 @@ impl ConjectureEngine {
         }
         // Sort all conjectures by fitness
         self.conjectures.sort_by(|a, b| {
-            a.fitness.partial_cmp(&b.fitness).unwrap_or(std::cmp::Ordering::Equal)
+            a.fitness
+                .partial_cmp(&b.fitness)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
         &self.conjectures
     }
@@ -2232,7 +2954,9 @@ impl ConjectureEngine {
             }
             if let Some(seq) = observations.iter().find(|s| s.name == conjecture.source) {
                 let (train, test) = seq.train_test_split();
-                if test.is_empty() { continue; }
+                if test.is_empty() {
+                    continue;
+                }
 
                 let test_mse = compute_mse(&conjecture.formula, &test);
                 let train_mse = conjecture.training_mse;
@@ -2247,25 +2971,35 @@ impl ConjectureEngine {
 
                 // ── Asymptotic verification (#1) ──────────────────────
                 // For asymptotic formulas, use RELATIVE error on test data
-                let rel_errors: Vec<f64> = test.iter()
+                let rel_errors: Vec<f64> = test
+                    .iter()
                     .filter_map(|(x, y)| {
                         let pred = conjecture.formula.eval(&[("n", *x)]);
                         if pred.is_finite() && y.abs() > 1e-10 {
                             Some(((pred - y) / y).abs())
-                        } else { None }
+                        } else {
+                            None
+                        }
                     })
                     .collect();
-                let mean_rel_error = if rel_errors.is_empty() { f64::MAX }
-                    else { rel_errors.iter().sum::<f64>() / rel_errors.len() as f64 };
+                let mean_rel_error = if rel_errors.is_empty() {
+                    f64::MAX
+                } else {
+                    rel_errors.iter().sum::<f64>() / rel_errors.len() as f64
+                };
 
                 // Accept if: (a) test MSE reasonable, OR (b) constant capturing limit,
                 // OR (c) relative error < 10%
-                if test_mse.is_finite() && (
-                    test_mse < train_mse * 10.0 ||
-                    (is_constant && test_better) ||
-                    mean_rel_error < 0.10
-                ) {
+                if test_mse.is_finite()
+                    && (test_mse < train_mse * 10.0
+                        || (is_constant && test_better)
+                        || mean_rel_error < 0.10)
+                {
                     conjecture.status = ConjectureStatus::NumericallyTested { test_mse };
+                    elevate_macro_promotion_tier(
+                        conjecture,
+                        MacroPromotionTier::RecurrentNumerical,
+                    );
                     if test_better || mean_rel_error < 0.01 {
                         conjecture.confidence = (conjecture.confidence + 0.9) / 2.0;
                     } else {
@@ -2285,6 +3019,7 @@ impl ConjectureEngine {
                     conjecture.status = ConjectureStatus::Refuted {
                         counterexample: test[0].0,
                     };
+                    conjecture.macro_promotion_tier = MacroPromotionTier::Quarantined;
                     conjecture.confidence = 0.0;
                 }
                 // If neither accepted nor refuted, stays Proposed (uncertain)
@@ -2308,7 +3043,10 @@ impl ConjectureEngine {
     pub fn verify_formal(&mut self, max_n: usize) {
         let observations = self.observations.clone();
         for conjecture in &mut self.conjectures {
-            if !matches!(conjecture.status, ConjectureStatus::NumericallyTested { .. }) {
+            if !matches!(
+                conjecture.status,
+                ConjectureStatus::NumericallyTested { .. }
+            ) {
                 continue;
             }
 
@@ -2317,13 +3055,15 @@ impl ConjectureEngine {
             // is the wrong verification mode. They're already numerically verified.
             let v1 = conjecture.formula.eval(&[("n", 10.0)]);
             let v2 = conjecture.formula.eval(&[("n", 100.0)]);
-            let is_asymptotic = v1.is_finite() && v2.is_finite() && (v1 - v2).abs() < v1.abs().max(1.0) * 0.01;
-            if is_asymptotic { continue; }
+            let is_asymptotic =
+                v1.is_finite() && v2.is_finite() && (v1 - v2).abs() < v1.abs().max(1.0) * 0.01;
+            if is_asymptotic {
+                continue;
+            }
 
             if let Some(seq) = observations.iter().find(|s| s.name == conjecture.source) {
-                let known: std::collections::HashMap<i64, f64> = seq.data.iter()
-                    .map(|(x, y)| (*x as i64, *y))
-                    .collect();
+                let known: std::collections::HashMap<i64, f64> =
+                    seq.data.iter().map(|(x, y)| (*x as i64, *y)).collect();
 
                 let mut all_exact = true;
                 let mut checked = 0usize;
@@ -2353,6 +3093,7 @@ impl ConjectureEngine {
                     conjecture.status = ConjectureStatus::FormallyVerified {
                         proof_steps: checked,
                     };
+                    elevate_macro_promotion_tier(conjecture, MacroPromotionTier::Formal);
                     conjecture.confidence = 0.95;
                 } else if let Some(cx) = first_failure {
                     if known.contains_key(&(cx as i64)) {
@@ -2361,9 +3102,12 @@ impl ConjectureEngine {
                         let expected = known[&(cx as i64)];
                         let rel_err = if expected.abs() > 1e-10 {
                             ((pred - expected) / expected).abs()
-                        } else { (pred - expected).abs() };
+                        } else {
+                            (pred - expected).abs()
+                        };
                         if rel_err > 0.5 {
                             conjecture.status = ConjectureStatus::Refuted { counterexample: cx };
+                            conjecture.macro_promotion_tier = MacroPromotionTier::Quarantined;
                             conjecture.confidence = 0.0;
                         }
                         // If rel_err <= 0.5, stay NumericallyTested (don't refute)
@@ -2397,9 +3141,9 @@ impl ConjectureEngine {
                     "[conjecture_engine] auto_prove_via_z3: z3 not found — \
                      set $Z3_PATH or add z3 to PATH (e.g. `nix-shell -p z3`). \
                      Formal verification skipped for {} conjectures.",
-                    self.conjectures.iter()
-                        .filter(|c| matches!(c.status,
-                            ConjectureStatus::NumericallyTested { .. }))
+                    self.conjectures
+                        .iter()
+                        .filter(|c| matches!(c.status, ConjectureStatus::NumericallyTested { .. }))
                         .count()
                 );
                 return;
@@ -2410,7 +3154,10 @@ impl ConjectureEngine {
         let observations = self.observations.clone();
 
         for conjecture in &mut self.conjectures {
-            if !matches!(conjecture.status, ConjectureStatus::NumericallyTested { .. }) {
+            if !matches!(
+                conjecture.status,
+                ConjectureStatus::NumericallyTested { .. }
+            ) {
                 continue;
             }
 
@@ -2442,7 +3189,9 @@ impl ConjectureEngine {
 
             for &(x, y) in &src.data {
                 let n_val = x;
-                if !n_val.is_finite() || !y.is_finite() { continue; }
+                if !n_val.is_finite() || !y.is_finite() {
+                    continue;
+                }
 
                 // Build a query that asks: "can formula(n_val) differ from y?"
                 // If UNSAT, the formula matches y exactly at n_val.
@@ -2495,6 +3244,7 @@ impl ConjectureEngine {
                 conjecture.status = ConjectureStatus::FormallyVerified {
                     proof_steps: tested_points,
                 };
+                elevate_macro_promotion_tier(conjecture, MacroPromotionTier::Formal);
                 conjecture.confidence = 0.99;
             }
         }
@@ -2502,9 +3252,14 @@ impl ConjectureEngine {
 
     /// Get the best verified conjecture for a given source.
     pub fn best_for(&self, source: &str) -> Option<&Conjecture> {
-        self.conjectures.iter()
+        self.conjectures
+            .iter()
             .filter(|c| c.source == source)
-            .min_by(|a, b| a.training_mse.partial_cmp(&b.training_mse).unwrap_or(std::cmp::Ordering::Equal))
+            .min_by(|a, b| {
+                a.training_mse
+                    .partial_cmp(&b.training_mse)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
     }
 
     /// Generate a human-readable report of all conjectures.
@@ -2516,10 +3271,7 @@ impl ConjectureEngine {
         lines.push(String::new());
 
         for (i, c) in self.conjectures.iter().enumerate().take(10) {
-            lines.push(format!(
-                "#{}: {} ≈ {}",
-                i + 1, c.source, c.formula_str,
-            ));
+            lines.push(format!("#{}: {} ≈ {}", i + 1, c.source, c.formula_str,));
             lines.push(format!(
                 "   MSE={:.2e}, complexity={}, confidence={:.2}, status={:?}",
                 c.training_mse, c.complexity, c.confidence, c.status,
@@ -2576,7 +3328,9 @@ impl ConjectureEngine {
 
         out.push_str("\\begin{table}[htbp]\n");
         out.push_str("\\centering\n");
-        out.push_str("\\caption{Autonomous discoveries from the Ramanujan Protocol conjecture engine.}\n");
+        out.push_str(
+            "\\caption{Autonomous discoveries from the Ramanujan Protocol conjecture engine.}\n",
+        );
         out.push_str("\\label{tab:ramanujan_discoveries}\n");
         out.push_str(&format!("\\begin{{tabular}}{{{}}}\n", col_spec));
         out.push_str("\\toprule\n");
@@ -2657,8 +3411,9 @@ impl ConjectureEngine {
 
         for c in &rows {
             let status_tag = match &c.status {
-                ConjectureStatus::FormallyVerified { proof_steps } =>
-                    format!("FORMAL ✓ ({} steps)", proof_steps),
+                ConjectureStatus::FormallyVerified { proof_steps } => {
+                    format!("FORMAL ✓ ({} steps)", proof_steps)
+                }
                 ConjectureStatus::NumericallyTested { .. } => "Numeric".to_string(),
                 ConjectureStatus::SymbolicallyChecked => "Symbolic".to_string(),
                 ConjectureStatus::Refuted { .. } => "REFUTED".to_string(),
@@ -2708,7 +3463,10 @@ impl ConjectureEngine {
     /// For each conjecture, tests whether its formula fits sequences from
     /// other domains within a given MSE ratio tolerance. Returns matches
     /// sorted by quality (lowest MSE ratio first).
-    pub fn discover_cross_domain_formulas(&self, max_mse_ratio: f64) -> Vec<CrossDomainFormulaMatch> {
+    pub fn discover_cross_domain_formulas(
+        &self,
+        max_mse_ratio: f64,
+    ) -> Vec<CrossDomainFormulaMatch> {
         let mut matches = Vec::new();
 
         for conjecture in &self.conjectures {
@@ -2769,10 +3527,17 @@ pub struct LanglandsDiscovery {
 impl std::fmt::Display for LanglandsDiscovery {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.is_identity {
-            write!(f, "MODULARITY: {} ↔ {} ({}/{} primes, {})",
-                self.curve, self.form, self.matching_primes, self.total_primes, self.relation)
+            write!(
+                f,
+                "MODULARITY: {} ↔ {} ({}/{} primes, {})",
+                self.curve, self.form, self.matching_primes, self.total_primes, self.relation
+            )
         } else {
-            write!(f, "RELATION: {} ~ {} ({})", self.curve, self.form, self.relation)
+            write!(
+                f,
+                "RELATION: {} ~ {} ({})",
+                self.curve, self.form, self.relation
+            )
         }
     }
 }
@@ -2811,20 +3576,27 @@ impl ConjectureEngine {
             for form_seq in &form_seqs {
                 // Align by prime indices — curve seq has (p, a_p), form has (n, c_n)
                 // Extract values at matching x-coordinates
-                let curve_map: std::collections::HashMap<i64, f64> =
-                    curve_seq.data.iter().map(|(x, y)| (*x as i64, *y)).collect();
+                let curve_map: std::collections::HashMap<i64, f64> = curve_seq
+                    .data
+                    .iter()
+                    .map(|(x, y)| (*x as i64, *y))
+                    .collect();
                 let form_map: std::collections::HashMap<i64, f64> =
                     form_seq.data.iter().map(|(x, y)| (*x as i64, *y)).collect();
 
-                let common: Vec<i64> = curve_map.keys()
+                let common: Vec<i64> = curve_map
+                    .keys()
                     .filter(|k| form_map.contains_key(k))
                     .cloned()
                     .collect();
 
-                if common.len() < 3 { continue; }
+                if common.len() < 3 {
+                    continue;
+                }
 
                 // Count exact matches
-                let matches = common.iter()
+                let matches = common
+                    .iter()
                     .filter(|k| (curve_map[k] - form_map[k]).abs() < 0.5)
                     .count();
 
@@ -2838,7 +3610,12 @@ impl ConjectureEngine {
                         relation: if match_rate > 0.99 {
                             format!("IDENTITY: a_p = c_p ({}/{} exact)", matches, total)
                         } else {
-                            format!("APPROXIMATE: {}/{} match ({:.1}%)", matches, total, match_rate * 100.0)
+                            format!(
+                                "APPROXIMATE: {}/{} match ({:.1}%)",
+                                matches,
+                                total,
+                                match_rate * 100.0
+                            )
                         },
                         matching_primes: matches,
                         total_primes: total,
@@ -2900,9 +3677,12 @@ impl fmt::Display for CrossDomainFormulaMatch {
         write!(
             f,
             "{} ({:?}) → {} ({:?}): f(n) ≈ {} [ratio={:.2}]",
-            self.source_seq, self.source_domain,
-            self.target_seq, self.target_domain,
-            self.formula_str, self.mse_ratio
+            self.source_seq,
+            self.source_domain,
+            self.target_seq,
+            self.target_domain,
+            self.formula_str,
+            self.mse_ratio
         )
     }
 }
@@ -2933,7 +3713,11 @@ pub fn observe_fibonacci_ratios(max_n: usize) -> ObservedSequence {
         .filter_map(|n| {
             let prev = fibonacci(n as u64 - 1);
             let curr = fibonacci(n as u64);
-            if prev > 0 { Some((n as f64, curr as f64 / prev as f64)) } else { None }
+            if prev > 0 {
+                Some((n as f64, curr as f64 / prev as f64))
+            } else {
+                None
+            }
         })
         .collect();
     ObservedSequence::new("fibonacci_ratio(n)", MathDomain::Combinatorics, data)
@@ -2951,7 +3735,11 @@ pub fn observe_gct_obstruction(max_n: usize) -> ObservedSequence {
             (n as f64, result.obstruction_ratio)
         })
         .collect();
-    ObservedSequence::new("gct_obstruction_ratio(n)", MathDomain::AlgebraicComplexity, data)
+    ObservedSequence::new(
+        "gct_obstruction_ratio(n)",
+        MathDomain::AlgebraicComplexity,
+        data,
+    )
 }
 
 /// Detailed GCT obstruction report — returns raw counts + survivor triples.
@@ -2999,7 +3787,8 @@ pub fn observe_prime_gaps(max_prime: u64) -> ObservedSequence {
             }
         }
     }
-    let data: Vec<(f64, f64)> = primes.windows(2)
+    let data: Vec<(f64, f64)> = primes
+        .windows(2)
         .enumerate()
         .map(|(i, w)| (i as f64 + 1.0, (w[1] - w[0]) as f64))
         .collect();
@@ -3031,7 +3820,9 @@ pub fn observe_maximal_prime_gap(max_n: u64) -> ObservedSequence {
     for n in 3..=max_n {
         if n as usize <= max_n as usize && is_prime[n as usize] {
             let gap = n - prev_prime;
-            if gap > max_gap { max_gap = gap; }
+            if gap > max_gap {
+                max_gap = gap;
+            }
             prev_prime = n;
         }
         if next_cp < checkpoints.len() && n >= checkpoints[next_cp] {
@@ -3109,7 +3900,11 @@ pub fn observe_lorenz_time_averages(n_samples: usize) -> ObservedSequence {
     let (_, states) = rk45_trajectory(lorenz_rhs, &[1.0, 1.0, 1.0], 50.0, 0.01);
 
     // Skip transient (first 1000 steps) to reach attractor
-    let attractor_states = if states.len() > 1000 { &states[1000..] } else { &states };
+    let attractor_states = if states.len() > 1000 {
+        &states[1000..]
+    } else {
+        &states
+    };
     let total = attractor_states.len();
 
     // Compute running time-average of z as a function of sample count
@@ -3126,7 +3921,11 @@ pub fn observe_lorenz_time_averages(n_samples: usize) -> ObservedSequence {
         }
     }
 
-    ObservedSequence::new("lorenz_time_avg_z(samples)", MathDomain::DynamicalSystems, data)
+    ObservedSequence::new(
+        "lorenz_time_avg_z(samples)",
+        MathDomain::DynamicalSystems,
+        data,
+    )
 }
 
 /// Observe Lorenz attractor: for each time step, compute candidate invariant
@@ -3144,28 +3943,46 @@ pub fn observe_lorenz_invariant_candidates(n_points: usize) -> Vec<ObservedSeque
     let mut seqs = Vec::new();
 
     // Candidate 1: z(t) — should oscillate around ρ-1 = 27
-    let z_data: Vec<(f64, f64)> = attractor.iter().zip(attractor_t)
+    let z_data: Vec<(f64, f64)> = attractor
+        .iter()
+        .zip(attractor_t)
         .step_by(step.max(1))
         .take(n_points)
         .map(|(s, &t)| (t, s[2]))
         .collect();
-    seqs.push(ObservedSequence::new("lorenz_z(t)", MathDomain::DynamicalSystems, z_data));
+    seqs.push(ObservedSequence::new(
+        "lorenz_z(t)",
+        MathDomain::DynamicalSystems,
+        z_data,
+    ));
 
     // Candidate 2: x² + y² (oscillation energy proxy)
-    let xy_data: Vec<(f64, f64)> = attractor.iter().zip(attractor_t)
+    let xy_data: Vec<(f64, f64)> = attractor
+        .iter()
+        .zip(attractor_t)
         .step_by(step.max(1))
         .take(n_points)
         .map(|(s, &t)| (t, s[0] * s[0] + s[1] * s[1]))
         .collect();
-    seqs.push(ObservedSequence::new("lorenz_x2_y2(t)", MathDomain::DynamicalSystems, xy_data));
+    seqs.push(ObservedSequence::new(
+        "lorenz_x2_y2(t)",
+        MathDomain::DynamicalSystems,
+        xy_data,
+    ));
 
     // Candidate 3: x²+y²+z² (total "energy" — not conserved but bounded)
-    let r2_data: Vec<(f64, f64)> = attractor.iter().zip(attractor_t)
+    let r2_data: Vec<(f64, f64)> = attractor
+        .iter()
+        .zip(attractor_t)
         .step_by(step.max(1))
         .take(n_points)
-        .map(|(s, &t)| (t, s[0]*s[0] + s[1]*s[1] + s[2]*s[2]))
+        .map(|(s, &t)| (t, s[0] * s[0] + s[1] * s[1] + s[2] * s[2]))
         .collect();
-    seqs.push(ObservedSequence::new("lorenz_r2(t)", MathDomain::DynamicalSystems, r2_data));
+    seqs.push(ObservedSequence::new(
+        "lorenz_r2(t)",
+        MathDomain::DynamicalSystems,
+        r2_data,
+    ));
 
     seqs
 }
@@ -3177,9 +3994,7 @@ pub fn observe_lorenz_invariant_candidates(n_points: usize) -> Vec<ObservedSeque
 /// Observe Bell numbers B(n) for n=0..max_n.
 pub fn observe_bell_numbers(max_n: usize) -> ObservedSequence {
     use super::combinatorics::bell;
-    let data: Vec<(f64, f64)> = (0..=max_n)
-        .map(|n| (n as f64, bell(n) as f64))
-        .collect();
+    let data: Vec<(f64, f64)> = (0..=max_n).map(|n| (n as f64, bell(n) as f64)).collect();
     ObservedSequence::new("bell(n)", MathDomain::Combinatorics, data)
 }
 
@@ -3214,7 +4029,7 @@ pub fn observe_bell_stirling_residual(max_n: usize) -> ObservedSequence {
 // PHYSICS INVARIANT DISCOVERY
 /// Observe Catalan numbers C(n) = C(2n,n)/(n+1).
 pub fn observe_catalan(max_n: usize) -> ObservedSequence {
-    use super::combinatorics::{catalan, binomial};
+    use super::combinatorics::{binomial, catalan};
     let data: Vec<(f64, f64)> = (0..=max_n)
         .map(|n| (n as f64, catalan(n as u64) as f64))
         .collect();
@@ -3246,18 +4061,27 @@ pub fn observe_derangement_ratio(max_n: usize) -> ObservedSequence {
 /// Observe prime counting function π(n) for n = 1..max_n.
 pub fn observe_prime_counting(max_n: usize) -> ObservedSequence {
     let mut is_prime = vec![true; max_n + 1];
-    if max_n >= 1 { is_prime[0] = false; }
-    if max_n >= 2 { is_prime[1] = false; }
+    if max_n >= 1 {
+        is_prime[0] = false;
+    }
+    if max_n >= 2 {
+        is_prime[1] = false;
+    }
     for i in 2..=max_n {
         if is_prime[i] {
             let mut j = i * 2;
-            while j <= max_n { is_prime[j] = false; j += i; }
+            while j <= max_n {
+                is_prime[j] = false;
+                j += i;
+            }
         }
     }
     let mut count = 0u64;
     let data: Vec<(f64, f64)> = (1..=max_n)
         .map(|n| {
-            if is_prime[n] { count += 1; }
+            if is_prime[n] {
+                count += 1;
+            }
             (n as f64, count as f64)
         })
         .collect();
@@ -3285,7 +4109,9 @@ fn kepler_rhs(s: &[f64], _t: f64) -> Vec<f64> {
     let (x, y, vx, vy) = (s[0], s[1], s[2], s[3]);
     let r2 = x * x + y * y;
     let r3 = r2 * r2.sqrt(); // r³
-    if r3 < 1e-15 { return vec![vx, vy, 0.0, 0.0]; }
+    if r3 < 1e-15 {
+        return vec![vx, vy, 0.0, 0.0];
+    }
     vec![vx, vy, -x / r3, -y / r3]
 }
 
@@ -3302,7 +4128,9 @@ fn double_pendulum_rhs(s: &[f64], _t: f64) -> Vec<f64> {
     // M = [[2, cos(δ)], [cos(δ), 1]]  (mass matrix)
     // det(M) = 2 - cos²(δ)
     let det = 2.0 - cd * cd;
-    if det.abs() < 1e-15 { return vec![w1, w2, 0.0, 0.0]; }
+    if det.abs() < 1e-15 {
+        return vec![w1, w2, 0.0, 0.0];
+    }
 
     // RHS of Lagrange equations:
     // F₁ = -2g·sin(θ₁) - ω₂²·sin(δ)
@@ -3337,24 +4165,40 @@ pub fn observe_harmonic_invariants(n_points: usize) -> Vec<ObservedSequence> {
     let step = states.len() / n_points.max(1);
     let mut seqs = Vec::new();
 
-    let energy: Vec<(f64, f64)> = states.iter().zip(&times)
-        .step_by(step.max(1)).take(n_points)
+    let energy: Vec<(f64, f64)> = states
+        .iter()
+        .zip(&times)
+        .step_by(step.max(1))
+        .take(n_points)
         .map(|(s, &t)| (t, s[0] * s[0] + s[1] * s[1]))
         .collect();
-    seqs.push(ObservedSequence::new("harmonic_E(t)", MathDomain::DynamicalSystems, energy));
+    seqs.push(ObservedSequence::new(
+        "harmonic_E(t)",
+        MathDomain::DynamicalSystems,
+        energy,
+    ));
 
-    let x2: Vec<(f64, f64)> = states.iter().zip(&times)
-        .step_by(step.max(1)).take(n_points)
+    let x2: Vec<(f64, f64)> = states
+        .iter()
+        .zip(&times)
+        .step_by(step.max(1))
+        .take(n_points)
         .map(|(s, &t)| (t, s[0] * s[0]))
         .collect();
-    seqs.push(ObservedSequence::new("harmonic_x²(t)", MathDomain::DynamicalSystems, x2));
+    seqs.push(ObservedSequence::new(
+        "harmonic_x²(t)",
+        MathDomain::DynamicalSystems,
+        x2,
+    ));
 
     seqs
 }
 
 /// Score invariant by variance. Zero variance = exact conservation law.
 pub fn invariant_variance(data: &[(f64, f64)]) -> (f64, f64) {
-    if data.is_empty() { return (0.0, f64::MAX); }
+    if data.is_empty() {
+        return (0.0, f64::MAX);
+    }
     let values: Vec<f64> = data.iter().map(|(_, v)| *v).collect();
     let mean = values.iter().sum::<f64>() / values.len() as f64;
     let var = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
@@ -3381,7 +4225,9 @@ pub fn observe_central_binomial_limit(max_n: usize) -> ObservedSequence {
             let val = cbn * (n as f64).sqrt() / 4.0_f64.powi(n as i32);
             if val.is_finite() && val > 0.0 {
                 Some((n as f64, val))
-            } else { None }
+            } else {
+                None
+            }
         })
         .collect();
     ObservedSequence::new("central_binom_limit(n)", MathDomain::Combinatorics, data)
@@ -3407,9 +4253,7 @@ pub fn observe_hydrogen_energy_levels(max_n: usize) -> ObservedSequence {
 /// In natural units (ℏω = 1): E_n = n + 0.5. The conjecture engine should
 /// discover the linear relationship with the ½ zero-point offset.
 pub fn observe_quantum_harmonic_oscillator(max_n: usize) -> ObservedSequence {
-    let data: Vec<(f64, f64)> = (0..=max_n)
-        .map(|n| (n as f64, n as f64 + 0.5))
-        .collect();
+    let data: Vec<(f64, f64)> = (0..=max_n).map(|n| (n as f64, n as f64 + 0.5)).collect();
     ObservedSequence::new("qho_E(n)", MathDomain::Physics, data)
 }
 
@@ -3512,8 +4356,11 @@ pub fn expr_to_smtlib2(expr: &Expr, var_name: &str) -> Option<String> {
         Expr::Const(c) => {
             if (*c - c.round()).abs() < 1e-10 && c.abs() < 1e12 {
                 let i = *c as i64;
-                if i >= 0 { Some(format!("{}.0", i)) }
-                else { Some(format!("(- 0.0 {}.0)", -i)) }
+                if i >= 0 {
+                    Some(format!("{}.0", i))
+                } else {
+                    Some(format!("(- 0.0 {}.0)", -i))
+                }
             } else {
                 Some(format!("{:.10}", c))
             }
@@ -3534,7 +4381,7 @@ pub fn expr_to_smtlib2(expr: &Expr, var_name: &str) -> Option<String> {
             let a = expr_to_smtlib2(arg, var_name)?;
             match func {
                 UnaryFn::Sqrt => Some(format!("(^ {} 0.5)", a)),
-                UnaryFn::Exp => Some(format!("(exp {})", a)),  // Z3 supports exp in QF_NRA
+                UnaryFn::Exp => Some(format!("(exp {})", a)), // Z3 supports exp in QF_NRA
                 UnaryFn::Log => Some(format!("(log {})", a)),
                 UnaryFn::Sin => Some(format!("(sin {})", a)),
                 UnaryFn::Cos => Some(format!("(cos {})", a)),
@@ -3572,21 +4419,31 @@ impl SymExpr {
     /// Evaluate with variable bindings.
     pub fn eval(&self, vars: &[(&str, f64)]) -> f64 {
         match self {
-            SymExpr::Var(name) => vars.iter()
+            SymExpr::Var(name) => vars
+                .iter()
                 .find(|(n, _)| *n == name.as_str())
-                .map(|(_, v)| *v).unwrap_or(0.0),
+                .map(|(_, v)| *v)
+                .unwrap_or(0.0),
             SymExpr::Const(c) => *c,
             SymExpr::Add(a, b) => a.eval(vars) + b.eval(vars),
             SymExpr::Mul(a, b) => a.eval(vars) * b.eval(vars),
             SymExpr::Div(a, b) => {
                 let bv = b.eval(vars);
-                if bv.abs() > 1e-15 { a.eval(vars) / bv } else { f64::NAN }
+                if bv.abs() > 1e-15 {
+                    a.eval(vars) / bv
+                } else {
+                    f64::NAN
+                }
             }
             SymExpr::Neg(a) => -a.eval(vars),
             SymExpr::Pow(base, exp) => base.eval(vars).powf(*exp),
             SymExpr::Log(a) => {
                 let v = a.eval(vars);
-                if v > 0.0 { v.ln() } else { f64::NAN }
+                if v > 0.0 {
+                    v.ln()
+                } else {
+                    f64::NAN
+                }
             }
             SymExpr::Sin(a) => a.eval(vars).sin(),
             SymExpr::Cos(a) => a.eval(vars).cos(),
@@ -3597,13 +4454,14 @@ impl SymExpr {
     pub fn diff(&self, var: &str) -> SymExpr {
         match self {
             SymExpr::Var(name) => {
-                if name == var { SymExpr::Const(1.0) } else { SymExpr::Const(0.0) }
+                if name == var {
+                    SymExpr::Const(1.0)
+                } else {
+                    SymExpr::Const(0.0)
+                }
             }
             SymExpr::Const(_) => SymExpr::Const(0.0),
-            SymExpr::Add(a, b) => SymExpr::Add(
-                Box::new(a.diff(var)),
-                Box::new(b.diff(var)),
-            ),
+            SymExpr::Add(a, b) => SymExpr::Add(Box::new(a.diff(var)), Box::new(b.diff(var))),
             SymExpr::Mul(a, b) => {
                 // Product rule: (a·b)' = a'·b + a·b'
                 SymExpr::Add(
@@ -3617,7 +4475,10 @@ impl SymExpr {
                     Box::new(SymExpr::Add(
                         Box::new(SymExpr::Mul(Box::new(a.diff(var)), b.clone())),
                         Box::new(SymExpr::Neg(Box::new(SymExpr::Mul(
-                            a.clone(), Box::new(b.diff(var)))))))),
+                            a.clone(),
+                            Box::new(b.diff(var)),
+                        )))),
+                    )),
                     Box::new(SymExpr::Pow(b.clone(), 2.0)),
                 )
             }
@@ -3634,17 +4495,11 @@ impl SymExpr {
             }
             SymExpr::Log(a) => {
                 // Chain rule: d/dx(ln(f)) = f'(x) / f(x)
-                SymExpr::Div(
-                    Box::new(a.diff(var)),
-                    a.clone(),
-                )
+                SymExpr::Div(Box::new(a.diff(var)), a.clone())
             }
             SymExpr::Sin(a) => {
                 // Chain rule: d/dx(sin(f)) = cos(f) · f'(x)
-                SymExpr::Mul(
-                    Box::new(SymExpr::Cos(a.clone())),
-                    Box::new(a.diff(var)),
-                )
+                SymExpr::Mul(Box::new(SymExpr::Cos(a.clone())), Box::new(a.diff(var)))
             }
             SymExpr::Cos(a) => {
                 // Chain rule: d/dx(cos(f)) = -sin(f) · f'(x)
@@ -3695,14 +4550,20 @@ impl SymExpr {
                 match (&a, &b) {
                     (SymExpr::Const(x), _) if x.abs() < 1e-15 => SymExpr::Const(0.0),
                     (_, SymExpr::Const(x)) if (*x - 1.0).abs() < 1e-15 => a,
-                    (SymExpr::Const(x), SymExpr::Const(y)) if y.abs() > 1e-15 => SymExpr::Const(x / y),
+                    (SymExpr::Const(x), SymExpr::Const(y)) if y.abs() > 1e-15 => {
+                        SymExpr::Const(x / y)
+                    }
                     _ => SymExpr::Div(Box::new(a), Box::new(b)),
                 }
             }
             SymExpr::Pow(base, exp) => {
                 let base = base.simplify();
-                if (*exp - 1.0).abs() < 1e-15 { return base; }
-                if exp.abs() < 1e-15 { return SymExpr::Const(1.0); }
+                if (*exp - 1.0).abs() < 1e-15 {
+                    return base;
+                }
+                if exp.abs() < 1e-15 {
+                    return SymExpr::Const(1.0);
+                }
                 match &base {
                     SymExpr::Const(c) => SymExpr::Const(c.powf(*exp)),
                     _ => SymExpr::Pow(Box::new(base), *exp),
@@ -3739,8 +4600,11 @@ impl fmt::Display for SymExpr {
         match self {
             SymExpr::Var(name) => write!(f, "{}", name),
             SymExpr::Const(c) => {
-                if (*c - c.round()).abs() < 1e-10 { write!(f, "{}", *c as i64) }
-                else { write!(f, "{:.4}", c) }
+                if (*c - c.round()).abs() < 1e-10 {
+                    write!(f, "{}", *c as i64)
+                } else {
+                    write!(f, "{:.4}", c)
+                }
             }
             SymExpr::Add(a, b) => write!(f, "({} + {})", a, b),
             SymExpr::Mul(a, b) => write!(f, "({} · {})", a, b),
@@ -3771,9 +4635,12 @@ impl fmt::Display for ConservationProof {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "Conservation test for {}:", self.quantity)?;
         writeln!(f, "  dE/dt = {}", self.total_derivative)?;
-        writeln!(f, "  Conserved: {} (numerical residual: {:.2e})",
+        writeln!(
+            f,
+            "  Conserved: {} (numerical residual: {:.2e})",
             if self.is_conserved { "YES" } else { "NO" },
-            self.max_numerical_residual)?;
+            self.max_numerical_residual
+        )?;
         Ok(())
     }
 }
@@ -3813,7 +4680,8 @@ pub fn verify_conservation_symbolic(
         vec![("x", 2.0), ("v", -1.5)],
     ];
 
-    let max_residual = test_points.iter()
+    let max_residual = test_points
+        .iter()
         .map(|pt| total_deriv.eval(pt).abs())
         .fold(0.0f64, f64::max);
 
@@ -3838,16 +4706,24 @@ pub fn expr_to_sym(expr: &Expr) -> Option<SymExpr> {
             let r = expr_to_sym(right)?;
             match op {
                 BinOp::Add => Some(SymExpr::Add(Box::new(l), Box::new(r))),
-                BinOp::Sub => Some(SymExpr::Add(Box::new(l), Box::new(SymExpr::Neg(Box::new(r))))),
+                BinOp::Sub => Some(SymExpr::Add(
+                    Box::new(l),
+                    Box::new(SymExpr::Neg(Box::new(r))),
+                )),
                 BinOp::Mul => Some(SymExpr::Mul(Box::new(l), Box::new(r))),
                 BinOp::Pow => {
                     if let Expr::Const(exp) = right.as_ref() {
                         Some(SymExpr::Pow(Box::new(l), *exp))
-                    } else { None } // variable exponent not supported
+                    } else {
+                        None
+                    } // variable exponent not supported
                 }
                 BinOp::Div => {
                     // a/b = a * b^(-1)
-                    Some(SymExpr::Mul(Box::new(l), Box::new(SymExpr::Pow(Box::new(r), -1.0))))
+                    Some(SymExpr::Mul(
+                        Box::new(l),
+                        Box::new(SymExpr::Pow(Box::new(r), -1.0)),
+                    ))
                 }
             }
         }
@@ -3881,7 +4757,9 @@ pub fn verify_formula_derivative(
         let (x0, y0) = w[0];
         let (x1, y1) = w[1];
         let dx = x1 - x0;
-        if dx.abs() < 1e-15 { continue; }
+        if dx.abs() < 1e-15 {
+            continue;
+        }
         let finite_diff = (y1 - y0) / dx;
         let midpoint = (x0 + x1) / 2.0;
         let symbolic_val = deriv.eval(&[(var, midpoint)]);
@@ -3892,7 +4770,9 @@ pub fn verify_formula_derivative(
         }
     }
 
-    if checked == 0 { return None; }
+    if checked == 0 {
+        return None;
+    }
 
     Some(DerivativeVerification {
         derivative_str: format!("{}", deriv),
@@ -3942,35 +4822,59 @@ fn build_invariant_candidates(
     if ndim >= 2 {
         let (v0, v1) = (var_names[0], var_names[1]);
         // Σ xᵢ²
-        candidates.push((format!("{}² + {}²", v0, v1),
-            Box::new(|s: &[f64]| s[0]*s[0] + s[1]*s[1]),
+        candidates.push((
+            format!("{}² + {}²", v0, v1),
+            Box::new(|s: &[f64]| s[0] * s[0] + s[1] * s[1]),
             SymExpr::Add(
                 Box::new(SymExpr::Pow(Box::new(SymExpr::Var(v0.into())), 2.0)),
-                Box::new(SymExpr::Pow(Box::new(SymExpr::Var(v1.into())), 2.0)))));
+                Box::new(SymExpr::Pow(Box::new(SymExpr::Var(v1.into())), 2.0)),
+            ),
+        ));
         // Cross term
-        candidates.push((format!("{}·{}", v0, v1),
-            Box::new(|s: &[f64]| s[0]*s[1]),
-            SymExpr::Mul(Box::new(SymExpr::Var(v0.into())), Box::new(SymExpr::Var(v1.into())))));
+        candidates.push((
+            format!("{}·{}", v0, v1),
+            Box::new(|s: &[f64]| s[0] * s[1]),
+            SymExpr::Mul(
+                Box::new(SymExpr::Var(v0.into())),
+                Box::new(SymExpr::Var(v1.into())),
+            ),
+        ));
         // Individual squares
-        candidates.push((format!("{}²", v0),
-            Box::new(|s: &[f64]| s[0]*s[0]),
-            SymExpr::Pow(Box::new(SymExpr::Var(v0.into())), 2.0)));
-        candidates.push((format!("{}²", v1),
-            Box::new(|s: &[f64]| s[1]*s[1]),
-            SymExpr::Pow(Box::new(SymExpr::Var(v1.into())), 2.0)));
+        candidates.push((
+            format!("{}²", v0),
+            Box::new(|s: &[f64]| s[0] * s[0]),
+            SymExpr::Pow(Box::new(SymExpr::Var(v0.into())), 2.0),
+        ));
+        candidates.push((
+            format!("{}²", v1),
+            Box::new(|s: &[f64]| s[1] * s[1]),
+            SymExpr::Pow(Box::new(SymExpr::Var(v1.into())), 2.0),
+        ));
         // Lotka-Volterra type
-        candidates.push((format!("{0} - ln({0}) + {1} - ln({1})", v0, v1),
+        candidates.push((
+            format!("{0} - ln({0}) + {1} - ln({1})", v0, v1),
             Box::new(|s: &[f64]| {
-                if s[0] > 0.0 && s[1] > 0.0 { s[0] - s[0].ln() + s[1] - s[1].ln() }
-                else { f64::NAN }
+                if s[0] > 0.0 && s[1] > 0.0 {
+                    s[0] - s[0].ln() + s[1] - s[1].ln()
+                } else {
+                    f64::NAN
+                }
             }),
             SymExpr::Add(
                 Box::new(SymExpr::Add(
                     Box::new(SymExpr::Var(v0.into())),
-                    Box::new(SymExpr::Neg(Box::new(SymExpr::Log(Box::new(SymExpr::Var(v0.into())))))))),
+                    Box::new(SymExpr::Neg(Box::new(SymExpr::Log(Box::new(
+                        SymExpr::Var(v0.into()),
+                    ))))),
+                )),
                 Box::new(SymExpr::Add(
                     Box::new(SymExpr::Var(v1.into())),
-                    Box::new(SymExpr::Neg(Box::new(SymExpr::Log(Box::new(SymExpr::Var(v1.into())))))))))));
+                    Box::new(SymExpr::Neg(Box::new(SymExpr::Log(Box::new(
+                        SymExpr::Var(v1.into()),
+                    ))))),
+                )),
+            ),
+        ));
     }
 
     // ── 4D candidates (Kepler: [x, y, vx, vy]) ──
@@ -3978,58 +4882,89 @@ fn build_invariant_candidates(
         let (x, y, vx, vy) = (var_names[0], var_names[1], var_names[2], var_names[3]);
 
         // Kinetic energy: ½(vx² + vy²)
-        candidates.push(("½(vx² + vy²)".into(),
-            Box::new(|s: &[f64]| 0.5 * (s[2]*s[2] + s[3]*s[3])),
+        candidates.push((
+            "½(vx² + vy²)".into(),
+            Box::new(|s: &[f64]| 0.5 * (s[2] * s[2] + s[3] * s[3])),
             SymExpr::Mul(
                 Box::new(SymExpr::Const(0.5)),
                 Box::new(SymExpr::Add(
                     Box::new(SymExpr::Pow(Box::new(SymExpr::Var(vx.into())), 2.0)),
-                    Box::new(SymExpr::Pow(Box::new(SymExpr::Var(vy.into())), 2.0)))))));
+                    Box::new(SymExpr::Pow(Box::new(SymExpr::Var(vy.into())), 2.0)),
+                )),
+            ),
+        ));
 
         // Angular momentum: L = x·vy - y·vx
-        candidates.push(("L = x·vy - y·vx".into(),
-            Box::new(|s: &[f64]| s[0]*s[3] - s[1]*s[2]),
+        candidates.push((
+            "L = x·vy - y·vx".into(),
+            Box::new(|s: &[f64]| s[0] * s[3] - s[1] * s[2]),
             SymExpr::Add(
-                Box::new(SymExpr::Mul(Box::new(SymExpr::Var(x.into())), Box::new(SymExpr::Var(vy.into())))),
+                Box::new(SymExpr::Mul(
+                    Box::new(SymExpr::Var(x.into())),
+                    Box::new(SymExpr::Var(vy.into())),
+                )),
                 Box::new(SymExpr::Neg(Box::new(SymExpr::Mul(
-                    Box::new(SymExpr::Var(y.into())), Box::new(SymExpr::Var(vx.into())))))))));
+                    Box::new(SymExpr::Var(y.into())),
+                    Box::new(SymExpr::Var(vx.into())),
+                )))),
+            ),
+        ));
 
         // r = √(x²+y²) — used in energy
         // E = ½(vx²+vy²) - 1/r (Kepler energy, k=1)
-        candidates.push(("E = ½v² - 1/r".into(),
+        candidates.push((
+            "E = ½v² - 1/r".into(),
             Box::new(|s: &[f64]| {
-                let r = (s[0]*s[0] + s[1]*s[1]).sqrt();
-                if r > 1e-10 { 0.5*(s[2]*s[2] + s[3]*s[3]) - 1.0/r } else { f64::NAN }
+                let r = (s[0] * s[0] + s[1] * s[1]).sqrt();
+                if r > 1e-10 {
+                    0.5 * (s[2] * s[2] + s[3] * s[3]) - 1.0 / r
+                } else {
+                    f64::NAN
+                }
             }),
             SymExpr::Add(
                 Box::new(SymExpr::Mul(
                     Box::new(SymExpr::Const(0.5)),
                     Box::new(SymExpr::Add(
                         Box::new(SymExpr::Pow(Box::new(SymExpr::Var(vx.into())), 2.0)),
-                        Box::new(SymExpr::Pow(Box::new(SymExpr::Var(vy.into())), 2.0)))))),
+                        Box::new(SymExpr::Pow(Box::new(SymExpr::Var(vy.into())), 2.0)),
+                    )),
+                )),
                 Box::new(SymExpr::Neg(Box::new(SymExpr::Pow(
                     Box::new(SymExpr::Add(
                         Box::new(SymExpr::Pow(Box::new(SymExpr::Var(x.into())), 2.0)),
-                        Box::new(SymExpr::Pow(Box::new(SymExpr::Var(y.into())), 2.0)))),
-                    -0.5)))))));
+                        Box::new(SymExpr::Pow(Box::new(SymExpr::Var(y.into())), 2.0)),
+                    )),
+                    -0.5,
+                )))),
+            ),
+        ));
 
         // Σ all squares
-        candidates.push(("x²+y²+vx²+vy²".into(),
-            Box::new(|s: &[f64]| s[0]*s[0]+s[1]*s[1]+s[2]*s[2]+s[3]*s[3]),
+        candidates.push((
+            "x²+y²+vx²+vy²".into(),
+            Box::new(|s: &[f64]| s[0] * s[0] + s[1] * s[1] + s[2] * s[2] + s[3] * s[3]),
             SymExpr::Add(
                 Box::new(SymExpr::Add(
                     Box::new(SymExpr::Pow(Box::new(SymExpr::Var(x.into())), 2.0)),
-                    Box::new(SymExpr::Pow(Box::new(SymExpr::Var(y.into())), 2.0)))),
+                    Box::new(SymExpr::Pow(Box::new(SymExpr::Var(y.into())), 2.0)),
+                )),
                 Box::new(SymExpr::Add(
                     Box::new(SymExpr::Pow(Box::new(SymExpr::Var(vx.into())), 2.0)),
-                    Box::new(SymExpr::Pow(Box::new(SymExpr::Var(vy.into())), 2.0)))))));
+                    Box::new(SymExpr::Pow(Box::new(SymExpr::Var(vy.into())), 2.0)),
+                )),
+            ),
+        ));
 
         // r² = x²+y²
-        candidates.push(("r² = x²+y²".into(),
-            Box::new(|s: &[f64]| s[0]*s[0]+s[1]*s[1]),
+        candidates.push((
+            "r² = x²+y²".into(),
+            Box::new(|s: &[f64]| s[0] * s[0] + s[1] * s[1]),
             SymExpr::Add(
                 Box::new(SymExpr::Pow(Box::new(SymExpr::Var(x.into())), 2.0)),
-                Box::new(SymExpr::Pow(Box::new(SymExpr::Var(y.into())), 2.0)))));
+                Box::new(SymExpr::Pow(Box::new(SymExpr::Var(y.into())), 2.0)),
+            ),
+        ));
     }
 
     candidates
@@ -4067,14 +5002,17 @@ pub fn discover_conservation_laws(
 
     for (name, eval_fn, sym_expr) in &candidates {
         // Evaluate along trajectory, filtering NaN
-        let values: Vec<f64> = states.iter()
+        let values: Vec<f64> = states
+            .iter()
             .step_by(step.max(1))
             .take(n_samples)
             .map(|s| eval_fn(s))
             .filter(|v| v.is_finite())
             .collect();
 
-        if values.len() < 10 { continue; }
+        if values.len() < 10 {
+            continue;
+        }
 
         let mean = values.iter().sum::<f64>() / values.len() as f64;
         let var = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
@@ -4097,7 +5035,11 @@ pub fn discover_conservation_laws(
     }
 
     // Sort by variance (most conserved first)
-    results.sort_by(|a, b| a.variance.partial_cmp(&b.variance).unwrap_or(std::cmp::Ordering::Equal));
+    results.sort_by(|a, b| {
+        a.variance
+            .partial_cmp(&b.variance)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     results
 }
 
@@ -4126,35 +5068,60 @@ pub fn discover_conservation_laws_with_custom(
     // Test auto-generated candidates
     let auto_candidates = build_invariant_candidates(var_names);
     for (name, eval_fn, sym_expr) in &auto_candidates {
-        let values: Vec<f64> = states.iter().step_by(step.max(1)).take(n_samples)
-            .map(|s| eval_fn(s)).filter(|v| v.is_finite()).collect();
-        if values.len() < 10 { continue; }
+        let values: Vec<f64> = states
+            .iter()
+            .step_by(step.max(1))
+            .take(n_samples)
+            .map(|s| eval_fn(s))
+            .filter(|v| v.is_finite())
+            .collect();
+        if values.len() < 10 {
+            continue;
+        }
         let mean = values.iter().sum::<f64>() / values.len() as f64;
         let var = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
         let proven = if var < 1e-6 * mean.abs().max(1.0) {
             verify_conservation_symbolic(sym_expr, dynamics).is_conserved
-        } else { false };
+        } else {
+            false
+        };
         results.push(DiscoveredConservation {
-            name: name.clone(), expression: format!("{}", sym_expr),
-            variance: var, mean_value: mean, symbolically_proven: proven,
+            name: name.clone(),
+            expression: format!("{}", sym_expr),
+            variance: var,
+            mean_value: mean,
+            symbolically_proven: proven,
         });
     }
 
     // Test custom candidates (numerical only)
     for (name, eval_fn) in &custom_candidates {
-        let values: Vec<f64> = states.iter().step_by(step.max(1)).take(n_samples)
-            .map(|s| eval_fn(s)).filter(|v| v.is_finite()).collect();
-        if values.len() < 10 { continue; }
+        let values: Vec<f64> = states
+            .iter()
+            .step_by(step.max(1))
+            .take(n_samples)
+            .map(|s| eval_fn(s))
+            .filter(|v| v.is_finite())
+            .collect();
+        if values.len() < 10 {
+            continue;
+        }
         let mean = values.iter().sum::<f64>() / values.len() as f64;
         let var = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
         results.push(DiscoveredConservation {
-            name: name.clone(), expression: name.clone(),
-            variance: var, mean_value: mean,
+            name: name.clone(),
+            expression: name.clone(),
+            variance: var,
+            mean_value: mean,
             symbolically_proven: false, // trig candidates can't be proven symbolically (yet)
         });
     }
 
-    results.sort_by(|a, b| a.variance.partial_cmp(&b.variance).unwrap_or(std::cmp::Ordering::Equal));
+    results.sort_by(|a, b| {
+        a.variance
+            .partial_cmp(&b.variance)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     results
 }
 
@@ -4172,8 +5139,17 @@ fn random_expr_multivar(rng: &mut u64, max_depth: usize, var_names: &[&str]) -> 
             *rng = lcg_step(*rng);
             Expr::Var(var_names[*rng as usize % var_names.len()].to_string())
         } else {
-            let constants = [0.0, 0.5, 1.0, 2.0, 3.0, -1.0, -0.5,
-                std::f64::consts::PI, std::f64::consts::E];
+            let constants = [
+                0.0,
+                0.5,
+                1.0,
+                2.0,
+                3.0,
+                -1.0,
+                -0.5,
+                std::f64::consts::PI,
+                std::f64::consts::E,
+            ];
             *rng = lcg_step(*rng);
             Expr::Const(constants[*rng as usize % constants.len()])
         }
@@ -4182,15 +5158,19 @@ fn random_expr_multivar(rng: &mut u64, max_depth: usize, var_names: &[&str]) -> 
         if *rng % 5 == 0 {
             let fns = [UnaryFn::Sqrt, UnaryFn::Log, UnaryFn::Sin, UnaryFn::Cos];
             *rng = lcg_step(*rng);
-            Expr::Func(fns[*rng as usize % fns.len()],
-                Box::new(random_expr_multivar(rng, max_depth - 1, var_names)))
+            Expr::Func(
+                fns[*rng as usize % fns.len()],
+                Box::new(random_expr_multivar(rng, max_depth - 1, var_names)),
+            )
         } else {
             let ops = [BinOp::Add, BinOp::Sub, BinOp::Mul, BinOp::Div, BinOp::Pow];
             *rng = lcg_step(*rng);
             let op = ops[*rng as usize % ops.len()];
-            Expr::BinOp(op,
+            Expr::BinOp(
+                op,
                 Box::new(random_expr_multivar(rng, max_depth - 1, var_names)),
-                Box::new(random_expr_multivar(rng, max_depth - 1, var_names)))
+                Box::new(random_expr_multivar(rng, max_depth - 1, var_names)),
+            )
         }
     }
 }
@@ -4207,13 +5187,27 @@ fn mutate_multivar(expr: &Expr, rng: &mut u64, depth: usize, var_names: &[&str])
         Expr::BinOp(op, l, r) => {
             *rng = lcg_step(*rng);
             if *rng % 2 == 0 {
-                Expr::BinOp(*op, Box::new(mutate_multivar(l, rng, depth + 1, var_names)), r.clone())
+                Expr::BinOp(
+                    *op,
+                    Box::new(mutate_multivar(l, rng, depth + 1, var_names)),
+                    r.clone(),
+                )
             } else {
-                Expr::BinOp(*op, l.clone(), Box::new(mutate_multivar(r, rng, depth + 1, var_names)))
+                Expr::BinOp(
+                    *op,
+                    l.clone(),
+                    Box::new(mutate_multivar(r, rng, depth + 1, var_names)),
+                )
             }
         }
-        Expr::Func(f, arg) => Expr::Func(*f, Box::new(mutate_multivar(arg, rng, depth + 1, var_names))),
-        Expr::Sum(body, var) => Expr::Sum(Box::new(mutate_multivar(body, rng, depth + 1, var_names)), var.clone()),
+        Expr::Func(f, arg) => Expr::Func(
+            *f,
+            Box::new(mutate_multivar(arg, rng, depth + 1, var_names)),
+        ),
+        Expr::Sum(body, var) => Expr::Sum(
+            Box::new(mutate_multivar(body, rng, depth + 1, var_names)),
+            var.clone(),
+        ),
     }
 }
 
@@ -4230,7 +5224,8 @@ fn compute_trajectory_variance(expr: &Expr, trajectory: &[Vec<f64>], var_names: 
     let mut values = Vec::with_capacity(trajectory.len());
     let mut nan_count = 0usize;
     for state in trajectory {
-        let bindings: Vec<(&str, f64)> = var_names.iter()
+        let bindings: Vec<(&str, f64)> = var_names
+            .iter()
             .zip(state.iter())
             .map(|(name, val)| (*name, *val))
             .collect();
@@ -4243,7 +5238,9 @@ fn compute_trajectory_variance(expr: &Expr, trajectory: &[Vec<f64>], var_names: 
     }
 
     let total = trajectory.len();
-    if total == 0 || values.len() < 10 { return f64::MAX; }
+    if total == 0 || values.len() < 10 {
+        return f64::MAX;
+    }
 
     // PENALTY: if more than 25% of trajectory points evaluate to NaN/Inf,
     // the formula is only valid on a subset of the state space — it's
@@ -4253,7 +5250,9 @@ fn compute_trajectory_variance(expr: &Expr, trajectory: &[Vec<f64>], var_names: 
     }
 
     let mean = values.iter().sum::<f64>() / values.len() as f64;
-    if !mean.is_finite() || mean.abs() > 1e15 { return f64::MAX; }
+    if !mean.is_finite() || mean.abs() > 1e15 {
+        return f64::MAX;
+    }
 
     // MAGNITUDE PRE-FILTER: reject expressions whose trajectory values all
     // sit near machine-epsilon. This catches two classes of degenerate
@@ -4277,7 +5276,9 @@ fn compute_trajectory_variance(expr: &Expr, trajectory: &[Vec<f64>], var_names: 
     }
 
     let var = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
-    if !var.is_finite() { return f64::MAX; }
+    if !var.is_finite() {
+        return f64::MAX;
+    }
 
     // Raw variance is the correct fitness: it's translation-invariant
     // (adding a constant doesn't change it, unlike var/mean² which can be
@@ -4325,6 +5326,34 @@ pub fn discover_invariants_autonomous(
     t_max: f64,
     dt: f64,
 ) -> Vec<AutonomousInvariant> {
+    discover_invariants_autonomous_with_seed_templates(
+        rhs,
+        initial_state,
+        var_names,
+        dynamics,
+        config,
+        t_max,
+        dt,
+        &[],
+    )
+}
+
+/// Autonomous invariant discovery with additional externally supplied seed templates.
+///
+/// This is the safe feedback path from the macro pool back into autonomous
+/// discovery: callers can pass only signature-compatible, already-promoted
+/// macros here, and the discoverer treats them as extra templates alongside
+/// its built-in invariant library.
+pub fn discover_invariants_autonomous_with_seed_templates(
+    rhs: fn(&[f64], f64) -> Vec<f64>,
+    initial_state: &[f64],
+    var_names: &[&str],
+    dynamics: Option<&[(&str, SymExpr)]>, // for symbolic proof (optional)
+    config: &RegressorConfig,
+    t_max: f64,
+    dt: f64,
+    extra_seed_templates: &[Expr],
+) -> Vec<AutonomousInvariant> {
     let ndim = initial_state.len();
     assert_eq!(var_names.len(), ndim);
 
@@ -4332,13 +5361,16 @@ pub fn discover_invariants_autonomous(
     let (_times, states) = rk45_trajectory(rhs, initial_state, t_max, dt);
     let n_samples = 200.min(states.len());
     let step = states.len() / n_samples.max(1);
-    let sampled: Vec<Vec<f64>> = states.iter()
+    let sampled: Vec<Vec<f64>> = states
+        .iter()
         .step_by(step.max(1))
         .take(n_samples)
         .cloned()
         .collect();
 
-    if sampled.len() < 20 { return Vec::new(); }
+    if sampled.len() < 20 {
+        return Vec::new();
+    }
 
     // Step 2: GP evolution with variance as fitness
     let pop_size = config.population_size;
@@ -4355,7 +5387,18 @@ pub fn discover_invariants_autonomous(
         .collect();
 
     // Seed with known useful templates
-    let seed_templates = build_invariant_templates(var_names);
+    let mut seed_templates = build_invariant_templates(var_names);
+    let mut seen_seed_templates: std::collections::HashSet<String> =
+        seed_templates.iter().map(macro_usage_key).collect();
+    for template in extra_seed_templates {
+        if !expr_uses_only_vars(template, var_names) {
+            continue;
+        }
+        let canonical = macro_usage_key(template);
+        if seen_seed_templates.insert(canonical) {
+            seed_templates.push(template.clone());
+        }
+    }
     for (i, template) in seed_templates.into_iter().enumerate() {
         if i < population.len() / 4 {
             population[i] = template;
@@ -4371,7 +5414,9 @@ pub fn discover_invariants_autonomous(
         let mut points = Vec::with_capacity(8);
         // 4 trajectory snapshots
         for i in [0, sampled.len() / 4, sampled.len() / 2, sampled.len() - 1] {
-            if i < sampled.len() { points.push(sampled[i].clone()); }
+            if i < sampled.len() {
+                points.push(sampled[i].clone());
+            }
         }
         // 4 synthetic perturbations of the initial state
         let perturbations: [&[f64]; 4] = [
@@ -4392,11 +5437,16 @@ pub fn discover_invariants_autonomous(
 
     for _gen in 0..generations {
         // Evaluate fitness (variance) for each individual
-        let fitnesses: Vec<f64> = population.iter()
+        let fitnesses: Vec<f64> = population
+            .iter()
             .map(|expr| {
-                if expr.complexity() > max_complexity { return f64::MAX; }
+                if expr.complexity() > max_complexity {
+                    return f64::MAX;
+                }
                 // Minimum complexity: trivial expressions (constants, single vars) get huge penalty
-                if expr.complexity() < 3 { return f64::MAX; }
+                if expr.complexity() < 3 {
+                    return f64::MAX;
+                }
 
                 // Non-triviality: evaluate at MANY independent test points and
                 // check that the formula produces meaningfully different values.
@@ -4405,18 +5455,21 @@ pub fn discover_invariants_autonomous(
                 // AST has variables in the exponent.
                 let mut values = Vec::with_capacity(nt_test_points.len());
                 for state in &nt_test_points {
-                    let bindings: Vec<(&str, f64)> = var_names.iter()
+                    let bindings: Vec<(&str, f64)> = var_names
+                        .iter()
                         .zip(state.iter())
                         .map(|(name, val)| (*name, *val))
                         .collect();
                     let v = expr.eval(&bindings);
-                    if !v.is_finite() { return f64::MAX; }
+                    if !v.is_finite() {
+                        return f64::MAX;
+                    }
                     values.push(v);
                 }
                 // Compute spread: relative std-dev across test points
                 let mean = values.iter().sum::<f64>() / values.len() as f64;
-                let var = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>()
-                    / values.len() as f64;
+                let var =
+                    values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
                 let spread = var.sqrt();
                 let scale = mean.abs().max(1e-6);
                 if spread / scale < 1e-6 {
@@ -4433,8 +5486,8 @@ pub fn discover_invariants_autonomous(
         let mut new_pop = Vec::with_capacity(pop_size);
 
         // Elitism: keep best 5
-        let mut ranked: Vec<(usize, f64)> = fitnesses.iter().enumerate()
-            .map(|(i, f)| (i, *f)).collect();
+        let mut ranked: Vec<(usize, f64)> =
+            fitnesses.iter().enumerate().map(|(i, f)| (i, *f)).collect();
         ranked.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
         for &(idx, _) in ranked.iter().take(5) {
             new_pop.push(population[idx].clone());
@@ -4474,7 +5527,9 @@ pub fn discover_invariants_autonomous(
     // `x - ln(x) + y - ln(y)` whose variance is ~1e-24 but nonzero. The
     // GP-loop fitness function already rejects these via a spread check —
     // we need the same gate here.
-    let mut scored: Vec<(usize, f64, f64)> = population.iter().enumerate()
+    let mut scored: Vec<(usize, f64, f64)> = population
+        .iter()
+        .enumerate()
         .map(|(i, expr)| {
             // Constants are not invariants of the dynamics — they're invariants
             // of nothing. Reject via simplify-to-Const check.
@@ -4484,17 +5539,21 @@ pub fn discover_invariants_autonomous(
             // Non-triviality spread check (same as GP-loop fitness).
             let mut nt_vals = Vec::with_capacity(nt_test_points.len());
             for state in &nt_test_points {
-                let bindings: Vec<(&str, f64)> = var_names.iter()
+                let bindings: Vec<(&str, f64)> = var_names
+                    .iter()
                     .zip(state.iter())
                     .map(|(name, val)| (*name, *val))
                     .collect();
                 let v = expr.eval(&bindings);
-                if !v.is_finite() { return (i, f64::MAX, 0.0); }
+                if !v.is_finite() {
+                    return (i, f64::MAX, 0.0);
+                }
                 nt_vals.push(v);
             }
             let nt_mean = nt_vals.iter().sum::<f64>() / nt_vals.len() as f64;
             let nt_spread = (nt_vals.iter().map(|v| (v - nt_mean).powi(2)).sum::<f64>()
-                / nt_vals.len() as f64).sqrt();
+                / nt_vals.len() as f64)
+                .sqrt();
             let nt_scale = nt_mean.abs().max(1e-6);
             if nt_spread / nt_scale < 1e-6 {
                 return (i, f64::MAX, 0.0);
@@ -4502,15 +5561,23 @@ pub fn discover_invariants_autonomous(
 
             let var = compute_trajectory_variance(expr, &sampled, var_names);
             let mean = {
-                let vals: Vec<f64> = sampled.iter()
+                let vals: Vec<f64> = sampled
+                    .iter()
                     .map(|s| {
-                        let bindings: Vec<(&str, f64)> = var_names.iter()
-                            .zip(s.iter()).map(|(n, v)| (*n, *v)).collect();
+                        let bindings: Vec<(&str, f64)> = var_names
+                            .iter()
+                            .zip(s.iter())
+                            .map(|(n, v)| (*n, *v))
+                            .collect();
                         expr.eval(&bindings)
                     })
                     .filter(|v| v.is_finite())
                     .collect();
-                if vals.is_empty() { 0.0 } else { vals.iter().sum::<f64>() / vals.len() as f64 }
+                if vals.is_empty() {
+                    0.0
+                } else {
+                    vals.iter().sum::<f64>() / vals.len() as f64
+                }
             };
             (i, var, mean)
         })
@@ -4526,23 +5593,38 @@ pub fn discover_invariants_autonomous(
         // Reject trivial invariants: constants and expressions that evaluate
         // to the same value regardless of state (disguised constants like x-x, 0*v, etc.)
         let expr_simplified = simplify(&population[idx]);
-        if matches!(expr_simplified, Expr::Const(_)) { continue; }
+        if matches!(expr_simplified, Expr::Const(_)) {
+            continue;
+        }
 
         // Non-triviality: must differ at two different states
         let test_states: Vec<Vec<(&str, f64)>> = vec![
-            var_names.iter().enumerate().map(|(i, n)| (*n, if i == 0 { 1.0 } else { 0.5 })).collect(),
-            var_names.iter().enumerate().map(|(i, n)| (*n, if i == 0 { 0.3 } else { 0.9 })).collect(),
+            var_names
+                .iter()
+                .enumerate()
+                .map(|(i, n)| (*n, if i == 0 { 1.0 } else { 0.5 }))
+                .collect(),
+            var_names
+                .iter()
+                .enumerate()
+                .map(|(i, n)| (*n, if i == 0 { 0.3 } else { 0.9 }))
+                .collect(),
         ];
         let v0 = expr_simplified.eval(&test_states[0]);
         let v1 = expr_simplified.eval(&test_states[1]);
-        if v0.is_finite() && v1.is_finite()
-            && (v0 - v1).abs() < 1e-8 * v0.abs().max(1.0) {
+        if v0.is_finite() && v1.is_finite() && (v0 - v1).abs() < 1e-8 * v0.abs().max(1.0) {
             continue; // effectively constant
         }
-        if !v0.is_finite() || !v1.is_finite() { continue; }
+        if !v0.is_finite() || !v1.is_finite() {
+            continue;
+        }
 
-        let is_duplicate = seen_means.iter().any(|m| (m - mean).abs() < mean.abs() * 0.01 + 1e-6);
-        if is_duplicate { continue; }
+        let is_duplicate = seen_means
+            .iter()
+            .any(|m| (m - mean).abs() < mean.abs() * 0.01 + 1e-6);
+        if is_duplicate {
+            continue;
+        }
         seen_means.push(mean);
 
         let expr = simplify(&population[idx]);
@@ -4552,9 +5634,15 @@ pub fn discover_invariants_autonomous(
             if var < 1e-4 * mean.abs().max(1.0) {
                 if let Some(sym) = expr_to_sym(&expr) {
                     verify_conservation_symbolic(&sym, dyn_rules).is_conserved
-                } else { false }
-            } else { false }
-        } else { false };
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        } else {
+            false
+        };
 
         results.push(AutonomousInvariant {
             formula_str: format!("{}", expr),
@@ -4565,7 +5653,9 @@ pub fn discover_invariants_autonomous(
             symbolically_proven: proven,
         });
 
-        if results.len() >= 10 { break; }
+        if results.len() >= 10 {
+            break;
+        }
     }
 
     results
@@ -4578,34 +5668,84 @@ fn build_invariant_templates(var_names: &[&str]) -> Vec<Expr> {
 
     // Sum of squares: Σ xᵢ²
     if ndim >= 2 {
-        let mut sum = Expr::BinOp(BinOp::Pow, Box::new(Expr::Var(var_names[0].into())), Box::new(Expr::Const(2.0)));
+        let mut sum = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var(var_names[0].into())),
+            Box::new(Expr::Const(2.0)),
+        );
         for v in &var_names[1..] {
-            sum = Expr::BinOp(BinOp::Add, Box::new(sum),
-                Box::new(Expr::BinOp(BinOp::Pow, Box::new(Expr::Var(v.to_string())), Box::new(Expr::Const(2.0)))));
+            sum = Expr::BinOp(
+                BinOp::Add,
+                Box::new(sum),
+                Box::new(Expr::BinOp(
+                    BinOp::Pow,
+                    Box::new(Expr::Var(v.to_string())),
+                    Box::new(Expr::Const(2.0)),
+                )),
+            );
         }
         templates.push(sum);
     }
 
     // Cross products (for 4D: x·vy - y·vx type)
     if ndim >= 4 {
-        templates.push(Expr::BinOp(BinOp::Sub,
-            Box::new(Expr::BinOp(BinOp::Mul,
+        templates.push(Expr::BinOp(
+            BinOp::Sub,
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
                 Box::new(Expr::Var(var_names[0].into())),
-                Box::new(Expr::Var(var_names[3].into())))),
-            Box::new(Expr::BinOp(BinOp::Mul,
+                Box::new(Expr::Var(var_names[3].into())),
+            )),
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
                 Box::new(Expr::Var(var_names[1].into())),
-                Box::new(Expr::Var(var_names[2].into()))))));
+                Box::new(Expr::Var(var_names[2].into())),
+            )),
+        ));
 
         // ½(v²) - 1/r type (Kepler energy)
-        let v2 = Expr::BinOp(BinOp::Add,
-            Box::new(Expr::BinOp(BinOp::Pow, Box::new(Expr::Var(var_names[2].into())), Box::new(Expr::Const(2.0)))),
-            Box::new(Expr::BinOp(BinOp::Pow, Box::new(Expr::Var(var_names[3].into())), Box::new(Expr::Const(2.0)))));
-        let r = Expr::Func(UnaryFn::Sqrt, Box::new(Expr::BinOp(BinOp::Add,
-            Box::new(Expr::BinOp(BinOp::Pow, Box::new(Expr::Var(var_names[0].into())), Box::new(Expr::Const(2.0)))),
-            Box::new(Expr::BinOp(BinOp::Pow, Box::new(Expr::Var(var_names[1].into())), Box::new(Expr::Const(2.0)))))));
-        templates.push(Expr::BinOp(BinOp::Sub,
-            Box::new(Expr::BinOp(BinOp::Mul, Box::new(Expr::Const(0.5)), Box::new(v2))),
-            Box::new(Expr::BinOp(BinOp::Div, Box::new(Expr::Const(1.0)), Box::new(r)))));
+        let v2 = Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var(var_names[2].into())),
+                Box::new(Expr::Const(2.0)),
+            )),
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var(var_names[3].into())),
+                Box::new(Expr::Const(2.0)),
+            )),
+        );
+        let r = Expr::Func(
+            UnaryFn::Sqrt,
+            Box::new(Expr::BinOp(
+                BinOp::Add,
+                Box::new(Expr::BinOp(
+                    BinOp::Pow,
+                    Box::new(Expr::Var(var_names[0].into())),
+                    Box::new(Expr::Const(2.0)),
+                )),
+                Box::new(Expr::BinOp(
+                    BinOp::Pow,
+                    Box::new(Expr::Var(var_names[1].into())),
+                    Box::new(Expr::Const(2.0)),
+                )),
+            )),
+        );
+        templates.push(Expr::BinOp(
+            BinOp::Sub,
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
+                Box::new(Expr::Const(0.5)),
+                Box::new(v2),
+            )),
+            Box::new(Expr::BinOp(
+                BinOp::Div,
+                Box::new(Expr::Const(1.0)),
+                Box::new(r),
+            )),
+        ));
 
         // Hénon-Heiles Hamiltonian template:
         //   H = ½(px² + py²) + ½(x² + y²) + x²y − (1/3)y³
@@ -4618,37 +5758,69 @@ fn build_invariant_templates(var_names: &[&str]) -> Vec<Expr> {
         // the known form. For non-Hénon-Heiles 4D systems this template has
         // a nonzero trajectory variance and harmlessly loses to the true
         // invariant via the same fitness mechanism.
-        let var0_sq = Expr::BinOp(BinOp::Pow,
+        let var0_sq = Expr::BinOp(
+            BinOp::Pow,
             Box::new(Expr::Var(var_names[0].into())),
-            Box::new(Expr::Const(2.0)));
-        let var1_sq = Expr::BinOp(BinOp::Pow,
+            Box::new(Expr::Const(2.0)),
+        );
+        let var1_sq = Expr::BinOp(
+            BinOp::Pow,
             Box::new(Expr::Var(var_names[1].into())),
-            Box::new(Expr::Const(2.0)));
-        let half_p2 = Expr::BinOp(BinOp::Mul,
+            Box::new(Expr::Const(2.0)),
+        );
+        let half_p2 = Expr::BinOp(
+            BinOp::Mul,
             Box::new(Expr::Const(0.5)),
-            Box::new(Expr::BinOp(BinOp::Add,
-                Box::new(Expr::BinOp(BinOp::Pow,
+            Box::new(Expr::BinOp(
+                BinOp::Add,
+                Box::new(Expr::BinOp(
+                    BinOp::Pow,
                     Box::new(Expr::Var(var_names[2].into())),
-                    Box::new(Expr::Const(2.0)))),
-                Box::new(Expr::BinOp(BinOp::Pow,
+                    Box::new(Expr::Const(2.0)),
+                )),
+                Box::new(Expr::BinOp(
+                    BinOp::Pow,
                     Box::new(Expr::Var(var_names[3].into())),
-                    Box::new(Expr::Const(2.0)))))));
-        let half_q2 = Expr::BinOp(BinOp::Mul,
+                    Box::new(Expr::Const(2.0)),
+                )),
+            )),
+        );
+        let half_q2 = Expr::BinOp(
+            BinOp::Mul,
             Box::new(Expr::Const(0.5)),
-            Box::new(Expr::BinOp(BinOp::Add, Box::new(var0_sq.clone()), Box::new(var1_sq))));
-        let coupling = Expr::BinOp(BinOp::Mul,
+            Box::new(Expr::BinOp(
+                BinOp::Add,
+                Box::new(var0_sq.clone()),
+                Box::new(var1_sq),
+            )),
+        );
+        let coupling = Expr::BinOp(
+            BinOp::Mul,
             Box::new(var0_sq),
-            Box::new(Expr::Var(var_names[1].into())));
-        let cubic = Expr::BinOp(BinOp::Mul,
+            Box::new(Expr::Var(var_names[1].into())),
+        );
+        let cubic = Expr::BinOp(
+            BinOp::Mul,
             Box::new(Expr::Const(-1.0 / 3.0)),
-            Box::new(Expr::BinOp(BinOp::Pow,
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
                 Box::new(Expr::Var(var_names[1].into())),
-                Box::new(Expr::Const(3.0)))));
-        templates.push(Expr::BinOp(BinOp::Add,
-            Box::new(Expr::BinOp(BinOp::Add,
-                Box::new(Expr::BinOp(BinOp::Add, Box::new(half_p2), Box::new(half_q2))),
-                Box::new(coupling))),
-            Box::new(cubic)));
+                Box::new(Expr::Const(3.0)),
+            )),
+        );
+        templates.push(Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::BinOp(
+                BinOp::Add,
+                Box::new(Expr::BinOp(
+                    BinOp::Add,
+                    Box::new(half_p2),
+                    Box::new(half_q2),
+                )),
+                Box::new(coupling),
+            )),
+            Box::new(cubic),
+        ));
 
         // Rotating-frame quasi-Jacobi skeleton:
         //   (var_names[0]² + var_names[1]²) − (var_names[2]² + var_names[3]²)
@@ -4665,21 +5837,37 @@ fn build_invariant_templates(var_names: &[&str]) -> Vec<Expr> {
         // positions) and aren't captured here. The autonomous discoverer still
         // has to assemble those via crossover + constant tuning. This template
         // at least gives the GP the right quadratic skeleton to start from.
-        let pos_sq = Expr::BinOp(BinOp::Add,
-            Box::new(Expr::BinOp(BinOp::Pow,
+        let pos_sq = Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
                 Box::new(Expr::Var(var_names[0].into())),
-                Box::new(Expr::Const(2.0)))),
-            Box::new(Expr::BinOp(BinOp::Pow,
+                Box::new(Expr::Const(2.0)),
+            )),
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
                 Box::new(Expr::Var(var_names[1].into())),
-                Box::new(Expr::Const(2.0)))));
-        let vel_sq = Expr::BinOp(BinOp::Add,
-            Box::new(Expr::BinOp(BinOp::Pow,
+                Box::new(Expr::Const(2.0)),
+            )),
+        );
+        let vel_sq = Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
                 Box::new(Expr::Var(var_names[2].into())),
-                Box::new(Expr::Const(2.0)))),
-            Box::new(Expr::BinOp(BinOp::Pow,
+                Box::new(Expr::Const(2.0)),
+            )),
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
                 Box::new(Expr::Var(var_names[3].into())),
-                Box::new(Expr::Const(2.0)))));
-        templates.push(Expr::BinOp(BinOp::Sub, Box::new(pos_sq.clone()), Box::new(vel_sq.clone())));
+                Box::new(Expr::Const(2.0)),
+            )),
+        );
+        templates.push(Expr::BinOp(
+            BinOp::Sub,
+            Box::new(pos_sq.clone()),
+            Box::new(vel_sq.clone()),
+        ));
 
         // Coupled-oscillator Hamiltonian skeleton:
         //   ½(p² + p²) + q² + q·q' + q'²
@@ -4691,15 +5879,21 @@ fn build_invariant_templates(var_names: &[&str]) -> Vec<Expr> {
         // GP cannot assemble the cross-coupling via the base mutation set
         // (random subexpression replacement rarely produces `x * y` from
         // sum-of-squares parents).
-        let half_vel2 = Expr::BinOp(BinOp::Mul,
-            Box::new(Expr::Const(0.5)),
-            Box::new(vel_sq));
-        let cross_qq = Expr::BinOp(BinOp::Mul,
+        let half_vel2 = Expr::BinOp(BinOp::Mul, Box::new(Expr::Const(0.5)), Box::new(vel_sq));
+        let cross_qq = Expr::BinOp(
+            BinOp::Mul,
             Box::new(Expr::Var(var_names[0].into())),
-            Box::new(Expr::Var(var_names[1].into())));
-        templates.push(Expr::BinOp(BinOp::Add,
-            Box::new(Expr::BinOp(BinOp::Add, Box::new(half_vel2), Box::new(pos_sq))),
-            Box::new(cross_qq)));
+            Box::new(Expr::Var(var_names[1].into())),
+        );
+        templates.push(Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::BinOp(
+                BinOp::Add,
+                Box::new(half_vel2),
+                Box::new(pos_sq),
+            )),
+            Box::new(cross_qq),
+        ));
     }
 
     // ── Logarithmic / transcendental skeletons ──────────────────────
@@ -4719,46 +5913,64 @@ fn build_invariant_templates(var_names: &[&str]) -> Vec<Expr> {
     // For each pair (a, b): a·ln(a) + b·ln(b)  (entropy-like)
     for v in var_names {
         // x - ln(x)  (single-variable Lotka skeleton)
-        templates.push(Expr::BinOp(BinOp::Sub,
+        templates.push(Expr::BinOp(
+            BinOp::Sub,
             Box::new(Expr::Var(v.to_string())),
-            Box::new(Expr::Func(UnaryFn::Log, Box::new(Expr::Var(v.to_string()))))));
+            Box::new(Expr::Func(UnaryFn::Log, Box::new(Expr::Var(v.to_string())))),
+        ));
     }
     if ndim >= 2 {
         let (a, b) = (var_names[0], var_names[1]);
         // a - ln(a) + b - ln(b)  (Lotka-Volterra first integral)
-        templates.push(Expr::BinOp(BinOp::Add,
-            Box::new(Expr::BinOp(BinOp::Sub,
+        templates.push(Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::BinOp(
+                BinOp::Sub,
                 Box::new(Expr::Var(a.into())),
-                Box::new(Expr::Func(UnaryFn::Log, Box::new(Expr::Var(a.into())))))),
-            Box::new(Expr::BinOp(BinOp::Sub,
+                Box::new(Expr::Func(UnaryFn::Log, Box::new(Expr::Var(a.into())))),
+            )),
+            Box::new(Expr::BinOp(
+                BinOp::Sub,
                 Box::new(Expr::Var(b.into())),
-                Box::new(Expr::Func(UnaryFn::Log, Box::new(Expr::Var(b.into())))))),
+                Box::new(Expr::Func(UnaryFn::Log, Box::new(Expr::Var(b.into())))),
+            )),
         ));
         // ln(a) + ln(b)  (log product)
-        templates.push(Expr::BinOp(BinOp::Add,
+        templates.push(Expr::BinOp(
+            BinOp::Add,
             Box::new(Expr::Func(UnaryFn::Log, Box::new(Expr::Var(a.into())))),
             Box::new(Expr::Func(UnaryFn::Log, Box::new(Expr::Var(b.into())))),
         ));
         // ln(a) - ln(b) = ln(a/b)  (log ratio)
-        templates.push(Expr::BinOp(BinOp::Sub,
+        templates.push(Expr::BinOp(
+            BinOp::Sub,
             Box::new(Expr::Func(UnaryFn::Log, Box::new(Expr::Var(a.into())))),
             Box::new(Expr::Func(UnaryFn::Log, Box::new(Expr::Var(b.into())))),
         ));
         // a·ln(a) + b·ln(b)  (entropy-like, for stat mech free energy)
-        templates.push(Expr::BinOp(BinOp::Add,
-            Box::new(Expr::BinOp(BinOp::Mul,
+        templates.push(Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
                 Box::new(Expr::Var(a.into())),
-                Box::new(Expr::Func(UnaryFn::Log, Box::new(Expr::Var(a.into())))))),
-            Box::new(Expr::BinOp(BinOp::Mul,
+                Box::new(Expr::Func(UnaryFn::Log, Box::new(Expr::Var(a.into())))),
+            )),
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
                 Box::new(Expr::Var(b.into())),
-                Box::new(Expr::Func(UnaryFn::Log, Box::new(Expr::Var(b.into())))))),
+                Box::new(Expr::Func(UnaryFn::Log, Box::new(Expr::Var(b.into())))),
+            )),
         ));
     }
 
     // Individual variables and simple products
     for v in var_names {
         templates.push(Expr::Var(v.to_string()));
-        templates.push(Expr::BinOp(BinOp::Pow, Box::new(Expr::Var(v.to_string())), Box::new(Expr::Const(2.0))));
+        templates.push(Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var(v.to_string())),
+            Box::new(Expr::Const(2.0)),
+        ));
     }
 
     templates
@@ -4772,11 +5984,20 @@ fn build_invariant_templates(var_names: &[&str]) -> Vec<Expr> {
 #[derive(Debug, Clone, PartialEq)]
 pub enum SystemClassification {
     /// At least one invariant found with low variance — system has conservation laws
-    Conservative { num_invariants: usize, best_variance: f64 },
+    Conservative {
+        num_invariants: usize,
+        best_variance: f64,
+    },
     /// No invariant found — system is dissipative or chaotic
-    Dissipative { best_variance: f64, lyapunov_candidate: Option<String> },
+    Dissipative {
+        best_variance: f64,
+        lyapunov_candidate: Option<String>,
+    },
     /// Invariants exist at low energy but vanish at high energy
-    IntegrabilityTransition { low_energy_invariants: usize, high_energy_invariants: usize },
+    IntegrabilityTransition {
+        low_energy_invariants: usize,
+        high_energy_invariants: usize,
+    },
 }
 
 /// Result of full autonomous analysis of a dynamical system.
@@ -4802,15 +6023,16 @@ pub fn analyze_system_autonomous(
     t_max: f64,
     dt: f64,
 ) -> SystemAnalysis {
-    let invariants = discover_invariants_autonomous(
-        rhs, initial_state, var_names, dynamics, config, t_max, dt);
+    let invariants =
+        discover_invariants_autonomous(rhs, initial_state, var_names, dynamics, config, t_max, dt);
 
     // Use RELATIVE variance: var / mean² < threshold
     // This correctly handles systems where state values are O(10-30) (Lorenz)
     // vs O(1) (harmonic oscillator). Absolute variance 1e-4 would false-positive
     // on Lorenz where |z| ~ 27 → z² ~ 729.
     let conservation_threshold = 1e-6;
-    let conserved: Vec<&AutonomousInvariant> = invariants.iter()
+    let conserved: Vec<&AutonomousInvariant> = invariants
+        .iter()
         .filter(|i| {
             let rel_var = i.variance / (i.mean_value * i.mean_value).max(1e-10);
             rel_var < conservation_threshold
@@ -4819,10 +6041,20 @@ pub fn analyze_system_autonomous(
 
     if !conserved.is_empty() {
         let best_var = conserved[0].variance;
-        let mut report = format!("CONSERVATIVE SYSTEM: {} invariant(s) found\n", conserved.len());
+        let mut report = format!(
+            "CONSERVATIVE SYSTEM: {} invariant(s) found\n",
+            conserved.len()
+        );
         for inv in &conserved {
-            let proven = if inv.symbolically_proven { " [PROVEN]" } else { "" };
-            report += &format!("  {} (var={:.2e}){}\n", inv.formula_str, inv.variance, proven);
+            let proven = if inv.symbolically_proven {
+                " [PROVEN]"
+            } else {
+                ""
+            };
+            report += &format!(
+                "  {} (var={:.2e}){}\n",
+                inv.formula_str, inv.variance, proven
+            );
         }
         SystemAnalysis {
             classification: SystemClassification::Conservative {
@@ -4840,8 +6072,10 @@ pub fn analyze_system_autonomous(
         let lyapunov = find_lyapunov_candidate(rhs, initial_state, var_names, t_max, dt);
 
         let mut report = format!("DISSIPATIVE SYSTEM: no conservation law found\n");
-        report += &format!("  Best candidate variance: {:.2e} (threshold: {:.2e})\n",
-            best_var, conservation_threshold);
+        report += &format!(
+            "  Best candidate variance: {:.2e} (threshold: {:.2e})\n",
+            best_var, conservation_threshold
+        );
         if let Some(ref ly) = lyapunov {
             report += &format!("  Lyapunov function candidate: {}\n", ly);
         } else {
@@ -4871,27 +6105,39 @@ fn find_lyapunov_candidate(
     dt: f64,
 ) -> Option<String> {
     let (_times, states) = rk45_trajectory(rhs, initial_state, t_max, dt);
-    if states.len() < 100 { return None; }
+    if states.len() < 100 {
+        return None;
+    }
 
     // Test: V = Σ xᵢ² (distance from origin)
     // Check if V is monotonically decreasing
-    let v_values: Vec<f64> = states.iter()
+    let v_values: Vec<f64> = states
+        .iter()
         .map(|s| s.iter().map(|x| x * x).sum::<f64>())
         .collect();
 
     // Check if V converges to a finite value (attractor)
     let last_quarter = &v_values[v_values.len() * 3 / 4..];
     let mean_last = last_quarter.iter().sum::<f64>() / last_quarter.len() as f64;
-    let var_last = last_quarter.iter().map(|v| (v - mean_last).powi(2)).sum::<f64>()
+    let var_last = last_quarter
+        .iter()
+        .map(|v| (v - mean_last).powi(2))
+        .sum::<f64>()
         / last_quarter.len() as f64;
 
     // For a dissipative system with an attractor, V oscillates around a finite value
     if mean_last.is_finite() && var_last < mean_last * mean_last * 0.5 {
         // Not strictly decreasing, but bounded — report the attractor
         let names: Vec<&str> = var_names.iter().copied().collect();
-        return Some(format!("Σ{}ᵢ² → {:.2} (bounded attractor, not Lyapunov)",
-            if names.len() <= 3 { names.join("²+") } else { "x".into() },
-            mean_last));
+        return Some(format!(
+            "Σ{}ᵢ² → {:.2} (bounded attractor, not Lyapunov)",
+            if names.len() <= 3 {
+                names.join("²+")
+            } else {
+                "x".into()
+            },
+            mean_last
+        ));
     }
 
     None
@@ -4927,7 +6173,9 @@ fn henon_heiles_energy(s: &[f64]) -> f64 {
 /// The -L²/r³ term causes Mercury's perihelion precession.
 fn schwarzschild_rhs(s: &[f64], _t: f64) -> Vec<f64> {
     let (r, _phi, pr, l) = (s[0], s[1], s[2], s[3]);
-    if r < 2.5 { return vec![0.0; 4]; }
+    if r < 2.5 {
+        return vec![0.0; 4];
+    }
     let r2 = r * r;
     let r3 = r2 * r;
     let r4 = r3 * r;
@@ -4938,7 +6186,9 @@ fn schwarzschild_rhs(s: &[f64], _t: f64) -> Vec<f64> {
 /// Newtonian orbit (no GR correction) for comparison.
 fn newtonian_orbit_rhs(s: &[f64], _t: f64) -> Vec<f64> {
     let (r, _phi, pr, l) = (s[0], s[1], s[2], s[3]);
-    if r < 0.1 { return vec![0.0; 4]; }
+    if r < 0.1 {
+        return vec![0.0; 4];
+    }
     let r2 = r * r;
     let r3 = r2 * r;
     vec![pr, l / r2, -1.0 / r2 + l * l / r3, 0.0] // no GR term
@@ -4983,9 +6233,12 @@ pub fn compute_rolling_average(
     eval_fn: &dyn Fn(&[f64]) -> f64,
     window_size: usize,
 ) -> Vec<f64> {
-    if states.len() < window_size { return Vec::new(); }
+    if states.len() < window_size {
+        return Vec::new();
+    }
     let values: Vec<f64> = states.iter().map(|s| eval_fn(s)).collect();
-    values.windows(window_size)
+    values
+        .windows(window_size)
         .map(|w| w.iter().sum::<f64>() / w.len() as f64)
         .collect()
 }
@@ -5005,18 +6258,24 @@ pub fn check_virial_theorem(
     let t_avg = compute_rolling_average(states, kinetic_fn, window_size);
     let v_avg = compute_rolling_average(states, potential_fn, window_size);
 
-    if t_avg.is_empty() || v_avg.is_empty() { return (f64::NAN, f64::MAX); }
+    if t_avg.is_empty() || v_avg.is_empty() {
+        return (f64::NAN, f64::MAX);
+    }
 
     let n = t_avg.len().min(v_avg.len());
     let ratios: Vec<f64> = (0..n)
         .filter_map(|i| {
             if v_avg[i].abs() > 1e-10 {
                 Some(2.0 * t_avg[i] / v_avg[i])
-            } else { None }
+            } else {
+                None
+            }
         })
         .collect();
 
-    if ratios.is_empty() { return (f64::NAN, f64::MAX); }
+    if ratios.is_empty() {
+        return (f64::NAN, f64::MAX);
+    }
     let mean = ratios.iter().sum::<f64>() / ratios.len() as f64;
     let var = ratios.iter().map(|r| (r - mean).powi(2)).sum::<f64>() / ratios.len() as f64;
     (mean, var)
@@ -5040,19 +6299,20 @@ pub fn detect_z3_path() -> Option<std::path::PathBuf> {
     // 1. Explicit env var override
     if let Ok(p) = std::env::var("Z3_PATH") {
         let path = std::path::PathBuf::from(&p);
-        if path.exists() { return Some(path); }
+        if path.exists() {
+            return Some(path);
+        }
     }
 
     // 2. `which z3` via PATH
-    if let Ok(output) = std::process::Command::new("which")
-        .arg("z3")
-        .output()
-    {
+    if let Ok(output) = std::process::Command::new("which").arg("z3").output() {
         if output.status.success() {
             let found = String::from_utf8_lossy(&output.stdout).trim().to_string();
             if !found.is_empty() {
                 let path = std::path::PathBuf::from(&found);
-                if path.exists() { return Some(path); }
+                if path.exists() {
+                    return Some(path);
+                }
             }
         }
     }
@@ -5060,9 +6320,11 @@ pub fn detect_z3_path() -> Option<std::path::PathBuf> {
     // 3. Last-resort: known nix store path (for reproducible environments
     // where z3 has been fetched but not wired into PATH). This will bit-rot
     // across nixpkgs updates — env var or PATH is the preferred route.
-    let nix_fallback = std::path::PathBuf::from(
-        "/nix/store/fyvrsfnsqsbalrfhmq3sfjnqc316mlmw-z3-4.15.8/bin/z3");
-    if nix_fallback.exists() { return Some(nix_fallback); }
+    let nix_fallback =
+        std::path::PathBuf::from("/nix/store/fyvrsfnsqsbalrfhmq3sfjnqc316mlmw-z3-4.15.8/bin/z3");
+    if nix_fallback.exists() {
+        return Some(nix_fallback);
+    }
 
     None
 }
@@ -5071,7 +6333,9 @@ pub fn detect_z3_path() -> Option<std::path::PathBuf> {
 // ═══════════════════════════════════════════════════════════════════════════
 
 fn lcg_step(state: u64) -> u64 {
-    state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407)
+    state
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -5089,8 +6353,7 @@ pub fn observe_motzkin(max_n: usize) -> ObservedSequence {
     m[0] = 1.0;
     m[1] = 1.0;
     for n in 1..max_n {
-        m[n + 1] = ((2 * n + 3) as f64 * m[n] + 3.0 * n as f64 * m[n - 1])
-            / (n + 3) as f64;
+        m[n + 1] = ((2 * n + 3) as f64 * m[n] + 3.0 * n as f64 * m[n - 1]) / (n + 3) as f64;
     }
     let data: Vec<(f64, f64)> = (0..=max_n).map(|n| (n as f64, m[n])).collect();
     ObservedSequence::new("motzkin(n)", MathDomain::Combinatorics, data)
@@ -5108,7 +6371,9 @@ pub fn observe_fubini(max_n: usize) -> ObservedSequence {
             let mut sum = 0u64;
             let mut k_fact = 1u64;
             for k in 0..=n {
-                if k > 0 { k_fact = k_fact.saturating_mul(k as u64); }
+                if k > 0 {
+                    k_fact = k_fact.saturating_mul(k as u64);
+                }
                 sum = sum.saturating_add(k_fact.saturating_mul(stirling_second(n, k)));
             }
             (n as f64, sum as f64)
@@ -5185,12 +6450,21 @@ pub struct CrossSequenceRelation {
 impl fmt::Display for CrossSequenceRelation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.relation_type {
-            RelationType::Proportional { constant } =>
-                write!(f, "{} ≈ {:.4} · {} (R²={:.4})", self.source_a, constant, self.source_b, self.r_squared),
-            RelationType::ConstantDifference { offset } =>
-                write!(f, "{} ≈ {} + {:.4} (R²={:.4})", self.source_a, self.source_b, offset, self.r_squared),
-            RelationType::Linear { slope, intercept } =>
-                write!(f, "{} ≈ {:.4}·{} + {:.4} (R²={:.4})", self.source_a, slope, self.source_b, intercept, self.r_squared),
+            RelationType::Proportional { constant } => write!(
+                f,
+                "{} ≈ {:.4} · {} (R²={:.4})",
+                self.source_a, constant, self.source_b, self.r_squared
+            ),
+            RelationType::ConstantDifference { offset } => write!(
+                f,
+                "{} ≈ {} + {:.4} (R²={:.4})",
+                self.source_a, self.source_b, offset, self.r_squared
+            ),
+            RelationType::Linear { slope, intercept } => write!(
+                f,
+                "{} ≈ {:.4}·{} + {:.4} (R²={:.4})",
+                self.source_a, slope, self.source_b, intercept, self.r_squared
+            ),
         }
     }
 }
@@ -5203,35 +6477,53 @@ pub fn discover_cross_sequence_relations(
 ) -> Vec<CrossSequenceRelation> {
     let mut relations = Vec::new();
     // Align sequences by matching x-values
-    let pairs: Vec<(f64, f64)> = a.data.iter()
+    let pairs: Vec<(f64, f64)> = a
+        .data
+        .iter()
         .filter_map(|(ax, ay)| {
-            b.data.iter()
+            b.data
+                .iter()
                 .find(|(bx, _)| (*bx - *ax).abs() < 1e-10)
                 .map(|(_, by)| (*ay, *by))
         })
         .collect();
 
-    if pairs.len() < 3 { return relations; }
+    if pairs.len() < 3 {
+        return relations;
+    }
 
     // Test proportional: A = k·B
-    let valid_ratios: Vec<f64> = pairs.iter()
+    let valid_ratios: Vec<f64> = pairs
+        .iter()
         .filter(|(_, by)| by.abs() > 1e-10)
         .map(|(ay, by)| ay / by)
         .collect();
     if valid_ratios.len() >= 3 {
         let mean_ratio = valid_ratios.iter().sum::<f64>() / valid_ratios.len() as f64;
-        let var = valid_ratios.iter().map(|r| (r - mean_ratio).powi(2)).sum::<f64>()
+        let var = valid_ratios
+            .iter()
+            .map(|r| (r - mean_ratio).powi(2))
+            .sum::<f64>()
             / valid_ratios.len() as f64;
         let cv = var.sqrt() / mean_ratio.abs().max(1e-10);
         if cv < 0.1 {
-            let ss_res: f64 = pairs.iter().map(|(ay, by)| (ay - mean_ratio * by).powi(2)).sum();
+            let ss_res: f64 = pairs
+                .iter()
+                .map(|(ay, by)| (ay - mean_ratio * by).powi(2))
+                .sum();
             let mean_a = pairs.iter().map(|(ay, _)| ay).sum::<f64>() / pairs.len() as f64;
             let ss_tot: f64 = pairs.iter().map(|(ay, _)| (ay - mean_a).powi(2)).sum();
-            let r2 = if ss_tot > 1e-10 { 1.0 - ss_res / ss_tot } else { 0.0 };
+            let r2 = if ss_tot > 1e-10 {
+                1.0 - ss_res / ss_tot
+            } else {
+                0.0
+            };
             relations.push(CrossSequenceRelation {
                 source_a: a.name.clone(),
                 source_b: b.name.clone(),
-                relation_type: RelationType::Proportional { constant: mean_ratio },
+                relation_type: RelationType::Proportional {
+                    constant: mean_ratio,
+                },
                 r_squared: r2,
             });
         }
@@ -5242,11 +6534,22 @@ pub fn discover_cross_sequence_relations(
     let mean_diff = diffs.iter().sum::<f64>() / diffs.len() as f64;
     let diff_var = diffs.iter().map(|d| (d - mean_diff).powi(2)).sum::<f64>() / diffs.len() as f64;
     let mean_a = pairs.iter().map(|(ay, _)| ay).sum::<f64>() / pairs.len() as f64;
-    let a_var = pairs.iter().map(|(ay, _)| (ay - mean_a).powi(2)).sum::<f64>() / pairs.len() as f64;
+    let a_var = pairs
+        .iter()
+        .map(|(ay, _)| (ay - mean_a).powi(2))
+        .sum::<f64>()
+        / pairs.len() as f64;
     if diff_var < a_var * 0.01 && a_var > 1e-10 {
-        let ss_res: f64 = pairs.iter().map(|(ay, by)| (ay - by - mean_diff).powi(2)).sum();
+        let ss_res: f64 = pairs
+            .iter()
+            .map(|(ay, by)| (ay - by - mean_diff).powi(2))
+            .sum();
         let ss_tot: f64 = pairs.iter().map(|(ay, _)| (ay - mean_a).powi(2)).sum();
-        let r2 = if ss_tot > 1e-10 { 1.0 - ss_res / ss_tot } else { 0.0 };
+        let r2 = if ss_tot > 1e-10 {
+            1.0 - ss_res / ss_tot
+        } else {
+            0.0
+        };
         relations.push(CrossSequenceRelation {
             source_a: a.name.clone(),
             source_b: b.name.clone(),
@@ -5271,7 +6574,11 @@ mod tests {
         // f(n) = n^2 + 1
         let expr = Expr::BinOp(
             BinOp::Add,
-            Box::new(Expr::BinOp(BinOp::Pow, Box::new(Expr::Var("n".into())), Box::new(Expr::Const(2.0)))),
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("n".into())),
+                Box::new(Expr::Const(2.0)),
+            )),
             Box::new(Expr::Const(1.0)),
         );
         assert!((expr.eval(&[("n", 3.0)]) - 10.0).abs() < 1e-10);
@@ -5282,7 +6589,11 @@ mod tests {
     fn test_expr_complexity() {
         let simple = Expr::Var("n".into());
         assert_eq!(simple.complexity(), 1);
-        let compound = Expr::BinOp(BinOp::Add, Box::new(Expr::Var("n".into())), Box::new(Expr::Const(1.0)));
+        let compound = Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::Var("n".into())),
+            Box::new(Expr::Const(1.0)),
+        );
         assert_eq!(compound.complexity(), 3);
     }
 
@@ -5291,7 +6602,11 @@ mod tests {
         let expr = Expr::BinOp(
             BinOp::Mul,
             Box::new(Expr::Var("n".into())),
-            Box::new(Expr::BinOp(BinOp::Add, Box::new(Expr::Var("n".into())), Box::new(Expr::Const(1.0)))),
+            Box::new(Expr::BinOp(
+                BinOp::Add,
+                Box::new(Expr::Var("n".into())),
+                Box::new(Expr::Const(1.0)),
+            )),
         );
         assert_eq!(format!("{}", expr), "(n * (n + 1))");
     }
@@ -5301,14 +6616,22 @@ mod tests {
         let mut rng = 42u64;
         for _ in 0..20 {
             let expr = random_expr(&mut rng, 3);
-            assert!(expr.complexity() <= 15, "depth-3 tree should have ≤15 nodes, got {}", expr.complexity());
+            assert!(
+                expr.complexity() <= 15,
+                "depth-3 tree should have ≤15 nodes, got {}",
+                expr.complexity()
+            );
         }
     }
 
     #[test]
     fn test_compute_mse_exact() {
         // f(n) = 2n, data = [(1,2), (2,4), (3,6)]
-        let expr = Expr::BinOp(BinOp::Mul, Box::new(Expr::Const(2.0)), Box::new(Expr::Var("n".into())));
+        let expr = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(Expr::Const(2.0)),
+            Box::new(Expr::Var("n".into())),
+        );
         let data = vec![(1.0, 2.0), (2.0, 4.0), (3.0, 6.0)];
         let mse = compute_mse(&expr, &data);
         assert!(mse < 1e-20, "exact fit should have MSE ≈ 0, got {}", mse);
@@ -5328,7 +6651,11 @@ mod tests {
         // Last ratio should be close to golden ratio φ ≈ 1.618
         let phi = (1.0 + 5.0_f64.sqrt()) / 2.0;
         let last = seq.data.last().unwrap().1;
-        assert!((last - phi).abs() < 1e-6, "F(20)/F(19) should ≈ φ, got {}", last);
+        assert!(
+            (last - phi).abs() < 1e-6,
+            "F(20)/F(19) should ≈ φ, got {}",
+            last
+        );
     }
 
     #[test]
@@ -5336,7 +6663,11 @@ mod tests {
         let seq = observe_gct_obstruction(3);
         assert!(seq.data.len() >= 2, "should have data for n=2,3");
         // Obstruction ratio should be > 0 (we know it's ~90% for n=2)
-        assert!(seq.data[0].1 > 0.3, "n=2 obstruction ratio should be high, got {}", seq.data[0].1);
+        assert!(
+            seq.data[0].1 > 0.3,
+            "n=2 obstruction ratio should be high, got {}",
+            seq.data[0].1
+        );
     }
 
     #[test]
@@ -5360,9 +6691,12 @@ mod tests {
         let results = regressor.fit(&seq, 3);
         assert!(!results.is_empty(), "should find at least one conjecture");
         // Best conjecture should have low MSE
-        assert!(results[0].training_mse < 1.0,
+        assert!(
+            results[0].training_mse < 1.0,
             "best fit for 2n+1 should have MSE < 1, got {} (formula: {})",
-            results[0].training_mse, results[0].formula_str);
+            results[0].training_mse,
+            results[0].formula_str
+        );
     }
 
     #[test]
@@ -5378,7 +6712,11 @@ mod tests {
 
         // Observe a simple quadratic: f(n) = n²
         let data: Vec<(f64, f64)> = (1..=25).map(|n| (n as f64, (n * n) as f64)).collect();
-        engine.observe(ObservedSequence::new("squares", MathDomain::NumberTheory, data));
+        engine.observe(ObservedSequence::new(
+            "squares",
+            MathDomain::NumberTheory,
+            data,
+        ));
 
         // Generate conjectures
         engine.generate_conjectures(5);
@@ -5389,7 +6727,11 @@ mod tests {
 
         // Report
         let report = engine.report();
-        assert!(report.contains("squares"), "report should mention source: {}", report);
+        assert!(
+            report.contains("squares"),
+            "report should mention source: {}",
+            report
+        );
     }
 
     #[test]
@@ -5443,7 +6785,11 @@ mod tests {
         let triangular: Vec<(f64, f64)> = (1..=25)
             .map(|n| (n as f64, (n * (n + 1) / 2) as f64))
             .collect();
-        engine.observe(ObservedSequence::new("triangular(n)", MathDomain::Combinatorics, triangular));
+        engine.observe(ObservedSequence::new(
+            "triangular(n)",
+            MathDomain::Combinatorics,
+            triangular,
+        ));
 
         // Run discovery
         engine.generate_conjectures(3);
@@ -5453,11 +6799,18 @@ mod tests {
         eprintln!("\n{}\n", engine.report());
 
         // Print detailed results per sequence
-        for seq_name in &["fibonacci_ratio(n)", "perm_det_ratio(n)", "triangular(n)", "partition_count(n)"] {
+        for seq_name in &[
+            "fibonacci_ratio(n)",
+            "perm_det_ratio(n)",
+            "triangular(n)",
+            "partition_count(n)",
+        ] {
             if let Some(best) = engine.best_for(seq_name) {
                 eprintln!("DISCOVERY: {} ≈ {}", seq_name, best.formula_str);
-                eprintln!("  MSE={:.2e}, complexity={}, confidence={:.2}, status={:?}",
-                    best.training_mse, best.complexity, best.confidence, best.status);
+                eprintln!(
+                    "  MSE={:.2e}, complexity={}, confidence={:.2}, status={:?}",
+                    best.training_mse, best.complexity, best.confidence, best.status
+                );
                 // Evaluate at a few points
                 for n in [1.0, 5.0, 10.0, 20.0] {
                     let predicted = best.formula.eval(&[("n", n)]);
@@ -5468,7 +6821,10 @@ mod tests {
         }
 
         // At minimum, the engine should have generated some conjectures
-        assert!(!engine.conjectures.is_empty(), "should generate at least one conjecture");
+        assert!(
+            !engine.conjectures.is_empty(),
+            "should generate at least one conjecture"
+        );
     }
 
     /// Test formal verification: triangular number formula should pass bounded induction.
@@ -5487,7 +6843,11 @@ mod tests {
         let data: Vec<(f64, f64)> = (1..=30)
             .map(|n| (n as f64, (n * (n + 1) / 2) as f64))
             .collect();
-        engine.observe(ObservedSequence::new("triangular(n)", MathDomain::Combinatorics, data));
+        engine.observe(ObservedSequence::new(
+            "triangular(n)",
+            MathDomain::Combinatorics,
+            data,
+        ));
 
         engine.generate_conjectures(3);
         engine.verify_numerical();
@@ -5495,13 +6855,17 @@ mod tests {
 
         eprintln!("\n=== Formal Verification Results ===");
         for c in &engine.conjectures {
-            eprintln!("  {} ≈ {} | status={:?} | confidence={:.2}",
-                c.source, c.formula_str, c.status, c.confidence);
+            eprintln!(
+                "  {} ≈ {} | status={:?} | confidence={:.2}",
+                c.source, c.formula_str, c.status, c.confidence
+            );
         }
 
         // At least one conjecture should be formally verified
-        let any_verified = engine.conjectures.iter().any(|c|
-            matches!(c.status, ConjectureStatus::FormallyVerified { .. }));
+        let any_verified = engine
+            .conjectures
+            .iter()
+            .any(|c| matches!(c.status, ConjectureStatus::FormallyVerified { .. }));
         // It's OK if none are formally verified (the regressor might find a
         // formula that's close but not exact for all 200 values)
         if any_verified {
@@ -5522,12 +6886,19 @@ mod tests {
         eprintln!("\n═══ GCT SCALING EXPERIMENT ═══");
         eprintln!("Computing Kronecker coefficient obstructions for perm_n vs det_n²...\n");
         for obs in &detailed {
-            eprintln!("  n={}: {}/{} zero coefficients ({:.1}%) — P≠NP evidence: {}",
-                obs.n, obs.obstructions, obs.total, obs.ratio * 100.0,
-                if obs.ratio > 0.3 { "YES" } else { "no" });
+            eprintln!(
+                "  n={}: {}/{} zero coefficients ({:.1}%) — P≠NP evidence: {}",
+                obs.n,
+                obs.obstructions,
+                obs.total,
+                obs.ratio * 100.0,
+                if obs.ratio > 0.3 { "YES" } else { "no" }
+            );
             for (lam, mu, nu, coeff) in &obs.survivors {
-                eprintln!("    SURVIVOR: λ={:?}, μ={:?}, ν={:?} → LR bound = {}",
-                    lam, mu, nu, coeff);
+                eprintln!(
+                    "    SURVIVOR: λ={:?}, μ={:?}, ν={:?} → LR bound = {}",
+                    lam, mu, nu, coeff
+                );
             }
         }
 
@@ -5548,8 +6919,10 @@ mod tests {
 
         eprintln!("\n═══ CONJECTURE ENGINE RESULTS ═══");
         for c in engine.conjectures.iter().take(5) {
-            eprintln!("  obstruction(n) ≈ {} | MSE={:.2e} | status={:?}",
-                c.formula_str, c.training_mse, c.status);
+            eprintln!(
+                "  obstruction(n) ≈ {} | MSE={:.2e} | status={:?}",
+                c.formula_str, c.training_mse, c.status
+            );
             // Evaluate predictions
             for n in 2..=6 {
                 let pred = c.formula.eval(&[("n", n as f64)]);
@@ -5558,12 +6931,21 @@ mod tests {
         }
 
         if let Some(best) = engine.best_for("gct_obstruction_ratio(n)") {
-            eprintln!("\n  >>> BEST SCALING LAW: obstruction(n) ≈ {}", best.formula_str);
-            eprintln!("  >>> MSE={:.2e}, confidence={:.2}", best.training_mse, best.confidence);
+            eprintln!(
+                "\n  >>> BEST SCALING LAW: obstruction(n) ≈ {}",
+                best.formula_str
+            );
+            eprintln!(
+                "  >>> MSE={:.2e}, confidence={:.2}",
+                best.training_mse, best.confidence
+            );
 
             // Predict n=6 (potentially novel — extrapolation beyond training data)
             let pred_6 = best.formula.eval(&[("n", 6.0)]);
-            eprintln!("  >>> PREDICTION for n=6: obstruction_ratio ≈ {:.4}", pred_6);
+            eprintln!(
+                "  >>> PREDICTION for n=6: obstruction_ratio ≈ {:.4}",
+                pred_6
+            );
             eprintln!("  >>> (This prediction is UNTESTED — verify by computing check_obstruction_conjecture(6, 36))");
         }
 
@@ -5590,8 +6972,10 @@ mod tests {
 
         eprintln!("\n=== Partition Function Discovery (Expanded Grammar) ===");
         for c in engine.conjectures.iter().take(5) {
-            eprintln!("  p(n) ≈ {} | MSE={:.2e} | complexity={} | status={:?}",
-                c.formula_str, c.training_mse, c.complexity, c.status);
+            eprintln!(
+                "  p(n) ≈ {} | MSE={:.2e} | complexity={} | status={:?}",
+                c.formula_str, c.training_mse, c.complexity, c.status
+            );
             // Show predictions vs actual
             for n in [5, 10, 15, 20] {
                 let pred = c.formula.eval(&[("n", n as f64)]);
@@ -5625,8 +7009,10 @@ mod tests {
 
         eprintln!("\n═══ LORENZ TIME-AVERAGE DISCOVERY ═══");
         for c in engine.conjectures.iter().take(3) {
-            eprintln!("  ⟨z⟩ ≈ {} | MSE={:.2e} | status={:?}",
-                c.formula_str, c.training_mse, c.status);
+            eprintln!(
+                "  ⟨z⟩ ≈ {} | MSE={:.2e} | status={:?}",
+                c.formula_str, c.training_mse, c.status
+            );
             let pred = c.formula.eval(&[("n", 20.0)]);
             eprintln!("    predicted ⟨z⟩ = {:.4} (expected ≈ 27.0)", pred);
         }
@@ -5634,12 +7020,16 @@ mod tests {
         // The time average should converge to ~27 (ρ-1)
         if let Some(best) = engine.best_for("lorenz_time_avg_z(samples)") {
             let pred = best.formula.eval(&[("n", 20.0)]);
-            eprintln!("\n  >>> BEST: ⟨z⟩ ≈ {} (predicted={:.4})", best.formula_str, pred);
+            eprintln!(
+                "\n  >>> BEST: ⟨z⟩ ≈ {} (predicted={:.4})",
+                best.formula_str, pred
+            );
             // Should be within 10% of 27
             assert!(
                 (pred - 27.0).abs() < 5.0 || best.training_mse < 1.0,
                 "Lorenz ⟨z⟩ should approximate 27, got {:.4} (formula: {})",
-                pred, best.formula_str,
+                pred,
+                best.formula_str,
             );
         }
     }
@@ -5651,7 +7041,11 @@ mod tests {
         assert_eq!(states[0].len(), 3, "Lorenz is 3D");
         // After transient, z should be positive (attractor lives at z > 0)
         let last_z = states.last().unwrap()[2];
-        assert!(last_z > 0.0, "Lorenz z should be positive on attractor, got {}", last_z);
+        assert!(
+            last_z > 0.0,
+            "Lorenz z should be positive on attractor, got {}",
+            last_z
+        );
     }
 
     /// PHYSICS DISCOVERY: find E = x² + v² is conserved in harmonic oscillator.
@@ -5663,23 +7057,41 @@ mod tests {
         for seq in &candidates {
             let (mean, var) = invariant_variance(&seq.data);
             let is_conserved = var < 1e-6;
-            eprintln!("  {} | mean={:.6}, variance={:.2e} | CONSERVED: {}",
-                seq.name, mean, var, if is_conserved { "YES" } else { "no" });
+            eprintln!(
+                "  {} | mean={:.6}, variance={:.2e} | CONSERVED: {}",
+                seq.name,
+                mean,
+                var,
+                if is_conserved { "YES" } else { "no" }
+            );
         }
 
         // x²+v² should be conserved (variance ≈ 0)
         let (e_mean, e_var) = invariant_variance(&candidates[0].data);
-        assert!(e_var < 1e-6,
-            "E = x²+v² should be conserved (var={:.2e}), mean={:.6}", e_var, e_mean);
-        assert!((e_mean - 1.0).abs() < 0.01,
-            "E should equal initial energy 1.0, got {:.6}", e_mean);
+        assert!(
+            e_var < 1e-6,
+            "E = x²+v² should be conserved (var={:.2e}), mean={:.6}",
+            e_var,
+            e_mean
+        );
+        assert!(
+            (e_mean - 1.0).abs() < 0.01,
+            "E should equal initial energy 1.0, got {:.6}",
+            e_mean
+        );
 
         // x² should NOT be conserved
         let (_, x2_var) = invariant_variance(&candidates[1].data);
-        assert!(x2_var > 0.01,
-            "x² should oscillate (not conserved), var={:.2e}", x2_var);
+        assert!(
+            x2_var > 0.01,
+            "x² should oscillate (not conserved), var={:.2e}",
+            x2_var
+        );
 
-        eprintln!("  >>> DISCOVERY: E = x² + v² is a conserved quantity (var={:.2e})", e_var);
+        eprintln!(
+            "  >>> DISCOVERY: E = x² + v² is a conserved quantity (var={:.2e})",
+            e_var
+        );
         eprintln!("  >>> x² alone is NOT conserved (var={:.2e})", x2_var);
     }
 
@@ -5690,10 +7102,18 @@ mod tests {
         let expr = Expr::Sum(Box::new(Expr::Var("k".into())), "k".into());
         // Σ_{k=0}^5 k = 0+1+2+3+4+5 = 15
         let result = expr.eval(&[("n", 5.0)]);
-        assert!((result - 15.0).abs() < 1e-10, "Σ k for n=5 should be 15, got {}", result);
+        assert!(
+            (result - 15.0).abs() < 1e-10,
+            "Σ k for n=5 should be 15, got {}",
+            result
+        );
         // Σ_{k=0}^10 k = 55
         let result10 = expr.eval(&[("n", 10.0)]);
-        assert!((result10 - 55.0).abs() < 1e-10, "Σ k for n=10 should be 55, got {}", result10);
+        assert!(
+            (result10 - 55.0).abs() < 1e-10,
+            "Σ k for n=10 should be 55, got {}",
+            result10
+        );
         // Display
         assert_eq!(format!("{}", expr), "Σ_k(k)");
     }
@@ -5723,9 +7143,17 @@ mod tests {
             let s = stirling_seq.data[i].1;
             let diff = residual.data[i].1;
             let matches = diff < 1e-10;
-            if !matches { all_match = false; }
-            eprintln!("  n={:2}: B(n)={:>10.0}, Σ S(n,k)={:>10.0}, |diff|={:.0e} {}",
-                n, b, s, diff, if matches { "✓" } else { "✗" });
+            if !matches {
+                all_match = false;
+            }
+            eprintln!(
+                "  n={:2}: B(n)={:>10.0}, Σ S(n,k)={:>10.0}, |diff|={:.0e} {}",
+                n,
+                b,
+                s,
+                diff,
+                if matches { "✓" } else { "✗" }
+            );
         }
 
         assert!(all_match, "B(n) should equal Σ S(n,k) for all n");
@@ -5788,11 +7216,16 @@ mod tests {
     #[test]
     fn test_cross_fit_rejects_same_domain() {
         let seq1 = ObservedSequence::new(
-            "seq1", MathDomain::Physics,
+            "seq1",
+            MathDomain::Physics,
             vec![(1.0, 1.0), (2.0, 4.0), (3.0, 9.0)],
         );
         let conjecture = Conjecture {
-            formula: Expr::BinOp(BinOp::Pow, Box::new(Expr::Var("n".into())), Box::new(Expr::Const(2.0))),
+            formula: Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("n".into())),
+                Box::new(Expr::Const(2.0)),
+            ),
             formula_str: "n^2".to_string(),
             source: "seq1".to_string(),
             domain: MathDomain::Physics,
@@ -5801,6 +7234,7 @@ mod tests {
             fitness: 0.003,
             status: ConjectureStatus::Proposed,
             confidence: 0.5,
+            macro_promotion_tier: MacroPromotionTier::RecurrentNumerical,
         };
         // Same domain → should return None
         assert!(ConjectureEngine::cross_fit(&conjecture, &seq1).is_none());
@@ -5811,11 +7245,13 @@ mod tests {
         let mut engine = ConjectureEngine::new();
         // Linear law in two different domains
         engine.observe(ObservedSequence::new(
-            "spring_force(x)", MathDomain::Physics,
+            "spring_force(x)",
+            MathDomain::Physics,
             (1..=20).map(|n| (n as f64, 2.0 * n as f64 + 1.0)).collect(),
         ));
         engine.observe(ObservedSequence::new(
-            "cost_function(q)", MathDomain::Economics,
+            "cost_function(q)",
+            MathDomain::Economics,
             (1..=20).map(|n| (n as f64, 2.0 * n as f64 + 1.0)).collect(),
         ));
         engine.generate_conjectures(3);
@@ -5835,41 +7271,79 @@ mod tests {
     #[test]
     fn test_simplify_identity_rules() {
         // x + 0 = x
-        let e = Expr::BinOp(BinOp::Add, Box::new(Expr::Var("n".into())), Box::new(Expr::Const(0.0)));
+        let e = Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::Var("n".into())),
+            Box::new(Expr::Const(0.0)),
+        );
         assert_eq!(format!("{}", simplify(&e)), "n");
         // x * 1 = x
-        let e = Expr::BinOp(BinOp::Mul, Box::new(Expr::Var("n".into())), Box::new(Expr::Const(1.0)));
+        let e = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(Expr::Var("n".into())),
+            Box::new(Expr::Const(1.0)),
+        );
         assert_eq!(format!("{}", simplify(&e)), "n");
         // x * 0 = 0
-        let e = Expr::BinOp(BinOp::Mul, Box::new(Expr::Var("n".into())), Box::new(Expr::Const(0.0)));
+        let e = Expr::BinOp(
+            BinOp::Mul,
+            Box::new(Expr::Var("n".into())),
+            Box::new(Expr::Const(0.0)),
+        );
         assert_eq!(format!("{}", simplify(&e)), "0");
         // x ^ 1 = x
-        let e = Expr::BinOp(BinOp::Pow, Box::new(Expr::Var("n".into())), Box::new(Expr::Const(1.0)));
+        let e = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("n".into())),
+            Box::new(Expr::Const(1.0)),
+        );
         assert_eq!(format!("{}", simplify(&e)), "n");
     }
 
     #[test]
     fn test_simplify_div_div() {
         // a / (b / c) = a*c / b → (n+1) / (2/n) → ((n+1)*n) / 2
-        let inner = Expr::BinOp(BinOp::Div, Box::new(Expr::Const(2.0)), Box::new(Expr::Var("n".into())));
-        let outer = Expr::BinOp(BinOp::Div,
-            Box::new(Expr::BinOp(BinOp::Add, Box::new(Expr::Var("n".into())), Box::new(Expr::Const(1.0)))),
-            Box::new(inner));
+        let inner = Expr::BinOp(
+            BinOp::Div,
+            Box::new(Expr::Const(2.0)),
+            Box::new(Expr::Var("n".into())),
+        );
+        let outer = Expr::BinOp(
+            BinOp::Div,
+            Box::new(Expr::BinOp(
+                BinOp::Add,
+                Box::new(Expr::Var("n".into())),
+                Box::new(Expr::Const(1.0)),
+            )),
+            Box::new(inner),
+        );
         let simplified = simplify(&outer);
         // Should evaluate the same at n=5: (5+1)/(2/5) = 6/0.4 = 15 = T(5)
         let orig_val = outer.eval(&[("n", 5.0)]);
         let simp_val = simplified.eval(&[("n", 5.0)]);
-        assert!((orig_val - simp_val).abs() < 1e-10,
-            "simplified should match original: {} vs {}", orig_val, simp_val);
+        assert!(
+            (orig_val - simp_val).abs() < 1e-10,
+            "simplified should match original: {} vs {}",
+            orig_val,
+            simp_val
+        );
         // The simplified form should contain Mul (not nested Div)
         let s = format!("{}", simplified);
-        assert!(!s.contains("/ ("), "should eliminate nested division: {}", s);
+        assert!(
+            !s.contains("/ ("),
+            "should eliminate nested division: {}",
+            s
+        );
     }
 
     #[test]
     fn test_simplify_constant_folding() {
         // 2 + 3 = 5
-        let e = Expr::BinOp(BinOp::Add, Box::new(Expr::Const(2.0)), Box::new(Expr::Const(3.0)));
+        let e = Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::Const(2.0)),
+            Box::new(Expr::Const(3.0)),
+        );
         assert_eq!(format!("{}", simplify(&e)), "5");
         // sin(0) = 0
         let e = Expr::Func(UnaryFn::Sin, Box::new(Expr::Const(0.0)));
@@ -5881,12 +7355,17 @@ mod tests {
     #[test]
     fn test_detect_recurrence_triangular() {
         // T(n) = T(n-1) + n: data = [(1,1), (2,3), (3,6), (4,10), (5,15)]
-        let data: Vec<(f64, f64)> = (1..=10).map(|n| (n as f64, (n*(n+1)/2) as f64)).collect();
+        let data: Vec<(f64, f64)> = (1..=10)
+            .map(|n| (n as f64, (n * (n + 1) / 2) as f64))
+            .collect();
         let rec = detect_recurrence(&data);
         assert!(rec.is_some(), "should detect f(n) = f(n-1) + n");
         let r = rec.unwrap();
         assert!(r.formula.contains("f(n-1) + n"), "formula: {}", r.formula);
-        eprintln!("  Detected: {} (residual={:.2e})", r.formula, r.max_residual);
+        eprintln!(
+            "  Detected: {} (residual={:.2e})",
+            r.formula, r.max_residual
+        );
     }
 
     #[test]
@@ -5897,7 +7376,10 @@ mod tests {
         assert!(rec.is_some(), "should detect f(n) = f(n-1) + f(n-2)");
         let r = rec.unwrap();
         assert!(r.formula.contains("f(n-2)"), "formula: {}", r.formula);
-        eprintln!("  Detected: {} (residual={:.2e})", r.formula, r.max_residual);
+        eprintln!(
+            "  Detected: {} (residual={:.2e})",
+            r.formula, r.max_residual
+        );
     }
 
     #[test]
@@ -5907,26 +7389,156 @@ mod tests {
         let rec = detect_recurrence(&data);
         assert!(rec.is_some(), "should detect f(n) = 2*f(n-1)");
         let r = rec.unwrap();
-        assert!((r.coefficients[0] - 2.0).abs() < 1e-6, "coefficient should be 2, got {}", r.coefficients[0]);
-        eprintln!("  Detected: {} (residual={:.2e})", r.formula, r.max_residual);
+        assert!(
+            (r.coefficients[0] - 2.0).abs() < 1e-6,
+            "coefficient should be 2, got {}",
+            r.coefficients[0]
+        );
+        eprintln!(
+            "  Detected: {} (residual={:.2e})",
+            r.formula, r.max_residual
+        );
     }
 
     /// Nelder-Mead constant optimization test
     #[test]
     fn test_nelder_mead_improves_constants() {
         // Create a*n + b with wrong constants, fit to y = 3n + 7
-        let expr = Expr::BinOp(BinOp::Add,
-            Box::new(Expr::BinOp(BinOp::Mul, Box::new(Expr::Const(1.0)), Box::new(Expr::Var("n".into())))),
-            Box::new(Expr::Const(1.0)));
+        let expr = Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
+                Box::new(Expr::Const(1.0)),
+                Box::new(Expr::Var("n".into())),
+            )),
+            Box::new(Expr::Const(1.0)),
+        );
         let data: Vec<(f64, f64)> = (1..=20).map(|n| (n as f64, 3.0 * n as f64 + 7.0)).collect();
 
         let before_mse = compute_mse(&expr, &data);
         let optimized = optimize_constants(&expr, &data, 100);
         let after_mse = compute_mse(&optimized, &data);
 
-        eprintln!("  NM optimization: MSE {:.2e} → {:.2e}", before_mse, after_mse);
-        assert!(after_mse < before_mse * 0.1,
-            "NM should significantly improve: {:.2e} → {:.2e}", before_mse, after_mse);
+        eprintln!(
+            "  NM optimization: MSE {:.2e} → {:.2e}",
+            before_mse, after_mse
+        );
+        assert!(
+            after_mse < before_mse * 0.1,
+            "NM should significantly improve: {:.2e} → {:.2e}",
+            before_mse,
+            after_mse
+        );
+    }
+
+    #[test]
+    fn test_seed_specialization_recovers_distance_kernel_offset() {
+        let n2_plus_c = Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("n".into())),
+                Box::new(Expr::Const(2.0)),
+            )),
+            Box::new(Expr::Const(1.0)),
+        );
+        let kernel_seed = Expr::BinOp(
+            BinOp::Div,
+            Box::new(Expr::Const(1.0)),
+            Box::new(Expr::Func(UnaryFn::Sqrt, Box::new(n2_plus_c))),
+        );
+        let data: Vec<(f64, f64)> = (1..=20)
+            .map(|i| {
+                let n = i as f64;
+                (n, 1.0 / (n * n + 4.0).sqrt())
+            })
+            .collect();
+
+        let before_mse = compute_mse(&kernel_seed, &data);
+        let specialized = specialize_seed_constants(&kernel_seed, &data, 120);
+        let after_mse = compute_mse(&specialized, &data);
+
+        eprintln!(
+            "  Seed specialization: {}  MSE {:.2e} → {:.2e}",
+            specialized, before_mse, after_mse
+        );
+        assert!(
+            after_mse < 1e-8,
+            "specialized distance-kernel seed should recover offset 4; got mse {:.3e} with {}",
+            after_mse,
+            specialized
+        );
+    }
+
+    #[test]
+    fn test_macro_loop_quality_gate_distance_kernel_transfer() {
+        let data: Vec<(f64, f64)> = (1..=20)
+            .map(|i| {
+                let n = i as f64;
+                (n, 1.0 / (n * n + 4.0).sqrt())
+            })
+            .collect();
+        let target = ObservedSequence::new("distance_kernel_variant(n)", MathDomain::Physics, data);
+
+        let seed = Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("n".into())),
+                Box::new(Expr::Const(2.0)),
+            )),
+            Box::new(Expr::Const(1.0)),
+        );
+
+        let base_config = RegressorConfig {
+            population_size: 60,
+            generations: 2,
+            max_depth: 5,
+            max_complexity: 20,
+            lambda: 0.001,
+            tournament_size: 5,
+            mutation_rate: 0.3,
+            seed: 4242,
+            disable_macro_seeds: true,
+        };
+
+        let mut cold = SymbolicRegressor::new(base_config.clone());
+        let cold_best = cold.fit(&target, 1).remove(0);
+
+        let mut primed_config = base_config;
+        primed_config.disable_macro_seeds = false;
+        let mut primed = SymbolicRegressor::new(primed_config);
+        primed.set_seed_macros(vec![seed]);
+        let primed_best = primed.fit(&target, 1).remove(0);
+
+        eprintln!(
+            "  Loop gate distance-kernel: cold {:.3e} via {}; primed {:.3e} via {}; specialization {:?}",
+            cold_best.training_mse,
+            cold_best.formula,
+            primed_best.training_mse,
+            primed_best.formula,
+            primed.seed_specialization_stats()
+        );
+
+        assert!(
+            primed.seed_specialization_stats().variants_scored > 0,
+            "primed run should score specialized seed variants"
+        );
+        assert!(
+            primed.seed_specialization_stats().exact_fit_found,
+            "distance-kernel seed specialization should find an exact pre-gen0 fit"
+        );
+        assert!(
+            primed_best.training_mse < 1e-8,
+            "primed run should solve the distance-kernel variant, got {:.3e}",
+            primed_best.training_mse
+        );
+        assert!(
+            primed_best.training_mse <= cold_best.training_mse,
+            "cold should not dominate primed: cold {:.3e}, primed {:.3e}",
+            cold_best.training_mse,
+            primed_best.training_mse
+        );
     }
 
     /// Can Nelder-Mead recover Hardy-Ramanujan constants given the right skeleton?
@@ -5938,17 +7550,26 @@ mod tests {
 
         // Build the skeleton: a * exp(b * sqrt(n)) / (c * n)
         // with initial guesses a=1, b=1, c=1
-        let skeleton = Expr::BinOp(BinOp::Div,
-            Box::new(Expr::BinOp(BinOp::Mul,
+        let skeleton = Expr::BinOp(
+            BinOp::Div,
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
                 Box::new(Expr::Const(1.0)), // a
-                Box::new(Expr::Func(UnaryFn::Exp,
-                    Box::new(Expr::BinOp(BinOp::Mul,
+                Box::new(Expr::Func(
+                    UnaryFn::Exp,
+                    Box::new(Expr::BinOp(
+                        BinOp::Mul,
                         Box::new(Expr::Const(1.0)), // b
-                        Box::new(Expr::Func(UnaryFn::Sqrt,
-                            Box::new(Expr::Var("n".into())))))))))),
-            Box::new(Expr::BinOp(BinOp::Mul,
+                        Box::new(Expr::Func(UnaryFn::Sqrt, Box::new(Expr::Var("n".into())))),
+                    )),
+                )),
+            )),
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
                 Box::new(Expr::Const(1.0)), // c
-                Box::new(Expr::Var("n".into())))));
+                Box::new(Expr::Var("n".into())),
+            )),
+        );
 
         let data: Vec<(f64, f64)> = (5..=40)
             .map(|n| (n as f64, partition_count(n as u64) as f64))
@@ -5967,21 +7588,41 @@ mod tests {
         if consts.len() >= 3 {
             let true_a = 1.0 / (4.0 * 3.0_f64.sqrt());
             let true_b = std::f64::consts::PI * (2.0_f64 / 3.0).sqrt();
-            eprintln!("  Discovered: a={:.6}, b={:.6}, c={:.6}", consts[0], consts[1], consts[2]);
+            eprintln!(
+                "  Discovered: a={:.6}, b={:.6}, c={:.6}",
+                consts[0], consts[1], consts[2]
+            );
             eprintln!("  True H-R:   a={:.6}, b={:.6}", true_a, true_b);
-            eprintln!("  a error: {:.1}%", ((consts[0] - true_a) / true_a * 100.0).abs());
-            eprintln!("  b error: {:.1}%", ((consts[1] - true_b) / true_b * 100.0).abs());
+            eprintln!(
+                "  a error: {:.1}%",
+                ((consts[0] - true_a) / true_a * 100.0).abs()
+            );
+            eprintln!(
+                "  b error: {:.1}%",
+                ((consts[1] - true_b) / true_b * 100.0).abs()
+            );
         }
 
         // Show predictions
         for n in [10, 20, 30, 40, 50] {
             let pred = optimized.eval(&[("n", n as f64)]);
-            let actual = if n <= 40 { partition_count(n) as f64 } else { f64::NAN };
-            eprintln!("  p({})={:.0}, predicted={:.0}", n,
-                if actual.is_nan() { -1.0 } else { actual }, pred);
+            let actual = if n <= 40 {
+                partition_count(n) as f64
+            } else {
+                f64::NAN
+            };
+            eprintln!(
+                "  p({})={:.0}, predicted={:.0}",
+                n,
+                if actual.is_nan() { -1.0 } else { actual },
+                pred
+            );
         }
 
-        assert!(after_mse < before_mse, "NM should improve on wrong constants");
+        assert!(
+            after_mse < before_mse,
+            "NM should improve on wrong constants"
+        );
     }
 
     /// Combined pipeline: recurrence detection + simplification + GP discovery
@@ -5991,7 +7632,9 @@ mod tests {
         let data: Vec<(f64, f64)> = (1..=10)
             .map(|n| {
                 let mut f = 1u64;
-                for i in 1..=n { f *= i; }
+                for i in 1..=n {
+                    f *= i;
+                }
                 (n as f64, f as f64)
             })
             .collect();
@@ -6006,14 +7649,20 @@ mod tests {
         // GP + NM should find an approximation
         let seq = ObservedSequence::new("factorial(n)", MathDomain::Combinatorics, data.clone());
         let mut regressor = SymbolicRegressor::new(RegressorConfig {
-            population_size: 200, generations: 80, max_depth: 4,
-            max_complexity: 12, seed: 42, ..RegressorConfig::default()
+            population_size: 200,
+            generations: 80,
+            max_depth: 4,
+            max_complexity: 12,
+            seed: 42,
+            ..RegressorConfig::default()
         });
         let results = regressor.fit(&seq, 3);
         for r in &results {
             let simplified = simplify(&r.formula);
-            eprintln!("  GP found: {} (simplified: {}) MSE={:.2e}",
-                r.formula_str, simplified, r.training_mse);
+            eprintln!(
+                "  GP found: {} (simplified: {}) MSE={:.2e}",
+                r.formula_str, simplified, r.training_mse
+            );
         }
 
         assert!(!results.is_empty());
@@ -6046,11 +7695,18 @@ mod tests {
         engine.verify_formal(200);
 
         eprintln!("\n═══ COMPREHENSIVE DISCOVERY RESULTS ═══\n");
-        let sources = ["fibonacci_ratio(n)", "partition_count(n)",
-                       "catalan(n)", "derangement_ratio(n)", "prime_counting(n)"];
+        let sources = [
+            "fibonacci_ratio(n)",
+            "partition_count(n)",
+            "catalan(n)",
+            "derangement_ratio(n)",
+            "prime_counting(n)",
+        ];
         for source in &sources {
             eprintln!("── {} ──", source);
-            let relevant: Vec<_> = engine.conjectures.iter()
+            let relevant: Vec<_> = engine
+                .conjectures
+                .iter()
                 .filter(|c| c.source == *source)
                 .take(2)
                 .collect();
@@ -6058,23 +7714,36 @@ mod tests {
                 eprintln!("  (no conjectures)");
             }
             for c in &relevant {
-                eprintln!("  {} | MSE={:.2e} | complexity={} | conf={:.2} | {:?}",
-                    c.formula_str, c.training_mse, c.complexity, c.confidence, c.status);
+                eprintln!(
+                    "  {} | MSE={:.2e} | complexity={} | conf={:.2} | {:?}",
+                    c.formula_str, c.training_mse, c.complexity, c.confidence, c.status
+                );
             }
             eprintln!();
         }
 
         // Summary stats
         let total = engine.conjectures.len();
-        let verified = engine.conjectures.iter()
-            .filter(|c| matches!(c.status, ConjectureStatus::NumericallyTested { .. }
-                | ConjectureStatus::FormallyVerified { .. }))
+        let verified = engine
+            .conjectures
+            .iter()
+            .filter(|c| {
+                matches!(
+                    c.status,
+                    ConjectureStatus::NumericallyTested { .. }
+                        | ConjectureStatus::FormallyVerified { .. }
+                )
+            })
             .count();
-        let refuted = engine.conjectures.iter()
+        let refuted = engine
+            .conjectures
+            .iter()
             .filter(|c| matches!(c.status, ConjectureStatus::Refuted { .. }))
             .count();
-        eprintln!("SUMMARY: {} conjectures, {} verified, {} refuted",
-            total, verified, refuted);
+        eprintln!(
+            "SUMMARY: {} conjectures, {} verified, {} refuted",
+            total, verified, refuted
+        );
 
         assert!(total > 5, "should generate conjectures across sequences");
     }
@@ -6085,8 +7754,12 @@ mod tests {
         let seq = observe_derangement_ratio(12);
         let last = seq.data.last().unwrap().1;
         let inv_e = 1.0 / std::f64::consts::E;
-        assert!((last - inv_e).abs() < 1e-6,
-            "D(12)/12! should ≈ 1/e = {:.6}, got {:.6}", inv_e, last);
+        assert!(
+            (last - inv_e).abs() < 1e-6,
+            "D(12)/12! should ≈ 1/e = {:.6}, got {:.6}",
+            inv_e,
+            last
+        );
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -6111,13 +7784,22 @@ mod tests {
 
         eprintln!("\n═══ HYDROGEN ENERGY LEVEL DISCOVERY ═══");
         for c in engine.conjectures.iter().take(5) {
-            eprintln!("  E(n) ≈ {} | MSE={:.2e} | {:?}", c.formula_str, c.training_mse, c.status);
+            eprintln!(
+                "  E(n) ≈ {} | MSE={:.2e} | {:?}",
+                c.formula_str, c.training_mse, c.status
+            );
         }
 
         if let Some(best) = engine.best_for("hydrogen_E(n)") {
-            eprintln!("  >>> Best: {} (MSE={:.2e})", best.formula_str, best.training_mse);
-            assert!(best.training_mse < 5.0,
-                "hydrogen energy MSE should be < 5.0, got {:.2e}", best.training_mse);
+            eprintln!(
+                "  >>> Best: {} (MSE={:.2e})",
+                best.formula_str, best.training_mse
+            );
+            assert!(
+                best.training_mse < 5.0,
+                "hydrogen energy MSE should be < 5.0, got {:.2e}",
+                best.training_mse
+            );
             let e1 = best.formula.eval(&[("n", 1.0)]);
             if e1.is_finite() {
                 eprintln!("  >>> E(1) = {:.4} (expected -13.6)", e1);
@@ -6143,9 +7825,15 @@ mod tests {
 
         eprintln!("\n═══ QUANTUM HARMONIC OSCILLATOR DISCOVERY ═══");
         if let Some(best) = engine.best_for("qho_E(n)") {
-            eprintln!("  E(n) ≈ {} | MSE={:.2e}", best.formula_str, best.training_mse);
-            assert!(best.training_mse < 1.0,
-                "QHO should be discoverable, MSE={:.2e}", best.training_mse);
+            eprintln!(
+                "  E(n) ≈ {} | MSE={:.2e}",
+                best.formula_str, best.training_mse
+            );
+            assert!(
+                best.training_mse < 1.0,
+                "QHO should be discoverable, MSE={:.2e}",
+                best.training_mse
+            );
         }
     }
 
@@ -6168,7 +7856,10 @@ mod tests {
 
         eprintln!("\n═══ BLACKBODY PEAK (WIEN'S LAW) DISCOVERY ═══");
         if let Some(best) = engine.best_for("blackbody_peak(T)") {
-            eprintln!("  λ_max(T) ≈ {} | MSE={:.2e}", best.formula_str, best.training_mse);
+            eprintln!(
+                "  λ_max(T) ≈ {} | MSE={:.2e}",
+                best.formula_str, best.training_mse
+            );
             // Strict threshold 1e-10 would flake under rayon parallel-reduction
             // non-determinism (parallel sum-of-squares is not bit-exact, so GP
             // can settle on 0.99999*b/T instead of b/T, giving MSE ~1e-6).
@@ -6178,13 +7869,13 @@ mod tests {
             let structural_ok = {
                 // At T=1000, λ_max should be ≈ 2.898e-6 m
                 let lambda_at_1000 = best.formula.eval(&[("n", 1000.0)]);
-                lambda_at_1000.is_finite()
-                    && (lambda_at_1000 - 2.898e-6).abs() < 1e-6
+                lambda_at_1000.is_finite() && (lambda_at_1000 - 2.898e-6).abs() < 1e-6
             };
             assert!(
                 strict_ok || structural_ok,
                 "Wien's law should be discoverable, got MSE={:.2e}, formula={}",
-                best.training_mse, best.formula_str
+                best.training_mse,
+                best.formula_str
             );
         }
     }
@@ -6207,11 +7898,17 @@ mod tests {
 
         eprintln!("\n═══ KEPLER'S THIRD LAW DISCOVERY ═══");
         if let Some(best) = engine.best_for("kepler_T(r)") {
-            eprintln!("  T(r) ≈ {} | MSE={:.2e}", best.formula_str, best.training_mse);
+            eprintln!(
+                "  T(r) ≈ {} | MSE={:.2e}",
+                best.formula_str, best.training_mse
+            );
             let t4 = best.formula.eval(&[("n", 4.0)]);
             if t4.is_finite() {
-                assert!((t4 - 8.0).abs() < 1.0,
-                    "T(4AU) should be ≈ 8 years, got {:.4}", t4);
+                assert!(
+                    (t4 - 8.0).abs() < 1.0,
+                    "T(4AU) should be ≈ 8 years, got {:.4}",
+                    t4
+                );
             }
         }
     }
@@ -6234,7 +7931,10 @@ mod tests {
 
         eprintln!("\n═══ STEFAN-BOLTZMANN LAW DISCOVERY ═══");
         if let Some(best) = engine.best_for("stefan_boltzmann_P(T)") {
-            eprintln!("  P(T) ≈ {} | MSE={:.2e}", best.formula_str, best.training_mse);
+            eprintln!(
+                "  P(T) ≈ {} | MSE={:.2e}",
+                best.formula_str, best.training_mse
+            );
         }
     }
 
@@ -6244,12 +7944,18 @@ mod tests {
         let seq = observe_balmer_series(10);
         // n=3 → Hα ≈ 656.3 nm
         let h_alpha = seq.data[0].1;
-        assert!((h_alpha - 656.3).abs() < 1.0,
-            "Hα should be ≈ 656.3 nm, got {:.1}", h_alpha);
+        assert!(
+            (h_alpha - 656.3).abs() < 1.0,
+            "Hα should be ≈ 656.3 nm, got {:.1}",
+            h_alpha
+        );
         // n=4 → Hβ ≈ 486.1 nm
         let h_beta = seq.data[1].1;
-        assert!((h_beta - 486.1).abs() < 1.0,
-            "Hβ should be ≈ 486.1 nm, got {:.1}", h_beta);
+        assert!(
+            (h_beta - 486.1).abs() < 1.0,
+            "Hβ should be ≈ 486.1 nm, got {:.1}",
+            h_beta
+        );
         eprintln!("Balmer series: Hα={:.1}nm, Hβ={:.1}nm", h_alpha, h_beta);
     }
 
@@ -6279,15 +7985,22 @@ mod tests {
         let mut discoveries = 0;
         for source in &sources {
             if let Some(best) = engine.best_for(source) {
-                eprintln!("  {} ≈ {} | MSE={:.2e} | {:?}",
-                    source, best.formula_str, best.training_mse, best.status);
-                if best.training_mse < 1.0 { discoveries += 1; }
+                eprintln!(
+                    "  {} ≈ {} | MSE={:.2e} | {:?}",
+                    source, best.formula_str, best.training_mse, best.status
+                );
+                if best.training_mse < 1.0 {
+                    discoveries += 1;
+                }
             } else {
                 eprintln!("  {} — no conjecture found", source);
             }
         }
-        assert!(discoveries >= 2,
-            "should discover at least 2 of 3 physics laws, got {}", discoveries);
+        assert!(
+            discoveries >= 2,
+            "should discover at least 2 of 3 physics laws, got {}",
+            discoveries
+        );
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -6302,9 +8015,16 @@ mod tests {
         let inv_sqrt_pi = 1.0 / std::f64::consts::PI.sqrt();
         // Last value should be approaching 1/√π ≈ 0.5642
         let last = seq.data.last().unwrap().1;
-        assert!((last - inv_sqrt_pi).abs() < 0.01,
-            "C(60,30)·√30/4^30 should ≈ {:.4}, got {:.4}", inv_sqrt_pi, last);
-        eprintln!("C(2n,n)·√n/4^n at n=30: {:.6} (true: {:.6})", last, inv_sqrt_pi);
+        assert!(
+            (last - inv_sqrt_pi).abs() < 0.01,
+            "C(60,30)·√30/4^30 should ≈ {:.4}, got {:.4}",
+            inv_sqrt_pi,
+            last
+        );
+        eprintln!(
+            "C(2n,n)·√n/4^n at n=30: {:.6} (true: {:.6})",
+            last, inv_sqrt_pi
+        );
     }
 
     /// Test that convergent-limit templates discover 1/√π.
@@ -6330,18 +8050,29 @@ mod tests {
 
         if let Some(best) = engine.best_for("central_binom_limit(n)") {
             let limit = best.formula.eval(&[("n", 1000.0)]);
-            eprintln!("  BEST: {} | MSE={:.2e}", best.formula_str, best.training_mse);
+            eprintln!(
+                "  BEST: {} | MSE={:.2e}",
+                best.formula_str, best.training_mse
+            );
             if limit.is_finite() {
                 let error = (limit - inv_sqrt_pi).abs() / inv_sqrt_pi * 100.0;
                 eprintln!("  Limit at n=1000: {:.6} (error: {:.1}%)", limit, error);
             }
         }
 
-        for c in engine.conjectures.iter()
-            .filter(|c| c.source.contains("central_binom")).take(5) {
+        for c in engine
+            .conjectures
+            .iter()
+            .filter(|c| c.source.contains("central_binom"))
+            .take(5)
+        {
             let lim = c.formula.eval(&[("n", 1000.0)]);
-            eprintln!("  {} | lim={:.6} | MSE={:.2e}", c.formula_str,
-                if lim.is_finite() { lim } else { f64::NAN }, c.training_mse);
+            eprintln!(
+                "  {} | lim={:.6} | MSE={:.2e}",
+                c.formula_str,
+                if lim.is_finite() { lim } else { f64::NAN },
+                c.training_mse
+            );
         }
 
         assert!(!engine.conjectures.is_empty());
@@ -6377,7 +8108,9 @@ mod tests {
             coefficients: vec![1.0],
             max_residual: 0.0,
         };
-        let data: Vec<(f64, f64)> = (0..=5).map(|n| (n as f64, (n * (n + 1) / 2) as f64)).collect();
+        let data: Vec<(f64, f64)> = (0..=5)
+            .map(|n| (n as f64, (n * (n + 1) / 2) as f64))
+            .collect();
         let closed = solve_recurrence(&rec, &data);
         assert!(closed.is_some(), "should solve triangular recurrence");
         let expr = closed.unwrap();
@@ -6397,12 +8130,17 @@ mod tests {
             coefficients: vec![1.0],
             max_residual: 0.0,
         };
-        let data: Vec<(f64, f64)> = (1..=10).map(|n| (n as f64, (n * (n + 1) / 2) as f64)).collect();
+        let data: Vec<(f64, f64)> = (1..=10)
+            .map(|n| (n as f64, (n * (n + 1) / 2) as f64))
+            .collect();
         let closed = solve_recurrence(&rec, &data).expect("should solve");
         // Critical: evaluate at the starting point and verify we hit v0 exactly.
         assert!((closed.eval(&[("n", 1.0)]) - 1.0).abs() < 1e-10, "T(1)=1");
         assert!((closed.eval(&[("n", 5.0)]) - 15.0).abs() < 1e-10, "T(5)=15");
-        assert!((closed.eval(&[("n", 10.0)]) - 55.0).abs() < 1e-10, "T(10)=55");
+        assert!(
+            (closed.eval(&[("n", 10.0)]) - 55.0).abs() < 1e-10,
+            "T(10)=55"
+        );
     }
 
     #[test]
@@ -6415,10 +8153,15 @@ mod tests {
             coefficients: vec![3.0, 0.0],
             max_residual: 0.0,
         };
-        let data: Vec<(f64, f64)> = (2..=6).map(|n| (n as f64, 9.0 * 3.0f64.powi((n - 2) as i32))).collect();
+        let data: Vec<(f64, f64)> = (2..=6)
+            .map(|n| (n as f64, 9.0 * 3.0f64.powi((n - 2) as i32)))
+            .collect();
         let closed = solve_recurrence(&rec, &data).expect("should solve");
         assert!((closed.eval(&[("n", 2.0)]) - 9.0).abs() < 1e-6, "f(2)=9");
-        assert!((closed.eval(&[("n", 6.0)]) - 729.0).abs() < 1e-6, "f(6)=9·3^4=729");
+        assert!(
+            (closed.eval(&[("n", 6.0)]) - 729.0).abs() < 1e-6,
+            "f(6)=9·3^4=729"
+        );
     }
 
     #[test]
@@ -6436,7 +8179,11 @@ mod tests {
         eprintln!("Binet: {}", expr);
         // F(10) ≈ 55
         let val = expr.eval(&[("n", 10.0)]);
-        assert!((val - 55.0).abs() < 1.0, "F(10) ≈ 55 via Binet, got {:.1}", val);
+        assert!(
+            (val - 55.0).abs() < 1.0,
+            "F(10) ≈ 55 via Binet, got {:.1}",
+            val
+        );
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -6462,21 +8209,35 @@ mod tests {
     #[test]
     fn test_bayesian_verification_pipeline() {
         let mut engine = ConjectureEngine::with_config(RegressorConfig {
-            population_size: 100, generations: 40, max_depth: 3,
-            max_complexity: 12, seed: 42, ..RegressorConfig::default()
+            population_size: 100,
+            generations: 40,
+            max_depth: 3,
+            max_complexity: 12,
+            seed: 42,
+            ..RegressorConfig::default()
         });
 
         let data: Vec<(f64, f64)> = (1..=20).map(|n| (n as f64, (n * n) as f64)).collect();
-        engine.observe(ObservedSequence::new("squares", MathDomain::NumberTheory, data));
+        engine.observe(ObservedSequence::new(
+            "squares",
+            MathDomain::NumberTheory,
+            data,
+        ));
         engine.generate_conjectures(3);
         engine.verify_bayesian(200);
 
         for c in &engine.conjectures {
-            assert!(c.confidence >= 0.0 && c.confidence <= 1.0,
-                "confidence should be valid: {}", c.confidence);
+            assert!(
+                c.confidence >= 0.0 && c.confidence <= 1.0,
+                "confidence should be valid: {}",
+                c.confidence
+            );
         }
         // At least one should have high confidence (n² is easy to discover)
-        let max_conf = engine.conjectures.iter().map(|c| c.confidence)
+        let max_conf = engine
+            .conjectures
+            .iter()
+            .map(|c| c.confidence)
             .fold(0.0f64, |a, b| a.max(b));
         eprintln!("Max confidence for n²: {:.3}", max_conf);
     }
@@ -6510,19 +8271,27 @@ mod tests {
         let identities: Vec<_> = discoveries.iter().filter(|d| d.is_identity).collect();
         eprintln!("  Exact identities found: {}", identities.len());
 
-        assert!(!discoveries.is_empty(),
-            "Engine should discover at least one curve-form correspondence");
+        assert!(
+            !discoveries.is_empty(),
+            "Engine should discover at least one curve-form correspondence"
+        );
 
         // The 11a1 ↔ f_11a1 correspondence should be among the discoveries
-        let found_11a1 = discoveries.iter().any(|d|
-            d.curve.contains("11a1") && d.form.contains("11a1") && d.is_identity);
+        let found_11a1 = discoveries
+            .iter()
+            .any(|d| d.curve.contains("11a1") && d.form.contains("11a1") && d.is_identity);
         if found_11a1 {
             eprintln!("\n  >>> MODULARITY DISCOVERED AUTONOMOUSLY for 11a1!");
         }
 
         // Count how many correct curve-form pairs were found
-        let correct_pairs = discoveries.iter()
-            .filter(|d| d.is_identity && d.curve.contains(&d.form.replace("f_", "").replace("_q(n)", "")))
+        let correct_pairs = discoveries
+            .iter()
+            .filter(|d| {
+                d.is_identity
+                    && d.curve
+                        .contains(&d.form.replace("f_", "").replace("_q(n)", ""))
+            })
             .count();
         eprintln!("  Correct modularity pairs discovered: {}", correct_pairs);
     }
@@ -6547,7 +8316,11 @@ mod tests {
 
         // OBSERVE: square numbers
         let data: Vec<(f64, f64)> = (1..=25).map(|n| (n as f64, (n * n) as f64)).collect();
-        engine.observe(ObservedSequence::new("squares", MathDomain::NumberTheory, data));
+        engine.observe(ObservedSequence::new(
+            "squares",
+            MathDomain::NumberTheory,
+            data,
+        ));
 
         // DISCOVER: GP finds formula
         engine.generate_conjectures(3);
@@ -6556,8 +8329,10 @@ mod tests {
 
         eprintln!("  Phase 1 — Discovery:");
         for c in engine.conjectures.iter().take(3) {
-            eprintln!("    {} ≈ {} (MSE={:.2e}, status={:?})",
-                c.source, c.formula_str, c.training_mse, c.status);
+            eprintln!(
+                "    {} ≈ {} (MSE={:.2e}, status={:?})",
+                c.source, c.formula_str, c.training_mse, c.status
+            );
         }
 
         // PROVE: Z3 formally verifies
@@ -6567,8 +8342,10 @@ mod tests {
         let mut any_proved = false;
         for c in &engine.conjectures {
             if matches!(c.status, ConjectureStatus::FormallyVerified { .. }) {
-                eprintln!("    >>> FORMALLY PROVED: {} ≈ {} (confidence={:.2})",
-                    c.source, c.formula_str, c.confidence);
+                eprintln!(
+                    "    >>> FORMALLY PROVED: {} ≈ {} (confidence={:.2})",
+                    c.source, c.formula_str, c.confidence
+                );
                 any_proved = true;
             }
         }
@@ -6587,20 +8364,29 @@ mod tests {
     #[test]
     fn test_expr_to_smtlib2() {
         // n * (n + 1) / 2
-        let expr = Expr::BinOp(BinOp::Div,
-            Box::new(Expr::BinOp(BinOp::Mul,
+        let expr = Expr::BinOp(
+            BinOp::Div,
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
                 Box::new(Expr::Var("n".into())),
-                Box::new(Expr::BinOp(BinOp::Add,
+                Box::new(Expr::BinOp(
+                    BinOp::Add,
                     Box::new(Expr::Var("n".into())),
-                    Box::new(Expr::Const(1.0)))))),
-            Box::new(Expr::Const(2.0)));
+                    Box::new(Expr::Const(1.0)),
+                )),
+            )),
+            Box::new(Expr::Const(2.0)),
+        );
 
         let smt = expr_to_smtlib2(&expr, "n");
         assert!(smt.is_some());
         let s = smt.unwrap();
         eprintln!("SMTLIB2: {}", s);
         assert!(s.contains("n"), "should contain variable n");
-        assert!(s.contains("*") || s.contains("+"), "should have arithmetic ops");
+        assert!(
+            s.contains("*") || s.contains("+"),
+            "should have arithmetic ops"
+        );
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -6631,13 +8417,21 @@ mod tests {
     fn test_nuclear_binding_energy_peak() {
         let seq = observe_nuclear_binding_energy(100);
         // B/A should peak around A=56 (iron) at ~8.5-9 MeV/nucleon
-        let (peak_a, peak_ba) = seq.data.iter()
+        let (peak_a, peak_ba) = seq
+            .data
+            .iter()
             .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
             .unwrap();
-        assert!(*peak_a > 40.0 && *peak_a < 80.0,
-            "B/A peak should be near Fe-56, got A={}", peak_a);
-        assert!(*peak_ba > 7.0 && *peak_ba < 10.0,
-            "peak B/A should be ~8.5 MeV, got {:.2}", peak_ba);
+        assert!(
+            *peak_a > 40.0 && *peak_a < 80.0,
+            "B/A peak should be near Fe-56, got A={}",
+            peak_a
+        );
+        assert!(
+            *peak_ba > 7.0 && *peak_ba < 10.0,
+            "peak B/A should be ~8.5 MeV, got {:.2}",
+            peak_ba
+        );
         eprintln!("Nuclear B/A peak: A={}, B/A={:.2} MeV", peak_a, peak_ba);
     }
 
@@ -6688,7 +8482,10 @@ mod tests {
         eprintln!("\n╔══════════════════════════════════════════════════════════════╗");
         eprintln!("║         RAMANUJAN PROTOCOL — DISCOVERY SHOWCASE             ║");
         eprintln!("╠══════════════════════════════════════════════════════════════╣");
-        eprintln!("║ {:30} │ {:8} │ {:6} │ {:>4} ║", "Sequence", "MSE", "Conf", "Cmplx");
+        eprintln!(
+            "║ {:30} │ {:8} │ {:6} │ {:>4} ║",
+            "Sequence", "MSE", "Conf", "Cmplx"
+        );
         eprintln!("╠══════════════════════════════════════════════════════════════╣");
 
         let sources = [
@@ -6705,23 +8502,42 @@ mod tests {
         let mut discovered = 0;
         for (source, _expected) in &sources {
             if let Some(best) = engine.best_for(source) {
-                let status = if best.training_mse < 1e-6 { "EXACT" }
-                    else if best.training_mse < 1.0 { "GOOD" }
-                    else { "APPROX" };
+                let status = if best.training_mse < 1e-6 {
+                    "EXACT"
+                } else if best.training_mse < 1.0 {
+                    "GOOD"
+                } else {
+                    "APPROX"
+                };
                 let annotation = annotate_conjecture(best);
-                eprintln!("║ {:30} │ {:.2e} │ {:.3}  │ {:>4} ║  {} → {}{}",
-                    source, best.training_mse, best.confidence, best.complexity,
-                    status, best.formula_str, annotation);
-                if best.training_mse < 10.0 { discovered += 1; }
+                eprintln!(
+                    "║ {:30} │ {:.2e} │ {:.3}  │ {:>4} ║  {} → {}{}",
+                    source,
+                    best.training_mse,
+                    best.confidence,
+                    best.complexity,
+                    status,
+                    best.formula_str,
+                    annotation
+                );
+                if best.training_mse < 10.0 {
+                    discovered += 1;
+                }
             } else {
-                eprintln!("║ {:30} │ {:>8} │ {:>6} │ {:>4} ║  NONE",
-                    source, "—", "—", "—");
+                eprintln!(
+                    "║ {:30} │ {:>8} │ {:>6} │ {:>4} ║  NONE",
+                    source, "—", "—", "—"
+                );
             }
         }
 
         eprintln!("╠══════════════════════════════════════════════════════════════╣");
-        eprintln!("║ Discovered: {}/{}   Expected: {}                       ║",
-            discovered, sources.len(), sources.iter().map(|(_, e)| *e).collect::<Vec<_>>().len());
+        eprintln!(
+            "║ Discovered: {}/{}   Expected: {}                       ║",
+            discovered,
+            sources.len(),
+            sources.iter().map(|(_, e)| *e).collect::<Vec<_>>().len()
+        );
         eprintln!("╚══════════════════════════════════════════════════════════════╝");
 
         // Recurrence solving demo
@@ -6734,20 +8550,32 @@ mod tests {
             eprintln!("  Fibonacci recurrence: {}", rec.formula);
             if let Some(closed) = solve_recurrence(&rec, &fib_data) {
                 let binet_10 = closed.eval(&[("n", 10.0)]);
-                eprintln!("  Binet closed form: {} → F(10)={:.1} (expected 55)", closed, binet_10);
+                eprintln!(
+                    "  Binet closed form: {} → F(10)={:.1} (expected 55)",
+                    closed, binet_10
+                );
             }
         }
 
-        let tri_data: Vec<(f64, f64)> = (1..=10).map(|n| (n as f64, (n*(n+1)/2) as f64)).collect();
+        let tri_data: Vec<(f64, f64)> = (1..=10)
+            .map(|n| (n as f64, (n * (n + 1) / 2) as f64))
+            .collect();
         if let Some(rec) = detect_recurrence(&tri_data) {
             eprintln!("  Triangular recurrence: {}", rec.formula);
             if let Some(closed) = solve_recurrence(&rec, &tri_data) {
-                eprintln!("  Closed form: {} → T(10)={:.0}", closed, closed.eval(&[("n", 10.0)]));
+                eprintln!(
+                    "  Closed form: {} → T(10)={:.0}",
+                    closed,
+                    closed.eval(&[("n", 10.0)])
+                );
             }
         }
 
-        assert!(discovered >= 3,
-            "should discover at least 3 of 8 laws/limits, got {}", discovered);
+        assert!(
+            discovered >= 3,
+            "should discover at least 3 of 8 laws/limits, got {}",
+            discovered
+        );
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -6760,7 +8588,11 @@ mod tests {
         let expr = SymExpr::Pow(Box::new(SymExpr::Var("x".into())), 2.0);
         let deriv = expr.diff("x").simplify();
         let val = deriv.eval(&[("x", 3.0)]);
-        assert!((val - 6.0).abs() < 1e-10, "d/dx(x²) at x=3 should be 6, got {}", val);
+        assert!(
+            (val - 6.0).abs() < 1e-10,
+            "d/dx(x²) at x=3 should be 6, got {}",
+            val
+        );
     }
 
     #[test]
@@ -6772,7 +8604,11 @@ mod tests {
         );
         let deriv = expr.diff("x").simplify();
         let val = deriv.eval(&[("x", 2.0), ("v", 5.0)]);
-        assert!((val - 5.0).abs() < 1e-10, "d/dx(x·v) should be v=5, got {}", val);
+        assert!(
+            (val - 5.0).abs() < 1e-10,
+            "d/dx(x·v) should be v=5, got {}",
+            val
+        );
     }
 
     /// THE KEY TEST: Prove E = x² + v² is conserved under harmonic oscillator dynamics.
@@ -6789,17 +8625,22 @@ mod tests {
         );
 
         let dynamics = vec![
-            ("x", SymExpr::Var("v".into())),                          // dx/dt = v
-            ("v", SymExpr::Neg(Box::new(SymExpr::Var("x".into())))),   // dv/dt = -x
+            ("x", SymExpr::Var("v".into())),                         // dx/dt = v
+            ("v", SymExpr::Neg(Box::new(SymExpr::Var("x".into())))), // dv/dt = -x
         ];
 
         let proof = verify_conservation_symbolic(&energy, &dynamics);
         eprintln!("\n{}", proof);
 
-        assert!(proof.is_conserved,
-            "E = x² + v² should be conserved under harmonic oscillator dynamics");
-        assert!(proof.max_numerical_residual < 1e-10,
-            "numerical residual should be ~0, got {:.2e}", proof.max_numerical_residual);
+        assert!(
+            proof.is_conserved,
+            "E = x² + v² should be conserved under harmonic oscillator dynamics"
+        );
+        assert!(
+            proof.max_numerical_residual < 1e-10,
+            "numerical residual should be ~0, got {:.2e}",
+            proof.max_numerical_residual
+        );
     }
 
     /// Negative test: E = x² is NOT conserved under harmonic oscillator.
@@ -6816,8 +8657,10 @@ mod tests {
         let proof = verify_conservation_symbolic(&energy, &dynamics);
         eprintln!("\n{}", proof);
 
-        assert!(!proof.is_conserved,
-            "E = x² should NOT be conserved (dE/dt = 2xv ≠ 0)");
+        assert!(
+            !proof.is_conserved,
+            "E = x² should NOT be conserved (dE/dt = 2xv ≠ 0)"
+        );
     }
 
     /// Test conservation for Lotka-Volterra invariant: V = x - ln(x) + y - ln(y)
@@ -6840,44 +8683,73 @@ mod tests {
         // dE/dt = 2x·v + 6v·(-x/3) = 2xv - 2xv = 0
         let dynamics = vec![
             ("x", SymExpr::Var("v".into())),
-            ("v", SymExpr::Mul(
-                Box::new(SymExpr::Const(-1.0 / 3.0)),
-                Box::new(SymExpr::Var("x".into())),
-            )),
+            (
+                "v",
+                SymExpr::Mul(
+                    Box::new(SymExpr::Const(-1.0 / 3.0)),
+                    Box::new(SymExpr::Var("x".into())),
+                ),
+            ),
         ];
 
         let proof = verify_conservation_symbolic(&energy, &dynamics);
         eprintln!("\n{}", proof);
-        assert!(proof.is_conserved,
-            "E = x² + 3v² with dv/dt = -x/3 should be conserved");
+        assert!(
+            proof.is_conserved,
+            "E = x² + 3v² with dv/dt = -x/3 should be conserved"
+        );
     }
 
     #[test]
     fn test_expr_to_sym_conversion() {
         // n² + 3·n → SymExpr
-        let expr = Expr::BinOp(BinOp::Add,
-            Box::new(Expr::BinOp(BinOp::Pow, Box::new(Expr::Var("n".into())), Box::new(Expr::Const(2.0)))),
-            Box::new(Expr::BinOp(BinOp::Mul, Box::new(Expr::Const(3.0)), Box::new(Expr::Var("n".into())))));
+        let expr = Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("n".into())),
+                Box::new(Expr::Const(2.0)),
+            )),
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
+                Box::new(Expr::Const(3.0)),
+                Box::new(Expr::Var("n".into())),
+            )),
+        );
 
         let sym = expr_to_sym(&expr);
         assert!(sym.is_some(), "should convert polynomial");
         let sym = sym.unwrap();
         let gp_val = expr.eval(&[("n", 5.0)]);
         let sym_val = sym.eval(&[("n", 5.0)]);
-        assert!((gp_val - sym_val).abs() < 1e-10, "GP={} vs Sym={}", gp_val, sym_val);
+        assert!(
+            (gp_val - sym_val).abs() < 1e-10,
+            "GP={} vs Sym={}",
+            gp_val,
+            sym_val
+        );
     }
 
     #[test]
     fn test_verify_formula_derivative_quadratic() {
-        let expr = Expr::BinOp(BinOp::Pow, Box::new(Expr::Var("n".into())), Box::new(Expr::Const(2.0)));
+        let expr = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("n".into())),
+            Box::new(Expr::Const(2.0)),
+        );
         let data: Vec<(f64, f64)> = (1..=20).map(|n| (n as f64, (n * n) as f64)).collect();
 
         let result = verify_formula_derivative(&expr, &data, "n");
         assert!(result.is_some(), "should verify quadratic derivative");
         let v = result.unwrap();
-        eprintln!("Derivative: f'(n) = {}, max_err={:.4}, consistent={}",
-            v.derivative_str, v.max_relative_error, v.is_consistent);
-        assert!(v.is_consistent, "n² derivative should match finite differences");
+        eprintln!(
+            "Derivative: f'(n) = {}, max_err={:.4}, consistent={}",
+            v.derivative_str, v.max_relative_error, v.is_consistent
+        );
+        assert!(
+            v.is_consistent,
+            "n² derivative should match finite differences"
+        );
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -6887,9 +8759,18 @@ mod tests {
     #[test]
     fn test_identify_known_constants() {
         assert_eq!(identify_constant(std::f64::consts::PI), Some("π".into()));
-        assert_eq!(identify_constant((1.0 + 5.0_f64.sqrt()) / 2.0), Some("φ".into()));
-        assert_eq!(identify_constant(1.0 / std::f64::consts::PI.sqrt()), Some("1/√π".into()));
-        assert_eq!(identify_constant(1.0 / std::f64::consts::E), Some("1/e".into()));
+        assert_eq!(
+            identify_constant((1.0 + 5.0_f64.sqrt()) / 2.0),
+            Some("φ".into())
+        );
+        assert_eq!(
+            identify_constant(1.0 / std::f64::consts::PI.sqrt()),
+            Some("1/√π".into())
+        );
+        assert_eq!(
+            identify_constant(1.0 / std::f64::consts::E),
+            Some("1/e".into())
+        );
         // Fractions
         assert_eq!(identify_constant(0.5), Some("1/2".into()));
         assert_eq!(identify_constant(0.333333), Some("1/3".into()));
@@ -6907,9 +8788,496 @@ mod tests {
             fitness: 0.0,
             status: ConjectureStatus::Proposed,
             confidence: 0.5,
+            macro_promotion_tier: MacroPromotionTier::RecurrentNumerical,
         };
         let ann = annotate_conjecture(&conjecture);
         assert!(ann.contains("φ"), "should identify φ: {}", ann);
+    }
+
+    #[cfg(feature = "abstract_thought")]
+    #[test]
+    fn test_autonomous_numeric_invariants_do_not_fast_track_macros() {
+        use super::super::primitive_system::PrimitiveSystem;
+
+        let mut engine = ConjectureEngine::new();
+        engine.enable_abstract_thought();
+        let invariants = vec![AutonomousInvariant {
+            formula: Expr::BinOp(
+                BinOp::Mul,
+                Box::new(Expr::Var("x".into())),
+                Box::new(Expr::Var("y".into())),
+            ),
+            formula_str: "(x * y)".into(),
+            variance: 1e-6,
+            mean_value: 1.0,
+            complexity: 3,
+            symbolically_proven: false,
+        }];
+
+        engine.ingest_autonomous_invariants("autonomous_numeric", MathDomain::Physics, &invariants);
+        assert_eq!(
+            engine.conjectures[0].macro_promotion_tier,
+            MacroPromotionTier::Quarantined
+        );
+
+        let prims = PrimitiveSystem::new();
+        engine.reflect(&prims);
+
+        assert!(
+            engine.macro_operators().is_empty(),
+            "numeric-only autonomous invariants must not fast-track singleton macros"
+        );
+    }
+
+    #[cfg(feature = "abstract_thought")]
+    #[test]
+    fn test_compatible_macro_seeds_filter_out_multivariate_templates() {
+        use crate::hdc::abstract_thought::dynamic_grammar::MacroOperator;
+
+        let mut engine = ConjectureEngine::new();
+        engine.enable_abstract_thought();
+
+        let one_d = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("n".into())),
+            Box::new(Expr::Const(2.0)),
+        );
+        let multivar = Expr::BinOp(
+            BinOp::Sub,
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
+                Box::new(Expr::Var("x".into())),
+                Box::new(Expr::Var("vy".into())),
+            )),
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
+                Box::new(Expr::Var("y".into())),
+                Box::new(Expr::Var("vx".into())),
+            )),
+        );
+
+        let at = engine
+            .abstract_thought
+            .as_mut()
+            .expect("abstract thought enabled");
+        at.dynamic_grammar.operators.push(MacroOperator {
+            name: "M_ONE_D".into(),
+            canonical: crate::hdc::abstract_thought::expr_canonical_string(&one_d),
+            template: one_d.clone(),
+            arity: 1,
+            promotion_tier: MacroPromotionTier::Formal,
+            source_conjectures: vec![0],
+            parent_formulas: vec![format!("{}", one_d)],
+            vars_used: crate::hdc::abstract_thought::expr_variables(&one_d),
+            var_count: 1,
+            signature: crate::hdc::abstract_thought::expr_signature(&one_d),
+            source_count: 1,
+            usage_count: 0,
+            created_at: 0,
+        });
+        at.dynamic_grammar.operators.push(MacroOperator {
+            name: "M_MULTI".into(),
+            canonical: crate::hdc::abstract_thought::expr_canonical_string(&multivar),
+            template: multivar,
+            arity: 0,
+            promotion_tier: MacroPromotionTier::Formal,
+            source_conjectures: vec![1],
+            parent_formulas: vec!["((vy * x) - (vx * y))".into()],
+            vars_used: vec!["vx".into(), "vy".into(), "x".into(), "y".into()],
+            var_count: 4,
+            signature: "vx|vy|x|y".into(),
+            source_count: 1,
+            usage_count: 0,
+            created_at: 0,
+        });
+
+        let seeds = engine.compatible_macro_seeds_for_sequence();
+        assert_eq!(seeds.len(), 1);
+        assert_eq!(format!("{}", seeds[0]), format!("{}", one_d));
+        assert!(expr_uses_only_vars(&seeds[0], &["n"]));
+    }
+
+    #[cfg(feature = "abstract_thought")]
+    #[test]
+    fn test_autonomous_macro_templates_respect_signature() {
+        use crate::hdc::abstract_thought::dynamic_grammar::MacroOperator;
+
+        let mut engine = ConjectureEngine::new();
+        engine.enable_abstract_thought();
+
+        let one_d = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("n".into())),
+            Box::new(Expr::Const(2.0)),
+        );
+        let multivar = Expr::BinOp(
+            BinOp::Sub,
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
+                Box::new(Expr::Var("x".into())),
+                Box::new(Expr::Var("vy".into())),
+            )),
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
+                Box::new(Expr::Var("y".into())),
+                Box::new(Expr::Var("vx".into())),
+            )),
+        );
+
+        let at = engine.abstract_thought.as_mut().unwrap();
+        at.dynamic_grammar.operators.push(MacroOperator {
+            name: "M_ONE_D".into(),
+            canonical: crate::hdc::abstract_thought::expr_canonical_string(&one_d),
+            template: one_d.clone(),
+            arity: 1,
+            promotion_tier: MacroPromotionTier::Formal,
+            source_conjectures: vec![0],
+            parent_formulas: vec![format!("{}", one_d)],
+            vars_used: crate::hdc::abstract_thought::expr_variables(&one_d),
+            var_count: 1,
+            signature: crate::hdc::abstract_thought::expr_signature(&one_d),
+            source_count: 1,
+            usage_count: 0,
+            created_at: 0,
+        });
+        at.dynamic_grammar.operators.push(MacroOperator {
+            name: "M_MULTI".into(),
+            canonical: crate::hdc::abstract_thought::expr_canonical_string(&multivar),
+            template: multivar.clone(),
+            arity: 0,
+            promotion_tier: MacroPromotionTier::Formal,
+            source_conjectures: vec![1],
+            parent_formulas: vec![format!("{}", multivar)],
+            vars_used: crate::hdc::abstract_thought::expr_variables(&multivar),
+            var_count: 4,
+            signature: crate::hdc::abstract_thought::expr_signature(&multivar),
+            source_count: 1,
+            usage_count: 0,
+            created_at: 0,
+        });
+
+        let seeds = engine.autonomous_macro_templates_for_vars(&["x", "y", "vx", "vy"]);
+        assert_eq!(seeds.len(), 1);
+        assert_eq!(format!("{}", seeds[0]), format!("{}", multivar));
+    }
+
+    #[cfg(feature = "abstract_thought")]
+    #[test]
+    fn test_formal_fast_track_rejects_trivial_unary_wrapper() {
+        use super::super::primitive_system::PrimitiveSystem;
+
+        let mut engine = ConjectureEngine::new();
+        engine.enable_abstract_thought();
+
+        let weak = Expr::Func(
+            UnaryFn::Cos,
+            Box::new(Expr::BinOp(
+                BinOp::Div,
+                Box::new(Expr::Var("y".into())),
+                Box::new(Expr::Const(1.0)),
+            )),
+        );
+        engine.conjectures.push(Conjecture {
+            formula: weak.clone(),
+            formula_str: format!("{}", weak),
+            source: "weak_wrapper".into(),
+            domain: MathDomain::Physics,
+            training_mse: 0.0,
+            complexity: weak.complexity(),
+            fitness: 0.0,
+            status: ConjectureStatus::FormallyVerified { proof_steps: 5 },
+            confidence: 0.99,
+            macro_promotion_tier: MacroPromotionTier::Formal,
+        });
+
+        let prims = PrimitiveSystem::new();
+        engine.reflect(&prims);
+
+        assert!(
+            engine.macro_operators().is_empty(),
+            "trivial unary wrappers should not fast-track into the macro pool"
+        );
+    }
+
+    #[cfg(feature = "abstract_thought")]
+    #[test]
+    fn test_discover_and_ingest_autonomous_invariants_uses_engine_feedback_path() {
+        use crate::hdc::abstract_thought::dynamic_grammar::MacroOperator;
+
+        let mut engine = ConjectureEngine::new();
+        engine.enable_abstract_thought();
+
+        let compatible_macro = Expr::BinOp(
+            BinOp::Sub,
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
+                Box::new(Expr::Var("x".into())),
+                Box::new(Expr::Var("vy".into())),
+            )),
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
+                Box::new(Expr::Var("y".into())),
+                Box::new(Expr::Var("vx".into())),
+            )),
+        );
+        let incompatible_macro = Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::Var("n".into())),
+            Box::new(Expr::Const(1.0)),
+        );
+
+        let at = engine.abstract_thought.as_mut().unwrap();
+        at.dynamic_grammar.operators.push(MacroOperator {
+            name: "ANGMOM".into(),
+            canonical: crate::hdc::abstract_thought::expr_canonical_string(&compatible_macro),
+            template: compatible_macro.clone(),
+            arity: 0,
+            promotion_tier: MacroPromotionTier::Formal,
+            source_conjectures: vec![0],
+            parent_formulas: vec![format!("{}", compatible_macro)],
+            vars_used: crate::hdc::abstract_thought::expr_variables(&compatible_macro),
+            var_count: 4,
+            signature: crate::hdc::abstract_thought::expr_signature(&compatible_macro),
+            source_count: 1,
+            usage_count: 0,
+            created_at: 0,
+        });
+        at.dynamic_grammar.operators.push(MacroOperator {
+            name: "ONE_D".into(),
+            canonical: crate::hdc::abstract_thought::expr_canonical_string(&incompatible_macro),
+            template: incompatible_macro.clone(),
+            arity: 1,
+            promotion_tier: MacroPromotionTier::Formal,
+            source_conjectures: vec![1],
+            parent_formulas: vec![format!("{}", incompatible_macro)],
+            vars_used: crate::hdc::abstract_thought::expr_variables(&incompatible_macro),
+            var_count: 1,
+            signature: crate::hdc::abstract_thought::expr_signature(&incompatible_macro),
+            source_count: 1,
+            usage_count: 0,
+            created_at: 0,
+        });
+
+        fn kepler_rhs(s: &[f64], _t: f64) -> Vec<f64> {
+            let (x, y, vx, vy) = (s[0], s[1], s[2], s[3]);
+            let r2 = x * x + y * y;
+            let r3 = r2 * r2.sqrt();
+            if r3 < 1e-15 {
+                return vec![vx, vy, 0.0, 0.0];
+            }
+            vec![vx, vy, -x / r3, -y / r3]
+        }
+
+        let r2 = || {
+            SymExpr::Add(
+                Box::new(SymExpr::Pow(Box::new(SymExpr::Var("x".into())), 2.0)),
+                Box::new(SymExpr::Pow(Box::new(SymExpr::Var("y".into())), 2.0)),
+            )
+        };
+        let dynamics = vec![
+            ("x", SymExpr::Var("vx".into())),
+            ("y", SymExpr::Var("vy".into())),
+            (
+                "vx",
+                SymExpr::Mul(
+                    Box::new(SymExpr::Neg(Box::new(SymExpr::Var("x".into())))),
+                    Box::new(SymExpr::Pow(Box::new(r2()), -1.5)),
+                ),
+            ),
+            (
+                "vy",
+                SymExpr::Mul(
+                    Box::new(SymExpr::Neg(Box::new(SymExpr::Var("y".into())))),
+                    Box::new(SymExpr::Pow(Box::new(r2()), -1.5)),
+                ),
+            ),
+        ];
+
+        let config = RegressorConfig {
+            population_size: 150,
+            generations: 60,
+            max_depth: 5,
+            max_complexity: 18,
+            lambda: 0.0005,
+            mutation_rate: 0.35,
+            seed: 42,
+            ..RegressorConfig::default()
+        };
+
+        let before = engine.conjectures.len();
+        let invariants = engine.discover_and_ingest_autonomous_invariants(
+            "kepler_feedback",
+            MathDomain::Physics,
+            kepler_rhs,
+            &[1.0, 0.0, 0.0, 0.8],
+            &["x", "y", "vx", "vy"],
+            Some(&dynamics),
+            &config,
+            10.0,
+            0.002,
+        );
+
+        assert!(!invariants.is_empty());
+        assert_eq!(engine.conjectures.len(), before + invariants.len());
+        assert!(engine
+            .conjectures
+            .iter()
+            .any(|c| c.source == "kepler_feedback"));
+        assert!(engine
+            .autonomous_macro_templates_for_vars(&["x", "y", "vx", "vy"])
+            .iter()
+            .all(|expr| expr_uses_only_vars(expr, &["x", "y", "vx", "vy"])));
+    }
+
+    #[cfg(feature = "abstract_thought")]
+    #[test]
+    fn test_macro_pool_metrics_report_quality_summary() {
+        use crate::hdc::abstract_thought::dynamic_grammar::MacroOperator;
+
+        let mut engine = ConjectureEngine::new();
+        engine.enable_abstract_thought();
+
+        let template = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("n".into())),
+            Box::new(Expr::Const(2.0)),
+        );
+        let at = engine.abstract_thought.as_mut().unwrap();
+        at.dynamic_grammar.cycle = 20;
+        at.dynamic_grammar.operators.push(MacroOperator {
+            name: "SQUARE".into(),
+            canonical: crate::hdc::abstract_thought::expr_canonical_string(&template),
+            template: template.clone(),
+            arity: 1,
+            promotion_tier: MacroPromotionTier::Formal,
+            source_conjectures: vec![0],
+            parent_formulas: vec![format!("{}", template)],
+            vars_used: vec!["n".into()],
+            var_count: 1,
+            signature: "n".into(),
+            source_count: 2,
+            usage_count: 4,
+            created_at: 0,
+        });
+
+        let metrics = engine.macro_pool_metrics().expect("metrics available");
+        assert_eq!(metrics.total_operators, 1);
+        assert_eq!(metrics.formal_operators, 1);
+        assert_eq!(metrics.used_operators, 1);
+        assert_eq!(metrics.signature_stats.len(), 1);
+        assert_eq!(metrics.signature_stats[0].signature, "n");
+    }
+
+    #[cfg(feature = "abstract_thought")]
+    #[test]
+    fn test_reflect_ticks_and_prunes_unused_macros() {
+        use super::super::primitive_system::PrimitiveSystem;
+        use crate::hdc::abstract_thought::dynamic_grammar::MacroOperator;
+
+        let mut engine = ConjectureEngine::new();
+        engine.enable_abstract_thought();
+
+        let template = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("n".into())),
+            Box::new(Expr::Const(2.0)),
+        );
+        engine
+            .abstract_thought
+            .as_mut()
+            .unwrap()
+            .dynamic_grammar
+            .operators
+            .push(MacroOperator {
+                name: "STALE".into(),
+                canonical: crate::hdc::abstract_thought::expr_canonical_string(&template),
+                template,
+                arity: 1,
+                promotion_tier: MacroPromotionTier::Formal,
+                source_conjectures: vec![0],
+                parent_formulas: vec!["(n ^ 2)".into()],
+                vars_used: vec!["n".into()],
+                var_count: 1,
+                signature: "n".into(),
+                source_count: 1,
+                usage_count: 0,
+                created_at: 0,
+            });
+
+        let prims = PrimitiveSystem::new();
+        for _ in 0..10 {
+            engine.reflect(&prims);
+        }
+
+        assert!(
+            engine.macro_operators().is_empty(),
+            "unused operators should age out once the grammar cycle advances"
+        );
+    }
+
+    #[cfg(feature = "abstract_thought")]
+    #[test]
+    fn test_generate_conjectures_records_macro_usage() {
+        use crate::hdc::abstract_thought::dynamic_grammar::MacroOperator;
+
+        let mut engine = ConjectureEngine::with_config(RegressorConfig {
+            population_size: 120,
+            generations: 60,
+            max_depth: 4,
+            max_complexity: 12,
+            lambda: 0.001,
+            tournament_size: 5,
+            mutation_rate: 0.3,
+            seed: 42,
+            disable_macro_seeds: false,
+        });
+        engine.enable_abstract_thought();
+
+        let template = Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("n".into())),
+            Box::new(Expr::Const(2.0)),
+        );
+        engine
+            .abstract_thought
+            .as_mut()
+            .unwrap()
+            .dynamic_grammar
+            .operators
+            .push(MacroOperator {
+                name: "SQUARE".into(),
+                canonical: crate::hdc::abstract_thought::expr_canonical_string(&template),
+                template,
+                arity: 1,
+                promotion_tier: MacroPromotionTier::Formal,
+                source_conjectures: vec![0],
+                parent_formulas: vec!["(n ^ 2)".into()],
+                vars_used: vec!["n".into()],
+                var_count: 1,
+                signature: "n".into(),
+                source_count: 1,
+                usage_count: 0,
+                created_at: 0,
+            });
+
+        engine.observe(ObservedSequence::new(
+            "squares",
+            MathDomain::NumberTheory,
+            (1..=8).map(|n| (n as f64, (n * n) as f64)).collect(),
+        ));
+        engine.generate_conjectures(3);
+
+        let usage = engine
+            .abstract_thought
+            .as_ref()
+            .unwrap()
+            .dynamic_grammar
+            .operators[0]
+            .usage_count;
+        assert!(
+            usage > 0,
+            "macro usage should be recorded on downstream GP runs"
+        );
     }
 
     #[test]
@@ -6918,7 +9286,11 @@ mod tests {
         assert!(!seq.data.is_empty(), "should have data points");
         // Max gap below 1000 is 20 (between 887 and 907)
         let last = seq.data.last().unwrap();
-        assert!(last.1 >= 8.0, "max gap below 1000 should be ≥ 8, got {}", last.1);
+        assert!(
+            last.1 >= 8.0,
+            "max gap below 1000 should be ≥ 8, got {}",
+            last.1
+        );
         eprintln!("Max prime gap below {}: {}", last.0, last.1);
     }
 
@@ -6941,11 +9313,17 @@ mod tests {
 
         eprintln!("\n═══ FRONTIER: PRIME GAP SCALING (Cramér's conjecture) ═══");
         eprintln!("  Expected: G(n) ~ (ln n)² (open problem)\n");
-        for c in engine.conjectures.iter()
-            .filter(|c| c.source.contains("max_prime_gap")).take(5) {
+        for c in engine
+            .conjectures
+            .iter()
+            .filter(|c| c.source.contains("max_prime_gap"))
+            .take(5)
+        {
             let annotation = annotate_conjecture(c);
-            eprintln!("  {} | MSE={:.2e} | conf={:.2}{}",
-                c.formula_str, c.training_mse, c.confidence, annotation);
+            eprintln!(
+                "  {} | MSE={:.2e} | conf={:.2}{}",
+                c.formula_str, c.training_mse, c.confidence, annotation
+            );
         }
 
         assert!(!engine.conjectures.is_empty());
@@ -6968,26 +9346,46 @@ mod tests {
         ];
 
         let results = discover_conservation_laws(
-            harmonic_rhs, &[1.0, 0.0], &dynamics, &["x", "v"], 20.0, 0.01);
+            harmonic_rhs,
+            &[1.0, 0.0],
+            &dynamics,
+            &["x", "v"],
+            20.0,
+            0.01,
+        );
 
         eprintln!("\n═══ AUTOMATED PHYSICIST: HARMONIC OSCILLATOR ═══");
         eprintln!("  Input: dx/dt = v, dv/dt = -x\n");
         for r in &results {
-            let status = if r.symbolically_proven { "PROVEN ✓" }
-                else if r.variance < 1e-6 { "numerically conserved" }
-                else { "NOT conserved" };
-            eprintln!("  {:12} │ var={:.2e} │ mean={:.4} │ {}",
-                r.name, r.variance, r.mean_value, status);
+            let status = if r.symbolically_proven {
+                "PROVEN ✓"
+            } else if r.variance < 1e-6 {
+                "numerically conserved"
+            } else {
+                "NOT conserved"
+            };
+            eprintln!(
+                "  {:12} │ var={:.2e} │ mean={:.4} │ {}",
+                r.name, r.variance, r.mean_value, status
+            );
         }
 
         // x² + v² should be discovered as conserved AND symbolically proven
         let best = &results[0];
-        assert!(best.name == "x² + y²" || best.name == "x² + v²",
-            "best invariant should be x²+v², got {}", best.name);
-        assert!(best.variance < 1e-6,
-            "E = x²+v² variance should be ~0, got {:.2e}", best.variance);
-        assert!(best.symbolically_proven,
-            "E = x²+v² should be symbolically proven");
+        assert!(
+            best.name == "x² + y²" || best.name == "x² + v²",
+            "best invariant should be x²+v², got {}",
+            best.name
+        );
+        assert!(
+            best.variance < 1e-6,
+            "E = x²+v² variance should be ~0, got {:.2e}",
+            best.variance
+        );
+        assert!(
+            best.symbolically_proven,
+            "E = x²+v² should be symbolically proven"
+        );
 
         // x² alone should NOT be conserved
         let x2 = results.iter().find(|r| r.name == "x²").unwrap();
@@ -7009,43 +9407,73 @@ mod tests {
     fn test_automated_conservation_lotka_volterra() {
         // Symbolic dynamics: dx/dt = x(1-y) = x - xy, dy/dt = y(x-1) = xy - y
         let dynamics = vec![
-            ("x", SymExpr::Add(
-                Box::new(SymExpr::Var("x".into())),
-                Box::new(SymExpr::Neg(Box::new(SymExpr::Mul(
+            (
+                "x",
+                SymExpr::Add(
                     Box::new(SymExpr::Var("x".into())),
-                    Box::new(SymExpr::Var("y".into())))))))),
-            ("y", SymExpr::Add(
-                Box::new(SymExpr::Mul(
-                    Box::new(SymExpr::Var("x".into())),
-                    Box::new(SymExpr::Var("y".into())))),
-                Box::new(SymExpr::Neg(Box::new(SymExpr::Var("y".into())))))),
+                    Box::new(SymExpr::Neg(Box::new(SymExpr::Mul(
+                        Box::new(SymExpr::Var("x".into())),
+                        Box::new(SymExpr::Var("y".into())),
+                    )))),
+                ),
+            ),
+            (
+                "y",
+                SymExpr::Add(
+                    Box::new(SymExpr::Mul(
+                        Box::new(SymExpr::Var("x".into())),
+                        Box::new(SymExpr::Var("y".into())),
+                    )),
+                    Box::new(SymExpr::Neg(Box::new(SymExpr::Var("y".into())))),
+                ),
+            ),
         ];
 
         // Initial condition: x₀=2, y₀=1 (off-equilibrium, creates oscillating orbits)
         let results = discover_conservation_laws(
-            lotka_volterra_rhs, &[2.0, 1.0], &dynamics, &["x", "y"], 30.0, 0.005);
+            lotka_volterra_rhs,
+            &[2.0, 1.0],
+            &dynamics,
+            &["x", "y"],
+            30.0,
+            0.005,
+        );
 
         eprintln!("\n═══ AUTOMATED PHYSICIST: LOTKA-VOLTERRA PREDATOR-PREY ═══");
         eprintln!("  Input: dx/dt = x(1-y), dy/dt = y(x-1)\n");
         for r in &results {
-            let status = if r.symbolically_proven { "PROVEN ✓" }
-                else if r.variance < 1e-4 { "numerically conserved" }
-                else { "NOT conserved" };
-            eprintln!("  {:25} │ var={:.2e} │ mean={:.4} │ {}",
-                r.name, r.variance, r.mean_value, status);
+            let status = if r.symbolically_proven {
+                "PROVEN ✓"
+            } else if r.variance < 1e-4 {
+                "numerically conserved"
+            } else {
+                "NOT conserved"
+            };
+            eprintln!(
+                "  {:25} │ var={:.2e} │ mean={:.4} │ {}",
+                r.name, r.variance, r.mean_value, status
+            );
         }
 
         // The LV invariant should be discovered AND symbolically proven
-        let lv = results.iter().find(|r| r.name.contains("ln(x)") && r.name.contains("ln(y)") && r.name.contains("x -"));
+        let lv = results.iter().find(|r| {
+            r.name.contains("ln(x)") && r.name.contains("ln(y)") && r.name.contains("x -")
+        });
         assert!(lv.is_some(), "should find LV invariant candidate");
         let lv = lv.unwrap();
-        assert!(lv.variance < 1e-4,
-            "V = x - ln(x) + y - ln(y) should be conserved, var={:.2e}", lv.variance);
+        assert!(
+            lv.variance < 1e-4,
+            "V = x - ln(x) + y - ln(y) should be conserved, var={:.2e}",
+            lv.variance
+        );
 
         // Polynomial candidates should NOT be conserved
         let x2y2 = results.iter().find(|r| r.name == "x² + y²");
         if let Some(c) = x2y2 {
-            assert!(!c.symbolically_proven, "x²+y² should NOT be conserved in LV");
+            assert!(
+                !c.symbolically_proven,
+                "x²+y² should NOT be conserved in LV"
+            );
         }
 
         eprintln!("\n  >>> DISCOVERY: V = x - ln(x) + y - ln(y) is a conserved quantity");
@@ -7063,16 +9491,27 @@ mod tests {
         let deriv = expr.diff("x").simplify();
         // Evaluate: at x=2, d/dx(ln(x)) = 1/2 = 0.5
         let val = deriv.eval(&[("x", 2.0)]);
-        assert!((val - 0.5).abs() < 1e-10, "d/dx(ln(x)) at x=2 = 0.5, got {}", val);
+        assert!(
+            (val - 0.5).abs() < 1e-10,
+            "d/dx(ln(x)) at x=2 = 0.5, got {}",
+            val
+        );
 
         // d/dx(x - ln(x)) = 1 - 1/x
         let expr2 = SymExpr::Add(
             Box::new(SymExpr::Var("x".into())),
-            Box::new(SymExpr::Neg(Box::new(SymExpr::Log(Box::new(SymExpr::Var("x".into())))))));
+            Box::new(SymExpr::Neg(Box::new(SymExpr::Log(Box::new(
+                SymExpr::Var("x".into()),
+            ))))),
+        );
         let deriv2 = expr2.diff("x").simplify();
         // At x=2: 1 - 1/2 = 0.5
         let val2 = deriv2.eval(&[("x", 2.0)]);
-        assert!((val2 - 0.5).abs() < 1e-10, "d/dx(x - ln(x)) at x=2 = 0.5, got {}", val2);
+        assert!(
+            (val2 - 0.5).abs() < 1e-10,
+            "d/dx(x - ln(x)) at x=2 = 0.5, got {}",
+            val2
+        );
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -7089,49 +9528,81 @@ mod tests {
         // dx/dt = vx, dy/dt = vy
         // dvx/dt = -x/r³ = -x·(x²+y²)^(-3/2)
         // dvy/dt = -y/r³ = -y·(x²+y²)^(-3/2)
-        let r2 = || SymExpr::Add(
-            Box::new(SymExpr::Pow(Box::new(SymExpr::Var("x".into())), 2.0)),
-            Box::new(SymExpr::Pow(Box::new(SymExpr::Var("y".into())), 2.0)));
+        let r2 = || {
+            SymExpr::Add(
+                Box::new(SymExpr::Pow(Box::new(SymExpr::Var("x".into())), 2.0)),
+                Box::new(SymExpr::Pow(Box::new(SymExpr::Var("y".into())), 2.0)),
+            )
+        };
 
         let dynamics = vec![
-            ("x",  SymExpr::Var("vx".into())),
-            ("y",  SymExpr::Var("vy".into())),
-            ("vx", SymExpr::Mul(
-                Box::new(SymExpr::Neg(Box::new(SymExpr::Var("x".into())))),
-                Box::new(SymExpr::Pow(Box::new(r2()), -1.5)))),
-            ("vy", SymExpr::Mul(
-                Box::new(SymExpr::Neg(Box::new(SymExpr::Var("y".into())))),
-                Box::new(SymExpr::Pow(Box::new(r2()), -1.5)))),
+            ("x", SymExpr::Var("vx".into())),
+            ("y", SymExpr::Var("vy".into())),
+            (
+                "vx",
+                SymExpr::Mul(
+                    Box::new(SymExpr::Neg(Box::new(SymExpr::Var("x".into())))),
+                    Box::new(SymExpr::Pow(Box::new(r2()), -1.5)),
+                ),
+            ),
+            (
+                "vy",
+                SymExpr::Mul(
+                    Box::new(SymExpr::Neg(Box::new(SymExpr::Var("y".into())))),
+                    Box::new(SymExpr::Pow(Box::new(r2()), -1.5)),
+                ),
+            ),
         ];
 
         // Elliptical orbit: x₀=1, y₀=0, vx₀=0, vy₀=0.8 (bound orbit)
         let results = discover_conservation_laws(
-            kepler_rhs, &[1.0, 0.0, 0.0, 0.8], &dynamics,
-            &["x", "y", "vx", "vy"], 20.0, 0.001);
+            kepler_rhs,
+            &[1.0, 0.0, 0.0, 0.8],
+            &dynamics,
+            &["x", "y", "vx", "vy"],
+            20.0,
+            0.001,
+        );
 
         eprintln!("\n═══ AUTOMATED PHYSICIST: KEPLER TWO-BODY ═══");
         eprintln!("  Input: d²r/dt² = -r/|r|³ (inverse-square gravity)\n");
         for r in &results {
-            let status = if r.symbolically_proven { "PROVEN ✓" }
-                else if r.variance < 1e-4 { "numerically conserved" }
-                else { "NOT conserved" };
-            eprintln!("  {:25} │ var={:.2e} │ mean={:>10.4} │ {}",
-                r.name, r.variance, r.mean_value, status);
+            let status = if r.symbolically_proven {
+                "PROVEN ✓"
+            } else if r.variance < 1e-4 {
+                "numerically conserved"
+            } else {
+                "NOT conserved"
+            };
+            eprintln!(
+                "  {:25} │ var={:.2e} │ mean={:>10.4} │ {}",
+                r.name, r.variance, r.mean_value, status
+            );
         }
 
         // Energy should be discovered as conserved
-        let energy = results.iter().find(|r| r.name.contains("½v²") && r.name.contains("1/r"));
+        let energy = results
+            .iter()
+            .find(|r| r.name.contains("½v²") && r.name.contains("1/r"));
         assert!(energy.is_some(), "should find Kepler energy candidate");
         let energy = energy.unwrap();
-        assert!(energy.variance < 1e-4,
-            "Kepler energy should be conserved, var={:.2e}", energy.variance);
+        assert!(
+            energy.variance < 1e-4,
+            "Kepler energy should be conserved, var={:.2e}",
+            energy.variance
+        );
 
         // Angular momentum should be discovered as conserved
-        let ang_mom = results.iter().find(|r| r.name.contains("vy") && r.name.contains("vx"));
+        let ang_mom = results
+            .iter()
+            .find(|r| r.name.contains("vy") && r.name.contains("vx"));
         assert!(ang_mom.is_some(), "should find angular momentum candidate");
         let ang_mom = ang_mom.unwrap();
-        assert!(ang_mom.variance < 1e-4,
-            "angular momentum should be conserved, var={:.2e}", ang_mom.variance);
+        assert!(
+            ang_mom.variance < 1e-4,
+            "angular momentum should be conserved, var={:.2e}",
+            ang_mom.variance
+        );
 
         eprintln!("\n  >>> DISCOVERED: E = ½v² - 1/r (orbital energy)");
         eprintln!("  >>> DISCOVERED: L = x·vy - y·vx (angular momentum)");
@@ -7151,12 +9622,19 @@ mod tests {
     fn test_automated_conservation_double_pendulum() {
         // Custom candidate: the exact Hamiltonian (with trig — can't be in SymExpr yet)
         let custom = vec![
-            ("H = ½(2ω₁²+ω₂²+2ω₁ω₂cos(Δθ)) - g(2cosθ₁+cosθ₂)".into(),
-             Box::new(|s: &[f64]| double_pendulum_energy(s)) as Box<dyn Fn(&[f64]) -> f64>),
-            ("½(ω₁² + ω₂²)".into(),
-             Box::new(|s: &[f64]| 0.5*(s[2]*s[2] + s[3]*s[3])) as Box<dyn Fn(&[f64]) -> f64>),
-            ("θ₁ + θ₂".into(),
-             Box::new(|s: &[f64]| s[0] + s[1]) as Box<dyn Fn(&[f64]) -> f64>),
+            (
+                "H = ½(2ω₁²+ω₂²+2ω₁ω₂cos(Δθ)) - g(2cosθ₁+cosθ₂)".into(),
+                Box::new(|s: &[f64]| double_pendulum_energy(s)) as Box<dyn Fn(&[f64]) -> f64>,
+            ),
+            (
+                "½(ω₁² + ω₂²)".into(),
+                Box::new(|s: &[f64]| 0.5 * (s[2] * s[2] + s[3] * s[3]))
+                    as Box<dyn Fn(&[f64]) -> f64>,
+            ),
+            (
+                "θ₁ + θ₂".into(),
+                Box::new(|s: &[f64]| s[0] + s[1]) as Box<dyn Fn(&[f64]) -> f64>,
+            ),
         ];
 
         // Empty symbolic dynamics (can't prove trig conservation symbolically yet)
@@ -7164,33 +9642,56 @@ mod tests {
 
         // Initial condition: small angles (mildly nonlinear — enough to test conservation)
         let results = discover_conservation_laws_with_custom(
-            double_pendulum_rhs, &[0.5, 0.3, 0.0, 0.0], &dynamics,
-            &["θ₁", "θ₂", "ω₁", "ω₂"], custom, 5.0, 0.0005);
+            double_pendulum_rhs,
+            &[0.5, 0.3, 0.0, 0.0],
+            &dynamics,
+            &["θ₁", "θ₂", "ω₁", "ω₂"],
+            custom,
+            5.0,
+            0.0005,
+        );
 
         eprintln!("\n═══ AUTOMATED PHYSICIST: DOUBLE PENDULUM (CHAOS) ═══");
         eprintln!("  Input: coupled pendulum, θ₁=1.5, θ₂=1.0 (chaotic regime)\n");
         for r in &results {
-            let status = if r.symbolically_proven { "PROVEN ✓" }
-                else if r.variance < 1e-3 { "CONSERVED (numerical)" }
-                else { "NOT conserved" };
-            eprintln!("  {:50} │ var={:.2e} │ mean={:>8.3} │ {}",
-                r.name, r.variance, r.mean_value, status);
+            let status = if r.symbolically_proven {
+                "PROVEN ✓"
+            } else if r.variance < 1e-3 {
+                "CONSERVED (numerical)"
+            } else {
+                "NOT conserved"
+            };
+            eprintln!(
+                "  {:50} │ var={:.2e} │ mean={:>8.3} │ {}",
+                r.name, r.variance, r.mean_value, status
+            );
         }
 
         // The Hamiltonian should be the most conserved quantity
-        let hamiltonian = results.iter().find(|r| r.name.contains("Hamiltonian") || r.name.contains("2cosθ"));
+        let hamiltonian = results
+            .iter()
+            .find(|r| r.name.contains("Hamiltonian") || r.name.contains("2cosθ"));
         if let Some(h) = hamiltonian {
-            eprintln!("\n  >>> DISCOVERED: Hamiltonian is conserved amid chaos (var={:.2e})", h.variance);
+            eprintln!(
+                "\n  >>> DISCOVERED: Hamiltonian is conserved amid chaos (var={:.2e})",
+                h.variance
+            );
             // Relaxed tolerance — double pendulum integration accumulates numerical error
-            assert!(h.variance < 1e-2,
-                "Hamiltonian should be conserved, var={:.2e}", h.variance);
+            assert!(
+                h.variance < 1e-2,
+                "Hamiltonian should be conserved, var={:.2e}",
+                h.variance
+            );
         }
 
         // Other quantities should NOT be conserved in chaotic regime
         let kinetic = results.iter().find(|r| r.name.contains("½(ω₁² + ω₂²)"));
         if let Some(k) = kinetic {
-            assert!(k.variance > 1e-2,
-                "kinetic energy alone should not be conserved: var={:.2e}", k.variance);
+            assert!(
+                k.variance > 1e-2,
+                "kinetic energy alone should not be conserved: var={:.2e}",
+                k.variance
+            );
         }
 
         eprintln!("  >>> The Hamiltonian survives chaos — only total energy is invariant");
@@ -7221,29 +9722,53 @@ mod tests {
         };
 
         let invariants = discover_invariants_autonomous(
-            harmonic_rhs, &[1.0, 0.0], &["x", "v"],
-            Some(&dynamics), &config, 20.0, 0.01);
+            harmonic_rhs,
+            &[1.0, 0.0],
+            &["x", "v"],
+            Some(&dynamics),
+            &config,
+            20.0,
+            0.01,
+        );
 
         eprintln!("\n╔══════════════════════════════════════════════════════════════╗");
         eprintln!("║  AUTONOMOUS PHYSICIST — ZERO HUMAN GUIDANCE                 ║");
         eprintln!("║  Input: dx/dt = v, dv/dt = -x (that's ALL she gets)        ║");
         eprintln!("╠══════════════════════════════════════════════════════════════╣");
         for (i, inv) in invariants.iter().enumerate() {
-            let status = if inv.symbolically_proven { "PROVEN ✓" }
-                else if inv.variance < 1e-6 { "conserved" }
-                else { "—" };
-            eprintln!("║ #{}: {:40} │ var={:.2e} │ {}",
-                i + 1, inv.formula_str, inv.variance, status);
+            let status = if inv.symbolically_proven {
+                "PROVEN ✓"
+            } else if inv.variance < 1e-6 {
+                "conserved"
+            } else {
+                "—"
+            };
+            eprintln!(
+                "║ #{}: {:40} │ var={:.2e} │ {}",
+                i + 1,
+                inv.formula_str,
+                inv.variance,
+                status
+            );
         }
         eprintln!("╚══════════════════════════════════════════════════════════════╝");
 
         // The best invariant should have near-zero variance
-        assert!(!invariants.is_empty(), "should discover at least one invariant");
+        assert!(
+            !invariants.is_empty(),
+            "should discover at least one invariant"
+        );
         let best = &invariants[0];
-        assert!(best.variance < 1e-4,
-            "best invariant should have low variance, got {:.2e}", best.variance);
+        assert!(
+            best.variance < 1e-4,
+            "best invariant should have low variance, got {:.2e}",
+            best.variance
+        );
 
-        eprintln!("\n  >>> BEST DISCOVERY: {} (var={:.2e})", best.formula_str, best.variance);
+        eprintln!(
+            "\n  >>> BEST DISCOVERY: {} (var={:.2e})",
+            best.formula_str, best.variance
+        );
         if best.symbolically_proven {
             eprintln!("  >>> SYMBOLICALLY PROVEN: dE/dt = 0 ✓");
         }
@@ -7252,18 +9777,29 @@ mod tests {
     /// Autonomous Kepler: discover both energy and angular momentum with no candidates.
     #[test]
     fn test_autonomous_discovery_kepler() {
-        let r2 = || SymExpr::Add(
-            Box::new(SymExpr::Pow(Box::new(SymExpr::Var("x".into())), 2.0)),
-            Box::new(SymExpr::Pow(Box::new(SymExpr::Var("y".into())), 2.0)));
+        let r2 = || {
+            SymExpr::Add(
+                Box::new(SymExpr::Pow(Box::new(SymExpr::Var("x".into())), 2.0)),
+                Box::new(SymExpr::Pow(Box::new(SymExpr::Var("y".into())), 2.0)),
+            )
+        };
         let dynamics = vec![
-            ("x",  SymExpr::Var("vx".into())),
-            ("y",  SymExpr::Var("vy".into())),
-            ("vx", SymExpr::Mul(
-                Box::new(SymExpr::Neg(Box::new(SymExpr::Var("x".into())))),
-                Box::new(SymExpr::Pow(Box::new(r2()), -1.5)))),
-            ("vy", SymExpr::Mul(
-                Box::new(SymExpr::Neg(Box::new(SymExpr::Var("y".into())))),
-                Box::new(SymExpr::Pow(Box::new(r2()), -1.5)))),
+            ("x", SymExpr::Var("vx".into())),
+            ("y", SymExpr::Var("vy".into())),
+            (
+                "vx",
+                SymExpr::Mul(
+                    Box::new(SymExpr::Neg(Box::new(SymExpr::Var("x".into())))),
+                    Box::new(SymExpr::Pow(Box::new(r2()), -1.5)),
+                ),
+            ),
+            (
+                "vy",
+                SymExpr::Mul(
+                    Box::new(SymExpr::Neg(Box::new(SymExpr::Var("y".into())))),
+                    Box::new(SymExpr::Pow(Box::new(r2()), -1.5)),
+                ),
+            ),
         ];
 
         let config = RegressorConfig {
@@ -7278,28 +9814,45 @@ mod tests {
         };
 
         let invariants = discover_invariants_autonomous(
-            kepler_rhs, &[1.0, 0.0, 0.0, 0.8],
+            kepler_rhs,
+            &[1.0, 0.0, 0.0, 0.8],
             &["x", "y", "vx", "vy"],
-            Some(&dynamics), &config, 20.0, 0.001);
+            Some(&dynamics),
+            &config,
+            20.0,
+            0.001,
+        );
 
         eprintln!("\n╔══════════════════════════════════════════════════════════════╗");
         eprintln!("║  AUTONOMOUS PHYSICIST — KEPLER TWO-BODY                     ║");
         eprintln!("║  Input: d²r/dt² = -r/|r|³ (that's ALL she gets)            ║");
         eprintln!("╠══════════════════════════════════════════════════════════════╣");
         for (i, inv) in invariants.iter().enumerate() {
-            let status = if inv.symbolically_proven { "PROVEN ✓" }
-                else if inv.variance < 1e-4 { "conserved" }
-                else { "—" };
-            eprintln!("║ #{}: {:40} │ var={:.2e} │ {}",
-                i + 1, inv.formula_str, inv.variance, status);
+            let status = if inv.symbolically_proven {
+                "PROVEN ✓"
+            } else if inv.variance < 1e-4 {
+                "conserved"
+            } else {
+                "—"
+            };
+            eprintln!(
+                "║ #{}: {:40} │ var={:.2e} │ {}",
+                i + 1,
+                inv.formula_str,
+                inv.variance,
+                status
+            );
         }
         eprintln!("╚══════════════════════════════════════════════════════════════╝");
 
         assert!(!invariants.is_empty());
         // Should find at least one well-conserved quantity
         let conserved_count = invariants.iter().filter(|i| i.variance < 1e-4).count();
-        assert!(conserved_count >= 1,
-            "should find at least 1 conserved quantity, found {}", conserved_count);
+        assert!(
+            conserved_count >= 1,
+            "should find at least 1 conserved quantity, found {}",
+            conserved_count
+        );
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -7320,69 +9873,114 @@ mod tests {
     fn test_laplace_runge_lenz_discovery() {
         let custom = vec![
             // Energy: E = ½(vx²+vy²) - 1/r
-            ("E = ½v² - 1/r".into(),
-             Box::new(|s: &[f64]| {
-                 let r = (s[0]*s[0] + s[1]*s[1]).sqrt();
-                 if r > 1e-10 { 0.5*(s[2]*s[2]+s[3]*s[3]) - 1.0/r } else { f64::NAN }
-             }) as Box<dyn Fn(&[f64]) -> f64>),
+            (
+                "E = ½v² - 1/r".into(),
+                Box::new(|s: &[f64]| {
+                    let r = (s[0] * s[0] + s[1] * s[1]).sqrt();
+                    if r > 1e-10 {
+                        0.5 * (s[2] * s[2] + s[3] * s[3]) - 1.0 / r
+                    } else {
+                        f64::NAN
+                    }
+                }) as Box<dyn Fn(&[f64]) -> f64>,
+            ),
             // Angular momentum: L = x·vy - y·vx
-            ("L = x·vy - y·vx".into(),
-             Box::new(|s: &[f64]| s[0]*s[3] - s[1]*s[2]) as Box<dyn Fn(&[f64]) -> f64>),
+            (
+                "L = x·vy - y·vx".into(),
+                Box::new(|s: &[f64]| s[0] * s[3] - s[1] * s[2]) as Box<dyn Fn(&[f64]) -> f64>,
+            ),
             // LRL x-component: Ax = vy·L - x/r
-            ("Ax = vy·L - x/r (Laplace-Runge-Lenz)".into(),
-             Box::new(|s: &[f64]| {
-                 let (x, y, vx, vy) = (s[0], s[1], s[2], s[3]);
-                 let l = x*vy - y*vx;
-                 let r = (x*x + y*y).sqrt();
-                 if r > 1e-10 { vy*l - x/r } else { f64::NAN }
-             }) as Box<dyn Fn(&[f64]) -> f64>),
+            (
+                "Ax = vy·L - x/r (Laplace-Runge-Lenz)".into(),
+                Box::new(|s: &[f64]| {
+                    let (x, y, vx, vy) = (s[0], s[1], s[2], s[3]);
+                    let l = x * vy - y * vx;
+                    let r = (x * x + y * y).sqrt();
+                    if r > 1e-10 {
+                        vy * l - x / r
+                    } else {
+                        f64::NAN
+                    }
+                }) as Box<dyn Fn(&[f64]) -> f64>,
+            ),
             // LRL y-component: Ay = -vx·L - y/r
-            ("Ay = -vx·L - y/r (Laplace-Runge-Lenz)".into(),
-             Box::new(|s: &[f64]| {
-                 let (x, y, vx, vy) = (s[0], s[1], s[2], s[3]);
-                 let l = x*vy - y*vx;
-                 let r = (x*x + y*y).sqrt();
-                 if r > 1e-10 { -vx*l - y/r } else { f64::NAN }
-             }) as Box<dyn Fn(&[f64]) -> f64>),
+            (
+                "Ay = -vx·L - y/r (Laplace-Runge-Lenz)".into(),
+                Box::new(|s: &[f64]| {
+                    let (x, y, vx, vy) = (s[0], s[1], s[2], s[3]);
+                    let l = x * vy - y * vx;
+                    let r = (x * x + y * y).sqrt();
+                    if r > 1e-10 {
+                        -vx * l - y / r
+                    } else {
+                        f64::NAN
+                    }
+                }) as Box<dyn Fn(&[f64]) -> f64>,
+            ),
             // |A|² = 1 + 2EL² (magnitude — should also be conserved)
-            ("|A|² = Ax² + Ay²".into(),
-             Box::new(|s: &[f64]| {
-                 let (x, y, vx, vy) = (s[0], s[1], s[2], s[3]);
-                 let l = x*vy - y*vx;
-                 let r = (x*x + y*y).sqrt();
-                 if r > 1e-10 {
-                     let ax = vy*l - x/r;
-                     let ay = -vx*l - y/r;
-                     ax*ax + ay*ay
-                 } else { f64::NAN }
-             }) as Box<dyn Fn(&[f64]) -> f64>),
+            (
+                "|A|² = Ax² + Ay²".into(),
+                Box::new(|s: &[f64]| {
+                    let (x, y, vx, vy) = (s[0], s[1], s[2], s[3]);
+                    let l = x * vy - y * vx;
+                    let r = (x * x + y * y).sqrt();
+                    if r > 1e-10 {
+                        let ax = vy * l - x / r;
+                        let ay = -vx * l - y / r;
+                        ax * ax + ay * ay
+                    } else {
+                        f64::NAN
+                    }
+                }) as Box<dyn Fn(&[f64]) -> f64>,
+            ),
             // Kinetic energy alone (should NOT be conserved)
-            ("½(vx²+vy²)".into(),
-             Box::new(|s: &[f64]| 0.5*(s[2]*s[2]+s[3]*s[3])) as Box<dyn Fn(&[f64]) -> f64>),
+            (
+                "½(vx²+vy²)".into(),
+                Box::new(|s: &[f64]| 0.5 * (s[2] * s[2] + s[3] * s[3]))
+                    as Box<dyn Fn(&[f64]) -> f64>,
+            ),
         ];
 
         let dynamics: Vec<(&str, SymExpr)> = vec![]; // skip symbolic proof for vector quantities
 
         // Elliptical orbit
         let results = discover_conservation_laws_with_custom(
-            kepler_rhs, &[1.0, 0.0, 0.0, 0.8], &dynamics,
-            &["x", "y", "vx", "vy"], custom, 20.0, 0.001);
+            kepler_rhs,
+            &[1.0, 0.0, 0.0, 0.8],
+            &dynamics,
+            &["x", "y", "vx", "vy"],
+            custom,
+            20.0,
+            0.001,
+        );
 
         eprintln!("\n═══ LAPLACE-RUNGE-LENZ VECTOR DISCOVERY ═══");
         eprintln!("  The hidden SO(4) symmetry of the Kepler problem\n");
         for r in &results {
-            let status = if r.variance < 1e-6 { "CONSERVED ✓" }
-                else if r.variance < 1e-3 { "~conserved" }
-                else { "NOT conserved" };
-            eprintln!("  {:45} │ var={:.2e} │ mean={:>8.4} │ {}",
-                r.name, r.variance, r.mean_value, status);
+            let status = if r.variance < 1e-6 {
+                "CONSERVED ✓"
+            } else if r.variance < 1e-3 {
+                "~conserved"
+            } else {
+                "NOT conserved"
+            };
+            eprintln!(
+                "  {:45} │ var={:.2e} │ mean={:>8.4} │ {}",
+                r.name, r.variance, r.mean_value, status
+            );
         }
 
         // All three Kepler invariants should be found
-        let energy = results.iter().find(|r| r.name.contains("½v²") && r.name.contains("1/r"));
+        let energy = results
+            .iter()
+            .find(|r| r.name.contains("½v²") && r.name.contains("1/r"));
         let ang_mom = results.iter().find(|r| r.name.contains("x·vy"));
-        let lrl_x = results.iter().find(|r| r.name.contains("Laplace") && r.name.contains("Ax"));
-        let lrl_y = results.iter().find(|r| r.name.contains("Laplace") && r.name.contains("Ay"));
+        let lrl_x = results
+            .iter()
+            .find(|r| r.name.contains("Laplace") && r.name.contains("Ax"));
+        let lrl_y = results
+            .iter()
+            .find(|r| r.name.contains("Laplace") && r.name.contains("Ay"));
         let lrl_mag = results.iter().find(|r| r.name.contains("|A|²"));
 
         if let Some(e) = energy {
@@ -7402,7 +10000,10 @@ mod tests {
             eprintln!("  >>> LRL Ay: CONSERVED (var={:.2e})", ay.variance);
         }
         if let Some(a2) = lrl_mag {
-            eprintln!("  >>> |A|²: var={:.2e}, mean={:.4} (= 1 + 2EL²)", a2.variance, a2.mean_value);
+            eprintln!(
+                "  >>> |A|²: var={:.2e}, mean={:.4} (= 1 + 2EL²)",
+                a2.variance, a2.mean_value
+            );
         }
 
         eprintln!("\n  >>> FIVE independent conserved quantities discovered:");
@@ -7432,8 +10033,14 @@ mod tests {
         };
 
         let analysis = analyze_system_autonomous(
-            lorenz_rhs, &[1.0, 1.0, 1.0], &["x", "y", "z"],
-            None, &config, 20.0, 0.01);
+            lorenz_rhs,
+            &[1.0, 1.0, 1.0],
+            &["x", "y", "z"],
+            None,
+            &config,
+            20.0,
+            0.01,
+        );
 
         eprintln!("\n╔══════════════════════════════════════════════════════════════╗");
         eprintln!("║  THE HONESTY TEST: LORENZ ATTRACTOR                         ║");
@@ -7442,22 +10049,37 @@ mod tests {
         eprintln!("{}", analysis.report);
 
         match &analysis.classification {
-            SystemClassification::Dissipative { best_variance, lyapunov_candidate } => {
+            SystemClassification::Dissipative {
+                best_variance,
+                lyapunov_candidate,
+            } => {
                 eprintln!("  CORRECT: System classified as DISSIPATIVE");
-                eprintln!("  Best variance: {:.2e} (too high for conservation law)", best_variance);
+                eprintln!(
+                    "  Best variance: {:.2e} (too high for conservation law)",
+                    best_variance
+                );
                 if let Some(ly) = lyapunov_candidate {
                     eprintln!("  Lyapunov candidate: {}", ly);
                 }
             }
             SystemClassification::Conservative { num_invariants, .. } => {
-                panic!("WRONG: Lorenz should be dissipative, but found {} 'invariants'", num_invariants);
+                panic!(
+                    "WRONG: Lorenz should be dissipative, but found {} 'invariants'",
+                    num_invariants
+                );
             }
             _ => {}
         }
         eprintln!("╚══════════════════════════════════════════════════════════════╝");
 
-        assert!(matches!(analysis.classification, SystemClassification::Dissipative { .. }),
-            "Lorenz should be classified as dissipative, got {:?}", analysis.classification);
+        assert!(
+            matches!(
+                analysis.classification,
+                SystemClassification::Dissipative { .. }
+            ),
+            "Lorenz should be classified as dissipative, got {:?}",
+            analysis.classification
+        );
     }
 
     /// HÉNON-HEILES: Detect the integrability phase transition.
@@ -7482,14 +10104,26 @@ mod tests {
         // Initial conditions: x=0.2, y=0, px=0, py chosen for E≈0.08
         let py_low = (2.0f64 * 0.08 - 0.04).sqrt(); // py = √(2E - x²) ≈ 0.346
         let analysis_low = analyze_system_autonomous(
-            henon_heiles_rhs, &[0.2, 0.0, 0.0, py_low],
-            &["x", "y", "px", "py"], None, &config, 50.0, 0.01);
+            henon_heiles_rhs,
+            &[0.2, 0.0, 0.0, py_low],
+            &["x", "y", "px", "py"],
+            None,
+            &config,
+            50.0,
+            0.01,
+        );
 
         // High energy: E ≈ 0.18 (near escape energy 1/6 ≈ 0.167, chaotic)
         let py_high = (2.0f64 * 0.18 - 0.04).sqrt(); // py ≈ 0.566
         let analysis_high = analyze_system_autonomous(
-            henon_heiles_rhs, &[0.2, 0.0, 0.0, py_high],
-            &["x", "y", "px", "py"], None, &config, 50.0, 0.01);
+            henon_heiles_rhs,
+            &[0.2, 0.0, 0.0, py_high],
+            &["x", "y", "px", "py"],
+            None,
+            &config,
+            50.0,
+            0.01,
+        );
 
         eprintln!("\n╔══════════════════════════════════════════════════════════════╗");
         eprintln!("║  HÉNON-HEILES: INTEGRABILITY PHASE TRANSITION               ║");
@@ -7521,8 +10155,16 @@ mod tests {
         // The low-energy regime should have at least as many invariants as high-energy
         // (In practice, both may register as conservative since H is always conserved,
         // but low energy should have better-quality/more invariants)
-        let low_best_var = analysis_low.invariants.first().map(|i| i.variance).unwrap_or(f64::MAX);
-        let high_best_var = analysis_high.invariants.first().map(|i| i.variance).unwrap_or(f64::MAX);
+        let low_best_var = analysis_low
+            .invariants
+            .first()
+            .map(|i| i.variance)
+            .unwrap_or(f64::MAX);
+        let high_best_var = analysis_high
+            .invariants
+            .first()
+            .map(|i| i.variance)
+            .unwrap_or(f64::MAX);
         eprintln!("  Low energy best variance: {:.2e}", low_best_var);
         eprintln!("  High energy best variance: {:.2e}", high_best_var);
     }
@@ -7536,7 +10178,7 @@ mod tests {
     #[test]
     fn test_gr_correction_discovery() {
         let l = 10.0; // larger L makes the -L²/r³ correction more prominent
-        // Small r range where the 1/r³ correction varies by orders of magnitude
+                      // Small r range where the 1/r³ correction varies by orders of magnitude
         let seq = observe_gr_correction(l, 3.0, 15.0, 100);
 
         let mut engine = ConjectureEngine::with_config(RegressorConfig {
@@ -7555,13 +10197,22 @@ mod tests {
 
         eprintln!("\n╔══════════════════════════════════════════════════════════════╗");
         eprintln!("║  SCHWARZSCHILD: REDISCOVERING GENERAL RELATIVITY            ║");
-        eprintln!("║  Target: V_GR - V_Newton = -L²/r³ (L={})                     ║", l);
+        eprintln!(
+            "║  Target: V_GR - V_Newton = -L²/r³ (L={})                     ║",
+            l
+        );
         eprintln!("╠══════════════════════════════════════════════════════════════╣");
-        for c in engine.conjectures.iter()
-            .filter(|c| c.source.contains("V_GR")).take(5) {
+        for c in engine
+            .conjectures
+            .iter()
+            .filter(|c| c.source.contains("V_GR"))
+            .take(5)
+        {
             let annotation = annotate_conjecture(c);
-            eprintln!("║ {} | MSE={:.2e} | complexity={}{}",
-                c.formula_str, c.training_mse, c.complexity, annotation);
+            eprintln!(
+                "║ {} | MSE={:.2e} | complexity={}{}",
+                c.formula_str, c.training_mse, c.complexity, annotation
+            );
         }
         eprintln!("╚══════════════════════════════════════════════════════════════╝");
 
@@ -7570,9 +10221,18 @@ mod tests {
             let val_at_10 = best.formula.eval(&[("n", 10.0)]);
             let true_at_5 = -l * l / 125.0; // -100/125 = -0.8
             let true_at_10 = -l * l / 1000.0; // -100/1000 = -0.1
-            eprintln!("\n  >>> Best: {} (MSE={:.2e})", best.formula_str, best.training_mse);
-            eprintln!("  >>> At r=5:  predicted={:.4}, true={:.4}", val_at_5, true_at_5);
-            eprintln!("  >>> At r=10: predicted={:.4}, true={:.4}", val_at_10, true_at_10);
+            eprintln!(
+                "\n  >>> Best: {} (MSE={:.2e})",
+                best.formula_str, best.training_mse
+            );
+            eprintln!(
+                "  >>> At r=5:  predicted={:.4}, true={:.4}",
+                val_at_5, true_at_5
+            );
+            eprintln!(
+                "  >>> At r=10: predicted={:.4}, true={:.4}",
+                val_at_10, true_at_10
+            );
             // Success criterion: found a formula that (1) is negative, (2) gets
             // more negative at small r (capturing the 1/r³ divergence structure).
             //
@@ -7586,7 +10246,9 @@ mod tests {
                 strict_ok || lenient_ok,
                 "formula should capture 1/r³-like decreasing structure \
                  (val_at_5={:.6}, val_at_10={:.6}, formula={})",
-                val_at_5, val_at_10, best.formula_str
+                val_at_5,
+                val_at_10,
+                best.formula_str
             );
             eprintln!("  >>> SUCCESS: Engine captured the relativistic correction structure");
             eprintln!("  >>> (True form is -L²/r³; GP found rational approximation)");
@@ -7611,26 +10273,44 @@ mod tests {
         // Note: L is explicitly conserved in our formulation (dL/dτ = 0),
         // so L itself should be trivially discovered as the #1 invariant.
         let invariants = discover_invariants_autonomous(
-            schwarzschild_rhs, &[10.0, 0.0, 0.1, 4.0],
-            &["r", "phi", "pr", "L"], None, &config, 50.0, 0.01);
+            schwarzschild_rhs,
+            &[10.0, 0.0, 0.1, 4.0],
+            &["r", "phi", "pr", "L"],
+            None,
+            &config,
+            50.0,
+            0.01,
+        );
 
         eprintln!("\n╔══════════════════════════════════════════════════════════════╗");
         eprintln!("║  AUTONOMOUS DISCOVERY: SCHWARZSCHILD GEODESIC               ║");
         eprintln!("╠══════════════════════════════════════════════════════════════╣");
         for (i, inv) in invariants.iter().take(5).enumerate() {
-            let status = if inv.symbolically_proven { "PROVEN ✓" }
-                else if inv.variance < 1e-4 { "conserved" }
-                else { "—" };
-            eprintln!("║ #{}: {:40} │ var={:.2e} │ {}",
-                i + 1, inv.formula_str, inv.variance, status);
+            let status = if inv.symbolically_proven {
+                "PROVEN ✓"
+            } else if inv.variance < 1e-4 {
+                "conserved"
+            } else {
+                "—"
+            };
+            eprintln!(
+                "║ #{}: {:40} │ var={:.2e} │ {}",
+                i + 1,
+                inv.formula_str,
+                inv.variance,
+                status
+            );
         }
         eprintln!("╚══════════════════════════════════════════════════════════════╝");
 
         assert!(!invariants.is_empty(), "should find at least one invariant");
         // L should be trivially conserved (dL/dτ = 0 by construction)
         let best = &invariants[0];
-        assert!(best.variance < 1e-10,
-            "angular momentum L should be conserved, var={:.2e}", best.variance);
+        assert!(
+            best.variance < 1e-10,
+            "angular momentum L should be conserved, var={:.2e}",
+            best.variance
+        );
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -7641,15 +10321,18 @@ mod tests {
     #[test]
     fn test_virial_theorem_kepler() {
         // Integrate Kepler orbit for many periods to get good time averages
-        let (_, states) = rk45_trajectory(
-            kepler_rhs, &[1.0, 0.0, 0.0, 0.8], 50.0, 0.001);
+        let (_, states) = rk45_trajectory(kepler_rhs, &[1.0, 0.0, 0.0, 0.8], 50.0, 0.001);
 
         // Kinetic energy: T = ½(vx² + vy²)
         let kinetic = |s: &[f64]| 0.5 * (s[2] * s[2] + s[3] * s[3]);
         // Potential: V = -1/r (k=1)
         let potential = |s: &[f64]| {
             let r = (s[0] * s[0] + s[1] * s[1]).sqrt();
-            if r > 1e-10 { -1.0 / r } else { 0.0 }
+            if r > 1e-10 {
+                -1.0 / r
+            } else {
+                0.0
+            }
         };
 
         // Use a large window to capture multi-period behavior
@@ -7666,8 +10349,11 @@ mod tests {
         eprintln!("╚══════════════════════════════════════════════════════════════╝");
 
         // The Virial theorem: 2⟨T⟩ + ⟨V⟩ = 0, so 2⟨T⟩/⟨V⟩ = -1
-        assert!((ratio - (-1.0)).abs() < 0.2,
-            "Virial ratio should be ≈ -1, got {:.4}", ratio);
+        assert!(
+            (ratio - (-1.0)).abs() < 0.2,
+            "Virial ratio should be ≈ -1, got {:.4}",
+            ratio
+        );
 
         eprintln!("\n  >>> VIRIAL THEOREM VERIFIED: statistical invariant confirmed");
         eprintln!("  >>> 2⟨T⟩ + ⟨V⟩ = 0 for gravitational orbits");
@@ -7724,7 +10410,10 @@ mod tests {
             .map(|n| (n as f64, (n * (n + 1) / 2) as f64))
             .collect();
         engine.observe(ObservedSequence::new(
-            "triangular(n)", MathDomain::Combinatorics, data));
+            "triangular(n)",
+            MathDomain::Combinatorics,
+            data,
+        ));
 
         engine.generate_conjectures(3);
         engine.verify_numerical();
@@ -7735,16 +10424,19 @@ mod tests {
         eprintln!("  Z3 available: {}", z3_available);
 
         for c in engine.conjectures.iter().take(5) {
-            eprintln!("  {} | MSE={:.2e} | {:?}",
-                c.formula_str, c.training_mse, c.status);
+            eprintln!(
+                "  {} | MSE={:.2e} | {:?}",
+                c.formula_str, c.training_mse, c.status
+            );
         }
 
         if z3_available {
             // When Z3 is present, at least one conjecture should be
             // formally verified (assuming the GP found a correct formula).
-            let num_proven = engine.conjectures.iter()
-                .filter(|c| matches!(c.status,
-                    ConjectureStatus::FormallyVerified { .. }))
+            let num_proven = engine
+                .conjectures
+                .iter()
+                .filter(|c| matches!(c.status, ConjectureStatus::FormallyVerified { .. }))
                 .count();
             eprintln!("  Formally verified: {}", num_proven);
             // Soft assertion: we expect at least one proven, but the GP is
@@ -7753,8 +10445,10 @@ mod tests {
             if num_proven > 0 {
                 eprintln!("  ✓ Z3 successfully proved {} conjecture(s)", num_proven);
             } else {
-                eprintln!("  ⚠ Z3 ran but didn't promote any conjecture this run \
-                           (stochastic GP — not a bug)");
+                eprintln!(
+                    "  ⚠ Z3 ran but didn't promote any conjecture this run \
+                           (stochastic GP — not a bug)"
+                );
             }
         } else {
             eprintln!("  ⚠ Z3 not detected — skipping formal verification assertion");
@@ -7763,11 +10457,15 @@ mod tests {
 
         // Always: the engine must not have crashed and must have at least
         // one numerically-tested conjecture ready for Z3.
-        let ready_for_z3 = engine.conjectures.iter()
+        let ready_for_z3 = engine
+            .conjectures
+            .iter()
             .filter(|c| !matches!(c.status, ConjectureStatus::Proposed))
             .count();
-        assert!(ready_for_z3 > 0,
-            "at least one conjecture should have been numerically verified");
+        assert!(
+            ready_for_z3 > 0,
+            "at least one conjecture should have been numerically verified"
+        );
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -7789,29 +10487,43 @@ mod tests {
     #[test]
     fn test_latex_triangular_formula() {
         // n(n+1)/2
-        let expr = Expr::BinOp(BinOp::Div,
-            Box::new(Expr::BinOp(BinOp::Mul,
+        let expr = Expr::BinOp(
+            BinOp::Div,
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
                 Box::new(Expr::Var("n".into())),
-                Box::new(Expr::BinOp(BinOp::Add,
+                Box::new(Expr::BinOp(
+                    BinOp::Add,
                     Box::new(Expr::Var("n".into())),
-                    Box::new(Expr::Const(1.0)))))),
-            Box::new(Expr::Const(2.0)));
+                    Box::new(Expr::Const(1.0)),
+                )),
+            )),
+            Box::new(Expr::Const(2.0)),
+        );
         let latex = expr_to_latex(&expr);
         eprintln!("Triangular LaTeX: {}", latex);
         // Should contain \frac, n, and 2
         assert!(latex.contains("\\frac"), "should use \\frac: {}", latex);
         assert!(latex.contains("n"), "should contain n: {}", latex);
-        assert!(latex.contains("{2}"), "should contain denominator 2: {}", latex);
+        assert!(
+            latex.contains("{2}"),
+            "should contain denominator 2: {}",
+            latex
+        );
     }
 
     #[test]
     fn test_latex_hydrogen_formula() {
         // -13.6 / n²
-        let expr = Expr::BinOp(BinOp::Div,
+        let expr = Expr::BinOp(
+            BinOp::Div,
             Box::new(Expr::Const(-13.6)),
-            Box::new(Expr::BinOp(BinOp::Pow,
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
                 Box::new(Expr::Var("n".into())),
-                Box::new(Expr::Const(2.0)))));
+                Box::new(Expr::Const(2.0)),
+            )),
+        );
         let latex = expr_to_latex(&expr);
         eprintln!("Hydrogen LaTeX: {}", latex);
         assert!(latex.contains("\\frac"));
@@ -7822,22 +10534,26 @@ mod tests {
     #[test]
     fn test_latex_kepler_energy() {
         // ½(vx² + vy²) - 1/r  →  the symbolic form of Kepler energy
-        let v_squared = Expr::BinOp(BinOp::Add,
-            Box::new(Expr::BinOp(BinOp::Pow,
+        let v_squared = Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
                 Box::new(Expr::Var("vx".into())),
-                Box::new(Expr::Const(2.0)))),
-            Box::new(Expr::BinOp(BinOp::Pow,
+                Box::new(Expr::Const(2.0)),
+            )),
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
                 Box::new(Expr::Var("vy".into())),
-                Box::new(Expr::Const(2.0)))));
-        let kinetic = Expr::BinOp(BinOp::Mul,
-            Box::new(Expr::Const(0.5)),
-            Box::new(v_squared));
-        let potential = Expr::BinOp(BinOp::Div,
+                Box::new(Expr::Const(2.0)),
+            )),
+        );
+        let kinetic = Expr::BinOp(BinOp::Mul, Box::new(Expr::Const(0.5)), Box::new(v_squared));
+        let potential = Expr::BinOp(
+            BinOp::Div,
             Box::new(Expr::Const(1.0)),
-            Box::new(Expr::Var("r".into())));
-        let energy = Expr::BinOp(BinOp::Sub,
-            Box::new(kinetic),
-            Box::new(potential));
+            Box::new(Expr::Var("r".into())),
+        );
+        let energy = Expr::BinOp(BinOp::Sub, Box::new(kinetic), Box::new(potential));
 
         let latex = expr_to_latex(&energy);
         eprintln!("Kepler energy LaTeX: {}", latex);
@@ -7858,11 +10574,15 @@ mod tests {
         assert_eq!(expr_to_latex(&ln_x), "\\ln\\left(x\\right)");
 
         // sqrt(2πn)
-        let inner = Expr::BinOp(BinOp::Mul,
+        let inner = Expr::BinOp(
+            BinOp::Mul,
             Box::new(Expr::Const(2.0)),
-            Box::new(Expr::BinOp(BinOp::Mul,
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
                 Box::new(Expr::Const(std::f64::consts::PI)),
-                Box::new(Expr::Var("n".into())))));
+                Box::new(Expr::Var("n".into())),
+            )),
+        );
         let sqrt_2pin = Expr::Func(UnaryFn::Sqrt, Box::new(inner));
         let latex = expr_to_latex(&sqrt_2pin);
         eprintln!("sqrt(2πn) LaTeX: {}", latex);
@@ -7877,9 +10597,11 @@ mod tests {
         let y = Expr::Var("y".into());
         let ln_x = Expr::Func(UnaryFn::Log, Box::new(x.clone()));
         let ln_y = Expr::Func(UnaryFn::Log, Box::new(y.clone()));
-        let expr = Expr::BinOp(BinOp::Add,
+        let expr = Expr::BinOp(
+            BinOp::Add,
             Box::new(Expr::BinOp(BinOp::Sub, Box::new(x), Box::new(ln_x))),
-            Box::new(Expr::BinOp(BinOp::Sub, Box::new(y), Box::new(ln_y))));
+            Box::new(Expr::BinOp(BinOp::Sub, Box::new(y), Box::new(ln_y))),
+        );
         let latex = expr_to_latex(&expr);
         eprintln!("Lotka-Volterra LaTeX: {}", latex);
         assert!(latex.contains("\\ln"));
@@ -7890,13 +10612,19 @@ mod tests {
     #[test]
     fn test_lv_template_trajectory_variance_direct() {
         // Build the exact Lotka-Volterra invariant template.
-        let expr = Expr::BinOp(BinOp::Add,
-            Box::new(Expr::BinOp(BinOp::Sub,
+        let expr = Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::BinOp(
+                BinOp::Sub,
                 Box::new(Expr::Var("x".into())),
-                Box::new(Expr::Func(UnaryFn::Log, Box::new(Expr::Var("x".into())))))),
-            Box::new(Expr::BinOp(BinOp::Sub,
+                Box::new(Expr::Func(UnaryFn::Log, Box::new(Expr::Var("x".into())))),
+            )),
+            Box::new(Expr::BinOp(
+                BinOp::Sub,
                 Box::new(Expr::Var("y".into())),
-                Box::new(Expr::Func(UnaryFn::Log, Box::new(Expr::Var("y".into())))))));
+                Box::new(Expr::Func(UnaryFn::Log, Box::new(Expr::Var("y".into())))),
+            )),
+        );
 
         // Integrate LV trajectory: dx = x(1-y), dy = y(x-1), start (2, 1)
         fn rhs(s: &[f64], _t: f64) -> Vec<f64> {
@@ -7909,13 +10637,22 @@ mod tests {
         // Sample like discover_invariants_autonomous does.
         let n_samples = 200.min(states.len());
         let step = states.len() / n_samples.max(1);
-        let sampled: Vec<Vec<f64>> = states.iter().step_by(step.max(1)).take(n_samples).cloned().collect();
+        let sampled: Vec<Vec<f64>> = states
+            .iter()
+            .step_by(step.max(1))
+            .take(n_samples)
+            .cloned()
+            .collect();
 
         let var = compute_trajectory_variance(&expr, &sampled, &["x", "y"]);
         eprintln!("LV template variance: {:.3e}", var);
         eprintln!("Complexity: {}", expr.complexity());
         assert!(var.is_finite(), "variance should be finite, got {}", var);
-        assert!(var < 1e-6, "LV invariant should have near-zero variance, got {}", var);
+        assert!(
+            var < 1e-6,
+            "LV invariant should have near-zero variance, got {}",
+            var
+        );
     }
 
     #[test]
@@ -7944,16 +10681,27 @@ mod tests {
         );
         eprintln!("LV autonomous discovery: {} candidates", results.len());
         for (i, r) in results.iter().take(5).enumerate() {
-            eprintln!("  #{}: variance={:.3e} complexity={} formula={}",
-                i, r.variance, r.complexity, r.formula_str);
+            eprintln!(
+                "  #{}: variance={:.3e} complexity={} formula={}",
+                i, r.variance, r.complexity, r.formula_str
+            );
         }
-        assert!(!results.is_empty(), "LV discovery returned zero candidates — templates aren't surviving");
+        assert!(
+            !results.is_empty(),
+            "LV discovery returned zero candidates — templates aren't surviving"
+        );
         // The top result should contain log structure (x - ln(x) + y - ln(y) or equivalent).
         let top = &results[0].formula_str;
-        assert!(top.contains("ln(x)") && top.contains("ln(y)"),
-            "top result should be the LV log invariant, got: {}", top);
-        assert!(results[0].variance < 1e-15,
-            "top variance should be near-zero for a perfect invariant, got: {}", results[0].variance);
+        assert!(
+            top.contains("ln(x)") && top.contains("ln(y)"),
+            "top result should be the LV log invariant, got: {}",
+            top
+        );
+        assert!(
+            results[0].variance < 1e-15,
+            "top variance should be near-zero for a perfect invariant, got: {}",
+            results[0].variance
+        );
     }
 
     #[test]
@@ -7986,43 +10734,73 @@ mod tests {
         );
         eprintln!("HH autonomous: {} candidates", results.len());
         for (i, r) in results.iter().take(5).enumerate() {
-            eprintln!("  #{}: var={:.3e} complexity={} formula={}",
-                i, r.variance, r.complexity, r.formula_str);
+            eprintln!(
+                "  #{}: var={:.3e} complexity={} formula={}",
+                i, r.variance, r.complexity, r.formula_str
+            );
         }
         assert!(!results.is_empty(), "HH discovery returned zero candidates");
         // The top result should have effectively-zero normalized variance
         // — the true HH energy is a perfect invariant. We don't require
         // the GP to spell out the exact 5-term form, but the variance gap
         // between it and any degenerate artifact should be huge.
-        assert!(results[0].variance < 1e-20,
+        assert!(
+            results[0].variance < 1e-20,
             "top variance should be near machine epsilon for a true invariant, got {}",
-            results[0].variance);
+            results[0].variance
+        );
     }
 
     #[cfg(feature = "abstract_thought")]
     #[test]
     fn test_multivariate_macro_bridge_kepler() {
-        // Stage 2 MVP: wire `discover_invariants_autonomous` to the
-        // abstract_thought extraction pipeline. Runs Kepler autonomous
-        // discovery, ingests the invariants as conjectures, reflects, and
-        // asserts that at least one macro containing multiple variables
-        // (i.e. genuinely multivariate, not a 1D reduction) lands in M₁.
+        // Safe multivariate bridge: run Kepler autonomous discovery WITH
+        // symbolic dynamics, ingest the proven invariants, reflect, and assert
+        // that at least one genuinely multivariate macro lands in M₁.
         //
         // Success criterion: ≥1 macro whose template references at least
         // TWO distinct variable names from {x, y, vx, vy}. Such a macro is
         // irreducibly multivariate and would be architecturally unreachable
-        // via the 1D `ObservedSequence` path. If this passes, the multivariate
-        // macro pool is functional — the architectural unblock for Ceiling B
-        // (2D distance kernels, Jacobi integrals, etc.) has landed.
+        // via the 1D `ObservedSequence` path. If this passes, the safe
+        // multivariate bridge is functional: formally-proven autonomous
+        // discoveries can feed the macro pool without reopening the numeric
+        // singleton poisoning path.
         use super::super::primitive_system::PrimitiveSystem;
 
         fn kepler_rhs(s: &[f64], _t: f64) -> Vec<f64> {
             let (x, y, vx, vy) = (s[0], s[1], s[2], s[3]);
             let r2 = x * x + y * y;
             let r3 = r2 * r2.sqrt();
-            if r3 < 1e-15 { return vec![vx, vy, 0.0, 0.0]; }
+            if r3 < 1e-15 {
+                return vec![vx, vy, 0.0, 0.0];
+            }
             vec![vx, vy, -x / r3, -y / r3]
         }
+
+        let r2 = || {
+            SymExpr::Add(
+                Box::new(SymExpr::Pow(Box::new(SymExpr::Var("x".into())), 2.0)),
+                Box::new(SymExpr::Pow(Box::new(SymExpr::Var("y".into())), 2.0)),
+            )
+        };
+        let dynamics = vec![
+            ("x", SymExpr::Var("vx".into())),
+            ("y", SymExpr::Var("vy".into())),
+            (
+                "vx",
+                SymExpr::Mul(
+                    Box::new(SymExpr::Neg(Box::new(SymExpr::Var("x".into())))),
+                    Box::new(SymExpr::Pow(Box::new(r2()), -1.5)),
+                ),
+            ),
+            (
+                "vy",
+                SymExpr::Mul(
+                    Box::new(SymExpr::Neg(Box::new(SymExpr::Var("y".into())))),
+                    Box::new(SymExpr::Pow(Box::new(r2()), -1.5)),
+                ),
+            ),
+        ];
 
         let config = RegressorConfig {
             population_size: 500,
@@ -8040,12 +10818,19 @@ mod tests {
             kepler_rhs,
             &[1.0, 0.0, 0.0, 0.8],
             &["x", "y", "vx", "vy"],
-            None,
+            Some(&dynamics),
             &config,
             20.0,
             0.001,
         );
-        assert!(!invariants.is_empty(), "Kepler discovery should find invariants");
+        assert!(
+            !invariants.is_empty(),
+            "Kepler discovery should find invariants"
+        );
+        assert!(
+            invariants.iter().any(|inv| inv.symbolically_proven),
+            "Kepler discovery should produce at least one symbolically proven invariant for safe macro promotion"
+        );
 
         // 2. Ingest into the ConjectureEngine's pool and reflect
         let mut engine = ConjectureEngine::new();
@@ -8057,7 +10842,10 @@ mod tests {
 
         // 3. Inspect macro pool for multivariate shapes
         let macros = engine.macro_operators();
-        eprintln!("Multivariate bridge test — {} macros in pool:", macros.len());
+        eprintln!(
+            "Multivariate bridge test — {} macros in pool:",
+            macros.len()
+        );
         for (i, m) in macros.iter().enumerate() {
             eprintln!("  {}. {}", i + 1, m.template);
         }
@@ -8065,9 +10853,14 @@ mod tests {
         // Count variable names referenced in each macro's template
         fn collect_vars(expr: &Expr, out: &mut std::collections::HashSet<String>) {
             match expr {
-                Expr::Var(name) => { out.insert(name.clone()); }
+                Expr::Var(name) => {
+                    out.insert(name.clone());
+                }
                 Expr::Const(_) => {}
-                Expr::BinOp(_, l, r) => { collect_vars(l, out); collect_vars(r, out); }
+                Expr::BinOp(_, l, r) => {
+                    collect_vars(l, out);
+                    collect_vars(r, out);
+                }
                 Expr::Func(_, arg) => collect_vars(arg, out),
                 Expr::Sum(body, _) => collect_vars(body, out),
             }
@@ -8079,10 +10872,16 @@ mod tests {
         for m in macros {
             let mut vars = std::collections::HashSet::new();
             collect_vars(&m.template, &mut vars);
-            let kepler_var_count = vars.iter().filter(|v| kepler_vars.contains(v.as_str())).count();
+            let kepler_var_count = vars
+                .iter()
+                .filter(|v| kepler_vars.contains(v.as_str()))
+                .count();
             if kepler_var_count >= 2 {
                 multivariate_macros += 1;
-                eprintln!("  ✓ multivariate: {} (uses {} vars)", m.template, kepler_var_count);
+                eprintln!(
+                    "  ✓ multivariate: {} (uses {} vars)",
+                    m.template, kepler_var_count
+                );
             }
         }
 
@@ -8134,26 +10933,34 @@ mod tests {
         );
         eprintln!("Mystery ODE: {} candidates", results.len());
         for (i, r) in results.iter().take(5).enumerate() {
-            eprintln!("  #{}: var={:.3e} complexity={} formula={}",
-                i, r.variance, r.complexity, r.formula_str);
+            eprintln!(
+                "  #{}: var={:.3e} complexity={} formula={}",
+                i, r.variance, r.complexity, r.formula_str
+            );
         }
         assert!(!results.is_empty(), "should find at least one candidate");
         // Demand a high-quality invariant (variance near machine epsilon).
         // We don't require the exact H form — any quantity with variance
         // below 1e-20 on this trajectory is effectively a true invariant.
-        assert!(results[0].variance < 1e-20,
+        assert!(
+            results[0].variance < 1e-20,
             "top candidate should be a near-perfect invariant, got variance {}",
-            results[0].variance);
+            results[0].variance
+        );
     }
 
     #[test]
     fn test_latex_gr_correction() {
         // -100/r³  (the Einstein GR correction we discovered)
-        let expr = Expr::BinOp(BinOp::Div,
+        let expr = Expr::BinOp(
+            BinOp::Div,
             Box::new(Expr::Const(-100.0)),
-            Box::new(Expr::BinOp(BinOp::Pow,
+            Box::new(Expr::BinOp(
+                BinOp::Pow,
                 Box::new(Expr::Var("r".into())),
-                Box::new(Expr::Const(3.0)))));
+                Box::new(Expr::Const(3.0)),
+            )),
+        );
         let latex = expr_to_latex(&expr);
         eprintln!("GR correction LaTeX: {}", latex);
         assert!(latex.contains("\\frac"));
@@ -8191,7 +10998,10 @@ mod tests {
             .map(|n| (n as f64, (n * (n + 1) / 2) as f64))
             .collect();
         engine.observe(ObservedSequence::new(
-            "triangular(n)", MathDomain::Combinatorics, data));
+            "triangular(n)",
+            MathDomain::Combinatorics,
+            data,
+        ));
         engine.generate_conjectures(3);
         engine.verify_numerical();
 
@@ -8225,7 +11035,10 @@ mod tests {
             .map(|n| (n as f64, (n * (n + 1) / 2) as f64))
             .collect();
         engine.observe(ObservedSequence::new(
-            "T(n)", MathDomain::Combinatorics, data));
+            "T(n)",
+            MathDomain::Combinatorics,
+            data,
+        ));
         engine.generate_conjectures(3);
         engine.verify_numerical();
 
@@ -8258,7 +11071,10 @@ mod tests {
             .map(|n| (n as f64, (n * (n + 1) / 2) as f64))
             .collect();
         engine.observe(ObservedSequence::new(
-            "triangles", MathDomain::Combinatorics, data));
+            "triangles",
+            MathDomain::Combinatorics,
+            data,
+        ));
         engine.generate_conjectures(3);
         engine.verify_numerical();
 
