@@ -27,6 +27,7 @@ members = [
     "crates/symthaea-observability",
     "crates/symthaea-support",
     "crates/symthaea-psych-bench",
+    "crates/symthaea-lean-bridge",
     "crates/symthaea-flight",
     "crates/symthaea-helicopter",
     "crates/symthaea-auv",
