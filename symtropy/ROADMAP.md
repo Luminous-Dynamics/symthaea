@@ -2,6 +2,8 @@
 
 ## North Star
 
+**Component-level gap analysis:** see [`docs/GAME_ENGINE_COMPONENTS.md`](docs/GAME_ENGINE_COMPONENTS.md) for a per-component matrix of what's covered by Symtropy vs Bevy vs Symthaea/Mycelix vs community crates vs still-missing, with concrete crate recommendations for each gap. The doc complements this ROADMAP: the ROADMAP is phase-oriented; the components doc is a living checklist.
+
 Dual-track engine:
 
 - **A. Research hero** — best-in-class **N-dimensional, Φ-coupled physics with deterministic replay** as a first-class physical law. No other engine does this. 2D/3D/4D rigid-body dynamics with integration metrics (Φ, harmony, energy) that meaningfully modulate forces, impulses, and friction at the solver level.
