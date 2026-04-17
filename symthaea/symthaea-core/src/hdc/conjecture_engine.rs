@@ -1342,17 +1342,27 @@ fn lie_derivative_variance(
         return f64::MAX;
     }
     let mean = lie_vals.iter().sum::<f64>() / lie_vals.len() as f64;
-    let raw_var = lie_vals
-        .iter()
-        .map(|v| (v - mean).powi(2))
-        .sum::<f64>()
-        / lie_vals.len() as f64;
+    let raw_var = lie_vals.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / lie_vals.len() as f64;
     let mean_grad_sq = grad_mag_sq_sum / grad_n as f64;
-    // Prevent div-by-zero and floor-dominance for flat gradients;
-    // use a minimum scale of 1e-30 which is below any meaningful
-    // physical magnitude on unit-scaled orbits.
-    let scale = mean_grad_sq.max(1e-30);
-    raw_var / scale
+    // Session 31 diagnosis: the existing `.max(1e-30)` floor prevented
+    // div-by-zero but did not REJECT functionally-constant expressions.
+    // Kepler stage-4 seed=42 produced the algebraic zero
+    // `(x - (x²+y²)) + ((x²+y²) - x) ≡ 0` with `mean_grad_sq = 0` and
+    // `raw_var = 0`, which divided to `0.0 / 1e-30 = 0` — a perfect
+    // Lie-variance score. Literal zero is a trivial conservation law
+    // but also a useless one: every ODE conserves the constant 0.
+    //
+    // Physical invariants on unit-scaled orbits have mean_grad_sq in
+    // the range [0.1, 10] (e.g. L has ~2, 1/r has ~1, x²+y² has ~4).
+    // A threshold of 1e-12 is 10 orders of magnitude above machine
+    // epsilon and 10+ orders below any legitimate invariant, so it
+    // rejects functionally-constant expressions without accidentally
+    // filtering real physics.
+    const MIN_GRADIENT_MAG_SQ: f64 = 1e-12;
+    if mean_grad_sq < MIN_GRADIENT_MAG_SQ {
+        return f64::MAX;
+    }
+    raw_var / mean_grad_sq
 }
 
 /// Session 29: finite-difference gradient of an expression at a state
@@ -3153,14 +3163,14 @@ impl ConjectureEngine {
                     tournament_size: self.config.tournament_size,
                     mutation_rate: self.config.mutation_rate,
                     disable_macro_seeds: self.config.disable_macro_seeds,
-                exclude_trig: false,
-                diverse_trajectory_count: self.config.diverse_trajectory_count,
-                prior_composition_rate: self.config.prior_composition_rate,
-                prior_fragment_bonus: self.config.prior_fragment_bonus,
-                orthogonality_penalty: self.config.orthogonality_penalty,
-                orthogonality_threshold: self.config.orthogonality_threshold,
-                known_invariants: self.config.known_invariants.clone(),
-                use_lie_fitness: self.config.use_lie_fitness,
+                    exclude_trig: false,
+                    diverse_trajectory_count: self.config.diverse_trajectory_count,
+                    prior_composition_rate: self.config.prior_composition_rate,
+                    prior_fragment_bonus: self.config.prior_fragment_bonus,
+                    orthogonality_penalty: self.config.orthogonality_penalty,
+                    orthogonality_threshold: self.config.orthogonality_threshold,
+                    known_invariants: self.config.known_invariants.clone(),
+                    use_lie_fitness: self.config.use_lie_fitness,
                 });
                 let diff_results = diff_reg.fit(&diff_obs, 1);
                 for c in &diff_results {
@@ -5968,11 +5978,10 @@ pub fn discover_invariants_autonomous_with_seed_templates(
     // Session 25: precompute canonical keys for fragment-match counting.
     // An expression is fitness-bonused per pinned prior that appears
     // verbatim as a subtree.
-    let pinned_prior_keys: Vec<String> =
-        pinned_priors.iter().map(macro_usage_key).collect();
+    let pinned_prior_keys: Vec<String> = pinned_priors.iter().map(macro_usage_key).collect();
     let fragment_bonus = config.prior_fragment_bonus;
-    let fragment_active = fragment_bonus > 0.0 && fragment_bonus < 1.0
-        && !pinned_prior_keys.is_empty();
+    let fragment_active =
+        fragment_bonus > 0.0 && fragment_bonus < 1.0 && !pinned_prior_keys.is_empty();
 
     // Session 29: precompute Gram-Schmidt orthonormal bases of the
     // known-invariant gradients at a small set of probe points. A
@@ -6134,9 +6143,7 @@ pub fn discover_invariants_autonomous_with_seed_templates(
                 if orth_active {
                     let mut orth_sum = 0.0;
                     let mut orth_n = 0usize;
-                    for (state, basis) in
-                        orth_probe_points.iter().zip(orth_bases.iter())
-                    {
+                    for (state, basis) in orth_probe_points.iter().zip(orth_bases.iter()) {
                         if basis.is_empty() {
                             continue;
                         }
@@ -6198,9 +6205,7 @@ pub fn discover_invariants_autonomous_with_seed_templates(
 
             rng = lcg_step(rng);
             let roll = (*&rng as f64 / u64::MAX as f64);
-            let child = if pinned_priors.len() >= 2
-                && roll < config.prior_composition_rate
-            {
+            let child = if pinned_priors.len() >= 2 && roll < config.prior_composition_rate {
                 // Session 24: prior-pair composition. Pick two distinct
                 // pinned priors and combine with a random binary op.
                 // Directly constructs compositions the random crossover
@@ -7450,6 +7455,7 @@ mod tests {
             mutation_rate: 0.3,
             seed: 42,
             disable_macro_seeds: false,
+            ..Default::default()
         };
         let mut regressor = SymbolicRegressor::new(config);
         let results = regressor.fit(&seq, 3);
@@ -8349,6 +8355,7 @@ mod tests {
             mutation_rate: 0.3,
             seed: 4242,
             disable_macro_seeds: true,
+            ..Default::default()
         };
 
         let mut cold = SymbolicRegressor::new(base_config.clone());
@@ -12089,5 +12096,85 @@ mod tests {
         assert_eq!(truncate("hello world", 5), "hell…");
         // Multi-byte char
         assert_eq!(truncate("αβγδε", 3), "αβ…");
+    }
+
+    /// S31 regression: `lie_derivative_variance` must reject
+    /// functionally-constant expressions. Seed 42 of the S31 Kepler
+    /// postproc produced `(x - (x²+y²)) + ((x²+y²) - x) ≡ 0` with
+    /// `mean_grad_sq = 0`, which — under the pre-fix `.max(1e-30)`
+    /// scale floor — scored Lie variance `0.0 / 1e-30 = 0`, beating
+    /// every legitimate candidate. Post-fix, the MIN_GRADIENT_MAG_SQ
+    /// threshold rejects such expressions with `f64::MAX`.
+    #[test]
+    fn test_lie_variance_rejects_algebraic_zero() {
+        // Build (x - (x²+y²)) + ((x²+y²) - x), which simplifies to 0.
+        let x = || Expr::Var("x".into());
+        let y = || Expr::Var("y".into());
+        let r2 = || {
+            Expr::BinOp(
+                BinOp::Add,
+                Box::new(Expr::BinOp(
+                    BinOp::Pow,
+                    Box::new(x()),
+                    Box::new(Expr::Const(2.0)),
+                )),
+                Box::new(Expr::BinOp(
+                    BinOp::Pow,
+                    Box::new(y()),
+                    Box::new(Expr::Const(2.0)),
+                )),
+            )
+        };
+        let algebraic_zero = Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::BinOp(BinOp::Sub, Box::new(x()), Box::new(r2()))),
+            Box::new(Expr::BinOp(BinOp::Sub, Box::new(r2()), Box::new(x()))),
+        );
+
+        // Tiny Kepler trajectory (4 states, circular-orbit samples).
+        fn rhs(s: &[f64], _t: f64) -> Vec<f64> {
+            let (x, y, vx, vy) = (s[0], s[1], s[2], s[3]);
+            let r2 = x * x + y * y;
+            let r3 = r2 * r2.sqrt();
+            vec![vx, vy, -x / r3, -y / r3]
+        }
+        let trajectory: Vec<Vec<f64>> = (0..40)
+            .map(|i| {
+                let t = i as f64 * 0.15;
+                vec![t.cos(), t.sin(), -t.sin(), t.cos()]
+            })
+            .collect();
+        let var_names = ["x", "y", "vx", "vy"];
+
+        // Algebraic zero must be rejected (f64::MAX, not 0.0).
+        let zero_var = lie_derivative_variance(&algebraic_zero, rhs, &trajectory, &var_names);
+        assert_eq!(
+            zero_var,
+            f64::MAX,
+            "algebraic zero should be rejected; got {zero_var:e}"
+        );
+
+        // Sanity check: a legitimate invariant (angular momentum
+        // L = x·vy − y·vx) must pass with a small finite value. Not
+        // machine epsilon on this coarse trajectory, but well under
+        // 1e-2 and finite.
+        let ang_mom = Expr::BinOp(
+            BinOp::Sub,
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
+                Box::new(x()),
+                Box::new(Expr::Var("vy".into())),
+            )),
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
+                Box::new(y()),
+                Box::new(Expr::Var("vx".into())),
+            )),
+        );
+        let l_var = lie_derivative_variance(&ang_mom, rhs, &trajectory, &var_names);
+        assert!(
+            l_var.is_finite() && l_var < 1e-2,
+            "angular momentum should pass with small Lie variance; got {l_var:e}"
+        );
     }
 }
