@@ -43,6 +43,7 @@ enum Command {
     CastVote(VoteInput),
     QueryActiveProposals,
     QueryTendBalance { member_did: String },
+    GetProposal { proposal_id: String },
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -138,8 +139,7 @@ impl State {
                 BridgeResponse::ok(request_id, serde_json::json!(action_hash))
             }
             Command::CastVote(vote) => {
-                let proposal_exists =
-                    self.proposals.iter().any(|p| p.id == vote.proposal_id);
+                let proposal_exists = self.proposals.iter().any(|p| p.id == vote.proposal_id);
                 if !proposal_exists {
                     return BridgeResponse::err(
                         request_id,
@@ -151,10 +151,18 @@ impl State {
                 BridgeResponse::ok(request_id, serde_json::json!(proposal_id))
             }
             Command::QueryActiveProposals => {
-                let data = serde_json::to_value(&self.proposals).unwrap_or(
-                    serde_json::Value::Array(vec![]),
-                );
+                let data = serde_json::to_value(&self.proposals)
+                    .unwrap_or(serde_json::Value::Array(vec![]));
                 BridgeResponse::ok(request_id, data)
+            }
+            Command::GetProposal { proposal_id } => {
+                match self.proposals.iter().find(|p| p.id == proposal_id) {
+                    Some(p) => BridgeResponse::ok(
+                        request_id,
+                        serde_json::to_value(p).unwrap_or(serde_json::Value::Null),
+                    ),
+                    None => BridgeResponse::ok(request_id, serde_json::Value::Null),
+                }
             }
             Command::QueryTendBalance { member_did } => {
                 let balance = *self

@@ -53,10 +53,9 @@ fn five_agent_proposal_vote_invariant_against_mock() {
         report.summary, report.ticks, report.errors
     );
     assert_eq!(report.errors, 0);
-    // 5 submit requests + 1 query = 6 sent.
-    assert_eq!(report.requests_sent, 6);
-    // 5 proposal-submitted responses + 1 active-proposals response.
-    assert_eq!(report.responses_received, 6);
+    // 5 SubmitProposal + 5 GetProposal = 10 sent; 10 responses.
+    assert_eq!(report.requests_sent, 10);
+    assert_eq!(report.responses_received, 10);
 }
 
 #[test]
@@ -71,8 +70,8 @@ fn ten_agent_scale_test_against_mock() {
         "10-agent scenario failed: {} ({} ticks)",
         report.summary, report.ticks
     );
-    assert_eq!(report.requests_sent, 11); // 10 submits + 1 query
-    assert_eq!(report.responses_received, 11);
+    assert_eq!(report.requests_sent, 20); // 10 submits + 10 get_proposal
+    assert_eq!(report.responses_received, 20);
 }
 
 #[test]
@@ -82,5 +81,5 @@ fn one_agent_degenerate_case() {
         .with_bridge_binary(mock_binary_path());
     let report = proposal_vote_invariant(config);
     assert!(report.passed, "1-agent scenario failed: {}", report.summary);
-    assert_eq!(report.requests_sent, 2); // 1 submit + 1 query
+    assert_eq!(report.requests_sent, 2); // 1 submit + 1 get_proposal
 }

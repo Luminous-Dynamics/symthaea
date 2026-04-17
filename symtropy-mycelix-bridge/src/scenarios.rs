@@ -52,6 +52,12 @@ pub struct ScenarioConfig {
     /// `did:key:z6Mk{did_seed}-agent-{i}` to keep them deterministic and
     /// easy to grep in logs.
     pub did_seed: String,
+    /// Optional full `MycelixConfig` override. When `None`, scenarios use
+    /// `MycelixConfig::default().with_bridge_binary(self.bridge_binary)`.
+    /// When `Some`, the provided config is used verbatim (with
+    /// `bridge_binary` still overridden for consistency). Lets live runs
+    /// point `app_id`/`role` at actually-installed hApps.
+    pub mycelix_config: Option<MycelixConfig>,
 }
 
 impl ScenarioConfig {
@@ -66,6 +72,7 @@ impl ScenarioConfig {
             tick_budget: 60,
             bridge_binary: PathBuf::from("mycelix-mock-conductor"),
             did_seed: "scenario".to_string(),
+            mycelix_config: None,
         }
     }
 
@@ -85,6 +92,23 @@ impl ScenarioConfig {
     pub fn with_bridge_binary(mut self, path: impl Into<PathBuf>) -> Self {
         self.bridge_binary = path.into();
         self
+    }
+
+    /// Supply a full [`MycelixConfig`] override. The scenario will still
+    /// apply `self.bridge_binary` to it, so the binary choice stays
+    /// consistent with `with_bridge_binary`.
+    pub fn with_mycelix_config(mut self, cfg: MycelixConfig) -> Self {
+        self.mycelix_config = Some(cfg);
+        self
+    }
+
+    /// Resolve the [`MycelixConfig`] this scenario will pass to
+    /// [`BevyMycelixPlugin`]. Internal helper — `bridge_binary` wins.
+    fn resolved_mycelix_config(&self) -> MycelixConfig {
+        self.mycelix_config
+            .clone()
+            .unwrap_or_default()
+            .with_bridge_binary(self.bridge_binary.clone())
     }
 }
 
@@ -136,6 +160,13 @@ struct AgentState {
     proposal_id: String,
     submitted: bool,
     submission_confirmed: bool,
+    /// Tracks whether a direct `GetProposal(id)` lookup has returned
+    /// a non-`None` Record for this agent's proposal. Distinct from
+    /// `submission_confirmed` (which only means the conductor accepted
+    /// the create_proposal zome call and returned a Record).
+    retrieval_confirmed: bool,
+    /// Have we dispatched the GetProposal query for this agent?
+    get_query_sent: bool,
 }
 
 /// The scenario state machine. Kept as a Bevy `Resource` so systems can
@@ -143,20 +174,30 @@ struct AgentState {
 #[derive(Resource)]
 struct ProposalVoteState {
     agents: Vec<AgentState>,
-    query_sent: bool,
-    all_proposals_seen: bool,
+    all_proposals_retrieved: bool,
     errors: Vec<String>,
     sent_count: u32,
     recv_count: u32,
+    /// Monotonic tick counter. Used as a startup-delay gate instead of
+    /// `Time::elapsed_secs` — Time under MinimalPlugins doesn't always
+    /// advance reliably in a tight `app.update()` loop with external
+    /// wall-time sleeps, and we'd rather count deterministic ticks.
+    frame: u32,
 }
 
 // ---------------------------------------------------------------------------
 // proposal_vote_invariant
 // ---------------------------------------------------------------------------
 
-/// Scenario: N agents each submit one proposal. After all submissions
-/// confirm, issue a `GetActiveProposals` and assert every proposal appears
-/// in the result.
+/// Scenario: N agents each submit one proposal, then each proposal is
+/// retrieved by ID via `GetProposal`. Asserts every submitted proposal is
+/// retrievable on the next tick.
+///
+/// Uses per-proposal `GetProposal(id)` rather than `GetActiveProposals`
+/// because the governance state machine requires Draft → Active transitions
+/// (which need author-is-caller authorization) before proposals appear in
+/// the active-proposals index. Direct lookup bypasses the state machine
+/// and proves the full write/read round-trip end-to-end.
 ///
 /// This is the M2-gate 5-entity test and the smoke test for the harness.
 pub fn proposal_vote_invariant(config: ScenarioConfig) -> ScenarioReport {
@@ -168,22 +209,21 @@ pub fn proposal_vote_invariant(config: ScenarioConfig) -> ScenarioReport {
             proposal_id: format!("MIP-{}-{i:04}", config.did_seed),
             submitted: false,
             submission_confirmed: false,
+            retrieval_confirmed: false,
+            get_query_sent: false,
         })
         .collect();
 
     let mut app = App::new();
     app.add_plugins(MinimalPlugins)
-        .add_plugins(BevyMycelixPlugin::new(
-            MycelixConfig::default()
-                .with_bridge_binary(config.bridge_binary.clone()),
-        ))
+        .add_plugins(BevyMycelixPlugin::new(config.resolved_mycelix_config()))
         .insert_resource(ProposalVoteState {
             agents,
-            query_sent: false,
-            all_proposals_seen: false,
+            all_proposals_retrieved: false,
             errors: Vec::new(),
             sent_count: 0,
             recv_count: 0,
+            frame: 0,
         })
         .add_systems(Update, (proposal_vote_driver, proposal_vote_collector));
 
@@ -202,11 +242,11 @@ pub fn proposal_vote_invariant(config: ScenarioConfig) -> ScenarioReport {
         std::thread::sleep(Duration::from_millis(10));
         ticks += 1;
         let state = app.world().resource::<ProposalVoteState>();
-        if state.all_proposals_seen {
+        if state.all_proposals_retrieved {
             return ScenarioReport {
                 passed: true,
                 summary: format!(
-                    "{} agents, all proposals retrievable, 0 errors",
+                    "{} agents, all proposals submitted + retrievable by id, 0 errors",
                     state.agents.len()
                 ),
                 elapsed: start.elapsed(),
@@ -219,11 +259,7 @@ pub fn proposal_vote_invariant(config: ScenarioConfig) -> ScenarioReport {
         if !state.errors.is_empty() {
             return ScenarioReport {
                 passed: false,
-                summary: format!(
-                    "{} errors: {}",
-                    state.errors.len(),
-                    state.errors.join("; ")
-                ),
+                summary: format!("{} errors: {}", state.errors.len(), state.errors.join("; ")),
                 elapsed: start.elapsed(),
                 ticks,
                 requests_sent: state.sent_count,
@@ -236,22 +272,24 @@ pub fn proposal_vote_invariant(config: ScenarioConfig) -> ScenarioReport {
     ScenarioReport::timeout(
         start.elapsed(),
         ticks,
-        "all_proposals_seen never reached",
+        "all_proposals_retrieved never reached",
     )
     .fail()
     .clone()
 }
 
-/// Per-tick driver: submit agent proposals, then issue the query once all
-/// submissions are confirmed.
-fn proposal_vote_driver(
-    client: Res<MycelixClient>,
-    mut state: ResMut<ProposalVoteState>,
-    time: Res<Time>,
-) {
-    // Wait a beat for the subprocess to come up — 5 ticks ≈ 83 ms at 60 Hz
-    // and is more than enough for the mock to print "ready".
-    if time.elapsed_secs() < 0.08 {
+/// Per-tick driver: submit agent proposals, then issue a `GetProposal`
+/// per agent once submission is confirmed.
+fn proposal_vote_driver(client: Res<MycelixClient>, mut state: ResMut<ProposalVoteState>) {
+    // Tick-based startup delay: give the dispatcher task a few frames to
+    // spawn the subprocess before we start pushing requests. With the
+    // 10 ms/tick wall sleep in the outer loop, 5 ticks ≈ 50 ms which is
+    // enough for the mock. Live bridge needs seconds to finish admin
+    // connect + auth; those sends buffer cleanly on the flume channel
+    // (budget 128), so early writes are safe — the subprocess will read
+    // them after its startup completes.
+    state.frame = state.frame.saturating_add(1);
+    if state.frame < 5 {
         return;
     }
 
@@ -285,21 +323,30 @@ fn proposal_vote_driver(
     }
     state.sent_count += sent_this_tick;
 
-    // Phase 2: all submitted, all confirmed — issue the query once.
-    let all_confirmed = state.agents.iter().all(|a| a.submission_confirmed);
-    if all_confirmed && !state.query_sent {
-        match client.send(MycelixRequest::GetActiveProposals {
+    // Phase 2: submission confirmed → dispatch a GetProposal(id) per
+    // agent. We check each agent independently so a backpressured send
+    // for one doesn't block the others.
+    let mut sent_this_tick = 0u32;
+    for agent in &mut state.agents {
+        if !agent.submission_confirmed || agent.get_query_sent {
+            continue;
+        }
+        let req = MycelixRequest::GetProposal {
             requester: Entity::PLACEHOLDER,
-        }) {
+            proposal_id: agent.proposal_id.clone(),
+        };
+        match client.send(req) {
             Ok(()) => {
-                state.query_sent = true;
-                state.sent_count += 1;
+                agent.get_query_sent = true;
+                sent_this_tick += 1;
             }
             Err(err) => {
-                tracing::debug!(?err, "query backpressured, will retry");
+                tracing::debug!(?err, "get_proposal backpressured, will retry");
+                break;
             }
         }
     }
+    state.sent_count += sent_this_tick;
 }
 
 /// Per-tick collector: match responses to bookkeeping, fire the invariant
@@ -321,38 +368,37 @@ fn proposal_vote_collector(
                     agent.submission_confirmed = true;
                 }
             }
-            MycelixResponse::ActiveProposals { proposals, .. } => {
-                if !state.query_sent {
-                    // Stray — not ours.
-                    continue;
-                }
-                let expected: std::collections::HashSet<&str> = state
+            MycelixResponse::Proposal {
+                proposal_id,
+                record,
+                ..
+            } => {
+                // Find the matching agent by proposal_id. If the record
+                // came back as Some, retrieval is confirmed.
+                if let Some(agent) = state
                     .agents
-                    .iter()
-                    .map(|a| a.proposal_id.as_str())
-                    .collect();
-                let got: std::collections::HashSet<String> = proposals
-                    .iter()
-                    .filter_map(|p| p.get("id").and_then(|v| v.as_str()).map(String::from))
-                    .collect();
-                let missing: Vec<String> = expected
-                    .iter()
-                    .filter(|id| !got.contains(**id))
-                    .map(|s| s.to_string())
-                    .collect();
-                if missing.is_empty() {
-                    state.all_proposals_seen = true;
-                } else {
-                    state.errors.push(format!(
-                        "missing proposals: {}",
-                        missing.join(", ")
-                    ));
+                    .iter_mut()
+                    .find(|a| a.proposal_id.as_str() == proposal_id.as_str())
+                {
+                    if record.is_some() {
+                        agent.retrieval_confirmed = true;
+                    } else {
+                        state
+                            .errors
+                            .push(format!("get_proposal returned None for {proposal_id}"));
+                    }
+                }
+                // If every agent's proposal is now retrievable, mark done.
+                if state.agents.iter().all(|a| a.retrieval_confirmed) {
+                    state.all_proposals_retrieved = true;
                 }
             }
             MycelixResponse::Error { reason, .. } => {
                 state.errors.push(reason.clone());
             }
-            MycelixResponse::VoteCast { .. } | MycelixResponse::TendBalance { .. } => {
+            MycelixResponse::ActiveProposals { .. }
+            | MycelixResponse::VoteCast { .. }
+            | MycelixResponse::TendBalance { .. } => {
                 // Not used by this scenario.
             }
         }

@@ -42,11 +42,7 @@ fn main() {
 #[derive(Resource)]
 struct RequestSent(bool);
 
-fn send_once(
-    client: Res<MycelixClient>,
-    mut sent: ResMut<RequestSent>,
-    time: Res<Time>,
-) {
+fn send_once(client: Res<MycelixClient>, mut sent: ResMut<RequestSent>, time: Res<Time>) {
     // Wait one second so the dispatcher task has a chance to connect.
     if sent.0 || time.elapsed_secs() < 1.0 {
         return;
@@ -60,10 +56,7 @@ fn send_once(
     sent.0 = true;
 }
 
-fn log_and_exit(
-    mut reader: MessageReader<MycelixResponse>,
-    mut exit: MessageWriter<AppExit>,
-) {
+fn log_and_exit(mut reader: MessageReader<MycelixResponse>, mut exit: MessageWriter<AppExit>) {
     for response in reader.read() {
         match response {
             MycelixResponse::ActiveProposals {
@@ -81,14 +74,31 @@ fn log_and_exit(
             }
             // M2 variants — not expected in this M1 smoke test, but covered
             // for exhaustiveness.
-            MycelixResponse::ProposalSubmitted { requester, action_hash } => {
+            MycelixResponse::ProposalSubmitted {
+                requester,
+                action_hash,
+            } => {
                 info!(?requester, %action_hash, "received ProposalSubmitted (unexpected for M1 smoke)");
             }
-            MycelixResponse::VoteCast { requester, proposal_id } => {
+            MycelixResponse::VoteCast {
+                requester,
+                proposal_id,
+            } => {
                 info!(?requester, %proposal_id, "received VoteCast (unexpected for M1 smoke)");
             }
             MycelixResponse::TendBalance { requester, balance } => {
-                info!(?requester, ?balance, "received TendBalance (unexpected for M1 smoke)");
+                info!(
+                    ?requester,
+                    ?balance,
+                    "received TendBalance (unexpected for M1 smoke)"
+                );
+            }
+            MycelixResponse::Proposal {
+                requester,
+                proposal_id,
+                record,
+            } => {
+                info!(?requester, %proposal_id, found = record.is_some(), "received Proposal (unexpected for M1 smoke)");
             }
         }
         exit.write(AppExit::Success);

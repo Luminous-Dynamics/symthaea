@@ -40,6 +40,13 @@ pub enum MycelixRequest {
         requester: Entity,
         member_did: String,
     },
+    /// Fetch a single proposal by its ID. Returns `ProposalFound`
+    /// (with the full Record as JSON) or `ProposalNotFound` via the
+    /// `found` field.
+    GetProposal {
+        requester: Entity,
+        proposal_id: String,
+    },
 }
 
 impl MycelixRequest {
@@ -49,7 +56,8 @@ impl MycelixRequest {
             MycelixRequest::GetActiveProposals { requester }
             | MycelixRequest::SubmitProposal { requester, .. }
             | MycelixRequest::CastVote { requester, .. }
-            | MycelixRequest::QueryTendBalance { requester, .. } => *requester,
+            | MycelixRequest::QueryTendBalance { requester, .. }
+            | MycelixRequest::GetProposal { requester, .. } => *requester,
         }
     }
 }
@@ -85,11 +93,16 @@ pub enum MycelixResponse {
         requester: Entity,
         balance: serde_json::Value,
     },
-    /// Any error from transport, authentication, or zome execution.
-    Error {
+    /// Success response to [`MycelixRequest::GetProposal`]. `record` is
+    /// `Some(raw Record JSON)` when the proposal exists on chain, `None`
+    /// when `get_proposal` returned `None`.
+    Proposal {
         requester: Entity,
-        reason: String,
+        proposal_id: String,
+        record: Option<serde_json::Value>,
     },
+    /// Any error from transport, authentication, or zome execution.
+    Error { requester: Entity, reason: String },
 }
 
 impl MycelixResponse {
@@ -100,6 +113,7 @@ impl MycelixResponse {
             | MycelixResponse::ProposalSubmitted { requester, .. }
             | MycelixResponse::VoteCast { requester, .. }
             | MycelixResponse::TendBalance { requester, .. }
+            | MycelixResponse::Proposal { requester, .. }
             | MycelixResponse::Error { requester, .. } => *requester,
         }
     }

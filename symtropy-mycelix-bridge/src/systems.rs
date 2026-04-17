@@ -64,6 +64,7 @@ enum WireCommand {
     SubmitProposal(WireProposalInput),
     CastVote(WireVoteInput),
     QueryTendBalance { member_did: String },
+    GetProposal { proposal_id: String },
 }
 
 #[derive(Debug, Serialize)]
@@ -103,6 +104,7 @@ enum PendingKind {
     ProposalSubmitted,
     VoteCast { proposal_id: String },
     TendBalance,
+    Proposal { proposal_id: String },
 }
 
 #[derive(Debug)]
@@ -136,7 +138,10 @@ pub(crate) fn spawn_dispatcher_task(
 
     runtime.spawn_background_task(move |_ctx| async move {
         if let Err(err) = run_dispatcher_loop(config, req_rx, resp_tx).await {
-            error!(?err, "symtropy-mycelix-bridge: dispatcher loop exited with error");
+            error!(
+                ?err,
+                "symtropy-mycelix-bridge: dispatcher loop exited with error"
+            );
         }
     });
 }
@@ -289,6 +294,12 @@ async fn writer_loop(
                 PendingKind::TendBalance,
                 WireCommand::QueryTendBalance { member_did },
             ),
+            MycelixRequest::GetProposal { proposal_id, .. } => (
+                PendingKind::Proposal {
+                    proposal_id: proposal_id.clone(),
+                },
+                WireCommand::GetProposal { proposal_id },
+            ),
         };
 
         {
@@ -296,11 +307,17 @@ async fn writer_loop(
             p.insert(request_id, Pending { requester, kind });
         }
 
-        let wire = WireRequest { request_id, command };
+        let wire = WireRequest {
+            request_id,
+            command,
+        };
         let mut line = serde_json::to_string(&wire).map_err(DispatcherError::Serialise)?;
         line.push('\n');
 
-        stdin.write_all(line.as_bytes()).await.map_err(DispatcherError::Stdin)?;
+        stdin
+            .write_all(line.as_bytes())
+            .await
+            .map_err(DispatcherError::Stdin)?;
         stdin.flush().await.map_err(DispatcherError::Stdin)?;
 
         trace!(%request_id, %requester, "dispatched request to subprocess");
@@ -390,6 +407,18 @@ async fn translate(id: u64, wire: WireResponse, pending: &PendingMap) -> Mycelix
         PendingKind::TendBalance => MycelixResponse::TendBalance {
             requester,
             balance: wire.data.unwrap_or(serde_json::Value::Null),
+        },
+        PendingKind::Proposal { proposal_id } => MycelixResponse::Proposal {
+            requester,
+            proposal_id,
+            // `get_proposal` returns `Option<Record>` — the conductor
+            // sends Null for None, an object for Some(Record). Preserve
+            // that distinction: None → `record: None`, Some(object) →
+            // `record: Some(object)`.
+            record: match wire.data {
+                Some(serde_json::Value::Null) | None => None,
+                Some(other) => Some(other),
+            },
         },
     }
 }
