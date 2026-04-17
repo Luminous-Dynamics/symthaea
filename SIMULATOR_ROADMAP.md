@@ -22,7 +22,29 @@ answer. Aspirational work is explicitly called out.
 languages. They don't yet share a telemetry contract or a composite
 experiment harness. Each lives in its own epistemic bubble.
 
-## Priority A — Near-term: consolidate mycelix-multiworld-sim
+## Priority A — CLOSED (2026-04-17)
+
+All four A-series items shipped. Summary:
+
+| Item | Status | Commit | Outcome |
+|---|---|---|---|
+| A1: resilience in report | ✓ | `657baeefd4` | 10-seed resilience mean 0.689 |
+| A2: counterfactual A/B | ✓ | `d9cd07af3d` | **Null** (Δ −0.004 ± 0.008) |
+| A3: sensitivity sweep (dose) | ✓ | `1ba6175863` | Null is dose-invariant |
+| Geometric CVS | ✓ | `a0df345c40` | Null is aggregation-invariant |
+| A4: write-up | ✓ | (this commit) | `PHASE2_FINDINGS.md` |
+
+**Headline finding:** Phase 2 machinery does not produce a measurable
+civilizational-outcome benefit over the Phi+MYCEL baseline in this
+simulator. Diagnosed cause: the attack model operates on governance-
+internal state that CVS does not read. See `PHASE2_FINDINGS.md` for
+the full story.
+
+Near-term work now shifts to **attack-cascade modeling** — making the
+sim capable of detecting defense effects — before any further A/B
+variation is worth running.
+
+## Priority A — ORIGINAL PLAN (historical, superseded by closure above)
 
 We just finished Phase 1 survey + Phase 3 DKG + 10-seed validation. The
 natural next moves aren't new phases — they're payoff from the machinery
