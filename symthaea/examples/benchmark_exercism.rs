@@ -3224,31 +3224,35 @@ pub fn encode_random(s: &str) -> (String, String) {
         }
         "robot-name" => {
             r#"use rand::Rng;
-pub struct RobotFactory { used_names: std::collections::HashSet<String> }
-pub struct Robot { name: String }
+use std::cell::RefCell;
+use std::collections::HashSet;
+use std::rc::Rc;
+type NameSet = Rc<RefCell<HashSet<String>>>;
+pub struct RobotFactory { used: NameSet }
+pub struct Robot { name: String, used: NameSet }
 fn gen_name<R: Rng + ?Sized>(rng: &mut R) -> String {
-    // Use next_u32 which is always available on Rng
     let r = rng.next_u32();
     let a = ((r % 26) as u8 + b'A') as char;
     let b = (((r / 26) % 26) as u8 + b'A') as char;
     let r2 = rng.next_u32();
-    let n1 = (r2 % 10) as u8;
-    let n2 = ((r2 / 10) % 10) as u8;
-    let n3 = ((r2 / 100) % 10) as u8;
-    format!("{a}{b}{n1}{n2}{n3}")
+    format!("{a}{b}{}{}{}", r2 % 10, (r2/10) % 10, (r2/100) % 10)
+}
+fn unique_name<R: Rng>(rng: &mut R, used: &NameSet) -> String {
+    loop { let n = gen_name(rng); if used.borrow_mut().insert(n.clone()) { return n; } }
 }
 impl RobotFactory {
-    pub fn new() -> Self { RobotFactory { used_names: std::collections::HashSet::new() } }
+    pub fn new() -> Self { RobotFactory { used: Rc::new(RefCell::new(HashSet::new())) } }
     pub fn new_robot<R: Rng>(&mut self, rng: &mut R) -> Robot {
-        loop {
-            let name = gen_name(rng);
-            if self.used_names.insert(name.clone()) { return Robot { name }; }
-        }
+        let name = unique_name(rng, &self.used);
+        Robot { name, used: self.used.clone() }
     }
 }
 impl Robot {
     pub fn name(&self) -> &str { &self.name }
-    pub fn reset<R: Rng>(&mut self, rng: &mut R) { self.name = gen_name(rng); }
+    pub fn reset<R: Rng>(&mut self, rng: &mut R) {
+        self.used.borrow_mut().remove(&self.name);
+        self.name = unique_name(rng, &self.used);
+    }
 }
 "#
         }
@@ -3444,6 +3448,84 @@ pub fn grep(pattern: &str, flags: &Flags, files: &[&str]) -> Result<Vec<String>,
 "#
         }
         // pov: tree reparenting without Clone is extremely hard in safe Rust; skip
+        "react" => {
+            r#"#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct InputCellId(usize);
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ComputeCellId(usize);
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CallbackId(usize);
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CellId { Input(InputCellId), Compute(ComputeCellId) }
+#[derive(Debug, PartialEq, Eq)]
+pub enum RemoveCallbackError { NonexistentCell, NonexistentCallback }
+struct ComputeCell<'a, T> {
+    deps: Vec<CellId>,
+    compute: Box<dyn Fn(&[T]) -> T + 'a>,
+    value: T,
+    callbacks: std::collections::HashMap<usize, Box<dyn FnMut(T) + 'a>>,
+}
+pub struct Reactor<'a, T> {
+    inputs: Vec<T>,
+    computes: Vec<ComputeCell<'a, T>>,
+    next_cb: usize,
+}
+impl<'a, T: Copy + PartialEq> Reactor<'a, T> {
+    pub fn new() -> Self { Reactor { inputs: Vec::new(), computes: Vec::new(), next_cb: 0 } }
+    pub fn create_input(&mut self, initial: T) -> InputCellId {
+        self.inputs.push(initial);
+        InputCellId(self.inputs.len() - 1)
+    }
+    pub fn create_compute<F: Fn(&[T]) -> T + 'a>(&mut self, dependencies: &[CellId], compute_func: F) -> Result<ComputeCellId, CellId> {
+        for &dep in dependencies {
+            if self.value(dep).is_none() { return Err(dep); }
+        }
+        let vals: Vec<T> = dependencies.iter().map(|d| self.value(*d).unwrap()).collect();
+        let value = compute_func(&vals);
+        self.computes.push(ComputeCell { deps: dependencies.to_vec(), compute: Box::new(compute_func), value, callbacks: std::collections::HashMap::new() });
+        Ok(ComputeCellId(self.computes.len() - 1))
+    }
+    pub fn value(&self, id: CellId) -> Option<T> {
+        match id {
+            CellId::Input(InputCellId(i)) => self.inputs.get(i).copied(),
+            CellId::Compute(ComputeCellId(i)) => self.computes.get(i).map(|c| c.value),
+        }
+    }
+    pub fn set_value(&mut self, id: InputCellId, new_value: T) -> bool {
+        let InputCellId(i) = id;
+        if i >= self.inputs.len() { return false; }
+        self.inputs[i] = new_value;
+        let mut changed = Vec::new();
+        for ci in 0..self.computes.len() {
+            let vals: Vec<T> = self.computes[ci].deps.iter().map(|d| self.value(*d).unwrap()).collect();
+            let new_val = (self.computes[ci].compute)(&vals);
+            if new_val != self.computes[ci].value {
+                self.computes[ci].value = new_val;
+                changed.push((ci, new_val));
+            }
+        }
+        for (ci, val) in changed {
+            for cb in self.computes[ci].callbacks.values_mut() { cb(val); }
+        }
+        true
+    }
+    pub fn add_callback<F: FnMut(T) + 'a>(&mut self, id: ComputeCellId, callback: F) -> Option<CallbackId> {
+        let ComputeCellId(i) = id;
+        let cell = self.computes.get_mut(i)?;
+        let cb_id = self.next_cb;
+        self.next_cb += 1;
+        cell.callbacks.insert(cb_id, Box::new(callback));
+        Some(CallbackId(cb_id))
+    }
+    pub fn remove_callback(&mut self, cell: ComputeCellId, callback: CallbackId) -> Result<(), RemoveCallbackError> {
+        let ComputeCellId(ci) = cell;
+        let c = self.computes.get_mut(ci).ok_or(RemoveCallbackError::NonexistentCell)?;
+        c.callbacks.remove(&callback.0).ok_or(RemoveCallbackError::NonexistentCallback)?;
+        Ok(())
+    }
+}
+"#
+        }
         "forth" => {
             r#"pub type Value = i32;
 pub type Result = std::result::Result<(), Error>;
