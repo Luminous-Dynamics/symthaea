@@ -1,0 +1,31 @@
+[package]
+name = "symtropy-bevy-core"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+description = "Permissively-licensed Bevy plugin for symtropy-physics N-dimensional physics. Generic over PhysicsCallback; bring your own coupling or use NoCoupling. Zero AGPL deps — safe for proprietary projects."
+repository = "https://github.com/luminous-dynamics/symtropy"
+keywords = ["bevy", "physics", "n-dimensional", "game-engine", "simulation"]
+categories = ["game-engines", "simulation"]
+readme = "README.md"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[dependencies]
+symtropy-math = { version = "0.2.0", path = "../symtropy-math" }
+symtropy-physics = { version = "0.2.0", path = "../symtropy-physics" }
+bevy = { version = "0.18", default-features = false, features = [
+    "bevy_core_pipeline",
+    "bevy_render",
+    "bevy_sprite",
+    "bevy_sprite_render",
+    "bevy_winit",
+    "bevy_color",
+    "bevy_state",
+    "bevy_log",
+    "multi_threaded",
+    "x11",
+] }
+nalgebra = "0.34"
