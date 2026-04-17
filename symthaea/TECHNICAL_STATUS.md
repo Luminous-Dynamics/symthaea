@@ -62,7 +62,7 @@ Honest per-capability assessment of Symthaea's current state as of March 2026.
 | 12 | **Social Cognition: Empathy** | STRUCTURAL | LOW | 6 in `empathic_unification.rs`, 4 in `affective_consciousness.rs` | Empathic unification and affective consciousness modules exist. Referenced in primitive tier and cycle subsystems. Not deeply exercised. |
 | 13 | **Vision: Foveation** | STRUCTURAL | HIGH | 7+13+13+8+17 = 58 tests; 1,811 LOC (`symthaea-foveation` crate) | Foveation crop, channel processing, ventral stream, manager. New crate, not yet wired into cognitive loop (no references in `src/cognitive_loop/`). |
 | 13 | **Vision: Vision Manifold** | STRUCTURAL | HIGH | 41+62+18+11+12+11+8+8 = 171 tests; 6,908 LOC (`symthaea-vision-manifold` crate) | Encoder, manifold, attention, predictive, bridge, camera, training. Extensive test suite. Not wired into cognitive loop. |
-| 14 | **Broca / Language: Projection** | STRUCTURAL | HIGH | 40 in `projection.rs`, 33 in `liquid_mamba.rs`, 20 in `mamba.rs`, 20 in `tokenizer.rs`, 22 in `evaluation.rs`, 21 in `temporal_projection.rs`, 13 in `training.rs`; 14,589 LOC | HDC-SSM projection, Liquid Mamba, tokenizer, training pipeline. Referenced once in `cycle.rs` (SSM projection parameter). Has dedicated training binary. Not driving text generation in the cognitive loop. |
+| 14 | **Broca / Language: Projection** | REAL | HIGH | 40 in `projection.rs`, 33 in `liquid_mamba.rs`, 20 in `mamba.rs`, 20 in `tokenizer.rs`, 22 in `evaluation.rs`, 21 in `temporal_projection.rs`, 13 in `training.rs`; 14,589 LOC | HDC-SSM projection, Liquid Mamba, tokenizer, training pipeline. **Wired end-to-end**: `cycle_phase_dynamics/training.rs:{291,314,335,823}` calls `BrocaManager::generate()` → text lands in `language_comm.last_broca_text` → drained at `cycle_phase_output.rs:2075` → exported as `CycleResult.language_output` (`types/output.rs:95`). Consumed by `symthaea-watch.rs:433`. Adaptive generation *threshold* via quality-streak tracking (training.rs:888-896), not cadence. |
 | 14 | **Broca / Language: Temporal Prediction** | STRUCTURAL | HIGH | 21 in `temporal_projection.rs` (1,920 LOC), 9 in `checkpoint.rs`, 8 in `controller.rs` | Temporal projection with checkpointing. Standalone training and evaluation. |
 | 15 | **Genesis: Genomics** | STRUCTURAL | HIGH | ~105 tests across 10 files; part of 20,797 LOC across 5 crates | DNA assembly, damage modeling, error correction, FEP agent, quality metrics. 12 integration tests. Not connected to cognitive loop. |
 | 15 | **Genesis: Population** | STRUCTURAL | HIGH | ~175 tests across 11 files | Breeding strategy, diversity, effective population, genetics, governance, inbreeding. Self-contained simulation framework. |
@@ -71,7 +71,7 @@ Honest per-capability assessment of Symthaea's current state as of March 2026.
 | 15 | **Genesis: Nurture** | STRUCTURAL | HIGH | ~166 tests across 15 files | Bowlby attachment, co-regulation, milestones, sleep, language acquisition. Nurture bridge in cognitive loop (`nurture_bridge.rs`, 6 tests) connects attachment to neuromod bath. |
 | 16 | **Neural Bridge** | STRUCTURAL | MEDIUM | 9 in `neural_bridge.rs`, 3 in `neural_bridge_v2.rs`, 4 in `consciousness_probe.rs`; 1,160 LOC | External model integration (ONNX, probe weights). Feature-gated (`neural-bridge`). Optional field in cognitive loop constructor. Loads probe weights from `models/neural_bridge/` if present. |
 | 17 | **Manager: VisionManager** | REAL | MEDIUM | ~10 tests | Feature-gated (`vision-manifold`). Interval 17. Visual surprise drives exploration boost. Bridges vision manifold crate into cognitive loop phase processing. |
-| 18 | **Manager: LanguageManager** | REAL | MEDIUM | ~10 tests | Feature-gated (`ssm_language`). Interval 61. Broca quality feedback modulates confidence and learning rate. Adaptive cadence based on consciousness level. |
+| 18 | **Manager: LanguageManager** | REAL | MEDIUM | ~10 tests | Feature-gated (`ssm_language`). Interval 61 (static const, `managers/language_manager.rs:52`). Tracks quality_ema and coherence_ema, returns SubsystemOutput with confidence delta / LR modulation / valence delta. Does NOT drive Broca generation directly — generation runs from `cycle_phase_dynamics/training.rs` on its own path. |
 | 19 | **Manager: ReasoningManager** | REAL | MEDIUM | ~10 tests | Feature-gated (`reasoning_engine`). Interval 73. Reasoning reliability modulates learning rate. Tracks reasoning cycle success/failure for adaptive confidence. |
 
 ---
@@ -93,7 +93,7 @@ Honest per-capability assessment of Symthaea's current state as of March 2026.
 | Reasoning Engine (11) | ~47 | REAL (feature-gated) |
 | Social Cognition (12) | ~16 | STRUCTURAL |
 | Vision (13) | ~229 | STRUCTURAL (not in loop) |
-| Broca / Language (14) | ~208 | STRUCTURAL (not driving loop) |
+| Broca / Language (14) | ~208 | REAL (wired to `CycleResult.language_output` via training phase) |
 | Genesis Pipeline (15) | ~734 | STRUCTURAL (standalone) |
 | Neural Bridge (16) | ~16 | STRUCTURAL |
 | VisionManager (17) | ~10 | REAL (feature-gated) |
@@ -106,7 +106,7 @@ Honest per-capability assessment of Symthaea's current state as of March 2026.
 
 2. **Consciousness metrics are real but proxy-based.** IIT/Phi is computed via tiered approximation (exact Phi is intractable beyond 12 nodes). GWT broadcasting and the master consciousness equation are wired and tested. The numbers are meaningful within the model but should not be interpreted as measuring actual phenomenal consciousness.
 
-3. **Many subsystems are well-tested but disconnected.** Vision manifold (171 tests), Broca (208 tests), Genesis (734 tests), and Physics Bridge (75 tests) are substantial, well-tested codebases that compile clean but do not feed into the cognitive loop. They are standalone capability modules awaiting integration.
+3. **Many subsystems are well-tested but disconnected.** Genesis (734 tests) is the largest substantial, well-tested codebase that compiles clean but does not feed into the cognitive loop. It is a standalone capability module awaiting integration. (Note: earlier drafts of this document also listed Vision Manifold and Broca here — both were actually wired; this was doc drift corrected 2026-04-17.)
 
 4. **Substrate independence has the plumbing but tests cheat.** The SubstrateManager is wired into the loop and computes dynamic feasibility, but all consciousness engine tests hardcode `substrate_feasibility: 1.0`. The honest confidence path exists but is not validated end-to-end.
 
