@@ -11,13 +11,25 @@ Committed fixes:
 | `f93b19b1bd` | mycelix-energy | Moved `resolver`/`members` from `[workspace.package]` to `[workspace]` |
 | `a42521542f` | mycelix-personal | Added missing `license` to `[workspace.package]` |
 | `cf209373b7` | mycelix-desci | Removed dangling `pub mod reproducibility_engine` |
-| `d22016222d` | mycelix-civic robotics-dispatch integrity | Added `RoboticCredential` match arm |
+| `d22016222d` | mycelix-civic integrity | Added `RoboticCredential` match arm |
+| `dc69f6b716` | mycelix-energy projects | Initialized 4 consciousness-scoring fields as `None` |
+| `2330e52d89` | mycelix-conductor-bridge | Pass `None` for new `origin` arg in `AppWebsocket::connect` |
+| `a6ba298d9d` | mycelix-domain-template | Sync trait/enum/struct to current `portal_domain_trait` |
+| `d747944f48` | mycelix-civic coordinator | HDK 0.6 migration: `agent_initial_pubkey` + `LinkQuery` |
 
-Net compile-check delta on 16 tractable clusters: **12 PASS → 14 PASS**.
+Net compile-check delta: **12 PASS → 18 PASS** (of 26 Rust clusters).
 
-Still FAIL:
-- **civic** — coordinator zome has pre-existing HDK API drift (`AgentInfo.agent_latest_pubkey`, arity changes) masked by the integrity error I fixed
-- **energy** — manifest fix exposed secondary code drift: `EnergyProject` initializer missing 4 fields (`consciousness_assessed_at`, `consciousness_scorer_did`, `harmony_alignment`, +1)
+Still FAIL (real issues, require coordination or investigation):
+- **governance** — shared-crate drift (feldman-dkg `SigningKey::verifying_key`, `ConsciousnessAttestation::validate_with_freshness`, voting `CastAttestedVoteInput.consciousness_attestation_json`). Multiple touchpoints in `mycelix-core/libs/feldman-dkg/` and `mycelix-bridge-common`.
+- **finance** — 21 errors in payments + finance_bridge from shared `finance-wire-types` stub. P0.3 blocker.
+- **multiworld-sim** — `ExecutiveSummary`, `StandardizedReport`, `ReproducibilityInfo` restructured in `crates/luminous-sim-core/`; consumer uses richer schema. Data-model judgment call.
+- **supplychain** — nested workspaces: outer `Cargo.toml` lacks `[workspace.dependencies]`; inner `holochain/Cargo.toml` has them but is shadowed. Requires workspace-structure decision.
+
+Still FAIL (environment issues, not code):
+- **craft** — `datachannel-sys` needs libdatachannel C dep (run inside `nix develop`)
+- **music-desktop** — `wayland-sys` needs libwayland (same)
+- **identity, knowledge** — `sccache rustc -vV` fails; likely stale sccache cache
+
 
 ## Compile Health (verified 2026-04-17)
 
