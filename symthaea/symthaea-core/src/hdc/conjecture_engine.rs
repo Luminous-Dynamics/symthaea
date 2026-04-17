@@ -1283,6 +1283,77 @@ fn macro_usage_key(expr: &Expr) -> String {
     }
 }
 
+/// Session 29: finite-difference gradient of an expression at a state
+/// point, one component per variable in var_names. Returns NaN
+/// components if eval goes non-finite anywhere — caller must handle.
+fn fd_gradient(expr: &Expr, state: &[f64], var_names: &[&str]) -> Vec<f64> {
+    const EPS: f64 = 1e-5;
+    let mut grad = Vec::with_capacity(var_names.len());
+    for i in 0..var_names.len() {
+        let mut plus = state.to_vec();
+        let mut minus = state.to_vec();
+        plus[i] += EPS;
+        minus[i] -= EPS;
+        let bindings_plus: Vec<(&str, f64)> = var_names
+            .iter()
+            .zip(plus.iter())
+            .map(|(n, v)| (*n, *v))
+            .collect();
+        let bindings_minus: Vec<(&str, f64)> = var_names
+            .iter()
+            .zip(minus.iter())
+            .map(|(n, v)| (*n, *v))
+            .collect();
+        let f_plus = expr.eval(&bindings_plus);
+        let f_minus = expr.eval(&bindings_minus);
+        grad.push((f_plus - f_minus) / (2.0 * EPS));
+    }
+    grad
+}
+
+/// Session 29: Gram-Schmidt orthonormalization of a set of vectors.
+/// Returns the orthonormal basis as Vec<Vec<f64>>. Discards vectors
+/// that are (near-)linearly dependent on earlier ones.
+fn gram_schmidt(vectors: &[Vec<f64>]) -> Vec<Vec<f64>> {
+    let mut basis: Vec<Vec<f64>> = Vec::new();
+    for v in vectors {
+        let mut u = v.clone();
+        for b in &basis {
+            let dot: f64 = u.iter().zip(b.iter()).map(|(a, c)| a * c).sum();
+            for i in 0..u.len() {
+                u[i] -= dot * b[i];
+            }
+        }
+        let norm: f64 = u.iter().map(|x| x * x).sum::<f64>().sqrt();
+        if norm > 1e-10 && norm.is_finite() {
+            for x in u.iter_mut() {
+                *x /= norm;
+            }
+            basis.push(u);
+        }
+    }
+    basis
+}
+
+/// Session 29: fraction of `g` that lies in the subspace orthogonal to
+/// `basis` (orthonormal). Returns value in [0, 1]. Near 1 = gradient
+/// is linearly independent from basis; near 0 = gradient is fully
+/// captured by the basis (and thus functionally dependent on those
+/// invariants).
+fn orthogonal_fraction(g: &[f64], basis: &[Vec<f64>]) -> f64 {
+    let total_sq: f64 = g.iter().map(|x| x * x).sum();
+    if total_sq < 1e-30 {
+        return 1.0; // zero gradient: no preference, don't penalize
+    }
+    let mut parallel_sq = 0.0;
+    for b in basis {
+        let dot: f64 = g.iter().zip(b.iter()).map(|(a, c)| a * c).sum();
+        parallel_sq += dot * dot;
+    }
+    let orth_sq = (total_sq - parallel_sq).max(0.0);
+    (orth_sq / total_sq).sqrt()
+}
+
 /// Session 25: count how many of `prior_keys` appear as exact subtrees
 /// in `expr`. Each match stops descent into that subtree (so a prior
 /// that fully matches does not also count its sub-components). Used
@@ -5698,6 +5769,44 @@ pub fn discover_invariants_autonomous_with_seed_templates(
     let fragment_active = fragment_bonus > 0.0 && fragment_bonus < 1.0
         && !pinned_prior_keys.is_empty();
 
+    // Session 29: precompute Gram-Schmidt orthonormal bases of the
+    // known-invariant gradients at a small set of probe points. A
+    // candidate whose gradient is linearly dependent on these bases
+    // (orthogonal fraction below threshold) gets a fitness penalty.
+    // This unblocks the multi-invariant ceiling diagnosed in S28.
+    let orth_penalty = config.orthogonality_penalty;
+    let orth_threshold_sin = (1.0_f64 - config.orthogonality_threshold.powi(2))
+        .max(0.0)
+        .sqrt();
+    let orth_active = orth_penalty > 1.0 && !config.known_invariants.is_empty();
+    let orth_probe_points: Vec<Vec<f64>> = if orth_active {
+        // Take 8 evenly-spaced points from the primary trajectory.
+        (0..8)
+            .filter_map(|k| {
+                let idx = (k * sampled.len()) / 8;
+                sampled.get(idx).cloned()
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+    let orth_bases: Vec<Vec<Vec<f64>>> = if orth_active {
+        orth_probe_points
+            .iter()
+            .map(|state| {
+                let grads: Vec<Vec<f64>> = config
+                    .known_invariants
+                    .iter()
+                    .map(|inv| fd_gradient(inv, state, var_names))
+                    .filter(|g| g.iter().all(|x| x.is_finite()))
+                    .collect();
+                gram_schmidt(&grads)
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
     // Pre-compute several distinct "off-trajectory" test points for the
     // non-triviality filter. We use both the trajectory samples themselves
     // (so disguised constants like 0^(non-constant)→0 are caught) AND a few
@@ -5793,6 +5902,38 @@ pub fn discover_invariants_autonomous_with_seed_templates(
                     let matches = count_prior_subtrees(expr, &pinned_prior_keys);
                     if matches > 0 {
                         worst *= fragment_bonus.powi(matches as i32);
+                    }
+                }
+                // Session 29: gradient-orthogonality penalty. Compute
+                // the candidate's gradient at the probe points and
+                // measure how much of it lies OUTSIDE the subspace
+                // spanned by known-invariant gradients. Penalize when
+                // the orthogonal fraction is low (candidate is
+                // linearly dependent on known invariants — e.g. L·π,
+                // L+L, exp(L), etc). Mean orth fraction across probes.
+                if orth_active {
+                    let mut orth_sum = 0.0;
+                    let mut orth_n = 0usize;
+                    for (state, basis) in
+                        orth_probe_points.iter().zip(orth_bases.iter())
+                    {
+                        if basis.is_empty() {
+                            continue;
+                        }
+                        let g = fd_gradient(expr, state, var_names);
+                        if g.iter().all(|x| x.is_finite()) {
+                            orth_sum += orthogonal_fraction(&g, basis);
+                            orth_n += 1;
+                        }
+                    }
+                    if orth_n > 0 {
+                        let mean_orth = orth_sum / orth_n as f64;
+                        // mean_orth < sin(threshold_angle) means
+                        // mean |cos(θ)| > orthogonality_threshold,
+                        // so the candidate is linearly dependent.
+                        if mean_orth < orth_threshold_sin {
+                            worst *= orth_penalty;
+                        }
                     }
                 }
                 worst
