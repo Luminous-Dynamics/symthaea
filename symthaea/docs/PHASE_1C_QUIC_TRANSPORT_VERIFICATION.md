@@ -235,21 +235,38 @@ cargo build --no-default-features --features holon-viewer \
 LOSS=1 FRAMES=60 symthaea/scripts/phase_1c_netem_ab.sh
 ```
 
-The expected qualitative behavior: under 1% packet loss on loopback, WS
-frame delivery exhibits TCP-retransmit stalls (latency tail lengthens,
-max_us spikes) while QUIC datagrams show drop-and-continue (the app sees
-more `timed out waiting for QUIC frame` and `sample` count drops, but
-successful frames stay fast). This is the head-of-line-blocking
-phenomenon QUIC is designed to eliminate.
+Results (2026-04-17, three loss levels, same machine):
 
-Live run pending — script is ready, no external privileges required.
+| LOSS | FRAMES | WS p50 | WS p99 | WS max | QUIC p50 | QUIC p99 | QUIC max |
+|---|---|---|---|---|---|---|---|
+| 0% (control) | 30 | 43 ms | 52 ms | 60 ms | 59 ms | 71 ms | 74 ms |
+| 1% | 60 | 48 ms | 93 ms | **280 ms** | 63 ms | 92 ms | **97 ms** |
+| 5% | 60 | 59 ms | **277 ms** | **314 ms** | 59 ms | 97 ms | **115 ms** |
+
+**Head-of-line blocking signal at 1% loss**: WS max inflates from 60 ms
+→ 280 ms (4.7× worse), while QUIC max moves 74 ms → 97 ms (1.3× worse).
+At 5% loss the WS tail explodes further (p99=277 ms, max=314 ms — 5.3×
+and 5.2× vs control) while QUIC stays within 2× (p99=97 ms,
+max=115 ms). Exact match to the Phase I.C design thesis: QUIC
+unreliable datagrams drop-and-continue; TCP retransmit stalls the
+entire stream until recovery.
+
+The WS p50 also degrades more gracefully than the tail — at 1% loss
+WS p50 is 48 ms vs QUIC's 63 ms, so the *median* frame looks fine on
+WS. The distinction is entirely in the distribution tail. A
+cognitive-loop consumer sampling at the 30 fps frame rate would see
+the occasional 280 ms WS stall as a visible hitch; QUIC's 97 ms max
+stays under a 3-frame window even at p99+.
 
 ## Remaining Phase I.C Verification
 
 - [ ] Execute the scrcpy-stream A/B live against the Pixel 8 Pro and record
       numbers for this document.
-- [ ] Execute `phase_1c_netem_ab.sh` for LOSS ∈ {0, 1, 5} and record the
-      WS-vs-QUIC stall behavior.
+- [x] **Execute `phase_1c_netem_ab.sh` for LOSS ∈ {0, 1, 5} and record the
+      WS-vs-QUIC stall behavior.** Done 2026-04-17; numbers in the tc qdisc
+      section above. WS tail inflates 4.7-5.3× at 1%/5% loss; QUIC stays
+      within 1.3-2×. Head-of-line blocking thesis confirmed on this
+      machine.
 - [ ] Run a **bounded 2-minute soak** over QUIC with Phase I.B observability
       metrics (sealed bytes/s, seal+open p50/p99, queue depth, replay-reject
       count, restarts, decoded/dropped). The 10-minute full soak is deferred
