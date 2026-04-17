@@ -99,6 +99,69 @@ pub fn rule_to_tactic(rule: &str) -> Option<LeanTactic> {
     }
 }
 
+/// Pattern-match on a `Proposition` goal and emit a tactic block that closes
+/// it using **core Lean 4 only** (no Mathlib dependency).
+///
+/// Coverage (Phase 1):
+/// - `A → A` (any depth; identity implication) — `exact fun h => h`.
+/// - `A ∨ ¬A` (excluded middle, either order) — `exact Classical.em A`.
+/// - `¬A ∨ A` — `exact (Classical.em A).symm` via `cases`.
+/// - `(A → B) → A → B` and other "reflexive" implication chains — `intros;
+///   assumption`.
+/// - Everything else — falls through to `None`; caller emits `Sorry`.
+///
+/// Note: we deliberately do NOT emit `tauto` here. `tauto` is a Mathlib
+/// tactic; emitting it would require `import Mathlib.Tactic.Tauto` and a
+/// Mathlib-populated Lean project. Phase 2 may add a Mathlib-aware emission
+/// path for goals beyond core-Lean reach.
+pub fn tactics_for_goal(goal: &Proposition) -> Option<Vec<LeanTactic>> {
+    // Case 1: identity implication A → A (any `A`).
+    if let Proposition::Implies(a, b) = goal {
+        if a == b {
+            return Some(vec![LeanTactic::Raw("exact fun h => h".into())]);
+        }
+    }
+
+    // Case 2: excluded middle A ∨ ¬A (in either order). Core Lean 4 exposes
+    // `Classical.em : ∀ (p : Prop), p ∨ ¬p` without Mathlib.
+    if let Proposition::Or(lhs, rhs) = goal {
+        // A ∨ ¬A
+        if let Proposition::Not(na) = rhs.as_ref() {
+            if lhs.as_ref() == na.as_ref() {
+                let a_term = prop_to_lean_term(lhs);
+                return Some(vec![LeanTactic::Raw(format!(
+                    "exact Classical.em {}",
+                    a_term.to_lean()
+                ))]);
+            }
+        }
+        // ¬A ∨ A — use .symm on Classical.em's output.
+        if let Proposition::Not(na) = lhs.as_ref() {
+            if na.as_ref() == rhs.as_ref() {
+                let a_term = prop_to_lean_term(rhs);
+                return Some(vec![LeanTactic::Raw(format!(
+                    "exact (Classical.em {}).symm",
+                    a_term.to_lean()
+                ))]);
+            }
+        }
+    }
+
+    // Case 3: reflexive implication chain — try `intros; assumption`. This
+    // closes goals like `(P → Q) → P → Q`, `A → B → A`, etc., whenever the
+    // conclusion appears verbatim as a hypothesis after intros.
+    if matches!(goal, Proposition::Implies(_, _)) {
+        return Some(vec![LeanTactic::Raw("intros; assumption".into())]);
+    }
+
+    // Case 4: True.
+    if matches!(goal, Proposition::True) {
+        return Some(vec![LeanTactic::Trivial]);
+    }
+
+    None
+}
+
 /// Translate a full `ProofResult` into a `LeanProofScript` targeting
 /// `theorem_name : <goal in Lean syntax>`.
 ///
@@ -106,6 +169,10 @@ pub fn rule_to_tactic(rule: &str) -> Option<LeanTactic> {
 /// Only valid proofs (`result.valid == true`) produce non-`sorry` scripts;
 /// invalid proofs emit a `Sorry`-tagged script so the file still type-checks
 /// with a warning.
+///
+/// The tactic block is chosen by [`tactics_for_goal`]. If the goal doesn't
+/// match any Phase-1 pattern, we emit `Sorry` — counted as a failure in the
+/// external-verify gate (which is the honest signal).
 pub fn proof_result_to_lean(
     theorem_name: &str,
     goal: &Proposition,
@@ -114,11 +181,8 @@ pub fn proof_result_to_lean(
     let goal_term = prop_to_lean_term(goal);
     let statement = goal_term.to_lean();
 
-    // Phase 1 strategy: if the engine reports the proof valid AND every rule
-    // in the proof is classically sound propositional reasoning, close with
-    // `tauto`. If any step is unclassified, emit `sorry`.
     let tactics = if result.valid && all_rules_classified(&result.proof_steps) {
-        vec![LeanTactic::Raw("tauto".into())]
+        tactics_for_goal(goal).unwrap_or_else(|| vec![LeanTactic::Sorry])
     } else {
         vec![LeanTactic::Sorry]
     };
@@ -200,7 +264,7 @@ mod tests {
     }
 
     #[test]
-    fn valid_classified_proof_emits_tauto() {
+    fn valid_classified_identity_uses_term_mode() {
         let goal = atom("P").implies(atom("P"));
         let result = ProofResult {
             valid: true,
@@ -215,7 +279,51 @@ mod tests {
         };
         let script = proof_result_to_lean("id_impl", &goal, &result);
         let rendered = script.to_lean();
-        assert!(rendered.contains("tauto"));
+        // Identity should close in term mode, not with tauto.
+        assert!(rendered.contains("fun h => h"));
+        assert!(!rendered.contains("tauto"));
+        assert!(!script.contains_sorry());
+    }
+
+    #[test]
+    fn excluded_middle_uses_classical_em() {
+        let goal = atom("P").or(atom("P").not());
+        let result = ProofResult {
+            valid: true,
+            proof_steps: vec![ProofStepLogic {
+                step_number: 1,
+                rule: "Modus Ponens".to_string(),
+                formula: "P ∨ ¬P".to_string(),
+                justification: "LEM".to_string(),
+            }],
+            phi: 0.5,
+            description: "LEM".to_string(),
+        };
+        let script = proof_result_to_lean("lem", &goal, &result);
+        assert!(script.to_lean().contains("Classical.em"));
+        assert!(!script.contains_sorry());
+    }
+
+    #[test]
+    fn nested_implication_uses_intros_assumption() {
+        let goal = atom("P")
+            .implies(atom("Q"))
+            .implies(atom("P").implies(atom("Q")));
+        let result = ProofResult {
+            valid: true,
+            proof_steps: vec![ProofStepLogic {
+                step_number: 1,
+                rule: "Modus Ponens".to_string(),
+                formula: "(P → Q) → P → Q".to_string(),
+                justification: "deducibility".to_string(),
+            }],
+            phi: 0.5,
+            description: "MP deducibility".to_string(),
+        };
+        let script = proof_result_to_lean("mp_ded", &goal, &result);
+        let rendered = script.to_lean();
+        // Either term-mode (rhs == lhs) or intros/assumption.
+        assert!(rendered.contains("fun h => h") || rendered.contains("intros; assumption"));
         assert!(!script.contains_sorry());
     }
 

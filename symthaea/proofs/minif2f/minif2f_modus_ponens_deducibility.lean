@@ -5,4 +5,4 @@ variable (P : Prop)
 variable (Q : Prop)
 
 theorem minif2f_modus_ponens_deducibility : ((P → Q) → (P → Q)) := by
-  tauto
+  exact fun h => h

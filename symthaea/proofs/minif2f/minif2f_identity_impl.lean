@@ -4,4 +4,4 @@
 variable (P : Prop)
 
 theorem minif2f_identity_impl : (P → P) := by
-  tauto
+  exact fun h => h

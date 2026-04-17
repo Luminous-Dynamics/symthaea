@@ -4,4 +4,4 @@
 variable (P : Prop)
 
 theorem minif2f_excluded_middle : (P ∨ (¬ P)) := by
-  tauto
+  exact Classical.em P

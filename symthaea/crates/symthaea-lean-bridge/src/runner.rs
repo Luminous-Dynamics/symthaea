@@ -36,10 +36,15 @@ fn resolve_lean_binary() -> String {
     std::env::var("LEAN_PATH_BIN").unwrap_or_else(|_| "lean".to_string())
 }
 
-/// Run `lean --check <path>` and classify the outcome.
+/// Run `lean <path>` and classify the outcome.
+///
+/// In Lean 4, invoking `lean` on a source file type-checks it; there is no
+/// separate `--check` flag (that was a Lean 3 convention). A zero exit code
+/// means the file type-checked with no errors. Any stderr output from a
+/// successful run is informational (e.g. #check statements), not errors.
 pub fn check_with_lean4<P: AsRef<Path>>(path: P) -> CheckOutcome {
     let bin = resolve_lean_binary();
-    let output = match Command::new(&bin).arg("--check").arg(path.as_ref()).output() {
+    let output = match Command::new(&bin).arg(path.as_ref()).output() {
         Ok(o) => o,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             return CheckOutcome::LeanNotInstalled;
@@ -50,8 +55,11 @@ pub fn check_with_lean4<P: AsRef<Path>>(path: P) -> CheckOutcome {
     if output.status.success() {
         CheckOutcome::Accepted
     } else {
-        let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
-        CheckOutcome::Rejected(stderr)
+        // Lean writes errors to stdout in its default output mode, not stderr.
+        // Merge both so the rejection string is useful for triage.
+        let mut combined = String::from_utf8_lossy(&output.stdout).into_owned();
+        combined.push_str(&String::from_utf8_lossy(&output.stderr));
+        CheckOutcome::Rejected(combined)
     }
 }
 

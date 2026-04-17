@@ -118,6 +118,13 @@
           # the full Phase 5 verification path available in the dev shell.
           z3
 
+          # Lean 4 — symthaea-lean-bridge emits .lean proof scripts and
+          # the `LEAN_CHECK=1 cargo run -p symthaea-lean-bridge --example
+          # prove_minif2f` path invokes `lean --check`. Listing it here
+          # makes the Phase 1 external-verify gate (miniF2F, PutnamBench)
+          # available inside the dev shell without elan on the host.
+          lean4
+
           # MuJoCo 3.3.7 physics engine (for symthaea-flight mujoco feature)
           mujoco337
           glfw
