@@ -131,31 +131,40 @@ fn main() {
     }
     println!();
 
-    println!("━━━ Best per seed ━━━");
+    // Session 28: dump all invariants per seed, not just best.
+    // Question this answers: when energy isn't recovered as "best", does
+    // the returned pool still CONTAIN energy-like shapes?
+    //   - If yes, multi-invariant is a SELECTION problem (we just need
+    //     better top-K filtering by structural diversity).
+    //   - If no, multi-invariant is a DISCOVERY problem (GP never even
+    //     samples the energy shape because of convergence to ang_mom).
+    println!("━━━ All invariants per seed (Session 28 diagnostic) ━━━");
     let mut found_ang_mom = 0;
     let mut found_energy_like = 0;
     let mut found_inv_r = 0;
+    let mut pool_any_energy_like = 0;
+    let mut pool_any_inv_r = 0;
     for &seed in SEEDS {
         let invs = run_kepler(seed, &priors);
-        let best = invs
-            .iter()
-            .min_by(|a, b| {
-                a.variance
-                    .partial_cmp(&b.variance)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            })
-            .map(|b| b.clone());
-
-        match best {
-            Some(b) => {
-                let f = &b.formula_str;
-                let has_ang_mom =
-                    f.contains("(x * vy)") && f.contains("(y * vx)") && f.contains("-");
-                let has_energy_like = (f.contains("(vx ^ 2)") || f.contains("(vy ^ 2)"))
-                    && f.contains("sqrt")
-                    && (f.contains("(x ^ 2)") || f.contains("(y ^ 2)"));
-                let has_inv_r =
-                    f.contains("(1 / sqrt") && f.contains("(x ^ 2)") && f.contains("(y ^ 2)");
+        println!("\n  seed={} — {} invariant(s) returned", seed, invs.len());
+        let mut seed_has_energy_like_in_pool = false;
+        let mut seed_has_inv_r_in_pool = false;
+        for (rank, inv) in invs.iter().enumerate() {
+            let f = &inv.formula_str;
+            let has_ang_mom =
+                f.contains("(x * vy)") && f.contains("(y * vx)") && f.contains("-");
+            let has_energy_like = (f.contains("(vx ^ 2)") || f.contains("(vy ^ 2)"))
+                && f.contains("sqrt")
+                && (f.contains("(x ^ 2)") || f.contains("(y ^ 2)"));
+            let has_inv_r =
+                f.contains("(1 / sqrt") && f.contains("(x ^ 2)") && f.contains("(y ^ 2)");
+            if has_energy_like {
+                seed_has_energy_like_in_pool = true;
+            }
+            if has_inv_r {
+                seed_has_inv_r_in_pool = true;
+            }
+            if rank == 0 {
                 if has_ang_mom {
                     found_ang_mom += 1;
                 }
@@ -165,27 +174,34 @@ fn main() {
                 if has_inv_r {
                     found_inv_r += 1;
                 }
-                let tag = if has_energy_like {
-                    "✓ ENERGY-LIKE"
-                } else if has_ang_mom {
-                    "✓ angular momentum"
-                } else if has_inv_r {
-                    "~ partial (1/r)"
-                } else {
-                    "— other"
-                };
-                println!(
-                    "  seed={:<6} var={:.3e} cplx={:<2} {}  formula={}",
-                    seed, b.variance, b.complexity, tag, f
-                );
             }
-            None => {
-                println!("  seed={:<6} <no invariants returned>", seed);
-            }
+            let tag = if has_energy_like {
+                "✓ ENERGY-LIKE"
+            } else if has_ang_mom {
+                "✓ ang-mom"
+            } else if has_inv_r {
+                "~ contains 1/r"
+            } else {
+                "— other"
+            };
+            println!(
+                "    [{:>2}] var={:.3e} cplx={:<2} {}  formula={}",
+                rank + 1,
+                inv.variance,
+                inv.complexity,
+                tag,
+                f
+            );
+        }
+        if seed_has_energy_like_in_pool {
+            pool_any_energy_like += 1;
+        }
+        if seed_has_inv_r_in_pool {
+            pool_any_inv_r += 1;
         }
     }
 
-    println!("\n━━━ Summary ━━━");
+    println!("\n━━━ Summary (best only) ━━━");
     println!(
         "  Angular momentum recognized (x*vy - y*vx):  {} / {}",
         found_ang_mom,
@@ -201,6 +217,32 @@ fn main() {
         found_inv_r,
         SEEDS.len()
     );
+
+    println!("\n━━━ Session 28 diagnostic: pool-wide discovery ━━━");
+    println!(
+        "  Seeds with ANY energy-like shape in top-10:  {} / {}",
+        pool_any_energy_like,
+        SEEDS.len()
+    );
+    println!(
+        "  Seeds with ANY 1/r-containing shape in top-10: {} / {}",
+        pool_any_inv_r,
+        SEEDS.len()
+    );
+    println!();
+    if pool_any_energy_like >= 3 {
+        println!("  → DIAGNOSIS: multi-invariant is a SELECTION problem.");
+        println!("    GP discovers energy-shaped expressions but variance selection");
+        println!("    filters them behind ang_mom. Fix: structural-diversity top-K.");
+    } else if pool_any_inv_r >= 3 {
+        println!("  → DIAGNOSIS: partial — 1/r appears but not full energy composite.");
+        println!("    GP preserves the inv_r prior but doesn't compose it with v².");
+        println!("    Fix: bias composition toward distinct-prior-set parents.");
+    } else {
+        println!("  → DIAGNOSIS: multi-invariant is a DISCOVERY problem.");
+        println!("    GP never even samples energy shapes — ang_mom basin dominates.");
+        println!("    Fix: parallel populations or residual-search after S-1 finds ang_mom.");
+    }
 
     println!("\n━━━ Verdict ━━━");
     if found_energy_like >= 3 {
