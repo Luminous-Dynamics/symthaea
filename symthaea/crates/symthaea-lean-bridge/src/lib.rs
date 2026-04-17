@@ -29,6 +29,7 @@
 //! - [`runner`]: subprocess wrapper around `lean4 --check`.
 
 pub mod bridge;
+pub mod fol_ext_bridge; // Phase 2: FolFormulaExt → Lean proof script w/ Mathlib
 pub mod term;
 pub mod tactic;
 pub mod z3_to_lean;
