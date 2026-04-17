@@ -55,6 +55,10 @@ enum Command {
     CastVote(VoteInput),
     /// Maps to proposals coordinator: get_active_proposals(())
     QueryActiveProposals,
+    /// Maps to proposals coordinator: get_proposal(proposal_id). Direct
+    /// lookup by ID; returns None if not found. Bypasses the Draft→Active
+    /// state machine that `QueryActiveProposals` requires.
+    GetProposal { proposal_id: String },
     /// Maps to finance/finance_bridge: query_tend_balance({member_did})
     QueryTendBalance { member_did: String },
 }
@@ -369,6 +373,9 @@ async fn dispatch(ws: &AppWebsocket, role: &str, cmd: Command) -> BridgeResponse
         Command::CastVote(input) => call_zome(ws, role, "voting", "cast_vote", &input).await,
         Command::QueryActiveProposals => {
             call_zome(ws, role, "proposals", "get_active_proposals", &()).await
+        }
+        Command::GetProposal { proposal_id } => {
+            call_zome(ws, role, "proposals", "get_proposal", &proposal_id).await
         }
         Command::QueryTendBalance { member_did } => {
             // TEND balances live on the finance role, not governance — ignore
