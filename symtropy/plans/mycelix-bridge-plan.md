@@ -1,6 +1,36 @@
 # Plan: `symtropy-mycelix-bridge`
 
-**Status:** Planning · **Author:** Claude + Tristan · **Date:** 2026-04-17 · **Roadmap:** Phase 1, Track B
+**Status:** ✅ **Milestone 1 shipped 2026-04-17** · Author: Claude + Tristan · Roadmap: Phase 1, Track B
+
+## Status board
+
+| Milestone | Status | Commit |
+|---|---|---|
+| M1 — Spike | ✅ Complete | `91408552cd` |
+| M2 — Event API + 3 zome calls | Pending | — |
+| M3 — Scenario harness | Pending | — |
+| M4 — 50-NPC visual demo | Pending | — |
+
+## Architectural pivot landed in M1
+
+The original plan called for wrapping `symthaea-mycelix-holochain` as a Bevy Resource. That hit a hard dependency wall: `holochain_client 0.6.0` exact-pins `serde = 1.0.203`, Bevy 0.18 requires `serde_core >= 1.0.221` via `hashbrown 0.16`. Not resolvable in one compilation unit.
+
+**Resolution:** run the Holochain client as a **separate process** and pipe JSON over stdin/stdout. The crate `mycelix-conductor-bridge` already implements this protocol — so the bridge spawns it as a child process rather than linking it.
+
+**Why this is better than the original plan:**
+
+1. Zero Holochain dependencies in the Bevy crate — no serde conflict possible.
+2. Process isolation: a crash or hang in the Holochain client doesn't crash the game.
+3. The `mycelix-conductor-bridge` subprocess is reusable by other hosts (e.g., test runners, CLI tools) with no changes.
+4. If either Bevy or Holochain bumps serde again, nothing in this crate breaks.
+5. License surface shrinks: this crate could be permissively licensed since it has no AGPL deps in its graph. (We're keeping it AGPL because it's Mycelix-specific glue; that's a policy choice, not a technical requirement.)
+
+**Cost:** subprocess IPC has per-request latency (~1 ms for JSON parse + syscall) and a startup cost (~1 s for conductor auth). Acceptable for the game-loop budget (5–10 Hz per NPC) — negligible next to the 4 ms of an actual zome call.
+
+**What the plan below should be read as:** M1's "Design" and "Threading model" sections were written for the in-process architecture. The shipped implementation is subprocess-based. M2–M4 sections are still accurate except where they assume typed Rust methods on `GovernanceDispatcher`; those translate to JSON variants in the subprocess protocol.
+
+---
+
 
 ## Goal
 
@@ -168,11 +198,14 @@ These are **the real Phase 1 deliverable** — the Bevy Resource is plumbing; th
 
 ### Milestone 2 — Event API + 3 zome calls (1 day)
 
-- `MycelixRequest` / `MycelixResponse` enums with variants for: get_active_proposals, submit_proposal, query_tend_balance.
-- `pump_requests` / `pump_responses` systems.
-- Integration test: spawn 5 entities, each submits one proposal, all proposals appear in the next tick's get_active_proposals response.
+- Add `MycelixRequest::SubmitProposal { requester, text, did }` and `MycelixRequest::Vote { requester, proposal_hash, approve, did }` variants. (`GetActiveProposals` already shipped in M1.)
+- Add corresponding `MycelixResponse` variants (`ProposalSubmitted { action_hash }`, `VoteCast { proposal_hash }`).
+- Extend `WireCommand` + `WireResponse` in `systems.rs` to map these to the JSON protocol already spoken by `mycelix-conductor-bridge`. The subprocess side already supports `SubmitProposal` and `CastVote` — no subprocess changes needed.
+- Add `MycelixRequest::QueryTendBalance { requester, did }`. This requires a new subprocess command — extend `mycelix-conductor-bridge::Command` enum with `QueryTendBalance`, plumb through to `FinanceDispatcher::query_tend_balance`.
+- Correlation: upgrade from FIFO to request-ID. Each request carries a `u64` correlation id; responses include it.
+- Integration test: spawn 5 entities, each submits one proposal, all proposals appear in the next tick's `GetActiveProposals` response.
 
-**Gate:** 5-entity test passes reliably.
+**Gate:** 5-entity test passes reliably against a running conductor.
 
 ### Milestone 3 — Scenario harness (1 day)
 
@@ -224,13 +257,18 @@ Players of a native Symtropy game see Track C screens reading real Mycelix state
 
 Users of the permissive core crates (`symtropy-math`, `-physics`, `-bevy-core`) are unaffected — they simply don't take this dep.
 
-## Decision points for user
+## Decision points
 
-Before starting Milestone 1:
+All four M1 decisions confirmed 2026-04-17:
 
-- [ ] **Confirm crate location.** Top-level sibling `/srv/luminous-dynamics/symtropy-mycelix-bridge/` (matching `mycelix-conductor-bridge` pattern), not inside `symtropy/crates/`. OK?
-- [ ] **Confirm zome scope for milestone 2.** Governance + finance only, or add commons/civic?
-- [ ] **CI strategy.** Mock transport for PR CI, real conductor for nightly — OK?
-- [ ] **Kickoff timing.** Next session? Separate worktree per the Praxis pattern?
+- [x] **Crate location:** top-level sibling `/srv/luminous-dynamics/symtropy-mycelix-bridge/`. (Post-pivot: the serde-conflict rationale went away, but keeping it as a top-level sibling for cohesion with `mycelix-conductor-bridge` and `symthaea-mycelix-holochain` is still the right call.)
+- [x] **Zome scope for M2:** governance + finance only (no commons/civic in M2; expand once the pipeline is proven).
+- [x] **CI strategy:** mock transport for PRs (fast), real conductor for nightlies.
+- [x] **Kickoff:** M1 completed in worktree `session-mycelix-bridge-m1` (branch `worktree-session-mycelix-bridge-m1`). Same pattern for M2+.
 
-Once these are answered, Milestone 1 is a clean 4-hour task.
+## Pending decisions for M2
+
+- [ ] **Worktree re-use.** Continue in `session-mycelix-bridge-m1` or spin up `session-mycelix-bridge-m2`? (Recommendation: new worktree, so the M1 delta stays reviewable independently.)
+- [ ] **Subprocess command extension.** `mycelix-conductor-bridge` needs `QueryTendBalance`, `QueryActiveProposals` (and possibly others). Contribute to that crate directly, or fork into a symtropy-specific variant? (Recommendation: direct contribution — it's a small additive change and benefits other consumers.)
+- [ ] **Correlation id protocol.** Add `id` field to `WireCommand` + `WireResponse`? (Recommendation: yes. FIFO correlation is too fragile once requests can fail or arrive out of order.)
+
