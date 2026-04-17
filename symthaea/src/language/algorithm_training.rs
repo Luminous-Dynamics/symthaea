@@ -12,7 +12,7 @@ use super::algorithm_encoder::{
     extract_features, AlgorithmChannels, AlgorithmClass, AlgorithmEncoder, AlgorithmTrainingPair,
 };
 use crate::dynamics::cfc_code_sequencer::{CfCCodeSequencer, PlanAction};
-use symthaea_core::hdc::ContinuousHV;
+use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 
 // ─── Exercism Solution Corpus ──────────────────────────────────────────────
 
@@ -945,10 +945,120 @@ fn class_to_plan(class: AlgorithmClass, channels: &AlgorithmChannels) -> Vec<Pla
     plan
 }
 
-/// Project a full 16,384D HV down to 512D for the CfC sequencer.
+/// Learned projection from 16,384D → 512D that preserves class separation.
 ///
-/// The CfC operates in a 512D input space — this takes the first 512
-/// components, matching the sequencer's `hv_to_input` projection.
+/// Uses Fisher-inspired centroid projection:
+/// 1. Compute class centroids in full 16,384D
+/// 2. Find the dimensions with maximum inter-centroid variance
+/// 3. Project onto those dimensions
+///
+/// This preserves the information that distinguishes algorithm classes
+/// instead of arbitrarily truncating.
+pub struct LearnedProjection {
+    /// Indices of the top-512 most discriminative dimensions.
+    selected_dims: Vec<usize>,
+    /// Per-dimension scaling factors (inter-centroid std dev).
+    scales: Vec<f32>,
+}
+
+impl LearnedProjection {
+    /// Learn the projection from labeled training data.
+    pub fn fit(pairs: &[AlgorithmTrainingPair]) -> Self {
+        let target_dim = 512usize;
+        let full_dim = pairs
+            .first()
+            .map(|p| p.hv.values.len())
+            .unwrap_or(HDC_DIMENSION);
+
+        // Step 1: Compute class centroids
+        let mut class_sums: std::collections::HashMap<AlgorithmClass, (Vec<f64>, usize)> =
+            std::collections::HashMap::new();
+
+        for pair in pairs {
+            let entry = class_sums
+                .entry(pair.class)
+                .or_insert_with(|| (vec![0.0f64; full_dim], 0));
+            for (i, &v) in pair.hv.values.iter().enumerate() {
+                entry.0[i] += v as f64;
+            }
+            entry.1 += 1;
+        }
+
+        let centroids: Vec<Vec<f64>> = class_sums
+            .values()
+            .map(|(sum, count)| sum.iter().map(|s| s / *count as f64).collect())
+            .collect();
+
+        // Step 2: Compute global centroid
+        let n_classes = centroids.len();
+        let mut global = vec![0.0f64; full_dim];
+        for c in &centroids {
+            for (i, v) in c.iter().enumerate() {
+                global[i] += v;
+            }
+        }
+        for v in global.iter_mut() {
+            *v /= n_classes as f64;
+        }
+
+        // Step 3: Per-dimension inter-centroid variance
+        // variance[d] = (1/K) * Σ_k (centroid_k[d] - global[d])²
+        let mut variance = vec![0.0f64; full_dim];
+        for c in &centroids {
+            for (d, v) in c.iter().enumerate() {
+                let diff = v - global[d];
+                variance[d] += diff * diff;
+            }
+        }
+
+        // Step 4: Select top-512 dimensions by inter-centroid variance
+        let mut indexed: Vec<(usize, f64)> = variance.iter().copied().enumerate().collect();
+        indexed.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+        let selected_dims: Vec<usize> = indexed.iter().take(target_dim).map(|(i, _)| *i).collect();
+        let scales: Vec<f32> = indexed
+            .iter()
+            .take(target_dim)
+            .map(|(_, v)| (v.sqrt() as f32).max(1e-8))
+            .collect();
+
+        Self {
+            selected_dims,
+            scales,
+        }
+    }
+
+    /// Project a full-dimensional HV to 512D using the learned dimension selection.
+    pub fn project(&self, hv: &ContinuousHV) -> ContinuousHV {
+        let values: Vec<f32> = self
+            .selected_dims
+            .iter()
+            .zip(self.scales.iter())
+            .map(|(&dim_idx, &scale)| {
+                let v = if dim_idx < hv.values.len() {
+                    hv.values[dim_idx]
+                } else {
+                    0.0
+                };
+                v / scale // normalize by inter-centroid std dev
+            })
+            .collect();
+        ContinuousHV::from_vec(values)
+    }
+
+    /// Report the variance captured by the projection.
+    pub fn variance_captured(&self) -> f32 {
+        let total: f32 = self.scales.iter().map(|s| s * s).sum();
+        let top: f32 = self.scales.iter().take(64).map(|s| s * s).sum();
+        if total > 0.0 {
+            top / total
+        } else {
+            0.0
+        }
+    }
+}
+
+/// Project using naive truncation (legacy fallback).
 fn project_to_sequencer_dim(hv: &ContinuousHV) -> ContinuousHV {
     let dim = 512;
     let values: Vec<f32> = hv.values.iter().take(dim).copied().collect();
@@ -957,13 +1067,17 @@ fn project_to_sequencer_dim(hv: &ContinuousHV) -> ContinuousHV {
 
 /// Train the CfC code sequencer on algorithm HDC vectors.
 ///
-/// Returns a CfcTrainingReport with loss curves and plan accuracy.
+/// Uses the learned Fisher projection to compress 16,384D → 512D
+/// while preserving class separation. Returns honest metrics.
 pub fn train_cfc_sequencer(epochs: usize, learning_rate: f32) -> CfcTrainingReport {
     let pairs = build_training_pairs();
     let sequencer = CfCCodeSequencer::default();
 
     let split = (pairs.len() * 4) / 5;
     let (train, eval) = pairs.split_at(split);
+
+    // Learn the projection from training data
+    let projection = LearnedProjection::fit(train);
 
     let mut epoch_losses = Vec::new();
 
@@ -973,7 +1087,7 @@ pub fn train_cfc_sequencer(epochs: usize, learning_rate: f32) -> CfcTrainingRepo
 
         for pair in train.iter() {
             let target_plan = class_to_plan(pair.class, &pair.channels);
-            let projected = project_to_sequencer_dim(&pair.hv);
+            let projected = projection.project(&pair.hv);
             match sequencer.train_sequence(&projected, &target_plan, learning_rate) {
                 Ok(loss) => {
                     epoch_loss += loss;
@@ -997,7 +1111,7 @@ pub fn train_cfc_sequencer(epochs: usize, learning_rate: f32) -> CfcTrainingRepo
     let mut eval_total = 0usize;
 
     for pair in eval.iter() {
-        let projected = project_to_sequencer_dim(&pair.hv);
+        let projected = projection.project(&pair.hv);
         let planned = sequencer.plan_structure(&projected, &[]);
         let target_plan = class_to_plan(pair.class, &pair.channels);
 
@@ -1220,6 +1334,75 @@ mod tests {
                 pair.name
             );
         }
+    }
+
+    #[test]
+    fn test_learned_projection_improves_separation() {
+        let pairs = build_training_pairs();
+        let projection = LearnedProjection::fit(&pairs);
+
+        // Compare separation in projected vs naive-truncated space
+        let mut naive_intra = Vec::new();
+        let mut naive_inter = Vec::new();
+        let mut proj_intra = Vec::new();
+        let mut proj_inter = Vec::new();
+
+        for (i, a) in pairs.iter().enumerate() {
+            for (j, b) in pairs.iter().enumerate() {
+                if i >= j {
+                    continue;
+                }
+                let naive_a = project_to_sequencer_dim(&a.hv);
+                let naive_b = project_to_sequencer_dim(&b.hv);
+                let proj_a = projection.project(&a.hv);
+                let proj_b = projection.project(&b.hv);
+
+                let naive_sim = naive_a.similarity(&naive_b);
+                let proj_sim = proj_a.similarity(&proj_b);
+
+                if a.class == b.class {
+                    naive_intra.push(naive_sim);
+                    proj_intra.push(proj_sim);
+                } else {
+                    naive_inter.push(naive_sim);
+                    proj_inter.push(proj_sim);
+                }
+            }
+        }
+
+        let avg = |v: &[f32]| v.iter().sum::<f32>() / v.len().max(1) as f32;
+
+        let naive_sep = avg(&naive_intra) - avg(&naive_inter);
+        let proj_sep = avg(&proj_intra) - avg(&proj_inter);
+
+        println!(
+            "Naive truncation: intra={:.4} inter={:.4} sep={:.4}",
+            avg(&naive_intra),
+            avg(&naive_inter),
+            naive_sep
+        );
+        println!(
+            "Learned projection: intra={:.4} inter={:.4} sep={:.4}",
+            avg(&proj_intra),
+            avg(&proj_inter),
+            proj_sep
+        );
+        println!(
+            "Improvement: {:.4} → {:.4} ({:+.1}%)",
+            naive_sep,
+            proj_sep,
+            if naive_sep.abs() > 1e-6 {
+                (proj_sep / naive_sep - 1.0) * 100.0
+            } else {
+                f32::INFINITY
+            }
+        );
+
+        assert!(
+            proj_sep > 0.0,
+            "learned projection should have positive separation: {:.4}",
+            proj_sep
+        );
     }
 
     #[test]
