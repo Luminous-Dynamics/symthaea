@@ -134,6 +134,11 @@ impl CognitiveLoopService {
         if !aux_sensor_hvs.is_empty() {
             aux_sensor_hvs.insert(0, encoding.hv16_cached);
             encoding.hv16_cached = crate::hdc::BinaryHV::bundle(&aux_sensor_hvs);
+            // Keep the continuous view in sync — the CfC input path at
+            // cycle_strategy.rs:464 reads encoding_result.hdv (not hv16_cached),
+            // so without this line the blended sensors would never reach the
+            // thought-vector generator.
+            encoding.encoding_result.hdv = encoding.hv16_cached.to_continuous();
         }
 
         // ACh-modulated scene memory thresholds
