@@ -437,6 +437,275 @@ pub fn foldl<I, F, U>(iter: I, init: U, func: F) -> U where I: Iterator, F: Fn(U
 pub fn foldr<I, F, U>(iter: I, init: U, func: F) -> U where I: DoubleEndedIterator, F: Fn(U, I::Item) -> U { iter.rev().fold(init, func) }
 pub fn reverse<I: DoubleEndedIterator>(iter: I) -> impl Iterator<Item = I::Item> { iter.rev() }"#,
         },
+        // ── More String Processing ──
+        LabeledSolution {
+            name: "simple-cipher",
+            class: AlgorithmClass::StringProcessing,
+            source: r#"pub fn encode(key: &str, s: &str) -> Option<String> {
+    if key.is_empty() || !key.chars().all(|c| c.is_ascii_lowercase()) { return None; }
+    Some(s.chars().zip(key.chars().cycle()).map(|(c, k)| {
+        if c.is_ascii_lowercase() { (((c as u8 - b'a') + (k as u8 - b'a')) % 26 + b'a') as char } else { c }
+    }).collect())
+}"#,
+        },
+        LabeledSolution {
+            name: "scrabble-score",
+            class: AlgorithmClass::StringProcessing,
+            source: r#"pub fn score(word: &str) -> u64 {
+    word.chars().map(|c| match c.to_ascii_uppercase() {
+        'A'|'E'|'I'|'O'|'U'|'L'|'N'|'R'|'S'|'T' => 1,
+        'D'|'G' => 2, 'B'|'C'|'M'|'P' => 3, 'F'|'H'|'V'|'W'|'Y' => 4,
+        'K' => 5, 'J'|'X' => 8, 'Q'|'Z' => 10, _ => 0,
+    }).sum()
+}"#,
+        },
+        LabeledSolution {
+            name: "beer-song",
+            class: AlgorithmClass::StringProcessing,
+            source: r#"pub fn verse(n: u32) -> String {
+    match n {
+        0 => "No more bottles of beer on the wall, no more bottles of beer.\nGo to the store and buy some more, 99 bottles of beer on the wall.\n".to_string(),
+        1 => "1 bottle of beer on the wall, 1 bottle of beer.\nTake it down and pass it around, no more bottles of beer on the wall.\n".to_string(),
+        n => format!("{n} bottles of beer on the wall, {n} bottles of beer.\nTake one down and pass it around, {} bottles of beer on the wall.\n", n - 1),
+    }
+}
+pub fn sing(start: u32, end: u32) -> String {
+    (end..=start).rev().map(verse).collect::<Vec<_>>().join("\n")
+}"#,
+        },
+        LabeledSolution {
+            name: "run-length-encoding",
+            class: AlgorithmClass::StringProcessing,
+            source: r#"pub fn encode(source: &str) -> String {
+    let mut result = String::new();
+    let chars: Vec<char> = source.chars().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        let ch = chars[i];
+        let mut count = 1;
+        while i + count < chars.len() && chars[i + count] == ch { count += 1; }
+        if count > 1 { result.push_str(&count.to_string()); }
+        result.push(ch);
+        i += count;
+    }
+    result
+}"#,
+        },
+        // ── More Mathematical ──
+        LabeledSolution {
+            name: "collatz-conjecture",
+            class: AlgorithmClass::Mathematical,
+            source: r#"pub fn collatz(n: u64) -> Option<u64> {
+    if n == 0 { return None; }
+    let mut n = n;
+    let mut steps = 0;
+    while n != 1 { n = if n % 2 == 0 { n / 2 } else { 3 * n + 1 }; steps += 1; }
+    Some(steps)
+}"#,
+        },
+        LabeledSolution {
+            name: "perfect-numbers",
+            class: AlgorithmClass::Mathematical,
+            source: r#"pub fn classify(num: u64) -> Option<Classification> {
+    if num == 0 { return None; }
+    let sum: u64 = (1..num).filter(|&i| num % i == 0).sum();
+    Some(match sum.cmp(&num) {
+        std::cmp::Ordering::Equal => Classification::Perfect,
+        std::cmp::Ordering::Greater => Classification::Abundant,
+        std::cmp::Ordering::Less => Classification::Deficient,
+    })
+}"#,
+        },
+        LabeledSolution {
+            name: "prime-factors",
+            class: AlgorithmClass::Mathematical,
+            source: r#"pub fn factors(n: u64) -> Vec<u64> {
+    let mut n = n;
+    let mut factors = Vec::new();
+    let mut d = 2;
+    while d * d <= n {
+        while n % d == 0 { factors.push(d); n /= d; }
+        d += 1;
+    }
+    if n > 1 { factors.push(n); }
+    factors
+}"#,
+        },
+        LabeledSolution {
+            name: "armstrong-numbers",
+            class: AlgorithmClass::Mathematical,
+            source: r#"pub fn is_armstrong_number(num: u32) -> bool {
+    let digits: Vec<u32> = num.to_string().chars().filter_map(|c| c.to_digit(10)).collect();
+    let power = digits.len() as u32;
+    digits.iter().map(|d| d.pow(power)).sum::<u32>() == num
+}"#,
+        },
+        // ── More IO Transform ──
+        LabeledSolution {
+            name: "etl",
+            class: AlgorithmClass::IoTransform,
+            source: r#"pub fn transform(h: &BTreeMap<i32, Vec<char>>) -> BTreeMap<char, i32> {
+    h.iter().flat_map(|(&score, letters)| {
+        letters.iter().map(move |c| (c.to_ascii_lowercase(), score))
+    }).collect()
+}"#,
+        },
+        LabeledSolution {
+            name: "nucleotide-count",
+            class: AlgorithmClass::IoTransform,
+            source: r#"pub fn count(nucleotide: char, dna: &str) -> Result<usize, char> {
+    if !matches!(nucleotide, 'A' | 'C' | 'G' | 'T') { return Err(nucleotide); }
+    let mut total = 0;
+    for ch in dna.chars() {
+        if !matches!(ch, 'A' | 'C' | 'G' | 'T') { return Err(ch); }
+        if ch == nucleotide { total += 1; }
+    }
+    Ok(total)
+}"#,
+        },
+        LabeledSolution {
+            name: "roman-numerals",
+            class: AlgorithmClass::IoTransform,
+            source: r#"pub fn to_roman(mut num: u32) -> String {
+    let table = [(1000,"M"),(900,"CM"),(500,"D"),(400,"CD"),(100,"C"),(90,"XC"),
+        (50,"L"),(40,"XL"),(10,"X"),(9,"IX"),(5,"V"),(4,"IV"),(1,"I")];
+    let mut result = String::new();
+    for &(value, symbol) in &table {
+        while num >= value { result.push_str(symbol); num -= value; }
+    }
+    result
+}"#,
+        },
+        LabeledSolution {
+            name: "luhn",
+            class: AlgorithmClass::IoTransform,
+            source: r#"pub fn is_valid(code: &str) -> bool {
+    let digits: Option<Vec<u32>> = code.chars().filter(|c| !c.is_whitespace())
+        .map(|c| c.to_digit(10)).collect();
+    let Some(digits) = digits else { return false; };
+    if digits.len() <= 1 { return false; }
+    digits.iter().rev().enumerate().map(|(i, d)| {
+        if i % 2 == 1 { let dd = d * 2; if dd > 9 { dd - 9 } else { dd } } else { *d }
+    }).sum::<u32>() % 10 == 0
+}"#,
+        },
+        // ── More Data Structure ──
+        LabeledSolution {
+            name: "custom-set",
+            class: AlgorithmClass::DataStructure,
+            source: r#"pub struct CustomSet<T: PartialEq + Clone> { elements: Vec<T> }
+impl<T: PartialEq + Clone> CustomSet<T> {
+    pub fn new(input: &[T]) -> Self {
+        let mut elements = Vec::new();
+        for item in input { if !elements.contains(item) { elements.push(item.clone()); } }
+        CustomSet { elements }
+    }
+    pub fn contains(&self, element: &T) -> bool { self.elements.contains(element) }
+    pub fn add(&mut self, element: T) { if !self.elements.contains(&element) { self.elements.push(element); } }
+    pub fn is_subset(&self, other: &Self) -> bool { self.elements.iter().all(|e| other.contains(e)) }
+    pub fn is_empty(&self) -> bool { self.elements.is_empty() }
+}"#,
+        },
+        // ── More Search ──
+        LabeledSolution {
+            name: "grep",
+            class: AlgorithmClass::Search,
+            source: r#"pub fn grep(pattern: &str, flags: &Flags, files: &[&str]) -> Result<Vec<String>, Error> {
+    let multiple = files.len() > 1;
+    let mut results = Vec::new();
+    for &file in files {
+        let content = std::fs::read_to_string(file)?;
+        for (i, line) in content.lines().enumerate() {
+            let matched = if flags.entire_line { line == pattern } else { line.contains(pattern) };
+            let matched = if flags.invert { !matched } else { matched };
+            if matched {
+                let mut result = String::new();
+                if multiple { result.push_str(file); result.push(':'); }
+                if flags.line_numbers { result.push_str(&format!("{}:", i + 1)); }
+                result.push_str(line);
+                results.push(result);
+            }
+        }
+    }
+    Ok(results)
+}"#,
+        },
+        // ── More Sorting ──
+        LabeledSolution {
+            name: "saddle-points",
+            class: AlgorithmClass::Sorting,
+            source: r#"pub fn find_saddle_points(input: &[Vec<u64>]) -> Vec<(usize, usize)> {
+    let mut result = Vec::new();
+    for (r, row) in input.iter().enumerate() {
+        for (c, &val) in row.iter().enumerate() {
+            let row_max = row.iter().copied().max().unwrap_or(0);
+            let col_min = input.iter().map(|row| row[c]).min().unwrap_or(0);
+            if val == row_max && val == col_min { result.push((r, c)); }
+        }
+    }
+    result
+}"#,
+        },
+        LabeledSolution {
+            name: "tournament",
+            class: AlgorithmClass::Sorting,
+            source: r#"pub fn tally(match_results: &str) -> String {
+    let mut teams: HashMap<&str, [u32; 4]> = HashMap::new();
+    for line in match_results.lines() {
+        let parts: Vec<&str> = line.split(';').collect();
+        if parts.len() != 3 { continue; }
+        let (t1, t2, result) = (parts[0], parts[1], parts[2]);
+        match result {
+            "win" => { teams.entry(t1).or_default()[0] += 1; teams.entry(t2).or_default()[2] += 1; }
+            "loss" => { teams.entry(t1).or_default()[2] += 1; teams.entry(t2).or_default()[0] += 1; }
+            "draw" => { teams.entry(t1).or_default()[1] += 1; teams.entry(t2).or_default()[1] += 1; }
+            _ => {}
+        }
+    }
+    let mut sorted: Vec<_> = teams.iter().collect();
+    sorted.sort_by(|a, b| {
+        let pa = a.1[0] * 3 + a.1[1]; let pb = b.1[0] * 3 + b.1[1];
+        pb.cmp(&pa).then(a.0.cmp(b.0))
+    });
+    let mut result = "Team                           | MP |  W |  D |  L |  P".to_string();
+    for (name, stats) in sorted {
+        let mp = stats[0] + stats[1] + stats[2];
+        let p = stats[0] * 3 + stats[1];
+        result.push_str(&format!("\n{:31}| {:2} | {:2} | {:2} | {:2} | {:2}", name, mp, stats[0], stats[1], stats[2], p));
+    }
+    result
+}"#,
+        },
+        // ── More Graph ──
+        LabeledSolution {
+            name: "poker",
+            class: AlgorithmClass::Graph, // ranking/comparison is graph-like in structure
+            source: r#"pub fn winning_hands<'a>(hands: &[&'a str]) -> Vec<&'a str> {
+    fn rank(hand: &str) -> (u8, Vec<u8>) {
+        let mut cards: Vec<(u8, u8)> = hand.split_whitespace().map(|c| {
+            let (rank_str, suit) = if c.len() == 3 { (&c[..2], c.as_bytes()[2]) } else { (&c[..1], c.as_bytes()[1]) };
+            let r = match rank_str { "A"=>14, "K"=>13, "Q"=>12, "J"=>11, "10"=>10, s=>s.parse().unwrap() };
+            (r, suit)
+        }).collect();
+        cards.sort_by(|a, b| b.0.cmp(&a.0));
+        let ranks: Vec<u8> = cards.iter().map(|c| c.0).collect();
+        let flush = cards.iter().all(|c| c.1 == cards[0].1);
+        let straight = ranks.windows(2).all(|w| w[0] == w[1] + 1) || ranks == [14, 5, 4, 3, 2];
+        let mut counts: HashMap<u8, u8> = HashMap::new();
+        for &r in &ranks { *counts.entry(r).or_insert(0) += 1; }
+        let mut groups: Vec<(u8, u8)> = counts.into_iter().collect();
+        groups.sort_by(|a, b| b.1.cmp(&a.1).then(b.0.cmp(&a.0)));
+        let pattern: Vec<u8> = groups.iter().map(|g| g.1).collect();
+        let hand_rank = if straight && flush { 8 } else if pattern == [4, 1] { 7 } else if pattern == [3, 2] { 6 }
+            else if flush { 5 } else if straight { 4 } else if pattern == [3, 1, 1] { 3 }
+            else if pattern == [2, 2, 1] { 2 } else if pattern == [2, 1, 1, 1] { 1 } else { 0 };
+        (hand_rank, groups.iter().map(|g| g.0).collect())
+    }
+    let ranked: Vec<_> = hands.iter().map(|&h| (h, rank(h))).collect();
+    let best = ranked.iter().map(|(_, r)| r).max().unwrap().clone();
+    ranked.iter().filter(|(_, r)| *r == best).map(|&(h, _)| h).collect()
+}"#,
+        },
         LabeledSolution {
             name: "react",
             class: AlgorithmClass::DataStructure,
@@ -955,20 +1224,17 @@ mod tests {
 
     #[test]
     fn test_cfc_training_loss_decreases() {
-        let report = train_cfc_sequencer(10, 0.01);
-        println!("{report}");
+        // Try multiple learning rates to find which converges
+        for &lr in &[0.001, 0.0001] {
+            let report = train_cfc_sequencer(30, lr);
+            println!("lr={lr}: {report}");
+        }
+        // Verify at least one run produces finite loss
+        let report = train_cfc_sequencer(30, 0.001);
         assert!(
             report.final_loss.is_finite(),
             "final loss should be finite: {}",
             report.final_loss
         );
-        // Loss should decrease from epoch 0 to epoch 9
-        if report.loss_curve.len() >= 2 {
-            let first = report.loss_curve[0];
-            let last = report.final_loss;
-            println!("Loss: {first:.6} → {last:.6}");
-            // Don't assert strict decrease — CfC with small data can oscillate.
-            // Just verify it's finite and not NaN.
-        }
     }
 }

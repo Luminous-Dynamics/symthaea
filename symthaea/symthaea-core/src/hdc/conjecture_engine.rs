@@ -5687,6 +5687,137 @@ pub struct AutonomousInvariant {
     pub symbolically_proven: bool,
 }
 
+/// Session 31: post-process the top-K discovered invariants by trying
+/// pairwise arithmetic combinations with constant tuning.
+///
+/// For each ordered pair (i, j) with i ≠ j, each op in
+/// {Add, Sub, Mul, Div}, and each scale c in a small grid, construct
+/// `op(c · I_i, I_j)` and score by the S30 Lie-derivative variance.
+/// Return the best composite found, **or `None` if no composite beats
+/// the best single-term baseline** (so callers can fall back to the
+/// GP's raw output).
+///
+/// Motivation (from S30 diagnosis): Kepler energy `E = 0.5·v² − 1/r`
+/// requires subtracting two distinct subexpressions that each often
+/// appear somewhere in the top-K, but random crossover + mutation
+/// rarely produces the `Sub` structure with the correct scaling in
+/// the GP's finite budget. Exhaustive pairwise search with a
+/// coefficient grid explicitly constructs those composites on top of
+/// whatever the GP already found.
+///
+/// Budget: `k·(k-1)·|OPS|·|SCALES|` Lie-variance evaluations. With
+/// `top_k=5`, ops=4, scales=6 → 480 evaluations. Each is ~200
+/// trajectory points, so ~100k expression evaluations total —
+/// negligible next to GP cost (~pop·gen ≈ 30k trajectories per run).
+pub fn compose_top_k_invariants(
+    invariants: &[AutonomousInvariant],
+    rhs: fn(&[f64], f64) -> Vec<f64>,
+    initial_state: &[f64],
+    var_names: &[&str],
+    t_max: f64,
+    dt: f64,
+    top_k: usize,
+) -> Option<AutonomousInvariant> {
+    let k = invariants.len().min(top_k);
+    if k < 2 {
+        return None;
+    }
+
+    // Reproduce the 200-point trajectory sample that
+    // `discover_invariants_autonomous` uses internally, so the
+    // composite's Lie variance is computed on the same support as the
+    // baseline single-term variances.
+    let (_t, states) = rk45_trajectory(rhs, initial_state, t_max, dt);
+    let n_samples = 200.min(states.len());
+    if n_samples < 20 {
+        return None;
+    }
+    let step = states.len() / n_samples.max(1);
+    let trajectory: Vec<Vec<f64>> = states
+        .iter()
+        .step_by(step.max(1))
+        .take(n_samples)
+        .cloned()
+        .collect();
+
+    // Baseline: the lowest Lie variance among the top-K single terms,
+    // recomputed on the same trajectory so the comparison is fair
+    // even if the input invariants were scored with a different
+    // fitness function.
+    let baseline: f64 = invariants[..k]
+        .iter()
+        .map(|inv| lie_derivative_variance(&inv.formula, rhs, &trajectory, var_names))
+        .filter(|v| v.is_finite())
+        .fold(f64::INFINITY, f64::min);
+
+    const OPS: [BinOp; 4] = [BinOp::Add, BinOp::Sub, BinOp::Mul, BinOp::Div];
+    const SCALES: [f64; 6] = [0.25, 0.5, 1.0, 2.0, -0.5, -1.0];
+
+    let mut best: Option<(Expr, f64)> = None;
+    for i in 0..k {
+        for j in 0..k {
+            if i == j {
+                continue;
+            }
+            for &op in &OPS {
+                for &c in &SCALES {
+                    let scaled_i = Expr::BinOp(
+                        BinOp::Mul,
+                        Box::new(Expr::Const(c)),
+                        Box::new(invariants[i].formula.clone()),
+                    );
+                    let composite = Expr::BinOp(
+                        op,
+                        Box::new(scaled_i),
+                        Box::new(invariants[j].formula.clone()),
+                    );
+                    let var = lie_derivative_variance(&composite, rhs, &trajectory, var_names);
+                    if !var.is_finite() {
+                        continue;
+                    }
+                    if best.as_ref().map_or(true, |(_, v)| var < *v) {
+                        best = Some((composite, var));
+                    }
+                }
+            }
+        }
+    }
+
+    let (expr, variance) = best?;
+    if !(variance < baseline) {
+        return None;
+    }
+
+    // Mean value for the returned AutonomousInvariant (for caller
+    // diagnostics; not used in the fitness decision above).
+    let mut sum = 0.0f64;
+    let mut n = 0usize;
+    for state in &trajectory {
+        let bindings: Vec<(&str, f64)> = var_names
+            .iter()
+            .zip(state.iter())
+            .map(|(name, val)| (*name, *val))
+            .collect();
+        let v = expr.eval(&bindings);
+        if v.is_finite() {
+            sum += v;
+            n += 1;
+        }
+    }
+    let mean_value = if n > 0 { sum / n as f64 } else { f64::NAN };
+    let formula_str = format!("{}", expr);
+    let complexity = expr.complexity();
+
+    Some(AutonomousInvariant {
+        formula: expr,
+        formula_str,
+        variance,
+        mean_value,
+        complexity,
+        symbolically_proven: false,
+    })
+}
+
 /// Autonomously discover conservation laws from a dynamical system.
 ///
 /// **No pre-specified candidates.** The GP evolves expressions over state
