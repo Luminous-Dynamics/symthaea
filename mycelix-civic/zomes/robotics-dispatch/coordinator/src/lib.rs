@@ -54,7 +54,7 @@ pub struct RegisterAssetInput {
 pub fn register_asset(input: RegisterAssetInput) -> ExternResult<Record> {
     mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "register_asset")?;
 
-    let agent = agent_info()?.agent_latest_pubkey;
+    let agent = agent_info()?.agent_initial_pubkey;
 
     let asset = RoboticAsset {
         asset_id: input.asset_id,
@@ -120,7 +120,7 @@ pub fn dispatch_mission(input: DispatchMissionInput) -> ExternResult<Record> {
         mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "dispatch_mission")?;
     }
 
-    let agent = agent_info()?.agent_latest_pubkey;
+    let agent = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
 
     // 24-hour expiry (Essay 17: emergency power must not be permanently entrenched)
@@ -298,7 +298,8 @@ pub fn get_all_assets(_: ()) -> ExternResult<Vec<Record>> {
     let anchor_hash = hash_entry(&anchor)?;
 
     let links = get_links(
-        GetLinksInputBuilder::try_new(anchor_hash, LinkTypes::AnchorToAsset)?.build(),
+        LinkQuery::try_new(anchor_hash, LinkTypes::AnchorToAsset)?,
+        GetStrategy::default(),
     )?;
 
     let mut assets = Vec::new();
@@ -317,7 +318,8 @@ pub fn get_all_assets(_: ()) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn get_asset_orders(asset_hash: ActionHash) -> ExternResult<Vec<Record>> {
     let links = get_links(
-        GetLinksInputBuilder::try_new(asset_hash, LinkTypes::AssetToOrder)?.build(),
+        LinkQuery::try_new(asset_hash, LinkTypes::AssetToOrder)?,
+        GetStrategy::default(),
     )?;
 
     let mut orders = Vec::new();
@@ -336,7 +338,8 @@ pub fn get_asset_orders(asset_hash: ActionHash) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn get_order_telemetry(order_hash: ActionHash) -> ExternResult<Vec<Record>> {
     let links = get_links(
-        GetLinksInputBuilder::try_new(order_hash, LinkTypes::OrderToTelemetry)?.build(),
+        LinkQuery::try_new(order_hash, LinkTypes::OrderToTelemetry)?,
+        GetStrategy::default(),
     )?;
 
     let mut reports = Vec::new();
@@ -370,7 +373,7 @@ pub struct IssueCredentialInput {
 #[hdk_extern]
 pub fn issue_credential(input: IssueCredentialInput) -> ExternResult<Record> {
     // Consciousness gate: PROPOSAL tier
-    let _author = agent_info()?.agent_latest_pubkey;
+    let _author = agent_info()?.agent_initial_pubkey;
 
     let now = sys_time()?;
     let credential = RoboticCredential {
@@ -456,7 +459,8 @@ pub fn get_credential_vitality(credential_hash: ActionHash) -> ExternResult<u16>
 #[hdk_extern]
 pub fn get_asset_credentials(asset_hash: ActionHash) -> ExternResult<Vec<Record>> {
     let links = get_links(
-        GetLinksInputBuilder::try_new(asset_hash, LinkTypes::AssetToCredential)?.build(),
+        LinkQuery::try_new(asset_hash, LinkTypes::AssetToCredential)?,
+        GetStrategy::default(),
     )?;
 
     let mut credentials = Vec::new();
