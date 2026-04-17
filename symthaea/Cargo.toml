@@ -618,6 +618,7 @@ digital_metabolism = []                      # Real hardware constraints as embo
 # ── Distributed / Network ──────────────────────────────────────────
 mesh = []                                   # Physical mesh radio (LoRa + B.A.T.M.A.N. + Yggdrasil)
 lz4_compression = ["mesh", "dep:lz4_flex"]  # LZ4 packet compression for mesh radio
+holon-lz4 = ["mesh-encryption", "dep:lz4_flex"]  # Phase II.A: LZ4-before-seal for holon RDP wire
 mesh-encryption = ["mesh", "dep:chacha20poly1305", "dep:zeroize"]  # ChaCha20-Poly1305 AEAD encryption for mesh packets
 mesh-key-exchange = ["mesh-encryption", "dep:x25519-dalek", "dep:hkdf", "dep:sha2"]  # X25519 Diffie-Hellman per-peer key agreement
 swarm = ["iroh"]                            # Real-time P2P tensor streaming via Iroh 0.95+
