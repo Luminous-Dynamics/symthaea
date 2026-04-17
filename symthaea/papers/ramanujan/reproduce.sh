@@ -48,12 +48,16 @@ echo "[reproduce] showcase complete."
 echo "[reproduce]   stdout: ${STDOUT_FILE}"
 echo "[reproduce]   stderr: ${STDERR_FILE}"
 
-# Extract the LaTeX table block (between "\\begin{table}" and "\\end{table}").
+# Extract the LaTeX table block (between "\\begin{table}" and "\\end{table}"),
+# sanitizing Unicode that pdflatex rejects (↳ → `--`). XeLaTeX/LuaLaTeX would
+# accept it natively, but we target pdflatex for simpler CI.
 awk '
   /^\\begin\{table\}/ { in_table = 1 }
   in_table { print }
   /^\\end\{table\}/ && in_table { in_table = 0; print ""; exit }
-' "${STDOUT_FILE}" > "${TABLE_FILE}"
+' "${STDOUT_FILE}" \
+  | sed 's/↳ MATCHES/-- matches/g; s/↳ resembles/-- resembles/g; s/↳ weakly/-- weakly/g; s/↳ NO/-- no/g' \
+  > "${TABLE_FILE}"
 
 echo "[reproduce]   table:  ${TABLE_FILE}"
 
