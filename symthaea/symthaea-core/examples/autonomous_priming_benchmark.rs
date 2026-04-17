@@ -154,12 +154,26 @@ fn run_one(
     exclude_trig: bool,
     diverse_n: usize,
 ) -> Vec<AutonomousInvariant> {
+    run_with_budget(seed, priors, exclude_trig, diverse_n, POP_SIZE, GENERATIONS)
+}
+
+/// Session 23: variant with caller-specified budget. Higher pop/gen
+/// gives crossover more chances to compose pinned Jacobi primitives
+/// into the full invariant.
+fn run_with_budget(
+    seed: u64,
+    priors: &[Expr],
+    exclude_trig: bool,
+    diverse_n: usize,
+    pop: usize,
+    gens: usize,
+) -> Vec<AutonomousInvariant> {
     let config = RegressorConfig {
         seed,
-        population_size: POP_SIZE,
-        generations: GENERATIONS,
-        max_depth: 5,
-        max_complexity: 18,
+        population_size: pop,
+        generations: gens,
+        max_depth: 6,
+        max_complexity: 24,
         lambda: 0.0005,
         mutation_rate: 0.35,
         exclude_trig,
@@ -309,6 +323,22 @@ fn main() {
         .collect();
     aggregate("cheat + diverse-5", &cheat_div);
 
+    println!(
+        "\n━━━ Jacobi cheat + no-trig + diverse-5 + HIGH BUDGET (Session 23) ━━━"
+    );
+    println!("  pop=300 gen=100 max_depth=6 max_complexity=24, depth+reach boosted");
+    let cheat_hb: Vec<SeedResult> = SEEDS
+        .iter()
+        .map(|&seed| {
+            summarize(
+                "cheat-HB",
+                seed,
+                &run_with_budget(seed, &cheat, true, 5, 300, 100),
+            )
+        })
+        .collect();
+    aggregate("cheat + high-bud", &cheat_hb);
+
     println!("\n━━━ Head-to-head per seed (primed vs cold, trig allowed) ━━━");
     head_to_head("cold vs primed", &cold, &primed);
 
@@ -324,6 +354,11 @@ fn main() {
         "\n━━━ Head-to-head per seed (cheat vs cold, DIVERSE fitness — Session 21) ━━━"
     );
     head_to_head("cold-D vs cheat-D", &cold_div, &cheat_div);
+
+    println!(
+        "\n━━━ Head-to-head per seed (cheat-HB vs cheat-D — Session 23 budget ablation) ━━━"
+    );
+    head_to_head("cheat-D vs cheat-HB", &cheat_div, &cheat_hb);
 
     println!("\n━━━ Degeneracy accounting: formulas containing cos/sin ━━━");
     for (label, runs) in [
@@ -356,6 +391,7 @@ fn main() {
         ("cheat+no-trig  ", &cheat_notrig),
         ("cold+diverse-5 ", &cold_div),
         ("cheat+diverse-5", &cheat_div),
+        ("cheat+high-bud ", &cheat_hb),
     ] {
         let jacobi_count = runs
             .iter()
