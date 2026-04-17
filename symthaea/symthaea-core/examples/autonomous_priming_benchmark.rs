@@ -168,6 +168,21 @@ fn run_with_budget(
     pop: usize,
     gens: usize,
 ) -> Vec<AutonomousInvariant> {
+    run_with_budget_and_composition(seed, priors, exclude_trig, diverse_n, pop, gens, 0.0)
+}
+
+/// Session 24: extends run_with_budget with prior_composition_rate.
+/// When > 0, the GP probabilistically composes pairs of pinned priors
+/// directly, bypassing random crossover.
+fn run_with_budget_and_composition(
+    seed: u64,
+    priors: &[Expr],
+    exclude_trig: bool,
+    diverse_n: usize,
+    pop: usize,
+    gens: usize,
+    composition_rate: f64,
+) -> Vec<AutonomousInvariant> {
     let config = RegressorConfig {
         seed,
         population_size: pop,
@@ -178,6 +193,7 @@ fn run_with_budget(
         mutation_rate: 0.35,
         exclude_trig,
         diverse_trajectory_count: diverse_n,
+        prior_composition_rate: composition_rate,
         ..RegressorConfig::default()
     };
     discover_invariants_autonomous_with_seed_templates(
@@ -339,6 +355,22 @@ fn main() {
         .collect();
     aggregate("cheat + high-bud", &cheat_hb);
 
+    println!(
+        "\n━━━ Jacobi cheat + high-budget + prior-composition-0.15 (Session 24) ━━━"
+    );
+    println!("  15% of new children = op(prior_A, prior_B) for random distinct pinned priors");
+    let cheat_comp: Vec<SeedResult> = SEEDS
+        .iter()
+        .map(|&seed| {
+            summarize(
+                "cheat-C",
+                seed,
+                &run_with_budget_and_composition(seed, &cheat, true, 5, 300, 100, 0.15),
+            )
+        })
+        .collect();
+    aggregate("cheat + composit", &cheat_comp);
+
     println!("\n━━━ Head-to-head per seed (primed vs cold, trig allowed) ━━━");
     head_to_head("cold vs primed", &cold, &primed);
 
@@ -359,6 +391,11 @@ fn main() {
         "\n━━━ Head-to-head per seed (cheat-HB vs cheat-D — Session 23 budget ablation) ━━━"
     );
     head_to_head("cheat-D vs cheat-HB", &cheat_div, &cheat_hb);
+
+    println!(
+        "\n━━━ Head-to-head per seed (cheat-C vs cheat-HB — Session 24 composition) ━━━"
+    );
+    head_to_head("cheat-HB vs cheat-C", &cheat_hb, &cheat_comp);
 
     println!("\n━━━ Degeneracy accounting: formulas containing cos/sin ━━━");
     for (label, runs) in [
@@ -392,6 +429,7 @@ fn main() {
         ("cold+diverse-5 ", &cold_div),
         ("cheat+diverse-5", &cheat_div),
         ("cheat+high-bud ", &cheat_hb),
+        ("cheat+composit ", &cheat_comp),
     ] {
         let jacobi_count = runs
             .iter()
