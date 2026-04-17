@@ -8,7 +8,7 @@
 
 - **Minimum viable:** 4 weeks focused (one engineer, one context). Delivers a working `linarith`-style bridge for the algebra subset of miniF2F-v2.
 - **Comfortable:** 6 weeks. Adds non-linear arithmetic via `QF_NIA` + `polyrith` and a Mathlib-aware CI lane.
-- **Stretch:** 8 weeks. Includes a parser subset for mild miniF2F statements so theorems can be ingested without hand-translation.
+- **Stretch:** 8 weeks. Adds the Lean-metaprogramming ingestion layer (see §5) so theorems are ingested automatically via Lean's own parser rather than hand-translated.
 
 ## Scope matrix — what's in and what's out
 
@@ -94,17 +94,22 @@ New directory `lean-proofs/phase2/` with:
 
 This is the biggest infrastructural lift. Mathlib's full elaboration is ~10 min cold; warm cache is <1 min.
 
-### 5. Parser subset for miniF2F ingestion (stretch goal)
+### 5. miniF2F ingestion — Lean metaprogramming, NOT a custom parser
 
-If time: write a small recursive-descent parser for the subset of Lean 4 that miniF2F uses. miniF2F is surprisingly regular — most files match the pattern:
-```
-theorem NAME (bindings) (hypotheses) : GOAL := by sorry
-```
-where `bindings` are `(x : ℝ)`, `(n : ℕ)`; hypotheses are equations and inequalities; goals are equations.
+**User decision (April 17):** do NOT write a recursive-descent parser for Lean 4. Lean 4's syntax is highly extensible and changes across versions; any custom parser would be a maintenance trap.
 
-A recursive-descent parser targeting this subset is ~800 LOC and handles perhaps 60–70% of miniF2F files without any Lean toolchain involvement. The remaining 30–40% use Mathlib-specific notation (`Finset.range`, `∑`) that would require a proper Lean parser — skip those in Phase 2.
+**Better approach** — use Lean 4's own metaprogramming API:
 
-Without this parser, Phase 2 still works but requires hand-translation of miniF2F statements into our `FolFormulaExt`. That's fine for a paper demonstrating 30% reach on a curated subset, less fine for an automated leaderboard submission.
+1. Write a small Lake executable in Lean that uses `Lean.Parser` to parse a `.lean` file (guaranteed-accurate because it's the same parser Lean uses itself).
+2. The executable walks the resulting `Syntax` tree and emits either an S-expression or JSON that mirrors our `FolFormulaExt` shape.
+3. Symthaea's Rust side invokes this as a subprocess and deserializes into `FolFormulaExt`.
+
+Advantages:
+- Zero custom parsing in Rust (~800 LOC saved vs the previous plan).
+- Syntactic accuracy matches whatever Lean version we pin via `lean-toolchain`.
+- Same mechanism scales to PutnamBench and future benchmarks without incremental parser work.
+
+**Deferred to a later sprint.** Phase 2 MVP (weeks 1–4) measures accept rate against a hand-translated ~50-problem curated miniF2F subset. Full auto-ingestion via the Lean executable is the 8-week stretch.
 
 ## Measurement plan
 
