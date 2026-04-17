@@ -3972,6 +3972,19 @@ impl MultiWorldSimulator {
                 }
             }
 
+            // Phase 7.55: Mycelix adversarial tick (Phase 2c).
+            // Applies TierBuyer/DemurrageEvader/CorrectionFarmer/GuildColluder
+            // modifiers to agent state. Runs between sanctions and genuine
+            // restorative corrections so farmed attempts still hit the rate
+            // limiter defined in sub_passport.rs.
+            for world in &mut self.worlds {
+                let _tel = red_team::apply_mycelix_adversarial_tick(
+                    &mut world.agents,
+                    self.current_tick,
+                    0.01,
+                );
+            }
+
             // Phase 7.6: Restorative corrections (Phase 2b).
             // Agents accumulating care work / strong virtue-care ethics record
             // a correction probabilistically, unwinding tier penalties over

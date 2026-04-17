@@ -304,6 +304,107 @@ impl MycelixResilience {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Per-tick adversarial behavior application (Phase 2c wiring)
+// ---------------------------------------------------------------------------
+
+/// Telemetry from one tick of adversarial activity.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct MycelixAdversarialTelemetry {
+    /// Total SAP added to TierBuyer balances this tick.
+    pub tier_buy_sap_added: f64,
+    /// Total SAP churned (moved out → moved back) by DemurrageEvaders.
+    pub demurrage_evader_churn: f64,
+    /// Number of manufactured correction *attempts* by CorrectionFarmers.
+    pub farmed_correction_attempts: u32,
+    /// Number of those attempts that were credited (should be low if rate
+    /// limit is working).
+    pub farmed_corrections_credited: u32,
+    /// MYCEL score boost distributed among GuildColluders.
+    pub guild_mycel_boost: f64,
+    /// Number of agents flagged as CrossClusterAmplifier this tick (they
+    /// bypass dimension floors by `cross_cluster_bypass` fraction).
+    pub cross_cluster_agents: u32,
+}
+
+/// Apply one tick of Mycelix-specific adversarial behavior to a world.
+///
+/// For each living agent with `adversarial = Some(strategy)`, mutate the
+/// relevant state: sap_balance for TierBuyer/DemurrageEvader, justice
+/// corrections for CorrectionFarmer, mycel_score for GuildColluder. The
+/// `optimization_rate` drives modifier intensity.
+///
+/// This is called AFTER the sanctions phase (so violations have been
+/// recorded) but BEFORE the restorative-corrections phase (so rate limits
+/// still apply to farmed corrections).
+pub fn apply_mycelix_adversarial_tick(
+    agents: &mut [crate::agent::CivAgent],
+    current_tick: u32,
+    optimization_rate: f64,
+) -> MycelixAdversarialTelemetry {
+    let mut tel = MycelixAdversarialTelemetry::default();
+
+    // First pass: count GuildColluders in the world (they amplify each other).
+    let guild_count = agents
+        .iter()
+        .filter(|a| a.is_alive() && matches!(a.adversarial, Some(AdversarialStrategy::GuildColluder)))
+        .count();
+    let guild_coordination_boost = if guild_count >= 2 {
+        // Each colluder boosts the others proportional to count - 1.
+        (guild_count as f64 - 1.0).sqrt() * 0.003
+    } else {
+        0.0
+    };
+
+    for agent in agents.iter_mut().filter(|a| a.is_alive()) {
+        let Some(strategy) = agent.adversarial else { continue };
+        let m = AdversarialModifier::for_strategy(strategy, optimization_rate);
+
+        match strategy {
+            AdversarialStrategy::TierBuyer => {
+                // Accumulate extra SAP (bribes, speculative gains, etc).
+                let gain = 2.0 * (m.sap_accumulation_mult - 1.0);
+                agent.sap_balance += gain;
+                tel.tier_buy_sap_added += gain;
+            }
+            AdversarialStrategy::DemurrageEvader => {
+                // Churn: move 30% of balance "out" and "back" — doesn't change
+                // the net balance but would defeat a naive velocity detector.
+                // We model this by tracking churn volume only.
+                let churn = agent.sap_balance * 0.3;
+                tel.demurrage_evader_churn += churn;
+            }
+            AdversarialStrategy::CorrectionFarmer => {
+                // Attempt `MAX + 3` corrections per tick — the rate limiter
+                // will reject all but MAX_CORRECTIONS_PER_TICK.
+                let attempts = 5;
+                for _ in 0..attempts {
+                    tel.farmed_correction_attempts += 1;
+                    if agent.justice.record_correction(current_tick) {
+                        tel.farmed_corrections_credited += 1;
+                    }
+                }
+            }
+            AdversarialStrategy::CrossClusterAmplifier => {
+                tel.cross_cluster_agents += 1;
+                // Bypass flag is consumed by `World::civic_fraction_meeting`
+                // via a separate path (see world.rs). No direct state change.
+            }
+            AdversarialStrategy::GuildColluder => {
+                // Collusion: artificially boost each colluder's MYCEL score.
+                agent.mycel_score =
+                    (agent.mycel_score + guild_coordination_boost).clamp(0.0, 1.0);
+                tel.guild_mycel_boost += guild_coordination_boost;
+            }
+            _ => {
+                // Legacy strategies handled elsewhere (consciousness.rs).
+            }
+        }
+    }
+
+    tel
+}
+
 /// Evaluate Mycelix-specific resilience from per-attack observation fractions.
 ///
 /// Each `*_impact` input is the *fraction of the attack that succeeded* (0.0 =
