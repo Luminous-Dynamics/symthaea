@@ -20,7 +20,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 deterministic-net = []
 
 [dependencies]
-symtropy-math = { version = "0.1.0", path = "../symtropy-math" }
+symtropy-math = { version = "0.2.0", path = "../symtropy-math" }
 nalgebra = "0.34"
 arrayvec = "0.7"
 

@@ -10,7 +10,7 @@ categories = ["game-engines", "simulation"]
 readme = "README.md"
 
 [dependencies]
-symtropy-math = { version = "0.1.0", path = "../symtropy-math" }
+symtropy-math = { version = "0.2.0", path = "../symtropy-math" }
 symtropy-physics = { version = "0.1.0", path = "../symtropy-physics" }
 symtropy-consciousness-physics = { version = "0.1.0", path = "../symtropy-consciousness-physics" }
 bevy = { version = "0.18", default-features = false, features = [
