@@ -85,6 +85,10 @@ pub mod rust_parser;
 #[cfg(feature = "code_generation")]
 pub mod analogy_generation;
 #[cfg(feature = "code_generation")]
+pub mod code_discovery;
+#[cfg(feature = "code_generation")]
+pub mod hv_code_decoder;
+#[cfg(feature = "code_generation")]
 pub mod sequencer_benchmark;
 #[cfg(feature = "code_generation")]
 pub mod sequencer_training;
