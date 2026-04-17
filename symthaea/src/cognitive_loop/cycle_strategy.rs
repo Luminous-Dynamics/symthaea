@@ -287,7 +287,7 @@ impl CognitiveLoopService {
     ) -> EncodingPhaseResult {
         // 1. HDC encode with attention from previous prediction
         let _t_core = Instant::now();
-        let encoding_result = self.encoder.encode(input);
+        let mut encoding_result = self.encoder.encode(input);
         let prediction_error = encoding_result.prediction_error;
         module_timings.core_hdc_encode = _t_core.elapsed().as_micros() as u64;
 
@@ -346,6 +346,11 @@ impl CognitiveLoopService {
                 // At theta peaks + high salience → strong temporal integration.
                 if binding_strength > THETA_BINDING_BOOST_THRESHOLD {
                     hv16_cached = crate::hdc::BinaryHV::bundle(&[hv16_cached, temporal_context]);
+                    // Propagate the theta-bound percept to the CfC input path.
+                    // Without this, compress_for_ltc() at :464 reads the pre-binding
+                    // hdv and the temporal network is blind to its own short-term
+                    // memory integration — defeating the purpose of theta gating.
+                    encoding_result.hdv = hv16_cached.to_continuous();
                 }
             }
         }
@@ -362,6 +367,10 @@ impl CognitiveLoopService {
                 / SUBSTRATE_NOISE_FRACTION_DIVISOR; // [0.0, 0.1]
             let seed = self.stats.total_cycles as u64;
             hv16_cached = hv16_cached.add_noise(noise_fraction, seed);
+            // Mirror the noise into the CfC input. Without this, scale-pressured
+            // substrates would have a pristine ContinuousHV feeding the CfC —
+            // equivalent to faking the robustness benchmark.
+            encoding_result.hdv = hv16_cached.to_continuous();
         }
         module_timings.core_compress = _t_core.elapsed().as_micros() as u64;
 
