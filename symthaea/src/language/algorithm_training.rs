@@ -1057,6 +1057,35 @@ pub fn build_training_pairs() -> Vec<AlgorithmTrainingPair> {
         .collect()
 }
 
+// ─── Difficulty Scoring ────────────────────────────────────────────────────
+
+/// Compute structural difficulty score from algorithm channels.
+///
+/// Higher = more complex. Weights structural nesting and state management
+/// over raw code size. A 5-line recursive function scores higher than
+/// a 20-line flat iterator chain.
+pub fn difficulty_score(channels: &AlgorithmChannels) -> f32 {
+    let c = &channels.channels;
+    c[0]          // loop_depth
+    + c[1]        // branch_depth
+    + 2.0 * c[2]  // recursion (×2 — recursion is inherently harder)
+    + c[3]        // closure_count
+    + c[23]       // mutation_level
+    + c[25]       // error_handling
+    + c[29]       // helper_functions
+    + 0.5 * c[30] // pattern_match_arms (half weight)
+    + 0.1 * c[26] // line_count (small weight — size matters less than structure)
+}
+
+/// Sort training pairs by difficulty (easiest first).
+pub fn sort_by_difficulty(pairs: &mut [AlgorithmTrainingPair]) {
+    pairs.sort_by(|a, b| {
+        let da = difficulty_score(&a.channels);
+        let db = difficulty_score(&b.channels);
+        da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
+    });
+}
+
 /// Train the CfC code sequencer on algorithm HDC vectors.
 ///
 /// Returns: (training_loss, classification_accuracy, confusion_matrix_summary)
@@ -1459,6 +1488,165 @@ pub fn train_cfc_sequencer(epochs: usize, learning_rate: f32) -> CfcTrainingRepo
             0.0
         },
     }
+}
+
+/// Curriculum-based CfC training.
+///
+/// Three phases:
+/// 1. Easy (50 epochs): train on the easiest third of the corpus
+/// 2. Medium (50 epochs): expand to the easiest two-thirds
+/// 3. Full (remaining epochs): train on all examples
+///
+/// This gives the CfC a stable gradient on simple patterns before
+/// introducing complex multi-function state machines.
+pub fn train_cfc_curriculum(total_epochs: usize, learning_rate: f32) -> CfcTrainingReport {
+    let mut pairs = build_training_pairs();
+    let sequencer = CfCCodeSequencer::default();
+
+    // Sort by structural difficulty
+    sort_by_difficulty(&mut pairs);
+
+    let n = pairs.len();
+    let split = (n * 4) / 5;
+    let (all_train, eval) = pairs.split_at(split);
+
+    // Learn projection from all training data (not curriculum-gated)
+    let projection = LearnedProjection::fit(all_train);
+
+    // Curriculum phases: easy third → two-thirds → full
+    let easy_end = all_train.len() / 3;
+    let medium_end = (all_train.len() * 2) / 3;
+
+    let phase_1_epochs = total_epochs / 4;
+    let phase_2_epochs = total_epochs / 4;
+    let phase_3_epochs = total_epochs - phase_1_epochs - phase_2_epochs;
+
+    let mut epoch_losses = Vec::new();
+
+    // Phase 1: Easy examples only
+    for _epoch in 0..phase_1_epochs {
+        let loss = train_one_epoch(
+            &sequencer,
+            &all_train[..easy_end],
+            &projection,
+            learning_rate,
+        );
+        epoch_losses.push(loss);
+    }
+
+    // Phase 2: Easy + medium
+    for _epoch in 0..phase_2_epochs {
+        let loss = train_one_epoch(
+            &sequencer,
+            &all_train[..medium_end],
+            &projection,
+            learning_rate,
+        );
+        epoch_losses.push(loss);
+    }
+
+    // Phase 3: Full corpus
+    for _epoch in 0..phase_3_epochs {
+        let loss = train_one_epoch(&sequencer, all_train, &projection, learning_rate);
+        epoch_losses.push(loss);
+    }
+
+    // Evaluate
+    let (correct_first, correct_class, eval_total) = evaluate_plans(&sequencer, eval, &projection);
+
+    CfcTrainingReport {
+        epochs: total_epochs,
+        learning_rate,
+        train_size: all_train.len(),
+        eval_size: eval.len(),
+        final_loss: epoch_losses.last().copied().unwrap_or(f32::NAN),
+        loss_curve: epoch_losses,
+        first_action_accuracy: if eval_total > 0 {
+            correct_first as f32 / eval_total as f32
+        } else {
+            0.0
+        },
+        class_from_plan_accuracy: if eval_total > 0 {
+            correct_class as f32 / eval_total as f32
+        } else {
+            0.0
+        },
+    }
+}
+
+/// Train one epoch on a subset of pairs.
+fn train_one_epoch(
+    sequencer: &CfCCodeSequencer,
+    train: &[AlgorithmTrainingPair],
+    projection: &LearnedProjection,
+    lr: f32,
+) -> f32 {
+    let mut total_loss = 0.0f32;
+    let mut count = 0;
+    for pair in train {
+        let target_plan = class_to_plan(pair.class, &pair.channels);
+        let projected = projection.project(&pair.hv);
+        if let Ok(loss) = sequencer.train_sequence(&projected, &target_plan, lr) {
+            total_loss += loss;
+            count += 1;
+        }
+    }
+    if count > 0 {
+        total_loss / count as f32
+    } else {
+        f32::NAN
+    }
+}
+
+/// Evaluate CfC plans on held-out data.
+fn evaluate_plans(
+    sequencer: &CfCCodeSequencer,
+    eval: &[AlgorithmTrainingPair],
+    projection: &LearnedProjection,
+) -> (usize, usize, usize) {
+    let mut correct_first = 0usize;
+    let mut correct_class = 0usize;
+    let mut total = 0usize;
+
+    for pair in eval {
+        let projected = projection.project(&pair.hv);
+        let planned = sequencer.plan_structure(&projected, &[]);
+        let target_plan = class_to_plan(pair.class, &pair.channels);
+
+        if let (Some(predicted), Some(expected)) = (planned.first(), target_plan.get(1)) {
+            if predicted.action == *expected {
+                correct_first += 1;
+            }
+        }
+
+        let has_for_loop = planned.iter().any(|s| s.action == PlanAction::ForLoop);
+        let has_iter_chain = planned
+            .iter()
+            .any(|s| s.action == PlanAction::IteratorChain);
+        let has_struct = planned.iter().any(|s| s.action == PlanAction::DefineStruct);
+        let has_match = planned
+            .iter()
+            .any(|s| s.action == PlanAction::MatchExpression);
+
+        let predicted_class = if has_struct {
+            AlgorithmClass::DataStructure
+        } else if has_iter_chain && !has_for_loop {
+            AlgorithmClass::IoTransform
+        } else if has_match && has_for_loop {
+            AlgorithmClass::Graph
+        } else if has_for_loop {
+            AlgorithmClass::Mathematical
+        } else {
+            AlgorithmClass::StringProcessing
+        };
+
+        if predicted_class == pair.class {
+            correct_class += 1;
+        }
+        total += 1;
+    }
+
+    (correct_first, correct_class, total)
 }
 
 /// CfC training results.
@@ -2342,10 +2530,10 @@ mod tests {
     }
 
     #[test]
+    #[test]
     fn test_cfc_training_converges() {
         let report = train_cfc_sequencer(200, 0.001);
         println!("{report}");
-        // Print loss curve samples
         let n = report.loss_curve.len();
         if n >= 4 {
             println!(
@@ -2362,6 +2550,63 @@ mod tests {
             "loss should decrease over training: {:.6} → {:.6}",
             report.loss_curve[0],
             report.final_loss
+        );
+    }
+
+    #[test]
+    fn test_curriculum_vs_flat_training() {
+        // Curriculum: easy → medium → hard
+        let curriculum = train_cfc_curriculum(200, 0.001);
+        println!("CURRICULUM: {curriculum}");
+
+        // Flat: same epochs, same lr, no ordering
+        let flat = train_cfc_sequencer(200, 0.001);
+        println!("FLAT: {flat}");
+
+        println!(
+            "\n=== COMPARISON ===\nClass accuracy: curriculum={:.1}% vs flat={:.1}%",
+            curriculum.class_from_plan_accuracy * 100.0,
+            flat.class_from_plan_accuracy * 100.0,
+        );
+        println!(
+            "Final loss: curriculum={:.6} vs flat={:.6}",
+            curriculum.final_loss, flat.final_loss,
+        );
+
+        // Both should have finite loss
+        assert!(curriculum.final_loss.is_finite());
+        assert!(flat.final_loss.is_finite());
+    }
+
+    #[test]
+    fn test_difficulty_ordering() {
+        let mut pairs = build_training_pairs();
+        sort_by_difficulty(&mut pairs);
+
+        // First should be simpler than last
+        let first_diff = difficulty_score(&pairs[0].channels);
+        let last_diff = difficulty_score(&pairs[pairs.len() - 1].channels);
+        println!(
+            "Difficulty range: {:.1} ({}) → {:.1} ({})",
+            first_diff,
+            pairs[0].name,
+            last_diff,
+            pairs[pairs.len() - 1].name
+        );
+
+        // Print the ordering
+        for (i, p) in pairs.iter().enumerate() {
+            let d = difficulty_score(&p.channels);
+            if i < 5 || i >= pairs.len() - 5 {
+                println!("  {:2}. {:.1} {:?} {}", i, d, p.class, p.name);
+            } else if i == 5 {
+                println!("  ...");
+            }
+        }
+
+        assert!(
+            first_diff <= last_diff,
+            "should be sorted easy→hard: {first_diff} > {last_diff}"
         );
     }
 }
