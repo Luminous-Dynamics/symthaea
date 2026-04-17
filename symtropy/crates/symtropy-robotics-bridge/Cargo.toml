@@ -2,7 +2,7 @@
 name = "symtropy-robotics-bridge"
 version = "0.1.0"
 edition = "2021"
-license = "Apache-2.0 OR MIT"
+license = "AGPL-3.0-or-later"
 description = "Bridge Symthaea robotics platforms into the Symtropy game engine"
 
 [dependencies]

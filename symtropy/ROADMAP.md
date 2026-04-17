@@ -26,10 +26,20 @@ If a feature helps both tracks, it's a core priority. If it helps only B at the 
 
 Cheap moves that unlock every later phase.
 
-- **License split** (decided):
-  - Apache-2.0 OR MIT: `symtropy-math`, `symtropy-physics`, `symtropy-render-bridge`, `symtropy-robotics-bridge`, `symtropy-net`, `symtropy-bevy`
-  - AGPL-3.0-or-later: `symtropy-consciousness-physics`, `symtropy-sim-bridge`, game crates
-  - Update `COMMERCIAL_LICENSE.md` and per-crate `Cargo.toml` `license` fields.
+- **License split** (partially done, 2026-04-17):
+  - ✅ **Apache-2.0 OR MIT** (no AGPL deps, publishable now): `symtropy-math`, `symtropy-physics`, `symtropy-render-bridge`
+  - ⏳ **AGPL today, permissive variant arrives in Phase 0.5**: `symtropy-bevy`, `symtropy-robotics-bridge`, `symtropy-net` — each has required AGPL deps that must be feature-gated before the permissive claim is honest. See [LICENSING.md](./LICENSING.md) Note 1.
+  - ✅ **AGPL-3.0-or-later** (research / integration): `symtropy-consciousness-physics`, `symtropy-sim-bridge`, `symtropy-world`, `symtropy-holochain-relay`, `symtropy-lightyear`, `symthaea-bevy-brain`, game crates
+
+### Phase 0.5 — Bevy / net / robotics-bridge split (inserted)
+
+Before the three currently-AGPL adoption crates can go permissive, each needs a `-core` extraction. Work items:
+
+- **`symtropy-bevy-core`** (new, Apache/MIT) — physics plugin, gizmos, transforms, input, schedules. No consciousness-physics. Feature-gate `biometrics`, `macro_bridge`, `debug.rs:SafetyTier` usage in `symtropy-bevy` (remains AGPL).
+- **`symtropy-net-core`** (new, Apache/MIT) — spatial authority partitioning, lockstep protocol, `SyncableState` trait. `symtropy-net` re-exports `-core` + adds Holochain (remains AGPL).
+- **`symtropy-robotics-bridge-core`** (new, Apache/MIT) — `PlatformType`, `RoboticAgent` trait, physics-body spawning. `symtropy-robotics-bridge` adds FEP + consciousness-equation (remains AGPL).
+
+Each split is a 1–2 day refactor. All three can ship in Phase 0.5 parallel to Phase 1 integration wins.
 - **Publish remaining crates** to crates.io (physics, render-bridge, robotics-bridge, net) with docs.rs metadata, `README.md` per crate, and `html_logo_url`.
 - **The Symtropy Book** (mdBook): generic state-coupling in 50 LOC, Bevy integration, 4D tutorial, determinism contract, `PhysicsCallback` guide, 6-platform robotics quickstart.
 - **CI matrix**: Linux / macOS / Windows × x86_64 / aarch64 × stable / beta / MSRV. Currently Linux/X11 only.

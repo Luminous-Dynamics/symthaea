@@ -9,12 +9,12 @@ Symtropy uses a **dual-track license model**. The split is designed to:
 
 | Crate | License | Rationale |
 |---|---|---|
-| `symtropy-math` | **Apache-2.0 OR MIT** | Core: ND geometric algebra. Permissive to maximise adoption. |
-| `symtropy-physics` | **Apache-2.0 OR MIT** | Core: GJK+EPA, CCD, joints, raycasting, deterministic replay. |
-| `symtropy-render-bridge` | **Apache-2.0 OR MIT** | Core: ND→Bevy projection, 4D cross-section slicing. |
-| `symtropy-robotics-bridge` | **Apache-2.0 OR MIT** | Core: FEP agent + platform interface. |
-| `symtropy-net` | **Apache-2.0 OR MIT** | Core: P2P spatial authority, lockstep protocol. |
-| `symtropy-bevy` | **Apache-2.0 OR MIT** | Core: Bevy plugin integration. |
+| `symtropy-math` | **Apache-2.0 OR MIT** | Core: ND geometric algebra. Zero AGPL deps. |
+| `symtropy-physics` | **Apache-2.0 OR MIT** | Core: GJK+EPA, CCD, joints, raycasting, deterministic replay. Zero AGPL deps. |
+| `symtropy-render-bridge` | **Apache-2.0 OR MIT** | Core: ND→Bevy projection, 4D cross-section slicing. Zero AGPL deps. |
+| `symtropy-robotics-bridge` | **AGPL-3.0-or-later** (*see note 1*) | Currently depends on AGPL `consciousness-physics` + Symthaea FEP. Phase 1 will split into a permissive `-core` + AGPL integration crate. |
+| `symtropy-net` | **AGPL-3.0-or-later** (*see note 1*) | Currently depends on AGPL `symtropy-holochain-relay`. Phase 1 will extract permissive `symtropy-net-core`. |
+| `symtropy-bevy` | **AGPL-3.0-or-later** (*see note 1*) | Currently depends on AGPL `consciousness-physics` throughout `plugin.rs`, `biometrics.rs`, `macro_bridge.rs`. Phase 0.5 extracts `symtropy-bevy-core` (permissive) via feature-gating. |
 | `symtropy-consciousness-physics` | **AGPL-3.0-or-later** | Research hero: Φ coupling, 63 experiments, Master Equation, ThermodynamicLedger. |
 | `symtropy-sim-bridge` | **AGPL-3.0-or-later** | Mycelix governance / economy / federated learning integration. |
 | `symtropy-world` | **AGPL-3.0-or-later** | Depends on consciousness-physics (transitively AGPL). |
@@ -24,6 +24,17 @@ Symtropy uses a **dual-track license model**. The split is designed to:
 | `symtropy-gravcraft-demo` | **AGPL-3.0-or-later** | Demo game. |
 | `symtropy-manipulator-demo` | **AGPL-3.0-or-later** | Demo game. |
 | Root `symtropy` (game crate) | **AGPL-3.0-or-later** | *The Room That Remembers You* + Sol Atlas. |
+
+> **Note 1** — These three crates were initially targeted for permissive licensing to support generalist adoption, but each has required dependencies on AGPL crates. AGPL is viral: any crate that *requires* AGPL code cannot itself be permissively licensed without misrepresenting the combined work's terms. The Phase 0.5 / Phase 1 roadmap extracts permissive `-core` variants by feature-gating the AGPL integrations:
+>
+> - **`symtropy-bevy-core`** — physics plugin, gizmos, input. No consciousness-physics. Apache/MIT.
+> - **`symtropy-bevy`** — re-exports `-core` + adds consciousness/biometrics systems. AGPL.
+> - **`symtropy-net-core`** — spatial authority + lockstep protocol. No Holochain. Apache/MIT.
+> - **`symtropy-net`** — adds Holochain DHT persistence. AGPL.
+> - **`symtropy-robotics-bridge-core`** — platform traits + `PhysicsCallback` hook. No Symthaea. Apache/MIT.
+> - **`symtropy-robotics-bridge`** — current functionality. AGPL.
+>
+> The `symtropy-math`, `symtropy-physics`, `symtropy-render-bridge` crates already have zero AGPL deps, so they're truly permissive today.
 
 ## What this means in practice
 
@@ -75,21 +86,22 @@ This is the same structural model used by many successful OSS projects (e.g. Mon
 
 ## crates.io history note
 
-As of the initial license split (2026-04), the following crates had already been published to crates.io at version `0.1.0` under **AGPL-3.0-or-later**:
+As of the initial license split (2026-04-17), the following crates had already been published to crates.io at version `0.1.0` under **AGPL-3.0-or-later**:
 
 - `symtropy-math` 0.1.0 (AGPL)
 - `symtropy-physics` 0.1.0 (AGPL)
 - `symtropy-bevy` 0.1.0 (AGPL)
 - `symtropy-consciousness-physics` 0.1.0 (AGPL — stays AGPL, no change)
 
-Published versions on crates.io are immutable — `0.1.0` remains under AGPL forever for anyone who pulls that exact version. The source tree (this repo) now reflects the new license for the **next** published version. When these crates are next released, they will be published as:
+Published versions on crates.io are immutable — `0.1.0` remains under AGPL forever for anyone who pulls that exact version. When these crates are next released:
 
-- `symtropy-math` ≥ 0.2.0 under **Apache-2.0 OR MIT**
-- `symtropy-physics` ≥ 0.2.0 under **Apache-2.0 OR MIT**
-- `symtropy-bevy` ≥ 0.2.0 under **Apache-2.0 OR MIT**
-- `symtropy-consciousness-physics` ≥ 0.x under **AGPL-3.0-or-later** (unchanged)
+- `symtropy-math` **0.2.0** under **Apache-2.0 OR MIT** (truly permissive, zero AGPL deps)
+- `symtropy-physics` **0.2.0** under **Apache-2.0 OR MIT** (truly permissive, zero AGPL deps)
+- `symtropy-render-bridge` **0.1.0** under **Apache-2.0 OR MIT** (first publish, zero AGPL deps)
+- `symtropy-bevy` stays 0.1.0 AGPL until the Phase 0.5 split (see Note 1 above) — next release will be **`symtropy-bevy-core` 0.1.0** Apache/MIT + **`symtropy-bevy` 0.2.0** AGPL
+- `symtropy-consciousness-physics` unchanged under **AGPL-3.0-or-later**
 
-Users who want the permissive licensing should depend on `>= 0.2.0`. The version bump is intentional: it signals the license-model change so automated tooling (cargo-audit, license scanners) can flag it.
+Users who want permissive licensing should depend on `symtropy-math >= 0.2.0` and `symtropy-physics >= 0.2.0` (plus `symtropy-render-bridge >= 0.1.0`). The version bump on math/physics signals the license-model change so automated tooling (cargo-audit, license scanners) can flag it.
 
 ## References
 

@@ -3,7 +3,15 @@ name = "symtropy-render-bridge"
 version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0 OR MIT"
-description = "ND physics → Bevy rendering bridge with 4D cross-section slicing"
+description = "Project N-dimensional physics worlds into Bevy 3D rendering, with first-class 4D cross-section slicing (Miegakure-style). Bridge crate between symtropy-physics and Bevy."
+repository = "https://github.com/luminous-dynamics/symtropy"
+keywords = ["bevy", "physics", "4d", "rendering", "n-dimensional"]
+categories = ["game-engines", "simulation", "rendering"]
+readme = "README.md"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 symtropy-math = { path = "../symtropy-math" }
