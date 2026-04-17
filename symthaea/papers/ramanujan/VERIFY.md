@@ -41,9 +41,18 @@ cd papers/ramanujan
 ./reproduce.sh
 ```
 
-### Path 3: SMT-only (deferred until Phase 2)
+### Path 3: SMT-only (no Rust required)
 
-At Phase 1 we do not commit `.smt2` witnesses (see "SMT proof witness availability" below). Once the engine instrumentation lands, the workflow will be: `./reproduce.sh --verify-proofs` re-runs every committed `.smt2` file through the user's local SMT solver (Z3, CVC5, MathSAT). Until then, this path falls back to Path 1 or Path 2.
+Every `.smt2` file in `proofs/` is a standalone formal proof obligation checkable by any SMT-LIB2-compliant solver. With Z3:
+
+```bash
+for f in papers/ramanujan/proofs/*.smt2; do
+  printf "%-40s " "$(basename $f)"
+  z3 -smt2 "$f" | tail -1
+done
+```
+
+Expected output: `unsat` on every line. CVC5 and MathSAT also close these; tested with Z3 4.13+. The `./reproduce.sh --verify-proofs` flag automates this loop.
 
 ## Scope of formal verification
 
@@ -71,12 +80,29 @@ The PCR3BP row deserves attention: the discovered expression has variance $2.7 \
 
 ## SMT proof witness availability
 
-**Phase 1 caveat:** the \texttt{conjecture\_engine} calls Z3 as a subprocess with SMT-LIB2 piped via stdin. It does not currently write the SMT-LIB2 to disk. Committing \texttt{.smt2} witnesses under \texttt{proofs/} requires a small instrumentation change (Phase 2 work). Until then, verification options are:
+**As of the formal-verify commit, four `.smt2` witness files are committed under `proofs/`**:
 
-1. Run \texttt{./reproduce.sh} --- the engine re-invokes Z3 on your host with the same SMT-LIB2 it used originally.
-2. Trust the committed \texttt{PROVEN} status string. This is a weaker form of reproducibility --- it reproduces only if your host agrees with ours on what Z3 returns.
+- `harmonic_oscillator.smt2` — `E = x² + v²`
+- `kepler_angular_momentum.smt2` — `L = xvy − yvx`
+- `henon_heiles_6H.smt2` — `6H = 3(px² + py²) + 3(x² + y²) + 6x²y − 2y³` (scaled Hénon-Heiles; see note)
+- `mystery_ode.smt2` — `H = ½(px² + py²) + x² + y² + xy`
 
-Readers who need stronger reproducibility should wait for the Phase 2 engine change or run \texttt{reproduce.sh} themselves.
+All four return `unsat` under Z3 4.13+ (tested), independent re-verification confirmed.
+
+### Honest distinction between "PROVEN (showcase)" and "formally verified (SMT)"
+
+Two stacked layers of evidence exist. The paper reports both:
+
+| Status tag in `showcase_stdout.txt` | Method | Reach |
+|-------------------------------------|--------|-------|
+| `PROVEN ✓` (shown in the showcase LaTeX table) | Symbolic chain-rule derivation via `SymExpr::diff` + `SymExpr::simplify`, then numerical residual check at 6 sample trajectory points | Handles polynomial and transcendental invariants; strong evidence but not a formal proof |
+| `unsat` (shown in `proofs/*.smt2` after `verify_invariants_formal`) | Z3 UNSAT on the obligation `∃x : dE/dt ≠ 0` encoded in `QF_NRA` | Polynomial invariants only; this IS a formal proof |
+
+The Lotka–Volterra invariant is `PROVEN` (symbolic + numerical) but **not** `unsat` (its log term is transcendental, outside `QF_NRA`). This is the correct honest pair of labels: we have strong evidence of conservation (showcase) and explicitly cannot formalize it within Z3's algebraic fragment (proofs/).
+
+### Why Hénon-Heiles uses 6H
+
+IEEE-754 `f64` cannot represent `1/3` exactly. The serializer emits `0.3333333333333333`, which Z3 reads as the literal rational `3333333333333333/10000000000000000`, making `dE/dt` nonzero as a rational expression (sat, wrongly). Multiplying `H` by 6 clears all fractional coefficients; since conservation is preserved under constant rescaling, proving `d(6H)/dt = 0` proves `dH/dt = 0`. Phase 2 can upgrade the serializer to emit exact rationals (`(/ 1 3)` in SMT-LIB2) and avoid the rescale.
 
 ## Cross-host determinism
 

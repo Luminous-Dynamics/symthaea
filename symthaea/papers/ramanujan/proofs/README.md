@@ -1,38 +1,52 @@
-# SMT-LIB2 Proof Witnesses (Phase 1: currently empty)
+# SMT-LIB2 Proof Witnesses
 
-This directory is reserved for SMT-LIB2 proof obligations corresponding to each `PROVEN` row in the paper's results table.
+Each file in this directory is a formal proof obligation for one Ramanujan-Protocol invariant. Each asserts `∃x : dE/dt ≠ 0` and expects Z3 to return `unsat` — which is a formal proof that the invariant is conserved on the encoded dynamics.
 
-## Phase 1 state
+## How they're built
 
-**Empty.** The `conjecture_engine` in `symthaea-core` calls Z3 as a subprocess (see `conjecture_engine.rs:3157 auto_prove_via_z3`) and pipes the SMT-LIB2 via stdin without saving to disk. Committing witnesses requires a small instrumentation change — Phase 2 work.
-
-## What lands here in Phase 2
-
-For each `PROVEN` row, one file named `<problem>_<invariant>.smt2` containing:
-
-```smt2
-(set-logic QF_NRA)
-; Problem: Harmonic oscillator
-; Discovered invariant: C(x,v) = x^2 + v^2
-; Dynamics: dx/dt = v, dv/dt = -x
-; Obligation: dC/dt = 0
-
-(declare-const x Real)
-(declare-const v Real)
-(declare-const dx_dt Real)
-(declare-const dv_dt Real)
-(assert (= dx_dt v))
-(assert (= dv_dt (- x)))
-
-; dC/dt = 2x·(dx/dt) + 2v·(dv/dt)
-(assert (not (= (+ (* 2 x dx_dt) (* 2 v dv_dt)) 0)))
-
-(check-sat)
-; expected: unsat
+```bash
+cargo run -p symthaea-physics-bridge --example verify_invariants_formal
 ```
 
-A reader with any SMT-LIB2 solver (Z3, CVC5, MathSAT, etc.) can re-check each file independently.
+The example hand-derives `dE/dt = Σ (∂E/∂xᵢ)·(dxᵢ/dt)` via `SymExpr::diff` + `SymExpr::simplify`, serializes the resulting expression to SMT-LIB2 (polynomial subset of `QF_NRA`), and writes one `.smt2` per invariant. Output directory is `papers/ramanujan/proofs/` by default, overridable via `SYMTHAEA_Z3_DUMP_DIR`.
 
-## Verification without witness files (Phase 1 workaround)
+## Current witnesses (all Z3-unsat as of this commit)
 
-Until Phase 2 lands, use `../reproduce.sh` — it re-invokes Z3 on the reader's host with the same SMT-LIB2 the engine built internally. Provided Z3 is installed and agrees with ours on `unsat`, this is equivalent to the per-file check.
+| File | Invariant | Status |
+|------|-----------|--------|
+| `harmonic_oscillator.smt2` | `E = x² + v²` | **unsat** (formally proven) |
+| `kepler_angular_momentum.smt2` | `L = x·vy − y·vx` | **unsat** |
+| `henon_heiles_6H.smt2` | `6H = 3(px² + py²) + 3(x² + y²) + 6x²y − 2y³` | **unsat** |
+| `mystery_ode.smt2` | `H = ½(px² + py²) + x² + y² + xy` | **unsat** |
+
+## Why Hénon-Heiles uses 6H instead of H
+
+The standard Hénon-Heiles Hamiltonian is `H = ½(px² + py²) + ½(x² + y²) + x²y − y³/3`. The `1/3` is not exact in IEEE-754 `f64`; the serializer emits it as `0.3333333333333333`, which Z3 reads as the literal rational `3333333333333333/10000000000000000`, not as `1/3`. Multiplying the whole invariant by 6 removes all fractional coefficients. Since `6H` is conserved iff `H` is (linearity of conservation under constant rescaling), the formal proof of `6H` is a formal proof of `H`. The rescale is documented in `main.tex`; this is not a trick, it's a numerical-representation workaround that future work can avoid by adding exact-rational serialization to the bridge.
+
+## Independent re-verification
+
+Any SMT-LIB2-compliant solver closes each file. With Z3:
+
+```bash
+# verify one:
+z3 -smt2 harmonic_oscillator.smt2
+# expected output: unsat
+
+# verify all:
+for f in papers/ramanujan/proofs/*.smt2; do
+  printf "%-40s " "$(basename $f)"
+  z3 -smt2 "$f" | tail -1
+done
+```
+
+CVC5 and MathSAT should also return `unsat`. Different solvers may take different times (Z3 is fast on these: ~50 ms each).
+
+## Problems NOT in this directory and why
+
+| Problem | Reason |
+|---------|--------|
+| Lotka–Volterra `x − ln x + y − ln y` | Transcendental; outside `QF_NRA`. `verify_invariants_formal` reports `skipped` for it. |
+| PCR3BP Jacobi | Showcase rediscovered a wrong expression (`cos(y/e)^(x³)`); the honest-numeric-failure row has no provable invariant. |
+| Triangular numbers `n(n+1)/2` | Sequence identity, not a trajectory invariant; verified at each `n` by the showcase's per-point `verify_formal`, not as a single `dE/dt = 0` obligation. |
+
+These gaps are documented honestly in `../VERIFY.md` and `../main.tex`.

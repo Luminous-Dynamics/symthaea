@@ -3086,6 +3086,364 @@ impl<T> CircularBuffer<T> {
 }
 "#
         }
+        "sieve" => {
+            r#"pub fn primes_up_to(upper_bound: u64) -> Vec<u64> {
+    if upper_bound < 2 { return Vec::new(); }
+    let n = upper_bound as usize;
+    let mut is_prime = vec![true; n + 1];
+    is_prime[0] = false;
+    is_prime[1] = false;
+    let mut i = 2;
+    while i * i <= n {
+        if is_prime[i] { for j in (i*i..=n).step_by(i) { is_prime[j] = false; } }
+        i += 1;
+    }
+    (2..=n).filter(|&i| is_prime[i]).map(|i| i as u64).collect()
+}
+"#
+        }
+        "series" => {
+            r#"pub fn series(digits: &str, len: usize) -> Vec<String> {
+    if len == 0 { return vec!["".to_string(); digits.len() + 1]; }
+    digits.as_bytes().windows(len).map(|w| std::str::from_utf8(w).unwrap().to_string()).collect()
+}
+"#
+        }
+        "acronym" => {
+            r#"pub fn abbreviate(phrase: &str) -> String {
+    phrase.split(|c: char| c.is_whitespace() || c == '-' || c == '_')
+        .filter(|w| !w.is_empty())
+        .flat_map(|word| {
+            let mut chars = word.chars().peekable();
+            let mut initials = vec![chars.next().unwrap().to_ascii_uppercase()];
+            while let Some(c) = chars.next() {
+                if c.is_uppercase() && chars.peek().map_or(false, |n| n.is_lowercase()) {
+                    initials.push(c);
+                }
+            }
+            initials
+        })
+        .collect()
+}
+"#
+        }
+        "scrabble-score" => {
+            r#"pub fn score(word: &str) -> u64 {
+    word.chars().map(|c| match c.to_ascii_uppercase() {
+        'A'|'E'|'I'|'O'|'U'|'L'|'N'|'R'|'S'|'T' => 1,
+        'D'|'G' => 2,
+        'B'|'C'|'M'|'P' => 3,
+        'F'|'H'|'V'|'W'|'Y' => 4,
+        'K' => 5,
+        'J'|'X' => 8,
+        'Q'|'Z' => 10,
+        _ => 0,
+    }).sum()
+}
+"#
+        }
+        "two-fer" => {
+            r#"pub fn twofer(name: &str) -> String {
+    if name.is_empty() {
+        "One for you, one for me.".to_string()
+    } else {
+        format!("One for {name}, one for me.")
+    }
+}
+"#
+        }
+        "say" => {
+            r#"pub fn encode(n: u64) -> String {
+    if n == 0 { return "zero".to_string(); }
+    let ones = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+        "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen",
+        "seventeen", "eighteen", "nineteen"];
+    let tens = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
+    fn say_below_1000(n: u64, ones: &[&str], tens: &[&str]) -> String {
+        if n == 0 { return String::new(); }
+        if n < 20 { return ones[n as usize].to_string(); }
+        if n < 100 {
+            let t = tens[(n / 10) as usize].to_string();
+            if n % 10 == 0 { t } else { format!("{}-{}", t, ones[(n % 10) as usize]) }
+        } else {
+            let h = format!("{} hundred", ones[(n / 100) as usize]);
+            if n % 100 == 0 { h } else { format!("{} {}", h, say_below_1000(n % 100, ones, tens)) }
+        }
+    }
+    let scales = ["", "thousand", "million", "billion", "trillion", "quadrillion", "quintillion"];
+    let mut parts = Vec::new();
+    let mut remaining = n;
+    let mut scale = 0;
+    while remaining > 0 {
+        let chunk = remaining % 1000;
+        if chunk > 0 {
+            let s = say_below_1000(chunk, &ones, &tens);
+            if scale > 0 { parts.push(format!("{} {}", s, scales[scale])); } else { parts.push(s); }
+        }
+        remaining /= 1000;
+        scale += 1;
+    }
+    parts.reverse();
+    parts.join(" ")
+}
+"#
+        }
+        "simple-cipher" => {
+            r#"pub fn encode(key: &str, s: &str) -> Option<String> {
+    if key.is_empty() || !key.chars().all(|c| c.is_ascii_lowercase()) { return None; }
+    Some(s.chars().zip(key.chars().cycle()).map(|(c, k)| {
+        if c.is_ascii_lowercase() {
+            (((c as u8 - b'a') + (k as u8 - b'a')) % 26 + b'a') as char
+        } else { c }
+    }).collect())
+}
+
+pub fn decode(key: &str, s: &str) -> Option<String> {
+    if key.is_empty() || !key.chars().all(|c| c.is_ascii_lowercase()) { return None; }
+    Some(s.chars().zip(key.chars().cycle()).map(|(c, k)| {
+        if c.is_ascii_lowercase() {
+            (((c as u8 - b'a') + 26 - (k as u8 - b'a')) % 26 + b'a') as char
+        } else { c }
+    }).collect())
+}
+
+pub fn encode_random(s: &str) -> (String, String) {
+    let key: String = (0..100).map(|_| (b'a' + (std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH).unwrap().subsec_nanos() as u8 % 26)) as char)
+        .collect();
+    let encoded = encode(&key, s).unwrap();
+    (key, encoded)
+}
+"#
+        }
+        "accumulate" => {
+            r#"pub fn map<T, U, F: FnMut(T) -> U>(input: Vec<T>, mut function: F) -> Vec<U> {
+    input.into_iter().map(|x| function(x)).collect()
+}
+"#
+        }
+        "robot-name" => {
+            r#"use rand::Rng;
+pub struct RobotFactory { used_names: std::collections::HashSet<String> }
+pub struct Robot { name: String }
+fn gen_name<R: Rng + ?Sized>(rng: &mut R) -> String {
+    // Use next_u32 which is always available on Rng
+    let r = rng.next_u32();
+    let a = ((r % 26) as u8 + b'A') as char;
+    let b = (((r / 26) % 26) as u8 + b'A') as char;
+    let r2 = rng.next_u32();
+    let n1 = (r2 % 10) as u8;
+    let n2 = ((r2 / 10) % 10) as u8;
+    let n3 = ((r2 / 100) % 10) as u8;
+    format!("{a}{b}{n1}{n2}{n3}")
+}
+impl RobotFactory {
+    pub fn new() -> Self { RobotFactory { used_names: std::collections::HashSet::new() } }
+    pub fn new_robot<R: Rng>(&mut self, rng: &mut R) -> Robot {
+        loop {
+            let name = gen_name(rng);
+            if self.used_names.insert(name.clone()) { return Robot { name }; }
+        }
+    }
+}
+impl Robot {
+    pub fn name(&self) -> &str { &self.name }
+    pub fn reset<R: Rng>(&mut self, rng: &mut R) { self.name = gen_name(rng); }
+}
+"#
+        }
+        "beer-song" => {
+            r#"pub fn verse(n: u32) -> String {
+    match n {
+        0 => "No more bottles of beer on the wall, no more bottles of beer.\nGo to the store and buy some more, 99 bottles of beer on the wall.\n".to_string(),
+        1 => "1 bottle of beer on the wall, 1 bottle of beer.\nTake it down and pass it around, no more bottles of beer on the wall.\n".to_string(),
+        2 => "2 bottles of beer on the wall, 2 bottles of beer.\nTake one down and pass it around, 1 bottle of beer on the wall.\n".to_string(),
+        n => format!("{n} bottles of beer on the wall, {n} bottles of beer.\nTake one down and pass it around, {} bottles of beer on the wall.\n", n - 1),
+    }
+}
+pub fn sing(start: u32, end: u32) -> String {
+    (end..=start).rev().map(verse).collect::<Vec<_>>().join("\n")
+}
+"#
+        }
+        "bottle-song" => {
+            r#"pub fn recite(start_bottles: u32, take_down: u32) -> String {
+    fn num_word(n: u32) -> &'static str {
+        match n { 0=>"no", 1=>"One", 2=>"Two", 3=>"Three", 4=>"Four", 5=>"Five",
+            6=>"Six", 7=>"Seven", 8=>"Eight", 9=>"Nine", 10=>"Ten", _ => "" }
+    }
+    fn bottles(n: u32) -> String {
+        let w = num_word(n).to_lowercase();
+        match n { 0 => "no green bottles".to_string(), 1 => format!("{w} green bottle"),
+            _ => format!("{w} green bottles") }
+    }
+    let mut verses = Vec::new();
+    for i in 0..take_down {
+        let n = start_bottles - i;
+        let hanging = bottles(n);
+        let remaining = bottles(n - 1);
+        let cap_hanging = { let mut c = hanging.chars(); match c.next() {
+            Some(f) => f.to_uppercase().collect::<String>() + c.as_str(), None => String::new() }};
+        verses.push(format!("{cap_hanging} hanging on the wall,\n{cap_hanging} hanging on the wall,\nAnd if one green bottle should accidentally fall,\nThere'll be {remaining} hanging on the wall."));
+    }
+    verses.join("\n\n")
+}
+"#
+        }
+        "two-bucket" => {
+            r#"#[derive(PartialEq, Eq, Debug)]
+pub enum Bucket { One, Two }
+#[derive(PartialEq, Eq, Debug)]
+pub struct BucketStats { pub moves: u8, pub goal_bucket: Bucket, pub other_bucket: u8 }
+pub fn solve(cap1: u8, cap2: u8, goal: u8, start: &Bucket) -> Option<BucketStats> {
+    use std::collections::HashSet;
+    let (ca, cb, swap) = match start {
+        Bucket::One => (cap1 as i16, cap2 as i16, false),
+        Bucket::Two => (cap2 as i16, cap1 as i16, true),
+    };
+    let mut visited = HashSet::new();
+    let mut queue = std::collections::VecDeque::new();
+    queue.push_back((0i16, 0i16, 0u8));
+    visited.insert((0i16, 0i16));
+    // Fill start bucket first
+    queue.clear(); visited.clear();
+    queue.push_back((ca, 0, 1));
+    visited.insert((ca, 0));
+    if cb == goal as i16 { visited.insert((ca, cb)); queue.push_back((ca, cb, 1)); /* handled below */ }
+    while let Some((a, b, moves)) = queue.pop_front() {
+        let (real_a, real_b) = if swap { (b, a) } else { (a, b) };
+        if real_a == goal as i16 { return Some(BucketStats { moves, goal_bucket: Bucket::One, other_bucket: real_b as u8 }); }
+        if real_b == goal as i16 { return Some(BucketStats { moves, goal_bucket: Bucket::Two, other_bucket: real_a as u8 }); }
+        let nexts = [
+            (ca, b), (a, cb), (0, b), (a, 0),
+            { let pour = a.min(cb - b); (a - pour, b + pour) },
+            { let pour = b.min(ca - a); (a + pour, b - pour) },
+        ];
+        for (na, nb) in nexts {
+            if na == 0 && nb == cb { continue; } // can't fill other bucket without filling start first
+            if visited.insert((na, nb)) { queue.push_back((na, nb, moves + 1)); }
+        }
+    }
+    None
+}
+"#
+        }
+        "dominoes" => {
+            r#"pub fn chain(input: &[(u8, u8)]) -> Option<Vec<(u8, u8)>> {
+    if input.is_empty() { return Some(Vec::new()); }
+    let n = input.len();
+    let mut used = vec![false; n];
+    let mut path = Vec::with_capacity(n);
+    fn solve(input: &[(u8, u8)], used: &mut Vec<bool>, path: &mut Vec<(u8, u8)>, n: usize) -> bool {
+        if path.len() == n { return path.first().unwrap().0 == path.last().unwrap().1; }
+        let need = if path.is_empty() { None } else { Some(path.last().unwrap().1) };
+        for i in 0..n {
+            if used[i] { continue; }
+            let (a, b) = input[i];
+            for &domino in &[(a, b), (b, a)] {
+                if need.is_none() || need == Some(domino.0) {
+                    used[i] = true;
+                    path.push(domino);
+                    if solve(input, used, path, n) { return true; }
+                    path.pop();
+                    used[i] = false;
+                }
+            }
+        }
+        false
+    }
+    if solve(input, &mut used, &mut path, n) { Some(path) } else { None }
+}
+"#
+        }
+        "poker" => {
+            r#"pub fn winning_hands<'a>(hands: &[&'a str]) -> Vec<&'a str> {
+    fn rank(hand: &str) -> (u8, Vec<u8>) {
+        let mut cards: Vec<(u8, u8)> = hand.split_whitespace().map(|c| {
+            let bytes = c.as_bytes();
+            let (rank_str, suit) = if bytes.len() == 3 { (&c[..2], bytes[2]) } else { (&c[..1], bytes[1]) };
+            let r = match rank_str { "A"=>14, "K"=>13, "Q"=>12, "J"=>11, "10"=>10, s=>s.parse().unwrap() };
+            (r, suit)
+        }).collect();
+        cards.sort_by(|a, b| b.0.cmp(&a.0));
+        let ranks: Vec<u8> = cards.iter().map(|c| c.0).collect();
+        let flush = cards.iter().all(|c| c.1 == cards[0].1);
+        let straight = {
+            let mut s = ranks.windows(2).all(|w| w[0] == w[1] + 1);
+            if !s && ranks == [14, 5, 4, 3, 2] { s = true; }
+            s
+        };
+        let mut counts: std::collections::HashMap<u8, u8> = std::collections::HashMap::new();
+        for &r in &ranks { *counts.entry(r).or_insert(0) += 1; }
+        let mut groups: Vec<(u8, u8)> = counts.into_iter().collect();
+        groups.sort_by(|a, b| b.1.cmp(&a.1).then(b.0.cmp(&a.0)));
+        let pattern: Vec<u8> = groups.iter().map(|g| g.1).collect();
+        let sorted_ranks: Vec<u8> = groups.iter().map(|g| g.0).collect();
+        let hand_rank = if straight && flush && ranks[0] == 14 && ranks[1] == 13 { 9 }
+            else if straight && flush { 8 }
+            else if pattern == [4, 1] { 7 }
+            else if pattern == [3, 2] { 6 }
+            else if flush { 5 }
+            else if straight { 4 }
+            else if pattern == [3, 1, 1] { 3 }
+            else if pattern == [2, 2, 1] { 2 }
+            else if pattern == [2, 1, 1, 1] { 1 }
+            else { 0 };
+        let tie = if straight && ranks == [14, 5, 4, 3, 2] { vec![5, 4, 3, 2, 1] } else { sorted_ranks };
+        (hand_rank, tie)
+    }
+    let ranked: Vec<(&str, (u8, Vec<u8>))> = hands.iter().map(|&h| (h, rank(h))).collect();
+    let best = ranked.iter().map(|(_, r)| r).max().unwrap().clone();
+    ranked.iter().filter(|(_, r)| *r == best).map(|&(h, _)| h).collect()
+}
+"#
+        }
+        "grep" => {
+            r#"use anyhow::Error;
+#[derive(Debug)]
+pub struct Flags { line_numbers: bool, case_insensitive: bool, filenames_only: bool, invert: bool, entire_line: bool }
+impl Flags {
+    pub fn new(flags: &[&str]) -> Self {
+        Flags {
+            line_numbers: flags.contains(&"-n"),
+            case_insensitive: flags.contains(&"-i"),
+            filenames_only: flags.contains(&"-l"),
+            invert: flags.contains(&"-v"),
+            entire_line: flags.contains(&"-x"),
+        }
+    }
+}
+pub fn grep(pattern: &str, flags: &Flags, files: &[&str]) -> Result<Vec<String>, Error> {
+    let multiple = files.len() > 1;
+    let mut results = Vec::new();
+    for &file in files {
+        let content = std::fs::read_to_string(file)?;
+        let mut file_matched = false;
+        for (i, line) in content.lines().enumerate() {
+            let (search_line, search_pattern) = if flags.case_insensitive {
+                (line.to_lowercase(), pattern.to_lowercase())
+            } else {
+                (line.to_string(), pattern.to_string())
+            };
+            let matched = if flags.entire_line { search_line == search_pattern }
+                else { search_line.contains(&search_pattern) };
+            let matched = if flags.invert { !matched } else { matched };
+            if matched {
+                if flags.filenames_only { file_matched = true; break; }
+                let mut result = String::new();
+                if multiple { result.push_str(file); result.push(':'); }
+                if flags.line_numbers { result.push_str(&format!("{}:", i + 1)); }
+                result.push_str(line);
+                results.push(result);
+            }
+        }
+        if flags.filenames_only && file_matched { results.push(file.to_string()); }
+    }
+    Ok(results)
+}
+"#
+        }
+        // pov: tree reparenting without Clone is extremely hard in safe Rust; skip
         _ => return None,
     };
 

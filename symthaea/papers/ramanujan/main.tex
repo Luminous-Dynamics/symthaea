@@ -111,18 +111,38 @@ via symbolic differentiation and then normalizes (polynomial expansion, common-
 factor cancellation, logarithmic identity simplification). If the normalized
 form is exactly zero, the candidate is marked \texttt{PROVEN} without calling Z3.
 
-\subsection{Formal SMT delegation}
-When the normalizer cannot close the expression, the engine converts
-$\neg(\mathrm{d}C/\mathrm{d}t = 0)$ to SMT-LIB2 in the \texttt{QF\_NRA} fragment
-and invokes Z3. Reported statuses:
-\begin{itemize}
-  \item \textbf{PROVEN} --- Z3 returns \texttt{unsat} on the negation.
-  \item \textbf{Numeric} --- trajectory variance below threshold but no symbolic
-        or SMT certificate (e.g.\ transcendental invariants beyond the
-        normalizer's reach).
-  \item \textbf{Approximate} --- variance above threshold; reported as a best-
-        effort candidate.
-\end{itemize}
+\subsection{Two-tier verification}
+
+Symthaea reports two evidence tiers, kept distinct to avoid overclaiming:
+
+\textbf{Tier A (showcase \texttt{PROVEN}).} Symbolic chain-rule derivation
+via \texttt{SymExpr::diff} + \texttt{SymExpr::simplify}, followed by a
+numerical residual check at six generic sample points in phase space. A
+polynomial that simplifies to zero and evaluates to numerical zero at six
+unrelated points is strong evidence of identity; however, in isolation this
+is not a formal proof.
+
+\textbf{Tier B (formal \texttt{unsat}).} For polynomial invariants, the
+companion binary \texttt{verify\_invariants\_formal} emits the SMT-LIB2
+obligation $\exists\mathbf{x} : \mathrm{d}E/\mathrm{d}t \neq 0$ in the
+\texttt{QF\_NRA} fragment, invokes Z3, and commits the witness file under
+\texttt{proofs/}. A return of \texttt{unsat} is a formal proof. Transcendental
+invariants (Lotka--Volterra's $\ln x$) are explicitly marked
+\emph{out-of-scope for QF\_NRA}; they receive Tier A evidence only.
+
+Each row of the headline table below is tagged with whichever tiers apply.
+Readers who require formal proof should open \texttt{proofs/*.smt2} and
+verify with any SMT-LIB2-compliant solver.
+
+\subsection{Implementation note on fractional coefficients}
+
+IEEE-754 \texttt{f64} represents $1/2$ exactly but not $1/3$. The default
+serializer emits $1/3$ as \texttt{0.3333333333333333}, which Z3 reads as a
+literal rational that is not $1/3$, making otherwise-conserved quantities
+appear non-conserved (\texttt{sat}, wrongly). We work around this for
+Hénon--Heiles by verifying $6H$ instead of $H$; since conservation is
+preserved under constant rescaling the implication is sound. A cleaner fix
+--- rational-serialization --- is tracked as Phase 2 work.
 
 \subsection{Physics catalog recognition}
 Discovered invariants are compared dimensionally and structurally against a

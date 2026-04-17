@@ -57,16 +57,29 @@ awk '
 
 echo "[reproduce]   table:  ${TABLE_FILE}"
 
-# Optional: re-verify SMT witnesses if --verify-proofs passed.
+# Optional: regenerate + re-verify SMT witnesses if --verify-proofs passed.
 if [[ "${1:-}" == "--verify-proofs" ]]; then
   if ! command -v z3 > /dev/null 2>&1; then
     echo "[reproduce] z3 not on PATH; skipping independent verification." >&2
     exit 0
   fi
+
+  # Regenerate the SMT-LIB2 witnesses from source. This guarantees the
+  # committed files match what our code currently says, not a stale copy.
+  echo "[reproduce] regenerating SMT-LIB2 witnesses via verify_invariants_formal..."
+  cargo run --release \
+    -p symthaea-physics-bridge \
+    --example verify_invariants_formal \
+    > "${PAPER_DIR}/verify_invariants_results.csv" \
+    2>> "${STDERR_FILE}"
+
+  echo "[reproduce]   witness CSV: ${PAPER_DIR}/verify_invariants_results.csv"
+
+  # Independent re-verification with whichever Z3 is on the reader's PATH.
   echo "[reproduce] re-verifying committed SMT-LIB2 witnesses..."
   proofs_dir="${PAPER_DIR}/proofs"
   if [[ ! -d "${proofs_dir}" ]]; then
-    echo "[reproduce] no committed proofs at ${proofs_dir} yet." >&2
+    echo "[reproduce] no committed proofs at ${proofs_dir}." >&2
     exit 0
   fi
   all_ok=1
