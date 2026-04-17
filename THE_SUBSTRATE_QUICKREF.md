@@ -69,11 +69,23 @@ The *honest counterpart* to feasibility scores. Explicitly acknowledges uncertai
 
 ## Current Integration
 
-`ConsciousnessEquationV2` accepts `substrate_feasibility` in `ConsciousnessStateV2`, but it's **hardcoded to 1.0** in:
-- `consciousness_engine.rs:408`
-- `cycle_subsystems.rs:249`
+`ConsciousnessEquationV2` receives `substrate_feasibility` in `ConsciousnessStateV2`.
+**Production sites are wired to `SubstrateManager::effective_feasibility`** (Roadmap Phase 2, DONE):
+- `src/cognitive_loop/cycle_subsystems.rs:254` — cycle metadata assembly
+- `src/cognitive_loop/cycle_phase_feedback.rs:899` — consciousness feedback
+- `src/cognitive_loop/substrate_manager.rs:502` — telemetry
 
-See `THE_SUBSTRATE_ROADMAP.md` for the plan to wire this dynamically.
+Hardcoded `1.0` now only remains in:
+- `src/cognitive_loop/consciousness_engine/tests.rs` (9 sites — test fixtures with controlled inputs; legitimate)
+- `src/consciousness/measurement/consciousness_equation_v2.rs:194` (default-constructor helper)
+- `examples/evolve_consciousness_equation.rs:155` (example script)
+
+Optional enrichment (not yet wired): `crates/symthaea-quantum-chemistry/WIRING_INSTRUCTIONS.md`
+describes a `quantum-consciousness` feature that would replace the category-based
+feasibility with molecular-physics-derived values (already declared in Cargo.toml,
+bridge crate ready, integration deferred).
+
+See `THE_SUBSTRATE_ROADMAP.md` for the full status across Phases 1–5.
 
 ## Running Tests
 
