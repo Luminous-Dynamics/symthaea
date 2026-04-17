@@ -1,0 +1,259 @@
+% ═════════════════════════════════════════════════════════════════════════
+% Ramanujan Protocol — Autonomous Conservation-Law Discovery
+%
+% This is a DRAFT. The numeric table in Section "Results" is auto-generated
+% by `cargo run -p symthaea-physics-bridge --example ramanujan_showcase`.
+% Run `./reproduce.sh` to regenerate it.
+% ═════════════════════════════════════════════════════════════════════════
+
+\documentclass[11pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{booktabs}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{url}
+\geometry{margin=1in}
+
+\title{%
+  Ramanujan Protocol: Autonomous Conservation-Law Discovery\\
+  \large Genetic symbolic regression with chain-rule verification and Z3 formal proofs%
+}
+\author{Tristan Stoltz\\Luminous Dynamics\\\texttt{tristan.stoltz@evolvingresonantcocreationism.com}}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We present the Ramanujan Protocol, a pipeline that rediscovers conservation laws
+of canonical dynamical systems directly from their differential equations,
+without access to analytic solutions, textbook hints, or numerical labels. The
+method combines grammar-guided genetic symbolic regression over expression
+trees, symbolic verification of conservation via the chain rule, and formal
+proof delegation to the Z3 SMT solver for the invariants that admit polynomial
+or polynomial-with-reciprocal encoding. Applied to six canonical systems
+(harmonic oscillator, Lotka--Volterra, Kepler two-body, Hénon--Heiles,
+anisotropic coupled oscillator, and the circular restricted three-body
+problem), the pipeline recovers the exact analytic conservation laws in five
+cases and an approximate but numerically conserved quantity in the sixth, with
+deterministic reproducibility (fixed seed $=42$) and machine-checkable witnesses.
+We publish all code, fixed-seed outputs, and SMT-LIB2 proof witnesses; any
+reader with Docker or a local Rust + Z3 toolchain can regenerate the results
+end-to-end in under thirty minutes.
+\end{abstract}
+
+% ═════════════════════════════════════════════════════════════════════════
+\section{Introduction}
+
+Conservation laws are the fingerprints of dynamical symmetry
+\cite{noether1918invariante}. Recovering them from raw trajectory data is the
+central task of machine-assisted physics discovery. Existing symbolic
+regression systems (AI Feynman~\cite{udrescu2020ai}, PySR~\cite{cranmer2023pysr}) achieve
+high accuracy on the Feynman equation benchmark, but they typically operate
+against \emph{functional} data: supervised $f(x_1, \dots, x_n) \to y$ pairs,
+often generated from the analytic target. The conservation-law task is
+structurally different: the discovery target is a scalar function $C(x)$ whose
+Lie derivative along the flow is zero, which is never directly labeled.
+
+This paper describes a pipeline, implemented in the open-source \texttt{symthaea}
+codebase, that combines three existing pieces and one custom component:
+
+\begin{enumerate}
+  \item Grammar-guided genetic programming over a rich expression grammar
+        (arithmetic, powers, exponentials, logarithms, trigonometric and
+        inverse-trigonometric functions).
+  \item A fitness function combining \emph{trajectory variance}, Occam
+        parsimony via Akaike Information Criterion, and scale invariance.
+  \item Symbolic chain-rule verification: given symbolic dynamics $\dot{x} = f(x)$
+        and a candidate $C$, compute $\nabla C \cdot f$ analytically and test
+        whether the resulting expression simplifies to zero.
+  \item Formal SMT delegation: when $\nabla C \cdot f$ cannot be simplified to
+        zero by the local normalizer, emit an SMT-LIB2 query $\neg(\nabla C \cdot
+        f = 0)$ and call Z3 in the non-linear real arithmetic fragment. A
+        certificate of \texttt{unsat} is a formal proof of conservation.
+\end{enumerate}
+
+No single component is novel; the contribution is the integrated pipeline, its
+determinism, its open-source reproducibility, and the honest reporting that
+one of the six test problems (PCR3BP) is rediscovered only approximately
+rather than exactly.
+
+% ═════════════════════════════════════════════════════════════════════════
+\section{Method}
+
+\subsection{Expression grammar}
+The expression space is a grammar-sampled AST over variables $x_i$, integer
+constants $\in \{-2, -1, 1, 2, 3\}$, and nonterminals
+\[
+E ::= V \mid C \mid E + E \mid E \cdot E \mid -E \mid E^k \mid \sqrt{E} \mid \ln E \mid \sin E \mid \cos E \mid \frac{1}{E}
+\]
+bounded by depth and size penalties.
+
+\subsection{Fitness}
+For a sampled trajectory $\{x(t_i)\}_{i=1}^N$ and candidate $C$,
+\[
+\mathrm{fitness}(C) = \operatorname{Var}_i C(x(t_i)) + \lambda \cdot \mathrm{size}(C).
+\]
+Candidates are kept if $\operatorname{Var} < 10^{-6}$.
+
+\subsection{Chain-rule verification}
+Given symbolic dynamics $\dot{x_i} = f_i(x)$ and candidate $C$, the engine
+computes the total derivative
+\[
+\frac{\mathrm{d}C}{\mathrm{d}t} = \sum_i \frac{\partial C}{\partial x_i} f_i
+\]
+via symbolic differentiation and then normalizes (polynomial expansion, common-
+factor cancellation, logarithmic identity simplification). If the normalized
+form is exactly zero, the candidate is marked \texttt{PROVEN} without calling Z3.
+
+\subsection{Formal SMT delegation}
+When the normalizer cannot close the expression, the engine converts
+$\neg(\mathrm{d}C/\mathrm{d}t = 0)$ to SMT-LIB2 in the \texttt{QF\_NRA} fragment
+and invokes Z3. Reported statuses:
+\begin{itemize}
+  \item \textbf{PROVEN} --- Z3 returns \texttt{unsat} on the negation.
+  \item \textbf{Numeric} --- trajectory variance below threshold but no symbolic
+        or SMT certificate (e.g.\ transcendental invariants beyond the
+        normalizer's reach).
+  \item \textbf{Approximate} --- variance above threshold; reported as a best-
+        effort candidate.
+\end{itemize}
+
+\subsection{Physics catalog recognition}
+Discovered invariants are compared dimensionally and structurally against a
+catalog of 128 landmark physics equations (Maxwell, Einstein, Schrödinger,
+Dirac, Yang--Mills, Navier--Stokes, Friedmann, etc.). The recognition module
+emits a headline string and a similarity score.
+
+% ═════════════════════════════════════════════════════════════════════════
+\section{Experiments}
+
+Six canonical dynamical systems span a range of difficulty:
+
+\begin{enumerate}
+  \item \textbf{Harmonic oscillator} --- analytic $E = x^2 + v^2$, polynomial,
+        easy.
+  \item \textbf{Lotka--Volterra} --- analytic $V = x - \ln x + y - \ln y$,
+        transcendental.
+  \item \textbf{Kepler two-body} --- two simultaneous invariants: energy
+        $E = \tfrac{1}{2}|\mathbf{v}|^2 - 1/r$ and angular momentum
+        $L = xv_y - yv_x$.
+  \item \textbf{Hénon--Heiles} --- chaotic 4D Hamiltonian; analytic energy
+        invariant but no second integral in chaos.
+  \item \textbf{Anisotropic coupled oscillator (``Mystery ODE'')} ---
+        $H = \tfrac{1}{2}(p_x^2 + p_y^2) + x^2 + y^2 + xy$; rediscovered
+        without being in any standard catalog.
+  \item \textbf{PCR3BP (Circular Restricted Three-Body)} --- Jacobi integral
+        $C_J$, known hard for symbolic regression.
+\end{enumerate}
+
+All runs share fixed configuration: pop size 250, generations 80 (transcendental
+targets use 500/200), seed $42$, $t_{\max} = 20$, $\mathrm{d}t = 0.01$.
+
+% ═════════════════════════════════════════════════════════════════════════
+\section{Results}
+
+The headline table below is produced verbatim by the showcase binary:
+
+% === BEGIN AUTO-GENERATED TABLE ===
+% cargo run -p symthaea-physics-bridge --example ramanujan_showcase --release
+% tail -N output; copy the \begin{table} … \end{table} block here
+\begin{table}[htbp]
+\centering
+\caption{Placeholder --- regenerated by \texttt{reproduce.sh}.}
+\label{tab:ramanujan_showcase}
+\begin{tabular}{lllll}
+\toprule
+System & Domain & Discovered Invariant & Verification & Catalog Match \\
+\midrule
+\textit{(table auto-generated)} & & & & \\
+\bottomrule
+\end{tabular}
+\end{table}
+% === END AUTO-GENERATED TABLE ===
+
+\subsection{Determinism}
+All runs use seed 42. The same host produces bit-identical LaTeX output across
+invocations; cross-host reproduction matches provided that Z3 is the same major
+version (we pin Z3 4.13 in the Dockerfile).
+
+\subsection{Honest failure: PCR3BP}
+The circular restricted three-body problem has a known closed-form invariant,
+the Jacobi integral, but our current fitness + expression grammar fails to
+recover it exactly. The pipeline returns a best-effort candidate whose
+trajectory variance exceeds threshold. We document this failure rather than
+suppress it; closing this gap is Phase 2 work and will require a richer
+expression grammar (log-of-polynomial terms and nested radicals).
+
+% ═════════════════════════════════════════════════════════════════════════
+\section{Reproducibility}
+
+The complete pipeline, all code, seed configuration, and Z3 witnesses are in
+the public \texttt{symthaea} repository. To reproduce the table above:
+
+\begin{verbatim}
+# Option A: Docker (no local toolchain required)
+cd papers/ramanujan
+docker build -t ramanujan-repro .
+docker run --rm ramanujan-repro
+
+# Option B: Local (requires Rust stable + Z3 4.13)
+cd papers/ramanujan
+./reproduce.sh
+\end{verbatim}
+
+The Z3 proof witnesses for each \texttt{PROVEN} invariant are committed under
+\texttt{papers/ramanujan/proofs/}. A reader with any SMT-LIB2-compliant solver
+can re-check them without running any Rust code.
+
+% ═════════════════════════════════════════════════════════════════════════
+\section{Limitations}
+
+\begin{itemize}
+  \item Current expression grammar does not include nested radicals or
+        \texttt{atan2}, which excludes several known invariants.
+  \item Z3 is used only in the \texttt{QF\_NRA} fragment; transcendental
+        conservation laws (Lotka--Volterra) are verified only numerically, not
+        formally.
+  \item Physics catalog recognition is structural, not semantic; matches to
+        catalog entries should be read as ``structurally resembles'', not
+        ``provably is''.
+  \item The pipeline assumes access to symbolic dynamics $f(x)$. Trajectory-only
+        discovery is Phase 2 work.
+\end{itemize}
+
+% ═════════════════════════════════════════════════════════════════════════
+\section*{Acknowledgements}
+
+This work was developed as part of the open-source \texttt{symthaea} project at
+Luminous Dynamics. No funding, no institutional affiliation, no gatekeeping.
+
+% ═════════════════════════════════════════════════════════════════════════
+\begin{thebibliography}{9}
+
+\bibitem{noether1918invariante}
+E.~Noether,
+\emph{Invariante Variationsprobleme},
+Nachrichten von der Gesellschaft der Wissenschaften zu Göttingen, 1918.
+
+\bibitem{udrescu2020ai}
+S.-M.~Udrescu and M.~Tegmark,
+\emph{AI Feynman: A Physics-Inspired Method for Symbolic Regression},
+Science Advances, 2020.
+
+\bibitem{cranmer2023pysr}
+M.~Cranmer,
+\emph{Interpretable Machine Learning for Science with PySR and SymbolicRegression.jl},
+arXiv:2305.01582, 2023.
+
+\bibitem{demoura2008z3}
+L.~de Moura and N.~Bjørner,
+\emph{Z3: An Efficient SMT Solver},
+TACAS, 2008.
+
+\end{thebibliography}
+
+\end{document}
