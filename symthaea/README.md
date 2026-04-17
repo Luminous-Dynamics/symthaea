@@ -119,6 +119,8 @@ cd papers/binius-hdc && bash reproduce.sh
 cargo run --features psych_bench --example run_all_benchmarks
 ```
 
+`psych-bench` is an internal benchmark suite. For the honest per-module status of math and science capabilities (Lie theory, Langlands, thermodynamics, persistent homology, frontier physics, etc.), see [`MODULE_STATUS.md`](MODULE_STATUS.md). External-benchmark results (miniF2F, PutnamBench, ARC-AGI-2) are planned for Phase 1.
+
 ### Key Research Claims
 
 - **256x constraint reduction** for HDC XOR binding in binary-field STARKs (measured, same scale)

@@ -2,6 +2,8 @@
 
 Honest per-capability assessment of Symthaea's current state as of March 2026.
 
+**See also:** [`MODULE_STATUS.md`](MODULE_STATUS.md) — per-module audit of math and science capabilities (Lie theory, Langlands, thermodynamics, measure theory, frontier physics, etc.), distinct from the per-capability pipeline/consciousness assessment below. `MODULE_STATUS.md` is the source of truth for "what does module X actually implement and test", while this document assesses end-to-end capabilities of the cognitive loop.
+
 ## Status Levels
 
 | Level | Meaning |
