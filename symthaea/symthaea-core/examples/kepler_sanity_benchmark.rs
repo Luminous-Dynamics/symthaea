@@ -82,6 +82,11 @@ fn kepler_priors() -> Vec<Expr> {
 }
 
 fn run_kepler(seed: u64, priors: &[Expr]) -> Vec<AutonomousInvariant> {
+    // Session 27: uses the `for_autonomous_discovery()` preset that
+    // bundles the S19 (exclude_trig), S21 (diverse_trajectory),
+    // S24 (prior_composition), and S25 (prior_fragment_bonus)
+    // defaults validated by this very benchmark. Callers override
+    // only problem-specific fields (pop, gens, depth, complexity).
     let config = RegressorConfig {
         seed,
         population_size: POP_SIZE,
@@ -90,11 +95,7 @@ fn run_kepler(seed: u64, priors: &[Expr]) -> Vec<AutonomousInvariant> {
         max_complexity: 24,
         lambda: 0.0005,
         mutation_rate: 0.35,
-        exclude_trig: true,
-        diverse_trajectory_count: 5,
-        prior_composition_rate: 0.15,
-        prior_fragment_bonus: 0.5,
-        ..RegressorConfig::default()
+        ..RegressorConfig::for_autonomous_discovery()
     };
     discover_invariants_autonomous_with_seed_templates(
         kepler_rhs,

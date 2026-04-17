@@ -677,6 +677,59 @@ impl Default for RegressorConfig {
     }
 }
 
+impl RegressorConfig {
+    /// Preset tuned for autonomous multivariate invariant discovery.
+    ///
+    /// This is the configuration validated by the Ramanujan Protocol's
+    /// twelve-session arc (Sessions 15-26, Apr 17 2026), including the
+    /// S26 Kepler control experiment that recovered angular momentum
+    /// verbatim in 5/5 seeds at machine-epsilon variance.
+    ///
+    /// Settings:
+    /// - `exclude_trig: true` — drops Sin/Cos from the unary function
+    ///   set. Session 19 showed trig functions produce low-variance
+    ///   degenerate fits (e.g. `cos(y³)·c`) that crowd out Kepler-shaped
+    ///   primitives during multivariate discovery.
+    /// - `diverse_trajectory_count: 5` — fitness is evaluated as MAX
+    ///   variance across 5 perturbed-IC orbits instead of one.
+    ///   Session 21 showed this prevents "accidentally-near-constant
+    ///   on this specific orbit" from beating true conservation laws.
+    /// - `prior_composition_rate: 0.15` — 15% of children are
+    ///   `op(prior_A, prior_B)` for random distinct pinned priors.
+    ///   Session 24 produced the arc's first 2-piece composite
+    ///   (`1/r₁ − 1/r_origin`) with this rate.
+    /// - `prior_fragment_bonus: 0.5` — fitness is halved per pinned
+    ///   prior appearing as exact subtree. Session 25 showed this
+    ///   gives the best-reliability condition (4/5 survivors, lowest
+    ///   variance).
+    ///
+    /// Callers can still override any field after construction.
+    /// Leaves `population_size`, `generations`, `seed` etc. at the
+    /// default values — callers should set these for their target.
+    ///
+    /// # Example
+    /// ```no_run
+    /// use symthaea_core::hdc::conjecture_engine::RegressorConfig;
+    /// let cfg = RegressorConfig {
+    ///     seed: 42,
+    ///     population_size: 300,
+    ///     generations: 100,
+    ///     max_depth: 6,
+    ///     max_complexity: 24,
+    ///     ..RegressorConfig::for_autonomous_discovery()
+    /// };
+    /// ```
+    pub fn for_autonomous_discovery() -> Self {
+        Self {
+            exclude_trig: true,
+            diverse_trajectory_count: 5,
+            prior_composition_rate: 0.15,
+            prior_fragment_bonus: 0.5,
+            ..Self::default()
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct SeedSpecializationStats {
     pub variants_scored: usize,
