@@ -183,6 +183,31 @@ fn run_with_budget_and_composition(
     gens: usize,
     composition_rate: f64,
 ) -> Vec<AutonomousInvariant> {
+    run_s25(
+        seed,
+        priors,
+        exclude_trig,
+        diverse_n,
+        pop,
+        gens,
+        composition_rate,
+        1.0, // no fragment bonus
+    )
+}
+
+/// Session 25: extends run_with_budget_and_composition with
+/// prior_fragment_bonus. When < 1, fitness is multiplied by
+/// `bonus^k` for k pinned-prior-subtree matches in the expression.
+fn run_s25(
+    seed: u64,
+    priors: &[Expr],
+    exclude_trig: bool,
+    diverse_n: usize,
+    pop: usize,
+    gens: usize,
+    composition_rate: f64,
+    fragment_bonus: f64,
+) -> Vec<AutonomousInvariant> {
     let config = RegressorConfig {
         seed,
         population_size: pop,
@@ -194,6 +219,7 @@ fn run_with_budget_and_composition(
         exclude_trig,
         diverse_trajectory_count: diverse_n,
         prior_composition_rate: composition_rate,
+        prior_fragment_bonus: fragment_bonus,
         ..RegressorConfig::default()
     };
     discover_invariants_autonomous_with_seed_templates(
@@ -371,6 +397,22 @@ fn main() {
         .collect();
     aggregate("cheat + composit", &cheat_comp);
 
+    println!(
+        "\n━━━ Jacobi cheat + composition-0.15 + fragment-bonus-0.5 (Session 25) ━━━"
+    );
+    println!("  each pinned prior matched as subtree halves fitness → composites reliably win");
+    let cheat_frag: Vec<SeedResult> = SEEDS
+        .iter()
+        .map(|&seed| {
+            summarize(
+                "cheat-F",
+                seed,
+                &run_s25(seed, &cheat, true, 5, 300, 100, 0.15, 0.5),
+            )
+        })
+        .collect();
+    aggregate("cheat + fragment", &cheat_frag);
+
     println!("\n━━━ Head-to-head per seed (primed vs cold, trig allowed) ━━━");
     head_to_head("cold vs primed", &cold, &primed);
 
@@ -396,6 +438,11 @@ fn main() {
         "\n━━━ Head-to-head per seed (cheat-C vs cheat-HB — Session 24 composition) ━━━"
     );
     head_to_head("cheat-HB vs cheat-C", &cheat_hb, &cheat_comp);
+
+    println!(
+        "\n━━━ Head-to-head per seed (cheat-F vs cheat-C — Session 25 fragment bonus) ━━━"
+    );
+    head_to_head("cheat-C vs cheat-F", &cheat_comp, &cheat_frag);
 
     println!("\n━━━ Degeneracy accounting: formulas containing cos/sin ━━━");
     for (label, runs) in [
@@ -430,6 +477,7 @@ fn main() {
         ("cheat+diverse-5", &cheat_div),
         ("cheat+high-bud ", &cheat_hb),
         ("cheat+composit ", &cheat_comp),
+        ("cheat+fragment ", &cheat_frag),
     ] {
         let jacobi_count = runs
             .iter()
