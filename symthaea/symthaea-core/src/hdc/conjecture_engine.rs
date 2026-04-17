@@ -9237,6 +9237,153 @@ mod tests {
 
     #[cfg(feature = "abstract_thought")]
     #[test]
+    fn test_kepler_to_pcr3bp_curriculum_forwards_macros() {
+        // Session 16 curriculum probe.
+        //
+        // Verifies the bidirectional macros↔autonomous feedback loop end
+        // to end across two related but distinct physical systems. The
+        // flow we're testing:
+        //   1. A Kepler-derived macro (angular momentum x*vy - y*vx) is
+        //      seeded into the active grammar, representing what a prior
+        //      Kepler run would have produced.
+        //   2. PCR3BP is run via discover_and_ingest_autonomous_invariants
+        //      on the same engine.
+        //      - Internally that method calls
+        //        autonomous_macro_templates_for_vars([x,y,vx,vy]),
+        //      - forwards the result to
+        //        discover_invariants_autonomous_with_seed_templates,
+        //      - which mixes them into the initial GP population.
+        //   3. The test asserts the bridge actually forwards the Kepler
+        //      macro AND that the PCR3BP call completes without
+        //      corrupting engine state.
+        //
+        // This is a smoke test for the feedback loop, NOT a proof that
+        // priming accelerates PCR3BP discovery (that's a benchmark-scale
+        // claim deferred to Session 17+). But it locks in the regression
+        // where Kepler macros would fail to flow through to a subsequent
+        // multivariate run on the same engine.
+        use crate::hdc::abstract_thought::dynamic_grammar::MacroOperator;
+
+        fn pcr3bp_rhs(s: &[f64], _t: f64) -> Vec<f64> {
+            const MU: f64 = 0.01215; // Earth-Moon mass ratio
+            let (x, y, vx, vy) = (s[0], s[1], s[2], s[3]);
+            let dx1 = x + MU;
+            let dx2 = x - 1.0 + MU;
+            let r1_sq = dx1 * dx1 + y * y;
+            let r2_sq = dx2 * dx2 + y * y;
+            if r1_sq < 1e-12 || r2_sq < 1e-12 {
+                return vec![vx, vy, 0.0, 0.0];
+            }
+            let r1_3 = r1_sq * r1_sq.sqrt();
+            let r2_3 = r2_sq * r2_sq.sqrt();
+            let ax = 2.0 * vy + x - (1.0 - MU) * dx1 / r1_3 - MU * dx2 / r2_3;
+            let ay = -2.0 * vx + y - (1.0 - MU) * y / r1_3 - MU * y / r2_3;
+            vec![vx, vy, ax, ay]
+        }
+
+        let mut engine = ConjectureEngine::new();
+        engine.enable_abstract_thought();
+
+        // ── Stage 1: inject the Kepler-derived macro ─────────────────
+        // Angular momentum L = x*vy - y*vx. Deterministically placed
+        // rather than produced by GP so the test doesn't flake on
+        // discovery noise; the GP-discovery path is separately covered by
+        // test_discover_and_ingest_autonomous_invariants_uses_engine_feedback_path.
+        let ang_mom = Expr::BinOp(
+            BinOp::Sub,
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
+                Box::new(Expr::Var("x".into())),
+                Box::new(Expr::Var("vy".into())),
+            )),
+            Box::new(Expr::BinOp(
+                BinOp::Mul,
+                Box::new(Expr::Var("y".into())),
+                Box::new(Expr::Var("vx".into())),
+            )),
+        );
+        {
+            let at = engine.abstract_thought.as_mut().unwrap();
+            at.dynamic_grammar.operators.push(MacroOperator {
+                name: "KEPLER_L".into(),
+                canonical: crate::hdc::abstract_thought::expr_canonical_string(&ang_mom),
+                template: ang_mom.clone(),
+                arity: 0,
+                promotion_tier: MacroPromotionTier::Formal,
+                source_conjectures: vec![],
+                parent_formulas: vec![format!("{}", ang_mom)],
+                vars_used: crate::hdc::abstract_thought::expr_variables(&ang_mom),
+                var_count: 4,
+                signature: crate::hdc::abstract_thought::expr_signature(&ang_mom),
+                source_count: 1,
+                usage_count: 0,
+                created_at: 0,
+            });
+        }
+
+        let vars = ["x", "y", "vx", "vy"];
+        let seeds_before = engine.autonomous_macro_templates_for_vars(&vars);
+        assert_eq!(
+            seeds_before.len(),
+            1,
+            "the seeded Kepler macro must be visible to the autonomous bridge"
+        );
+        assert_eq!(format!("{}", seeds_before[0]), format!("{}", ang_mom));
+
+        // ── Stage 2: PCR3BP run receives the Kepler macro as seed ────
+        let config = RegressorConfig {
+            population_size: 120,
+            generations: 20,
+            max_depth: 5,
+            max_complexity: 18,
+            lambda: 0.0005,
+            mutation_rate: 0.35,
+            seed: 7,
+            ..RegressorConfig::default()
+        };
+        let pcr3bp_invariants = engine.discover_and_ingest_autonomous_invariants(
+            "pcr3bp",
+            MathDomain::Physics,
+            pcr3bp_rhs,
+            &[0.8, 0.1, 0.05, 0.3],
+            &vars,
+            None,
+            &config,
+            6.0,
+            0.003,
+        );
+
+        // The bridge round-trips: every invariant produced by the
+        // autonomous discoverer for "pcr3bp" ends up in engine.conjectures.
+        assert_eq!(
+            pcr3bp_invariants.len(),
+            engine
+                .conjectures
+                .iter()
+                .filter(|c| c.source == "pcr3bp")
+                .count(),
+            "PCR3BP invariants must round-trip into the conjecture pool"
+        );
+
+        // The Kepler macro survives the PCR3BP run — it was not pruned
+        // as an unused macro during intermediate prune cycles because it
+        // may or may not be used; we just confirm the pool still knows
+        // about it after Stage 2.
+        let seeds_after = engine.autonomous_macro_templates_for_vars(&vars);
+        assert!(
+            seeds_after
+                .iter()
+                .any(|e| format!("{}", e) == format!("{}", ang_mom)),
+            "Kepler angular-momentum macro must persist through PCR3BP run; got {:?}",
+            seeds_after
+                .iter()
+                .map(|e| format!("{}", e))
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[cfg(feature = "abstract_thought")]
+    #[test]
     fn test_macro_pool_metrics_report_quality_summary() {
         use crate::hdc::abstract_thought::dynamic_grammar::MacroOperator;
 
