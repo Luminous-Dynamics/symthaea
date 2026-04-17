@@ -3543,14 +3543,14 @@ pub fn solve(input: &str) -> Option<HashMap<char, u8>> {
 "#
         }
         "fizzy" => {
-            r#"pub struct Matcher<T> { matcher: Box<dyn Fn(&T) -> bool>, subs: String }
+            r#"pub struct Matcher<T> { matcher: Box<dyn Fn(T) -> bool>, subs: String }
 impl<T> Matcher<T> {
-    pub fn new<F: Fn(&T) -> bool + 'static, S: ToString>(matcher: F, subs: S) -> Matcher<T> {
+    pub fn new<F: Fn(T) -> bool + 'static, S: ToString>(matcher: F, subs: S) -> Matcher<T> {
         Matcher { matcher: Box::new(matcher), subs: subs.to_string() }
     }
 }
 pub struct Fizzy<T> { matchers: Vec<Matcher<T>> }
-impl<T: ToString> Fizzy<T> {
+impl<T: ToString + Copy> Fizzy<T> {
     pub fn new() -> Self { Fizzy { matchers: Vec::new() } }
     #[must_use]
     pub fn add_matcher(mut self, matcher: Matcher<T>) -> Self { self.matchers.push(matcher); self }
@@ -3559,7 +3559,7 @@ impl<T: ToString> Fizzy<T> {
         iter.map(move |item| {
             let mut result = String::new();
             for m in &matchers {
-                if (m.matcher)(&item) { result.push_str(&m.subs); }
+                if (m.matcher)(item) { result.push_str(&m.subs); }
             }
             if result.is_empty() { item.to_string() } else { result }
         })
@@ -3567,8 +3567,8 @@ impl<T: ToString> Fizzy<T> {
 }
 pub fn fizz_buzz<T: std::ops::Rem<Output = T> + From<u8> + PartialEq + ToString + Copy + 'static>() -> Fizzy<T> {
     Fizzy::new()
-        .add_matcher(Matcher::new(|n: &T| *n % T::from(3u8) == T::from(0u8), "fizz"))
-        .add_matcher(Matcher::new(|n: &T| *n % T::from(5u8) == T::from(0u8), "buzz"))
+        .add_matcher(Matcher::new(|n: T| n % T::from(3u8) == T::from(0u8), "fizz"))
+        .add_matcher(Matcher::new(|n: T| n % T::from(5u8) == T::from(0u8), "buzz"))
 }
 "#
         }
@@ -3640,13 +3640,14 @@ impl<'a> Xorcism<'a> {
             self.pos += 1;
         }
     }
-    pub fn munge<Data: IntoIterator>(&mut self, data: Data) -> impl Iterator<Item = u8> + '_
-    where Data::Item: std::borrow::Borrow<u8>
+    pub fn munge<Data>(&mut self, data: Data) -> impl Iterator<Item = u8>
+    where Data: IntoIterator, Data::Item: Into<u8>
     {
         let key = self.key.to_vec();
         let start_pos = self.pos;
         let items: Vec<u8> = data.into_iter().enumerate().map(|(i, b)| {
-            *b.borrow() ^ key[(start_pos + i) % key.len()]
+            let byte: u8 = b.into();
+            byte ^ key[(start_pos + i) % key.len()]
         }).collect();
         self.pos += items.len();
         items.into_iter()
