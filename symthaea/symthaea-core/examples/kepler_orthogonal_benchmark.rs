@@ -106,6 +106,32 @@ fn run_stage1(seed: u64, priors: &[Expr]) -> Vec<AutonomousInvariant> {
 }
 
 fn run_stage2(seed: u64, priors: &[Expr], known: Vec<Expr>) -> Vec<AutonomousInvariant> {
+    run_with_ic(seed, priors, known, [1.0, 0.0, 0.0, 1.0])
+}
+
+/// Stage 3: same pipeline as stage 2, but on an ECCENTRIC orbit.
+///
+/// Initial condition `[1.5, 0, 0, 0.6]` gives a bound elliptical orbit
+/// with eccentricity ≈ 0.46 (vs stage 2's e = 0 circular orbit). On a
+/// circular orbit, `r` and `v` stay near-constant, so single primitives
+/// like `1/r` are themselves near-conserved — no pressure to compose.
+/// On an eccentric orbit, `r` varies between perihelion and aphelion,
+/// `1/r` varies substantially, and only the true Hamiltonian
+/// `E = 0.5v² − 1/r` remains constant by physics.
+///
+/// If energy appears in stage 3 but not stage 2, the "composition
+/// ceiling" identified after S29 was a circular-orbit artifact, not
+/// a real mechanism problem.
+fn run_stage3(seed: u64, priors: &[Expr], known: Vec<Expr>) -> Vec<AutonomousInvariant> {
+    run_with_ic(seed, priors, known, [1.5, 0.0, 0.0, 0.6])
+}
+
+fn run_with_ic(
+    seed: u64,
+    priors: &[Expr],
+    known: Vec<Expr>,
+    ic: [f64; 4],
+) -> Vec<AutonomousInvariant> {
     let config = RegressorConfig {
         seed,
         population_size: POP_SIZE,
@@ -114,8 +140,6 @@ fn run_stage2(seed: u64, priors: &[Expr], known: Vec<Expr>) -> Vec<AutonomousInv
         max_complexity: 24,
         lambda: 0.0005,
         mutation_rate: 0.35,
-        // S29: enable orthogonality. 1000× fitness penalty for
-        // candidates whose gradient aligns with known_invariants.
         orthogonality_penalty: 1000.0,
         orthogonality_threshold: 0.9,
         known_invariants: known,
@@ -123,7 +147,7 @@ fn run_stage2(seed: u64, priors: &[Expr], known: Vec<Expr>) -> Vec<AutonomousInv
     };
     discover_invariants_autonomous_with_seed_templates(
         kepler_rhs,
-        &[1.0, 0.0, 0.0, 1.0],
+        &ic,
         &["x", "y", "vx", "vy"],
         None,
         &config,
@@ -220,13 +244,23 @@ fn main() {
         .collect();
     let (s1_am, s1_en, s1_ir) = report_stage("stage1", &stage1_runs);
 
-    println!("\n━━━ Stage 2: orthogonality penalty ON, L as known_invariant ━━━");
+    println!("\n━━━ Stage 2: orth ON + CIRCULAR orbit [1, 0, 0, 1] ━━━");
     let known = vec![ang_mom_canonical()];
     let stage2_runs: Vec<(u64, Vec<AutonomousInvariant>)> = SEEDS
         .iter()
         .map(|&seed| (seed, run_stage2(seed, &priors, known.clone())))
         .collect();
     let (s2_am, s2_en, s2_ir) = report_stage("stage2", &stage2_runs);
+
+    println!("\n━━━ Stage 3: orth ON + ECCENTRIC orbit [1.5, 0, 0, 0.6], e≈0.46 ━━━");
+    println!("  Tests whether 'composition ceiling' is real or circular-orbit artifact.");
+    println!("  On circular orbits, 1/r is itself near-conserved (r=const).");
+    println!("  On eccentric orbits, 1/r varies — only true energy is near-conserved.");
+    let stage3_runs: Vec<(u64, Vec<AutonomousInvariant>)> = SEEDS
+        .iter()
+        .map(|&seed| (seed, run_stage3(seed, &priors, known.clone())))
+        .collect();
+    let (s3_am, s3_en, s3_ir) = report_stage("stage3", &stage3_runs);
 
     println!("\n━━━ Pool-wide discovery accounting ━━━");
     println!(
@@ -260,21 +294,42 @@ fn main() {
         s2_ir,
         SEEDS.len()
     );
+    println!();
+    println!(
+        "  Stage 3 — seeds with any ang_mom in top-10:     {} / {}",
+        s3_am,
+        SEEDS.len()
+    );
+    println!(
+        "  Stage 3 — seeds with any energy-like in top-10: {} / {}",
+        s3_en,
+        SEEDS.len()
+    );
+    println!(
+        "  Stage 3 — seeds with any 1/r in top-10:         {} / {}",
+        s3_ir,
+        SEEDS.len()
+    );
 
     println!("\n━━━ Verdict ━━━");
-    if s2_en >= 3 {
+    if s3_en >= 3 {
+        println!("  ✓ ENERGY EMERGES ON ECCENTRIC ORBIT.");
+        println!("    The 'composition ceiling' was a circular-orbit artifact — on a");
+        println!("    varied orbit, only the true Hamiltonian is near-conserved and");
+        println!("    the GP is forced toward it. No new mechanism needed.");
+    } else if s3_en >= 1 {
+        println!("  ± SIGNAL ON ECCENTRIC: energy in ≥1/5 stage-3 pools.");
+        println!("    Composition partially works on varied orbits; may need more seeds");
+        println!("    or iterative orthogonality (S30 candidate) to push to reliable 3+.");
+    } else if s2_en >= 3 {
         println!(
-            "  ✓ CEILING CLOSED: energy appears in ≥3/5 stage-2 top-10 pools."
+            "  ✓ CEILING CLOSED on circular (stage 2). Eccentric still needs work."
         );
-        println!("    Gradient-orthogonality penalty unshadows the second invariant.");
     } else if s2_en >= 1 || s2_ir >= 3 {
-        println!("  ± PARTIAL WIN: some energy/inv_r shapes now visible (was 0/5 in S28).");
-        println!("    Orthogonality mechanism works; may need stronger penalty or more gens.");
-    } else if s2_am < s1_am {
-        println!("  ~ SIGNAL BUT NO TARGET: ang_mom suppressed but energy not recovered.");
-        println!("    Penalty is too strong; try smaller penalty or looser threshold.");
+        println!("  ± PARTIAL WIN (stage 2): some 1/r visible but no energy either orbit.");
+        println!("    Composition ceiling appears real — S30 iterative orthogonality next.");
     } else {
-        println!("  ✗ NO CHANGE: penalty didn't bite.");
+        println!("  ✗ NO CHANGE: penalty didn't bite even on circular.");
         println!("    Check: gradient computation, threshold, known_invariant wiring.");
     }
 }
