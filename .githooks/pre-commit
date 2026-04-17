@@ -58,37 +58,52 @@ if [ -n "$STAGED_ALL" ]; then
 fi
 fi  # end merge-skip wrapper
 
-# ─── cargo fmt on staged Rust files ──────────────────────────────────
+# ─── rustfmt on staged Rust files ────────────────────────────────────
+#
+# Scope: ONLY the files this commit is staging. We do NOT run
+# `cargo fmt --all --check` because that checks the entire workspace,
+# which in a monorepo with 12+ concurrent sessions means you inherit
+# every other session's unformatted in-flight code as a blocker. That
+# punishes the committer for someone else's debt and blocks all useful
+# work until somebody pays off the sweep.
+#
+# Using `rustfmt` directly (not `cargo fmt`) also sidesteps workspace
+# metadata resolution, which fails when any member crate has a stale
+# module declaration pointing at a file that hasn't been written yet —
+# a common state during concurrent multi-session development.
+#
+# Edition defaults to 2021 here; per-crate `rustfmt.toml` can override
+# other options (rustfmt walks up from each file to find it).
 
-# Only check if there are staged .rs files
 STAGED_RS=$(git diff --cached --name-only --diff-filter=ACM | grep '\.rs$' || true)
 if [ -z "$STAGED_RS" ]; then
     exit 0
 fi
 
-# cargo fmt --check (requires nix shell for toolchain)
-if ! command -v cargo &> /dev/null; then
-    echo "pre-commit: cargo not found (run inside nix develop), skipping fmt check"
+if ! command -v rustfmt &> /dev/null; then
+    echo "pre-commit: rustfmt not found (run inside nix develop), skipping fmt check"
     exit 0
 fi
 
-echo "pre-commit: checking cargo fmt..."
+echo "pre-commit: checking rustfmt on staged files..."
 
-# Check each workspace that has staged files
 FMT_FAILED=0
-for ws in symthaea symthaea/symthaea-core; do
-    if echo "$STAGED_RS" | grep -q "^${ws}/"; then
-        if [ -f "${ws}/Cargo.toml" ]; then
-            if ! cargo fmt --all --check --manifest-path "${ws}/Cargo.toml" 2>/dev/null; then
-                FMT_FAILED=1
-            fi
-        fi
+FMT_FAILED_FILES=""
+while IFS= read -r file; do
+    [ -z "$file" ] && continue
+    # Skip files staged for deletion / removed on disk.
+    [ ! -f "$file" ] && continue
+    if ! rustfmt --check --edition 2021 "$file" > /dev/null 2>&1; then
+        FMT_FAILED=1
+        FMT_FAILED_FILES+=$'\n   '"$file"
     fi
-done
+done <<< "$STAGED_RS"
 
 if [ "$FMT_FAILED" -eq 1 ]; then
     echo ""
-    echo "pre-commit: formatting issues found. Run 'cargo fmt' to fix."
+    echo "pre-commit: rustfmt violations in staged files:${FMT_FAILED_FILES}"
+    echo ""
+    echo "  Fix with: rustfmt --edition 2021${FMT_FAILED_FILES}"
     exit 1
 fi
 
