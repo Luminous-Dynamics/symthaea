@@ -5907,10 +5907,14 @@ pub fn discover_invariants_autonomous_with_seed_templates(
                 // Session 29: gradient-orthogonality penalty. Compute
                 // the candidate's gradient at the probe points and
                 // measure how much of it lies OUTSIDE the subspace
-                // spanned by known-invariant gradients. Penalize when
-                // the orthogonal fraction is low (candidate is
-                // linearly dependent on known invariants — e.g. L·π,
-                // L+L, exp(L), etc). Mean orth fraction across probes.
+                // spanned by known-invariant gradients. Candidates
+                // whose mean orthogonal fraction < threshold are
+                // HARD-REJECTED (fitness = f64::MAX). We can't
+                // scale — when known invariants have machine-epsilon
+                // variance (~1e-29), any finite multiplier still
+                // lets tautological rescalings beat genuine
+                // higher-variance invariants. Hard rejection is the
+                // only workable mechanism at this scale gap.
                 if orth_active {
                     let mut orth_sum = 0.0;
                     let mut orth_n = 0usize;
@@ -5929,10 +5933,10 @@ pub fn discover_invariants_autonomous_with_seed_templates(
                     if orth_n > 0 {
                         let mean_orth = orth_sum / orth_n as f64;
                         // mean_orth < sin(threshold_angle) means
-                        // mean |cos(θ)| > orthogonality_threshold,
-                        // so the candidate is linearly dependent.
+                        // mean |cos(θ)| > orthogonality_threshold.
+                        // Hard-reject: candidate is a tautology.
                         if mean_orth < orth_threshold_sin {
-                            worst *= orth_penalty;
+                            return f64::MAX;
                         }
                     }
                 }
