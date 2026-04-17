@@ -7,6 +7,7 @@
 import Mathlib.Tactic
 
 theorem trichotomy_real : (∀ x : ℝ, (∀ y : ℝ, (((x = y) ∨ (x < y)) ∨ (y < x)))) := by
+  intro x y
   try intros
   first
     | (rfl; done)
@@ -14,9 +15,9 @@ theorem trichotomy_real : (∀ x : ℝ, (∀ y : ℝ, (((x = y) ∨ (x < y)) ∨
     | (ring; done)
     | (omega; done)
     | (linarith; done)
-    | (nlinarith [sq_nonneg _, sq_nonneg (_ - _), sq_nonneg (_ + _), mul_self_nonneg _]; done)
+    | (nlinarith [sq_nonneg x, mul_self_nonneg x, sq_nonneg (x - 1), sq_nonneg (x + 1), sq_nonneg y, mul_self_nonneg y, sq_nonneg (y - 1), sq_nonneg (y + 1), sq_nonneg (x - y), sq_nonneg (x + y)]; done)
     | (positivity; done)
-    | (rcases lt_trichotomy _ _ with h | h | h <;> tauto; done)
+    | (rcases lt_trichotomy x y with h | h | h <;> tauto; done)
     | (rcases le_total _ _ with h | h <;> first | linarith | tauto; done)
     | (tauto; done)
     | (polyrith; done)

@@ -7,6 +7,7 @@
 import Mathlib.Tactic
 
 theorem square_nonneg_pow : (∀ x : ℝ, ((0) ≤ (x ^ 2))) := by
+  intro x
   try intros
   first
     | (rfl; done)
@@ -14,7 +15,7 @@ theorem square_nonneg_pow : (∀ x : ℝ, ((0) ≤ (x ^ 2))) := by
     | (ring; done)
     | (omega; done)
     | (linarith; done)
-    | (nlinarith [sq_nonneg _, sq_nonneg (_ - _), sq_nonneg (_ + _), mul_self_nonneg _]; done)
+    | (nlinarith [sq_nonneg x, mul_self_nonneg x, sq_nonneg (x - 1), sq_nonneg (x + 1)]; done)
     | (positivity; done)
     | (rcases lt_trichotomy _ _ with h | h | h <;> tauto; done)
     | (rcases le_total _ _ with h | h <;> first | linarith | tauto; done)

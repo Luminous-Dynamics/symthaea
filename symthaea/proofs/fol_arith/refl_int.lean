@@ -7,6 +7,7 @@
 import Mathlib.Tactic
 
 theorem refl_int : (∀ n : ℤ, (n = n)) := by
+  intro n
   try intros
   first
     | (rfl; done)
@@ -14,7 +15,7 @@ theorem refl_int : (∀ n : ℤ, (n = n)) := by
     | (ring; done)
     | (omega; done)
     | (linarith; done)
-    | (nlinarith [sq_nonneg _, sq_nonneg (_ - _), sq_nonneg (_ + _), mul_self_nonneg _]; done)
+    | (nlinarith [sq_nonneg n, mul_self_nonneg n, sq_nonneg (n - 1), sq_nonneg (n + 1)]; done)
     | (positivity; done)
     | (rcases lt_trichotomy _ _ with h | h | h <;> tauto; done)
     | (rcases le_total _ _ with h | h <;> first | linarith | tauto; done)

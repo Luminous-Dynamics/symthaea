@@ -7,6 +7,7 @@
 import Mathlib.Tactic
 
 theorem sum_of_squares_nonneg : (∀ a : ℝ, (∀ b : ℝ, ((0) ≤ ((a ^ 2) + (b ^ 2))))) := by
+  intro a b
   try intros
   first
     | (rfl; done)
@@ -14,9 +15,9 @@ theorem sum_of_squares_nonneg : (∀ a : ℝ, (∀ b : ℝ, ((0) ≤ ((a ^ 2) + 
     | (ring; done)
     | (omega; done)
     | (linarith; done)
-    | (nlinarith [sq_nonneg _, sq_nonneg (_ - _), sq_nonneg (_ + _), mul_self_nonneg _]; done)
+    | (nlinarith [sq_nonneg a, mul_self_nonneg a, sq_nonneg (a - 1), sq_nonneg (a + 1), sq_nonneg b, mul_self_nonneg b, sq_nonneg (b - 1), sq_nonneg (b + 1), sq_nonneg (a - b), sq_nonneg (a + b)]; done)
     | (positivity; done)
-    | (rcases lt_trichotomy _ _ with h | h | h <;> tauto; done)
+    | (rcases lt_trichotomy a b with h | h | h <;> tauto; done)
     | (rcases le_total _ _ with h | h <;> first | linarith | tauto; done)
     | (tauto; done)
     | (polyrith; done)

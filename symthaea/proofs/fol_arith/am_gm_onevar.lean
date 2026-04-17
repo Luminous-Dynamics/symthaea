@@ -7,6 +7,7 @@
 import Mathlib.Tactic
 
 theorem am_gm_onevar : (∀ a : ℝ, (((2) * a) ≤ ((1) + (a ^ 2)))) := by
+  intro a
   try intros
   first
     | (rfl; done)
@@ -14,7 +15,7 @@ theorem am_gm_onevar : (∀ a : ℝ, (((2) * a) ≤ ((1) + (a ^ 2)))) := by
     | (ring; done)
     | (omega; done)
     | (linarith; done)
-    | (nlinarith [sq_nonneg _, sq_nonneg (_ - _), sq_nonneg (_ + _), mul_self_nonneg _]; done)
+    | (nlinarith [sq_nonneg a, mul_self_nonneg a, sq_nonneg (a - 1), sq_nonneg (a + 1)]; done)
     | (positivity; done)
     | (rcases lt_trichotomy _ _ with h | h | h <;> tauto; done)
     | (rcases le_total _ _ with h | h <;> first | linarith | tauto; done)

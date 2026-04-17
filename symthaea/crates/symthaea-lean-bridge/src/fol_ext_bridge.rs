@@ -178,6 +178,48 @@ pub fn render_fol_ext_file(theorem_name: &str, phi: &FolFormulaExt) -> String {
     out
 }
 
+/// Walk a `FolFormulaExt` and collect outer universal-quantifier binder
+/// names in the order they appear. Stops at the first non-`Forall` node.
+///
+/// For `∀ x : ℝ, ∀ y : ℝ, x + y = y + x` → `["x", "y"]`.
+/// For `3 * (1/3) = 1` → `[]`.
+/// For `∀ x : ℝ, P → Q` → `["x"]` (stops at `Implies`).
+fn collect_outer_forall_binders(phi: &FolFormulaExt) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut cur = phi;
+    while let FolFormulaExt::Forall(name, _, body) = cur {
+        out.push(name.clone());
+        cur = body;
+    }
+    out
+}
+
+/// Build the `nlinarith` hint list from a set of bound variable names.
+/// With concrete names, hints unify cleanly; without them, `_` placeholders
+/// often fail to resolve.
+fn build_nlinarith_hints(names: &[String]) -> String {
+    if names.is_empty() {
+        return String::from("sq_nonneg _, mul_self_nonneg _");
+    }
+    let mut parts: Vec<String> = Vec::new();
+    for n in names {
+        parts.push(format!("sq_nonneg {}", n));
+        parts.push(format!("mul_self_nonneg {}", n));
+        // Literal offsets — catch AM-GM-like identities like
+        // `2a ≤ 1 + a²` which reduces to `(a - 1)² ≥ 0`.
+        parts.push(format!("sq_nonneg ({} - 1)", n));
+        parts.push(format!("sq_nonneg ({} + 1)", n));
+    }
+    // Pairwise differences and sums (often needed for AM-GM-like identities).
+    for i in 0..names.len() {
+        for j in (i + 1)..names.len() {
+            parts.push(format!("sq_nonneg ({} - {})", names[i], names[j]));
+            parts.push(format!("sq_nonneg ({} + {})", names[i], names[j]));
+        }
+    }
+    parts.join(", ")
+}
+
 /// Choose a tactic block for an arithmetic goal. Returns
 /// `(tactic_block, contains_sorry)`.
 ///
@@ -187,13 +229,20 @@ pub fn render_fol_ext_file(theorem_name: &str, phi: &FolFormulaExt) -> String {
 /// common tactics in order from strongest-but-restricted to weakest-but-
 /// broadest. The first succeeding alternative closes the goal.
 ///
+/// **Phase 3 improvement: named-variable threading.** The cascade now
+/// emits `intro x y z` with concrete names extracted from the outer
+/// quantifier binders, and nlinarith hints like `sq_nonneg x` and
+/// `mul_self_nonneg y` use those concrete names instead of `_`
+/// placeholders that failed to unify. Similarly `rcases lt_trichotomy x y`
+/// replaces the `_ _` form.
+///
 /// All tactics below are Mathlib. Ordering is chosen to maximize hit rate
 /// on miniF2F-v2's typical goal shapes.
 fn synthesize_arith_tactic(phi: &FolFormulaExt, fragment: SmtFragment) -> (LeanTactic, bool) {
-    let _ = (phi, fragment); // cascade is fragment-agnostic; fragment guides
-                             // the FIRST-choice tactic but we always include
-                             // the full cascade so strong goals close fast
-                             // and weird shapes still have fallbacks.
+    let _ = fragment; // cascade is fragment-agnostic; fragment guides
+                      // the FIRST-choice tactic but we always include
+                      // the full cascade so strong goals close fast
+                      // and weird shapes still have fallbacks.
 
     // Lean 4 `first | t1 | t2 | …` tries alternatives left-to-right,
     // committing to the first that succeeds. `intros` + tactic composes
@@ -218,35 +267,55 @@ fn synthesize_arith_tactic(phi: &FolFormulaExt, fragment: SmtFragment) -> (LeanT
     // `try` ensures `intros` never fails on goals that have no universals
     // (e.g. the raw `3 * (1/3) = 1` theorem); without `try` a closed-form
     // goal would silently fail the whole cascade because `intros` threw.
+    // Phase 3: named-variable threading. Introduce outer universals with
+    // concrete names (not anonymous via `try intros`), then use those
+    // names in `rcases lt_trichotomy` and nlinarith hints so the `_`
+    // placeholders that failed to unify in W4 now resolve cleanly.
+    let binders = collect_outer_forall_binders(phi);
+    // Introduce outer universals with concrete names, then `try intros`
+    // to additionally peel implication hypotheses (goals like
+    // `∀ x : ℝ, 0 < x → 0 ≤ x` need both: `intro x` for the universal
+    // and `intros` for the implication's antecedent).
+    let intro_line = if binders.is_empty() {
+        String::from("try intros\n  ")
+    } else {
+        format!("intro {}\n  try intros\n  ", binders.join(" "))
+    };
+    let hints = build_nlinarith_hints(&binders);
+
+    // rcases lt_trichotomy needs the first two binders. If we have fewer
+    // than 2, fall back to `_ _` placeholders (the original W4 form).
+    let lt_trichotomy_alt = if binders.len() >= 2 {
+        format!(
+            "(rcases lt_trichotomy {} {} with h | h | h <;> tauto; done)",
+            binders[0], binders[1]
+        )
+    } else {
+        String::from("(rcases lt_trichotomy _ _ with h | h | h <;> tauto; done)")
+    };
+
     // Every alternative is `; done`-terminated. Reason: some Mathlib
     // tactics (notably `norm_num`) partially simplify the goal even when
     // they can't close it, which interferes with `first`'s backtracking.
     // Appending `done` forces each branch to either fully close the goal
     // or fail cleanly, letting `first` fall through to the next tactic.
-    //
-    // Extended for Phase 2 W4:
-    // - `mul_self_nonneg _` hint helps nlinarith on goals like `0 ≤ x*x`
-    //   where the sq_nonneg hint's `x^2` form doesn't directly unify.
-    // - `rcases lt_trichotomy` + `tauto` handles goals of the form
-    //   `x = y ∨ x < y ∨ y < x` (and permutations of the order).
-    // - Combined `intros` wrapping in the le_total alternative handles
-    //   implication-wrapped ordering goals that plain linarith can't
-    //   reach without case splitting on le_total.
-    let cascade = r#"try intros
-  first
+    let cascade = format!(
+        r#"{}first
     | (rfl; done)
     | (norm_num; done)
     | (ring; done)
     | (omega; done)
     | (linarith; done)
-    | (nlinarith [sq_nonneg _, sq_nonneg (_ - _), sq_nonneg (_ + _), mul_self_nonneg _]; done)
+    | (nlinarith [{}]; done)
     | (positivity; done)
-    | (rcases lt_trichotomy _ _ with h | h | h <;> tauto; done)
+    | {}
     | (rcases le_total _ _ with h | h <;> first | linarith | tauto; done)
     | (tauto; done)
-    | (polyrith; done)"#;
+    | (polyrith; done)"#,
+        intro_line, hints, lt_trichotomy_alt
+    );
 
-    (LeanTactic::Raw(cascade.to_string()), false)
+    (LeanTactic::Raw(cascade), false)
 }
 
 /// Same as [`render_fol_ext_file`] but returns the parsed `LeanProofScript`

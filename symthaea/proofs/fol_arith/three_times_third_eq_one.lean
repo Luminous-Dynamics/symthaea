@@ -14,7 +14,7 @@ theorem three_times_third_eq_one : (((3) * ((1 : ℝ) / (3 : ℝ))) = (1)) := by
     | (ring; done)
     | (omega; done)
     | (linarith; done)
-    | (nlinarith [sq_nonneg _, sq_nonneg (_ - _), sq_nonneg (_ + _), mul_self_nonneg _]; done)
+    | (nlinarith [sq_nonneg _, mul_self_nonneg _]; done)
     | (positivity; done)
     | (rcases lt_trichotomy _ _ with h | h | h <;> tauto; done)
     | (rcases le_total _ _ with h | h <;> first | linarith | tauto; done)
