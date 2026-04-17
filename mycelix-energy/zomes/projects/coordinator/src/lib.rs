@@ -29,6 +29,10 @@ pub fn register_project(input: RegisterProjectInput) -> ExternResult<Record> {
         financials: input.financials,
         created: now,
         updated: now,
+        phi_score: None,
+        harmony_alignment: None,
+        consciousness_assessed_at: None,
+        consciousness_scorer_did: None,
     };
 
     let action_hash = create_entry(&EntryTypes::EnergyProject(project.clone()))?;
