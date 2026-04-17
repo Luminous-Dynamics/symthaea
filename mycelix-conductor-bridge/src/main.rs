@@ -121,7 +121,7 @@ async fn main() {
         cli.conductor_url, cli.app_id, cli.role
     );
 
-    let ws = match AppWebsocket::connect(&cli.conductor_url, token, signer).await {
+    let ws = match AppWebsocket::connect(&cli.conductor_url, token, signer, None).await {
         Ok(ws) => {
             eprintln!("Connected.");
             ws
