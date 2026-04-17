@@ -109,19 +109,31 @@ impl CognitiveLoopService {
         let mut encoding = self.run_encoding_and_preprocessing(input, module_timings);
 
         // ═══════════════════════════════════════════════════════════════════════
-        // PHASE 1.2b: Live STT input blend (voice-stt-live feature)
+        // PHASE 1.2b: Additive sensory modality blend
         // ═══════════════════════════════════════════════════════════════════════
-        // When live mic capture is active, drain the latest auditory ContinuousHV
-        // from the background STT worker and bundle it into the input encoding.
-        // Bundle (superposition) rather than bind (XOR) because audio is an
-        // additive sensory modality, not a modifier of semantic content.
+        // Live STT (voice-stt-live) and radio/SDR spectrum (mesh) are both
+        // ambient sensory inputs, not semantic modifiers. Collect any modality
+        // HVs that fired this cycle and bundle them into the perception HV
+        // with one call so all sources share the same thresholding pass
+        // instead of being biased by sequential bundling order.
+        #[allow(unused_mut)]
+        let mut aux_sensor_hvs: Vec<crate::hdc::BinaryHV> = Vec::new();
+
         #[cfg(feature = "voice-stt-live")]
         if let Some(ref stt) = self.stt_capture {
             if let Some(stt_chv) = stt.drain_latest() {
-                let stt_binary = crate::hdc::BinaryHV::from_bipolar(&stt_chv.values);
-                encoding.hv16_cached =
-                    crate::hdc::BinaryHV::bundle(&[encoding.hv16_cached, stt_binary]);
+                aux_sensor_hvs.push(crate::hdc::BinaryHV::from_bipolar(&stt_chv.values));
             }
+        }
+
+        #[cfg(feature = "mesh")]
+        if let Some(radio_hv) = self.spectrum_manager.perception_hv() {
+            aux_sensor_hvs.push(radio_hv);
+        }
+
+        if !aux_sensor_hvs.is_empty() {
+            aux_sensor_hvs.insert(0, encoding.hv16_cached);
+            encoding.hv16_cached = crate::hdc::BinaryHV::bundle(&aux_sensor_hvs);
         }
 
         // ACh-modulated scene memory thresholds
