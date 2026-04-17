@@ -1,129 +1,188 @@
 # Mycelix Improvement Plan
 
-*Drafted 2026-04-17 after deep review. Corrects several errors in the initial Explore-agent review.*
+*Drafted 2026-04-17. Revised after verified `cargo check --workspace` across all 26 Rust clusters.*
 
-## Ground Truth (verified, not inferred)
+## Compile Health (verified 2026-04-17)
 
-| Claim from initial review | Reality |
+### PASS — 12 clusters
+atlas, attribution, climate, commons, core, health, hearth, manufacturing, portal, position, praxis, space
+
+### FAIL — 14 clusters, split by root cause
+
+**A. Real code errors (6 clusters, drift from shared types):**
+
+| Cluster | Error | Fix surface |
+|---|---|---|
+| **civic** | `E0004: non-exhaustive patterns: EntryTypes::RoboticCredential(_) not covered` | Add match arm in `robotics_dispatch_integrity` |
+| **desci** | `E0583: file not found for module 'reproducibility_engine'` | Create file or remove `mod` decl |
+| **domain-template** | Trait method `default_activity` missing + `EntryTypeInfo.entry_type` + `DataSensitivity::Internal` | Sync template to current `portal_domain_trait` API |
+| **finance** | `payments` (12 errors) + `finance_bridge` (9 errors) — wire-types stub drift | Fill `finance-wire-types` stub |
+| **governance** | `feldman-dkg`: `validate_with_freshness`, `verifying_key`, `CastAttestedVoteInput.consciousness_attestation_json` missing | API alignment with `ConsciousnessAttestation` + `SigningKey` |
+| **multiworld-sim** | `ExecutiveSummary` missing `critical_events`, `final_cvs`, `final_population`, `worlds_surviving` | Consumer out of sync with type def |
+
+**B. Build-environment issues (5 clusters, NixOS/deps):**
+
+| Cluster | Error | Likely fix |
+|---|---|---|
+| **conductor-bridge** | `failed to select a version for serde` | Version pin / Cargo.lock rebuild |
+| **craft** | `datachannel-sys v0.23.0+0.23.2` custom build failed | Needs C deps (libdatachannel); enter `nix develop` |
+| **music-desktop** | `wayland-sys v0.31.11` custom build failed | Needs libwayland in PATH |
+| **identity** | `sccache rustc -vV exit status: 2` | Stale sccache state; clear `~/.cache/sccache` or rebuild without sccache |
+| **knowledge** | same sccache failure | same fix |
+
+**C. Workspace manifest issues (3 clusters, structural):**
+
+| Cluster | Error | Fix |
+|---|---|---|
+| **energy** | `virtual manifest, workspace has no members` | Root `Cargo.toml` members list is empty |
+| **personal** | `failed to load manifest for workspace member personal-types` | Missing/broken `personal-types/Cargo.toml` |
+| **supplychain** | `failed to load manifest for procurement/integrity` | Same pattern |
+
+---
+
+## What the initial review got wrong
+
+| Initial claim | Reality |
 |---|---|
-| hearth-bridge-integrity has compile errors | **CLEAN.** 278 warnings from 4D→8D migration, zero errors |
-| commons care-circles-integrity has compile errors | **CLEAN.** Initial check ran `cargo` outside a workspace |
-| mycelix-finance has "warnings but functional" | **12 real errors** in zomes/payments + zomes/bridge — wire-types stub drift |
+| hearth-bridge-integrity has compile errors | **CLEAN.** 267 warnings from 4D→8D migration, zero errors |
+| commons care-circles-integrity has compile errors | **CLEAN.** 256 warnings, zero errors |
+| mycelix-finance has "warnings but functional" | **21 errors.** Wire-types stub drift across `payments` + `finance_bridge` |
+| Only finance is blocked | **6 clusters have real code errors**, 5 have env issues, 3 have manifest issues |
 | Unified hApp wires 14 of 18 claimed roles | **19 roles wired**; 4 omitted by design (marketplace, space, mail, desci) |
-| TS SDK is a skeletal 7-file stub | **Real SDK is in mycelix-workspace/sdk-ts** (217 test files); top-level `mycelix-sdk-ts/` is an orphan 965-LOC stub |
-| SDK claims (226K LOC, 6K+ tests) don't match | **Plausible.** `mycelix-workspace/sdk*/` totals ~513K LOC, 1,493 Rust tests, 217 TS test files |
-
-Net: the codebase is in substantially better shape than the initial review suggested.
+| TS SDK is a skeletal 7-file stub | Real SDK in `mycelix-workspace/sdk-ts/` (217 test files); top-level `mycelix-sdk-ts/` is a 965-LOC orphan |
 
 ---
 
-## Priority 0 — Real issues
+## Priority 0 — Real compile blockers
 
-### P0.1 — Finance wire-types schema drift (BLOCKER, do not touch from concurrent session)
+### P0.1 — Drift cluster: pattern match in civic
 
-**Symptom**: `cd mycelix-finance && cargo check --workspace` produces 12 errors in:
-- `zomes/payments/coordinator/src/lib.rs` — references 5 missing fields on `SapBalanceResponse` (`member_did`, `raw_balance`, `effective_balance`, `pending_demurrage`, `last_demurrage_at`) and 3 missing types (`ApplyDemurrageInput`, `DemurrageResult`, `MintSapFromGovernanceInput`)
-- `zomes/bridge/coordinator/src/lib.rs` — references 6 missing types (`BalanceResponse`, `DepositCollateralInput`, `FeeTierResponse`, `FinanceBridgeHealth`, `ProcessPaymentInput`, `UpdateCollateralHealthInput`) and missing fields on `RegisterCollateralInput`
+**File**: `mycelix-civic/zomes/robotics-dispatch/integrity/src/lib.rs` (or similar)
+**Error**: `EntryTypes::RoboticCredential(_) not covered`
+**Effort**: ~5 min. Single match arm.
+**Risk**: Low. Integrity zome change needs WASM rebuild.
 
-**Cause**: Commit `9effae6f9b fix(finance): restore workspace — remove ghost members, create wire-types stub` created a partial stub. Commit `9145f03f42 feat(finance,frontends): complete wire-types + radar in 5 more apps` started filling it in. The fill-in is incomplete.
+### P0.2 — Missing module file in desci
 
-**Recommendation**: **Coordinate before editing.** `finance-wire-types` is a shared type crate — exactly what `.claude/rules/CONCURRENT_SESSIONS.md` flags as high collision risk. When owned solo: add missing fields to `SapBalanceResponse`, export missing `*Input`/`*Response` types from `finance-wire-types/src/lib.rs`, re-run `cargo check --workspace` until green. The Str-size errors (`input.local_commons_pool_id`) suggest the field type should be `Option<String>` not `Option<str>` — probably a typo in the stub.
+**File**: Somewhere a `mod reproducibility_engine;` declaration lacks a backing `.rs` file.
+**Effort**: ~10 min. Either create stub or remove decl.
+**Risk**: Low.
 
-### P0.2 — Clarify orphan top-level `mycelix-sdk-ts/`
+### P0.3 — Finance wire-types stub (biggest blocker, 21 errors)
 
-**State**: `/srv/luminous-dynamics/mycelix-sdk-ts/` is a separate `@mycelix/sdk v0.1.0` TypeScript package with 4 source files (965 LOC total: index, sovereign-profile, sovereignty, types). It is **not** the SDK referenced in CLAUDE.md claims.
+Same as before: `finance-wire-types/src/lib.rs` is a partial stub. `payments` and `finance_bridge` zomes import missing types and fields. **Active session-coordination required** before editing shared crate.
 
-**Options**:
-1. If it's a clean-slate rewrite-in-progress: rename to `mycelix-sdk-ts-v2/` and add a README explaining relationship to `mycelix-workspace/sdk-ts/`
-2. If it's an abandoned earlier attempt: delete it
-3. If it's a published npm facade that re-exports from workspace: wire it properly
+### P0.4 — Governance DKG API drift
 
-**Recommendation**: Low priority but resolve within 2 weeks — currently misleading.
+`feldman-dkg` zome expects APIs on `ConsciousnessAttestation` and `SigningKey` that no longer exist. Either:
+- Upstream regressed (restore methods)
+- Zome is stale (update calls)
 
----
+Needs investigation, probably 1-2 hours.
 
-## Priority 1 — Documentation drift (affects new contributors)
+### P0.5 — Multiworld-sim `ExecutiveSummary` struct drift
 
-### P1.1 — CLAUDE.md SDK path is ambiguous
+4 renamed/removed fields. Consumer at `mycelix-multiworld-sim` needs update to current struct shape. ~30 min.
 
-The line "SDKs: Rust (18 modules, ~50K LOC, 1,036+ tests), TypeScript (37 modules, ~226K LOC, 6,316 tests), Python, WASM" doesn't say **where**. New contributors (and AI agents) land on the top-level stub.
+### P0.6 — Domain template API sync
 
-**Fix**: Single-line update to CLAUDE.md — add `mycelix-workspace/sdk{,-ts,-python,-wasm}/` path.
-
-### P1.2 — Unified hApp exclusions should be explicit
-
-The manifest header comment lists included clusters but doesn't say why marketplace, space, mail, desci are excluded. Readers have to infer.
-
-**Fix**: Add one paragraph to `mycelix-workspace/happs/mycelix-unified-happ.yaml` header comment explaining the exclusion policy (likely: DeSci is REST-only, Mail/Marketplace/Space are standalone hApps not yet ready for cross-cluster calls).
+Template is reference scaffold — if broken, new domain authors will copy broken code. Fix or label `EXPERIMENTAL`.
 
 ---
 
-## Priority 2 — Migration debt (clean up after stability)
+## Priority 1 — Environment/config fixes (not code bugs)
 
-### P2.1 — 278 deprecation warnings in bridge-common
+### P1.1 — sccache stale for identity + knowledge
 
-`mycelix-bridge-common` has 278 warnings (35 duplicates) from the 4D→8D consciousness profile migration. Every use of `ConsciousnessCredential::profile`, `::tier`, `::issued_at` and `GovernanceRequirement::{min_tier,min_identity,min_community}` is deprecated in favor of `SovereignCredential` and `CivicRequirement`.
+Both fail identically at `sccache rustc -vV exit status: 2`. Likely `~/.cache/sccache` corruption from a killed compile.
 
-**Not blocking**, but:
-- Hides real warnings under noise
-- Signals migration is incomplete
-- Three internal sites inside bridge-common itself still use deprecated fields: `sovereign_gate.rs:43-44,82-84`, `offline_credential.rs:111,123,137,144,145,158,161,169,172,175`
+**Fix**: `SCCACHE_STOP_SERVER=1 sccache --stop-server; rm -rf ~/.cache/sccache/*; sccache --start-server` then retry.
 
-**Fix plan**:
-1. Migrate the 13 internal bridge-common call sites first (they're in the same crate — same compile unit, low risk)
-2. Audit downstream clusters — likely hearth, commons, civic still call deprecated APIs
-3. Once ≤10 warnings, delete the `#[deprecated]` shims entirely
+### P1.2 — conductor-bridge serde selection
 
-Estimated effort: ~1 day of focused work. Must be done from a **single session** (shared crate).
+Cargo can't pick a `serde` version. Probably two crates pinning incompatible versions. Fix with `cargo tree -i serde` + alignment pass.
 
-### P2.2 — Snake-case warning for `pub mod ExtensionKey`
+### P1.3 — NixOS deps for craft + music-desktop
 
-`mycelix-bridge-common/src/consciousness_profile.rs:353` uses CamelCase for a module name. Either rename to `extension_key` and expose re-exports, or `#[allow(non_snake_case)]` with a comment.
+`datachannel-sys` and `wayland-sys` need system libraries. Either:
+- Add to `nix develop` shell (`flake.nix`)
+- Document: "run this cluster inside `nix develop`"
 
----
+### P1.4 — Workspace manifest fixes (energy, personal, supplychain)
 
-## Priority 3 — Observability & CI
-
-### P3.1 — No workspace-wide compile check in CI
-
-`mycelix-finance` broken state reached `main` unnoticed. No CI catches `cargo check --workspace` per cluster.
-
-**Recommendation**: Add a GitHub Actions workflow in the standalone mycelix repo (not the private monorepo — Rule #7) that runs `cargo check --workspace` for each cluster that publishes. Even a nightly cron job would have caught the finance drift within 24h.
-
-### P3.2 — Test counts are hard to verify
-
-CLAUDE.md reports specific test counts per cluster ("Commons: 5,276 tests"). Verifying these requires running the full workspace. Consider a `just test-counts` recipe that emits a table.
+3 clusters have broken `Cargo.toml` members. One-line fixes each:
+- `energy`: populate `[workspace]` members
+- `personal`: fix `personal-types/Cargo.toml` (likely missing `[package]`)
+- `supplychain`: same for `procurement/integrity`
 
 ---
 
-## Priority 4 — Architecture (longer horizon)
+## Priority 2 — Migration debt
 
-### P4.1 — Fractal completion: finish the 4 orphan clusters
+### P2.1 — 4D→8D deprecation warnings
 
-Marketplace, Space, Mail, DeSci are "Built" but don't participate in the unified hApp. Either:
-- **Promote**: integrate into unified hApp with bridge wiring + routing_registry entries
-- **Explicitly demote**: move to a separate `mycelix-standalone/` grouping and document them as non-fractal
+256 warnings in commons, 267 in hearth, 251 in finance. Noise hiding real warnings.
 
-Decide by June 2026. Current ambiguity creates discoverability noise.
+**Plan**: One dedicated session fixes `mycelix-bridge-common`'s own internal call sites (13 locations), then downstream clusters. ~1 day focused work, must be single-session (shared crate).
 
-### P4.2 — Routing registry test coverage
+### P2.2 — CamelCase module warning
 
-`routing_registry.rs` has 13 routes and 35 tests — good ratio, but some edge cases (unknown cluster, malformed role name, cycle detection) aren't obvious. Worth a property-test sweep in the next bridge-common refactor.
+`mycelix-bridge-common/src/consciousness_profile.rs:353` — `pub mod ExtensionKey` should be `extension_key` or `#[allow(non_snake_case)]`.
+
+### P2.3 — Clean up orphan `mycelix-sdk-ts/`
+
+Top-level `mycelix-sdk-ts/` is a 965-LOC stub separate from the real SDK at `mycelix-workspace/sdk-ts/`. Decide: delete, rename, or wire properly.
+
+---
+
+## Priority 3 — Infrastructure
+
+### P3.1 — Add nightly cross-cluster `cargo check`
+
+Finance was in a broken state for multiple commits unnoticed. Add a nightly GitHub Actions job (in the **standalone** mycelix repo, not the monorepo — Rule #7) that runs `cargo check --workspace` across all clusters and posts a status table.
+
+### P3.2 — `just test-counts` recipe
+
+Generate verifiable test-count table from `cargo test -- --list` across workspace. Prevents CLAUDE.md claim drift.
+
+---
+
+## Priority 4 — Architecture
+
+### P4.1 — Complete or explicitly exclude the 4 orphan clusters
+
+Marketplace, Space, Mail, DeSci are "Built" but not in unified hApp. Decision needed by June 2026:
+- **Promote**: bridge wiring + routing_registry entries
+- **Demote**: move to `mycelix-standalone/` grouping
+
+Already documented in manifest header (done in commit `4ca01a5938`).
+
+### P4.2 — Routing registry edge-case coverage
+
+`routing_registry.rs` has 35 tests for 13 routes — good ratio. Worth a property-test sweep for: unknown cluster role, malformed zome name, cycle detection.
 
 ---
 
 ## Execution Order
 
-1. **Now (this session)**: This plan document ← you are here
-2. **Next session owning finance**: Fix P0.1 (wire-types drift)
-3. **Anyone, isolated**: P1.1 + P1.2 (doc edits, low risk)
-4. **Dedicated bridge-common session**: P2.1 (deprecation cleanup)
-5. **Organizational**: P3.1 (CI), P4.1 (fractal decision)
+| # | Task | Owner | Blocker? |
+|---|---|---|---|
+| 1 | P1.1 (sccache reset) | Any session | No, unblocks identity/knowledge builds |
+| 2 | P0.1 (civic pattern match) | Solo session | Yes for civic tests |
+| 3 | P0.2 (desci missing file) | Solo session | Yes for desci |
+| 4 | P0.5 (multiworld-sim struct drift) | Solo session | Yes for sim |
+| 5 | P1.4 (manifest fixes) | Solo session × 3 | Yes for energy/personal/supplychain |
+| 6 | P0.3 (finance wire-types) | **Coordinate** — shared crate | Yes for finance |
+| 7 | P0.4 (governance DKG drift) | Needs investigation first | Yes for governance |
+| 8 | P0.6 (domain template) | Any | Low priority |
+| 9 | P2.1 (deprecation cleanup) | Single dedicated session | No |
+| 10 | P3.1 (CI nightly) | Standalone repo | No |
 
-## What I Deliberately Didn't Do
+## What I Deliberately Didn't Do This Session
 
-- **Didn't edit finance-wire-types** — 6 concurrent sessions, shared type crate, high collision risk per CONCURRENT_SESSIONS.md
-- **Didn't edit bridge-common** — same reason
+- **Didn't edit any shared crates** (bridge-common, finance-wire-types) — 6 concurrent sessions active, high collision risk
+- **Didn't attempt sccache reset** — affects other sessions
 - **Didn't delete mycelix-sdk-ts orphan** — needs user call on intent
+- **Didn't touch wip/fleet-fallback-and-geodesic-synthesis branch** — another session's working branch
 
-Per CLAUDE.md Rule #8, this plan should be committed so the next session can pick it up.
+Plan committed on main (8d64c8eaf5). P1.1/P1.2 doc fixes committed (4ca01a5938).
