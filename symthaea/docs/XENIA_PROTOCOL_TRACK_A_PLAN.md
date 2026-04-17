@@ -257,15 +257,22 @@ cryptographically verifiable sessions," which is unclaimed.
   - `0x20` `ConsentRequest` — tech asks end user to approve session.
     Contains tech identity fingerprint, claimed reason (free-text
     ticket reference), requested scope (screen / keyboard / files /
-    shell), time limit.
+    shell), time limit, **`causal_binding: Option<CausalPredicate>`
+    (always `None` in v1 — reserved for v1.1 Ricardian extension)**,
+    **MSP attestation chain (see 5d-3 below)**.
   - `0x21` `ConsentResponse` — end user signs approval or denial
     with their device key.
+  - **`0x22` `ConsentRevocation` — end user terminates session
+    asymmetrically, mid-stream. Recorded as a terminal event in
+    the attestation chain. See 5d-2 below.**
 - Session establishment requires a valid `ConsentResponse` before any
   `RdpFrame` is accepted. Server-side enforcement: if missing,
   `session.open()` on an `RdpFrame` returns `WireError::NoConsent`.
+  After a valid `ConsentRevocation`, subsequent frames return
+  `WireError::ConsentRevoked`.
 - Spec section documents the flow + threat model (what MITM looks
   like, why device key signing prevents it).
-- Test vectors for consent request + response.
+- Test vectors for consent request + response + revocation.
 
 **5b. Sealed-replay recording** (~1 day):
 - New file format `.xenia-session` — a simple container: metadata
@@ -283,13 +290,61 @@ cryptographically verifiable sessions," which is unclaimed.
 - Every command/input the tech issues is signed by the tech's device
   key and logged with monotonic sequence number + hash of prior log
   entry (blockchain-of-one-tech).
-- New payload type `0x22` `AttestedAction`.
+- New payload type `0x23` `AttestedAction`.
 - End-user client can verify the chain retroactively to prove no
   tamper.
 - Spec section documents it.
 
+**5d. Design considerations locked in before implementation**
+
+Three decisions pre-made here so Week 5's implementer isn't deriving
+them under time pressure. Each is cheap to make now, painful to
+retrofit once the 0.1 wire format ships.
+
+**5d-1. Causal-binding forward compatibility**. The v1
+`ConsentRequest` payload MUST include a `causal_binding:
+Option<CausalPredicate>` field, always set to `None` in v1. This
+reserves the wire-format slot for the v1.1 Ricardian ticket-state
+binding extension. Receivers that don't understand the predicate
+(old clients) still parse the message correctly; v1.1-aware
+receivers honor it. Zero-cost optionality in v1; breaking-change
+avoided in v1.1.
+
+**5d-2. ConsentRevocation is v1, not later**. Reserve payload type
+`0x22` for revocation shipped FROM end user TO server. Semantics:
+arriving revocation immediately terminates the session; all
+subsequent `RdpFrame`s from the tech return
+`WireError::ConsentRevoked`; the revocation is recorded in the
+attestation chain as a terminal event (monotonic sequence +
+hash-chain entry identical to an `AttestedAction` but with a
+distinct payload_type so auditors can grep for it). Defining it now
+means the revocation format is stable from day 1; retrofitting
+later creates a "some revocations verified, some not" mess. One
+payload type + one sentence in the spec; half-day of
+implementation.
+
+**5d-3. Tech-credential attestation chain** — the "attested by your
+MSP" phrase in 5a is made concrete: MSP runs a Holochain agent;
+MSP's agent key signs the tech's device public key (canonical DID
+format `did:key:...` or `did:holo:...`); the signature is stored in
+a Holochain directory addressable by the MSP's public key; the
+`ConsentRequest.msp_attestation` field carries the (tech_key,
+msp_key, signature, optional expiry) tuple. End user's client
+queries the Holochain network to verify the signature matches the
+MSP's published agent key. This makes the decentralized-trust
+claim concrete rather than hand-wavy — and it matches the Holochain
+architecture Luminous Dynamics is already building. If the
+Holochain directory is unreachable at consent time, the client can
+fall back to a cached signature with a user-visible "offline
+verification" indicator (threat-model decision: prefer soft-fail
+over hard-fail for availability, with explicit UX to communicate
+the downgrade).
+
 **Exit criterion**: each of 5a/5b/5c is spec'd, implemented with
 tests, and the spec cross-references them as v1-required features.
+5d-1/5d-2/5d-3 are documented as design decisions in the spec
+rationale section, not optional appendices — they're load-bearing
+for v1.1 and beyond.
 
 **Why in Track A** (not deferred): retrofitting security-critical
 protocol features after v1 is painful and often impossible. Ship them
@@ -407,12 +462,21 @@ value; just commercially null.
 - [x] **Name approved 2026-04-17: Xenia.** Crate: `xenia-wire` (core
       byte protocol) + `xenia-viewer-web` (WASM demo viewer). Future
       higher-level crates TBD (`xenia-agent`, `xenia-tenant`).
-- [ ] Decision on GitHub repo location: `luminousdynamics/xenia-wire`,
-      or under tstoltz's personal org, or a new org.
-- [ ] Decision on which user identity publishes to crates.io (reuses
-      the existing BWS-stored token or a new per-crate token).
+- [x] **Repo location: `luminousdynamics/xenia-wire` on GitHub,
+      public from day 1 with a conspicuous `PRE-ALPHA — DO NOT USE
+      IN PRODUCTION` banner in the README.** Rationale: private-
+      until-release means no community feedback during development;
+      public-from-day-1 matches the Rust ecosystem norm and lets
+      feedback arrive when it's actionable.
+- [x] **crates.io publishing identity: reuse the existing
+      BWS-stored Luminous Dynamics token** (secret
+      `736da236-a95f-4dd2-8efc-b42800c9106a` per project CLAUDE.md —
+      same org that publishes `symtropy-*`, `symthaea-core`,
+      `sovereign-profile`). Aligns with the GitHub org choice; no
+      new token provisioning needed.
 - [ ] 4-6 weeks of calendar time blocked out — Track A does not
-      succeed if fragmented across 12 weeks of part-time work.
+      succeed if fragmented across 12 weeks of part-time work. **This
+      is the last remaining prerequisite before Week 1 can begin.**
 
 ---
 
@@ -624,23 +688,36 @@ Explicitly: no commitment to Track B/C upfront. The plan is a
 
 ---
 
-## Open questions for the user
+## Open questions — all decided as of 2026-04-17 (draft 3)
 
-1. ~~Crate name~~ **DECIDED 2026-04-17**: Xenia (`xenia-wire` +
+1. ~~Crate name~~ **DECIDED**: Xenia (`xenia-wire` +
    `xenia-viewer-web`). Prior-art: Xbox emulator `xenia-project`
    (executable, not a library — namespace clean).
-2. **Paper target**: do we pre-commit to a specific venue now, or
-   decide at end of Week 3 based on CFP timing?
-3. **Repo location**: under `luminousdynamics` org on GitHub? Public
-   from day 1? Or private until Week 6 release?
-4. **License**: Apache-2.0 OR MIT (the symtropy pattern) confirmed?
-5. **Budget**: 4 weeks or 6 weeks? The plan is written at 6 but the
-   core deliverables fit in 4 with tight scope control.
-6. **Consulting outreach list**: user has the ~20 names in mind or
-   wants me to draft a short research list?
-7. **Frontier features ordering**: which of the four listed in the
-   "Future spec extensions" section belong in v1.1 vs v2? See that
-   section for my engineering take; user has final say on priority.
+2. ~~Paper target~~ **DECIDED**: decide at end of Week 3 based on CFP
+   timing. Candidates remain USENIX Security, NDSS, ACM CCS,
+   IEEE S&P. Arxiv + workshop as fallback.
+3. ~~Repo location~~ **DECIDED**: `luminousdynamics/xenia-wire` on
+   GitHub, public from day 1 with a PRE-ALPHA banner.
+4. ~~License~~ **DECIDED**: Apache-2.0 OR MIT dual (the symtropy
+   pattern). Both license files ship in the repo root.
+5. ~~Budget~~ **DECIDED**: plan for 6 weeks, aim for 4. The 6-week
+   schedule includes a buffer for the high-risk WASM+AEAD work in
+   Week 4; the core deliverables fit a 4-week sprint if Week 4 is
+   clean.
+6. ~~Consulting outreach list~~ **DECIDED**: draft the ~20-name
+   research list during Week 6 polish, targeting MSP owners,
+   cybersecurity consultants, decentralized-tech founders, and
+   independent security researchers.
+7. ~~Frontier features ordering~~ **DECIDED**: v1.1/v2 split per the
+   engineering-take table in the Future spec extensions section.
+   Ticket-bound authority (Ricardian) in v1.1; privacy masking and
+   biometric presence in v2; holographic audit as a speculative
+   companion product (not a spec extension).
+
+The only remaining prerequisite before Week 1 begins is the
+4-6-week calendar-time commitment in the Prerequisites section
+above. Once that's blocked out, Week 1 can begin in a fresh,
+focused session.
 
 ---
 
@@ -649,6 +726,28 @@ the plan gets feedback before Week 1 starts.*
 
 ## Change log
 
+- **2026-04-17** (draft 3): **Prerequisites resolved + Week-5 design
+  considerations locked in.** All seven open questions answered (see
+  Open questions section). Repo set to `luminousdynamics/xenia-wire`,
+  public from day 1 with PRE-ALPHA banner. crates.io publisher: reuse
+  BWS-stored Luminous Dynamics token. License Apache-2.0 OR MIT dual.
+  Paper venue decision deferred to end of Week 3 based on CFP timing.
+  Consulting outreach list drafted in Week 6. Frontier feature
+  ordering per the engineering-take table. Week 5 gains new subsection
+  "5d. Design considerations locked in before implementation":
+  (5d-1) `causal_binding: Option<CausalPredicate>` reserved in v1
+  `ConsentRequest` so the v1.1 Ricardian extension doesn't break
+  wire compat; (5d-2) `ConsentRevocation` payload type `0x22` is a
+  v1 feature not later, with `WireError::ConsentRevoked` and
+  terminal-event recording in the attestation chain; (5d-3)
+  tech-credential attestation chain made concrete — MSP runs a
+  Holochain agent, MSP-key signs tech-device-key in canonical DID
+  format, stored in a Holochain directory, carried in
+  `ConsentRequest.msp_attestation`, fall-back to cached signature
+  with user-visible offline indicator for availability. Payload-type
+  rebase: `AttestedAction` moves from `0x22` → `0x23` to make room
+  for `ConsentRevocation`. Only remaining prerequisite before Week 1
+  is the 4-6-week calendar-time commitment.
 - **2026-04-17** (draft 2): **Name approved — Xenia.** Doc renamed
   from `SOMA_PROTOCOL_TRACK_A_PLAN.md` to
   `XENIA_PROTOCOL_TRACK_A_PLAN.md`. All external-facing references
