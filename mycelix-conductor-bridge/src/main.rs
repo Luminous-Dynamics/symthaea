@@ -46,6 +46,21 @@ enum Command {
     CastVote(VoteInput),
     /// Maps to proposals coordinator: get_active_proposals(())
     QueryActiveProposals,
+    /// Maps to finance/finance_bridge: query_tend_balance({member_did})
+    QueryTendBalance { member_did: String },
+}
+
+/// Envelope carrying a correlation id alongside the command. Lets the client
+/// (e.g. `symtropy-mycelix-bridge`) match responses to requests even if
+/// execution order shuffles them. Uses `request_id` (not `id`) to avoid
+/// colliding with the existing `id` field inside `ProposalInput` when the
+/// command is serde-flattened.
+#[derive(Debug, Deserialize)]
+struct Request {
+    #[serde(default)]
+    request_id: Option<u64>,
+    #[serde(flatten)]
+    command: Command,
 }
 
 /// Matches the Proposal entry in proposals_integrity (field subset).
@@ -95,6 +110,11 @@ struct VoteInput {
 
 #[derive(Serialize)]
 struct BridgeResponse {
+    /// Echoed from the inbound [`Request::request_id`] when the envelope
+    /// parsed successfully. `None` for framing errors before a request
+    /// could be identified (malformed JSON, etc.).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    request_id: Option<u64>,
     ok: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     data: Option<serde_json::Value>,
@@ -128,6 +148,7 @@ async fn main() {
         }
         Err(e) => {
             let resp = BridgeResponse {
+                request_id: None,
                 ok: false,
                 data: None,
                 error: Some(format!("Failed to connect to conductor: {e:?}")),
@@ -148,10 +169,11 @@ async fn main() {
             continue;
         }
 
-        let cmd: Command = match serde_json::from_str(&line) {
-            Ok(c) => c,
+        let req: Request = match serde_json::from_str(&line) {
+            Ok(r) => r,
             Err(e) => {
                 let resp = BridgeResponse {
+                    request_id: None,
                     ok: false,
                     data: None,
                     error: Some(format!("Invalid JSON: {e}")),
@@ -161,7 +183,9 @@ async fn main() {
             }
         };
 
-        let result = dispatch(&ws, &cli.role, cmd).await;
+        let request_id = req.request_id;
+        let mut result = dispatch(&ws, &cli.role, req.command).await;
+        result.request_id = request_id;
         println!("{}", serde_json::to_string(&result).unwrap());
     }
 
@@ -179,6 +203,18 @@ async fn dispatch(ws: &AppWebsocket, role: &str, cmd: Command) -> BridgeResponse
         Command::QueryActiveProposals => {
             call_zome(ws, role, "proposals", "get_active_proposals", &()).await
         }
+        Command::QueryTendBalance { member_did } => {
+            // TEND balances live on the finance role, not governance — ignore
+            // the CLI default role for this command and call finance directly.
+            call_zome(
+                ws,
+                "finance",
+                "finance_bridge",
+                "query_tend_balance",
+                &serde_json::json!({ "member_did": member_did }),
+            )
+            .await
+        }
     }
 }
 
@@ -193,6 +229,7 @@ async fn call_zome<P: Serialize + std::fmt::Debug>(
         Ok(i) => i,
         Err(e) => {
             return BridgeResponse {
+                request_id: None,
                 ok: false,
                 data: None,
                 error: Some(format!("Encode failed: {e}")),
@@ -211,17 +248,20 @@ async fn call_zome<P: Serialize + std::fmt::Debug>(
     {
         Ok(result) => match result.decode::<serde_json::Value>() {
             Ok(data) => BridgeResponse {
+                request_id: None,
                 ok: true,
                 data: Some(data),
                 error: None,
             },
             Err(e) => BridgeResponse {
+                request_id: None,
                 ok: false,
                 data: None,
                 error: Some(format!("Decode response failed: {e}")),
             },
         },
         Err(e) => BridgeResponse {
+            request_id: None,
             ok: false,
             data: None,
             error: Some(format!("Zome call {zome}::{fn_name} failed: {e:?}")),
