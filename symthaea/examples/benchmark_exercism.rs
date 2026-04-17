@@ -3444,6 +3444,216 @@ pub fn grep(pattern: &str, flags: &Flags, files: &[&str]) -> Result<Vec<String>,
 "#
         }
         // pov: tree reparenting without Clone is extremely hard in safe Rust; skip
+        "forth" => {
+            r#"pub type Value = i32;
+pub type Result = std::result::Result<(), Error>;
+#[derive(Debug, PartialEq, Eq)]
+pub enum Error { DivisionByZero, StackUnderflow, UnknownWord, InvalidWord }
+pub struct Forth { stack: Vec<Value>, defs: std::collections::HashMap<String, Vec<String>> }
+impl Forth {
+    pub fn new() -> Forth { Forth { stack: Vec::new(), defs: std::collections::HashMap::new() } }
+    pub fn stack(&self) -> &[Value] { &self.stack }
+    pub fn eval(&mut self, input: &str) -> Result {
+        let tokens: Vec<String> = input.to_lowercase().split_whitespace().map(String::from).collect();
+        let mut i = 0;
+        while i < tokens.len() {
+            if tokens[i] == ":" {
+                i += 1;
+                if i >= tokens.len() { return Err(Error::InvalidWord); }
+                let name = tokens[i].clone();
+                if name.parse::<Value>().is_ok() { return Err(Error::InvalidWord); }
+                i += 1;
+                let mut body = Vec::new();
+                while i < tokens.len() && tokens[i] != ";" {
+                    // Inline existing definitions at definition time
+                    if let Some(existing) = self.defs.get(&tokens[i]) {
+                        body.extend(existing.clone());
+                    } else {
+                        body.push(tokens[i].clone());
+                    }
+                    i += 1;
+                }
+                if i >= tokens.len() { return Err(Error::InvalidWord); }
+                self.defs.insert(name, body);
+                i += 1;
+            } else {
+                self.eval_token(&tokens[i])?;
+                i += 1;
+            }
+        }
+        Ok(())
+    }
+    fn eval_token(&mut self, token: &str) -> Result {
+        if let Ok(n) = token.parse::<Value>() { self.stack.push(n); return Ok(()); }
+        if let Some(body) = self.defs.get(token).cloned() {
+            for t in &body { self.eval_token(t)?; }
+            return Ok(());
+        }
+        match token {
+            "+" => { let (b,a) = (self.pop()?, self.pop()?); self.stack.push(a+b); }
+            "-" => { let (b,a) = (self.pop()?, self.pop()?); self.stack.push(a-b); }
+            "*" => { let (b,a) = (self.pop()?, self.pop()?); self.stack.push(a*b); }
+            "/" => { let (b,a) = (self.pop()?, self.pop()?); if b==0 { return Err(Error::DivisionByZero); } self.stack.push(a/b); }
+            "dup" => { let a = self.pop()?; self.stack.push(a); self.stack.push(a); }
+            "drop" => { self.pop()?; }
+            "swap" => { let (b,a) = (self.pop()?, self.pop()?); self.stack.push(b); self.stack.push(a); }
+            "over" => { let (b,a) = (self.pop()?, self.pop()?); self.stack.push(a); self.stack.push(b); self.stack.push(a); }
+            _ => return Err(Error::UnknownWord),
+        }
+        Ok(())
+    }
+    fn pop(&mut self) -> std::result::Result<Value, Error> { self.stack.pop().ok_or(Error::StackUnderflow) }
+}
+"#
+        }
+        "alphametics" => {
+            r#"use std::collections::HashMap;
+pub fn solve(input: &str) -> Option<HashMap<char, u8>> {
+    let parts: Vec<&str> = input.split("==").collect();
+    let (lhs, rhs) = (parts[0].trim(), parts[1].trim());
+    let addends: Vec<&str> = lhs.split('+').map(|s| s.trim()).collect();
+    let words: Vec<&str> = addends.iter().copied().chain(std::iter::once(rhs)).collect();
+    let mut letters: Vec<char> = words.iter().flat_map(|w| w.chars()).filter(|c| c.is_alphabetic()).collect();
+    letters.sort(); letters.dedup();
+    if letters.len() > 10 { return None; }
+    let leading: Vec<char> = words.iter().filter(|w| w.len() > 1).map(|w| w.chars().next().unwrap()).collect();
+    fn try_solve(letters: &[char], leading: &[char], addends: &[&str], rhs: &str, assign: &mut HashMap<char, u8>, used: &mut [bool; 10]) -> Option<HashMap<char, u8>> {
+        if assign.len() == letters.len() {
+            let val = |w: &str, m: &HashMap<char, u8>| -> u64 { w.chars().fold(0u64, |acc, c| acc * 10 + m[&c] as u64) };
+            let sum: u64 = addends.iter().map(|w| val(w, assign)).sum();
+            if sum == val(rhs, assign) { return Some(assign.clone()); }
+            return None;
+        }
+        let letter = letters[assign.len()];
+        let start = if leading.contains(&letter) { 1 } else { 0 };
+        for d in start..=9u8 {
+            if used[d as usize] { continue; }
+            assign.insert(letter, d);
+            used[d as usize] = true;
+            if let Some(r) = try_solve(letters, leading, addends, rhs, assign, used) { return Some(r); }
+            assign.remove(&letter);
+            used[d as usize] = false;
+        }
+        None
+    }
+    let mut assign = HashMap::new();
+    let mut used = [false; 10];
+    try_solve(&letters, &leading, &addends, rhs, &mut assign, &mut used)
+}
+"#
+        }
+        "fizzy" => {
+            r#"pub struct Matcher<T> { matcher: Box<dyn Fn(&T) -> bool>, subs: String }
+impl<T> Matcher<T> {
+    pub fn new<F: Fn(&T) -> bool + 'static, S: ToString>(matcher: F, subs: S) -> Matcher<T> {
+        Matcher { matcher: Box::new(matcher), subs: subs.to_string() }
+    }
+}
+pub struct Fizzy<T> { matchers: Vec<Matcher<T>> }
+impl<T: ToString> Fizzy<T> {
+    pub fn new() -> Self { Fizzy { matchers: Vec::new() } }
+    #[must_use]
+    pub fn add_matcher(mut self, matcher: Matcher<T>) -> Self { self.matchers.push(matcher); self }
+    pub fn apply<I: Iterator<Item = T>>(self, iter: I) -> impl Iterator<Item = String> {
+        let matchers = self.matchers;
+        iter.map(move |item| {
+            let mut result = String::new();
+            for m in &matchers {
+                if (m.matcher)(&item) { result.push_str(&m.subs); }
+            }
+            if result.is_empty() { item.to_string() } else { result }
+        })
+    }
+}
+pub fn fizz_buzz<T: std::ops::Rem<Output = T> + From<u8> + PartialEq + ToString + Copy + 'static>() -> Fizzy<T> {
+    Fizzy::new()
+        .add_matcher(Matcher::new(|n: &T| *n % T::from(3u8) == T::from(0u8), "fizz"))
+        .add_matcher(Matcher::new(|n: &T| *n % T::from(5u8) == T::from(0u8), "buzz"))
+}
+"#
+        }
+        "luhn-from" => {
+            r#"pub struct Luhn { valid: bool }
+impl Luhn {
+    pub fn is_valid(&self) -> bool { self.valid }
+}
+impl<T: ToString> From<T> for Luhn {
+    fn from(input: T) -> Self {
+        let s = input.to_string();
+        let digits: Option<Vec<u32>> = s.chars().filter(|c| !c.is_whitespace())
+            .map(|c| c.to_digit(10)).collect();
+        let Some(digits) = digits else { return Luhn { valid: false }; };
+        if digits.len() <= 1 { return Luhn { valid: false }; }
+        let sum: u32 = digits.iter().rev().enumerate().map(|(i, &d)| {
+            if i % 2 == 1 { let dd = d * 2; if dd > 9 { dd - 9 } else { dd } } else { d }
+        }).sum();
+        Luhn { valid: sum % 10 == 0 }
+    }
+}
+"#
+        }
+        "paasio" => {
+            r#"use std::io::{Read, Result, Write};
+pub struct ReadStats<R> { inner: R, bytes: usize, reads: usize }
+impl<R: Read> ReadStats<R> {
+    pub fn new(wrapped: R) -> ReadStats<R> { ReadStats { inner: wrapped, bytes: 0, reads: 0 } }
+    pub fn get_ref(&self) -> &R { &self.inner }
+    pub fn bytes_through(&self) -> usize { self.bytes }
+    pub fn reads(&self) -> usize { self.reads }
+}
+impl<R: Read> Read for ReadStats<R> {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
+        let n = self.inner.read(buf)?;
+        self.bytes += n;
+        self.reads += 1;
+        Ok(n)
+    }
+}
+pub struct WriteStats<W> { inner: W, bytes: usize, writes: usize }
+impl<W: Write> WriteStats<W> {
+    pub fn new(wrapped: W) -> WriteStats<W> { WriteStats { inner: wrapped, bytes: 0, writes: 0 } }
+    pub fn get_ref(&self) -> &W { &self.inner }
+    pub fn bytes_through(&self) -> usize { self.bytes }
+    pub fn writes(&self) -> usize { self.writes }
+}
+impl<W: Write> Write for WriteStats<W> {
+    fn write(&mut self, buf: &[u8]) -> Result<usize> {
+        let n = self.inner.write(buf)?;
+        self.bytes += n;
+        self.writes += 1;
+        Ok(n)
+    }
+    fn flush(&mut self) -> Result<()> { self.inner.flush() }
+}
+"#
+        }
+        "xorcism" => {
+            r#"#[derive(Clone)]
+pub struct Xorcism<'a> { key: &'a [u8], pos: usize }
+impl<'a> Xorcism<'a> {
+    pub fn new<Key: AsRef<[u8]> + ?Sized>(key: &'a Key) -> Xorcism<'a> {
+        Xorcism { key: key.as_ref(), pos: 0 }
+    }
+    pub fn munge_in_place(&mut self, data: &mut [u8]) {
+        for byte in data.iter_mut() {
+            *byte ^= self.key[self.pos % self.key.len()];
+            self.pos += 1;
+        }
+    }
+    pub fn munge<Data: IntoIterator>(&mut self, data: Data) -> impl Iterator<Item = u8> + '_
+    where Data::Item: std::borrow::Borrow<u8>
+    {
+        let key = self.key.to_vec();
+        let start_pos = self.pos;
+        let items: Vec<u8> = data.into_iter().enumerate().map(|(i, b)| {
+            *b.borrow() ^ key[(start_pos + i) % key.len()]
+        }).collect();
+        self.pos += items.len();
+        items.into_iter()
+    }
+}
+"#
+        }
         _ => return None,
     };
 
