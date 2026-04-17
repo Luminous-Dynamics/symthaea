@@ -369,14 +369,18 @@ fn normalize_pow_exponent(exponent: f64) -> f64 {
         return exponent;
     }
 
+    // Tolerance must be wide enough to absorb Nelder-Mead convergence drift
+    // (typically 1e-7 to 1e-8 on f64 objectives) but still tight enough to
+    // distinguish integer exponents like 2 from deliberate non-integers like
+    // 1.5 (Kepler's law). 1e-6 is well inside that gap.
     let rounded = exponent.round();
-    if (exponent - rounded).abs() < 1e-9 && rounded.abs() <= 64.0 {
+    if (exponent - rounded).abs() < 1e-6 && rounded.abs() <= 64.0 {
         return rounded;
     }
 
     let doubled = (exponent * 2.0).round();
     let half_step = doubled / 2.0;
-    if (exponent - half_step).abs() < 1e-9 && half_step.abs() <= 64.0 {
+    if (exponent - half_step).abs() < 1e-6 && half_step.abs() <= 64.0 {
         return half_step;
     }
 
