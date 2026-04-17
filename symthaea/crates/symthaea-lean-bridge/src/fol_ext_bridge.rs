@@ -223,6 +223,15 @@ fn synthesize_arith_tactic(phi: &FolFormulaExt, fragment: SmtFragment) -> (LeanT
     // they can't close it, which interferes with `first`'s backtracking.
     // Appending `done` forces each branch to either fully close the goal
     // or fail cleanly, letting `first` fall through to the next tactic.
+    //
+    // Extended for Phase 2 W4:
+    // - `mul_self_nonneg _` hint helps nlinarith on goals like `0 ≤ x*x`
+    //   where the sq_nonneg hint's `x^2` form doesn't directly unify.
+    // - `rcases lt_trichotomy` + `tauto` handles goals of the form
+    //   `x = y ∨ x < y ∨ y < x` (and permutations of the order).
+    // - Combined `intros` wrapping in the le_total alternative handles
+    //   implication-wrapped ordering goals that plain linarith can't
+    //   reach without case splitting on le_total.
     let cascade = r#"try intros
   first
     | (rfl; done)
@@ -230,8 +239,10 @@ fn synthesize_arith_tactic(phi: &FolFormulaExt, fragment: SmtFragment) -> (LeanT
     | (ring; done)
     | (omega; done)
     | (linarith; done)
-    | (nlinarith [sq_nonneg _, sq_nonneg (_ - _), sq_nonneg (_ + _)]; done)
+    | (nlinarith [sq_nonneg _, sq_nonneg (_ - _), sq_nonneg (_ + _), mul_self_nonneg _]; done)
     | (positivity; done)
+    | (rcases lt_trichotomy _ _ with h | h | h <;> tauto; done)
+    | (rcases le_total _ _ with h | h <;> first | linarith | tauto; done)
     | (tauto; done)
     | (polyrith; done)"#;
 
