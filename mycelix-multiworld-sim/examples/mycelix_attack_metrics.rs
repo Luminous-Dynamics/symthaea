@@ -1,5 +1,12 @@
 // Quick metrics dump for the Phase 2c attack wiring.
-// Runs a 5-year mixed-attack sim and prints defense telemetry.
+// Runs a 50-year mixed-attack sim and prints defense telemetry.
+//
+// Reference numbers (seed 42):
+//   5 year:  survived, CVS 0.670, farming 0.612, TierBuyer +0.35 SAP vs pop
+//   50 year: survived, CVS 0.726, farming 0.612, TierBuyer −2.78 SAP vs pop
+// The negative delta at 50 years is the dilution signature — injected
+// adversaries don't procreate attackers, so general population outgrows the
+// one-shot attack over generations.
 
 use mycelix_multiworld_sim::MultiWorldSimulator;
 use mycelix_multiworld_sim::config::{PolicyConfig, SimulationConfig};
@@ -7,7 +14,7 @@ use mycelix_multiworld_sim::red_team::AdversarialStrategy;
 
 fn main() {
     let mut config = SimulationConfig::default_150_year();
-    config.total_ticks = 5 * 12;
+    config.total_ticks = 50 * 12;
     config.seed = 42;
     config.policy = PolicyConfig::default();
 

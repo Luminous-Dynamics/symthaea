@@ -1,0 +1,280 @@
+//! Session 29: two-stage Kepler discovery with gradient orthogonality.
+//!
+//! Stage 1: run the S27 preset on Kepler with the usual priors.
+//! Expected (from S26): 5/5 seeds recover angular momentum L.
+//!
+//! Stage 2: run the same pipeline, but now pass the S1-discovered L
+//! as a `known_invariant` and enable orthogonality penalty.
+//! Expected: energy-like expressions (containing `v²` AND `sqrt` AND
+//! `x² + y²`) appear in the returned top-10 because L variants are
+//! penalized for gradient-parallelism with ∇L.
+//!
+//! The Session 28 diagnostic proved L dominates because:
+//!   - L variance: ~1e-29 (machine epsilon)
+//!   - inv_r variance: ~1e-15 (integration error of 1/r)
+//!   - 14-order-of-magnitude gap pushes non-L candidates to rank ~46k
+//!
+//! With orthogonality penalty, every L-like expression (L·π, L+L,
+//! exp(L), etc.) has gradient parallel to ∇L in state space and gets
+//! fitness multiplied by the penalty factor. This should unshadow
+//! the energy/inv_r family.
+//!
+//! Success criterion: ≥ 1 seed finds an energy-like or 1/r-containing
+//! expression in the top-10 in stage 2 (vs 0/5 in stage 1).
+
+use symthaea_core::hdc::conjecture_engine::{
+    discover_invariants_autonomous_with_seed_templates, AutonomousInvariant, BinOp, Expr,
+    RegressorConfig, UnaryFn,
+};
+
+const SEEDS: &[u64] = &[42, 1337, 2718, 7919, 31415];
+const T_MAX: f64 = 6.0;
+const DT: f64 = 0.003;
+const POP_SIZE: usize = 300;
+const GENERATIONS: usize = 100;
+
+fn kepler_rhs(s: &[f64], _t: f64) -> Vec<f64> {
+    let (x, y, vx, vy) = (s[0], s[1], s[2], s[3]);
+    let r2 = x * x + y * y;
+    if r2 < 1e-12 {
+        return vec![vx, vy, 0.0, 0.0];
+    }
+    let r3 = r2 * r2.sqrt();
+    vec![vx, vy, -x / r3, -y / r3]
+}
+
+fn var(name: &str) -> Expr {
+    Expr::Var(name.into())
+}
+fn mul(a: Expr, b: Expr) -> Expr {
+    Expr::BinOp(BinOp::Mul, Box::new(a), Box::new(b))
+}
+fn add(a: Expr, b: Expr) -> Expr {
+    Expr::BinOp(BinOp::Add, Box::new(a), Box::new(b))
+}
+fn sub(a: Expr, b: Expr) -> Expr {
+    Expr::BinOp(BinOp::Sub, Box::new(a), Box::new(b))
+}
+fn div(a: Expr, b: Expr) -> Expr {
+    Expr::BinOp(BinOp::Div, Box::new(a), Box::new(b))
+}
+fn pow(a: Expr, e: f64) -> Expr {
+    Expr::BinOp(BinOp::Pow, Box::new(a), Box::new(Expr::Const(e)))
+}
+
+fn kepler_priors() -> Vec<Expr> {
+    let x = || var("x");
+    let y = || var("y");
+    let vx = || var("vx");
+    let vy = || var("vy");
+    let r2 = add(pow(x(), 2.0), pow(y(), 2.0));
+    let v2 = add(pow(vx(), 2.0), pow(vy(), 2.0));
+    let ang_mom = sub(mul(x(), vy()), mul(y(), vx()));
+    let inv_r = div(
+        Expr::Const(1.0),
+        Expr::Func(UnaryFn::Sqrt, Box::new(add(pow(x(), 2.0), pow(y(), 2.0)))),
+    );
+    vec![ang_mom, r2, v2, inv_r]
+}
+
+/// Canonical angular-momentum expression for use as a known_invariant.
+fn ang_mom_canonical() -> Expr {
+    sub(mul(var("x"), var("vy")), mul(var("y"), var("vx")))
+}
+
+fn run_stage1(seed: u64, priors: &[Expr]) -> Vec<AutonomousInvariant> {
+    let config = RegressorConfig {
+        seed,
+        population_size: POP_SIZE,
+        generations: GENERATIONS,
+        max_depth: 6,
+        max_complexity: 24,
+        lambda: 0.0005,
+        mutation_rate: 0.35,
+        ..RegressorConfig::for_autonomous_discovery()
+    };
+    discover_invariants_autonomous_with_seed_templates(
+        kepler_rhs,
+        &[1.0, 0.0, 0.0, 1.0],
+        &["x", "y", "vx", "vy"],
+        None,
+        &config,
+        T_MAX,
+        DT,
+        priors,
+    )
+}
+
+fn run_stage2(seed: u64, priors: &[Expr], known: Vec<Expr>) -> Vec<AutonomousInvariant> {
+    let config = RegressorConfig {
+        seed,
+        population_size: POP_SIZE,
+        generations: GENERATIONS,
+        max_depth: 6,
+        max_complexity: 24,
+        lambda: 0.0005,
+        mutation_rate: 0.35,
+        // S29: enable orthogonality. 1000× fitness penalty for
+        // candidates whose gradient aligns with known_invariants.
+        orthogonality_penalty: 1000.0,
+        orthogonality_threshold: 0.9,
+        known_invariants: known,
+        ..RegressorConfig::for_autonomous_discovery()
+    };
+    discover_invariants_autonomous_with_seed_templates(
+        kepler_rhs,
+        &[1.0, 0.0, 0.0, 1.0],
+        &["x", "y", "vx", "vy"],
+        None,
+        &config,
+        T_MAX,
+        DT,
+        priors,
+    )
+}
+
+fn classify(f: &str) -> (bool, bool, bool) {
+    let has_ang_mom = f.contains("(x * vy)") && f.contains("(y * vx)") && f.contains("-");
+    let has_energy_like = (f.contains("(vx ^ 2)") || f.contains("(vy ^ 2)"))
+        && f.contains("sqrt")
+        && (f.contains("(x ^ 2)") || f.contains("(y ^ 2)"));
+    let has_inv_r = f.contains("(1 / sqrt") && f.contains("(x ^ 2)") && f.contains("(y ^ 2)");
+    (has_ang_mom, has_energy_like, has_inv_r)
+}
+
+fn report_stage(label: &str, runs: &[(u64, Vec<AutonomousInvariant>)]) -> (usize, usize, usize) {
+    let mut any_ang_mom = 0;
+    let mut any_energy = 0;
+    let mut any_inv_r = 0;
+    for (seed, invs) in runs {
+        let mut has_ang_mom = false;
+        let mut has_energy = false;
+        let mut has_inv_r = false;
+        for inv in invs {
+            let (am, en, ir) = classify(&inv.formula_str);
+            has_ang_mom |= am;
+            has_energy |= en;
+            has_inv_r |= ir;
+        }
+        if has_ang_mom {
+            any_ang_mom += 1;
+        }
+        if has_energy {
+            any_energy += 1;
+        }
+        if has_inv_r {
+            any_inv_r += 1;
+        }
+        let best = invs
+            .iter()
+            .min_by(|a, b| {
+                a.variance
+                    .partial_cmp(&b.variance)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .map(|b| b.clone());
+        if let Some(b) = best {
+            let (am, en, ir) = classify(&b.formula_str);
+            let tag = if en {
+                "✓ ENERGY-LIKE"
+            } else if am {
+                "✓ ang-mom"
+            } else if ir {
+                "~ 1/r"
+            } else {
+                "— other"
+            };
+            println!(
+                "  [{:>6}] seed={:<6} best_var={:.3e} pool=[am={} en={} ir={}]  best_tag={}  formula={}",
+                label, seed, b.variance, has_ang_mom, has_energy, has_inv_r, tag, b.formula_str
+            );
+        }
+    }
+    (any_ang_mom, any_energy, any_inv_r)
+}
+
+fn main() {
+    println!("╔══════════════════════════════════════════════════════════════╗");
+    println!("║  Session 29: two-stage Kepler with gradient orthogonality    ║");
+    println!("║  Does penalizing ∇L-parallel candidates unshadow energy/1/r? ║");
+    println!("╚══════════════════════════════════════════════════════════════╝");
+    println!(
+        "\nConfig: {} seeds, pop={}, gen={}, t_max={}, dt={}",
+        SEEDS.len(),
+        POP_SIZE,
+        GENERATIONS,
+        T_MAX,
+        DT
+    );
+
+    let priors = kepler_priors();
+    println!("\nPriors used in both stages:");
+    for p in &priors {
+        println!("  · {}", p);
+    }
+
+    println!("\n━━━ Stage 1: S27 preset (no orthogonality penalty) ━━━");
+    let stage1_runs: Vec<(u64, Vec<AutonomousInvariant>)> = SEEDS
+        .iter()
+        .map(|&seed| (seed, run_stage1(seed, &priors)))
+        .collect();
+    let (s1_am, s1_en, s1_ir) = report_stage("stage1", &stage1_runs);
+
+    println!("\n━━━ Stage 2: orthogonality penalty ON, L as known_invariant ━━━");
+    let known = vec![ang_mom_canonical()];
+    let stage2_runs: Vec<(u64, Vec<AutonomousInvariant>)> = SEEDS
+        .iter()
+        .map(|&seed| (seed, run_stage2(seed, &priors, known.clone())))
+        .collect();
+    let (s2_am, s2_en, s2_ir) = report_stage("stage2", &stage2_runs);
+
+    println!("\n━━━ Pool-wide discovery accounting ━━━");
+    println!(
+        "  Stage 1 — seeds with any ang_mom in top-10:    {} / {}",
+        s1_am,
+        SEEDS.len()
+    );
+    println!(
+        "  Stage 1 — seeds with any energy-like in top-10: {} / {}",
+        s1_en,
+        SEEDS.len()
+    );
+    println!(
+        "  Stage 1 — seeds with any 1/r in top-10:        {} / {}",
+        s1_ir,
+        SEEDS.len()
+    );
+    println!();
+    println!(
+        "  Stage 2 — seeds with any ang_mom in top-10:    {} / {}",
+        s2_am,
+        SEEDS.len()
+    );
+    println!(
+        "  Stage 2 — seeds with any energy-like in top-10: {} / {}",
+        s2_en,
+        SEEDS.len()
+    );
+    println!(
+        "  Stage 2 — seeds with any 1/r in top-10:        {} / {}",
+        s2_ir,
+        SEEDS.len()
+    );
+
+    println!("\n━━━ Verdict ━━━");
+    if s2_en >= 3 {
+        println!(
+            "  ✓ CEILING CLOSED: energy appears in ≥3/5 stage-2 top-10 pools."
+        );
+        println!("    Gradient-orthogonality penalty unshadows the second invariant.");
+    } else if s2_en >= 1 || s2_ir >= 3 {
+        println!("  ± PARTIAL WIN: some energy/inv_r shapes now visible (was 0/5 in S28).");
+        println!("    Orthogonality mechanism works; may need stronger penalty or more gens.");
+    } else if s2_am < s1_am {
+        println!("  ~ SIGNAL BUT NO TARGET: ang_mom suppressed but energy not recovered.");
+        println!("    Penalty is too strong; try smaller penalty or looser threshold.");
+    } else {
+        println!("  ✗ NO CHANGE: penalty didn't bite.");
+        println!("    Check: gradient computation, threshold, known_invariant wiring.");
+    }
+}

@@ -996,6 +996,11 @@ impl World {
     /// Fraction of living agents that meet a `CivicRequirement` under the given
     /// weights, with the per-agent restorative-justice penalty applied to tier.
     /// Used by 8D-gated governance to compute eligible voter fraction.
+    ///
+    /// A `CrossClusterAmplifier` agent has its per-dimension minimums reduced
+    /// by `cross_cluster_bypass` — modeling the leniency of the easier cluster
+    /// gate they route through. This is the only strategy that gets a gating
+    /// concession; all others pay the full cost.
     pub fn civic_fraction_meeting(
         &self,
         requirement: &crate::sovereign_profile::CivicRequirement,
@@ -1010,11 +1015,23 @@ impl World {
                 let effective = a.justice.effective_tier(raw);
                 // Tier check: use effective tier (degraded).
                 let tier_ok = effective >= requirement.min_tier;
-                // Per-dimension minimums still apply to the raw profile.
+                // Per-dimension minimums: CrossClusterAmplifier routes the
+                // check through a lenient cluster gate, reducing each floor.
+                let bypass = match a.adversarial {
+                    Some(crate::red_team::AdversarialStrategy::CrossClusterAmplifier) => {
+                        let m = crate::red_team::AdversarialModifier::for_strategy(
+                            crate::red_team::AdversarialStrategy::CrossClusterAmplifier,
+                            0.01,
+                        );
+                        m.cross_cluster_bypass.clamp(0.0, 1.0)
+                    }
+                    _ => 0.0,
+                };
                 let dim_ok = requirement.min_dimensions.iter().all(|&(dim, min)| {
                     let v = a.sovereign_profile.get(dim);
                     let sanitized = if v.is_finite() { v.clamp(0.0, 1.0) } else { 0.0 };
-                    sanitized >= min
+                    let effective_min = min * (1.0 - bypass);
+                    sanitized >= effective_min
                 });
                 let e = e + (tier_ok && dim_ok) as usize;
                 (e, t + 1)

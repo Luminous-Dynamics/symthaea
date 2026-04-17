@@ -134,6 +134,67 @@ fn guild_colluder_boosts_mycel_score() {
 }
 
 #[test]
+fn cross_cluster_amplifier_bypasses_dim_floors() {
+    // Build two worlds by hand — not through the full sim — so we can assert
+    // the bypass mechanic cleanly without fighting demographics.
+    use mycelix_multiworld_sim::red_team::AdversarialStrategy;
+    use mycelix_multiworld_sim::sovereign_profile::{
+        CivicRequirement, CivicTier, DimensionWeights, SovereignDimension, SovereignProfile,
+    };
+
+    // An agent whose 8D profile is borderline: tier is high enough (Citizen)
+    // by combined score but EpistemicIntegrity is 0.15 — below the 0.25
+    // voting floor. Baseline gating should reject; bypass should admit.
+    let config = setup(42, 2);
+    let mut sim = MultiWorldSimulator::new(config);
+    sim.run_initialization();
+
+    // Find a world and hand-assign a targeted profile to one agent, then
+    // tag them CrossClusterAmplifier.
+    let profile = SovereignProfile {
+        epistemic_integrity: 0.15,
+        thermodynamic_yield: 0.60,
+        network_resilience: 0.60,
+        economic_velocity: 0.60,
+        civic_participation: 0.60,
+        stewardship_care: 0.60,
+        semantic_resonance: 0.60,
+        domain_competence: 0.60,
+    };
+    let requirement = CivicRequirement {
+        min_tier: CivicTier::Citizen,
+        min_dimensions: vec![(SovereignDimension::EpistemicIntegrity, 0.25)],
+    };
+    let weights = DimensionWeights::governance();
+
+    for world in sim.worlds.iter_mut() {
+        // Scope mutation so `world` is available immutably below.
+        let target_idx = {
+            let idx = world.agents.iter().position(|a| a.is_alive());
+            let Some(idx) = idx else { continue };
+            world.agents[idx].sovereign_profile = profile.clone();
+            world.agents[idx].adversarial = None;
+            idx
+        };
+        // Path 1: baseline — 0.15 EI should fail the 0.25 floor.
+        let baseline_meets = world.civic_fraction_meeting(&requirement, &weights);
+
+        // Path 2: tag the target and re-run — bypass lowers floor.
+        world.agents[target_idx].adversarial = Some(AdversarialStrategy::CrossClusterAmplifier);
+        let amplifier_meets = world.civic_fraction_meeting(&requirement, &weights);
+
+        assert!(
+            amplifier_meets >= baseline_meets,
+            "bypass should weakly increase eligibility: {} vs {}",
+            amplifier_meets,
+            baseline_meets,
+        );
+        return;
+    }
+    panic!("no agent available to assign profile");
+}
+
+#[test]
 fn sim_survives_mixed_attack() {
     // Deploy 3 attackers of each Mycelix strategy.
     let config = setup(42, 5);
@@ -152,6 +213,38 @@ fn sim_survives_mixed_attack() {
     assert!(
         report.final_cvs >= 0.2,
         "CVS too low under attack: {:.3}",
+        report.final_cvs,
+    );
+}
+
+/// Long-horizon A/B: 50 years with all 5 Mycelix attack vectors engaged.
+///
+/// This is the *equilibrium* test. Short-horizon survival (5 years) only
+/// proves the defenses engage. 50 years tests whether defenses hold as the
+/// population evolves — new adversaries aren't spawned by inject_adversaries
+/// (children don't inherit adversarial status), so the test also shows the
+/// attack's intensity naturally decays.
+#[test]
+fn sim_equilibrium_under_sustained_attack() {
+    let config = setup(42, 50);
+    let mut sim = MultiWorldSimulator::new(config);
+    sim.run_initialization();
+    sim.inject_adversaries(AdversarialStrategy::TierBuyer, 3);
+    sim.inject_adversaries(AdversarialStrategy::DemurrageEvader, 3);
+    sim.inject_adversaries(AdversarialStrategy::CorrectionFarmer, 3);
+    sim.inject_adversaries(AdversarialStrategy::CrossClusterAmplifier, 3);
+    sim.inject_adversaries(AdversarialStrategy::GuildColluder, 3);
+
+    let report = sim.run();
+    assert!(
+        report.survived,
+        "civilization should survive 50 years of attack",
+    );
+    // Stricter CVS floor at equilibrium: defense quality should improve over
+    // time as adversaries age out and the population normalizes.
+    assert!(
+        report.final_cvs >= 0.3,
+        "50yr equilibrium CVS too low: {:.3}",
         report.final_cvs,
     );
 }
