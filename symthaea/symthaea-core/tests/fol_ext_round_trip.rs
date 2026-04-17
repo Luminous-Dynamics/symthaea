@@ -88,11 +88,7 @@ fn taut_reflexivity_real() {
         return;
     }
     // ∀ x : ℝ, x = x
-    let phi = FolFormulaExt::forall(
-        "x",
-        NumericType::Real,
-        FolFormulaExt::eq(x(), x()),
-    );
+    let phi = FolFormulaExt::forall("x", NumericType::Real, FolFormulaExt::eq(x(), x()));
     expect_unsat(&phi, "∀ x : ℝ, x = x");
 }
 
@@ -103,11 +99,7 @@ fn taut_reflexivity_int() {
         return;
     }
     // ∀ n : ℤ, n = n
-    let phi = FolFormulaExt::forall(
-        "n",
-        NumericType::Int,
-        FolFormulaExt::eq(n(), n()),
-    );
+    let phi = FolFormulaExt::forall("n", NumericType::Int, FolFormulaExt::eq(n(), n()));
     expect_unsat(&phi, "∀ n : ℤ, n = n");
 }
 
@@ -192,10 +184,7 @@ fn taut_exact_rational_one_third_times_three() {
     // 3 * (1/3) = 1 — this is the test that FAILS when RatLit is
     // serialized as 0.3333… f64 and Z3 reads the literal rational.
     // With (/ 1 3) exact serialization, Z3 closes this trivially.
-    let phi = FolFormulaExt::eq(
-        Term::IntLit(3).mul(Term::rat(1, 3)),
-        Term::IntLit(1),
-    );
+    let phi = FolFormulaExt::eq(Term::IntLit(3).mul(Term::rat(1, 3)), Term::IntLit(1));
     expect_unsat(&phi, "3 · (1/3) = 1 (RatLit exactness)");
 }
 

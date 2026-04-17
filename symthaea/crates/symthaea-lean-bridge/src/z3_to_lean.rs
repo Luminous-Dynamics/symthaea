@@ -71,11 +71,7 @@ pub fn parse_set_logic(smtlib: &str) -> SmtLogic {
 /// The generated script assumes the goal is already expressed in Lean
 /// syntax by the caller (we don't re-parse SMT-LIB here — that's the job of
 /// `symthaea-core::hdc::conjecture_engine::expr_to_smtlib2` in reverse).
-pub fn lean_from_z3(
-    theorem_name: &str,
-    lean_statement: &str,
-    smtlib: &str,
-) -> LeanProofScript {
+pub fn lean_from_z3(theorem_name: &str, lean_statement: &str, smtlib: &str) -> LeanProofScript {
     let logic = parse_set_logic(smtlib);
     LeanProofScript {
         theorem_name: theorem_name.to_string(),

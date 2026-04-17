@@ -30,10 +30,10 @@
 
 pub mod bridge;
 pub mod fol_ext_bridge; // Phase 2: FolFormulaExt → Lean proof script w/ Mathlib
-pub mod term;
-pub mod tactic;
-pub mod z3_to_lean;
 pub mod runner;
+pub mod tactic;
+pub mod term;
+pub mod z3_to_lean;
 
 /// Crate version — bumped when emitted Lean surface format changes.
 pub const CRATE_VERSION: &str = env!("CARGO_PKG_VERSION");

@@ -88,9 +88,7 @@ impl LeanProofScript {
     /// the external-verify gate to distinguish "accepted by Lean" from
     /// "provably proved".
     pub fn contains_sorry(&self) -> bool {
-        self.tactics
-            .iter()
-            .any(|t| matches!(t, LeanTactic::Sorry))
+        self.tactics.iter().any(|t| matches!(t, LeanTactic::Sorry))
     }
 }
 

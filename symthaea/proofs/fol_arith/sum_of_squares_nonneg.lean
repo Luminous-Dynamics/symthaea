@@ -7,4 +7,14 @@
 import Mathlib.Tactic
 
 theorem sum_of_squares_nonneg : (∀ a : ℝ, (∀ b : ℝ, ((0) ≤ ((a ^ 2) + (b ^ 2))))) := by
-  nlinarith
+  try intros
+  first
+    | (rfl; done)
+    | (norm_num; done)
+    | (ring; done)
+    | (omega; done)
+    | (linarith; done)
+    | (nlinarith [sq_nonneg _, sq_nonneg (_ - _), sq_nonneg (_ + _)]; done)
+    | (positivity; done)
+    | (tauto; done)
+    | (polyrith; done)

@@ -359,6 +359,8 @@ pub mod curriculum;
 pub mod differential_equations; // ODE/PDE solvers: RK4, shooting, heat eq, wave eq
 pub mod diophantine;
 pub mod fft; // Fast Fourier Transform: Cooley-Tukey radix-2, convolution
+pub mod fol_ext_smt; // Phase 2: SMT-LIB2 serializer + fragment detection for FolFormulaExt
+pub mod fol_formula_ext; // Phase 2: FOL with arithmetic (Term + FolFormulaExt over ℤ/ℕ/ℝ)
 pub mod foundations;
 pub mod functional_equations;
 pub mod graph_theory; // Graph algorithms: BFS, DFS, Dijkstra, MST, coloring, combinatorics
@@ -370,8 +372,6 @@ pub mod inequalities;
 pub mod integer; // Integer arithmetic (ℤ) - extends natural numbers with sign
 pub mod linear_algebra; // General linear algebra: LU, QR, Cholesky, eigendecomposition, SVD
 pub mod liquid_holocell; // Atomic primitive unit: Liquid Holocell with dilation
-pub mod fol_ext_smt; // Phase 2: SMT-LIB2 serializer + fragment detection for FolFormulaExt
-pub mod fol_formula_ext; // Phase 2: FOL with arithmetic (Term + FolFormulaExt over ℤ/ℕ/ℝ)
 pub mod logic_engine; // Propositional & FOL logic: SAT (DPLL), natural deduction, unification
 pub mod lsh_index; // LSH index for fast approximate similarity search (heap-optimized)
 pub mod lsh_simhash; // SimHash for binary vectors (Hamming distance)

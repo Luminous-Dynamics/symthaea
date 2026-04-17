@@ -7,4 +7,14 @@
 import Mathlib.Tactic
 
 theorem succ_gt_self_int : (∀ n : ℤ, (n < (n + (1)))) := by
-  omega
+  try intros
+  first
+    | (rfl; done)
+    | (norm_num; done)
+    | (ring; done)
+    | (omega; done)
+    | (linarith; done)
+    | (nlinarith [sq_nonneg _, sq_nonneg (_ - _), sq_nonneg (_ + _)]; done)
+    | (positivity; done)
+    | (tauto; done)
+    | (polyrith; done)

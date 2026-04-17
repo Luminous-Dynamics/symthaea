@@ -345,9 +345,7 @@ impl FolFormulaExt {
                     }
                 }
             }
-            FolFormulaExt::And(a, b)
-            | FolFormulaExt::Or(a, b)
-            | FolFormulaExt::Implies(a, b) => {
+            FolFormulaExt::And(a, b) | FolFormulaExt::Or(a, b) | FolFormulaExt::Implies(a, b) => {
                 a.walk_free_vars(out, bound, default_ty);
                 b.walk_free_vars(out, bound, default_ty);
             }
@@ -369,9 +367,7 @@ impl FolFormulaExt {
         match self {
             FolFormulaExt::Base(_) => true,
             FolFormulaExt::Eq(_, _) | FolFormulaExt::Lt(_, _) | FolFormulaExt::Le(_, _) => false,
-            FolFormulaExt::And(a, b)
-            | FolFormulaExt::Or(a, b)
-            | FolFormulaExt::Implies(a, b) => {
+            FolFormulaExt::And(a, b) | FolFormulaExt::Or(a, b) | FolFormulaExt::Implies(a, b) => {
                 a.is_purely_propositional() && b.is_purely_propositional()
             }
             FolFormulaExt::Not(a) => a.is_purely_propositional(),
@@ -477,11 +473,7 @@ mod tests {
     #[test]
     fn forall_bound_var_excluded_from_free() {
         // ∀ x : Int, x = x
-        let f = FolFormulaExt::forall(
-            "x",
-            NumericType::Int,
-            FolFormulaExt::eq(x(), x()),
-        );
+        let f = FolFormulaExt::forall("x", NumericType::Int, FolFormulaExt::eq(x(), x()));
         let free = f.free_arith_vars();
         assert!(free.is_empty(), "x should be bound; got free={:?}", free);
     }
@@ -506,8 +498,7 @@ mod tests {
     #[test]
     fn implication_over_arithmetic_not_purely_prop() {
         // (x > 0) → (x ≥ 0)
-        let f = FolFormulaExt::lt(Term::int(0), x())
-            .implies(FolFormulaExt::le(Term::int(0), x()));
+        let f = FolFormulaExt::lt(Term::int(0), x()).implies(FolFormulaExt::le(Term::int(0), x()));
         assert!(!f.is_purely_propositional());
     }
 }

@@ -34,7 +34,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use symthaea_core::hdc::logic_engine::{LogicEngine, Proposition, ProofResult, ProofStepLogic};
+use symthaea_core::hdc::logic_engine::{LogicEngine, ProofResult, ProofStepLogic, Proposition};
 use symthaea_lean_bridge::bridge::render_lean_file;
 use symthaea_lean_bridge::runner::{check_with_lean4, CheckOutcome};
 
@@ -124,9 +124,7 @@ fn fixtures() -> Vec<Fixture> {
         Fixture {
             name: "contrapositive",
             description: "(P → Q) → (¬Q → ¬P)",
-            goal: p()
-                .implies(q())
-                .implies(q().not().implies(p().not())),
+            goal: p().implies(q()).implies(q().not().implies(p().not())),
         },
         Fixture {
             name: "double_negation_intro",
@@ -180,9 +178,7 @@ fn fixtures() -> Vec<Fixture> {
         Fixture {
             name: "and_distrib_over_and",
             description: "P ∧ Q ∧ R → R ∧ P ∧ Q",
-            goal: p()
-                .and(q().and(r()))
-                .implies(r().and(p().and(q()))),
+            goal: p().and(q().and(r())).implies(r().and(p().and(q()))),
         },
         Fixture {
             name: "triple_impl",

@@ -7,4 +7,14 @@
 import Mathlib.Tactic
 
 theorem trichotomy_real : (∀ x : ℝ, (∀ y : ℝ, (((x = y) ∨ (x < y)) ∨ (y < x)))) := by
-  linarith
+  try intros
+  first
+    | (rfl; done)
+    | (norm_num; done)
+    | (ring; done)
+    | (omega; done)
+    | (linarith; done)
+    | (nlinarith [sq_nonneg _, sq_nonneg (_ - _), sq_nonneg (_ + _)]; done)
+    | (positivity; done)
+    | (tauto; done)
+    | (polyrith; done)

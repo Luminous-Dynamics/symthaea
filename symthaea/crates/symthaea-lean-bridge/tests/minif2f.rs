@@ -13,9 +13,9 @@
 //! properties of the emitted text that are necessary conditions for
 //! Lean acceptance.
 
-use symthaea_core::hdc::logic_engine::{LogicEngine, Proposition, ProofResult, ProofStepLogic};
+use symthaea_core::hdc::logic_engine::{LogicEngine, ProofResult, ProofStepLogic, Proposition};
 use symthaea_lean_bridge::bridge::{
-    atoms_in_prop, prop_to_lean_term, proof_result_to_lean, render_lean_file,
+    atoms_in_prop, proof_result_to_lean, prop_to_lean_term, render_lean_file,
 };
 use symthaea_lean_bridge::tactic::LeanTactic;
 
@@ -30,7 +30,10 @@ fn identity_implication_emits_tauto() {
     let goal = atom("P").implies(atom("P"));
 
     // Confirm this really is a tautology according to the logic engine.
-    assert!(LogicEngine::is_tautology(&goal), "P → P must be a tautology");
+    assert!(
+        LogicEngine::is_tautology(&goal),
+        "P → P must be a tautology"
+    );
 
     // Synthesize a minimal ProofResult tagged with a classically-sound rule.
     let result = ProofResult {
@@ -49,14 +52,20 @@ fn identity_implication_emits_tauto() {
 
     // Lean surface-syntax requirements:
     assert!(file.contains("variable (P : Prop)"), "must declare P");
-    assert!(file.contains("theorem t_identity"), "must emit theorem name");
+    assert!(
+        file.contains("theorem t_identity"),
+        "must emit theorem name"
+    );
     assert!(file.contains("(P → P)"), "must emit the implication");
     assert!(
         file.contains("fun ") && file.contains(" => "),
         "identity implication must use term-mode proof (core Lean 4)"
     );
     assert!(!file.contains("tauto"), "must not use Mathlib `tauto`");
-    assert!(!file.contains("sorry"), "valid tautology must not emit sorry");
+    assert!(
+        !file.contains("sorry"),
+        "valid tautology must not emit sorry"
+    );
 }
 
 /// Fixture 2: real modus_ponens invocation.

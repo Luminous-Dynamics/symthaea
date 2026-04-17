@@ -7,4 +7,14 @@
 import Mathlib.Tactic
 
 theorem two_xy_le_sum_of_squares : (∀ x : ℝ, (∀ y : ℝ, ((((2) * x) * y) ≤ ((x ^ 2) + (y ^ 2))))) := by
-  nlinarith
+  try intros
+  first
+    | (rfl; done)
+    | (norm_num; done)
+    | (ring; done)
+    | (omega; done)
+    | (linarith; done)
+    | (nlinarith [sq_nonneg _, sq_nonneg (_ - _), sq_nonneg (_ + _)]; done)
+    | (positivity; done)
+    | (tauto; done)
+    | (polyrith; done)

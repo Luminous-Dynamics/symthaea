@@ -7,4 +7,14 @@
 import Mathlib.Tactic
 
 theorem square_of_sum : (∀ a : ℝ, (∀ b : ℝ, (((a + b) ^ 2) = (((a ^ 2) + (((2) * a) * b)) + (b ^ 2))))) := by
-  nlinarith
+  try intros
+  first
+    | (rfl; done)
+    | (norm_num; done)
+    | (ring; done)
+    | (omega; done)
+    | (linarith; done)
+    | (nlinarith [sq_nonneg _, sq_nonneg (_ - _), sq_nonneg (_ + _)]; done)
+    | (positivity; done)
+    | (tauto; done)
+    | (polyrith; done)

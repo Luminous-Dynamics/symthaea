@@ -25,9 +25,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use symthaea_core::hdc::logic_engine::{
-    LogicEngine, Proposition, ProofResult, ProofStepLogic,
-};
+use symthaea_core::hdc::logic_engine::{LogicEngine, ProofResult, ProofStepLogic, Proposition};
 use symthaea_lean_bridge::bridge::render_lean_file;
 use symthaea_lean_bridge::runner::{check_with_lean4, CheckOutcome};
 

@@ -178,25 +178,70 @@ pub fn render_fol_ext_file(theorem_name: &str, phi: &FolFormulaExt) -> String {
     out
 }
 
-/// Choose a tactic for an arithmetic goal based on the detected SMT
-/// fragment. Returns `(tactic, contains_sorry)`; the second flag is the
-/// honest signal for the external-verify gate.
-fn synthesize_arith_tactic(
-    phi: &FolFormulaExt,
-    fragment: SmtFragment,
-) -> (LeanTactic, bool) {
-    let _ = phi; // placeholder: fragment-driven for now.
-    let tac = fragment.suggested_lean_tactic();
-    (LeanTactic::Raw(tac.to_string()), false)
+/// Choose a tactic block for an arithmetic goal. Returns
+/// `(tactic_block, contains_sorry)`.
+///
+/// Strategy: we don't know a priori which tactic will close a given goal
+/// (e.g. `∀ x : ℝ, x = x` is closed by `rfl` after `intro`, not by
+/// `linarith`). Emit a `first | … | …` cascade that tries the most
+/// common tactics in order from strongest-but-restricted to weakest-but-
+/// broadest. The first succeeding alternative closes the goal.
+///
+/// All tactics below are Mathlib. Ordering is chosen to maximize hit rate
+/// on miniF2F-v2's typical goal shapes.
+fn synthesize_arith_tactic(phi: &FolFormulaExt, fragment: SmtFragment) -> (LeanTactic, bool) {
+    let _ = (phi, fragment); // cascade is fragment-agnostic; fragment guides
+                             // the FIRST-choice tactic but we always include
+                             // the full cascade so strong goals close fast
+                             // and weird shapes still have fallbacks.
+
+    // Lean 4 `first | t1 | t2 | …` tries alternatives left-to-right,
+    // committing to the first that succeeds. `intros` + tactic composes
+    // the two-step "strip universals then close" pattern seen in most
+    // miniF2F-v2 statements.
+    //
+    // Rough ordering rationale:
+    //   rfl          — literal `x = x` after intros
+    //   norm_num     — numeric literals (3 · 1/3 = 1, etc.)
+    //   ring         — polynomial equalities over commutative rings
+    //   omega        — linear arithmetic over ℤ/ℕ
+    //   linarith     — linear arithmetic over ordered fields
+    //   nlinarith    — nonlinear arithmetic (squares, products)
+    //   positivity   — non-negativity / strict-positivity of expressions
+    //   tauto        — classical propositional tautologies
+    //   polyrith     — polynomial arithmetic with rationals (catches some
+    //                  cases that nlinarith misses)
+    // Apply `intros` once at the top (Lean 4 drops `intros` → `intro` in
+    // places; we use the safer `try intros` which no-ops if there are no
+    // universals to strip). Then a flat `first | … | …` of closer tactics.
+    //
+    // `try` ensures `intros` never fails on goals that have no universals
+    // (e.g. the raw `3 * (1/3) = 1` theorem); without `try` a closed-form
+    // goal would silently fail the whole cascade because `intros` threw.
+    // Every alternative is `; done`-terminated. Reason: some Mathlib
+    // tactics (notably `norm_num`) partially simplify the goal even when
+    // they can't close it, which interferes with `first`'s backtracking.
+    // Appending `done` forces each branch to either fully close the goal
+    // or fail cleanly, letting `first` fall through to the next tactic.
+    let cascade = r#"try intros
+  first
+    | (rfl; done)
+    | (norm_num; done)
+    | (ring; done)
+    | (omega; done)
+    | (linarith; done)
+    | (nlinarith [sq_nonneg _, sq_nonneg (_ - _), sq_nonneg (_ + _)]; done)
+    | (positivity; done)
+    | (tauto; done)
+    | (polyrith; done)"#;
+
+    (LeanTactic::Raw(cascade.to_string()), false)
 }
 
 /// Same as [`render_fol_ext_file`] but returns the parsed `LeanProofScript`
 /// rather than a full file. Callers that want to post-process (e.g. inject
 /// hypotheses) can work on the script directly.
-pub fn script_for_fol_ext(
-    theorem_name: &str,
-    phi: &FolFormulaExt,
-) -> LeanProofScript {
+pub fn script_for_fol_ext(theorem_name: &str, phi: &FolFormulaExt) -> LeanProofScript {
     let fragment = detect_fragment(phi);
     let statement = formula_to_lean(phi);
     let (tactic, _) = synthesize_arith_tactic(phi, fragment);
@@ -220,47 +265,55 @@ mod tests {
     }
 
     #[test]
-    fn reflexivity_real_emits_linarith_family() {
-        // ∀ x : ℝ, x = x
-        let phi = FolFormulaExt::forall(
-            "x",
-            NumericType::Real,
-            FolFormulaExt::eq(x(), x()),
-        );
+    fn arith_goals_emit_cascade() {
+        // Every arithmetic goal gets the same `first | … | …` cascade.
+        // The individual tactics (rfl, norm_num, ring, omega, linarith,
+        // nlinarith, positivity, tauto, polyrith) appear verbatim in the
+        // emitted file.
+        let phi = FolFormulaExt::forall("x", NumericType::Real, FolFormulaExt::eq(x(), x()));
         let file = render_fol_ext_file("t_refl", &phi);
         assert!(file.contains("import Mathlib.Tactic"));
         assert!(file.contains("theorem t_refl"));
         assert!(file.contains("(∀ x : ℝ,"));
-        // Quantified over reals → LRA → linarith
-        assert!(file.contains("linarith"), "got: {}", file);
+        // Cascade members must all be present:
+        for t in [
+            "rfl",
+            "norm_num",
+            "ring",
+            "omega",
+            "linarith",
+            "nlinarith",
+            "positivity",
+            "tauto",
+            "polyrith",
+        ] {
+            assert!(file.contains(t), "cascade missing {}: file = {}", t, file);
+        }
+        assert!(file.contains("first"));
         assert!(!file.contains("sorry"));
     }
 
     #[test]
-    fn linear_int_emits_omega() {
-        // ∀ n : ℤ, n < n + 1
+    fn linear_int_cascade_includes_omega() {
         let phi = FolFormulaExt::forall(
             "n",
             NumericType::Int,
             FolFormulaExt::lt(n(), n().add(Term::IntLit(1))),
         );
         let file = render_fol_ext_file("t_succ_gt", &phi);
-        // Quantified over integers → LIA → omega
-        assert!(file.contains("omega"), "got: {}", file);
+        assert!(file.contains("omega"));
         assert!(!file.contains("sorry"));
     }
 
     #[test]
-    fn nonlinear_real_emits_nlinarith() {
-        // ∀ x : ℝ, 0 ≤ x * x
+    fn nonlinear_real_cascade_includes_nlinarith() {
         let phi = FolFormulaExt::forall(
             "x",
             NumericType::Real,
             FolFormulaExt::le(Term::IntLit(0), x().mul(x())),
         );
         let file = render_fol_ext_file("t_sq_nonneg", &phi);
-        // Non-linear real → NRA → nlinarith
-        assert!(file.contains("nlinarith"), "got: {}", file);
+        assert!(file.contains("nlinarith"));
         assert!(!file.contains("sorry"));
     }
 
@@ -292,9 +345,7 @@ mod tests {
         use symthaea_core::hdc::logic_engine::Proposition;
         // Wrap a pure-propositional tautology and verify the Phase 1
         // synthesizer signature appears (variable declarations).
-        let phi = FolFormulaExt::from_prop(
-            Proposition::atom("P").implies(Proposition::atom("P")),
-        );
+        let phi = FolFormulaExt::from_prop(Proposition::atom("P").implies(Proposition::atom("P")));
         let file = render_fol_ext_file("t_id", &phi);
         // Phase 1 path emits `variable (P : Prop)`; arithmetic path does not.
         assert!(

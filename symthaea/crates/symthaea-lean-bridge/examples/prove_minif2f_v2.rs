@@ -45,12 +45,8 @@ fn data_dir() -> Option<PathBuf> {
 /// `Finset`, `∑`, `∏`, `Nat.`, etc.
 fn looks_propositional_only(source: &str) -> bool {
     let disqualifiers = [
-        "ℝ", "ℕ", "ℤ", "ℚ",
-        "Nat", "Int", "Real", "Rat",
-        "Finset", "∑", "∏",
-        " = ", "≤", "≥", "<", ">",
-        " + ", " * ", " - ", " / ",
-        "^",
+        "ℝ", "ℕ", "ℤ", "ℚ", "Nat", "Int", "Real", "Rat", "Finset", "∑", "∏", " = ", "≤", "≥", "<",
+        ">", " + ", " * ", " - ", " / ", "^",
     ];
     for d in &disqualifiers {
         if source.contains(d) {

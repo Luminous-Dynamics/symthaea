@@ -7,4 +7,14 @@
 import Mathlib.Tactic
 
 theorem three_times_third_eq_one : (((3) * ((1 : ℝ) / (3 : ℝ))) = (1)) := by
-  linarith
+  try intros
+  first
+    | (rfl; done)
+    | (norm_num; done)
+    | (ring; done)
+    | (omega; done)
+    | (linarith; done)
+    | (nlinarith [sq_nonneg _, sq_nonneg (_ - _), sq_nonneg (_ + _)]; done)
+    | (positivity; done)
+    | (tauto; done)
+    | (polyrith; done)

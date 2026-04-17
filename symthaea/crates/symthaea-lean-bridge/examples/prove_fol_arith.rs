@@ -52,20 +52,12 @@ fn fixtures() -> Vec<Fixture> {
         Fixture {
             name: "refl_real",
             description: "∀ x : ℝ, x = x",
-            goal: FolFormulaExt::forall(
-                "x",
-                NumericType::Real,
-                FolFormulaExt::eq(v("x"), v("x")),
-            ),
+            goal: FolFormulaExt::forall("x", NumericType::Real, FolFormulaExt::eq(v("x"), v("x"))),
         },
         Fixture {
             name: "refl_int",
             description: "∀ n : ℤ, n = n",
-            goal: FolFormulaExt::forall(
-                "n",
-                NumericType::Int,
-                FolFormulaExt::eq(v("n"), v("n")),
-            ),
+            goal: FolFormulaExt::forall("n", NumericType::Int, FolFormulaExt::eq(v("n"), v("n"))),
         },
         // ─── Linear successor / monotonicity ──────────────────────────────
         Fixture {
@@ -95,10 +87,7 @@ fn fixtures() -> Vec<Fixture> {
                 FolFormulaExt::forall(
                     "b",
                     NumericType::Real,
-                    FolFormulaExt::eq(
-                        v("a").add(v("b")),
-                        v("b").add(v("a")),
-                    ),
+                    FolFormulaExt::eq(v("a").add(v("b")), v("b").add(v("a"))),
                 ),
             ),
         },
@@ -151,10 +140,7 @@ fn fixtures() -> Vec<Fixture> {
         Fixture {
             name: "three_times_third_eq_one",
             description: "3 · (1/3) = 1  (RatLit exactness; closes without rescale)",
-            goal: FolFormulaExt::eq(
-                Term::IntLit(3).mul(Term::rat(1, 3)),
-                Term::IntLit(1),
-            ),
+            goal: FolFormulaExt::eq(Term::IntLit(3).mul(Term::rat(1, 3)), Term::IntLit(1)),
         },
         // ─── Algebraic identities (stretch `nlinarith`) ───────────────────
         Fixture {
@@ -169,7 +155,8 @@ fn fixtures() -> Vec<Fixture> {
                     NumericType::Real,
                     FolFormulaExt::eq(
                         v("a").add(v("b")).pow(2),
-                        v("a").pow(2)
+                        v("a")
+                            .pow(2)
                             .add(Term::IntLit(2).mul(v("a")).mul(v("b")))
                             .add(v("b").pow(2)),
                     ),
@@ -199,10 +186,7 @@ fn fixtures() -> Vec<Fixture> {
                 FolFormulaExt::forall(
                     "b",
                     NumericType::Real,
-                    FolFormulaExt::le(
-                        Term::IntLit(0),
-                        v("a").pow(2).add(v("b").pow(2)),
-                    ),
+                    FolFormulaExt::le(Term::IntLit(0), v("a").pow(2).add(v("b").pow(2))),
                 ),
             ),
         },
@@ -243,14 +227,17 @@ fn lake_env_available() -> bool {
         .unwrap_or(false)
 }
 
-fn verify_with_lake(
-    lean_file: &PathBuf,
-    project_dir: &PathBuf,
-) -> Result<bool, String> {
+fn verify_with_lake(lean_file: &PathBuf, project_dir: &PathBuf) -> Result<bool, String> {
+    // Lake's `env lean` resolves the target path relative to the current
+    // working directory, but we cd into `project_dir` for Mathlib
+    // resolution. Canonicalize the lean file path to an absolute form so
+    // the cd-into-project doesn't break path lookup.
+    let abs_lean_file = fs::canonicalize(lean_file)
+        .map_err(|e| format!("canonicalize {} failed: {}", lean_file.display(), e))?;
     let out = Command::new("lake")
         .arg("env")
         .arg("lean")
-        .arg(lean_file)
+        .arg(&abs_lean_file)
         .current_dir(project_dir)
         .output()
         .map_err(|e| format!("spawn lake failed: {}", e))?;
