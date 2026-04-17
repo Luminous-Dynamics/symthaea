@@ -231,7 +231,7 @@ Fractal CivOS with 5 tiers, consolidated into cluster DNAs (single DNA = cross-d
 - **Cross-cluster bridge**: All clusters via `CallTargetCell::OtherRole` (unified hApp: `mycelix-workspace/happs/mycelix-unified-happ.yaml`). Centralized routing in `routing_registry.rs` (13 routes, 35 tests). `CrossClusterRole`: Commons, Civic, Identity, Hearth, Personal, Finance, Governance, Music
 - **Consciousness gating**: 4D profile (identity/reputation/community/engagement) → 5 tiers (Observer→Guardian) → configurable vote weights (`VoteWeightConfig`: default/constitutional/budget/emergency presets)
 - **Sub-Passport**: Automatic effective_tier recovery (6h cooldown, 3:1 correction ratio, gradual one-tier-per-cooldown)
-- **SDKs**: Rust (18 modules, ~50K LOC, 1,036+ tests), TypeScript (37 modules, ~226K LOC, 6,316 tests), Python, WASM
+- **SDKs** (in `mycelix-workspace/sdk{,-ts,-python,-wasm}/`, NOT top-level `mycelix-sdk-ts/` which is an orphan stub): Rust (18 modules, ~50K LOC, 1,036+ tests), TypeScript (37 modules, ~226K LOC, 6,316 tests), Python, WASM
 - **Dashboards**: LUCID (SvelteKit + Tauri, 40+ components, 95% Symthaea bridge), Observatory (SvelteKit)
 - **Build**: `just build-commons` / `just build-civic` (or `cargo build --release --target wasm32-unknown-unknown`)
 - **Tests**: 8,600+ Rust workspace tests across clusters + 295+ bridge-common + 1,036 SDK Rust + 6,316 SDK TS

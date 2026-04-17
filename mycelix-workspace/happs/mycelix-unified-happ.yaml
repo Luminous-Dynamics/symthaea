@@ -34,6 +34,17 @@ description: |
   Note: "HEARTH" in the finance hApp refers to commons pool governance;
   the hearth DNA here is the family/kinship coordination layer.
 
+  Deliberately excluded from this unified bundle (status 2026-04-17):
+  - desci: REST-only service (Actix-web), not a Holochain hApp
+  - mail: standalone hApp at mycelix-workspace/mycelix-pulse/, PQC-encrypted,
+    no cross-cluster bridge wiring yet
+  - marketplace: beta stage, arbitration flows not stable enough for
+    cross-cluster calls
+  - space: production but standalone — orbital-mechanics domain is
+    self-contained, no bridge integration needed yet
+  Promote to unified bundle when bridge wiring exists and zomes are
+  stable (see MYCELIX_IMPROVEMENT_PLAN.md P4.1).
+
 roles:
   - name: personal
     provisioning:
