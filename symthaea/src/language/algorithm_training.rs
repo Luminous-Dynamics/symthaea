@@ -1406,17 +1406,25 @@ mod tests {
     }
 
     #[test]
-    fn test_cfc_training_loss_decreases() {
-        // Try multiple learning rates to find which converges
-        for &lr in &[0.001, 0.0001] {
-            let report = train_cfc_sequencer(30, lr);
-            println!("lr={lr}: {report}");
+    fn test_cfc_training_converges() {
+        let report = train_cfc_sequencer(200, 0.001);
+        println!("{report}");
+        // Print loss curve samples
+        let n = report.loss_curve.len();
+        if n >= 4 {
+            println!(
+                "Loss curve: epoch 0={:.6}, 25%={:.6}, 50%={:.6}, 75%={:.6}, 100%={:.6}",
+                report.loss_curve[0],
+                report.loss_curve[n / 4],
+                report.loss_curve[n / 2],
+                report.loss_curve[3 * n / 4],
+                report.loss_curve[n - 1],
+            );
         }
-        // Verify at least one run produces finite loss
-        let report = train_cfc_sequencer(30, 0.001);
         assert!(
-            report.final_loss.is_finite(),
-            "final loss should be finite: {}",
+            report.final_loss < report.loss_curve[0],
+            "loss should decrease over training: {:.6} → {:.6}",
+            report.loss_curve[0],
             report.final_loss
         );
     }
