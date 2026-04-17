@@ -80,7 +80,19 @@ Ship the two test harnesses that are already 90% there, plus the Rapier3D bridge
 - This is the moment Symtropy becomes a real end-to-end Symthaea test bench.
 - Unlocks: reasoning engine, meta-cognition, thalamic router, prediction error → motor precision closed-loop at full fidelity.
 
-**Gate to Phase 2:** At least one robot platform walks/flies/manipulates reliably in-engine with Φ-gated motor authority; Mycelix CI catches a governance invariant violation on a PR.
+### Track B: `symtropy-mycelix-bridge` — Holochain as a Bevy Resource (preferred architectural path)
+
+Wrap the upstream `holochain_client` crate as a Bevy `Resource` so systems and NPCs can call Mycelix zomes directly. Turns every Bevy agent into a Mycelix user — a stress test no headless harness can match.
+
+- `MycelixClient` Resource — authenticated connection to shared conductor (`ws://localhost:8888`).
+- `MycelixRequest` / `MycelixResponse` events — Bevy events for async zome calls.
+- Per-cluster typed helpers: `call_governance(proposal)`, `call_commons(resource_claim)`, etc.
+- Integration suite: spawn N agents, let them vote / trade / stake, assert invariants (same anti-tyranny set as `headless_test` plus scale-dependent ones).
+- **Cross-cutting with** Phase 2 Track C (below) and Phase 4 Track A.
+
+WebView-embed of real Leptos apps (Track A's native variant) is explicitly NOT pursued. `wry` doesn't support offscreen rendering ([tauri/wry#391](https://github.com/tauri-apps/wry/issues/391), open since 2021); Servo-as-library and CEF are out of scope. See Phase 4 Track A for the tractable browser-overlay alternative.
+
+**Gate to Phase 2:** At least one robot platform walks/flies/manipulates reliably in-engine with Φ-gated motor authority; Mycelix CI catches a governance invariant violation on a PR; at least one `MycelixClient`-driven test scenario runs green with ≥5 NPC-users.
 
 ---
 
@@ -95,6 +107,13 @@ The biggest current gap. Without this, "best OSS engine" is not reachable.
 - **Asset imports**: glTF 2.0 (bevy_gltf), png/jpg/ktx2, (stretch) OpenUSD-Lite.
 - **Editor integration** — not a bespoke editor. Ship a `bevy_inspector_egui` plugin set:
   - `SymtropyInspectorPlugin`: Φ inspector, live coupling-channel tuning, replay scrubber, determinism checker, thermodynamic ledger dashboard.
+
+### Track C: `symtropy-ui-mycelix` — native Bevy UI for Mycelix screens
+
+Re-implement the 3–5 most-important Mycelix interactions (governance vote card, Praxis lesson panel, Craft profile, TEND balance, commons resource request) as native `bevy_egui` / `bevy_ui` screens. Each renders on a 3D plane with the holographic shader built above. Zero duplicated logic — UI reads and writes through Track B's `MycelixClient`.
+
+- **Tradeoff:** duplicated UI code vs the Leptos web apps. Cost scales with screen count, so we keep the list short and cover only what a player inside the game world would touch.
+- **Why bevy_egui over bevy_ui:** faster iteration for data-heavy panels, immediate-mode is a better fit for reactive Mycelix state than Bevy's retained UI today. Wrap behind a feature so consumers aren't forced onto egui if they prefer pure bevy_ui.
 
 ---
 
@@ -116,6 +135,7 @@ The biggest current gap. Without this, "best OSS engine" is not reachable.
 - **Spatial authority integration test** — `symtropy-net` wired to Lightyear, validated on 3 peers over LAN, with a chaos-test harness that injects packet loss/reorder.
 - **Holochain persistence** — DHT-backed governance votes and consciousness profiles (via `symtropy-holochain-relay`). Ships as optional feature.
 - **WASM target** — browser-runnable experiments. 63 consciousness examples accessible from a web gallery. Huge educational win.
+- **Track A: CSS-3D iframe overlay of real Leptos apps.** Once Bevy runs in WASM, the hero "holographic Mycelix screen" demo becomes trivial: Leptos app lives in an iframe, CSS 3D transforms match a Bevy 3D quad's screen-space projection, postMessage forwards input. Zero duplicated UI code, zero WebView dependency. Browser-only — complements Phase 2 Track C which covers the native binary.
 - **Windows / macOS verified** — audited not just built; gamepad, audio, filesystem, window resizing all exercised.
 - **XR/VR** — `bevy_openxr` integration for native OpenXR. WebXR via wasm target. First-class hero demo: **visualize 4D cross-sections in a headset** (consciousness-physics made spatially legible). *Note: this is drop-in if bevy_openxr is mature enough; can slip earlier in schedule if a concrete XR use case appears.*
 
@@ -273,3 +293,4 @@ These remain outside the core engine's scope. Reframed from "never" to "not here
 4. **XR/VR** — Phase 4 (`bevy_openxr` + WebXR); hero demo is 4D cross-section visualization in headset.
 5. **Rapier3D** — Phase 1 as `symtropy-rapier3d-bridge` (opt-in), for high-fidelity 3D robotics; native ND solver remains research path. Backend chosen at spawn time; `PhysicsCallback` works identically on both.
 6. **Terrain + Soft-body** — Phase 5 ecosystem crates, not core engine builds.
+7. **Mycelix-in-Bevy** — three tracks across phases, *preferred architectural path is Track B*. Track A (WASM + CSS-3D iframe) covers browser-only hero demo. Track C (native Bevy UI screens) covers desktop-native player interaction. Track B (direct Holochain client as Bevy Resource) is the architectural foundation all three share. WebView-embed of real Leptos apps on native desktop is **not pursued** due to wry offscreen-rendering limitations.
