@@ -510,13 +510,13 @@ impl CognitiveLoopService {
     }
 
     /// Whether a physical embodiment bridge is active.
-    #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
+    #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))]
     pub fn has_embodiment(&self) -> bool {
         self.sensorimotor.embodiment_bridge.is_some()
     }
 
     /// Get the current embodiment platform.
-    #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
+    #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))]
     pub fn embodiment_platform(&self) -> super::super::motor_bridge::EmbodimentPlatform {
         self.sensorimotor
             .embodiment_bridge
@@ -526,13 +526,13 @@ impl CognitiveLoopService {
     }
 
     /// Get the latest embodiment telemetry.
-    #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
+    #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))]
     pub fn embodiment_telemetry(&self) -> &super::super::motor_bridge::EmbodimentTelemetry {
         &self.sensorimotor.embodiment_telemetry
     }
 
     /// Get the last proprioceptive HV.
-    #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
+    #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))]
     pub fn last_proprioceptive_hv(&self) -> Option<&symthaea_core::hdc::ContinuousHV> {
         self.sensorimotor.last_proprioceptive_hv.as_ref()
     }
@@ -545,7 +545,7 @@ impl CognitiveLoopService {
     ///
     /// This enables Multiple Realizability experiments: does consciousness survive
     /// a body transfer? Does Phi adapt when the proprioceptive dimensionality changes?
-    #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped"))]
+    #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))]
     pub fn switch_embodiment(
         &mut self,
         platform: super::super::motor_bridge::EmbodimentPlatform,
