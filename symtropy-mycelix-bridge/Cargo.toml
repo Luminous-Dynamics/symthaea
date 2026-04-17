@@ -51,6 +51,8 @@ thiserror = "1"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+hex = "0.4"
 
 # ---------------------------------------------------------------------------
 # Mock conductor binary — zero Holochain deps, answers the same JSON protocol
