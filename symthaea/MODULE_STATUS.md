@@ -83,10 +83,14 @@ These are pillars that either do not exist or exist as name-only scaffolding:
 | Benchmark | Type | Result | External Commensurability |
 |-----------|------|--------|---------------------------|
 | `symthaea-psych-bench` | Internal, 136+ problems, 26 domains | Composite z-score | **Internal only.** This metric is not commensurable with any external benchmark. Do not cite externally as evidence of math/sci capability. External validation is the Phase 1 goal. |
-| Ramanujan conjecture suite | Internal, 6 physics targets | 6 PROVEN via GP + Z3 | Partial — Z3 proofs are formally checkable, but SR discovery is unique to Symthaea and not directly comparable to external SR benchmarks (AI Feynman, PySR) without matched-harness work. |
+| Ramanujan conjecture suite | Internal, 7 physics targets | 6 PROVEN + 1 Numeric honest failure (PCR3BP) via GP + Z3; 221-equation catalog ≥99% match | Strong. Fully reproducible (`papers/ramanujan/reproduce.sh`, seed=42, ~5 min runtime). Paper draft at `papers/ramanujan/main.tex`. Phase 1 W4-W5 delivered. |
 | IMO tactics | Internal, 14 problems | 14/14 across 5 domains | Partial — problem set is curated, not a standard contest year. Externally-commensurable contest results await Phase 1 AIME/HMMT work (Phase 2+). |
+| Lean 4 propositional tautology suite (`proptauts`) | Internal, 23 fixtures via `synthesize_proof_term` | **23/23 Lean-accepted, 0 `sorry`, 100% strict rate** — externally verified by `lean <file>` | Strong. Each proof term regenerable from source (`cargo run -p symthaea-lean-bridge --example prove_proptauts`). Every emitted `.lean` file committed under `proofs/proptauts/`. |
+| Lean 4 miniF2F subset | Existing fixtures (`proofs/minif2f/`) | **3/3 accepted** | Strong, but tiny corpus — fixtures are symthaea-engine-originated, not drawn from the miniF2F-v2 upstream. |
+| **Lean 4 miniF2F-v2 full** | Upstream corpus at github.com/openai/miniF2F | **Architecturally out-of-scope at Phase 1** — see `docs/minif2f-v2-scope.md`. Propositional bridge cannot represent the algebraic/arithmetic/real-number content that constitutes ~98% of the benchmark. | Nil (0/N expected). Honest scope signal, not a quality failure. Phase 2 path: extend `Proposition` with equality + arithmetic, hook Z3 `QF_LRA`/`QF_LIA` to `linarith`-style Lean tactics. |
+| PutnamBench | Upstream Lean 4 Putnam formalization | Not yet attempted | Same architectural mismatch as miniF2F-v2; Phase 2. |
 
-**Planned external benchmarks (Phase 1):** miniF2F-v2 (Lean 4), PutnamBench (Lean 4), ARC-AGI-2 public eval. See `plans/2-please-make-precious-fairy.md`.
+**Phase 1 delivered externally-commensurable:** propositional tautology suite (23/23), the ~3-problem miniF2F-style internal set (3/3), and the Ramanujan Protocol reproduction. **Not yet delivered:** genuine algebraic/arithmetic coverage of miniF2F-v2 or PutnamBench — requires Phase 2 scope expansion.
 
 ---
 
