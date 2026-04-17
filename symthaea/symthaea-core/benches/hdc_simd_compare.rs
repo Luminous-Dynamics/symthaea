@@ -122,6 +122,46 @@ fn bench_bind_paths(c: &mut Criterion) {
         })
     });
 
+    group.bench_function("bind_assign_inplace", |bench| {
+        let mut acc = a;
+        bench.iter(|| {
+            acc.bind_assign(black_box(&b));
+            black_box(acc.0[0])
+        })
+    });
+
+    group.finish();
+}
+
+fn bench_bind_chain_paths(c: &mut Criterion) {
+    let mut group = c.benchmark_group("hdc_simd_bind_chain_16k");
+
+    for count in [2usize, 3, 5, 11] {
+        let vectors = seeded_vectors(count);
+        let refs: Vec<&BinaryHV> = vectors.iter().collect();
+        group.throughput(Throughput::Elements(count as u64));
+
+        group.bench_with_input(
+            BenchmarkId::new("legacy_chained_bind_byval", count),
+            &vectors,
+            |bench, vectors| {
+                bench.iter(|| {
+                    let mut acc = vectors[0];
+                    for v in &vectors[1..] {
+                        acc = acc.bind(v);
+                    }
+                    black_box(acc)
+                })
+            },
+        );
+
+        group.bench_with_input(
+            BenchmarkId::new("bind_chain_inplace", count),
+            &refs,
+            |bench, refs| bench.iter(|| black_box(BinaryHV::bind_chain(black_box(refs)))),
+        );
+    }
+
     group.finish();
 }
 
@@ -243,6 +283,7 @@ criterion_group!(
     benches,
     report_simd_capabilities,
     bench_bind_paths,
+    bench_bind_chain_paths,
     bench_similarity_paths,
     bench_hamming_paths,
     bench_bundle_paths,
