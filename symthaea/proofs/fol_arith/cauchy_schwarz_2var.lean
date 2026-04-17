@@ -15,7 +15,7 @@ theorem cauchy_schwarz_2var : (∀ a : ℝ, (∀ b : ℝ, (∀ x : ℝ, (∀ y :
     | (ring; done)
     | (omega; done)
     | (linarith; done)
-    | (nlinarith [sq_nonneg a, mul_self_nonneg a, sq_nonneg (a - 1), sq_nonneg (a + 1), sq_nonneg b, mul_self_nonneg b, sq_nonneg (b - 1), sq_nonneg (b + 1), sq_nonneg x, mul_self_nonneg x, sq_nonneg (x - 1), sq_nonneg (x + 1), sq_nonneg y, mul_self_nonneg y, sq_nonneg (y - 1), sq_nonneg (y + 1), sq_nonneg (a - b), sq_nonneg (a + b), sq_nonneg (a - x), sq_nonneg (a + x), sq_nonneg (a - y), sq_nonneg (a + y), sq_nonneg (b - x), sq_nonneg (b + x), sq_nonneg (b - y), sq_nonneg (b + y), sq_nonneg (x - y), sq_nonneg (x + y)]; done)
+    | (nlinarith [sq_nonneg a, mul_self_nonneg a, sq_nonneg (a - 1), sq_nonneg (a + 1), sq_nonneg b, mul_self_nonneg b, sq_nonneg (b - 1), sq_nonneg (b + 1), sq_nonneg x, mul_self_nonneg x, sq_nonneg (x - 1), sq_nonneg (x + 1), sq_nonneg y, mul_self_nonneg y, sq_nonneg (y - 1), sq_nonneg (y + 1), sq_nonneg (a - b), sq_nonneg (a + b), sq_nonneg (a - x), sq_nonneg (a + x), sq_nonneg (a - y), sq_nonneg (a + y), sq_nonneg (b - x), sq_nonneg (b + x), sq_nonneg (b - y), sq_nonneg (b + y), sq_nonneg (x - y), sq_nonneg (x + y), sq_nonneg (a*x - b*y), sq_nonneg (a*y - b*x)]; done)
     | (positivity; done)
     | (rcases lt_trichotomy a b with h | h | h <;> tauto; done)
     | (rcases le_total _ _ with h | h <;> first | linarith | tauto; done)

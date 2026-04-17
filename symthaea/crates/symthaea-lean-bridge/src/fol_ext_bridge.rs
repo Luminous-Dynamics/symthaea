@@ -217,6 +217,45 @@ fn build_nlinarith_hints(names: &[String]) -> String {
             parts.push(format!("sq_nonneg ({} + {})", names[i], names[j]));
         }
     }
+
+    // Multiplicative antisymmetric cross-term hints (Phase 3 Move 1).
+    //
+    // For goals shaped like Cauchy-Schwarz 2-variable —
+    //   (a·x + b·y)² ≤ (a² + b²)(x² + y²)
+    // — the key witness is `sq_nonneg (a·y - b·x)` because
+    //   (a·y - b·x)² = a²y² - 2abxy + b²x² ≥ 0
+    // rearranges directly to the target. Additive-only hints can't
+    // produce this because the witness is *multiplicative*.
+    //
+    // Strategy: for every pair of disjoint 2-subsets of binders
+    // {(names[i], names[j]), (names[k], names[l])}, emit the four
+    // Lagrange-identity witnesses:
+    //   sq_nonneg (a*x - b*y), sq_nonneg (a*y - b*x),
+    //   sq_nonneg (a*x + b*y), sq_nonneg (a*y + b*x)
+    // The antisymmetric forms (with minus) are the Cauchy-Schwarz
+    // witnesses; the symmetric (with plus) cover Lagrange and
+    // companion inequalities.
+    //
+    // Capped at 4-binder systems (one pair of pairs) to keep the hint
+    // list manageable; this is the common IMO-algebra shape. Larger
+    // systems still get pairwise-additive and per-binder hints.
+    if names.len() >= 4 {
+        for i in 0..names.len() {
+            for j in (i + 1)..names.len() {
+                for k in (j + 1)..names.len() {
+                    for l in (k + 1)..names.len() {
+                        let a = &names[i];
+                        let b = &names[j];
+                        let x = &names[k];
+                        let y = &names[l];
+                        parts.push(format!("sq_nonneg ({}*{} - {}*{})", a, x, b, y));
+                        parts.push(format!("sq_nonneg ({}*{} - {}*{})", a, y, b, x));
+                    }
+                }
+            }
+        }
+    }
+
     parts.join(", ")
 }
 
