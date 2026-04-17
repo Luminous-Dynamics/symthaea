@@ -1,6 +1,6 @@
 [package]
 name = "symtropy-consciousness-physics"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "AGPL-3.0-or-later"
 description = "Integrated information (Phi) as a first-class physics parameter: 5-channel coupling, thermodynamic closure with Landauer bound, CEMI-inspired harmony fields, and 63 research experiments."

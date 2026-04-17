@@ -265,7 +265,7 @@ fn sanctuary_dampens_collision_in_physics_loop() {
         .entities
         .get_mut(&agent_copy)
         .unwrap()
-        .harmony_activations = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.9];
+        .harmony_activations = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.9, 0.0];
     let inputs = ConsciousnessInputs {
         phi: 0.9,
         broadcast: 0.8,

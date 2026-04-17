@@ -15,7 +15,7 @@ symtropy-physics = { version = "0.2.0", path = "../symtropy-physics" }
 # Re-exports PhysicsBody + optionally the BevyPhysicsPlugin for users who
 # want no-coupling physics. No duplication.
 symtropy-bevy-core = { version = "0.1.0", path = "../symtropy-bevy-core" }
-symtropy-consciousness-physics = { version = "0.1.0", path = "../symtropy-consciousness-physics" }
+symtropy-consciousness-physics = { version = "0.2.0", path = "../symtropy-consciousness-physics" }
 bevy = { version = "0.18", default-features = false, features = [
     "bevy_core_pipeline", "bevy_render", "bevy_sprite", "bevy_sprite_render",
     "bevy_winit", "bevy_color", "bevy_state", "bevy_log",

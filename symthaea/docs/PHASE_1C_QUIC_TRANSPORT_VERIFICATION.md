@@ -198,7 +198,7 @@ Run command (10-second bounded run; see Soak section for longer):
 
 ```bash
 target/debug/examples/holon_phone_transport_ab_scrcpy \
-  --duration 10 --fps 15 --serial 41201FDJG000UM
+  --duration 10 --fps 15 --serial 41201FDJG000UM --tcp-port 8401
 ```
 
 Expected output shape: per-frame `captured frame=N source=WxH
@@ -206,9 +206,46 @@ prediction_error=...` lines during capture, then `WS samples=N p50=... p99=...`
 and `QUIC samples=N p50=... p99=...` latency stats, then `Reverse input path
 OK for WS and QUIC`.
 
-Live-device run pending — left unscheduled so it can be invoked against
-the Pixel 8 Pro when both the phone is plugged in and the USB tether budget
-can spare the ~400 KB/s scrcpy stream.
+### Live run (2026-04-17, Pixel 8 Pro, idle home screen)
+
+Result (10 s, 15 fps budget, 1008×2240 native):
+
+```text
+Capturing scrcpy frames: serial=41201FDJG000UM duration=10s fps-budget=15 nominal=1008x2244 port=8401
+captured frame=1 source=1008x2240 prediction_error=0.000
+captured frame=2 source=1008x2240 prediction_error=0.086
+captured frame=3 source=1008x2240 prediction_error=0.054
+scrcpy stream: 3 device frames observed, 3 RDP frames produced
+Captured 3 RDP frame(s); replaying transports...
+WS   samples=3 p50=2136057us p99=2136057us max=2337146us
+QUIC samples=3 p50=2407376us p99=2407376us max=2593081us
+Reverse input path OK for WS and QUIC
+Source: scrcpy persistent HEVC capture via StreamingPhoneBridge
+```
+
+**End-to-end works**: scrcpy-server launched, 3 device frames decoded,
+3 `SomaRdpServer` RDP frames emitted, same frame vector replayed through
+both WS and QUIC, reverse input path validated for both.
+
+**Latency caveat (same as the ADB-path checkpoint above)**: these
+numbers are **dominated by `Full`-frame bootstrap payloads**, not by
+steady-state delta traffic. Idle home-screen capture produced 0.3 fps
+(3 frames in 10 s — the HDC tile-change detector only emits RDP
+frames on change, and a static screen barely changes). Each of those
+3 frames was a fresh `Full` frame (~500 KB at 1008×2240 RGBA) rather
+than a small delta. The 2.1-2.6 s transport time is the
+fragmentation-over-localhost budget for sub-MB sealed envelopes, not
+the 30-fps-delta-stream latency Phase III will actually measure.
+
+A fair steady-state number requires either (a) running longer with
+motion (scrolling, video playback) so the encoder emits deltas after
+the bootstrap, or (b) reducing `SomaRdpServer`'s `Full`-emission
+cadence. Both are Phase II.A measurement work, not Phase I.C closeout.
+
+Startup note: the default `--tcp-port 8408` collided with a local
+Python process on this machine; `--tcp-port 8401` worked. The
+`holon_phone_transport_ab_scrcpy` help text lists the flag. Dev-test
+range 8400-8409 per `.claude/rules/PORTS.md`; pick any free port.
 
 ## tc qdisc packet-loss A/B (scripted, user-namespace based)
 
@@ -260,8 +297,11 @@ stays under a 3-frame window even at p99+.
 
 ## Remaining Phase I.C Verification
 
-- [ ] Execute the scrcpy-stream A/B live against the Pixel 8 Pro and record
-      numbers for this document.
+- [x] **Execute the scrcpy-stream A/B live against the Pixel 8 Pro and
+      record numbers for this document.** Done 2026-04-17; numbers in
+      the scrcpy-stream A/B section above. End-to-end path works; the
+      captured latency is bootstrap-dominated, not steady-state.
+      Steady-state measurement deferred to Phase II.A.
 - [x] **Execute `phase_1c_netem_ab.sh` for LOSS ∈ {0, 1, 5} and record the
       WS-vs-QUIC stall behavior.** Done 2026-04-17; numbers in the tc qdisc
       section above. WS tail inflates 4.7-5.3× at 1%/5% loss; QUIC stays

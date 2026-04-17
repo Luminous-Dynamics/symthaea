@@ -41,7 +41,12 @@ async fn main() -> anyhow::Result<()> {
     use symthaea_phone_embodiment::streaming_bridge::StreamingPhoneBridge;
 
     const PLACEHOLDER_KEY: [u8; 32] = [0x42; 32];
-    const FRAME_TIMEOUT: Duration = Duration::from_secs(2);
+    // 10 s, not 2. scrcpy full-frame bootstraps traverse the QUIC
+    // reliable-stream fallback (for oversized sealed frames) which is
+    // slower than the datagram path and can exceed 2 s on localhost
+    // with heavy scrcpy keyframe payloads. 10 s is generous for the
+    // A/B; per-frame time is what we measure, not the deadline.
+    const FRAME_TIMEOUT: Duration = Duration::from_secs(10);
     const DEFAULT_JAR: &str =
         "crates/symthaea-phone-embodiment/vendor/scrcpy-server-v2.4.jar";
     const DEFAULT_TCP_PORT: u16 = 8408; // Dev/test range 8400-8409 per PORTS.md
