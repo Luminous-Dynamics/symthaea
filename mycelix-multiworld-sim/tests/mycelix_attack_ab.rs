@@ -248,3 +248,60 @@ fn sim_equilibrium_under_sustained_attack() {
         report.final_cvs,
     );
 }
+
+/// Multi-seed A/B sanity check: 3 seeds × 30 years. Catches seed-specific
+/// regressions in the defense mechanisms. The 10-seed × 50-year full sweep
+/// lives in `examples/mycelix_multiseed_sweep.rs` for interactive use.
+#[test]
+fn multiseed_attack_defense_holds() {
+    let seeds = [7u64, 42, 137];
+    let mut survivors = 0usize;
+    let mut cvs_values = Vec::new();
+    let mut min_farming = 1.0_f64;
+
+    for &seed in &seeds {
+        let config = setup(seed, 30);
+        let mut sim = MultiWorldSimulator::new(config);
+        sim.run_initialization();
+        sim.inject_adversaries(AdversarialStrategy::TierBuyer, 3);
+        sim.inject_adversaries(AdversarialStrategy::DemurrageEvader, 3);
+        sim.inject_adversaries(AdversarialStrategy::CorrectionFarmer, 3);
+        sim.inject_adversaries(AdversarialStrategy::CrossClusterAmplifier, 3);
+        sim.inject_adversaries(AdversarialStrategy::GuildColluder, 3);
+        let report = sim.run();
+
+        if report.survived {
+            survivors += 1;
+        }
+        cvs_values.push(report.final_cvs);
+
+        let (mut credited, mut rejected) = (0u32, 0u32);
+        for world in &sim.worlds {
+            for a in world.agents.iter().filter(|a| {
+                a.is_alive() && matches!(a.adversarial, Some(AdversarialStrategy::CorrectionFarmer))
+            }) {
+                credited += a.justice.corrections;
+                rejected += a.justice.rejected_corrections;
+            }
+        }
+        if credited + rejected > 0 {
+            let farming = rejected as f64 / (credited + rejected) as f64;
+            if farming < min_farming {
+                min_farming = farming;
+            }
+        }
+    }
+
+    assert_eq!(survivors, seeds.len(), "survival should be 100% across seeds");
+    let mean_cvs = cvs_values.iter().sum::<f64>() / cvs_values.len() as f64;
+    assert!(
+        mean_cvs >= 0.3,
+        "mean CVS across seeds too low: {:.3}",
+        mean_cvs,
+    );
+    assert!(
+        min_farming >= 0.5,
+        "worst-seed farming rejection rate too low: {:.3}",
+        min_farming,
+    );
+}
