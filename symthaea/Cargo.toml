@@ -588,6 +588,7 @@ webcam = []                                           # Live webcam capture (gat
 vision-manifold = ["dep:symthaea-vision-manifold"]    # Patch-based HDC video encoding + CfC temporal manifold
 phone = ["dep:symthaea-phone-embodiment", "vision-manifold"]  # ADB phone screen embodiment
 phone-scrcpy = ["phone", "symthaea-phone-embodiment/scrcpy"]  # Phase I.B persistent HEVC capture via scrcpy-server
+phase-2a-lz4 = ["phone-scrcpy", "holon-viewer", "dep:lz4_flex"]  # Phase II.A LZ4 compression measurement gate
 # REMOVED: vision-manifold-camera (0 cfg gates; requires V4L2 hardware, never tested)
 foveation = ["dep:symthaea-foveation", "vision-manifold"]  # Foveation bridge for active vision (dorsal→ventral dispatch)
 # REMOVED: foveation-perception (0 cfg gates; requires GPU models, never tested)
