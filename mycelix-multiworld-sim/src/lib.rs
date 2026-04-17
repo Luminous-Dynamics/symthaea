@@ -29,6 +29,7 @@ pub mod agent;
 pub mod civic_dimensions;
 pub mod sovereign_profile;
 pub mod sub_passport;
+pub mod dkg;
 pub mod metabolism;
 pub mod wound_healing;
 pub mod currency;
