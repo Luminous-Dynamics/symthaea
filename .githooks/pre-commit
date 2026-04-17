@@ -1,8 +1,64 @@
 #!/usr/bin/env bash
-# Pre-commit hook: cargo fmt check on staged Rust files
-# Opt-in: git config core.hooksPath .githooks
+# Pre-commit hook: concurrent-session safety guard + cargo fmt.
+# Enable: git config core.hooksPath .githooks
 
 set -e
+
+# ─── Cross-project staging guard ─────────────────────────────────────
+# This repo has 12+ concurrent Claude sessions. `git add -A`, `git add .`,
+# or `git commit -a` from one session scoops up another session's
+# uncommitted edits and commits them under the wrong message. Incident
+# log: 2026-04-17 Phase I.C scrcpy A/B edits were absorbed into an
+# unrelated symtropy-bevy publish-prep commit because the other session
+# staged broadly.
+#
+# Policy: a commit may touch at most ONE top-level project directory
+# (plus monorepo-root metadata files like Cargo.lock, README.md). If
+# yours legitimately spans projects (merges, coordinated renames),
+# override with CLAUDE_ALLOW_CROSS_PROJECT=1.
+
+# Merge commits legitimately span projects; skip the guard.
+GIT_DIR_PATH=$(git rev-parse --git-dir)
+if [ -e "$GIT_DIR_PATH/MERGE_HEAD" ] || [ -e "$GIT_DIR_PATH/CHERRY_PICK_HEAD" ] || [ -e "$GIT_DIR_PATH/REVERT_HEAD" ]; then
+    :  # skip cross-project guard for merge/cherry-pick/revert
+else
+    STAGED_ALL=$(git diff --cached --name-only --diff-filter=ACMRD || true)
+if [ -n "$STAGED_ALL" ]; then
+    # Project dir = first path segment. Root-level files (no '/') are
+    # metadata and don't count toward the cross-project tally.
+    STAGED_NESTED=$(echo "$STAGED_ALL" | grep '/' || true)
+    if [ -n "$STAGED_NESTED" ]; then
+        PROJECTS=$(echo "$STAGED_NESTED" | awk -F/ '{print $1}' | sort -u)
+        PROJECT_COUNT=$(echo "$PROJECTS" | wc -l)
+        if [ "$PROJECT_COUNT" -gt 1 ] && [ "${CLAUDE_ALLOW_CROSS_PROJECT:-0}" != "1" ]; then
+            echo "" >&2
+            echo "==================================================================" >&2
+            echo " CONCURRENT-SESSION SAFETY: cross-project commit REJECTED" >&2
+            echo "==================================================================" >&2
+            echo "" >&2
+            echo " Commit stages files across $PROJECT_COUNT top-level project dirs:" >&2
+            echo "$PROJECTS" | sed 's/^/   /' >&2
+            echo "" >&2
+            echo " This pattern usually means a 'git add -A' / 'git commit -a'" >&2
+            echo " scooped another session's uncommitted work. Incident: Phase I.C" >&2
+            echo " scrcpy edits absorbed into symtropy-bevy publish commit" >&2
+            echo " (2026-04-17). See memory/feedback_commit_frequently.md." >&2
+            echo "" >&2
+            echo " If unintentional, unstage and re-stage only your files:" >&2
+            echo "   git restore --staged ." >&2
+            echo "   git add <your files only>" >&2
+            echo "" >&2
+            echo " If intentional (merge, coordinated rename), override:" >&2
+            echo "   CLAUDE_ALLOW_CROSS_PROJECT=1 git commit ..." >&2
+            echo "" >&2
+            echo "==================================================================" >&2
+            exit 1
+        fi
+    fi
+fi
+fi  # end merge-skip wrapper
+
+# ─── cargo fmt on staged Rust files ──────────────────────────────────
 
 # Only check if there are staged .rs files
 STAGED_RS=$(git diff --cached --name-only --diff-filter=ACM | grep '\.rs$' || true)
