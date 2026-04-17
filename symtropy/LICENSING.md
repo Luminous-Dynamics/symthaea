@@ -12,6 +12,7 @@ Symtropy uses a **dual-track license model**. The split is designed to:
 | `symtropy-math` | **Apache-2.0 OR MIT** | Core: ND geometric algebra. Zero AGPL deps. |
 | `symtropy-physics` | **Apache-2.0 OR MIT** | Core: GJK+EPA, CCD, joints, raycasting, deterministic replay. Zero AGPL deps. |
 | `symtropy-render-bridge` | **Apache-2.0 OR MIT** | Core: ND→Bevy projection, 4D cross-section slicing. Zero AGPL deps. |
+| `symtropy-bevy-core` | **Apache-2.0 OR MIT** | Core: Bevy plugin with generic `PhysicsCallback` coupling. Zero AGPL deps. Use directly for proprietary games; `symtropy-bevy` (AGPL) adds ConsciousnessField. |
 | `symtropy-robotics-bridge` | **AGPL-3.0-or-later** (*see note 1*) | Currently depends on AGPL `consciousness-physics` + Symthaea FEP. Phase 1 will split into a permissive `-core` + AGPL integration crate. |
 | `symtropy-net` | **AGPL-3.0-or-later** (*see note 1*) | Currently depends on AGPL `symtropy-holochain-relay`. Phase 1 will extract permissive `symtropy-net-core`. |
 | `symtropy-bevy` | **AGPL-3.0-or-later** (*see note 1*) | Currently depends on AGPL `consciousness-physics` throughout `plugin.rs`, `biometrics.rs`, `macro_bridge.rs`. Phase 0.5 extracts `symtropy-bevy-core` (permissive) via feature-gating. |
@@ -93,15 +94,19 @@ As of the initial license split (2026-04-17), the following crates had already b
 - `symtropy-bevy` 0.1.0 (AGPL)
 - `symtropy-consciousness-physics` 0.1.0 (AGPL — stays AGPL, no change)
 
-Published versions on crates.io are immutable — `0.1.0` remains under AGPL forever for anyone who pulls that exact version. When these crates are next released:
+Published versions on crates.io are immutable — `0.1.0` remains under AGPL forever for anyone who pulls that exact version.
 
-- `symtropy-math` **0.2.0** under **Apache-2.0 OR MIT** (truly permissive, zero AGPL deps)
-- `symtropy-physics` **0.2.0** under **Apache-2.0 OR MIT** (truly permissive, zero AGPL deps)
-- `symtropy-render-bridge` **0.1.0** under **Apache-2.0 OR MIT** (first publish, zero AGPL deps)
-- `symtropy-bevy` stays 0.1.0 AGPL until the Phase 0.5 split (see Note 1 above) — next release will be **`symtropy-bevy-core` 0.1.0** Apache/MIT + **`symtropy-bevy` 0.2.0** AGPL
+**Published 2026-04-17 under Apache-2.0 OR MIT** (zero AGPL deps, safe for proprietary use):
+
+- `symtropy-math` **0.2.0** ✅
+- `symtropy-physics` **0.2.0** ✅
+- `symtropy-render-bridge` **0.1.0** ✅ (first publish)
+- `symtropy-bevy-core` **0.1.0** ✅ (first publish — Phase 0.5 permissive Bevy plugin)
+
+`symtropy-bevy` 0.1.0 stays AGPL on crates.io. Its refactor to re-export `symtropy-bevy-core` and layer `ConsciousnessField` on top is queued in Phase 0.5.
 - `symtropy-consciousness-physics` unchanged under **AGPL-3.0-or-later**
 
-Users who want permissive licensing should depend on `symtropy-math >= 0.2.0` and `symtropy-physics >= 0.2.0` (plus `symtropy-render-bridge >= 0.1.0`). The version bump on math/physics signals the license-model change so automated tooling (cargo-audit, license scanners) can flag it.
+Users who want permissive licensing should depend on `symtropy-math >= 0.2.0`, `symtropy-physics >= 0.2.0`, `symtropy-render-bridge >= 0.1.0`, `symtropy-bevy-core >= 0.1.0`. The version bump on math/physics signals the license-model change so automated tooling (cargo-audit, license scanners) can flag it.
 
 ## References
 

@@ -31,15 +31,15 @@ Cheap moves that unlock every later phase.
   - ⏳ **AGPL today, permissive variant arrives in Phase 0.5**: `symtropy-bevy`, `symtropy-robotics-bridge`, `symtropy-net` — each has required AGPL deps that must be feature-gated before the permissive claim is honest. See [LICENSING.md](./LICENSING.md) Note 1.
   - ✅ **AGPL-3.0-or-later** (research / integration): `symtropy-consciousness-physics`, `symtropy-sim-bridge`, `symtropy-world`, `symtropy-holochain-relay`, `symtropy-lightyear`, `symthaea-bevy-brain`, game crates
 
-### Phase 0.5 — Bevy / net / robotics-bridge split (inserted)
+### Phase 0.5 — Bevy / net / robotics-bridge split (partially done, 2026-04-17)
 
-Before the three currently-AGPL adoption crates can go permissive, each needs a `-core` extraction. Work items:
+Before the three currently-AGPL adoption crates can go permissive, each needs a `-core` extraction.
 
-- **`symtropy-bevy-core`** (new, Apache/MIT) — physics plugin, gizmos, transforms, input, schedules. No consciousness-physics. Feature-gate `biometrics`, `macro_bridge`, `debug.rs:SafetyTier` usage in `symtropy-bevy` (remains AGPL).
-- **`symtropy-net-core`** (new, Apache/MIT) — spatial authority partitioning, lockstep protocol, `SyncableState` trait. `symtropy-net` re-exports `-core` + adds Holochain (remains AGPL).
-- **`symtropy-robotics-bridge-core`** (new, Apache/MIT) — `PlatformType`, `RoboticAgent` trait, physics-body spawning. `symtropy-robotics-bridge` adds FEP + consciousness-equation (remains AGPL).
+- ✅ **`symtropy-bevy-core` 0.1.0** — PUBLISHED Apache/MIT. Generic over `PhysicsCallback` via `step_physics<D, C>`; ships `BevyPhysics<D>`, `PhysicsBody`, `NoCouplingResource`, `BevyPhysicsPlugin<D>`, `BevyPhysicsCorePlugin<D>`. 12 tests. Zero AGPL deps.
+- ⏳ **`symtropy-net-core`** — spatial authority partitioning, lockstep protocol, `SyncableState` trait. `symtropy-net` re-exports `-core` + adds Holochain (remains AGPL). Ships in Phase 4 alongside Lightyear productionisation.
+- ⏳ **`symtropy-robotics-bridge-core`** — `PlatformType`, `RoboticAgent` trait, physics-body spawning. `symtropy-robotics-bridge` adds FEP + consciousness-equation (remains AGPL). Ships in Phase 1 once the `EmbodimentBridge` wiring stabilises (premature to publish before that churn).
 
-Each split is a 1–2 day refactor. All three can ship in Phase 0.5 parallel to Phase 1 integration wins.
+Also queued: refactor existing `symtropy-bevy` (AGPL) to re-export `symtropy-bevy-core` + add `ConsciousnessField` integration on top, eliminating duplication.
 - **Publish remaining crates** to crates.io (physics, render-bridge, robotics-bridge, net) with docs.rs metadata, `README.md` per crate, and `html_logo_url`.
 - **The Symtropy Book** (mdBook): generic state-coupling in 50 LOC, Bevy integration, 4D tutorial, determinism contract, `PhysicsCallback` guide, 6-platform robotics quickstart.
 - **CI matrix**: Linux / macOS / Windows × x86_64 / aarch64 × stable / beta / MSRV. Currently Linux/X11 only.
