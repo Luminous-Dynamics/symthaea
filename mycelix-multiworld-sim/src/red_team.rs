@@ -36,6 +36,26 @@ pub enum AdversarialStrategy {
     /// Saboteur: deliberately degrades collective phi by causing conflict.
     /// Low consciousness but high disruption impact.
     Saboteur,
+    // --- Phase 2c: Mycelix-specific attack vectors (survey Gap 5) ---
+    /// Tier-buyer: accumulates SAP + MYCEL to artificially boost
+    /// `EconomicVelocity` and `SemanticResonance` in the 8D profile, crossing
+    /// the Citizen/Steward thresholds via economic scale rather than merit.
+    TierBuyer,
+    /// Demurrage evader: rapid stash-and-move patterns to keep SAP just above
+    /// the exempt floor (200), avoiding the 2%/year decay. Low compliance with
+    /// the anti-hoarding mechanism.
+    DemurrageEvader,
+    /// Correction farmer: alternates deliberate violations with corrective
+    /// actions, exploiting the 10-corrections-restores-1-tier mechanic to
+    /// keep tier_penalty near zero while accruing "compliant" reputation.
+    CorrectionFarmer,
+    /// Cross-cluster amplifier: uses one cluster's lenient per-dimension
+    /// threshold (e.g. commons basic tier) as a stepping stone to bypass
+    /// another cluster's stricter gate (e.g. civic Guardian tier).
+    CrossClusterAmplifier,
+    /// Guild colluder: several agents coordinate vote-weighting and
+    /// peer-recognition to compound each other's civic scores artificially.
+    GuildColluder,
 }
 
 /// Configuration for the red team module.
@@ -108,44 +128,107 @@ pub struct AdversarialModifier {
     pub phi_damage: f64,
     /// Whether this agent's profile appears legitimate to the governance system.
     pub appears_legitimate: bool,
+    // --- Phase 2c: Mycelix-specific modifiers ---
+    /// SAP accumulation rate multiplier. TierBuyers push their 8D
+    /// `EconomicVelocity` dimension artificially via raw balance growth.
+    pub sap_accumulation_mult: f64,
+    /// SAP churn multiplier: demurrage evaders shift balance rapidly to avoid
+    /// the per-tick decay. 1.0 = normal, >1 = excessive churn (detectable).
+    pub sap_churn_mult: f64,
+    /// Correction farm rate: extra corrections manufactured per tick by
+    /// alternating violations with corrective acts. 0 = none, 0.1 = one
+    /// correction every 10 ticks beyond natural behavior.
+    pub correction_farm_rate: f64,
+    /// Cross-cluster bypass factor: fraction of agent's 8D requirement
+    /// checks routed through a lenient cluster gate. 0.0 = no bypass, 1.0 =
+    /// every gate check uses the easiest cluster's threshold.
+    pub cross_cluster_bypass: f64,
+    /// Guild coordination factor: multiplicative bonus to peer-recognition
+    /// / MYCEL score from colluding peers (>1 amplifies artificially).
+    pub guild_coordination: f64,
 }
 
 impl AdversarialModifier {
-    pub fn for_strategy(strategy: AdversarialStrategy, optimization_rate: f64) -> Self {
-        match strategy {
-            AdversarialStrategy::ProfileMaximizer => Self {
-                strategy,
-                phi_growth_mult: 1.0 + optimization_rate * 5.0, // grows 5× faster
-                engagement_mult: 2.0,    // artificially high engagement
-                faction_recruitment_mult: 1.0,
-                phi_damage: 0.0,
-                appears_legitimate: true, // hardest to detect
-            },
-            AdversarialStrategy::FreeRider => Self {
-                strategy,
-                phi_growth_mult: 0.5,    // lower actual growth (doesn't do real work)
-                engagement_mult: 1.5,    // fakes engagement
-                faction_recruitment_mult: 1.0,
-                phi_damage: 0.0,
-                appears_legitimate: true, // hard to detect
-            },
-            AdversarialStrategy::FactionBuilder => Self {
-                strategy,
-                phi_growth_mult: 1.2,
-                engagement_mult: 1.5,
-                faction_recruitment_mult: 3.0, // aggressive recruitment
-                phi_damage: 0.0,
-                appears_legitimate: true,
-            },
-            AdversarialStrategy::Saboteur => Self {
-                strategy,
-                phi_growth_mult: 0.3,    // doesn't invest in growth
-                engagement_mult: 0.5,    // disengaged
-                faction_recruitment_mult: 1.0,
-                phi_damage: 0.005,       // actively damages collective phi
-                appears_legitimate: false, // detectable by monitoring
-            },
+    /// Construct a default modifier with Mycelix fields zeroed. Strategy-
+    /// specific variants override the fields they exploit.
+    fn baseline(strategy: AdversarialStrategy) -> Self {
+        Self {
+            strategy,
+            phi_growth_mult: 1.0,
+            engagement_mult: 1.0,
+            faction_recruitment_mult: 1.0,
+            phi_damage: 0.0,
+            appears_legitimate: true,
+            sap_accumulation_mult: 1.0,
+            sap_churn_mult: 1.0,
+            correction_farm_rate: 0.0,
+            cross_cluster_bypass: 0.0,
+            guild_coordination: 1.0,
         }
+    }
+
+    pub fn for_strategy(strategy: AdversarialStrategy, optimization_rate: f64) -> Self {
+        let mut m = Self::baseline(strategy);
+        match strategy {
+            AdversarialStrategy::ProfileMaximizer => {
+                m.phi_growth_mult = 1.0 + optimization_rate * 5.0; // grows 5× faster
+                m.engagement_mult = 2.0; // artificially high engagement
+                // hardest to detect (already true by baseline)
+            }
+            AdversarialStrategy::FreeRider => {
+                m.phi_growth_mult = 0.5; // lower actual growth
+                m.engagement_mult = 1.5; // fakes engagement
+                // hard to detect
+            }
+            AdversarialStrategy::FactionBuilder => {
+                m.phi_growth_mult = 1.2;
+                m.engagement_mult = 1.5;
+                m.faction_recruitment_mult = 3.0;
+            }
+            AdversarialStrategy::Saboteur => {
+                m.phi_growth_mult = 0.3;
+                m.engagement_mult = 0.5;
+                m.phi_damage = 0.005;
+                m.appears_legitimate = false;
+            }
+            // Phase 2c Mycelix attacks:
+            AdversarialStrategy::TierBuyer => {
+                // Hoards SAP / accelerates earning to push 8D EconomicVelocity.
+                m.sap_accumulation_mult = 1.0 + optimization_rate * 20.0;
+                m.engagement_mult = 1.3; // buys access to high-velocity actions
+                m.appears_legitimate = true;
+            }
+            AdversarialStrategy::DemurrageEvader => {
+                // Rapid churn cycles around the exempt floor: high churn, modest balance.
+                m.sap_churn_mult = 3.0;
+                m.sap_accumulation_mult = 0.9;
+                // Detectable by SAP-velocity signature, not by tier alone.
+                m.appears_legitimate = false;
+            }
+            AdversarialStrategy::CorrectionFarmer => {
+                // Alternates violations with manufactured corrections. The
+                // 10:3 restore:degrade ratio means rate ≈ 0.10 corrections/tick
+                // fully offsets 0.03 violations/tick.
+                m.correction_farm_rate = 0.10;
+                // Appears legitimate because compliance_ratio stays high.
+                m.appears_legitimate = true;
+            }
+            AdversarialStrategy::CrossClusterAmplifier => {
+                // Exploits lenient per-dim minimums in one cluster's
+                // requirement to meet a stricter cluster's tier gate.
+                m.cross_cluster_bypass = 0.75;
+                // Only detectable with cross-cluster correlation analysis.
+                m.appears_legitimate = true;
+            }
+            AdversarialStrategy::GuildColluder => {
+                // Coordinates MYCEL/peer-recognition boosts.
+                m.guild_coordination = 2.0;
+                m.faction_recruitment_mult = 2.0;
+                // Detectable by vote-correlation clustering.
+                m.appears_legitimate = false;
+            }
+        }
+        m
     }
 }
 
@@ -171,6 +254,75 @@ pub fn evaluate_resilience(
         + 0.2 * cvs_resilience
         + 0.2 * detection_score)
         .clamp(0.0, 1.0)
+}
+
+/// Per-attack resilience breakdown for Mycelix-specific threats (Phase 2c).
+///
+/// Each field is a resilience score in [0, 1]: 1.0 = the attack produced no
+/// measurable impact, 0.0 = the attack fully captured that surface.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct MycelixResilience {
+    /// Resilience to `TierBuyer` — how well per-dim civic minimums blocked
+    /// pure-economic tier promotion.
+    pub tier_buy_resilience: f64,
+    /// Resilience to `DemurrageEvader` — fraction of would-be-demurraged SAP
+    /// that was actually collected.
+    pub demurrage_resilience: f64,
+    /// Resilience to `CorrectionFarmer` — gap between farmed corrections and
+    /// genuine ones detected by the sim's rate or pattern checks.
+    pub correction_farm_resilience: f64,
+    /// Resilience to `CrossClusterAmplifier` — fraction of bypass attempts
+    /// caught by stricter cluster's requirements.
+    pub cross_cluster_resilience: f64,
+    /// Resilience to `GuildColluder` — fraction of collusion detected via
+    /// vote correlation / peer recognition divergence.
+    pub guild_collusion_resilience: f64,
+}
+
+impl MycelixResilience {
+    /// Mean resilience across the 5 Mycelix attack surfaces.
+    pub fn mean(&self) -> f64 {
+        (self.tier_buy_resilience
+            + self.demurrage_resilience
+            + self.correction_farm_resilience
+            + self.cross_cluster_resilience
+            + self.guild_collusion_resilience)
+            / 5.0
+    }
+
+    /// Whether the minimum-resilience surface is above the survival threshold.
+    /// Survey requirement: no single attack surface below 0.3.
+    pub fn no_weak_surface(&self, floor: f64) -> bool {
+        let arr = [
+            self.tier_buy_resilience,
+            self.demurrage_resilience,
+            self.correction_farm_resilience,
+            self.cross_cluster_resilience,
+            self.guild_collusion_resilience,
+        ];
+        arr.iter().all(|&r| r >= floor)
+    }
+}
+
+/// Evaluate Mycelix-specific resilience from per-attack observation fractions.
+///
+/// Each `*_impact` input is the *fraction of the attack that succeeded* (0.0 =
+/// fully blocked, 1.0 = fully succeeded). Resilience is `1 − impact`.
+pub fn evaluate_mycelix_resilience(
+    tier_buy_impact: f64,
+    demurrage_impact: f64,
+    correction_farm_impact: f64,
+    cross_cluster_impact: f64,
+    guild_collusion_impact: f64,
+) -> MycelixResilience {
+    let r = |x: f64| (1.0 - x).clamp(0.0, 1.0);
+    MycelixResilience {
+        tier_buy_resilience: r(tier_buy_impact),
+        demurrage_resilience: r(demurrage_impact),
+        correction_farm_resilience: r(correction_farm_impact),
+        cross_cluster_resilience: r(cross_cluster_impact),
+        guild_collusion_resilience: r(guild_collusion_impact),
+    }
 }
 
 #[cfg(test)]
@@ -217,5 +369,91 @@ mod tests {
         assert!(!config.enabled, "Red team should be disabled by default");
         assert_eq!(config.agents_per_world, 5);
         assert_eq!(config.strategies.len(), 3);
+    }
+
+    // ---- Phase 2c: Mycelix-specific strategy tests ----
+
+    #[test]
+    fn tier_buyer_has_sap_accumulation_boost() {
+        let m = AdversarialModifier::for_strategy(AdversarialStrategy::TierBuyer, 0.05);
+        assert!(m.sap_accumulation_mult > 1.5);
+        assert_eq!(m.sap_churn_mult, 1.0);
+        assert_eq!(m.correction_farm_rate, 0.0);
+    }
+
+    #[test]
+    fn demurrage_evader_has_high_churn_and_is_detectable() {
+        let m = AdversarialModifier::for_strategy(AdversarialStrategy::DemurrageEvader, 0.01);
+        assert!(m.sap_churn_mult >= 2.0);
+        assert!(m.sap_accumulation_mult < 1.0);
+        assert!(!m.appears_legitimate);
+    }
+
+    #[test]
+    fn correction_farmer_manufactures_corrections() {
+        let m = AdversarialModifier::for_strategy(AdversarialStrategy::CorrectionFarmer, 0.01);
+        // 0.10/tick corrections offsets 0.03/tick violations under 10:3 parity.
+        assert!(m.correction_farm_rate >= 0.05);
+        assert!(m.appears_legitimate, "correction farmer hides behind compliance");
+    }
+
+    #[test]
+    fn cross_cluster_amplifier_bypasses_gates() {
+        let m = AdversarialModifier::for_strategy(
+            AdversarialStrategy::CrossClusterAmplifier,
+            0.01,
+        );
+        assert!(m.cross_cluster_bypass > 0.5);
+    }
+
+    #[test]
+    fn guild_colluder_amplifies_peer_recognition() {
+        let m = AdversarialModifier::for_strategy(AdversarialStrategy::GuildColluder, 0.01);
+        assert!(m.guild_coordination >= 1.5);
+        assert!(!m.appears_legitimate);
+    }
+
+    #[test]
+    fn mycelix_resilience_full_block() {
+        let r = evaluate_mycelix_resilience(0.0, 0.0, 0.0, 0.0, 0.0);
+        assert!((r.mean() - 1.0).abs() < 1e-9);
+        assert!(r.no_weak_surface(0.99));
+    }
+
+    #[test]
+    fn mycelix_resilience_half_capture() {
+        let r = evaluate_mycelix_resilience(0.5, 0.5, 0.5, 0.5, 0.5);
+        assert!((r.mean() - 0.5).abs() < 1e-9);
+        assert!(r.no_weak_surface(0.5));
+        assert!(!r.no_weak_surface(0.6));
+    }
+
+    #[test]
+    fn mycelix_resilience_exposes_weak_surface() {
+        // Four surfaces strong, one weak.
+        let r = evaluate_mycelix_resilience(0.1, 0.1, 0.95, 0.1, 0.1);
+        assert!(r.correction_farm_resilience < 0.1);
+        assert!(!r.no_weak_surface(0.3), "weak surface should be flagged");
+    }
+
+    #[test]
+    fn mycelix_strategies_have_distinct_signatures() {
+        let strategies = [
+            AdversarialStrategy::TierBuyer,
+            AdversarialStrategy::DemurrageEvader,
+            AdversarialStrategy::CorrectionFarmer,
+            AdversarialStrategy::CrossClusterAmplifier,
+            AdversarialStrategy::GuildColluder,
+        ];
+        // Each strategy should leave a non-default value in at least one Mycelix field.
+        for s in strategies {
+            let m = AdversarialModifier::for_strategy(s, 0.01);
+            let nontrivial = m.sap_accumulation_mult != 1.0
+                || m.sap_churn_mult != 1.0
+                || m.correction_farm_rate != 0.0
+                || m.cross_cluster_bypass != 0.0
+                || m.guild_coordination != 1.0;
+            assert!(nontrivial, "{:?} modifier is indistinct from baseline", s);
+        }
     }
 }

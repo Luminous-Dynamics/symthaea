@@ -41,18 +41,36 @@ pub const CORRECTIONS_PER_RESTORE: u32 = 10;
 /// Maximum tier penalty (matches the number of civic tiers − 1).
 pub const MAX_TIER_PENALTY: u8 = 4;
 
+/// Phase 2c: maximum corrections credited per tick, to defeat CorrectionFarmer
+/// attacks that alternate violations with manufactured corrections at >1/tick.
+/// Production Mycelix uses a 6h cooldown between credited corrections; in the
+/// sim's monthly ticks we cap to a small integer per tick.
+pub const MAX_CORRECTIONS_PER_TICK: u32 = 2;
+
 /// Per-agent restorative-justice state.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RestorativeJustice {
     /// Cumulative moral violations.
     pub violations: u32,
-    /// Cumulative corrective actions.
+    /// Cumulative corrective actions (credited, after rate limiting).
     pub corrections: u32,
     /// Current tier degradation (0 = none, up to MAX_TIER_PENALTY).
     pub tier_penalty: u8,
     /// Tick of the most recent tier delta (degrade or restore). Prevents
     /// same-tick oscillation.
     pub last_delta_tick: Option<u32>,
+    /// Phase 2c: number of corrections credited on `current_tick` so far.
+    /// Reset whenever `record_correction` sees a newer tick.
+    #[serde(default)]
+    pub corrections_this_tick: u32,
+    /// Phase 2c: most recent tick where a correction was recorded (or
+    /// attempted). Drives the per-tick rate limit.
+    #[serde(default)]
+    pub last_correction_tick: Option<u32>,
+    /// Phase 2c: rejected-correction count. A suspiciously high value is
+    /// evidence of `CorrectionFarmer` attack pattern.
+    #[serde(default)]
+    pub rejected_corrections: u32,
 }
 
 impl RestorativeJustice {
@@ -62,6 +80,9 @@ impl RestorativeJustice {
             corrections: 0,
             tier_penalty: 0,
             last_delta_tick: None,
+            corrections_this_tick: 0,
+            last_correction_tick: None,
+            rejected_corrections: 0,
         }
     }
 
@@ -80,9 +101,23 @@ impl RestorativeJustice {
     }
 
     /// Record a corrective action. At every `CORRECTIONS_PER_RESTORE`-th
-    /// correction, one tier of penalty is restored — subject to the same
-    /// one-delta-per-tick cooldown.
-    pub fn record_correction(&mut self, current_tick: u32) {
+    /// correction, one tier of penalty is restored — subject to the
+    /// one-delta-per-tick cooldown AND a `MAX_CORRECTIONS_PER_TICK` rate
+    /// limit (Phase 2c CorrectionFarmer defense).
+    ///
+    /// Returns `true` if the correction was credited, `false` if it was
+    /// rejected due to rate limiting.
+    pub fn record_correction(&mut self, current_tick: u32) -> bool {
+        // Reset per-tick counter when tick advances.
+        if self.last_correction_tick != Some(current_tick) {
+            self.corrections_this_tick = 0;
+            self.last_correction_tick = Some(current_tick);
+        }
+        if self.corrections_this_tick >= MAX_CORRECTIONS_PER_TICK {
+            self.rejected_corrections = self.rejected_corrections.saturating_add(1);
+            return false;
+        }
+        self.corrections_this_tick += 1;
         self.corrections = self.corrections.saturating_add(1);
         if self.corrections % CORRECTIONS_PER_RESTORE == 0
             && self.tier_penalty > 0
@@ -90,6 +125,20 @@ impl RestorativeJustice {
         {
             self.tier_penalty -= 1;
             self.last_delta_tick = Some(current_tick);
+        }
+        true
+    }
+
+    /// Phase 2c: correction-farming suspicion score in [0, 1].
+    /// 0.0 = genuine behavior, 1.0 = strong evidence of farming.
+    /// Ratio of rejected corrections to total attempts; if many corrections
+    /// were rejected by the rate limiter, the agent is spamming.
+    pub fn correction_farming_score(&self) -> f64 {
+        let attempted = self.corrections + self.rejected_corrections;
+        if attempted == 0 {
+            0.0
+        } else {
+            self.rejected_corrections as f64 / attempted as f64
         }
     }
 
@@ -177,16 +226,20 @@ mod tests {
         rj.record_violation(5); // → penalty becomes 1, last_delta_tick = 5
         assert_eq!(rj.tier_penalty, 1);
 
-        // Corrections in the same tick: penalty does NOT restore.
+        // Phase 2c: with MAX_CORRECTIONS_PER_TICK = 2, only 2 of the burst
+        // are credited on tick 5. Penalty stays at 1 (no milestone reached).
         for _ in 0..10 {
             rj.record_correction(5);
         }
-        assert_eq!(rj.tier_penalty, 1, "restore blocked by same-tick cooldown");
+        assert_eq!(rj.tier_penalty, 1, "restore blocked by cooldown + rate limit");
+        assert!(rj.corrections <= MAX_CORRECTIONS_PER_TICK);
 
-        // Next tick, one more correction milestone can apply. Already at
-        // 10 corrections; next milestone is 20.
-        for _ in 0..10 {
-            rj.record_correction(6);
+        // Accumulate the remaining corrections needed (up to 10 total) at
+        // ≤ 2/tick to reach the restore milestone.
+        let mut tick = 6;
+        while rj.corrections < CORRECTIONS_PER_RESTORE {
+            rj.record_correction(tick);
+            tick += 1;
         }
         assert_eq!(rj.tier_penalty, 0);
     }
@@ -246,6 +299,39 @@ mod tests {
             "penalty unbounded: {}",
             rj.tier_penalty,
         );
+    }
+
+    #[test]
+    fn correction_rate_limit_catches_farming() {
+        // CorrectionFarmer attack: try to credit 100 corrections all on tick 0.
+        let mut rj = RestorativeJustice::new();
+        for _ in 0..100 {
+            rj.record_correction(0);
+        }
+        assert_eq!(rj.corrections, MAX_CORRECTIONS_PER_TICK);
+        // 98 attempts rejected → farming score should be very high.
+        assert!(rj.correction_farming_score() > 0.95);
+    }
+
+    #[test]
+    fn genuine_correction_has_low_farming_score() {
+        let mut rj = RestorativeJustice::new();
+        // One correction per tick — genuine behavior.
+        for t in 0..50 {
+            rj.record_correction(t);
+        }
+        assert_eq!(rj.rejected_corrections, 0);
+        assert_eq!(rj.correction_farming_score(), 0.0);
+    }
+
+    #[test]
+    fn record_correction_returns_credited_status() {
+        let mut rj = RestorativeJustice::new();
+        assert!(rj.record_correction(0));
+        assert!(rj.record_correction(0));
+        // Third attempt on same tick exceeds MAX_CORRECTIONS_PER_TICK.
+        assert!(!rj.record_correction(0));
+        assert_eq!(rj.rejected_corrections, 1);
     }
 
     #[test]
