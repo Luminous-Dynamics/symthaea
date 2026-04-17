@@ -34,12 +34,14 @@ pub mod config;
 pub mod events;
 pub mod plugin;
 pub mod resource;
+pub mod scenarios;
 pub mod systems;
 
 pub use config::MycelixConfig;
 pub use events::{MycelixRequest, MycelixResponse};
 pub use plugin::BevyMycelixPlugin;
 pub use resource::{MycelixClient, MycelixSendError};
+pub use scenarios::{proposal_vote_invariant, ScenarioConfig, ScenarioReport};
 
 #[cfg(test)]
 mod tests;

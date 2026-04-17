@@ -79,6 +79,17 @@ fn log_and_exit(
             MycelixResponse::Error { requester, reason } => {
                 warn!(?requester, %reason, "received Error (plumbing OK, conductor state unclear)");
             }
+            // M2 variants — not expected in this M1 smoke test, but covered
+            // for exhaustiveness.
+            MycelixResponse::ProposalSubmitted { requester, action_hash } => {
+                info!(?requester, %action_hash, "received ProposalSubmitted (unexpected for M1 smoke)");
+            }
+            MycelixResponse::VoteCast { requester, proposal_id } => {
+                info!(?requester, %proposal_id, "received VoteCast (unexpected for M1 smoke)");
+            }
+            MycelixResponse::TendBalance { requester, balance } => {
+                info!(?requester, ?balance, "received TendBalance (unexpected for M1 smoke)");
+            }
         }
         exit.write(AppExit::Success);
     }
