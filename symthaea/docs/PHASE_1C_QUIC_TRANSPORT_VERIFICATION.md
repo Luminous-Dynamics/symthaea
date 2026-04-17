@@ -137,12 +137,10 @@ the intended drop-and-continue behavior for datagram-sized display frames. It
 does not replace the roadmap's `tc qdisc` packet-loss test because it does not
 exercise kernel/network behavior or TCP/WebSocket head-of-line stalls.
 
-## Live Phone-Content Checkpoint
+## Live Phone-Content Checkpoint (ADB screenshot path)
 
-The repository's `main` branch currently has the older ADB screenshot capture
-path, while the Phase I.B scrcpy implementation is still on
-`worktree-session-phase-1b-scrcpy`. To avoid blocking Phase I.C transport work
-on that branch merge, the live-content checkpoint uses:
+The initial live-content checkpoint used the ADB screenshot path because
+Phase I.B's scrcpy implementation had not yet been merged:
 
 ```text
 PhoneBridge.capture_and_observe_rgba -> SomaRdpServer -> sealed RdpFrame replay -> WS/QUIC
@@ -174,11 +172,91 @@ attempt failed on QUIC with a frame timeout; the reliable fallback for oversized
 sealed frames fixed it. The latency numbers are dominated by huge screenshot
 full-frame payloads and are not representative of the target scrcpy stream.
 
+## scrcpy-Stream A/B (harness ready, live run pending)
+
+Phase I.B merged to main on 2026-04-17, so the scrcpy-stream A/B is now
+buildable. The harness lives at
+`symthaea/examples/holon_phone_transport_ab_scrcpy.rs` and pulls real HEVC
+frames through `StreamingPhoneBridge` from Phase I.B, converts them to
+`RdpFrame`s via `SomaRdpServer`, then replays the same frame vector through
+both the baseline WebSocket transport and the QUIC transport.
+
+Gate: `--features holon-viewer,phone-scrcpy`. The `phone-scrcpy` main-crate
+feature transitively enables `symthaea-phone-embodiment/scrcpy`, which pulls
+in ffmpeg-next 7 + sha2, so the build must run inside `nix develop`
+(LIBCLANG_PATH + BINDGEN_EXTRA_CLANG_ARGS come from the dev shell).
+
+Build command:
+
+```bash
+nix develop ./symthaea --command cargo build \
+  --no-default-features --features holon-viewer,phone-scrcpy \
+  --example holon_phone_transport_ab_scrcpy
+```
+
+Run command (10-second bounded run; see Soak section for longer):
+
+```bash
+target/debug/examples/holon_phone_transport_ab_scrcpy \
+  --duration 10 --fps 15 --serial 41201FDJG000UM
+```
+
+Expected output shape: per-frame `captured frame=N source=WxH
+prediction_error=...` lines during capture, then `WS samples=N p50=... p99=...`
+and `QUIC samples=N p50=... p99=...` latency stats, then `Reverse input path
+OK for WS and QUIC`.
+
+Live-device run pending — left unscheduled so it can be invoked against
+the Pixel 8 Pro when both the phone is plugged in and the USB tether budget
+can spare the ~400 KB/s scrcpy stream.
+
+## tc qdisc packet-loss A/B (scripted, user-namespace based)
+
+Script: `symthaea/scripts/phase_1c_netem_ab.sh`. Uses Linux unprivileged
+user+net namespaces (no sudo) to apply `tc qdisc ... netem loss N%` to
+loopback inside an isolated namespace, then runs the existing synthetic
+`holon_transport_ab` example under that loss.
+
+Kernel requirement probed and OK on this machine:
+
+```bash
+$ unshare --user --net --map-root-user /usr/bin/env true && echo OK
+OK
+$ unshare --user --net --map-root-user -- sh -c \
+    'ip link set lo up && tc qdisc add dev lo root netem loss 1% && tc qdisc show dev lo'
+qdisc netem 8001: root refcnt 2 limit 1000 loss 1% seed ...
+```
+
+Run:
+
+```bash
+cargo build --no-default-features --features holon-viewer \
+  --example holon_transport_ab
+LOSS=1 FRAMES=60 symthaea/scripts/phase_1c_netem_ab.sh
+```
+
+The expected qualitative behavior: under 1% packet loss on loopback, WS
+frame delivery exhibits TCP-retransmit stalls (latency tail lengthens,
+max_us spikes) while QUIC datagrams show drop-and-continue (the app sees
+more `timed out waiting for QUIC frame` and `sample` count drops, but
+successful frames stay fast). This is the head-of-line-blocking
+phenomenon QUIC is designed to eliminate.
+
+Live run pending — script is ready, no external privileges required.
+
 ## Remaining Phase I.C Verification
 
-- Run the same scrcpy-derived stream through WS and QUIC simultaneously and
-  compare end-to-end latency p50/p99.
-- Induce packet loss with `tc qdisc` at 1% and compare stall behavior.
-- Run a 10-minute QUIC soak with Phase I.B observability metrics.
-- Perform manual migration cutover: `--transport=ws`, then `--transport=quic`,
-  and confirm functional parity.
+- [ ] Execute the scrcpy-stream A/B live against the Pixel 8 Pro and record
+      numbers for this document.
+- [ ] Execute `phase_1c_netem_ab.sh` for LOSS ∈ {0, 1, 5} and record the
+      WS-vs-QUIC stall behavior.
+- [ ] Run a **bounded 2-minute soak** over QUIC with Phase I.B observability
+      metrics (sealed bytes/s, seal+open p50/p99, queue depth, replay-reject
+      count, restarts, decoded/dropped). The 10-minute full soak is deferred
+      out of respect for the user's USB tether budget (see
+      `memory/user_usb_tether.md`).
+- [ ] Manual migration cutover walkthrough: run `holon_rdp_viewer
+      --transport=ws`, then the same with `--transport=quic`, against the
+      same phone session. Confirm the viewer renders in both cases. This is
+      largely proven functionally by the A/B harness but not yet by a
+      human-observable cutover.

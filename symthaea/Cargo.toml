@@ -587,6 +587,7 @@ perception = ["embeddings", "vision"]                 # Full multimodal percepti
 webcam = []                                           # Live webcam capture (gates cfg blocks in source)
 vision-manifold = ["dep:symthaea-vision-manifold"]    # Patch-based HDC video encoding + CfC temporal manifold
 phone = ["dep:symthaea-phone-embodiment", "vision-manifold"]  # ADB phone screen embodiment
+phone-scrcpy = ["phone", "symthaea-phone-embodiment/scrcpy"]  # Phase I.B persistent HEVC capture via scrcpy-server
 # REMOVED: vision-manifold-camera (0 cfg gates; requires V4L2 hardware, never tested)
 foveation = ["dep:symthaea-foveation", "vision-manifold"]  # Foveation bridge for active vision (dorsal→ventral dispatch)
 # REMOVED: foveation-perception (0 cfg gates; requires GPU models, never tested)

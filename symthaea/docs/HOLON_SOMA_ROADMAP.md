@@ -1,13 +1,17 @@
 # Holon-Soma Roadmap
 
-**Version**: 1.5 (2026-04-14)
+**Version**: 1.6 (2026-04-17)
 **Scope**: The PQC-sealed binary RDP wire connecting a Symthaea cognitive
 loop to a physical embodiment (starting with the Pixel 8 Pro), and the
 research program that rides on top of it.
 **Status**: Phase I.A delivered and hardware-validated. Phase I.A.5
 hardening interlude complete (9 of 10 tracks). Phase I.A.2 Pieces 1+2
-code-complete. Forward phases (I.B → II → III → IV → V) planned and
-pre-registered where applicable.
+code-complete. **Phase I.B CLOSED on main (2026-04-17, recovery merge** of
+the April-14 worktree that had been pruned without merging; `git merge
+--no-ff phase-1b-recovery`). **Phase I.C harness extended**: scrcpy-backed
+WS-vs-QUIC A/B example, unprivileged-user-namespace netem packet-loss
+script, and updated verification doc — live-device A/B run pending. Forward
+phases (II → III → IV → V) planned and pre-registered where applicable.
 
 **Relationship to `docs/ROADMAP.md`**: that doc describes the whole
 Symthaea AGI-partner program (Phi_dyad goal). This document describes
@@ -663,27 +667,62 @@ consolidation, once without.
 
 ---
 
-## Revised Phase II sequencing (from 2026-04-14 USB measurement)
+## Phase II sub-phase decomposition (v1.6, with Phase I.B.6 numbers)
 
-Before the USB ceiling measurement, Phase II was planned as "attention
-backchannel" with codec compression as optional polish. The measurement
-revealed that heavy-activity 30 fps content would exceed USB 2.0 budget
-without compression (72 MB/s projected vs 35 MB/s ceiling). This
-changes the sequencing:
+Phase I.B.6's empirical measurement closes one arm of the v1.4 "attention
+backchannel before or after codec" question. The sustained HEVC wire on a
+Pixel 8 Pro running 720p YouTube clocked **404 KB/s at ~16 fps mean**.
+Projecting to the 30 fps design target:
 
-1. **Phase I.B first** (scrcpy at real fps — prerequisite for meaningful measurement)
-2. Measure real-content sealed per-frame size with scrcpy
-3. **LZ4 wrap before sealing** (1 hour, zero new deps, 2-3× reduction)
-4. Measure again — if under 25% USB budget, SKIP step 5
-5. Sparse patch encoding (3-4 hours, 5-10× additional)
-6. Attention backchannel (the original Phase II task)
-7. Content-adaptive quantization (only if still over budget)
-8. Inter-frame delta coding (Phase II-plus, if we want serious compression)
+| Quantity | Value | Source |
+|---|---|---|
+| HEVC wire @ 16 fps (measured) | 404 KB/s | I.B.6 canonical sustain run |
+| HEVC wire @ 30 fps (projected) | ~758 KB/s | linear scale 30/16 |
+| USB 2.0 ceiling | ~35 MB/s | `adb push/pull 200 MB` in I.A |
+| 25% of USB budget | 8.75 MB/s | "leave 75% for the tether" |
+| **Raw HEVC vs budget** | **~8.7%** | — |
 
-**The key insight**: compression was optional polish before the USB
-measurement. It's now required to hit Phase II's 30 fps target on USB
-2.0 without saturating the bus (and thereby degrading the user's
-laptop internet via RNDIS tethering contention).
+Raw HEVC at 30 fps already uses only **~8.7% of the USB budget**. That
+inverts the v1.4 assumption. Compression is still useful for WAN
+deployments and for Phase IV split-cognition over WiFi, but on the
+USB-tethered rig **it is optional polish, not a prerequisite**.
+
+### Phase II.A — Measure first, then decide (~1-2 hrs)
+
+1. Run the scrcpy A/B (added in Phase I.C closeout) with the netem loss
+   script at 0% loss, 30 fps, 60 s duration. Record real sealed
+   per-frame size for HEVC at the target rate.
+2. Add LZ4 wrap behind a `seal_frame_lz4` fork (1 hr, uses existing
+   workspace `lz4_flex` dep). Re-run the A/B with LZ4 enabled.
+3. Report three numbers: raw sealed KB/s, LZ4'd sealed KB/s, ratio.
+
+**STOP gate**: if LZ4'd sealed ≤ 8.75 MB/s on the measurement,
+skip sparse patches, content-adaptive, and delta coding entirely.
+Proceed directly to Phase II.B (attention backchannel) as optional polish.
+
+### Phase II.B — Attention backchannel (~1 week, polish not prerequisite)
+
+The original "Track A" plan. Desktop `HolonViewerApp` exports
+`VisionManifold::saliency_map()`, ships it upstream at 5 Hz as a new
+`HolonRdpMessage::AttentionMap` variant, server consults the map when
+deciding which detected-change tiles to include in outbound deltas.
+Still valuable for Phase III's Φ-sweep (a consciousness-gated wire is
+what the whole program is about), but not required to hit the 30 fps
+USB budget.
+
+### Phase II.C — Deeper compression (deferred, measurement-gated)
+
+Sparse patches (3-4 hr), content-adaptive quantization (1 day), and
+inter-frame delta coding (2 days) only light up if LZ4 alone doesn't
+clear the 8.75 MB/s gate OR if Phase IV needs WAN-friendly compression
+for split-cognition over WiFi/internet.
+
+**The key insight**: compression was feared to be a blocker before
+Phase I.B.6 measured real numbers. With 404 KB/s at 16 fps scaling to
+~758 KB/s at 30 fps, the USB tether already has ~40× more headroom
+than the heavy-content wire needs. The sequencing inverts: **measure,
+ship attention backchannel for the research thesis, compress only if
+WAN deployment makes it necessary**.
 
 ---
 
@@ -711,11 +750,14 @@ before Phase II, not after.
   attention backchannel (which has fan-in semantics), larger
   memory footprint per viewer
 
-**Recommendation**: **Option α**. Sealing cost matters more than
-crypto purity at 30 fps. Attention backchannel fan-in is natural
-under broadcast semantics. Implement as the first task of Phase II,
-not as "Track 2.5 unblock" — its outcome gates every downstream
-wire change.
+**Decision (v1.6, 2026-04-17): Option α**. Not a recommendation any
+more — a pinned decision. Sealing cost at 30 fps matters more than
+double-encryption purity, attention-backchannel fan-in is natural
+under broadcast semantics, and the downstream Phase II, III, and IV
+wire architectures all assume broadcast-sealing. Implement as the
+first task of Phase II.B (the attention backchannel's natural home),
+not as "Track 2.5 unblock" — its outcome gates every downstream wire
+change.
 
 ---
 
@@ -836,6 +878,48 @@ infrastructure.
 
 ## Change log
 
+- **1.6** (2026-04-17): **Phase I.B recovery + Phase I.C extension + Phase II decomposition.**
+  - **Phase I.B recovery merge on main** (`d1df1216d1` via `git merge
+    --no-ff phase-1b-recovery`). The v1.5 closure claimed the work was
+    complete but the worktree branch `worktree-session-phase-1b-scrcpy`
+    had been pruned without merging — only the doc update landed on
+    main. All 11 sub-task commits (still in `.git`'s object store,
+    not yet GC'd) cherry-picked onto a fresh branch off current main.
+    The only conflict was `flake.nix` (Z3+Lean4 drift vs
+    ffmpeg_7+libclang), trivially additive. Verified `34/34 pass` of
+    the Phase I.B test suite inside `nix develop`. 1,670 LOC + 2
+    verification docs + 1 vendored JAR + 1 HEVC asset now on main.
+    Canonical incident of the concurrent-session commit-frequently
+    rule (`memory/feedback_commit_frequently.md`).
+  - **Phase I.C harness extension** (adds to v1.5+ status):
+    - `examples/holon_phone_transport_ab_scrcpy.rs` — scrcpy-backed
+      WS-vs-QUIC A/B behind new `phone-scrcpy` main-crate feature.
+      Replaces the ADB-polling `holon_phone_transport_ab` for the
+      scrcpy-stream A/B gate (needs live device to run, compiles
+      in any `nix develop`).
+    - `scripts/phase_1c_netem_ab.sh` — `unshare --user --net` +
+      `tc qdisc netem loss N%` on loopback, no sudo. Kernel
+      capability probed and green on this machine.
+    - Pre-existing breakage fix: cognitive-loop cfg gates for
+      embodiment fields (`sensorimotor_execution.rs`, `config/mod.rs`,
+      `accessors/system.rs`, `cycle_phase_output.rs`, `mod.rs`) now
+      include `feature = "phone"` to match the commit `01d12dd5728`
+      intent. Main had been uncompileable under `phone` feature
+      since April 12.
+    - Live-device scrcpy A/B + full `tc qdisc` loss run + bounded
+      2-min QUIC soak + manual cutover walkthrough: ready to run,
+      not yet executed.
+  - **Phase II decomposed into II.A / II.B / II.C** with empirical
+    STOP gate from Phase I.B.6 numbers. Measured HEVC wire of
+    ~404 KB/s at 16 fps projects to ~758 KB/s at 30 fps — **~8.7%
+    of the USB 2.0 budget, not 206%** as the v1.4 projection feared.
+    LZ4 + measurement is Phase II.A (~1-2 hrs); attention backchannel
+    is Phase II.B (optional polish, ~1 week); sparse/content-adaptive/
+    delta coding is Phase II.C (deferred, gated on WAN deployment
+    or LZ4 failing the STOP gate).
+  - **PQC architectural fork pinned to Option α** (broadcast-sealing
+    + per-viewer unwrap). No longer a recommendation — a decision.
+    Implement as first task of Phase II.B.
 - **1.5** (2026-04-14, later same day): **Phase I.B CLOSED.** All 8
   subtasks complete on `worktree-session-phase-1b-scrcpy`. 11 of 12
   core claims Proven; B12 (sustain ≥25.5 fps mean) Asserted with a
