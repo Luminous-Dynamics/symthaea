@@ -45,9 +45,6 @@ pub mod prediction;
 pub mod semantic;
 pub mod decay;
 
-// Reproducibility engine
-pub mod reproducibility_engine;
-
 // Advanced epistemic modules (Phase 2 - v0.4.0)
 pub mod inference;
 pub mod citation;
