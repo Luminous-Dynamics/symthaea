@@ -1198,6 +1198,9 @@ impl CognitiveLoopService {
             // social_mgr moved to behavior (BehavioralSynthesis)
             // vision_sensory, motor_rendering, somatic/thermal/embodiment moved to sensorimotor
             sensorimotor: sensorimotor_built,
+            // STT capture: opt-in, started post-construction via start_stt_capture().
+            #[cfg(feature = "voice-stt-live")]
+            stt_capture: None,
             #[cfg(feature = "nurture")]
             nurture_attachment: if enable_nurture_attachment {
                 Some(super::nurture_bridge::NurtureAttachmentBridge::new())

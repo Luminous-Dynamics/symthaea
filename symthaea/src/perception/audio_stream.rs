@@ -27,7 +27,7 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, SyncSender, TrySendError};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
@@ -78,7 +78,10 @@ impl Default for MicCaptureConfig {
 /// cycle. The stream and worker are torn down when the handle is dropped.
 pub struct MicCaptureHandle {
     _stream: cpal::Stream,
-    hv_rx: Receiver<ContinuousHV>,
+    // Wrapped in Mutex because `mpsc::Receiver` is !Sync and the containing
+    // CognitiveLoopService must stay Sync for its MetricsProvider bound.
+    // Drain is single-threaded (perception phase) so the mutex is uncontended.
+    hv_rx: Mutex<Receiver<ContinuousHV>>,
     shutdown: Arc<AtomicBool>,
     worker: Option<JoinHandle<()>>,
     sample_rate: u32,
@@ -119,7 +122,7 @@ impl MicCaptureHandle {
 
         Ok(Self {
             _stream: stream,
-            hv_rx,
+            hv_rx: Mutex::new(hv_rx),
             shutdown,
             worker: Some(worker),
             sample_rate: config.sample_rate,
@@ -131,8 +134,12 @@ impl MicCaptureHandle {
     /// Non-blocking. Older HVs in the queue are discarded so the perception
     /// phase always sees the latest auditory snapshot without accumulating lag.
     pub fn drain_latest(&self) -> Option<ContinuousHV> {
+        let rx = match self.hv_rx.lock() {
+            Ok(rx) => rx,
+            Err(poisoned) => poisoned.into_inner(),
+        };
         let mut latest = None;
-        while let Ok(hv) = self.hv_rx.try_recv() {
+        while let Ok(hv) = rx.try_recv() {
             latest = Some(hv);
         }
         latest

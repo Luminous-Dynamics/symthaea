@@ -568,6 +568,13 @@ pub struct CognitiveLoopService {
     /// Extracted from CognitiveLoopService to reduce field count (Phase 5, Stage 4).
     pub(crate) sensorimotor: sensorimotor_execution::SensoriMotorExecution,
 
+    /// Live STT capture handle. When `Some`, the perception phase polls the
+    /// mic each cycle and binds the resulting auditory HV into the input
+    /// encoding. Sibling to vision — both are sensory input modalities.
+    /// Opt-in: call `start_stt_capture()` after construction.
+    #[cfg(feature = "voice-stt-live")]
+    pub(crate) stt_capture: Option<crate::perception::MicCaptureHandle>,
+
     /// Nurture/attachment bridge — Bowlby attachment -> neuromodulator modulation.
     /// When enabled, models caregiver presence/absence and modulates oxytocin, NE,
     /// 5-HT, DA, adenosine based on attachment dynamics each cycle.

@@ -108,6 +108,22 @@ impl CognitiveLoopService {
         #[allow(unused_mut)]
         let mut encoding = self.run_encoding_and_preprocessing(input, module_timings);
 
+        // ═══════════════════════════════════════════════════════════════════════
+        // PHASE 1.2b: Live STT input blend (voice-stt-live feature)
+        // ═══════════════════════════════════════════════════════════════════════
+        // When live mic capture is active, drain the latest auditory ContinuousHV
+        // from the background STT worker and bundle it into the input encoding.
+        // Bundle (superposition) rather than bind (XOR) because audio is an
+        // additive sensory modality, not a modifier of semantic content.
+        #[cfg(feature = "voice-stt-live")]
+        if let Some(ref stt) = self.stt_capture {
+            if let Some(stt_chv) = stt.drain_latest() {
+                let stt_binary = crate::hdc::BinaryHV::from_bipolar(&stt_chv.values);
+                encoding.hv16_cached =
+                    crate::hdc::BinaryHV::bundle(&[encoding.hv16_cached, stt_binary]);
+            }
+        }
+
         // ACh-modulated scene memory thresholds
         #[cfg(feature = "vision-manifold")]
         if let Some(ref mut bridge) = self.sensorimotor.vision_sensory.vision_bridge {

@@ -222,6 +222,35 @@ impl CognitiveLoopService {
             .map(|b| b.manifold().evaluate_horizons())
     }
 
+    /// Start live microphone capture. On success, subsequent cycles blend the
+    /// auditory HV into the perception encoding each tick. Idempotent: if
+    /// capture is already running, returns Ok without restarting.
+    #[cfg(feature = "voice-stt-live")]
+    pub fn start_stt_capture(
+        &mut self,
+        config: crate::perception::MicCaptureConfig,
+    ) -> anyhow::Result<()> {
+        if self.stt_capture.is_some() {
+            return Ok(());
+        }
+        let handle = crate::perception::MicCaptureHandle::start(config)?;
+        self.stt_capture = Some(handle);
+        Ok(())
+    }
+
+    /// Stop live microphone capture. The cpal stream and worker thread are
+    /// torn down via the handle's Drop impl.
+    #[cfg(feature = "voice-stt-live")]
+    pub fn stop_stt_capture(&mut self) {
+        self.stt_capture = None;
+    }
+
+    /// Whether live STT capture is currently running.
+    #[cfg(feature = "voice-stt-live")]
+    pub fn stt_capture_active(&self) -> bool {
+        self.stt_capture.is_some()
+    }
+
     /// Build a capability card from the current config and runtime stats.
     ///
     /// The card captures substrate type, cycle frequency, Phi, enabled features,
