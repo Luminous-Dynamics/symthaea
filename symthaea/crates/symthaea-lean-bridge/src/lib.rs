@@ -28,6 +28,7 @@
 //! - [`z3_to_lean`]: Z3 SMT-LIB2 → Lean proof script.
 //! - [`runner`]: subprocess wrapper around `lean4 --check`.
 
+pub mod bridge;
 pub mod term;
 pub mod tactic;
 pub mod z3_to_lean;
