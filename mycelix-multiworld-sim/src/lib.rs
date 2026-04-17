@@ -4594,6 +4594,13 @@ impl MultiWorldSimulator {
             max_oppression,
             collective_phi,
         );
+        let final_cvs_geometric = EpochManager::compute_cvs_geometric(
+            genetic_diversity,
+            economic_sustainability,
+            harmony_mean,
+            max_oppression,
+            collective_phi,
+        );
 
         let mut final_snapshot = EpochSnapshot::from_worlds(
             self.epoch_manager.current_epoch,
@@ -4676,6 +4683,9 @@ impl MultiWorldSimulator {
         // Phase 2c roadmap A1: expose MycelixResilience for scenarios that
         // injected adversaries. `None` if no agent is tagged adversarial.
         report.mycelix_resilience = red_team::compute_resilience_from_worlds(&self.worlds);
+
+        // Geometric-mean CVS ("weakest link" — K-index-inspired).
+        report.final_cvs_geometric = final_cvs_geometric;
 
         report
     }

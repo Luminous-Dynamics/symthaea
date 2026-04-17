@@ -18,13 +18,15 @@ struct PairResult {
     seed: u64,
     cvs_on: f64,
     cvs_off: f64,
+    cvs_geo_on: f64,
+    cvs_geo_off: f64,
     pop_on: usize,
     pop_off: usize,
     res_on: f64,
     res_off: f64,
 }
 
-fn run_condition(seed: u64, years: u32, phase2: bool) -> (f64, usize, f64) {
+fn run_condition(seed: u64, years: u32, phase2: bool) -> (f64, f64, usize, f64) {
     let mut config = SimulationConfig::default_150_year();
     config.total_ticks = years * 12;
     config.seed = seed;
@@ -44,7 +46,7 @@ fn run_condition(seed: u64, years: u32, phase2: bool) -> (f64, usize, f64) {
         .as_ref()
         .map(|r| r.mean())
         .unwrap_or(f64::NAN);
-    (report.final_cvs, report.final_population, res)
+    (report.final_cvs, report.final_cvs_geometric, report.final_population, res)
 }
 
 fn main() {
@@ -58,24 +60,41 @@ fn main() {
     );
     println!();
     println!(
-        "{:>6} {:>8} {:>8} {:>9} {:>8} {:>8} {:>8} {:>8}",
-        "seed", "cvs_on", "cvs_off", "d_cvs", "pop_on", "pop_off", "res_on", "res_off",
+        "{:>6} {:>7} {:>7} {:>+8} {:>7} {:>7} {:>+8} {:>7} {:>7}",
+        "seed",
+        "cvs_on",
+        "cvs_off",
+        "d_arith",
+        "geo_on",
+        "geo_off",
+        "d_geo",
+        "res_on",
+        "res_off",
     );
-    println!("{}", "-".repeat(76));
+    println!("{}", "-".repeat(79));
 
     let mut results = Vec::new();
     for &seed in &seeds {
-        let (cvs_on, pop_on, res_on) = run_condition(seed, years, true);
-        let (cvs_off, pop_off, res_off) = run_condition(seed, years, false);
-        let delta = cvs_on - cvs_off;
+        let (cvs_on, geo_on, pop_on, res_on) = run_condition(seed, years, true);
+        let (cvs_off, geo_off, pop_off, res_off) = run_condition(seed, years, false);
         println!(
-            "{:>6} {:>8.3} {:>8.3} {:>+9.3} {:>8} {:>8} {:>8.3} {:>8.3}",
-            seed, cvs_on, cvs_off, delta, pop_on, pop_off, res_on, res_off,
+            "{:>6} {:>7.3} {:>7.3} {:>+8.3} {:>7.3} {:>7.3} {:>+8.3} {:>7.3} {:>7.3}",
+            seed,
+            cvs_on,
+            cvs_off,
+            cvs_on - cvs_off,
+            geo_on,
+            geo_off,
+            geo_on - geo_off,
+            res_on,
+            res_off,
         );
         results.push(PairResult {
             seed,
             cvs_on,
             cvs_off,
+            cvs_geo_on: geo_on,
+            cvs_geo_off: geo_off,
             pop_on,
             pop_off,
             res_on,
@@ -84,18 +103,29 @@ fn main() {
     }
 
     let n = results.len() as f64;
-    let mean_delta = results.iter().map(|r| r.cvs_on - r.cvs_off).sum::<f64>() / n;
-    let var_delta = results
+    let mean_d_arith = results.iter().map(|r| r.cvs_on - r.cvs_off).sum::<f64>() / n;
+    let std_d_arith = (results
         .iter()
-        .map(|r| {
-            let d = r.cvs_on - r.cvs_off;
-            (d - mean_delta).powi(2)
-        })
+        .map(|r| (r.cvs_on - r.cvs_off - mean_d_arith).powi(2))
+        .sum::<f64>()
+        / n)
+        .sqrt();
+    let mean_d_geo = results
+        .iter()
+        .map(|r| r.cvs_geo_on - r.cvs_geo_off)
         .sum::<f64>()
         / n;
-    let std_delta = var_delta.sqrt();
-    let wins = results.iter().filter(|r| r.cvs_on > r.cvs_off).count();
-    let losses = results.iter().filter(|r| r.cvs_on < r.cvs_off).count();
+    let std_d_geo = (results
+        .iter()
+        .map(|r| (r.cvs_geo_on - r.cvs_geo_off - mean_d_geo).powi(2))
+        .sum::<f64>()
+        / n)
+        .sqrt();
+    let wins_arith = results.iter().filter(|r| r.cvs_on > r.cvs_off).count();
+    let wins_geo = results
+        .iter()
+        .filter(|r| r.cvs_geo_on > r.cvs_geo_off)
+        .count();
     let mean_res_on = results
         .iter()
         .map(|r| r.res_on)
@@ -112,18 +142,21 @@ fn main() {
     println!();
     println!("Aggregate:");
     println!(
-        "  CVS delta     mean {:+.3} ± {:.3} (phase2=on − phase2=off)",
-        mean_delta, std_delta,
-    );
-    println!(
-        "  Phase 2 wins  {}/{} seeds (on > off), losses {}, ties {}",
-        wins,
+        "  Arithmetic CVS delta  mean {:+.3} ± {:.3}, Phase 2 wins {}/{}",
+        mean_d_arith,
+        std_d_arith,
+        wins_arith,
         seeds.len(),
-        losses,
-        seeds.len() - wins - losses,
     );
     println!(
-        "  Resilience    phase2=on {:.3} vs phase2=off {:.3}",
+        "  Geometric  CVS delta  mean {:+.3} ± {:.3}, Phase 2 wins {}/{}",
+        mean_d_geo,
+        std_d_geo,
+        wins_geo,
+        seeds.len(),
+    );
+    println!(
+        "  Resilience            phase2=on {:.3} vs phase2=off {:.3}",
         mean_res_on, mean_res_off,
     );
 }

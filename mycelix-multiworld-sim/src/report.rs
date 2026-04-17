@@ -89,6 +89,13 @@ pub struct CivilizationReport {
     /// `red_team::MycelixResilience`.
     #[serde(default)]
     pub mycelix_resilience: Option<crate::red_team::MycelixResilience>,
+
+    /// Geometric-mean CVS — "weakest link" variant from kosmic-lab K-index.
+    /// Always computed alongside `final_cvs` (arithmetic). Strictly ≤
+    /// arithmetic for the same inputs. A civilization with one collapsed
+    /// dimension scores near 0 here, regardless of other strengths.
+    #[serde(default)]
+    pub final_cvs_geometric: f64,
 }
 
 impl CivilizationReport {
@@ -363,6 +370,7 @@ FACTION ANALYSIS:
             carrington_events: 0,
             tech_milestones_achieved: 0,
             mycelix_resilience: None,
+            final_cvs_geometric: 0.0,
         }
     }
 }
@@ -452,6 +460,7 @@ mod tests {
             secessions: 0,
             turchin_transitions: 0,
             mycelix_resilience: None,
+            final_cvs_geometric: 0.0,
         }
     }
 

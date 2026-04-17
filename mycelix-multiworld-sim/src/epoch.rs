@@ -1167,11 +1167,14 @@ impl EpochManager {
         next
     }
 
-    /// Compute the Civilization Viability Score (CVS).
+    /// Compute the Civilization Viability Score (CVS) — arithmetic mean.
     ///
     /// CVS = 0.2 * genetic + 0.2 * economic + 0.2 * harmonies + 0.2 * (1 - oppression) + 0.2 * phi
     ///
-    /// All inputs should be in [0, 1]. The result is in [0, 1].
+    /// All inputs should be in [0, 1]. The result is in [0, 1]. Fully
+    /// substitutable — one collapsed dimension can be hidden by strong
+    /// performance elsewhere. See `compute_cvs_geometric` for a "weakest
+    /// link" variant inspired by kosmic-lab's historical K-index.
     pub fn compute_cvs(
         genetic: f64,
         economic: f64,
@@ -1185,6 +1188,41 @@ impl EpochManager {
         let o = 1.0 - oppression.clamp(0.0, 1.0);
         let p = phi.clamp(0.0, 1.0);
         0.2 * g + 0.2 * e + 0.2 * h + 0.2 * o + 0.2 * p
+    }
+
+    /// Geometric-mean CVS — the "weakest link" variant (kosmic-lab K-index
+    /// Path C default, 2025-11-27).
+    ///
+    /// `CVS_geo = exp((1/5) * Σ log(x_i + ε))`, ε = 1e-10 for numerical
+    /// stability near zero. A civilization with `oppression = 1.0` (i.e.
+    /// the anti-oppression component is 0) scores close to 0 regardless
+    /// of how well other dimensions perform. Matches the intuition that
+    /// a totally oppressive society isn't civilizationally viable even
+    /// with great genetics.
+    ///
+    /// Returns a value in [0, 1]. Strictly ≤ `compute_cvs` for the same
+    /// inputs (geometric ≤ arithmetic; equal only when all inputs equal).
+    pub fn compute_cvs_geometric(
+        genetic: f64,
+        economic: f64,
+        harmonies: f64,
+        oppression: f64,
+        phi: f64,
+    ) -> f64 {
+        const EPS: f64 = 1e-10;
+        let parts = [
+            genetic.clamp(0.0, 1.0),
+            economic.clamp(0.0, 1.0),
+            harmonies.clamp(0.0, 1.0),
+            1.0 - oppression.clamp(0.0, 1.0),
+            phi.clamp(0.0, 1.0),
+        ];
+        let n = parts.len() as f64;
+        let sum_log: f64 = parts.iter().map(|x| (x + EPS).ln()).sum();
+        let geo = (sum_log / n).exp();
+        // Subtract the ε floor so a truly-zero input maps to ~0 rather
+        // than exp(ln(ε)) ≈ ε. Keeps the scale comparable to arithmetic.
+        (geo - EPS).clamp(0.0, 1.0)
     }
 
     /// Record a milestone event by kind.
@@ -1367,6 +1405,81 @@ mod tests {
         assert!(
             (cvs_balanced - 0.5).abs() < 0.01,
             "Balanced CVS should be 0.5, got {cvs_balanced}"
+        );
+    }
+
+    #[test]
+    fn test_cvs_geometric_perfect_and_zero() {
+        // Perfect inputs → 1.0.
+        let cvs = EpochManager::compute_cvs_geometric(1.0, 1.0, 1.0, 0.0, 1.0);
+        assert!((cvs - 1.0).abs() < 1e-5, "Perfect CVS_geo ≈ 1.0, got {cvs}");
+        // Fully oppressed (anti-oppression term = 0) → near 0 even with
+        // other maxed inputs. Arithmetic would give 0.8 here.
+        let cvs_oppressed = EpochManager::compute_cvs_geometric(1.0, 1.0, 1.0, 1.0, 1.0);
+        assert!(
+            cvs_oppressed < 0.05,
+            "Fully oppressed CVS_geo should ≈ 0, got {cvs_oppressed}",
+        );
+    }
+
+    #[test]
+    fn test_cvs_geometric_le_arithmetic() {
+        // For the same inputs, geometric ≤ arithmetic (equal only when all
+        // inputs are equal — AM–GM inequality).
+        for &(g, e, h, o, p) in &[
+            (0.5, 0.5, 0.5, 0.5, 0.5),
+            (0.3, 0.8, 0.6, 0.2, 0.7),
+            (0.9, 0.1, 0.5, 0.0, 0.5),
+            (0.7, 0.7, 0.7, 0.3, 0.7),
+        ] {
+            let arith = EpochManager::compute_cvs(g, e, h, o, p);
+            let geo = EpochManager::compute_cvs_geometric(g, e, h, o, p);
+            assert!(
+                geo <= arith + 1e-9,
+                "geo {:.4} should be ≤ arith {:.4} for ({},{},{},{},{})",
+                geo,
+                arith,
+                g,
+                e,
+                h,
+                o,
+                p,
+            );
+        }
+    }
+
+    #[test]
+    fn test_cvs_geometric_weakest_link() {
+        // A civilization with one zero-valued component should be
+        // severely penalized by geometric mean, even if other components
+        // are perfect. Arithmetic mean cannot distinguish such a profile
+        // from one with moderate values everywhere.
+        //
+        // Profile A: perfect on 4 dims, zero on phi.
+        //   arith = (1+1+1+1+0)/5 = 0.8
+        // Profile B: uniform 0.8 across all dims.
+        //   arith = (0.8*4 + 0.8)/5 = 0.8  (note: anti-opp here is 0.8 → opp=0.2)
+        let arith_a = EpochManager::compute_cvs(1.0, 1.0, 1.0, 0.0, 0.0);
+        let arith_b = EpochManager::compute_cvs(0.8, 0.8, 0.8, 0.2, 0.8);
+        assert!(
+            (arith_a - arith_b).abs() < 0.01,
+            "Setup: profiles should have ~equal arithmetic CVS (got {:.3} vs {:.3})",
+            arith_a,
+            arith_b,
+        );
+        let geo_a = EpochManager::compute_cvs_geometric(1.0, 1.0, 1.0, 0.0, 0.0);
+        let geo_b = EpochManager::compute_cvs_geometric(0.8, 0.8, 0.8, 0.2, 0.8);
+        // A has phi=0 → geom should be near-zero regardless of other perfect dims.
+        assert!(
+            geo_a < 0.1,
+            "Profile A (phi=0) should have near-zero geom, got {:.3}",
+            geo_a,
+        );
+        assert!(
+            geo_b > geo_a + 0.5,
+            "Profile B (uniform) should score much higher than A despite same arith: A={:.3}, B={:.3}",
+            geo_a,
+            geo_b,
         );
     }
 
