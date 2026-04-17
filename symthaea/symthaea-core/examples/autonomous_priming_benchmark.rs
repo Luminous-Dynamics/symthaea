@@ -97,6 +97,57 @@ fn kepler_priors() -> Vec<Expr> {
     vec![ang_mom, r2(), v2(), inv_r]
 }
 
+/// "Cheat" priors — the exact Jacobi-integral subtrees for PCR3BP.
+///
+/// The Jacobi integral is `C_J = (x²+y²) + 2·[(1-μ)/r₁ + μ/r₂] − (vx²+vy²)`
+/// where `r₁ = sqrt((x+μ)²+y²)` and `r₂ = sqrt((x-1+μ)²+y²)`.
+///
+/// We hand it the displaced-origin distance kernels explicitly. If the
+/// GP can't assemble the full Jacobi integral even with these priors,
+/// the crossover/fitness machinery itself — not priming content — is
+/// the Ceiling-4 bottleneck.
+fn jacobi_cheat_priors() -> Vec<Expr> {
+    let mu = Expr::Const(MU);
+    let one_minus_mu = Expr::Const(1.0 - MU);
+    let mu_minus_one = Expr::Const(MU - 1.0);
+    let x = || var("x");
+    let y = || var("y");
+    let vx = || var("vx");
+    let vy = || var("vy");
+    let r2_local = || add(pow(x(), 2.0), pow(y(), 2.0));
+    let v2_local = || add(pow(vx(), 2.0), pow(vy(), 2.0));
+    // r₁² = (x+μ)² + y²
+    let r1_sq = || add(pow(add(x(), mu.clone()), 2.0), pow(y(), 2.0));
+    // r₂² = (x+μ-1)² + y²    = (x - (1-μ))² + y²
+    let r2_sq = || add(pow(add(x(), mu_minus_one.clone()), 2.0), pow(y(), 2.0));
+    let inv_r1 = div(
+        Expr::Const(1.0),
+        Expr::Func(UnaryFn::Sqrt, Box::new(r1_sq())),
+    );
+    let inv_r2 = div(
+        Expr::Const(1.0),
+        Expr::Func(UnaryFn::Sqrt, Box::new(r2_sq())),
+    );
+    // The nonlocal combination as a single prior — removes the
+    // requirement that crossover assemble the two terms from scratch.
+    let nonlocal = add(
+        mul(one_minus_mu.clone(), inv_r1.clone()),
+        mul(mu.clone(), inv_r2.clone()),
+    );
+    // The local quasi-Jacobi skeleton `(x²+y²) − (vx²+vy²)` — exact
+    // form (no factor of 2 on the nonlocal yet; that's a constant the
+    // constant-optimizer can find).
+    let quasi_local = sub(r2_local(), v2_local());
+    vec![
+        inv_r1,
+        inv_r2,
+        nonlocal,
+        quasi_local,
+        r2_local(),
+        v2_local(),
+    ]
+}
+
 fn run_one(seed: u64, priors: &[Expr], exclude_trig: bool) -> Vec<AutonomousInvariant> {
     let config = RegressorConfig {
         seed,
@@ -192,8 +243,13 @@ fn main() {
     );
 
     let priors = kepler_priors();
+    let cheat = jacobi_cheat_priors();
     println!("Kepler priors used in primed condition:");
     for p in &priors {
+        println!("  · {}", p);
+    }
+    println!("\nJacobi cheat priors (Session 20):");
+    for p in &cheat {
         println!("  · {}", p);
     }
     println!();
@@ -226,6 +282,13 @@ fn main() {
         .collect();
     aggregate("primed + no-trig", &primed_notrig);
 
+    println!("\n━━━ Jacobi cheat priors + no-trig (Session 20 decisive test) ━━━");
+    let cheat_notrig: Vec<SeedResult> = SEEDS
+        .iter()
+        .map(|&seed| summarize("cheat-NT", seed, &run_one(seed, &cheat, true)))
+        .collect();
+    aggregate("cheat + no-trig ", &cheat_notrig);
+
     println!("\n━━━ Head-to-head per seed (primed vs cold, trig allowed) ━━━");
     head_to_head("cold vs primed", &cold, &primed);
 
@@ -234,12 +297,16 @@ fn main() {
     );
     head_to_head("cold-NT vs primed-NT", &cold_notrig, &primed_notrig);
 
+    println!("\n━━━ Head-to-head per seed (cheat vs cold, trig DISABLED — Session 20) ━━━");
+    head_to_head("cold-NT vs cheat-NT", &cold_notrig, &cheat_notrig);
+
     println!("\n━━━ Degeneracy accounting: formulas containing cos/sin ━━━");
     for (label, runs) in [
         ("cold           ", &cold),
         ("primed         ", &primed),
         ("cold+no-trig   ", &cold_notrig),
         ("primed+no-trig ", &primed_notrig),
+        ("cheat+no-trig  ", &cheat_notrig),
     ] {
         let trig_count = runs
             .iter()
@@ -249,6 +316,31 @@ fn main() {
             "  {}: {}/{} best-formula trig-degenerate",
             label,
             trig_count,
+            runs.len()
+        );
+    }
+
+    println!("\n━━━ Jacobi-family accounting: formulas containing displaced sqrt kernels ━━━");
+    // Looking for any trace of the injected `1/sqrt((x+MU)²+y²)` or
+    // `1/sqrt((x+MU-1)²+y²)` shapes. If zero appear in `cheat-NT` even
+    // after we seeded them directly, Ceiling 4 is mechanism-limited,
+    // not priming-limited.
+    for (label, runs) in [
+        ("cold+no-trig   ", &cold_notrig),
+        ("primed+no-trig ", &primed_notrig),
+        ("cheat+no-trig  ", &cheat_notrig),
+    ] {
+        let jacobi_count = runs
+            .iter()
+            .filter(|r| {
+                let f = &r.best_formula;
+                f.contains("sqrt") && (f.contains("x + 0.01215") || f.contains("x + -0.987"))
+            })
+            .count();
+        println!(
+            "  {}: {}/{} best-formula contains displaced-origin sqrt",
+            label,
+            jacobi_count,
             runs.len()
         );
     }
