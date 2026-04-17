@@ -132,6 +132,21 @@ fn run_with_ic(
     known: Vec<Expr>,
     ic: [f64; 4],
 ) -> Vec<AutonomousInvariant> {
+    run_full(seed, priors, known, ic, false)
+}
+
+/// Session 30: orthogonality + Lie-derivative fitness.
+fn run_stage4(seed: u64, priors: &[Expr], known: Vec<Expr>) -> Vec<AutonomousInvariant> {
+    run_full(seed, priors, known, [1.5, 0.0, 0.0, 0.6], true)
+}
+
+fn run_full(
+    seed: u64,
+    priors: &[Expr],
+    known: Vec<Expr>,
+    ic: [f64; 4],
+    lie: bool,
+) -> Vec<AutonomousInvariant> {
     let config = RegressorConfig {
         seed,
         population_size: POP_SIZE,
@@ -143,6 +158,7 @@ fn run_with_ic(
         orthogonality_penalty: 1000.0,
         orthogonality_threshold: 0.9,
         known_invariants: known,
+        use_lie_fitness: lie,
         ..RegressorConfig::for_autonomous_discovery()
     };
     discover_invariants_autonomous_with_seed_templates(
@@ -262,6 +278,16 @@ fn main() {
         .collect();
     let (s3_am, s3_en, s3_ir) = report_stage("stage3", &stage3_runs);
 
+    println!("\n━━━ Stage 4: orth ON + ECCENTRIC + LIE-DERIVATIVE FITNESS (Session 30) ━━━");
+    println!("  Fitness = variance of ∇E·f(state) along trajectory, not variance of E.");
+    println!("  Physics-correct: L_f E = 0 identically for true conservation laws.");
+    println!("  1D near-constant accidents like y^6 have L_f = 6y⁵·vy, nonzero → rejected.");
+    let stage4_runs: Vec<(u64, Vec<AutonomousInvariant>)> = SEEDS
+        .iter()
+        .map(|&seed| (seed, run_stage4(seed, &priors, known.clone())))
+        .collect();
+    let (s4_am, s4_en, s4_ir) = report_stage("stage4", &stage4_runs);
+
     println!("\n━━━ Pool-wide discovery accounting ━━━");
     println!(
         "  Stage 1 — seeds with any ang_mom in top-10:    {} / {}",
@@ -310,26 +336,35 @@ fn main() {
         s3_ir,
         SEEDS.len()
     );
+    println!();
+    println!(
+        "  Stage 4 — seeds with any ang_mom in top-10:     {} / {}",
+        s4_am,
+        SEEDS.len()
+    );
+    println!(
+        "  Stage 4 — seeds with any energy-like in top-10: {} / {}",
+        s4_en,
+        SEEDS.len()
+    );
+    println!(
+        "  Stage 4 — seeds with any 1/r in top-10:         {} / {}",
+        s4_ir,
+        SEEDS.len()
+    );
 
     println!("\n━━━ Verdict ━━━");
-    if s3_en >= 3 {
-        println!("  ✓ ENERGY EMERGES ON ECCENTRIC ORBIT.");
-        println!("    The 'composition ceiling' was a circular-orbit artifact — on a");
-        println!("    varied orbit, only the true Hamiltonian is near-conserved and");
-        println!("    the GP is forced toward it. No new mechanism needed.");
+    if s4_en >= 3 {
+        println!("  ✓✓ ENERGY EMERGES WITH LIE-DERIVATIVE FITNESS.");
+        println!("    The full composition ceiling is closed. The S15-S29 mechanism");
+        println!("    stack plus physics-correct fitness recovers both invariants on");
+        println!("    Kepler. The arc's research question is answered end-to-end.");
+    } else if s4_en >= 1 || s4_ir >= 3 {
+        println!("  ± PARTIAL ON LIE: some energy/1/r visible with Lie fitness.");
+        println!("    Mechanism improves over raw-variance but needs tuning for reliability.");
     } else if s3_en >= 1 {
-        println!("  ± SIGNAL ON ECCENTRIC: energy in ≥1/5 stage-3 pools.");
-        println!("    Composition partially works on varied orbits; may need more seeds");
-        println!("    or iterative orthogonality (S30 candidate) to push to reliable 3+.");
-    } else if s2_en >= 3 {
-        println!(
-            "  ✓ CEILING CLOSED on circular (stage 2). Eccentric still needs work."
-        );
-    } else if s2_en >= 1 || s2_ir >= 3 {
-        println!("  ± PARTIAL WIN (stage 2): some 1/r visible but no energy either orbit.");
-        println!("    Composition ceiling appears real — S30 iterative orthogonality next.");
+        println!("  ± ECCENTRIC SIGNAL: composition partially works on varied orbits.");
     } else {
-        println!("  ✗ NO CHANGE: penalty didn't bite even on circular.");
-        println!("    Check: gradient computation, threshold, known_invariant wiring.");
+        println!("  ✗ NO ENERGY: Lie fitness tried and insufficient. Deeper gap remains.");
     }
 }
