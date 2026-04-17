@@ -5532,6 +5532,19 @@ pub fn discover_invariants_autonomous_with_seed_templates(
         }
     }
 
+    // Session 22: pin the caller-supplied priors so they cannot be
+    // evicted from the population by mutation/crossover. Session 21's
+    // diverse-fitness fix proved Jacobi-family primitives can survive
+    // selection, but the GP still shreds them via crossover before the
+    // complementary pieces arrive for composition. Keeping at least
+    // one intact copy of each prior in every generation gives crossover
+    // a reliable source to copy from.
+    let pinned_priors: Vec<Expr> = extra_seed_templates
+        .iter()
+        .filter(|t| expr_uses_only_vars(t, var_names))
+        .cloned()
+        .collect();
+
     // Pre-compute several distinct "off-trajectory" test points for the
     // non-triviality filter. We use both the trajectory samples themselves
     // (so disguised constants like 0^(non-constant)→0 are caught) AND a few
@@ -5631,6 +5644,23 @@ pub fn discover_invariants_autonomous_with_seed_templates(
         ranked.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
         for &(idx, _) in ranked.iter().take(5) {
             new_pop.push(population[idx].clone());
+        }
+
+        // Session 22: pin priors. If any caller-supplied prior is
+        // missing from the new population after elitism, re-inject one
+        // canonical copy. Cap at pop_size/4 so we don't starve diversity.
+        let max_pinned = pop_size / 4;
+        let mut pinned_added = 0;
+        for prior in &pinned_priors {
+            if pinned_added >= max_pinned {
+                break;
+            }
+            let key = macro_usage_key(prior);
+            let present = new_pop.iter().any(|e| macro_usage_key(e) == key);
+            if !present && new_pop.len() < pop_size {
+                new_pop.push(prior.clone());
+                pinned_added += 1;
+            }
         }
 
         while new_pop.len() < pop_size {
