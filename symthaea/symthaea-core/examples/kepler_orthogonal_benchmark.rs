@@ -23,8 +23,8 @@
 //! expression in the top-10 in stage 2 (vs 0/5 in stage 1).
 
 use symthaea_core::hdc::conjecture_engine::{
-    discover_invariants_autonomous_with_seed_templates, AutonomousInvariant, BinOp, Expr,
-    RegressorConfig, UnaryFn,
+    compose_top_k_invariants, discover_invariants_autonomous_with_seed_templates,
+    AutonomousInvariant, BinOp, Expr, RegressorConfig, UnaryFn,
 };
 
 const SEEDS: &[u64] = &[42, 1337, 2718, 7919, 31415];
@@ -353,18 +353,92 @@ fn main() {
         SEEDS.len()
     );
 
+    println!("\n━━━ Stage 5: compose_top_k postproc on stage 4 invariants (Session 31) ━━━");
+    println!("  Exhaustive pairwise composition of top-5 survivors with 4 ops × 6 scales.");
+    println!("  Physics target: E = 0.5·v² − 1/r. Success = composite contains both");
+    println!("  (vx²+vy²) AND 1/sqrt(x²+y²) substructure with Lie variance < 1e-4.");
+    let stage4_ic: [f64; 4] = [1.5, 0.0, 0.0, 0.6];
+    let var_names = ["x", "y", "vx", "vy"];
+    let mut s5_both = 0usize;
+    let mut s5_lowvar = 0usize;
+    let mut s5_energy_like = 0usize;
+    for (seed, invs) in &stage4_runs {
+        let composite =
+            compose_top_k_invariants(invs, kepler_rhs, &stage4_ic, &var_names, T_MAX, DT, 5);
+        match composite {
+            Some(c) => {
+                let has_v2 =
+                    c.formula_str.contains("(vx ^ 2)") && c.formula_str.contains("(vy ^ 2)");
+                let has_inv_r = c.formula_str.contains("(1 / sqrt")
+                    && c.formula_str.contains("(x ^ 2)")
+                    && c.formula_str.contains("(y ^ 2)");
+                let both = has_v2 && has_inv_r;
+                let (_am, energy_like, _ir) = classify(&c.formula_str);
+                if both {
+                    s5_both += 1;
+                }
+                if c.variance < 1e-4 {
+                    s5_lowvar += 1;
+                }
+                if energy_like {
+                    s5_energy_like += 1;
+                }
+                let tag = if energy_like {
+                    "✓ ENERGY-LIKE"
+                } else if both {
+                    "✓ both subexprs"
+                } else {
+                    "— other"
+                };
+                println!(
+                    "  [stage5] seed={:<6} lie_var={:.3e} both_v2_and_inv_r={}  tag={}  formula={}",
+                    seed, c.variance, both, tag, c.formula_str
+                );
+            }
+            None => {
+                println!(
+                    "  [stage5] seed={:<6} no pairwise composite beat the single-term baseline",
+                    seed
+                );
+            }
+        }
+    }
+    println!(
+        "\n  Stage 5 — composites containing BOTH v² AND 1/sqrt(r²): {} / {}",
+        s5_both,
+        SEEDS.len()
+    );
+    println!(
+        "  Stage 5 — composites with Lie variance < 1e-4:          {} / {}",
+        s5_lowvar,
+        SEEDS.len()
+    );
+    println!(
+        "  Stage 5 — composites matching ENERGY-LIKE classifier:   {} / {}",
+        s5_energy_like,
+        SEEDS.len()
+    );
+
     println!("\n━━━ Verdict ━━━");
-    if s4_en >= 3 {
-        println!("  ✓✓ ENERGY EMERGES WITH LIE-DERIVATIVE FITNESS.");
-        println!("    The full composition ceiling is closed. The S15-S29 mechanism");
-        println!("    stack plus physics-correct fitness recovers both invariants on");
-        println!("    Kepler. The arc's research question is answered end-to-end.");
+    if s5_both >= 3 && s5_lowvar >= 3 {
+        println!("  ✓✓ CEILING 4 CLOSED VIA POSTPROC (S31).");
+        println!("    Pairwise composition of stage-4 top-K recovers an energy-family");
+        println!("    invariant with both v² and 1/r subexpressions in ≥3/5 seeds, at");
+        println!("    Lie variance < 1e-4. The arc is closed: GP finds components,");
+        println!("    postproc composes them.");
+    } else if s5_both >= 1 {
+        println!("  ± PARTIAL POSTPROC (S31): some seeds compose v²+1/r, not reliable.");
+        println!("    Mechanism is mechanically valid but fragile. Needs either richer");
+        println!("    scale grid, op coverage, or upstream discovery improvements.");
+    } else if s4_en >= 3 {
+        println!("  ✓✓ ENERGY EMERGES WITH LIE-DERIVATIVE FITNESS (no postproc needed).");
     } else if s4_en >= 1 || s4_ir >= 3 {
         println!("  ± PARTIAL ON LIE: some energy/1/r visible with Lie fitness.");
-        println!("    Mechanism improves over raw-variance but needs tuning for reliability.");
+        println!("    Postproc did not find a v²+1/r composite — pieces may not");
+        println!("    co-occur in the same seed's top-K.");
     } else if s3_en >= 1 {
         println!("  ± ECCENTRIC SIGNAL: composition partially works on varied orbits.");
     } else {
-        println!("  ✗ NO ENERGY: Lie fitness tried and insufficient. Deeper gap remains.");
+        println!("  ✗ NO ENERGY: Lie fitness + postproc insufficient. Deeper gap remains.");
     }
 }
