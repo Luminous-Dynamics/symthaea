@@ -523,6 +523,7 @@ mod tests {
             fitness: 0.001 + 0.001 * complexity as f64,
             status: ConjectureStatus::FormallyVerified { proof_steps: 5 },
             confidence: 0.95,
+            macro_promotion_tier: crate::hdc::conjecture_engine::MacroPromotionTier::Formal,
         }
     }
 

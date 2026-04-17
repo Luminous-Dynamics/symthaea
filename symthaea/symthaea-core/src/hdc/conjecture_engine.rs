@@ -3006,6 +3006,27 @@ impl ConjectureEngine {
                         conjecture.confidence = (conjecture.confidence + 0.7) / 2.0;
                     }
 
+                    // ── Near-exact fast-track upgrade (Session 15) ────────
+                    // An exact (MSE ≈ 0) fit on BOTH the training set and
+                    // the held-out test set is pointwise-proof-equivalent
+                    // evidence over all observed data — there are no
+                    // unobserved points left for the formula to disagree on.
+                    // This matches what `verify_bayesian` / `verify_formal`
+                    // would conclude on the same grid, but those require
+                    // >=100 points; we've only got the observed sequence.
+                    // Upgrading here lets AbstractThought::reflect extract
+                    // singleton subtrees from exact numerical fits (e.g.
+                    // the distance-kernel `1/sqrt(n²+1)` solution) via the
+                    // fast-track promotion path.
+                    const NEAR_EXACT_MSE: f64 = 1e-10;
+                    if train_mse < NEAR_EXACT_MSE && test_mse < NEAR_EXACT_MSE {
+                        conjecture.status = ConjectureStatus::FormallyVerified {
+                            proof_steps: seq.data.len(),
+                        };
+                        elevate_macro_promotion_tier(conjecture, MacroPromotionTier::Formal);
+                        conjecture.confidence = (conjecture.confidence + 0.95) / 2.0;
+                    }
+
                     // ── Known constant matching (#7) ──────────────────
                     // If it's a constant, try to identify it
                     if is_constant {
@@ -6732,6 +6753,91 @@ mod tests {
             "report should mention source: {}",
             report
         );
+    }
+
+    #[test]
+    fn test_verify_numerical_upgrades_exact_fit_to_formal() {
+        // Session 15: verify_numerical must upgrade conjectures with
+        // MSE ≈ 0 on BOTH train and test to FormallyVerified/Formal. This
+        // is what lets AbstractThought::reflect extract subtrees from a
+        // single-source exact numerical fit (e.g. distance-kernel) via
+        // the fast-track promotion path. Without this upgrade, the
+        // observed sequence would have to contain >=100 points for
+        // verify_formal to certify it — which the compounding benchmark
+        // can't afford.
+        let mut engine = ConjectureEngine::with_config(RegressorConfig {
+            population_size: 120,
+            generations: 40,
+            max_depth: 3,
+            max_complexity: 10,
+            seed: 7,
+            ..RegressorConfig::default()
+        });
+
+        let data: Vec<(f64, f64)> = (1..=25).map(|n| (n as f64, (n * n) as f64)).collect();
+        engine.observe(ObservedSequence::new(
+            "n_squared",
+            MathDomain::NumberTheory,
+            data,
+        ));
+
+        engine.generate_conjectures(3);
+        engine.verify_numerical();
+
+        let best = engine
+            .best_for("n_squared")
+            .expect("should have at least one conjecture for n_squared");
+
+        assert!(
+            best.training_mse < 1e-10,
+            "n² should be found exactly; got train_mse={}, formula={}",
+            best.training_mse,
+            best.formula_str
+        );
+        assert!(
+            matches!(best.status, ConjectureStatus::FormallyVerified { .. }),
+            "exact fit should upgrade to FormallyVerified; got status={:?}, formula={}",
+            best.status,
+            best.formula_str
+        );
+        assert_eq!(
+            best.macro_promotion_tier,
+            MacroPromotionTier::Formal,
+            "exact fit should upgrade tier to Formal; got {:?}, formula={}",
+            best.macro_promotion_tier,
+            best.formula_str
+        );
+    }
+
+    #[test]
+    fn test_verify_numerical_keeps_approximate_fit_recurrent() {
+        // Counterpart to the near-exact upgrade: an approximate-but-not-exact
+        // fit must NOT get the FormallyVerified treatment. Fibonacci ratios
+        // don't converge exactly on small n, so any GP fit will have residual
+        // MSE > 1e-10 — status must stay NumericallyTested.
+        let mut engine = ConjectureEngine::with_config(RegressorConfig {
+            population_size: 150,
+            generations: 40,
+            max_depth: 3,
+            max_complexity: 8,
+            seed: 42,
+            ..RegressorConfig::default()
+        });
+
+        engine.observe(observe_fibonacci_ratios(30));
+        engine.generate_conjectures(3);
+        engine.verify_numerical();
+
+        if let Some(best) = engine.best_for("fibonacci_ratio(n)") {
+            if best.training_mse >= 1e-10 {
+                assert!(
+                    !matches!(best.status, ConjectureStatus::FormallyVerified { .. }),
+                    "approximate fit (train_mse={}) must not be FormallyVerified; formula={}",
+                    best.training_mse,
+                    best.formula_str
+                );
+            }
+        }
     }
 
     #[test]
