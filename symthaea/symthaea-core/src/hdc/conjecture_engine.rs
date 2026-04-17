@@ -655,6 +655,29 @@ pub struct RegressorConfig {
     /// the composition operator produces 2-piece composites but
     /// variance selection doesn't reward their structural richness.
     pub prior_fragment_bonus: f64,
+    /// Session 29: gradient-orthogonality penalty. When > 1.0 and
+    /// `known_invariants` is non-empty, each candidate's fitness is
+    /// multiplied by this factor whenever its state-space gradient
+    /// is highly parallel (mean |cos θ| > orthogonality_threshold)
+    /// to any known invariant's gradient across sampled trajectory
+    /// points. Catches tautological variants like `L·π`, `L+L`,
+    /// `exp(L)`, etc — all of which have gradients parallel to `∇L`
+    /// even when the functional form differs. This unblocks the
+    /// multi-invariant discovery problem diagnosed in Session 28
+    /// (ang_mom's 1e-29 variance floor shadows all other invariants
+    /// in top-10 selection). Default 1.0 (no penalty).
+    pub orthogonality_penalty: f64,
+    /// Session 29: cosine threshold for orthogonality_penalty. Mean
+    /// |cos(grad_E, grad_I_k)| above this triggers the penalty.
+    /// 0.9 catches scalar rescalings and element-wise nonlinearities;
+    /// 0.99 is strict; 0.5 is lax. Default 0.9.
+    pub orthogonality_threshold: f64,
+    /// Session 29: invariants already discovered in a previous pass.
+    /// When provided together with `orthogonality_penalty > 1.0`,
+    /// candidates whose state-space gradient is parallel to any of
+    /// these get a fitness penalty, forcing discovery of structurally
+    /// independent invariants. Default empty.
+    pub known_invariants: Vec<Expr>,
 }
 
 impl Default for RegressorConfig {
@@ -673,6 +696,9 @@ impl Default for RegressorConfig {
             diverse_trajectory_count: 1,
             prior_composition_rate: 0.0,
             prior_fragment_bonus: 1.0,
+            orthogonality_penalty: 1.0,
+            orthogonality_threshold: 0.9,
+            known_invariants: Vec::new(),
         }
     }
 }
@@ -849,6 +875,9 @@ impl SymbolicRegressor {
                 diverse_trajectory_count: self.config.diverse_trajectory_count,
                 prior_composition_rate: self.config.prior_composition_rate,
                 prior_fragment_bonus: self.config.prior_fragment_bonus,
+                orthogonality_penalty: self.config.orthogonality_penalty,
+                orthogonality_threshold: self.config.orthogonality_threshold,
+                known_invariants: self.config.known_invariants.clone(),
             });
             let log_results = log_regressor.fit(&log_seq, 2);
 
@@ -2985,6 +3014,9 @@ impl ConjectureEngine {
                 diverse_trajectory_count: self.config.diverse_trajectory_count,
                 prior_composition_rate: self.config.prior_composition_rate,
                 prior_fragment_bonus: self.config.prior_fragment_bonus,
+                orthogonality_penalty: self.config.orthogonality_penalty,
+                orthogonality_threshold: self.config.orthogonality_threshold,
+                known_invariants: self.config.known_invariants.clone(),
                 });
                 let diff_results = diff_reg.fit(&diff_obs, 1);
                 for c in &diff_results {
@@ -3028,6 +3060,9 @@ impl ConjectureEngine {
                     diverse_trajectory_count: self.config.diverse_trajectory_count,
                     prior_composition_rate: self.config.prior_composition_rate,
                     prior_fragment_bonus: self.config.prior_fragment_bonus,
+                    orthogonality_penalty: self.config.orthogonality_penalty,
+                    orthogonality_threshold: self.config.orthogonality_threshold,
+                    known_invariants: self.config.known_invariants.clone(),
                 });
                 if !macro_seeds.is_empty() {
                     regressor.set_seed_macros(macro_seeds.clone());
