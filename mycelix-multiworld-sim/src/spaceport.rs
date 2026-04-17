@@ -264,6 +264,7 @@ pub fn instantiate_colonists(
             sovereign_profile: crate::sovereign_profile::SovereignProfile::sample(
                 source_region.cultural_profile.individualism, rng,
             ),
+            justice: crate::sub_passport::RestorativeJustice::new(),
         };
         *next_agent_id += 1;
         agents.push(agent);

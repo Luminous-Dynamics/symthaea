@@ -28,6 +28,7 @@
 pub mod agent;
 pub mod civic_dimensions;
 pub mod sovereign_profile;
+pub mod sub_passport;
 pub mod metabolism;
 pub mod wound_healing;
 pub mod currency;
@@ -471,6 +472,7 @@ impl MultiWorldSimulator {
                     sovereign_profile: crate::sovereign_profile::SovereignProfile::sample(
                         culture_individualism, &mut self.rng,
                     ),
+                    justice: crate::sub_passport::RestorativeJustice::new(),
                 };
                 world.next_agent_id += 1;
                 world.agents.push(agent);
@@ -582,6 +584,7 @@ impl MultiWorldSimulator {
                 sovereign_profile: crate::sovereign_profile::SovereignProfile::sample(
                     world.culture.individualism, &mut self.rng,
                 ),
+                justice: crate::sub_passport::RestorativeJustice::new(),
             };
             world.next_agent_id += 1;
             world.agents.push(agent);
@@ -3969,6 +3972,19 @@ impl MultiWorldSimulator {
                 }
             }
 
+            // Phase 7.6: Restorative corrections (Phase 2b).
+            // Agents accumulating care work / strong virtue-care ethics record
+            // a correction probabilistically, unwinding tier penalties over
+            // time. The 10:3 correction:violation ratio keeps long-run penalty
+            // bounded around zero in healthy populations.
+            for world in &mut self.worlds {
+                let _ = sanctions::apply_restorative_corrections(
+                    &mut world.agents,
+                    self.current_tick,
+                    &mut self.rng,
+                );
+            }
+
             // Phase 8: Consciousness
             self.tick_consciousness();
 
@@ -5084,6 +5100,7 @@ harmony_policy = true
             trauma_level: 0.0, cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
             ethics: crate::agent::EthicalOrientation::default(),
             sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
+            justice: crate::sub_passport::RestorativeJustice::new(),
         };
         happy.skills.learn(0, 0.5);
         happy.needs.engagement = 0.8;

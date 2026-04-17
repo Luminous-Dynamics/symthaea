@@ -104,7 +104,7 @@ pub fn sanction_level_from_oppression(oppression_index: f64) -> SanctionLevel {
 pub fn apply_sanctions(
     agents: &mut [CivAgent],
     oppression_index: f64,
-    _current_tick: u32,
+    current_tick: u32,
 ) -> SanctionResult {
     let level = sanction_level_from_oppression(oppression_index);
     if level == SanctionLevel::None {
@@ -121,6 +121,13 @@ pub fn apply_sanctions(
             agent.sap_balance -= fine;
             result.total_burned += fine;
 
+            // Phase 2b: restorative justice — a sanction is a moral violation.
+            // Severe sanctions count as two violations (they degrade tier faster).
+            agent.justice.record_violation(current_tick);
+            if matches!(level, SanctionLevel::Severe) {
+                agent.justice.record_violation(current_tick);
+            }
+
             match level {
                 SanctionLevel::Minor => result.minor_count += 1,
                 SanctionLevel::Moderate => result.moderate_count += 1,
@@ -131,6 +138,33 @@ pub fn apply_sanctions(
     }
 
     result
+}
+
+/// Per-tick restorative-corrections pass.
+///
+/// Reward corrective behavior: agents accumulating care work (high
+/// `tend_balance`) or strong virtue-care ethics record a correction. This is
+/// probabilistic so populations with diverse ethics display diverse recovery
+/// profiles. Returns the total corrections recorded.
+pub fn apply_restorative_corrections(
+    agents: &mut [CivAgent],
+    current_tick: u32,
+    rng: &mut crate::stochastic::StochasticEngine,
+) -> u32 {
+    let mut count = 0u32;
+    for agent in agents.iter_mut().filter(|a| a.is_alive()) {
+        // Base probability scales with observable care signals.
+        let care_signal = (agent.tend_balance / 40.0).clamp(0.0, 1.0) * 0.5
+            + agent.ethics.virtue_care * 0.25
+            + agent.ethics.relational * 0.15
+            + (agent.mycel_score).clamp(0.0, 1.0) * 0.10;
+        let p = care_signal.clamp(0.0, 0.15); // cap at 15% per tick
+        if p > 0.0 && rng.bernoulli(p) {
+            agent.justice.record_correction(current_tick);
+            count += 1;
+        }
+    }
+    count
 }
 
 // ============================================================================

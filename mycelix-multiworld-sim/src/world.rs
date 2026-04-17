@@ -969,8 +969,8 @@ impl World {
     }
 
     /// Fraction of living agents at each civic tier (0-4), using the 8D sovereign
-    /// profile with the given weights. Parallel to `tier_distribution` which uses
-    /// the scalar Phi pathway.
+    /// profile with the given weights AND applying the per-agent restorative-
+    /// justice penalty. Parallel to `tier_distribution` which uses scalar Phi.
     pub fn civic_tier_distribution(
         &self,
         weights: &crate::sovereign_profile::DimensionWeights,
@@ -978,7 +978,9 @@ impl World {
         let mut counts = [0usize; 5];
         let mut total = 0usize;
         for a in self.agents.iter().filter(|a| a.is_alive()) {
-            counts[a.sovereign_profile.tier(weights).index()] += 1;
+            let raw = a.sovereign_profile.tier(weights);
+            let effective = a.justice.effective_tier(raw);
+            counts[effective.index()] += 1;
             total += 1;
         }
         if total == 0 {
@@ -992,7 +994,8 @@ impl World {
     }
 
     /// Fraction of living agents that meet a `CivicRequirement` under the given
-    /// weights. Used by 8D-gated governance to compute eligible voter fraction.
+    /// weights, with the per-agent restorative-justice penalty applied to tier.
+    /// Used by 8D-gated governance to compute eligible voter fraction.
     pub fn civic_fraction_meeting(
         &self,
         requirement: &crate::sovereign_profile::CivicRequirement,
@@ -1003,7 +1006,17 @@ impl World {
             .iter()
             .filter(|a| a.is_alive())
             .fold((0usize, 0usize), |(e, t), a| {
-                let e = e + (a.sovereign_profile.meets_requirement(requirement, weights) as usize);
+                let raw = a.sovereign_profile.tier(weights);
+                let effective = a.justice.effective_tier(raw);
+                // Tier check: use effective tier (degraded).
+                let tier_ok = effective >= requirement.min_tier;
+                // Per-dimension minimums still apply to the raw profile.
+                let dim_ok = requirement.min_dimensions.iter().all(|&(dim, min)| {
+                    let v = a.sovereign_profile.get(dim);
+                    let sanitized = if v.is_finite() { v.clamp(0.0, 1.0) } else { 0.0 };
+                    sanitized >= min
+                });
+                let e = e + (tier_ok && dim_ok) as usize;
                 (e, t + 1)
             });
         if total == 0 {
@@ -1117,6 +1130,7 @@ mod tests {
                     cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
                     ethics: crate::agent::EthicalOrientation::default(),
                     sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
+                    justice: crate::sub_passport::RestorativeJustice::new(),
             };
             world.agents.push(agent);
         }

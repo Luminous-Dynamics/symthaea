@@ -438,6 +438,7 @@ impl PopulationEngine {
                     sovereign_profile: crate::sovereign_profile::SovereignProfile::sample(
                         world.culture.individualism, rng,
                     ),
+                    justice: crate::sub_passport::RestorativeJustice::new(),
                 };
 
                 events.push(CivEvent::new(
@@ -774,6 +775,7 @@ mod tests {
                 trauma_level: 0.0,
                     cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(), ethics: crate::agent::EthicalOrientation::default(),
                     sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
+                    justice: crate::sub_passport::RestorativeJustice::new(),
             };
             world.next_agent_id += 1;
             world.agents.push(agent);
@@ -873,6 +875,7 @@ mod tests {
                 tend_balance: 0.0, parent_ids: None, faction_id: None,
                 generation: 0, trauma_level: 0.0, cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(), ethics: crate::agent::EthicalOrientation::default(),
                 sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
+                justice: crate::sub_passport::RestorativeJustice::new(),
             },
             CivAgent {
                 id: 1, birth_tick: 0, death_tick: None, sex: BiologicalSex::Female,
@@ -883,6 +886,7 @@ mod tests {
                 tend_balance: 0.0, parent_ids: None, faction_id: None,
                 generation: 0, trauma_level: 0.0, cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(), ethics: crate::agent::EthicalOrientation::default(),
                 sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
+                justice: crate::sub_passport::RestorativeJustice::new(),
             },
             CivAgent {
                 id: 2, birth_tick: 100, death_tick: None, sex: BiologicalSex::Male,
@@ -893,6 +897,7 @@ mod tests {
                 tend_balance: 0.0, parent_ids: Some((0, 1)), faction_id: None,
                 generation: 1, trauma_level: 0.0, cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(), ethics: crate::agent::EthicalOrientation::default(),
                 sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
+                justice: crate::sub_passport::RestorativeJustice::new(),
             },
             CivAgent {
                 id: 3, birth_tick: 100, death_tick: None, sex: BiologicalSex::Female,
@@ -903,6 +908,7 @@ mod tests {
                 tend_balance: 0.0, parent_ids: Some((0, 1)), faction_id: None,
                 generation: 1, trauma_level: 0.0, cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(), ethics: crate::agent::EthicalOrientation::default(),
                 sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
+                justice: crate::sub_passport::RestorativeJustice::new(),
             },
         ];
 

@@ -478,6 +478,10 @@ pub struct CivAgent {
     /// each governance tick via `refresh_sovereign_profile`.
     #[serde(default)]
     pub sovereign_profile: crate::sovereign_profile::SovereignProfile,
+    /// Restorative justice state — tracks violations, corrections, and
+    /// effective civic tier degradation. Survey Gap 2 (Phase 2b).
+    #[serde(default)]
+    pub justice: crate::sub_passport::RestorativeJustice,
 }
 
 fn default_mycel() -> f64 { 0.1 }
@@ -650,6 +654,7 @@ mod tests {
                     cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
                     ethics: EthicalOrientation::default(),
                     sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
+                    justice: crate::sub_passport::RestorativeJustice::new(),
         }
     }
 
