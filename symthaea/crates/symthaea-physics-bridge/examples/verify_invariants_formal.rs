@@ -222,6 +222,91 @@ fn problems() -> Vec<Problem> {
             dynamics: vec![],
             formally_verifiable: false,
         },
+        // ─── Additional polynomial invariants (Tier B extensions) ───────
+        Problem {
+            // Duffing oscillator (unforced, conservative):
+            //   dx/dt = v, dv/dt = -x - x^3
+            // Energy: E = ½v² + ½x² + ¼x⁴  →  ×4 for integer coefs:
+            //   4E = 2v² + 2x² + x⁴
+            name: "duffing_4E",
+            description: "4E = 2v² + 2x² + x⁴ (Duffing oscillator, conservative; ×4 for integer coefs)",
+            energy: add(
+                add(mul(c(2.0), pow(v("v"), 2.0)), mul(c(2.0), pow(v("x"), 2.0))),
+                pow(v("x"), 4.0),
+            ),
+            dynamics: vec![
+                ("x", v("v")),
+                ("v", neg(add(v("x"), pow(v("x"), 3.0)))),
+            ],
+            formally_verifiable: true,
+        },
+        Problem {
+            // Quartic anharmonic oscillator:
+            //   dx/dt = v, dv/dt = -x³
+            // Energy: E = ½v² + ¼x⁴  →  ×4: 4E = 2v² + x⁴
+            name: "quartic_anharmonic_4E",
+            description: "4E = 2v² + x⁴ (quartic anharmonic oscillator; ×4 for integer coefs)",
+            energy: add(mul(c(2.0), pow(v("v"), 2.0)), pow(v("x"), 4.0)),
+            dynamics: vec![("x", v("v")), ("v", neg(pow(v("x"), 3.0)))],
+            formally_verifiable: true,
+        },
+        Problem {
+            // 2D isotropic harmonic oscillator:
+            //   dx/dt = vx, dy/dt = vy
+            //   dvx/dt = -x, dvy/dt = -y
+            // Energy: E = ½(vx² + vy²) + ½(x² + y²)  →  ×2: 2E = vx² + vy² + x² + y²
+            name: "isotropic_2d_energy",
+            description: "2E = vx² + vy² + x² + y² (2D isotropic harmonic; ×2)",
+            energy: add(
+                add(pow(v("vx"), 2.0), pow(v("vy"), 2.0)),
+                add(pow(v("x"), 2.0), pow(v("y"), 2.0)),
+            ),
+            dynamics: vec![
+                ("x", v("vx")),
+                ("y", v("vy")),
+                ("vx", neg(v("x"))),
+                ("vy", neg(v("y"))),
+            ],
+            formally_verifiable: true,
+        },
+        Problem {
+            // Same 2D isotropic harmonic oscillator, but the angular-momentum
+            // invariant L = x·vy − y·vx. Demonstrates a second independent
+            // conservation law beyond energy.
+            name: "isotropic_2d_angular_momentum",
+            description: "L = x·vy − y·vx (2D isotropic harmonic oscillator)",
+            energy: add(mul(v("x"), v("vy")), neg(mul(v("y"), v("vx")))),
+            dynamics: vec![
+                ("x", v("vx")),
+                ("y", v("vy")),
+                ("vx", neg(v("x"))),
+                ("vy", neg(v("y"))),
+            ],
+            formally_verifiable: true,
+        },
+        Problem {
+            // Linear coupled oscillators (two modes with coupling constant k=1):
+            //   dx1/dt = v1, dx2/dt = v2
+            //   dv1/dt = -2x1 + x2, dv2/dt = -2x2 + x1
+            // Energy: E = ½(v1² + v2²) + x1² + x2² − x1·x2  →  ×2:
+            //   2E = v1² + v2² + 2x1² + 2x2² − 2·x1·x2
+            name: "linear_coupled_2E",
+            description: "2E = v1² + v2² + 2x1² + 2x2² − 2·x1·x2 (linear coupled oscillators, k=1; ×2)",
+            energy: add(
+                add(pow(v("v1"), 2.0), pow(v("v2"), 2.0)),
+                add(
+                    add(mul(c(2.0), pow(v("x1"), 2.0)), mul(c(2.0), pow(v("x2"), 2.0))),
+                    neg(mul(c(2.0), mul(v("x1"), v("x2")))),
+                ),
+            ),
+            dynamics: vec![
+                ("x1", v("v1")),
+                ("x2", v("v2")),
+                ("v1", add(neg(mul(c(2.0), v("x1"))), v("x2"))),
+                ("v2", add(neg(mul(c(2.0), v("x2"))), v("x1"))),
+            ],
+            formally_verifiable: true,
+        },
     ]
 }
 

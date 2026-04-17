@@ -14,10 +14,17 @@ The example hand-derives `dE/dt = Σ (∂E/∂xᵢ)·(dxᵢ/dt)` via `SymExpr::d
 
 | File | Invariant | Status |
 |------|-----------|--------|
-| `harmonic_oscillator.smt2` | `E = x² + v²` | **unsat** (formally proven) |
+| `harmonic_oscillator.smt2` | `E = x² + v²` | **unsat** |
 | `kepler_angular_momentum.smt2` | `L = x·vy − y·vx` | **unsat** |
-| `henon_heiles_6H.smt2` | `6H = 3(px² + py²) + 3(x² + y²) + 6x²y − 2y³` | **unsat** |
+| `henon_heiles_6H.smt2` | `6H` (Hénon-Heiles ×6 rescale) | **unsat** |
 | `mystery_ode.smt2` | `H = ½(px² + py²) + x² + y² + xy` | **unsat** |
+| `duffing_4E.smt2` | `4E = 2v² + 2x² + x⁴` (Duffing conservative, ×4) | **unsat** |
+| `quartic_anharmonic_4E.smt2` | `4E = 2v² + x⁴` (pure quartic, ×4) | **unsat** |
+| `isotropic_2d_energy.smt2` | `2E = vx² + vy² + x² + y²` (2D isotropic, ×2) | **unsat** |
+| `isotropic_2d_angular_momentum.smt2` | `L = x·vy − y·vx` (same system, 2nd invariant) | **unsat** |
+| `linear_coupled_2E.smt2` | `2E = v1² + v2² + 2x1² + 2x2² − 2·x1·x2` (2-mode, ×2) | **unsat** |
+
+Nine formal proofs across six distinct dynamical systems, including a system with two independent invariants (2D isotropic harmonic oscillator: energy + angular momentum).
 
 ## Why Hénon-Heiles uses 6H instead of H
 
