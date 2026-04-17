@@ -182,10 +182,14 @@ impl WorldGovernance {
         rng: &mut StochasticEngine,
         amendment_enabled: bool,
     ) -> Vec<CivEvent> {
-        self.tick_governance_full(world, current_tick, rng, amendment_enabled, false, 0.0)
+        self.tick_governance_full(world, current_tick, rng, amendment_enabled, false, 0.0, true)
     }
 
     /// Run one tick of governance with full policy control including hostile guardian mode.
+    ///
+    /// `phase2_enabled` controls whether the 8D sovereign-profile blend
+    /// contributes to voter eligibility. When false (A2 counterfactual),
+    /// falls back to the Phi+MYCEL 50/50 blend that predated Phase 2a.
     pub fn tick_governance_full(
         &mut self,
         world: &World,
@@ -194,6 +198,7 @@ impl WorldGovernance {
         amendment_enabled: bool,
         hostile_guardian: bool,
         voting_suppression: f64,
+        phase2_enabled: bool,
     ) -> Vec<CivEvent> {
         let mut events = Vec::new();
         let population = world.population();
@@ -241,14 +246,17 @@ impl WorldGovernance {
         // weights preset and the voting civic requirement (Citizen tier +
         // EpistemicIntegrity >= 0.25). Matches production Mycelix's gating
         // logic more faithfully than scalar Phi alone.
-        let civic_eligible = world.civic_fraction_meeting(
-            &crate::sovereign_profile::civic_requirement_voting(),
-            &crate::sovereign_profile::DimensionWeights::governance(),
-        );
-
-        // Weighted blend: Phi-tier (1/3) + MYCEL (1/3) + 8D civic (1/3).
-        let effective_eligible =
-            eligible_fraction / 3.0 + mycel_eligible / 3.0 + civic_eligible / 3.0;
+        let effective_eligible = if phase2_enabled {
+            let civic_eligible = world.civic_fraction_meeting(
+                &crate::sovereign_profile::civic_requirement_voting(),
+                &crate::sovereign_profile::DimensionWeights::governance(),
+            );
+            // Weighted blend: Phi-tier (1/3) + MYCEL (1/3) + 8D civic (1/3).
+            eligible_fraction / 3.0 + mycel_eligible / 3.0 + civic_eligible / 3.0
+        } else {
+            // A2 counterfactual: pre-Phase-2 blend (Phi tier + MYCEL 50/50).
+            eligible_fraction * 0.5 + mycel_eligible * 0.5
+        };
 
         // --- Check for amendments (every review period) ---
         if amendment_enabled
@@ -887,7 +895,7 @@ mod tests {
         gov.evolve_authority(3, 100, 0.35, 0.5);
 
         for tick in 0..(150 * 12) {
-            let _ = gov.tick_governance_full(&world, tick, &mut rng, true, false, 0.0);
+            let _ = gov.tick_governance_full(&world, tick, &mut rng, true, false, 0.0, true);
         }
 
         // In a healthy community, vetoes should be extremely rare (deterrence).
@@ -922,7 +930,7 @@ mod tests {
 
         // Run 50 years with hostile guardian
         for tick in 0..(50 * 12) {
-            let _ = gov.tick_governance_full(&world, tick, &mut rng, true, true, 0.0);
+            let _ = gov.tick_governance_full(&world, tick, &mut rng, true, true, 0.0, true);
         }
 
         // Hostile guardian should have attempted vetoes
@@ -968,7 +976,7 @@ mod tests {
 
         // Run 100 ticks with hostile guardian
         for tick in 0..100 {
-            let _ = gov.tick_governance_full(&world, tick, &mut rng, true, true, 0.0);
+            let _ = gov.tick_governance_full(&world, tick, &mut rng, true, true, 0.0, true);
         }
 
         // Rate limit: max 1 veto per 7 ticks = ~14 vetoes in 100 ticks
@@ -993,7 +1001,7 @@ mod tests {
 
         // Run past the membership term
         for tick in 0..(MEMBERSHIP_TERM_TICKS + 10) {
-            let _ = gov.tick_governance_full(&world, tick, &mut rng, true, false, 0.0);
+            let _ = gov.tick_governance_full(&world, tick, &mut rng, true, false, 0.0, true);
         }
 
         // Membership should have been processed (either renewed or failed)
@@ -1039,7 +1047,7 @@ mod tests {
             gov.evolve_authority(3, 100, 0.35, 0.5);
 
             for tick in 0..(100 * 12) {
-                let _ = gov.tick_governance_full(&world, tick, &mut rng, true, false, 0.0);
+                let _ = gov.tick_governance_full(&world, tick, &mut rng, true, false, 0.0, true);
             }
 
             results.push((seed, gov.stability_score, gov.veto_count, gov.amendment_count));

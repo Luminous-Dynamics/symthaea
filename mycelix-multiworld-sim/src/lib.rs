@@ -2322,8 +2322,12 @@ impl MultiWorldSimulator {
                 let stability = world.governance.stability_score;
                 world.governance.evolve_authority(epoch, pop, mean_phi, stability);
                 // Phase 2a: refresh 8D sovereign profiles from current agent
-                // state before any gating decisions this tick.
-                world.refresh_sovereign_profiles();
+                // state before any gating decisions this tick. Skipped in
+                // A2 counterfactual mode so the baseline governance operates
+                // on the same state as before Phase 2 existed.
+                if self.config.policy.phase2_enabled {
+                    world.refresh_sovereign_profiles();
+                }
                 let mut gov = std::mem::take(&mut world.governance);
                 let voting_suppression = self.phase_modifiers
                     .get(&world.id)
@@ -2331,6 +2335,7 @@ impl MultiWorldSimulator {
                     .unwrap_or(0.0);
                 let gov_events = gov.tick_governance_full(
                     world, tick, rng, amendment_enabled, hostile_guardian, voting_suppression,
+                    self.config.policy.phase2_enabled,
                 );
                 world.governance = gov;
                 all_gov_events.extend(gov_events);
@@ -3961,23 +3966,26 @@ impl MultiWorldSimulator {
                     }
                 }
             }
-            // Phase 7.5: Graduated Sanctions (Ostrom Principle 5, Zosh et al. 2025)
+            // Phase 7.5: Graduated Sanctions (Ostrom Principle 5, Zosh et al. 2025).
+            // Uses the Phase 2-aware entry so A2 counterfactual runs skip
+            // the restorative-justice violation hook.
+            let phase2 = self.config.policy.phase2_enabled;
             for world in &mut self.worlds {
                 let oppression = world.governance.oppression_index;
                 if oppression > 0.1 {
-                    let _result = sanctions::apply_sanctions(
+                    let _result = sanctions::apply_sanctions_with_phase2(
                         &mut world.agents,
                         oppression,
                         self.current_tick,
+                        phase2,
                     );
                 }
             }
 
             // Phase 7.55: Mycelix adversarial tick (Phase 2c).
-            // Applies TierBuyer/DemurrageEvader/CorrectionFarmer/GuildColluder
-            // modifiers to agent state. Runs between sanctions and genuine
-            // restorative corrections so farmed attempts still hit the rate
-            // limiter defined in sub_passport.rs.
+            // Attack behavior still engages regardless of `phase2_enabled`
+            // — we want counterfactual runs to receive the same attack
+            // environment, isolating the DEFENSE's contribution.
             for world in &mut self.worlds {
                 let _tel = red_team::apply_mycelix_adversarial_tick(
                     &mut world.agents,
@@ -3986,17 +3994,17 @@ impl MultiWorldSimulator {
                 );
             }
 
-            // Phase 7.6: Restorative corrections (Phase 2b).
-            // Agents accumulating care work / strong virtue-care ethics record
-            // a correction probabilistically, unwinding tier penalties over
-            // time. The 10:3 correction:violation ratio keeps long-run penalty
-            // bounded around zero in healthy populations.
-            for world in &mut self.worlds {
-                let _ = sanctions::apply_restorative_corrections(
-                    &mut world.agents,
-                    self.current_tick,
-                    &mut self.rng,
-                );
+            // Phase 7.6: Restorative corrections (Phase 2b). Only runs when
+            // Phase 2 defenses are active — the counterfactual baseline
+            // doesn't have restorative justice.
+            if self.config.policy.phase2_enabled {
+                for world in &mut self.worlds {
+                    let _ = sanctions::apply_restorative_corrections(
+                        &mut world.agents,
+                        self.current_tick,
+                        &mut self.rng,
+                    );
+                }
             }
 
             // Phase 8: Consciousness

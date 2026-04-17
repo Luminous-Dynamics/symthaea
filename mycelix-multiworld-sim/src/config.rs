@@ -103,6 +103,13 @@ pub struct PolicyConfig {
     #[serde(default)]
     pub age_demographics_enabled: bool,
 
+    /// A2 counterfactual: enable the Phase 2 governance machinery (8D
+    /// sovereign profile, restorative justice, Mycelix rate limits).
+    /// Default true. Set false to run the scalar-Phi + MYCEL baseline
+    /// against the same attackers, isolating the defense's contribution.
+    #[serde(default = "default_true")]
+    pub phase2_enabled: bool,
+
     // === DISASTER CATEGORY TOGGLES ===
 
     /// Solar weather events (M-class, X-class, Carrington, SPE).
@@ -244,6 +251,7 @@ impl Default for PolicyConfig {
             coordination_understanding_initial: 0.0,
             education_boost: 0.0,
             consciousness_boost: 0.0,
+            phase2_enabled: true,
         }
     }
 }

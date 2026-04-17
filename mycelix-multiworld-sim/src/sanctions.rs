@@ -106,6 +106,18 @@ pub fn apply_sanctions(
     oppression_index: f64,
     current_tick: u32,
 ) -> SanctionResult {
+    apply_sanctions_with_phase2(agents, oppression_index, current_tick, true)
+}
+
+/// `apply_sanctions` with an explicit Phase 2 toggle. When `phase2_enabled`
+/// is false the violation-recording hook is skipped — this is the A2
+/// counterfactual path.
+pub fn apply_sanctions_with_phase2(
+    agents: &mut [CivAgent],
+    oppression_index: f64,
+    current_tick: u32,
+    phase2_enabled: bool,
+) -> SanctionResult {
     let level = sanction_level_from_oppression(oppression_index);
     if level == SanctionLevel::None {
         return SanctionResult::default();
@@ -123,9 +135,11 @@ pub fn apply_sanctions(
 
             // Phase 2b: restorative justice — a sanction is a moral violation.
             // Severe sanctions count as two violations (they degrade tier faster).
-            agent.justice.record_violation(current_tick);
-            if matches!(level, SanctionLevel::Severe) {
+            if phase2_enabled {
                 agent.justice.record_violation(current_tick);
+                if matches!(level, SanctionLevel::Severe) {
+                    agent.justice.record_violation(current_tick);
+                }
             }
 
             match level {
