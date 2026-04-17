@@ -203,10 +203,11 @@ fn build_standardized_report(
     } else {
         SimulationOutcome::Collapsed { at_year: report.duration_years }
     };
+    let worlds_surviving = sim.worlds.iter().filter(|w| w.population() > 0).count();
 
     let mut key_findings = Vec::new();
-    key_findings.push(format!("Final population: {} across {} worlds",
-        report.final_population, sim.worlds.len()));
+    key_findings.push(format!("Final population: {} across {} worlds ({} surviving)",
+        report.final_population, sim.worlds.len(), worlds_surviving));
     key_findings.push(format!("CVS: {:.4} ({})",
         report.final_cvs,
         if report.final_cvs > 0.7 { "thriving" }
@@ -266,26 +267,30 @@ fn build_standardized_report(
     if let Some(s) = earth_section { sections.push(s); }
 
     StandardizedReport {
-        scenario_name: "Luminous Dynamics Civilization Simulation".into(),
         executive_summary: ExecutiveSummary {
-            outcome,
-            final_cvs: report.final_cvs,
-            final_population: report.final_population,
-            worlds_surviving: sim.worlds.iter().filter(|w| w.population() > 0).count(),
+            title: "Luminous Dynamics Civilization Simulation".into(),
+            outcome: outcome.to_string(),
             key_findings,
-            critical_events: Vec::new(),
-        },
-        module_sections: sections,
-        honest_assessment: HonestAssessment::default(),
-        reproducibility: ReproducibilityInfo {
-            config_hash: format!("{:x}", seed), // simplified
-            seed,
-            version: "0.1.0".into(),
-            git_commit: None,
-            platform: format!("{} {}", std::env::consts::OS, std::env::consts::ARCH),
             wall_time_seconds: wall_time,
         },
-        time_series: Vec::new(),
+        module_reports: sections,
+        honest_assessment: HonestAssessment {
+            limitations: vec![
+                "Simulation abstracts many real-world dynamics".into(),
+                "Parameter calibration against historical data is incomplete".into(),
+            ],
+            cannot_predict: vec![
+                "Black swan geopolitical events".into(),
+                "Technological breakthroughs outside trained priors".into(),
+            ],
+            confidence_level: "exploratory".into(),
+        },
+        reproducibility: ReproducibilityInfo {
+            seed,
+            total_ticks: (report.duration_years * 12.0) as u32,
+            version: "0.1.0".into(),
+            config_hash: format!("{:x}", seed),
+        },
     }
 }
 
