@@ -13,7 +13,9 @@
 //! wrapper that makes them spawn-able entities with FEP behavior.
 
 pub mod agent;
+pub mod motor;
 pub mod platform;
 
 pub use agent::RoboticAgent;
+pub use motor::{MotorPlanner, UniformGainPlanner};
 pub use platform::PlatformType;

@@ -11,6 +11,7 @@ use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation
 use symtropy_consciousness_physics::safety::SafetyTier;
 use symtropy_physics::body::BodyHandle;
 
+use crate::motor::{MotorPlanner, UniformGainPlanner};
 use crate::platform::PlatformType;
 
 /// A robotic agent in the game world.
@@ -124,6 +125,33 @@ impl RoboticAgent {
             .as_ref()
             .map(|r| r.consciousness_level)
             .unwrap_or(0.0)
+    }
+
+    /// Run one tick and plan per-joint motor commands with the given planner.
+    ///
+    /// Returns a vector of commands with length [`PlatformType::num_actuators`].
+    /// The scalar NRC safety gain is fed into `planner.plan(observation, gain,
+    /// num_actuators)`. Use [`UniformGainPlanner`] for a no-intelligence
+    /// baseline, or provide your own planner to map observation + gain to
+    /// real per-joint commands (e.g. wrap a Symthaea `EmbodimentBridge` step).
+    pub fn tick_motor_commands_with<P: MotorPlanner>(
+        &mut self,
+        observation: &[f64],
+        danger_level: f64,
+        planner: &mut P,
+    ) -> Vec<f64> {
+        let gain = self.tick(observation, danger_level);
+        planner.plan(observation, gain, self.platform.num_actuators())
+    }
+
+    /// Convenience: run one tick and plan per-joint motor commands using
+    /// [`UniformGainPlanner`] (every actuator gets the same gain).
+    ///
+    /// Not a realistic controller — for real robotics, wire a platform-specific
+    /// planner via [`tick_motor_commands_with`](Self::tick_motor_commands_with).
+    pub fn tick_motor_commands(&mut self, observation: &[f64], danger_level: f64) -> Vec<f64> {
+        let mut planner = UniformGainPlanner;
+        self.tick_motor_commands_with(observation, danger_level, &mut planner)
     }
 
     /// Current bottleneck name.
@@ -254,6 +282,68 @@ mod tests {
         );
         assert_eq!(physics.body_count(), 1);
         assert_eq!(agent.platform, PlatformType::Auv);
+    }
+
+    #[test]
+    fn tick_motor_commands_humanoid_produces_21_dof() {
+        let mut agent = RoboticAgent::new(
+            BodyHandle(0),
+            PlatformType::Humanoid,
+            "Humanoid-1",
+        );
+        let cmds = agent.tick_motor_commands(&[0.5, 0.3, 0.1, 0.2], 0.1);
+        assert_eq!(cmds.len(), 21, "humanoid should emit 21 per-joint commands");
+        // All joints should get the same scalar gain from the uniform planner.
+        let g = cmds[0];
+        assert!(g >= 0.0 && g <= 1.0);
+        for c in &cmds {
+            assert!((c - g).abs() < 1e-12);
+        }
+    }
+
+    #[test]
+    fn tick_motor_commands_scales_with_danger() {
+        let mut agent = RoboticAgent::new(
+            BodyHandle(0),
+            PlatformType::Humanoid,
+            "Humanoid-1",
+        );
+        // After many high-danger ticks, caution saturates → low phi → Red tier → 0 gain
+        for _ in 0..100 {
+            agent.tick_motor_commands(&[0.5, 0.3, 0.9, 0.8], 0.95);
+        }
+        let cmds = agent.tick_motor_commands(&[0.5, 0.3, 0.9, 0.8], 0.95);
+        let max = cmds.iter().cloned().fold(0.0_f64, f64::max);
+        assert!(
+            max <= 0.5,
+            "sustained danger should suppress motor authority (got max={max})"
+        );
+    }
+
+    #[test]
+    fn tick_motor_commands_with_custom_planner() {
+        use crate::motor::MotorPlanner;
+
+        struct HalfPlanner;
+        impl MotorPlanner for HalfPlanner {
+            fn plan(&mut self, _: &[f64], gain: f64, n: usize) -> Vec<f64> {
+                vec![gain * 0.5; n]
+            }
+        }
+
+        let mut agent = RoboticAgent::new(
+            BodyHandle(0),
+            PlatformType::Manipulator,
+            "Arm-1",
+        );
+        let mut planner = HalfPlanner;
+        let cmds = agent.tick_motor_commands_with(&[0.5, 0.3, 0.1, 0.2], 0.0, &mut planner);
+        assert_eq!(cmds.len(), 8, "manipulator has 8 actuators");
+        // Half-planner halves the gain uniformly.
+        let expected = agent.safety_tier.motor_gain() * 0.5;
+        for c in &cmds {
+            assert!((c - expected).abs() < 1e-12, "c={c} expected={expected}");
+        }
     }
 
     #[test]
