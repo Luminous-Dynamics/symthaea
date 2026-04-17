@@ -472,6 +472,12 @@ pub struct CivAgent {
     /// Influences governance voting, sector preference, faction joining, migration.
     #[serde(default)]
     pub ethics: EthicalOrientation,
+    /// 8D Sovereign Profile for consciousness-gated governance.
+    /// Production Mycelix uses this instead of scalar Phi. Initialized via
+    /// Monte Carlo sampling at agent creation and refreshed from agent state
+    /// each governance tick via `refresh_sovereign_profile`.
+    #[serde(default)]
+    pub sovereign_profile: crate::sovereign_profile::SovereignProfile,
 }
 
 fn default_mycel() -> f64 { 0.1 }
@@ -583,6 +589,38 @@ impl CivAgent {
             .clamp(0.5, 1.2);
         self.skills.total() * self.health * stage_factor * engagement_factor * affect_factor
     }
+
+    /// Refresh the 8D sovereign profile from current agent state.
+    ///
+    /// Maps observable state (skills, mycel, tend, consciousness, ethics)
+    /// to the 6 dimensions that can be derived; leaves the other 2
+    /// (ThermodynamicYield, NetworkResilience) at their sampled values —
+    /// those require infrastructure-telemetry inputs not modeled in the sim.
+    pub fn refresh_sovereign_profile(&mut self) {
+        let max_skill = self
+            .skills
+            .as_slice()
+            .iter()
+            .cloned()
+            .fold(0.0_f64, f64::max);
+
+        // SAP hoard proxy: low balance = high velocity. SAP_EXEMPT_FLOOR = 200.
+        let hoard = (self.sap_balance / 1_000.0).clamp(0.0, 1.0);
+
+        self.sovereign_profile.epistemic_integrity = ((self.coordination_understanding * 0.6
+            + self.education_level * 0.4)
+            + self.consciousness.epistemic_confidence * 0.1)
+            .clamp(0.0, 1.0);
+        self.sovereign_profile.economic_velocity = (1.0 - hoard).clamp(0.0, 1.0);
+        self.sovereign_profile.civic_participation = self.consciousness.phi().clamp(0.0, 1.0);
+        self.sovereign_profile.stewardship_care = ((self.tend_balance / 40.0)
+            .clamp(0.0, 1.0)
+            * 0.6
+            + self.ethics.virtue_care * 0.4)
+            .clamp(0.0, 1.0);
+        self.sovereign_profile.semantic_resonance = self.mycel_score.clamp(0.0, 1.0);
+        self.sovereign_profile.domain_competence = max_skill.clamp(0.0, 1.0);
+    }
 }
 
 #[cfg(test)]
@@ -611,6 +649,7 @@ mod tests {
             trauma_level: 0.0,
                     cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
                     ethics: EthicalOrientation::default(),
+                    sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
         }
     }
 

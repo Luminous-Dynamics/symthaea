@@ -152,6 +152,7 @@ mod tests {
             is_biological: true,
             wounds: Vec::new(),
             ethics: crate::agent::EthicalOrientation::default(),
+            sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
         }
     }
 

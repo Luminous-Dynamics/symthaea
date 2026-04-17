@@ -228,8 +228,7 @@ impl WorldGovernance {
         let tier_dist = world.tier_distribution();
         let eligible_fraction = self.eligible_voter_fraction(&tier_dist);
 
-        // MYCEL-blended eligible fraction: 50% consciousness tier + 50% MYCEL score
-        // This makes soulbound reputation matter for governance, not just raw Phi.
+        // MYCEL-blended eligible fraction: soulbound reputation matters too.
         let mycel_eligible = {
             let pop = world.population().max(1) as f64;
             let mycel_voters = world.agents.iter()
@@ -237,7 +236,19 @@ impl WorldGovernance {
                 .count() as f64;
             mycel_voters / pop
         };
-        let effective_eligible = eligible_fraction * 0.5 + mycel_eligible * 0.5;
+
+        // Phase 2a: 8D sovereign profile eligible fraction. Uses the governance
+        // weights preset and the voting civic requirement (Citizen tier +
+        // EpistemicIntegrity >= 0.25). Matches production Mycelix's gating
+        // logic more faithfully than scalar Phi alone.
+        let civic_eligible = world.civic_fraction_meeting(
+            &crate::sovereign_profile::civic_requirement_voting(),
+            &crate::sovereign_profile::DimensionWeights::governance(),
+        );
+
+        // Weighted blend: Phi-tier (1/3) + MYCEL (1/3) + 8D civic (1/3).
+        let effective_eligible =
+            eligible_fraction / 3.0 + mycel_eligible / 3.0 + civic_eligible / 3.0;
 
         // --- Check for amendments (every review period) ---
         if amendment_enabled
@@ -651,6 +662,7 @@ mod tests {
                     trauma_level: 0.0,
                     cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
                     ethics: crate::agent::EthicalOrientation::default(),
+                    sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
                 };
                 agents.push(agent);
                 id += 1;

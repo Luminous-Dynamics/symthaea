@@ -27,6 +27,7 @@
 
 pub mod agent;
 pub mod civic_dimensions;
+pub mod sovereign_profile;
 pub mod metabolism;
 pub mod wound_healing;
 pub mod currency;
@@ -466,6 +467,10 @@ impl MultiWorldSimulator {
                     cumulative_dose_sv: 0.0, adversarial: None,
                     coordination_understanding: self.config.policy.coordination_understanding_initial, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
                     ethics: agent::EthicalOrientation::from_culture(culture_individualism, &mut self.rng),
+                    // 8D sovereign profile: founder sample from cultural individualism.
+                    sovereign_profile: crate::sovereign_profile::SovereignProfile::sample(
+                        culture_individualism, &mut self.rng,
+                    ),
                 };
                 world.next_agent_id += 1;
                 world.agents.push(agent);
@@ -574,6 +579,9 @@ impl MultiWorldSimulator {
                 cumulative_dose_sv: 0.0, adversarial: None,
                 coordination_understanding: self.config.policy.coordination_understanding_initial, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
                 ethics: agent::EthicalOrientation::from_culture(world.culture.individualism, &mut self.rng),
+                sovereign_profile: crate::sovereign_profile::SovereignProfile::sample(
+                    world.culture.individualism, &mut self.rng,
+                ),
             };
             world.next_agent_id += 1;
             world.agents.push(agent);
@@ -2309,6 +2317,9 @@ impl MultiWorldSimulator {
                 let mean_phi = world.mean_phi();
                 let stability = world.governance.stability_score;
                 world.governance.evolve_authority(epoch, pop, mean_phi, stability);
+                // Phase 2a: refresh 8D sovereign profiles from current agent
+                // state before any gating decisions this tick.
+                world.refresh_sovereign_profiles();
                 let mut gov = std::mem::take(&mut world.governance);
                 let voting_suppression = self.phase_modifiers
                     .get(&world.id)
@@ -5072,6 +5083,7 @@ harmony_policy = true
             faction_id: None, generation: 0,
             trauma_level: 0.0, cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
             ethics: crate::agent::EthicalOrientation::default(),
+            sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
         };
         happy.skills.learn(0, 0.5);
         happy.needs.engagement = 0.8;

@@ -968,6 +968,59 @@ impl World {
         self.agents.push(agent);
     }
 
+    /// Fraction of living agents at each civic tier (0-4), using the 8D sovereign
+    /// profile with the given weights. Parallel to `tier_distribution` which uses
+    /// the scalar Phi pathway.
+    pub fn civic_tier_distribution(
+        &self,
+        weights: &crate::sovereign_profile::DimensionWeights,
+    ) -> [f64; 5] {
+        let mut counts = [0usize; 5];
+        let mut total = 0usize;
+        for a in self.agents.iter().filter(|a| a.is_alive()) {
+            counts[a.sovereign_profile.tier(weights).index()] += 1;
+            total += 1;
+        }
+        if total == 0 {
+            return [0.0; 5];
+        }
+        let mut dist = [0.0; 5];
+        for i in 0..5 {
+            dist[i] = counts[i] as f64 / total as f64;
+        }
+        dist
+    }
+
+    /// Fraction of living agents that meet a `CivicRequirement` under the given
+    /// weights. Used by 8D-gated governance to compute eligible voter fraction.
+    pub fn civic_fraction_meeting(
+        &self,
+        requirement: &crate::sovereign_profile::CivicRequirement,
+        weights: &crate::sovereign_profile::DimensionWeights,
+    ) -> f64 {
+        let (eligible, total) = self
+            .agents
+            .iter()
+            .filter(|a| a.is_alive())
+            .fold((0usize, 0usize), |(e, t), a| {
+                let e = e + (a.sovereign_profile.meets_requirement(requirement, weights) as usize);
+                (e, t + 1)
+            });
+        if total == 0 {
+            0.0
+        } else {
+            eligible as f64 / total as f64
+        }
+    }
+
+    /// Refresh each living agent's 8D sovereign profile from current state.
+    /// Called once per governance tick before gating decisions.
+    pub fn refresh_sovereign_profiles(&mut self) {
+        for a in self.agents.iter_mut().filter(|a| a.is_alive()) {
+            a.refresh_sovereign_profile();
+        }
+    }
+
     /// Create a founding population snapshot string.
     pub fn founding_population_snapshot(&self) -> String {
         let living = self.population();
@@ -1063,6 +1116,7 @@ mod tests {
                 trauma_level: 0.0,
                     cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
                     ethics: crate::agent::EthicalOrientation::default(),
+                    sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
             };
             world.agents.push(agent);
         }

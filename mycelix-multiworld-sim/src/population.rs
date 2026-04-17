@@ -433,6 +433,11 @@ impl PopulationEngine {
                     cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
                     // Phase 3c: children inherit parents' ethical orientation with noise
                     ethics: crate::agent::EthicalOrientation::inherit(&birth.mother_ethics, &birth.father_ethics, rng),
+                    // 8D sovereign profile: sampled at birth from the parents' cultural individualism.
+                    // Refreshed from state each governance tick.
+                    sovereign_profile: crate::sovereign_profile::SovereignProfile::sample(
+                        world.culture.individualism, rng,
+                    ),
                 };
 
                 events.push(CivEvent::new(
@@ -768,6 +773,7 @@ mod tests {
                 generation: 0,
                 trauma_level: 0.0,
                     cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(), ethics: crate::agent::EthicalOrientation::default(),
+                    sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
             };
             world.next_agent_id += 1;
             world.agents.push(agent);
@@ -866,6 +872,7 @@ mod tests {
                 is_immigrant: false, needs: PsychologicalNeeds::new(),
                 tend_balance: 0.0, parent_ids: None, faction_id: None,
                 generation: 0, trauma_level: 0.0, cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(), ethics: crate::agent::EthicalOrientation::default(),
+                sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
             },
             CivAgent {
                 id: 1, birth_tick: 0, death_tick: None, sex: BiologicalSex::Female,
@@ -875,6 +882,7 @@ mod tests {
                 is_immigrant: false, needs: PsychologicalNeeds::new(),
                 tend_balance: 0.0, parent_ids: None, faction_id: None,
                 generation: 0, trauma_level: 0.0, cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(), ethics: crate::agent::EthicalOrientation::default(),
+                sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
             },
             CivAgent {
                 id: 2, birth_tick: 100, death_tick: None, sex: BiologicalSex::Male,
@@ -884,6 +892,7 @@ mod tests {
                 is_immigrant: false, needs: PsychologicalNeeds::new(),
                 tend_balance: 0.0, parent_ids: Some((0, 1)), faction_id: None,
                 generation: 1, trauma_level: 0.0, cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(), ethics: crate::agent::EthicalOrientation::default(),
+                sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
             },
             CivAgent {
                 id: 3, birth_tick: 100, death_tick: None, sex: BiologicalSex::Female,
@@ -893,6 +902,7 @@ mod tests {
                 is_immigrant: false, needs: PsychologicalNeeds::new(),
                 tend_balance: 0.0, parent_ids: Some((0, 1)), faction_id: None,
                 generation: 1, trauma_level: 0.0, cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(), ethics: crate::agent::EthicalOrientation::default(),
+                sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
             },
         ];
 

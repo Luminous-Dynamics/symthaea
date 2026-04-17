@@ -219,6 +219,7 @@ mod tests {
             adversarial: None,
             coordination_understanding: 0.5, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
             ethics: crate::agent::EthicalOrientation::default(),
+            sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
         }
     }
 
