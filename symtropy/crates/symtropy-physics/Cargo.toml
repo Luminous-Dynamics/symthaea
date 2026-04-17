@@ -1,6 +1,6 @@
 [package]
 name = "symtropy-physics"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "Apache-2.0 OR MIT"
 description = "N-dimensional rigid body physics with GJK+EPA collision, CCD, joints, raycasting, and warm-starting. Pluggable PhysicsCallback trait for coupling custom metrics to forces and friction."
