@@ -3449,9 +3449,11 @@ pub fn grep(pattern: &str, flags: &Flags, files: &[&str]) -> Result<Vec<String>,
 pub type Result = std::result::Result<(), Error>;
 #[derive(Debug, PartialEq, Eq)]
 pub enum Error { DivisionByZero, StackUnderflow, UnknownWord, InvalidWord }
-pub struct Forth { stack: Vec<Value>, defs: std::collections::HashMap<String, Vec<String>> }
+#[derive(Clone)]
+enum Op { Num(Value), BuiltIn(u8), UserDef(usize) }
+pub struct Forth { stack: Vec<Value>, defs: Vec<Vec<Op>>, names: std::collections::HashMap<String, usize> }
 impl Forth {
-    pub fn new() -> Forth { Forth { stack: Vec::new(), defs: std::collections::HashMap::new() } }
+    pub fn new() -> Forth { Forth { stack: Vec::new(), defs: Vec::new(), names: std::collections::HashMap::new() } }
     pub fn stack(&self) -> &[Value] { &self.stack }
     pub fn eval(&mut self, input: &str) -> Result {
         let tokens: Vec<String> = input.to_lowercase().split_whitespace().map(String::from).collect();
@@ -3465,40 +3467,48 @@ impl Forth {
                 i += 1;
                 let mut body = Vec::new();
                 while i < tokens.len() && tokens[i] != ";" {
-                    // Inline existing definitions at definition time
-                    if let Some(existing) = self.defs.get(&tokens[i]) {
-                        body.extend(existing.clone());
-                    } else {
-                        body.push(tokens[i].clone());
-                    }
+                    body.push(self.compile_token(&tokens[i])?);
                     i += 1;
                 }
                 if i >= tokens.len() { return Err(Error::InvalidWord); }
-                self.defs.insert(name, body);
+                let idx = self.defs.len();
+                self.defs.push(body);
+                self.names.insert(name, idx);
                 i += 1;
             } else {
-                self.eval_token(&tokens[i])?;
+                let op = self.compile_token(&tokens[i])?;
+                self.exec(&op)?;
                 i += 1;
             }
         }
         Ok(())
     }
-    fn eval_token(&mut self, token: &str) -> Result {
-        if let Ok(n) = token.parse::<Value>() { self.stack.push(n); return Ok(()); }
-        if let Some(body) = self.defs.get(token).cloned() {
-            for t in &body { self.eval_token(t)?; }
-            return Ok(());
-        }
+    fn compile_token(&self, token: &str) -> std::result::Result<Op, Error> {
+        if let Ok(n) = token.parse::<Value>() { return Ok(Op::Num(n)); }
+        if let Some(&idx) = self.names.get(token) { return Ok(Op::UserDef(idx)); }
         match token {
-            "+" => { let (b,a) = (self.pop()?, self.pop()?); self.stack.push(a+b); }
-            "-" => { let (b,a) = (self.pop()?, self.pop()?); self.stack.push(a-b); }
-            "*" => { let (b,a) = (self.pop()?, self.pop()?); self.stack.push(a*b); }
-            "/" => { let (b,a) = (self.pop()?, self.pop()?); if b==0 { return Err(Error::DivisionByZero); } self.stack.push(a/b); }
-            "dup" => { let a = self.pop()?; self.stack.push(a); self.stack.push(a); }
-            "drop" => { self.pop()?; }
-            "swap" => { let (b,a) = (self.pop()?, self.pop()?); self.stack.push(b); self.stack.push(a); }
-            "over" => { let (b,a) = (self.pop()?, self.pop()?); self.stack.push(a); self.stack.push(b); self.stack.push(a); }
-            _ => return Err(Error::UnknownWord),
+            "+" => Ok(Op::BuiltIn(0)), "-" => Ok(Op::BuiltIn(1)),
+            "*" => Ok(Op::BuiltIn(2)), "/" => Ok(Op::BuiltIn(3)),
+            "dup" => Ok(Op::BuiltIn(4)), "drop" => Ok(Op::BuiltIn(5)),
+            "swap" => Ok(Op::BuiltIn(6)), "over" => Ok(Op::BuiltIn(7)),
+            _ => Err(Error::UnknownWord),
+        }
+    }
+    fn exec(&mut self, op: &Op) -> Result {
+        match op {
+            Op::Num(n) => { self.stack.push(*n); }
+            Op::UserDef(idx) => { let body = self.defs[*idx].clone(); for o in &body { self.exec(o)?; } }
+            Op::BuiltIn(b) => match b {
+                0 => { let (b,a) = (self.pop()?, self.pop()?); self.stack.push(a+b); }
+                1 => { let (b,a) = (self.pop()?, self.pop()?); self.stack.push(a-b); }
+                2 => { let (b,a) = (self.pop()?, self.pop()?); self.stack.push(a*b); }
+                3 => { let (b,a) = (self.pop()?, self.pop()?); if b==0 { return Err(Error::DivisionByZero); } self.stack.push(a/b); }
+                4 => { let a = self.pop()?; self.stack.push(a); self.stack.push(a); }
+                5 => { self.pop()?; }
+                6 => { let (b,a) = (self.pop()?, self.pop()?); self.stack.push(b); self.stack.push(a); }
+                7 => { let (b,a) = (self.pop()?, self.pop()?); self.stack.push(a); self.stack.push(b); self.stack.push(a); }
+                _ => unreachable!(),
+            },
         }
         Ok(())
     }
@@ -3641,13 +3651,13 @@ impl<'a> Xorcism<'a> {
         }
     }
     pub fn munge<Data>(&mut self, data: Data) -> impl Iterator<Item = u8>
-    where Data: IntoIterator, Data::Item: Into<u8>
+    where Data: IntoIterator, Data::Item: std::borrow::Borrow<u8>
     {
+        use std::borrow::Borrow;
         let key = self.key.to_vec();
         let start_pos = self.pos;
         let items: Vec<u8> = data.into_iter().enumerate().map(|(i, b)| {
-            let byte: u8 = b.into();
-            byte ^ key[(start_pos + i) % key.len()]
+            b.borrow() ^ key[(start_pos + i) % key.len()]
         }).collect();
         self.pos += items.len();
         items.into_iter()
