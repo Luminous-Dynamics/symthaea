@@ -207,6 +207,39 @@ fn fixtures() -> Vec<Fixture> {
                 ),
             ),
         },
+        // ─── IMO-class stress test ────────────────────────────────────────
+        Fixture {
+            // Cauchy-Schwarz (2-variable form): (a·x + b·y)² ≤ (a²+b²)(x²+y²)
+            // Key witness: (a·y - b·x)² ≥ 0 expands to a²y² - 2abxy + b²x² ≥ 0,
+            // which rearranges to the Cauchy-Schwarz inequality.
+            // The cascade should close this via nlinarith with sq_nonneg hints
+            // on pairwise differences (a·y - b·x).
+            name: "cauchy_schwarz_2var",
+            description: "∀ a b x y : ℝ, (a·x + b·y)² ≤ (a²+b²)(x²+y²) — Cauchy-Schwarz",
+            goal: FolFormulaExt::forall(
+                "a",
+                NumericType::Real,
+                FolFormulaExt::forall(
+                    "b",
+                    NumericType::Real,
+                    FolFormulaExt::forall(
+                        "x",
+                        NumericType::Real,
+                        FolFormulaExt::forall(
+                            "y",
+                            NumericType::Real,
+                            FolFormulaExt::le(
+                                v("a").mul(v("x")).add(v("b").mul(v("y"))).pow(2),
+                                v("a")
+                                    .pow(2)
+                                    .add(v("b").pow(2))
+                                    .mul(v("x").pow(2).add(v("y").pow(2))),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        },
     ]
 }
 
