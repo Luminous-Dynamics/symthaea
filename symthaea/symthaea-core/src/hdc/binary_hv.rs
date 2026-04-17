@@ -179,15 +179,13 @@ impl BinaryHV {
     /// }
     /// ```
     ///
-    /// The u64-chunked XOR body auto-vectorizes to the compilation target's
-    /// widest SIMD (AVX2 / NEON) in release mode.
+    /// Routes through the same runtime-dispatched SIMD kernel as [`bind`]
+    /// (AVX-512 / AVX2 / SSE4.1 / NEON / scalar). With `#[inline]`, the
+    /// compiler can elide the 2 KiB stack temporary and write directly
+    /// into `self.0` on release builds.
     #[inline]
     pub fn bind_assign(&mut self, other: &Self) {
-        for (a_chunk, b_chunk) in self.0.chunks_exact_mut(8).zip(other.0.chunks_exact(8)) {
-            let a_word = u64::from_ne_bytes(a_chunk.try_into().expect("8-byte chunk"));
-            let b_word = u64::from_ne_bytes(b_chunk.try_into().expect("8-byte chunk"));
-            a_chunk.copy_from_slice(&(a_word ^ b_word).to_ne_bytes());
-        }
+        self.0 = super::simd_ops::bind_simd(&self.0, &other.0);
     }
 
     /// Fold-bind a slice of hypervectors: `v[0] ⊗ v[1] ⊗ ... ⊗ v[n-1]`.
