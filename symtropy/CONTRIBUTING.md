@@ -25,5 +25,13 @@ If you’re contributing to core simulation: **determinism is a hard requirement
 - Prefer adding tests next to the code you change.
 
 ## Licensing
-Symtropy is AGPL-3.0-or-later (with commercial licensing available). By contributing, you agree your contributions are licensed under the repository’s licensing terms.
+
+Symtropy uses a **dual-track license model** — see [LICENSING.md](LICENSING.md) for the full breakdown.
+
+- Contributions to **core crates** (`symtropy-math`, `symtropy-physics`, `symtropy-render-bridge`, `symtropy-robotics-bridge`, `symtropy-net`, `symtropy-bevy`) are dual-licensed **Apache-2.0 OR MIT** (Rust ecosystem convention).
+- Contributions to **research crates** (`symtropy-consciousness-physics`, `symtropy-sim-bridge`, `symtropy-world`, game crates) are licensed **AGPL-3.0-or-later**.
+
+By submitting a contribution to a given crate, you agree your contribution is licensed under that crate's terms. This matches the convention used by the Rust compiler and Bevy itself.
+
+Commercial licensing for the AGPL tier: see [../COMMERCIAL_LICENSE.md](../COMMERCIAL_LICENSE.md) or contact tristan.stoltz@evolvingresonantcocreationism.com.
 

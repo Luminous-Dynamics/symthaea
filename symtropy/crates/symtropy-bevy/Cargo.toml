@@ -2,7 +2,7 @@
 name = "symtropy-bevy"
 version = "0.1.0"
 edition = "2021"
-license = "AGPL-3.0-or-later"
+license = "Apache-2.0 OR MIT"
 description = "Drop-in Bevy plugin for Phi-coupled N-dimensional physics. One line to add integrated information as a first-class physics parameter to any Bevy app."
 repository = "https://github.com/luminous-dynamics/symtropy"
 keywords = ["bevy", "physics", "n-dimensional", "phi", "game-engine"]

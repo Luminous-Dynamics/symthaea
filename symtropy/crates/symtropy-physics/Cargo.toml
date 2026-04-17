@@ -2,7 +2,7 @@
 name = "symtropy-physics"
 version = "0.1.0"
 edition = "2021"
-license = "AGPL-3.0-or-later"
+license = "Apache-2.0 OR MIT"
 description = "N-dimensional rigid body physics with GJK+EPA collision, CCD, joints, raycasting, and warm-starting. Pluggable PhysicsCallback trait for coupling custom metrics to forces and friction."
 repository = "https://github.com/luminous-dynamics/symtropy"
 keywords = ["physics", "n-dimensional", "gjk", "collision-detection", "rigid-body"]

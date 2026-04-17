@@ -178,7 +178,10 @@ cargo build --release --features mycelix
 
 ## License
 
-AGPL-3.0-or-later. Commercial licensing available -- see COMMERCIAL_LICENSE.md.
+**Dual-track license model** — see [LICENSING.md](LICENSING.md) for the full breakdown.
+
+- **Core engine** (`symtropy-math`, `symtropy-physics`, `symtropy-render-bridge`, `symtropy-robotics-bridge`, `symtropy-net`, `symtropy-bevy`): **Apache-2.0 OR MIT** — build and ship proprietary games, services, and products freely.
+- **Research layer** (`symtropy-consciousness-physics`, `symtropy-sim-bridge`, game crates): **AGPL-3.0-or-later** — modifications must be shared back under AGPL, or negotiate a [commercial license](../COMMERCIAL_LICENSE.md).
 
 ## References
 
