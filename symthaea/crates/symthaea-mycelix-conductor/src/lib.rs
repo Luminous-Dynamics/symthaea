@@ -120,6 +120,36 @@ pub enum DispatchCommand {
         confidence: f64,
         detected_at_cycle: u64,
     },
+    /// Submit a robotics telemetry report to the robotics-dispatch zome.
+    ///
+    /// Targets `mycelix-civic` role, `robotics_dispatch` zome,
+    /// `submit_telemetry` extern. Requires both asset_hash and order_hash —
+    /// autonomous platforms with no active dispatch order have no telemetry
+    /// target and should not emit this command.
+    SubmitRoboticsTelemetry {
+        correlation_id: u64,
+        /// ActionHash of the registered RoboticAsset (raw 39-byte hash).
+        asset_hash: Vec<u8>,
+        /// ActionHash of the active DispatchOrder (raw 39-byte hash).
+        order_hash: Vec<u8>,
+        /// Current position (WGS84 lat/lon, meters altitude).
+        lat: f64,
+        lon: f64,
+        alt: f64,
+        /// Current Phi / consciousness level.
+        consciousness_level: f64,
+        /// Safety tier string — "Green"/"Yellow"/"Orange"/"Red".
+        safety_level: String,
+        /// Mission progress 0.0–1.0.
+        mission_progress: f64,
+        /// Fuel/battery level 0.0–1.0.
+        fuel_level: f64,
+        /// Platform name (e.g., "helicopter") — informational, bundled into
+        /// `platform_specific` alongside platform-specific bytes.
+        platform: String,
+        /// Platform-specific serialized telemetry bytes (opaque to the zome).
+        platform_specific: Vec<u8>,
+    },
 }
 
 /// Outcome received back from the conductor.
@@ -144,6 +174,14 @@ pub enum DispatchOutcome {
     },
     Timeout {
         correlation_id: u64,
+    },
+    TelemetryAccepted {
+        correlation_id: u64,
+        action_hash: Option<String>,
+    },
+    TelemetryRejected {
+        correlation_id: u64,
+        reason: String,
     },
 }
 
@@ -537,6 +575,80 @@ impl<T: ConductorTransport> GovernanceDispatcher<T> {
                     }
                 }
             }
+            DispatchCommand::SubmitRoboticsTelemetry {
+                correlation_id,
+                asset_hash,
+                order_hash,
+                lat,
+                lon,
+                alt,
+                consciousness_level,
+                safety_level,
+                mission_progress,
+                fuel_level,
+                platform,
+                platform_specific,
+            } => {
+                // Prepend platform name to platform_specific so the zome's
+                // opaque-bytes field retains a minimal, self-describing header.
+                // Format: [len(u8) | platform_utf8 | caller_bytes]
+                let mut tagged = Vec::with_capacity(1 + platform.len() + platform_specific.len());
+                let plen = platform.len().min(255) as u8;
+                tagged.push(plen);
+                tagged.extend_from_slice(&platform.as_bytes()[..plen as usize]);
+                tagged.extend_from_slice(&platform_specific);
+
+                let payload = serde_json::json!({
+                    "asset_hash": asset_hash,
+                    "order_hash": order_hash,
+                    "lat": lat,
+                    "lon": lon,
+                    "alt": alt,
+                    "consciousness_level": consciousness_level,
+                    "safety_level": safety_level,
+                    "mission_progress": mission_progress,
+                    "fuel_level": fuel_level,
+                    "platform_specific": tagged,
+                });
+                let payload_bytes = rmp_serde::to_vec(&payload).unwrap_or_default();
+
+                match self
+                    .transport
+                    .call_zome(
+                        "civic",
+                        "robotics_dispatch",
+                        "submit_telemetry",
+                        payload_bytes,
+                    )
+                    .await
+                {
+                    Ok(result) => {
+                        let action_hash = String::from_utf8(result).ok();
+                        info!(
+                            correlation_id,
+                            %platform,
+                            %safety_level,
+                            "Robotics telemetry submitted to Mycelix civic DHT"
+                        );
+                        DispatchOutcome::TelemetryAccepted {
+                            correlation_id,
+                            action_hash,
+                        }
+                    }
+                    Err(reason) => {
+                        warn!(
+                            correlation_id,
+                            %platform,
+                            %reason,
+                            "Robotics telemetry rejected by conductor"
+                        );
+                        DispatchOutcome::TelemetryRejected {
+                            correlation_id,
+                            reason,
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -559,7 +671,10 @@ impl<T: ConductorTransport> GovernanceDispatcher<T> {
                     DispatchCommand::SubmitProposal { correlation_id, .. }
                     | DispatchCommand::CastVote { correlation_id, .. }
                     | DispatchCommand::EvaluateAsset { correlation_id, .. }
-                    | DispatchCommand::DeclareCrisis { correlation_id, .. } => *correlation_id,
+                    | DispatchCommand::DeclareCrisis { correlation_id, .. }
+                    | DispatchCommand::SubmitRoboticsTelemetry { correlation_id, .. } => {
+                        *correlation_id
+                    }
                     DispatchCommand::QueryActiveProposals => 0,
                 };
                 if corr_id > 0 {
@@ -572,6 +687,8 @@ impl<T: ConductorTransport> GovernanceDispatcher<T> {
                     | DispatchOutcome::ProposalRejected { correlation_id, .. }
                     | DispatchOutcome::VoteAccepted { correlation_id, .. }
                     | DispatchOutcome::VoteRejected { correlation_id, .. }
+                    | DispatchOutcome::TelemetryAccepted { correlation_id, .. }
+                    | DispatchOutcome::TelemetryRejected { correlation_id, .. }
                     | DispatchOutcome::Timeout { correlation_id } => *correlation_id,
                 };
                 pending.retain(|(id, _)| *id != responded_id);
@@ -782,5 +899,64 @@ mod tests {
         }
 
         handle.abort();
+    }
+
+    #[tokio::test]
+    async fn mock_dispatcher_submit_robotics_telemetry() {
+        let mut dispatcher = GovernanceDispatcher::new(MockTransport);
+
+        let cmd = DispatchCommand::SubmitRoboticsTelemetry {
+            correlation_id: 4242,
+            asset_hash: vec![0x84, 0x21, 0x24, 0x00],
+            order_hash: vec![0x84, 0x21, 0x24, 0x01],
+            lat: 40.7128,
+            lon: -74.0060,
+            alt: 1200.0,
+            consciousness_level: 0.78,
+            safety_level: "Green".into(),
+            mission_progress: 0.25,
+            fuel_level: 0.88,
+            platform: "helicopter".into(),
+            platform_specific: vec![0xDE, 0xAD, 0xBE, 0xEF],
+        };
+
+        let outcome = dispatcher.dispatch(cmd).await;
+        match outcome {
+            DispatchOutcome::TelemetryAccepted { correlation_id, .. } => {
+                assert_eq!(correlation_id, 4242);
+            }
+            _ => panic!("Expected TelemetryAccepted, got {:?}", outcome),
+        }
+    }
+
+    #[test]
+    fn telemetry_command_serde_roundtrip() {
+        let cmd = DispatchCommand::SubmitRoboticsTelemetry {
+            correlation_id: 7,
+            asset_hash: vec![1, 2, 3],
+            order_hash: vec![4, 5, 6],
+            lat: 1.5,
+            lon: -2.5,
+            alt: 100.0,
+            consciousness_level: 0.65,
+            safety_level: "Yellow".into(),
+            mission_progress: 0.5,
+            fuel_level: 0.4,
+            platform: "helicopter".into(),
+            platform_specific: vec![9, 9, 9],
+        };
+        let json = serde_json::to_string(&cmd).unwrap();
+        let decoded: DispatchCommand = serde_json::from_str(&json).unwrap();
+        match decoded {
+            DispatchCommand::SubmitRoboticsTelemetry {
+                correlation_id,
+                platform,
+                ..
+            } => {
+                assert_eq!(correlation_id, 7);
+                assert_eq!(platform, "helicopter");
+            }
+            _ => panic!("wrong variant"),
+        }
     }
 }
