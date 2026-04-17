@@ -64,4 +64,36 @@ if [[ -d "$PROJECT_DIR/.githooks" ]]; then
     fi
 fi
 
+# Educational nudge: warn ONCE per session if this session is opening
+# in the main tree (not a worktree) while other Claude sessions are
+# active. The cross-project guard catches cross-project scoops; this
+# nudge suggests the isolation-level fix (worktree) for same-project
+# scoops. Non-blocking — users may have good reasons to stay in main.
+# Writes to stdout (SessionStart convention: Claude Code surfaces this
+# to the model as initial-turn context).
+session_cwd="${CLAUDE_PROJECT_DIR:-$PROJECT_DIR}"
+case "$session_cwd" in
+    "$PROJECT_DIR"/.claude/worktrees/*) ;;  # in a worktree — skip
+    "$PROJECT_DIR"|"$PROJECT_DIR"/)
+        # In main tree. Count other active Claude sessions.
+        claude_sessions=$(pgrep -f claude-unwrapped 2>/dev/null | wc -l)
+        if (( claude_sessions > 1 )); then
+            cat <<NOTICE
+────────────────────────────────────────────────────────────────
+ Concurrent-session notice — opened in main tree, ${claude_sessions} sessions active
+────────────────────────────────────────────────────────────────
+ Cross-project staging guard is armed (.githooks/pre-commit).
+ For source-level isolation (stops same-project scoops + silent
+ reverts), consider a worktree BEFORE starting edits:
+
+     ./scripts/session-worktree.sh create <name>
+     cd .claude/worktrees/session-<name>
+
+ Playbook: .claude/rules/CONCURRENT_SESSIONS.md
+────────────────────────────────────────────────────────────────
+NOTICE
+        fi
+        ;;
+esac
+
 exit 0

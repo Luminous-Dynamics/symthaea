@@ -72,3 +72,11 @@ and broadly stages) still pass. For those, the defense is:
 3. **Use worktrees for source-level isolation** when editing shared files
    concurrently with other sessions (`./scripts/session-worktree.sh create
    <name>` per Rule #6).
+
+## SessionStart nudge
+
+`.claude/hooks/session-cargo-target.sh` prints a one-shot educational
+message at session-start IF the session opened in the main tree AND there
+are other Claude sessions active. The message points at the worktree
+helper script. Non-blocking. Skipped silently if the session is already
+inside `.claude/worktrees/*`.
