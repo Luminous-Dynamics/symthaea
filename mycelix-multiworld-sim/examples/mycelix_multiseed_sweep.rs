@@ -18,6 +18,9 @@ struct SeedResult {
     farmer_rejected: u32,
     farmer_credited: u32,
     tier_buyer_delta: f64, // TierBuyer mean SAP − baseline mean SAP
+    /// A1: mean of MycelixResilience over the 5 attack surfaces (NaN if
+    /// the metric wasn't populated).
+    resilience_mean: f64,
 }
 
 fn run_seed(seed: u64, years: u32) -> SeedResult {
@@ -72,6 +75,12 @@ fn run_seed(seed: u64, years: u32) -> SeedResult {
         0.0
     };
 
+    let resilience_mean = report
+        .mycelix_resilience
+        .as_ref()
+        .map(|r| r.mean())
+        .unwrap_or(f64::NAN);
+
     SeedResult {
         seed,
         survived: report.survived,
@@ -81,6 +90,7 @@ fn run_seed(seed: u64, years: u32) -> SeedResult {
         farmer_rejected,
         farmer_credited,
         tier_buyer_delta,
+        resilience_mean,
     }
 }
 
@@ -95,16 +105,17 @@ fn main() {
     );
     println!();
     println!(
-        "{:>6} {:>8} {:>8} {:>7} {:>9} {:>10} {:>10} {:>10}",
+        "{:>6} {:>8} {:>8} {:>7} {:>9} {:>10} {:>10} {:>10} {:>10}",
         "seed", "survive", "cvs", "pop", "farm_scr", "f_rejected", "f_credited", "tb_delta",
+        "resilnc",
     );
-    println!("{}", "-".repeat(82));
+    println!("{}", "-".repeat(93));
 
     let mut results = Vec::new();
     for &seed in &seeds {
         let r = run_seed(seed, years);
         println!(
-            "{:>6} {:>8} {:>8.3} {:>7} {:>9.3} {:>10} {:>10} {:>+10.2}",
+            "{:>6} {:>8} {:>8.3} {:>7} {:>9.3} {:>10} {:>10} {:>+10.2} {:>10.3}",
             r.seed,
             r.survived,
             r.final_cvs,
@@ -113,6 +124,7 @@ fn main() {
             r.farmer_rejected,
             r.farmer_credited,
             r.tier_buyer_delta,
+            r.resilience_mean,
         );
         results.push(r);
     }
@@ -152,4 +164,11 @@ fn main() {
         "  farming_score mean {:.3}, min {:.3}",
         mean_farming, min_farming,
     );
+    let mean_resilience = results
+        .iter()
+        .map(|r| r.resilience_mean)
+        .filter(|x| x.is_finite())
+        .sum::<f64>()
+        / n;
+    println!("  resilience    mean {:.3}", mean_resilience);
 }

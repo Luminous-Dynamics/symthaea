@@ -82,6 +82,13 @@ pub struct CivilizationReport {
     pub total_disasters: u64,
     pub carrington_events: u32,
     pub tech_milestones_achieved: usize,
+
+    /// Phase 2c: Mycelix-specific attack-surface resilience, computed from
+    /// end-of-sim agent state. `None` when no adversaries were injected
+    /// (saves old reports from carrying irrelevant fields). See
+    /// `red_team::MycelixResilience`.
+    #[serde(default)]
+    pub mycelix_resilience: Option<crate::red_team::MycelixResilience>,
 }
 
 impl CivilizationReport {
@@ -355,6 +362,7 @@ FACTION ANALYSIS:
             total_disasters: 0,
             carrington_events: 0,
             tech_milestones_achieved: 0,
+            mycelix_resilience: None,
         }
     }
 }
@@ -443,6 +451,7 @@ mod tests {
             civil_wars: 0,
             secessions: 0,
             turchin_transitions: 0,
+            mycelix_resilience: None,
         }
     }
 

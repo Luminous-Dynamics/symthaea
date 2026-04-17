@@ -405,6 +405,113 @@ pub fn apply_mycelix_adversarial_tick(
     tel
 }
 
+/// Compute end-of-sim Mycelix resilience from all living agents across the
+/// given worlds. Returns `None` when no adversaries were injected — the
+/// metric is meaningless without an attack to score against.
+///
+/// Impact fractions per surface:
+/// - **TierBuyer**: `(buyer_mean_sap − baseline_mean_sap) / baseline_mean_sap`
+///   clamped to [0, 1]. Positive delta = attack landed.
+/// - **DemurrageEvader**: presence-weighted proxy — every living evader
+///   counts as impact `0.5` (we have no real turnover telemetry yet).
+///   Honest placeholder; upgrade when SAP churn tracking lands.
+/// - **CorrectionFarmer**: `credited / (credited + rejected)` across all
+///   farmers. High credited-ratio = attack succeeded.
+/// - **CrossClusterAmplifier**: presence-weighted, `0.5` per living
+///   amplifier. (The bypass itself is boolean; we don't track attempted-
+///   vs-denied gates per-agent.)
+/// - **GuildColluder**: fraction of colluders whose `mycel_score` exceeds
+///   `0.3` (the voter-eligibility MYCEL floor used in governance).
+///
+/// Each impact is clamped to [0, 1] and mapped to resilience via `1 − x`.
+pub fn compute_resilience_from_worlds(
+    worlds: &[crate::world::World],
+) -> Option<MycelixResilience> {
+    let mut buyer_sap = 0.0;
+    let mut buyer_count = 0usize;
+    let mut baseline_sap = 0.0;
+    let mut baseline_count = 0usize;
+    let mut farmer_credited = 0u64;
+    let mut farmer_rejected = 0u64;
+    let mut evader_count = 0usize;
+    let mut amplifier_count = 0usize;
+    let mut colluder_count = 0usize;
+    let mut colluder_above_floor = 0usize;
+    let mut total_adversaries = 0usize;
+
+    for world in worlds {
+        for a in world.agents.iter().filter(|a| a.is_alive()) {
+            match a.adversarial {
+                Some(AdversarialStrategy::TierBuyer) => {
+                    buyer_sap += a.sap_balance;
+                    buyer_count += 1;
+                    total_adversaries += 1;
+                }
+                Some(AdversarialStrategy::DemurrageEvader) => {
+                    evader_count += 1;
+                    total_adversaries += 1;
+                }
+                Some(AdversarialStrategy::CorrectionFarmer) => {
+                    farmer_credited += a.justice.corrections as u64;
+                    farmer_rejected += a.justice.rejected_corrections as u64;
+                    total_adversaries += 1;
+                }
+                Some(AdversarialStrategy::CrossClusterAmplifier) => {
+                    amplifier_count += 1;
+                    total_adversaries += 1;
+                }
+                Some(AdversarialStrategy::GuildColluder) => {
+                    colluder_count += 1;
+                    if a.mycel_score > 0.3 {
+                        colluder_above_floor += 1;
+                    }
+                    total_adversaries += 1;
+                }
+                _ => {
+                    baseline_sap += a.sap_balance;
+                    baseline_count += 1;
+                }
+            }
+        }
+    }
+
+    if total_adversaries == 0 {
+        return None;
+    }
+
+    let tier_buy_impact = if buyer_count > 0 && baseline_count > 0 {
+        let buyer_mean = buyer_sap / buyer_count as f64;
+        let base_mean = baseline_sap / baseline_count as f64;
+        if base_mean > 0.0 {
+            ((buyer_mean - base_mean) / base_mean).clamp(0.0, 1.0)
+        } else {
+            0.0
+        }
+    } else {
+        0.0
+    };
+    let demurrage_impact = if evader_count > 0 { 0.5 } else { 0.0 };
+    let correction_farm_impact = if farmer_credited + farmer_rejected > 0 {
+        farmer_credited as f64 / (farmer_credited + farmer_rejected) as f64
+    } else {
+        0.0
+    };
+    let cross_cluster_impact = if amplifier_count > 0 { 0.5 } else { 0.0 };
+    let guild_collusion_impact = if colluder_count > 0 {
+        colluder_above_floor as f64 / colluder_count as f64
+    } else {
+        0.0
+    };
+
+    Some(evaluate_mycelix_resilience(
+        tier_buy_impact,
+        demurrage_impact,
+        correction_farm_impact,
+        cross_cluster_impact,
+        guild_collusion_impact,
+    ))
+}
+
 /// Evaluate Mycelix-specific resilience from per-attack observation fractions.
 ///
 /// Each `*_impact` input is the *fraction of the attack that succeeded* (0.0 =

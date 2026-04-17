@@ -4665,6 +4665,10 @@ impl MultiWorldSimulator {
             .map(|s| s.trauma_level)
             .fold(0.0f64, f64::max);
 
+        // Phase 2c roadmap A1: expose MycelixResilience for scenarios that
+        // injected adversaries. `None` if no agent is tagged adversarial.
+        report.mycelix_resilience = red_team::compute_resilience_from_worlds(&self.worlds);
+
         report
     }
 }

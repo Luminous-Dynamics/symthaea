@@ -249,6 +249,92 @@ fn sim_equilibrium_under_sustained_attack() {
     );
 }
 
+/// A1 roadmap: resilience metric exposed in report. 5yr mixed attack —
+/// short horizon is the worst-case for defense (attacks have fully
+/// engaged but dilution hasn't happened yet). Asserts the metric is
+/// populated and in-range; no pass/fail on magnitude at 5yr.
+#[test]
+fn report_exposes_mycelix_resilience_under_attack() {
+    let config = setup(42, 5);
+    let mut sim = MultiWorldSimulator::new(config);
+    sim.run_initialization();
+    sim.inject_adversaries(AdversarialStrategy::TierBuyer, 3);
+    sim.inject_adversaries(AdversarialStrategy::DemurrageEvader, 3);
+    sim.inject_adversaries(AdversarialStrategy::CorrectionFarmer, 3);
+    sim.inject_adversaries(AdversarialStrategy::CrossClusterAmplifier, 3);
+    sim.inject_adversaries(AdversarialStrategy::GuildColluder, 3);
+    let report = sim.run();
+
+    let r = report
+        .mycelix_resilience
+        .expect("adversaries injected → resilience should be Some");
+    for v in [
+        r.tier_buy_resilience,
+        r.demurrage_resilience,
+        r.correction_farm_resilience,
+        r.cross_cluster_resilience,
+        r.guild_collusion_resilience,
+    ] {
+        assert!(
+            (0.0..=1.0).contains(&v),
+            "resilience component out of [0, 1]: {}",
+            v,
+        );
+    }
+    // CorrectionFarmer resilience is the most robust signal at any horizon
+    // because the rate limiter bounds attack success.
+    assert!(
+        r.correction_farm_resilience > 0.5,
+        "farm resilience should exceed 0.5 even at 5yr: {:.3}",
+        r.correction_farm_resilience,
+    );
+}
+
+/// A1: at 50yr horizon the dilution signature (Phase 2c memory) should
+/// push mean resilience above 0.5. This is the "equilibrium worked"
+/// signal.
+#[test]
+fn mycelix_resilience_improves_at_equilibrium() {
+    let config = setup(42, 50);
+    let mut sim = MultiWorldSimulator::new(config);
+    sim.run_initialization();
+    sim.inject_adversaries(AdversarialStrategy::TierBuyer, 3);
+    sim.inject_adversaries(AdversarialStrategy::DemurrageEvader, 3);
+    sim.inject_adversaries(AdversarialStrategy::CorrectionFarmer, 3);
+    sim.inject_adversaries(AdversarialStrategy::CrossClusterAmplifier, 3);
+    sim.inject_adversaries(AdversarialStrategy::GuildColluder, 3);
+    let report = sim.run();
+
+    let r = report
+        .mycelix_resilience
+        .expect("adversaries injected → resilience should be Some");
+    // At 50yr the TierBuyer attack dilutes (memory: delta goes negative),
+    // so tier_buy_resilience should be near 1.0.
+    assert!(
+        r.tier_buy_resilience > 0.9,
+        "TierBuyers should be diluted at 50yr: {:.3}",
+        r.tier_buy_resilience,
+    );
+    assert!(
+        r.mean() > 0.5,
+        "mean resilience at 50yr too low: {:.3}",
+        r.mean(),
+    );
+}
+
+/// A1 complement: a clean run (no adversaries) should leave
+/// `mycelix_resilience` unset, reflecting "metric inapplicable" honestly.
+#[test]
+fn report_omits_resilience_without_attack() {
+    let config = setup(42, 5);
+    let mut sim = MultiWorldSimulator::new(config);
+    let report = sim.run();
+    assert!(
+        report.mycelix_resilience.is_none(),
+        "no adversaries → no resilience metric",
+    );
+}
+
 /// Multi-seed A/B sanity check: 3 seeds × 30 years. Catches seed-specific
 /// regressions in the defense mechanisms. The 10-seed × 50-year full sweep
 /// lives in `examples/mycelix_multiseed_sweep.rs` for interactive use.
