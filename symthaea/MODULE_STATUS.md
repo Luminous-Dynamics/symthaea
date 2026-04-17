@@ -90,8 +90,13 @@ These are pillars that either do not exist or exist as name-only scaffolding:
 | Lean 4 miniF2F subset | Existing fixtures (`proofs/minif2f/`) | **3/3 accepted** | Strong, but tiny corpus — fixtures are symthaea-engine-originated, not drawn from the miniF2F-v2 upstream. |
 | **Lean 4 miniF2F-v2 full** | Upstream corpus at github.com/openai/miniF2F | **Architecturally out-of-scope at Phase 1** — see `docs/minif2f-v2-scope.md`. Propositional bridge cannot represent the algebraic/arithmetic/real-number content that constitutes ~98% of the benchmark. | Nil (0/N expected). Honest scope signal, not a quality failure. Phase 2 path: extend `Proposition` with equality + arithmetic, hook Z3 `QF_LRA`/`QF_LIA` to `linarith`-style Lean tactics. |
 | PutnamBench | Upstream Lean 4 Putnam formalization | Not yet attempted | Same architectural mismatch as miniF2F-v2; Phase 2. |
+| **Lean 4 Phase 2 arithmetic suite (`fol_arith`)** | Internal, 14 hand-crafted `FolFormulaExt` fixtures | **10/14 accepted (71%), exceeds Phase 2 MVP target of 30%**. Closed via Mathlib cascade: `first \| (rfl; done) \| (norm_num; done) \| (ring; done) \| (omega; done) \| (linarith; done) \| (nlinarith […]; done) \| (positivity; done) \| …`. Accepted: reflexivity, integer monotonicity, Nat non-negativity, commutativity, square-nonneg (via Pow), binomial identity, sum-of-squares nonneg, RatLit exactness (3·(1/3)=1). Rejected (Phase 3+): trichotomy, `x*x` non-neg shape, AM-GM-onevar, `2xy ≤ x²+y²` — all need named-variable threading in the emitter. | Strong. Reproducible via `LAKE_ENV=1 cargo run -p symthaea-lean-bridge --example prove_fol_arith`. Lake project at `lean-proofs/phase2/` pulls Mathlib v4.12.0 (elan-managed). 14 `.lean` files under `proofs/fol_arith/`. |
 
-**Phase 1 delivered externally-commensurable:** propositional tautology suite (23/23), the ~3-problem miniF2F-style internal set (3/3), and the Ramanujan Protocol reproduction. **Not yet delivered:** genuine algebraic/arithmetic coverage of miniF2F-v2 or PutnamBench — requires Phase 2 scope expansion.
+**Phase 1 delivered externally-commensurable:** propositional tautology suite (23/23), the ~3-problem miniF2F-style internal set (3/3), and the Ramanujan Protocol reproduction.
+
+**Phase 2 delivered externally-commensurable (as of W4, 2026-04-17, worktree-session-phase2-algebraic):** arithmetic FolFormulaExt + SMT serializer (49 internal tests), Lake/Mathlib project setup via elan, Mathlib-tactic Lean bridge emitting files checked by `lake env lean`, 10/14 = 71% accept rate on hand-crafted arithmetic suite.
+
+**Not yet delivered:** measurement against *curated subset* of real miniF2F-v2 problems (Phase 3). Named-variable threading in the emitter to close the 4 remaining cascade fallbacks (Phase 3).
 
 ---
 
