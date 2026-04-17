@@ -21,15 +21,15 @@ Seven artifacts, per the plan's "Week-10 Decision-Point Deliverables" section:
 | Plan artifact | Status | Reference |
 |---------------|--------|-----------|
 | 1. `MODULE_STATUS.md` | ✅ | `symthaea/MODULE_STATUS.md` |
-| 2. ARC-AGI-2 CSV harness | ✅ (harness); ⏸ (data needs user download) | `examples/benchmark_arc_agi2.rs`, `docs/arc-agi-2-dataset.md` |
-| 3a. miniF2F proof CSV | ✅ — on engine-originated subset (3/3 Lean-accepted) | `proofs/minif2f/` |
+| 2. ARC-AGI-2 CSV (real 120-task eval) | ✅ — run end-to-end | `docs/phase1-results/arc_agi2_results.csv` |
+| 3a. miniF2F proof CSV (engine-originated subset) | ✅ — 3/3 Lean-accepted | `proofs/minif2f/` |
 | 3b. Propositional tautology suite | ✅ — **23/23 Lean-accepted, 0 sorry, 100% strict** | `proofs/proptauts/`, `docs/minif2f-v2-scope.md` |
-| 3c. miniF2F-v2 full | ❌ — architecturally out of scope at Phase 1 | `docs/minif2f-v2-scope.md` |
+| 3c. miniF2F-v2 real 490-file CSV | ✅ (run) but **0/490 in scope** — architectural Phase 2 | `docs/phase1-results/minif2f_v2_results.csv`, `docs/minif2f-v2-scope.md` |
 | 3d. PutnamBench | ❌ — same architectural scope issue | `docs/minif2f-v2-scope.md` |
 | 4. Lean CI badge | ⏸ | Needs standalone-repo sync; see notes below |
 | 5. Ramanujan arxiv preprint | ✅ (draft); ⏸ (submission is a user action) | `papers/ramanujan/main.tex`, `reproduce.sh`, `VERIFY.md`, `Dockerfile` |
 | 6. Tagged commits | ✅ — multiple per workstream | `git log --oneline` |
-| 7. This memo | 🏗 | This file |
+| 7. This memo | ✅ (draft for joint review) | This file |
 
 ## Honest unqualified results
 
@@ -39,11 +39,11 @@ Seven artifacts, per the plan's "Week-10 Decision-Point Deliverables" section:
 - **Propositional tautology suite: 23/23 externally Lean-verified**, zero `sorry`. Every proof is a structurally meaningful term (`fun h0 => ⟨h0.1.1, ⟨h0.1.2, h0.2⟩⟩` and similar). Classical logic coverage includes intro/elim for ∧ ∨ → ¬, curry/uncurry, contrapositive, double-negation, ex falso, excluded middle.
 - **Module audit honesty**: `MODULE_STATUS.md` has replaced vibes-based claims in the repo docs with a per-module evidence row citing file paths and test counts. Corrected several places where the pre-audit research was overly pessimistic about module state.
 
-### Architecturally out of scope at Phase 1
+### Architecturally out of scope at Phase 1 (now measured against real data)
 
-- **miniF2F-v2 (full upstream)**: the benchmark is ~98% real-arithmetic and number-theoretic algebra; our `Proposition` enum doesn't represent equality, arithmetic, or function quantification. Honest accept rate: near zero. Not a pipeline failure — a deliberate scope boundary.
-- **PutnamBench**: same mismatch. Most problems require Mathlib-level algebraic machinery.
-- **ARC-AGI-2 intelligence**: current rule-vector pipeline is a first-token similarity measure; no grid-output generator. Baseline number will be single-digit-to-zero percent. This was the Phase 1 expectation and was explicitly flagged as deferred to Phase 2 stretch.
+- **miniF2F-v2 (real 490-file Lean 4 corpus, yangky11/miniF2F-lean4)**: scope-test harness reports `appears_propositional = 0/490`. Every file is real-number / integer / set-theoretic algebra, number theory, or AIME-style arithmetic. Our `Proposition` enum doesn't represent these. Measured accept rate at Phase 1: **0/490**, as predicted by the scope analysis. This is a scope declaration, not a pipeline failure.
+- **ARC-AGI-2 intelligence (real 120-task evaluation set, arcprize/ARC-AGI-2)**: benchmark ran end-to-end. 120/120 tasks parsed, 0/120 solved because no output-grid generator is wired. **Mean intra-task rule consistency 0.85** (41% of tasks > 0.9) — the representation clusters training examples correctly within each task, which is a necessary-but-not-sufficient signal for a future predictor.
+- **PutnamBench**: same architectural mismatch as miniF2F-v2. Not yet attempted; Phase 2.
 
 ### Known gaps in the delivered infrastructure
 
@@ -109,7 +109,8 @@ Whatever the choice, three sub-actions are always-good-to-do regardless:
 ## Appendix: Phase 1 test / verification totals
 
 - 28 passing tests in `symthaea-lean-bridge` (23 unit + 5 integration).
-- 26 Lean 4 files externally verified by `lean <file>` (3 miniF2F + 23 proptauts).
+- 26 Lean 4 files externally verified by `lean <file>` (3 miniF2F-style + 23 proptauts).
 - 1 reproducible multi-physics showcase producing the Ramanujan table (7 rows, deterministic at seed=42).
-- 1 honest-signal CSV harness for ARC-AGI-2 (smoke-tested on 2-task synthetic data).
-- 12+ commits on `main`, all tagged in commit messages with the workstream they belong to.
+- ARC-AGI-2 baseline: **120/120 tasks processed**, mean rule consistency 0.85, CSV committed at `docs/phase1-results/arc_agi2_results.csv`.
+- miniF2F-v2 scope test: **490/490 files processed**, 0 in-scope under propositional filter, CSV committed at `docs/phase1-results/minif2f_v2_results.csv`.
+- 15+ commits on `main`, all tagged in commit messages with the workstream they belong to.
