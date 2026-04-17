@@ -6061,6 +6061,32 @@ pub fn discover_invariants_autonomous_with_seed_templates(
                 return (i, f64::MAX, 0.0);
             }
 
+            // Session 29: same orthogonality hard-reject as per-gen
+            // fitness. The final scoring pass must apply it too,
+            // otherwise pinning + tournament selection floods the
+            // final population with known-invariant variants that
+            // bypass the per-gen check via pinning re-injection.
+            if orth_active {
+                let mut orth_sum = 0.0_f64;
+                let mut orth_n = 0usize;
+                for (state, basis) in orth_probe_points.iter().zip(orth_bases.iter()) {
+                    if basis.is_empty() {
+                        continue;
+                    }
+                    let g = fd_gradient(expr, state, var_names);
+                    if g.iter().all(|x| x.is_finite()) {
+                        orth_sum += orthogonal_fraction(&g, basis);
+                        orth_n += 1;
+                    }
+                }
+                if orth_n > 0 {
+                    let mean_orth = orth_sum / orth_n as f64;
+                    if mean_orth < orth_threshold_sin {
+                        return (i, f64::MAX, 0.0);
+                    }
+                }
+            }
+
             // Session 21: report the worst (max) variance across
             // diverse orbits so the AutonomousInvariant's `variance`
             // field accurately represents how well the expression
