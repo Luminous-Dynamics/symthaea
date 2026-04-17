@@ -16,6 +16,11 @@ impl AdbDevice {
         }
     }
 
+    /// Device serial as configured at construction time.
+    pub fn serial(&self) -> &str {
+        &self.serial
+    }
+
     /// Check if the device is connected and authorized.
     pub fn is_connected(&self) -> bool {
         let output = Command::new("adb")

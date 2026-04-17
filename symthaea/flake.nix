@@ -89,6 +89,20 @@
           # FFT for signal processing
           fftw
 
+          # FFmpeg 7 for HEVC decode in the symthaea-phone-embodiment `scrcpy`
+          # feature (Phase I.B). Pinned to ffmpeg_7 — nixpkgs default `ffmpeg`
+          # is 8.0, but ffmpeg-next 7.x only ships bindings up through
+          # ffmpeg_7_1; using `ffmpeg` (8.0) compiled but exposed API drift at
+          # the call site. ffmpeg-next finds these via pkg-config (PKG_CONFIG_PATH
+          # is extended below).
+          ffmpeg_7
+          ffmpeg_7.dev
+
+          # libclang for ffmpeg-sys-next's bindgen invocation. Without
+          # LIBCLANG_PATH (set in shellHook below), bindgen panics with
+          # "Unable to find libclang" during the ffmpeg-sys build script.
+          llvmPackages.libclang
+
           # Image processing (for vision feature)
           libpng
           libjpeg
@@ -204,7 +218,16 @@
             export LD_LIBRARY_PATH="/run/opengl-driver/lib:${libPath}:${onnxPath}:${mujocoPath}:$LD_LIBRARY_PATH"
             export MUJOCO_PATH="${mujoco337}"
             export MUJOCO_DYNAMIC_LINK_DIR="${mujoco337}/lib"
-            export PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig:${pkgs.alsa-lib}/lib/pkgconfig:${pkgs.dbus}/lib/pkgconfig:$PKG_CONFIG_PATH"
+            export PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig:${pkgs.alsa-lib}/lib/pkgconfig:${pkgs.dbus}/lib/pkgconfig:${pkgs.ffmpeg_7.dev}/lib/pkgconfig:$PKG_CONFIG_PATH"
+
+            # bindgen (used by ffmpeg-sys-next under the scrcpy feature) needs
+            # libclang to parse the ffmpeg headers. Without this it panics
+            # "Unable to find libclang" mid-build-script.
+            export LIBCLANG_PATH="${pkgs.llvmPackages.libclang.lib}/lib"
+            # bindgen also needs the right -isystem flags so its clang can
+            # find glibc headers like errno.h. nix-support/libc-cflags +
+            # cc-cflags carry exactly those for the active stdenv cc.
+            export BINDGEN_EXTRA_CLANG_ARGS="$(< ${pkgs.stdenv.cc}/nix-support/libc-cflags) $(< ${pkgs.stdenv.cc}/nix-support/cc-cflags)"
 
             # ONNX Runtime dynamic loading
             export ORT_DYLIB_PATH="${onnxPath}/libonnxruntime.so"
