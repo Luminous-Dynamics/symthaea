@@ -156,6 +156,73 @@ fn fixtures() -> Vec<Fixture> {
                 Term::IntLit(1),
             ),
         },
+        // ─── Algebraic identities (stretch `nlinarith`) ───────────────────
+        Fixture {
+            // (a + b)² = a² + 2ab + b²
+            name: "square_of_sum",
+            description: "∀ a b : ℝ, (a + b)² = a² + 2·a·b + b²",
+            goal: FolFormulaExt::forall(
+                "a",
+                NumericType::Real,
+                FolFormulaExt::forall(
+                    "b",
+                    NumericType::Real,
+                    FolFormulaExt::eq(
+                        v("a").add(v("b")).pow(2),
+                        v("a").pow(2)
+                            .add(Term::IntLit(2).mul(v("a")).mul(v("b")))
+                            .add(v("b").pow(2)),
+                    ),
+                ),
+            ),
+        },
+        Fixture {
+            // AM-GM for one variable degenerate: 2·a ≤ 1 + a² ⇔ (a - 1)² ≥ 0
+            name: "am_gm_onevar",
+            description: "∀ a : ℝ, 2·a ≤ 1 + a²  (equivalent to (a-1)² ≥ 0)",
+            goal: FolFormulaExt::forall(
+                "a",
+                NumericType::Real,
+                FolFormulaExt::le(
+                    Term::IntLit(2).mul(v("a")),
+                    Term::IntLit(1).add(v("a").pow(2)),
+                ),
+            ),
+        },
+        Fixture {
+            // Sum of squares is non-negative
+            name: "sum_of_squares_nonneg",
+            description: "∀ a b : ℝ, 0 ≤ a² + b²",
+            goal: FolFormulaExt::forall(
+                "a",
+                NumericType::Real,
+                FolFormulaExt::forall(
+                    "b",
+                    NumericType::Real,
+                    FolFormulaExt::le(
+                        Term::IntLit(0),
+                        v("a").pow(2).add(v("b").pow(2)),
+                    ),
+                ),
+            ),
+        },
+        Fixture {
+            // 2xy ≤ x² + y² (variance ≥ 0 identity rearranged)
+            name: "two_xy_le_sum_of_squares",
+            description: "∀ x y : ℝ, 2·x·y ≤ x² + y²",
+            goal: FolFormulaExt::forall(
+                "x",
+                NumericType::Real,
+                FolFormulaExt::forall(
+                    "y",
+                    NumericType::Real,
+                    FolFormulaExt::le(
+                        Term::IntLit(2).mul(v("x")).mul(v("y")),
+                        v("x").pow(2).add(v("y").pow(2)),
+                    ),
+                ),
+            ),
+        },
     ]
 }
 
