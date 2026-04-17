@@ -27,3 +27,9 @@ nalgebra = "0.34"
 [features]
 default = ["debug-gizmos"]
 debug-gizmos = []
+
+[dev-dependencies]
+# Tests construct ConsciousnessInputs directly. This type lives upstream of
+# symtropy-consciousness-physics; declare it here as a dev-dep so tests can
+# import it without adding a runtime dep.
+symthaea-consciousness-equation = { version = "0.1.0", path = "../../../symthaea/crates/symthaea-consciousness-equation" }

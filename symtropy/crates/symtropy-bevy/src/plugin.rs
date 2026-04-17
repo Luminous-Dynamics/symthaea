@@ -200,23 +200,16 @@ fn sync_transforms<const D: usize>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bevy::prelude::*;
     use nalgebra::SVector;
-    use symtropy_consciousness_physics::coupling::ConsciousnessInputs;
-
-    // Helper: minimal headless App with SymtropyPhysics<D> inserted.
-    fn headless_app<const D: usize>() -> App {
-        let mut app = App::new();
-        app.insert_resource(SymtropyPhysics::<D>::default());
-        app
-    }
+    use symthaea_consciousness_equation::ConsciousnessInputs;
+    use symtropy_math::Point;
 
     // --- SymtropyPhysics resource construction ---
 
     #[test]
     fn symtropy_physics_2d_default_has_zero_gravity() {
         let p = SymtropyPhysics::<2>::default();
-        let g = p.world.gravity();
+        let g = p.world.gravity;
         assert_eq!(g[0], 0.0);
         assert_eq!(g[1], 0.0);
     }
@@ -229,7 +222,7 @@ mod tests {
     #[test]
     fn symtropy_physics_with_gravity_stores_gravity() {
         let p = SymtropyPhysics::<2>::with_gravity(SVector::from([0.0, -9.81]));
-        let g = p.world.gravity();
+        let g = p.world.gravity;
         assert!((g[1] - (-9.81)).abs() < 1e-9);
     }
 
@@ -238,7 +231,7 @@ mod tests {
     #[test]
     fn physics_body_new_stores_handle_and_radius() {
         let mut world = symtropy_physics::PhysicsWorld::<2>::new(SVector::zeros());
-        let pt = symtropy_physics::body::Point::new([0.0, 0.0]);
+        let pt = Point::new([0.0, 0.0]);
         let h = world.add_sphere(pt, 1.0, 1.0);
         let body = PhysicsBody::new(h, 0.5);
         assert_eq!(body.handle, h);
@@ -250,13 +243,13 @@ mod tests {
     #[test]
     fn plugin_config_default_has_zero_gravity_2d() {
         let cfg = SymtropyPhysicsPluginConfig::<2>::default();
-        assert_eq!(cfg.gravity, SVector::zeros());
+        assert_eq!(cfg.gravity, SVector::<f64, 2>::zeros());
     }
 
     #[test]
     fn plugin_config_default_has_zero_gravity_3d() {
         let cfg = SymtropyPhysicsPluginConfig::<3>::default();
-        assert_eq!(cfg.gravity, SVector::zeros());
+        assert_eq!(cfg.gravity, SVector::<f64, 3>::zeros());
     }
 
     // --- Physics world operations ---
@@ -264,7 +257,7 @@ mod tests {
     #[test]
     fn can_add_sphere_to_physics_world() {
         let mut p = SymtropyPhysics::<2>::default();
-        let pt = symtropy_physics::body::Point::new([0.0, 5.0]);
+        let pt = Point::new([0.0, 5.0]);
         let h = p.world.add_sphere(pt, 1.0, 1.0);
         assert!(p.world.body(h).is_some());
     }
@@ -272,8 +265,8 @@ mod tests {
     #[test]
     fn can_add_and_query_multiple_bodies() {
         let mut p = SymtropyPhysics::<2>::default();
-        let h1 = p.world.add_sphere(symtropy_physics::body::Point::new([0.0, 0.0]), 1.0, 1.0);
-        let h2 = p.world.add_sphere(symtropy_physics::body::Point::new([5.0, 0.0]), 1.0, 1.0);
+        let h1 = p.world.add_sphere(Point::new([0.0, 0.0]), 1.0, 1.0);
+        let h2 = p.world.add_sphere(Point::new([5.0, 0.0]), 1.0, 1.0);
         assert!(p.world.body(h1).is_some());
         assert!(p.world.body(h2).is_some());
     }
@@ -281,16 +274,16 @@ mod tests {
     #[test]
     fn can_register_body_with_consciousness_field() {
         let mut p = SymtropyPhysics::<2>::default();
-        let h = p.world.add_sphere(symtropy_physics::body::Point::new([0.0, 0.0]), 1.0, 1.0);
+        let h = p.world.add_sphere(Point::new([0.0, 0.0]), 1.0, 1.0);
         p.field.register(h, 100.0, 10.0);
-        let state = p.field.entity(h);
+        let state = p.field.entities.get(&h);
         assert!(state.is_some());
     }
 
     #[test]
     fn manual_physics_step_does_not_panic() {
         let mut p = SymtropyPhysics::<2>::default();
-        p.world.add_sphere(symtropy_physics::body::Point::new([0.0, 0.0]), 1.0, 1.0);
+        p.world.add_sphere(Point::new([0.0, 0.0]), 1.0, 1.0);
         let SymtropyPhysics { ref mut world, ref mut field } = p;
         world.step_with_callback(1.0 / 60.0, field);
     }
@@ -298,7 +291,7 @@ mod tests {
     #[test]
     fn gravity_step_moves_body_downward() {
         let mut p = SymtropyPhysics::<2>::with_gravity(SVector::from([0.0, -9.81]));
-        let h = p.world.add_sphere(symtropy_physics::body::Point::new([0.0, 10.0]), 1.0, 1.0);
+        let h = p.world.add_sphere(Point::new([0.0, 10.0]), 1.0, 1.0);
         let y0 = p.world.body(h).unwrap().position().coord(1);
         let SymtropyPhysics { ref mut world, ref mut field } = p;
         for _ in 0..10 {
@@ -311,16 +304,21 @@ mod tests {
     #[test]
     fn field_phi_updates_after_consciousness_inputs() {
         let mut p = SymtropyPhysics::<2>::default();
-        let h = p.world.add_sphere(symtropy_physics::body::Point::new([0.0, 0.0]), 1.0, 1.0);
+        let h = p.world.add_sphere(Point::new([0.0, 0.0]), 1.0, 1.0);
         p.field.register(h, 100.0, 10.0);
         let inputs = ConsciousnessInputs {
             phi: 0.75,
-            prediction_error: 0.1,
-            free_energy: 0.2,
+            broadcast: 0.75,
+            working_memory: 0.75,
+            attention: 0.75,
+            recurrence: 0.75,
+            embodiment: 0.75,
+            knowledge: 0.75,
+            synchrony: 0.75,
         };
-        p.field.update_entity(h, inputs);
-        let state = p.field.entity(h).unwrap();
-        assert!((state.phi - 0.75).abs() < 1e-9);
+        p.field.update_entity(h, &inputs, Point::origin());
+        let state = p.field.entities.get(&h).unwrap();
+        assert!(state.phi() > 0.0);
     }
 
     // --- Plugin construction ---
@@ -367,7 +365,7 @@ mod tests {
         let mut app = App::new();
         SymtropyPhysicsPlugin::<2>::default().build(&mut app);
         let mut res = app.world_mut().resource_mut::<SymtropyPhysics<2>>();
-        let pt = symtropy_physics::body::Point::new([1.0, 2.0]);
+        let pt = Point::new([1.0, 2.0]);
         let h = res.world.add_sphere(pt, 0.5, 1.0);
         assert!(res.world.body(h).is_some());
     }
@@ -377,7 +375,7 @@ mod tests {
         let mut app = App::new();
         SymtropyPhysicsPlugin::<2>::with_gravity([0.0, -9.81]).build(&mut app);
         let res = app.world().resource::<SymtropyPhysics<2>>();
-        let g = res.world.gravity();
+        let g = res.world.gravity;
         assert!((g[1] - (-9.81)).abs() < 1e-9);
     }
 }

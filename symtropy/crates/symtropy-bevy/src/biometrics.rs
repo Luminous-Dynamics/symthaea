@@ -155,7 +155,7 @@ mod tests {
 
     fn add_player(p: &mut SymtropyPhysics<2>) -> BodyHandle {
         let h = p.world.add_sphere(
-            symtropy_physics::body::Point::new([0.0, 0.0]),
+            symtropy_math::Point::new([0.0, 0.0]),
             1.0, 1.0,
         );
         p.field.register(h, 100.0, 5.0);
@@ -199,7 +199,7 @@ mod tests {
         let h = add_player(&mut p);
 
         // Before biometric coupling: phi is 0.0 (no inputs yet)
-        let phi_before = p.field.entity(h).unwrap().phi();
+        let phi_before = p.field.entities.get(&h).unwrap().phi();
         assert_eq!(phi_before, 0.0);
 
         // Create resource with high-coherence samples
@@ -216,7 +216,7 @@ mod tests {
         let inputs = bio.history.to_consciousness_inputs();
         p.field.update_entity(h, &inputs, symtropy_math::Point::origin());
 
-        let phi_after = p.field.entity(h).unwrap().phi();
+        let phi_after = p.field.entities.get(&h).unwrap().phi();
         assert!(
             phi_after > phi_before,
             "high gamma coherence should produce non-zero Phi, got {phi_after}"
@@ -241,7 +241,7 @@ mod tests {
         let inputs = bio.history.to_consciousness_inputs();
         // phi=0.5, which should produce a non-zero consciousness level
         p.field.update_entity(h, &inputs, symtropy_math::Point::origin());
-        let phi = p.field.entity(h).unwrap().phi();
+        let phi = p.field.entities.get(&h).unwrap().phi();
         assert!(phi > 0.0, "neutral inputs (0.5) should produce non-zero Phi");
     }
 
@@ -257,6 +257,6 @@ mod tests {
         });
         let inputs = bio.history.to_consciousness_inputs();
         p.field.update_entity(h, &inputs, symtropy_math::Point::origin());
-        assert!(p.field.entity(h).is_some());
+        assert!(p.field.entities.get(&h).is_some());
     }
 }

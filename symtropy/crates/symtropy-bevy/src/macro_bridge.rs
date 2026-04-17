@@ -120,7 +120,7 @@ mod tests {
 
     fn add_entity(p: &mut SymtropyPhysics<2>) -> symtropy_physics::BodyHandle {
         let h = p.world.add_sphere(
-            symtropy_physics::body::Point::new([0.0, 0.0]), 1.0, 1.0,
+            symtropy_math::Point::new([0.0, 0.0]), 1.0, 1.0,
         );
         p.field.register(h, 100.0, 5.0);
         h
