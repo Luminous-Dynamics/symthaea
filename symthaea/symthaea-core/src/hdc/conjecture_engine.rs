@@ -637,6 +637,15 @@ pub struct RegressorConfig {
     /// loses to a true conservation law constant on all orbits. This is
     /// the Session-21 fix for Ceiling 4.
     pub diverse_trajectory_count: usize,
+    /// Session 24: probability per-child that, instead of standard
+    /// mutation/crossover, the GP composes two distinct pinned priors
+    /// via a random binary operation (Add/Sub/Mul). Targets the
+    /// composition-limited ceiling identified by Session 23: crossover
+    /// rarely picks complementary pinned primitives as both parents,
+    /// so the GP finds single-term partials instead of compositions.
+    /// Default 0.0 preserves prior behavior. Only fires when the caller
+    /// supplies at least 2 priors via extra_seed_templates.
+    pub prior_composition_rate: f64,
 }
 
 impl Default for RegressorConfig {
@@ -653,6 +662,7 @@ impl Default for RegressorConfig {
             disable_macro_seeds: false,
             exclude_trig: false,
             diverse_trajectory_count: 1,
+            prior_composition_rate: 0.0,
         }
     }
 }
@@ -774,6 +784,7 @@ impl SymbolicRegressor {
                 disable_macro_seeds: self.config.disable_macro_seeds,
                 exclude_trig: self.config.exclude_trig,
                 diverse_trajectory_count: self.config.diverse_trajectory_count,
+                prior_composition_rate: self.config.prior_composition_rate,
             });
             let log_results = log_regressor.fit(&log_seq, 2);
 
@@ -2878,6 +2889,7 @@ impl ConjectureEngine {
                     disable_macro_seeds: self.config.disable_macro_seeds,
                 exclude_trig: false,
                 diverse_trajectory_count: self.config.diverse_trajectory_count,
+                prior_composition_rate: self.config.prior_composition_rate,
                 });
                 let diff_results = diff_reg.fit(&diff_obs, 1);
                 for c in &diff_results {
@@ -2919,6 +2931,7 @@ impl ConjectureEngine {
                     disable_macro_seeds: self.config.disable_macro_seeds,
                     exclude_trig: self.config.exclude_trig,
                     diverse_trajectory_count: self.config.diverse_trajectory_count,
+                    prior_composition_rate: self.config.prior_composition_rate,
                 });
                 if !macro_seeds.is_empty() {
                     regressor.set_seed_macros(macro_seeds.clone());
@@ -5672,7 +5685,30 @@ pub fn discover_invariants_autonomous_with_seed_templates(
             let winner = if fitnesses[a] < fitnesses[b] { a } else { b };
 
             rng = lcg_step(rng);
-            let child = if (*&rng as f64 / u64::MAX as f64) < config.mutation_rate {
+            let roll = (*&rng as f64 / u64::MAX as f64);
+            let child = if pinned_priors.len() >= 2
+                && roll < config.prior_composition_rate
+            {
+                // Session 24: prior-pair composition. Pick two distinct
+                // pinned priors and combine with a random binary op.
+                // Directly constructs compositions the random crossover
+                // rarely finds — e.g. quasi_local + 2·nonlocal = Jacobi.
+                rng = lcg_step(rng);
+                let i = (rng as usize) % pinned_priors.len();
+                rng = lcg_step(rng);
+                let mut j = (rng as usize) % pinned_priors.len();
+                if j == i {
+                    j = (j + 1) % pinned_priors.len();
+                }
+                rng = lcg_step(rng);
+                let ops = [BinOp::Add, BinOp::Sub, BinOp::Mul];
+                let op = ops[(rng as usize) % ops.len()];
+                Expr::BinOp(
+                    op,
+                    Box::new(pinned_priors[i].clone()),
+                    Box::new(pinned_priors[j].clone()),
+                )
+            } else if roll < config.mutation_rate {
                 mutate_multivar(&population[winner], &mut rng, 0, var_names, exclude_trig)
             } else {
                 // Crossover with another tournament winner
