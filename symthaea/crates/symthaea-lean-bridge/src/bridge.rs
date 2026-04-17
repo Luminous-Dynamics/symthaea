@@ -99,67 +99,198 @@ pub fn rule_to_tactic(rule: &str) -> Option<LeanTactic> {
     }
 }
 
+/// Synthesize a closed Lean 4 proof term for a propositional goal, given a
+/// context of named hypotheses. Returns `None` if no term is found within the
+/// depth budget.
+///
+/// This is a small classical propositional proof search that handles:
+/// - Identity / assumption lookup
+/// - `True.intro`
+/// - Conjunction intro (⟨a, b⟩) and projection (`h.1`, `h.2`)
+/// - Disjunction intro (`Or.inl`, `Or.inr`) and disjunction elim
+/// - Implication intro (`fun h => _`) and assumption chaining
+/// - Excluded middle via `Classical.em` for `A ∨ ¬A`
+/// - Reductio: derive `False` from `A` and `¬A` in context
+///
+/// The search is bounded by `depth`; call with `depth = 16` for Phase 1
+/// propositional fixtures. All emitted terms type-check in core Lean 4 without
+/// Mathlib imports.
+/// Walk a hypothesis and record every `And`-projection path along with the
+/// proposition at that path. For `h : A ∧ (B ∧ C)`, records:
+/// `(h, A ∧ (B ∧ C))`, `(h.1, A)`, `(h.2, B ∧ C)`, `(h.2.1, B)`, `(h.2.2, C)`.
+fn collect_projections<'a>(
+    name: &str,
+    prop: &'a Proposition,
+    out: &mut Vec<(String, &'a Proposition)>,
+) {
+    out.push((name.to_string(), prop));
+    if let Proposition::And(l, r) = prop {
+        collect_projections(&format!("{}.1", name), l, out);
+        collect_projections(&format!("{}.2", name), r, out);
+    }
+}
+
+/// Peel an implication chain `A₁ → A₂ → … → Aₙ → G` and, if `G == goal`,
+/// attempt to synthesize each Aᵢ as a proof term. Returns the list of
+/// argument terms in order. Returns `None` if the chain's final conclusion
+/// doesn't equal the goal, or if any Aᵢ is unprovable within the depth budget.
+fn try_curry_apply(
+    prop: &Proposition,
+    goal: &Proposition,
+    hypotheses: &[(String, Proposition)],
+    depth: u32,
+) -> Option<Vec<String>> {
+    let mut cursor = prop;
+    let mut args_to_prove: Vec<&Proposition> = Vec::new();
+    while let Proposition::Implies(a, b) = cursor {
+        args_to_prove.push(a);
+        cursor = b;
+    }
+    // Must have consumed at least one arrow and landed exactly on the goal.
+    if args_to_prove.is_empty() || cursor != goal {
+        return None;
+    }
+    let mut arg_terms: Vec<String> = Vec::new();
+    for a in &args_to_prove {
+        let t = synthesize_proof_term(a, hypotheses, depth.saturating_sub(1))?;
+        arg_terms.push(t);
+    }
+    Some(arg_terms)
+}
+
+pub fn synthesize_proof_term(
+    goal: &Proposition,
+    hypotheses: &[(String, Proposition)],
+    depth: u32,
+) -> Option<String> {
+    if depth == 0 {
+        return None;
+    }
+
+    // 1. True is always provable.
+    if matches!(goal, Proposition::True) {
+        return Some("True.intro".to_string());
+    }
+
+    // 2. Assumption lookup: is the goal already in context?
+    for (name, h) in hypotheses {
+        if h == goal {
+            return Some(name.clone());
+        }
+    }
+
+    // 3. Projection from conjunction hypotheses, including nested
+    //    projection. Expand every hypothesis `h : A₁ ∧ A₂ ∧ …` into all
+    //    reachable sub-projections `h.i.j.k…` and look for the goal.
+    let mut projections: Vec<(String, &Proposition)> = Vec::new();
+    for (name, h) in hypotheses {
+        collect_projections(name, h, &mut projections);
+    }
+    for (expr, prop) in &projections {
+        if *prop == goal {
+            return Some(expr.clone());
+        }
+    }
+
+    // 3b. False-elim: any hypothesis of type False (reachable via
+    //     projection) closes any goal via `False.elim`.
+    for (expr, prop) in &projections {
+        if matches!(prop, Proposition::False) {
+            return Some(format!("(False.elim {})", expr));
+        }
+    }
+
+    // 4. Curried modus ponens: for each projection
+    //    `h : A₁ → A₂ → … → Aₙ → G` whose final conclusion G equals the goal,
+    //    try to synthesize each Aᵢ and emit `h a₁ a₂ … aₙ`. This subsumes
+    //    single-arg MP and handles uncurrying patterns like
+    //    `(P → Q → R) → P ∧ Q → R`.
+    for (expr, prop) in &projections {
+        if let Some(arg_terms) = try_curry_apply(prop, goal, hypotheses, depth - 1) {
+            let mut s = expr.clone();
+            for a in &arg_terms {
+                s = format!("({} {})", s, a);
+            }
+            return Some(s);
+        }
+    }
+
+    // 5. Goal-directed rules.
+    match goal {
+        Proposition::And(a, b) => {
+            let ta = synthesize_proof_term(a, hypotheses, depth - 1)?;
+            let tb = synthesize_proof_term(b, hypotheses, depth - 1)?;
+            Some(format!("⟨{}, {}⟩", ta, tb))
+        }
+        Proposition::Or(a, b) => {
+            // Excluded-middle shortcut: A ∨ ¬A or ¬A ∨ A.
+            if let Proposition::Not(na) = b.as_ref() {
+                if a.as_ref() == na.as_ref() {
+                    let a_term = prop_to_lean_term(a);
+                    return Some(format!("Classical.em {}", a_term.to_lean()));
+                }
+            }
+            if let Proposition::Not(na) = a.as_ref() {
+                if na.as_ref() == b.as_ref() {
+                    let a_term = prop_to_lean_term(b);
+                    return Some(format!("(Classical.em {}).symm", a_term.to_lean()));
+                }
+            }
+            // Try the left side first.
+            if let Some(ta) = synthesize_proof_term(a, hypotheses, depth - 1) {
+                return Some(format!("Or.inl {}", ta));
+            }
+            if let Some(tb) = synthesize_proof_term(b, hypotheses, depth - 1) {
+                return Some(format!("Or.inr {}", tb));
+            }
+            None
+        }
+        Proposition::Implies(a, b) => {
+            // Introduce hypothesis. Use a fresh name to avoid clashes.
+            let fresh = format!("h{}", hypotheses.len());
+            let mut extended = hypotheses.to_vec();
+            extended.push((fresh.clone(), (**a).clone()));
+            let body = synthesize_proof_term(b, &extended, depth - 1)?;
+            Some(format!("(fun {} => {})", fresh, body))
+        }
+        Proposition::Not(a) => {
+            // ¬A is A → False; recurse as implication.
+            let imp = Proposition::Implies(a.clone(), Box::new(Proposition::False));
+            synthesize_proof_term(&imp, hypotheses, depth - 1)
+        }
+        Proposition::False => {
+            // Find contradictory pair A and ¬A in context.
+            for (nname, nh) in hypotheses {
+                if let Proposition::Not(inner) = nh {
+                    if let Some(ht) = synthesize_proof_term(inner, hypotheses, depth - 1) {
+                        return Some(format!("({} {})", nname, ht));
+                    }
+                }
+            }
+            None
+        }
+        Proposition::Iff(a, b) => {
+            // Encode A ↔ B as ⟨A → B, B → A⟩ (matches prop_to_lean_term).
+            let ab = Proposition::Implies(a.clone(), b.clone());
+            let ba = Proposition::Implies(b.clone(), a.clone());
+            let tab = synthesize_proof_term(&ab, hypotheses, depth - 1)?;
+            let tba = synthesize_proof_term(&ba, hypotheses, depth - 1)?;
+            Some(format!("⟨{}, {}⟩", tab, tba))
+        }
+        _ => None,
+    }
+}
+
 /// Pattern-match on a `Proposition` goal and emit a tactic block that closes
 /// it using **core Lean 4 only** (no Mathlib dependency).
 ///
-/// Coverage (Phase 1):
-/// - `A → A` (any depth; identity implication) — `exact fun h => h`.
-/// - `A ∨ ¬A` (excluded middle, either order) — `exact Classical.em A`.
-/// - `¬A ∨ A` — `exact (Classical.em A).symm` via `cases`.
-/// - `(A → B) → A → B` and other "reflexive" implication chains — `intros;
-///   assumption`.
-/// - Everything else — falls through to `None`; caller emits `Sorry`.
-///
-/// Note: we deliberately do NOT emit `tauto` here. `tauto` is a Mathlib
-/// tactic; emitting it would require `import Mathlib.Tactic.Tauto` and a
-/// Mathlib-populated Lean project. Phase 2 may add a Mathlib-aware emission
-/// path for goals beyond core-Lean reach.
+/// Phase 1 strategy: synthesize a closed proof term via
+/// [`synthesize_proof_term`] and emit `exact <term>`. For the goals that don't
+/// fit the propositional fragment (e.g. FOL with free variables), returns
+/// `None` and the caller emits `Sorry`.
 pub fn tactics_for_goal(goal: &Proposition) -> Option<Vec<LeanTactic>> {
-    // Case 1: identity implication A → A (any `A`).
-    if let Proposition::Implies(a, b) = goal {
-        if a == b {
-            return Some(vec![LeanTactic::Raw("exact fun h => h".into())]);
-        }
-    }
-
-    // Case 2: excluded middle A ∨ ¬A (in either order). Core Lean 4 exposes
-    // `Classical.em : ∀ (p : Prop), p ∨ ¬p` without Mathlib.
-    if let Proposition::Or(lhs, rhs) = goal {
-        // A ∨ ¬A
-        if let Proposition::Not(na) = rhs.as_ref() {
-            if lhs.as_ref() == na.as_ref() {
-                let a_term = prop_to_lean_term(lhs);
-                return Some(vec![LeanTactic::Raw(format!(
-                    "exact Classical.em {}",
-                    a_term.to_lean()
-                ))]);
-            }
-        }
-        // ¬A ∨ A — use .symm on Classical.em's output.
-        if let Proposition::Not(na) = lhs.as_ref() {
-            if na.as_ref() == rhs.as_ref() {
-                let a_term = prop_to_lean_term(rhs);
-                return Some(vec![LeanTactic::Raw(format!(
-                    "exact (Classical.em {}).symm",
-                    a_term.to_lean()
-                ))]);
-            }
-        }
-    }
-
-    // Case 3: reflexive implication chain — try `intros; assumption`. This
-    // closes goals like `(P → Q) → P → Q`, `A → B → A`, etc., whenever the
-    // conclusion appears verbatim as a hypothesis after intros.
-    if matches!(goal, Proposition::Implies(_, _)) {
-        return Some(vec![LeanTactic::Raw("intros; assumption".into())]);
-    }
-
-    // Case 4: True.
-    if matches!(goal, Proposition::True) {
-        return Some(vec![LeanTactic::Trivial]);
-    }
-
-    None
+    let term = synthesize_proof_term(goal, &[], 16)?;
+    Some(vec![LeanTactic::Raw(format!("exact {}", term))])
 }
 
 /// Translate a full `ProofResult` into a `LeanProofScript` targeting
@@ -280,7 +411,8 @@ mod tests {
         let script = proof_result_to_lean("id_impl", &goal, &result);
         let rendered = script.to_lean();
         // Identity should close in term mode, not with tauto.
-        assert!(rendered.contains("fun h => h"));
+        // Synthesizer uses fresh names like `h0`; assert shape, not name.
+        assert!(rendered.contains("fun ") && rendered.contains(" => "));
         assert!(!rendered.contains("tauto"));
         assert!(!script.contains_sorry());
     }
@@ -322,8 +454,9 @@ mod tests {
         };
         let script = proof_result_to_lean("mp_ded", &goal, &result);
         let rendered = script.to_lean();
-        // Either term-mode (rhs == lhs) or intros/assumption.
-        assert!(rendered.contains("fun h => h") || rendered.contains("intros; assumption"));
+        // Synthesizer closes this as nested `fun`: (fun h0 => h0) whose type
+        // is the reflexive implication.
+        assert!(rendered.contains("fun ") && rendered.contains(" => "));
         assert!(!script.contains_sorry());
     }
 

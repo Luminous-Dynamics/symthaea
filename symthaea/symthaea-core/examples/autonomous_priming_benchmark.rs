@@ -148,7 +148,12 @@ fn jacobi_cheat_priors() -> Vec<Expr> {
     ]
 }
 
-fn run_one(seed: u64, priors: &[Expr], exclude_trig: bool) -> Vec<AutonomousInvariant> {
+fn run_one(
+    seed: u64,
+    priors: &[Expr],
+    exclude_trig: bool,
+    diverse_n: usize,
+) -> Vec<AutonomousInvariant> {
     let config = RegressorConfig {
         seed,
         population_size: POP_SIZE,
@@ -158,6 +163,7 @@ fn run_one(seed: u64, priors: &[Expr], exclude_trig: bool) -> Vec<AutonomousInva
         lambda: 0.0005,
         mutation_rate: 0.35,
         exclude_trig,
+        diverse_trajectory_count: diverse_n,
         ..RegressorConfig::default()
     };
     discover_invariants_autonomous_with_seed_templates(
@@ -257,37 +263,51 @@ fn main() {
     println!("━━━ Cold (no priors, trig allowed) ━━━");
     let cold: Vec<SeedResult> = SEEDS
         .iter()
-        .map(|&seed| summarize("cold", seed, &run_one(seed, &[], false)))
+        .map(|&seed| summarize("cold", seed, &run_one(seed, &[], false, 1)))
         .collect();
     aggregate("cold            ", &cold);
 
     println!("\n━━━ Primed (Kepler priors, trig allowed) ━━━");
     let primed: Vec<SeedResult> = SEEDS
         .iter()
-        .map(|&seed| summarize("primed", seed, &run_one(seed, &priors, false)))
+        .map(|&seed| summarize("primed", seed, &run_one(seed, &priors, false, 1)))
         .collect();
     aggregate("primed          ", &primed);
 
     println!("\n━━━ Cold + no-trig (Session 19 ablation) ━━━");
     let cold_notrig: Vec<SeedResult> = SEEDS
         .iter()
-        .map(|&seed| summarize("cold-NT", seed, &run_one(seed, &[], true)))
+        .map(|&seed| summarize("cold-NT", seed, &run_one(seed, &[], true, 1)))
         .collect();
     aggregate("cold + no-trig  ", &cold_notrig);
 
     println!("\n━━━ Primed + no-trig (Session 19 ablation) ━━━");
     let primed_notrig: Vec<SeedResult> = SEEDS
         .iter()
-        .map(|&seed| summarize("prim-NT", seed, &run_one(seed, &priors, true)))
+        .map(|&seed| summarize("prim-NT", seed, &run_one(seed, &priors, true, 1)))
         .collect();
     aggregate("primed + no-trig", &primed_notrig);
 
     println!("\n━━━ Jacobi cheat priors + no-trig (Session 20 decisive test) ━━━");
     let cheat_notrig: Vec<SeedResult> = SEEDS
         .iter()
-        .map(|&seed| summarize("cheat-NT", seed, &run_one(seed, &cheat, true)))
+        .map(|&seed| summarize("cheat-NT", seed, &run_one(seed, &cheat, true, 1)))
         .collect();
     aggregate("cheat + no-trig ", &cheat_notrig);
+
+    println!("\n━━━ Cold + no-trig + DIVERSE fitness (Session 21) ━━━");
+    let cold_div: Vec<SeedResult> = SEEDS
+        .iter()
+        .map(|&seed| summarize("cold-D", seed, &run_one(seed, &[], true, 5)))
+        .collect();
+    aggregate("cold + diverse-5", &cold_div);
+
+    println!("\n━━━ Jacobi cheat + no-trig + DIVERSE fitness (Session 21) ━━━");
+    let cheat_div: Vec<SeedResult> = SEEDS
+        .iter()
+        .map(|&seed| summarize("cheat-D", seed, &run_one(seed, &cheat, true, 5)))
+        .collect();
+    aggregate("cheat + diverse-5", &cheat_div);
 
     println!("\n━━━ Head-to-head per seed (primed vs cold, trig allowed) ━━━");
     head_to_head("cold vs primed", &cold, &primed);
@@ -299,6 +319,11 @@ fn main() {
 
     println!("\n━━━ Head-to-head per seed (cheat vs cold, trig DISABLED — Session 20) ━━━");
     head_to_head("cold-NT vs cheat-NT", &cold_notrig, &cheat_notrig);
+
+    println!(
+        "\n━━━ Head-to-head per seed (cheat vs cold, DIVERSE fitness — Session 21) ━━━"
+    );
+    head_to_head("cold-D vs cheat-D", &cold_div, &cheat_div);
 
     println!("\n━━━ Degeneracy accounting: formulas containing cos/sin ━━━");
     for (label, runs) in [
@@ -329,6 +354,8 @@ fn main() {
         ("cold+no-trig   ", &cold_notrig),
         ("primed+no-trig ", &primed_notrig),
         ("cheat+no-trig  ", &cheat_notrig),
+        ("cold+diverse-5 ", &cold_div),
+        ("cheat+diverse-5", &cheat_div),
     ] {
         let jacobi_count = runs
             .iter()

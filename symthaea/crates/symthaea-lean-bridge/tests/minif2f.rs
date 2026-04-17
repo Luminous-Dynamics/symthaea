@@ -52,7 +52,7 @@ fn identity_implication_emits_tauto() {
     assert!(file.contains("theorem t_identity"), "must emit theorem name");
     assert!(file.contains("(P → P)"), "must emit the implication");
     assert!(
-        file.contains("fun h => h"),
+        file.contains("fun ") && file.contains(" => "),
         "identity implication must use term-mode proof (core Lean 4)"
     );
     assert!(!file.contains("tauto"), "must not use Mathlib `tauto`");
@@ -78,9 +78,9 @@ fn real_modus_ponens_through_bridge() {
     assert!(file.contains("variable (P : Prop)"));
     assert!(file.contains("variable (Q : Prop)"));
     assert!(file.contains("theorem t_mp"));
-    // Reflexive implication → term-mode identity or `intros; assumption`.
+    // Synthesizer closes this with a term-mode lambda.
     assert!(
-        file.contains("fun h => h") || file.contains("intros; assumption"),
+        file.contains("fun ") && file.contains(" => "),
         "reflexive implication chain must close in core Lean 4"
     );
     assert!(!file.contains("sorry"));

@@ -629,6 +629,14 @@ pub struct RegressorConfig {
     /// out Kepler-shaped primitives during PCR3BP discovery. Setting
     /// this to true forces the GP to seek non-trigonometric invariants.
     pub exclude_trig: bool,
+    /// Number of trajectories (with perturbed initial conditions) to
+    /// sample in the autonomous discoverer's fitness function.
+    /// Default 1 preserves prior behavior. Values > 1 evaluate variance
+    /// on each trajectory independently and take the MAX — an expression
+    /// constant on only one orbit (accidental-constant-of-this-orbit)
+    /// loses to a true conservation law constant on all orbits. This is
+    /// the Session-21 fix for Ceiling 4.
+    pub diverse_trajectory_count: usize,
 }
 
 impl Default for RegressorConfig {
@@ -644,6 +652,7 @@ impl Default for RegressorConfig {
             seed: 42,
             disable_macro_seeds: false,
             exclude_trig: false,
+            diverse_trajectory_count: 1,
         }
     }
 }
@@ -764,6 +773,7 @@ impl SymbolicRegressor {
                 seed: self.config.seed.wrapping_add(777),
                 disable_macro_seeds: self.config.disable_macro_seeds,
                 exclude_trig: self.config.exclude_trig,
+                diverse_trajectory_count: self.config.diverse_trajectory_count,
             });
             let log_results = log_regressor.fit(&log_seq, 2);
 
@@ -2867,6 +2877,7 @@ impl ConjectureEngine {
                     mutation_rate: self.config.mutation_rate,
                     disable_macro_seeds: self.config.disable_macro_seeds,
                 exclude_trig: false,
+                diverse_trajectory_count: self.config.diverse_trajectory_count,
                 });
                 let diff_results = diff_reg.fit(&diff_obs, 1);
                 for c in &diff_results {
@@ -2907,6 +2918,7 @@ impl ConjectureEngine {
                     mutation_rate: self.config.mutation_rate,
                     disable_macro_seeds: self.config.disable_macro_seeds,
                     exclude_trig: self.config.exclude_trig,
+                    diverse_trajectory_count: self.config.diverse_trajectory_count,
                 });
                 if !macro_seeds.is_empty() {
                     regressor.set_seed_macros(macro_seeds.clone());
@@ -5434,19 +5446,56 @@ pub fn discover_invariants_autonomous_with_seed_templates(
     let ndim = initial_state.len();
     assert_eq!(var_names.len(), ndim);
 
-    // Step 1: Integrate and sample trajectory
-    let (_times, states) = rk45_trajectory(rhs, initial_state, t_max, dt);
-    let n_samples = 200.min(states.len());
-    let step = states.len() / n_samples.max(1);
-    let sampled: Vec<Vec<f64>> = states
-        .iter()
-        .step_by(step.max(1))
-        .take(n_samples)
-        .cloned()
-        .collect();
-
+    // Step 1: Integrate and sample trajectory.
+    //
+    // When `config.diverse_trajectory_count > 1`, we also integrate
+    // perturbed-initial-condition trajectories. The fitness function
+    // then takes the MAX variance across all orbits — an expression
+    // that is near-constant on one orbit but varies on another (an
+    // "accidental conservation law") loses. This is the Session-21 fix
+    // for Ceiling 4: without it, compute_trajectory_variance rewards
+    // 1D rationals that happen to be near-constant on one specific
+    // trajectory, crowding out genuine conservation laws.
+    let sample_one = |ic: &[f64]| -> Vec<Vec<f64>> {
+        let (_t, states) = rk45_trajectory(rhs, ic, t_max, dt);
+        let n_samples = 200.min(states.len());
+        let step = states.len() / n_samples.max(1);
+        states
+            .iter()
+            .step_by(step.max(1))
+            .take(n_samples)
+            .cloned()
+            .collect()
+    };
+    let sampled = sample_one(initial_state);
     if sampled.len() < 20 {
         return Vec::new();
+    }
+
+    let mut sampled_orbits: Vec<Vec<Vec<f64>>> = vec![sampled.clone()];
+    let diverse_n = config.diverse_trajectory_count.max(1);
+    if diverse_n > 1 {
+        // Generate perturbed initial conditions. We perturb each
+        // component by ±10% of its magnitude (floor 0.05) using a
+        // deterministic rng seeded from config.seed so the benchmark
+        // is reproducible. Orbits with divergent dynamics may drift
+        // significantly — that's fine, what matters is that each orbit
+        // is a valid sample of the dynamical system.
+        let mut prng = config.seed.wrapping_mul(0x517cc1b727220a95);
+        for _ in 1..diverse_n {
+            prng = lcg_step(prng);
+            let mut ic = initial_state.to_vec();
+            for x in ic.iter_mut() {
+                prng = lcg_step(prng);
+                let u = (prng as f64 / u64::MAX as f64) * 2.0 - 1.0; // [-1, 1]
+                let scale = x.abs().max(0.05);
+                *x += u * 0.1 * scale;
+            }
+            let extra = sample_one(&ic);
+            if extra.len() >= 20 {
+                sampled_orbits.push(extra);
+            }
+        }
     }
 
     // Step 2: GP evolution with variance as fitness
@@ -5555,8 +5604,21 @@ pub fn discover_invariants_autonomous_with_seed_templates(
                     return f64::MAX;
                 }
 
-                let var = compute_trajectory_variance(expr, &sampled, var_names);
-                var
+                // Max variance across all orbits. An expression
+                // constant on one but varying on another scores by its
+                // worst orbit, so accidental-constants-of-this-orbit
+                // lose to true conservation laws.
+                let mut worst = 0.0_f64;
+                for orbit in &sampled_orbits {
+                    let v = compute_trajectory_variance(expr, orbit, var_names);
+                    if !v.is_finite() {
+                        return f64::MAX;
+                    }
+                    if v > worst {
+                        worst = v;
+                    }
+                }
+                worst
             })
             .collect();
 
@@ -5637,7 +5699,16 @@ pub fn discover_invariants_autonomous_with_seed_templates(
                 return (i, f64::MAX, 0.0);
             }
 
-            let var = compute_trajectory_variance(expr, &sampled, var_names);
+            // Session 21: report the worst (max) variance across
+            // diverse orbits so the AutonomousInvariant's `variance`
+            // field accurately represents how well the expression
+            // generalizes beyond the sampled trajectory. Mean is still
+            // taken from the primary trajectory for display stability.
+            let var = sampled_orbits
+                .iter()
+                .map(|orbit| compute_trajectory_variance(expr, orbit, var_names))
+                .filter(|v| v.is_finite())
+                .fold(0.0_f64, f64::max);
             let mean = {
                 let vals: Vec<f64> = sampled
                     .iter()
