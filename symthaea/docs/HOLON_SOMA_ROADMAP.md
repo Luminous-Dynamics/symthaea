@@ -1,6 +1,6 @@
 # Holon-Soma Roadmap
 
-**Version**: 1.6 (2026-04-17)
+**Version**: 1.7 (2026-04-17, later same day)
 **Scope**: The PQC-sealed binary RDP wire connecting a Symthaea cognitive
 loop to a physical embodiment (starting with the Pixel 8 Pro), and the
 research program that rides on top of it.
@@ -667,62 +667,105 @@ consolidation, once without.
 
 ---
 
-## Phase II sub-phase decomposition (v1.6, with Phase I.B.6 numbers)
+## Phase II sub-phase decomposition (v1.7, with Phase II.A measurement)
 
-Phase I.B.6's empirical measurement closes one arm of the v1.4 "attention
-backchannel before or after codec" question. The sustained HEVC wire on a
-Pixel 8 Pro running 720p YouTube clocked **404 KB/s at ~16 fps mean**.
-Projecting to the 30 fps design target:
+### Two distinct wires, two distinct bandwidth budgets (v1.7 correction)
 
-| Quantity | Value | Source |
+v1.6 conflated two pipes into one budget comparison. **Honest framing**:
+
+| Leg | Pipe | v1.6 number | v1.7 correction |
+|---|---|---|---|
+| Pixel → laptop | USB 2.0 HEVC wire | 404 KB/s @ 16 fps (Phase I.B.6) → ~758 KB/s @ 30 fps (projected) | Correct. ~2% of USB ceiling. Compression pointless on this leg. |
+| Laptop → viewer/remote Symthaea | localhost or WAN, sealed RDP | Not measured — v1.6 claimed "8.7% of USB" by mistakenly using the HEVC number | **Measured 2026-04-17** via `examples/phase_2a_lz4_measurement.rs`: steady-state Delta = 641 KB/frame sealed → 18.35 MB/s projected @ 30 fps. **2.1× OVER the 8.75 MB/s network-friendly gate.** |
+
+Why the laptop→viewer leg is ~25× heavier than the phone→laptop HEVC
+wire: `SomaRdpServer` ships the full tile-grid of quantized HDC patches
+per frame, not the HEVC-compressed pixel data. That's the right thing
+for the consciousness-gated research architecture (the patches are the
+HDC vectors Phase III / IV operate on) but it's expensive bytes.
+
+### Phase II.A — Measure first, then decide ✅ DONE (2026-04-17)
+
+Example: `examples/phase_2a_lz4_measurement.rs` (feature:
+`phase-2a-lz4`). Offline measurement: captures real scrcpy frames,
+serializes each `RdpFrame` via `bincode`, applies `lz4_flex`, reports
+per-frame sizes, projects to 30 fps, applies the STOP gate.
+
+**Structural correction**: LZ4 must happen **before** AEAD sealing.
+ChaCha20-Poly1305 ciphertext is pseudorandom and doesn't compress (a
+first draft that LZ4'd the sealed output got 1.00× ratio). The
+production path is `lz4(bincode(frame))` → `aead_wrap(…)`.
+
+Live numbers (Pixel 8 Pro on clock screen, 15 s, 15 fps budget):
+
+| Measurement | Full frame | Delta frame |
 |---|---|---|
-| HEVC wire @ 16 fps (measured) | 404 KB/s | I.B.6 canonical sustain run |
-| HEVC wire @ 30 fps (projected) | ~758 KB/s | linear scale 30/16 |
-| USB 2.0 ceiling | ~35 MB/s | `adb push/pull 200 MB` in I.A |
-| 25% of USB budget | 8.75 MB/s | "leave 75% for the tether" |
-| **Raw HEVC vs budget** | **~8.7%** | — |
+| bincode raw | 2,363,952 B | 641,200 B |
+| bincode + LZ4 | 1,157,679 B | 291,301 B |
+| AEAD overhead | 28 B constant | 28 B constant |
+| Compression ratio | 2.04× | 2.20× |
+| Seal latency (debug build) | — | 658 ms/frame |
+| LZ4 latency (debug build) | — | 79 µs/frame |
 
-Raw HEVC at 30 fps already uses only **~8.7% of the USB budget**. That
-inverts the v1.4 assumption. Compression is still useful for WAN
-deployments and for Phase IV split-cognition over WiFi, but on the
-USB-tethered rig **it is optional polish, not a prerequisite**.
+Overall compression ratio: **2.12×** (matches the roadmap's v1.3-v1.6
+"2-3×" estimate).
 
-### Phase II.A — Measure first, then decide (~1-2 hrs)
+Projection to 30 fps (steady-state Delta basis):
 
-1. Run the scrcpy A/B (added in Phase I.C closeout) with the netem loss
-   script at 0% loss, 30 fps, 60 s duration. Record real sealed
-   per-frame size for HEVC at the target rate.
-2. Add LZ4 wrap behind a `seal_frame_lz4` fork (1 hr, uses existing
-   workspace `lz4_flex` dep). Re-run the A/B with LZ4 enabled.
-3. Report three numbers: raw sealed KB/s, LZ4'd sealed KB/s, ratio.
+| Path | Throughput | vs 8.75 MB/s gate |
+|---|---|---|
+| Raw sealed wire | **18.35 MB/s** | **2.1× OVER** |
+| LZ4 before seal | **8.34 MB/s** | **clears with 5% margin** |
 
-**STOP gate**: if LZ4'd sealed ≤ 8.75 MB/s on the measurement,
-skip sparse patches, content-adaptive, and delta coding entirely.
-Proceed directly to Phase II.B (attention backchannel) as optional polish.
+### Phase II.A decision (v1.7): LZ4 is minimum-viable, not polish
 
-### Phase II.B — Attention backchannel (~1 week, polish not prerequisite)
+Contra v1.6. **LZ4-before-seal is required** to stay under a modest
+network pipe at 30 fps on this architecture. Phase II.B (attention
+backchannel) and Phase II.C (sparse/content-adaptive/delta) remain
+deferred — but the 5% margin is tight. Any of the following eats it:
+
+- Higher-motion content (full-screen video, games): ratio may drop
+  below 2× as deltas fill more tiles → margin goes negative.
+- Full-HD or 4K capture: bincode scales with tile-grid area; 1008×2240
+  is already middling, a full phone display would double.
+- WAN deployment (Phase IV split-cognition) with typical residential
+  upload of 1-5 MB/s: even 8.34 MB/s exceeds, so II.C becomes necessary.
+
+**Implementation of Phase II.A as shipped code (not yet done)**: the
+measurement example demonstrates LZ4 helps by 2.12×; production usage
+requires a `seal_frame_lz4` / `open_frame_lz4` pair that bincodes,
+LZ4s, then AEAD-wraps. Estimated ~1 hour. Currently the wire ships
+raw sealed bytes; sessions wanting the 2.12× reduction invoke the
+measurement example and would need the seal/open wrap to land before
+Phase II.B starts.
+
+### Phase II.B — Attention backchannel (~1 week, polish given 5% margin)
 
 The original "Track A" plan. Desktop `HolonViewerApp` exports
 `VisionManifold::saliency_map()`, ships it upstream at 5 Hz as a new
 `HolonRdpMessage::AttentionMap` variant, server consults the map when
 deciding which detected-change tiles to include in outbound deltas.
 Still valuable for Phase III's Φ-sweep (a consciousness-gated wire is
-what the whole program is about), but not required to hit the 30 fps
-USB budget.
+what the whole program is about).
 
-### Phase II.C — Deeper compression (deferred, measurement-gated)
+### Phase II.C — Deeper compression (deferred, margin-gated)
 
 Sparse patches (3-4 hr), content-adaptive quantization (1 day), and
-inter-frame delta coding (2 days) only light up if LZ4 alone doesn't
-clear the 8.75 MB/s gate OR if Phase IV needs WAN-friendly compression
-for split-cognition over WiFi/internet.
+inter-frame delta coding (2 days) light up if any of:
+- Heavier-motion steady-state content eats the 5% LZ4 margin.
+- WAN deployment (Phase IV) demands sub-megabit/sec throughput.
+- Phase I.D GPU-decode actually delivers true 30 fps (the current
+  ceiling is ~16 fps mean per Phase I.B.6; at that rate the sealed
+  wire is 9.8 MB/s raw / 4.4 MB/s LZ4 — already fine).
 
-**The key insight**: compression was feared to be a blocker before
-Phase I.B.6 measured real numbers. With 404 KB/s at 16 fps scaling to
-~758 KB/s at 30 fps, the USB tether already has ~40× more headroom
-than the heavy-content wire needs. The sequencing inverts: **measure,
-ship attention backchannel for the research thesis, compress only if
-WAN deployment makes it necessary**.
+### What Phase II.A actually inverted
+
+v1.6 claimed "compression is optional polish" based on HEVC wire bytes.
+v1.7 says "LZ4 is minimum-viable" based on sealed RDP bytes. **The
+research thesis unchanged**: Phase II.B's consciousness-gated
+attention backchannel is still the publishable artifact. The STOP
+gate just moved from "compression required? probably not" to
+"compression required? yes, the minimum one."
 
 ---
 
@@ -878,6 +921,30 @@ infrastructure.
 
 ## Change log
 
+- **1.7** (2026-04-17, later same day): **Phase II.A measurement shipped, v1.6 framing corrected.**
+  - `examples/phase_2a_lz4_measurement.rs` + `phase-2a-lz4` feature.
+    Offline measurement of LZ4-before-seal compression ratio on real
+    Pixel 8 Pro capture. Live numbers (15 s, clock screen): Full frame
+    2.04× ratio, Delta frame 2.20× ratio, overall 2.12×. AEAD overhead
+    measured empirically at 28 B constant (nonce + Poly1305 tag).
+  - First draft LZ4-after-seal returned 1.00× (ChaCha20-Poly1305
+    ciphertext is pseudorandom; a lesson for any future "compress the
+    wire" proposal: compression MUST precede AEAD).
+  - Projection at 30 fps steady-state: raw 18.35 MB/s (2.1× OVER
+    the 8.75 MB/s network-friendly gate), LZ4 8.34 MB/s (clears
+    with 5% margin).
+  - **v1.6 framing error corrected**: the "8.7% of USB budget" claim
+    used Phase I.B.6's HEVC wire bytes (404 KB/s, phone→laptop leg).
+    The laptop→viewer leg carries full tile-grid HDC patches (~25×
+    larger) and is what Phase II.A's STOP gate actually measures.
+    The two pipes have different budgets — v1.7 splits them in the
+    Phase II section.
+  - **Phase II.A decision flipped** from "compression is polish" to
+    "LZ4 is minimum-viable": 5% margin is tight, any of heavier motion
+    / higher resolution / WAN deployment eats it.
+  - **Phase II.A implementation TODO**: measurement example is only
+    the decision-input. A `seal_frame_lz4` / `open_frame_lz4` pair
+    still needs to land before Phase II.B can ship. Estimated ~1 hour.
 - **1.6** (2026-04-17): **Phase I.B recovery + Phase I.C extension + Phase II decomposition.**
   - **Phase I.B recovery merge on main** (`d1df1216d1` via `git merge
     --no-ff phase-1b-recovery`). The v1.5 closure claimed the work was
