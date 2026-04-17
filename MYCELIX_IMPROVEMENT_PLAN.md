@@ -1,6 +1,23 @@
 # Mycelix Improvement Plan
 
-*Drafted 2026-04-17. Revised after verified `cargo check --workspace` across all 26 Rust clusters.*
+*Drafted 2026-04-17. Revised after verified `cargo check --workspace` across all 26 Rust clusters. Updated with fix progress 2026-04-17.*
+
+## Session Progress (2026-04-17)
+
+Committed fixes:
+| Commit | Target | What |
+|---|---|---|
+| `4ca01a5938` | CLAUDE.md + unified hApp manifest | P1.1 + P1.2 doc fixes |
+| `f93b19b1bd` | mycelix-energy | Moved `resolver`/`members` from `[workspace.package]` to `[workspace]` |
+| `a42521542f` | mycelix-personal | Added missing `license` to `[workspace.package]` |
+| `cf209373b7` | mycelix-desci | Removed dangling `pub mod reproducibility_engine` |
+| `d22016222d` | mycelix-civic robotics-dispatch integrity | Added `RoboticCredential` match arm |
+
+Net compile-check delta on 16 tractable clusters: **12 PASS → 14 PASS**.
+
+Still FAIL:
+- **civic** — coordinator zome has pre-existing HDK API drift (`AgentInfo.agent_latest_pubkey`, arity changes) masked by the integrity error I fixed
+- **energy** — manifest fix exposed secondary code drift: `EnergyProject` initializer missing 4 fields (`consciousness_assessed_at`, `consciousness_scorer_did`, `harmony_alignment`, +1)
 
 ## Compile Health (verified 2026-04-17)
 
