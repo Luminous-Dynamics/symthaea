@@ -1,0 +1,30 @@
+[book]
+title = "The Symtropy Book"
+authors = ["Tristan Stoltz", "Luminous Dynamics"]
+description = "Guide to Symtropy — a dual-track game engine: best-in-class N-dimensional deterministic physics, with optional consciousness-coupled research primitives."
+language = "en"
+src = "src"
+
+[output.html]
+default-theme = "navy"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/luminous-dynamics/symtropy"
+edit-url-template = "https://github.com/luminous-dynamics/symtropy/edit/main/book/{path}"
+
+[output.html.playground]
+editable = false
+copyable = true
+line-numbers = true
+
+[output.html.search]
+enable = true
+limit-results = 30
+use-boolean-and = true
+boost-title = 2
+boost-hierarchy = 1
+boost-paragraph = 1
+expand = true
+heading-split-level = 3
+
+[rust]
+edition = "2021"
