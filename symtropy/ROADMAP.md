@@ -87,9 +87,13 @@ Bevy systems and NPCs call Mycelix zomes via a `MycelixClient` Resource that spe
 **Architecture:** subprocess IPC, not in-process linking. Holochain's `holochain_client 0.6.0` exact-pins `serde = 1.0.203` while Bevy 0.18 requires `serde_core >= 1.0.221` (unresolvable in one Rust compilation unit). Running the Holochain client as a separate child process sidesteps the conflict permanently and adds process-isolation for free.
 
 - **M1 SHIPPED (2026-04-17, `91408552cd`):** subprocess plumbing, `MycelixClient` Resource, `MycelixResponse` Message, `BevyMycelixPlugin`, `GetActiveProposals` zome call, 9 unit tests, `hello_mycelix` example runs end-to-end.
-- **M2 (next):** extend wire protocol + `mycelix-conductor-bridge` with `SubmitProposal`, `CastVote`, `QueryTendBalance`. Upgrade FIFO correlation to request-IDs. 5-entity integration test.
-- **M3:** scenario harness + CI (`symtropy-mycelix-verify`).
+- **M2 SHIPPED (2026-04-17, `506156c594`):** `SubmitProposal`, `CastVote`, `QueryTendBalance` zome calls wired through `mycelix-conductor-bridge`. `QueryTendBalance` routes to `finance/finance_bridge` instead of governance. Wire protocol upgraded from FIFO to `request_id: u64` correlation (named to avoid colliding with `ProposalInput.id` on serde-flatten). `AtomicU64` counter + `HashMap<u64, Pending>` correlation map. 12 unit tests green.
+- **M3 (next):** scenario harness (`ScenarioConfig`, `ScenarioReport`, `run_scenario`) + CI job (`symtropy-mycelix-verify`). 5-entity integration scenario against a live conductor.
 - **M4:** 50-NPC visual village demo at 60fps.
+
+**Also shipped 2026-04-17:**
+- `symtropy-bevy 0.2.0` refactored to layer on top of `symtropy-bevy-core` — re-exports the permissive types (`PhysicsBody`, `BevyPhysics`, both plugin flavours), adds consciousness integration on top. Commit `8a8963bd6f`.
+- `symtropy-robotics-bridge` gains `tick_motor_commands()` returning platform-aware `Vec<f64>` (humanoid → 21 per-joint commands) + `MotorPlanner` trait for future per-joint intelligence. `UniformGainPlanner` ships as baseline. Deliberately does NOT depend on `symthaea-core`; Symthaea `EmbodimentBridge` adapters live in user/platform code. Commit `ba47296649`. 16 tests green.
 - **Cross-cutting with** Phase 2 Track C (below) and Phase 4 Track A. All three tracks share this crate's `MycelixClient`.
 
 WebView-embed of real Leptos apps (Track A's native variant) is explicitly NOT pursued. `wry` doesn't support offscreen rendering ([tauri/wry#391](https://github.com/tauri-apps/wry/issues/391), open since 2021); Servo-as-library and CEF are out of scope. See Phase 4 Track A for the tractable browser-overlay alternative.
