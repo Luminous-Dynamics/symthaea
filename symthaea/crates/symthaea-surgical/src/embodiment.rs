@@ -4,22 +4,42 @@ use symthaea_core::genesis::GenesisSeed; use symthaea_core::hdc::ContinuousHV;
 use crate::controller::SurgicalController; use crate::encoder::SurgicalHdcEncoder;
 use crate::simulator::{SimpleSurgicalSimulator, SurgicalPhysicsSimulator};
 use crate::types::{SurgicalConfig, SurgicalSafetyLevel, NUM_ACTUATORS};
-pub use symthaea_core::embodiment::{grounding_from_prediction_error, grounding_label, EmbodimentResult, EmbodimentTelemetry, MotorSafetyLevel, GROUNDING_SENSORIMOTOR};
+pub use symthaea_core::embodiment::{grounding_from_prediction_error, grounding_label, EmbodimentResult, EmbodimentTelemetry, MoralGateInput, MotorSafetyLevel, GROUNDING_SENSORIMOTOR};
 
-pub struct SurgicalEmbodiment { controller: SurgicalController, simulator: SimpleSurgicalSimulator, encoder: SurgicalHdcEncoder, last_perception: Option<ContinuousHV>, total_steps: usize, current_safety: MotorSafetyLevel, safety_override: Option<MotorSafetyLevel>, last_control_effort: f32, last_prediction_error: f32, surgical_safety: SurgicalSafetyLevel }
+pub struct SurgicalEmbodiment { controller: SurgicalController, simulator: SimpleSurgicalSimulator, encoder: SurgicalHdcEncoder, last_perception: Option<ContinuousHV>, total_steps: usize, current_safety: MotorSafetyLevel, safety_override: Option<MotorSafetyLevel>, moral_safety: Option<MotorSafetyLevel>, last_control_effort: f32, last_prediction_error: f32, surgical_safety: SurgicalSafetyLevel }
 
 impl SurgicalEmbodiment {
-    pub fn new(g: &GenesisSeed) -> Self { let c = SurgicalConfig::default(); Self { controller: SurgicalController::new(g, &c), simulator: SimpleSurgicalSimulator::new(), encoder: SurgicalHdcEncoder::new(g, 32), last_perception: None, total_steps: 0, current_safety: MotorSafetyLevel::Green, safety_override: None, last_control_effort: 0.0, last_prediction_error: 0.0, surgical_safety: SurgicalSafetyLevel::FullControl } }
+    pub fn new(g: &GenesisSeed) -> Self { let c = SurgicalConfig::default(); Self { controller: SurgicalController::new(g, &c), simulator: SimpleSurgicalSimulator::new(), encoder: SurgicalHdcEncoder::new(g, 32), last_perception: None, total_steps: 0, current_safety: MotorSafetyLevel::Green, safety_override: None, moral_safety: None, last_control_effort: 0.0, last_prediction_error: 0.0, surgical_safety: SurgicalSafetyLevel::FullControl } }
     pub fn set_safety_override(&mut self, l: MotorSafetyLevel) { self.safety_override = Some(l); }
     pub fn clear_safety_override(&mut self) { self.safety_override = None; }
     pub fn surgical_safety(&self) -> SurgicalSafetyLevel { self.surgical_safety }
+    /// Apply moral gate from ethics engine. SAFETY-CRITICAL: surgical robot cuts human tissue.
+    /// Ahimsa violation or Blocked verdict forces Retract (emergency stop + disable cautery + withdraw pose).
+    /// Consent violation forces Orange (no cautery, reduced torque). Caution verdict forces Yellow.
+    pub fn apply_moral_gate(&mut self, gate: MoralGateInput) {
+        self.moral_safety = if gate.ahimsa_violated || gate.verdict == MoralGateInput::VERDICT_BLOCKED { Some(MotorSafetyLevel::Red) }
+            else if gate.consent_violation { Some(MotorSafetyLevel::Orange) }
+            else if gate.verdict == MoralGateInput::VERDICT_CAUTION { Some(MotorSafetyLevel::Yellow) }
+            else { None };
+    }
     pub fn step(&mut self, hv: &ContinuousHV, dt: f32, phi: f64) -> EmbodimentResult {
-        self.surgical_safety = SurgicalSafetyLevel::from_phi(phi); let tg = self.surgical_safety.torque_gain();
-        let pl = MotorSafetyLevel::from_phi(phi); self.current_safety = match self.safety_override { Some(ov) => pl.max(ov), None => pl };
+        self.surgical_safety = SurgicalSafetyLevel::from_phi(phi);
+        // Moral gate downgrades surgical_safety: Red moral → force Retract so existing
+        // retract-pose + disable-cautery logic below engages uniformly.
+        if matches!(self.moral_safety, Some(MotorSafetyLevel::Red) | Some(MotorSafetyLevel::Orange)) {
+            self.surgical_safety = SurgicalSafetyLevel::Retract;
+        }
+        let tg = self.surgical_safety.torque_gain();
+        let pl = MotorSafetyLevel::from_phi(phi);
+        self.current_safety = pl;
+        if let Some(ov) = self.safety_override { self.current_safety = self.current_safety.max(ov); }
+        if let Some(m) = self.moral_safety { self.current_safety = self.current_safety.max(m); }
         let mut cmd = self.controller.forward(hv, dt);
         for t in &mut cmd.joint_torques { *t *= tg; }
         if !self.surgical_safety.cautery_allowed() { cmd.cautery = 0.0; }
         if self.surgical_safety == SurgicalSafetyLevel::Retract { cmd.joint_torques = [0.0,-0.3,0.0,0.0,0.0,0.0]; cmd.jaw = 0.0; cmd.cautery = 0.0; }
+        // Moral-Red (ahimsa) is stricter than phi-Red retract pose: full emergency stop, zero torque.
+        if self.moral_safety == Some(MotorSafetyLevel::Red) { cmd.joint_torques = [0.0; 6]; cmd.jaw = 0.0; cmd.cautery = 0.0; }
         self.last_control_effort = cmd.control_effort(); self.simulator.step(&cmd, dt as f64);
         let p = self.encoder.encode(self.simulator.state());
         let pe = if let Some(ref prev) = self.last_perception { (1.0-p.similarity(prev).max(0.0)).min(1.0) } else { 0.0f32 };
@@ -27,7 +47,7 @@ impl SurgicalEmbodiment {
         EmbodimentResult { num_actuators: NUM_ACTUATORS, control_effort: self.last_control_effort, success: self.simulator.state().is_finite(), prediction_error: pe, safety_level: self.current_safety, epistemic_grounding: GROUNDING_SENSORIMOTOR, observation_confidence: grounding_from_prediction_error(pe) }
     }
     pub fn encode_perception(&mut self) -> ContinuousHV { let p = self.encoder.encode(self.simulator.state()); self.last_perception = Some(p.clone()); p }
-    pub fn reset(&mut self) { self.simulator.reset(); self.controller.reset(); self.encoder.reset(); self.last_perception = None; self.total_steps = 0; self.current_safety = MotorSafetyLevel::Green; self.safety_override = None; self.last_control_effort = 0.0; self.last_prediction_error = 0.0; self.surgical_safety = SurgicalSafetyLevel::FullControl; }
+    pub fn reset(&mut self) { self.simulator.reset(); self.controller.reset(); self.encoder.reset(); self.last_perception = None; self.total_steps = 0; self.current_safety = MotorSafetyLevel::Green; self.safety_override = None; self.moral_safety = None; self.last_control_effort = 0.0; self.last_prediction_error = 0.0; self.surgical_safety = SurgicalSafetyLevel::FullControl; }
     pub fn safety_level(&self) -> MotorSafetyLevel { self.current_safety }
     pub fn total_steps(&self) -> usize { self.total_steps }
     pub fn telemetry(&self) -> EmbodimentTelemetry { EmbodimentTelemetry { total_steps: self.total_steps as u64, control_effort: self.last_control_effort, prediction_error: self.last_prediction_error, safety_level: format!("{:?}", self.current_safety), platform: "surgical".to_string(), num_actuators: NUM_ACTUATORS, epistemic_grounding: grounding_label(GROUNDING_SENSORIMOTOR).to_string(), observation_confidence: grounding_from_prediction_error(self.last_prediction_error), platform_specific: Vec::new() } }
@@ -44,10 +64,29 @@ impl symthaea_core::embodiment::EmbodimentBridge for SurgicalEmbodiment {
     fn num_actuators(&self) -> usize { NUM_ACTUATORS }
     fn total_steps(&self) -> usize { self.total_steps() }
     fn telemetry(&self) -> EmbodimentTelemetry { self.telemetry() }
+    fn apply_moral_gate(&mut self, gate: MoralGateInput) { self.apply_moral_gate(gate) }
 }
 
 #[cfg(test)] mod tests { use super::*;
     #[test] fn test_step() { let mut b = SurgicalEmbodiment::new(&GenesisSeed::from_phrase("t")); assert!(b.step(&ContinuousHV::random(16384, 42), 0.001, 0.7).success); }
     #[test] fn test_retract() { let mut b = SurgicalEmbodiment::new(&GenesisSeed::from_phrase("t")); b.step(&ContinuousHV::random(16384, 42), 0.001, 0.05); assert_eq!(b.surgical_safety(), SurgicalSafetyLevel::Retract); }
     #[test] fn test_extended() { let mut b = SurgicalEmbodiment::new(&GenesisSeed::from_phrase("t")); let hv = ContinuousHV::random(16384, 42); for _ in 0..500 { assert!(b.step(&hv, 0.001, 0.7).success); } }
+    #[test]
+    fn test_moral_gate_ahimsa_emergency_stop() {
+        // SAFETY-CRITICAL: surgical ahimsa violation → strict zero (not the gentler retract pose).
+        let mut b = SurgicalEmbodiment::new(&GenesisSeed::from_phrase("t"));
+        b.apply_moral_gate(MoralGateInput { verdict: MoralGateInput::VERDICT_SAFE, consent_violation: false, ahimsa_violated: true });
+        let r = b.step(&ContinuousHV::random(16384, 42), 0.001, 0.9);
+        assert_eq!(r.safety_level, MotorSafetyLevel::Red, "ahimsa must force Red at any phi");
+        assert_eq!(b.surgical_safety(), SurgicalSafetyLevel::Retract, "ahimsa must also force surgical Retract");
+        assert!(r.control_effort < 1e-6, "ahimsa must emergency-stop (strict zero), got {}", r.control_effort);
+    }
+    #[test]
+    fn test_moral_gate_consent_violation() {
+        let mut b = SurgicalEmbodiment::new(&GenesisSeed::from_phrase("t"));
+        b.apply_moral_gate(MoralGateInput { verdict: MoralGateInput::VERDICT_SAFE, consent_violation: true, ahimsa_violated: false });
+        let r = b.step(&ContinuousHV::random(16384, 42), 0.001, 0.9);
+        assert_eq!(r.safety_level, MotorSafetyLevel::Orange, "consent violation → Orange");
+        assert_eq!(b.surgical_safety(), SurgicalSafetyLevel::Retract, "Orange moral also forces Retract");
+    }
 }
