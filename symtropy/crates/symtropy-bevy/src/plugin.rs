@@ -5,8 +5,8 @@
 
 use bevy::prelude::*;
 use nalgebra::SVector;
+use symtropy_bevy_core::PhysicsBody;
 use symtropy_consciousness_physics::coupling::ConsciousnessField;
-use symtropy_physics::body::BodyHandle;
 use symtropy_physics::PhysicsWorld;
 
 use crate::biometrics::biometric_to_phi_system;
@@ -49,23 +49,10 @@ impl<const D: usize> SymtropyPhysics<D> {
     }
 }
 
-/// Bevy component linking an entity to a physics body.
-///
-/// Attach this to a Bevy entity (with `Sprite`, `Mesh3d`, etc.)
-/// to have its `Transform` automatically synced from the physics world.
-#[derive(Component)]
-pub struct PhysicsBody {
-    /// Handle to the body in the physics world.
-    pub handle: BodyHandle,
-    /// Visual radius for debug rendering.
-    pub visual_radius: f32,
-}
-
-impl PhysicsBody {
-    pub fn new(handle: BodyHandle, visual_radius: f32) -> Self {
-        Self { handle, visual_radius }
-    }
-}
+// `PhysicsBody` is now re-exported from `symtropy-bevy-core` (identical
+// definition; see lib.rs). This crate no longer owns the type — any entity
+// marked with `PhysicsBody` is compatible with both the permissive
+// `BevyPhysicsPlugin` and the Phi-coupled `SymtropyPhysicsPlugin`.
 
 /// Plugin configuration.
 pub struct SymtropyPhysicsPluginConfig<const D: usize> {

@@ -7,7 +7,8 @@
 //! Disable with `default-features = false` in your Cargo.toml.
 
 use bevy::prelude::*;
-use crate::plugin::{PhysicsBody, SymtropyPhysics};
+use crate::plugin::SymtropyPhysics;
+use symtropy_bevy_core::PhysicsBody;
 use symtropy_consciousness_physics::safety::SafetyTier;
 
 /// Safety tier colors (NRC-inspired).

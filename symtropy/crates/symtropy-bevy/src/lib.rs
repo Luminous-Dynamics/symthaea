@@ -21,6 +21,14 @@
 //! - Physics step system in `FixedUpdate` with Phi-coupling via `PhysicsCallback`
 //! - Transform sync system that writes body positions to Bevy `Transform`
 //! - Debug gizmo rendering (collider outlines, contact points, safety tiers)
+//!
+//! # Crate relationship
+//!
+//! This crate layers on top of [`symtropy-bevy-core`], which provides
+//! permissive-licensed physics-only Bevy integration. The types
+//! [`PhysicsBody`], [`BevyPhysics`], [`BevyPhysicsPlugin`] are re-exported
+//! from bevy-core so users can drop down to no-coupling physics without
+//! switching crates.
 
 pub mod biometrics;
 pub mod macro_bridge;
@@ -30,4 +38,17 @@ pub mod debug;
 
 pub use biometrics::{biometric_to_phi_system, PlayerBiometrics};
 pub use macro_bridge::{apply_macro_modifiers_system, MacroWorldState};
-pub use plugin::{SymtropyPhysicsPlugin, SymtropyPhysics, PhysicsBody};
+pub use plugin::{SymtropyPhysics, SymtropyPhysicsPlugin};
+
+/// Re-exported from [`symtropy-bevy-core`]. Identical type used by both
+/// crates, so an entity with `PhysicsBody` works with either the permissive
+/// or the Phi-coupled plugin.
+pub use symtropy_bevy_core::PhysicsBody;
+
+/// Re-exported from [`symtropy-bevy-core`] for users who want a
+/// physics-only path inside a project that also uses the Phi-coupled
+/// plugin (e.g., some scenes take the full consciousness integration,
+/// others don't).
+pub use symtropy_bevy_core::{
+    BevyPhysics, BevyPhysicsCorePlugin, BevyPhysicsPlugin, NoCouplingResource,
+};
