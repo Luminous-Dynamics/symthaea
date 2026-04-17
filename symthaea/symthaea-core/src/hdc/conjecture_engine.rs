@@ -1302,13 +1302,15 @@ fn macro_usage_key(expr: &Expr) -> String {
 }
 
 /// Session 30: variance of the Lie derivative of `expr` along the
-/// flow, across sampled trajectory points. For a true conservation
-/// law `E`, `L_f E = ∇E · f(state) = 0` exactly, so the variance is
-/// zero up to numerical error. For a gameable 1D near-constant like
-/// `y^6`, `∇(y^6) = [0, 6y⁵, 0, 0]` and `∇·f = 6y⁵·vy`, which
-/// varies substantially along the trajectory — high variance,
-/// correctly rejected. This is the physics-correct fitness, not
-/// gameable by finite-sample accidents.
+/// flow, NORMALIZED by the mean squared gradient magnitude across
+/// the trajectory. For a true conservation law `E`, `L_f E = 0`
+/// exactly, so the normalized variance is zero up to numerical
+/// error. For a gameable 1D near-constant like `y^6`, L_f = 6y⁵·vy
+/// varies substantially — high variance, rejected. Normalizing by
+/// ||∇E||² prevents scale-gaming where an expression with tiny
+/// gradient magnitude (e.g. `0.125^(x+π+3)` has ∇ ~ 1e-4) produces
+/// small absolute Lie variance without being a true invariant.
+/// Dimensionless normalized metric: ⟨(L_f E)²⟩ / ⟨||∇E||²⟩ · ||f||².
 fn lie_derivative_variance(
     expr: &Expr,
     rhs: fn(&[f64], f64) -> Vec<f64>,
@@ -1316,6 +1318,8 @@ fn lie_derivative_variance(
     var_names: &[&str],
 ) -> f64 {
     let mut lie_vals = Vec::with_capacity(trajectory.len());
+    let mut grad_mag_sq_sum = 0.0_f64;
+    let mut grad_n = 0usize;
     for state in trajectory {
         let grad = fd_gradient(expr, state, var_names);
         if !grad.iter().all(|g| g.is_finite()) {
@@ -1330,16 +1334,25 @@ fn lie_derivative_variance(
             return f64::MAX;
         }
         lie_vals.push(lie);
+        let grad_sq: f64 = grad.iter().map(|g| g * g).sum();
+        grad_mag_sq_sum += grad_sq;
+        grad_n += 1;
     }
-    if lie_vals.is_empty() {
+    if lie_vals.is_empty() || grad_n == 0 {
         return f64::MAX;
     }
     let mean = lie_vals.iter().sum::<f64>() / lie_vals.len() as f64;
-    lie_vals
+    let raw_var = lie_vals
         .iter()
         .map(|v| (v - mean).powi(2))
         .sum::<f64>()
-        / lie_vals.len() as f64
+        / lie_vals.len() as f64;
+    let mean_grad_sq = grad_mag_sq_sum / grad_n as f64;
+    // Prevent div-by-zero and floor-dominance for flat gradients;
+    // use a minimum scale of 1e-30 which is below any meaningful
+    // physical magnitude on unit-scaled orbits.
+    let scale = mean_grad_sq.max(1e-30);
+    raw_var / scale
 }
 
 /// Session 29: finite-difference gradient of an expression at a state
