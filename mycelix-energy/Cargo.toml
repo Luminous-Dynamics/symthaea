@@ -1,7 +1,4 @@
 [workspace]
-
-[workspace.package]
-license = "AGPL-3.0-or-later"
 resolver = "2"
 members = [
     "zomes/shared",
@@ -17,6 +14,9 @@ members = [
     "zomes/bridge/coordinator",
 ]
 exclude = ["tests"]
+
+[workspace.package]
+license = "AGPL-3.0-or-later"
 
 [workspace.dependencies]
 # Holochain 0.6 compatible
