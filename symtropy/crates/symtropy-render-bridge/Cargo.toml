@@ -14,8 +14,8 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-symtropy-math = { path = "../symtropy-math" }
-symtropy-physics = { path = "../symtropy-physics" }
+symtropy-math = { version = "0.2.0", path = "../symtropy-math" }
+symtropy-physics = { version = "0.2.0", path = "../symtropy-physics" }
 nalgebra = "0.34"
 bevy = { version = "0.18", default-features = false, features = [
     "bevy_render", "bevy_core_pipeline", "bevy_sprite", "bevy_sprite_render",
