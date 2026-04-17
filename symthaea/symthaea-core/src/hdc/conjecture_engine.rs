@@ -678,6 +678,22 @@ pub struct RegressorConfig {
     /// these get a fitness penalty, forcing discovery of structurally
     /// independent invariants. Default empty.
     pub known_invariants: Vec<Expr>,
+    /// Session 30: use Lie-derivative variance instead of raw
+    /// trajectory variance as the fitness metric. For a candidate
+    /// `E(state)`, the Lie derivative along the flow is
+    /// `L_f E = ∇E · f(state)` where `f` is the RHS of the ODE.
+    /// True conservation laws satisfy `L_f E = 0` exactly (up to
+    /// integration error), so the variance of `L_f E` along the
+    /// trajectory is zero for genuine invariants. Gameable 1D
+    /// near-constants like `y^6` have non-zero `L_f E` because the
+    /// flow `f` has non-zero components in every direction, forcing
+    /// any expression with non-trivial dependence to produce varying
+    /// derivatives. This is the physics-correct fitness — it cannot
+    /// be satisfied by finite-sample accidents.
+    /// Requires the caller to pass `rhs` (the ODE function) as part
+    /// of the autonomous-discovery API, which we already do. Default
+    /// false (preserves the S19-S29 variance fitness).
+    pub use_lie_fitness: bool,
 }
 
 impl Default for RegressorConfig {
@@ -699,6 +715,7 @@ impl Default for RegressorConfig {
             orthogonality_penalty: 1.0,
             orthogonality_threshold: 0.9,
             known_invariants: Vec::new(),
+            use_lie_fitness: false,
         }
     }
 }
@@ -878,6 +895,7 @@ impl SymbolicRegressor {
                 orthogonality_penalty: self.config.orthogonality_penalty,
                 orthogonality_threshold: self.config.orthogonality_threshold,
                 known_invariants: self.config.known_invariants.clone(),
+                use_lie_fitness: self.config.use_lie_fitness,
             });
             let log_results = log_regressor.fit(&log_seq, 2);
 
@@ -1281,6 +1299,47 @@ fn macro_usage_key(expr: &Expr) -> String {
     {
         format!("{}", expr)
     }
+}
+
+/// Session 30: variance of the Lie derivative of `expr` along the
+/// flow, across sampled trajectory points. For a true conservation
+/// law `E`, `L_f E = ∇E · f(state) = 0` exactly, so the variance is
+/// zero up to numerical error. For a gameable 1D near-constant like
+/// `y^6`, `∇(y^6) = [0, 6y⁵, 0, 0]` and `∇·f = 6y⁵·vy`, which
+/// varies substantially along the trajectory — high variance,
+/// correctly rejected. This is the physics-correct fitness, not
+/// gameable by finite-sample accidents.
+fn lie_derivative_variance(
+    expr: &Expr,
+    rhs: fn(&[f64], f64) -> Vec<f64>,
+    trajectory: &[Vec<f64>],
+    var_names: &[&str],
+) -> f64 {
+    let mut lie_vals = Vec::with_capacity(trajectory.len());
+    for state in trajectory {
+        let grad = fd_gradient(expr, state, var_names);
+        if !grad.iter().all(|g| g.is_finite()) {
+            return f64::MAX;
+        }
+        let rhs_vec = rhs(state, 0.0);
+        if rhs_vec.len() != grad.len() {
+            return f64::MAX;
+        }
+        let lie: f64 = grad.iter().zip(rhs_vec.iter()).map(|(g, f)| g * f).sum();
+        if !lie.is_finite() {
+            return f64::MAX;
+        }
+        lie_vals.push(lie);
+    }
+    if lie_vals.is_empty() {
+        return f64::MAX;
+    }
+    let mean = lie_vals.iter().sum::<f64>() / lie_vals.len() as f64;
+    lie_vals
+        .iter()
+        .map(|v| (v - mean).powi(2))
+        .sum::<f64>()
+        / lie_vals.len() as f64
 }
 
 /// Session 29: finite-difference gradient of an expression at a state
@@ -3088,6 +3147,7 @@ impl ConjectureEngine {
                 orthogonality_penalty: self.config.orthogonality_penalty,
                 orthogonality_threshold: self.config.orthogonality_threshold,
                 known_invariants: self.config.known_invariants.clone(),
+                use_lie_fitness: self.config.use_lie_fitness,
                 });
                 let diff_results = diff_reg.fit(&diff_obs, 1);
                 for c in &diff_results {
@@ -3134,6 +3194,7 @@ impl ConjectureEngine {
                     orthogonality_penalty: self.config.orthogonality_penalty,
                     orthogonality_threshold: self.config.orthogonality_threshold,
                     known_invariants: self.config.known_invariants.clone(),
+                    use_lie_fitness: self.config.use_lie_fitness,
                 });
                 if !macro_seeds.is_empty() {
                     regressor.set_seed_macros(macro_seeds.clone());
@@ -5883,9 +5944,20 @@ pub fn discover_invariants_autonomous_with_seed_templates(
                 // constant on one but varying on another scores by its
                 // worst orbit, so accidental-constants-of-this-orbit
                 // lose to true conservation laws.
+                //
+                // Session 30: when `use_lie_fitness`, measure the
+                // variance of the Lie derivative `∇E · f(state)`
+                // instead of the value E(state). True conservation
+                // laws have `L_f E = 0` identically; 1D near-constant
+                // accidents have nonzero `L_f E` that varies along
+                // the trajectory, so they get correctly rejected.
                 let mut worst = 0.0_f64;
                 for orbit in &sampled_orbits {
-                    let v = compute_trajectory_variance(expr, orbit, var_names);
+                    let v = if config.use_lie_fitness {
+                        lie_derivative_variance(expr, rhs, orbit, var_names)
+                    } else {
+                        compute_trajectory_variance(expr, orbit, var_names)
+                    };
                     if !v.is_finite() {
                         return f64::MAX;
                     }
@@ -6092,9 +6164,20 @@ pub fn discover_invariants_autonomous_with_seed_templates(
             // field accurately represents how well the expression
             // generalizes beyond the sampled trajectory. Mean is still
             // taken from the primary trajectory for display stability.
+            //
+            // Session 30: use Lie-derivative variance here too when
+            // enabled, so returned AutonomousInvariant.variance is
+            // the Lie-derivative variance (directly comparable to
+            // the in-loop fitness).
             let var = sampled_orbits
                 .iter()
-                .map(|orbit| compute_trajectory_variance(expr, orbit, var_names))
+                .map(|orbit| {
+                    if config.use_lie_fitness {
+                        lie_derivative_variance(expr, rhs, orbit, var_names)
+                    } else {
+                        compute_trajectory_variance(expr, orbit, var_names)
+                    }
+                })
                 .filter(|v| v.is_finite())
                 .fold(0.0_f64, f64::max);
             let mean = {
