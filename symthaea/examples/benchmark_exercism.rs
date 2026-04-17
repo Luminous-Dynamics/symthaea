@@ -3300,32 +3300,31 @@ pub enum Bucket { One, Two }
 #[derive(PartialEq, Eq, Debug)]
 pub struct BucketStats { pub moves: u8, pub goal_bucket: Bucket, pub other_bucket: u8 }
 pub fn solve(cap1: u8, cap2: u8, goal: u8, start: &Bucket) -> Option<BucketStats> {
-    use std::collections::HashSet;
+    use std::collections::{HashSet, VecDeque};
     let (ca, cb, swap) = match start {
         Bucket::One => (cap1 as i16, cap2 as i16, false),
         Bucket::Two => (cap2 as i16, cap1 as i16, true),
     };
+    let g = goal as i16;
+    // Forbidden state: start bucket empty AND other bucket full
+    let forbidden = |a: i16, b: i16| a == 0 && b == cb;
     let mut visited = HashSet::new();
-    let mut queue = std::collections::VecDeque::new();
-    queue.push_back((0i16, 0i16, 0u8));
-    visited.insert((0i16, 0i16));
-    // Fill start bucket first
-    queue.clear(); visited.clear();
-    queue.push_back((ca, 0, 1));
-    visited.insert((ca, 0));
-    if cb == goal as i16 { visited.insert((ca, cb)); queue.push_back((ca, cb, 1)); /* handled below */ }
+    let mut queue = VecDeque::new();
+    // Must start by filling the start bucket
+    visited.insert((ca, 0i16));
+    queue.push_back((ca, 0i16, 1u8));
     while let Some((a, b, moves)) = queue.pop_front() {
-        let (real_a, real_b) = if swap { (b, a) } else { (a, b) };
-        if real_a == goal as i16 { return Some(BucketStats { moves, goal_bucket: Bucket::One, other_bucket: real_b as u8 }); }
-        if real_b == goal as i16 { return Some(BucketStats { moves, goal_bucket: Bucket::Two, other_bucket: real_a as u8 }); }
-        let nexts = [
+        let (r1, r2) = if swap { (b, a) } else { (a, b) };
+        if r1 == g { return Some(BucketStats { moves, goal_bucket: Bucket::One, other_bucket: r2 as u8 }); }
+        if r2 == g { return Some(BucketStats { moves, goal_bucket: Bucket::Two, other_bucket: r1 as u8 }); }
+        for (na, nb) in [
             (ca, b), (a, cb), (0, b), (a, 0),
-            { let pour = a.min(cb - b); (a - pour, b + pour) },
-            { let pour = b.min(ca - a); (a + pour, b - pour) },
-        ];
-        for (na, nb) in nexts {
-            if na == 0 && nb == cb { continue; } // can't fill other bucket without filling start first
-            if visited.insert((na, nb)) { queue.push_back((na, nb, moves + 1)); }
+            { let p = a.min(cb - b); (a - p, b + p) },
+            { let p = b.min(ca - a); (a + p, b - p) },
+        ] {
+            if !forbidden(na, nb) && visited.insert((na, nb)) {
+                queue.push_back((na, nb, moves + 1));
+            }
         }
     }
     None
