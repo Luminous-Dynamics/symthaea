@@ -685,10 +685,7 @@ impl CognitiveLoopService {
                             .filter_map(|id| analyzer.interval_content(id))
                             .collect();
                         if contents.len() >= 2 {
-                            let mut bound = *contents[0];
-                            for hv in &contents[1..] {
-                                bound = bound.bind(hv);
-                            }
+                            let bound = crate::hdc::BinaryHV::bind_chain(&contents);
                             // Compress to resonator dim via same pipeline as compressed_state
                             let continuous = bound.to_continuous();
                             let compressed = self
