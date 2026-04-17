@@ -95,8 +95,6 @@ impl DomainModule for TemplateDomain {
         &["template_core", "template_bridge"]
     }
 
-    fn default_activity(&self) -> f64 { 0.3 }
-
     fn description(&self) -> &'static str {
         "A template domain — replace this with your domain's description"
     }
@@ -115,9 +113,8 @@ impl DomainModule for TemplateDomain {
         &[
             EntryTypeInfo {
                 zome: "template_core",
-                entry_type: "TemplateRecord",
                 label: "Template Record",
-                sensitivity: DataSensitivity::Internal,
+                sensitivity: DataSensitivity::Community,
             },
         ]
     }
