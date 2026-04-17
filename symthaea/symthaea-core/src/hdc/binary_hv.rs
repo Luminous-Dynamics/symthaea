@@ -166,6 +166,55 @@ impl BinaryHV {
         Self(super::simd_ops::bind_simd(&self.0, &other.0))
     }
 
+    /// In-place XOR binding: `self ^= other`.
+    ///
+    /// Avoids the 2 KiB by-value return of [`bind`]. Use this in accumulator
+    /// loops where the previous bound hypervector is overwritten:
+    ///
+    /// ```
+    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// let mut acc = BinaryHV::random(1);
+    /// for seed in 2..5 {
+    ///     acc.bind_assign(&BinaryHV::random(seed));
+    /// }
+    /// ```
+    ///
+    /// The u64-chunked XOR body auto-vectorizes to the compilation target's
+    /// widest SIMD (AVX2 / NEON) in release mode.
+    #[inline]
+    pub fn bind_assign(&mut self, other: &Self) {
+        for (a_chunk, b_chunk) in self.0.chunks_exact_mut(8).zip(other.0.chunks_exact(8)) {
+            let a_word = u64::from_ne_bytes(a_chunk.try_into().expect("8-byte chunk"));
+            let b_word = u64::from_ne_bytes(b_chunk.try_into().expect("8-byte chunk"));
+            a_chunk.copy_from_slice(&(a_word ^ b_word).to_ne_bytes());
+        }
+    }
+
+    /// Fold-bind a slice of hypervectors: `v[0] ⊗ v[1] ⊗ ... ⊗ v[n-1]`.
+    ///
+    /// Single allocation for the accumulator; subsequent steps XOR in place
+    /// via [`bind_assign`]. Empty input returns [`BinaryHV::zero`], a single
+    /// input returns a copy.
+    ///
+    /// Replaces the common pattern:
+    ///
+    /// ```ignore
+    /// let mut acc = *vectors[0];
+    /// for hv in &vectors[1..] {
+    ///     acc = acc.bind(hv);   // N-1 wasted 2 KiB allocations
+    /// }
+    /// ```
+    pub fn bind_chain(vectors: &[&Self]) -> Self {
+        if vectors.is_empty() {
+            return Self::zero();
+        }
+        let mut acc = *vectors[0];
+        for v in &vectors[1..] {
+            acc.bind_assign(v);
+        }
+        acc
+    }
+
     /// Non-commutative temporal binding: ρ(self) ⊕ other.
     ///
     /// Cyclic permutation breaks XOR commutativity so that
