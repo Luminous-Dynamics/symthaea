@@ -329,6 +329,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::RoboticAsset(asset) => validate_robotic_asset(&asset, &EntryCreationAction::Create(action)),
                 EntryTypes::DispatchOrder(order) => validate_dispatch_order(&order, &EntryCreationAction::Create(action)),
                 EntryTypes::TelemetryReport(report) => validate_telemetry_report(&report),
+                EntryTypes::RoboticCredential(credential) => validate_robotic_credential(&credential),
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
             },
             OpEntry::UpdateEntry {
@@ -458,5 +459,19 @@ fn validate_telemetry_report(report: &TelemetryReport) -> ExternResult<ValidateC
         ));
     }
 
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_robotic_credential(credential: &RoboticCredential) -> ExternResult<ValidateCallbackResult> {
+    if credential.vitality_permille > 1000 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Vitality must be in 0..=1000 permille".to_string(),
+        ));
+    }
+    if credential.mastery_at_issue > 1000 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Mastery must be in 0..=1000 permille".to_string(),
+        ));
+    }
     Ok(ValidateCallbackResult::Valid)
 }
