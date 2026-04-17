@@ -646,6 +646,15 @@ pub struct RegressorConfig {
     /// Default 0.0 preserves prior behavior. Only fires when the caller
     /// supplies at least 2 priors via extra_seed_templates.
     pub prior_composition_rate: f64,
+    /// Session 25: structural-richness reward. When less than 1.0,
+    /// fitness is multiplied by `prior_fragment_bonus^k` where k is
+    /// the count of caller-supplied priors that appear as exact
+    /// subtrees in the expression. Lower is stronger: 0.5 halves
+    /// fitness per matched prior, 0.1 cuts it by 10× per match.
+    /// Default 1.0 (no bonus). Targets the Session-24 finding that
+    /// the composition operator produces 2-piece composites but
+    /// variance selection doesn't reward their structural richness.
+    pub prior_fragment_bonus: f64,
 }
 
 impl Default for RegressorConfig {
@@ -663,6 +672,7 @@ impl Default for RegressorConfig {
             exclude_trig: false,
             diverse_trajectory_count: 1,
             prior_composition_rate: 0.0,
+            prior_fragment_bonus: 1.0,
         }
     }
 }
@@ -785,6 +795,7 @@ impl SymbolicRegressor {
                 exclude_trig: self.config.exclude_trig,
                 diverse_trajectory_count: self.config.diverse_trajectory_count,
                 prior_composition_rate: self.config.prior_composition_rate,
+                prior_fragment_bonus: self.config.prior_fragment_bonus,
             });
             let log_results = log_regressor.fit(&log_seq, 2);
 
@@ -1187,6 +1198,36 @@ fn macro_usage_key(expr: &Expr) -> String {
     #[cfg(not(feature = "abstract_thought"))]
     {
         format!("{}", expr)
+    }
+}
+
+/// Session 25: count how many of `prior_keys` appear as exact subtrees
+/// in `expr`. Each match stops descent into that subtree (so a prior
+/// that fully matches does not also count its sub-components). Used
+/// by the fragment-match bonus in the autonomous discoverer's fitness.
+fn count_prior_subtrees(expr: &Expr, prior_keys: &[String]) -> usize {
+    if prior_keys.is_empty() {
+        return 0;
+    }
+    let mut count = 0;
+    count_prior_inner(expr, prior_keys, &mut count);
+    count
+}
+
+fn count_prior_inner(expr: &Expr, prior_keys: &[String], count: &mut usize) {
+    let key = macro_usage_key(expr);
+    if prior_keys.iter().any(|k| k == &key) {
+        *count += 1;
+        return;
+    }
+    match expr {
+        Expr::BinOp(_, l, r) => {
+            count_prior_inner(l, prior_keys, count);
+            count_prior_inner(r, prior_keys, count);
+        }
+        Expr::Func(_, arg) => count_prior_inner(arg, prior_keys, count),
+        Expr::Sum(body, _) => count_prior_inner(body, prior_keys, count),
+        _ => {}
     }
 }
 
@@ -2890,6 +2931,7 @@ impl ConjectureEngine {
                 exclude_trig: false,
                 diverse_trajectory_count: self.config.diverse_trajectory_count,
                 prior_composition_rate: self.config.prior_composition_rate,
+                prior_fragment_bonus: self.config.prior_fragment_bonus,
                 });
                 let diff_results = diff_reg.fit(&diff_obs, 1);
                 for c in &diff_results {
@@ -2932,6 +2974,7 @@ impl ConjectureEngine {
                     exclude_trig: self.config.exclude_trig,
                     diverse_trajectory_count: self.config.diverse_trajectory_count,
                     prior_composition_rate: self.config.prior_composition_rate,
+                    prior_fragment_bonus: self.config.prior_fragment_bonus,
                 });
                 if !macro_seeds.is_empty() {
                     regressor.set_seed_macros(macro_seeds.clone());
@@ -5558,6 +5601,15 @@ pub fn discover_invariants_autonomous_with_seed_templates(
         .cloned()
         .collect();
 
+    // Session 25: precompute canonical keys for fragment-match counting.
+    // An expression is fitness-bonused per pinned prior that appears
+    // verbatim as a subtree.
+    let pinned_prior_keys: Vec<String> =
+        pinned_priors.iter().map(macro_usage_key).collect();
+    let fragment_bonus = config.prior_fragment_bonus;
+    let fragment_active = fragment_bonus > 0.0 && fragment_bonus < 1.0
+        && !pinned_prior_keys.is_empty();
+
     // Pre-compute several distinct "off-trajectory" test points for the
     // non-triviality filter. We use both the trajectory samples themselves
     // (so disguised constants like 0^(non-constant)→0 are caught) AND a few
@@ -5642,6 +5694,17 @@ pub fn discover_invariants_autonomous_with_seed_templates(
                     }
                     if v > worst {
                         worst = v;
+                    }
+                }
+                // Session 25: fragment-match bonus. Each pinned prior
+                // appearing verbatim as a subtree of `expr` multiplies
+                // fitness by `fragment_bonus < 1`. Converts "rare
+                // surviving composition" to "reliably selected
+                // composition" by rewarding structural richness.
+                if fragment_active {
+                    let matches = count_prior_subtrees(expr, &pinned_prior_keys);
+                    if matches > 0 {
+                        worst *= fragment_bonus.powi(matches as i32);
                     }
                 }
                 worst
