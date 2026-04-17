@@ -41,41 +41,42 @@ cd papers/ramanujan
 ./reproduce.sh
 ```
 
-### Path 3: SMT-only (no Rust required)
+### Path 3: SMT-only (deferred until Phase 2)
 
-Every `PROVEN` row in the results table is backed by an SMT-LIB2 proof obligation committed under `papers/ramanujan/proofs/`. Each file encodes `dC/dt = 0` on the supplied dynamics; Z3's certificate of `unsat` on the negation is the formal proof.
-
-Any SMT-LIB2-compliant solver works: Z3, CVC5, MathSAT, etc. To re-verify every committed proof:
-
-```bash
-cd papers/ramanujan
-./reproduce.sh --verify-proofs
-```
-
-Without `reproduce.sh`:
-
-```bash
-for f in papers/ramanujan/proofs/*.smt2; do
-  printf '%s: ' "$(basename "$f")"
-  z3 -smt2 "$f" | tail -1
-done
-```
-
-Expected output: `unsat` for every file.
+At Phase 1 we do not commit `.smt2` witnesses (see "SMT proof witness availability" below). Once the engine instrumentation lands, the workflow will be: `./reproduce.sh --verify-proofs` re-runs every committed `.smt2` file through the user's local SMT solver (Z3, CVC5, MathSAT). Until then, this path falls back to Path 1 or Path 2.
 
 ## Scope of formal verification
 
-| Discovery | Verification modality |
-|-----------|-----------------------|
-| Harmonic oscillator `E = x² + v²` | Chain-rule + Z3 `unsat` on `QF_NRA` negation |
-| Kepler energy `½\|v\|² − 1/r` | Chain-rule symbolic cancellation; Z3 unreliable because of the `1/r` singularity |
-| Kepler angular momentum `xv_y − yv_x` | Chain-rule + Z3 `unsat` |
-| Hénon–Heiles energy | Chain-rule + Z3 `unsat` |
-| "Mystery ODE" anisotropic oscillator | Chain-rule + Z3 `unsat` |
-| Lotka–Volterra `x − ln x + y − ln y` | **Numeric only** — normalizer handles polynomials but not logarithmic identities; Z3 cannot decide transcendentals |
-| PCR3BP Jacobi | **Approximate only** — our grammar doesn't reach it exactly |
+The pipeline reports one of three statuses per discovered invariant:
 
-Readers should accept `PROVEN` claims only for rows where a committed `.smt2` witness exists.
+| Status | Meaning |
+|--------|---------|
+| **PROVEN** | Chain-rule normalization closes $\mathrm{d}C/\mathrm{d}t$ to zero symbolically. When the normalizer cannot close, the engine emits the corresponding SMT-LIB2 query and accepts Z3's `unsat` verdict as a formal proof. |
+| **Numeric** | Trajectory variance below threshold ($<10^{-6}$) but no symbolic certificate. The discovered expression might be algebraically wrong but numerically conserved on the particular trajectory sampled. |
+| **Approximate** | Best-effort candidate, variance above threshold. |
+
+Results from the committed baseline run (see `showcase_stdout.txt`):
+
+| Row | Discovery | Status |
+|-----|-----------|--------|
+| Harmonic oscillator | `x² + v²` | **PROVEN** |
+| Lotka–Volterra | `x − ln x + y − ln y` | **PROVEN** |
+| Kepler two-body (angular momentum) | `xv_y − yv_x` | **PROVEN** |
+| Hénon–Heiles | full 4D Hamiltonian | **PROVEN** |
+| PCR3BP Jacobi | `cos(y/e)^(x³)` | **Numeric** (low variance, wrong formula — honest) |
+| Mystery ODE (anisotropic oscillator) | `½(pₓ²+pᵧ²) + x² + y² + xy` | **PROVEN** |
+| Triangular numbers | `n(n+1)/2` | Identity |
+
+The PCR3BP row deserves attention: the discovered expression has variance $2.7 \times 10^{-10}$ but is transparently unrelated to the Jacobi integral. The pipeline reports \texttt{Numeric}, not \texttt{PROVEN}, which is the correct honest signal. A reader should read this as "the engine found something that happens to be low-variance on this trajectory, not a conservation law."
+
+## SMT proof witness availability
+
+**Phase 1 caveat:** the \texttt{conjecture\_engine} calls Z3 as a subprocess with SMT-LIB2 piped via stdin. It does not currently write the SMT-LIB2 to disk. Committing \texttt{.smt2} witnesses under \texttt{proofs/} requires a small instrumentation change (Phase 2 work). Until then, verification options are:
+
+1. Run \texttt{./reproduce.sh} --- the engine re-invokes Z3 on your host with the same SMT-LIB2 it used originally.
+2. Trust the committed \texttt{PROVEN} status string. This is a weaker form of reproducibility --- it reproduces only if your host agrees with ours on what Z3 returns.
+
+Readers who need stronger reproducibility should wait for the Phase 2 engine change or run \texttt{reproduce.sh} themselves.
 
 ## Cross-host determinism
 
