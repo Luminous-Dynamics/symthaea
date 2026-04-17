@@ -177,20 +177,28 @@ Full rules: @.claude/rules/DEVELOPMENT.md
 ### Symthaea Robotics (Consciousness-Coupled Platforms)
 Consciousness-first robotics via `EmbodimentBridge` trait: thought → motor → physics → proprioception → next cycle.
 
-| Crate | Platform | State/Command | Tests | Key Physics |
-|-------|----------|---------------|-------|-------------|
-| `symthaea-helicopter` | SAR helicopter | 18D/6D | 79 | Rotor dynamics (RPM lag, gyroscopic precession, autorotation), wind model (Dryden gusts, ground effect) |
-| `symthaea-auv` | Water steward AUV | 32D/8D | 47 | 6DOF hydrodynamics (added mass, quadratic drag, buoyancy), 8 chemical sensors (WHO compliance) |
-| `symthaea-manipulator` | Industrial arm | 21D/8D | 12 | 7-DOF DH kinematics, DLS inverse kinematics (Wampler 1986), joint limits |
-| `symthaea-humanoid` | Bipedal (DMC) | 72D/21D | 113 | Contact dynamics, gait analysis, PD curriculum |
-| `symthaea-flight` | Quadrotor | 13D/4D | 179 | Ballistic + MuJoCo, formation control, swarm training |
-| `symthaea-vehicle` | Autonomous car | 20D/3D | 164 | Bicycle model, Pacejka tires, mesh swarm |
+**10 robot platforms** (all implement `EmbodimentBridge`; test counts are `#[test]` markers, verified 2026-04-17):
 
-- **EmbodimentBridge trait**: `motor_bridge.rs` — `step(thought_hv, dt, phi)`, `encode_perception()`, `reset()`, 4-tier safety (Green/Yellow/Orange/Red from Phi)
-- **Proprioceptive loop**: Phase 2.5 in `cycle.rs` — blends body state into perception at configurable weight (default 0.2)
-- **Dispatch zome**: `mycelix-civic/zomes/robotics-dispatch/` — RoboticAsset, DispatchOrder, TelemetryReport with 24h authority expiry
-- **Features**: `humanoid`, `helicopter`, `flight` — each enables its platform in the cognitive loop constructor
-- **Build**: `cargo test -p symthaea-helicopter --lib` (each crate independently testable)
+| Crate | Platform | State/Cmd | Tests | Key Physics / Status |
+|-------|----------|-----------|-------|----------------------|
+| `symthaea-humanoid` | Bipedal (DMC) | 72D/21D | **191** | Contact dynamics, gait analysis, PD curriculum. Wired via `MotorBridge` in main crate. |
+| `symthaea-flight` | Quadrotor | 13D/4D | **205** | Ballistic + MuJoCo, formation control, 128-instance swarm training |
+| `symthaea-vehicle` | Autonomous car | 20D/3D | **181** | Bicycle model, Pacejka tires, mesh swarm |
+| `symthaea-manipulator` | Industrial arm | 21D/8D | **111** | 7-DOF DH kinematics, DLS IK (Wampler 1986), joint limits. Coffee Cup Gate 5/5 PASSED. |
+| `symthaea-auv` | Water steward | 32D/8D | **90** | 6DOF hydrodynamics (added mass, quadratic drag, buoyancy), 8 WHO-compliant chemical sensors |
+| `symthaea-helicopter` | SAR helicopter | 18D/6D | **81** | Rotor dynamics (RPM lag, gyroscopic precession, autorotation), Dryden wind model |
+| `symthaea-exoskeleton` | Full-Frame (Tier 0 capstone) | — | **34** | 1,794 LOC — substantial. Co-embodiment target; "second nervous system" framing. |
+| `symthaea-quadruped` | 4-leg × 3-joint | — | 11 | symtropy-physics terrain contact. Newer. |
+| `symthaea-surgical` | Surgical robot | — | 7 | 314 LOC — early stage / scaffolding |
+| `symthaea-orbital` | Orbital platform | — | 4 | 208 LOC — platform stub |
+
+**Also: `symthaea-phone-embodiment`** (12 tests, 1,265 LOC) — NOT a robot. Holon-Soma Pixel 8 Pro ADB bridge for the phone-as-sensor path.
+
+- **EmbodimentBridge trait**: `symthaea-core/src/embodiment.rs:355` — `step(thought_hv, dt, phi)`, `encode_perception()`, `reset()`, 4-tier safety (Green/Yellow/Orange/Red from Phi), `apply_moral_gate()` default method (ethics → motor)
+- **Proprioceptive loop**: Phase 2.5 in `cycle.rs` blends body state into perception at configurable weight (`embodiment_blend_weight`, default 0.1)
+- **Dispatch zome**: `mycelix-civic/zomes/robotics-dispatch/` — RoboticAsset, DispatchOrder, TelemetryReport with 24h authority expiry. **Schema only — not yet wired to symthaea runtime telemetry.**
+- **Features**: `humanoid`, `helicopter`, `flight`, `vehicle`, `auv`, `manipulator`, `exoskeleton`, `surgical`, `orbital`, `quadruped`, `phone` — each enables its platform in the cognitive loop constructor
+- **Build**: `cargo test -p symthaea-<platform> --lib` (each crate independently testable). Scaffold new platform via `./scripts/new-platform.sh`.
 
 ### Mycelix Fractal Architecture (16-cluster unified hApp)
 Fractal CivOS with 5 tiers, consolidated into cluster DNAs (single DNA = cross-domain `call(CallTargetCell::Local, ...)`):
