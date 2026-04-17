@@ -132,12 +132,20 @@
           # the full Phase 5 verification path available in the dev shell.
           z3
 
-          # Lean 4 — symthaea-lean-bridge emits .lean proof scripts and
-          # the `LEAN_CHECK=1 cargo run -p symthaea-lean-bridge --example
-          # prove_minif2f` path invokes `lean --check`. Listing it here
-          # makes the Phase 1 external-verify gate (miniF2F, PutnamBench)
-          # available inside the dev shell without elan on the host.
-          lean4
+          # Lean 4 via elan — the official Lean version manager (analogous
+          # to rustup). Symthaea-lean-bridge emits .lean proof scripts;
+          # Phase 1 uses core Lean 4 term-mode proofs, Phase 2 needs
+          # Mathlib for `linarith`/`omega`/`nlinarith`.
+          #
+          # We use elan instead of nixpkgs's lean4 because Mathlib's Lake
+          # dependency graph (specifically `proofwidgets`) requires exact
+          # Lean version matching, and nixpkgs's `lean4` (currently 4.26.0
+          # on nixos-unstable) is too new for any stable Mathlib tag. Elan
+          # reads `lean-toolchain` files in each Lake project and downloads
+          # the matching Lean release automatically, delegating version
+          # management to the Lean ecosystem. See
+          # `lean-proofs/phase2/README.md` for the Phase 2 setup flow.
+          elan
 
           # MuJoCo 3.3.7 physics engine (for symthaea-flight mujoco feature)
           mujoco337

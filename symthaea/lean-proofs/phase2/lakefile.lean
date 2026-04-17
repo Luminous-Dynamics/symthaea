@@ -24,14 +24,12 @@ package «symthaea-phase2» where
     ⟨`pp.unicode.fun, true⟩
   ]
 
--- Mathlib pinned to `main`. Phase 2 Week 2 note: the previously-tried
--- `v4.12.0` tag was incompatible with the Lean 4.26 in our flake — a
--- transitive `proofwidgets` dep used older Lake APIs. `main` tracks Lean
--- head, so it matches whatever Lean version `lean-toolchain` downloads.
--- Trade-off: reproducibility is now commit-pinned via `lake-manifest.json`
--- after first `lake update`, not version-tagged in this file.
+-- Mathlib pinned to v4.12.0 matching our `lean-toolchain` file. Elan
+-- (in the flake) reads lean-toolchain and downloads the exact Lean
+-- 4.12.0 binary, guaranteeing proofwidgets + Mathlib + Lean all use
+-- the same Lake API.
 require mathlib from git
-  "https://github.com/leanprover-community/mathlib4.git" @ "main"
+  "https://github.com/leanprover-community/mathlib4.git" @ "v4.12.0"
 
 @[default_target]
 lean_lib «SymthaeaPhase2» where
