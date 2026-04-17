@@ -97,7 +97,7 @@ fn kepler_priors() -> Vec<Expr> {
     vec![ang_mom, r2(), v2(), inv_r]
 }
 
-fn run_one(seed: u64, priors: &[Expr]) -> Vec<AutonomousInvariant> {
+fn run_one(seed: u64, priors: &[Expr], exclude_trig: bool) -> Vec<AutonomousInvariant> {
     let config = RegressorConfig {
         seed,
         population_size: POP_SIZE,
@@ -106,6 +106,7 @@ fn run_one(seed: u64, priors: &[Expr]) -> Vec<AutonomousInvariant> {
         max_complexity: 18,
         lambda: 0.0005,
         mutation_rate: 0.35,
+        exclude_trig,
         ..RegressorConfig::default()
     };
     discover_invariants_autonomous_with_seed_templates(
@@ -197,56 +198,90 @@ fn main() {
     }
     println!();
 
-    println!("━━━ Cold (no priors) ━━━");
+    println!("━━━ Cold (no priors, trig allowed) ━━━");
     let cold: Vec<SeedResult> = SEEDS
         .iter()
-        .map(|&seed| summarize("cold", seed, &run_one(seed, &[])))
+        .map(|&seed| summarize("cold", seed, &run_one(seed, &[], false)))
         .collect();
-    aggregate("cold  ", &cold);
+    aggregate("cold            ", &cold);
 
-    println!("\n━━━ Primed (Kepler priors) ━━━");
+    println!("\n━━━ Primed (Kepler priors, trig allowed) ━━━");
     let primed: Vec<SeedResult> = SEEDS
         .iter()
-        .map(|&seed| summarize("primed", seed, &run_one(seed, &priors)))
+        .map(|&seed| summarize("primed", seed, &run_one(seed, &priors, false)))
         .collect();
-    aggregate("primed", &primed);
+    aggregate("primed          ", &primed);
 
-    println!("\n━━━ Head-to-head per seed ━━━");
-    let mut primed_wins = 0;
-    let mut cold_wins = 0;
+    println!("\n━━━ Cold + no-trig (Session 19 ablation) ━━━");
+    let cold_notrig: Vec<SeedResult> = SEEDS
+        .iter()
+        .map(|&seed| summarize("cold-NT", seed, &run_one(seed, &[], true)))
+        .collect();
+    aggregate("cold + no-trig  ", &cold_notrig);
+
+    println!("\n━━━ Primed + no-trig (Session 19 ablation) ━━━");
+    let primed_notrig: Vec<SeedResult> = SEEDS
+        .iter()
+        .map(|&seed| summarize("prim-NT", seed, &run_one(seed, &priors, true)))
+        .collect();
+    aggregate("primed + no-trig", &primed_notrig);
+
+    println!("\n━━━ Head-to-head per seed (primed vs cold, trig allowed) ━━━");
+    head_to_head("cold vs primed", &cold, &primed);
+
+    println!(
+        "\n━━━ Head-to-head per seed (primed vs cold, trig DISABLED — Session 19) ━━━"
+    );
+    head_to_head("cold-NT vs primed-NT", &cold_notrig, &primed_notrig);
+
+    println!("\n━━━ Degeneracy accounting: formulas containing cos/sin ━━━");
+    for (label, runs) in [
+        ("cold           ", &cold),
+        ("primed         ", &primed),
+        ("cold+no-trig   ", &cold_notrig),
+        ("primed+no-trig ", &primed_notrig),
+    ] {
+        let trig_count = runs
+            .iter()
+            .filter(|r| r.best_formula.contains("cos") || r.best_formula.contains("sin"))
+            .count();
+        println!(
+            "  {}: {}/{} best-formula trig-degenerate",
+            label,
+            trig_count,
+            runs.len()
+        );
+    }
+}
+
+fn head_to_head(label: &str, a: &[SeedResult], b: &[SeedResult]) {
+    let mut b_wins = 0;
+    let mut a_wins = 0;
     let mut ties = 0;
-    for (c, p) in cold.iter().zip(primed.iter()) {
-        assert_eq!(c.seed, p.seed);
-        let ratio = p.best_variance / c.best_variance.max(1e-30);
-        let verdict = if p.best_variance < c.best_variance * 0.5 {
-            primed_wins += 1;
-            "✓ primed wins (>2× better)"
-        } else if c.best_variance < p.best_variance * 0.5 {
-            cold_wins += 1;
-            "✗ cold wins (>2× better)"
+    for (x, y) in a.iter().zip(b.iter()) {
+        assert_eq!(x.seed, y.seed);
+        let ratio = y.best_variance / x.best_variance.max(1e-30);
+        let verdict = if y.best_variance < x.best_variance * 0.5 {
+            b_wins += 1;
+            "✓ B wins (>2× better)"
+        } else if x.best_variance < y.best_variance * 0.5 {
+            a_wins += 1;
+            "✗ A wins (>2× better)"
         } else {
             ties += 1;
             "— effectively tied"
         };
         println!(
-            "  seed={:<6} cold={:.2e}  primed={:.2e}  ratio={:.2}  {}",
-            c.seed, c.best_variance, p.best_variance, ratio, verdict
+            "  seed={:<6} A={:.2e}  B={:.2e}  ratio={:.2}  {}",
+            x.seed, x.best_variance, y.best_variance, ratio, verdict
         );
     }
     println!(
-        "\nVerdict: primed_wins={} cold_wins={} ties={} / {}",
-        primed_wins,
-        cold_wins,
+        "  {}: A_wins={} B_wins={} ties={} / {}",
+        label,
+        a_wins,
+        b_wins,
         ties,
-        SEEDS.len()
+        a.len()
     );
-    if primed_wins > cold_wins + ties {
-        println!("→ Kepler priming appears to accelerate PCR3BP discovery in this configuration.");
-    } else if cold_wins > primed_wins + ties {
-        println!(
-            "→ Kepler priming appears to HURT PCR3BP discovery — structural mismatch dominates."
-        );
-    } else {
-        println!("→ No clear acceleration effect at this seed count. Need larger N or tighter metrics.");
-    }
 }

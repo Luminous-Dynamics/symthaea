@@ -622,6 +622,13 @@ pub struct RegressorConfig {
     /// If true, skip macro-operator seeding even if macros are available.
     /// Used for cold-vs-primed benchmarking.
     pub disable_macro_seeds: bool,
+    /// If true, remove Sin/Cos from the unary function set used by the
+    /// multivariate autonomous GP (random_expr_multivar + mutate_multivar).
+    /// Diagnostic flag for Ceiling-4 work: trig functions create
+    /// low-variance degenerate fits (e.g. `cos(y³) * 0.11`) that crowd
+    /// out Kepler-shaped primitives during PCR3BP discovery. Setting
+    /// this to true forces the GP to seek non-trigonometric invariants.
+    pub exclude_trig: bool,
 }
 
 impl Default for RegressorConfig {
@@ -636,6 +643,7 @@ impl Default for RegressorConfig {
             mutation_rate: 0.3,
             seed: 42,
             disable_macro_seeds: false,
+            exclude_trig: false,
         }
     }
 }
@@ -755,6 +763,7 @@ impl SymbolicRegressor {
                 mutation_rate: self.config.mutation_rate,
                 seed: self.config.seed.wrapping_add(777),
                 disable_macro_seeds: self.config.disable_macro_seeds,
+                exclude_trig: self.config.exclude_trig,
             });
             let log_results = log_regressor.fit(&log_seq, 2);
 
@@ -2857,6 +2866,7 @@ impl ConjectureEngine {
                     tournament_size: self.config.tournament_size,
                     mutation_rate: self.config.mutation_rate,
                     disable_macro_seeds: self.config.disable_macro_seeds,
+                exclude_trig: false,
                 });
                 let diff_results = diff_reg.fit(&diff_obs, 1);
                 for c in &diff_results {
@@ -2896,6 +2906,7 @@ impl ConjectureEngine {
                     tournament_size: self.config.tournament_size,
                     mutation_rate: self.config.mutation_rate,
                     disable_macro_seeds: self.config.disable_macro_seeds,
+                    exclude_trig: self.config.exclude_trig,
                 });
                 if !macro_seeds.is_empty() {
                     regressor.set_seed_macros(macro_seeds.clone());
@@ -5151,7 +5162,12 @@ pub fn discover_conservation_laws_with_custom(
 // ═══════════════════════════════════════════════════════════════════════════
 
 /// Generate a random expression tree over multiple state variables.
-fn random_expr_multivar(rng: &mut u64, max_depth: usize, var_names: &[&str]) -> Expr {
+fn random_expr_multivar(
+    rng: &mut u64,
+    max_depth: usize,
+    var_names: &[&str],
+    exclude_trig: bool,
+) -> Expr {
     *rng = lcg_step(*rng);
     if max_depth == 0 || (*rng % 3 == 0 && max_depth < 3) {
         *rng = lcg_step(*rng);
@@ -5177,11 +5193,23 @@ fn random_expr_multivar(rng: &mut u64, max_depth: usize, var_names: &[&str]) -> 
     } else {
         *rng = lcg_step(*rng);
         if *rng % 5 == 0 {
-            let fns = [UnaryFn::Sqrt, UnaryFn::Log, UnaryFn::Sin, UnaryFn::Cos];
+            // When exclude_trig is set, drop Sin/Cos so the GP can't
+            // settle on trigonometric degeneracies (e.g. `cos(y³)·c` in
+            // PCR3BP discovery). See RegressorConfig::exclude_trig.
+            let fns: &[UnaryFn] = if exclude_trig {
+                &[UnaryFn::Sqrt, UnaryFn::Log]
+            } else {
+                &[UnaryFn::Sqrt, UnaryFn::Log, UnaryFn::Sin, UnaryFn::Cos]
+            };
             *rng = lcg_step(*rng);
             Expr::Func(
                 fns[*rng as usize % fns.len()],
-                Box::new(random_expr_multivar(rng, max_depth - 1, var_names)),
+                Box::new(random_expr_multivar(
+                    rng,
+                    max_depth - 1,
+                    var_names,
+                    exclude_trig,
+                )),
             )
         } else {
             let ops = [BinOp::Add, BinOp::Sub, BinOp::Mul, BinOp::Div, BinOp::Pow];
@@ -5189,44 +5217,72 @@ fn random_expr_multivar(rng: &mut u64, max_depth: usize, var_names: &[&str]) -> 
             let op = ops[*rng as usize % ops.len()];
             Expr::BinOp(
                 op,
-                Box::new(random_expr_multivar(rng, max_depth - 1, var_names)),
-                Box::new(random_expr_multivar(rng, max_depth - 1, var_names)),
+                Box::new(random_expr_multivar(
+                    rng,
+                    max_depth - 1,
+                    var_names,
+                    exclude_trig,
+                )),
+                Box::new(random_expr_multivar(
+                    rng,
+                    max_depth - 1,
+                    var_names,
+                    exclude_trig,
+                )),
             )
         }
     }
 }
 
 /// Mutate an expression, using multi-variable random subtrees.
-fn mutate_multivar(expr: &Expr, rng: &mut u64, depth: usize, var_names: &[&str]) -> Expr {
+fn mutate_multivar(
+    expr: &Expr,
+    rng: &mut u64,
+    depth: usize,
+    var_names: &[&str],
+    exclude_trig: bool,
+) -> Expr {
     *rng = lcg_step(*rng);
     let p = 1.0 / (1.0 + depth as f64);
     if (*rng as f64 / u64::MAX as f64) < p {
-        return random_expr_multivar(rng, 2, var_names);
+        return random_expr_multivar(rng, 2, var_names, exclude_trig);
     }
     match expr {
-        Expr::Var(_) | Expr::Const(_) => random_expr_multivar(rng, 1, var_names),
+        Expr::Var(_) | Expr::Const(_) => random_expr_multivar(rng, 1, var_names, exclude_trig),
         Expr::BinOp(op, l, r) => {
             *rng = lcg_step(*rng);
             if *rng % 2 == 0 {
                 Expr::BinOp(
                     *op,
-                    Box::new(mutate_multivar(l, rng, depth + 1, var_names)),
+                    Box::new(mutate_multivar(l, rng, depth + 1, var_names, exclude_trig)),
                     r.clone(),
                 )
             } else {
                 Expr::BinOp(
                     *op,
                     l.clone(),
-                    Box::new(mutate_multivar(r, rng, depth + 1, var_names)),
+                    Box::new(mutate_multivar(r, rng, depth + 1, var_names, exclude_trig)),
                 )
             }
         }
         Expr::Func(f, arg) => Expr::Func(
             *f,
-            Box::new(mutate_multivar(arg, rng, depth + 1, var_names)),
+            Box::new(mutate_multivar(
+                arg,
+                rng,
+                depth + 1,
+                var_names,
+                exclude_trig,
+            )),
         ),
         Expr::Sum(body, var) => Expr::Sum(
-            Box::new(mutate_multivar(body, rng, depth + 1, var_names)),
+            Box::new(mutate_multivar(
+                body,
+                rng,
+                depth + 1,
+                var_names,
+                exclude_trig,
+            )),
             var.clone(),
         ),
     }
@@ -5400,10 +5456,11 @@ pub fn discover_invariants_autonomous_with_seed_templates(
     let max_complexity = config.max_complexity;
 
     let mut rng = config.seed;
+    let exclude_trig = config.exclude_trig;
     let mut population: Vec<Expr> = (0..pop_size)
         .map(|_| {
             rng = lcg_step(rng);
-            random_expr_multivar(&mut rng, max_depth.min(3), var_names)
+            random_expr_multivar(&mut rng, max_depth.min(3), var_names, exclude_trig)
         })
         .collect();
 
@@ -5524,7 +5581,7 @@ pub fn discover_invariants_autonomous_with_seed_templates(
 
             rng = lcg_step(rng);
             let child = if (*&rng as f64 / u64::MAX as f64) < config.mutation_rate {
-                mutate_multivar(&population[winner], &mut rng, 0, var_names)
+                mutate_multivar(&population[winner], &mut rng, 0, var_names, exclude_trig)
             } else {
                 // Crossover with another tournament winner
                 rng = lcg_step(rng);
