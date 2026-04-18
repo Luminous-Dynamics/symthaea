@@ -1099,6 +1099,10 @@ name = "nix_self_improve_bench"
 required-features = ["code_generation"]
 
 [[example]]
+name = "nix_eval_benchmark_rag"
+required-features = ["code_generation"]
+
+[[example]]
 name = "benchmark_exercism"
 required-features = ["code_generation"]
 

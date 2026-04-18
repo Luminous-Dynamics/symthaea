@@ -1739,7 +1739,12 @@ pub fn generate_nix_with_cache(
         return (result, SelfImproveSource::LearnedCache);
     }
     let result = generate_nix_with_index_verify(prompt, max_iterations);
-    let recorded = if result.base.parses && result.unknown_options.is_empty() {
+    // Only cache idiom-sourced results. Skeleton ("no idea, here's `{ }`")
+    // would Jaccard-match anything later and poison the cache.
+    let recorded = if result.base.parses
+        && result.unknown_options.is_empty()
+        && result.base.source == NixGenSource::Idiom
+    {
         cache.record(prompt, &result.base.code, result.base.intent);
         true
     } else {
@@ -1876,8 +1881,23 @@ fn render_rag_draft(prompt: &str, hits: &[crate::language::nixos_search::SearchH
 /// Returns `None` if no useful options were found (e.g. prompt is OOD or
 /// the search backend is unreachable).
 pub fn rag_draft_from_search(prompt: &str) -> Option<String> {
-    let intent = classify_nix_intent(&prompt.to_lowercase());
-    let prefixes = rag_prefixes_for_intent(intent);
+    let lower = prompt.to_lowercase();
+    let intent = classify_nix_intent(&lower);
+
+    // For Generic intent, fall back to the most-likely top-level prefixes
+    // when the prompt looks like a configuration request. Catches the
+    // "set up jellyfin" / "enable redis" cases the keyword classifier
+    // routes to Generic because the service name isn't in its dictionary.
+    let setup_like = lower.contains("set up")
+        || lower.contains("setup")
+        || lower.contains("install")
+        || lower.contains("enable")
+        || lower.contains("configure")
+        || lower.contains("provision");
+    let mut prefixes: Vec<&'static str> = rag_prefixes_for_intent(intent).to_vec();
+    if prefixes.is_empty() && intent == NixIntent::Generic && setup_like {
+        prefixes = vec!["services.", "programs.", "hardware.", "networking."];
+    }
     if prefixes.is_empty() {
         return None;
     }
@@ -1951,10 +1971,12 @@ pub fn generate_nix_with_rag(
     // Step 2: standard pipeline.
     let mut result = generate_nix_with_index_verify(prompt, max_iterations);
 
-    // Step 3: if the idiom path produced a Skeleton (or unknown options
-    // weakened the result), try a RAG draft.
-    let weak =
-        matches!(result.base.source, NixGenSource::Skeleton) || !result.unknown_options.is_empty();
+    // Step 3: if the idiom path produced a Skeleton (no idiom matched),
+    // try a RAG draft. We do NOT trigger RAG on unknown_options alone —
+    // hand-written idioms often emit dynamic attribute paths
+    // (`users.users.<name>`, `hardware.opengl.driSupport`) that the
+    // option-index can't resolve, but the idiom output is still canonical.
+    let weak = matches!(result.base.source, NixGenSource::Skeleton);
     if weak {
         if let Some(draft) = rag_draft_from_search(prompt) {
             // RAG draft replaces the weak result. We mark parses=true
@@ -1979,9 +2001,106 @@ pub fn generate_nix_with_rag(
     // Step 4: record verified, non-RAG results.
     let recorded = if result.base.parses
         && result.unknown_options.is_empty()
-        && result.base.source != NixGenSource::RagDraft
+        && result.base.source == NixGenSource::Idiom
     {
         shared_learned_cache().record(prompt, &result.base.code, result.base.intent);
+        true
+    } else {
+        false
+    };
+    (result, SelfImproveSource::FreshlyGenerated { recorded })
+}
+
+/// Fast-mode variant — same pipeline as `generate_nix_with_rag` but skips
+/// `try_nix_eval` (which re-imports nixpkgs each call ≈100s) and instead
+/// relies on `try_nix_parse` (millisecond). Cold-prompt latency drops from
+/// ~100s to ~10ms. Use this for interactive paths (HTTP API, REPL, IDE).
+///
+/// What it gives up: the deeper semantic checks `try_nix_eval` provides
+/// (undefined names, attribute mismatches). Callers who need that should
+/// use `generate_nix_with_rag` (slow) or `generate_nix_with_dry_build`
+/// (slowest, full nixos eval) for batch verification.
+///
+/// What it keeps: idiom library, learned-idiom cache, RAG fallback,
+/// nixpkgs option-index validation. Cache writes are gated on `parses ==
+/// true` only (not eval) so the cache may include code that would have
+/// failed `try_nix_eval`. In practice the option-index check catches
+/// most semantic errors that eval would; the gap is narrow.
+pub fn generate_nix_with_rag_fast(
+    prompt: &str,
+    max_iterations: usize,
+) -> (NixGenWithIndexResult, SelfImproveSource) {
+    generate_nix_with_rag_fast_using(prompt, max_iterations, shared_learned_cache())
+}
+
+/// Fast-mode RAG with an injectable cache (mirrors `generate_nix_with_cache`).
+pub fn generate_nix_with_rag_fast_using(
+    prompt: &str,
+    max_iterations: usize,
+    cache: &LearnedIdiomCache,
+) -> (NixGenWithIndexResult, SelfImproveSource) {
+    // Step 1: cache.
+    if let Some(idiom) = cache.find_match(prompt) {
+        let intent = classify_nix_intent(&prompt.to_lowercase());
+        let result = NixGenWithIndexResult {
+            base: NixGenResult {
+                prompt: prompt.to_string(),
+                intent,
+                code: idiom.code.clone(),
+                iterations: 0,
+                parses: true,
+                last_error: None,
+                source: NixGenSource::Idiom,
+            },
+            unknown_options: Vec::new(),
+        };
+        return (result, SelfImproveSource::LearnedCache);
+    }
+
+    // Step 2: idiom + parse-only verification (no eval).
+    let mut iterations = 0;
+    let mut base = generate_nix(prompt);
+    iterations += base.iterations;
+
+    // Step 3: option-index validation (cheap — pure HTTP/disk lookups).
+    let unknown_options = if base.parses {
+        validate_options(&base.code, shared_nixpkgs_index())
+    } else {
+        Vec::new()
+    };
+
+    // Step 4: RAG fallback if the idiom matcher punted to Skeleton.
+    // (See `generate_nix_with_rag` step 3 for why we do NOT trigger on
+    // unknown_options alone.)
+    let weak = matches!(base.source, NixGenSource::Skeleton);
+    let mut unknown_options = unknown_options;
+    if weak {
+        if let Some(draft) = rag_draft_from_search(prompt) {
+            iterations += 1;
+            base = NixGenResult {
+                prompt: prompt.to_string(),
+                intent: base.intent,
+                code: draft,
+                iterations,
+                parses: true,
+                last_error: None,
+                source: NixGenSource::RagDraft,
+            };
+            unknown_options = Vec::new();
+        }
+    }
+
+    let result = NixGenWithIndexResult {
+        base,
+        unknown_options,
+    };
+
+    // Step 5: record clean non-RAG results.
+    let recorded = if result.base.parses
+        && result.unknown_options.is_empty()
+        && result.base.source == NixGenSource::Idiom
+    {
+        cache.record(prompt, &result.base.code, result.base.intent);
         true
     } else {
         false
@@ -2428,5 +2547,42 @@ pkgs.mkShell {
                 result.base.code
             );
         }
+    }
+
+    #[test]
+    fn rag_fast_cold_latency_is_sub_second() {
+        // The headline guarantee: cold prompts return in <1s with the fast
+        // pipeline. Real interactive use needs this — full eval mode takes
+        // ~100s per cold prompt because of nixpkgs re-import.
+        use std::path::PathBuf;
+        use std::time::Instant;
+        let cache_path: PathBuf = std::env::temp_dir().join(format!(
+            "symthaea_rag_fast_latency_{}_{}.json",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let _ = std::fs::remove_file(&cache_path);
+        let cache = LearnedIdiomCache::with_cache_path(cache_path.clone());
+
+        // Pick a prompt the idiom library knows so we don't depend on
+        // search.nixos.org being reachable.
+        let t0 = Instant::now();
+        let (result, _src) =
+            generate_nix_with_rag_fast_using("set up postgresql with pgvector", 3, &cache);
+        let elapsed = t0.elapsed();
+
+        assert!(
+            result.base.parses,
+            "fast-mode RAG should produce parsing code"
+        );
+        assert!(
+            elapsed.as_secs() < 1,
+            "fast-mode cold latency must be <1s, got {:?}",
+            elapsed
+        );
+        let _ = std::fs::remove_file(&cache_path);
     }
 }

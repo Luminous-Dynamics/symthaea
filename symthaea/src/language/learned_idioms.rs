@@ -165,16 +165,33 @@ impl LearnedIdiomCache {
         if keywords.is_empty() {
             return None;
         }
+        let prompt_set: HashSet<&String> = keywords.iter().collect();
 
         let mut inner = self.inner.lock().ok()?;
 
-        // Find the highest-scoring idiom that clears MIN_OVERLAP.
-        // Tie-break on more-recent verified_at, then higher hit_count.
+        // Find the highest-scoring idiom that clears MIN_OVERLAP AND
+        // satisfies subset containment: every keyword in the new prompt
+        // must appear in the cached idiom's keyword set. Without this,
+        // "rust dev with sccache" would Jaccard-match a cached "rust dev
+        // with rust-analyzer" entry (overlap 2/3 ≥ MIN_OVERLAP) and
+        // serve the rust-analyzer answer that doesn't mention sccache.
+        //
+        // The subset rule treats cached idioms as supersets — if every
+        // ask in the new prompt is covered by what the cached prompt
+        // asked for, the cached answer is plausibly fit. Adds false
+        // negatives when the cached answer is actually a superset of the
+        // new ask but the cache prompt lacks a keyword the new prompt
+        // mentions; we accept that to avoid the silent wrong-answer
+        // failure mode.
         let mut best_idx: Option<usize> = None;
         let mut best_score: f32 = -1.0;
         for (idx, idiom) in inner.idioms.iter().enumerate() {
             let score = jaccard(&keywords, &idiom.keywords);
             if score < MIN_OVERLAP {
+                continue;
+            }
+            let cached_set: HashSet<&String> = idiom.keywords.iter().collect();
+            if !prompt_set.is_subset(&cached_set) {
                 continue;
             }
             let take = match best_idx {
@@ -374,12 +391,24 @@ mod tests {
             NixIntent::Service,
         );
 
-        // Paraphrase of #1 — keywords {postgresql, pgvector, database}
-        let m = cache.find_match("install postgresql and pgvector for vector database");
-        assert!(m.is_some(), "should match the postgresql idiom");
+        // Strict subset of #1's keywords — should match (cached idiom is a
+        // superset of what the new prompt asks for, so the answer fits).
+        let m = cache.find_match("postgresql pgvector");
+        assert!(m.is_some(), "subset paraphrase should match: {:?}", m);
         assert!(
             m.unwrap().code.contains("postgresql"),
             "matched the wrong idiom"
+        );
+
+        // Has unique keywords not in any cached entry — should NOT match.
+        // Without this rejection, "install postgresql for vector database"
+        // would Jaccard-match the postgresql idiom and return code that
+        // doesn't address the "vector database" specifics.
+        let m_extra = cache.find_match("install postgresql for vector database");
+        assert!(
+            m_extra.is_none(),
+            "prompt with extra keywords should NOT match: {:?}",
+            m_extra
         );
 
         // Unrelated → None.

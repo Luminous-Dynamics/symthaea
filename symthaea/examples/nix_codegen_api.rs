@@ -26,7 +26,7 @@ use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 
 use symthaea::language::nix_codegen::{
-    generate_nix_with_rag, shared_learned_cache, NixIntent, SelfImproveSource,
+    generate_nix_with_rag_fast, shared_learned_cache, NixIntent, SelfImproveSource,
 };
 
 /// Minimal JSON encoder for our response shape.
@@ -108,9 +108,13 @@ fn handle_generate_nix(body: &str) -> String {
     };
     let max_iter = extract_int_field(body, "max_iterations").unwrap_or(3) as usize;
 
-    // Tier 3 + RAG path: cache hit → idiom → RAG draft fallback. Records
-    // verified results into ~/.cache/symthaea/learned-idioms.json.
-    let (result, src) = generate_nix_with_rag(&prompt, max_iter);
+    // Tier 3 + RAG fast-path: cache hit → idiom (parse-only) → RAG draft.
+    // Records verified results into ~/.cache/symthaea/learned-idioms.json.
+    // Fast mode skips `try_nix_eval` (~100s/call) for sub-second cold
+    // latency. Callers needing deeper verification should call the
+    // /generate-nix endpoint with deeper-verify support (future work) or
+    // run the dry-build verifier server-side.
+    let (result, src) = generate_nix_with_rag_fast(&prompt, max_iter);
     let base = result.base;
     let unknowns_count = result.unknown_options.len();
     let unknowns = result
@@ -145,7 +149,7 @@ fn handle_generate_nix(body: &str) -> String {
 fn handle_health() -> String {
     let cache_size = shared_learned_cache().len();
     let body = format!(
-        r#"{{"status":"ok","version":"1.1","service":"symthaea-nix-codegen","learned_idioms_cached":{cache_size},"pipeline":"cache+idiom+index+rag"}}"#
+        r#"{{"status":"ok","version":"1.2","service":"symthaea-nix-codegen","learned_idioms_cached":{cache_size},"pipeline":"cache+idiom+parse+index+rag (fast)","mode":"interactive"}}"#
     );
     json_response(200, &body)
 }
