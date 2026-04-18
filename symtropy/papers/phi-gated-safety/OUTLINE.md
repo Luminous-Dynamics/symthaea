@@ -28,12 +28,14 @@ platform's empirical Φ lives in [0.099, 0.145] — never reaching the
 hardcoded 0.6 Green cutoff; (ii) the minimal sufficient mapping is a
 sprint threshold matched to the empirical band plus a crawl-rate floor,
 implementable as `if Φ > sprint { 1.0 } else { floor }`; (iii) this
-mapping loses to SSM at S_p ≈ 1 m by 85.7 % but **wins by +150 %**
-at S_p = 2.5 m and holds throughput where SSM collapses to zero at
-S_p ≥ 3 m. We frame Φ as an ISO 21448 / SOTIF triggering-condition
-monitor, not a replacement for certified envelopes.
+mapping loses to SSM at S_p ≈ 1 m by 81.4 % but **wins by +178.6 %**
+at S_p = 2.5 m (N=30) and holds throughput where SSM collapses to zero
+at S_p ≥ 3 m. The gating-shape advantage replicates on a quadrotor
+(+71.4 %, N=30, Figure 3). We frame Φ as an ISO 21448 / SOTIF
+triggering-condition monitor, not a replacement for certified envelopes.
 
-_(Word count: 149. IWAI cap: 150.)_
+_(Word count: ~150. IWAI cap: 150 — re-verify exact count at draft-to-
+submission step; word counters handle `Φ` and `S_p` differently.)_
 
 ## Abstract (draft 0, 220 words — retained for reference)
 
