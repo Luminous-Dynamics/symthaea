@@ -13,7 +13,7 @@ use crate::types::VehicleConfig;
 
 pub use symthaea_core::embodiment::{
     grounding_from_prediction_error, grounding_label, EmbodimentResult, EmbodimentTelemetry,
-    MotorSafetyLevel, SafeFallback, GROUNDING_SENSORIMOTOR,
+    MoralGateInput, MotorSafetyLevel, SafeFallback, GROUNDING_SENSORIMOTOR,
 };
 
 /// Multi-stage emergency fallback for vehicles.
@@ -44,6 +44,7 @@ pub struct VehicleEmbodiment {
     total_steps: usize,
     current_safety: MotorSafetyLevel,
     safety_override: Option<MotorSafetyLevel>,
+    moral_safety: Option<MotorSafetyLevel>,
     last_control_effort: f32,
     last_prediction_error: f32,
     /// Last commanded steering angle (held through safe fallback with taper).
@@ -67,6 +68,7 @@ impl VehicleEmbodiment {
             total_steps: 0,
             current_safety: MotorSafetyLevel::Green,
             safety_override: None,
+            moral_safety: None,
             last_control_effort: 0.0,
             last_prediction_error: 0.0,
             last_safe_steering: 0.0,
@@ -74,6 +76,23 @@ impl VehicleEmbodiment {
             fallback_stage: VehicleFallbackStage::MaintainCourse,
             fallback_cycles_in_stage: 0,
         }
+    }
+
+    /// Apply moral gate from ethics engine.
+    /// A vehicle moving at speed can kill — ahimsa forces Red (triggers
+    /// ADAS emergency-brake fallback), consent violation forces Orange,
+    /// caution forces Yellow.
+    pub fn apply_moral_gate(&mut self, gate: MoralGateInput) {
+        self.moral_safety =
+            if gate.ahimsa_violated || gate.verdict == MoralGateInput::VERDICT_BLOCKED {
+                Some(MotorSafetyLevel::Red)
+            } else if gate.consent_violation {
+                Some(MotorSafetyLevel::Orange)
+            } else if gate.verdict == MoralGateInput::VERDICT_CAUTION {
+                Some(MotorSafetyLevel::Yellow)
+            } else {
+                None
+            };
     }
 
     /// Advance the multi-stage fallback state machine based on speed and time.
@@ -135,12 +154,20 @@ impl VehicleEmbodiment {
             Some(override_level) => phi_level.max(override_level),
             None => phi_level,
         };
+        // Ethics gate max-composes on top of phi + override. Moral-Red
+        // escalates into the existing emergency-brake fallback chain.
+        if let Some(m) = self.moral_safety {
+            self.current_safety = self.current_safety.max(m);
+        }
         let gain = self.current_safety.motor_gain();
 
         let mut cmd = self.controller.forward(thought_hv, dt);
 
         // Record the last safe steering during normal operation
-        if matches!(self.current_safety, MotorSafetyLevel::Green | MotorSafetyLevel::Yellow) {
+        if matches!(
+            self.current_safety,
+            MotorSafetyLevel::Green | MotorSafetyLevel::Yellow
+        ) {
             self.last_safe_steering = cmd.steering;
             self.fallback_cycles = 0;
         }
@@ -234,6 +261,7 @@ impl VehicleEmbodiment {
         self.total_steps = 0;
         self.current_safety = MotorSafetyLevel::Green;
         self.safety_override = None;
+        self.moral_safety = None;
         self.last_control_effort = 0.0;
         self.last_prediction_error = 0.0;
         self.last_safe_steering = 0.0;
@@ -266,16 +294,39 @@ impl VehicleEmbodiment {
 }
 
 impl symthaea_core::embodiment::EmbodimentBridge for VehicleEmbodiment {
-    fn step(&mut self, hv: &ContinuousHV, dt: f32, phi: f64) -> EmbodimentResult { self.step(hv, dt, phi) }
-    fn encode_perception(&mut self) -> ContinuousHV { self.encode_perception() }
-    fn reset(&mut self) { self.reset() }
-    fn safety_level(&self) -> MotorSafetyLevel { self.safety_level() }
-    fn set_safety_override(&mut self, level: MotorSafetyLevel) { self.set_safety_override(level) }
-    fn clear_safety_override(&mut self) { self.clear_safety_override() }
-    fn platform(&self) -> symthaea_core::embodiment::EmbodimentPlatform { symthaea_core::embodiment::EmbodimentPlatform::Vehicle }
-    fn num_actuators(&self) -> usize { 3 }
-    fn total_steps(&self) -> usize { self.total_steps() }
-    fn telemetry(&self) -> EmbodimentTelemetry { self.telemetry() }
+    fn step(&mut self, hv: &ContinuousHV, dt: f32, phi: f64) -> EmbodimentResult {
+        self.step(hv, dt, phi)
+    }
+    fn encode_perception(&mut self) -> ContinuousHV {
+        self.encode_perception()
+    }
+    fn reset(&mut self) {
+        self.reset()
+    }
+    fn safety_level(&self) -> MotorSafetyLevel {
+        self.safety_level()
+    }
+    fn set_safety_override(&mut self, level: MotorSafetyLevel) {
+        self.set_safety_override(level)
+    }
+    fn clear_safety_override(&mut self) {
+        self.clear_safety_override()
+    }
+    fn platform(&self) -> symthaea_core::embodiment::EmbodimentPlatform {
+        symthaea_core::embodiment::EmbodimentPlatform::Vehicle
+    }
+    fn num_actuators(&self) -> usize {
+        3
+    }
+    fn total_steps(&self) -> usize {
+        self.total_steps()
+    }
+    fn telemetry(&self) -> EmbodimentTelemetry {
+        self.telemetry()
+    }
+    fn apply_moral_gate(&mut self, gate: MoralGateInput) {
+        self.apply_moral_gate(gate)
+    }
 }
 
 /// SafeFallback guarantees for the Vehicle platform.
@@ -289,13 +340,21 @@ impl symthaea_core::embodiment::EmbodimentBridge for VehicleEmbodiment {
 ///   - No brakes at highway speed (catastrophic)
 ///   - Sudden steering snap causing lane departure
 impl SafeFallback for VehicleEmbodiment {
-    fn platform_name(&self) -> &'static str { "vehicle" }
-    fn current_safety_level(&self) -> MotorSafetyLevel { self.current_safety }
-    fn safe_fallback_priority(&self) -> u8 { 10 } // Critical: human-carrying, at speed
+    fn platform_name(&self) -> &'static str {
+        "vehicle"
+    }
+    fn current_safety_level(&self) -> MotorSafetyLevel {
+        self.current_safety
+    }
+    fn safe_fallback_priority(&self) -> u8 {
+        10
+    } // Critical: human-carrying, at speed
     fn safe_fallback_description(&self) -> &'static str {
         "Multi-stage: MaintainCourse → GradualDeceleration → EmergencyBrake → PostStop"
     }
-    fn safe_fallback_latency_cycles(&self) -> u32 { 1 } // Immediate
+    fn safe_fallback_latency_cycles(&self) -> u32 {
+        1
+    } // Immediate
 }
 
 #[cfg(test)]
@@ -345,5 +404,40 @@ mod tests {
         bridge.step(&hv, 0.005, 0.7);
         bridge.reset();
         assert_eq!(bridge.total_steps(), 0);
+    }
+
+    #[test]
+    fn test_moral_gate_ahimsa_forces_red() {
+        let mut bridge = VehicleEmbodiment::new(&GenesisSeed::from_phrase("test"));
+        bridge.apply_moral_gate(MoralGateInput {
+            verdict: MoralGateInput::VERDICT_SAFE,
+            consent_violation: false,
+            ahimsa_violated: true,
+        });
+        let hv = ContinuousHV::random(16384, 42);
+        // Phi 0.9 → Green normally; ahimsa forces Red.
+        let r = bridge.step(&hv, 0.005, 0.9);
+        assert_eq!(
+            r.safety_level,
+            MotorSafetyLevel::Red,
+            "ahimsa must force Red regardless of phi"
+        );
+    }
+
+    #[test]
+    fn test_moral_gate_consent_violation_forces_orange() {
+        let mut bridge = VehicleEmbodiment::new(&GenesisSeed::from_phrase("test"));
+        bridge.apply_moral_gate(MoralGateInput {
+            verdict: MoralGateInput::VERDICT_SAFE,
+            consent_violation: true,
+            ahimsa_violated: false,
+        });
+        let hv = ContinuousHV::random(16384, 42);
+        let r = bridge.step(&hv, 0.005, 0.9);
+        assert_eq!(
+            r.safety_level,
+            MotorSafetyLevel::Orange,
+            "consent violation → Orange"
+        );
     }
 }
