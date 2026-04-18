@@ -180,16 +180,28 @@ required for single-point-of-failure hazardous actions (cautery).
   (`bcd80ef6aa`); 11 regression tests lock the invariant (`6773fa2a92`).
 
 ### §8. Cross-platform applicability
-- `sprint_floor_gain` primitive wired into flight-demo (`8d61e348d9`)
-  and vehicle-demo (`c2f2fb46c8`) as proof of mechanical transfer
-  — the change is ~5 lines per platform plus an updated doc-comment
-  for calibration provenance. Per-platform calibration required: each
-  platform's Φ band may drift because the observation-vector channels
-  differ.
-- Current adopters (manipulator / flight / vehicle) all use the same
-  starting SPRINT_PHI = 0.135, FLOOR_GAIN = 0.3 inherited from the
-  manipulator study's measured band [0.099, 0.145]. Each remains a
-  starting point subject to per-platform Φ-trace measurement.
+- `sprint_floor_gain` primitive wired into **6 platforms** as proof of
+  mechanical transfer — ~5 lines per platform plus a calibration
+  doc-comment. Commits: flight-demo `8d61e348d9`, vehicle-demo
+  `c2f2fb46c8`, AUV/helicopter/humanoid-demo `9556b7e776`.
+- All six adopters use SPRINT_PHI = 0.135, FLOOR_GAIN = 0.3 inherited
+  from the manipulator study's measured band [0.099, 0.145]. Each
+  remains a starting point subject to per-platform Φ-trace
+  recalibration, because observation-vector channels differ per
+  platform:
+    - manipulator: danger / PE / effort / stiffness (measured band)
+    - flight:      altitude / attitude / wind / PE
+    - vehicle:     speed / slip / friction
+    - AUV:         depth / current / chemical sensors
+    - helicopter:  altitude / wind-intensity / attitude
+    - humanoid:    uprightness / push-norm
+- Four remaining demos (exoskeleton / quadruped / surgical / orbital)
+  use *mode-selection* gating instead — AssistanceMode / GaitType /
+  SafetyLevel + hardware-interlock / MissionPhase respectively —
+  where `sprint_floor_gain` doesn't apply as-is. The paper positions
+  those as a separate pattern-family; §7 discusses the surgical demo's
+  dual-channel cautery interlock as the certification-defensible
+  reference.
 - **Flight benchmark (Figure 3, N=30 paired trials)**: a port of the
   §4 harness to the quadrotor reproduces the §6 crossover headline
   on a second platform. Tier-gate mean thrust 0.180 ± 0.078 N with
