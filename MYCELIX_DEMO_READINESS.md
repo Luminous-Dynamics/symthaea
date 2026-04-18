@@ -122,14 +122,16 @@ A demo with empty screens feels dead. Each cluster needs realistic seed data —
 
 ### Part 5b — What's missing (the real gap for Type 1 civ aesthetic)
 
-Indlela handles the organic/relational half of Type 1 civ feel. The **control-room / telemetry half** doesn't yet exist as shared primitives. Adding those to `mycelix-leptos-core` — not replacing Indlela — gives the full spectrum. Proposal:
+Indlela handles the organic/relational half of Type 1 civ feel. The **control-room / telemetry half** didn't yet exist as shared primitives. Adding those to `mycelix-leptos-core` — not replacing Indlela — gave the full spectrum:
 
-**New primitives to add** (complementing existing ones):
-- **`TelemetryLine`** — thin horizontal strip showing one stream of data over time. Building block of observatory dashboards and cluster-vitals panels. Distinct from `stat_card` (which is a static number).
-- **`DataTable`** — 1-line-per-row, zero padding, sort/filter inline. The backbone of flow-logs, audit trails, dispatch queues.
-- **`GraphNode` + `GraphEdge`** — dot-with-label that auto-connects to neighbors. Used for kinship, reciprocity, credentials, orbital traffic — SAME component, different data. Indlela's GrowthStage drives visual size.
-- **`ClusterCard`** — cross-cluster navigation primitive. Shows cluster name + live signal density, not a logo.
-- **`FlowIndicator`** — animated arrow/pulse showing resource/credential/message moving between two clusters. Ties the "connections visible" commitment concretely.
+**New primitives (shipped 2026-04-18)**:
+- ✅ **`TelemetryLine`** (`fa95528240`) — thin horizontal strip showing one stream of data over time. Building block of observatory dashboards and cluster-vitals panels. Complements `stat_card` (static number).
+- ✅ **`DataTable`** — already existed in the crate (`data_table.rs`, with `Column` + `Pagination`). No work needed.
+- ✅ **`GraphNode` + `GraphEdge`** (`dfaf95ed52`) — dot-with-label composed inside consumer-owned `<svg>`. Tied to Indlela's `GrowthStage` so a node's radius/opacity reflects maturity — one design decision, two visual layers. `NodeEmphasis` exposes 4 semantic colors (default/signal, consensus, care, alarm) via CSS custom properties.
+- ⏭ **`ClusterCard`** — overlaps `cluster_launcher` (existing). Skipped as redundant; `cluster_launcher` + `ClusterLink` already covers the use case.
+- ✅ **`FlowIndicator`** (`899d748591`) — SVG `<animateMotion>` pulse traveling from source to target. Completes the "connections drawn, not just nodes" commitment. Reuses `NodeEmphasis` for color consistency with graph nodes.
+
+**16 pure-logic tests** across the 3 new primitives, all passing on `wasm32-unknown-unknown`. Semantic CSS tokens throughout (`--md-signal`, `--md-consensus`, `--md-care`, `--md-alarm`, `--md-mono`, `--md-fg*`, plus optional `--md-*-glow` for drop-shadow effects).
 
 **Color token conventions** (proposed CSS-variable names for per-app themes to standardize on, not hardcode):
 - `--md-base`: carbon-black background
@@ -152,9 +154,14 @@ Each cluster theme maps its own colors to these semantic tokens; apps using `myc
 
 ### Part 5d — Adoption gap (the work item)
 
-14 of 27 frontends use `mycelix-leptos-core`. **13 don't**. Those 13 either roll their own CSS (symthaea-web, nixforhumanity-web, prism-ui, sol-atlas-leptos, symthaea-sim-ui, portal-shell) — which is fine, they're outside the Mycelix cluster family — or are stub/minimal (probably civic which doesn't have a frontend at all).
+14 of 27 frontends use `mycelix-leptos-core`. **13 don't**. Those 13 either roll their own CSS (symthaea-web, nixforhumanity-web, prism-ui, sol-atlas-leptos, symthaea-sim-ui, portal-shell) — which is fine, they're outside the Mycelix cluster family — or are stub/minimal (e.g., civic which doesn't have a frontend at all).
 
-The adoption task in Week 3 of the execution path isn't "build the crate" — it's "add the 5 missing primitives + per-cluster semantic-color-token conventions, and drive reference-impl adoption in Praxis first." Much smaller scope than my earlier draft implied.
+The adoption task in Week 3 of the execution path isn't "build the crate" — it was "add the 3 true-gap primitives + semantic-color-token conventions, then drive reference-impl adoption in Praxis first." **The 3 primitives are now shipped** (see Part 5b). Remaining adoption work:
+
+1. **Propose per-cluster `--md-*` color-token mappings** — each Leptos app's theme CSS defines its concrete palette that maps to the semantic tokens.
+2. **Reference implementation in Praxis** (or Observatory — already uses `mycelix-leptos-core`). A single cluster dashboard page built with `TelemetryLine` + `GraphNode`/`Edge` + `FlowIndicator` + `StatCard` + `SovereignRadar` proves the aesthetic story. Builds the pattern others copy.
+3. **Migrate 3-5 other cluster frontends** to the same palette + component usage rhythm. Commons + Hearth + Finance are good candidates.
+4. **Civic Leptos frontend** — currently zero UI for a Tier-2 cluster with 20 zomes + 2,276 tests. Writing it from scratch on top of the full primitive set gives the cleanest "greenfield exemplar."
 
 ---
 
