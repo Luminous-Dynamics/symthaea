@@ -194,23 +194,43 @@ fn collect_outer_forall_binders(phi: &FolFormulaExt) -> Vec<String> {
     out
 }
 
-/// Build the `nlinarith` hint list from a set of bound variable names.
-/// With concrete names, hints unify cleanly; without them, `_` placeholders
-/// often fail to resolve.
-fn build_nlinarith_hints(names: &[String]) -> String {
-    if names.is_empty() {
-        return String::from("sq_nonneg _, mul_self_nonneg _");
+/// Strip outer `Forall` and `Implies` wrappers to reach the ultimate
+/// conclusion formula. Used to decide whether to emit the And-splitter
+/// branch: we only emit it when the conclusion is syntactically an `And`,
+/// because embedding a `refine ⟨?_, ?_⟩` branch for non-And goals
+/// interacts poorly with Lean's elaborator on the widened-hint path
+/// (observed: deterministic heartbeat timeouts on `mathd_algebra_37`,
+/// `_141` during Phase 4 re-measurement).
+fn conclusion_is_and(phi: &FolFormulaExt) -> bool {
+    let mut cur = phi;
+    loop {
+        match cur {
+            FolFormulaExt::Forall(_, _, body) | FolFormulaExt::Implies(_, body) => cur = body,
+            FolFormulaExt::And(_, _) => return true,
+            _ => return false,
+        }
     }
-    let mut parts: Vec<String> = Vec::new();
-    for n in names {
-        parts.push(format!("sq_nonneg {}", n));
-        parts.push(format!("mul_self_nonneg {}", n));
-        // Literal offsets — catch AM-GM-like identities like
-        // `2a ≤ 1 + a²` which reduces to `(a - 1)² ≥ 0`.
-        parts.push(format!("sq_nonneg ({} - 1)", n));
-        parts.push(format!("sq_nonneg ({} + 1)", n));
+}
+
+/// Offsets for the *widened* `sq_nonneg (x ± k)` hints used only in the
+/// slow-path nlinarith branch. Phase 3 measurement showed vertex-at-7 and
+/// vertex-at-3 parabolas needed these, but Phase 4 re-measurement showed
+/// that emitting them in the *fast* nlinarith branch caused Lean heartbeat
+/// timeouts on well-behaved problems (`mathd_algebra_37`, `_141`) where
+/// the compact hint set closed in under a second. Solution: cascade tries
+/// compact hints first, widened hints only as a fallback.
+const VERTEX_OFFSETS_WIDE: &[i32] = &[-10, -7, -5, -3, -1, 1, 3, 5, 7, 10];
+
+fn append_var_hints(parts: &mut Vec<String>, n: &str, offsets: &[i32]) {
+    parts.push(format!("sq_nonneg {}", n));
+    parts.push(format!("mul_self_nonneg {}", n));
+    for k in offsets {
+        let sign = if *k < 0 { "-" } else { "+" };
+        parts.push(format!("sq_nonneg ({} {} {})", n, sign, k.abs()));
     }
-    // Pairwise differences and sums (often needed for AM-GM-like identities).
+}
+
+fn append_pairwise_hints(parts: &mut Vec<String>, names: &[String]) {
     for i in 0..names.len() {
         for j in (i + 1)..names.len() {
             parts.push(format!("sq_nonneg ({} - {})", names[i], names[j]));
@@ -255,7 +275,38 @@ fn build_nlinarith_hints(names: &[String]) -> String {
             }
         }
     }
+}
 
+/// Build the *compact* `nlinarith` hint list (Phase 3 baseline). Uses only
+/// the `{-1, +1}` offset pair. This is the fast path: nlinarith closes
+/// most polynomial problems with this set in well under the Lean heartbeat
+/// budget.
+fn build_nlinarith_hints(names: &[String]) -> String {
+    if names.is_empty() {
+        return String::from("sq_nonneg _, mul_self_nonneg _");
+    }
+    let mut parts: Vec<String> = Vec::new();
+    for n in names {
+        append_var_hints(&mut parts, n, &[-1, 1]);
+    }
+    append_pairwise_hints(&mut parts, names);
+    parts.join(", ")
+}
+
+/// Build the *widened* `nlinarith` hint list (Phase 4 addition). Uses the
+/// dense offset set `VERTEX_OFFSETS_WIDE`. Emitted as a *later-in-cascade*
+/// fallback branch — tried only if the compact branch doesn't close.
+/// Catches vertex-of-parabola inequalities like `mathd_algebra_113`
+/// (vertex at 7) and `mathd_algebra_410` (vertex at 3).
+fn build_nlinarith_hints_widened(names: &[String]) -> String {
+    if names.is_empty() {
+        return String::from("sq_nonneg _, mul_self_nonneg _");
+    }
+    let mut parts: Vec<String> = Vec::new();
+    for n in names {
+        append_var_hints(&mut parts, n, VERTEX_OFFSETS_WIDE);
+    }
+    append_pairwise_hints(&mut parts, names);
     parts.join(", ")
 }
 
@@ -320,7 +371,8 @@ fn synthesize_arith_tactic(phi: &FolFormulaExt, fragment: SmtFragment) -> (LeanT
     } else {
         format!("intro {}\n  try intros\n  ", binders.join(" "))
     };
-    let hints = build_nlinarith_hints(&binders);
+    let hints_compact = build_nlinarith_hints(&binders);
+    let hints_widened = build_nlinarith_hints_widened(&binders);
 
     // rcases lt_trichotomy needs the first two binders. If we have fewer
     // than 2, fall back to `_ _` placeholders (the original W4 form).
@@ -333,11 +385,36 @@ fn synthesize_arith_tactic(phi: &FolFormulaExt, fragment: SmtFragment) -> (LeanT
         String::from("(rcases lt_trichotomy _ _ with h | h | h <;> tauto; done)")
     };
 
+    // **Phase 4 addition: conjunction-splitter.** Gated on the conclusion
+    // being syntactically `And`. Phase 4 re-measurement revealed that
+    // emitting this branch unconditionally caused Lean heartbeat timeouts
+    // on non-And goals that *had* been closing under Phase 3 (regressed
+    // `mathd_algebra_37`, `_141`). Gating fixes the regression while
+    // keeping the gain on `mathd_algebra_126`, `_101`.
+    let and_splitter_alt = if conclusion_is_and(phi) {
+        format!(
+            "\n    | (refine ⟨?_, ?_⟩ <;> first | (linarith; done) | (nlinarith [{hints_compact}]; done) | (nlinarith [{hints_widened}]; done) | (omega; done) | (norm_num; done) | (ring; done); done)",
+            hints_compact = hints_compact,
+            hints_widened = hints_widened,
+        )
+    } else {
+        String::new()
+    };
+
     // Every alternative is `; done`-terminated. Reason: some Mathlib
     // tactics (notably `norm_num`) partially simplify the goal even when
     // they can't close it, which interferes with `first`'s backtracking.
     // Appending `done` forces each branch to either fully close the goal
     // or fail cleanly, letting `first` fall through to the next tactic.
+    //
+    // **Phase 4 ordering.** Compact nlinarith (±1 offsets only) goes first
+    // — it closes most polynomial problems fast and stays well under the
+    // Lean heartbeat budget. Widened nlinarith (dense offset set) goes
+    // later as a fallback for vertex-of-parabola inequalities like
+    // `mathd_algebra_113` (vertex at 7) and `_410` (vertex at 3). The
+    // And-splitter, gated on `conclusion_is_and`, sits between the two
+    // so it can re-use the compact hints on each subgoal before
+    // escalating.
     let cascade = format!(
         r#"{}first
     | (rfl; done)
@@ -345,13 +422,18 @@ fn synthesize_arith_tactic(phi: &FolFormulaExt, fragment: SmtFragment) -> (LeanT
     | (ring; done)
     | (omega; done)
     | (linarith; done)
-    | (nlinarith [{}]; done)
-    | (positivity; done)
-    | {}
+    | (nlinarith [{hints_compact}]; done)
+    | (positivity; done){and_splitter_alt}
+    | (nlinarith [{hints_widened}]; done)
+    | {lt_trichotomy_alt}
     | (rcases le_total _ _ with h | h <;> first | linarith | tauto; done)
     | (tauto; done)
     | (polyrith; done)"#,
-        intro_line, hints, lt_trichotomy_alt
+        intro_line,
+        hints_compact = hints_compact,
+        hints_widened = hints_widened,
+        and_splitter_alt = and_splitter_alt,
+        lt_trichotomy_alt = lt_trichotomy_alt,
     );
 
     (LeanTactic::Raw(cascade), false)

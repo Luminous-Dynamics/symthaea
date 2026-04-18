@@ -2231,11 +2231,17 @@ pub fn generate_with_repair(
 }
 
 /// Build initial channels from purpose text and signature.
+/// Build algorithm channels from a natural-language purpose + signature.
+///
+/// Populates 20+ channels by parsing the description for algorithmic
+/// signals (verbs, data structures, complexity hints) and the signature
+/// for type information (arity, generics, lifetimes, return types).
 fn build_channels_from_purpose(purpose: &str, signature: &str) -> AlgorithmChannels {
     let mut channels = AlgorithmChannels::default();
     let lower = purpose.to_lowercase();
 
-    // Parse arity from signature
+    // ── Type features from signature (channels 6-11) ──
+
     let arity = signature
         .split('(')
         .nth(1)
@@ -2250,28 +2256,253 @@ fn build_channels_from_purpose(purpose: &str, signature: &str) -> AlgorithmChann
         .unwrap_or(0);
     channels.set_input_arity(arity as f32);
 
-    // Return type analysis
     if signature.contains("-> Option<") {
         channels.set_returns_option_result(1.0);
     } else if signature.contains("-> Result<") {
         channels.set_returns_option_result(2.0);
     }
-    if signature.contains("Vec<") || signature.contains("&[") {
-        channels.set_allocation_level(1.0);
+
+    // Generics: count <...> in signature
+    let generic_count = signature.matches('<').count();
+    channels.set_generic_count(generic_count as f32);
+
+    // Lifetimes
+    channels.set_has_lifetime(signature.contains("'a") || signature.contains("'_"));
+
+    // Trait bounds
+    let trait_bounds = signature.matches(": ").count() + signature.matches("where").count();
+    channels.set_trait_bound_count(trait_bounds.saturating_sub(arity) as f32);
+
+    // Type complexity: nested angle brackets
+    let mut max_depth = 0u32;
+    let mut depth = 0u32;
+    for c in signature.chars() {
+        match c {
+            '<' => {
+                depth += 1;
+                max_depth = max_depth.max(depth);
+            }
+            '>' => depth = depth.saturating_sub(1),
+            _ => {}
+        }
     }
-    if signature.contains("HashMap") || signature.contains("HashSet") {
-        channels.set_allocation_level(2.0);
+    channels.set_type_complexity(max_depth as f32);
+
+    // ── Allocation level from signature + purpose ──
+
+    let alloc = if signature.contains("Box<")
+        || signature.contains("Rc<")
+        || signature.contains("Arc<")
+        || lower.contains("linked")
+        || lower.contains("tree")
+        || lower.contains("graph")
+    {
+        3.0
+    } else if signature.contains("HashMap")
+        || signature.contains("HashSet")
+        || signature.contains("BTreeMap")
+        || lower.contains("dictionary")
+        || lower.contains("map of")
+        || lower.contains("set of")
+    {
+        2.0
+    } else if signature.contains("Vec<")
+        || signature.contains("&[")
+        || signature.contains("String")
+        || lower.contains("list")
+        || lower.contains("array")
+        || lower.contains("collection")
+    {
+        1.0
+    } else {
+        0.0
+    };
+    channels.set_allocation_level(alloc);
+
+    // ── Loop depth from purpose hints ──
+
+    let loop_depth = if lower.contains("nested loop")
+        || lower.contains("matrix")
+        || lower.contains("grid")
+        || lower.contains("2d")
+        || lower.contains("table")
+    {
+        2.0
+    } else if lower.contains("each")
+        || lower.contains("every")
+        || lower.contains("iterate")
+        || lower.contains("loop")
+        || lower.contains("traverse")
+        || lower.contains("scan")
+        || lower.contains("for all")
+        || lower.contains("foreach")
+    {
+        1.0
+    } else {
+        0.0
+    };
+    channels.set_loop_depth(loop_depth);
+
+    // Branch depth — if/match keywords
+    if lower.contains("if")
+        || lower.contains("when")
+        || lower.contains("case")
+        || lower.contains("either")
+        || lower.contains("based on")
+        || lower.contains("depending")
+    {
+        channels.set_branch_depth(1.0);
     }
 
-    // Structural hints from purpose
-    if lower.contains("each") || lower.contains("every") || lower.contains("iterate") {
-        channels.set_loop_depth(1.0);
-    }
-    if lower.contains("nested") || lower.contains("matrix") || lower.contains("grid") {
-        channels.set_loop_depth(2.0);
-    }
-    if lower.contains("recursive") || lower.contains("factorial") {
+    // Recursion hints
+    if lower.contains("recursive")
+        || lower.contains("recursion")
+        || lower.contains("factorial")
+        || lower.contains("fibonacci")
+        || lower.contains("tree")
+        || lower.contains("divide and conquer")
+    {
         channels.set_recursion(true);
+    }
+
+    // Closures / higher-order
+    if lower.contains("apply")
+        || lower.contains("function")
+        || lower.contains("callback")
+        || lower.contains("transform")
+        || lower.contains("predicate")
+        || signature.contains("Fn(")
+    {
+        channels.set_closure_count(1.0);
+    }
+
+    // Iterator chain
+    if lower.contains("filter")
+        || lower.contains("map")
+        || lower.contains("transform")
+        || lower.contains("collect")
+        || lower.contains("chain")
+        || lower.contains("pipeline")
+    {
+        channels.set_iterator_chain_len(3.0);
+    }
+
+    // ── Algorithm class hints (channels 12-19) ──
+    // Set the class one-hot but ALSO populate related secondary channels
+
+    let class = classify_from_purpose(purpose);
+    channels.set_class(class);
+
+    // ── Data flow (channels 20-25) ──
+
+    if lower.contains("map")
+        || lower.contains("transform")
+        || lower.contains("convert")
+        || lower.contains("translate")
+    {
+        channels.set_map_count(1.0);
+    }
+    if lower.contains("filter")
+        || lower.contains("select")
+        || lower.contains("keep")
+        || lower.contains("remove")
+        || lower.contains("exclude")
+    {
+        channels.set_filter_count(1.0);
+    }
+    if lower.contains("sum")
+        || lower.contains("count")
+        || lower.contains("accumulate")
+        || lower.contains("reduce")
+        || lower.contains("fold")
+        || lower.contains("aggregate")
+        || lower.contains("total")
+    {
+        channels.set_fold_count(1.0);
+    }
+
+    // Mutation level
+    let mutation = if signature.contains("&mut self") {
+        2.0
+    } else if signature.contains("&mut ")
+        || lower.contains("update")
+        || lower.contains("modify")
+        || lower.contains("change")
+        || lower.contains("set ")
+        || lower.contains("insert")
+        || lower.contains("remove")
+        || lower.contains("push")
+    {
+        1.0
+    } else {
+        0.0
+    };
+    channels.set_mutation_level(mutation);
+
+    // Error handling
+    let err = if signature.contains("Result<") {
+        2.0
+    } else if signature.contains("Option<")
+        || lower.contains("validate")
+        || lower.contains("check")
+        || lower.contains("verify")
+        || lower.contains("invalid")
+    {
+        1.0
+    } else {
+        0.0
+    };
+    channels.set_error_handling(err);
+
+    // ── Complexity estimates (channels 26-31) ──
+
+    // Estimate line count from purpose complexity (rough heuristic)
+    let estimated_lines = 5.0
+        + 5.0 * loop_depth
+        + 3.0 * channels.channels[1] // branch_depth
+        + 5.0 * if channels.channels[2] > 0.5 { 1.0 } else { 0.0 } // recursion
+        + 3.0 * channels.channels[3] // closures
+        + 2.0 * channels.channels[20] // map
+        + 2.0 * channels.channels[21] // filter
+        + 2.0 * channels.channels[22] // fold
+        + 4.0 * channels.channels[10]; // trait bounds
+    channels.set_line_count(estimated_lines);
+
+    // Cyclomatic complexity ≈ branches + loops + 1
+    let cyclo = 1.0
+        + channels.channels[0]
+        + channels.channels[1]
+        + 0.5 * (channels.channels[20] + channels.channels[21]);
+    channels.set_cyclomatic_complexity(cyclo);
+
+    // State variables
+    if mutation > 0.5
+        || lower.contains("counter")
+        || lower.contains("accumulator")
+        || lower.contains("buffer")
+        || lower.contains("state")
+    {
+        channels.set_state_variables(2.0);
+    } else if loop_depth > 0.5 {
+        channels.set_state_variables(1.0);
+    }
+
+    // Helper functions
+    if lower.contains("helper")
+        || lower.contains("subroutine")
+        || (channels.channels[2] > 0.5 && lower.contains("inner"))
+    {
+        channels.set_helper_functions(1.0);
+    }
+
+    // Pattern match arms
+    if lower.contains("match") || lower.contains("case") || lower.contains("variant") {
+        channels.set_pattern_match_arms(3.0);
+    } else if signature.contains("enum ")
+        || signature.contains("Option<")
+        || signature.contains("Result<")
+    {
+        channels.set_pattern_match_arms(2.0);
     }
 
     channels
