@@ -7469,6 +7469,45 @@ dependencies = [
 ]
 
 [[package]]
+name = "hcl-edit"
+version = "0.8.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "88489f7cdf733b4c7798403f72d2c16fdc2b720e82c5151055f618a9b49afc1c"
+dependencies = [
+ "fnv",
+ "hcl-primitives",
+ "vecmap-rs",
+ "winnow 0.7.15",
+]
+
+[[package]]
+name = "hcl-primitives"
+version = "0.1.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "829a11d304c89e2cfe0dbb494a686bbe2b48ade17705c62cd1957b04aa4630f6"
+dependencies = [
+ "itoa",
+ "kstring",
+ "ryu",
+ "serde",
+ "unicode-ident",
+]
+
+[[package]]
+name = "hcl-rs"
+version = "0.18.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "48af7144c49a8db969e8a9d00cd470e1a446a3a73f6fa5eafc1eeb3d44d61ff4"
+dependencies = [
+ "hcl-edit",
+ "hcl-primitives",
+ "indexmap 2.11.1",
+ "itoa",
+ "serde",
+ "vecmap-rs",
+]
+
+[[package]]
 name = "hdbscan"
 version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8965,6 +9004,16 @@ name = "khronos_api"
 version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2db585e1d738fc771bf08a151420d3ed193d9d895a36df7f6f8a9456b911ddc"
+
+[[package]]
+name = "kstring"
+version = "2.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "558bf9508a558512042d3095138b1f7b8fe90c5467d94f9f1da28b3731c5dbd1"
+dependencies = [
+ "serde",
+ "static_assertions",
+]
 
 [[package]]
 name = "lab"
@@ -14827,6 +14876,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_yaml"
+version = "0.9.34+deprecated"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a8b1a1a2ebf674015cc02edccce75287f1a0130d394307b36743c2f5d504b47"
+dependencies = [
+ "indexmap 2.11.1",
+ "itoa",
+ "ryu",
+ "serde",
+ "unsafe-libyaml",
+]
+
+[[package]]
 name = "serial_test"
 version = "3.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -15746,6 +15808,7 @@ dependencies = [
  "espeak-rs",
  "futures",
  "futures-util",
+ "hcl-rs",
  "hex",
  "hf-hub",
  "hkdf",
@@ -15790,6 +15853,7 @@ dependencies = [
  "scraper",
  "serde",
  "serde_json",
+ "serde_yaml",
  "serial_test",
  "sha2 0.10.9",
  "sha3",
@@ -18510,6 +18574,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "unsafe-libyaml"
+version = "0.2.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "673aac59facbab8a9007c7f6108d11f63b603f7cabff99fabf650fea5c32b861"
+
+[[package]]
 name = "untrusted"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -18693,6 +18763,15 @@ name = "vcpkg"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
+
+[[package]]
+name = "vecmap-rs"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f9758649b51083aa8008666f41c23f05abca1766aad4cc447b195dd83ef1297b"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "vergen"

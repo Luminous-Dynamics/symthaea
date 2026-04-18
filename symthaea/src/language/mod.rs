@@ -84,6 +84,8 @@ pub mod emitters;
 #[cfg(feature = "code_generation")]
 pub mod epistemic_generation;
 #[cfg(feature = "code_generation")]
+pub mod hcl_scorer;
+#[cfg(feature = "code_generation")]
 pub mod hv_code_decoder;
 #[cfg(feature = "code_generation")]
 pub mod learned_idioms;
