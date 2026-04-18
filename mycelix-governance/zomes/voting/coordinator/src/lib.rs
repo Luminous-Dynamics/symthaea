@@ -195,11 +195,7 @@ pub fn create_ethics_disclosure(input: CreateEthicsDisclosureInput) -> ExternRes
     }
 
     let now = sys_time()?;
-    let disclosure_id = format!(
-        "ethics:{}:{}",
-        input.proposal_id,
-        now.as_micros()
-    );
+    let disclosure_id = format!("ethics:{}:{}", input.proposal_id, now.as_micros());
 
     let disclosure = EthicsDisclosure {
         id: disclosure_id,
@@ -2135,7 +2131,10 @@ pub fn tally_phi_votes(input: TallyPhiVotesInput) -> ExternResult<Record> {
         LinkTypes::BlocDetectionAnchor,
         (),
     ) {
-        debug!("Non-critical: failed to index tally for bloc detection: {:?}", e);
+        debug!(
+            "Non-critical: failed to index tally for bloc detection: {:?}",
+            e
+        );
     }
 
     // Emit real-time signal for tally completion
@@ -2231,15 +2230,9 @@ pub fn tally_phi_votes(input: TallyPhiVotesInput) -> ExternResult<Record> {
                                     severity, reason, cooling_hours
                                 ),
                             ),
-                            CircuitBreakerOutcome::MandatoryReview {
-                                reason,
-                                severity,
-                            } => (
+                            CircuitBreakerOutcome::MandatoryReview { reason, severity } => (
                                 "Mandatory-Review".to_string(),
-                                format!(
-                                    "Circuit breaker (severity {}): {}",
-                                    severity, reason
-                                ),
+                                format!("Circuit breaker (severity {}): {}", severity, reason),
                             ),
                             _ => ("Approved".to_string(), String::new()),
                         };
@@ -2257,13 +2250,12 @@ pub fn tally_phi_votes(input: TallyPhiVotesInput) -> ExternResult<Record> {
                             );
 
                             // Emit circuit breaker signal
-                            let _ = emit_governance_signal(
-                                GovernanceSignal::ProposalStatusChanged {
+                            let _ =
+                                emit_governance_signal(GovernanceSignal::ProposalStatusChanged {
                                     proposal_id: input.proposal_id.clone(),
                                     new_status: new_status.clone(),
                                     reason,
-                                },
-                            );
+                                });
                         }
                     }
                 }
@@ -2701,13 +2693,21 @@ pub fn cast_verified_vote(input: CastVerifiedVoteInput) -> ExternResult<Record> 
 
     // Validate consciousness attestation freshness if provided (replay prevention)
     if let Some(ref att_json) = input.consciousness_attestation_json {
-        if let Ok(att) = serde_json::from_str::<mycelix_bridge_common::consciousness_zkp::ConsciousnessAttestation>(att_json) {
+        if let Ok(att) = serde_json::from_str::<
+            mycelix_bridge_common::consciousness_zkp::ConsciousnessAttestation,
+        >(att_json)
+        {
             let epoch = (now.as_micros() / 1_000_000) as u64;
             if let Err(e) = att.validate_with_freshness(epoch) {
-                return Err(wasm_error!(WasmErrorInner::Guest(format!("Attestation freshness failed: {}", e))));
+                return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                    "Attestation freshness failed: {}",
+                    e
+                ))));
             }
         } else {
-            return Err(wasm_error!(WasmErrorInner::Guest("Invalid attestation JSON".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Invalid attestation JSON".into()
+            )));
         }
     }
 
@@ -2789,6 +2789,10 @@ pub struct CastVerifiedVoteInput {
     pub eligibility_proof_hash: ActionHash,
     pub voter_commitment: Vec<u8>,
     pub reason: Option<String>,
+    /// Optional ZKP consciousness attestation (JSON-encoded).
+    /// When present, the coordinator validates freshness for replay prevention.
+    #[serde(default)]
+    pub consciousness_attestation_json: Option<String>,
 }
 
 /// Get voter's verified votes for a specific proposal
@@ -3234,13 +3238,21 @@ pub fn cast_attested_vote(input: CastAttestedVoteInput) -> ExternResult<Record> 
 
     // Validate consciousness attestation freshness if provided (replay prevention)
     if let Some(ref att_json) = input.consciousness_attestation_json {
-        if let Ok(att) = serde_json::from_str::<mycelix_bridge_common::consciousness_zkp::ConsciousnessAttestation>(att_json) {
+        if let Ok(att) = serde_json::from_str::<
+            mycelix_bridge_common::consciousness_zkp::ConsciousnessAttestation,
+        >(att_json)
+        {
             let epoch = (now.as_micros() / 1_000_000) as u64;
             if let Err(e) = att.validate_with_freshness(epoch) {
-                return Err(wasm_error!(WasmErrorInner::Guest(format!("Attestation freshness failed: {}", e))));
+                return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                    "Attestation freshness failed: {}",
+                    e
+                ))));
             }
         } else {
-            return Err(wasm_error!(WasmErrorInner::Guest("Invalid attestation JSON".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Invalid attestation JSON".into()
+            )));
         }
     }
 
@@ -3320,6 +3332,10 @@ pub struct CastAttestedVoteInput {
     pub eligibility_proof_hash: ActionHash,
     pub voter_commitment: Vec<u8>,
     pub reason: Option<String>,
+    /// Optional ZKP consciousness attestation (JSON-encoded).
+    /// When present, the coordinator validates freshness for replay prevention.
+    #[serde(default)]
+    pub consciousness_attestation_json: Option<String>,
 }
 
 // ============================================================================
@@ -3815,15 +3831,14 @@ pub fn detect_voting_blocs(input: DetectBlocsInput) -> ExternResult<Record> {
                             .ok()
                             .flatten()
                         {
-                            voter_histories
-                                .entry(vote.voter.clone())
-                                .or_default()
-                                .push(VoteRecord {
+                            voter_histories.entry(vote.voter.clone()).or_default().push(
+                                VoteRecord {
                                     proposal_id: tally.proposal_id.clone(),
                                     choice: vote.choice.clone(),
                                     weight: vote.effective_weight,
                                     timestamp_us: vote.voted_at.as_micros() as u64,
-                                });
+                                },
+                            );
                         }
                     }
                 }
@@ -3943,10 +3958,7 @@ fn count_blocs(pairs: &[CorrelatedPair], all_voters: &[String]) -> u32 {
         parent.insert(voter.as_str(), voter.as_str());
     }
 
-    fn find<'a>(
-        parent: &mut std::collections::HashMap<&'a str, &'a str>,
-        x: &'a str,
-    ) -> &'a str {
+    fn find<'a>(parent: &mut std::collections::HashMap<&'a str, &'a str>, x: &'a str) -> &'a str {
         let p = parent[x];
         if p == x {
             return x;
@@ -3970,10 +3982,8 @@ fn count_blocs(pairs: &[CorrelatedPair], all_voters: &[String]) -> u32 {
         .flat_map(|p| [p.agent_a.as_str(), p.agent_b.as_str()])
         .collect();
 
-    let roots: std::collections::HashSet<&str> = involved
-        .iter()
-        .map(|v| find(&mut parent, v))
-        .collect();
+    let roots: std::collections::HashSet<&str> =
+        involved.iter().map(|v| find(&mut parent, v)).collect();
 
     roots.len() as u32
 }
@@ -4050,7 +4060,9 @@ pub fn release_cooling_period(input: ReleaseCoolingPeriodInput) -> ExternResult<
     })?;
 
     // Check if cooling period has elapsed (auto-release path)
-    let elapsed_us = now.as_micros().saturating_sub(reflection.timestamp.as_micros());
+    let elapsed_us = now
+        .as_micros()
+        .saturating_sub(reflection.timestamp.as_micros());
     let auto_release = elapsed_us >= COOLING_PERIOD_US;
 
     if !auto_release {
@@ -4125,8 +4137,9 @@ pub fn check_cooling_period_expired(proposal_id: &str) -> ExternResult<Option<bo
                 {
                     let outcome = reflection.circuit_breaker_outcome();
                     if outcome.blocks_advancement() {
-                        let elapsed_us =
-                            now.as_micros().saturating_sub(reflection.timestamp.as_micros());
+                        let elapsed_us = now
+                            .as_micros()
+                            .saturating_sub(reflection.timestamp.as_micros());
                         return Ok(Some(elapsed_us >= COOLING_PERIOD_US));
                     }
                 }
@@ -4176,15 +4189,20 @@ pub struct CastAnonymousVoteInput {
 #[hdk_extern]
 pub fn cast_anonymous_vote(input: CastAnonymousVoteInput) -> ExternResult<Record> {
     // 1. Fetch the eligibility proof
-    let proof_record = get(input.eligibility_proof_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Eligibility proof not found on DHT".into()
-        )))?;
+    let proof_record =
+        get(input.eligibility_proof_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+            WasmErrorInner::Guest("Eligibility proof not found on DHT".into())
+        ))?;
 
     let proof: EligibilityProof = proof_record
         .entry()
         .to_app_option()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to decode proof: {}", e))))?
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode proof: {}",
+                e
+            )))
+        })?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "Eligibility proof entry is empty".into()
         )))?;
@@ -4219,7 +4237,10 @@ pub fn cast_anonymous_vote(input: CastAnonymousVoteInput) -> ExternResult<Record
     create_entry(&EntryTypes::Anchor(Anchor(proposal_anchor_str.clone())))?;
     let proposal_anchor_hash = anchor_hash(&proposal_anchor_str)?;
     let existing_votes = get_links(
-        LinkQuery::try_new(proposal_anchor_hash.clone(), LinkTypes::ProposalToVerifiedVote)?,
+        LinkQuery::try_new(
+            proposal_anchor_hash.clone(),
+            LinkTypes::ProposalToVerifiedVote,
+        )?,
         GetStrategy::default(),
     )?;
 
@@ -4280,10 +4301,9 @@ pub fn cast_anonymous_vote(input: CastAnonymousVoteInput) -> ExternResult<Record
         (),
     )?;
 
-    get(vote_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Failed to fetch created vote".into()
-        )))
+    get(vote_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to fetch created vote".into()
+    )))
 }
 
 /// Calculate vote weight from ZKP eligibility proof.
@@ -5007,10 +5027,9 @@ mod tests {
         };
 
         // Serialize to JSON and back — verifies field names are correct
-        let json = serde_json::to_string(&mirror)
-            .expect("ProposalMirror → JSON should succeed");
-        let back: ProposalMirror = serde_json::from_str(&json)
-            .expect("JSON → ProposalMirror roundtrip should succeed");
+        let json = serde_json::to_string(&mirror).expect("ProposalMirror → JSON should succeed");
+        let back: ProposalMirror =
+            serde_json::from_str(&json).expect("JSON → ProposalMirror roundtrip should succeed");
 
         // Verify all 13 fields survived the roundtrip
         // (If Proposal adds a new field, this test must be updated to match)
@@ -5021,7 +5040,10 @@ mod tests {
         assert_eq!(back.author, "did:mycelix:test_author");
         assert_eq!(back.actions, "{}");
         assert_eq!(back.version, 1);
-        assert_eq!(back.discussion_url, Some("https://forum.mycelix.net/t/1".into()));
+        assert_eq!(
+            back.discussion_url,
+            Some("https://forum.mycelix.net/t/1".into())
+        );
 
         // Verify field count: JSON object should have exactly 13 keys
         let json_map: serde_json::Value = serde_json::from_str(&json).unwrap();
@@ -5059,8 +5081,15 @@ mod tests {
     #[test]
     fn test_proposal_status_mirror_variants() {
         let expected = vec![
-            "Draft", "Active", "Ended", "Approved", "Signed",
-            "Rejected", "Executed", "Cancelled", "Failed",
+            "Draft",
+            "Active",
+            "Ended",
+            "Approved",
+            "Signed",
+            "Rejected",
+            "Executed",
+            "Cancelled",
+            "Failed",
         ];
         let variants = vec![
             ProposalStatusMirror::Draft,
