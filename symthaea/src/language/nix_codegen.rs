@@ -9,7 +9,9 @@
 //! Idioms were extracted from the user's actual ~/etc/nixos/ flake-based
 //! config to ensure templates reflect real-world patterns.
 
+use crate::language::nixpkgs_index::NixpkgsIndex;
 use std::process::Command;
+use std::sync::OnceLock;
 
 // ─── Nix Intent Categories ─────────────────────────────────────────────────
 
@@ -192,15 +194,21 @@ pub fn classify_nix_intent(lower: &str) -> NixIntent {
             || lower.contains("node development")
             || lower.contains("haskell"));
     // Secrets management — check before generic Service so "encrypt" etc. routes here
-    if lower.contains("sops") || lower.contains("agenix") || lower.contains("secret")
-        || lower.contains("encrypted") || lower.contains("encrypt password")
-        || lower.contains("manage credentials") || lower.contains("age key")
+    if lower.contains("sops")
+        || lower.contains("agenix")
+        || lower.contains("secret")
+        || lower.contains("encrypted")
+        || lower.contains("encrypt password")
+        || lower.contains("manage credentials")
+        || lower.contains("age key")
     {
         return NixIntent::Secrets;
     }
     // Flake template — full project/system scaffolding
-    if lower.contains("flake template") || lower.contains("flake.nix template")
-        || lower.contains("project scaffold") || lower.contains("complete flake")
+    if lower.contains("flake template")
+        || lower.contains("flake.nix template")
+        || lower.contains("project scaffold")
+        || lower.contains("complete flake")
         || (lower.contains("full") && lower.contains("flake"))
         || (lower.contains("system flake") || lower.contains("nixosconfigurations"))
     {
@@ -1307,6 +1315,189 @@ pub fn generate_nix_with_repair(prompt: &str, max_iterations: usize) -> NixGenRe
     }
 }
 
+// ─── Tier 1.1: option-index verification ──────────────────────────────────
+
+/// One unrecognized NixOS option path found in generated code.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnknownOption {
+    /// Dotted path as seen in the source (e.g. `services.nginxx.enable`).
+    pub path: String,
+    /// Suggested nearest-known prefix, if we can find one.
+    pub nearest_known_prefix: Option<String>,
+}
+
+/// Top-level NixOS option roots we know about. Used to gate which `a.b.c`
+/// dotted paths we even attempt to verify (reduces false positives — e.g.
+/// `pkgs.python3.withPackages` is NOT an option path).
+const KNOWN_OPTION_ROOTS: &[&str] = &[
+    "services",
+    "hardware",
+    "programs",
+    "networking",
+    "boot",
+    "users",
+    "systemd",
+    "security",
+    "virtualisation",
+    "nix",
+    "nixpkgs",
+    "fileSystems",
+    "swapDevices",
+    "fonts",
+    "i18n",
+    "time",
+    "xdg",
+    "console",
+    "sound",
+    "powerManagement",
+    "documentation",
+    "system",
+];
+
+/// Extract candidate NixOS option paths from a Nix source fragment.
+///
+/// Heuristics: matches the longest dotted identifier whose root is in
+/// `KNOWN_OPTION_ROOTS` and whose tail looks like an option path (no `${`
+/// interpolation, no leading number). Returns paths like `services.nginx.enable`.
+pub fn extract_option_paths(code: &str) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let bytes = code.as_bytes();
+    let mut i = 0usize;
+
+    while i < bytes.len() {
+        // Skip strings (rough — only handles "...")
+        if bytes[i] == b'"' {
+            i += 1;
+            while i < bytes.len() && bytes[i] != b'"' {
+                if bytes[i] == b'\\' {
+                    i += 1;
+                }
+                i += 1;
+            }
+            i += 1;
+            continue;
+        }
+        // Skip line comments
+        if i + 1 < bytes.len() && &bytes[i..i + 1] == b"#" {
+            while i < bytes.len() && bytes[i] != b'\n' {
+                i += 1;
+            }
+            continue;
+        }
+        // Identifier start?
+        if bytes[i].is_ascii_alphabetic() || bytes[i] == b'_' {
+            let start = i;
+            while i < bytes.len()
+                && (bytes[i].is_ascii_alphanumeric()
+                    || bytes[i] == b'_'
+                    || bytes[i] == b'-'
+                    || bytes[i] == b'.')
+            {
+                i += 1;
+            }
+            let span = &code[start..i];
+            // Must contain at least one dot and start with a known root.
+            if span.contains('.')
+                && !span.contains("..")
+                && !span.ends_with('.')
+                && !span.starts_with('.')
+            {
+                let root = span.split('.').next().unwrap_or("");
+                if KNOWN_OPTION_ROOTS.iter().any(|r| *r == root) {
+                    // Skip if it looks like a function call (followed by `(`)
+                    // or attr selection from pkgs (`pkgs.xxx`).
+                    out.push(span.to_string());
+                }
+            }
+            continue;
+        }
+        i += 1;
+    }
+    // De-dup while preserving order.
+    let mut seen: Vec<String> = Vec::new();
+    for p in out {
+        if !seen.contains(&p) {
+            seen.push(p);
+        }
+    }
+    seen
+}
+
+/// Process-level shared index handle (lazy-init).
+static SHARED_INDEX: OnceLock<NixpkgsIndex> = OnceLock::new();
+
+/// Get the shared, process-wide nixpkgs index (cache at default path).
+pub fn shared_nixpkgs_index() -> &'static NixpkgsIndex {
+    SHARED_INDEX.get_or_init(NixpkgsIndex::default_cache)
+}
+
+/// Validate option paths in `code` against the nixpkgs option index.
+/// Returns the list of paths that did NOT resolve.
+///
+/// Trims trailing assignment fragments — only the head path is verified.
+/// E.g. `services.nginx.enable = true;` -> we verify `services.nginx.enable`.
+pub fn validate_options(code: &str, index: &NixpkgsIndex) -> Vec<UnknownOption> {
+    let paths = extract_option_paths(code);
+    let mut unknown: Vec<UnknownOption> = Vec::new();
+
+    for p in paths {
+        // Try the full path first; if missing, walk back to find longest known prefix.
+        if index.option_exists(&p) {
+            continue;
+        }
+        // Walk backwards by '.' to find the longest known prefix.
+        let mut nearest: Option<String> = None;
+        let mut parts: Vec<&str> = p.split('.').collect();
+        while parts.len() > 1 {
+            parts.pop();
+            let candidate = parts.join(".");
+            if index.option_exists(&candidate) {
+                nearest = Some(candidate);
+                break;
+            }
+        }
+        unknown.push(UnknownOption {
+            path: p,
+            nearest_known_prefix: nearest,
+        });
+    }
+    unknown
+}
+
+/// Result of running the generation pipeline with option-index verification.
+#[derive(Debug)]
+pub struct NixGenWithIndexResult {
+    pub base: NixGenResult,
+    /// Options that the index could not resolve (only meaningful when
+    /// `base.parses == true` — otherwise the syntax error precedes any
+    /// semantic check).
+    pub unknown_options: Vec<UnknownOption>,
+}
+
+/// Like `generate_nix_with_repair`, but additionally validates emitted option
+/// paths against the live nixpkgs option index. The result includes a list of
+/// unresolved option paths so callers can decide whether to surface a warning
+/// or trigger another repair pass.
+///
+/// Note: this does NOT yet feed `unknown_options` back into the channel
+/// enrichment — it's an out-of-band signal for the caller. Tier 3
+/// (self-improvement loop) will close that feedback loop.
+pub fn generate_nix_with_index_verify(
+    prompt: &str,
+    max_iterations: usize,
+) -> NixGenWithIndexResult {
+    let base = generate_nix_with_repair(prompt, max_iterations);
+    let unknown_options = if base.parses {
+        validate_options(&base.code, shared_nixpkgs_index())
+    } else {
+        Vec::new()
+    };
+    NixGenWithIndexResult {
+        base,
+        unknown_options,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1410,12 +1601,13 @@ mod tests {
 
     #[test]
     fn test_eval_catches_typos_that_parse_misses() {
-        // Parse-only would accept this; eval catches the undefined name
-        let bad = "{ x = pkgs.firefoxxxx_does_not_exist; }";
+        // Nix 2.31's `--parse` resolves free variables (so a bare
+        // `pkgs.firefoxxxx_undef` now fails parse too). To exercise the
+        // parse-vs-eval gap, hide the bad attribute access behind a
+        // function whose body is only invoked at eval time.
+        let bad = "let f = x: x.firefoxxxx_undefined_attr; in f { }";
         let parse_ok = try_nix_parse(bad).is_ok();
         let eval_ok = try_nix_eval(bad).is_ok();
-        // Parse-only DOES accept attribute access (it's syntactic)
-        // Eval should NOT accept undefined `pkgs.firefoxxxx_does_not_exist`
         assert!(parse_ok, "parse should accept syntactically valid input");
         assert!(!eval_ok, "eval should reject undefined attribute reference");
     }
@@ -1465,5 +1657,108 @@ mod tests {
         // Should succeed quickly (idiom matches first try)
         assert!(result.parses);
         assert!(result.iterations <= 3);
+    }
+
+    #[test]
+    fn extract_option_paths_finds_known_roots() {
+        let code = r#"{
+  services.nginx.enable = true;
+  services.postgresql.enable = true;
+  hardware.opengl.enable = true;
+  networking.firewall.allowedTCPPorts = [ 80 443 ];
+  # comment with services.fake.path that should also be found by the scanner
+  programs.git.enable = true;
+}"#;
+        let paths = extract_option_paths(code);
+        // The scanner skips comments, so services.fake.path should NOT appear.
+        assert!(paths.contains(&"services.nginx.enable".to_string()));
+        assert!(paths.contains(&"services.postgresql.enable".to_string()));
+        assert!(paths.contains(&"hardware.opengl.enable".to_string()));
+        assert!(paths.contains(&"networking.firewall.allowedTCPPorts".to_string()));
+        assert!(paths.contains(&"programs.git.enable".to_string()));
+        assert!(!paths.contains(&"services.fake.path".to_string()));
+    }
+
+    #[test]
+    fn extract_option_paths_ignores_pkgs_attrs() {
+        // pkgs.* is NOT an option path — should be excluded.
+        let code = r#"{ pkgs ? import <nixpkgs> {} }:
+pkgs.mkShell {
+  buildInputs = [ pkgs.rust-analyzer pkgs.mold ];
+}"#;
+        let paths = extract_option_paths(code);
+        // pkgs is not in KNOWN_OPTION_ROOTS so none of those should appear.
+        for p in &paths {
+            assert!(
+                !p.starts_with("pkgs."),
+                "pkgs.* should be excluded, got {p}"
+            );
+        }
+    }
+
+    #[test]
+    fn extract_option_paths_skips_strings() {
+        // Strings should be skipped — `services.fake` inside a string is not
+        // a real option reference.
+        let code = r#"{
+  services.openssh.enable = true;
+  description = "see services.fake.path docs";
+}"#;
+        let paths = extract_option_paths(code);
+        assert!(paths.contains(&"services.openssh.enable".to_string()));
+        assert!(!paths.contains(&"services.fake.path".to_string()));
+    }
+
+    #[test]
+    fn validate_options_flags_unknown() {
+        // This test uses the live shared index — only meaningful if
+        // nix-instantiate is available.
+        if Command::new("nix-instantiate")
+            .arg("--version")
+            .output()
+            .is_err()
+        {
+            eprintln!("[skip] nix-instantiate not available");
+            return;
+        }
+        let code = r#"{
+  services.nginx.enable = true;
+  services.this_definitely_does_not_exist_xyz.enable = true;
+}"#;
+        let unknown = validate_options(code, shared_nixpkgs_index());
+        let bad_path = "services.this_definitely_does_not_exist_xyz.enable";
+        assert!(
+            unknown.iter().any(|u| u.path == bad_path),
+            "expected to flag {bad_path}, got {unknown:?}"
+        );
+        // services.nginx.enable is real — should NOT be flagged.
+        assert!(
+            !unknown.iter().any(|u| u.path == "services.nginx.enable"),
+            "real path should not be flagged"
+        );
+    }
+
+    #[test]
+    fn generate_with_index_verify_clean_idiom() {
+        if Command::new("nix-instantiate")
+            .arg("--version")
+            .output()
+            .is_err()
+        {
+            eprintln!("[skip] nix-instantiate not available");
+            return;
+        }
+        // The rust dev shell idiom doesn't reference any NixOS module options
+        // (it's a standalone shell.nix), so there should be 0 unknown options.
+        let result = generate_nix_with_index_verify(
+            "set up a rust dev environment with rust-analyzer and mold",
+            3,
+        );
+        assert!(result.base.parses);
+        assert!(
+            result.unknown_options.is_empty(),
+            "shell.nix idiom should have no NixOS option references, got {:?}",
+            result.unknown_options
+        );
     }
 }
