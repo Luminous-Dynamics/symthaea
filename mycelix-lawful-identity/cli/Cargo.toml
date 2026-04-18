@@ -1,0 +1,22 @@
+[package]
+name = "lawful-id-cli"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+description = "Command-line interface for mycelix-lawful-identity — create legal DIDs, import credentials, generate cross-DID proofs."
+
+[[bin]]
+name = "lawful-id"
+path = "src/main.rs"
+
+[dependencies]
+# No holochain_client dependency yet — the conductor integration is
+# deferred per plan notes. The CLI ships the onboarding disclosure and
+# local-only helpers today; conductor round-trip lands once the happ is
+# packed + installed in a dev session.
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+clap = { version = "4.5", features = ["derive"] }
+directories = "5"
+thiserror = "2"
+sha2 = "0.10"
