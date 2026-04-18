@@ -159,7 +159,7 @@ Each cluster theme maps its own colors to these semantic tokens; apps using `myc
 The adoption task in Week 3 of the execution path isn't "build the crate" — it was "add the 3 true-gap primitives + semantic-color-token conventions, then drive reference-impl adoption in Praxis first." **The 3 primitives are now shipped** (see Part 5b). Remaining adoption work:
 
 1. **Propose per-cluster `--md-*` color-token mappings** — each Leptos app's theme CSS defines its concrete palette that maps to the semantic tokens.
-2. **Reference implementation in Praxis** (or Observatory — already uses `mycelix-leptos-core`). A single cluster dashboard page built with `TelemetryLine` + `GraphNode`/`Edge` + `FlowIndicator` + `StatCard` + `SovereignRadar` proves the aesthetic story. Builds the pattern others copy.
+2. ✅ **Reference implementation** (`473f16a72d`) — delivered as a portable `<Showcase />` component in `mycelix-leptos-core` itself. Composes StatCard + TelemetryLine + GraphNode/Edge + FlowIndicator + semantic-color chips on one scene (Kagiso's morning watershed survey from the Part 2 storyboard). Any Leptos app can render it via `view! { <Showcase /> }` — no Trunk/build wiring needed. Portable instead of bound to one cluster, so every adopter can diff their own page against it.
 3. **Migrate 3-5 other cluster frontends** to the same palette + component usage rhythm. Commons + Hearth + Finance are good candidates.
 4. **Civic Leptos frontend** — currently zero UI for a Tier-2 cluster with 20 zomes + 2,276 tests. Writing it from scratch on top of the full primitive set gives the cleanest "greenfield exemplar."
 
