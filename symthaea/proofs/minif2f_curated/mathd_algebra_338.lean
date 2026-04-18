@@ -17,6 +17,7 @@ theorem mathd_algebra_338 : (∀ a : ℝ, (∀ b : ℝ, (∀ c : ℝ, ((((((3) *
     | (linarith; done)
     | (nlinarith [sq_nonneg a, mul_self_nonneg a, sq_nonneg (a - 1), sq_nonneg (a + 1), sq_nonneg b, mul_self_nonneg b, sq_nonneg (b - 1), sq_nonneg (b + 1), sq_nonneg c, mul_self_nonneg c, sq_nonneg (c - 1), sq_nonneg (c + 1), sq_nonneg (a - b), sq_nonneg (a + b), sq_nonneg (a - c), sq_nonneg (a + c), sq_nonneg (b - c), sq_nonneg (b + c)]; done)
     | (positivity; done)
+    | (nlinarith [sq_nonneg a, mul_self_nonneg a, sq_nonneg (a - 10), sq_nonneg (a - 7), sq_nonneg (a - 5), sq_nonneg (a - 3), sq_nonneg (a - 1), sq_nonneg (a + 1), sq_nonneg (a + 3), sq_nonneg (a + 5), sq_nonneg (a + 7), sq_nonneg (a + 10), sq_nonneg b, mul_self_nonneg b, sq_nonneg (b - 10), sq_nonneg (b - 7), sq_nonneg (b - 5), sq_nonneg (b - 3), sq_nonneg (b - 1), sq_nonneg (b + 1), sq_nonneg (b + 3), sq_nonneg (b + 5), sq_nonneg (b + 7), sq_nonneg (b + 10), sq_nonneg c, mul_self_nonneg c, sq_nonneg (c - 10), sq_nonneg (c - 7), sq_nonneg (c - 5), sq_nonneg (c - 3), sq_nonneg (c - 1), sq_nonneg (c + 1), sq_nonneg (c + 3), sq_nonneg (c + 5), sq_nonneg (c + 7), sq_nonneg (c + 10), sq_nonneg (a - b), sq_nonneg (a + b), sq_nonneg (a - c), sq_nonneg (a + c), sq_nonneg (b - c), sq_nonneg (b + c)]; done)
     | (rcases lt_trichotomy a b with h | h | h <;> tauto; done)
     | (rcases le_total _ _ with h | h <;> first | linarith | tauto; done)
     | (tauto; done)

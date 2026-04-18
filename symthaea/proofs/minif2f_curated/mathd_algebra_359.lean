@@ -17,6 +17,7 @@ theorem mathd_algebra_359 : (∀ y : ℝ, ((((y + (6)) + y) = ((2) * (12))) → 
     | (linarith; done)
     | (nlinarith [sq_nonneg y, mul_self_nonneg y, sq_nonneg (y - 1), sq_nonneg (y + 1)]; done)
     | (positivity; done)
+    | (nlinarith [sq_nonneg y, mul_self_nonneg y, sq_nonneg (y - 10), sq_nonneg (y - 7), sq_nonneg (y - 5), sq_nonneg (y - 3), sq_nonneg (y - 1), sq_nonneg (y + 1), sq_nonneg (y + 3), sq_nonneg (y + 5), sq_nonneg (y + 7), sq_nonneg (y + 10)]; done)
     | (rcases lt_trichotomy _ _ with h | h | h <;> tauto; done)
     | (rcases le_total _ _ with h | h <;> first | linarith | tauto; done)
     | (tauto; done)

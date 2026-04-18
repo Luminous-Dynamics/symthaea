@@ -17,6 +17,7 @@ theorem mathd_algebra_160 : (∀ n : ℝ, (∀ x : ℝ, (((n + x) = (97)) → ((
     | (linarith; done)
     | (nlinarith [sq_nonneg n, mul_self_nonneg n, sq_nonneg (n - 1), sq_nonneg (n + 1), sq_nonneg x, mul_self_nonneg x, sq_nonneg (x - 1), sq_nonneg (x + 1), sq_nonneg (n - x), sq_nonneg (n + x)]; done)
     | (positivity; done)
+    | (nlinarith [sq_nonneg n, mul_self_nonneg n, sq_nonneg (n - 10), sq_nonneg (n - 7), sq_nonneg (n - 5), sq_nonneg (n - 3), sq_nonneg (n - 1), sq_nonneg (n + 1), sq_nonneg (n + 3), sq_nonneg (n + 5), sq_nonneg (n + 7), sq_nonneg (n + 10), sq_nonneg x, mul_self_nonneg x, sq_nonneg (x - 10), sq_nonneg (x - 7), sq_nonneg (x - 5), sq_nonneg (x - 3), sq_nonneg (x - 1), sq_nonneg (x + 1), sq_nonneg (x + 3), sq_nonneg (x + 5), sq_nonneg (x + 7), sq_nonneg (x + 10), sq_nonneg (n - x), sq_nonneg (n + x)]; done)
     | (rcases lt_trichotomy n x with h | h | h <;> tauto; done)
     | (rcases le_total _ _ with h | h <;> first | linarith | tauto; done)
     | (tauto; done)

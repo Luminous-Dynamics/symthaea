@@ -17,6 +17,7 @@ theorem mathd_algebra_119 : (∀ d : ℝ, (∀ e : ℝ, ((((2) * d) = (((17) * e
     | (linarith; done)
     | (nlinarith [sq_nonneg d, mul_self_nonneg d, sq_nonneg (d - 1), sq_nonneg (d + 1), sq_nonneg e, mul_self_nonneg e, sq_nonneg (e - 1), sq_nonneg (e + 1), sq_nonneg (d - e), sq_nonneg (d + e)]; done)
     | (positivity; done)
+    | (nlinarith [sq_nonneg d, mul_self_nonneg d, sq_nonneg (d - 10), sq_nonneg (d - 7), sq_nonneg (d - 5), sq_nonneg (d - 3), sq_nonneg (d - 1), sq_nonneg (d + 1), sq_nonneg (d + 3), sq_nonneg (d + 5), sq_nonneg (d + 7), sq_nonneg (d + 10), sq_nonneg e, mul_self_nonneg e, sq_nonneg (e - 10), sq_nonneg (e - 7), sq_nonneg (e - 5), sq_nonneg (e - 3), sq_nonneg (e - 1), sq_nonneg (e + 1), sq_nonneg (e + 3), sq_nonneg (e + 5), sq_nonneg (e + 7), sq_nonneg (e + 10), sq_nonneg (d - e), sq_nonneg (d + e)]; done)
     | (rcases lt_trichotomy d e with h | h | h <;> tauto; done)
     | (rcases le_total _ _ with h | h <;> first | linarith | tauto; done)
     | (tauto; done)

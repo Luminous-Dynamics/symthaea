@@ -16,6 +16,7 @@ theorem mathd_algebra_304 : (((91) ^ 2) = (8281)) := by
     | (linarith; done)
     | (nlinarith [sq_nonneg _, mul_self_nonneg _]; done)
     | (positivity; done)
+    | (nlinarith [sq_nonneg _, mul_self_nonneg _]; done)
     | (rcases lt_trichotomy _ _ with h | h | h <;> tauto; done)
     | (rcases le_total _ _ with h | h <;> first | linarith | tauto; done)
     | (tauto; done)

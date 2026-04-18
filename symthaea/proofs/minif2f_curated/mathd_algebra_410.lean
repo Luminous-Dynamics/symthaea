@@ -17,6 +17,7 @@ theorem mathd_algebra_410 : (∀ x : ℝ, (∀ y : ℝ, ((y = (((x ^ 2) - ((6) *
     | (linarith; done)
     | (nlinarith [sq_nonneg x, mul_self_nonneg x, sq_nonneg (x - 1), sq_nonneg (x + 1), sq_nonneg y, mul_self_nonneg y, sq_nonneg (y - 1), sq_nonneg (y + 1), sq_nonneg (x - y), sq_nonneg (x + y)]; done)
     | (positivity; done)
+    | (nlinarith [sq_nonneg x, mul_self_nonneg x, sq_nonneg (x - 10), sq_nonneg (x - 7), sq_nonneg (x - 5), sq_nonneg (x - 3), sq_nonneg (x - 1), sq_nonneg (x + 1), sq_nonneg (x + 3), sq_nonneg (x + 5), sq_nonneg (x + 7), sq_nonneg (x + 10), sq_nonneg y, mul_self_nonneg y, sq_nonneg (y - 10), sq_nonneg (y - 7), sq_nonneg (y - 5), sq_nonneg (y - 3), sq_nonneg (y - 1), sq_nonneg (y + 1), sq_nonneg (y + 3), sq_nonneg (y + 5), sq_nonneg (y + 7), sq_nonneg (y + 10), sq_nonneg (x - y), sq_nonneg (x + y)]; done)
     | (rcases lt_trichotomy x y with h | h | h <;> tauto; done)
     | (rcases le_total _ _ with h | h <;> first | linarith | tauto; done)
     | (tauto; done)

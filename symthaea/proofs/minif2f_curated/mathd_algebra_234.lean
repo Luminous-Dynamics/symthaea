@@ -17,6 +17,7 @@ theorem mathd_algebra_234 : (∀ d : ℝ, (((((27 : ℝ) / (125 : ℝ)) * d) = (
     | (linarith; done)
     | (nlinarith [sq_nonneg d, mul_self_nonneg d, sq_nonneg (d - 1), sq_nonneg (d + 1)]; done)
     | (positivity; done)
+    | (nlinarith [sq_nonneg d, mul_self_nonneg d, sq_nonneg (d - 10), sq_nonneg (d - 7), sq_nonneg (d - 5), sq_nonneg (d - 3), sq_nonneg (d - 1), sq_nonneg (d + 1), sq_nonneg (d + 3), sq_nonneg (d + 5), sq_nonneg (d + 7), sq_nonneg (d + 10)]; done)
     | (rcases lt_trichotomy _ _ with h | h | h <;> tauto; done)
     | (rcases le_total _ _ with h | h <;> first | linarith | tauto; done)
     | (tauto; done)

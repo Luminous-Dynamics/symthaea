@@ -17,6 +17,7 @@ theorem mathd_algebra_176 : (∀ x : ℝ, ((((x + (1)) ^ 2) * x) = (((x ^ 3) + (
     | (linarith; done)
     | (nlinarith [sq_nonneg x, mul_self_nonneg x, sq_nonneg (x - 1), sq_nonneg (x + 1)]; done)
     | (positivity; done)
+    | (nlinarith [sq_nonneg x, mul_self_nonneg x, sq_nonneg (x - 10), sq_nonneg (x - 7), sq_nonneg (x - 5), sq_nonneg (x - 3), sq_nonneg (x - 1), sq_nonneg (x + 1), sq_nonneg (x + 3), sq_nonneg (x + 5), sq_nonneg (x + 7), sq_nonneg (x + 10)]; done)
     | (rcases lt_trichotomy _ _ with h | h | h <;> tauto; done)
     | (rcases le_total _ _ with h | h <;> first | linarith | tauto; done)
     | (tauto; done)

@@ -17,6 +17,7 @@ theorem mathd_numbertheory_326 : (∀ n : ℤ, (((((n - (1)) * n) * (n + (1))) =
     | (linarith; done)
     | (nlinarith [sq_nonneg n, mul_self_nonneg n, sq_nonneg (n - 1), sq_nonneg (n + 1)]; done)
     | (positivity; done)
+    | (nlinarith [sq_nonneg n, mul_self_nonneg n, sq_nonneg (n - 10), sq_nonneg (n - 7), sq_nonneg (n - 5), sq_nonneg (n - 3), sq_nonneg (n - 1), sq_nonneg (n + 1), sq_nonneg (n + 3), sq_nonneg (n + 5), sq_nonneg (n + 7), sq_nonneg (n + 10)]; done)
     | (rcases lt_trichotomy _ _ with h | h | h <;> tauto; done)
     | (rcases le_total _ _ with h | h <;> first | linarith | tauto; done)
     | (tauto; done)

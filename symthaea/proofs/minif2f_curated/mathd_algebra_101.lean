@@ -17,6 +17,8 @@ theorem mathd_algebra_101 : (∀ x : ℝ, (((((x ^ 2) - ((5) * x)) - (4)) ≤ (1
     | (linarith; done)
     | (nlinarith [sq_nonneg x, mul_self_nonneg x, sq_nonneg (x - 1), sq_nonneg (x + 1)]; done)
     | (positivity; done)
+    | (refine ⟨?_, ?_⟩ <;> first | (linarith; done) | (nlinarith [sq_nonneg x, mul_self_nonneg x, sq_nonneg (x - 1), sq_nonneg (x + 1)]; done) | (nlinarith [sq_nonneg x, mul_self_nonneg x, sq_nonneg (x - 10), sq_nonneg (x - 7), sq_nonneg (x - 5), sq_nonneg (x - 3), sq_nonneg (x - 1), sq_nonneg (x + 1), sq_nonneg (x + 3), sq_nonneg (x + 5), sq_nonneg (x + 7), sq_nonneg (x + 10)]; done) | (omega; done) | (norm_num; done) | (ring; done); done)
+    | (nlinarith [sq_nonneg x, mul_self_nonneg x, sq_nonneg (x - 10), sq_nonneg (x - 7), sq_nonneg (x - 5), sq_nonneg (x - 3), sq_nonneg (x - 1), sq_nonneg (x + 1), sq_nonneg (x + 3), sq_nonneg (x + 5), sq_nonneg (x + 7), sq_nonneg (x + 10)]; done)
     | (rcases lt_trichotomy _ _ with h | h | h <;> tauto; done)
     | (rcases le_total _ _ with h | h <;> first | linarith | tauto; done)
     | (tauto; done)
