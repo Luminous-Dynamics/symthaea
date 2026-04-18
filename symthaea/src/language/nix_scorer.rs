@@ -30,6 +30,14 @@ pub enum CanonValue {
     Int(i64),
     /// String literal with quotes stripped.
     Str(String),
+    /// A list of package identifiers. Captured from `with pkgs; [ a b c ]`
+    /// and bare `[ a b c ]` forms. BTreeSet so order is canonical.
+    ///
+    /// **Satisfaction semantics**: generated list satisfies golden iff
+    /// `golden ⊆ generated` — extras are accepted (more packages are
+    /// strictly more useful in a dev shell). This matches the "extraneous
+    /// is warning, not fail" principle applied at path-set level.
+    PackageList(std::collections::BTreeSet<String>),
     /// Raw source of the RHS, trimmed and whitespace-collapsed.
     /// Used for anything we don't canonicalize further yet.
     Opaque(String),
@@ -42,7 +50,28 @@ impl CanonValue {
             CanonValue::Bool(b) => b.to_string(),
             CanonValue::Int(i) => i.to_string(),
             CanonValue::Str(s) => format!("\"{}\"", s),
+            CanonValue::PackageList(pkgs) => {
+                let joined: Vec<&str> = pkgs.iter().map(|s| s.as_str()).collect();
+                format!("with pkgs; [ {} ]", joined.join(" "))
+            }
             CanonValue::Opaque(s) => s.clone(),
+        }
+    }
+
+    /// Directional comparison: does `self` (the generated value) satisfy
+    /// the `want` (golden) value?
+    ///
+    /// For Bool/Int/Str/Opaque this is structural equality. For
+    /// PackageList it's "superset OK": a generated list satisfies a
+    /// golden list iff every package in the golden is present in the
+    /// generated list (extras are fine). Mixed-type compares are never
+    /// satisfied — an int value can't meet a string expectation, etc.
+    pub fn satisfies(&self, want: &CanonValue) -> bool {
+        match (self, want) {
+            (CanonValue::PackageList(got), CanonValue::PackageList(wanted)) => {
+                wanted.is_subset(got)
+            }
+            _ => self == want,
         }
     }
 }
@@ -256,6 +285,13 @@ fn canonicalize_value(node: &SyntaxNode) -> CanonValue {
         return CanonValue::Str(inner.to_string());
     }
 
+    // PackageList: `with pkgs; [ a b c ]` or plain `[ a b c ]` with only
+    // identifiers inside. Checked before Opaque so subset semantics
+    // apply where they naturally should (dev-shell buildInputs).
+    if let Some(pkgs) = try_parse_package_list(trimmed) {
+        return CanonValue::PackageList(pkgs);
+    }
+
     // Fallback: canonicalize formatting. First pad structural punctuation
     // so `[a b]` and `[ a b ]` tokenize identically, then collapse runs
     // of whitespace. Crude but catches the common cosmetic differences
@@ -269,6 +305,45 @@ fn canonicalize_value(node: &SyntaxNode) -> CanonValue {
         .replace(',', " , ");
     let collapsed: String = padded.split_whitespace().collect::<Vec<_>>().join(" ");
     CanonValue::Opaque(collapsed)
+}
+
+/// Recognize `with pkgs; [ ident ident ]` and plain `[ ident ident ]`
+/// forms. Returns `None` if the list contains anything that isn't a
+/// plain identifier (falls through to Opaque).
+fn try_parse_package_list(src: &str) -> Option<std::collections::BTreeSet<String>> {
+    let body = if let Some(rest) = src.strip_prefix("with ") {
+        // `with <scope>;` — find the `;` and skip past it.
+        let semi = rest.find(';')?;
+        rest[semi + 1..].trim_start()
+    } else {
+        src
+    };
+    let body = body.strip_prefix('[')?.strip_suffix(']')?;
+
+    let mut pkgs = std::collections::BTreeSet::new();
+    for token in body.split_whitespace() {
+        if !is_package_identifier(token) {
+            return None;
+        }
+        pkgs.insert(token.to_string());
+    }
+    if pkgs.is_empty() {
+        None
+    } else {
+        Some(pkgs)
+    }
+}
+
+/// Identifier shape: `[A-Za-z_][\w.-]*`. Rejects anything that could be
+/// an expression (quoted strings, interpolations, calls, etc.) so the
+/// subset-check can't accidentally compare semantically-different values.
+fn is_package_identifier(s: &str) -> bool {
+    let mut chars = s.chars();
+    match chars.next() {
+        Some(c) if c.is_ascii_alphabetic() || c == '_' => {}
+        _ => return false,
+    }
+    chars.all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.' || c == '-')
 }
 
 /// Strip line-comments (`#…` to EOL) before parsing. Block comments
@@ -342,7 +417,10 @@ pub fn score(generated: &str, golden: &str) -> StructuralVerdict {
         let key: &String = **path;
         let got = &gen_map[key];
         let want = &gold_map[key];
-        if got != want {
+        // `satisfies` is directional: for package lists, extras on the
+        // generated side are OK (subset semantics). For scalars it's
+        // still structural equality.
+        if !got.satisfies(want) {
             verdict.value_mismatches.push(ValueMismatch {
                 path: key.clone(),
                 got: got.clone(),
@@ -493,6 +571,64 @@ mod tests {
         let flat = wrap("a.b.c = 1;");
         let v = score(&nested, &flat);
         assert!(v.pass(), "deep nesting should flatten; got {:?}", v);
+    }
+
+    #[test]
+    fn package_list_superset_satisfies_golden() {
+        // A dev-shell generator might emit a more complete package set
+        // than the hand-written golden. As long as every required pkg
+        // is present, extras (rustfmt, clippy) should NOT fail the check.
+        let gen =
+            wrap("buildInputs = with pkgs; [ rustc cargo rustfmt clippy rust-analyzer mold ];");
+        let gold = wrap("buildInputs = with pkgs; [ rustc cargo rust-analyzer mold ];");
+        let v = score(&gen, &gold);
+        assert!(
+            v.pass(),
+            "generator superset must satisfy golden; got {:?}",
+            v
+        );
+    }
+
+    #[test]
+    fn package_list_missing_pkg_fails() {
+        // Conversely: if a required package is absent, the structural
+        // scorer must report a mismatch — this is the legitimate
+        // generator-bug case that matters to catch.
+        let gen = wrap("buildInputs = with pkgs; [ rustc cargo ];");
+        let gold = wrap("buildInputs = with pkgs; [ rustc cargo rust-analyzer ];");
+        let v = score(&gen, &gold);
+        assert!(!v.pass(), "missing required package must fail");
+        assert_eq!(v.value_mismatches.len(), 1);
+    }
+
+    #[test]
+    fn package_list_order_independent() {
+        // BTreeSet canonicalization means [ b a c ] == [ a b c ].
+        let gen = wrap("buildInputs = with pkgs; [ cargo rustc rust-analyzer ];");
+        let gold = wrap("buildInputs = with pkgs; [ rustc cargo rust-analyzer ];");
+        let v = score(&gen, &gold);
+        assert!(v.pass(), "list order should not matter; got {:?}", v);
+    }
+
+    #[test]
+    fn non_identifier_list_falls_through_to_opaque() {
+        // Lists containing non-identifier expressions (strings, numbers)
+        // must NOT become PackageList — subset semantics don't make sense
+        // for config values.
+        let gen = wrap("networking.firewall.allowedTCPPorts = [ 80 443 ];");
+        let gold = wrap("networking.firewall.allowedTCPPorts = [ 80 443 ];");
+        let v = score(&gen, &gold);
+        assert!(v.pass(), "integer list should still match; got {:?}", v);
+        // Confirm it canonicalized as Opaque (not PackageList) by adding
+        // an extra port that SHOULD fail — if it became PackageList, the
+        // subset rule would let this through.
+        let gen_extra = wrap("networking.firewall.allowedTCPPorts = [ 80 443 8080 ];");
+        let v2 = score(&gen_extra, &gold);
+        assert!(
+            !v2.pass(),
+            "extra integer in opaque-int-list must fail (only package lists are subset-tolerant); got {:?}",
+            v2
+        );
     }
 
     #[test]
