@@ -69,14 +69,22 @@ fn make_broca_channels(
     has_hardware_flag: f32,
 ) -> ThoughtChannels {
     let mut tc = ThoughtChannels::default();
+    // Broca's `ThoughtChannels::default()` sets position 7 to 1.0
+    // (Unknown-intent default). Clear the 0-7 intent block before
+    // setting our target — otherwise every generation gets BOTH the
+    // requested intent AND Unknown as active, which muddies output.
+    // This matches `nix_channels_as_broca` in the main crate, which
+    // always produces a clean one-hot in 0-7.
+    for i in 0..8 {
+        tc.channels[i] = 0.0;
+    }
     // 0..8 — intent one-hot.
     tc.channels[intent as usize] = 1.0;
     // 24..28 — code-channel-packed Nix context.
-    // syntax_complexity (item_count/5); leaving at 0 for smoke demo.
-    tc.channels[24] = 0.0;
+    tc.channels[24] = 0.0; // syntax_complexity — smoke demo leaves 0
     tc.channels[25] = 0.0; // has_extras — smoke demo leaves 0
     tc.channels[26] = language_norm; // algorithm_pattern = language / 6.0
-    tc.channels[27] = has_hardware_flag * 0.5; // hardware gets top bit of the 4-flag pack
+    tc.channels[27] = has_hardware_flag * 0.5; // hardware = top bit of 4-flag pack
     tc
 }
 
