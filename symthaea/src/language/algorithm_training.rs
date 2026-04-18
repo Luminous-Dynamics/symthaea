@@ -1900,7 +1900,7 @@ pub fn cold_generate_classified(
     // System 1: predict class via linear classifier on HDC vector
     let hv = encoder.encode(&channels);
     let projected = projection.project(&hv);
-    let predicted_class = classifier.predict(&projected.values);
+    let predicted_class = hybrid_classify(purpose, &projected.values, classifier);
     channels.set_class(predicted_class);
 
     // Re-encode with the predicted class (consistency)
@@ -2506,6 +2506,113 @@ fn build_channels_from_purpose(purpose: &str, signature: &str) -> AlgorithmChann
     }
 
     channels
+}
+
+/// Strong keyword match: returns Some(class) only when there's a high-confidence
+/// signal in the purpose text. Returns None for ambiguous cases.
+///
+/// Used as a prior for the hybrid System 1 classifier — if keywords are
+/// strong, trust them over the linear classifier (which has limited training
+/// data per class).
+pub fn strong_keyword_class(purpose: &str) -> Option<AlgorithmClass> {
+    let lower = purpose.to_lowercase();
+
+    // Sorting — very specific verbs
+    if lower.contains("sort ")
+        || lower.contains("sorted ")
+        || lower.contains("ascending")
+        || lower.contains("descending")
+        || lower.contains("order ") && !lower.contains("order of")
+    {
+        return Some(AlgorithmClass::Sorting);
+    }
+
+    // Mathematical — number-theoretic specifics
+    if lower.contains("fibonacci")
+        || lower.contains("factorial")
+        || lower.contains("prime")
+        || lower.contains("collatz")
+        || lower.contains("armstrong")
+        || lower.contains("perfect number")
+        || lower.contains("gcd")
+        || lower.contains("modulo")
+    {
+        return Some(AlgorithmClass::Mathematical);
+    }
+
+    // String processing — text-specific verbs
+    if lower.contains("reverse")
+        || lower.contains("uppercase")
+        || lower.contains("lowercase")
+        || lower.contains("acronym")
+        || lower.contains("anagram")
+        || lower.contains("palindrome")
+        || lower.contains("cipher")
+        || lower.contains("encode")
+        || lower.contains("decode")
+    {
+        return Some(AlgorithmClass::StringProcessing);
+    }
+
+    // Search
+    if lower.contains("binary search")
+        || lower.contains("linear search")
+        || lower.contains("sieve")
+        || lower.contains("lookup")
+    {
+        return Some(AlgorithmClass::Search);
+    }
+
+    // Dynamic programming
+    if lower.contains("knapsack")
+        || lower.contains("dynamic programming")
+        || lower.contains("optimal substructure")
+        || lower.contains("memoize")
+    {
+        return Some(AlgorithmClass::DynamicProgramming);
+    }
+
+    // Graph
+    if lower.contains("graph")
+        || lower.contains("dfs")
+        || lower.contains("bfs")
+        || lower.contains("shortest path")
+        || lower.contains("traversal")
+        || lower.contains("euler")
+        || lower.contains("hamilton")
+    {
+        return Some(AlgorithmClass::Graph);
+    }
+
+    // Data structure
+    if lower.contains("linked list")
+        || lower.contains("stack ")
+        || lower.contains("queue ")
+        || lower.contains("buffer")
+        || lower.contains("hashmap")
+        || lower.contains("hashset")
+        || lower.contains("custom set")
+        || lower.contains("circular")
+    {
+        return Some(AlgorithmClass::DataStructure);
+    }
+
+    None
+}
+
+/// Hybrid classifier: keyword priors + linear classifier fallback.
+///
+/// If strong_keyword_class returns Some, trust it. Otherwise use the
+/// trained linear classifier on HDC features.
+pub fn hybrid_classify(
+    purpose: &str,
+    features: &[f32],
+    classifier: &AlgorithmClassifier,
+) -> AlgorithmClass {
+    if let Some(class) = strong_keyword_class(purpose) {
+        return class;
+    }
+    classifier.predict(features)
 }
 
 /// Classify algorithm from purpose text.

@@ -37,6 +37,8 @@
 
 use std::fmt;
 
+use symthaea_core::hdc::fol_formula_ext::{ArithOp, FolFormulaExt, NumericType, Term};
+
 // ════════════════════════════════════════════════════════════════════════
 // AST — what the parser produces
 // ════════════════════════════════════════════════════════════════════════
@@ -929,6 +931,149 @@ impl<'a> Parser<'a> {
 }
 
 // ════════════════════════════════════════════════════════════════════════
+// Translator — LeanTheorem → FolFormulaExt
+// ════════════════════════════════════════════════════════════════════════
+
+/// Translate a parsed `LeanTheorem` into the `FolFormulaExt` the Phase 2
+/// W4 cascade consumes. The shape mirrors the hand-translator idiom
+/// in `prove_minif2f_curated.rs`:
+///
+///   `∀ x₁ : T₁, … ∀ xₙ : Tₙ, (hyp₁ → hyp₂ → … → goal)`
+///
+/// Typed binders become `Forall`s wrapping the body (outermost first,
+/// matching the hand-translator's `forall_all(&binders, body)` loop).
+/// Hypothesis binders become a right-associated implication chain
+/// whose final consequent is the translated goal.
+pub fn translate_theorem(t: &LeanTheorem) -> Result<FolFormulaExt, IngestError> {
+    // Body: hyp₁ → hyp₂ → … → goal (right-assoc).
+    let mut body = translate_statement(&t.goal)?;
+    for b in t.binders.iter().rev() {
+        if let LeanBinder::Hyp { stmt, .. } = b {
+            let hyp = translate_statement(stmt)?;
+            body = hyp.implies(body);
+        }
+    }
+    // Wrap with Forall for each typed binder (outer quantifier first
+    // matches `forall_all`'s iter.rev() loop in the hand-translator).
+    for b in t.binders.iter().rev() {
+        if let LeanBinder::TypedVar { name, ty } = b {
+            body = FolFormulaExt::forall(name, translate_type(*ty), body);
+        }
+    }
+    Ok(body)
+}
+
+fn translate_type(t: LeanType) -> NumericType {
+    match t {
+        LeanType::Real => NumericType::Real,
+        LeanType::Int => NumericType::Int,
+        LeanType::Nat => NumericType::Nat,
+    }
+}
+
+fn translate_statement(s: &LeanStatement) -> Result<FolFormulaExt, IngestError> {
+    match s {
+        LeanStatement::Rel(op, a, b) => {
+            let a = translate_term(a)?;
+            let b = translate_term(b)?;
+            Ok(match op {
+                RelOp::Eq => FolFormulaExt::eq(a, b),
+                // `a ≠ b` → `¬ (a = b)`; FolFormulaExt has no NotEq
+                // constructor.
+                RelOp::NotEq => FolFormulaExt::eq(a, b).neg(),
+                RelOp::Lt => FolFormulaExt::lt(a, b),
+                RelOp::Le => FolFormulaExt::le(a, b),
+                // `a > b` ≡ `b < a`; flip to match the available constructor.
+                RelOp::Gt => FolFormulaExt::lt(b, a),
+                // `a ≥ b` ≡ `b ≤ a`; flip.
+                RelOp::Ge => FolFormulaExt::le(b, a),
+            })
+        }
+        LeanStatement::And(p, q) => Ok(translate_statement(p)?.and(translate_statement(q)?)),
+        LeanStatement::Or(p, q) => Ok(translate_statement(p)?.or(translate_statement(q)?)),
+        LeanStatement::Implies(p, q) => {
+            Ok(translate_statement(p)?.implies(translate_statement(q)?))
+        }
+        LeanStatement::Iff(p, q) => {
+            // `p ↔ q` ≡ `(p → q) ∧ (q → p)`; no direct constructor.
+            let p = translate_statement(p)?;
+            let q = translate_statement(q)?;
+            Ok(p.clone().implies(q.clone()).and(q.implies(p)))
+        }
+        LeanStatement::Not(p) => Ok(translate_statement(p)?.neg()),
+    }
+}
+
+fn translate_term(t: &LeanTerm) -> Result<Term, IngestError> {
+    match t {
+        LeanTerm::Var(n) => Ok(Term::var(n)),
+        LeanTerm::IntLit(n) => Ok(Term::int(*n)),
+        LeanTerm::Neg(inner) => Ok(translate_term(inner)?.neg()),
+        LeanTerm::Bin(op, a, b) => {
+            match op {
+                BinOp::Add => Ok(translate_term(a)?.add(translate_term(b)?)),
+                BinOp::Sub => Ok(translate_term(a)?.sub(translate_term(b)?)),
+                BinOp::Mul => Ok(translate_term(a)?.mul(translate_term(b)?)),
+                BinOp::Div => {
+                    // Common miniF2F shape: `p / q` with both sides
+                    // integer literals → exact rational. This matches
+                    // the hand-translator's `rat(p, q)` and keeps the
+                    // SMT fragment detector (LRA vs NRA) honest.
+                    if let (LeanTerm::IntLit(p), LeanTerm::IntLit(q)) = (a.as_ref(), b.as_ref()) {
+                        if *q == 0 {
+                            return Err(IngestError::UnsupportedTranslation {
+                                reason: "division by literal 0".into(),
+                            });
+                        }
+                        return Ok(Term::rat(*p, *q));
+                    }
+                    Ok(translate_term(a)?.div(translate_term(b)?))
+                }
+                BinOp::Pow => {
+                    // `FolFormulaExt::Term::Pow` stores the exponent as
+                    // `u32`, so we only accept non-negative integer
+                    // literal exponents. Variable exponents (`x^y`) and
+                    // negative / fractional exponents (`x^(-1)`) fall
+                    // outside the supported fragment and produce a
+                    // named failure for the scorecard.
+                    let base = translate_term(a)?;
+                    match b.as_ref() {
+                        LeanTerm::IntLit(n) if *n >= 0 => {
+                            let exp: u32 = (*n).try_into().map_err(|_| {
+                                IngestError::UnsupportedTranslation {
+                                    reason: format!("exponent {n} exceeds u32::MAX"),
+                                }
+                            })?;
+                            Ok(base.pow(exp))
+                        }
+                        LeanTerm::IntLit(n) => Err(IngestError::UnsupportedTranslation {
+                            reason: format!("negative exponent {n}"),
+                        }),
+                        _ => Err(IngestError::UnsupportedTranslation {
+                            reason: "non-literal exponent".into(),
+                        }),
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// One-shot helper: parse a `.lean` source string and translate. Returns
+/// a `(parsed_ok, translated_ok, formula)` tuple where `parsed_ok` and
+/// `translated_ok` feed the three-tier scorecard; the third stage
+/// (Lake accept) is handled downstream by `render_fol_ext_file`.
+///
+/// Returns `Err` with the categorized `IngestError` when either stage
+/// fails. Callers that need the "Parsed but not Translated" middle
+/// state can call `parse_theorem` and `translate_theorem` separately
+/// and dispatch on the individual `Result`s.
+pub fn ingest(src: &str) -> Result<FolFormulaExt, IngestError> {
+    let theorem = parse_theorem(src)?;
+    translate_theorem(&theorem)
+}
+
+// ════════════════════════════════════════════════════════════════════════
 // Tests
 // ════════════════════════════════════════════════════════════════════════
 
@@ -1227,5 +1372,143 @@ mod tests {
             parse_theorem("example : 1 = 1 := by rfl").unwrap_err(),
             IngestError::NotATheorem
         );
+    }
+
+    // ─── translator ─────────────────────────────────────────────────
+
+    /// Convenience: build the same `FolFormulaExt` shape the
+    /// hand-translator writes for `mathd_algebra_109`. Used by the
+    /// round-trip test below.
+    fn expected_algebra_109() -> FolFormulaExt {
+        use symthaea_core::hdc::fol_formula_ext::NumericType as N;
+        let r = N::Real;
+        // body: h₀ → h₁ → goal (right-assoc)
+        let h0 = FolFormulaExt::eq(
+            Term::int(3)
+                .mul(Term::var("a"))
+                .add(Term::int(2).mul(Term::var("b"))),
+            Term::int(12),
+        );
+        let h1 = FolFormulaExt::eq(Term::var("a"), Term::int(4));
+        let goal = FolFormulaExt::eq(Term::var("b"), Term::int(0));
+        let body = h0.implies(h1.implies(goal));
+        // ∀ a : ℝ, ∀ b : ℝ, body (outermost = a)
+        FolFormulaExt::forall("a", r, FolFormulaExt::forall("b", r, body))
+    }
+
+    #[test]
+    fn translate_mathd_algebra_109_matches_hand_translator() {
+        let src = "theorem mathd_algebra_109 (a b : ℝ) (h₀ : 3 * a + 2 * b = 12) \
+                   (h₁ : a = 4) : b = 0 := by sorry";
+        let t = parse_theorem(src).unwrap();
+        let formula = translate_theorem(&t).unwrap();
+        assert_eq!(formula, expected_algebra_109());
+    }
+
+    #[test]
+    fn translate_rel_operators_cover_all_six() {
+        let cases = [
+            ("x = y", RelOp::Eq),
+            ("x ≠ y", RelOp::NotEq),
+            ("x < y", RelOp::Lt),
+            ("x ≤ y", RelOp::Le),
+            ("x > y", RelOp::Gt),
+            ("x ≥ y", RelOp::Ge),
+        ];
+        for (expr, _op) in cases {
+            let src = format!("theorem t (x y : ℝ) : {expr} := by sorry");
+            let t = parse_theorem(&src).expect(expr);
+            let f = translate_theorem(&t).expect(expr);
+            // A shallow assertion: translator must not have returned
+            // an unsupported-translation error for any of the six
+            // relations.
+            match f {
+                FolFormulaExt::Forall(_, _, _) => { /* ok */ }
+                other => panic!("expected ∀-wrapped formula for {expr}, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn translate_rational_literal_folds_to_ratlit() {
+        // `q/p = 2/3` is Phase 5 Pattern B's canonical shape; the
+        // translator should fold `2 / 3` into an exact `RatLit(2, 3)`
+        // rather than a BinOp(Div) — the SMT fragment detector uses
+        // this distinction (QF_LRA vs QF_NRA).
+        let src = "theorem t : 1 = 2 / 3 := by sorry";
+        let t = parse_theorem(src).unwrap();
+        let f = translate_theorem(&t).unwrap();
+        match f {
+            FolFormulaExt::Eq(_, Term::RatLit(p, q)) => {
+                assert_eq!((p, q), (2, 3));
+            }
+            other => panic!("expected Eq(_, RatLit(2,3)), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn translate_pow_accepts_nonneg_literal_exponent() {
+        let src = "theorem t (x : ℝ) : x^2 = x*x := by sorry";
+        let t = parse_theorem(src).unwrap();
+        translate_theorem(&t).unwrap();
+    }
+
+    #[test]
+    fn translate_pow_rejects_variable_exponent() {
+        let src = "theorem t (x y : ℝ) : x^y = 0 := by sorry";
+        let t = parse_theorem(src).unwrap();
+        let err = translate_theorem(&t).unwrap_err();
+        assert_eq!(err.category(), "translate");
+    }
+
+    #[test]
+    fn translate_pow_rejects_negative_literal_exponent() {
+        // `-1` is pre-folded to IntLit(-1) by the parser; translator
+        // sees it as a negative literal and rejects.
+        let src = "theorem t (x : ℝ) : x^(-1) = 1 := by sorry";
+        let t = parse_theorem(src).unwrap();
+        let err = translate_theorem(&t).unwrap_err();
+        match err {
+            IngestError::UnsupportedTranslation { reason } => {
+                assert!(reason.contains("negative exponent"), "got {reason}");
+            }
+            other => panic!("expected UnsupportedTranslation, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn translate_iff_desugars_to_bidirectional_implies_conjunction() {
+        let src = "theorem t (x : ℝ) : x = 0 ↔ 2 * x = 0 := by sorry";
+        let t = parse_theorem(src).unwrap();
+        let f = translate_theorem(&t).unwrap();
+        // Outer: ∀ x, (p → q) ∧ (q → p)
+        match f {
+            FolFormulaExt::Forall(_, _, body) => match *body {
+                FolFormulaExt::And(l, r) => {
+                    assert!(matches!(*l, FolFormulaExt::Implies(_, _)));
+                    assert!(matches!(*r, FolFormulaExt::Implies(_, _)));
+                }
+                other => panic!("expected And for iff desugar, got {other:?}"),
+            },
+            other => panic!("expected Forall, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn ingest_one_shot_returns_formula() {
+        let src = "theorem t (a b : ℝ) (h : a = b) : b = a := by sorry";
+        let f = ingest(src).unwrap();
+        // Result shape: Forall a, Forall b, Implies(Eq(a,b), Eq(b,a))
+        match f {
+            FolFormulaExt::Forall(_, _, _) => { /* ok */ }
+            other => panic!("expected Forall, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn ingest_division_by_zero_literal_rejected() {
+        let src = "theorem t : 1 = 1 / 0 := by sorry";
+        let err = ingest(src).unwrap_err();
+        assert_eq!(err.category(), "translate");
     }
 }
