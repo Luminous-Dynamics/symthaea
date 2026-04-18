@@ -232,12 +232,23 @@ fn run_trial_arm(policy: Policy, params: &TrialParams) -> u32 {
 /// - `Continuous` — linear map of the empirical band [0.099, 0.145] →
 ///   [0.0, 1.0], clamped outside. Eliminates tier hysteresis; Φ flows
 ///   directly into motor authority.
+/// - `ClampedLinear` — linear map but floored at `FLOOR_GAIN` so the
+///   arm never fully stalls. Tests the hypothesis (from the
+///   Recalibrated vs Continuous comparison) that the *floor* is what
+///   makes the gain mapping beat binary SSM, not the smoothness.
 #[derive(Clone, Copy)]
 pub enum ThresholdSet {
     Default,
     Recalibrated,
     Continuous,
+    ClampedLinear,
 }
+
+/// Crawl-rate floor for `ClampedLinear`. Chosen to match the
+/// Recalibrated Orange tier so the two variants are directly
+/// comparable — Recalibrated gives gain = 0.3 step-wise, ClampedLinear
+/// gives gain ∈ [0.3, 1.0] continuous with the same floor.
+const FLOOR_GAIN: f64 = 0.3;
 
 /// Empirical Φ distribution band observed in 40 s trace. If the
 /// consciousness-equation aggregation changes, re-run with
@@ -280,6 +291,14 @@ fn gain_from_phi(phi: f64, set: ThresholdSet) -> f64 {
             // equation's output on this task.
             let span = PHI_BAND_HIGH - PHI_BAND_LOW;
             ((phi - PHI_BAND_LOW) / span).clamp(0.0, 1.0)
+        }
+        ThresholdSet::ClampedLinear => {
+            // Linear map [low, high] → [0, 1], then clamp to [FLOOR, 1.0].
+            // The arm never fully stalls — Φ dips below the band still
+            // give FLOOR gain, keeping the crawl window alive.
+            let span = PHI_BAND_HIGH - PHI_BAND_LOW;
+            let linear = ((phi - PHI_BAND_LOW) / span).clamp(0.0, 1.0);
+            linear.max(FLOOR_GAIN)
         }
     }
 }
@@ -333,9 +352,9 @@ fn run_trial_phi(params: &TrialParams, trace: bool, thresholds: ThresholdSet) ->
             let default_gain = agent.tick(&obs, danger);
             last_gain = match thresholds {
                 ThresholdSet::Default => default_gain,
-                ThresholdSet::Recalibrated | ThresholdSet::Continuous => {
-                    gain_from_phi(agent.phi(), thresholds)
-                }
+                ThresholdSet::Recalibrated
+                | ThresholdSet::Continuous
+                | ThresholdSet::ClampedLinear => gain_from_phi(agent.phi(), thresholds),
             };
             last_perception = Some(hv);
 
@@ -574,8 +593,11 @@ fn main() {
         .unwrap_or(DEFAULT_PHI_TRIALS);
 
     let phi_n_steps = phi_steps();
-    // Threshold-set selection: MANIP_BENCH_PHI_CONT takes precedence
-    // over MANIP_BENCH_PHI_RECAL. Default if neither set.
+    // Threshold-set selection: MANIP_BENCH_PHI_CLAMP > CONT > RECAL > Default.
+    let clamp_enabled = std::env::var("MANIP_BENCH_PHI_CLAMP")
+        .ok()
+        .map(|v| v != "0" && !v.is_empty())
+        .unwrap_or(false);
     let cont_enabled = std::env::var("MANIP_BENCH_PHI_CONT")
         .ok()
         .map(|v| v != "0" && !v.is_empty())
@@ -584,7 +606,12 @@ fn main() {
         .ok()
         .map(|v| v != "0" && !v.is_empty())
         .unwrap_or(false);
-    let (thresholds, threshold_label) = if cont_enabled {
+    let (thresholds, threshold_label) = if clamp_enabled {
+        (
+            ThresholdSet::ClampedLinear,
+            "clamped-linear Φ→gain (floor=0.3, linear above)",
+        )
+    } else if cont_enabled {
         (
             ThresholdSet::Continuous,
             "continuous Φ→gain [0.099, 0.145] → [0, 1]",
