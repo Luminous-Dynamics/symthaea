@@ -87,6 +87,25 @@ struct Args {
     /// HdcLtc uses novel hypervector-based LTC with O(1) temporal jumps.
     #[arg(long, value_name = "BACKEND", default_value = "cfc")]
     backend: String,
+
+    /// LLM backend for voice / translation. Choices:
+    ///   "ollama"       — external Ollama (gemma3:1b, default)
+    ///   "broca"        — native CfC-HDC SSM (requires `ssm_language` feature)
+    ///   "liquid-mamba" — Liquid-Mamba fusion: mamba-130m + HDC gating
+    ///                    (requires `liquid-mamba` feature; set BROCA_PROJECTION_PATH
+    ///                    to load trained projection weights)
+    ///
+    /// Sovereign-voice path: `--llm-backend liquid-mamba` drops the external
+    /// Ollama dependency once the projection checkpoint is trained against
+    /// a loadable CfC-HDC checkpoint. See phase0-results/FINDINGS.md.
+    #[arg(long, value_name = "LLM", default_value = "ollama")]
+    llm_backend: String,
+
+    /// Ollama model name (only used when `--llm-backend ollama`).
+    /// Default `gemma4:e2b` — the largest approved Gemma generation
+    /// available locally. Override for larger models: `mistral:7b`.
+    #[arg(long, value_name = "MODEL", default_value = "gemma4:e2b")]
+    ollama_model: String,
 }
 
 /// REPL state holding all integrated components
@@ -137,6 +156,8 @@ impl ReplState {
         voice_device: Option<String>,
         cycles_per_input: usize,
         backend: &str,
+        llm_backend: &str,
+        ollama_model: &str,
     ) -> Result<Self> {
         // Parse temporal backend
         let temporal_backend = match backend.to_lowercase().as_str() {
@@ -162,18 +183,12 @@ impl ReplState {
 
         info!("Using temporal backend: {:?}", temporal_backend);
 
-        // Initialize LLM organ with Ollama backend (falls back to simulation if unavailable)
-        // Uses gemma3:1b as default (smallest approved general-purpose model)
-        // Connect timeout: 2s to fail fast if Ollama is down
-        // Response timeout: 120s for generation
+        // Initialize LLM organ — backend selected by --llm-backend flag.
+        // Default Ollama (gemma3:1b) is the external-LLM fallback; "broca" and
+        // "liquid-mamba" activate sovereign native generation when the
+        // ssm_language / liquid-mamba features are compiled in.
         let llm_config = LLMOrganConfig::default();
-        let ollama_backend = OllamaBackend::with_timeouts(
-            "http://localhost:11434",
-            "gemma3:1b",
-            std::time::Duration::from_secs(2),
-            std::time::Duration::from_secs(120),
-        );
-        let llm = LLMOrgan::with_backend(llm_config, Arc::new(ollama_backend));
+        let llm = build_llm_organ(llm_backend, ollama_model, llm_config)?;
 
         // Initialize action policy (restrictive by default)
         let policy = PolicyBundle::restrictive();
@@ -554,6 +569,74 @@ impl ReplState {
     }
 }
 
+/// Construct the `LLMOrgan` for the selected backend.
+///
+/// Decoupling the backend choice from `ReplState::new` keeps the feature gates
+/// in one place and lets the REPL accept `--llm-backend` at runtime without
+/// recompiling. Unknown choices fall back to Ollama with a warning — the plan
+/// is to flip the default to a Broca variant once Phase 2 projection training
+/// produces checkpoints that generate fluent English (see
+/// `phase0-results/FINDINGS.md`).
+fn build_llm_organ(
+    llm_backend: &str,
+    ollama_model: &str,
+    config: LLMOrganConfig,
+) -> Result<LLMOrgan> {
+    let choice = llm_backend.to_lowercase();
+    let choice = choice.as_str();
+
+    // Broca native (CfC-HDC SSM, no external LLM) — gated by `ssm_language`.
+    #[cfg(feature = "ssm_language")]
+    {
+        if choice == "broca" || choice == "ssm" || choice == "native" {
+            use symthaea::language::ssm_backend::SsmBackend;
+            use symthaea_core::genesis::GenesisSeed;
+            let genesis = GenesisSeed::from_phrase("symthaea-repl");
+            let backend = SsmBackend::new(&genesis);
+            info!("LLM backend: native CfC-HDC Broca (no external dependency)");
+            return Ok(LLMOrgan::with_backend(config, Arc::new(backend)));
+        }
+    }
+
+    // Liquid-Mamba fusion (mamba-130m guided by HDC) — gated by `liquid-mamba`.
+    #[cfg(feature = "liquid-mamba")]
+    {
+        if choice == "liquid-mamba" || choice == "liquid_mamba" || choice == "lmamba" {
+            use symthaea::language::ssm_backend::LiquidMambaBackend;
+            use symthaea_core::genesis::GenesisSeed;
+            let genesis = GenesisSeed::from_phrase("symthaea-repl");
+            let lm_config = symthaea_broca::LiquidMambaConfig::default();
+            let backend = LiquidMambaBackend::new(&genesis, lm_config)?;
+            info!(
+                "LLM backend: Liquid-Mamba fusion (mamba-130m + HDC gating); \
+                 set BROCA_PROJECTION_PATH to load trained projection weights"
+            );
+            return Ok(LLMOrgan::with_backend(config, Arc::new(backend)));
+        }
+    }
+
+    // Explicit ollama or unknown → default Ollama with a clear warning for unknown.
+    if !matches!(choice, "" | "ollama") {
+        warn!(
+            "Unknown --llm-backend '{}'; falling back to Ollama. \
+             Rebuild with --features \"ssm_language\" for 'broca', \
+             or --features \"liquid-mamba\" for 'liquid-mamba'.",
+            llm_backend
+        );
+    }
+    let ollama = OllamaBackend::with_timeouts(
+        "http://localhost:11434",
+        ollama_model,
+        std::time::Duration::from_secs(2),
+        std::time::Duration::from_secs(120),
+    );
+    info!(
+        "LLM backend: Ollama ({}, http://localhost:11434)",
+        ollama_model
+    );
+    Ok(LLMOrgan::with_backend(config, Arc::new(ollama)))
+}
+
 /// Create a simple ASCII progress bar
 fn create_bar(value: f32, width: usize) -> String {
     let filled = (value.clamp(0.0, 1.0) * width as f32) as usize;
@@ -636,6 +719,8 @@ fn main() -> Result<()> {
         args.voice_device,
         args.cycles,
         &args.backend,
+        &args.llm_backend,
+        &args.ollama_model,
     )?;
 
     info!(
