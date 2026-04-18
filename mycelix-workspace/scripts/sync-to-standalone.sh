@@ -82,6 +82,13 @@ RSYNC_EXCLUDE=(
     --exclude='artifacts/'
     --exclude='coverage/'
     --exclude='.conductor/'
+    # ML training data — mycelix-core/0TML/datasets/ is 7.6 GB of femnist/mnist/
+    # cifar/emnist/shakespeare training corpora. Regenerable from standard
+    # sources; never belongs in a public repo. Same rule for any `datasets/`
+    # or `checkpoints/` directory that sneaks in via other clusters.
+    --exclude='datasets'
+    --exclude='checkpoints'
+    --exclude='train_data'
     # Python virtualenvs — never belong in git. Includes nested `*/venv/` etc.
     --exclude='.venv'
     --exclude='venv'
