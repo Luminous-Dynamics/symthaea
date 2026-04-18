@@ -6,10 +6,11 @@
 //! empirical constants, and step-by-step implementation plan. This file is
 //! built incrementally per the plan's "Implementation steps" section.
 //!
-//! Current step: **7 — Shock on click.** Left-click adds horizontal velocity
-//! to the nearest pendulum bob within 50 px of the cursor. This is what kicks
-//! a region out of the all-synced equilibrium so the Phi → damping feedback
-//! loop has something to chew on.
+//! Current step: **7 + jitter polish.** Demo is feature-complete (Steps 1-7
+//! landed). Bobs now spawn at slightly perturbed angles (~horizontal ± 17°,
+//! deterministic per-cell) instead of perfect lockstep — this gives
+//! `update_phi_from_neighborhood` non-zero baseline variance from frame 1, so
+//! the Phi values vary across the grid even before any click.
 
 use std::collections::HashMap;
 
@@ -40,6 +41,9 @@ const LOW_DAMP: f64 = 0.001; // phi ≈ max → essentially conservative
 const HIGH_DAMP: f64 = 0.5; // phi = 0 → PBD sleep within ~4 s
 const SHOCK_RADIUS: f32 = 50.0;
 const SHOCK_VELOCITY: f64 = 400.0;
+// Per-cell phase jitter amplitude (radians). 0.30 ≈ ±17°. Breaks the all-synced
+// equilibrium so neighborhood variance is non-zero from the first frame.
+const PHASE_JITTER: f64 = 0.30;
 
 #[derive(Component)]
 struct Pendulum {
@@ -111,10 +115,17 @@ fn spawn_pendulum(
         p.collision_mask = 0;
     }
 
-    let bob_handle =
-        physics
-            .world
-            .add_sphere(Point::new([pivot_x + ARM_LENGTH, pivot_y]), 10.0, 1.0);
+    // Deterministic per-cell phase offset around horizontal (90° from vertical).
+    // Hash-style index combination keeps adjacent cells visually distinct.
+    let cell_hash = grid.0.wrapping_mul(7).wrapping_add(grid.1.wrapping_mul(13));
+    let phase = (cell_hash as f64 * 0.37).sin() * PHASE_JITTER;
+    let theta = std::f64::consts::FRAC_PI_2 + phase;
+    let bob_x = pivot_x + ARM_LENGTH * theta.sin();
+    let bob_y = pivot_y - ARM_LENGTH * theta.cos();
+
+    let bob_handle = physics
+        .world
+        .add_sphere(Point::new([bob_x, bob_y]), 10.0, 1.0);
     if let Some(b) = physics.world.body_mut(bob_handle) {
         b.collision_mask = 0;
         // Initial damping; overwritten each FixedUpdate by `phi_modulates_damping`.
@@ -147,7 +158,7 @@ fn spawn_pendulum(
         },
         PhysicsBody::new(bob_handle, BOB_RADIUS),
         Sprite::from_color(Color::srgb(0.7, 0.85, 1.0), Vec2::splat(BOB_RADIUS * 2.0)),
-        Transform::from_xyz((pivot_x + ARM_LENGTH) as f32, pivot_y as f32, 1.0),
+        Transform::from_xyz(bob_x as f32, bob_y as f32, 1.0),
     ));
 
     bob_handle
