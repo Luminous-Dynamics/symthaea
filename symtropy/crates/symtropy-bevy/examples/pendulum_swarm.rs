@@ -6,12 +6,11 @@
 //! empirical constants, and step-by-step implementation plan. This file is
 //! built incrementally per the plan's "Implementation steps" section.
 //!
-//! Current step: **4 — Phi from neighborhood variance.** Each bob is registered
-//! with the `ConsciousnessField`. Each tick, a system reads the bob's velocity
-//! and its 8 neighbors' velocities, computes the variance, and maps low variance
-//! → high coherence → high Phi (via uniform `ConsciousnessInputs`). Damping is
-//! still uniform (Step 5 wires Phi → damping). Phi is only printed at startup
-//! diagnostic level for now; visual coupling lands in Step 6.
+//! Current step: **5 — Phi → damping.** The positive-feedback loop closes:
+//! coherent neighborhood → high Phi → low damping → motion persists → still
+//! coherent. Per the design doc's empirical landmine, Phi tops out around 0.314
+//! (not 1.0), so we normalize before mapping to `linear_damping`. LOW_DAMP=0.001
+//! (essentially conservative) ↔ HIGH_DAMP=0.5 (PBD sleep within ~4 s).
 
 use std::collections::HashMap;
 
@@ -33,6 +32,12 @@ const MAX_ENERGY: f64 = 100.0;
 // coherence ≈ 0.5. With v ∈ [0, 400], var can reach ~10000; we want
 // 1/(1 + var * scale) ≈ 0.5 there → scale ≈ 1e-4.
 const VARIANCE_SCALE: f64 = 1.0e-4;
+// Phi normalization (landmine 0): MasterConsciousnessEquation steady-state
+// max under uniform unit inputs is ~0.314, NOT 1.0. Without normalizing here,
+// the damping range collapses from 500× to ~1.5×.
+const PHI_NORMALIZE: f64 = 0.314;
+const LOW_DAMP: f64 = 0.001; // phi ≈ max → essentially conservative
+const HIGH_DAMP: f64 = 0.5; // phi = 0 → PBD sleep within ~4 s
 
 #[derive(Component)]
 struct Pendulum {
@@ -60,7 +65,10 @@ fn main() {
         .insert_resource(GridHandles::default())
         .add_plugins(SymtropyPhysicsPlugin::<2>::with_gravity([0.0, -981.0]))
         .add_systems(Startup, (setup_camera, spawn_swarm))
-        .add_systems(FixedUpdate, update_phi_from_neighborhood)
+        .add_systems(
+            FixedUpdate,
+            (update_phi_from_neighborhood, phi_modulates_damping).chain(),
+        )
         .add_systems(Update, draw_arm_gizmo)
         .run();
 }
@@ -107,7 +115,8 @@ fn spawn_pendulum(
             .add_sphere(Point::new([pivot_x + ARM_LENGTH, pivot_y]), 10.0, 1.0);
     if let Some(b) = physics.world.body_mut(bob_handle) {
         b.collision_mask = 0;
-        b.linear_damping = 0.05;
+        // Initial damping; overwritten each FixedUpdate by `phi_modulates_damping`.
+        b.linear_damping = HIGH_DAMP;
     }
 
     physics
@@ -195,6 +204,20 @@ fn update_phi_from_neighborhood(
             .map(|b| *b.position())
             .unwrap_or_else(Point::origin);
         physics.field.update_entity(p.bob, &inputs, pos);
+    }
+}
+
+/// Read each pendulum's current Phi, normalize, and write per-body damping.
+/// Coherent neighborhoods (high Phi) → near-conservative damping; incoherent
+/// neighborhoods → high damping → PBD sleep freezes the bob within seconds.
+fn phi_modulates_damping(mut physics: ResMut<SymtropyPhysics<2>>, pendulums: Query<&Pendulum>) {
+    for p in &pendulums {
+        let phi = physics.field.phi(p.bob);
+        let phi_norm = (phi / PHI_NORMALIZE).clamp(0.0, 1.0);
+        let damping = HIGH_DAMP + (LOW_DAMP - HIGH_DAMP) * phi_norm;
+        if let Some(body) = physics.world.body_mut(p.bob) {
+            body.linear_damping = damping;
+        }
     }
 }
 
