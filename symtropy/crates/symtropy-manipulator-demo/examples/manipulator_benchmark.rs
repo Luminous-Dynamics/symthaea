@@ -56,8 +56,17 @@ const PICK: [f64; 3] = [0.4, -0.3, 0.15];
 const PLACE: [f64; 3] = [0.4, 0.3, 0.15];
 const APPROACH_H: f64 = 0.30;
 
-/// ISO/TS 15066 protective distance (S_p) — conservative for a 7-DOF arm.
-const ISO_SP: f64 = 1.0;
+/// Default ISO/TS 15066 protective distance (S_p) — conservative for a 7-DOF arm.
+/// Override at runtime via `MANIP_BENCH_ISO_SP=X` to sweep the regime where
+/// Φ-gated safety may become competitive with binary SSM.
+const DEFAULT_ISO_SP: f64 = 1.0;
+
+fn iso_sp() -> f64 {
+    std::env::var("MANIP_BENCH_ISO_SP")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(DEFAULT_ISO_SP)
+}
 
 /// Default number of Monte Carlo trials when `MANIP_BENCH_TRIALS` is unset.
 const DEFAULT_TRIALS: usize = 30;
@@ -126,7 +135,7 @@ enum Policy {
     IsoSsm,
 }
 
-fn policy_gain(policy: Policy, human_dist: f64) -> f64 {
+fn policy_gain(policy: Policy, human_dist: f64, sp: f64) -> f64 {
     match policy {
         Policy::Adaptive => {
             if human_dist > 1.2 {
@@ -140,7 +149,7 @@ fn policy_gain(policy: Policy, human_dist: f64) -> f64 {
             }
         }
         Policy::IsoSsm => {
-            if human_dist > ISO_SP {
+            if human_dist > sp {
                 1.0
             } else {
                 0.0
@@ -156,11 +165,12 @@ fn run_trial_arm(policy: Policy, params: &TrialParams) -> u32 {
     let mut cycles = 0u32;
     let mut phase = 0;
     let mut target = [PICK[0], PICK[1], APPROACH_H];
+    let sp = iso_sp();
 
     for step in 0..TOTAL_STEPS {
         let t = step as f64 * DT;
         let human_dist = params.human_dist(t);
-        let gain = policy_gain(policy, human_dist);
+        let gain = policy_gain(policy, human_dist, sp);
 
         let state = sim.state();
         if gain > 0.0 {
@@ -476,12 +486,13 @@ fn main() {
         .and_then(|s| s.parse().ok())
         .unwrap_or(DEFAULT_TRIALS);
 
+    let sp = iso_sp();
     println!("╔══════════════════════════════════════════════════════════════╗");
     println!("║  Manipulator Monte Carlo Benchmark                           ║");
     println!("║  Adaptive Safety Gradient vs ISO/TS 15066 SSM                ║");
     println!(
-        "║  {:>3} paired trials × 100 s simulated per arm                 ║",
-        trials
+        "║  {:>3} paired trials × 100 s simulated,  ISO S_p = {:.2} m       ║",
+        trials, sp,
     );
     println!("╚══════════════════════════════════════════════════════════════╝");
     println!();
