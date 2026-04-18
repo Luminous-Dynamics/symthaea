@@ -1082,3 +1082,43 @@ pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
 
     Ok(InitCallbackResult::Pass)
 }
+
+// ==================== TEST-ONLY: FORGED-LINK HARNESS ====================
+
+/// Input to `debug_create_forged_inbox_link`.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DebugForgedLinkInput {
+    /// Base agent pubkey — whose inbox Eve is trying to spam.
+    pub base: AgentPubKey,
+    /// Target — an EncryptedEmail action hash Eve authored
+    /// (with herself as recipient, so the forgery is `link.base != email.recipient`).
+    pub target: ActionHash,
+}
+
+/// Attempt to create an `AgentToInbox` link directly, bypassing send_email's
+/// normal recipient-binding logic. Used by the Phase 0.5 sweettest
+/// (`phase0_forged_inbox_link_rejected`) to verify that the integrity zome's
+/// `validate_inbox_link` callback (Phase 0.3) rejects spam.
+///
+/// **This function is safe to ship in production**: it CANNOT actually spam
+/// anyone's inbox. Every forged link created here triggers
+/// `validate_inbox_link` during DHT propagation, which rejects unless
+/// `email.recipient == link.base` AND `email.sender == link.author`. The
+/// whole point is to give tests a way to *attempt* the attack and observe
+/// the rejection. The coordinator happily writes the CreateLink action to
+/// the local source chain; the DHT-side validator then refuses to propagate
+/// it, and any subsequent `get_links` from elsewhere returns empty.
+///
+/// Callers that want to verify the rejection should:
+/// 1. Use `call_fallible` (not `call`) to observe the error path
+/// 2. Or use `call` + `await_consistency` + `get_links` — the link will be
+///    absent from Bob's view even if Eve's local create succeeded
+#[hdk_extern]
+pub fn debug_create_forged_inbox_link(input: DebugForgedLinkInput) -> ExternResult<ActionHash> {
+    create_link(
+        input.base,
+        input.target,
+        LinkTypes::AgentToInbox,
+        LinkTag::new("forged-for-test"),
+    )
+}

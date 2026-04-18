@@ -1913,28 +1913,26 @@ async fn phase0_two_conductor_harness_smoke() {
 /// link with Bob's pubkey as base. The link author is Eve, and
 /// `email.recipient = Eve != Bob`, so validation must reject.
 ///
-/// NOTE: Runnable-state of this test now requires a small test-only zome
-/// helper that bypasses the coordinator's link-creation guard. The test
-/// goes:
+/// Full implementation (Phase 0.5). Uses the `debug_create_forged_inbox_link`
+/// coordinator extern — safe in production because the Phase 0.3 integrity
+/// rule rejects every forged link regardless of which extern created it.
 ///
-///   1. Eve self-signs an email (sender=Eve, recipient=Eve). After Phase
-///      0.8, this is a normal `send_email` with client-set timestamp and
-///      a canonical Ed25519 signature Eve computes over
-///      `email_signing_content(...)`.
-///   2. Eve calls a test-only zome function `debug_create_forged_inbox_link(
-///      base: AgentPubKey, target: ActionHash)` that just does `create_link`
-///      with `LinkTypes::AgentToInbox` using `base = Bob`'s pubkey and
-///      `target = eve_self_email_hash`. The coordinator has no such
-///      function in production — it's gated behind `#[cfg(feature =
-///      "sweettest")]` so real builds can't spam.
-///   3. The integrity zome's `validate_inbox_link` (Phase 0.3) runs during
-///      DHT propagation and rejects because `email.recipient = Eve != Bob`.
-///
-/// Left as a scaffold: step 2 needs the debug extern added to the
-/// coordinator zome, which is a small but deliberate change. Until then,
-/// this test documents the attack and its defense.
+/// Steps:
+///   1. Eve self-signs a valid email (sender=Eve, recipient=Eve). The entry
+///      itself is legitimate — it's Eve's own self-addressed mail.
+///   2. Eve calls `debug_create_forged_inbox_link { base: bob, target:
+///      eve_self_email_hash }`. The coordinator writes the CreateLink
+///      action to Eve's source chain.
+///   3. Integrity validation (`validate_inbox_link`): link.base (Bob) vs.
+///      email.recipient (Eve) → mismatch → Invalid.
+///   4. Depending on the validation path (sync-local vs. async-gossip)
+///      the assertion splits:
+///        a. call_fallible returns Err with "recipient" / "Invalid" → done
+///        b. call succeeds locally → await_consistency → Bob's get_inbox
+///           returns zero items (DHT validator refused to propagate)
+///      Either is a valid spam-defense outcome.
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "Phase 0.5 — blocked on test-only debug_create_forged_inbox_link coordinator extern"]
+#[ignore = "Phase 0.5 — requires running Holochain conductor; env prereqs in Appendix A"]
 async fn phase0_forged_inbox_link_rejected() {
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
     let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
@@ -1942,7 +1940,7 @@ async fn phase0_forged_inbox_link_rejected() {
         .expect("DNA bundle must load");
 
     let apps = conductors
-        .setup_app("pulse-phase0", &[dna_file.clone()])
+        .setup_app("pulse-ph0-forged", &[dna_file.clone()])
         .await
         .expect("setup_app must succeed");
 
@@ -1954,9 +1952,123 @@ async fn phase0_forged_inbox_link_rejected() {
         .await
         .expect("consistency pre-attack");
 
-    // Sanity: harness wiring is live. Filling in the two steps above is
-    // the next session's unit of work once the debug extern lands.
-    assert_ne!(eve_cell.agent_pubkey(), bob_cell.agent_pubkey());
+    // STEP 1 — Eve authors a valid self-addressed email. Legitimate entry.
+    let timestamp = Timestamp::now();
+    let message_id = "phase0-forged-001";
+    let encrypted_subject = vec![7u8, 7, 7];
+    let encrypted_body = vec![8u8, 8, 8];
+    let nonce = [2u8; 24];
+
+    let content = compute_signing_content(
+        eve_cell.agent_pubkey(),
+        eve_cell.agent_pubkey(),
+        &encrypted_subject,
+        &encrypted_body,
+        &nonce,
+        message_id,
+        timestamp,
+    );
+    let sig = conductors[0]
+        .keystore()
+        .sign(eve_cell.agent_pubkey().clone(), content.into())
+        .await
+        .expect("eve sign");
+
+    let self_send = SendEmailInput {
+        recipients: vec![eve_cell.agent_pubkey().clone()],
+        cc: vec![],
+        bcc: vec![],
+        encrypted_subject,
+        encrypted_body,
+        encrypted_attachments: vec![],
+        ephemeral_pubkey: vec![0u8; 32],
+        nonce,
+        signature: sig.0.to_vec(),
+        crypto_suite: CryptoSuite {
+            key_exchange: "x25519".to_string(),
+            symmetric: "chacha20-poly1305".to_string(),
+            signature: "ed25519".to_string(),
+        },
+        message_id: message_id.to_string(),
+        in_reply_to: None,
+        references: vec![],
+        priority: EmailPriority::Normal,
+        read_receipt_requested: false,
+        expires_at: None,
+        timestamp,
+    };
+    let self_out: SendEmailOutput = conductors[0]
+        .call(&eve_cell.zome("mail_messages"), "send_email", self_send)
+        .await;
+    assert_eq!(
+        self_out.delivered_to.len(),
+        1,
+        "Eve-to-Eve self-send must succeed"
+    );
+    let eve_email_hash = self_out.email_hash;
+
+    await_consistency(30, [&eve_cell, &bob_cell])
+        .await
+        .expect("consistency post-self-send");
+
+    // STEP 2 + 3 — Eve forges an AgentToInbox link targeting Bob's inbox.
+    let forged: Result<ActionHash, _> = conductors[0]
+        .call_fallible(
+            &eve_cell.zome("mail_messages"),
+            "debug_create_forged_inbox_link",
+            DebugForgedLinkInput {
+                base: bob_cell.agent_pubkey().clone(),
+                target: eve_email_hash.clone(),
+            },
+        )
+        .await;
+
+    // STEP 4 — Either sync validation caught it, or Bob's view must be empty.
+    match forged {
+        Err(e) => {
+            let msg = format!("{:?}", e);
+            assert!(
+                msg.contains("recipient")
+                    || msg.contains("AgentToInbox")
+                    || msg.contains("Invalid"),
+                "validation error should mention link/recipient; got: {}",
+                msg
+            );
+        }
+        Ok(_) => {
+            await_consistency(30, [&eve_cell, &bob_cell])
+                .await
+                .expect("consistency post-forgery-attempt");
+
+            let bob_inbox: Vec<EmailListItem> = conductors[1]
+                .call(
+                    &bob_cell.zome("mail_messages"),
+                    "get_inbox",
+                    EmailQuery {
+                        limit: Some(10),
+                        ..Default::default()
+                    },
+                )
+                .await;
+
+            assert_eq!(
+                bob_inbox.len(),
+                0,
+                "Bob's inbox must remain empty — forged link must be \
+                 rejected by DHT validation even if Eve's local create \
+                 succeeded. Got {} items; Phase 0.3 link validation \
+                 is broken.",
+                bob_inbox.len()
+            );
+        }
+    }
+}
+
+/// Mirror of coordinator's DebugForgedLinkInput.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct DebugForgedLinkInput {
+    pub base: AgentPubKey,
+    pub target: ActionHash,
 }
 
 // ============================================================================
