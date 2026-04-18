@@ -21,5 +21,18 @@ anyhow = { workspace = true }
 serde_json = { workspace = true }
 proptest = "1"
 
+[dependencies.symtropy-physics]
+# [standalone-stripped] path = "../../../symtropy/crates/symtropy-physics"
+optional = true
+
+[dependencies.symtropy-math]
+# [standalone-stripped] path = "../../../symtropy/crates/symtropy-math"
+optional = true
+
+[dependencies.nalgebra]
+version = "0.34"
+optional = true
+
 [features]
 default = []
+symtropy = ["dep:symtropy-physics", "dep:symtropy-math", "dep:nalgebra"]

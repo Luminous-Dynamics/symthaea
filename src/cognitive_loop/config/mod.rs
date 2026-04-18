@@ -708,7 +708,8 @@ pub struct CognitiveLoopConfig {
         feature = "exoskeleton",
         feature = "surgical",
         feature = "orbital",
-        feature = "quadruped"
+        feature = "quadruped",
+        feature = "phone"
     ))]
     #[serde(default)]
     pub embodiment_platform: super::motor_bridge::EmbodimentPlatform,
@@ -729,7 +730,8 @@ pub struct CognitiveLoopConfig {
         feature = "exoskeleton",
         feature = "surgical",
         feature = "orbital",
-        feature = "quadruped"
+        feature = "quadruped",
+        feature = "phone"
     ))]
     #[serde(default = "default_embodiment_blend")]
     pub embodiment_blend_weight: f32,
@@ -745,7 +747,8 @@ pub struct CognitiveLoopConfig {
         feature = "exoskeleton",
         feature = "surgical",
         feature = "orbital",
-        feature = "quadruped"
+        feature = "quadruped",
+        feature = "phone"
     ))]
     #[serde(default = "default_embodiment_interval")]
     pub embodiment_step_interval: usize,
@@ -761,7 +764,8 @@ pub struct CognitiveLoopConfig {
     feature = "exoskeleton",
     feature = "surgical",
     feature = "orbital",
-    feature = "quadruped"
+    feature = "quadruped",
+    feature = "phone"
 ))]
 fn default_embodiment_blend() -> f32 {
     0.1 // Optimized via weight sweep: 0.1 → Phi=0.757 (was 0.2 → ~0.62)
@@ -777,7 +781,8 @@ fn default_embodiment_blend() -> f32 {
     feature = "exoskeleton",
     feature = "surgical",
     feature = "orbital",
-    feature = "quadruped"
+    feature = "quadruped",
+    feature = "phone"
 ))]
 fn default_embodiment_interval() -> usize {
     1
@@ -950,7 +955,8 @@ impl Default for CognitiveLoopConfig {
                 feature = "exoskeleton",
                 feature = "surgical",
                 feature = "orbital",
-                feature = "quadruped"
+                feature = "quadruped",
+                feature = "phone"
             ))]
             embodiment_platform: super::motor_bridge::EmbodimentPlatform::None,
             #[cfg(any(
@@ -963,7 +969,8 @@ impl Default for CognitiveLoopConfig {
                 feature = "exoskeleton",
                 feature = "surgical",
                 feature = "orbital",
-                feature = "quadruped"
+                feature = "quadruped",
+                feature = "phone"
             ))]
             embodiment_blend_weight: 0.1,
             #[cfg(any(
@@ -976,7 +983,8 @@ impl Default for CognitiveLoopConfig {
                 feature = "exoskeleton",
                 feature = "surgical",
                 feature = "orbital",
-                feature = "quadruped"
+                feature = "quadruped",
+                feature = "phone"
             ))]
             embodiment_step_interval: 1,
         }
@@ -1063,7 +1071,8 @@ impl CognitiveLoopConfig {
             feature = "exoskeleton",
             feature = "surgical",
             feature = "orbital",
-            feature = "quadruped"
+            feature = "quadruped",
+            feature = "phone"
         ))]
         {
             config.embodiment_platform = platform;
@@ -1098,7 +1107,8 @@ impl CognitiveLoopConfig {
             feature = "exoskeleton",
             feature = "surgical",
             feature = "orbital",
-            feature = "quadruped"
+            feature = "quadruped",
+            feature = "phone"
         ))]
         {
             config.embodiment_platform = platform;
@@ -1574,7 +1584,8 @@ mod tests {
             feature = "exoskeleton",
             feature = "surgical",
             feature = "orbital",
-            feature = "quadruped"
+            feature = "quadruped",
+            feature = "phone"
         ))]
         assert_eq!(c.embodiment_platform, EmbodimentPlatform::Auv);
     }

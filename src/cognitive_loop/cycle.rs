@@ -286,7 +286,8 @@ impl CognitiveLoopService {
             feature = "exoskeleton",
             feature = "surgical",
             feature = "orbital",
-            feature = "quadruped"
+            feature = "quadruped",
+            feature = "phone"
         ))]
         {
             let cycle_num = self.stats.total_cycles as usize;
@@ -474,7 +475,8 @@ impl CognitiveLoopService {
                 feature = "exoskeleton",
                 feature = "surgical",
                 feature = "orbital",
-                feature = "quadruped"
+                feature = "quadruped",
+                feature = "phone"
             ))]
             if let Some(ref mut bridge) = self.sensorimotor.embodiment_bridge {
                 use crate::cognitive_loop::motor_bridge::MotorSafetyLevel;

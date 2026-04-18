@@ -1971,6 +1971,24 @@ dependencies = [
 
 [[package]]
 name = "bindgen"
+version = "0.70.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f49d8fed880d473ea71efb9bf597651e77201bdd4893efe54c9e5d65ae04ce6f"
+dependencies = [
+ "bitflags 2.11.0",
+ "cexpr",
+ "clang-sys",
+ "itertools 0.13.0",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "rustc-hash 1.1.0",
+ "shlex",
+ "syn 2.0.117",
+]
+
+[[package]]
+name = "bindgen"
 version = "0.72.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "993776b509cfb49c750f11b8f07a46fa23e0a1386ffc01fb1e7d343efc387895"
@@ -2459,6 +2477,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "bytecount"
+version = "0.6.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "175812e0be2bccb6abe50bb8d566126198344f707e304f45c648fd8f2cc0365e"
+
+[[package]]
 name = "bytemuck"
 version = "1.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2590,6 +2614,9 @@ name = "camino"
 version = "1.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e629a66d692cb9ff1a1c664e41771b3dcaf961985a9774c0eb0bd1b51cf60a48"
+dependencies = [
+ "serde_core",
+]
 
 [[package]]
 name = "candle-core"
@@ -2657,6 +2684,28 @@ dependencies = [
  "serde_json",
  "serde_plain",
  "tracing",
+]
+
+[[package]]
+name = "cargo-platform"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e35af189006b9c0f00a064685c727031e3ed2d8020f7ba284d78cc2671bd36ea"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "cargo_metadata"
+version = "0.14.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4acbb09d9ee8e23699b9634375c72795d095bf268439da88562cf9b501f181fa"
+dependencies = [
+ "camino",
+ "cargo-platform",
+ "semver",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -3408,7 +3457,7 @@ dependencies = [
  "mach2 0.5.0",
  "ndk 0.9.0",
  "ndk-context",
- "num-derive",
+ "num-derive 0.4.2",
  "num-traits",
  "objc2 0.6.4",
  "objc2-audio-toolbox",
@@ -5083,6 +5132,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "dialoguer"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "658bce805d770f407bc62102fca7c2c64ceef2fbcb2b8bd19d2765ce093980de"
+dependencies = [
+ "console",
+ "shell-words",
+ "tempfile",
+ "thiserror 1.0.69",
+ "zeroize",
+]
+
+[[package]]
 name = "diatomic-waker"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5685,6 +5747,70 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "34aa73646ffb006b8f5147f3dc182bd4bcb190227ce861fc4a4844bf8e3cb2c0"
 
 [[package]]
+name = "encoding"
+version = "0.2.33"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b0d943856b990d12d3b55b359144ff341533e516d94098b1d3fc1ac666d36ec"
+dependencies = [
+ "encoding-index-japanese",
+ "encoding-index-korean",
+ "encoding-index-simpchinese",
+ "encoding-index-singlebyte",
+ "encoding-index-tradchinese",
+]
+
+[[package]]
+name = "encoding-index-japanese"
+version = "1.20141219.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "04e8b2ff42e9a05335dbf8b5c6f7567e5591d0d916ccef4e0b1710d32a0d0c91"
+dependencies = [
+ "encoding_index_tests",
+]
+
+[[package]]
+name = "encoding-index-korean"
+version = "1.20141219.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4dc33fb8e6bcba213fe2f14275f0963fd16f0a02c878e3095ecfdf5bee529d81"
+dependencies = [
+ "encoding_index_tests",
+]
+
+[[package]]
+name = "encoding-index-simpchinese"
+version = "1.20141219.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d87a7194909b9118fc707194baa434a4e3b0fb6a5a757c73c3adb07aa25031f7"
+dependencies = [
+ "encoding_index_tests",
+]
+
+[[package]]
+name = "encoding-index-singlebyte"
+version = "1.20141219.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3351d5acffb224af9ca265f435b859c7c01537c0849754d3db3fdf2bfe2ae84a"
+dependencies = [
+ "encoding_index_tests",
+]
+
+[[package]]
+name = "encoding-index-tradchinese"
+version = "1.20141219.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fd0e20d5688ce3cab59eb3ef3a2083a5c77bf496cb798dc6fcdb75f323890c18"
+dependencies = [
+ "encoding_index_tests",
+]
+
+[[package]]
+name = "encoding_index_tests"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a246d82be1c9d791c5dfde9a2bd045fc3cbba3fa2b11ad558f27d01712f00569"
+
+[[package]]
 name = "encoding_rs"
 version = "0.8.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5790,6 +5916,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "error-chain"
+version = "0.12.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d2f06b9cac1506ece98fe3231e3cc9c4410ec3d5b1f24ae1c8946f0742cdefc"
+dependencies = [
+ "version_check",
+]
+
+[[package]]
 name = "error-code"
 version = "3.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5861,6 +5996,33 @@ checksum = "8be9f3dfaaffdae2972880079a491a1a8bb7cbed0b8dd7a347f668b4150a3b93"
 dependencies = [
  "event-listener",
  "pin-project-lite",
+]
+
+[[package]]
+name = "evtx"
+version = "0.8.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb8273ed69ad5086ec987e16e883ac35589a1cf0f2b000d965a693fc2a937a24"
+dependencies = [
+ "anyhow",
+ "bitflags 2.11.0",
+ "byteorder",
+ "chrono",
+ "clap",
+ "crc32fast",
+ "dialoguer",
+ "encoding",
+ "hashbrown 0.14.5",
+ "indoc",
+ "log",
+ "quick-xml 0.36.2",
+ "rayon",
+ "serde",
+ "serde_json",
+ "simplelog",
+ "skeptic",
+ "thiserror 1.0.69",
+ "winstructs",
 ]
 
 [[package]]
@@ -5984,6 +6146,31 @@ checksum = "27838c6815cfe9de2d3aeb145ffd19e565f577414b33f3bdbf42fe040e9e0ff6"
 dependencies = [
  "lazy_static",
  "log",
+]
+
+[[package]]
+name = "ffmpeg-next"
+version = "7.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da02698288e0275e442a47fc12ca26d50daf0d48b15398ba5906f20ac2e2a9f9"
+dependencies = [
+ "bitflags 2.11.0",
+ "ffmpeg-sys-next",
+ "libc",
+]
+
+[[package]]
+name = "ffmpeg-sys-next"
+version = "7.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f9e9c75ebd4463de9d8998fb134ba26347fe5faee62fabf0a4b4d41bd500b4ad"
+dependencies = [
+ "bindgen 0.70.1",
+ "cc",
+ "libc",
+ "num_cpus",
+ "pkg-config",
+ "vcpkg",
 ]
 
 [[package]]
@@ -7281,6 +7468,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7382cf6263419f2d8df38c55d7da83da5c18aef87fc7a7fc1fb1e344edfe14c1"
 dependencies = [
  "hashbrown 0.15.5",
+]
+
+[[package]]
+name = "hdbscan"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "466aa8bfaa22c81efcf67c84e6ad046de13a05c6cc9d41a5094361bff464247a"
+dependencies = [
+ "kdtree",
+ "num-traits",
 ]
 
 [[package]]
@@ -8733,6 +8930,16 @@ dependencies = [
  "hashbrown 0.16.1",
  "portable-atomic",
  "thiserror 2.0.18",
+]
+
+[[package]]
+name = "kdtree"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0f0a0e9f770b65bac9aad00f97a67ab5c5319effed07f6da385da3c2115e47ba"
+dependencies = [
+ "num-traits",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -10491,6 +10698,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "nasm-rs"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "706bf8a5e8c8ddb99128c3291d31bd21f4bcde17f0f4c20ec678d85c74faa149"
+dependencies = [
+ "log",
+]
+
+[[package]]
 name = "native-tls"
 version = "0.2.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10935,6 +11151,17 @@ name = "num-conv"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "51d515d32fb182ee37cda2ccdcb92950d6a3c2893aa280e540671c2cd0f3b1d9"
+
+[[package]]
+name = "num-derive"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "876a53fff98e03a936a674b29568b0e605f06b29372c2489ff4de23f1949743d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
 
 [[package]]
 name = "num-derive"
@@ -11476,7 +11703,7 @@ dependencies = [
  "jni 0.21.1",
  "ndk 0.8.0",
  "ndk-context",
- "num-derive",
+ "num-derive 0.4.2",
  "num-traits",
  "oboe-sys",
 ]
@@ -11584,6 +11811,27 @@ dependencies = [
  "tokio",
  "url",
  "uuid",
+]
+
+[[package]]
+name = "openh264"
+version = "0.6.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c1af3a4d35290ba7a46d1ce69cb13ae740a2d72cc2ee00abee3c84bed3dbe5d"
+dependencies = [
+ "openh264-sys2",
+ "wide",
+]
+
+[[package]]
+name = "openh264-sys2"
+version = "0.6.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77a77c1e18503537113d77b1b1d05274e81fa9f44843c06be2d735adb19f7c9d"
+dependencies = [
+ "cc",
+ "nasm-rs",
+ "walkdir",
 ]
 
 [[package]]
@@ -12795,6 +13043,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "pulldown-cmark"
+version = "0.9.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57206b407293d2bcd3af849ce869d52068623f19e1b5ff8e8778e3309439682b"
+dependencies = [
+ "bitflags 2.11.0",
+ "memchr",
+ "unicase",
+]
+
+[[package]]
 name = "pulley-interpreter"
 version = "29.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12898,6 +13157,15 @@ checksum = "a993555f31e5a609f617c12db6250dedcac1b0a85076912c436e6fc9b2c8e6a3"
 
 [[package]]
 name = "quick-xml"
+version = "0.36.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f7649a7b4df05aed9ea7ec6f628c67c9953a43869b8bc50929569b2999d443fe"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
+name = "quick-xml"
 version = "0.37.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "331e97a1af0bf59823e6eadffe373d7b27f485be8748f71471c662c1f269b7fb"
@@ -12953,6 +13221,7 @@ checksum = "434b42fec591c96ef50e21e886936e66d3cc3f737104fdb9b737c40ffb94c098"
 dependencies = [
  "aws-lc-rs",
  "bytes",
+ "fastbloom",
  "getrandom 0.3.4",
  "lru-slab",
  "rand 0.9.2",
@@ -12960,6 +13229,7 @@ dependencies = [
  "rustc-hash 2.1.1",
  "rustls 0.23.37",
  "rustls-pki-types",
+ "rustls-platform-verifier",
  "slab",
  "thiserror 2.0.18",
  "tinyvec",
@@ -13274,6 +13544,12 @@ dependencies = [
  "unicode-segmentation",
  "unicode-width 0.2.0",
 ]
+
+[[package]]
+name = "rav1d"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b78ef9cb8a0acca6c3ddace366634b8b080221df1b9dbd9064e0b6c80e466b95"
 
 [[package]]
 name = "raw-cpuid"
@@ -14716,6 +14992,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "shell-words"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc6fe69c597f9c37bfeeeeeb33da3530379845f10be461a66d16d03eca2ded77"
+
+[[package]]
 name = "shellexpand"
 version = "3.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -14835,10 +15117,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "simplelog"
+version = "0.12.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "16257adbfaef1ee58b1363bdc0664c9b8e1e30aed86049635fb5f147d065a9c0"
+dependencies = [
+ "log",
+ "termcolor",
+ "time",
+]
+
+[[package]]
 name = "siphasher"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b2aa850e253778c88a04c3d7323b043aeda9d3e30d5971937c1855769763678e"
+
+[[package]]
+name = "skeptic"
+version = "0.13.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "16d23b015676c90a0f01c197bfdc786c20342c73a0afdda9025adb0bc42940a8"
+dependencies = [
+ "bytecount",
+ "cargo_metadata",
+ "error-chain",
+ "glob",
+ "pulldown-cmark",
+ "tempfile",
+ "walkdir",
+]
 
 [[package]]
 name = "sketches-ddsketch"
@@ -15420,6 +15728,7 @@ dependencies = [
  "axum",
  "bincode 1.3.3",
  "blake3",
+ "bytes",
  "candle-core",
  "candle-nn",
  "candle-transformers",
@@ -15438,6 +15747,7 @@ dependencies = [
  "egui",
  "espeak-rs",
  "futures",
+ "futures-util",
  "hex",
  "hf-hub",
  "hkdf",
@@ -15463,10 +15773,12 @@ dependencies = [
  "prism-common",
  "prism-search",
  "proptest",
+ "quinn",
  "rand 0.8.5",
  "rand_chacha 0.3.1",
  "ratatui 0.29.0",
  "rayon",
+ "rcgen",
  "regex",
  "reqwest 0.13.2",
  "ringbuf",
@@ -15475,6 +15787,7 @@ dependencies = [
  "rubato",
  "rusqlite",
  "rustfft",
+ "rustls 0.23.37",
  "scraper",
  "serde",
  "serde_json",
@@ -15559,6 +15872,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tokenizers",
  "tokio",
+ "tokio-tungstenite",
  "tower 0.5.3",
  "tower-http 0.5.2",
  "tracing",
@@ -15779,7 +16093,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha3",
- "symtropy-math",
+ "symtropy-math 0.1.0",
  "thiserror 1.0.69",
  "tokenizers",
  "tokio",
@@ -15805,6 +16119,7 @@ dependencies = [
  "anyhow",
  "blake3",
  "serde",
+ "symthaea-core",
 ]
 
 [[package]]
@@ -15867,11 +16182,17 @@ dependencies = [
 name = "symthaea-exoskeleton"
 version = "0.1.0"
 dependencies = [
+ "nalgebra",
  "proptest",
  "rand 0.8.5",
  "serde",
  "symthaea-core",
  "symthaea-fep",
+ "symthaea-hal",
+ "symthaea-humanoid",
+ "symthaea-sensors",
+ "symtropy-math 0.2.0",
+ "symtropy-physics",
 ]
 
 [[package]]
@@ -16076,10 +16397,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-lean-bridge"
+version = "0.1.0"
+dependencies = [
+ "symthaea-core",
+]
+
+[[package]]
+name = "symthaea-logparse"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "evtx",
+ "hdbscan",
+ "serde",
+ "serde_json",
+ "syslog_loose",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "symthaea-manipulator"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "nalgebra",
  "proptest",
  "rand 0.8.5",
  "serde",
@@ -16087,6 +16429,8 @@ dependencies = [
  "symthaea-core",
  "symthaea-fep",
  "symthaea-hal",
+ "symtropy-math 0.2.0",
+ "symtropy-physics",
 ]
 
 [[package]]
@@ -16316,8 +16660,13 @@ dependencies = [
 name = "symthaea-phone-embodiment"
 version = "0.1.0"
 dependencies = [
+ "ffmpeg-next",
  "image 0.25.10",
+ "openh264",
+ "rav1d",
  "serde",
+ "serde_json",
+ "sha2 0.10.9",
  "symthaea-core",
  "symthaea-vision-manifold",
 ]
@@ -16416,11 +16765,14 @@ dependencies = [
 name = "symthaea-quadruped"
 version = "0.1.0"
 dependencies = [
+ "nalgebra",
  "proptest",
  "rand 0.8.5",
  "serde",
  "symthaea-core",
  "symthaea-fep",
+ "symtropy-math 0.2.0",
+ "symtropy-physics",
 ]
 
 [[package]]
@@ -16450,6 +16802,16 @@ version = "0.1.0"
 dependencies = [
  "rand 0.8.5",
  "serde",
+]
+
+[[package]]
+name = "symthaea-sensors"
+version = "0.1.0"
+dependencies = [
+ "nalgebra",
+ "rand 0.8.5",
+ "symtropy-math 0.2.0",
+ "symtropy-physics",
 ]
 
 [[package]]
@@ -16710,6 +17072,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "symtropy-math"
+version = "0.2.0"
+dependencies = [
+ "nalgebra",
+]
+
+[[package]]
+name = "symtropy-physics"
+version = "0.2.0"
+dependencies = [
+ "arrayvec",
+ "nalgebra",
+ "symtropy-math 0.2.0",
+]
+
+[[package]]
 name = "syn"
 version = "1.0.109"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -16789,6 +17167,16 @@ dependencies = [
  "libc",
  "thiserror 1.0.69",
  "walkdir",
+]
+
+[[package]]
+name = "syslog_loose"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "161028c00842709450114c39db3b29f44c898055ed8833bb9b535aba7facf30e"
+dependencies = [
+ "chrono",
+ "nom 7.1.3",
 ]
 
 [[package]]
@@ -17094,7 +17482,7 @@ dependencies = [
  "log",
  "memmem",
  "nix 0.29.0",
- "num-derive",
+ "num-derive 0.4.2",
  "num-traits",
  "ordered-float 4.6.0",
  "pest",
@@ -20251,6 +20639,23 @@ name = "winsafe"
 version = "0.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d135d17ab770252ad95e9a872d365cf3090e3be864a34ab46f48555993efc904"
+
+[[package]]
+name = "winstructs"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6dc7406cd936173d9cc3a4fd5dc5b295bc59612439d72038e3d7ac4e5dd42de9"
+dependencies = [
+ "bitflags 1.3.2",
+ "byteorder",
+ "chrono",
+ "log",
+ "num-derive 0.3.3",
+ "num-traits",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
 
 [[package]]
 name = "wit-bindgen"

@@ -65,13 +65,21 @@ fn eri_primitive(
             continue;
         }
         for u in 0..=(ma + mb) {
-            let ey_ab = hermite_coefficient(ma, mb, u, alpha_a, alpha_b, center_a[1], center_b[1]);
+            let ey_ab =
+                hermite_coefficient(ma, mb, u, alpha_a, alpha_b, center_a[1], center_b[1]);
             if ey_ab.abs() < 1e-15 {
                 continue;
             }
             for v in 0..=(na + nb) {
-                let ez_ab =
-                    hermite_coefficient(na, nb, v, alpha_a, alpha_b, center_a[2], center_b[2]);
+                let ez_ab = hermite_coefficient(
+                    na,
+                    nb,
+                    v,
+                    alpha_a,
+                    alpha_b,
+                    center_a[2],
+                    center_b[2],
+                );
                 if ez_ab.abs() < 1e-15 {
                     continue;
                 }
@@ -122,7 +130,14 @@ fn eri_primitive(
                                 -1.0
                             };
 
-                            let r = hermite_coulomb(t + tau, u + upsilon, v + phi, 0, alpha, rpq);
+                            let r = hermite_coulomb(
+                                t + tau,
+                                u + upsilon,
+                                v + phi,
+                                0,
+                                alpha,
+                                rpq,
+                            );
 
                             val += ex_ab * ey_ab * ez_ab * ex_cd * ey_cd * ez_cd * sign * r;
                         }
@@ -323,6 +338,9 @@ mod tests {
 
         // For a small basis, not many will be screened, but the machinery should work
         // The important thing is that computed + screened = total unique pairs
-        assert!(computed > 0, "Should compute at least some integrals");
+        assert!(
+            computed > 0,
+            "Should compute at least some integrals"
+        );
     }
 }

@@ -49,10 +49,7 @@ impl NavierStokes2D {
             u: vec![0.0; size],
             v: vec![0.0; size],
             p: vec![0.0; size],
-            nx,
-            ny,
-            dx,
-            nu,
+            nx, ny, dx, nu,
             rho: 1.0,
             dt,
         }
@@ -104,19 +101,13 @@ impl NavierStokes2D {
                 };
 
                 // Diffusion: ν∇²u
-                let laplacian_u = (self.u[idx(i + 1, j, ny)]
-                    + self.u[idx(i - 1, j, ny)]
-                    + self.u[idx(i, j + 1, ny)]
-                    + self.u[idx(i, j - 1, ny)]
-                    - 4.0 * self.u[cell])
-                    / (dx * dx);
+                let laplacian_u = (self.u[idx(i + 1, j, ny)] + self.u[idx(i - 1, j, ny)]
+                    + self.u[idx(i, j + 1, ny)] + self.u[idx(i, j - 1, ny)]
+                    - 4.0 * self.u[cell]) / (dx * dx);
 
-                let laplacian_v = (self.v[idx(i + 1, j, ny)]
-                    + self.v[idx(i - 1, j, ny)]
-                    + self.v[idx(i, j + 1, ny)]
-                    + self.v[idx(i, j - 1, ny)]
-                    - 4.0 * self.v[cell])
-                    / (dx * dx);
+                let laplacian_v = (self.v[idx(i + 1, j, ny)] + self.v[idx(i - 1, j, ny)]
+                    + self.v[idx(i, j + 1, ny)] + self.v[idx(i, j - 1, ny)]
+                    - 4.0 * self.v[cell]) / (dx * dx);
 
                 u_star[cell] = ui + dt * (-ui * dudx - vi * dudy + nu * laplacian_u);
                 v_star[cell] = vi + dt * (-ui * dvdx - vi * dvdy + nu * laplacian_v);
@@ -131,15 +122,12 @@ impl NavierStokes2D {
                 for j in 1..ny - 1 {
                     let cell = idx(i, j, ny);
                     let div = (u_star[idx(i + 1, j, ny)] - u_star[idx(i - 1, j, ny)]
-                        + v_star[idx(i, j + 1, ny)]
-                        - v_star[idx(i, j - 1, ny)])
+                        + v_star[idx(i, j + 1, ny)] - v_star[idx(i, j - 1, ny)])
                         / (2.0 * dx);
 
                     p_new[cell] = 0.25
-                        * (self.p[idx(i + 1, j, ny)]
-                            + self.p[idx(i - 1, j, ny)]
-                            + self.p[idx(i, j + 1, ny)]
-                            + self.p[idx(i, j - 1, ny)]
+                        * (self.p[idx(i + 1, j, ny)] + self.p[idx(i - 1, j, ny)]
+                            + self.p[idx(i, j + 1, ny)] + self.p[idx(i, j - 1, ny)]
                             - self.rho * dx * dx * div / dt);
                 }
             }
@@ -151,11 +139,9 @@ impl NavierStokes2D {
             for j in 1..ny - 1 {
                 let cell = idx(i, j, ny);
                 self.u[cell] = u_star[cell]
-                    - dt / self.rho * (self.p[idx(i + 1, j, ny)] - self.p[idx(i - 1, j, ny)])
-                        / (2.0 * dx);
+                    - dt / self.rho * (self.p[idx(i + 1, j, ny)] - self.p[idx(i - 1, j, ny)]) / (2.0 * dx);
                 self.v[cell] = v_star[cell]
-                    - dt / self.rho * (self.p[idx(i, j + 1, ny)] - self.p[idx(i, j - 1, ny)])
-                        / (2.0 * dx);
+                    - dt / self.rho * (self.p[idx(i, j + 1, ny)] - self.p[idx(i, j - 1, ny)]) / (2.0 * dx);
             }
         }
     }
@@ -168,9 +154,7 @@ impl NavierStokes2D {
     /// Compute total kinetic energy: E = ½ρ∫(u² + v²)dA
     pub fn kinetic_energy(&self) -> f64 {
         let cell_area = self.dx * self.dx;
-        self.u
-            .iter()
-            .zip(self.v.iter())
+        self.u.iter().zip(self.v.iter())
             .map(|(u, v)| 0.5 * self.rho * (u * u + v * v) * cell_area)
             .sum()
     }
@@ -227,11 +211,7 @@ mod tests {
         }
 
         let ke = sim.kinetic_energy();
-        assert!(
-            ke > 0.0 && ke.is_finite(),
-            "Lid-driven cavity should develop flow: KE={:.6}",
-            ke
-        );
+        assert!(ke > 0.0 && ke.is_finite(), "Lid-driven cavity should develop flow: KE={:.6}", ke);
     }
 
     #[test]
@@ -243,11 +223,7 @@ mod tests {
         }
 
         let ke = sim.kinetic_energy();
-        assert!(
-            ke < 1e-20,
-            "Quiescent fluid should stay still: KE={:.2e}",
-            ke
-        );
+        assert!(ke < 1e-20, "Quiescent fluid should stay still: KE={:.2e}", ke);
     }
 
     #[test]
@@ -260,20 +236,13 @@ mod tests {
         }
 
         let omega = sim.enstrophy();
-        assert!(
-            omega > 0.0 && omega.is_finite(),
-            "Flowing fluid should have enstrophy: {:.6}",
-            omega
-        );
+        assert!(omega > 0.0 && omega.is_finite(), "Flowing fluid should have enstrophy: {:.6}", omega);
     }
 
     #[test]
     fn test_reynolds_number() {
         let sim = NavierStokes2D::new(20, 20, 0.05, 0.01);
         let re = sim.reynolds_number(1.0, 1.0);
-        assert!(
-            (re - 100.0).abs() < 1e-10,
-            "Re = U*L/ν = 1.0*1.0/0.01 = 100"
-        );
+        assert!((re - 100.0).abs() < 1e-10, "Re = U*L/ν = 1.0*1.0/0.01 = 100");
     }
 }

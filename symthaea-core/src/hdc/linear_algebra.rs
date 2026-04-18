@@ -848,9 +848,7 @@ impl HdcMatrix {
         // independent from existing columns, orthogonalize and add.
         let mut filled = rank;
         for candidate_idx in 0..m {
-            if filled >= m {
-                break;
-            }
+            if filled >= m { break; }
 
             let mut col = vec![0.0; m];
             col[candidate_idx] = 1.0;
@@ -1317,17 +1315,13 @@ pub fn preconditioned_conjugate_gradient(
     let m_inv: Vec<f64> = (0..n)
         .map(|i| {
             let d = a[i][i];
-            if d.abs() > 1e-15 {
-                1.0 / d
-            } else {
-                1.0
-            }
+            if d.abs() > 1e-15 { 1.0 / d } else { 1.0 }
         })
         .collect();
 
     let mut x = vec![0.0f64; n];
     let mut r = b.to_vec(); // r₀ = b - A*0 = b
-                            // z = M⁻¹ * r
+    // z = M⁻¹ * r
     let mut z: Vec<f64> = r.iter().zip(m_inv.iter()).map(|(ri, mi)| ri * mi).collect();
     let mut p = z.clone();
     let mut rz = dot(&r, &z);
@@ -1475,9 +1469,7 @@ impl SparseMatrix {
         let mut prev_col = usize::MAX;
 
         for &(r, c, v) in &sorted {
-            if v.abs() < 1e-15 {
-                continue;
-            }
+            if v.abs() < 1e-15 { continue; }
             // Sum duplicates
             if r == prev_row && c == prev_col && !values.is_empty() {
                 *values.last_mut().unwrap() += v;
@@ -1495,13 +1487,7 @@ impl SparseMatrix {
             row_ptr[row] = values.len();
         }
 
-        Self {
-            rows,
-            cols,
-            values,
-            col_indices,
-            row_ptr,
-        }
+        Self { rows, cols, values, col_indices, row_ptr }
     }
 
     /// Create identity matrix of given size.
@@ -1592,16 +1578,12 @@ impl SparseMatrix {
         let mut rs_old: f64 = r.iter().map(|v| v * v).sum();
         let b_norm: f64 = b.iter().map(|v| v * v).sum::<f64>().sqrt();
 
-        if b_norm < 1e-15 {
-            return (x, 0);
-        }
+        if b_norm < 1e-15 { return (x, 0); }
 
         for iter in 0..max_iter {
             let ap = self.mul_vec(&p);
             let p_ap: f64 = p.iter().zip(&ap).map(|(pi, api)| pi * api).sum();
-            if p_ap.abs() < 1e-15 {
-                return (x, iter + 1);
-            }
+            if p_ap.abs() < 1e-15 { return (x, iter + 1); }
             let alpha = rs_old / p_ap;
 
             for i in 0..n {
@@ -2037,15 +2019,9 @@ mod tests {
         for i in 0..m {
             for j in 0..n {
                 let diff = (a.get(i, j) - reconstructed.get(i, j)).abs();
-                assert!(
-                    diff < 1e-6,
+                assert!(diff < 1e-6,
                     "SVD reconstruction failed at ({},{}): A={}, UΣV^T={}, diff={}",
-                    i,
-                    j,
-                    a.get(i, j),
-                    reconstructed.get(i, j),
-                    diff
-                );
+                    i, j, a.get(i, j), reconstructed.get(i, j), diff);
             }
         }
     }
@@ -2066,14 +2042,8 @@ mod tests {
         for i in 0..u.rows {
             for j in 0..u.rows {
                 let diff = (utu.get(i, j) - eye.get(i, j)).abs();
-                assert!(
-                    diff < 1e-6,
-                    "U not orthogonal at ({},{}): U^TU={}, I={}",
-                    i,
-                    j,
-                    utu.get(i, j),
-                    eye.get(i, j)
-                );
+                assert!(diff < 1e-6,
+                    "U not orthogonal at ({},{}): U^TU={}, I={}", i, j, utu.get(i, j), eye.get(i, j));
             }
         }
     }
@@ -2081,7 +2051,10 @@ mod tests {
     /// V should be orthogonal: V^T V ≈ I
     #[test]
     fn test_svd_v_orthogonal() {
-        let a = HdcMatrix::from_rows(&[&[1.0, 2.0, 3.0], &[4.0, 5.0, 6.0]]); // 2×3 — wide rectangular
+        let a = HdcMatrix::from_rows(&[
+            &[1.0, 2.0, 3.0],
+            &[4.0, 5.0, 6.0],
+        ]); // 2×3 — wide rectangular
         let (_, _, v, _) = a.svd();
         let vt = v.transpose();
         let (vtv, _) = vt.mul(&v);
@@ -2090,14 +2063,8 @@ mod tests {
         for i in 0..v.rows {
             for j in 0..v.rows {
                 let diff = (vtv.get(i, j) - eye.get(i, j)).abs();
-                assert!(
-                    diff < 1e-6,
-                    "V not orthogonal at ({},{}): V^TV={}, I={}",
-                    i,
-                    j,
-                    vtv.get(i, j),
-                    eye.get(i, j)
-                );
+                assert!(diff < 1e-6,
+                    "V not orthogonal at ({},{}): V^TV={}, I={}", i, j, vtv.get(i, j), eye.get(i, j));
             }
         }
     }
@@ -2105,16 +2072,16 @@ mod tests {
     /// SVD of rank-deficient matrix: [1 2 3; 2 4 6; 3 6 9] has rank 1
     #[test]
     fn test_svd_rank_deficient() {
-        let a = HdcMatrix::from_rows(&[&[1.0, 2.0, 3.0], &[2.0, 4.0, 6.0], &[3.0, 6.0, 9.0]]);
+        let a = HdcMatrix::from_rows(&[
+            &[1.0, 2.0, 3.0],
+            &[2.0, 4.0, 6.0],
+            &[3.0, 6.0, 9.0],
+        ]);
         let (sv, _, _, _) = a.svd();
 
         // Only 1 non-zero singular value
         let nonzero = sv.iter().filter(|&&s| s > 1e-6).count();
-        assert_eq!(
-            nonzero, 1,
-            "rank-1 matrix should have 1 nonzero singular value, got {}",
-            nonzero
-        );
+        assert_eq!(nonzero, 1, "rank-1 matrix should have 1 nonzero singular value, got {}", nonzero);
         assert_eq!(a.rank(), 1);
     }
 
@@ -2122,35 +2089,25 @@ mod tests {
     #[test]
     fn test_null_space() {
         // [1 2 3; 2 4 6; 3 6 9] has rank 1, null space dimension 2
-        let a = HdcMatrix::from_rows(&[&[1.0, 2.0, 3.0], &[2.0, 4.0, 6.0], &[3.0, 6.0, 9.0]]);
+        let a = HdcMatrix::from_rows(&[
+            &[1.0, 2.0, 3.0],
+            &[2.0, 4.0, 6.0],
+            &[3.0, 6.0, 9.0],
+        ]);
         let ns = a.null_space();
-        assert!(
-            ns.is_some(),
-            "rank-1 3×3 matrix should have non-trivial null space"
-        );
+        assert!(ns.is_some(), "rank-1 3×3 matrix should have non-trivial null space");
         let ns = ns.unwrap();
-        assert_eq!(
-            ns.cols, 2,
-            "null space should have dimension 2, got {}",
-            ns.cols
-        );
+        assert_eq!(ns.cols, 2, "null space should have dimension 2, got {}", ns.cols);
 
         // Verify A * null_vector ≈ 0 for each null space column
         for j in 0..ns.cols {
             let mut nv = vec![0.0; ns.rows];
-            for i in 0..ns.rows {
-                nv[i] = ns.get(i, j);
-            }
+            for i in 0..ns.rows { nv[i] = ns.get(i, j); }
             let nv_mat = HdcMatrix::new(nv, ns.rows, 1);
             let (product, _) = a.mul(&nv_mat);
             for i in 0..a.rows {
-                assert!(
-                    product.get(i, 0).abs() < 1e-6,
-                    "A * null_vec[{}] should be 0, got {} at row {}",
-                    j,
-                    product.get(i, 0),
-                    i
-                );
+                assert!(product.get(i, 0).abs() < 1e-6,
+                    "A * null_vec[{}] should be 0, got {} at row {}", j, product.get(i, 0), i);
             }
         }
     }
@@ -2159,26 +2116,24 @@ mod tests {
     #[test]
     fn test_null_space_full_rank() {
         let a = HdcMatrix::from_rows(&[&[1.0, 0.0], &[0.0, 1.0]]);
-        assert!(
-            a.null_space().is_none(),
-            "identity should have no null space"
-        );
+        assert!(a.null_space().is_none(), "identity should have no null space");
     }
 
     /// SVD of tall rectangular matrix (m > n)
     #[test]
     fn test_svd_tall_rectangular() {
-        let a = HdcMatrix::from_rows(&[&[1.0, 2.0], &[3.0, 4.0], &[5.0, 6.0]]); // 3×2
+        let a = HdcMatrix::from_rows(&[
+            &[1.0, 2.0],
+            &[3.0, 4.0],
+            &[5.0, 6.0],
+        ]); // 3×2
         let (sv, u, v, _) = a.svd();
         assert_eq!(sv.len(), 2, "should have min(3,2)=2 singular values");
         assert_eq!(u.rows, 3, "U should be 3×3");
         assert_eq!(v.rows, 2, "V should be 2×2");
 
         // All singular values should be positive (full column rank)
-        assert!(
-            sv.iter().all(|s| *s > 1e-6),
-            "3×2 full-rank matrix should have 2 positive singular values"
-        );
+        assert!(sv.iter().all(|s| *s > 1e-6), "3×2 full-rank matrix should have 2 positive singular values");
     }
 
     // ── Properties ───────────────────────────────────────────────────────
@@ -2843,23 +2798,14 @@ mod tests {
         let mut a = vec![vec![0.0f64; n]; n];
         for i in 0..n {
             a[i][i] = 4.0;
-            if i > 0 {
-                a[i][i - 1] = -1.0;
-            }
-            if i < n - 1 {
-                a[i][i + 1] = -1.0;
-            }
+            if i > 0 { a[i][i - 1] = -1.0; }
+            if i < n - 1 { a[i][i + 1] = -1.0; }
         }
         let b: Vec<f64> = (0..n).map(|i| i as f64 + 1.0).collect();
         let x = conjugate_gradient(&a, &b, 1e-8, 1000).unwrap();
         let ax = mat_vec_mul(&a, &x);
         for (ai, bi) in ax.iter().zip(b.iter()) {
-            assert!(
-                (ai - bi).abs() < 1e-6,
-                "Residual too large: {} vs {}",
-                ai,
-                bi
-            );
+            assert!((ai - bi).abs() < 1e-6, "Residual too large: {} vs {}", ai, bi);
         }
     }
 
@@ -2885,12 +2831,8 @@ mod tests {
         let mut a = vec![vec![0.0f64; n]; n];
         for i in 0..n {
             a[i][i] = (i + 2) as f64 * 2.0; // varying diagonal (tests preconditioning)
-            if i > 0 {
-                a[i][i - 1] = -0.5;
-            }
-            if i < n - 1 {
-                a[i][i + 1] = -0.5;
-            }
+            if i > 0 { a[i][i - 1] = -0.5; }
+            if i < n - 1 { a[i][i + 1] = -0.5; }
         }
         let b: Vec<f64> = vec![1.0; n];
         let x_pcg = preconditioned_conjugate_gradient(&a, &b, 1e-8, 500).unwrap();
@@ -2909,11 +2851,7 @@ mod tests {
             .collect();
         let cond = condition_number_estimate(&a, 50);
         assert!(cond >= 1.0, "Condition number must be >= 1: {}", cond);
-        assert!(
-            cond < 10.0,
-            "Identity condition number should be near 1: {}",
-            cond
-        );
+        assert!(cond < 10.0, "Identity condition number should be near 1: {}", cond);
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -2932,13 +2870,9 @@ mod tests {
     #[test]
     fn test_sparse_from_triplets() {
         let triplets = vec![
-            (0, 0, 2.0),
-            (0, 1, -1.0),
-            (1, 0, -1.0),
-            (1, 1, 2.0),
-            (1, 2, -1.0),
-            (2, 1, -1.0),
-            (2, 2, 2.0),
+            (0, 0, 2.0), (0, 1, -1.0),
+            (1, 0, -1.0), (1, 1, 2.0), (1, 2, -1.0),
+            (2, 1, -1.0), (2, 2, 2.0),
         ];
         let a = SparseMatrix::from_triplets(3, 3, &triplets);
         assert_eq!(a.nnz(), 7);
@@ -2954,13 +2888,9 @@ mod tests {
         // [-1 2 -1] [1] = [0]
         // [0 -1 2] [1]   [1]
         let triplets = vec![
-            (0, 0, 2.0),
-            (0, 1, -1.0),
-            (1, 0, -1.0),
-            (1, 1, 2.0),
-            (1, 2, -1.0),
-            (2, 1, -1.0),
-            (2, 2, 2.0),
+            (0, 0, 2.0), (0, 1, -1.0),
+            (1, 0, -1.0), (1, 1, 2.0), (1, 2, -1.0),
+            (2, 1, -1.0), (2, 2, 2.0),
         ];
         let a = SparseMatrix::from_triplets(3, 3, &triplets);
         let x = vec![1.0, 1.0, 1.0];
@@ -2999,12 +2929,8 @@ mod tests {
         let mut triplets = Vec::new();
         for i in 0..n {
             triplets.push((i, i, 4.0));
-            if i > 0 {
-                triplets.push((i, i - 1, -1.0));
-            }
-            if i < n - 1 {
-                triplets.push((i, i + 1, -1.0));
-            }
+            if i > 0 { triplets.push((i, i - 1, -1.0)); }
+            if i < n - 1 { triplets.push((i, i + 1, -1.0)); }
         }
         let a = SparseMatrix::from_triplets(n, n, &triplets);
         let b: Vec<f64> = vec![1.0; n];
@@ -3012,20 +2938,10 @@ mod tests {
         let (x, iters) = a.solve_cg(&b, 1e-10, 100);
         let ax = a.mul_vec(&x);
         for (ai, bi) in ax.iter().zip(b.iter()) {
-            assert!(
-                (ai - bi).abs() < 1e-8,
-                "Sparse CG residual too large: {} vs {}",
-                ai,
-                bi
-            );
+            assert!((ai - bi).abs() < 1e-8,
+                "Sparse CG residual too large: {} vs {}", ai, bi);
         }
-        eprintln!(
-            "Sparse CG: {}×{}, nnz={}, converged in {} iters",
-            n,
-            n,
-            a.nnz(),
-            iters
-        );
+        eprintln!("Sparse CG: {}×{}, nnz={}, converged in {} iters", n, n, a.nnz(), iters);
     }
 
     #[test]

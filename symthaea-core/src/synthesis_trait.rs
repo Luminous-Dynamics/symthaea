@@ -276,10 +276,7 @@ mod tests {
 
         assert_eq!(req.language, "rust");
         assert_eq!(req.name, "fibonacci");
-        assert_eq!(
-            req.signature.as_deref(),
-            Some("fn fibonacci(n: u64) -> u64")
-        );
+        assert_eq!(req.signature.as_deref(), Some("fn fibonacci(n: u64) -> u64"));
         assert_eq!(req.examples.len(), 2);
         assert_eq!(req.constraints.len(), 1);
         assert_eq!(req.epistemic_status, EpistemicStatus::Probable);

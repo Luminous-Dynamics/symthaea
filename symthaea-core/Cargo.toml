@@ -66,6 +66,21 @@ name = "primitive_showcase"
 path = "examples/primitive_showcase.rs"
 
 [[example]]
+name = "abstract_thought_demo"
+path = "examples/abstract_thought_demo.rs"
+required-features = ["abstract_thought"]
+
+[[example]]
+name = "macro_acceleration_benchmark"
+path = "examples/macro_acceleration_benchmark.rs"
+required-features = ["abstract_thought"]
+
+[[example]]
+name = "compounding_benchmark"
+path = "examples/compounding_benchmark.rs"
+required-features = ["abstract_thought"]
+
+[[example]]
 name = "cross_domain_query"
 path = "examples/cross_domain_query.rs"
 
@@ -77,6 +92,10 @@ required-features = ["_scaling_study"]
 
 [[bench]]
 name = "hdc_benchmarks"
+harness = false
+
+[[bench]]
+name = "hdc_simd_compare"
 harness = false
 
 [[bench]]
@@ -146,6 +165,7 @@ complex_cfc = []                             # Complex-valued CfC neuron with na
 geometric-algebra = ["dep:symtropy-math"]     # N-dimensional geometric algebra: bivectors, rotors, transforms
 _scaling_study = []                          # Gate for scaling_study_demo example
 epistemic = []                               # Epistemic substrate profiles and knowledge validation
+abstract_thought = []                        # Meta-HDC concept vectors, dynamic grammar generation, category theory discovery
 neural_validation = []                       # TRIBE v2 fMRI comparison: cortical activation maps, Glasser parcellation, HRF
 synthesis-trait = []                         # Unified CodeSynthesisBackend trait for cross-backend code generation
 

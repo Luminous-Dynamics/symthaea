@@ -47,11 +47,8 @@ impl QuantumCircuitsBenchmark {
         let state_plus = QuantumCircuit::new(1).h(0).execute();
         let p0 = state_plus.probability(0); // |0⟩
         let p1 = state_plus.probability(1); // |1⟩
-        let superposition_correct = if (p0 - 0.5).abs() < 1e-9 && (p1 - 0.5).abs() < 1e-9 {
-            1.0
-        } else {
-            0.0
-        };
+        let superposition_correct =
+            if (p0 - 0.5).abs() < 1e-9 && (p1 - 0.5).abs() < 1e-9 { 1.0 } else { 0.0 };
 
         // ── 2. Bell State: (H⊗I)·CNOT|00⟩ → (|00⟩+|11⟩)/√2 ─────────────
         // Qubit ordering: qubit 0 = MSB. CNOT with control=0, target=1.
@@ -61,12 +58,15 @@ impl QuantumCircuitsBenchmark {
         let p01 = bell.probability(0b01); // |01⟩
         let p10 = bell.probability(0b10); // |10⟩
         let p11 = bell.probability(0b11); // |11⟩
-        let bell_state_correct =
-            if (p00 - 0.5).abs() < 1e-9 && p01 < 1e-9 && p10 < 1e-9 && (p11 - 0.5).abs() < 1e-9 {
-                1.0
-            } else {
-                0.0
-            };
+        let bell_state_correct = if (p00 - 0.5).abs() < 1e-9
+            && p01 < 1e-9
+            && p10 < 1e-9
+            && (p11 - 0.5).abs() < 1e-9
+        {
+            1.0
+        } else {
+            0.0
+        };
 
         // ── 3. Phase Flip: Z|+⟩ → |−⟩ ────────────────────────────────────
         // Start: H|0⟩ = |+⟩ = [1/√2, 1/√2]
@@ -80,37 +80,19 @@ impl QuantumCircuitsBenchmark {
         // Verify the amplitude of |1⟩ is negative (real part < 0).
         let amp1_real = state_minus.amplitudes[1].0;
         let amp1_neg = amp1_real < -0.6; // should be -1/√2 ≈ -0.707
-        let phase_flip_correct = if probs_unchanged && amp1_neg {
-            1.0
-        } else {
-            0.0
-        };
+        let phase_flip_correct = if probs_unchanged && amp1_neg { 1.0 } else { 0.0 };
 
         // ── 4. Normalization preserved across multiple circuits ────────────
         let circuits_normalized = [
             QuantumCircuit::new(1).h(0).execute().total_probability(),
-            QuantumCircuit::new(2)
-                .h(0)
-                .cnot(0, 1)
-                .execute()
-                .total_probability(),
-            QuantumCircuit::new(1)
-                .h(0)
-                .z(0)
-                .execute()
-                .total_probability(),
-            QuantumCircuit::new(2)
-                .h(0)
-                .h(1)
-                .execute()
-                .total_probability(),
-            QuantumCircuit::new(1)
-                .x(0)
-                .h(0)
-                .execute()
-                .total_probability(),
+            QuantumCircuit::new(2).h(0).cnot(0, 1).execute().total_probability(),
+            QuantumCircuit::new(1).h(0).z(0).execute().total_probability(),
+            QuantumCircuit::new(2).h(0).h(1).execute().total_probability(),
+            QuantumCircuit::new(1).x(0).h(0).execute().total_probability(),
         ];
-        let normalization_preserved = if circuits_normalized.iter().all(|&p| (p - 1.0).abs() < 1e-9)
+        let normalization_preserved = if circuits_normalized
+            .iter()
+            .all(|&p| (p - 1.0).abs() < 1e-9)
         {
             1.0
         } else {
@@ -161,14 +143,8 @@ impl PsychBenchmark for QuantumCircuitsBenchmark {
             "superposition_accuracy",
             MetricValue::from_samples(&super_scores),
         );
-        result.insert(
-            "bell_state_accuracy",
-            MetricValue::from_samples(&bell_scores),
-        );
-        result.insert(
-            "phase_flip_accuracy",
-            MetricValue::from_samples(&phase_scores),
-        );
+        result.insert("bell_state_accuracy", MetricValue::from_samples(&bell_scores));
+        result.insert("phase_flip_accuracy", MetricValue::from_samples(&phase_scores));
         result.insert(
             "normalization_preserved",
             MetricValue::from_samples(&norm_scores),

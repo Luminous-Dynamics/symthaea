@@ -185,8 +185,7 @@ impl AntiPatternLibrary {
         ];
 
         for name in &anti_patterns {
-            lib.patterns
-                .push((name.to_string(), encoder.encode_name(name)));
+            lib.patterns.push((name.to_string(), encoder.encode_name(name)));
         }
 
         lib
@@ -264,8 +263,7 @@ impl CytokineSignal {
 
         // Update failure EMA
         let failure_signal = if success { 0.0 } else { 1.0 };
-        self.failure_ema =
-            self.failure_ema * (1.0 - self.ema_alpha) + failure_signal * self.ema_alpha;
+        self.failure_ema = self.failure_ema * (1.0 - self.ema_alpha) + failure_signal * self.ema_alpha;
 
         // Update inflammation
         if self.failure_ema > self.inflammation_threshold {
@@ -394,31 +392,14 @@ impl ImmuneCodeEvolver {
     pub fn seed_standard(&mut self) {
         self.seed(&[
             // V-segment patterns (input handling)
-            "validate_input",
-            "parse_parameters",
-            "check_bounds",
-            "convert_type",
+            "validate_input", "parse_parameters", "check_bounds", "convert_type",
             // D-segment patterns (core algorithms)
-            "sort_ascending",
-            "binary_search",
-            "hash_lookup",
-            "tree_traverse",
-            "accumulate_sum",
-            "filter_predicate",
-            "map_transform",
-            "reduce_fold",
-            "dynamic_programming",
-            "graph_bfs",
-            "divide_conquer",
-            "greedy_select",
+            "sort_ascending", "binary_search", "hash_lookup", "tree_traverse",
+            "accumulate_sum", "filter_predicate", "map_transform", "reduce_fold",
+            "dynamic_programming", "graph_bfs", "divide_conquer", "greedy_select",
             // J-segment patterns (output handling)
-            "format_result",
-            "handle_error",
-            "wrap_option",
-            "collect_vec",
-            "return_result",
-            "serialize_json",
-            "log_output",
+            "format_result", "handle_error", "wrap_option", "collect_vec",
+            "return_result", "serialize_json", "log_output",
         ]);
     }
 
@@ -717,11 +698,9 @@ impl ImmuneCodeEvolver {
 
     /// Get the best antibody in the population.
     pub fn best(&self) -> Option<&CodeAntibody> {
-        self.population.values().max_by(|a, b| {
-            a.fitness
-                .partial_cmp(&b.fitness)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        })
+        self.population
+            .values()
+            .max_by(|a, b| a.fitness.partial_cmp(&b.fitness).unwrap_or(std::cmp::Ordering::Equal))
     }
 
     /// Get the cytokine signaling state.

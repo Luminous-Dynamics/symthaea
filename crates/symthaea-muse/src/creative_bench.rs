@@ -182,8 +182,8 @@ pub fn emotional_alignment(composition: &Composition, target: ValenceArousal) ->
         let ratio = w[1].frequency / w[0].frequency.max(0.001);
         let semitones = (ratio.log2() * 12.0).abs().round() as i32;
         match semitones % 12 {
-            4 | 9 | 7 => major_count += 1, // M3, M6, P5 → bright
-            3 | 8 | 6 => minor_count += 1, // m3, m6, tritone → dark
+            4 | 9 | 7 => major_count += 1,  // M3, M6, P5 → bright
+            3 | 8 | 6 => minor_count += 1,  // m3, m6, tritone → dark
             _ => {}
         }
     }
@@ -192,11 +192,7 @@ pub fn emotional_alignment(composition: &Composition, target: ValenceArousal) ->
 
     // Velocity variance: high variance → tension → negative
     let vel_var = {
-        let var = notes
-            .iter()
-            .map(|n| (n.velocity - mean_vel).powi(2))
-            .sum::<f32>()
-            / n;
+        let var = notes.iter().map(|n| (n.velocity - mean_vel).powi(2)).sum::<f32>() / n;
         var.sqrt()
     };
     let dynamics_valence = -vel_var * 0.5;
@@ -258,9 +254,7 @@ pub fn form_compliance(composition: &Composition) -> f32 {
     let cv = |values: &[f32]| -> f32 {
         let n = values.len() as f32;
         let mean = values.iter().sum::<f32>() / n;
-        if mean < 0.001 {
-            return 0.0;
-        }
+        if mean < 0.001 { return 0.0; }
         let var = values.iter().map(|&v| (v - mean).powi(2)).sum::<f32>() / n;
         (var.sqrt() / mean).min(1.0)
     };
@@ -337,11 +331,7 @@ fn extract_melody(notes: &[Note]) -> Vec<Note> {
     // Group notes by onset time (within 30ms tolerance = same beat)
     let tolerance = 0.03f32;
     let mut sorted = notes.to_vec();
-    sorted.sort_by(|a, b| {
-        a.start_time
-            .partial_cmp(&b.start_time)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    sorted.sort_by(|a, b| a.start_time.partial_cmp(&b.start_time).unwrap_or(std::cmp::Ordering::Equal));
 
     let mut melody = Vec::new();
     let mut group_start = sorted[0].start_time;
@@ -491,16 +481,8 @@ impl AudioQualityScore {
         let peak = mono.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
         let rms = (mono.iter().map(|s| s * s).sum::<f32>() / n).sqrt();
 
-        let peak_db = if peak > 0.0 {
-            20.0 * peak.log10()
-        } else {
-            -100.0
-        };
-        let rms_db = if rms > 0.0 {
-            20.0 * rms.log10()
-        } else {
-            -100.0
-        };
+        let peak_db = if peak > 0.0 { 20.0 * peak.log10() } else { -100.0 };
+        let rms_db = if rms > 0.0 { 20.0 * rms.log10() } else { -100.0 };
         let crest_db = peak_db - rms_db;
 
         // Silence ratio
@@ -558,11 +540,7 @@ impl AudioQualityScore {
             let n_bands = band_mags.len() as f32;
             let log_geo_mean = band_mags.iter().map(|m| m.ln()).sum::<f32>() / n_bands;
             let arith_mean = band_mags.iter().sum::<f32>() / n_bands;
-            if arith_mean > 0.0 {
-                (log_geo_mean.exp() / arith_mean).clamp(0.0, 1.0)
-            } else {
-                0.0
-            }
+            if arith_mean > 0.0 { (log_geo_mean.exp() / arith_mean).clamp(0.0, 1.0) } else { 0.0 }
         };
 
         // Dynamic range variation: std dev of windowed RMS in dB
@@ -572,26 +550,18 @@ impl AudioQualityScore {
             if mono.len() > window_size * 2 {
                 let mut window_rms_db = Vec::new();
                 for chunk in mono.chunks(window_size) {
-                    let rms_w =
-                        (chunk.iter().map(|s| s * s).sum::<f32>() / chunk.len() as f32).sqrt();
+                    let rms_w = (chunk.iter().map(|s| s * s).sum::<f32>() / chunk.len() as f32).sqrt();
                     if rms_w > 1e-6 {
                         window_rms_db.push(20.0 * rms_w.log10());
                     }
                 }
                 if window_rms_db.len() > 1 {
                     let mean_db = window_rms_db.iter().sum::<f32>() / window_rms_db.len() as f32;
-                    let var = window_rms_db
-                        .iter()
-                        .map(|d| (d - mean_db).powi(2))
-                        .sum::<f32>()
+                    let var = window_rms_db.iter().map(|d| (d - mean_db).powi(2)).sum::<f32>()
                         / window_rms_db.len() as f32;
                     var.sqrt()
-                } else {
-                    0.0
-                }
-            } else {
-                0.0
-            }
+                } else { 0.0 }
+            } else { 0.0 }
         };
 
         // Harmonic-to-noise ratio: ratio of energy at harmonic peaks vs rest
@@ -611,9 +581,7 @@ impl AudioQualityScore {
                         corr += samples[j] * samples[j + lag];
                     }
                     let r = corr / energy;
-                    if r > best_r {
-                        best_r = r;
-                    }
+                    if r > best_r { best_r = r; }
                 }
             }
             // HNR from autocorrelation: HNR = 10 * log10(r / (1 - r))
@@ -659,14 +627,13 @@ impl AudioQualityScore {
         };
 
         // Dynamic variation: expression matters — flat dynamics = robotic
-        let expression_score =
-            if dynamic_range_variation_db > 3.0 && dynamic_range_variation_db < 15.0 {
-                1.0
-            } else if dynamic_range_variation_db > 1.0 {
-                0.6
-            } else {
-                0.3 // flat dynamics
-            };
+        let expression_score = if dynamic_range_variation_db > 3.0 && dynamic_range_variation_db < 15.0 {
+            1.0
+        } else if dynamic_range_variation_db > 1.0 {
+            0.6
+        } else {
+            0.3 // flat dynamics
+        };
 
         // HNR: higher = cleaner harmonic content
         let hnr_score = if harmonic_to_noise_db > 15.0 {
@@ -742,11 +709,11 @@ impl AudioQualityScore {
 /// averages the quality scores, giving a stable estimate of creative quality.
 pub fn run_benchmark(config: &MuseConfig, state: &MusicalState) -> BenchmarkResult {
     let test_cases: Vec<(ValenceArousal, u64)> = vec![
-        (ValenceArousal::new(0.5, 0.7), 1),  // happy/excited
-        (ValenceArousal::new(-0.4, 0.6), 2), // tense
-        (ValenceArousal::new(-0.2, 0.2), 3), // melancholy
-        (ValenceArousal::new(0.6, 0.3), 4),  // content
-        (ValenceArousal::new(0.0, 0.5), 5),  // neutral
+        (ValenceArousal::new(0.5, 0.7), 1),   // happy/excited
+        (ValenceArousal::new(-0.4, 0.6), 2),  // tense
+        (ValenceArousal::new(-0.2, 0.2), 3),  // melancholy
+        (ValenceArousal::new(0.6, 0.3), 4),   // content
+        (ValenceArousal::new(0.0, 0.5), 5),   // neutral
     ];
 
     let mut scores: Vec<CreativeQualityScore> = Vec::new();
@@ -781,11 +748,7 @@ pub fn run_benchmark(config: &MuseConfig, state: &MusicalState) -> BenchmarkResu
         mean_audio_quality: audio_scores.iter().map(|s| s.composite).sum::<f32>() / n,
         mean_rms_db: audio_scores.iter().map(|s| s.rms_db).sum::<f32>() / n,
         mean_silence_ratio: audio_scores.iter().map(|s| s.silence_ratio).sum::<f32>() / n,
-        mean_spectral_centroid: audio_scores
-            .iter()
-            .map(|s| s.spectral_centroid)
-            .sum::<f32>()
-            / n,
+        mean_spectral_centroid: audio_scores.iter().map(|s| s.spectral_centroid).sum::<f32>() / n,
         n_compositions: scores.len(),
     }
 }
@@ -850,9 +813,7 @@ mod tests {
 
     fn ascending_scale_notes() -> Vec<Note> {
         // C major scale ascending: C4 D4 E4 F4 G4 A4 B4 C5
-        let freqs = [
-            261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25,
-        ];
+        let freqs = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25];
         freqs
             .iter()
             .enumerate()
@@ -923,10 +884,7 @@ mod tests {
             })
             .collect();
         let score = rhythmic_regularity(&notes);
-        assert!(
-            score > 0.8,
-            "perfectly regular rhythm should score high: {score}"
-        );
+        assert!(score > 0.8, "perfectly regular rhythm should score high: {score}");
     }
 
     #[test]
@@ -944,39 +902,25 @@ mod tests {
         let reg_score = rhythmic_regularity(&ascending_scale_notes());
         let irr_score = rhythmic_regularity(&notes);
         // Irregular should be lower (though both are valid)
-        assert!(
-            irr_score <= reg_score + 0.1,
-            "irregular {irr_score} vs regular {reg_score}"
-        );
+        assert!(irr_score <= reg_score + 0.1, "irregular {irr_score} vs regular {reg_score}");
     }
 
     // ─── Emotional alignment ──────────────────────────────────────────────────
 
     #[test]
     fn alignment_bounded() {
-        let config = MuseConfig {
-            duration_secs: 2.0,
-            max_notes: 8,
-            ..Default::default()
-        };
+        let config = MuseConfig { duration_secs: 2.0, max_notes: 8, ..Default::default() };
         let state = MusicalState::default();
         let comp = crate::compose(&config, &state, 42);
         let score = emotional_alignment(&comp, ValenceArousal::neutral());
-        assert!(
-            score >= 0.0 && score <= 1.0,
-            "alignment out of bounds: {score}"
-        );
+        assert!(score >= 0.0 && score <= 1.0, "alignment out of bounds: {score}");
     }
 
     // ─── Form compliance ──────────────────────────────────────────────────────
 
     #[test]
     fn form_compliance_structured() {
-        let config = MuseConfig {
-            duration_secs: 4.0,
-            max_notes: 16,
-            ..Default::default()
-        };
+        let config = MuseConfig { duration_secs: 4.0, max_notes: 16, ..Default::default() };
         let state = MusicalState {
             harmony_activations: [0.2, 0.8, 0.3, 0.9, 0.1, 0.5, 0.7, 0.1],
             ..Default::default()
@@ -992,10 +936,7 @@ mod tests {
     fn diversity_uniform_is_max() {
         let sessions: Vec<[f32; 8]> = (0..10).map(|_| [0.5; 8]).collect();
         let score = harmony_diversity(&sessions);
-        assert!(
-            score > 0.95,
-            "uniform activations should score near 1.0: {score}"
-        );
+        assert!(score > 0.95, "uniform activations should score near 1.0: {score}");
     }
 
     #[test]
@@ -1014,11 +955,7 @@ mod tests {
 
     #[test]
     fn quality_score_bounded() {
-        let config = MuseConfig {
-            duration_secs: 2.0,
-            max_notes: 8,
-            ..Default::default()
-        };
+        let config = MuseConfig { duration_secs: 2.0, max_notes: 8, ..Default::default() };
         let state = MusicalState::default();
         let comp = crate::compose(&config, &state, 42);
         let score = CreativeQualityScore::evaluate(&comp, ValenceArousal::neutral());
@@ -1031,30 +968,18 @@ mod tests {
 
     #[test]
     fn benchmark_produces_result() {
-        let config = MuseConfig {
-            duration_secs: 2.0,
-            max_notes: 8,
-            ..Default::default()
-        };
+        let config = MuseConfig { duration_secs: 2.0, max_notes: 8, ..Default::default() };
         let state = MusicalState::default();
         let result = run_benchmark(&config, &state);
         assert_eq!(result.n_compositions, 5);
         assert!(result.mean_composite >= 0.0 && result.mean_composite <= 1.0);
         // Minimum quality bar: composite should be above 0.15 (very low bar for any output)
-        assert!(
-            result.passes(0.15),
-            "benchmark failed minimum quality: {}",
-            result.report()
-        );
+        assert!(result.passes(0.15), "benchmark failed minimum quality: {}", result.report());
     }
 
     #[test]
     fn quality_report_contains_scores() {
-        let config = MuseConfig {
-            duration_secs: 1.0,
-            max_notes: 4,
-            ..Default::default()
-        };
+        let config = MuseConfig { duration_secs: 1.0, max_notes: 4, ..Default::default() };
         let state = MusicalState::default();
         let comp = crate::compose(&config, &state, 42);
         let score = CreativeQualityScore::evaluate(&comp, ValenceArousal::neutral());
@@ -1148,10 +1073,7 @@ impl TheoryValidation {
         for note in notes {
             // Normalize to within one octave of the nearest scale frequency
             let pitch_class = note_to_pitch_class(note.frequency);
-            let scale_classes: Vec<f32> = scale_freqs
-                .iter()
-                .map(|&f| note_to_pitch_class(f))
-                .collect();
+            let scale_classes: Vec<f32> = scale_freqs.iter().map(|&f| note_to_pitch_class(f)).collect();
 
             // Check if this pitch class is within 25 cents of any scale degree
             let min_distance = scale_classes
@@ -1226,12 +1148,7 @@ impl TheoryValidation {
         }
 
         // Check how many onsets fall near grid positions (multiples/subdivisions of median IOI)
-        let grid_sizes = [
-            median_ioi,
-            median_ioi / 2.0,
-            median_ioi / 3.0,
-            median_ioi * 2.0,
-        ];
+        let grid_sizes = [median_ioi, median_ioi / 2.0, median_ioi / 3.0, median_ioi * 2.0];
         let tolerance = median_ioi * 0.15; // 15% tolerance
 
         let mut on_grid = 0usize;
@@ -1239,9 +1156,7 @@ impl TheoryValidation {
             let best_grid_dist = grid_sizes
                 .iter()
                 .map(|&grid| {
-                    if grid < 0.01 {
-                        return f32::MAX;
-                    }
+                    if grid < 0.01 { return f32::MAX; }
                     let remainder = note.start_time % grid;
                     remainder.min(grid - remainder)
                 })
@@ -1345,17 +1260,13 @@ impl TheoryValidation {
 
 /// Convert frequency to pitch class (0-12, where 0 = C, continuous).
 fn note_to_pitch_class(freq: f32) -> f32 {
-    if freq <= 0.0 {
-        return 0.0;
-    }
+    if freq <= 0.0 { return 0.0; }
     (12.0 * (freq / 261.63).log2()).rem_euclid(12.0) // relative to C4
 }
 
 /// Interval between two frequencies in semitones.
 fn interval_semitones(f1: f32, f2: f32) -> f32 {
-    if f1 <= 0.0 || f2 <= 0.0 {
-        return 0.0;
-    }
+    if f1 <= 0.0 || f2 <= 0.0 { return 0.0; }
     (12.0 * (f2 / f1).log2()).abs()
 }
 
@@ -1555,11 +1466,7 @@ mod external_validation_tests {
 
     #[test]
     fn theory_validation_on_composition() {
-        let config = MuseConfig {
-            duration_secs: 2.0,
-            max_notes: 8,
-            ..Default::default()
-        };
+        let config = MuseConfig { duration_secs: 2.0, max_notes: 8, ..Default::default() };
         let state = MusicalState::default();
         let comp = crate::compose(&config, &state, 42);
         let scale = crate::pitch::build_scale(&state);
@@ -1573,11 +1480,7 @@ mod external_validation_tests {
 
     #[test]
     fn audio_quality_has_new_metrics() {
-        let config = MuseConfig {
-            duration_secs: 1.0,
-            max_notes: 4,
-            ..Default::default()
-        };
+        let config = MuseConfig { duration_secs: 1.0, max_notes: 4, ..Default::default() };
         let state = MusicalState::default();
         let comp = crate::compose(&config, &state, 42);
         let aq = match &comp.audio {
@@ -1599,11 +1502,7 @@ mod external_validation_tests {
     #[test]
     fn fad_self_distance_near_zero() {
         // FAD of a set against itself should be ~0
-        let config = MuseConfig {
-            duration_secs: 1.0,
-            max_notes: 4,
-            ..Default::default()
-        };
+        let config = MuseConfig { duration_secs: 1.0, max_notes: 4, ..Default::default() };
         let state = MusicalState::default();
 
         let mut compositions = Vec::new();
@@ -1626,18 +1525,10 @@ mod external_validation_tests {
 
     #[test]
     fn fad_different_sets_diverge() {
-        let config = MuseConfig {
-            duration_secs: 1.0,
-            max_notes: 4,
-            ..Default::default()
-        };
+        let config = MuseConfig { duration_secs: 1.0, max_notes: 4, ..Default::default() };
 
         // Set A: calm music
-        let calm = MusicalState {
-            arousal: 0.2,
-            valence: 0.5,
-            ..Default::default()
-        };
+        let calm = MusicalState { arousal: 0.2, valence: 0.5, ..Default::default() };
         let mut set_a = Vec::new();
         for seed in 0..3 {
             let comp = crate::compose(&config, &calm, seed);
@@ -1647,12 +1538,7 @@ mod external_validation_tests {
         }
 
         // Set B: intense music
-        let intense = MusicalState {
-            arousal: 0.9,
-            valence: -0.5,
-            dopamine: 0.8,
-            ..Default::default()
-        };
+        let intense = MusicalState { arousal: 0.9, valence: -0.5, dopamine: 0.8, ..Default::default() };
         let mut set_b = Vec::new();
         for seed in 10..13 {
             let comp = crate::compose(&config, &intense, seed);
@@ -1667,63 +1553,32 @@ mod external_validation_tests {
             assert!(
                 fad_cross.fad > fad_self.fad,
                 "Cross-set FAD ({:.2}) should exceed self FAD ({:.2})",
-                fad_cross.fad,
-                fad_self.fad,
+                fad_cross.fad, fad_self.fad,
             );
         }
     }
 
     #[test]
     fn full_quality_benchmark() {
-        let config = MuseConfig {
-            duration_secs: 6.0,
-            max_notes: 32,
-            ..Default::default()
-        };
+        let config = MuseConfig { duration_secs: 6.0, max_notes: 32, ..Default::default() };
 
         let scenarios: Vec<(&str, MusicalState)> = vec![
-            (
-                "Joyful",
-                MusicalState {
-                    arousal: 0.7,
-                    valence: 0.6,
-                    dopamine: 0.7,
-                    serotonin: 0.6,
-                    consciousness_level: 0.6,
-                    ..Default::default()
-                },
-            ),
-            (
-                "Tense",
-                MusicalState {
-                    arousal: 0.8,
-                    valence: -0.5,
-                    dopamine: 0.4,
-                    noradrenaline: 0.7,
-                    consciousness_level: 0.5,
-                    ..Default::default()
-                },
-            ),
-            (
-                "Melancholy",
-                MusicalState {
-                    arousal: 0.2,
-                    valence: -0.3,
-                    serotonin: 0.3,
-                    consciousness_level: 0.4,
-                    ..Default::default()
-                },
-            ),
-            (
-                "Serene",
-                MusicalState {
-                    arousal: 0.3,
-                    valence: 0.4,
-                    serotonin: 0.7,
-                    consciousness_level: 0.7,
-                    ..Default::default()
-                },
-            ),
+            ("Joyful", MusicalState {
+                arousal: 0.7, valence: 0.6, dopamine: 0.7, serotonin: 0.6,
+                consciousness_level: 0.6, ..Default::default()
+            }),
+            ("Tense", MusicalState {
+                arousal: 0.8, valence: -0.5, dopamine: 0.4, noradrenaline: 0.7,
+                consciousness_level: 0.5, ..Default::default()
+            }),
+            ("Melancholy", MusicalState {
+                arousal: 0.2, valence: -0.3, serotonin: 0.3,
+                consciousness_level: 0.4, ..Default::default()
+            }),
+            ("Serene", MusicalState {
+                arousal: 0.3, valence: 0.4, serotonin: 0.7,
+                consciousness_level: 0.7, ..Default::default()
+            }),
             ("Neutral", MusicalState::default()),
         ];
 
@@ -1752,40 +1607,21 @@ mod external_validation_tests {
                 }
             };
 
-            eprintln!(
-                "\n── {} ({} notes, {:.1}s) ──",
-                name,
-                comp.notes.len(),
-                comp.duration_secs
-            );
-            eprintln!(
-                "  Creative:  mel={:.3} rhy={:.3} emo={:.3} form={:.3} -> {:.3}",
-                creative.melodic_coherence,
-                creative.rhythmic_regularity,
-                creative.emotional_alignment,
-                creative.form_compliance,
-                creative.composite
-            );
-            eprintln!(
-                "  Audio:     rms={:.1}dB flat={:.3} dynVar={:.1}dB hnr={:.1}dB -> {:.3}",
-                audio.rms_db,
-                audio.spectral_flatness,
-                audio.dynamic_range_variation_db,
-                audio.harmonic_to_noise_db,
-                audio.composite
-            );
+            eprintln!("\n── {} ({} notes, {:.1}s) ──", name, comp.notes.len(), comp.duration_secs);
+            eprintln!("  Creative:  mel={:.3} rhy={:.3} emo={:.3} form={:.3} -> {:.3}",
+                creative.melodic_coherence, creative.rhythmic_regularity,
+                creative.emotional_alignment, creative.form_compliance, creative.composite);
+            eprintln!("  Audio:     rms={:.1}dB flat={:.3} dynVar={:.1}dB hnr={:.1}dB -> {:.3}",
+                audio.rms_db, audio.spectral_flatness,
+                audio.dynamic_range_variation_db, audio.harmonic_to_noise_db, audio.composite);
             let harmonic = HarmonicProgressionScore::evaluate(&comp.notes);
             eprintln!("  Theory:    scale={:.0}% p5={:.0}% grid={:.0}% range={:.0}% contour={:.0}% -> {:.3}",
                 theory.scale_adherence * 100.0, theory.parallel_fifth_avoidance * 100.0,
                 theory.rhythmic_quantization * 100.0, theory.voice_range_compliance * 100.0,
                 theory.phrase_contour_quality * 100.0, theory.composite);
-            eprintln!(
-                "  Harmonic:  strong={:.0}% resolve={:.0}% variety={:.0}% -> {:.3}",
-                harmonic.strong_progressions * 100.0,
-                harmonic.resolution_tendency * 100.0,
-                harmonic.harmonic_variety * 100.0,
-                harmonic.composite
-            );
+            eprintln!("  Harmonic:  strong={:.0}% resolve={:.0}% variety={:.0}% -> {:.3}",
+                harmonic.strong_progressions * 100.0, harmonic.resolution_tendency * 100.0,
+                harmonic.harmonic_variety * 100.0, harmonic.composite);
 
             total_creative += creative.composite;
             total_audio += audio.composite;
@@ -1810,14 +1646,8 @@ mod external_validation_tests {
         eprintln!("══════════════════════════════════════════════════\n");
 
         // Baseline assertions: overall should be at least 0.3
-        assert!(
-            overall > 0.2,
-            "Overall quality {overall:.3} is below minimum"
-        );
-        assert!(
-            avg_creative > 0.2,
-            "Creative quality too low: {avg_creative:.3}"
-        );
+        assert!(overall > 0.2, "Overall quality {overall:.3} is below minimum");
+        assert!(avg_creative > 0.2, "Creative quality too low: {avg_creative:.3}");
     }
 }
 
@@ -1849,12 +1679,7 @@ impl HarmonicProgressionScore {
     /// Evaluate harmonic progression quality from note sequence.
     pub fn evaluate(notes: &[Note]) -> Self {
         if notes.len() < 3 {
-            return Self {
-                strong_progressions: 0.5,
-                resolution_tendency: 0.5,
-                harmonic_variety: 0.5,
-                composite: 0.5,
-            };
+            return Self { strong_progressions: 0.5, resolution_tendency: 0.5, harmonic_variety: 0.5, composite: 0.5 };
         }
 
         // Classify each interval by root motion quality
@@ -1890,11 +1715,8 @@ impl HarmonicProgressionScore {
         // Harmonic variety: Shannon entropy of motion histogram
         let harmonic_variety = {
             let n = total as f32;
-            if n < 1.0 {
-                0.0
-            } else {
-                let entropy: f32 = motion_histogram
-                    .iter()
+            if n < 1.0 { 0.0 } else {
+                let entropy: f32 = motion_histogram.iter()
                     .filter(|&&c| c > 0)
                     .map(|&c| {
                         let p = c as f32 / n;
@@ -1906,16 +1728,12 @@ impl HarmonicProgressionScore {
             }
         };
 
-        let composite =
-            (0.45 * strong_progressions + 0.30 * resolution_tendency + 0.25 * harmonic_variety)
-                .clamp(0.0, 1.0);
+        let composite = (0.45 * strong_progressions
+            + 0.30 * resolution_tendency
+            + 0.25 * harmonic_variety)
+            .clamp(0.0, 1.0);
 
-        Self {
-            strong_progressions,
-            resolution_tendency,
-            harmonic_variety,
-            composite,
-        }
+        Self { strong_progressions, resolution_tendency, harmonic_variety, composite }
     }
 
     pub fn report(&self) -> String {
@@ -2017,19 +1835,9 @@ impl ABTestPair {
              Score delta: {:+.3} (positive = B is better)\n\
              WAV sizes: A={}KB, B={}KB",
             self.scenario,
-            if self.score_b.composite > self.score_a.composite {
-                "B leads"
-            } else {
-                "A leads"
-            },
-            self.label_a,
-            self.score_a.composite,
-            self.score_a.melodic_coherence,
-            self.score_a.emotional_alignment,
-            self.label_b,
-            self.score_b.composite,
-            self.score_b.melodic_coherence,
-            self.score_b.emotional_alignment,
+            if self.score_b.composite > self.score_a.composite { "B leads" } else { "A leads" },
+            self.label_a, self.score_a.composite, self.score_a.melodic_coherence, self.score_a.emotional_alignment,
+            self.label_b, self.score_b.composite, self.score_b.melodic_coherence, self.score_b.emotional_alignment,
             self.score_b.composite - self.score_a.composite,
             self.wav_a.len() / 1024,
             self.wav_b.len() / 1024,
@@ -2043,11 +1851,7 @@ mod harmonic_tests {
 
     #[test]
     fn harmonic_progression_on_composition() {
-        let config = MuseConfig {
-            duration_secs: 4.0,
-            max_notes: 16,
-            ..Default::default()
-        };
+        let config = MuseConfig { duration_secs: 4.0, max_notes: 16, ..Default::default() };
         let state = MusicalState::default();
         let comp = crate::compose(&config, &state, 42);
         let hp = HarmonicProgressionScore::evaluate(&comp.notes);
@@ -2060,56 +1864,26 @@ mod harmonic_tests {
     #[test]
     fn stepwise_motion_scores_high() {
         // Chromatic ascending scale = all stepwise = strong progressions
-        let notes: Vec<Note> = (0..8)
-            .map(|i| Note {
-                frequency: 261.63 * 2.0f32.powf(i as f32 / 12.0),
-                start_time: i as f32 * 0.5,
-                duration: 0.4,
-                velocity: 0.7,
-            })
-            .collect();
+        let notes: Vec<Note> = (0..8).map(|i| Note {
+            frequency: 261.63 * 2.0f32.powf(i as f32 / 12.0),
+            start_time: i as f32 * 0.5,
+            duration: 0.4,
+            velocity: 0.7,
+        }).collect();
         let hp = HarmonicProgressionScore::evaluate(&notes);
-        assert!(
-            hp.strong_progressions > 0.8,
-            "stepwise should score high: {}",
-            hp.strong_progressions
-        );
+        assert!(hp.strong_progressions > 0.8, "stepwise should score high: {}", hp.strong_progressions);
     }
 
     #[test]
     fn random_leaps_score_lower() {
         // Large random intervals = weak progressions
         let notes: Vec<Note> = vec![
-            Note {
-                frequency: 261.63,
-                start_time: 0.0,
-                duration: 0.5,
-                velocity: 0.7,
-            },
-            Note {
-                frequency: 493.88,
-                start_time: 0.5,
-                duration: 0.5,
-                velocity: 0.7,
-            }, // +11 semitones (M7)
-            Note {
-                frequency: 277.18,
-                start_time: 1.0,
-                duration: 0.5,
-                velocity: 0.7,
-            }, // -10 semitones
-            Note {
-                frequency: 523.25,
-                start_time: 1.5,
-                duration: 0.5,
-                velocity: 0.7,
-            }, // +11 semitones
+            Note { frequency: 261.63, start_time: 0.0, duration: 0.5, velocity: 0.7 },
+            Note { frequency: 493.88, start_time: 0.5, duration: 0.5, velocity: 0.7 }, // +11 semitones (M7)
+            Note { frequency: 277.18, start_time: 1.0, duration: 0.5, velocity: 0.7 }, // -10 semitones
+            Note { frequency: 523.25, start_time: 1.5, duration: 0.5, velocity: 0.7 }, // +11 semitones
         ];
         let hp = HarmonicProgressionScore::evaluate(&notes);
-        assert!(
-            hp.strong_progressions < 0.5,
-            "random leaps should score low: {}",
-            hp.strong_progressions
-        );
+        assert!(hp.strong_progressions < 0.5, "random leaps should score low: {}", hp.strong_progressions);
     }
 }

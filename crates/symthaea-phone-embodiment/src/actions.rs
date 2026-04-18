@@ -77,21 +77,9 @@ mod tests {
         // More impactful actions require higher Phi
         assert!(PhoneAction::NoOp.required_phi() < PhoneAction::Screenshot.required_phi());
         assert!(PhoneAction::Screenshot.required_phi() < PhoneAction::Back.required_phi());
-        assert!(
-            PhoneAction::Back.required_phi()
-                < PhoneAction::OpenUrl { url: String::new() }.required_phi()
-        );
-        assert!(
-            PhoneAction::OpenUrl { url: String::new() }.required_phi()
-                < PhoneAction::Tap { x: 0, y: 0 }.required_phi()
-        );
-        assert!(
-            PhoneAction::Tap { x: 0, y: 0 }.required_phi()
-                < PhoneAction::Type {
-                    text: String::new()
-                }
-                .required_phi()
-        );
+        assert!(PhoneAction::Back.required_phi() < PhoneAction::OpenUrl { url: String::new() }.required_phi());
+        assert!(PhoneAction::OpenUrl { url: String::new() }.required_phi() < PhoneAction::Tap { x: 0, y: 0 }.required_phi());
+        assert!(PhoneAction::Tap { x: 0, y: 0 }.required_phi() < PhoneAction::Type { text: String::new() }.required_phi());
     }
 
     #[test]
@@ -103,9 +91,6 @@ mod tests {
     #[test]
     fn test_tap_is_mutating() {
         assert!(PhoneAction::Tap { x: 100, y: 200 }.is_mutating());
-        assert!(PhoneAction::Type {
-            text: "hello".into()
-        }
-        .is_mutating());
+        assert!(PhoneAction::Type { text: "hello".into() }.is_mutating());
     }
 }

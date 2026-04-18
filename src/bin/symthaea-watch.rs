@@ -248,18 +248,9 @@ CREATE TABLE IF NOT EXISTS symthaea_cycles (\
   TTL ts + INTERVAL 30 DAY\
 ";
 
-async fn clickhouse_query(
-    client: &reqwest::Client,
-    base_url: &str,
-    db: &str,
-    sql: &str,
-) -> Result<()> {
+async fn clickhouse_query(client: &reqwest::Client, base_url: &str, db: &str, sql: &str) -> Result<()> {
     let url = format!("{}/?database={}", base_url, db);
-    let resp = client
-        .post(&url)
-        .body(sql.to_string())
-        .send()
-        .await
+    let resp = client.post(&url).body(sql.to_string()).send().await
         .context("ClickHouse request failed")?;
     let status = resp.status();
     if !status.is_success() {
@@ -276,24 +267,17 @@ async fn flush_to_clickhouse(
     table: &str,
     rows: &[CycleRow],
 ) -> Result<()> {
-    if rows.is_empty() {
-        return Ok(());
-    }
+    if rows.is_empty() { return Ok(()); }
     let mut body = String::with_capacity(rows.len() * 200);
     for row in rows {
         body.push_str(&serde_json::to_string(row)?);
         body.push('\n');
     }
-    let url = format!(
-        "{}/?database={}&query=INSERT+INTO+{}+FORMAT+JSONEachRow",
-        base_url, db, table
-    );
-    let resp = client
-        .post(&url)
+    let url = format!("{}/?database={}&query=INSERT+INTO+{}+FORMAT+JSONEachRow", base_url, db, table);
+    let resp = client.post(&url)
         .header("Content-Type", "application/octet-stream")
         .body(body)
-        .send()
-        .await
+        .send().await
         .context("ClickHouse insert failed")?;
     let status = resp.status();
     if !status.is_success() {
@@ -307,15 +291,10 @@ async fn flush_to_clickhouse(
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    tracing_subscriber::fmt()
-        .with_target(false)
-        .with_level(true)
-        .init();
+    tracing_subscriber::fmt().with_target(false).with_level(true).init();
 
     let args = Args::parse();
-    let http = reqwest::Client::builder()
-        .timeout(Duration::from_secs(10))
-        .build()?;
+    let http = reqwest::Client::builder().timeout(Duration::from_secs(10)).build()?;
 
     if args.init_db {
         info!("Initializing ClickHouse table {}…", args.table);
@@ -364,10 +343,7 @@ async fn main() -> Result<()> {
         };
         let mut service = match CognitiveLoopService::new(config) {
             Ok(s) => s,
-            Err(e) => {
-                error!("Failed to create CognitiveLoopService: {e}");
-                return;
-            }
+            Err(e) => { error!("Failed to create CognitiveLoopService: {e}"); return; }
         };
 
         // Drain safety alerts — log them as info, don't let the channel fill up
@@ -393,30 +369,22 @@ async fn main() -> Result<()> {
             let result = service.cycle(input);
             let m = &result.metadata;
             cycle_num += 1;
-            metrics_for_loop
-                .total_cycles
-                .fetch_add(1, Ordering::Relaxed);
+            metrics_for_loop.total_cycles.fetch_add(1, Ordering::Relaxed);
 
             let psi = m.consciousness.consciousness_level;
             *metrics_for_loop.last_consciousness.lock().unwrap() = psi;
             *metrics_for_loop.last_prediction_error.lock().unwrap() = result.prediction_error;
-            *metrics_for_loop.last_urgency.lock().unwrap() =
-                format!("{:?}", m.urgency).to_lowercase();
+            *metrics_for_loop.last_urgency.lock().unwrap() = format!("{:?}", m.urgency).to_lowercase();
 
             // Anomaly: consciousness collapse
             if psi < collapse_threshold {
                 collapse_streak += 1;
                 if collapse_streak >= collapse_window {
-                    metrics_for_loop
-                        .anomalies_detected
-                        .fetch_add(1, Ordering::Relaxed);
+                    metrics_for_loop.anomalies_detected.fetch_add(1, Ordering::Relaxed);
                     warn!(
-                        cycle = cycle_num,
-                        psi = psi,
-                        pe = result.prediction_error,
+                        cycle = cycle_num, psi = psi, pe = result.prediction_error,
                         "ANOMALY: consciousness collapse ({} consecutive cycles below {:.2})",
-                        collapse_streak,
-                        collapse_threshold
+                        collapse_streak, collapse_threshold
                     );
                     collapse_streak = 0;
                 }
@@ -527,8 +495,7 @@ async fn main() -> Result<()> {
     );
 
     let addr = format!("127.0.0.1:{}", args.metrics_port);
-    let listener = tokio::net::TcpListener::bind(&addr)
-        .await
+    let listener = tokio::net::TcpListener::bind(&addr).await
         .with_context(|| format!("Failed to bind metrics server on {addr}"))?;
 
     info!("Prometheus metrics at http://{addr}/metrics");

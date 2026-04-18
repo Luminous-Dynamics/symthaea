@@ -57,11 +57,7 @@ fn van_der_pol(s: &[f64], _t: f64) -> Vec<f64> {
 
 fn lorenz(s: &[f64], _t: f64) -> Vec<f64> {
     let (sigma, rho, beta) = (10.0f64, 28.0f64, 8.0 / 3.0);
-    vec![
-        sigma * (s[1] - s[0]),
-        s[0] * (rho - s[2]) - s[1],
-        s[0] * s[1] - beta * s[2],
-    ]
+    vec![sigma * (s[1] - s[0]), s[0] * (rho - s[2]) - s[1], s[0] * s[1] - beta * s[2]]
 }
 
 fn robertson(s: &[f64], _t: f64) -> Vec<f64> {
@@ -102,36 +98,12 @@ fn rk45(
     let a21 = 1.0 / 5.0;
     let (a31, a32) = (3.0 / 40.0, 9.0 / 40.0);
     let (a41, a42, a43) = (44.0 / 45.0, -56.0 / 15.0, 32.0 / 9.0);
-    let (a51, a52, a53, a54) = (
-        19372.0 / 6561.0,
-        -25360.0 / 2187.0,
-        64448.0 / 6561.0,
-        -212.0 / 729.0,
-    );
-    let (a61, a62, a63, a64, a65) = (
-        9017.0 / 3168.0,
-        -355.0 / 33.0,
-        46732.0 / 5247.0,
-        49.0 / 176.0,
-        -5103.0 / 18656.0,
-    );
+    let (a51, a52, a53, a54) = (19372.0 / 6561.0, -25360.0 / 2187.0, 64448.0 / 6561.0, -212.0 / 729.0);
+    let (a61, a62, a63, a64, a65) = (9017.0 / 3168.0, -355.0 / 33.0, 46732.0 / 5247.0, 49.0 / 176.0, -5103.0 / 18656.0);
     // 5th-order solution weights
-    let (b1, b3, b4, b5, b6) = (
-        35.0 / 384.0,
-        500.0 / 1113.0,
-        125.0 / 192.0,
-        -2187.0 / 6784.0,
-        11.0 / 84.0,
-    );
+    let (b1, b3, b4, b5, b6) = (35.0 / 384.0, 500.0 / 1113.0, 125.0 / 192.0, -2187.0 / 6784.0, 11.0 / 84.0);
     // Error coefficients (difference between 4th and 5th order)
-    let (e1, e3, e4, e5, e6, e7) = (
-        71.0 / 57600.0,
-        -71.0 / 16695.0,
-        71.0 / 1920.0,
-        -17253.0 / 339200.0,
-        22.0 / 525.0,
-        -1.0 / 40.0,
-    );
+    let (e1, e3, e4, e5, e6, e7) = (71.0 / 57600.0, -71.0 / 16695.0, 71.0 / 1920.0, -17253.0 / 339200.0, 22.0 / 525.0, -1.0 / 40.0);
 
     let n = y0.len();
     let mut t = t0;
@@ -142,37 +114,23 @@ fn rk45(
     let mut states = vec![y.clone()];
 
     for _ in 0..max_steps {
-        if t >= t_end {
-            break;
-        }
+        if t >= t_end { break; }
         h = h.min(t_end - t);
 
         let k1 = f(&y, t);
         let y2: Vec<f64> = (0..n).map(|i| y[i] + h * a21 * k1[i]).collect();
         let k2 = f(&y2, t + h / 5.0);
-        let y3: Vec<f64> = (0..n)
-            .map(|i| y[i] + h * (a31 * k1[i] + a32 * k2[i]))
-            .collect();
+        let y3: Vec<f64> = (0..n).map(|i| y[i] + h * (a31 * k1[i] + a32 * k2[i])).collect();
         let k3 = f(&y3, t + 3.0 * h / 10.0);
-        let y4: Vec<f64> = (0..n)
-            .map(|i| y[i] + h * (a41 * k1[i] + a42 * k2[i] + a43 * k3[i]))
-            .collect();
+        let y4: Vec<f64> = (0..n).map(|i| y[i] + h * (a41 * k1[i] + a42 * k2[i] + a43 * k3[i])).collect();
         let k4 = f(&y4, t + 4.0 * h / 5.0);
-        let y5: Vec<f64> = (0..n)
-            .map(|i| y[i] + h * (a51 * k1[i] + a52 * k2[i] + a53 * k3[i] + a54 * k4[i]))
-            .collect();
+        let y5: Vec<f64> = (0..n).map(|i| y[i] + h * (a51 * k1[i] + a52 * k2[i] + a53 * k3[i] + a54 * k4[i])).collect();
         let k5 = f(&y5, t + 8.0 * h / 9.0);
-        let y6: Vec<f64> = (0..n)
-            .map(|i| {
-                y[i] + h * (a61 * k1[i] + a62 * k2[i] + a63 * k3[i] + a64 * k4[i] + a65 * k5[i])
-            })
-            .collect();
+        let y6: Vec<f64> = (0..n).map(|i| y[i] + h * (a61 * k1[i] + a62 * k2[i] + a63 * k3[i] + a64 * k4[i] + a65 * k5[i])).collect();
         let k6 = f(&y6, t + h);
 
         // 5th-order solution
-        let yn: Vec<f64> = (0..n)
-            .map(|i| y[i] + h * (b1 * k1[i] + b3 * k3[i] + b4 * k4[i] + b5 * k5[i] + b6 * k6[i]))
-            .collect();
+        let yn: Vec<f64> = (0..n).map(|i| y[i] + h * (b1 * k1[i] + b3 * k3[i] + b4 * k4[i] + b5 * k5[i] + b6 * k6[i])).collect();
         let k7 = f(&yn, t + h);
 
         // Error estimate
@@ -180,8 +138,7 @@ fn rk45(
             let mut sq_sum = 0.0f64;
             for i in 0..n {
                 let sc = atol + rtol * y[i].abs().max(yn[i].abs());
-                let ei = h
-                    * (e1 * k1[i] + e3 * k3[i] + e4 * k4[i] + e5 * k5[i] + e6 * k6[i] + e7 * k7[i]);
+                let ei = h * (e1 * k1[i] + e3 * k3[i] + e4 * k4[i] + e5 * k5[i] + e6 * k6[i] + e7 * k7[i]);
                 sq_sum += (ei / sc).powi(2);
             }
             (sq_sum / n as f64).sqrt()
@@ -195,11 +152,7 @@ fn rk45(
         }
 
         // Step-size control (PI controller)
-        let factor = if err < 1e-15 {
-            5.0
-        } else {
-            (0.9 * err.powf(-0.2)).clamp(0.1, 5.0)
-        };
+        let factor = if err < 1e-15 { 5.0 } else { (0.9 * err.powf(-0.2)).clamp(0.1, 5.0) };
         h *= factor;
     }
 
@@ -230,16 +183,8 @@ impl OdeChaosBenchmark {
         let min_x = stable.iter().map(|s| s[0]).fold(f64::INFINITY, f64::min);
 
         let van_der_pol_amplitude = if max_x > 1.5 && max_x < 2.5 { 1.0 } else { 0.0 };
-        let van_der_pol_oscillation = if min_x < -1.0 && max_x > 1.0 {
-            1.0
-        } else {
-            0.0
-        };
-        let van_der_pol_complete = if vdp_times.last().copied().unwrap_or(0.0) > 25.0 {
-            1.0
-        } else {
-            0.5
-        };
+        let van_der_pol_oscillation = if min_x < -1.0 && max_x > 1.0 { 1.0 } else { 0.0 };
+        let van_der_pol_complete = if vdp_times.last().copied().unwrap_or(0.0) > 25.0 { 1.0 } else { 0.5 };
 
         // ── 2. Lorenz attractor ────────────────────────────────────────────
         let (_, lorenz_states) = rk45(
@@ -253,33 +198,21 @@ impl OdeChaosBenchmark {
         );
 
         let n_lor = lorenz_states.len();
-        let in_bounds = lorenz_states
-            .iter()
-            .filter(|s| s[0].abs() <= 25.0 && s[1].abs() <= 35.0 && s[2] >= -1.0 && s[2] <= 56.0)
-            .count();
-        let lorenz_bounds = if n_lor > 0 {
-            in_bounds as f64 / n_lor as f64
-        } else {
-            0.0
-        };
+        let in_bounds = lorenz_states.iter().filter(|s| {
+            s[0].abs() <= 25.0 && s[1].abs() <= 35.0 && s[2] >= -1.0 && s[2] <= 56.0
+        }).count();
+        let lorenz_bounds = if n_lor > 0 { in_bounds as f64 / n_lor as f64 } else { 0.0 };
 
         // Time-averaged z ≈ ρ-1 = 27 (skip transient first 20%)
         let skip = n_lor / 5;
         let mean_z = if n_lor > skip + 10 {
             lorenz_states[skip..].iter().map(|s| s[2]).sum::<f64>() / (n_lor - skip) as f64
-        } else {
-            0.0
-        };
-        let lorenz_statistics = if mean_z > 20.0 && mean_z < 35.0 {
-            1.0
-        } else {
-            0.0
-        };
+        } else { 0.0 };
+        let lorenz_statistics = if mean_z > 20.0 && mean_z < 35.0 { 1.0 } else { 0.0 };
 
-        let max_r = lorenz_states
-            .iter()
-            .map(|s| (s[0] * s[0] + s[1] * s[1] + s[2] * s[2]).sqrt())
-            .fold(0.0f64, f64::max);
+        let max_r = lorenz_states.iter().map(|s| {
+            (s[0]*s[0] + s[1]*s[1] + s[2]*s[2]).sqrt()
+        }).fold(0.0f64, f64::max);
         let lorenz_bounded = if max_r < 70.0 { 1.0 } else { 0.0 };
 
         // ── 3. Robertson chemistry ─────────────────────────────────────────
@@ -294,42 +227,23 @@ impl OdeChaosBenchmark {
         );
 
         let max_cons_err = if !rob_states.is_empty() {
-            rob_states
-                .iter()
-                .map(|s| (s[0] + s[1] + s[2] - 1.0).abs())
-                .fold(0.0f64, f64::max)
-        } else {
-            1.0
-        };
-        let robertson_conservation = if max_cons_err < 1e-4 {
-            1.0
-        } else if max_cons_err < 0.01 {
-            0.5
-        } else {
-            0.0
-        };
+            rob_states.iter().map(|s| (s[0] + s[1] + s[2] - 1.0).abs()).fold(0.0f64, f64::max)
+        } else { 1.0 };
+        let robertson_conservation = if max_cons_err < 1e-4 { 1.0 } else if max_cons_err < 0.01 { 0.5 } else { 0.0 };
 
         // y2 (intermediate) should remain much smaller than y1 and y3
         let robertson_species = if let Some(final_s) = rob_states.last() {
             let y2_reasonable = final_s[1] < 1e-2;
             let sum_ok = (final_s[0] + final_s[1] + final_s[2] - 1.0).abs() < 1e-4;
-            if y2_reasonable && sum_ok {
-                1.0
-            } else if sum_ok {
-                0.7
-            } else {
-                0.3
-            }
-        } else {
-            0.0
-        };
+            if y2_reasonable && sum_ok { 1.0 } else if sum_ok { 0.7 } else { 0.3 }
+        } else { 0.0 };
 
         // ── 4. Coupled oscillators (energy conservation) ───────────────────
         let y0_osc = [1.0, 0.0, 0.0, 0.0f64];
         let (omega1_sq, omega2_sq, kappa) = (1.0f64, 1.1f64, 0.05f64);
         let energy = |s: &[f64]| -> f64 {
-            0.5 * (s[1] * s[1] + s[3] * s[3])
-                + 0.5 * (omega1_sq * s[0] * s[0] + omega2_sq * s[2] * s[2])
+            0.5 * (s[1]*s[1] + s[3]*s[3])
+                + 0.5 * (omega1_sq * s[0]*s[0] + omega2_sq * s[2]*s[2])
                 + 0.5 * kappa * (s[0] - s[2]).powi(2)
         };
         let e0 = energy(&y0_osc);
@@ -344,20 +258,14 @@ impl OdeChaosBenchmark {
             500_000,
         );
 
-        let max_err = osc_states
-            .iter()
-            .map(|s| ((energy(s) - e0) / e0.max(1e-15)).abs())
-            .fold(0.0f64, f64::max);
+        let max_err = osc_states.iter().map(|s| {
+            ((energy(s) - e0) / e0.max(1e-15)).abs()
+        }).fold(0.0f64, f64::max);
 
-        let oscillator_energy = if max_err < 0.001 {
-            1.0
-        } else if max_err < 0.01 {
-            0.8
-        } else if max_err < 0.1 {
-            0.5
-        } else {
-            0.0
-        };
+        let oscillator_energy = if max_err < 0.001 { 1.0 }
+            else if max_err < 0.01 { 0.8 }
+            else if max_err < 0.1 { 0.5 }
+            else { 0.0 };
 
         TrialResult {
             van_der_pol_amplitude,
@@ -406,42 +314,15 @@ impl PsychBenchmark for OdeChaosBenchmark {
             osc_e.push(r.oscillator_energy);
         }
 
-        result.insert(
-            "vdp_limit_cycle_amplitude",
-            MetricValue::from_samples(&vdp_amp),
-        );
-        result.insert(
-            "vdp_sustained_oscillation",
-            MetricValue::from_samples(&vdp_osc),
-        );
-        result.insert(
-            "vdp_integration_complete",
-            MetricValue::from_samples(&vdp_done),
-        );
-        result.insert(
-            "lorenz_attractor_bounds",
-            MetricValue::from_samples(&lor_bounds),
-        );
-        result.insert(
-            "lorenz_mean_z_statistics",
-            MetricValue::from_samples(&lor_stats),
-        );
-        result.insert(
-            "lorenz_trajectory_bounded",
-            MetricValue::from_samples(&lor_bound),
-        );
-        result.insert(
-            "robertson_conservation_law",
-            MetricValue::from_samples(&rob_cons),
-        );
-        result.insert(
-            "robertson_species_ordering",
-            MetricValue::from_samples(&rob_sp),
-        );
-        result.insert(
-            "coupled_oscillator_energy",
-            MetricValue::from_samples(&osc_e),
-        );
+        result.insert("vdp_limit_cycle_amplitude", MetricValue::from_samples(&vdp_amp));
+        result.insert("vdp_sustained_oscillation", MetricValue::from_samples(&vdp_osc));
+        result.insert("vdp_integration_complete", MetricValue::from_samples(&vdp_done));
+        result.insert("lorenz_attractor_bounds", MetricValue::from_samples(&lor_bounds));
+        result.insert("lorenz_mean_z_statistics", MetricValue::from_samples(&lor_stats));
+        result.insert("lorenz_trajectory_bounded", MetricValue::from_samples(&lor_bound));
+        result.insert("robertson_conservation_law", MetricValue::from_samples(&rob_cons));
+        result.insert("robertson_species_ordering", MetricValue::from_samples(&rob_sp));
+        result.insert("coupled_oscillator_energy", MetricValue::from_samples(&osc_e));
 
         result.conditions = 4; // VdP, Lorenz, Robertson, Oscillators
         result.trials_per_condition = n;
@@ -464,11 +345,7 @@ mod tests {
     use super::*;
 
     fn cfg() -> BenchmarkConfig {
-        BenchmarkConfig {
-            dimension: 256,
-            trials_per_condition: 2,
-            ..Default::default()
-        }
+        BenchmarkConfig { dimension: 256, trials_per_condition: 2, ..Default::default() }
     }
 
     #[test]
@@ -493,17 +370,13 @@ mod tests {
     fn test_robertson_conservation_at_origin() {
         // d(y1+y2+y3)/dt = 0 identically
         let r = robertson(&[1.0, 0.0, 0.0], 0.0);
-        assert!(
-            (r[0] + r[1] + r[2]).abs() < 1e-10,
-            "sum = {}",
-            r[0] + r[1] + r[2]
-        );
+        assert!((r[0]+r[1]+r[2]).abs() < 1e-10, "sum = {}", r[0]+r[1]+r[2]);
     }
 
     #[test]
     fn test_robertson_conservation_midway() {
         let r = robertson(&[0.5, 1e-5, 0.5 - 1e-5], 1.0);
-        assert!((r[0] + r[1] + r[2]).abs() < 1e-6);
+        assert!((r[0]+r[1]+r[2]).abs() < 1e-6);
     }
 
     #[test]
@@ -513,26 +386,13 @@ mod tests {
         assert!(!ts.is_empty());
         let t = ts.last().unwrap();
         let y = ys.last().unwrap()[0];
-        assert!(
-            (y - (-t).exp()).abs() < 1e-5,
-            "y={} expected={}",
-            y,
-            (-t).exp()
-        );
+        assert!((y - (-t).exp()).abs() < 1e-5, "y={} expected={}", y, (-t).exp());
     }
 
     #[test]
     fn test_rk45_harmonic_oscillator() {
         // d²x/dt² = -x → x(π) = cos(π) = -1
-        let (ts, ys) = rk45(
-            |s, _| vec![s[1], -s[0]],
-            &[1.0, 0.0],
-            0.0,
-            std::f64::consts::PI,
-            1e-8,
-            1e-10,
-            50000,
-        );
+        let (ts, ys) = rk45(|s, _| vec![s[1], -s[0]], &[1.0, 0.0], 0.0, std::f64::consts::PI, 1e-8, 1e-10, 50000);
         let y_final = ys.last().unwrap()[0];
         assert!((y_final + 1.0).abs() < 1e-4, "x(π)={}", y_final);
     }
@@ -549,17 +409,10 @@ mod tests {
     #[test]
     fn test_oscillator_energy_conservation() {
         let y0 = [1.0, 0.0, 0.0, 0.0f64];
-        let e = |s: &[f64]| {
-            0.5 * (s[1] * s[1] + s[3] * s[3])
-                + 0.5 * (s[0] * s[0] + 1.1 * s[2] * s[2])
-                + 0.025 * (s[0] - s[2]).powi(2)
-        };
+        let e = |s: &[f64]| 0.5*(s[1]*s[1]+s[3]*s[3]) + 0.5*(s[0]*s[0]+1.1*s[2]*s[2]) + 0.025*(s[0]-s[2]).powi(2);
         let e0 = e(&y0);
         let (_, states) = rk45(coupled_oscillators, &y0, 0.0, 50.0, 1e-8, 1e-10, 200_000);
-        let max_err = states
-            .iter()
-            .map(|s| ((e(s) - e0) / e0).abs())
-            .fold(0.0f64, f64::max);
+        let max_err = states.iter().map(|s| ((e(s)-e0)/e0).abs()).fold(0.0f64, f64::max);
         assert!(max_err < 0.01, "energy err = {:.2e}", max_err);
     }
 

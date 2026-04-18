@@ -406,6 +406,9 @@ pub struct SwarmManager {
     coalition_cycle_counter: u32,
     peer_blanket_permeability: Vec<(String, f64)>,
 
+    /// Swarm consciousness state (computed after coalition identification).
+    pub swarm_consciousness: super::swarm_consciousness::SwarmConsciousness,
+
     // ── Distress tracking ──────────────────────────────────────────────
     /// Number of distress signals received (monotonic).
     distress_signals_received: u32,
@@ -483,6 +486,7 @@ impl Default for SwarmManager {
             active_coalitions: Vec::new(),
             coalition_cycle_counter: 0,
             peer_blanket_permeability: Vec::new(),
+            swarm_consciousness: Default::default(),
             last_telemetry: SwarmTelemetry::default(),
             #[cfg(feature = "fhe-wisdom")]
             wisdom_pool: symthaea_core::hdc::hdc_fhe::CollectiveWisdomPool::new(),
@@ -750,11 +754,31 @@ impl SwarmManager {
             &edges,
             Self::COALITION_PERMEABILITY_THRESHOLD,
         );
+        // Recompute swarm consciousness after coalition identification
+        self.swarm_consciousness = super::swarm_consciousness::SwarmConsciousness::compute(
+            &self.active_coalitions,
+            self.mean_peer_phi(),
+            None, // self_id not tracked here; set by the cognitive loop
+        );
         self.active_coalitions.len()
     }
 
     pub fn coalitions(&self) -> &[crate::consciousness::fep_active_inference::SwarmCoalition] {
         &self.active_coalitions
+    }
+
+    /// Effective Phi for this agent, incorporating swarm delegation.
+    ///
+    /// Returns max(individual_phi, swarm-delegated Phi) when in a conscious collective.
+    pub fn effective_phi(&self, individual_phi: f64) -> f64 {
+        if self.swarm_consciousness.delegation.in_conscious_collective {
+            let alpha = 0.3;
+            let blended =
+                alpha * self.swarm_consciousness.phi_swarm + (1.0 - alpha) * individual_phi;
+            blended.max(individual_phi)
+        } else {
+            individual_phi
+        }
     }
 
     pub fn conscious_collective_count(&self) -> usize {

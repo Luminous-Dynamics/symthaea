@@ -25,11 +25,7 @@ pub fn gamma_matrix(mu: usize, i: usize, j: usize) -> (f64, f64) {
         0 => {
             // γ⁰ = diag(1, 1, -1, -1)
             if i == j {
-                if i < 2 {
-                    (1.0, 0.0)
-                } else {
-                    (-1.0, 0.0)
-                }
+                if i < 2 { (1.0, 0.0) } else { (-1.0, 0.0) }
             } else {
                 (0.0, 0.0)
             }
@@ -178,11 +174,7 @@ mod tests {
         let split = fine_structure_splitting(2, 1, 1);
         assert!(split > 0.0, "Fine structure should exist: {:.2e}", split);
         // Should be of order α⁴ ≈ 3e-9
-        assert!(
-            split < 1e-4,
-            "Fine structure should be small: {:.2e}",
-            split
-        );
+        assert!(split < 1e-4, "Fine structure should be small: {:.2e}", split);
     }
 
     #[test]

@@ -1,0 +1,33 @@
+fixture,source,category,fragment,tactic,bytes,z3_result,lake_check,note
+mathd_algebra_109,Valid/mathd_algebra_109.lean,linear_real,LRA,linarith,1439,unsat,accepted,(a b : ℝ) (h₀ : 3a + 2b = 12) (h₁ : a = 4) : b = 0
+mathd_algebra_119,Valid/mathd_algebra_119.lean,linear_real,LRA,linarith,1453,unsat,accepted,(d e : ℝ) (h₀ : 2d = 17e - 8) (h₁ : 2e = d - 9) : e = 2
+mathd_algebra_126,Valid/mathd_algebra_126.lean,linear_real,LRA,linarith,2287,unsat,accepted,(x y : ℝ) (h₀ : 2*3 = x - 9) (h₁ : 2*-5 = y + 1) : x = 15 ∧ y = -11
+mathd_algebra_142,Test/mathd_algebra_142.lean,linear_real,LRA,linarith,1447,unsat,accepted,(m b : ℝ) (h₀ : 7m + b = -1) (h₁ : -m + b = 7) : m + b = 5
+mathd_algebra_160,Test/mathd_algebra_160.lean,linear_real,LRA,linarith,1455,unsat,accepted,(n x : ℝ) (h₀ : n + x = 97) (h₁ : n + 5x = 265) : n + 2x = 139
+mathd_algebra_329,Test/mathd_algebra_329.lean,linear_real,LRA,linarith,1451,unsat,accepted,(x y : ℝ) (h₀ : 3y = x) (h₁ : 2x + 5y = 11) : x + y = 4
+mathd_algebra_354,Test/mathd_algebra_354.lean,linear_real,LRA,linarith,1464,unsat,accepted,(a d : ℝ) (h₀ : a + 6d = 30) (h₁ : a + 10d = 60) : a + 20d = 135
+mathd_algebra_359,Test/mathd_algebra_359.lean,linear_real,LRA,linarith,1036,unsat,accepted,(y : ℝ) (h₀ : y + 6 + y = 2*12) : y = 9
+mathd_algebra_388,Test/mathd_algebra_388.lean,linear_real,LRA,linarith,1956,unsat,accepted,(x y z : ℝ) (h₀ : 3x+4y-12z = 10) (h₁ : -2x-3y+9z = -4) : x = 14
+mathd_algebra_455,Valid/mathd_algebra_455.lean,linear_real,LRA,linarith,1046,unsat,accepted,(x : ℝ) (h₀ : 2*(2*(2*(2*x))) = 48) : x = 3
+mathd_algebra_51,Valid/mathd_algebra_51.lean,linear_real,LRA,linarith,1487,unsat,accepted,(a b : ℝ) (h₀ : 0<a ∧ 0<b) (h₁ : a+b=35) (h₂ : a = 2/5 * b) : b - a = 15
+mathd_algebra_24,Test/mathd_algebra_24.lean,linear_real,LRA,linarith,1025,unsat,accepted,(x : ℝ) (h₀ : x/50 = 40) : x = 2000
+mathd_algebra_190,Valid/mathd_algebra_190.lean,closed_form_rational,QF_LRA,linarith,845,unsat,accepted,((3:ℝ)/8 + 7/8) / (4/5) = 25/16
+mathd_algebra_462,Valid/mathd_algebra_462.lean,closed_form_rational,QF_NRA,nlinarith,873,unsat,accepted,((1:ℚ)/2 + 1/3) * (1/2 - 1/3) = 5/36 (translated as ℝ)
+mathd_algebra_304,Test/mathd_algebra_304.lean,closed_form_rational,QF_LIA,omega,754,unsat,accepted,91^2 = 8281 (ℕ; translated as ℤ)
+mathd_algebra_104,Valid/mathd_algebra_104.lean,closed_form_rational,LRA,linarith,1066,unsat,accepted,(x : ℝ) (h₀ : 125/8 = x/12) : x = 375/2
+mathd_algebra_55,Valid/mathd_algebra_55.lean,closed_form_rational,NRA,nlinarith,1848,unsat,accepted,(q p : ℝ) (h₀ : q = 2-4+6-8+10-12+14) (h₁ : p = 3-6+9-12+15-18+21) : q/p = 2/3
+mathd_algebra_176,Test/mathd_algebra_176.lean,polynomial_identity,NRA,nlinarith,1048,unsat,accepted,(x : ℝ) : (x+1)^2 * x = x^3 + 2x^2 + x
+mathd_algebra_107,Test/mathd_algebra_107.lean,polynomial_identity,NRA,nlinarith,1487,unsat,accepted,(x y : ℝ) (h₀ : x²+8x+y²-6y = 0) : (x+4)² + (y-3)² = 5²
+mathd_algebra_568,Valid/mathd_algebra_568.lean,polynomial_identity,NRA,nlinarith,1078,unsat,accepted,(a : ℝ) : (a-1)(a+1)(a+2) - (a-2)(a+1) = a^3 + a^2
+mathd_algebra_182,Valid/mathd_algebra_182.lean,polynomial_identity,LRA,linarith,1037,unsat,accepted,7 * (3y + 2) = 21y + 14 (original ℂ; translated as ℝ identity)
+mathd_algebra_101,Valid/mathd_algebra_101.lean,polynomial_inequality,NRA,nlinarith,1515,unsat,accepted,(x : ℝ) (h₀ : x^2 - 5x - 4 ≤ 10) : x ≥ -2 ∧ x ≤ 7
+mathd_algebra_113,Test/mathd_algebra_113.lean,polynomial_inequality,NRA,nlinarith,1060,unsat,accepted,(x : ℝ) : x² - 14x + 3 ≥ 7² - 14*7 + 3
+mathd_algebra_410,Valid/mathd_algebra_410.lean,polynomial_inequality,NRA,nlinarith,1430,timeout,accepted,(x y : ℝ) (h₀ : y = x² - 6x + 13) : 4 ≤ y
+mathd_algebra_37,Valid/mathd_algebra_37.lean,polynomial_system,NRA,nlinarith,1457,unsat,accepted,(x y : ℝ) (h₀ : x+y=7) (h₁ : 3x+y=45) : x² - y² = 217
+mathd_algebra_141,Test/mathd_algebra_141.lean,polynomial_system,NRA,nlinarith,1460,unsat,accepted,(a b : ℝ) (h₁ : ab=180) (h₂ : 2(a+b)=54) : a² + b² = 369
+mathd_algebra_234,Valid/mathd_algebra_234.lean,polynomial_system,NRA,nlinarith,1121,unsat,accepted,(d : ℝ) (h₀ : 27/125 * d = 9/25) : 3/5 * d^3 = 25/9
+mathd_algebra_338,Test/mathd_algebra_338.lean,polynomial_system,NRA,nlinarith,1972,unsat,rejected,(a b c : ℝ) 3a+b+c=-3; a+3b+c=9; a+b+3c=19 → abc=-56
+mathd_numbertheory_136,Valid/mathd_numbertheory_136.lean,numbertheory_int,LIA,omega,1040,unsat,accepted,(n : ℕ) (h₀ : 123n + 17 = 39500) : n = 321
+mathd_numbertheory_326,Valid/mathd_numbertheory_326.lean,numbertheory_int,NIA,omega_nat,1058,unsat,accepted,(n : ℤ) (h₀ : (n-1)*n*(n+1) = 720) : n + 1 = 10
+mathd_numbertheory_48,Valid/mathd_numbertheory_48.lean,numbertheory_int,NIA,omega_nat,1071,unsat,accepted,(b : ℕ) (h₀ : 0 < b) (h₁ : 3b² + 2b + 1 = 57) : b = 4
+mathd_algebra_123,Valid/mathd_algebra_123.lean,numbertheory_int,LIA,omega,1465,unsat,accepted,(a b : ℕ) (0<a ∧ 0<b) (a+b=20) (a=3b) : a - b = 10

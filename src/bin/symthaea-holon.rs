@@ -16,6 +16,7 @@
 //! ## Environment Variables
 //!
 //! - `HOLON_PORT` — HTTP port (default: 7778)
+//! - `HOLON_QUIC_PORT` — QUIC port for Phase I.C transport (default: `HOLON_PORT + 1`)
 //! - `HOLON_HZ` — Consciousness loop frequency in Hz (default: 20)
 //! - `HOLON_LISTEN` — Listen address (default: 127.0.0.1)
 //! - `HOLON_TOKEN` — Optional shared token for all endpoints (recommended if binding to LAN)
@@ -38,6 +39,8 @@ use tracing::{info, warn};
 
 use symthaea::api::holon::{holon_router, HolonHttpState};
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
+#[cfg(feature = "holon-quic")]
+use symthaea::swarm::quic_transport::{default_quic_port, spawn_holon_quic_server};
 
 fn env_truthy(key: &str) -> bool {
     std::env::var(key)
@@ -107,6 +110,11 @@ async fn main() -> Result<()> {
 
     let addr = format!("{}:{}", listen, port);
     let cycle_interval = std::time::Duration::from_micros(1_000_000 / cycle_hz as u64);
+    #[cfg(feature = "holon-quic")]
+    let quic_port: u16 = std::env::var("HOLON_QUIC_PORT")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or_else(|| default_quic_port(port));
 
     // Secure-by-default: if binding to a non-loopback interface, require an auth token.
     let require_token = !listen_is_loopback(&listen) && !insecure_allow_unauth;
@@ -165,6 +173,29 @@ async fn main() -> Result<()> {
             tracing::error!("Holon HTTP server error: {}", e);
         }
     });
+
+    #[cfg(feature = "holon-quic")]
+    let _quic_server = {
+        let quic_addr = std::net::SocketAddr::new(
+            listen
+                .parse()
+                .unwrap_or(std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST)),
+            quic_port,
+        );
+        match spawn_holon_quic_server(holon_http_state.clone(), quic_addr) {
+            Ok(server) => {
+                info!(
+                    "Holon QUIC transport active on quic://{}",
+                    server.local_addr
+                );
+                Some(server)
+            }
+            Err(error) => {
+                warn!(%error, "Holon QUIC transport disabled");
+                None
+            }
+        }
+    };
 
     // Wire Iroh P2P — creates NetworkService, initializes Ed25519 attestation,
     // spawns NetworkServiceBridge so SwarmEvents flow into the CLS each cycle.
@@ -319,8 +350,7 @@ async fn main() -> Result<()> {
     // The actor runs as an async tokio task; the handle is passed to the blocking loop.
     #[cfg(feature = "mesh")]
     let (mut mesh_bridge_handle, mesh_outbound_rx) = {
-        use symthaea::swarm::mesh::bridge::MeshBridgeHandle;
-        use symthaea::swarm::mesh::{DualLayerMesh, MeshReceiver};
+        use symthaea::swarm::mesh::{DualLayerMesh, MeshBridgeHandle, MeshReceiver};
 
         // Derive a stable node_id from our Iroh public key, or fall back to pid-seeded bytes.
         let node_id_bytes: [u8; 32] = cls
@@ -462,7 +492,7 @@ async fn main() -> Result<()> {
             // Drain mesh bridge — forward CLS outbound packets and receive inbound wisdom.
             #[cfg(feature = "mesh")]
             {
-                use symthaea::cognitive_loop::managers::swarm_manager::SwarmEvent;
+                use symthaea::cognitive_loop::SwarmEvent;
 
                 // Inbound: wisdom from mesh peers → SwarmEvent for the CLS.
                 let inbound = mesh_bridge_handle.drain_inbox();

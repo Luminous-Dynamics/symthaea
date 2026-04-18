@@ -101,6 +101,9 @@ pub mod resonance_graph;
 #[cfg(feature = "mesh")]
 pub mod web_of_trust;
 
+/// Holon QUIC transport for RDP datagrams + reliable control streams.
+#[cfg(feature = "holon-quic")]
+pub mod quic_transport;
 /// Adaptive quality engine (AIMD + consciousness tiers).
 pub mod rdp_adaptive;
 /// Audio capture and playback with consciousness-gated quality.
@@ -143,6 +146,10 @@ pub mod rdp_support_bridge;
 pub mod rdp_transport;
 /// Unattended access daemon (MFDI-gated, time-bounded, audit-logged).
 pub mod rdp_unattended;
+/// Binary wire envelope for RDP (bincode + ChaCha20-Poly1305 via packet_crypto).
+pub mod rdp_wire;
+/// Sliding-window replay protection for AEAD-sealed streams (RDP + future mesh).
+pub mod replay_window;
 
 // Re-exports
 pub use config::{

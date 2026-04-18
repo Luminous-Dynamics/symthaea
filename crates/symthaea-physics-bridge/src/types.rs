@@ -214,6 +214,74 @@ impl DimensionalSignature {
         amount: 0,
         luminous: 0,
     };
+
+    // ─── Dimensional arithmetic ─────────────────────────────────────────
+    //
+    // These operations let dimensional inference walk an expression tree.
+    // Multiplication of two quantities adds their dimensions; division
+    // subtracts; raising to an integer power scales.
+
+    /// Construct from a 7-element exponent array `[M, L, T, I, Θ, N, J]`.
+    pub fn from_array(exponents: [i8; 7]) -> Self {
+        Self {
+            mass: exponents[0],
+            length: exponents[1],
+            time: exponents[2],
+            current: exponents[3],
+            temperature: exponents[4],
+            amount: exponents[5],
+            luminous: exponents[6],
+        }
+    }
+
+    /// Add two dimensional signatures element-wise (corresponds to multiplying
+    /// quantities: `m·v` has dimensions M + (LT⁻¹) = M¹L¹T⁻¹).
+    ///
+    /// Returns a new signature; does not mutate `self`.
+    pub fn add(&self, other: &Self) -> Self {
+        Self {
+            mass: self.mass + other.mass,
+            length: self.length + other.length,
+            time: self.time + other.time,
+            current: self.current + other.current,
+            temperature: self.temperature + other.temperature,
+            amount: self.amount + other.amount,
+            luminous: self.luminous + other.luminous,
+        }
+    }
+
+    /// Subtract two dimensional signatures (corresponds to dividing
+    /// quantities: `F/m` has dimensions (MLT⁻²) − M = LT⁻²).
+    pub fn sub(&self, other: &Self) -> Self {
+        Self {
+            mass: self.mass - other.mass,
+            length: self.length - other.length,
+            time: self.time - other.time,
+            current: self.current - other.current,
+            temperature: self.temperature - other.temperature,
+            amount: self.amount - other.amount,
+            luminous: self.luminous - other.luminous,
+        }
+    }
+
+    /// Scale a dimensional signature by an integer factor (corresponds to
+    /// raising a quantity to a power: `v²` has dimensions 2·(LT⁻¹) = L²T⁻²).
+    ///
+    /// Returns `None` if any resulting exponent would overflow `i8`.
+    pub fn scale(&self, factor: i8) -> Option<Self> {
+        let arr = self.as_array();
+        let mut out = [0i8; 7];
+        for i in 0..7 {
+            out[i] = arr[i].checked_mul(factor)?;
+        }
+        Some(Self::from_array(out))
+    }
+
+    /// Whether two signatures are equal (alias for `==`, but spelled
+    /// out for use sites that prefer explicit method calls).
+    pub fn matches(&self, other: &Self) -> bool {
+        self == other
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -143,7 +143,7 @@ impl VisionManifold {
             error_ema: 0.0,
             predictive,
             learning_frozen: false,
-            scene_memory: None,  // Enabled externally via enable_scene_memory()
+            scene_memory: None, // Enabled externally via enable_scene_memory()
             object_memory: None, // Enabled externally via enable_object_memory()
             next_track_id: 0,
             last_tracking_result: None,
@@ -223,8 +223,13 @@ impl VisionManifold {
         // (need to establish initial object tracks) OR object memory has no tracks
         // (need to discover objects). The 0.01 threshold is very conservative —
         // only skip clustering for truly static, fully-predicted scenes.
-        let has_tracks = self.object_memory.as_ref().map_or(false, |m| !m.is_empty());
-        let scene_changed = self.prediction_error > 0.01 || self.frame_count < 10 || !has_tracks;
+        let has_tracks = self
+            .object_memory
+            .as_ref()
+            .map_or(false, |m| !m.is_empty());
+        let scene_changed = self.prediction_error > 0.01
+            || self.frame_count < 10
+            || !has_tracks;
 
         // P3-E: Object-level binding — replace the bag-of-words frame HV with
         // a relationally-structured HV that encodes *where* each perceptual
@@ -242,10 +247,7 @@ impl VisionManifold {
         // Saved hypotheses for downstream use (working memory, scene graph).
         let mut saved_hypotheses: Vec<crate::types::ObjectHypothesis> = Vec::new();
 
-        let bound_frame_hv = if self.config.enable_object_binding
-            && patch_hvs.len() >= 2
-            && scene_changed
-        {
+        let bound_frame_hv = if self.config.enable_object_binding && patch_hvs.len() >= 2 && scene_changed {
             let grid = self.encoder.grid_for(width, height);
             let mut hypotheses = Self::cluster_patches(&patch_hvs, &grid);
 
@@ -351,8 +353,7 @@ impl VisionManifold {
                         .filter(|t| wm_track_ids.contains(&t.track_id))
                         .collect();
                     // Collect into owned for update() signature
-                    let owned: Vec<TrackedObject> =
-                        wm_tracks.iter().map(|t| (*t).clone()).collect();
+                    let owned: Vec<TrackedObject> = wm_tracks.iter().map(|t| (*t).clone()).collect();
                     sg.update(&owned);
                 } else {
                     sg.update(tracks);
@@ -386,8 +387,14 @@ impl VisionManifold {
                 .as_ref()
                 .map_or(0.0, |m| m.similarity),
             imagination_surprise: self.imagination_surprise,
-            working_memory_load: self.working_memory.as_ref().map_or(0, |wm| wm.load()),
-            scene_graph_edges: self.scene_graph.as_ref().map_or(0, |sg| sg.num_edges()),
+            working_memory_load: self
+                .working_memory
+                .as_ref()
+                .map_or(0, |wm| wm.load()),
+            scene_graph_edges: self
+                .scene_graph
+                .as_ref()
+                .map_or(0, |sg| sg.num_edges()),
         };
 
         self.telemetry.clone()
@@ -417,9 +424,13 @@ impl VisionManifold {
         dt: f32,
     ) -> VisionTelemetry {
         // Compute stereo depth map
-        let stereo_depths =
-            self.encoder
-                .compute_stereo_depth(left, right, width, height, max_disparity);
+        let stereo_depths = self.encoder.compute_stereo_depth(
+            left,
+            right,
+            width,
+            height,
+            max_disparity,
+        );
 
         // Store stereo depths for use by extract_patch_features
         // (The depth feature will be overridden via precomputed features)
@@ -631,8 +642,9 @@ impl VisionManifold {
         // Precompute low-dimensional fingerprints for fast screening.
         // This avoids O(16,384) dot products during flood-fill — instead we do
         // O(128) screening + O(16,384) only for borderline cases.
-        let fp_dim =
-            Self::CLUSTER_FINGERPRINT_DIM.min(patch_hvs.first().map_or(128, |hv| hv.dim()));
+        let fp_dim = Self::CLUSTER_FINGERPRINT_DIM.min(
+            patch_hvs.first().map_or(128, |hv| hv.dim()),
+        );
         let fingerprints: Vec<&[f32]> = patch_hvs
             .iter()
             .map(|hv| &hv.as_slice()[..fp_dim])
@@ -664,17 +676,9 @@ impl VisionManifold {
                 let col = idx % grid.cols;
                 let neighbors = [
                     if row > 0 { Some(idx - grid.cols) } else { None },
-                    if row + 1 < grid.rows {
-                        Some(idx + grid.cols)
-                    } else {
-                        None
-                    },
+                    if row + 1 < grid.rows { Some(idx + grid.cols) } else { None },
                     if col > 0 { Some(idx - 1) } else { None },
-                    if col + 1 < grid.cols {
-                        Some(idx + 1)
-                    } else {
-                        None
-                    },
+                    if col + 1 < grid.cols { Some(idx + 1) } else { None },
                 ];
                 for nb_opt in neighbors.into_iter().flatten() {
                     if assigned[nb_opt] == usize::MAX {
@@ -973,7 +977,10 @@ impl VisionManifold {
     /// Requires `enable_object_memory()` to be active — the scene graph
     /// computes relations between tracked objects.
     pub fn enable_scene_graph(&mut self) {
-        self.scene_graph = Some(VisualSceneGraph::new(self.config.hdc_dim, self.config.seed));
+        self.scene_graph = Some(VisualSceneGraph::new(
+            self.config.hdc_dim,
+            self.config.seed,
+        ));
     }
 
     /// Access the visual scene graph.
@@ -1114,12 +1121,12 @@ impl VisionManifold {
     /// * `dt` — Time step per replay step (typically longer than real-time, e.g., 0.1s)
     /// * `steps_per_memory` — CfC evolution steps per memory (more = deeper consolidation)
     pub fn dream_replay(&mut self, dt: f32, steps_per_memory: usize) -> Vec<ContinuousHV> {
-        let landmarks: Vec<ContinuousHV> = self.scene_memory.as_ref().map_or(Vec::new(), |mem| {
-            mem.export_landmarks()
-                .iter()
-                .map(|(hv, _)| hv.clone())
-                .collect()
-        });
+        let landmarks: Vec<ContinuousHV> = self
+            .scene_memory
+            .as_ref()
+            .map_or(Vec::new(), |mem| {
+                mem.export_landmarks().iter().map(|(hv, _)| hv.clone()).collect()
+            });
 
         if landmarks.is_empty() {
             return Vec::new();
@@ -1142,7 +1149,10 @@ impl VisionManifold {
             let error = 1.0 - dream_state.similarity(landmark).clamp(-1.0, 1.0);
             if error > 0.01 {
                 let lr = 0.001; // gentle replay learning rate
-                let delta = ContinuousHV::weighted_bundle(&[landmark, &dream_state], &[lr, -lr]);
+                let delta = ContinuousHV::weighted_bundle(
+                    &[landmark, &dream_state],
+                    &[lr, -lr],
+                );
                 self.weight_hv = self.weight_hv.add(&delta);
             }
         }
@@ -1602,8 +1612,9 @@ impl ObjectMemory {
 
         // Evict stale tracks
         let before = self.tracks.len();
-        self.tracks
-            .retain(|t| current_frame.saturating_sub(t.last_seen_frame) <= self.max_absence_frames);
+        self.tracks.retain(|t| {
+            current_frame.saturating_sub(t.last_seen_frame) <= self.max_absence_frames
+        });
         let evicted = before - self.tracks.len();
 
         ObjectTrackingResult {
@@ -1695,11 +1706,9 @@ impl VisualWorkingMemory {
         // 2. Refresh tracked objects already in working memory
         for slot in &mut self.slots {
             if let Some(hyp) = hypotheses.iter().find(|h| {
-                tracks.iter().any(|t| {
-                    t.track_id == slot.track_id
-                        && t.centroid_row == h.centroid_row
-                        && t.centroid_col == h.centroid_col
-                })
+                tracks
+                    .iter()
+                    .any(|t| t.track_id == slot.track_id && t.centroid_row == h.centroid_row && t.centroid_col == h.centroid_col)
             }) {
                 slot.saliency = slot.saliency.max(hyp.saliency);
                 slot.centroid_row = hyp.centroid_row;
@@ -1714,9 +1723,7 @@ impl VisualWorkingMemory {
             }
             let saliency = hypotheses
                 .iter()
-                .find(|h| {
-                    h.centroid_row == track.centroid_row && h.centroid_col == track.centroid_col
-                })
+                .find(|h| h.centroid_row == track.centroid_row && h.centroid_col == track.centroid_col)
                 .map(|h| h.saliency)
                 .unwrap_or(0.0);
 
@@ -1869,7 +1876,12 @@ impl VisualSceneGraph {
     }
 
     /// Classify spatial relations between two objects.
-    fn classify_relation(&self, dr: i32, dc: i32, dist: f32) -> Vec<crate::types::SpatialRelation> {
+    fn classify_relation(
+        &self,
+        dr: i32,
+        dc: i32,
+        dist: f32,
+    ) -> Vec<crate::types::SpatialRelation> {
         use crate::types::SpatialRelation;
         let mut rels = Vec::new();
         let near = self.near_threshold as f32;
@@ -3464,10 +3476,7 @@ mod tests {
     #[test]
     fn test_working_memory_bundle_attended() {
         let mut wm = VisualWorkingMemory::new(4);
-        assert!(
-            wm.bundle_attended().is_none(),
-            "Empty WM should have no bundle"
-        );
+        assert!(wm.bundle_attended().is_none(), "Empty WM should have no bundle");
 
         let tracks = vec![TrackedObject {
             track_id: 0,
@@ -3487,7 +3496,10 @@ mod tests {
         wm.update(&tracks, &hyps, 0);
         let bundle = wm.bundle_attended();
         assert!(bundle.is_some(), "Non-empty WM should produce a bundle");
-        assert!(bundle.unwrap().norm() > 0.0, "Bundle should be non-zero");
+        assert!(
+            bundle.unwrap().norm() > 0.0,
+            "Bundle should be non-zero"
+        );
     }
 
     // === Visual Scene Graph ===
@@ -3516,10 +3528,9 @@ mod tests {
         sg.update(&tracks);
         assert!(sg.num_edges() > 0, "Two objects should produce edges");
         // Object 0 is above object 1 (row 0 < row 7)
-        let has_above = sg
-            .edges()
-            .iter()
-            .any(|e| e.relation == crate::types::SpatialRelation::Above);
+        let has_above = sg.edges().iter().any(|e| {
+            e.relation == crate::types::SpatialRelation::Above
+        });
         assert!(has_above, "Should detect Above relation");
         // Graph HV should exist
         assert!(sg.graph_hv().is_some());
@@ -3547,10 +3558,9 @@ mod tests {
             },
         ];
         sg.update(&tracks);
-        let has_overlap = sg
-            .edges()
-            .iter()
-            .any(|e| e.relation == crate::types::SpatialRelation::Overlapping);
+        let has_overlap = sg.edges().iter().any(|e| {
+            e.relation == crate::types::SpatialRelation::Overlapping
+        });
         assert!(has_overlap, "Same position should produce Overlapping");
     }
 
@@ -3688,7 +3698,7 @@ mod tests {
             for x in 0..64 {
                 let b = (y * 64 + x) * 3;
                 scene_b[b + 1] = 200; // green
-                scene_b[b + 2] = 0; // no blue
+                scene_b[b + 2] = 0;   // no blue
             }
         }
         let tel = m.observe_frame(&scene_b, 64, 64, 3, 0.033);
@@ -3760,7 +3770,9 @@ mod tests {
         // In 16,384D, a random goal has ~0 similarity to patches (concentration of
         // measure), so we need a goal that's semantically related to the scene.
         let goal_hv = bridge_with_goal.manifold().state().clone();
-        bridge_with_goal.set_goal_signal(CognitiveGoalSignal::with_gain(goal_hv, 0.8));
+        bridge_with_goal.set_goal_signal(
+            CognitiveGoalSignal::with_gain(goal_hv, 0.8),
+        );
 
         // Scene change → surprise → attention boost modulates differently
         let frame2: Vec<u8> = (0..64 * 64 * 3).map(|i| (i * 13 % 256) as u8).collect();
@@ -3795,14 +3807,8 @@ mod tests {
         // Create a scene with 8 distinct colored regions
         let mut pixels = vec![64u8; 128 * 128 * 3];
         let colors: [[u8; 3]; 8] = [
-            [200, 0, 0],
-            [0, 200, 0],
-            [0, 0, 200],
-            [200, 200, 0],
-            [200, 0, 200],
-            [0, 200, 200],
-            [200, 128, 0],
-            [128, 0, 200],
+            [200, 0, 0], [0, 200, 0], [0, 0, 200], [200, 200, 0],
+            [200, 0, 200], [0, 200, 200], [200, 128, 0], [128, 0, 200],
         ];
         for (i, color) in colors.iter().enumerate() {
             let row = (i / 4) * 64;

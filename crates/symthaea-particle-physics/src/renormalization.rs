@@ -78,21 +78,9 @@ pub fn gauge_couplings_at_scale(q: f64) -> (f64, f64, f64) {
     let inv_alpha2 = 1.0 / alpha2_mz + b2 / (4.0 * PI) * log_ratio;
     let inv_alpha3 = 1.0 / alpha3_mz + b3 / (4.0 * PI) * log_ratio;
 
-    let a1 = if inv_alpha1 > 0.0 {
-        1.0 / inv_alpha1
-    } else {
-        1.0
-    };
-    let a2 = if inv_alpha2 > 0.0 {
-        1.0 / inv_alpha2
-    } else {
-        1.0
-    };
-    let a3 = if inv_alpha3 > 0.0 {
-        1.0 / inv_alpha3
-    } else {
-        1.0
-    };
+    let a1 = if inv_alpha1 > 0.0 { 1.0 / inv_alpha1 } else { 1.0 };
+    let a2 = if inv_alpha2 > 0.0 { 1.0 / inv_alpha2 } else { 1.0 };
+    let a3 = if inv_alpha3 > 0.0 { 1.0 / inv_alpha3 } else { 1.0 };
 
     (a1, a2, a3)
 }

@@ -48,10 +48,42 @@ pub struct HolonHttpState {
     pub iroh_active: std::sync::atomic::AtomicBool,
     /// Latest collective QOL summary JSON (updated by consciousness loop).
     pub telemetry_json: std::sync::Mutex<String>,
+    /// Sealed outbound RDP frames (desktop/server → viewer/phone). Opaque bytes
+    /// produced by `swarm::rdp_wire::seal_frame`. The WS handler forwards these
+    /// to connected viewers as `Message::Binary`.
+    ///
+    /// **Dual path (Phase I.A.5 Track 3.2):** frames flow through both
+    /// `rdp_outbound_tx` (notify-driven, ~0 latency to connected subscribers)
+    /// AND `rdp_outbound` (the VecDeque buffer, for degraded-mode catch-up
+    /// when no viewer is connected). Producers call `push_rdp_outbound()`
+    /// which publishes to both paths atomically. Consumers choose one path:
+    /// the WS handler awaits the broadcast receiver; offline drains read
+    /// the VecDeque directly.
+    ///
+    /// This replaces the prior polling pattern (drain-on-500ms-tick) that
+    /// introduced up to 500 ms of latency per frame — unacceptable for the
+    /// 30 fps Phase II target (33 ms budget). The notify path drops latency
+    /// to ~0; the buffer path provides crash-free degraded mode.
+    pub rdp_outbound: std::sync::Mutex<std::collections::VecDeque<Vec<u8>>>,
+    /// Broadcast sender for notify-driven RDP frame delivery. WS handlers
+    /// subscribe via `rdp_outbound_tx.subscribe()` and await `recv()` in
+    /// their `tokio::select!` loop. Bounded at 16 entries — subscribers that
+    /// fall behind receive `Err(Lagged)` and can re-sync via the VecDeque
+    /// buffer path (`drain_rdp_outbound()`).
+    pub rdp_outbound_tx: tokio::sync::broadcast::Sender<Vec<u8>>,
+    /// Sealed inbound RDP input frames (viewer → server). Each entry is an
+    /// opaque ciphertext the endpoint will pass to `swarm::rdp_wire::open_input`.
+    /// The WS handler pushes to this queue on `Message::Binary` receive.
+    pub rdp_inbound: std::sync::Mutex<std::collections::VecDeque<Vec<u8>>>,
 }
 
 impl HolonHttpState {
     pub fn new(inbound_tx: std::sync::mpsc::Sender<(String, SomaMessage)>) -> Self {
+        // Broadcast channel capacity of 16 — enough to absorb a brief burst
+        // of frames during WS handler wake-up, small enough that a slow
+        // subscriber lags to Err(Lagged) quickly and re-syncs via the
+        // VecDeque path instead of holding back the whole broadcast.
+        let (rdp_outbound_tx, _) = tokio::sync::broadcast::channel::<Vec<u8>>(16);
         Self {
             auth_token: None,
             inbound_tx,
@@ -60,7 +92,68 @@ impl HolonHttpState {
             peer_count: std::sync::atomic::AtomicU32::new(0),
             iroh_active: std::sync::atomic::AtomicBool::new(false),
             telemetry_json: std::sync::Mutex::new("{}".to_string()),
+            rdp_outbound: std::sync::Mutex::new(std::collections::VecDeque::new()),
+            rdp_outbound_tx,
+            rdp_inbound: std::sync::Mutex::new(std::collections::VecDeque::new()),
         }
+    }
+
+    /// Push a sealed RDP frame (typically a `FrameBin` produced by
+    /// `swarm::rdp_wire::seal_frame`) onto the outbound path for WS delivery.
+    ///
+    /// **Dual delivery** (Phase I.A.5 Track 3.2):
+    ///
+    /// 1. The sealed bytes are cloned into the broadcast channel via
+    ///    `rdp_outbound_tx.send()`. Connected WS handlers awaiting `recv()`
+    ///    wake immediately and push the frame on the wire with ~0 latency.
+    /// 2. The same bytes are appended to the `rdp_outbound` VecDeque,
+    ///    bounded at 512 entries (drop-oldest FIFO under pressure). This
+    ///    is the degraded-mode buffer for when no viewer is connected or
+    ///    when a subscriber lags to `Err(Lagged)` and needs to re-sync.
+    ///
+    /// Producers never block on a slow viewer: both paths are non-blocking
+    /// (broadcast send returns immediately even with no subscribers; the
+    /// VecDeque cap drops oldest rather than blocking the producer).
+    pub fn push_rdp_outbound(&self, sealed: Vec<u8>) {
+        // Path 1 (notify): broadcast to any awaiting WS handler. send() is
+        // non-blocking; returns Err if no receivers, which we ignore.
+        let _ = self.rdp_outbound_tx.send(sealed.clone());
+        // Path 2 (buffer): VecDeque for catch-up / degraded mode.
+        if let Ok(mut q) = self.rdp_outbound.lock() {
+            if q.len() >= 512 {
+                q.pop_front();
+            }
+            q.push_back(sealed);
+        }
+    }
+
+    /// Drain all pending sealed RDP frames for WS delivery. Returns the bytes
+    /// in FIFO order.
+    pub fn drain_rdp_outbound(&self) -> Vec<Vec<u8>> {
+        self.rdp_outbound
+            .lock()
+            .map(|mut q| q.drain(..).collect())
+            .unwrap_or_default()
+    }
+
+    /// Push a sealed inbound RDP input frame (from a viewer over WS) onto the
+    /// inbound queue. The consciousness loop (or phone-side consumer) drains
+    /// this and calls `swarm::rdp_wire::open_input` to recover `InputFrame`s.
+    pub fn push_rdp_inbound(&self, sealed: Vec<u8>) {
+        if let Ok(mut q) = self.rdp_inbound.lock() {
+            if q.len() >= 512 {
+                q.pop_front();
+            }
+            q.push_back(sealed);
+        }
+    }
+
+    /// Drain all pending sealed inbound RDP input frames.
+    pub fn drain_rdp_inbound(&self) -> Vec<Vec<u8>> {
+        self.rdp_inbound
+            .lock()
+            .map(|mut q| q.drain(..).collect())
+            .unwrap_or_default()
     }
 
     pub fn new_with_auth_token(
@@ -357,9 +450,33 @@ async fn holon_ws_upgrade(
 }
 
 async fn holon_ws_handler(mut socket: WebSocket, state: SharedHolonState) {
-    // Push consciousness telemetry at ~2Hz (every 500ms).
-    // Also drain inbound Soma messages from the WebSocket and forward to CLS.
+    // Three streams multiplexed onto one WebSocket:
+    //
+    // 1. Consciousness telemetry — 2 Hz tick (500 ms), for dashboard-style
+    //    polling clients that expect a steady heartbeat.
+    // 2. Inbound Soma messages — drained from the WebSocket recv() and
+    //    forwarded to CLS through inbound_tx.
+    // 3. Sealed RDP frames — **notify-driven** via a broadcast channel
+    //    subscription. Wakes the handler immediately when a frame is
+    //    pushed to rdp_outbound_tx, cutting latency from up-to-500-ms
+    //    (prior polling pattern) to ~0 ms. Required for Phase II's 30 fps
+    //    target (33 ms frame budget).
+    //
+    // On initial connection, we also drain any frames that queued up in
+    // the VecDeque before this handler started subscribing — covers the
+    // edge case where frames arrived while no viewer was connected.
     let mut interval = tokio::time::interval(std::time::Duration::from_millis(500));
+    let mut rdp_rx = state.rdp_outbound_tx.subscribe();
+
+    // Catch-up drain: deliver any frames that were queued before a
+    // subscriber existed. Without this, a viewer that connects mid-session
+    // would miss all frames pushed before subscription.
+    let backlog = state.drain_rdp_outbound();
+    for sealed in backlog {
+        if socket.send(Message::Binary(sealed.into())).await.is_err() {
+            return; // Client disconnected during catch-up.
+        }
+    }
 
     loop {
         tokio::select! {
@@ -395,6 +512,35 @@ async fn holon_ws_handler(mut socket: WebSocket, state: SharedHolonState) {
                     }
                 }
             }
+            // NOTIFY-DRIVEN RDP FRAME ARM (Phase I.A.5 Track 3.2)
+            rdp_result = rdp_rx.recv() => {
+                match rdp_result {
+                    Ok(sealed) => {
+                        if socket.send(Message::Binary(sealed.into())).await.is_err() {
+                            break; // Client disconnected
+                        }
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                        // This subscriber missed `n` frames because the buffer
+                        // (16) overflowed. Re-sync by resubscribing (implicitly
+                        // skips the lagged frames) and draining the VecDeque
+                        // catch-up buffer to recover what the broadcast missed.
+                        tracing::debug!("holon_ws_handler: RDP broadcast lagged {n} frames, re-syncing via VecDeque");
+                        let catchup = state.drain_rdp_outbound();
+                        for sealed in catchup {
+                            if socket.send(Message::Binary(sealed.into())).await.is_err() {
+                                return;
+                            }
+                        }
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                        // The broadcast sender was dropped (should not happen
+                        // while HolonHttpState is alive — the state owns the
+                        // sender). Exit the handler cleanly.
+                        break;
+                    }
+                }
+            }
             msg = socket.recv() => {
                 match msg {
                     Some(Ok(Message::Text(text))) => {
@@ -410,8 +556,14 @@ async fn holon_ws_handler(mut socket: WebSocket, state: SharedHolonState) {
                             let _ = state.inbound_tx.send((device_id, soma_msg));
                         }
                     }
+                    Some(Ok(Message::Binary(bytes))) => {
+                        // Sealed RDP input (viewer → server reverse path). Opaque
+                        // ciphertext; the endpoint that holds the session key will
+                        // verify + decode it. Forward as-is onto the inbound queue.
+                        state.push_rdp_inbound(bytes.to_vec());
+                    }
                     Some(Ok(Message::Close(_))) | None => break,
-                    _ => {} // Ignore ping/pong/binary
+                    _ => {} // Ignore ping/pong
                 }
             }
         }
@@ -439,8 +591,12 @@ async fn holon_status(State(state): State<SharedHolonState>) -> Json<StatusRespo
         consciousness: state.get_consciousness(),
         has_tts: cfg!(feature = "voice-tts"),
         has_broca: cfg!(feature = "ssm_language"),
-        swarm_peers: state.peer_count.load(std::sync::atomic::Ordering::Relaxed),
-        iroh_active: state.iroh_active.load(std::sync::atomic::Ordering::Relaxed),
+        swarm_peers: state
+            .peer_count
+            .load(std::sync::atomic::Ordering::Relaxed),
+        iroh_active: state
+            .iroh_active
+            .load(std::sync::atomic::Ordering::Relaxed),
         federation_enabled: cfg!(feature = "swarm"),
     })
 }
@@ -842,5 +998,181 @@ async fn holon_search(
             sources: vec![],
             status: "web_research_module_not_enabled".to_string(),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fresh_state() -> SharedHolonState {
+        let (tx, _rx) = std::sync::mpsc::channel::<(String, SomaMessage)>();
+        Arc::new(HolonHttpState::new(tx))
+    }
+
+    #[test]
+    fn rdp_outbound_push_drain_fifo() {
+        let state = fresh_state();
+        state.push_rdp_outbound(vec![1, 2, 3]);
+        state.push_rdp_outbound(vec![4, 5]);
+        state.push_rdp_outbound(vec![6]);
+
+        let drained = state.drain_rdp_outbound();
+        assert_eq!(drained.len(), 3);
+        assert_eq!(drained[0], vec![1, 2, 3]);
+        assert_eq!(drained[1], vec![4, 5]);
+        assert_eq!(drained[2], vec![6]);
+
+        // Second drain returns empty.
+        assert!(state.drain_rdp_outbound().is_empty());
+    }
+
+    #[test]
+    fn rdp_outbound_caps_at_512() {
+        let state = fresh_state();
+        // Push 600 frames; queue should cap at 512 with the oldest 88 dropped.
+        for i in 0..600u16 {
+            state.push_rdp_outbound(vec![i as u8, (i >> 8) as u8]);
+        }
+        let drained = state.drain_rdp_outbound();
+        assert_eq!(drained.len(), 512);
+        // First surviving frame should be index 88 (0..88 were dropped).
+        let first = &drained[0];
+        assert_eq!(first[0] as u16 | ((first[1] as u16) << 8), 88);
+        let last = &drained[511];
+        assert_eq!(last[0] as u16 | ((last[1] as u16) << 8), 599);
+    }
+
+    #[test]
+    fn rdp_inbound_push_drain_fifo() {
+        let state = fresh_state();
+        state.push_rdp_inbound(vec![0x10, 0x20]);
+        state.push_rdp_inbound(vec![0x30]);
+        let drained = state.drain_rdp_inbound();
+        assert_eq!(drained.len(), 2);
+        assert_eq!(drained[0], vec![0x10, 0x20]);
+        assert_eq!(drained[1], vec![0x30]);
+        assert!(state.drain_rdp_inbound().is_empty());
+    }
+
+    #[test]
+    fn rdp_outbound_and_inbound_are_independent() {
+        let state = fresh_state();
+        state.push_rdp_outbound(vec![1]);
+        state.push_rdp_inbound(vec![2]);
+        // Draining outbound must not affect inbound and vice versa.
+        let out = state.drain_rdp_outbound();
+        assert_eq!(out, vec![vec![1u8]]);
+        let inb = state.drain_rdp_inbound();
+        assert_eq!(inb, vec![vec![2u8]]);
+    }
+
+    #[test]
+    fn rdp_empty_drain_returns_empty_vec() {
+        let state = fresh_state();
+        assert!(state.drain_rdp_outbound().is_empty());
+        assert!(state.drain_rdp_inbound().is_empty());
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Phase I.A.5 Track 3.2 — notify-driven outbound tests
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[tokio::test]
+    async fn rdp_outbound_broadcasts_to_subscriber() {
+        // Track 3.2 acceptance: a subscriber awaiting rdp_outbound_tx.recv()
+        // should receive the frame immediately after push_rdp_outbound(),
+        // with no dependence on any 500 ms tick.
+        let state = fresh_state();
+        let mut rx = state.rdp_outbound_tx.subscribe();
+
+        // Push a frame. The broadcast send should deliver synchronously to
+        // the subscriber task.
+        state.push_rdp_outbound(vec![0xAA, 0xBB, 0xCC]);
+
+        // The recv() future should be ready immediately.
+        let result = tokio::time::timeout(
+            std::time::Duration::from_millis(50),
+            rx.recv(),
+        )
+        .await
+        .expect("recv should complete within 50ms, not block waiting")
+        .expect("recv should return Ok");
+
+        assert_eq!(result, vec![0xAA, 0xBB, 0xCC]);
+    }
+
+    #[tokio::test]
+    async fn rdp_outbound_without_subscriber_buffers_to_vecdeque() {
+        // Track 3.2: frames pushed while no subscriber exists should still
+        // land in the VecDeque for later drain (degraded mode).
+        let state = fresh_state();
+
+        // No subscriber — push a frame.
+        state.push_rdp_outbound(vec![1, 2, 3]);
+
+        // Broadcast send() returned Err(NoReceivers) internally, ignored.
+        // But the VecDeque received the frame.
+        let drained = state.drain_rdp_outbound();
+        assert_eq!(drained, vec![vec![1u8, 2, 3]]);
+    }
+
+    #[tokio::test]
+    async fn rdp_outbound_dual_path_both_deliver() {
+        // Track 3.2: when a subscriber IS connected, the frame flows through
+        // both paths — broadcast (for real-time delivery) AND VecDeque
+        // (for backlog-catchup / lagged subscribers).
+        let state = fresh_state();
+        let mut rx = state.rdp_outbound_tx.subscribe();
+
+        state.push_rdp_outbound(vec![7, 8, 9]);
+
+        // Broadcast path delivers immediately.
+        let via_broadcast = tokio::time::timeout(
+            std::time::Duration::from_millis(50),
+            rx.recv(),
+        )
+        .await
+        .expect("broadcast delivers")
+        .expect("recv ok");
+        assert_eq!(via_broadcast, vec![7, 8, 9]);
+
+        // VecDeque path ALSO has the same frame (this is what enables
+        // backlog-catchup on reconnect / lag recovery).
+        let via_vecdeque = state.drain_rdp_outbound();
+        assert_eq!(via_vecdeque, vec![vec![7u8, 8, 9]]);
+    }
+
+    #[tokio::test]
+    async fn rdp_outbound_broadcast_lag_handling() {
+        // Track 3.2: if a subscriber lags more than 16 frames behind, the
+        // broadcast channel returns Err(Lagged). Connected viewers can
+        // recover via the VecDeque drain path (which has a 512 cap).
+        let state = fresh_state();
+        let mut rx = state.rdp_outbound_tx.subscribe();
+
+        // Push 20 frames without ever calling rx.recv(). The broadcast
+        // channel capacity is 16, so the oldest 4 frames will be dropped
+        // from the broadcast and the next recv() should return Lagged.
+        for i in 0..20u8 {
+            state.push_rdp_outbound(vec![i]);
+        }
+
+        // The VecDeque has all 20 (well under its 512 cap).
+        // Try to recv — should return Lagged.
+        use tokio::sync::broadcast::error::RecvError;
+        match rx.recv().await {
+            Err(RecvError::Lagged(n)) => {
+                assert!(n >= 4, "expected at least 4 lagged frames, got {n}");
+            }
+            other => {
+                panic!("expected Lagged, got {other:?}");
+            }
+        }
+
+        // After Lagged, the subscriber can re-sync by draining the VecDeque.
+        // The VecDeque still holds all 20 frames.
+        let recovery = state.drain_rdp_outbound();
+        assert_eq!(recovery.len(), 20, "VecDeque catchup should have all frames");
     }
 }

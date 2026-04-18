@@ -54,20 +54,14 @@ fn test_da_reward_drives_reasoning_confidence() {
     let baseline_results: Vec<_> = (0..20)
         .map(|_| service.cycle("the quick brown fox jumps over the lazy dog"))
         .collect();
-    let baseline_da: Vec<f32> = baseline_results
-        .iter()
-        .map(|r| r.metadata.neuromod.dopamine_effective)
-        .collect();
+    let baseline_da: Vec<f32> = baseline_results.iter().map(|r| r.metadata.neuromod.dopamine_effective).collect();
     let baseline_da_ema = ema(&baseline_da, 0.2);
 
     // Novel stimulus: reward-laden discovery input
     let novel_results: Vec<_> = (0..20)
         .map(|_| service.cycle("breakthrough discovery: unified field theory resolved — extraordinary implications"))
         .collect();
-    let novel_da: Vec<f32> = novel_results
-        .iter()
-        .map(|r| r.metadata.neuromod.dopamine_effective)
-        .collect();
+    let novel_da: Vec<f32> = novel_results.iter().map(|r| r.metadata.neuromod.dopamine_effective).collect();
     let novel_da_ema = ema(&novel_da, 0.2);
 
     // Dopamine should shift toward reward signal
@@ -98,15 +92,9 @@ fn test_ne_arousal_under_stress_input() {
 
     // Inject threat-like inputs
     let stress_results: Vec<_> = (0..15)
-        .map(|_| {
-            service
-                .cycle("CRITICAL FAILURE: system integrity violated — immediate response required")
-        })
+        .map(|_| service.cycle("CRITICAL FAILURE: system integrity violated — immediate response required"))
         .collect();
-    let stress_ne: Vec<f32> = stress_results
-        .iter()
-        .map(|r| r.metadata.neuromod.noradrenaline_effective)
-        .collect();
+    let stress_ne: Vec<f32> = stress_results.iter().map(|r| r.metadata.neuromod.noradrenaline_effective).collect();
     let stress_ne_ema = ema(&stress_ne, 0.3);
 
     println!("Calm NE: {calm_ne:.3}  Stress NE EMA: {stress_ne_ema:.3}");
@@ -119,10 +107,7 @@ fn test_ne_arousal_under_stress_input() {
 
     // Urgency should not be permanently stuck at Cruise after stress
     let any_not_cruise = stress_results.iter().any(|r| {
-        !matches!(
-            r.metadata.urgency,
-            symthaea::cognitive_loop::CycleUrgency::Cruise
-        )
+        !matches!(r.metadata.urgency, symthaea::cognitive_loop::CycleUrgency::Cruise)
     });
     println!("Any non-Cruise urgency during stress: {any_not_cruise}");
     // This is an observation test — stress inputs should engage the system
@@ -243,45 +228,19 @@ fn test_pharmacological_extremes_no_nan_or_panic() {
     let m = &final_result.metadata;
 
     // No NaN in any key field
-    assert!(
-        !m.consciousness.consciousness_level.is_nan(),
-        "consciousness_level is NaN"
-    );
-    assert!(
-        !final_result.prediction_error.is_nan(),
-        "prediction_error is NaN"
-    );
-    assert!(
-        !m.neuromod.dopamine_effective.is_nan(),
-        "dopamine_effective is NaN"
-    );
-    assert!(
-        !m.neuromod.noradrenaline_effective.is_nan(),
-        "noradrenaline_effective is NaN"
-    );
-    assert!(
-        !m.neuromod.serotonin_effective.is_nan(),
-        "serotonin_effective is NaN"
-    );
-    assert!(
-        !m.neuromod.acetylcholine_effective.is_nan(),
-        "acetylcholine_effective is NaN"
-    );
-    assert!(
-        !m.structural.structural_micro_phi.is_nan(),
-        "micro_phi is NaN"
-    );
-    assert!(
-        !m.temporal.temporal_coherence_score.is_nan(),
-        "temporal_coherence is NaN"
-    );
+    assert!(!m.consciousness.consciousness_level.is_nan(), "consciousness_level is NaN");
+    assert!(!final_result.prediction_error.is_nan(), "prediction_error is NaN");
+    assert!(!m.neuromod.dopamine_effective.is_nan(), "dopamine_effective is NaN");
+    assert!(!m.neuromod.noradrenaline_effective.is_nan(), "noradrenaline_effective is NaN");
+    assert!(!m.neuromod.serotonin_effective.is_nan(), "serotonin_effective is NaN");
+    assert!(!m.neuromod.acetylcholine_effective.is_nan(), "acetylcholine_effective is NaN");
+    assert!(!m.structural.structural_micro_phi.is_nan(), "micro_phi is NaN");
+    assert!(!m.temporal.temporal_coherence_score.is_nan(), "temporal_coherence is NaN");
 
     println!(
         "Post-extremes state — psi:{:.3} pe:{:.3} da:{:.3} ne:{:.3}",
-        m.consciousness.consciousness_level,
-        final_result.prediction_error,
-        m.neuromod.dopamine_effective,
-        m.neuromod.noradrenaline_effective
+        m.consciousness.consciousness_level, final_result.prediction_error,
+        m.neuromod.dopamine_effective, m.neuromod.noradrenaline_effective
     );
 }
 
@@ -317,7 +276,9 @@ fn test_neuromod_recovery_after_saturation() {
     }
     let recovery_pe_ema = ema(&recovery_errors, 0.2);
 
-    println!("Pre-recovery PE: {pre_recovery_pe:.4}  Recovery PE EMA: {recovery_pe_ema:.4}");
+    println!(
+        "Pre-recovery PE: {pre_recovery_pe:.4}  Recovery PE EMA: {recovery_pe_ema:.4}"
+    );
 
     // After saturation, the system should still be functional
     assert!(

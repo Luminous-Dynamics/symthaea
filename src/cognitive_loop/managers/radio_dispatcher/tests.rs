@@ -1963,3 +1963,79 @@ fn test_rtlsdr_bands_comprehensive() {
         assert!(low < high, "Band {low}-{high} inverted");
     }
 }
+
+// ── Perception HV encoding ───────────────────────────────────────────
+
+#[test]
+fn perception_hv_empty_returns_none() {
+    let sm = SpectrumManager::default();
+    assert!(
+        sm.perception_hv().is_none(),
+        "empty observation buffer must yield None so perception can skip"
+    );
+}
+
+#[test]
+fn perception_hv_nonempty_returns_some() {
+    let mut sm = SpectrumManager::default();
+    sm.inject_observation(SpectrumObservation {
+        frequency_hz: 915_000_000,
+        noise_floor_dbm: -100.0,
+        snr_db: 12.0,
+        jammed: false,
+    });
+    let hv = sm
+        .perception_hv()
+        .expect("one observation must produce an HV");
+    // 16,384 bits = 2048 bytes (BinaryHV::BYTES).
+    assert_eq!(hv.0.len(), 2048);
+}
+
+#[test]
+fn perception_hv_identical_observations_produce_identical_hvs() {
+    let obs = SpectrumObservation {
+        frequency_hz: 433_000_000,
+        noise_floor_dbm: -95.0,
+        snr_db: 7.5,
+        jammed: false,
+    };
+    let mut sm1 = SpectrumManager::default();
+    sm1.inject_observation(obs.clone());
+    let mut sm2 = SpectrumManager::default();
+    sm2.inject_observation(obs);
+
+    let h1 = sm1.perception_hv().unwrap();
+    let h2 = sm2.perception_hv().unwrap();
+    assert_eq!(h1, h2, "deterministic encoding must be stable across calls");
+}
+
+#[test]
+fn perception_hv_jammed_vs_clear_are_orthogonal() {
+    // Two observations that differ only in the `jammed` flag should produce
+    // HVs with low cosine similarity — HDC orthogonality across buckets.
+    let mut sm_clear = SpectrumManager::default();
+    sm_clear.inject_observation(SpectrumObservation {
+        frequency_hz: 2_400_000_000,
+        noise_floor_dbm: -90.0,
+        snr_db: 15.0,
+        jammed: false,
+    });
+    let mut sm_jam = SpectrumManager::default();
+    sm_jam.inject_observation(SpectrumObservation {
+        frequency_hz: 2_400_000_000,
+        noise_floor_dbm: -90.0,
+        snr_db: 15.0,
+        jammed: true,
+    });
+
+    let clear = sm_clear.perception_hv().unwrap();
+    let jammed = sm_jam.perception_hv().unwrap();
+    let sim = clear.similarity(&jammed);
+    // Bundling 4 pairs where one differs: ~75% agreement on XOR'd bits →
+    // similarity well below 1.0 but above 0. Being generous with the bound
+    // because HDC bundle thresholding is lossy.
+    assert!(
+        sim < 0.95,
+        "clear vs jammed must differ: similarity {sim} too high"
+    );
+}

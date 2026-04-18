@@ -781,7 +781,8 @@ impl CognitiveLoopService {
                 feature = "exoskeleton",
                 feature = "surgical",
                 feature = "orbital",
-                feature = "quadruped"
+                feature = "quadruped",
+                feature = "phone"
             ))]
             let embodiment_bridge_init = {
                 use super::motor_bridge::EmbodimentPlatform;
@@ -934,6 +935,22 @@ impl CognitiveLoopService {
                                 as Box<dyn super::motor_bridge::EmbodimentBridge>,
                         )
                     }
+                    #[cfg(feature = "phone")]
+                    EmbodimentPlatform::Phone => {
+                        let _genesis = config
+                            .genesis_phrase
+                            .as_ref()
+                            .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p))
+                            .unwrap_or_else(|| {
+                                symthaea_core::genesis::GenesisSeed::from_phrase("default")
+                            });
+                        Some(Box::new(symthaea_phone_embodiment::PhoneBridge::new(
+                            "41201FDJG000UM",
+                            1008,
+                            2244,
+                        ))
+                            as Box<dyn super::motor_bridge::EmbodimentBridge>)
+                    }
                     _ => None,
                 }
             };
@@ -960,7 +977,8 @@ impl CognitiveLoopService {
                     feature = "exoskeleton",
                     feature = "surgical",
                     feature = "orbital",
-                    feature = "quadruped"
+                    feature = "quadruped",
+                    feature = "phone"
                 ))]
                 embodiment_bridge_init,
                 #[cfg(any(
@@ -973,7 +991,8 @@ impl CognitiveLoopService {
                     feature = "exoskeleton",
                     feature = "surgical",
                     feature = "orbital",
-                    feature = "quadruped"
+                    feature = "quadruped",
+                    feature = "phone"
                 ))]
                 None,
                 #[cfg(any(
@@ -986,7 +1005,8 @@ impl CognitiveLoopService {
                     feature = "exoskeleton",
                     feature = "surgical",
                     feature = "orbital",
-                    feature = "quadruped"
+                    feature = "quadruped",
+                    feature = "phone"
                 ))]
                 super::motor_bridge::EmbodimentTelemetry::default(),
             )
@@ -1318,6 +1338,15 @@ impl CognitiveLoopService {
             // social_mgr moved to behavior (BehavioralSynthesis)
             // vision_sensory, motor_rendering, somatic/thermal/embodiment moved to sensorimotor
             sensorimotor: sensorimotor_built,
+            // STT capture: opt-in, started post-construction via start_stt_capture().
+            #[cfg(feature = "voice-stt-live")]
+            stt_capture: None,
+            // IMU fusion: opt-in. Install a fusion via install_imu_fusion()
+            // and push readings via inject_imu_reading().
+            #[cfg(feature = "sensor-imu")]
+            imu_fusion: None,
+            #[cfg(feature = "sensor-imu")]
+            latest_imu_reading: None,
             #[cfg(feature = "nurture")]
             nurture_attachment: if enable_nurture_attachment {
                 Some(super::nurture_bridge::NurtureAttachmentBridge::new())

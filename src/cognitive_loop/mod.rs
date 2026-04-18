@@ -264,7 +264,8 @@ pub mod nurture_bridge;
     feature = "exoskeleton",
     feature = "surgical",
     feature = "orbital",
-    feature = "quadruped"
+    feature = "quadruped",
+    feature = "phone"
 ))]
 pub mod motor_bridge;
 
@@ -578,6 +579,25 @@ pub struct CognitiveLoopService {
     /// pain/thermal channels, embodiment bridge.
     /// Extracted from CognitiveLoopService to reduce field count (Phase 5, Stage 4).
     pub(crate) sensorimotor: sensorimotor_execution::SensoriMotorExecution,
+
+    /// Live STT capture handle. When `Some`, the perception phase polls the
+    /// mic each cycle and binds the resulting auditory HV into the input
+    /// encoding. Sibling to vision — both are sensory input modalities.
+    /// Opt-in: call `start_stt_capture()` after construction.
+    #[cfg(feature = "voice-stt-live")]
+    pub(crate) stt_capture: Option<crate::perception::MicCaptureHandle>,
+
+    /// Optional IMU fusion module. When `Some`, the perception phase
+    /// fuses `latest_imu_reading` into an auxiliary sensory HV and bundles
+    /// it into the input encoding alongside STT/radio. Opt-in.
+    #[cfg(feature = "sensor-imu")]
+    pub(crate) imu_fusion: Option<Box<dyn crate::perception::sensor_fusion::ImuFusion>>,
+
+    /// Most recent IMU reading. Pushed from an external source (hardware
+    /// driver, ADB bridge, MAVLink adapter) via `inject_imu_reading()`.
+    /// The perception phase reads it each cycle.
+    #[cfg(feature = "sensor-imu")]
+    pub(crate) latest_imu_reading: Option<crate::perception::sensor_fusion::ImuReading>,
 
     /// Nurture/attachment bridge — Bowlby attachment -> neuromodulator modulation.
     /// When enabled, models caregiver presence/absence and modulates oxytocin, NE,

@@ -27,6 +27,7 @@ members = [
     "crates/symthaea-observability",
     "crates/symthaea-support",
     "crates/symthaea-psych-bench",
+    "crates/symthaea-lean-bridge",
     "crates/symthaea-flight",
     "crates/symthaea-helicopter",
     "crates/symthaea-auv",
@@ -42,6 +43,7 @@ members = [
     "crates/symthaea-surgical",
     "crates/symthaea-orbital",
     "crates/symthaea-quadruped",
+    "crates/symthaea-sensors",
     "crates/symthaea-browser",
     "crates/symthaea-hal",
     "crates/symthaea-ssm",
@@ -92,6 +94,8 @@ members = [
     "crates/symthaea-hdc-store",
     "crates/symthaea-mycelix-conductor",
     "crates/symthaea-epistemic-types",
+    # Phase 1 spike for MSP / IT-ops wedge. See memory/project_msp_wedge.md.
+    "crates/symthaea-logparse",
     # DRM/KMS boot animation — needs Linux DRM headers; not in default-members.
     "crates/symthaea-quicken-fb",
     # Leptos CSR web frontend — WASM target, not in default-members.
@@ -486,6 +490,17 @@ ratatui = { version = "0.29", optional = true }
 eframe = { version = "0.33", optional = true }
 egui = { version = "0.33", optional = true }
 
+# WebSocket client dependencies (optional) - for holon_rdp_viewer (Phase I.A.2)
+# tokio-tungstenite: same version as symthaea-scan workspace member.
+# The holon-viewer feature pulls egui + eframe + tokio-tungstenite together
+# so the viewer example can compile as a single feature-gated unit.
+tokio-tungstenite = { version = "0.24", optional = true }
+futures-util = { version = "0.3", optional = true }  # SinkExt/StreamExt for tokio-tungstenite split()
+bytes = { version = "1", optional = true }
+quinn = { version = "0.11", optional = true }
+rustls = { version = "0.23", optional = true }
+rcgen = { version = "0.13", optional = true }
+
 # IPC Protocol Enhancements
 rmp-serde = { workspace = true }  # MessagePack binary protocol (A1)
 
@@ -518,6 +533,8 @@ gui = ["eframe", "egui"]                    # symthaea-gui binary
 demo = ["clap", "ctrlc"]                    # Demo binaries (CLI args + signal handling)
 full = ["service", "shell", "gui", "demo"]  # All binaries
 api_module = ["axum", "tower-http"]         # HTTP API binary + module
+holon-quic = ["api_module", "mesh-encryption", "dep:bytes", "dep:quinn", "dep:rustls", "dep:rcgen"]  # Phase I.C QUIC transport for Holon RDP
+holon-viewer = ["eframe", "egui", "dep:tokio-tungstenite", "dep:futures-util", "mesh-encryption", "holon-quic"]  # Phase I.A.2 viewer + Phase I.C transport A/B
 
 # ── Sovereign RDP ──────────────────────────────────────────────────
 rdp = []                                   # Core RDP protocol + codec + session
@@ -534,6 +551,14 @@ rdp-x11 = ["rdp-server"]                   # X11 SHM capture + XTest injection (
 #   liquid-mamba    → SSM language center + pre-trained Mamba fusion (CPU; see ssm_language)
 voice-tts = ["ort", "hound", "hf-hub", "espeak-rs"]  # TTS with Kokoro (ONNX) + espeak-ng G2P
 voice-stt = ["symthaea-stt", "hound"]                 # STT with symthaea-stt crate (HDC + LTC + CfC)
+voice-stt-live = ["voice-stt", "cpal", "ringbuf"]     # Live microphone capture → STT → perception HV (cpal input + ring buffer)
+
+# ── Sensor Fusion (real sensors → perception HV) ────────────────────
+# Bridges physical/simulated sensor readings into the cognitive loop's
+# perception phase. Each sensor is independently gated so a platform
+# only pulls in the code for sensors it actually has.
+sensor-fusion = []        # Core SensorFusion trait + ContinuousHV bundler
+sensor-imu    = ["sensor-fusion"]  # 6-axis accel + gyro role-filler fusion
 audio = ["voice-tts", "rodio"]                        # Full audio including playback
 vocal-tract = ["hound", "symthaea-vocal-tract/hound"]  # LTC-driven articulatory synthesis pipeline + WAV output
 neural-vocoder = ["ort", "vocal-tract", "symthaea-vocal-tract/mel-conversion"]  # BigVGAN ONNX neural vocoder (Path A)
@@ -549,6 +574,8 @@ perception = ["embeddings", "vision"]                 # Full multimodal percepti
 webcam = []                                           # Live webcam capture (gates cfg blocks in source)
 vision-manifold = ["dep:symthaea-vision-manifold"]    # Patch-based HDC video encoding + CfC temporal manifold
 phone = ["dep:symthaea-phone-embodiment", "vision-manifold"]  # ADB phone screen embodiment
+phone-scrcpy = ["phone", "symthaea-phone-embodiment/scrcpy"]  # Phase I.B persistent HEVC capture via scrcpy-server
+phase-2a-lz4 = ["phone-scrcpy", "holon-viewer", "dep:lz4_flex"]  # Phase II.A LZ4 compression measurement gate
 # REMOVED: vision-manifold-camera (0 cfg gates; requires V4L2 hardware, never tested)
 foveation = ["dep:symthaea-foveation", "vision-manifold"]  # Foveation bridge for active vision (dorsal→ventral dispatch)
 # REMOVED: foveation-perception (0 cfg gates; requires GPU models, never tested)
@@ -578,6 +605,7 @@ digital_metabolism = []                      # Real hardware constraints as embo
 # ── Distributed / Network ──────────────────────────────────────────
 mesh = []                                   # Physical mesh radio (LoRa + B.A.T.M.A.N. + Yggdrasil)
 lz4_compression = ["mesh", "dep:lz4_flex"]  # LZ4 packet compression for mesh radio
+holon-lz4 = ["mesh-encryption", "dep:lz4_flex"]  # Phase II.A: LZ4-before-seal for holon RDP wire
 mesh-encryption = ["mesh", "dep:chacha20poly1305", "dep:zeroize"]  # ChaCha20-Poly1305 AEAD encryption for mesh packets
 mesh-key-exchange = ["mesh-encryption", "dep:x25519-dalek", "dep:hkdf", "dep:sha2"]  # X25519 Diffie-Hellman per-peer key agreement
 swarm = ["iroh"]                            # Real-time P2P tensor streaming via Iroh 0.95+
@@ -955,6 +983,13 @@ required-features = ["humanoid"]
 name = "embodiment_integration"
 required-features = ["humanoid"]
 
+[[test]]
+name = "safe_fallback_scorecard"
+required-features = [
+    "vehicle", "helicopter", "flight", "surgical",
+    "exoskeleton", "auv", "quadruped", "manipulator", "orbital",
+]
+
 [[example]]
 name = "helicopter_phi_benchmark"
 required-features = ["helicopter"]
@@ -962,6 +997,18 @@ required-features = ["helicopter"]
 [[example]]
 name = "dmc_humanoid_stand"
 required-features = ["humanoid"]
+
+[[example]]
+name = "robotics_benchmark_suite"
+# No required-features: gracefully degrades based on enabled platforms
+
+[[example]]
+name = "flight_integration"
+required-features = ["flight"]
+
+[[example]]
+name = "cross_platform_coherence"
+required-features = ["manipulator", "helicopter", "vehicle", "auv"]
 
 [[example]]
 name = "transfer_flight_to_humanoid"
@@ -1004,6 +1051,42 @@ required-features = ["code_generation"]
 
 [[example]]
 name = "benchmark_humaneval_verified"
+required-features = ["code_generation"]
+
+[[example]]
+name = "humaneval_class_classification"
+required-features = ["code_generation"]
+
+[[example]]
+name = "brain_codegen"
+required-features = ["code_generation"]
+
+[[example]]
+name = "nix_codegen"
+required-features = ["code_generation"]
+
+[[example]]
+name = "nix_eval_benchmark"
+required-features = ["code_generation"]
+
+[[example]]
+name = "nix_codegen_api"
+required-features = ["code_generation"]
+
+[[example]]
+name = "nix_self_improve_bench"
+required-features = ["code_generation"]
+
+[[example]]
+name = "nix_eval_benchmark_rag"
+required-features = ["code_generation"]
+
+[[example]]
+name = "nix_kg_override_demo"
+required-features = ["code_generation"]
+
+[[example]]
+name = "nix_kg_learn_from_config"
 required-features = ["code_generation"]
 
 [[example]]

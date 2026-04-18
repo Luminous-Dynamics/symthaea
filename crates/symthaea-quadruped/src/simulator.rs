@@ -132,6 +132,82 @@ mod tests {
         }
         assert!(s.state().base_position[0] > x0 + 1.0);
     }
+
+    #[test]
+    fn test_reset_returns_to_standing() {
+        // After arbitrary locomotion, reset() must restore the standing pose.
+        let mut s = SimpleQuadrupedSimulator::new();
+        let standing_pos = s.state().base_position;
+        let standing_angles = s.state().joint_angles;
+        // Let it trot for 500 steps to accumulate state.
+        for _ in 0..500 {
+            s.step(&QuadrupedCommand::zero(), 0.005);
+        }
+        assert_ne!(s.state().base_position[0], standing_pos[0]);
+        s.reset();
+        assert_eq!(s.state().base_position, standing_pos);
+        assert_eq!(s.state().joint_angles, standing_angles);
+        assert_eq!(s.state().joint_velocities, [0.0; NUM_JOINTS]);
+    }
+
+    #[test]
+    fn test_freeze_gait_stays_still() {
+        // Freeze gait has zero CPG frequency — robot shouldn't translate.
+        let mut s = SimpleQuadrupedSimulator::new();
+        s.set_gait(GaitType::Freeze);
+        let x0 = s.state().base_position[0];
+        for _ in 0..500 {
+            s.step(&QuadrupedCommand::zero(), 0.005);
+        }
+        // Freeze: motion limited to stabilization residuals — should stay
+        // within 10 cm of starting x (vs ~1 m for trot over same duration).
+        assert!(
+            (s.state().base_position[0] - x0).abs() < 0.1,
+            "freeze should not translate, drifted {:.3} m",
+            s.state().base_position[0] - x0
+        );
+    }
+
+    #[test]
+    fn test_deterministic_across_fresh_sims() {
+        // Two independent fresh sims with identical commands must end in
+        // identical state — RL training precondition.
+        let c = QuadrupedCommand {
+            joint_torques: [
+                0.1, -0.05, 0.15, 0.1, -0.05, 0.15, 0.1, -0.05, 0.15, 0.1, -0.05, 0.15,
+            ],
+        };
+        let mut a = SimpleQuadrupedSimulator::new();
+        let mut b = SimpleQuadrupedSimulator::new();
+        for _ in 0..200 {
+            a.step(&c, 0.005);
+            b.step(&c, 0.005);
+        }
+        assert_eq!(a.state().base_position, b.state().base_position);
+        assert_eq!(a.state().joint_angles, b.state().joint_angles);
+    }
+
+    #[test]
+    fn test_gait_switch_changes_cpg_frequency() {
+        // After set_gait(Walk), stepping should advance slower than Trot.
+        // Compare base translation over 500 steps for Walk vs Trot.
+        let mut trot = SimpleQuadrupedSimulator::new();
+        trot.set_gait(GaitType::Trot);
+        let mut walk = SimpleQuadrupedSimulator::new();
+        walk.set_gait(GaitType::Walk);
+        for _ in 0..500 {
+            trot.step(&QuadrupedCommand::zero(), 0.005);
+            walk.step(&QuadrupedCommand::zero(), 0.005);
+        }
+        // Trot at 2 Hz vs Walk at 1 Hz — trot should cover more ground.
+        assert!(
+            trot.state().base_position[0] > walk.state().base_position[0],
+            "trot ({:.3}) should exceed walk ({:.3}) in x translation",
+            trot.state().base_position[0],
+            walk.state().base_position[0]
+        );
+    }
+
     mod proptest_physics {
         use super::*;
         use proptest::prelude::*;

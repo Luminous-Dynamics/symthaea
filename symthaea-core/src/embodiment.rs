@@ -31,9 +31,13 @@ pub enum MotorSafetyLevel {
 impl MotorSafetyLevel {
     /// Determine safety level from current Phi value.
     ///
-    /// Non-finite inputs (NaN, Inf, -Inf) map to `Red` (emergency stop).
-    /// This is intentional: if the consciousness measurement is corrupt,
-    /// the safest response is full motor shutdown.
+    /// Non-finite inputs (NaN, Inf, -Inf) map to `Red` (emergency mode).
+    ///
+    /// IMPORTANT: `Red` does NOT mean "zero motor force". It means
+    /// "execute the platform's SafeFallback behavior" — which for a
+    /// vehicle means emergency braking, for an exoskeleton means locking
+    /// in standing position, for a helicopter means autorotation, etc.
+    /// See the [`SafeFallback`] trait for platform-specific guarantees.
     pub fn from_phi(phi: f64) -> Self {
         if !phi.is_finite() {
             return Self::Red;
@@ -49,7 +53,17 @@ impl MotorSafetyLevel {
         }
     }
 
-    /// Motor gain multiplier for this safety level.
+    /// Motor gain multiplier for consciousness-modulated commanded force.
+    ///
+    /// This is applied to COMMANDED torques only. Platforms that implement
+    /// [`SafeFallback`] produce an overriding command at Red that is NOT
+    /// scaled by this gain — the safe fallback must execute at full authority
+    /// to guarantee minimum safe behavior (emergency braking, lock, etc.).
+    ///
+    /// - Green: 1.0 (full commanded authority)
+    /// - Yellow: 0.6 (reduced)
+    /// - Orange: 0.3 (compliant)
+    /// - Red: 0.0 for commanded torques (but SafeFallback executes at 1.0)
     pub fn motor_gain(&self) -> f32 {
         match self {
             Self::Green => 1.0,
@@ -170,8 +184,10 @@ impl GroundingEstimator {
             if mean < 0.3 {
                 // Check trend: compare first half mean to second half mean
                 let half = self.capacity / 2;
-                let first_half: f32 = self.window[..half].iter().sum::<f32>() / half as f32;
-                let second_half: f32 = self.window[half..].iter().sum::<f32>() / half as f32;
+                let first_half: f32 =
+                    self.window[..half].iter().sum::<f32>() / half as f32;
+                let second_half: f32 =
+                    self.window[half..].iter().sum::<f32>() / half as f32;
                 if second_half <= first_half {
                     return GROUNDING_TEMPORAL;
                 }
@@ -258,6 +274,75 @@ impl AgentIdentity {
 impl std::fmt::Display for AgentIdentity {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.0)
+    }
+}
+
+// ── Safe Fallback Trait ────────────────────────────────────────────────────
+
+/// Safe fallback behaviors for consciousness degradation.
+///
+/// # The Core Safety Principle
+///
+/// When consciousness degrades, a machine does not lose its strength —
+/// it loses its goal-directed authority. The machine's MINIMUM-SAFE
+/// behavior must execute regardless of consciousness state.
+///
+/// This trait defines what "minimum-safe behavior" means for each platform:
+///
+/// | Platform | Red-tier Safe Fallback |
+/// |----------|------------------------|
+/// | Manipulator | Hold current pose (gravity compensation) |
+/// | Helicopter | Autorotation descent |
+/// | Quadrotor | Controlled emergency landing |
+/// | **Vehicle** | **Maximum brake + hazards + lane hold** |
+/// | **Exoskeleton** | **Lock legs in standing position** |
+/// | AUV | Buoyancy ascent to surface |
+/// | Quadruped | Controlled sit/lie-down |
+/// | Surgical | Freeze in place, retract cautery |
+///
+/// # Design Principle
+///
+/// `motor_gain=0` at Red is the DEFAULT behavior that requires no
+/// platform-specific safety knowledge — it's safe for manipulators
+/// and stationary arms. But for platforms carrying humans, moving at
+/// speed, or operating in environments where "no force" means "crash",
+/// the platform MUST implement this trait and override the step() logic
+/// to execute the safe fallback instead of the zero command.
+///
+/// # Invariants
+///
+/// 1. `safe_fallback_active()` returns true iff safety_level is Red or Orange
+/// 2. `safe_fallback_priority()` returns a numeric priority (higher = more critical)
+/// 3. The safe fallback command executes at FULL authority, not scaled by motor_gain
+/// 4. Safe fallback must NEVER require consciousness to execute (it's reflexive)
+pub trait SafeFallback {
+    /// Platform name for telemetry.
+    fn platform_name(&self) -> &'static str;
+
+    /// Whether the safe fallback is currently active (at Red/Orange safety).
+    fn safe_fallback_active(&self) -> bool {
+        matches!(
+            self.current_safety_level(),
+            MotorSafetyLevel::Red | MotorSafetyLevel::Orange
+        )
+    }
+
+    /// Current safety level driving fallback behavior.
+    fn current_safety_level(&self) -> MotorSafetyLevel;
+
+    /// Priority of this platform's safe fallback:
+    /// - 10: Critical (human-carrying, airborne, moving)
+    /// - 5: High (grasping, in-contact)
+    /// - 1: Low (stationary, contained)
+    fn safe_fallback_priority(&self) -> u8;
+
+    /// Human-readable description of the safe fallback behavior.
+    fn safe_fallback_description(&self) -> &'static str;
+
+    /// Latency in simulation cycles from Red trigger to fallback active.
+    /// MUST be 1 for human-carrying platforms.
+    fn safe_fallback_latency_cycles(&self) -> u32 {
+        1
     }
 }
 
@@ -394,9 +479,7 @@ pub struct PlatformRegistry {
 impl PlatformRegistry {
     /// Create an empty registry.
     pub fn new() -> Self {
-        Self {
-            plugins: Vec::new(),
-        }
+        Self { plugins: Vec::new() }
     }
 
     /// Register a platform plugin.
@@ -486,14 +569,8 @@ mod tests {
     #[test]
     fn test_from_phi_non_finite_returns_red() {
         assert_eq!(MotorSafetyLevel::from_phi(f64::NAN), MotorSafetyLevel::Red);
-        assert_eq!(
-            MotorSafetyLevel::from_phi(f64::INFINITY),
-            MotorSafetyLevel::Red
-        );
-        assert_eq!(
-            MotorSafetyLevel::from_phi(f64::NEG_INFINITY),
-            MotorSafetyLevel::Red
-        );
+        assert_eq!(MotorSafetyLevel::from_phi(f64::INFINITY), MotorSafetyLevel::Red);
+        assert_eq!(MotorSafetyLevel::from_phi(f64::NEG_INFINITY), MotorSafetyLevel::Red);
     }
 
     #[test]

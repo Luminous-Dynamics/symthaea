@@ -122,17 +122,9 @@ fn run_trial() -> TrialResult {
     let ds_combustion_kj_k = (213.785 + 2.0 * 69.950 - 186.250 - 2.0 * 205.150) / 1000.0;
     let dg_combustion = gibbs_free_energy(dh_combustion, 298.15, ds_combustion_kj_k * 1000.0);
     // The function takes ΔS in J/mol·K
-    let spontaneous_ok = if is_spontaneous(dg_combustion) {
-        1.0
-    } else {
-        0.0
-    };
+    let spontaneous_ok = if is_spontaneous(dg_combustion) { 1.0 } else { 0.0 };
     // Check ΔG is in the right ballpark (−800 to −900 kJ/mol)
-    let dg_range_ok = if dg_combustion < -700.0 && dg_combustion > -1000.0 {
-        1.0
-    } else {
-        0.0
-    };
+    let dg_range_ok = if dg_combustion < -700.0 && dg_combustion > -1000.0 { 1.0 } else { 0.0 };
 
     // ATP hydrolysis: ATP + H₂O → ADP + Pi  ΔG°' ≈ −30.5 kJ/mol
     // Use approximate values: ΔH≈−20.9 kJ/mol, ΔS≈34 J/mol·K at 310K (body temp)
@@ -227,22 +219,13 @@ impl PsychBenchmark for ChemistryBenchmark {
             "molar_mass_accuracy",
             MetricValue::from_samples(&molar_mass_scores),
         );
-        result.insert(
-            "hess_law_accuracy",
-            MetricValue::from_samples(&hess_law_scores),
-        );
+        result.insert("hess_law_accuracy", MetricValue::from_samples(&hess_law_scores));
         result.insert(
             "gibbs_free_energy_accuracy",
             MetricValue::from_samples(&gibbs_scores),
         );
-        result.insert(
-            "ice_equilibrium_accuracy",
-            MetricValue::from_samples(&ice_scores),
-        );
-        result.insert(
-            "arrhenius_kinetics_accuracy",
-            MetricValue::from_samples(&arrhenius_scores),
-        );
+        result.insert("ice_equilibrium_accuracy", MetricValue::from_samples(&ice_scores));
+        result.insert("arrhenius_kinetics_accuracy", MetricValue::from_samples(&arrhenius_scores));
         result.conditions = 5;
         result.trials_per_condition = n;
         result.elapsed_ms = start.elapsed().as_millis() as u64;
@@ -252,8 +235,7 @@ impl PsychBenchmark for ChemistryBenchmark {
     fn provenance(&self) -> Option<BenchmarkProvenance> {
         Some(BenchmarkProvenance {
             paradigm: "Physical Chemistry (Stoichiometry, Hess, Gibbs, ICE, Arrhenius)",
-            citation:
-                "NIST-JANAF (Chase 1998); Atkins Physical Chemistry 11e; Zumdahl Chemistry 10e",
+            citation: "NIST-JANAF (Chase 1998); Atkins Physical Chemistry 11e; Zumdahl Chemistry 10e",
             year: 1998,
             doi: Some("10.18434/T42S31"),
         })
@@ -271,30 +253,21 @@ mod tests {
     fn test_molar_mass_water() {
         let elems = all_elements();
         let mm = molar_mass("H2O", &elems).unwrap();
-        assert!(
-            (mm - 18.015).abs() < 0.1,
-            "H₂O molar mass expected ~18.015, got {mm}"
-        );
+        assert!((mm - 18.015).abs() < 0.1, "H₂O molar mass expected ~18.015, got {mm}");
     }
 
     #[test]
     fn test_molar_mass_co2() {
         let elems = all_elements();
         let mm = molar_mass("CO2", &elems).unwrap();
-        assert!(
-            (mm - 44.009).abs() < 0.1,
-            "CO₂ molar mass expected ~44.009, got {mm}"
-        );
+        assert!((mm - 44.009).abs() < 0.1, "CO₂ molar mass expected ~44.009, got {mm}");
     }
 
     #[test]
     fn test_molar_mass_nacl() {
         let elems = all_elements();
         let mm = molar_mass("NaCl", &elems).unwrap();
-        assert!(
-            (mm - 58.44).abs() < 0.5,
-            "NaCl molar mass expected ~58.44, got {mm}"
-        );
+        assert!((mm - 58.44).abs() < 0.5, "NaCl molar mass expected ~58.44, got {mm}");
     }
 
     #[test]
@@ -335,14 +308,8 @@ mod tests {
         // ΔS° = -243 J/mol·K → -0.243 kJ/mol·K; function takes J/mol·K
         let ds_j_k = -242.865;
         let dg = gibbs_free_energy(dh, 298.15, ds_j_k);
-        assert!(
-            is_spontaneous(dg),
-            "CH₄ combustion must be spontaneous at 298 K, ΔG = {dg}"
-        );
-        assert!(
-            dg < -700.0,
-            "CH₄ combustion ΔG° should be < −700 kJ, got {dg}"
-        );
+        assert!(is_spontaneous(dg), "CH₄ combustion must be spontaneous at 298 K, ΔG = {dg}");
+        assert!(dg < -700.0, "CH₄ combustion ΔG° should be < −700 kJ, got {dg}");
     }
 
     #[test]
@@ -351,10 +318,7 @@ mod tests {
         let dg = 2.0 * 51.310 - 97.890;
         let keq = keq_from_gibbs(dg, 298.15);
         // K_eq should be < 1 (ΔG° > 0 → products not favored at standard state)
-        assert!(
-            keq > 0.01 && keq < 1.0,
-            "N₂O₄ ⇌ 2NO₂ K_eq expected 0.01–1.0, got {keq}"
-        );
+        assert!(keq > 0.01 && keq < 1.0, "N₂O₄ ⇌ 2NO₂ K_eq expected 0.01–1.0, got {keq}");
     }
 
     #[test]
@@ -380,10 +344,7 @@ mod tests {
         let a = 1e12_f64;
         let k1 = arrhenius_k(a, ea, 300.0);
         let k2 = arrhenius_k(a, ea, 500.0);
-        assert!(
-            k1 > 0.0 && k2 > k1,
-            "Arrhenius k must increase with temperature"
-        );
+        assert!(k1 > 0.0 && k2 > k1, "Arrhenius k must increase with temperature");
         let ratio = k2 / k1;
         // Expected ratio: exp(Ea/R × (1/300 - 1/500))
         let expected = (ea / 8.314 * (1.0 / 300.0 - 1.0 / 500.0)).exp();
@@ -402,10 +363,7 @@ mod tests {
             ..Default::default()
         };
         let result = bench.run(&config);
-        assert!(
-            !result.metrics.is_empty(),
-            "Benchmark should produce metrics"
-        );
+        assert!(!result.metrics.is_empty(), "Benchmark should produce metrics");
         assert_eq!(result.conditions, 5);
     }
 

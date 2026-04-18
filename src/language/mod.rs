@@ -58,6 +58,10 @@ pub mod pattern_bootstrap;
 
 // Code understanding & generation (Phase: Consciousness-Aware Code)
 #[cfg(feature = "code_generation")]
+pub mod algorithm_encoder;
+#[cfg(feature = "code_generation")]
+pub mod algorithm_training;
+#[cfg(feature = "code_generation")]
 pub mod analogy_generation;
 #[cfg(feature = "code_generation")]
 pub mod code_discovery;
@@ -80,7 +84,19 @@ pub mod epistemic_generation;
 #[cfg(feature = "code_generation")]
 pub mod hv_code_decoder;
 #[cfg(feature = "code_generation")]
+pub mod learned_idioms;
+#[cfg(feature = "code_generation")]
 pub mod nix_code_parser;
+#[cfg(feature = "code_generation")]
+pub mod nix_codegen;
+#[cfg(feature = "code_generation")]
+pub mod nix_eval_corpus;
+#[cfg(feature = "code_generation")]
+pub mod nix_kg;
+#[cfg(feature = "code_generation")]
+pub mod nixos_search;
+#[cfg(feature = "code_generation")]
+pub mod nixpkgs_index;
 #[cfg(feature = "code_generation")]
 pub mod parser_registry;
 pub mod program_node_translator;

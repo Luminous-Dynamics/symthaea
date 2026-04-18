@@ -4,7 +4,7 @@ use crate::simulator::{OrbitalPhysicsSimulator, SimpleOrbitalSimulator};
 use crate::types::{OrbitalConfig, NUM_ACTUATORS};
 pub use symthaea_core::embodiment::{
     grounding_from_prediction_error, grounding_label, EmbodimentResult, EmbodimentTelemetry,
-    MotorSafetyLevel, GROUNDING_SENSORIMOTOR,
+    MoralGateInput, MotorSafetyLevel, GROUNDING_SENSORIMOTOR,
 };
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
@@ -17,6 +17,7 @@ pub struct OrbitalEmbodiment {
     steps: usize,
     safety: MotorSafetyLevel,
     safety_ov: Option<MotorSafetyLevel>,
+    moral_safety: Option<MotorSafetyLevel>,
     effort: f32,
     pe: f32,
 }
@@ -31,6 +32,7 @@ impl OrbitalEmbodiment {
             steps: 0,
             safety: MotorSafetyLevel::Green,
             safety_ov: None,
+            moral_safety: None,
             effort: 0.0,
             pe: 0.0,
         }
@@ -41,12 +43,29 @@ impl OrbitalEmbodiment {
     pub fn clear_safety_override(&mut self) {
         self.safety_ov = None;
     }
+    /// Apply moral gate from ethics engine.
+    /// Orbital platforms can damage other spacecraft/debris — ahimsa forces Red (park), consent Orange.
+    pub fn apply_moral_gate(&mut self, gate: MoralGateInput) {
+        self.moral_safety =
+            if gate.ahimsa_violated || gate.verdict == MoralGateInput::VERDICT_BLOCKED {
+                Some(MotorSafetyLevel::Red)
+            } else if gate.consent_violation {
+                Some(MotorSafetyLevel::Orange)
+            } else if gate.verdict == MoralGateInput::VERDICT_CAUTION {
+                Some(MotorSafetyLevel::Yellow)
+            } else {
+                None
+            };
+    }
     pub fn step(&mut self, hv: &ContinuousHV, dt: f32, phi: f64) -> EmbodimentResult {
         let pl = MotorSafetyLevel::from_phi(phi);
-        self.safety = match self.safety_ov {
-            Some(ov) => pl.max(ov),
-            None => pl,
-        };
+        self.safety = pl;
+        if let Some(ov) = self.safety_ov {
+            self.safety = self.safety.max(ov);
+        }
+        if let Some(m) = self.moral_safety {
+            self.safety = self.safety.max(m);
+        }
         let gain = self.safety.motor_gain();
         let mut cmd = self.ctrl.forward(hv, dt);
         if gain <= 0.3 {
@@ -94,6 +113,7 @@ impl OrbitalEmbodiment {
         self.steps = 0;
         self.safety = MotorSafetyLevel::Green;
         self.safety_ov = None;
+        self.moral_safety = None;
         self.effort = 0.0;
         self.pe = 0.0;
     }
@@ -148,6 +168,9 @@ impl symthaea_core::embodiment::EmbodimentBridge for OrbitalEmbodiment {
     fn telemetry(&self) -> EmbodimentTelemetry {
         self.telemetry()
     }
+    fn apply_moral_gate(&mut self, gate: MoralGateInput) {
+        self.apply_moral_gate(gate)
+    }
 }
 #[cfg(test)]
 mod tests {
@@ -162,5 +185,113 @@ mod tests {
         let mut b = OrbitalEmbodiment::new(&GenesisSeed::from_phrase("t"));
         let r = b.step(&ContinuousHV::random(16384, 42), 0.01, 0.15);
         assert!(r.control_effort < 0.01);
+    }
+    #[test]
+    fn test_moral_gate_ahimsa_forces_red() {
+        let mut b = OrbitalEmbodiment::new(&GenesisSeed::from_phrase("t"));
+        b.apply_moral_gate(MoralGateInput {
+            verdict: MoralGateInput::VERDICT_SAFE,
+            consent_violation: false,
+            ahimsa_violated: true,
+        });
+        let r = b.step(&ContinuousHV::random(16384, 42), 0.01, 0.9);
+        assert_eq!(
+            r.safety_level,
+            MotorSafetyLevel::Red,
+            "ahimsa must force Red regardless of phi"
+        );
+        assert!(
+            r.control_effort < 0.01,
+            "Red must park, got effort {}",
+            r.control_effort
+        );
+    }
+
+    #[test]
+    fn test_num_actuators() {
+        use symthaea_core::embodiment::EmbodimentBridge;
+        let b = OrbitalEmbodiment::new(&GenesisSeed::from_phrase("t"));
+        assert_eq!(b.num_actuators(), NUM_ACTUATORS);
+        assert_eq!(NUM_ACTUATORS, 7, "orbital manipulator has 7 actuators");
+    }
+
+    #[test]
+    fn test_platform_is_orbital() {
+        use symthaea_core::embodiment::{EmbodimentBridge, EmbodimentPlatform};
+        let b = OrbitalEmbodiment::new(&GenesisSeed::from_phrase("t"));
+        assert_eq!(b.platform(), EmbodimentPlatform::Orbital);
+    }
+
+    #[test]
+    fn test_telemetry_populated_after_step() {
+        let mut b = OrbitalEmbodiment::new(&GenesisSeed::from_phrase("t"));
+        let t0 = b.telemetry();
+        assert_eq!(t0.total_steps, 0);
+        assert_eq!(t0.platform, "orbital");
+        b.step(&ContinuousHV::random(16384, 42), 0.01, 0.7);
+        let t1 = b.telemetry();
+        assert_eq!(t1.total_steps, 1);
+        assert_eq!(t1.num_actuators, NUM_ACTUATORS);
+        assert!(t1.control_effort.is_finite());
+    }
+
+    #[test]
+    fn test_safety_override_raises_tier() {
+        // Phi of 0.9 would give Green; Red override should force Red.
+        let mut b = OrbitalEmbodiment::new(&GenesisSeed::from_phrase("t"));
+        b.set_safety_override(MotorSafetyLevel::Red);
+        let r = b.step(&ContinuousHV::random(16384, 42), 0.01, 0.9);
+        assert_eq!(r.safety_level, MotorSafetyLevel::Red);
+        // Red parks; motor gain ≤ 0.3 zeroes torques.
+        assert!(r.control_effort < 0.01);
+    }
+
+    #[test]
+    fn test_safety_override_cleared_returns_to_phi_tier() {
+        let mut b = OrbitalEmbodiment::new(&GenesisSeed::from_phrase("t"));
+        b.set_safety_override(MotorSafetyLevel::Red);
+        b.step(&ContinuousHV::random(16384, 42), 0.01, 0.9);
+        b.clear_safety_override();
+        let r = b.step(&ContinuousHV::random(16384, 42), 0.01, 0.9);
+        assert_eq!(r.safety_level, MotorSafetyLevel::Green);
+    }
+
+    #[test]
+    fn test_total_steps_increments_monotonically() {
+        let mut b = OrbitalEmbodiment::new(&GenesisSeed::from_phrase("t"));
+        let hv = ContinuousHV::random(16384, 42);
+        for expected in 1..=15 {
+            b.step(&hv, 0.01, 0.7);
+            assert_eq!(b.total_steps(), expected);
+        }
+    }
+
+    #[test]
+    fn test_reset_clears_accumulated_state() {
+        let mut b = OrbitalEmbodiment::new(&GenesisSeed::from_phrase("t"));
+        let hv = ContinuousHV::random(16384, 42);
+        for _ in 0..50 {
+            b.step(&hv, 0.01, 0.7);
+        }
+        b.set_safety_override(MotorSafetyLevel::Orange);
+        assert_eq!(b.total_steps(), 50);
+        b.reset();
+        assert_eq!(b.total_steps(), 0);
+        // Reset must clear the override too; next step at phi 0.9 → Green.
+        let r = b.step(&hv, 0.01, 0.9);
+        assert_eq!(r.safety_level, MotorSafetyLevel::Green);
+    }
+
+    #[test]
+    fn test_extended_run_stays_stable() {
+        // Long run under nominal phi — no panics, all results finite.
+        let mut b = OrbitalEmbodiment::new(&GenesisSeed::from_phrase("long_run"));
+        let hv = ContinuousHV::random(16384, 42);
+        for _ in 0..300 {
+            let r = b.step(&hv, 0.01, 0.7);
+            assert!(r.success);
+            assert!(r.control_effort.is_finite());
+            assert!(r.prediction_error.is_finite());
+        }
     }
 }

@@ -75,11 +75,7 @@ pub fn permanent(matrix: &[Vec<f64>]) -> f64 {
     }
 
     // Ryser's formula has a leading (-1)^n factor
-    if n % 2 == 1 {
-        -result
-    } else {
-        result
-    }
+    if n % 2 == 1 { -result } else { result }
 }
 
 /// Determinant of an n×n matrix via LU decomposition (O(n³), in P).
@@ -237,11 +233,7 @@ pub fn orbit_distance_estimate(
     let mut current_vals = det_vals.clone();
     for _ in 0..n_steps {
         // Optimal scalar factor: minimise ||scale*d - p||² → scale = <d,p>/<d,d>
-        let dp: f64 = current_vals
-            .iter()
-            .zip(&perm_vals)
-            .map(|(a, b)| a * b)
-            .sum();
+        let dp: f64 = current_vals.iter().zip(&perm_vals).map(|(a, b)| a * b).sum();
         let dd: f64 = current_vals.iter().map(|a| a * a).sum();
         if dd < 1e-30 {
             break;
@@ -479,7 +471,11 @@ pub fn sample_permanent_boundary(n: usize, n_samples: usize, seed: u64) -> Vec<V
 /// Returns `None` until the symmetric function arithmetic is implemented.
 /// When complete, this will compute a_{λ,μ}^ν — the multiplicity of S^ν(V)
 /// in the plethysm S^λ(S^μ(V)).
-pub fn plethysm_coefficient(_lambda: &[usize], _mu: &[usize], _nu: &[usize]) -> Option<u64> {
+pub fn plethysm_coefficient(
+    _lambda: &[usize],
+    _mu: &[usize],
+    _nu: &[usize],
+) -> Option<u64> {
     // TODO: Implement via symmetric function power-sum / Schur function conversion
     // 1. Express s_μ in power-sum basis: s_μ = Σ χ^μ(ρ)/z_ρ · p_ρ
     // 2. Apply plethysm: s_λ[s_μ] = s_λ[Σ ...] using the substitution rule
@@ -543,11 +539,7 @@ pub fn perm_det_hdc_similarity(n: usize) -> f64 {
                 (0..n)
                     .map(|_| {
                         rng = lcg_step(rng);
-                        if rng & 1 == 0 {
-                            1.0
-                        } else {
-                            -1.0
-                        }
+                        if rng & 1 == 0 { 1.0 } else { -1.0 }
                     })
                     .collect()
             })
@@ -601,14 +593,11 @@ fn l2_dist(a: &[f64], b: &[f64]) -> f64 {
 
 /// Linear congruential generator — fast, dependency-free.
 fn lcg_rng(seed: u64) -> u64 {
-    seed.wrapping_mul(6364136223846793005)
-        .wrapping_add(1442695040888963407)
+    seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407)
 }
 
 fn lcg_step(state: u64) -> u64 {
-    state
-        .wrapping_mul(6364136223846793005)
-        .wrapping_add(1442695040888963407)
+    state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407)
 }
 
 /// Box-Muller transform for standard normal samples (uses one LCG call).
@@ -646,11 +635,7 @@ mod tests {
         // perm([[a,b],[c,d]]) = ad + bc
         let m = vec![vec![1.0, 2.0], vec![3.0, 4.0]];
         let expected = 1.0 * 4.0 + 2.0 * 3.0; // = 10
-        assert!(
-            (permanent(&m) - expected).abs() < 1e-10,
-            "got {}",
-            permanent(&m)
-        );
+        assert!((permanent(&m) - expected).abs() < 1e-10, "got {}", permanent(&m));
     }
 
     #[test]
@@ -690,11 +675,7 @@ mod tests {
         // det = 1*(4*6-5*0) - 2*(0*6-5*1) + 3*(0*0-4*1)
         //      = 24 + 10 - 12 = 22
         let expected = 22.0;
-        assert!(
-            (determinant(&m) - expected).abs() < 1e-8,
-            "got {}",
-            determinant(&m)
-        );
+        assert!((determinant(&m) - expected).abs() < 1e-8, "got {}", determinant(&m));
     }
 
     #[test]
@@ -749,16 +730,10 @@ mod tests {
         // distance can increase if the perm/det value vectors are anti-correlated
         // (optimal scale s* < 0), so we only assert finiteness and correct fields.
         let od = orbit_distance_estimate(2, 3, 20, 42);
-        assert!(
-            od.initial_dist.is_finite() && od.initial_dist >= 0.0,
-            "initial_dist must be finite and non-negative: {}",
-            od.initial_dist
-        );
-        assert!(
-            od.after_k_steps.is_finite() && od.after_k_steps >= 0.0,
-            "after_k_steps must be finite and non-negative: {}",
-            od.after_k_steps
-        );
+        assert!(od.initial_dist.is_finite() && od.initial_dist >= 0.0,
+            "initial_dist must be finite and non-negative: {}", od.initial_dist);
+        assert!(od.after_k_steps.is_finite() && od.after_k_steps >= 0.0,
+            "after_k_steps must be finite and non-negative: {}", od.after_k_steps);
         assert_eq!(od.steps, 20);
     }
 
@@ -834,11 +809,7 @@ mod tests {
         let hv = encode_polynomial_hv(&coeffs);
         let norm: f32 = hv.iter().map(|x| x * x).sum::<f32>().sqrt();
         // 256-element f32 squared accumulation has ~O(n·eps_f32) ≈ 3e-5 error
-        assert!(
-            (norm - 1.0).abs() < 1e-3,
-            "HV should be unit-norm, got {}",
-            norm
-        );
+        assert!((norm - 1.0).abs() < 1e-3, "HV should be unit-norm, got {}", norm);
     }
 
     #[test]
@@ -847,19 +818,13 @@ mod tests {
         let b = encode_polynomial_hv(&[0.0, 1.0]);
         let dot: f32 = a.iter().zip(&b).map(|(x, y)| x * y).sum();
         // Different coefficient patterns should produce non-identical HVs
-        assert!(
-            (dot - 1.0).abs() > 0.01,
-            "distinct polys should differ in HV space"
-        );
+        assert!((dot - 1.0).abs() > 0.01, "distinct polys should differ in HV space");
     }
 
     #[test]
     fn test_perm_det_hdc_similarity_range() {
         let sim = perm_det_hdc_similarity(2);
-        assert!(
-            sim >= -1.0 && sim <= 1.0,
-            "cosine similarity out of range: {sim}"
-        );
+        assert!(sim >= -1.0 && sim <= 1.0, "cosine similarity out of range: {sim}");
     }
 
     // ── permanent variety boundary sampling ───────────────────────────────────

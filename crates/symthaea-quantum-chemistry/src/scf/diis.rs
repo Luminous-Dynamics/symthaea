@@ -37,7 +37,12 @@ impl Diis {
     }
 
     /// Compute the error vector: e = FPS - SPF.
-    fn compute_error(fock: &[f64], density: &[f64], overlap: &[f64], n: usize) -> Vec<f64> {
+    fn compute_error(
+        fock: &[f64],
+        density: &[f64],
+        overlap: &[f64],
+        n: usize,
+    ) -> Vec<f64> {
         // FP = F * P
         let fp = mat_mul(fock, density, n);
         // SP = S * P
@@ -53,7 +58,12 @@ impl Diis {
 
     /// Add a new Fock matrix and compute/store the error.
     /// Returns the extrapolated Fock matrix.
-    pub fn extrapolate(&mut self, fock: &[f64], density: &[f64], overlap: &[f64]) -> Vec<f64> {
+    pub fn extrapolate(
+        &mut self,
+        fock: &[f64],
+        density: &[f64],
+        overlap: &[f64],
+    ) -> Vec<f64> {
         let error = Self::compute_error(fock, density, overlap, self.n);
 
         self.fock_list.push(fock.to_vec());

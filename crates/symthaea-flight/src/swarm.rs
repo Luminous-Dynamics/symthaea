@@ -11,8 +11,8 @@
 //! But `MjData` is per-simulation and NOT thread-safe. Each rayon task creates
 //! its own `MuJoCoSimulator` (which owns both model and data).
 
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use parking_lot::Mutex;
 use rayon::prelude::*;

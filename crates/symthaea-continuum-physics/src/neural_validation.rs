@@ -35,9 +35,7 @@ pub fn eigenvalue_concentration(covariance_matrix: &[f64], n: usize) -> (f64, Ve
 pub fn effective_dimensionality(eigenvalues: &[f64]) -> f64 {
     let sum: f64 = eigenvalues.iter().sum();
     let sum_sq: f64 = eigenvalues.iter().map(|e| e * e).sum();
-    if sum_sq < 1e-30 {
-        return 0.0;
-    }
+    if sum_sq < 1e-30 { return 0.0; }
     sum * sum / sum_sq
 }
 
@@ -46,12 +44,10 @@ pub fn effective_dimensionality(eigenvalues: &[f64]) -> f64 {
 /// `signals[channel * n_samples + sample]` — row-major, channels × samples.
 pub fn compute_covariance(signals: &[f64], n_channels: usize, n_samples: usize) -> Vec<f64> {
     // Compute means
-    let means: Vec<f64> = (0..n_channels)
-        .map(|ch| {
-            let offset = ch * n_samples;
-            signals[offset..offset + n_samples].iter().sum::<f64>() / n_samples as f64
-        })
-        .collect();
+    let means: Vec<f64> = (0..n_channels).map(|ch| {
+        let offset = ch * n_samples;
+        signals[offset..offset + n_samples].iter().sum::<f64>() / n_samples as f64
+    }).collect();
 
     // Compute covariance
     let mut cov = vec![0.0; n_channels * n_channels];
@@ -60,7 +56,7 @@ pub fn compute_covariance(signals: &[f64], n_channels: usize, n_samples: usize) 
             let mut sum = 0.0;
             for s in 0..n_samples {
                 sum += (signals[i * n_samples + s] - means[i])
-                    * (signals[j * n_samples + s] - means[j]);
+                     * (signals[j * n_samples + s] - means[j]);
             }
             let c = sum / (n_samples - 1) as f64;
             cov[i * n_channels + j] = c;
@@ -92,13 +88,13 @@ pub fn compute_eeg_id(signals: &[f64], n_channels: usize, n_samples: usize) -> (
     integration /= n_pairs.max(1) as f64;
 
     // Differentiation: variance of channel powers (RMS voltage)
-    let powers: Vec<f64> = traces
-        .iter()
-        .map(|tr| (tr.iter().map(|v| v * v).sum::<f64>() / n_samples as f64).sqrt())
-        .collect();
+    let powers: Vec<f64> = traces.iter().map(|tr| {
+        (tr.iter().map(|v| v * v).sum::<f64>() / n_samples as f64).sqrt()
+    }).collect();
     let mean_power = powers.iter().sum::<f64>() / n_channels as f64;
-    let differentiation =
-        powers.iter().map(|p| (p - mean_power).powi(2)).sum::<f64>() / n_channels as f64;
+    let differentiation = powers.iter()
+        .map(|p| (p - mean_power).powi(2))
+        .sum::<f64>() / n_channels as f64;
 
     (integration, differentiation)
 }
@@ -113,9 +109,7 @@ pub fn consciousness_from_eigenvalue_spectrum(eigenvalues: &[f64]) -> f64 {
     let d_eff = effective_dimensionality(eigenvalues);
     let n = eigenvalues.len() as f64;
     // Normalize: d_eff ranges from 1 (minimal) to n (maximal)
-    if n <= 1.0 {
-        return 0.0;
-    }
+    if n <= 1.0 { return 0.0; }
     (d_eff - 1.0) / (n - 1.0)
 }
 
@@ -133,14 +127,11 @@ fn symmetric_eigenvalues(matrix: &[f64], n: usize) -> Vec<f64> {
             for j in (i + 1)..n {
                 if a[i * n + j].abs() > max_val {
                     max_val = a[i * n + j].abs();
-                    p = i;
-                    q = j;
+                    p = i; q = j;
                 }
             }
         }
-        if max_val < tol {
-            break;
-        }
+        if max_val < tol { break; }
 
         let app = a[p * n + p];
         let aqq = a[q * n + q];
@@ -180,21 +171,15 @@ fn symmetric_eigenvalues(matrix: &[f64], n: usize) -> Vec<f64> {
 
 fn pearson_abs(x: &[f64], y: &[f64]) -> f64 {
     let n = x.len().min(y.len()) as f64;
-    if n < 3.0 {
-        return 0.0;
-    }
+    if n < 3.0 { return 0.0; }
     let mx = x.iter().sum::<f64>() / n;
     let my = y.iter().sum::<f64>() / n;
     let (mut cov, mut vx, mut vy) = (0.0, 0.0, 0.0);
     for (xi, yi) in x.iter().zip(y.iter()) {
         let (dx, dy) = (xi - mx, yi - my);
-        cov += dx * dy;
-        vx += dx * dx;
-        vy += dy * dy;
+        cov += dx * dy; vx += dx * dx; vy += dy * dy;
     }
-    if vx < 1e-15 || vy < 1e-15 {
-        return 0.0;
-    }
+    if vx < 1e-15 || vy < 1e-15 { return 0.0; }
     (cov / (vx * vy).sqrt()).abs().min(1.0)
 }
 
@@ -207,15 +192,9 @@ mod tests {
         // Identity covariance: all eigenvalues equal → concentration = 1/n
         let n = 4;
         let mut cov = vec![0.0; n * n];
-        for i in 0..n {
-            cov[i * n + i] = 1.0;
-        }
+        for i in 0..n { cov[i * n + i] = 1.0; }
         let (conc, _) = eigenvalue_concentration(&cov, n);
-        assert!(
-            (conc - 0.25).abs() < 0.01,
-            "Identity concentration = {:.4}",
-            conc
-        );
+        assert!((conc - 0.25).abs() < 0.01, "Identity concentration = {:.4}", conc);
     }
 
     #[test]
@@ -224,9 +203,7 @@ mod tests {
         let n = 4;
         let mut cov = vec![0.0; n * n];
         cov[0] = 100.0; // Dominant
-        for i in 1..n {
-            cov[i * n + i] = 0.01;
-        }
+        for i in 1..n { cov[i * n + i] = 0.01; }
         let (conc, _) = eigenvalue_concentration(&cov, n);
         assert!(conc > 0.95, "Dominant concentration = {:.4}", conc);
     }
@@ -261,11 +238,7 @@ mod tests {
         // Single dominant → low consciousness
         let concentrated = vec![100.0, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1];
         let c2 = consciousness_from_eigenvalue_spectrum(&concentrated);
-        assert!(
-            c2 < 0.2,
-            "Concentrated spectrum = low consciousness: {:.4}",
-            c2
-        );
+        assert!(c2 < 0.2, "Concentrated spectrum = low consciousness: {:.4}", c2);
 
         // Prediction: c1 > c2 (distributed > concentrated)
         assert!(c1 > c2);

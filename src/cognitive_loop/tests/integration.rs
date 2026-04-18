@@ -1019,18 +1019,24 @@ fn test_visualization_records_when_enabled() {
 }
 
 #[test]
-fn test_visualization_disabled_by_default() {
+fn test_visualization_enabled_by_default() {
+    // Default flipped from false → true on 2026-04-04 (commit 2fd27225d99).
+    // Config default and the implied `attention_summary()` availability both
+    // track the flip.
     let config = CognitiveLoopConfig::default();
     assert!(
-        !config.enable_visualization,
-        "visualization should be off by default"
+        config.enable_visualization,
+        "visualization should be on by default"
     );
 
     let mut service = CognitiveLoopService::new(config).unwrap();
-    service.cycle("no visualization");
+    service.cycle("visualization enabled");
 
     let summary = service.attention_summary();
-    assert!(summary.is_none(), "no visualizer when disabled");
+    assert!(
+        summary.is_some(),
+        "visualizer should be populated when enable_visualization is true"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

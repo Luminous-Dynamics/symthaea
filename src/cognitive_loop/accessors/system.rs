@@ -222,6 +222,68 @@ impl CognitiveLoopService {
             .map(|b| b.manifold().evaluate_horizons())
     }
 
+    /// Start live microphone capture. On success, subsequent cycles blend the
+    /// auditory HV into the perception encoding each tick. Idempotent: if
+    /// capture is already running, returns Ok without restarting.
+    #[cfg(feature = "voice-stt-live")]
+    pub fn start_stt_capture(
+        &mut self,
+        config: crate::perception::MicCaptureConfig,
+    ) -> anyhow::Result<()> {
+        if self.stt_capture.is_some() {
+            return Ok(());
+        }
+        let handle = crate::perception::MicCaptureHandle::start(config)?;
+        self.stt_capture = Some(handle);
+        Ok(())
+    }
+
+    /// Stop live microphone capture. The cpal stream and worker thread are
+    /// torn down via the handle's Drop impl.
+    #[cfg(feature = "voice-stt-live")]
+    pub fn stop_stt_capture(&mut self) {
+        self.stt_capture = None;
+    }
+
+    /// Whether live STT capture is currently running.
+    #[cfg(feature = "voice-stt-live")]
+    pub fn stt_capture_active(&self) -> bool {
+        self.stt_capture.is_some()
+    }
+
+    /// Install an IMU fusion module. Subsequent calls to `inject_imu_reading`
+    /// will be fused each cycle and bundled into the perception HV. Replaces
+    /// any previously-installed fusion.
+    #[cfg(feature = "sensor-imu")]
+    pub fn install_imu_fusion(
+        &mut self,
+        fusion: Box<dyn crate::perception::sensor_fusion::ImuFusion>,
+    ) {
+        self.imu_fusion = Some(fusion);
+    }
+
+    /// Remove the IMU fusion module. Pending readings are discarded.
+    #[cfg(feature = "sensor-imu")]
+    pub fn clear_imu_fusion(&mut self) {
+        self.imu_fusion = None;
+        self.latest_imu_reading = None;
+    }
+
+    /// Push a fresh IMU reading into the cognitive loop. Latest-wins: the
+    /// perception phase reads whatever reading was most recently injected.
+    /// No-op if no `ImuFusion` is installed (the reading is still stored
+    /// so a fusion installed later picks up the most recent value).
+    #[cfg(feature = "sensor-imu")]
+    pub fn inject_imu_reading(&mut self, reading: crate::perception::sensor_fusion::ImuReading) {
+        self.latest_imu_reading = Some(reading);
+    }
+
+    /// Whether an IMU fusion is currently installed.
+    #[cfg(feature = "sensor-imu")]
+    pub fn imu_fusion_active(&self) -> bool {
+        self.imu_fusion.is_some()
+    }
+
     /// Build a capability card from the current config and runtime stats.
     ///
     /// The card captures substrate type, cycle frequency, Phi, enabled features,
@@ -491,7 +553,8 @@ impl CognitiveLoopService {
         feature = "exoskeleton",
         feature = "surgical",
         feature = "orbital",
-        feature = "quadruped"
+        feature = "quadruped",
+        feature = "phone"
     ))]
     pub fn has_embodiment(&self) -> bool {
         self.sensorimotor.embodiment_bridge.is_some()
@@ -508,7 +571,8 @@ impl CognitiveLoopService {
         feature = "exoskeleton",
         feature = "surgical",
         feature = "orbital",
-        feature = "quadruped"
+        feature = "quadruped",
+        feature = "phone"
     ))]
     pub fn embodiment_platform(&self) -> super::super::motor_bridge::EmbodimentPlatform {
         self.sensorimotor
@@ -529,7 +593,8 @@ impl CognitiveLoopService {
         feature = "exoskeleton",
         feature = "surgical",
         feature = "orbital",
-        feature = "quadruped"
+        feature = "quadruped",
+        feature = "phone"
     ))]
     pub fn embodiment_telemetry(&self) -> &super::super::motor_bridge::EmbodimentTelemetry {
         &self.sensorimotor.embodiment_telemetry
@@ -546,7 +611,8 @@ impl CognitiveLoopService {
         feature = "exoskeleton",
         feature = "surgical",
         feature = "orbital",
-        feature = "quadruped"
+        feature = "quadruped",
+        feature = "phone"
     ))]
     pub fn last_proprioceptive_hv(&self) -> Option<&symthaea_core::hdc::ContinuousHV> {
         self.sensorimotor.last_proprioceptive_hv.as_ref()
@@ -570,7 +636,8 @@ impl CognitiveLoopService {
         feature = "exoskeleton",
         feature = "surgical",
         feature = "orbital",
-        feature = "quadruped"
+        feature = "quadruped",
+        feature = "phone"
     ))]
     pub fn switch_embodiment(&mut self, platform: super::super::motor_bridge::EmbodimentPlatform) {
         use super::super::motor_bridge::EmbodimentPlatform;
@@ -584,6 +651,10 @@ impl CognitiveLoopService {
                     let bridge = super::super::motor_bridge::MotorBridge::new(&genesis);
                     Some(Box::new(bridge))
                 }
+                // Platform crates now implement EmbodimentBridge directly
+                // (symthaea-core trait), so the old `XBridgeAdapter` wrappers
+                // were removed. Box the implementation directly — matches the
+                // pattern used by exoskeleton/surgical/orbital/quadruped below.
                 #[cfg(feature = "helicopter")]
                 EmbodimentPlatform::Helicopter => Some(Box::new(
                     crate::helicopter::embodiment::HelicopterEmbodiment::new(&genesis),

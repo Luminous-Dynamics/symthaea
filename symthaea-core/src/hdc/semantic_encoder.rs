@@ -919,8 +919,12 @@ pub mod onnx {
 
             let repo = api.model("sentence-transformers/all-MiniLM-L6-v2".to_string());
 
+            // The ONNX export lives under `onnx/model.onnx` in the
+            // current HuggingFace layout (the bare `model.onnx` path
+            // returns 404). Verified 2026-04-13 via curl HEAD on the
+            // resolve/main URL.
             let model_path = repo
-                .get("model.onnx")
+                .get("onnx/model.onnx")
                 .map_err(|e| format!("Failed to download model: {}", e))?;
 
             let tokenizer_path = repo

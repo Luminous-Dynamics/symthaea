@@ -16,9 +16,37 @@ use crate::dimensional::DimensionalEncoder;
 use crate::equation_ast::{
     make_const, make_diffop, make_equals, make_field, make_product, make_sum, EquationEncoder,
 };
+use crate::recognize::expr_to_equation_node;
 use crate::symmetry::SymmetryEncoder;
 use crate::types::*;
+use symthaea_core::hdc::conjecture_engine::{BinOp, Expr, UnaryFn};
 use symthaea_core::hdc::ContinuousHV;
+
+/// Build a complete catalog entry `ast` (LHS + RHS wrapped in Equals) from a
+/// ConjectureEngine `Expr`, routing through the same `expr_to_equation_node`
+/// conversion that autonomous discovery uses at recognition time.
+///
+/// This eliminates the entire class of invisible structural-mismatch bugs
+/// where a hand-constructed catalog AST differs in subtle ways (nested vs
+/// flat Sum, `Const(-0.5)` vs `Negate(Const(0.5))`, literal naming
+/// conventions) from whatever the discovery path produces.
+///
+/// The caller supplies a unique `lhs_name` — we deliberately avoid sharing
+/// a single LHS token (like `"result"`) across all dogfooded entries,
+/// because that would inject a common HV component into every entry's
+/// full encoding and create false 99% matches between unrelated entries
+/// whose RHS share any atomic structure. Per-entry unique names keep the
+/// full axis honest: its job is to tiebreak among otherwise-identical
+/// skeletons, not to dominate.
+///
+/// **Use this** for any catalog entry whose canonical form is an invariant
+/// the ConjectureEngine is expected to rediscover autonomously.
+fn expr_to_catalog_ast(lhs_name: &str, expr: &Expr) -> EquationNode {
+    make_equals(
+        EquationNode::Constant { name: lhs_name.to_string() },
+        expr_to_equation_node(expr),
+    )
+}
 
 /// A single catalog entry with pre-computed HVs.
 pub struct CatalogEntry {
@@ -258,6 +286,42 @@ fn build_all_equations() -> Vec<PhysicsEquation> {
     eqs.push(bayes_theorem());
     eqs.push(arrhenius_equation());
     eqs.push(hubble_law());
+
+    // ── Phase A4: Orbital Mechanics + Hydrogen Spectrum ──
+    // Fills the gap between Kepler's third law (periods) and Rydberg (wavelengths)
+    // with the direct ENERGY forms that autonomous discovery actually produces.
+    eqs.push(hydrogen_energy_levels());
+    eqs.push(kepler_orbital_energy());
+    eqs.push(gravitational_potential_energy());
+    eqs.push(harmonic_oscillator_energy());
+    eqs.push(inverse_square_force());
+
+    // ── Phase A5: Invariant-form entries (Ramanujan Protocol showcase targets) ──
+    // These mirror the *shapes* autonomous conservation-law discovery actually
+    // produces (natural-units forms, Cartesian components, transcendental
+    // invariants), so recognition can route discoveries directly to their true
+    // catalog cousins instead of to nearest-neighbor noise.
+    eqs.push(harmonic_oscillator_invariant());
+    eqs.push(lotka_volterra_invariant());
+    eqs.push(angular_momentum_2d_cartesian());
+    eqs.push(henon_heiles_hamiltonian());
+
+    // ── Combinatorics (Mathematics domain) ──
+    // These give sequence-discovery targets a direct catalog home instead of
+    // routing to nearest-neighbor nuclear physics. Closes the Ramanujan
+    // Protocol showcase's last weak match (triangular → Coulomb Screening 0.70).
+    //
+    // NOTE: Sum of Cubes (`n²(n+1)²/4`) was tried but removed — its shape
+    // was too generic and produced false-positive matches at 99% against
+    // any discovered formula containing nested power-of-variable subtrees
+    // (e.g. PCR3BP's garbage `cos(y/e)^(x³)`). Its function `sum_of_cubes()`
+    // is kept for reference but no longer pushed. If the similarity metric
+    // is ever tightened to weight top-level operator agreement more heavily,
+    // it can be re-added.
+    eqs.push(triangular_numbers());
+    eqs.push(square_pyramidal_numbers());
+    eqs.push(tetrahedral_numbers());
+    eqs.push(harmonic_numbers());
 
     // ── Phase 1B: Expand to 150 ──
     // Classical Mechanics
@@ -4314,6 +4378,479 @@ fn rydberg_formula() -> PhysicsEquation {
         ),
         symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(3)], false),
         dimensions: DimensionalSignature::INVERSE_LENGTH,
+        tensor: None,
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PHASE A4: Orbital Mechanics + Hydrogen Spectrum
+// ═══════════════════════════════════════════════════════════════════════════
+// These entries fill the gap between Kepler's third law (periods) and the
+// Rydberg wavelength formula with the direct ENERGY forms that autonomous
+// discovery from numerical data actually produces.
+
+/// Hydrogen energy levels (Bohr model energy form): E_n = -13.6 eV / n²
+///
+/// The autonomous discoverer converges on this form when fed hydrogen spectral
+/// data or the Bohr-model ionization energies. Distinct from the Rydberg
+/// wavelength formula `1/λ = R(1/n₁² - 1/n₂²)` because it's the energy of a
+/// single orbital, not the transition wavelength between two.
+fn hydrogen_energy_levels() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Hydrogen Energy Levels".to_string(),
+        domain: PhysicsDomain::QuantumMechanics,
+        ast: make_equals(
+            make_const("E_n"),
+            make_product(vec![
+                EquationNode::Negate(Box::new(make_const("R_H"))),
+                EquationNode::Power {
+                    base: Box::new(make_const("n")),
+                    exponent: Box::new(EquationNode::Scalar(-2.0)),
+                },
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(3)], false),
+        dimensions: DimensionalSignature::ENERGY,
+        tensor: None,
+    }
+}
+
+/// Kepler orbital total energy: E = ½mv² - GMm/r
+///
+/// The conserved total mechanical energy for two-body gravitational orbits.
+/// Shape: kinetic (positive quadratic in velocity) minus potential (negative
+/// inverse distance). This is the Sum-of-(Product, Negate-of-Product) that
+/// the Kepler two-body autonomous discovery produces.
+fn kepler_orbital_energy() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Kepler Orbital Energy".to_string(),
+        domain: PhysicsDomain::ClassicalMechanics,
+        ast: make_equals(
+            make_const("E"),
+            make_sum(vec![
+                // ½ m v²
+                make_product(vec![
+                    EquationNode::Scalar(0.5),
+                    make_const("m"),
+                    EquationNode::Power {
+                        base: Box::new(make_const("v")),
+                        exponent: Box::new(EquationNode::Scalar(2.0)),
+                    },
+                ]),
+                // -GMm/r
+                EquationNode::Negate(Box::new(make_product(vec![
+                    make_const("G"),
+                    make_const("M"),
+                    make_const("m"),
+                    EquationNode::Power {
+                        base: Box::new(make_const("r")),
+                        exponent: Box::new(EquationNode::Scalar(-1.0)),
+                    },
+                ]))),
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::from_lie_groups(
+            // SO(4) captures the Kepler hidden symmetry (Laplace-Runge-Lenz)
+            vec![LieGroup::SO(4)],
+            false,
+        ),
+        dimensions: DimensionalSignature::ENERGY,
+        tensor: None,
+    }
+}
+
+/// Gravitational potential energy: U = -GMm/r
+///
+/// The pure inverse-distance potential. Discovery engines that see only
+/// potential-energy data (not kinetic) will converge on this form.
+fn gravitational_potential_energy() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Gravitational Potential Energy".to_string(),
+        domain: PhysicsDomain::ClassicalMechanics,
+        ast: make_equals(
+            make_const("U"),
+            EquationNode::Negate(Box::new(make_product(vec![
+                make_const("G"),
+                make_const("M"),
+                make_const("m"),
+                EquationNode::Power {
+                    base: Box::new(make_const("r")),
+                    exponent: Box::new(EquationNode::Scalar(-1.0)),
+                },
+            ]))),
+        ),
+        symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(3)], false),
+        dimensions: DimensionalSignature::ENERGY,
+        tensor: None,
+    }
+}
+
+/// Harmonic oscillator total energy: E = ½kx² + ½mv²
+///
+/// Shape: Sum of two quadratic kinetic/potential terms — the canonical
+/// `x² + v²` invariant the engine discovers for the harmonic oscillator.
+fn harmonic_oscillator_energy() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Harmonic Oscillator Energy".to_string(),
+        domain: PhysicsDomain::ClassicalMechanics,
+        ast: make_equals(
+            make_const("E"),
+            make_sum(vec![
+                // ½ k x²
+                make_product(vec![
+                    EquationNode::Scalar(0.5),
+                    make_const("k"),
+                    EquationNode::Power {
+                        base: Box::new(make_const("x")),
+                        exponent: Box::new(EquationNode::Scalar(2.0)),
+                    },
+                ]),
+                // ½ m v²
+                make_product(vec![
+                    EquationNode::Scalar(0.5),
+                    make_const("m"),
+                    EquationNode::Power {
+                        base: Box::new(make_const("v")),
+                        exponent: Box::new(EquationNode::Scalar(2.0)),
+                    },
+                ]),
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(2)], false),
+        dimensions: DimensionalSignature::ENERGY,
+        tensor: None,
+    }
+}
+
+/// Harmonic oscillator invariant in natural units: `x² + v²`
+///
+/// This is the shape autonomous discovery produces for a harmonic oscillator
+/// with `k = m = 1` — the raw Hamiltonian minus the ½ prefactor and named
+/// constants. Stored separately from `harmonic_oscillator_energy()` so
+/// recognition matches the discovered skeleton directly, not the physical
+/// formula with dimensioned coefficients.
+///
+/// Dimensions: declared as DIMENSIONLESS because natural units have already
+/// absorbed the physical scales. The dimensional inference layer likewise
+/// returns DIMENSIONLESS (via `Inconsistent → or_dimensionless()`) for the
+/// raw `x² + v²` query when `x` is length and `v` is velocity, so the two
+/// align along the dimensional axis.
+fn harmonic_oscillator_invariant() -> PhysicsEquation {
+    // Dogfood via expr_to_catalog_ast so the catalog shape is guaranteed
+    // identical to what autonomous discovery produces for this invariant.
+    let v = |n: &str| Expr::Var(n.into());
+    let pow2 = |e: Expr| Expr::BinOp(BinOp::Pow, Box::new(e), Box::new(Expr::Const(2.0)));
+    let add = |a: Expr, b: Expr| Expr::BinOp(BinOp::Add, Box::new(a), Box::new(b));
+    let expr = add(pow2(v("x")), pow2(v("v")));
+    PhysicsEquation {
+        name: "Harmonic Oscillator Invariant".to_string(),
+        domain: PhysicsDomain::ClassicalMechanics,
+        ast: expr_to_catalog_ast("E", &expr),
+        symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(2)], false),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    }
+}
+
+/// Lotka-Volterra first integral: `(x - ln(x)) + (y - ln(y))`
+///
+/// The canonical transcendental conservation law of predator-prey dynamics
+/// with rate constants set to unity. Stored as a dedicated catalog entry
+/// (separate from `lotka_volterra()` which encodes the ODE) so that when
+/// autonomous discovery finds the invariant, it has a direct recognition
+/// target instead of matching nearest-neighbor noise in nuclear physics.
+///
+/// Dimensions: DIMENSIONLESS — populations are counts and `ln` requires a
+/// dimensionless argument, so the entire expression is dimensionless.
+fn lotka_volterra_invariant() -> PhysicsEquation {
+    // Dogfood via expr_to_catalog_ast. The Expr is the exact form produced
+    // by the Lotka-Volterra template seed in `build_invariant_templates`:
+    //     (x - ln(x)) + (y - ln(y))
+    let v = |n: &str| Expr::Var(n.into());
+    let ln = |e: Expr| Expr::Func(UnaryFn::Log, Box::new(e));
+    let sub = |a: Expr, b: Expr| Expr::BinOp(BinOp::Sub, Box::new(a), Box::new(b));
+    let add = |a: Expr, b: Expr| Expr::BinOp(BinOp::Add, Box::new(a), Box::new(b));
+    let expr = add(sub(v("x"), ln(v("x"))), sub(v("y"), ln(v("y"))));
+    PhysicsEquation {
+        name: "Lotka-Volterra Invariant".to_string(),
+        domain: PhysicsDomain::Biophysics,
+        ast: expr_to_catalog_ast("V", &expr),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    }
+}
+
+/// 2D angular momentum in Cartesian form: `L_z = x·vy - y·vx`
+///
+/// The natural shape for conservation laws discovered from 4D orbital
+/// mechanics trajectories, where the state is `(x, y, vx, vy)`. The existing
+/// `Angular Momentum` catalog entry encodes the scalar form `L = I·ω`, which
+/// is structurally unrelated to what discovery produces. Stored separately
+/// so Kepler-like orbital invariants get a direct catalog cousin instead of
+/// matching nuclear-physics nearest neighbors.
+///
+/// Dimensions: `length × velocity = L²/T`. Since we've declared mass out of
+/// the equation (unit mass convention), the remaining dimensions are
+/// `[L² T⁻¹]`.
+fn angular_momentum_2d_cartesian() -> PhysicsEquation {
+    // Dogfood via expr_to_catalog_ast. Expr: x·vy - y·vx.
+    let v = |n: &str| Expr::Var(n.into());
+    let mul = |a: Expr, b: Expr| Expr::BinOp(BinOp::Mul, Box::new(a), Box::new(b));
+    let sub = |a: Expr, b: Expr| Expr::BinOp(BinOp::Sub, Box::new(a), Box::new(b));
+    let expr = sub(mul(v("x"), v("vy")), mul(v("y"), v("vx")));
+    PhysicsEquation {
+        name: "Angular Momentum (2D Cartesian)".to_string(),
+        domain: PhysicsDomain::ClassicalMechanics,
+        ast: expr_to_catalog_ast("L_z", &expr),
+        symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(2)], false),
+        dimensions: DimensionalSignature {
+            mass: 0,
+            length: 2,
+            time: -1,
+            current: 0,
+            temperature: 0,
+            amount: 0,
+            luminous: 0,
+        },
+        tensor: None,
+    }
+}
+
+/// Hénon-Heiles Hamiltonian: `H = ½(px² + py²) + ½(x² + y²) + x²y − (1/3)y³`
+///
+/// The canonical 4D chaotic Hamiltonian from stellar dynamics (Hénon &
+/// Heiles 1964). Energy is the only first integral — there is no second
+/// isolating integral in the chaotic regime.
+///
+/// Built from an `Expr` via `rhs_from_expr` so the catalog AST is
+/// guaranteed to exactly match what autonomous discovery produces. The
+/// earlier hand-constructed version used `Constant { name: "c_0.5000" }`
+/// but the discovery path emits `Constant { name: "c_0.5000" }` via a
+/// slightly different Product/Sum flattening order, and the shapes didn't
+/// align — so queries for the discovered HH form routed to the nearest
+/// nuclear-physics neighbor instead of this entry.
+fn henon_heiles_hamiltonian() -> PhysicsEquation {
+    // Construct the exact Expr tree the GP produces when the HH template
+    // seed wins. This mirrors `build_invariant_templates` in the
+    // ConjectureEngine 4D branch.
+    let v = |n: &str| Expr::Var(n.into());
+    let pow2 = |e: Expr| Expr::BinOp(BinOp::Pow, Box::new(e), Box::new(Expr::Const(2.0)));
+    let pow3 = |e: Expr| Expr::BinOp(BinOp::Pow, Box::new(e), Box::new(Expr::Const(3.0)));
+    let mul = |a: Expr, b: Expr| Expr::BinOp(BinOp::Mul, Box::new(a), Box::new(b));
+    let add = |a: Expr, b: Expr| Expr::BinOp(BinOp::Add, Box::new(a), Box::new(b));
+
+    let half_p2 = mul(Expr::Const(0.5), add(pow2(v("px")), pow2(v("py"))));
+    let half_q2 = mul(Expr::Const(0.5), add(pow2(v("x")), pow2(v("y"))));
+    let coupling = mul(pow2(v("x")), v("y"));
+    let cubic = mul(Expr::Const(-1.0 / 3.0), pow3(v("y")));
+
+    // ((((half_p2 + half_q2) + coupling) + cubic)
+    let hh_expr = add(add(add(half_p2, half_q2), coupling), cubic);
+
+    PhysicsEquation {
+        name: "Hénon-Heiles Hamiltonian".to_string(),
+        domain: PhysicsDomain::ClassicalMechanics,
+        ast: expr_to_catalog_ast("H", &hh_expr),
+        // No continuous rotational symmetry — the cubic cross-coupling
+        // `x²y − y³/3` breaks rotational invariance. `symmetry_inference`
+        // returns `none()` for a sum containing cubic terms (it only
+        // matches pure sum-of-squares), which aligns with this entry.
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COMBINATORICS — Ramanujan Showcase routing fix
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// The Ramanujan Protocol showcase discovers triangular numbers `n(n+1)/2` as
+// a Z3-proven closed form, but until these entries existed the nearest
+// neighbor in the catalog was "Coulomb Screening Enhancement" (similarity
+// ~0.70) — a nonsense match because there were zero combinatorics entries
+// in a 216-equation catalog dominated by physics.
+//
+// These five entries give canonical combinatorial sequences a direct
+// catalog home in the `Mathematics` domain. They're constructed via
+// `expr_to_catalog_ast` so the AST shape exactly matches what autonomous
+// discovery produces for each closed form.
+
+/// Triangular numbers: `T(n) = n(n+1)/2`
+///
+/// The 1st order polygonal number. Canonical closed form for Σk from 1 to n.
+/// Discovered as `(n * (n + 1)) / 2` by the ConjectureEngine's recurrence
+/// solver, so the AST is built from that exact shape.
+fn triangular_numbers() -> PhysicsEquation {
+    let v = |n: &str| Expr::Var(n.into());
+    let mul = |a: Expr, b: Expr| Expr::BinOp(BinOp::Mul, Box::new(a), Box::new(b));
+    let add = |a: Expr, b: Expr| Expr::BinOp(BinOp::Add, Box::new(a), Box::new(b));
+    let div = |a: Expr, b: Expr| Expr::BinOp(BinOp::Div, Box::new(a), Box::new(b));
+
+    // (n * (n + 1)) / 2 — exact shape produced by solve_recurrence
+    let expr = div(mul(v("n"), add(v("n"), Expr::Const(1.0))), Expr::Const(2.0));
+
+    PhysicsEquation {
+        name: "Triangular Numbers".to_string(),
+        domain: PhysicsDomain::Mathematics,
+        ast: expr_to_catalog_ast("T", &expr),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    }
+}
+
+/// Square pyramidal numbers: `P(n) = n(n+1)(2n+1)/6`
+///
+/// Σk² from 1 to n. Classic stepping stone in combinatorial identities;
+/// the natural closed form for sum-of-squares sequences. Built from the
+/// exact factored shape that GP recurrence solving produces.
+fn square_pyramidal_numbers() -> PhysicsEquation {
+    let v = |n: &str| Expr::Var(n.into());
+    let mul = |a: Expr, b: Expr| Expr::BinOp(BinOp::Mul, Box::new(a), Box::new(b));
+    let add = |a: Expr, b: Expr| Expr::BinOp(BinOp::Add, Box::new(a), Box::new(b));
+    let div = |a: Expr, b: Expr| Expr::BinOp(BinOp::Div, Box::new(a), Box::new(b));
+
+    // (n * (n + 1) * (2n + 1)) / 6
+    let two_n_plus_1 = add(mul(Expr::Const(2.0), v("n")), Expr::Const(1.0));
+    let expr = div(
+        mul(mul(v("n"), add(v("n"), Expr::Const(1.0))), two_n_plus_1),
+        Expr::Const(6.0),
+    );
+
+    PhysicsEquation {
+        name: "Square Pyramidal Numbers".to_string(),
+        domain: PhysicsDomain::Mathematics,
+        ast: expr_to_catalog_ast("P", &expr),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    }
+}
+
+/// Tetrahedral numbers: `Te(n) = n(n+1)(n+2)/6`
+///
+/// Σ T(k) from 1 to n — the 3D analogue of triangular numbers. Included
+/// because sequences like pyramid counts and layer sums naturally produce
+/// this shape, and it's structurally distinct from square pyramidal
+/// (different factor ordering).
+fn tetrahedral_numbers() -> PhysicsEquation {
+    let v = |n: &str| Expr::Var(n.into());
+    let mul = |a: Expr, b: Expr| Expr::BinOp(BinOp::Mul, Box::new(a), Box::new(b));
+    let add = |a: Expr, b: Expr| Expr::BinOp(BinOp::Add, Box::new(a), Box::new(b));
+    let div = |a: Expr, b: Expr| Expr::BinOp(BinOp::Div, Box::new(a), Box::new(b));
+
+    // n(n+1)(n+2) / 6
+    let expr = div(
+        mul(
+            mul(v("n"), add(v("n"), Expr::Const(1.0))),
+            add(v("n"), Expr::Const(2.0)),
+        ),
+        Expr::Const(6.0),
+    );
+
+    PhysicsEquation {
+        name: "Tetrahedral Numbers".to_string(),
+        domain: PhysicsDomain::Mathematics,
+        ast: expr_to_catalog_ast("Te", &expr),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    }
+}
+
+/// Sum of cubes: `Σk³ = (n(n+1)/2)² = T(n)²`
+///
+/// The famous Nicomachus identity — sum of the first n cubes equals the
+/// square of the nth triangular number. Stored in its explicit closed form
+/// `n²(n+1)²/4`.
+///
+/// **Currently not registered in the catalog list** because its AST shape
+/// is too generic for the similarity metric — it scored 99% matches against
+/// arbitrary formulas containing nested power-of-variable subtrees (e.g.
+/// `cos(y/e)^(x³)` from PCR3BP's garbage output). Kept as a reference
+/// implementation for future re-addition once the similarity metric
+/// weights top-level operator agreement more heavily.
+#[allow(dead_code)]
+fn sum_of_cubes() -> PhysicsEquation {
+    let v = |n: &str| Expr::Var(n.into());
+    let pow2 = |e: Expr| Expr::BinOp(BinOp::Pow, Box::new(e), Box::new(Expr::Const(2.0)));
+    let mul = |a: Expr, b: Expr| Expr::BinOp(BinOp::Mul, Box::new(a), Box::new(b));
+    let add = |a: Expr, b: Expr| Expr::BinOp(BinOp::Add, Box::new(a), Box::new(b));
+    let div = |a: Expr, b: Expr| Expr::BinOp(BinOp::Div, Box::new(a), Box::new(b));
+
+    // n² * (n+1)² / 4
+    let expr = div(
+        mul(pow2(v("n")), pow2(add(v("n"), Expr::Const(1.0)))),
+        Expr::Const(4.0),
+    );
+
+    PhysicsEquation {
+        name: "Sum of Cubes (Nicomachus)".to_string(),
+        domain: PhysicsDomain::Mathematics,
+        ast: expr_to_catalog_ast("C", &expr),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    }
+}
+
+/// Harmonic numbers: `H(n) ≈ ln(n) + γ`
+///
+/// Asymptotic closed form for the partial sums of the harmonic series.
+/// Stored as the log approximation (the exact H(n) has no elementary
+/// closed form) because that's what GP regression converges to on the
+/// harmonic sequence — the `ln(n) + 0.577...` shape.
+///
+/// Constant named for the Euler-Mascheroni constant γ ≈ 0.5772.
+fn harmonic_numbers() -> PhysicsEquation {
+    let v = |n: &str| Expr::Var(n.into());
+    let ln = |e: Expr| Expr::Func(UnaryFn::Log, Box::new(e));
+    let add = |a: Expr, b: Expr| Expr::BinOp(BinOp::Add, Box::new(a), Box::new(b));
+
+    // ln(n) + γ  (γ as literal 0.5772156649)
+    let expr = add(ln(v("n")), Expr::Const(0.577_215_664_901_532_9));
+
+    PhysicsEquation {
+        name: "Harmonic Numbers (asymptotic)".to_string(),
+        domain: PhysicsDomain::Mathematics,
+        ast: expr_to_catalog_ast("H", &expr),
+        symmetries: SymmetryDescriptor::none(),
+        dimensions: DimensionalSignature::DIMENSIONLESS,
+        tensor: None,
+    }
+}
+
+// Keep silencing unused-import warning in the rare case UnaryFn isn't
+// referenced elsewhere in catalog.rs — it's imported for future catalog
+// entries that use transcendental functions.
+#[allow(dead_code)]
+fn _unused_unary(_: UnaryFn) {}
+
+/// Inverse-square force law (general form): F = k/r²
+///
+/// The universal shape of Coulomb, Newton gravity, and the Yukawa limit.
+/// Distinct from the specific Newton gravity and Coulomb entries because
+/// it's domain-agnostic — discovery engines that find `f(r) ~ 1/r²` in
+/// unknown contexts (e.g., unknown force fields in simulation data) should
+/// match here even when the specific constant hasn't been named.
+fn inverse_square_force() -> PhysicsEquation {
+    PhysicsEquation {
+        name: "Inverse Square Force Law".to_string(),
+        domain: PhysicsDomain::ClassicalMechanics,
+        ast: make_equals(
+            make_const("F"),
+            make_product(vec![
+                make_const("k"),
+                EquationNode::Power {
+                    base: Box::new(make_const("r")),
+                    exponent: Box::new(EquationNode::Scalar(-2.0)),
+                },
+            ]),
+        ),
+        symmetries: SymmetryDescriptor::from_lie_groups(vec![LieGroup::SO(3)], false),
+        dimensions: DimensionalSignature::FORCE,
         tensor: None,
     }
 }

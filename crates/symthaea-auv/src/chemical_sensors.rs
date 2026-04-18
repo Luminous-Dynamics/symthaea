@@ -146,14 +146,12 @@ impl SensorNoiseModel {
 
         for i in 0..8 {
             // Deterministic pseudo-random noise (xorshift64)
-            let mut s = rng_seed
-                .wrapping_add(i as u64)
-                .wrapping_mul(6364136223846793005);
+            let mut s = rng_seed.wrapping_add(i as u64).wrapping_mul(6364136223846793005);
             s ^= s >> 12;
             s ^= s << 25;
             s ^= s >> 27;
             let uniform = (s as f64) / (u64::MAX as f64); // [0, 1)
-                                                          // Box-Muller approximation: (uniform - 0.5) * sqrt(12) ≈ N(0,1)
+            // Box-Muller approximation: (uniform - 0.5) * sqrt(12) ≈ N(0,1)
             let gaussian = (uniform - 0.5) * 3.464;
 
             // Additive noise
@@ -161,8 +159,7 @@ impl SensorNoiseModel {
 
             // Mean-reverting drift: drift += rate * gaussian - revert * drift
             let revert = 0.01;
-            self.drift_state[i] +=
-                self.drift_rate[i] * gaussian * dt.sqrt() - revert * self.drift_state[i] * dt;
+            self.drift_state[i] += self.drift_rate[i] * gaussian * dt.sqrt() - revert * self.drift_state[i] * dt;
 
             // Clean + noise + drift
             noisy[i] = channels[i] + noise + self.drift_state[i];
@@ -241,11 +238,7 @@ mod tests {
         }
         // pH should have nonzero variance (noise is being applied)
         let mean_ph: f64 = readings.iter().map(|r| r.ph).sum::<f64>() / 100.0;
-        let var_ph: f64 = readings
-            .iter()
-            .map(|r| (r.ph - mean_ph).powi(2))
-            .sum::<f64>()
-            / 100.0;
+        let var_ph: f64 = readings.iter().map(|r| (r.ph - mean_ph).powi(2)).sum::<f64>() / 100.0;
         assert!(var_ph > 0.0, "Noise should add variance to readings");
     }
 
@@ -262,8 +255,7 @@ mod tests {
         // Mean should be close to clean value (within 0.5 for pH)
         assert!(
             (mean_ph - clean.ph).abs() < 0.5,
-            "Mean pH {mean_ph} too far from clean {}",
-            clean.ph
+            "Mean pH {mean_ph} too far from clean {}", clean.ph
         );
     }
 

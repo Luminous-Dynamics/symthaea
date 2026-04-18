@@ -167,4 +167,89 @@ mod tests {
         assert!(SurgicalSafetyLevel::from_phi(0.8).cautery_allowed());
         assert!(!SurgicalSafetyLevel::from_phi(0.4).cautery_allowed());
     }
+
+    #[test]
+    fn test_command_zero_effort() {
+        let c = SurgicalCommand::zero();
+        assert_eq!(c.control_effort(), 0.0);
+        assert_eq!(c.joint_torques, [0.0; NUM_JOINTS]);
+    }
+
+    #[test]
+    fn test_command_effort_bounds() {
+        let c = SurgicalCommand {
+            joint_torques: [1.0; NUM_JOINTS],
+            jaw: 1.0,
+            cautery: 1.0,
+        };
+        // 6 joints + jaw + cautery = 8 unit contributions / 8 actuators = 1.0.
+        assert!((c.control_effort() - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_safety_torque_gain_ordering() {
+        // Gain must decrease monotonically as safety tightens.
+        let full = SurgicalSafetyLevel::FullControl.torque_gain();
+        let reduced = SurgicalSafetyLevel::Reduced.torque_gain();
+        let freeze = SurgicalSafetyLevel::Freeze.torque_gain();
+        let retract = SurgicalSafetyLevel::Retract.torque_gain();
+        assert!(full > reduced);
+        assert!(reduced > freeze);
+        assert_eq!(freeze, retract, "freeze and retract both zero torque");
+        assert_eq!(freeze, 0.0);
+    }
+
+    #[test]
+    fn test_safety_from_phi_boundaries() {
+        assert_eq!(
+            SurgicalSafetyLevel::from_phi(0.61),
+            SurgicalSafetyLevel::FullControl
+        );
+        assert_eq!(
+            SurgicalSafetyLevel::from_phi(0.60),
+            SurgicalSafetyLevel::Reduced
+        );
+        assert_eq!(
+            SurgicalSafetyLevel::from_phi(0.31),
+            SurgicalSafetyLevel::Reduced
+        );
+        assert_eq!(
+            SurgicalSafetyLevel::from_phi(0.30),
+            SurgicalSafetyLevel::Freeze
+        );
+        assert_eq!(
+            SurgicalSafetyLevel::from_phi(0.11),
+            SurgicalSafetyLevel::Freeze
+        );
+        assert_eq!(
+            SurgicalSafetyLevel::from_phi(0.10),
+            SurgicalSafetyLevel::Retract
+        );
+        assert_eq!(
+            SurgicalSafetyLevel::from_phi(0.0),
+            SurgicalSafetyLevel::Retract
+        );
+    }
+
+    #[test]
+    fn test_state_force_magnitude() {
+        let mut s = SurgicalState::home();
+        assert_eq!(s.force_magnitude(), 0.0);
+        s.tip_force = [3.0, 4.0, 0.0];
+        assert!((s.force_magnitude() - 5.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_config_physics_dt() {
+        let cfg = SurgicalConfig::default();
+        assert!((cfg.physics_dt() - 0.001).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_cautery_only_at_full_control() {
+        assert!(SurgicalSafetyLevel::FullControl.cautery_allowed());
+        assert!(!SurgicalSafetyLevel::Reduced.cautery_allowed());
+        assert!(!SurgicalSafetyLevel::Freeze.cautery_allowed());
+        assert!(!SurgicalSafetyLevel::Retract.cautery_allowed());
+    }
 }

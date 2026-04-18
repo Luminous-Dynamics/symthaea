@@ -90,23 +90,21 @@ impl MaterialsDesignBenchmark {
 
         // ── 3. Density ordering: steel > aluminum ─────────────────────────
         // Steel A36: 7850 kg/m³, Aluminum 6061: 2700 kg/m³.
-        let density_ordering = if steel.density_kg_m3 > aluminum.density_kg_m3 {
-            1.0
-        } else {
-            0.0
-        };
+        let density_ordering =
+            if steel.density_kg_m3 > aluminum.density_kg_m3 { 1.0 } else { 0.0 };
 
         // ── 4. Category filter: metal query never returns ceramics ─────────
-        let metal_results =
-            db.constrained_search(&steel, |m| m.category == MaterialCategory::Metal, 10);
-        let category_filter_correct = if metal_results
-            .iter()
-            .all(|r| r.material.category == MaterialCategory::Metal)
-        {
-            1.0
-        } else {
-            0.0
-        };
+        let metal_results = db.constrained_search(
+            &steel,
+            |m| m.category == MaterialCategory::Metal,
+            10,
+        );
+        let category_filter_correct =
+            if metal_results.iter().all(|r| r.material.category == MaterialCategory::Metal) {
+                1.0
+            } else {
+                0.0
+            };
 
         TrialResult {
             youngs_modulus_ordering,
@@ -156,10 +154,7 @@ impl PsychBenchmark for MaterialsDesignBenchmark {
             "metal_similarity_correct",
             MetricValue::from_samples(&sim_scores),
         );
-        result.insert(
-            "density_ordering",
-            MetricValue::from_samples(&density_scores),
-        );
+        result.insert("density_ordering", MetricValue::from_samples(&density_scores));
         result.insert(
             "category_filter_correct",
             MetricValue::from_samples(&filter_scores),
@@ -228,17 +223,18 @@ mod tests {
     #[test]
     fn test_database_has_presets() {
         let db = MaterialDatabase::with_presets();
-        assert!(
-            db.len() >= 3,
-            "Preset database should have at least 3 materials"
-        );
+        assert!(db.len() >= 3, "Preset database should have at least 3 materials");
     }
 
     #[test]
     fn test_constrained_search_no_ceramics_in_metal_results() {
         let db = MaterialDatabase::with_presets();
         let query = MaterialProperty::steel_a36();
-        let results = db.constrained_search(&query, |m| m.category == MaterialCategory::Metal, 10);
+        let results = db.constrained_search(
+            &query,
+            |m| m.category == MaterialCategory::Metal,
+            10,
+        );
         for r in &results {
             assert_eq!(
                 r.material.category,

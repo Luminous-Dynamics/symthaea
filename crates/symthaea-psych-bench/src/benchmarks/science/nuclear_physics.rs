@@ -65,22 +65,16 @@ impl NuclearPhysicsBenchmark {
         // Fe-56 (Z=26) is the most stable nucleus at A=56.
         // SEMF predicts Z_stable ≈ 24–28 for A=56.
         let z_predicted = semf.beta_stable_z(56);
-        let beta_stability_accuracy = if (z_predicted as i32 - 26).abs() <= 2 {
-            1.0
-        } else {
-            0.0
-        };
+        let beta_stability_accuracy =
+            if (z_predicted as i32 - 26).abs() <= 2 { 1.0 } else { 0.0 };
 
         // ── 4. Binding energy curve: He-4 < C-12 < Fe-56 ─────────────────
         let he4_bpa = semf.binding_energy_per_nucleon(4, 2);
         let c12_bpa = semf.binding_energy_per_nucleon(12, 6);
         // The binding energy curve rises steeply from H to Fe, then slowly decreases.
         // B/A: He-4 ≈ 7.07 MeV/A, C-12 ≈ 7.68 MeV/A, Fe-56 ≈ 8.79 MeV/A.
-        let binding_curve_monotone = if he4_bpa < c12_bpa && c12_bpa < fe56_bpa {
-            1.0
-        } else {
-            0.0
-        };
+        let binding_curve_monotone =
+            if he4_bpa < c12_bpa && c12_bpa < fe56_bpa { 1.0 } else { 0.0 };
 
         // ── 5. Magic number pairing: even-even near Z=28 ─────────────────
         // Ni-56 (Z=28, N=28): doubly magic, even-even → positive pairing delta.

@@ -14,5 +14,37 @@ serde = { workspace = true }
 rand = { workspace = true }
 proptest = "1"
 
+[dependencies.symtropy-physics]
+# [standalone-stripped] path = "../../../symtropy/crates/symtropy-physics"
+optional = true
+
+[dependencies.symtropy-math]
+# [standalone-stripped] path = "../../../symtropy/crates/symtropy-math"
+optional = true
+
+[dependencies.nalgebra]
+version = "0.34"
+optional = true
+
+[dependencies.symthaea-hal]
+path = "../symthaea-hal"
+default-features = false
+optional = true
+
+[dependencies.symthaea-humanoid]
+path = "../symthaea-humanoid"
+optional = true
+
+[dependencies.symthaea-sensors]
+path = "../symthaea-sensors"
+optional = true
+
 [features]
 default = []
+symtropy = ["dep:symtropy-physics", "dep:symtropy-math", "dep:nalgebra"]
+hal = ["dep:symthaea-hal", "dep:symthaea-humanoid", "symtropy"]
+sensors = ["dep:symthaea-sensors", "symtropy"]
+
+[[example]]
+name = "full_frame_demo"
+required-features = ["hal"]

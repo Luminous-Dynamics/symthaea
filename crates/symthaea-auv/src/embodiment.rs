@@ -13,7 +13,7 @@ use crate::types::AuvConfig;
 
 pub use symthaea_core::embodiment::{
     grounding_from_prediction_error, grounding_label, EmbodimentResult, EmbodimentTelemetry,
-    MotorSafetyLevel, GROUNDING_SENSORIMOTOR,
+    MoralGateInput, MotorSafetyLevel, GROUNDING_SENSORIMOTOR,
 };
 
 /// AUV embodiment bridge.
@@ -25,6 +25,7 @@ pub struct AuvEmbodiment {
     total_steps: usize,
     current_safety: MotorSafetyLevel,
     safety_override: Option<MotorSafetyLevel>,
+    moral_safety: Option<MotorSafetyLevel>,
     last_control_effort: f32,
     last_prediction_error: f32,
 }
@@ -40,6 +41,7 @@ impl AuvEmbodiment {
             total_steps: 0,
             current_safety: MotorSafetyLevel::Green,
             safety_override: None,
+            moral_safety: None,
             last_control_effort: 0.0,
             last_prediction_error: 0.0,
         }
@@ -53,12 +55,34 @@ impl AuvEmbodiment {
         self.safety_override = None;
     }
 
+    /// Apply moral gate from ethics engine.
+    /// An AUV operating near divers, fish, or reefs can cause harm — ahimsa
+    /// forces Red (zero thrust), consent violation forces Orange, caution
+    /// forces Yellow.
+    pub fn apply_moral_gate(&mut self, gate: MoralGateInput) {
+        self.moral_safety =
+            if gate.ahimsa_violated || gate.verdict == MoralGateInput::VERDICT_BLOCKED {
+                Some(MotorSafetyLevel::Red)
+            } else if gate.consent_violation {
+                Some(MotorSafetyLevel::Orange)
+            } else if gate.verdict == MoralGateInput::VERDICT_CAUTION {
+                Some(MotorSafetyLevel::Yellow)
+            } else {
+                None
+            };
+    }
+
     pub fn step(&mut self, thought_hv: &ContinuousHV, dt: f32, phi: f64) -> EmbodimentResult {
         let phi_level = MotorSafetyLevel::from_phi(phi);
         self.current_safety = match self.safety_override {
             Some(override_level) => phi_level.max(override_level),
             None => phi_level,
         };
+        // Ethics gate max-composes on top of phi + override. Moral-Red zeros
+        // thrust via motor_gain() just like phi-Red.
+        if let Some(m) = self.moral_safety {
+            self.current_safety = self.current_safety.max(m);
+        }
         let gain = self.current_safety.motor_gain();
         let mut cmd = self.controller.forward(thought_hv, dt);
         if gain < 1.0 {
@@ -102,6 +126,7 @@ impl AuvEmbodiment {
         self.total_steps = 0;
         self.current_safety = MotorSafetyLevel::Green;
         self.safety_override = None;
+        self.moral_safety = None;
         self.last_control_effort = 0.0;
         self.last_prediction_error = 0.0;
     }
@@ -158,6 +183,9 @@ impl symthaea_core::embodiment::EmbodimentBridge for AuvEmbodiment {
     fn telemetry(&self) -> EmbodimentTelemetry {
         self.telemetry()
     }
+    fn apply_moral_gate(&mut self, gate: MoralGateInput) {
+        self.apply_moral_gate(gate)
+    }
 }
 
 #[cfg(test)]
@@ -208,5 +236,41 @@ mod tests {
         bridge.step(&hv, 0.01, 0.7);
         bridge.reset();
         assert_eq!(bridge.total_steps(), 0);
+    }
+
+    #[test]
+    fn test_moral_gate_ahimsa_forces_red() {
+        let mut bridge = AuvEmbodiment::new(&GenesisSeed::from_phrase("test"));
+        bridge.apply_moral_gate(MoralGateInput {
+            verdict: MoralGateInput::VERDICT_SAFE,
+            consent_violation: false,
+            ahimsa_violated: true,
+        });
+        let hv = ContinuousHV::random(16384, 42);
+        // Phi 0.9 → Green normally; ahimsa forces Red.
+        let r = bridge.step(&hv, 0.01, 0.9);
+        assert_eq!(
+            r.safety_level,
+            MotorSafetyLevel::Red,
+            "ahimsa must force Red regardless of phi"
+        );
+        assert_eq!(r.control_effort, 0.0, "Red tier zeros thrust");
+    }
+
+    #[test]
+    fn test_moral_gate_consent_violation_forces_orange() {
+        let mut bridge = AuvEmbodiment::new(&GenesisSeed::from_phrase("test"));
+        bridge.apply_moral_gate(MoralGateInput {
+            verdict: MoralGateInput::VERDICT_SAFE,
+            consent_violation: true,
+            ahimsa_violated: false,
+        });
+        let hv = ContinuousHV::random(16384, 42);
+        let r = bridge.step(&hv, 0.01, 0.9);
+        assert_eq!(
+            r.safety_level,
+            MotorSafetyLevel::Orange,
+            "consent violation → Orange"
+        );
     }
 }

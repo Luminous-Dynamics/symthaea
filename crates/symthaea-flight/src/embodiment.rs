@@ -13,8 +13,24 @@ use crate::types::FlightConfig;
 
 pub use symthaea_core::embodiment::{
     grounding_from_prediction_error, grounding_label, EmbodimentResult, EmbodimentTelemetry,
-    MotorSafetyLevel, GROUNDING_SENSORIMOTOR,
+    MoralGateInput, MotorSafetyLevel, SafeFallback, GROUNDING_SENSORIMOTOR,
 };
+
+/// Multi-stage emergency fallback for quadrotors.
+///
+/// Mirrors DJI/PX4 emergency landing protocols:
+///   1. StabilizeHover: hold position, level attitude
+///   2. ControlledDescent: 30% hover thrust for ~3 m/s descent
+///   3. Touchdown: cushion landing thrust spike near ground (<1m)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FlightFallbackStage {
+    /// Stage 1: Maintain altitude with hover thrust, level attitude.
+    StabilizeHover,
+    /// Stage 2: Controlled descent at 30% hover thrust.
+    ControlledDescent,
+    /// Stage 3: Touchdown cushion (near ground).
+    Touchdown,
+}
 
 /// Quadrotor embodiment bridge.
 pub struct FlightEmbodiment {
@@ -25,8 +41,11 @@ pub struct FlightEmbodiment {
     total_steps: usize,
     current_safety: MotorSafetyLevel,
     safety_override: Option<MotorSafetyLevel>,
+    moral_safety: Option<MotorSafetyLevel>,
     last_control_effort: f32,
     last_prediction_error: f32,
+    fallback_stage: FlightFallbackStage,
+    fallback_cycles_in_stage: u32,
 }
 
 impl FlightEmbodiment {
@@ -45,9 +64,63 @@ impl FlightEmbodiment {
             total_steps: 0,
             current_safety: MotorSafetyLevel::Green,
             safety_override: None,
+            moral_safety: None,
             last_control_effort: 0.0,
             last_prediction_error: 0.0,
+            fallback_stage: FlightFallbackStage::StabilizeHover,
+            fallback_cycles_in_stage: 0,
         }
+    }
+
+    /// Apply moral gate from ethics engine.
+    /// A flying quadrotor can strike beings — ahimsa forces Red (which triggers
+    /// the StabilizeHover → ControlledDescent → Touchdown fallback chain at
+    /// the existing Red-tier handler), consent violation forces Orange,
+    /// caution forces Yellow.
+    pub fn apply_moral_gate(&mut self, gate: MoralGateInput) {
+        self.moral_safety =
+            if gate.ahimsa_violated || gate.verdict == MoralGateInput::VERDICT_BLOCKED {
+                Some(MotorSafetyLevel::Red)
+            } else if gate.consent_violation {
+                Some(MotorSafetyLevel::Orange)
+            } else if gate.verdict == MoralGateInput::VERDICT_CAUTION {
+                Some(MotorSafetyLevel::Yellow)
+            } else {
+                None
+            };
+    }
+
+    /// Update fallback stage based on altitude and time.
+    fn update_fallback_stage(&mut self) {
+        let altitude = self.simulator.state().position[2];
+        match self.fallback_stage {
+            FlightFallbackStage::StabilizeHover => {
+                // After 50 cycles of stable hover, begin controlled descent
+                if self.fallback_cycles_in_stage > 50 {
+                    self.fallback_stage = FlightFallbackStage::ControlledDescent;
+                    self.fallback_cycles_in_stage = 0;
+                }
+            }
+            FlightFallbackStage::ControlledDescent => {
+                // Approach ground → cushion landing
+                if altitude < 1.0 {
+                    self.fallback_stage = FlightFallbackStage::Touchdown;
+                    self.fallback_cycles_in_stage = 0;
+                }
+            }
+            FlightFallbackStage::Touchdown => {
+                // Stay in touchdown
+            }
+        }
+    }
+
+    fn reset_fallback_stage(&mut self) {
+        self.fallback_stage = FlightFallbackStage::StabilizeHover;
+        self.fallback_cycles_in_stage = 0;
+    }
+
+    pub fn fallback_stage(&self) -> FlightFallbackStage {
+        self.fallback_stage
     }
 
     pub fn set_safety_override(&mut self, level: MotorSafetyLevel) {
@@ -64,22 +137,49 @@ impl FlightEmbodiment {
             Some(override_level) => phi_level.max(override_level),
             None => phi_level,
         };
+        // Ethics gate max-composes on top of phi + override. A moral-Red
+        // feeds into the existing Red-tier fallback chain below.
+        if let Some(m) = self.moral_safety {
+            self.current_safety = self.current_safety.max(m);
+        }
         let gain = self.current_safety.motor_gain();
 
         let mut cmd = self.controller.forward(thought_hv, dt);
-        if gain < 1.0 {
-            cmd.roll_moment *= gain;
-            cmd.pitch_moment *= gain;
-            cmd.yaw_moment *= gain;
-            if gain == 0.0 {
-                // Red safety: controlled emergency descent, NOT freefall.
-                // Maintain minimal thrust (~30% hover) for drag-limited descent.
-                // Zero all moments to prevent attitude divergence.
-                cmd.thrust = Self::EMERGENCY_DESCENT_THRUST;
-                cmd.roll_moment = 0.0;
-                cmd.pitch_moment = 0.0;
-                cmd.yaw_moment = 0.0;
-            } else {
+
+        // ── MULTI-STAGE SAFE FALLBACK for Red tier ──────────────
+        // Mirrors DJI/PX4 emergency landing protocol:
+        //   Stage 1: StabilizeHover (50 cycles, hover thrust)
+        //   Stage 2: ControlledDescent (30% hover thrust, ~3 m/s)
+        //   Stage 3: Touchdown (cushion thrust spike <1m AGL)
+        if matches!(self.current_safety, MotorSafetyLevel::Red) {
+            self.fallback_cycles_in_stage += 1;
+            self.update_fallback_stage();
+
+            // Always zero moments at Red — prevent attitude divergence
+            cmd.roll_moment = 0.0;
+            cmd.pitch_moment = 0.0;
+            cmd.yaw_moment = 0.0;
+
+            cmd.thrust = match self.fallback_stage {
+                FlightFallbackStage::StabilizeHover => {
+                    // Hover thrust ~14.7 N for 1.5kg airframe
+                    14.7
+                }
+                FlightFallbackStage::ControlledDescent => {
+                    Self::EMERGENCY_DESCENT_THRUST // 4.4 N (30% hover)
+                }
+                FlightFallbackStage::Touchdown => {
+                    // Cushion landing — slightly more than descent thrust
+                    8.0
+                }
+            };
+        } else {
+            // Not in Red — reset state machine
+            self.reset_fallback_stage();
+            if gain < 1.0 {
+                cmd.roll_moment *= gain;
+                cmd.pitch_moment *= gain;
+                cmd.yaw_moment *= gain;
                 cmd.thrust *= gain;
             }
         }
@@ -131,8 +231,11 @@ impl FlightEmbodiment {
         self.total_steps = 0;
         self.current_safety = MotorSafetyLevel::Green;
         self.safety_override = None;
+        self.moral_safety = None;
         self.last_control_effort = 0.0;
         self.last_prediction_error = 0.0;
+        self.fallback_stage = FlightFallbackStage::StabilizeHover;
+        self.fallback_cycles_in_stage = 0;
     }
 
     pub fn safety_level(&self) -> MotorSafetyLevel {
@@ -193,6 +296,33 @@ impl symthaea_core::embodiment::EmbodimentBridge for FlightEmbodiment {
     }
     fn telemetry(&self) -> EmbodimentTelemetry {
         self.telemetry()
+    }
+    fn apply_moral_gate(&mut self, gate: MoralGateInput) {
+        self.apply_moral_gate(gate)
+    }
+}
+
+/// SafeFallback for Quadrotor — Multi-Stage Emergency Landing.
+///
+/// Mirrors DJI/PX4 emergency landing protocol:
+///   Stage 1 — StabilizeHover: 50 cycles of hover thrust to stop drift
+///   Stage 2 — ControlledDescent: 30% hover thrust → ~3 m/s drag-limited descent
+///   Stage 3 — Touchdown: cushion thrust spike (8N) when altitude <1m AGL
+impl SafeFallback for FlightEmbodiment {
+    fn platform_name(&self) -> &'static str {
+        "quadrotor"
+    }
+    fn current_safety_level(&self) -> MotorSafetyLevel {
+        self.current_safety
+    }
+    fn safe_fallback_priority(&self) -> u8 {
+        10
+    } // Critical: airborne
+    fn safe_fallback_description(&self) -> &'static str {
+        "Multi-stage: StabilizeHover → ControlledDescent → Touchdown"
+    }
+    fn safe_fallback_latency_cycles(&self) -> u32 {
+        1
     }
 }
 
@@ -274,5 +404,45 @@ mod tests {
         bridge.step(&hv, 0.002, 0.7);
         bridge.reset();
         assert_eq!(bridge.total_steps(), 0);
+    }
+
+    #[test]
+    fn test_moral_gate_ahimsa_forces_red() {
+        let mut bridge = FlightEmbodiment::new(&GenesisSeed::from_phrase("test"));
+        bridge.apply_moral_gate(MoralGateInput {
+            verdict: MoralGateInput::VERDICT_SAFE,
+            consent_violation: false,
+            ahimsa_violated: true,
+        });
+        let hv = ContinuousHV::random(16384, 42);
+        // Phi 0.9 → Green normally; ahimsa forces Red. Red triggers the
+        // emergency-landing fallback chain (StabilizeHover → ControlledDescent
+        // → Touchdown). Unlike ground-platform Red, flight does NOT zero
+        // thrust — a freefalling drone kills more people than a hovering one.
+        // So we verify only the tier escalation; the fallback-state assertion
+        // lives in the dedicated fallback tests.
+        let r = bridge.step(&hv, 0.002, 0.9);
+        assert_eq!(
+            r.safety_level,
+            MotorSafetyLevel::Red,
+            "ahimsa must force Red regardless of phi"
+        );
+    }
+
+    #[test]
+    fn test_moral_gate_consent_violation_forces_orange() {
+        let mut bridge = FlightEmbodiment::new(&GenesisSeed::from_phrase("test"));
+        bridge.apply_moral_gate(MoralGateInput {
+            verdict: MoralGateInput::VERDICT_SAFE,
+            consent_violation: true,
+            ahimsa_violated: false,
+        });
+        let hv = ContinuousHV::random(16384, 42);
+        let r = bridge.step(&hv, 0.002, 0.9);
+        assert_eq!(
+            r.safety_level,
+            MotorSafetyLevel::Orange,
+            "consent violation → Orange"
+        );
     }
 }

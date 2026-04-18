@@ -27,9 +27,24 @@
 //! // User approves → phone.execute_action(proposed)?;
 //! ```
 
-pub mod actions;
 pub mod adb;
 pub mod bridge;
+pub mod actions;
+pub mod task;
+
+/// scrcpy-server lifecycle, binary framing, HEVC decode.
+/// Gated behind the `scrcpy` feature; requires `nix develop` with ffmpeg
+/// for the first build (HEVC decoder via `ffmpeg-next`/pkg-config).
+#[cfg(feature = "scrcpy")]
+pub mod scrcpy;
+
+/// Streaming-capture wrapper around `PhoneBridge` — owns both a
+/// `PhoneBridge` and a `ScrcpyCaptureStream`. See module-level doc for
+/// the rationale behind keeping this as a separate type rather than
+/// embedding the stream into `PhoneBridge` itself.
+#[cfg(feature = "scrcpy")]
+pub mod streaming_bridge;
 
 pub use actions::PhoneAction;
 pub use bridge::PhoneBridge;
+pub use task::{Task, TaskStep, StepTarget, StepAction};

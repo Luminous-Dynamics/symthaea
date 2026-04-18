@@ -35,5 +35,6 @@ mod proptest_feedback_consensus;
 // mod proptest_feedback_loops;
 mod proptest_nan_resilience;
 mod proptest_substrate;
+mod sensor_blending;
 mod subsystem_smoke;
 mod subsystems;

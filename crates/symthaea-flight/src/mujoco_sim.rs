@@ -44,10 +44,12 @@ pub struct MuJoCoSimulator {
 impl MuJoCoSimulator {
     /// Create a new MuJoCo simulator from an MJCF XML path.
     pub fn new(model_path: &str) -> Result<Self, SimulatorError> {
-        let model =
-            Arc::new(MjModel::from_xml(model_path).map_err(|e| {
-                SimulatorError::ModelLoadFailed(format!("{}: {:?}", model_path, e))
-            })?);
+        let model = Arc::new(
+            MjModel::from_xml(model_path)
+                .map_err(|e| SimulatorError::ModelLoadFailed(
+                    format!("{}: {:?}", model_path, e),
+                ))?,
+        );
         let body_id = Self::find_body_id(&model, "cf2");
         let data = MjData::new(Arc::clone(&model));
 

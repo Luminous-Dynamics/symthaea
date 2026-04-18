@@ -319,16 +319,8 @@ mod tests {
             tags: Vec::new(),
         };
         let mid = ep.sample_va(0.5);
-        assert!(
-            (mid.valence).abs() < 0.15,
-            "midpoint valence should be near 0: {}",
-            mid.valence
-        );
-        assert!(
-            (mid.arousal - 0.5).abs() < 0.1,
-            "midpoint arousal near 0.5: {}",
-            mid.arousal
-        );
+        assert!((mid.valence).abs() < 0.15, "midpoint valence should be near 0: {}", mid.valence);
+        assert!((mid.arousal - 0.5).abs() < 0.1, "midpoint arousal near 0.5: {}", mid.arousal);
     }
 
     #[test]

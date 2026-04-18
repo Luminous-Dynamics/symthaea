@@ -29,6 +29,8 @@ pub mod fep_agent;
 pub mod kinematics;
 pub mod perturbations;
 pub mod simulator;
+#[cfg(feature = "symtropy")]
+pub mod symtropy_sim;
 pub mod training;
 pub mod types;
 pub mod workspace_safety;

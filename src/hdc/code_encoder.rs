@@ -404,8 +404,8 @@ impl CodeHDEncoder {
             // Hierarchical: bind coarse and fine position vectors
             let coarse_idx = (index / self.max_positions) % self.max_positions;
             let fine_idx = index % self.max_positions;
-            let composed =
-                self.coarse_position_vectors[coarse_idx].bind(&self.position_vectors[fine_idx]);
+            let composed = self.coarse_position_vectors[coarse_idx]
+                .bind(&self.position_vectors[fine_idx]);
             std::borrow::Cow::Owned(composed)
         }
     }
@@ -617,9 +617,7 @@ mod tests {
         let encoder = CodeHDEncoder::new(512);
 
         // Verify positions across a 500-entity module remain distinguishable
-        let positions: Vec<_> = (0..500)
-            .map(|i| encoder.position_vector(i).into_owned())
-            .collect();
+        let positions: Vec<_> = (0..500).map(|i| encoder.position_vector(i).into_owned()).collect();
 
         // Sample pairs should have low similarity (high-D random vectors are quasi-orthogonal)
         let sim_0_300 = positions[0].similarity(&positions[300]);

@@ -46,14 +46,13 @@ pub use camera::{CameraManifold, CapturedFrame, MockCameraSource};
 pub use encoder::{MotionField, MultiScaleEncoder, PatchHdcEncoder};
 pub use manifold::{
     HorizonAccuracy, ObjectMemory, ObjectTrackingResult, SceneMemory, TrackedObject,
-    VisionManifold, VisualSceneGraph, VisualWorkingMemory, WorkingMemorySlot,
+    VisualSceneGraph, VisualWorkingMemory, VisionManifold, WorkingMemorySlot,
 };
 pub use predictive::{PredictiveCodingHierarchy, PredictiveOutput};
 pub use spectrum::{MultiSpectralEncoder, MultiSpectralFrame, SpectralLayer, SpectrumBand};
 pub use training::{BpttResult, ManifoldTrainer};
 pub use types::{
-    AttentionMap, LearningConfig, ManifoldHealth, ManifoldState, MultiScaleConfig,
-    ObjectHypothesis, PatchGrid, SalientRegion, ScaleHealth, SceneGraphEdge, SceneMatch,
-    SceneMemoryState, SpatialRelation, TrainingConfig, TrainingMethod, VisionConfig,
-    VisionTelemetry,
+    AttentionMap, LearningConfig, ManifoldHealth, ManifoldState, MultiScaleConfig, ObjectHypothesis,
+    PatchGrid, SalientRegion, ScaleHealth, SceneGraphEdge, SceneMatch, SceneMemoryState,
+    SpatialRelation, TrainingConfig, TrainingMethod, VisionConfig, VisionTelemetry,
 };

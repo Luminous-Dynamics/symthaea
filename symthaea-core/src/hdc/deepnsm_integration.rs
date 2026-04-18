@@ -109,14 +109,23 @@ impl DeepNSMCorpus {
             return Some(&entries[0]);
         }
 
+        let query = word.to_lowercase();
         let context_lower = context.to_lowercase();
-        let context_words: Vec<&str> = context_lower.split_whitespace().collect();
+        let context_words: Vec<String> = context_lower
+            .split_whitespace()
+            .map(|w| {
+                w.trim_matches(|c: char| !c.is_ascii_alphanumeric())
+                    .to_string()
+            })
+            .filter(|w| !w.is_empty() && w != &query)
+            .collect();
 
         entries.iter().max_by_key(|e| {
             let usage_lower = e.usage.to_lowercase();
+            let usage_words: Vec<&str> = usage_lower.split_whitespace().collect();
             context_words
                 .iter()
-                .filter(|w| usage_lower.contains(**w))
+                .filter(|w| usage_words.contains(&w.as_str()))
                 .count()
         })
     }

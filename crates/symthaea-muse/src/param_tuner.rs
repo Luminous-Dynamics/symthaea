@@ -210,6 +210,72 @@ impl Genome {
     }
 }
 
+/// Sample-rate click/crackle detector.
+///
+/// Uses the second derivative of the signal: `|x[n] - 2*x[n-1] + x[n-2]|`.
+/// Clean audio has smooth trajectories (low 2nd derivative); clicks are
+/// impulsive discontinuities (high 2nd derivative).
+///
+/// Returns the MAX 2nd-derivative over the signal plus the count of
+/// samples exceeding a hard threshold (gives click density).
+///
+/// This is the **primary** crackling detector — spectral flatness misses
+/// it because clicks are localized (a few samples every chunk), while
+/// flatness measures whole-signal spectral distribution.
+///
+/// # Returns
+/// - `max_second_derivative`: peak discontinuity severity [0, 2+]
+/// - `click_count`: number of samples where 2nd deriv > 0.1
+/// - `click_density`: click_count / total_samples (fraction)
+#[derive(Debug, Clone, Copy)]
+pub struct ClickMetrics {
+    pub max_second_derivative: f32,
+    pub click_count: usize,
+    pub click_density: f32,
+}
+
+pub fn click_score(samples: &[f32]) -> ClickMetrics {
+    if samples.len() < 3 {
+        return ClickMetrics {
+            max_second_derivative: 0.0,
+            click_count: 0,
+            click_density: 0.0,
+        };
+    }
+
+    let mut max_2d: f32 = 0.0;
+    let mut click_count = 0usize;
+    let click_threshold = 0.1_f32;
+
+    // Skip first 0.5% of samples to avoid startup transient
+    let start = samples.len() / 200;
+    for i in (start + 2)..samples.len() {
+        let second_deriv = (samples[i] - 2.0 * samples[i - 1] + samples[i - 2]).abs();
+        if second_deriv > max_2d {
+            max_2d = second_deriv;
+        }
+        if second_deriv > click_threshold {
+            click_count += 1;
+        }
+    }
+
+    ClickMetrics {
+        max_second_derivative: max_2d,
+        click_count,
+        click_density: click_count as f32 / samples.len() as f32,
+    }
+}
+
+/// Convert click metrics to an inverse quality score [0, 1]: higher = cleaner.
+pub fn click_quality(metrics: &ClickMetrics) -> f32 {
+    // max_2d > 0.5 = severe clicking
+    let severity_score = (1.0 - metrics.max_second_derivative / 0.5).clamp(0.0, 1.0);
+    // density > 0.01 (1 click per 100 samples) = audible crackling
+    let density_score = (1.0 - metrics.click_density * 100.0).clamp(0.0, 1.0);
+    // Geometric mean: both must be low for a good score
+    (severity_score * density_score).sqrt()
+}
+
 /// Fitness score for a genome.
 #[derive(Debug, Clone)]
 pub struct Fitness {
@@ -217,6 +283,7 @@ pub struct Fitness {
     pub beauty: f32,
     pub harshness: f32,
     pub rms_error: f32,
+    pub click_quality: f32,
     pub total: f64,
 }
 
@@ -280,17 +347,23 @@ pub fn evaluate(genome: &Genome, params: &[ParamDef], seed: u64) -> Fitness {
     let target_rms = 0.04; // moderate level
     let rms_error = (rms - target_rms).abs();
 
-    let total = 0.30 * verdict.composite as f64
-        + 0.25 * beauty as f64
-        + 0.20 * (1.0 - harshness) as f64
-        + 0.15 * (1.0 - rms_error.min(1.0)) as f64
-        + 0.10 * 0.5; // placeholder for self-similarity
+    // CLICK DETECTION: the primary perceptual metric for crackling.
+    // Weighted highest (0.45) because crackling is the #1 quality issue.
+    let clicks = click_score(&samples);
+    let cq = click_quality(&clicks);
+
+    let total = 0.45 * cq as f64                           // clicks (primary)
+        + 0.20 * beauty as f64                             // aesthetic
+        + 0.15 * (1.0 - harshness) as f64                  // non-harshness
+        + 0.10 * verdict.composite as f64                  // critic
+        + 0.10 * (1.0 - rms_error.min(1.0)) as f64;        // RMS target
 
     Fitness {
         composite: verdict.composite,
         beauty,
         harshness,
         rms_error,
+        click_quality: cq,
         total,
     }
 }
@@ -648,6 +721,87 @@ mod tests {
             fitness.total > 0.0,
             "fitness should be positive: {}",
             fitness.total
+        );
+    }
+
+    // ── Click detection regression tests ──
+
+    #[test]
+    fn click_score_clean_signal() {
+        // Pure sine wave — should have ZERO clicks
+        let samples: Vec<f32> = (0..44100)
+            .map(|i| (i as f32 * 440.0 * std::f32::consts::TAU / 44100.0).sin() * 0.5)
+            .collect();
+        let metrics = click_score(&samples);
+        assert!(
+            metrics.max_second_derivative < 0.05,
+            "clean sine should have low 2nd deriv, got {}",
+            metrics.max_second_derivative
+        );
+        assert_eq!(metrics.click_count, 0, "clean sine should have 0 clicks");
+        let quality = click_quality(&metrics);
+        assert!(quality > 0.9, "clean sine quality should be > 0.9, got {}", quality);
+    }
+
+    #[test]
+    fn click_score_detects_haas_delay_bug() {
+        // Simulate the Haas delay bug: every 1408 samples (32ms chunk),
+        // a single sample drops to 0 then recovers. This matches what
+        // reading sample[0] would produce at chunk boundaries.
+        let mut samples: Vec<f32> = (0..44100)
+            .map(|i| (i as f32 * 440.0 * std::f32::consts::TAU / 44100.0).sin() * 0.5)
+            .collect();
+        for i in (1408..samples.len()).step_by(1408) {
+            samples[i] = 0.0; // drop to zero: this is the click
+        }
+        let metrics = click_score(&samples);
+        assert!(
+            metrics.max_second_derivative > 0.5,
+            "Haas bug should produce high 2nd deriv, got {}",
+            metrics.max_second_derivative
+        );
+        assert!(
+            metrics.click_count > 20,
+            "Haas bug should produce many clicks, got {}",
+            metrics.click_count
+        );
+        let quality = click_quality(&metrics);
+        assert!(quality < 0.5, "Haas bug quality should be low, got {}", quality);
+    }
+
+    #[test]
+    fn click_score_detects_amplitude_jump() {
+        // Simulate sub-bass volume jump: amplitude doubles at sample 20000
+        let mut samples: Vec<f32> = (0..44100)
+            .map(|i| (i as f32 * 100.0 * std::f32::consts::TAU / 44100.0).sin() * 0.3)
+            .collect();
+        for i in 20000..samples.len() {
+            samples[i] *= 2.5; // sudden amplitude jump
+        }
+        let metrics = click_score(&samples);
+        assert!(
+            metrics.max_second_derivative > 0.1,
+            "amplitude jump should produce click, got {}",
+            metrics.max_second_derivative
+        );
+    }
+
+    #[test]
+    fn click_score_detects_envelope_overshoot() {
+        // Simulate kick envelope overshoot: amplitude briefly > 1.0
+        let mut samples: Vec<f32> = (0..44100)
+            .map(|i| (i as f32 * 60.0 * std::f32::consts::TAU / 44100.0).sin() * 0.8)
+            .collect();
+        // Insert overshoot: amplitude momentarily 1.3 (the 1.0 + 0.3*vel bug)
+        for i in 5000..5050 {
+            samples[i] = 1.3 * (i as f32 * 60.0 * std::f32::consts::TAU / 44100.0).sin();
+        }
+        let metrics = click_score(&samples);
+        // Overshoot creates discontinuities at the boundary
+        assert!(
+            metrics.max_second_derivative > 0.05,
+            "overshoot should produce discontinuity, got {}",
+            metrics.max_second_derivative
         );
     }
 }

@@ -160,4 +160,87 @@ mod tests {
         assert_eq!(GaitType::from_phi(0.8), GaitType::Trot);
         assert_eq!(GaitType::from_phi(0.05), GaitType::Collapse);
     }
+
+    #[test]
+    fn test_gait_boundaries() {
+        // All four tier transitions at the documented phi thresholds.
+        assert_eq!(GaitType::from_phi(0.61), GaitType::Trot);
+        assert_eq!(GaitType::from_phi(0.60), GaitType::Walk);
+        assert_eq!(GaitType::from_phi(0.31), GaitType::Walk);
+        assert_eq!(GaitType::from_phi(0.30), GaitType::Freeze);
+        assert_eq!(GaitType::from_phi(0.11), GaitType::Freeze);
+        assert_eq!(GaitType::from_phi(0.10), GaitType::Collapse);
+        assert_eq!(GaitType::from_phi(0.0), GaitType::Collapse);
+    }
+
+    #[test]
+    fn test_gait_frequency_ordering() {
+        // Trot is faster than walk; freeze/collapse produce no motion.
+        assert!(GaitType::Trot.frequency() > GaitType::Walk.frequency());
+        assert_eq!(GaitType::Freeze.frequency(), 0.0);
+        assert_eq!(GaitType::Collapse.frequency(), 0.0);
+    }
+
+    #[test]
+    fn test_gait_step_height_ordering() {
+        // Trot lifts feet higher than walk; stationary gaits don't lift.
+        assert!(GaitType::Trot.step_height() > GaitType::Walk.step_height());
+        assert_eq!(GaitType::Freeze.step_height(), 0.0);
+        assert_eq!(GaitType::Collapse.step_height(), 0.0);
+    }
+
+    #[test]
+    fn test_command_zero_effort() {
+        let c = QuadrupedCommand::zero();
+        assert_eq!(c.control_effort(), 0.0);
+        assert_eq!(c.joint_torques, [0.0; NUM_ACTUATORS]);
+    }
+
+    #[test]
+    fn test_command_effort_max() {
+        // All 12 actuators saturated → effort = 1.0 (mean of |torques|).
+        let c = QuadrupedCommand {
+            joint_torques: [1.0; NUM_ACTUATORS],
+        };
+        assert!((c.control_effort() - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_standing_pose_fields() {
+        // Stowed state: feet all in contact, base at 0.35 m, quaternion
+        // identity, zero velocities everywhere.
+        let s = QuadrupedState::standing();
+        assert_eq!(s.base_position, [0.0, 0.0, 0.35]);
+        assert_eq!(s.base_quaternion, [1.0, 0.0, 0.0, 0.0]);
+        assert_eq!(s.foot_contacts, [1.0; NUM_LEGS]);
+        assert_eq!(s.base_linear_velocity, [0.0; 3]);
+        assert_eq!(s.base_angular_velocity, [0.0; 3]);
+    }
+
+    #[test]
+    fn test_height_accessor() {
+        let s = QuadrupedState::standing();
+        assert_eq!(s.height(), 0.35);
+    }
+
+    #[test]
+    fn test_config_physics_dt() {
+        // Default physics_hz = 200 Hz → dt = 5 ms.
+        let cfg = QuadrupedConfig::default();
+        assert!((cfg.physics_dt() - 0.005).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_num_joints_consistency() {
+        // NUM_JOINTS must equal NUM_LEGS × JOINTS_PER_LEG.
+        assert_eq!(NUM_JOINTS, NUM_LEGS * JOINTS_PER_LEG);
+        assert_eq!(NUM_JOINTS, NUM_ACTUATORS, "one actuator per joint");
+    }
+
+    #[test]
+    fn test_finite_rejects_nan() {
+        let mut s = QuadrupedState::standing();
+        s.joint_angles[0] = f64::NAN;
+        assert!(!s.is_finite());
+    }
 }

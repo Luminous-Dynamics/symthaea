@@ -49,9 +49,7 @@ pub fn dfs_dimension_collective_dephasing(n_qubits: usize) -> usize {
 }
 
 fn binomial_exact(n: usize, k: usize) -> usize {
-    if k > n {
-        return 0;
-    }
+    if k > n { return 0; }
     let mut result = 1usize;
     for i in 0..k {
         result = result * (n - i) / (i + 1);
@@ -156,12 +154,7 @@ mod tests {
         let p = 0.005; // Below threshold
         let e3 = surface_code_logical_error_rate(p, 3);
         let e5 = surface_code_logical_error_rate(p, 5);
-        assert!(
-            e5 < e3,
-            "Distance 5 should have lower error: e3={:.2e}, e5={:.2e}",
-            e3,
-            e5
-        );
+        assert!(e5 < e3, "Distance 5 should have lower error: e3={:.2e}, e5={:.2e}", e3, e5);
     }
 
     #[test]

@@ -1021,8 +1021,14 @@ pub struct ConsciousnessTemporalAnalyzer {
     /// Temporal reasoner
     reasoner: TemporalReasoner,
 
-    /// Conscious intervals
+    /// Conscious intervals (append-only — indices are stable).
     conscious_intervals: Vec<ConsciousInterval>,
+
+    /// O(1) lookup: interval ID → index into `conscious_intervals`.
+    /// Kept in sync with `conscious_intervals` via `add_interval`.
+    /// Perf profile flagged the prior linear `.iter().find()` path as
+    /// ~98% of cognitive-loop CPU (48% in `memcmp` alone).
+    interval_index: HashMap<String, usize>,
 
     /// Phi threshold for consciousness
     phi_threshold: f64,
@@ -1053,6 +1059,7 @@ impl ConsciousnessTemporalAnalyzer {
         Self {
             reasoner: TemporalReasoner::default(),
             conscious_intervals: Vec::new(),
+            interval_index: HashMap::new(),
             phi_threshold,
             causal_chains: Vec::new(),
         }
@@ -1061,7 +1068,10 @@ impl ConsciousnessTemporalAnalyzer {
     /// Add a conscious interval
     pub fn add_interval(&mut self, interval: ConsciousInterval) {
         self.reasoner.add_interval(interval.interval.clone());
+        let idx = self.conscious_intervals.len();
+        let id = interval.interval.id.clone();
         self.conscious_intervals.push(interval);
+        self.interval_index.insert(id, idx);
     }
 
     /// Find all intervals that could causally influence a given interval
@@ -1160,10 +1170,9 @@ impl ConsciousnessTemporalAnalyzer {
                 let avg_phi: f64 = chain_ids
                     .iter()
                     .filter_map(|id| {
-                        self.conscious_intervals
-                            .iter()
-                            .find(|i| i.interval.id == *id)
-                            .map(|i| i.phi)
+                        self.interval_index
+                            .get(id)
+                            .map(|&idx| self.conscious_intervals[idx].phi)
                     })
                     .sum::<f64>()
                     / chain_ids.len() as f64;
@@ -1187,10 +1196,9 @@ impl ConsciousnessTemporalAnalyzer {
     /// a reference to its `content` BinaryHV (if present). Used to bind causal chain
     /// contents for resonator codebook symbol creation.
     pub fn interval_content(&self, id: &str) -> Option<&BinaryHV> {
-        self.conscious_intervals
-            .iter()
-            .find(|ci| ci.interval.id == id)
-            .and_then(|ci| ci.content.as_ref())
+        self.interval_index
+            .get(id)
+            .and_then(|&idx| self.conscious_intervals[idx].content.as_ref())
     }
 
     /// Extract cycle numbers from genuine causal chains.

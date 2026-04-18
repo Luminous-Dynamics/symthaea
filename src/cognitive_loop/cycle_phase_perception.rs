@@ -108,6 +108,49 @@ impl CognitiveLoopService {
         #[allow(unused_mut)]
         let mut encoding = self.run_encoding_and_preprocessing(input, module_timings);
 
+        // ═══════════════════════════════════════════════════════════════════════
+        // PHASE 1.2b: Additive sensory modality blend
+        // ═══════════════════════════════════════════════════════════════════════
+        // Live STT (voice-stt-live) and radio/SDR spectrum (mesh) are both
+        // ambient sensory inputs, not semantic modifiers. Collect any modality
+        // HVs that fired this cycle and bundle them into the perception HV
+        // with one call so all sources share the same thresholding pass
+        // instead of being biased by sequential bundling order.
+        #[allow(unused_mut)]
+        let mut aux_sensor_hvs: Vec<crate::hdc::BinaryHV> = Vec::new();
+
+        #[cfg(feature = "voice-stt-live")]
+        if let Some(ref stt) = self.stt_capture {
+            if let Some(stt_chv) = stt.drain_latest() {
+                aux_sensor_hvs.push(crate::hdc::BinaryHV::from_bipolar(&stt_chv.values));
+            }
+        }
+
+        #[cfg(feature = "mesh")]
+        if let Some(radio_hv) = self.spectrum_manager.perception_hv() {
+            aux_sensor_hvs.push(radio_hv);
+        }
+
+        // IMU (sensor-imu): fuse the most-recent injected reading into an
+        // HV and treat it as another additive sensory modality. Skipped if
+        // either the fusion module or the reading is absent.
+        #[cfg(feature = "sensor-imu")]
+        if let (Some(ref fusion), Some(ref reading)) = (&self.imu_fusion, &self.latest_imu_reading)
+        {
+            let imu_chv = fusion.fuse(reading);
+            aux_sensor_hvs.push(crate::hdc::BinaryHV::from_bipolar(&imu_chv.values));
+        }
+
+        if !aux_sensor_hvs.is_empty() {
+            aux_sensor_hvs.insert(0, encoding.hv16_cached);
+            encoding.hv16_cached = crate::hdc::BinaryHV::bundle(&aux_sensor_hvs);
+            // Keep the continuous view in sync — the CfC input path at
+            // cycle_strategy.rs:464 reads encoding_result.hdv (not hv16_cached),
+            // so without this line the blended sensors would never reach the
+            // thought-vector generator.
+            encoding.encoding_result.hdv = encoding.hv16_cached.to_continuous();
+        }
+
         // ACh-modulated scene memory thresholds
         #[cfg(feature = "vision-manifold")]
         if let Some(ref mut bridge) = self.sensorimotor.vision_sensory.vision_bridge {

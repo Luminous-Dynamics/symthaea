@@ -710,6 +710,42 @@ impl CompressionStrategy {
 /// When a `RadioHardware` implementation is attached via `set_hardware()`,
 /// the manager polls real SNR and availability from hardware each cycle.
 /// Without hardware, it relies on manually-fed `SpectrumObservation`s.
+
+// ── Role seeds for SpectrumObservation HDC encoding (perception_hv) ─────
+// Four stable u64s identify each observation dimension. Role XOR Value
+// gives a bound pair; bundling four pairs forms the observation HV.
+const SPECTRUM_ROLE_FREQ: u64 = 0xF0E0_5EE0_0C0D_E001;
+const SPECTRUM_ROLE_NOISE: u64 = 0xF0E0_5EE0_0C0D_E002;
+const SPECTRUM_ROLE_SNR: u64 = 0xF0E0_5EE0_0C0D_E003;
+const SPECTRUM_ROLE_JAMMED: u64 = 0xF0E0_5EE0_0C0D_E004;
+
+/// Encode one spectrum observation as a BinaryHV via role-filler binding.
+///
+/// Quantization:
+/// - Frequency → 1 MHz buckets (rounded)
+/// - Noise floor → 2 dBm buckets
+/// - SNR → 2 dB buckets
+/// - Jammed → binary flag
+///
+/// Identical buckets produce identical HVs; different buckets produce
+/// HDC-orthogonal HVs. This is a discrete LSH, not a continuous-similarity
+/// embedding — sufficient for the cognitive loop to distinguish "clear RF
+/// scene" from "jammed 2.4 GHz neighborhood".
+fn encode_observation(obs: &SpectrumObservation) -> symthaea_core::hdc::BinaryHV {
+    use symthaea_core::hdc::BinaryHV;
+    let freq_bucket = obs.frequency_hz / 1_000_000;
+    let noise_bucket = ((obs.noise_floor_dbm / 2.0) as i64) as u64;
+    let snr_bucket = ((obs.snr_db / 2.0) as i64) as u64;
+    let jammed_bit = obs.jammed as u64;
+
+    let freq_pair = BinaryHV::random(SPECTRUM_ROLE_FREQ).bind(&BinaryHV::random(freq_bucket));
+    let noise_pair = BinaryHV::random(SPECTRUM_ROLE_NOISE).bind(&BinaryHV::random(noise_bucket));
+    let snr_pair = BinaryHV::random(SPECTRUM_ROLE_SNR).bind(&BinaryHV::random(snr_bucket));
+    let jammed_pair = BinaryHV::random(SPECTRUM_ROLE_JAMMED).bind(&BinaryHV::random(jammed_bit));
+
+    BinaryHV::bundle(&[freq_pair, noise_pair, snr_pair, jammed_pair])
+}
+
 pub struct SpectrumManager {
     // ── Tier state ───────────────────────────────────────────────────────
     /// Current tier availability.
@@ -974,6 +1010,30 @@ impl SpectrumManager {
     /// Pending spectrum observations (for diagnostics/testing).
     pub fn pending_observations(&self) -> &[SpectrumObservation] {
         &self.pending_observations
+    }
+
+    /// Encode the currently-pending observations as a perception HV.
+    ///
+    /// Non-destructive — the tier's own `process_observations()` still drains
+    /// them on its schedule. Perception consumes in parallel each cycle and
+    /// simply reflects whatever the SDR layer has most recently reported.
+    ///
+    /// Returns `None` when the observation buffer is empty so the caller can
+    /// skip the HDC bundle entirely.
+    ///
+    /// Encoding: role-filler binding — each observation produces four bound
+    /// pairs (freq, noise, snr, jammed-flag), bundled into a per-observation
+    /// HV, then all observation HVs are bundled together.
+    pub fn perception_hv(&self) -> Option<symthaea_core::hdc::BinaryHV> {
+        if self.pending_observations.is_empty() {
+            return None;
+        }
+        let per_obs: Vec<symthaea_core::hdc::BinaryHV> = self
+            .pending_observations
+            .iter()
+            .map(encode_observation)
+            .collect();
+        Some(symthaea_core::hdc::BinaryHV::bundle(&per_obs))
     }
 
     /// Get the last spectrum prediction error for FEP integration.

@@ -100,9 +100,7 @@ fn create_simulator(backend: &PhysicsBackend) -> Box<dyn PhysicsSimulator> {
     match backend {
         PhysicsBackend::Simple => Box::new(SimplePhysicsSimulator::new()),
         #[cfg(feature = "mujoco")]
-        PhysicsBackend::MuJoCo => {
-            Box::new(crate::mujoco_sim::MuJoCoSimulator::from_primitive().unwrap())
-        }
+        PhysicsBackend::MuJoCo => Box::new(crate::mujoco_sim::MuJoCoSimulator::from_primitive().unwrap()),
         #[cfg(feature = "mujoco")]
         PhysicsBackend::MuJoCoNoisy(noise_config) => {
             let mut sim = crate::mujoco_sim::MuJoCoSimulator::from_primitive().unwrap();

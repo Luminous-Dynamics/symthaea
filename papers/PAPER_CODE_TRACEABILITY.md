@@ -1,6 +1,6 @@
 # Paper–Code Traceability: HAI NeurIPS 2026
 
-Maps sections of `papers/latex/hai_neurips2026.tex` to their implementation in the Symthaea codebase.
+Maps sections of `papers/hai-neurips/hai_neurips2026.tex` to their implementation in the Symthaea codebase.
 
 ## Section → Code Map
 

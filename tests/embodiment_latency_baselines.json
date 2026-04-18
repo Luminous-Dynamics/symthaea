@@ -1,0 +1,59 @@
+{
+  "_meta": {
+    "comment": "Per-platform p95 latency baselines in microseconds. Update via SYMTHAEA_UPDATE_LATENCY_BASELINE=1, then review the diff and commit.",
+    "tolerance_multiplier": 1.5,
+    "hardware_note": "Captured on reference dev box; update on hardware change"
+  },
+  "platforms": {
+    "auv": {
+      "step_baseline_p95_us": 9310,
+      "step_red_p95_us": 8926,
+      "encode_p95_us": 3377
+    },
+    "exoskeleton": {
+      "step_baseline_p95_us": 10011,
+      "step_red_p95_us": 10747,
+      "encode_p95_us": 2622
+    },
+    "flight": {
+      "step_baseline_p95_us": 7991,
+      "step_red_p95_us": 8010,
+      "encode_p95_us": 3172
+    },
+    "helicopter": {
+      "step_baseline_p95_us": 9905,
+      "step_red_p95_us": 10527,
+      "encode_p95_us": 3235
+    },
+    "humanoid": {
+      "step_baseline_p95_us": 14890,
+      "step_red_p95_us": 15594,
+      "encode_p95_us": 1143
+    },
+    "manipulator": {
+      "step_baseline_p95_us": 11541,
+      "step_red_p95_us": 8257,
+      "encode_p95_us": 2404
+    },
+    "orbital": {
+      "step_baseline_p95_us": 11178,
+      "step_red_p95_us": 9458,
+      "encode_p95_us": 2553
+    },
+    "quadruped": {
+      "step_baseline_p95_us": 12853,
+      "step_red_p95_us": 10882,
+      "encode_p95_us": 3533
+    },
+    "surgical": {
+      "step_baseline_p95_us": 11013,
+      "step_red_p95_us": 8793,
+      "encode_p95_us": 2087
+    },
+    "vehicle": {
+      "step_baseline_p95_us": 12935,
+      "step_red_p95_us": 10853,
+      "encode_p95_us": 4274
+    }
+  }
+}

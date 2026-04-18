@@ -115,4 +115,60 @@ mod tests {
         assert!(s.is_finite());
         assert_eq!(s.to_channels().len(), NUM_STATE_CHANNELS);
     }
+
+    #[test]
+    fn test_command_zero_effort() {
+        let c = OrbitalCommand::zero();
+        assert_eq!(c.control_effort(), 0.0);
+        assert_eq!(c.joint_torques, [0.0; NUM_ACTUATORS]);
+    }
+
+    #[test]
+    fn test_command_effort_max() {
+        // All torques saturated → effort = 1.0 (mean of absolute values / N_actuators).
+        let c = OrbitalCommand {
+            joint_torques: [1.0; NUM_ACTUATORS],
+        };
+        assert!((c.control_effort() - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_command_effort_symmetric_in_sign() {
+        // Negative torques contribute equally to effort (magnitude-based).
+        let c = OrbitalCommand {
+            joint_torques: [-0.5; NUM_ACTUATORS],
+        };
+        assert!((c.control_effort() - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_config_physics_dt() {
+        // Default physics_hz = 100 Hz → dt = 10 ms.
+        let cfg = OrbitalConfig::default();
+        assert!((cfg.physics_dt() - 0.01).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_stowed_ee_position_above_origin() {
+        // Stowed pose documentation claims the end-effector sits 2 m above
+        // the spacecraft origin along z. Verify.
+        let s = OrbitalState::stowed();
+        assert_eq!(s.ee_position, [0.0, 0.0, 2.0]);
+    }
+
+    #[test]
+    fn test_stowed_exposure_and_comm_both_nominal() {
+        // Stowed initial state should have full solar exposure and open
+        // comm window — the "nominal" orbital starting condition.
+        let s = OrbitalState::stowed();
+        assert_eq!(s.solar_exposure, 1.0);
+        assert_eq!(s.comm_window, 1.0);
+    }
+
+    #[test]
+    fn test_finite_rejects_nan() {
+        let mut s = OrbitalState::stowed();
+        s.joint_angles[0] = f64::NAN;
+        assert!(!s.is_finite());
+    }
 }

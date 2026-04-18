@@ -68,9 +68,10 @@ pub(crate) struct SensoriMotorExecution {
         feature = "exoskeleton",
         feature = "surgical",
         feature = "orbital",
-        feature = "quadruped"
+        feature = "quadruped",
+        feature = "phone"
     ))]
-    pub embodiment_bridge: Option<Box<dyn super::motor_bridge::EmbodimentBridge>>,
+    pub embodiment_bridge: Option<Box<dyn symthaea_core::embodiment::EmbodimentBridge>>,
 
     /// Last proprioceptive HV from the embodiment bridge.
     #[cfg(any(
@@ -83,7 +84,8 @@ pub(crate) struct SensoriMotorExecution {
         feature = "exoskeleton",
         feature = "surgical",
         feature = "orbital",
-        feature = "quadruped"
+        feature = "quadruped",
+        feature = "phone"
     ))]
     pub last_proprioceptive_hv: Option<symthaea_core::hdc::ContinuousHV>,
 
@@ -98,9 +100,10 @@ pub(crate) struct SensoriMotorExecution {
         feature = "exoskeleton",
         feature = "surgical",
         feature = "orbital",
-        feature = "quadruped"
+        feature = "quadruped",
+        feature = "phone"
     ))]
-    pub embodiment_telemetry: super::motor_bridge::EmbodimentTelemetry,
+    pub embodiment_telemetry: symthaea_core::embodiment::EmbodimentTelemetry,
 }
 
 impl SensoriMotorExecution {
@@ -125,9 +128,10 @@ impl SensoriMotorExecution {
             feature = "exoskeleton",
             feature = "surgical",
             feature = "orbital",
-            feature = "quadruped"
+            feature = "quadruped",
+            feature = "phone"
         ))]
-        embodiment_bridge: Option<Box<dyn super::motor_bridge::EmbodimentBridge>>,
+        embodiment_bridge: Option<Box<dyn symthaea_core::embodiment::EmbodimentBridge>>,
         #[cfg(any(
             feature = "humanoid",
             feature = "helicopter",
@@ -138,7 +142,8 @@ impl SensoriMotorExecution {
             feature = "exoskeleton",
             feature = "surgical",
             feature = "orbital",
-            feature = "quadruped"
+            feature = "quadruped",
+            feature = "phone"
         ))]
         last_proprioceptive_hv: Option<symthaea_core::hdc::ContinuousHV>,
         #[cfg(any(
@@ -151,9 +156,10 @@ impl SensoriMotorExecution {
             feature = "exoskeleton",
             feature = "surgical",
             feature = "orbital",
-            feature = "quadruped"
+            feature = "quadruped",
+            feature = "phone"
         ))]
-        embodiment_telemetry: super::motor_bridge::EmbodimentTelemetry,
+        embodiment_telemetry: symthaea_core::embodiment::EmbodimentTelemetry,
     ) -> Self {
         Self {
             vision_sensory,
@@ -172,7 +178,8 @@ impl SensoriMotorExecution {
                 feature = "exoskeleton",
                 feature = "surgical",
                 feature = "orbital",
-                feature = "quadruped"
+                feature = "quadruped",
+                feature = "phone"
             ))]
             embodiment_bridge,
             #[cfg(any(
@@ -185,7 +192,8 @@ impl SensoriMotorExecution {
                 feature = "exoskeleton",
                 feature = "surgical",
                 feature = "orbital",
-                feature = "quadruped"
+                feature = "quadruped",
+                feature = "phone"
             ))]
             last_proprioceptive_hv,
             #[cfg(any(
@@ -198,7 +206,8 @@ impl SensoriMotorExecution {
                 feature = "exoskeleton",
                 feature = "surgical",
                 feature = "orbital",
-                feature = "quadruped"
+                feature = "quadruped",
+                feature = "phone"
             ))]
             embodiment_telemetry,
         }

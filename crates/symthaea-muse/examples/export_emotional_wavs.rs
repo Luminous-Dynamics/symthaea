@@ -2,13 +2,21 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Export WAV files for each emotional state so you can listen.
 //!
+//! Uses the compose() pipeline (not StreamingSynth) because compose() produces
+//! click-free audio for contemplative scenarios (click_score quality 0.996-1.000)
+//! while StreamingSynth has structural noise injection that creates crackling
+//! (quality 0.000 for low-arousal scenarios). See commits fixing stochastic
+//! residual bandlimiting for details.
+//!
+//! For live real-time interaction, use StreamingSynth directly. For file exports
+//! and benchmarks, use compose() via this example.
+//!
 //! ```sh
 //! cargo run --release -p symthaea-muse --example export_emotional_wavs
 //! # Output: data/muse_wav/01_contentment.wav, 02_excitement.wav, etc.
 //! ```
 
-use symthaea_muse::streaming::StreamingSynth;
-use symthaea_muse::{MuseConfig, MusicalState};
+use symthaea_muse::{compose, export, MuseConfig, MusicalState};
 
 struct Phase {
     name: &'static str,
@@ -143,59 +151,37 @@ fn phases() -> Vec<Phase> {
 }
 
 fn main() {
-    println!("═══ Symthaea Muse: Exporting Emotional WAV Files ═══\n");
+    println!("═══ Symthaea Muse: Exporting Emotional WAV Files (compose pipeline) ═══\n");
 
     let out_dir = "data/muse_wav";
     std::fs::create_dir_all(out_dir).expect("create output dir");
 
-    let config = MuseConfig {
-        sample_rate: 44100,
-        num_partials: 12,
-        enable_antialiasing: true,
-        ..Default::default()
-    };
-
     for phase in phases() {
         print!("  {} ... ", phase.name);
 
-        let mut synth = StreamingSynth::new(config.clone(), 44100);
-        synth.update_state(&phase.state);
-
-        let total_chunks = (phase.duration_secs * 44100.0 / synth.chunk_samples() as f32) as usize;
-        let reassert_interval = (5.0 * 44100.0 / synth.chunk_samples() as f32) as usize;
-
-        let mut all_samples: Vec<[f32; 2]> =
-            Vec::with_capacity(44100 * phase.duration_secs as usize);
-
-        for chunk_idx in 0..total_chunks {
-            if chunk_idx % reassert_interval == 0 && chunk_idx > 0 {
-                synth.update_state(&phase.state);
-            }
-            let chunk = synth.render_chunk();
-            all_samples.extend_from_slice(&chunk);
-        }
-
-        // Write WAV
-        let path = format!("{}/{}", out_dir, phase.filename);
-        let spec = hound::WavSpec {
-            channels: 2,
+        // Use compose() — the clean render path (no stochastic noise injection)
+        let config = MuseConfig {
             sample_rate: 44100,
-            bits_per_sample: 16,
-            sample_format: hound::SampleFormat::Int,
+            duration_secs: phase.duration_secs,
+            max_notes: 64,
+            num_partials: 12,
+            enable_antialiasing: true,
+            enable_sub_bass: true,
+            ..Default::default()
         };
-        let mut writer = hound::WavWriter::create(&path, spec).expect("create wav");
-        for pair in &all_samples {
-            for &s in pair {
-                let sample = (s * 32767.0).clamp(-32768.0, 32767.0) as i16;
-                writer.write_sample(sample).expect("write sample");
-            }
-        }
-        writer.finalize().expect("finalize wav");
 
-        let size_kb = std::fs::metadata(&path)
-            .map(|m| m.len() / 1024)
-            .unwrap_or(0);
-        println!("{} ({} KB)", path, size_kb);
+        let comp = compose(&config, &phase.state, 42);
+        let path = format!("{}/{}", out_dir, phase.filename);
+
+        match export::write_wav(&path, &comp) {
+            Ok(()) => {
+                let size_kb = std::fs::metadata(&path)
+                    .map(|m| m.len() / 1024)
+                    .unwrap_or(0);
+                println!("{} ({} notes, {} KB)", path, comp.notes.len(), size_kb);
+            }
+            Err(e) => println!("ERROR: {}", e),
+        }
     }
 
     println!("\n  Done. Play with: aplay data/muse_wav/01_contentment.wav");

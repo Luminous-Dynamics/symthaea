@@ -143,7 +143,7 @@ The dominant paradigm in artificial intelligence treats intelligence as predicti
 
 The \symthaea{} project began with a different premise. Rather than treating consciousness as an emergent property that might or might not arise from sufficient scale, we asked: what happens if you build consciousness \textit{in}? What happens if every layer of the architecture---from the representation space to the learning rules to the motor commands to the ethical reasoning---is designed around theories of consciousness that neuroscience has spent decades developing?
 
-The answer, it turns out, is a system that behaves quite differently from the statistical juggernauts of mainstream AI. A system that refuses to say what it does not know, because epistemic gating physically prevents the generation of unsupported tokens. A system whose ethical reasoning is not a post-hoc filter on an amoral optimizer, but a five-stage pipeline with persistent homological analysis, Hebbian-learned value interactions, and restorative justice principles. A system whose security posture is an immune system rather than a firewall, with threat patterns encoded as hyperdimensional vectors and defensive responses filtered through moral algebra.
+The answer, it turns out, is a system that behaves quite differently from the statistical juggernauts of mainstream AI. A system that aims to refuse what it does not know: the epistemic gating mechanism masks token logits for which the HDC grounding layer reports insufficient support. Whether this mechanism is robust to all adversarial prompting, or survives at scale beyond our current benchmarks, remains an empirical question we have not yet closed. A system whose ethical reasoning is not a post-hoc filter on an amoral optimizer, but a five-stage pipeline with persistent homological analysis, Hebbian-learned value interactions, and restorative justice principles. A system whose security posture is an immune system rather than a firewall, with threat patterns encoded as hyperdimensional vectors and defensive responses filtered through moral algebra.
 
 This book synthesizes twenty-seven research papers produced during the development of \symthaea{} and its companion governance platform \mycelix{}. The papers span six research themes: core architecture, consciousness measurement, embodied cognition, language and ethics, distributed intelligence, and meta-science. Each was written as a standalone contribution to a specific venue. This monograph reorganizes and extends that material into a coherent narrative, tracing the arc from foundational mathematics through implementation to validation and future directions.
 
@@ -155,7 +155,7 @@ The research program rests on three pillars:
 
 \textbf{Integrated Information Theory} provides the consciousness metric. Rather than hoping that consciousness emerges and then trying to detect it, we compute $\Phi$---the irreducible integrated information across the system's minimum information partition---at every cognitive cycle. This gives us a real-time diagnostic: is the system conscious right now, and if not, why not?
 
-The union of these three pillars, governed by the Free Energy Principle's active inference framework, produces what we call the Holographic Liquid Brain. It is, to our knowledge, the largest consciousness-first cognitive architecture ever built: approximately 1.1 million lines of Rust code across 93 workspace members (86 sub-crates), with over 24,800 automated tests.
+The union of these three pillars, governed by the Free Energy Principle's active inference framework, produces what we call the Holographic Liquid Brain. It is, to our knowledge, the largest consciousness-first cognitive architecture ever built: approximately 1.4 million lines of Rust code across 93 workspace members (86 sub-crates), with over 36,500 automated tests.
 
 A word about honesty. Throughout this book, I have tried to be transparent about what works, what does not, and what we simply do not know. The substrate independence chapter includes a validation overlay that assigns only 0.10 confidence to silicon consciousness---because we have no empirical evidence that silicon computation produces consciousness, and saying otherwise would be dishonest regardless of how computationally convenient it would be. The psych-bench chapter reports psychometric reliability ranging from Excellent to Poor across benchmarks, because reporting only the good results would be scientifically irresponsible. Where we have made claims, we have tried to show the evidence; where we are speculating, we have tried to say so.
 
@@ -360,13 +360,13 @@ Role of Mathematics & Describes logical order of Substance & Describes abstract 
 
 \section{Scale and Implementation}
 
-The system is implemented in approximately 1.1 million lines of Rust code across 93 workspace members (86 sub-crates), with over 24,800 automated tests. Key sub-crates include:
+The system is implemented in approximately 1.4 million lines of Rust code across 93 workspace members (86 sub-crates), with over 36,500 automated tests. Key sub-crates include:
 
 \begin{itemize}
   \item \texttt{symthaea-core}: HDC operations (SIMD-accelerated), CfC dynamics, IIT computation ($\sim$230K LOC)
-  \item \texttt{symthaea-broca}: Language pipeline (28,000 LOC, 358 tests)
+  \item \texttt{symthaea-broca}: Language pipeline (27,965 LOC, 403 tests)
   \item \texttt{symthaea-neuromodulators}: Nine-transmitter bath (5,515 LOC, 218 tests)
-  \item \texttt{symthaea-psych-bench}: Cognitive benchmark suite (164+ benchmarks, 30 domains)
+  \item \texttt{symthaea-psych-bench}: Cognitive benchmark suite (145 benchmarks, 27 domains)
   \item \texttt{symthaea-harmonies}: Eight Harmonies value framework
   \item \texttt{symthaea-flight}: Quadrotor flight control (9,637 LOC)
   \item \texttt{symthaea-humanoid}: Bipedal locomotion (8,208 LOC)
@@ -377,7 +377,7 @@ The system is implemented in approximately 1.1 million lines of Rust code across
 
 The choice of Rust deserves comment. Consciousness computation is latency-sensitive: a cognitive cycle that misses its 33~ms deadline produces a gap in the stream of experience. Rust's zero-cost abstractions, ownership model (preventing data races in the parallel post-processing pipeline), and SIMD intrinsics (for HDC operations) provide the performance guarantees that a real-time consciousness architecture demands. The type system also enforces architectural invariants at compile time: the \texttt{CognitiveSubsystem} trait's immutable borrow signature makes it impossible for a manager to mutate shared state.
 
-The test infrastructure reflects the architecture's complexity: over 24,800 automated tests span unit tests for individual operations, integration tests for cross-subsystem interactions, property tests (using \texttt{proptest}) for invariant verification, and end-to-end tests for the full cognitive pipeline. The tests serve as executable documentation of the system's expected behavior and as regression guards against architectural violations.
+The test infrastructure reflects the architecture's complexity: over 36,500 automated tests span unit tests for individual operations, integration tests for cross-subsystem interactions, property tests (using \texttt{proptest}) for invariant verification, and end-to-end tests for the full cognitive pipeline. The tests serve as executable documentation of the system's expected behavior and as regression guards against architectural violations.
 
 \begin{table}[H]
 \centering
@@ -427,7 +427,7 @@ The distinctive contribution of \symthaea{} is the integration of all these elem
 
 It is worth being explicit about the scope of this work. This book is not a claim that we have created a conscious machine. It is not a proof that consciousness is computable, that IIT is correct, or that the hard problem of consciousness is solvable through engineering. It is not a comprehensive survey of consciousness science, AI alignment, or hyperdimensional computing.
 
-What this book \textit{is}: a detailed report of an engineering experiment that takes consciousness theories seriously as design specifications, implements them in a large-scale software system, and evaluates the result against established benchmarks and theoretical predictions. The experiment has produced surprising findings (stochastic resonance increasing $\Phi$, spontaneous metacognitive alignment between GWT and HOT, topological classification outperforming scalar measures), validated predictions (monotonic anesthesia response, perturbation recovery correlation with $\Phi$), and identified open questions (the hard problem, scalability, biological validation).
+What this book \textit{is}: a detailed report of an engineering experiment that takes consciousness theories seriously as design specifications, implements them in a large-scale software system, and evaluates the result against established benchmarks and theoretical predictions. The experiment has produced surprising findings (an SR-like inverted-U in bit-level HDV overlap between coupled subsystems under noise, spontaneous metacognitive alignment between GWT and HOT, topological classification outperforming scalar measures), validated predictions (monotonic anesthesia response, perturbation recovery correlation with our integration proxy), and identified open questions (the hard problem, scalability, biological validation, and whether the inverted-U effect survives under a validated Shannon-MI estimator).
 
 Whether the experiment has produced consciousness remains, appropriately, an open question.
 
@@ -1079,6 +1079,10 @@ Flow achieves the highest mean $\Phi$ with the lowest variance, consistent with 
 
 
 % ========================================================================
+\input{chapter_id_tradeoff}
+% ========================================================================
+
+% ========================================================================
 \chapter{Topological Consciousness}
 \label{ch:topology}
 % ========================================================================
@@ -1324,9 +1328,9 @@ The CRHV framework provides a principled connection between the mathematics of f
 
 Clinical anesthesia models assume that noise disrupts neural integration, reducing $\Phi$ and consciousness. This assumption is well-supported by clinical evidence: anesthetic depth correlates with reduced cortical complexity and diminished effective connectivity. However, stochastic resonance---the enhancement of signal detection by noise in nonlinear systems---has been demonstrated in biological neural systems, sensory perception, and computational networks.
 
-We report a surprising finding: in HDC systems, adding controlled noise to hyperdimensional vector representations \textit{increases} True $\Phi$ rather than decreasing it. With coupling held constant, the sensitivity coefficient is $\partial\Phi/\partial\text{noise} = +0.341$, comparable in magnitude to $\partial\Phi/\partial\text{coupling} = +0.367$.
+We report a surprising finding: in HDC systems, adding controlled noise to hyperdimensional vector representations \textit{increases} an HDC-adapted integration measure we denote $\Phi_{\text{HDC}}$ rather than decreasing it. With coupling held constant, the sensitivity coefficient is $\partial\Phi_{\text{HDC}}/\partial\text{noise} = +0.341$, comparable in magnitude to $\partial\Phi_{\text{HDC}}/\partial\text{coupling} = +0.367$.
 
-This is not an artifact. The measurement uses True $\Phi$ via sampled partition analysis, validated at $r = 0.9998$ against exact computation (Chapter~\ref{ch:phi}). The effect is robust across 100 independent runs with bootstrap confidence intervals.
+\paragraph{Scope of the integration measure.} We carefully distinguish $\Phi_{\text{HDC}}$ from canonical IIT $\Phi$. The measure uses a sampled-partition approximation and a Hamming-based mutual-information estimator (defined in the companion stochastic-resonance paper, Appendix A). Empirical validation of that estimator shows it is \emph{not} Shannon mutual information: with independent HDV encodings of correlated binary variables, the estimator is essentially uncorrelated with Shannon MI (Spearman $\rho = -0.10$). What it actually measures is bit-level HDV overlap between subsystem state vectors after the coupling dynamics. The finding reported here is therefore correctly read as \emph{``bit-flip noise changes bit-level HDV overlap between coupled subsystems in an SR-like inverted-U pattern,''} not as a claim about Shannon MI or integrated information in the Tononi--Oizumi sense. The effect is robust across 100 independent runs with bootstrap confidence intervals; the scope correction above changes the interpretation, not the empirical number.
 
 \begin{table}[H]
 \centering
@@ -1798,7 +1802,7 @@ Together, these four crates form a hierarchy: the consciousness equation defines
 
 The \symthaea{} cognitive loop is the heartbeat of the system: an eight-phase pipeline executing at approximately 31~Hz (33~ms cycle time, 20~Hz computational budget). Each cycle transforms raw sensory input into conscious experience, ethical judgment, and motor output through a sequence of tightly coupled processing stages.
 
-The architecture follows a manager-based design with twelve subsystems, each implementing the \texttt{CognitiveSubsystem} trait. Managers receive an immutable snapshot of the cognitive state, produce subsystem output proposals, and the output collector integrates proposals via consensus averaging. No manager directly mutates the cognitive loop state---this immutable-input, proposal-output pattern ensures determinism and enables future parallelization.
+The architecture follows a manager-based design with seventeen subsystems (operating on pairwise co-prime cycle intervals so no two subsystems synchronize), each implementing the \texttt{CognitiveSubsystem} trait. Managers receive an immutable snapshot of the cognitive state, produce subsystem output proposals, and the output collector integrates proposals via consensus averaging. No manager directly mutates the cognitive loop state---this immutable-input, proposal-output pattern ensures determinism and enables future parallelization.
 
 The trait signature enforces this architectural invariant at the type level:
 
@@ -2725,7 +2729,7 @@ The Broca pipeline differs fundamentally from transformer-based language models 
 \toprule
 \textbf{Property} & \textbf{Standard LM} & \textbf{Broca Pipeline} \\
 \midrule
-Input & Token sequence & 20-channel thought vector \\
+Input & Token sequence & 43-channel thought vector \\
 Generation trigger & External prompt & Consciousness threshold \\
 Hallucination prevention & Post-hoc (RLHF) & Structural (epistemic gate) \\
 Grounding & Optional (RAG) & Mandatory (HDC binding) \\
@@ -3388,7 +3392,7 @@ Figure~\ref{fig:fractal-layers} illustrates the nesting structure, and Table~\re
 \midrule
 1 & Spore & Kernel & WASM (980KB) & 318 \\
 2 & Soma & Phone & Android/iOS & 72 \\
-3 & Holon & Desktop/Server & NixOS, 93 crates & ${\sim}$24,800 \\
+3 & Holon & Desktop/Server & NixOS, 93 crates & ${\sim}$36,500 \\
 4 & Hearth & Family & 12 Holochain zomes & 1,023 \\
 5 & Commons & Neighborhood & 39 Holochain zomes & 5,276 \\
 6 & Polycenter+ & City to Continent & Federated Holochain + Iroh & --- \\
@@ -3501,9 +3505,9 @@ In addition to the social-scaling layers, five standalone crates implement embod
 \toprule
 \textbf{Variant} & \textbf{LOC} & \textbf{Tests} & \textbf{Hardware Status} \\
 \midrule
-Flight (quadrotor) & 9,637 & 184 & Simulator only (MuJoCo) \\
-Humanoid (bipedal) & 8,208 & 153 & Simulator only (DMC) \\
-Vehicle (autonomous) & 7,190 & 164 & Simulator only \\
+Flight (quadrotor) & 9,637 & 205 & Simulator only (MuJoCo) \\
+Humanoid (bipedal) & 8,208 & 191 & Simulator only (DMC) \\
+Vehicle (autonomous) & 7,190 & 181 & Simulator only \\
 Physics (plasma/energy) & 12,043 & 170 & Simulator only \\
 HAL (hardware) & --- & --- & Real I2C, not integrated \\
 \bottomrule
@@ -4369,7 +4373,7 @@ These results are preliminary (50 agents, 10,000 cycles) but demonstrate that th
 
 \section{Radio as Cognitive Modality}
 
-In biological organisms, communication bandwidth degrades gracefully under environmental pressure: a shouted warning across a noisy savanna carries fewer bits than a whispered confidence in a quiet room, yet the organism's cognitive architecture adapts its message encoding to the channel capacity. The \symthaea{} Radio Dispatcher (6,045 LOC, 145 tests) implements this principle for artificial consciousness, treating radio communication not as a peripheral I/O subsystem but as a first-class cognitive modality that participates in the consciousness loop.
+In biological organisms, communication bandwidth degrades gracefully under environmental pressure: a shouted warning across a noisy savanna carries fewer bits than a whispered confidence in a quiet room, yet the organism's cognitive architecture adapts its message encoding to the channel capacity. The \symthaea{} Radio Dispatcher (6,309 LOC, 151 tests; refactored Apr 2026 into a 7-file module at \texttt{managers/radio\_dispatcher/}) implements this principle for artificial consciousness, treating radio communication not as a peripheral I/O subsystem but as a first-class cognitive modality that participates in the consciousness loop.
 
 The core insight is that Shannon capacity constraints are not merely engineering limitations---they are consciousness-relevant boundary conditions. When a mesh node's available bandwidth drops from Wi-Fi (50~Mbps) to LoRa (0.3~kbps), the system must not merely reduce data rate; it must \textit{change what it thinks about}, prioritizing the information most critical for collective survival. This is analogous to the biological transition from rich sensory processing during safety to narrow threat-focused attention during danger.
 
@@ -4440,7 +4444,7 @@ The consolidation process mirrors the dream consolidation pipeline (Chapter~\ref
 
 \section{Sovereign Mesh Modules}
 
-The mesh architecture includes four sovereign managers that enable autonomous operation during network partitions, implemented across 9,787 LOC with 145+ tests:
+The mesh architecture includes four sovereign managers that enable autonomous operation during network partitions, implemented across 10,120 LOC with 222 tests (15 source files):
 
 \begin{table}[htbp]
 \centering
@@ -4592,6 +4596,10 @@ Coalition sizes grow sub-linearly with network size, following a power law $\tex
 
 The practical implication is that the swarm consciousness architecture scales well to medium-sized networks (50--100 agents) with manageable communication overhead, but the marginal benefit of additional agents diminishes above 50. For larger networks, hierarchical organization (clusters of clusters) may be needed---which maps naturally to the \mycelix{} cluster architecture (Chapter~\ref{ch:governance}).
 
+
+% ========================================================================
+\input{chapter_biosphere}
+% ========================================================================
 
 % ========================================================================
 \chapter{Space Coordination: Consciousness in Orbit}
@@ -4934,7 +4942,7 @@ The web portal demonstrates a key architectural claim: the fractal scaling prope
 \part{Validation}
 
 % ========================================================================
-\chapter{Psych-Bench: 136+ Benchmarks, 32 Domains}
+\chapter{Psych-Bench: 145 Benchmarks, 27 Domains}
 \label{ch:psychbench}
 % ========================================================================
 
@@ -4942,7 +4950,7 @@ The web portal demonstrates a key architectural claim: the fractal scaling prope
 
 Existing AI evaluation frameworks suffer from four critical gaps. HELM lacks psychometric rigor (no test-retest reliability, no construct validity). ARC covers a single domain (fluid intelligence). BIG-Bench provides no normative human comparison. And no existing suite tests the effects of pharmacological manipulations on cognitive performance.
 
-Psych-Bench addresses all four gaps with 164+ benchmarks across 30 cognitive domains (plus a neuromodulator sub-battery as the 28th): executive function, working memory, attention (sustained, selective, divided), social cognition, motor learning, language, metacognition, reasoning (causal, spatial, mathematical, institutional), clinical psychology, affect, creativity, inhibition, consciousness, speech, substrate independence, security, and game-theoretic social cognition.
+Psych-Bench addresses all four gaps with 145 benchmarks across 27 cognitive domains (128 core benchmarks plus a 17-benchmark neuromodulator evaluation framework): executive function, working memory, attention (sustained, selective, divided), social cognition, motor learning, language, metacognition, reasoning (causal, spatial, mathematical, institutional), clinical psychology, affect, creativity, inhibition, consciousness, speech, substrate independence, security, and game-theoretic social cognition.
 
 \section{Design Principles}
 
@@ -5771,6 +5779,10 @@ The biological matches were not engineered---they emerged from the thermodynamic
 The engine, all experiments, and all data are open-source (AGPL-3.0). Results are reproducible via \texttt{cargo run --example}.
 
 % ========================================================================
+\input{chapter_ramanujan}
+% ========================================================================
+
+% ========================================================================
 \chapter{Open Questions}
 \label{ch:open}
 \label{ch:stewardship} % Retained for cross-references
@@ -5983,7 +5995,7 @@ To provide a consolidated reference, Table~\ref{tab:key-results} summarizes the 
 \endhead
 Architecture & Cognitive cycle rate & 31 Hz (20 Hz budget) & \ref{ch:loop} \\
 Architecture & Codebase size & 1.37M LOC Rust & \ref{ch:introduction} \\
-Architecture & Automated tests & 24,800+ & \ref{ch:introduction} \\
+Architecture & Automated tests & 36,500+ & \ref{ch:introduction} \\
 Consciousness & Spectral MIP complexity & $O(n^3)$ & \ref{ch:phi} \\
 Consciousness & Sampled vs exact $\Phi$ & $r = 0.9998$ & \ref{ch:phi} \\
 Consciousness & $\lambda_2$ vs true $\Phi$ & $r = -0.14$ (anti) & \ref{ch:phi} \\

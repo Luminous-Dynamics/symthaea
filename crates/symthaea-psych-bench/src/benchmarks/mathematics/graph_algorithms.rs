@@ -185,10 +185,7 @@ impl PsychBenchmark for GraphAlgorithmsBenchmark {
             "shortest_path_accuracy",
             MetricValue::from_samples(&sp_scores),
         );
-        result.insert(
-            "mst_weight_accuracy",
-            MetricValue::from_samples(&mst_scores),
-        );
+        result.insert("mst_weight_accuracy", MetricValue::from_samples(&mst_scores));
         result.insert("coloring_valid", MetricValue::from_samples(&color_scores));
         result.insert(
             "cycle_detection_accuracy",
@@ -274,9 +271,12 @@ mod tests {
         for u in 0..c8.n {
             for &(v, _) in &c8.adj[u] {
                 assert_ne!(
-                    coloring[u], coloring[v],
+                    coloring[u],
+                    coloring[v],
                     "Coloring conflict: vertices {} and {} share color {}",
-                    u, v, coloring[u]
+                    u,
+                    v,
+                    coloring[u]
                 );
             }
         }

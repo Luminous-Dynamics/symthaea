@@ -277,26 +277,6 @@ impl CodeEmitter for RustEmitter {
                     &spec.examples,
                 );
 
-                // If keyword matching produced todo!(), try structural reasoning
-                // from the function signature before giving up
-                #[cfg(feature = "code_generation")]
-                let raw_body = if raw_body.contains("todo!(") {
-                    let ret = sig.return_type.as_deref().unwrap_or("");
-                    let family = crate::language::type_causal_model::SolutionFamily::from_signature(
-                        &sig.params,
-                        ret,
-                    );
-                    if let Some(skeleton) =
-                        family.generate_skeleton(&sig.params, ret, &spec.purpose)
-                    {
-                        skeleton
-                    } else {
-                        raw_body
-                    }
-                } else {
-                    raw_body
-                };
-
                 // Apply causal type reasoning to fix return type mismatches
                 #[cfg(feature = "code_generation")]
                 let body = {

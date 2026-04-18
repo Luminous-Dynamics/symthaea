@@ -55,8 +55,7 @@ pub fn generate_melody(
 
     // Velocity: gesture shapes the base level and dynamic range
     let base_velocity = (0.3 + state.consciousness_level * 0.2 + state.dopamine * 0.1)
-        .clamp(0.15, 0.8)
-        * gesture.velocity_scale;
+        .clamp(0.15, 0.8) * gesture.velocity_scale;
     let dynamic_range = (0.10 + state.arousal * 0.20) * gesture.velocity_scale;
 
     for i in 0..config.max_notes {
@@ -81,13 +80,23 @@ pub fn generate_melody(
         // Select pitch from scale
         let freq = select_pitch(scale, pitch_selector.clamp(0.0, 1.0));
 
-        // Duration: gesture shapes note length (peace=2x, tension=0.6x, joy=0.8x)
+        // Duration: gesture shapes note length, but high arousal FORCES longer
+        // sustained notes to avoid dense polyphony sounding harsh.
+        // Energy should come from harmony and register, not from rapid-fire notes.
         let dur_factor = if rng.gen::<f32>() < syncopation {
             0.5 + rng.gen::<f32>() * 1.5
         } else {
             1.0
         };
-        let duration = (base_note_dur * dur_factor * gesture.duration_scale).max(0.05);
+        let gesture_dur = gesture.duration_scale;
+        // At arousal > 0.5, override gesture's short durations with sustained ones
+        let arousal_sustain = if state.arousal > 0.5 {
+            let t = (state.arousal - 0.5) * 2.0; // 0→1 as arousal goes 0.5→1.0
+            gesture_dur * (1.0 - t) + 2.0 * t // blend toward 2x duration
+        } else {
+            gesture_dur
+        };
+        let duration = (base_note_dur * dur_factor * arousal_sustain).max(0.05);
 
         // Expressive velocity: gesture + contour + jitter
         let vel_jitter = (rng.gen::<f32>() - 0.5) * 0.10; // ±5%

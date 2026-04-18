@@ -99,6 +99,11 @@ struct BinauralSource {
     gain_r: f32,
     itd_l: usize,
     itd_r: usize,
+    // Smoothing state: targets vs current for glitch-free updates
+    target_gain_l: f32,
+    target_gain_r: f32,
+    target_itd_l: usize,
+    target_itd_r: usize,
 }
 
 struct DelayLine {
@@ -134,6 +139,10 @@ impl BinauralSource {
             gain_r: 0.707,
             itd_l: 0,
             itd_r: 0,
+            target_gain_l: 0.707,
+            target_gain_r: 0.707,
+            target_itd_l: 0,
+            target_itd_r: 0,
         }
     }
 
@@ -147,40 +156,60 @@ impl BinauralSource {
         let itd_seconds = HEAD_RADIUS / SPEED_OF_SOUND * (theta.abs() + theta.abs().sin());
         let itd_samples = (itd_seconds * sr) as usize;
 
+        // FIX: Write TARGETS, not current values. process() smooths to them
+        // over samples, preventing the phase-jump/amplitude-pop clicks caused
+        // by instantaneous ITD/gain changes.
         if az >= 0.0 {
-            // Source on right: left ear delayed
-            self.itd_l = itd_samples;
-            self.itd_r = 0;
+            self.target_itd_l = itd_samples;
+            self.target_itd_r = 0;
         } else {
-            self.itd_l = 0;
-            self.itd_r = itd_samples;
+            self.target_itd_l = 0;
+            self.target_itd_r = itd_samples;
         }
 
-        // ILD: simple head-shadow model (~6dB at 90°)
         let shadow_db = 6.0 * az.abs().sin();
         let shadow_gain = 10.0f32.powf(-shadow_db / 20.0);
-        if az >= 0.0 {
-            self.gain_l = shadow_gain; // left ear shadowed
-            self.gain_r = 1.0;
+        let (mut g_l, mut g_r) = if az >= 0.0 {
+            (shadow_gain, 1.0)
         } else {
-            self.gain_l = 1.0;
-            self.gain_r = shadow_gain;
-        }
+            (1.0, shadow_gain)
+        };
 
-        // Distance attenuation (inverse square)
         let dist_gain = 1.0 / pos.distance.max(0.1);
-        self.gain_l *= dist_gain;
-        self.gain_r *= dist_gain;
+        g_l *= dist_gain;
+        g_r *= dist_gain;
 
-        // Elevation cue: gentle high-shelf boost for elevated sources
-        // (simplified — real HRTF uses pinna filtering)
         let elev_boost = 1.0 + pos.elevation.abs() * 0.15;
-        self.gain_l *= elev_boost;
-        self.gain_r *= elev_boost;
+        g_l *= elev_boost;
+        g_r *= elev_boost;
+
+        self.target_gain_l = g_l;
+        self.target_gain_r = g_r;
     }
 
     /// Process a mono sample through ITD delays and ILD gains.
+    ///
+    /// Smooths gain changes per-sample to prevent click artifacts when
+    /// consciousness state shifts position. ITD changes one sample at a
+    /// time — a gradual slew that sounds like natural head motion.
     fn process(&mut self, input: f32) -> (f32, f32) {
+        // Smooth gains: 1-pole filter, ~10ms time constant at 44.1kHz
+        let alpha = 0.003_f32;
+        self.gain_l += alpha * (self.target_gain_l - self.gain_l);
+        self.gain_r += alpha * (self.target_gain_r - self.gain_r);
+
+        // Slew ITD by at most 1 sample per call — prevents phase jumps
+        if self.itd_l < self.target_itd_l {
+            self.itd_l += 1;
+        } else if self.itd_l > self.target_itd_l {
+            self.itd_l -= 1;
+        }
+        if self.itd_r < self.target_itd_r {
+            self.itd_r += 1;
+        } else if self.itd_r > self.target_itd_r {
+            self.itd_r -= 1;
+        }
+
         let l = self.delay_l.write_and_read(input, self.itd_l) * self.gain_l;
         let r = self.delay_r.write_and_read(input, self.itd_r) * self.gain_r;
         (l, r)

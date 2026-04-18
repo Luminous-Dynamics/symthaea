@@ -41,11 +41,11 @@ fn select_attractor(activations: &[f32; 8]) -> AttractorType {
         .unwrap_or(0);
 
     match dominant {
-        3 => AttractorType::Clifford, // InfinitePlay → chaos
-        7 => AttractorType::Lorenz,   // SacredStillness → Lorenz
-        2 => AttractorType::Rossler,  // IntegralWisdom → ordered spirals
-        4 => AttractorType::Duffing,  // UniversalInterconnectedness → coupled
-        _ => AttractorType::Clifford, // default: Clifford
+        3 => AttractorType::Clifford,              // InfinitePlay → chaos
+        7 => AttractorType::Lorenz,                // SacredStillness → Lorenz
+        2 => AttractorType::Rossler,               // IntegralWisdom → ordered spirals
+        4 => AttractorType::Duffing,               // UniversalInterconnectedness → coupled
+        _ => AttractorType::Clifford,              // default: Clifford
     }
 }
 
@@ -237,15 +237,9 @@ fn normalize_points(points: &[[f32; 2]], width: f32, height: f32, margin: f32) -
     }
 
     let min_x = points.iter().map(|p| p[0]).fold(f32::INFINITY, f32::min);
-    let max_x = points
-        .iter()
-        .map(|p| p[0])
-        .fold(f32::NEG_INFINITY, f32::max);
+    let max_x = points.iter().map(|p| p[0]).fold(f32::NEG_INFINITY, f32::max);
     let min_y = points.iter().map(|p| p[1]).fold(f32::INFINITY, f32::min);
-    let max_y = points
-        .iter()
-        .map(|p| p[1])
-        .fold(f32::NEG_INFINITY, f32::max);
+    let max_y = points.iter().map(|p| p[1]).fold(f32::NEG_INFINITY, f32::max);
 
     let range_x = (max_x - min_x).max(0.001);
     let range_y = (max_y - min_y).max(0.001);
@@ -303,8 +297,10 @@ pub fn generate(
 
     // Render points as tiny translucent circles; color cycles with orbit position
     let step = (n / 3000).max(1); // subsample for SVG performance
-    let mut root =
-        SceneNode::group(Some(&format!("{attractor:?}-attractor").to_lowercase())).with_child(bg);
+    let mut root = SceneNode::group(Some(
+        &format!("{attractor:?}-attractor").to_lowercase(),
+    ))
+    .with_child(bg);
 
     for (i, p) in points.iter().step_by(step).enumerate() {
         let t = i as f32 / (n / step) as f32;
@@ -314,9 +310,7 @@ pub fn generate(
 
         let dot = SceneNode::circle(p[0], p[1], 1.0 + consciousness * 0.5).with_style(
             symthaea_canvas::scene_graph::Style {
-                fill: Some(symthaea_canvas::Color::from_hsla(
-                    hue, 0.90, lightness, opacity,
-                )),
+                fill: Some(symthaea_canvas::Color::from_hsla(hue, 0.90, lightness, opacity)),
                 ..Default::default()
             },
         );
@@ -386,20 +380,12 @@ mod tests {
     fn harmony_selects_attractor() {
         // InfinitePlay (idx 3) → Clifford
         assert!(matches!(
-            select_attractor(&{
-                let mut h = [0.1f32; 8];
-                h[3] = 0.9;
-                h
-            }),
+            select_attractor(&{ let mut h = [0.1f32; 8]; h[3] = 0.9; h }),
             AttractorType::Clifford
         ));
         // SacredStillness (idx 7) → Lorenz
         assert!(matches!(
-            select_attractor(&{
-                let mut h = [0.1f32; 8];
-                h[7] = 0.9;
-                h
-            }),
+            select_attractor(&{ let mut h = [0.1f32; 8]; h[7] = 0.9; h }),
             AttractorType::Lorenz
         ));
     }

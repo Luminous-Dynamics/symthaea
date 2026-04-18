@@ -1,0 +1,14 @@
+name,n_points,expected_shape,top_formula,train_mse,test_mse,test_rel_err,complexity,verdict,elapsed_ms
+hydrogen_energy_levels,30,"E(n) = -13.6 / n^2","(sin(0) ^ sin((0.666667 - (sin(n) + (2 / n)))))",8.3073e-2,inf,inf,12,missed,335
+quantum_harmonic_oscillator,31,"E(n) = n + 0.5","(n + sin(0.523599))",5.5594e-15,5.5594e-15,2.7331e-9,4,closed,111
+balmer_series,28,"1/λ = R*(1/4 - 1/n^2)","((4.048981 + 0.714339) ^ (1.696500 - -2.137423))",3.9669e3,9.4704e2,8.3976e-2,7,partial,114
+kepler_third_law,30,"T^2 = a^3 (i.e. T = a^1.5)","(1 * (n ^ 1.500000))",4.0606e-26,2.9326e-25,3.7150e-15,5,closed,131
+stefan_boltzmann,30,"P = σ * T^4","(n ^ 4)",0.0000e0,0.0000e0,0.0000e0,3,closed,111
+blackbody_peak,30,"λ_peak = b / T (Wien's law)","0",1.4710e-11,1.6295e-13,1.0000e0,1,missed,48
+partitions,30,"p(n) ~ exp(π√(2n/3)) / (4n√3)  (Hardy-Ramanujan)","(sin((((sin(n) / (1.638481 / n)) / (sin(0.376908) ^ (n * 2.728173))) + (n - 3.301883))) + n)",6.4635e2,inf,inf,20,missed,180
+bell_numbers,16,"B(n) ~ (n/W(n))^n * e^((n/W(n))-n-1) / sqrt(…)","(sin((((sin(-0.500000) / (-1.001561 ^ 4)) + n) / (n / ((n ^ 4.175000) ^ 4.218750)))) + n)",1.1372e5,inf,inf,19,missed,152
+catalan,21,"C(n) = (2n)! / ((n+1)! n!), ~ 4^n / n^1.5","(sin(((3.137109 / 1.366480) / ((n ^ (n * -2.049219)) * n))) + (2.466406 ^ n))",3.9613e3,inf,inf,16,missed,138
+central_binomial_limit,29,"C(2n,n) * n^0.5 / 4^n → 1/√π (constant)","(0.373036 / 0.671140)",5.3943e-5,3.3631e-5,1.0326e-2,3,closed,39
+derangement_ratio,15,"!n / n! → 1/e ≈ 0.3679 (constant)","0.345859",1.2352e-2,4.8489e-4,5.9857e-2,1,partial,25
+fibonacci_ratios,29,"F(n+1)/F(n) → φ = (1+√5)/2 ≈ 1.618 (constant)","(1.626216 - (0.504955 ^ n))",1.7420e-2,6.6946e-5,5.0568e-3,5,closed,51
+prime_counting,100,"π(n) ~ n / ln(n)","(0.764165 * (n ^ 0.762465))",1.6314e-1,1.7887e-1,1.7802e-2,5,closed,203

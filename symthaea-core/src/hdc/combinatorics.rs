@@ -704,8 +704,9 @@ impl UnionFind {
 
 /// Generalised inclusion-exclusion principle.
 ///
-/// Computes Σ_{S ⊆ {0..sets-1}} (-1)^|S| * f(S) where f receives the
-/// current subset as a sorted slice of element indices.
+/// Computes the union form:
+/// Σ_{∅≠S ⊆ {0..sets-1}} (-1)^(|S|+1) * f(S), where `f(S)` is the
+/// intersection size for the selected subset.
 ///
 /// # Arguments
 /// * `sets` — number of sets (universe size n; iterates over 2^n subsets)
@@ -720,9 +721,9 @@ where
     );
     let n = 1usize << sets;
     let mut total = 0i64;
-    for mask in 0..n {
+    for mask in 1..n {
         let subset: Vec<usize> = (0..sets).filter(|&i| mask & (1 << i) != 0).collect();
-        let sign = if subset.len() % 2 == 0 { 1i64 } else { -1i64 };
+        let sign = if subset.len() % 2 == 1 { 1i64 } else { -1i64 };
         total += sign * f(&subset);
     }
     total

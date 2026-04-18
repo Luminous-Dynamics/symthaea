@@ -18,10 +18,7 @@ fn test_embodiment_weight_sweep() {
     let mut results = Vec::new();
 
     eprintln!("\n=== EMBODIMENT WEIGHT SWEEP ===");
-    eprintln!(
-        "{:<8} {:>8} {:>8} {:>8} {:>10}",
-        "Weight", "Mean Φ", "Min Φ", "Max Φ", "Variance"
-    );
+    eprintln!("{:<8} {:>8} {:>8} {:>8} {:>10}", "Weight", "Mean Φ", "Min Φ", "Max Φ", "Variance");
     eprintln!("{}", "-".repeat(52));
 
     for &w in &weights {
@@ -32,8 +29,7 @@ fn test_embodiment_weight_sweep() {
             async_training: false,
             learning_threshold: 0.0,
             ..Default::default()
-        })
-        .expect("service");
+        }).expect("service");
 
         let mut phi_vals = Vec::with_capacity(CYCLES);
         for _ in 0..CYCLES {
@@ -48,10 +44,7 @@ fn test_embodiment_weight_sweep() {
         let max = steady.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
         let var: f64 = steady.iter().map(|p| (p - mean).powi(2)).sum::<f64>() / steady.len() as f64;
 
-        eprintln!(
-            "{:<8.1} {:>8.4} {:>8.4} {:>8.4} {:>10.6}",
-            w, mean, min, max, var
-        );
+        eprintln!("{:<8.1} {:>8.4} {:>8.4} {:>8.4} {:>10.6}", w, mean, min, max, var);
         results.push((w, mean, min, max, var));
     }
 
@@ -63,10 +56,7 @@ fn test_embodiment_weight_sweep() {
     }
 
     // Find optimal weight (highest mean Phi)
-    let best = results
-        .iter()
-        .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
-        .unwrap();
+    let best = results.iter().max_by(|a, b| a.1.partial_cmp(&b.1).unwrap()).unwrap();
     eprintln!("\nOPTIMAL: weight={:.1} → mean Phi={:.4}", best.0, best.1);
 
     // All values must be finite

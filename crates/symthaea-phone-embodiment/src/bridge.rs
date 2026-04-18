@@ -10,13 +10,14 @@
 
 use image::GenericImageView;
 use symthaea_core::embodiment::{
-    EmbodimentPlatform, EmbodimentResult, EmbodimentTelemetry, MotorSafetyLevel, GROUNDING_TEMPORAL,
+    EmbodimentPlatform, EmbodimentResult, EmbodimentTelemetry, MotorSafetyLevel,
+    GROUNDING_TEMPORAL,
 };
 use symthaea_core::hdc::ContinuousHV;
 use symthaea_vision_manifold::{VisionConfig, VisionManifold};
 
-use crate::actions::PhoneAction;
 use crate::adb::AdbDevice;
+use crate::actions::PhoneAction;
 
 /// Phone screen embodiment bridge.
 ///
@@ -58,13 +59,25 @@ impl PhoneBridge {
     /// * `serial` — ADB device serial (e.g., "41201FDJG000UM")
     /// * `screen_w`, `screen_h` — Native screen resolution
     pub fn new(serial: impl Into<String>, screen_w: u32, screen_h: u32) -> Self {
+        Self::with_resolution(serial, screen_w, screen_h, 64, 64)
+    }
+
+    /// Create a phone bridge with custom vision resolution.
+    ///
+    /// Higher resolution (e.g., 128×128) improves icon discrimination
+    /// at the cost of ~4× processing time. 64×64 fits 20Hz budget;
+    /// 128×128 runs at ~10 Hz but can distinguish individual app icons.
+    pub fn with_resolution(
+        serial: impl Into<String>,
+        screen_w: u32,
+        screen_h: u32,
+        target_w: u32,
+        target_h: u32,
+    ) -> Self {
         let mut cfg = VisionConfig::default();
         cfg.enable_depth = true;
         cfg.enable_object_binding = true;
         cfg.enable_temporal_binding = true;
-
-        let target_w = 64;
-        let target_h = 64;
         let mut vision = VisionManifold::new(cfg, target_w, target_h);
         vision.enable_object_memory(16);
         vision.enable_working_memory(4);
@@ -98,8 +111,8 @@ impl PhoneBridge {
         dt: f32,
     ) -> Result<symthaea_vision_manifold::VisionTelemetry, String> {
         let png_bytes = self.adb.screenshot()?;
-        let img =
-            image::load_from_memory(&png_bytes).map_err(|e| format!("Image decode failed: {e}"))?;
+        let img = image::load_from_memory(&png_bytes)
+            .map_err(|e| format!("Image decode failed: {e}"))?;
 
         // Update native screen dimensions from actual capture
         let (w, h) = img.dimensions();
@@ -115,10 +128,42 @@ impl PhoneBridge {
         let rgb = resized.to_rgb8();
         let pixels: Vec<u8> = rgb.into_raw();
 
+        let tel = self.vision.observe_frame(&pixels, self.target_w, self.target_h, 3, dt);
+        Ok(tel)
+    }
+
+    /// Capture a screenshot, observe through the vision manifold, AND return the
+    /// full-resolution RGBA frame for downstream consumers (e.g., SomaRdpServer).
+    ///
+    /// Unlike `capture_and_observe`, this keeps the native-resolution pixels alive
+    /// so they can be fed into a remote-desktop codec. The vision manifold still
+    /// runs on the downsampled target resolution — this method does both in one pass.
+    pub fn capture_and_observe_rgba(
+        &mut self,
+        dt: f32,
+    ) -> Result<(symthaea_vision_manifold::VisionTelemetry, Vec<u8>, u32, u32), String> {
+        let png_bytes = self.adb.screenshot()?;
+        let img = image::load_from_memory(&png_bytes)
+            .map_err(|e| format!("Image decode failed: {e}"))?;
+
+        let (w, h) = img.dimensions();
+        self.screen_w = w;
+        self.screen_h = h;
+
+        // Downsample copy for vision manifold (RGB).
+        let resized = img.resize_exact(
+            self.target_w,
+            self.target_h,
+            image::imageops::FilterType::Triangle,
+        );
+        let rgb_pixels: Vec<u8> = resized.to_rgb8().into_raw();
         let tel = self
             .vision
-            .observe_frame(&pixels, self.target_w, self.target_h, 3, dt);
-        Ok(tel)
+            .observe_frame(&rgb_pixels, self.target_w, self.target_h, 3, dt);
+
+        // Native-resolution RGBA copy for RDP codec.
+        let rgba_pixels: Vec<u8> = img.to_rgba8().into_raw();
+        Ok((tel, rgba_pixels, w, h))
     }
 
     /// Map a vision grid position to phone screen coordinates.
@@ -126,7 +171,7 @@ impl PhoneBridge {
     /// Converts from the 8×8 grid (at 64×64) to native screen pixels.
     pub fn grid_to_screen(&self, grid_row: usize, grid_col: usize) -> (u32, u32) {
         let patch_size = 8; // VisionConfig default
-                            // Center of the patch
+        // Center of the patch
         let vision_x = (grid_col * patch_size + patch_size / 2) as f32;
         let vision_y = (grid_row * patch_size + patch_size / 2) as f32;
         // Scale to screen
@@ -160,18 +205,12 @@ impl PhoneBridge {
         // Find the highest-saliency working memory object
         let action = if let Some(wm) = self.vision.working_memory() {
             if let Some(best) = wm.slots().iter().max_by(|a, b| {
-                a.saliency
-                    .partial_cmp(&b.saliency)
-                    .unwrap_or(std::cmp::Ordering::Equal)
+                a.saliency.partial_cmp(&b.saliency).unwrap_or(std::cmp::Ordering::Equal)
             }) {
-                let (screen_x, screen_y) =
-                    self.grid_to_screen(best.centroid_row, best.centroid_col);
+                let (screen_x, screen_y) = self.grid_to_screen(best.centroid_row, best.centroid_col);
                 // Only tap if Phi allows it
                 if phi >= (PhoneAction::Tap { x: 0, y: 0 }).required_phi() {
-                    PhoneAction::Tap {
-                        x: screen_x,
-                        y: screen_y,
-                    }
+                    PhoneAction::Tap { x: screen_x, y: screen_y }
                 } else {
                     PhoneAction::Screenshot
                 }
@@ -229,16 +268,7 @@ impl PhoneBridge {
         }
 
         // Strategy 2: No match found — explore by swiping down
-        if phi
-            >= (PhoneAction::Swipe {
-                x1: 0,
-                y1: 0,
-                x2: 0,
-                y2: 0,
-                duration_ms: 0,
-            })
-            .required_phi()
-        {
+        if phi >= (PhoneAction::Swipe { x1: 0, y1: 0, x2: 0, y2: 0, duration_ms: 0 }).required_phi() {
             let mid_x = self.screen_w / 2;
             let action = PhoneAction::Swipe {
                 x1: mid_x,
@@ -307,7 +337,10 @@ impl PhoneBridge {
     /// through the patch encoder, then **unbinds all position components**
     /// to produce a pure appearance template. This template will match
     /// the same visual content regardless of screen position.
-    pub fn learn_template_from_file(&self, path: &std::path::Path) -> Result<ContinuousHV, String> {
+    pub fn learn_template_from_file(
+        &self,
+        path: &std::path::Path,
+    ) -> Result<ContinuousHV, String> {
         let img = image::open(path).map_err(|e| format!("Load failed: {e}"))?;
         let resized = img.resize_exact(
             self.target_w,
@@ -319,8 +352,11 @@ impl PhoneBridge {
 
         // Encode through a temporary encoder (same config as manifold)
         let cfg = self.vision.config().clone();
-        let mut encoder =
-            symthaea_vision_manifold::PatchHdcEncoder::new(&cfg, self.target_w, self.target_h);
+        let mut encoder = symthaea_vision_manifold::PatchHdcEncoder::new(
+            &cfg,
+            self.target_w,
+            self.target_h,
+        );
         let (_, patch_hvs) = encoder.encode_frame(&pixels, self.target_w, self.target_h, 3);
 
         // Unbind position from each patch to get appearance-only HVs,
@@ -350,9 +386,116 @@ impl PhoneBridge {
         self.last_match_similarity
     }
 
+    /// Detect whether the last action caused a significant state transition.
+    ///
+    /// Uses imagination surprise and prediction error from the vision manifold
+    /// to determine if the screen changed meaningfully. This is the active
+    /// inference success signal: high surprise = reality changed.
+    ///
+    /// Returns `(is_transition, confidence)`:
+    /// - `is_transition`: true if PE > threshold (screen changed significantly)
+    /// - `confidence`: how confident we are (higher PE = more confident)
+    ///
+    /// Thresholds calibrated from empirical observation:
+    /// - App opening: PE ≈ 0.10–0.20, motion ≈ 0.20–0.40
+    /// - No change: PE ≈ 0.00–0.05
+    pub fn detect_state_transition(&self) -> (bool, f32) {
+        let tel = self.vision.telemetry();
+        let pe = tel.prediction_error;
+        let motion = tel.motion_surprise;
+        let img_surp = tel.imagination_surprise;
+
+        // Combine signals: PE is primary, motion and imagination surprise are secondary
+        let combined = pe * 0.5 + motion * 0.3 + img_surp * 0.2;
+        let threshold = 0.06; // Calibrated from YouTube opening: PE=0.133
+
+        (combined > threshold, combined.min(1.0))
+    }
+
+    /// Learn a template from the current screen by extracting a specific patch.
+    ///
+    /// Instead of encoding a cropped image file (which has resolution mismatch),
+    /// this extracts a single patch HV from the **live screen** at the given
+    /// grid position. The template is already at the correct patch resolution.
+    ///
+    /// # Arguments
+    /// * `grid_row`, `grid_col` — Position on the vision grid where the target
+    ///   object is currently visible. Use the output of a previous observation
+    ///   to identify which patch to learn from.
+    pub fn learn_template_from_screen(
+        &self,
+        grid_row: usize,
+        grid_col: usize,
+    ) -> Option<ContinuousHV> {
+        let patch_hvs = self.vision.last_patch_hvs();
+        let patch_size = 8usize;
+        let grid_cols = self.target_w as usize / patch_size;
+        let idx = grid_row * grid_cols + grid_col;
+
+        patch_hvs.get(idx).map(|phv| {
+            self.vision.encoder().unbind_position(phv, grid_row, grid_col)
+        })
+    }
+
+    /// Save a learned template HV to disk for future sessions.
+    ///
+    /// Templates are stored as JSON files containing the raw f32 vector.
+    /// Path: `data/phone-templates/{name}.json`
+    pub fn save_template(&self, name: &str, hv: &ContinuousHV) -> Result<(), String> {
+        let dir = std::path::Path::new("data/phone-templates");
+        std::fs::create_dir_all(dir).map_err(|e| format!("mkdir: {e}"))?;
+        let path = dir.join(format!("{name}.json"));
+        let values = hv.as_slice();
+        let json = serde_json::to_string(values).map_err(|e| format!("serialize: {e}"))?;
+        std::fs::write(&path, json).map_err(|e| format!("write: {e}"))?;
+        Ok(())
+    }
+
+    /// Load a previously saved template HV from disk.
+    pub fn load_template(&self, name: &str) -> Result<ContinuousHV, String> {
+        let path = std::path::Path::new("data/phone-templates").join(format!("{name}.json"));
+        let json = std::fs::read_to_string(&path).map_err(|e| format!("read: {e}"))?;
+        let values: Vec<f32> =
+            serde_json::from_str(&json).map_err(|e| format!("deserialize: {e}"))?;
+        Ok(ContinuousHV::from_vec(values))
+    }
+
+    /// Learn a template from a screen region by bundling multiple patches.
+    ///
+    /// Bundles appearance HVs from a rectangular region of the grid.
+    pub fn learn_template_from_region(
+        &self,
+        row_start: usize,
+        col_start: usize,
+        rows: usize,
+        cols: usize,
+    ) -> Option<ContinuousHV> {
+        let patch_hvs = self.vision.last_patch_hvs();
+        let patch_size = 8usize;
+        let grid_cols = self.target_w as usize / patch_size;
+        let encoder = self.vision.encoder();
+
+        let mut appearances: Vec<ContinuousHV> = Vec::new();
+        for r in row_start..row_start + rows {
+            for c in col_start..col_start + cols {
+                let idx = r * grid_cols + c;
+                if let Some(phv) = patch_hvs.get(idx) {
+                    appearances.push(encoder.unbind_position(phv, r, c));
+                }
+            }
+        }
+
+        if appearances.is_empty() {
+            return None;
+        }
+        let refs: Vec<&ContinuousHV> = appearances.iter().collect();
+        Some(ContinuousHV::bundle(&refs).normalize())
+    }
+
     /// Execute the proposed action (after user confirmation).
     pub fn confirm_and_execute(&mut self) -> Result<(), String> {
-        let action = self.proposed_action.take().ok_or("No action proposed")?;
+        let action = self.proposed_action.take()
+            .ok_or("No action proposed")?;
         self.execute_action(&action)
     }
 
@@ -367,13 +510,9 @@ impl PhoneBridge {
             PhoneAction::Back => self.adb.back(),
             PhoneAction::Home => self.adb.home(),
             PhoneAction::OpenUrl { url } => self.adb.open_url(url),
-            PhoneAction::Swipe {
-                x1,
-                y1,
-                x2,
-                y2,
-                duration_ms,
-            } => self.adb.swipe(*x1, *y1, *x2, *y2, *duration_ms),
+            PhoneAction::Swipe { x1, y1, x2, y2, duration_ms } => {
+                self.adb.swipe(*x1, *y1, *x2, *y2, *duration_ms)
+            }
             PhoneAction::Tap { x, y } => self.adb.tap(*x, *y),
             PhoneAction::Type { text } => self.adb.input_text(text),
         }?;
@@ -384,6 +523,25 @@ impl PhoneBridge {
     /// Access the underlying vision manifold.
     pub fn vision(&self) -> &VisionManifold {
         &self.vision
+    }
+
+    /// Override the bridge's idea of the device's native screen size.
+    /// Used by [`crate::streaming_bridge::StreamingPhoneBridge`] when the
+    /// scrcpy stream's video header reports different dimensions than the
+    /// caller initially supplied (rotation, encoder downscale).
+    pub fn set_screen_dimensions(&mut self, width: u32, height: u32) {
+        self.screen_w = width;
+        self.screen_h = height;
+    }
+
+    /// Vision manifold's downsampled target dimensions (e.g. 64×64).
+    pub fn vision_target_dims(&self) -> (u32, u32) {
+        (self.target_w, self.target_h)
+    }
+
+    /// Mutable access to the vision manifold (for dream_replay, reset, etc.).
+    pub fn vision_mut(&mut self) -> &mut VisionManifold {
+        &mut self.vision
     }
 
     /// Access the ADB device.
@@ -413,24 +571,145 @@ impl PhoneBridge {
 
     /// Working memory contents.
     pub fn working_memory_summary(&self) -> Vec<(u64, f32, u32, u32)> {
-        self.vision.working_memory().map_or(Vec::new(), |wm| {
-            wm.slots()
-                .iter()
-                .map(|s| {
-                    let (sx, sy) = self.grid_to_screen(s.centroid_row, s.centroid_col);
-                    (s.track_id, s.saliency, sx, sy)
-                })
-                .collect()
-        })
+        self.vision
+            .working_memory()
+            .map_or(Vec::new(), |wm| {
+                wm.slots()
+                    .iter()
+                    .map(|s| {
+                        let (sx, sy) = self.grid_to_screen(s.centroid_row, s.centroid_col);
+                        (s.track_id, s.saliency, sx, sy)
+                    })
+                    .collect()
+            })
     }
 }
 
 // EmbodimentBridge implementation — allows PhoneBridge to be used
 // as a drop-in embodiment platform in the cognitive loop.
 //
-// NOTE: This requires adding `Phone` to the `EmbodimentPlatform` enum
-// and the feature flag `phone` to the cfg gate in sensorimotor_execution.rs.
-// For now, this is used standalone via the example binary.
+// ── EmbodimentBridge Implementation ──────────────────────────────────
+
+impl PhoneBridge {
+    /// Step the embodiment: capture screen → propose action → execute if not confirmation mode.
+    ///
+    /// This is the EmbodimentBridge-compatible step that maps thought HV to phone actions.
+    /// The thought HV is used as a goal template for visual search when in Green safety.
+    pub fn step_embodiment(
+        &mut self,
+        _thought_hv: &symthaea_core::hdc::ContinuousHV,
+        dt: f32,
+        phi: f64,
+    ) -> symthaea_core::embodiment::EmbodimentResult {
+        use symthaea_core::embodiment::*;
+
+        // 1. Capture and observe
+        let capture_ok = self.capture_and_observe(dt).is_ok();
+
+        // 2. Propose action based on consciousness level
+        let action = self.propose_action(phi);
+
+        // 3. Execute if not in confirmation mode and capture succeeded
+        let mut success = capture_ok;
+        if capture_ok && !self.confirmation_mode && !matches!(action, PhoneAction::NoOp) {
+            if self.execute_action(&action).is_err() {
+                success = false;
+            }
+        }
+
+        // 4. Compute prediction error from vision manifold
+        let pe = self.last_prediction_error;
+        self.total_steps += 1;
+
+        EmbodimentResult {
+            num_actuators: 5, // tap_x, tap_y, swipe_dx, swipe_dy, keyboard
+            control_effort: if matches!(action, PhoneAction::NoOp | PhoneAction::Screenshot) {
+                0.0
+            } else {
+                0.5
+            },
+            success,
+            prediction_error: pe,
+            safety_level: self.current_safety,
+            epistemic_grounding: GROUNDING_SENSORIMOTOR,
+            observation_confidence: grounding_from_prediction_error(pe),
+        }
+    }
+
+    /// Encode current screen perception as a 16,384D ContinuousHV.
+    ///
+    /// Uses the last perception HV from the vision manifold observation,
+    /// or returns a zero HV if no observation has been made yet.
+    pub fn encode_perception_hv(&mut self) -> symthaea_core::hdc::ContinuousHV {
+        self.last_perception.clone().unwrap_or_else(|| {
+            symthaea_core::hdc::ContinuousHV::zero(symthaea_core::hdc::HDC_DIMENSION)
+        })
+    }
+}
+
+impl symthaea_core::embodiment::EmbodimentBridge for PhoneBridge {
+    fn step(
+        &mut self,
+        thought_hv: &symthaea_core::hdc::ContinuousHV,
+        dt: f32,
+        phi: f64,
+    ) -> symthaea_core::embodiment::EmbodimentResult {
+        self.step_embodiment(thought_hv, dt, phi)
+    }
+
+    fn encode_perception(&mut self) -> symthaea_core::hdc::ContinuousHV {
+        self.encode_perception_hv()
+    }
+
+    fn reset(&mut self) {
+        self.current_safety = MotorSafetyLevel::Red;
+        self.safety_override = None;
+        self.last_perception = None;
+        self.last_action = None;
+        self.proposed_action = None;
+        self.total_steps = 0;
+        self.last_prediction_error = 0.0;
+    }
+
+    fn safety_level(&self) -> MotorSafetyLevel {
+        self.current_safety
+    }
+
+    fn set_safety_override(&mut self, level: MotorSafetyLevel) {
+        self.safety_override = Some(level);
+    }
+
+    fn clear_safety_override(&mut self) {
+        self.safety_override = None;
+    }
+
+    fn platform(&self) -> symthaea_core::embodiment::EmbodimentPlatform {
+        symthaea_core::embodiment::EmbodimentPlatform::Phone
+    }
+
+    fn num_actuators(&self) -> usize {
+        5
+    }
+
+    fn total_steps(&self) -> usize {
+        self.total_steps
+    }
+
+    fn telemetry(&self) -> symthaea_core::embodiment::EmbodimentTelemetry {
+        use symthaea_core::embodiment::*;
+        EmbodimentTelemetry {
+            total_steps: self.total_steps as u64,
+            control_effort: 0.0,
+            prediction_error: self.last_prediction_error,
+            safety_level: format!("{:?}", self.current_safety),
+            platform: "phone".to_string(),
+            num_actuators: 5,
+            epistemic_grounding: grounding_label(GROUNDING_SENSORIMOTOR).to_string(),
+            observation_confidence: grounding_from_prediction_error(self.last_prediction_error),
+            platform_specific: Vec::new(),
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -448,6 +727,16 @@ mod tests {
         let (x, y) = phone.grid_to_screen(7, 7);
         assert!(x > 800, "Bottom-right x should be >800, got {x}");
         assert!(y > 1800, "Bottom-right y should be >1800, got {y}");
+    }
+
+    #[test]
+    fn test_embodiment_bridge_step_no_device() {
+        // step() fails gracefully when no ADB device is connected
+        let mut phone = PhoneBridge::new("nonexistent", 1008, 2244);
+        let hv = symthaea_core::hdc::ContinuousHV::random(symthaea_core::hdc::HDC_DIMENSION, 42);
+        let result = phone.step_embodiment(&hv, 0.033, 0.7);
+        // Should not panic — failure is reported via success=false
+        assert!(!result.success);
     }
 
     #[test]

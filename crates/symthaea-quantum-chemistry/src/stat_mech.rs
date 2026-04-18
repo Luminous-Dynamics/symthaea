@@ -104,11 +104,7 @@ pub fn translational_z(mass_au: f64, volume_bohr3: f64, temperature: f64) -> f64
 
 /// Rotational partition function (rigid rotor, linear molecule).
 /// Z_rot = kT / (σ × B)  where B = ℏ²/(2I) is the rotational constant
-pub fn rotational_z_linear(
-    rotational_constant: f64,
-    symmetry_number: u32,
-    temperature: f64,
-) -> f64 {
+pub fn rotational_z_linear(rotational_constant: f64, symmetry_number: u32, temperature: f64) -> f64 {
     K_BOLTZMANN_HARTREE * temperature / (symmetry_number as f64 * rotational_constant)
 }
 

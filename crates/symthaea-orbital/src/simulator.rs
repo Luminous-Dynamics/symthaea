@@ -115,6 +115,104 @@ mod tests {
                 > 0.0
         );
     }
+
+    #[test]
+    fn test_reset_returns_to_stowed() {
+        // After arbitrary motion, reset() must restore the stowed state.
+        let mut s = SimpleOrbitalSimulator::new();
+        let stowed_angles = s.state().joint_angles;
+        let mut c = OrbitalCommand::zero();
+        c.joint_torques[0] = 0.5;
+        for _ in 0..200 {
+            s.step(&c, 0.01);
+        }
+        assert_ne!(s.state().joint_angles, stowed_angles, "motion should occur");
+        s.reset();
+        assert_eq!(s.state().joint_angles, stowed_angles);
+        assert_eq!(s.state().joint_velocities, [0.0; NUM_JOINTS]);
+        assert_eq!(s.state().spacecraft_angular_velocity, [0.0; 3]);
+    }
+
+    #[test]
+    fn test_zero_command_no_joint_drift() {
+        // Starting at stowed (all angles 0) with zero torque, joints must
+        // stay at zero — no spontaneous motion from integration error.
+        let mut s = SimpleOrbitalSimulator::new();
+        for _ in 0..500 {
+            s.step(&OrbitalCommand::zero(), 0.01);
+        }
+        for i in 0..NUM_JOINTS {
+            assert!(
+                s.state().joint_angles[i].abs() < 1e-9,
+                "joint {} drifted under zero command",
+                i
+            );
+            assert!(s.state().joint_velocities[i].abs() < 1e-9);
+        }
+    }
+
+    #[test]
+    fn test_joint_limits_clamp() {
+        // Documented joint range is ±2.9 rad; sustained max torque must
+        // saturate at that boundary without going over.
+        let mut s = SimpleOrbitalSimulator::new();
+        let mut c = OrbitalCommand::zero();
+        c.joint_torques[0] = 1.0; // max positive
+        for _ in 0..10_000 {
+            s.step(&c, 0.01);
+        }
+        assert!(
+            s.state().joint_angles[0] <= 2.9 + 1e-6,
+            "joint 0 should saturate at +2.9 rad, got {}",
+            s.state().joint_angles[0]
+        );
+    }
+
+    #[test]
+    fn test_deterministic_across_fresh_sims() {
+        // Two independent fresh simulators driven by identical commands
+        // must end in the same state — RL training precondition.
+        let c = OrbitalCommand {
+            joint_torques: [0.2, -0.1, 0.3, 0.0, 0.15, -0.05, 0.1],
+        };
+        let mut a = SimpleOrbitalSimulator::new();
+        let mut b = SimpleOrbitalSimulator::new();
+        for _ in 0..300 {
+            a.step(&c, 0.01);
+            b.step(&c, 0.01);
+        }
+        assert_eq!(a.state().joint_angles, b.state().joint_angles);
+        assert_eq!(
+            a.state().spacecraft_angular_velocity,
+            b.state().spacecraft_angular_velocity
+        );
+    }
+
+    #[test]
+    fn test_orbit_phase_varies_solar_exposure() {
+        // Integrate over one full LEO orbit (5400 s, dt = 1 s). Orbit phase
+        // drives `solar_exposure = sin(phase) * 0.5 + 0.5`, so it must sweep
+        // through both extremes: phase=π/2 → ~1.0, phase=3π/2 → ~0.0 (clamped).
+        // Half an orbit is NOT enough — sin stays non-negative through π.
+        let mut s = SimpleOrbitalSimulator::new();
+        let mut saw_low = false;
+        let mut saw_high = false;
+        for _ in 0..5400 {
+            s.step(&OrbitalCommand::zero(), 1.0);
+            if s.state().solar_exposure < 0.1 {
+                saw_low = true;
+            }
+            if s.state().solar_exposure > 0.9 {
+                saw_high = true;
+            }
+        }
+        assert!(
+            saw_low && saw_high,
+            "over a full orbit solar_exposure should sweep through low and high values \
+             (saw_low={saw_low}, saw_high={saw_high})"
+        );
+    }
+
     mod proptest_physics {
         use super::*;
         use proptest::prelude::*;

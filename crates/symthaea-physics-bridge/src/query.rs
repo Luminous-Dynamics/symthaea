@@ -99,6 +99,59 @@ impl PhysicsSearchEngine {
         )
     }
 
+    /// Search for equations similar to the given equation, with custom
+    /// per-query weights. Identical to [`search_equation`] but lets callers
+    /// override `SearchWeights` for a single query without mutating the
+    /// engine's stored defaults. Useful for recognition paths that want to
+    /// down-weight the full-encoding axis (which is dominated by random-HV
+    /// hash noise when the top candidates all tie on structural + symmetry
+    /// + dimensional) without breaking other search-engine consumers.
+    pub fn search_equation_with_weights(
+        &self,
+        equation: &PhysicsEquation,
+        max_results: usize,
+        weights: SearchWeights,
+    ) -> Vec<SearchResult> {
+        let full_hv = self.eq_encoder.encode(&equation.ast);
+        let skeleton_hv = self.eq_encoder.encode_skeleton(&equation.ast);
+        let symmetry_hv = self.sym_encoder.encode(&equation.symmetries);
+        let dimensional_hv = self.dim_encoder.encode(&equation.dimensions);
+
+        let mut results: Vec<SearchResult> = self
+            .catalog
+            .entries()
+            .iter()
+            .map(|entry| {
+                let structural = entry.skeleton_hv.similarity(&skeleton_hv);
+                let symmetry = entry.symmetry_hv.similarity(&symmetry_hv);
+                let dimensional = entry.dimensional_hv.similarity(&dimensional_hv);
+                let full = entry.full_hv.similarity(&full_hv);
+                let score = weights.structural * structural
+                    + weights.symmetry * symmetry
+                    + weights.dimensional * dimensional
+                    + weights.full * full;
+                SearchResult {
+                    name: entry.equation.name.clone(),
+                    domain: entry.equation.domain,
+                    score,
+                    breakdown: SimilarityBreakdown {
+                        structural,
+                        symmetry,
+                        dimensional,
+                        full,
+                    },
+                }
+            })
+            .collect();
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        results.truncate(max_results);
+        results
+    }
+
     /// Search by skeleton only (best for cross-domain analogy discovery).
     pub fn search_by_skeleton(&self, ast: &EquationNode, max_results: usize) -> Vec<SearchResult> {
         let skeleton_hv = self.eq_encoder.encode_skeleton(ast);
@@ -482,8 +535,13 @@ mod tests {
         let eng = engine();
         // Search for the Gamow peak integral itself — should find related nuclear eqs
         let gamow = eng.catalog().find_by_name("Gamow Peak Integral").unwrap();
-        let results = eng.search_equation(&gamow.equation, 5);
-        // Gamow should be top, with other nuclear physics in top 5
+        let results = eng.search_equation(&gamow.equation, 10);
+        // Gamow should be top, with other nuclear physics near it. We use top-10
+        // rather than top-5 because the recognition catalog now includes
+        // structurally-similar entries from other domains (e.g. Angular Momentum
+        // 2D Cartesian, added for Ramanujan Protocol showcase) that can land
+        // between nuclear entries without changing the clustering intent: nuclear
+        // physics still forms a tight neighborhood around any nuclear query.
         assert_eq!(results[0].name, "Gamow Peak Integral");
         let nuclear_count = results
             .iter()
@@ -491,7 +549,7 @@ mod tests {
             .count();
         assert!(
             nuclear_count >= 2,
-            "Expected >= 2 nuclear equations in top 5, got {nuclear_count}"
+            "Expected >= 2 nuclear equations in top 10, got {nuclear_count}"
         );
     }
 

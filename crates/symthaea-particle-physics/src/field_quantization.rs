@@ -65,11 +65,7 @@ pub struct CoherentState {
 
 impl CoherentState {
     pub fn new(alpha_re: f64, alpha_im: f64, omega: f64) -> Self {
-        Self {
-            alpha_re,
-            alpha_im,
-            omega,
-        }
+        Self { alpha_re, alpha_im, omega }
     }
 
     /// |α|²

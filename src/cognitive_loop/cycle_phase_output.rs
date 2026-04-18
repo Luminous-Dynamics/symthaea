@@ -1037,7 +1037,8 @@ impl CognitiveLoopService {
             feature = "exoskeleton",
             feature = "surgical",
             feature = "orbital",
-            feature = "quadruped"
+            feature = "quadruped",
+            feature = "phone"
         ))]
         {
             let et = &self.sensorimotor.embodiment_telemetry;

@@ -162,6 +162,11 @@ impl MetricTensor {
         let is_diagonal = (0..n).all(|i| (0..n).all(|j| i == j || self.g(i, j).abs() < 1e-12));
 
         if is_diagonal {
+            let is_flat_identity = (0..n).all(|i| (self.g(i, i) - 1.0).abs() < 1e-12);
+            if is_flat_identity {
+                return riemann;
+            }
+
             // For a round sphere with radius r: sectional curvature K = 1/r²
             // R^l_{ijk} = K·(δ^l_k·g_{ij} - δ^l_j·g_{ik}) / det(g)^(1/n)
             // Simplified: R_{ijij} = K·g_{ii}·g_{jj} - K·g_{ij}² = K·g_{ii}·g_{jj}
@@ -180,7 +185,7 @@ impl MetricTensor {
                             let delta_lj = if l == j { 1.0 } else { 0.0 };
                             let delta_ik = if i == kk { 1.0 } else { 0.0 };
                             let idx = l * n * n * n + i * n * n + j * n + kk;
-                            riemann[idx] = k * (delta_lk * delta_ij - delta_lj * delta_ik) * r_sq;
+                            riemann[idx] = k * (delta_lj * delta_ik - delta_lk * delta_ij) * r_sq;
                         }
                     }
                 }
@@ -586,7 +591,7 @@ pub fn sectional_curvature(metric: &MetricTensor, i: usize, j: usize) -> f64 {
     let riemann = metric.riemann_tensor();
     // R_{ijij} = g_{il} R^l_{jij} — using lowered index form
     // Simplified: use R^i_{jij} which is riemann[i][j][i][j]
-    let r_ijij = riemann[i * n * n * n + j * n * n + i * n + j];
+    let r_ijij = metric.g(i, i) * riemann[i * n * n * n + j * n * n + i * n + j];
     let g_ii = metric.g(i, i);
     let g_jj = metric.g(j, j);
     let g_ij = metric.g(i, j);

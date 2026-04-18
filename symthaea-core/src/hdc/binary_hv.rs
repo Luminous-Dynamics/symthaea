@@ -166,6 +166,53 @@ impl BinaryHV {
         Self(super::simd_ops::bind_simd(&self.0, &other.0))
     }
 
+    /// In-place XOR binding: `self ^= other`.
+    ///
+    /// Avoids the 2 KiB by-value return of [`bind`]. Use this in accumulator
+    /// loops where the previous bound hypervector is overwritten:
+    ///
+    /// ```
+    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// let mut acc = BinaryHV::random(1);
+    /// for seed in 2..5 {
+    ///     acc.bind_assign(&BinaryHV::random(seed));
+    /// }
+    /// ```
+    ///
+    /// Routes through the same runtime-dispatched SIMD kernel as [`bind`]
+    /// (AVX-512 / AVX2 / SSE4.1 / NEON / scalar). With `#[inline]`, the
+    /// compiler can elide the 2 KiB stack temporary and write directly
+    /// into `self.0` on release builds.
+    #[inline]
+    pub fn bind_assign(&mut self, other: &Self) {
+        self.0 = super::simd_ops::bind_simd(&self.0, &other.0);
+    }
+
+    /// Fold-bind a slice of hypervectors: `v[0] ⊗ v[1] ⊗ ... ⊗ v[n-1]`.
+    ///
+    /// Single allocation for the accumulator; subsequent steps XOR in place
+    /// via [`bind_assign`]. Empty input returns [`BinaryHV::zero`], a single
+    /// input returns a copy.
+    ///
+    /// Replaces the common pattern:
+    ///
+    /// ```ignore
+    /// let mut acc = *vectors[0];
+    /// for hv in &vectors[1..] {
+    ///     acc = acc.bind(hv);   // N-1 wasted 2 KiB allocations
+    /// }
+    /// ```
+    pub fn bind_chain(vectors: &[&Self]) -> Self {
+        if vectors.is_empty() {
+            return Self::zero();
+        }
+        let mut acc = *vectors[0];
+        for v in &vectors[1..] {
+            acc.bind_assign(v);
+        }
+        acc
+    }
+
     /// Non-commutative temporal binding: ρ(self) ⊕ other.
     ///
     /// Cyclic permutation breaks XOR commutativity so that

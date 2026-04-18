@@ -290,11 +290,11 @@ mod tests {
         assert_eq!(auto_tier(5), ApproximationTier::ExhaustivePartition);
         assert_eq!(auto_tier(8), ApproximationTier::ExhaustivePartition);
 
-        // Medium systems: Spectral
-        assert_eq!(auto_tier(9), ApproximationTier::SpectralConnectivity);
-        assert_eq!(auto_tier(50), ApproximationTier::SpectralConnectivity);
-
-        // Large systems: Heuristic
+        // Medium/large systems: sampled heuristic.
+        // SpectralConnectivity measures spectral gap, not IIT Φ, and is not
+        // selected automatically.
+        assert_eq!(auto_tier(9), ApproximationTier::SampledPartition);
+        assert_eq!(auto_tier(50), ApproximationTier::SampledPartition);
         assert_eq!(auto_tier(51), ApproximationTier::SampledPartition);
         assert_eq!(auto_tier(500), ApproximationTier::SampledPartition);
 

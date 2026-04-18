@@ -280,9 +280,10 @@ impl FixRuleGenerator {
                     (entry.1 * strategy_count) / (strategy_count + 1.0)
                 };
             } else {
-                cluster
-                    .tried_strategies
-                    .push((fix_strategy.to_string(), if success { 1.0 } else { 0.0 }));
+                cluster.tried_strategies.push((
+                    fix_strategy.to_string(),
+                    if success { 1.0 } else { 0.0 },
+                ));
             }
 
             // Keep last 10 context samples
@@ -298,7 +299,10 @@ impl FixRuleGenerator {
                 pattern_signature: pattern_signature.to_string(),
                 total_attempts: 1,
                 successful_fixes: if success { 1 } else { 0 },
-                tried_strategies: vec![(fix_strategy.to_string(), if success { 1.0 } else { 0.0 })],
+                tried_strategies: vec![(
+                    fix_strategy.to_string(),
+                    if success { 1.0 } else { 0.0 },
+                )],
                 context_samples: vec![context_snippet.chars().take(200).collect()],
             };
             self.clusters.push(new_cluster);
@@ -313,7 +317,11 @@ impl FixRuleGenerator {
     /// # Arguments
     /// * `phi` — Current consciousness level (gates self-modification at 0.35)
     /// * `calibration_quality` — MAGI calibration ECE (gates at 0.8)
-    pub fn try_generate_rules(&mut self, phi: f32, calibration_quality: f32) -> Vec<String> {
+    pub fn try_generate_rules(
+        &mut self,
+        phi: f32,
+        calibration_quality: f32,
+    ) -> Vec<String> {
         // ── Consciousness Gate ──────────────────────────────────────────
         if phi < self.min_phi {
             self.stats.consciousness_gates += 1;
@@ -375,12 +383,8 @@ impl FixRuleGenerator {
         let common_patterns = Self::find_common_code_patterns(&cluster.context_samples);
 
         // Generate a rule based on the error category
-        let (fix_description, search_pattern, replacement) = self.synthesize_fix(
-            &cluster.category,
-            &cluster.error_code,
-            &common_patterns,
-            best_existing,
-        );
+        let (fix_description, search_pattern, replacement) =
+            self.synthesize_fix(&cluster.category, &cluster.error_code, &common_patterns, best_existing);
 
         let rule_id = format!("self_rule_{}", self.next_id);
         self.next_id += 1;
@@ -449,11 +453,8 @@ impl FixRuleGenerator {
                 };
 
                 (
-                    format!(
-                        "Auto-generated: add {} for type conversion (from {} occurrences)",
-                        conversion,
-                        common_patterns.len()
-                    ),
+                    format!("Auto-generated: add {} for type conversion (from {} occurrences)",
+                        conversion, common_patterns.len()),
                     None, // Context-dependent, no fixed search pattern
                     Some(conversion.to_string()),
                 )
@@ -486,11 +487,13 @@ impl FixRuleGenerator {
                     Some(fix.to_string()),
                 )
             }
-            "LifetimeError" => (
-                "Auto-generated: add explicit lifetime annotation <'a>".to_string(),
-                Some("fn ".to_string()),
-                Some("fn <'a>".to_string()),
-            ),
+            "LifetimeError" => {
+                (
+                    "Auto-generated: add explicit lifetime annotation <'a>".to_string(),
+                    Some("fn ".to_string()),
+                    Some("fn <'a>".to_string()),
+                )
+            }
             _ => {
                 // Generic fallback: describe the pattern for future analysis
                 let desc = if let Some((best_strat, rate)) = best_existing {
@@ -503,9 +506,7 @@ impl FixRuleGenerator {
                 } else {
                     format!(
                         "Auto-generated: new fix strategy for {} {} errors ({} samples)",
-                        category,
-                        error_code,
-                        common_patterns.len()
+                        category, error_code, common_patterns.len()
                     )
                 };
                 (desc, None, None)
@@ -523,8 +524,8 @@ impl FixRuleGenerator {
 
         // Common type names
         let type_keywords = [
-            "String", "&str", "Vec", "HashMap", "Option", "Result", "i32", "u32", "i64", "u64",
-            "f32", "f64", "usize", "bool",
+            "String", "&str", "Vec", "HashMap", "Option", "Result",
+            "i32", "u32", "i64", "u64", "f32", "f64", "usize", "bool",
         ];
 
         for keyword in &type_keywords {
@@ -639,7 +640,12 @@ impl FixRuleGenerator {
     pub fn active_rules_for(&self, error_code: &str) -> Vec<&GeneratedFixRule> {
         self.rules
             .values()
-            .filter(|r| !r.demoted && r.error_code.as_ref().map_or(false, |c| c == error_code))
+            .filter(|r| {
+                !r.demoted
+                    && r.error_code
+                        .as_ref()
+                        .map_or(false, |c| c == error_code)
+            })
             .collect()
     }
 
@@ -735,7 +741,8 @@ impl FixRuleGenerator {
         if let Ok(data_dir) = std::env::var("SYMTHAEA_DATA_DIR") {
             std::path::PathBuf::from(data_dir).join("fix-rules.json")
         } else if let Ok(home) = std::env::var("HOME") {
-            std::path::PathBuf::from(home).join(".local/share/symthaea/fix-rules.json")
+            std::path::PathBuf::from(home)
+                .join(".local/share/symthaea/fix-rules.json")
         } else {
             std::path::PathBuf::from("fix-rules.json")
         }

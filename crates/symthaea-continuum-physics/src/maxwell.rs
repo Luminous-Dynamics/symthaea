@@ -143,9 +143,9 @@ impl Maxwell1D {
 /// 2D FDTD for TM mode (E_z, H_x, H_y).
 #[derive(Debug, Clone)]
 pub struct Maxwell2D {
-    pub ez: Vec<f64>, // E_z[i*ny + j]
-    pub hx: Vec<f64>, // H_x
-    pub hy: Vec<f64>, // H_y
+    pub ez: Vec<f64>,   // E_z[i*ny + j]
+    pub hx: Vec<f64>,   // H_x
+    pub hy: Vec<f64>,   // H_y
     pub epsilon_r: Vec<f64>,
     pub nx: usize,
     pub ny: usize,
@@ -165,11 +165,7 @@ impl Maxwell2D {
             hx: vec![0.0; size],
             hy: vec![0.0; size],
             epsilon_r: vec![1.0; size],
-            nx,
-            ny,
-            dx,
-            dy,
-            dt,
+            nx, ny, dx, dy, dt,
             step: 0,
         }
     }
@@ -190,8 +186,7 @@ impl Maxwell2D {
         for i in 0..nx - 1 {
             for j in 0..ny {
                 let idx = i * ny + j;
-                self.hy[idx] +=
-                    (self.dt / (MU_0 * self.dx)) * (self.ez[(i + 1) * ny + j] - self.ez[idx]);
+                self.hy[idx] += (self.dt / (MU_0 * self.dx)) * (self.ez[(i + 1) * ny + j] - self.ez[idx]);
             }
         }
 
@@ -255,10 +250,7 @@ mod tests {
         let transmitted: f64 = sim.ez[110..130].iter().map(|e| e * e).sum();
 
         // Both reflected and transmitted should be nonzero
-        assert!(
-            reflected > 0.0 || transmitted > 0.0,
-            "Should see wave activity"
-        );
+        assert!(reflected > 0.0 || transmitted > 0.0, "Should see wave activity");
     }
 
     #[test]
@@ -286,8 +278,7 @@ mod tests {
         assert!(
             lossy_amplitude <= vacuum_amplitude + 1e-10,
             "Lossy medium should attenuate: lossy={:.6}, vacuum={:.6}",
-            lossy_amplitude,
-            vacuum_amplitude
+            lossy_amplitude, vacuum_amplitude
         );
     }
 

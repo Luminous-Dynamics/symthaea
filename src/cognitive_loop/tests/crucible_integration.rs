@@ -48,9 +48,18 @@ fn make_full_engine() -> EthicsEngine {
 
     // Use lower topology cadence for testing (fires sooner).
     // convergence_min_points: 3 for shorter test scenarios.
+    //
+    // NOTE: after the first fire, `cache.topology_cadence` adapts to one of
+    // {cadence_fast, cadence_moderate, cadence_slow} — defaults 150/300/600.
+    // Those defaults starve the short test scenarios (~4 cycles each at
+    // CYCLE_LCM=133), so we pin the adaptive cadences to 7 too. This matches
+    // the intent of initial_cadence=7: every test cycle can fire topology.
     let anomaly_config = MoralAnomalyConfig {
         initial_cadence: 7,
         convergence_min_points: 3,
+        cadence_fast: 7,
+        cadence_moderate: 7,
+        cadence_slow: 7,
         ..Default::default()
     };
 

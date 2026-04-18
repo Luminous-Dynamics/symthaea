@@ -176,8 +176,8 @@ fn compute_human_danger(beam_pos: [f64; 3], beam_vel: [f64; 3], human_pos: [f64;
 pub fn run_kinetic_sacrifice(config: &KineticSacrificeConfig) -> KineticSacrificeResult {
     let sacrifice_model_path = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/cf2_sacrifice.xml");
 
-    let mut sim =
-        MuJoCoSimulator::new(sacrifice_model_path).expect("Failed to load sacrifice MJCF model");
+    let mut sim = MuJoCoSimulator::new(sacrifice_model_path)
+        .expect("Failed to load sacrifice MJCF model");
     let genesis = GenesisSeed::from_phrase(&config.flight_config.genesis_phrase);
 
     let mut encoder = QuadrotorHdcEncoder::new(&genesis, config.flight_config.num_levels);

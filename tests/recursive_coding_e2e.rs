@@ -60,25 +60,13 @@ fn e2e_full_recursive_loop_native() {
     let response = orchestrator.synthesize(&request);
 
     // The native generator should at least attempt
-    assert!(
-        !orchestrator.attempt_history().is_empty(),
-        "Should have attempted generation"
-    );
-    assert!(
-        orchestrator.energy_spent() > 0.0,
-        "Should have consumed energy"
-    );
+    assert!(!orchestrator.attempt_history().is_empty(), "Should have attempted generation");
+    assert!(orchestrator.energy_spent() > 0.0, "Should have consumed energy");
 
     // ── Step 4: Self-test generation ─────────────────────────────────
     let test_suite = TestGenerator::generate(&request);
-    assert!(
-        !test_suite.tests.is_empty(),
-        "Should generate tests from examples"
-    );
-    assert!(
-        test_suite.source.contains("#[cfg(test)]"),
-        "Should produce test module"
-    );
+    assert!(!test_suite.tests.is_empty(), "Should generate tests from examples");
+    assert!(test_suite.source.contains("#[cfg(test)]"), "Should produce test module");
     assert!(
         test_suite.source.contains("test_add_example_0"),
         "Should name test after function + example index"
@@ -88,11 +76,7 @@ fn e2e_full_recursive_loop_native() {
     let compiled = response.accepted;
     let was_correct = magi.resolve_prediction(&prediction_id, compiled, Some(compiled));
     assert!(was_correct.is_some(), "Prediction should be resolvable");
-    assert_eq!(
-        magi.pending_count(),
-        0,
-        "No pending predictions after resolve"
-    );
+    assert_eq!(magi.pending_count(), 0, "No pending predictions after resolve");
     assert_eq!(magi.stats().total_predictions, 1);
 
     // ── Step 6: Check distillation capture ───────────────────────────
@@ -104,20 +88,14 @@ fn e2e_full_recursive_loop_native() {
 
         let capture = &orchestrator.distillation_buffer()[0];
         assert_eq!(capture.channels.len(), 43, "Channel vector should be 43D");
-        assert!(
-            !capture.source.is_empty(),
-            "Captured source should be non-empty"
-        );
+        assert!(!capture.source.is_empty(), "Captured source should be non-empty");
         assert!(capture.quality > 0.0, "Quality should be positive");
 
         // Verify JSONL export is well-formed
         let jsonl = orchestrator.export_distillation_jsonl();
         assert!(!jsonl.is_empty(), "JSONL export should be non-empty");
         assert!(jsonl.contains("channels"), "JSONL should contain channels");
-        assert!(
-            jsonl.contains("target_text"),
-            "JSONL should contain target_text"
-        );
+        assert!(jsonl.contains("target_text"), "JSONL should contain target_text");
 
         // ── Step 7: Check certificate ────────────────────────────────
         assert!(
@@ -126,23 +104,14 @@ fn e2e_full_recursive_loop_native() {
         );
         let cert = &orchestrator.certificates()[0];
         assert!(cert.id.starts_with("cert_"), "Certificate ID format");
-        assert!(
-            cert.verify_source(&response.source),
-            "Certificate should verify source"
-        );
+        assert!(cert.verify_source(&response.source), "Certificate should verify source");
         assert!(!cert.backend_used.is_empty(), "Backend should be recorded");
-        assert!(
-            cert.semantic_similarity > 0.0,
-            "Similarity should be positive"
-        );
+        assert!(cert.semantic_similarity > 0.0, "Similarity should be positive");
     }
 
     // ── Step 8: Calibration state ────────────────────────────────────
     let summary = magi.calibration_summary();
-    assert!(
-        summary.contains("1/1") || summary.contains("0/1"),
-        "Should show 1 prediction"
-    );
+    assert!(summary.contains("1/1") || summary.contains("0/1"), "Should show 1 prediction");
 }
 
 // ==================================================================================
@@ -172,10 +141,7 @@ fn e2e_calibration_improves_over_multiple_generations() {
     // Adjusted confidence should reflect historical data
     let adjusted = magi.adjusted_confidence(0.8, "CodeGenerator");
     // With only 5 data points, should still be close to raw but with pessimism
-    assert!(
-        adjusted > 0.0 && adjusted <= 0.95,
-        "Adjusted confidence: {adjusted}"
-    );
+    assert!(adjusted > 0.0 && adjusted <= 0.95, "Adjusted confidence: {adjusted}");
 }
 
 // ==================================================================================
@@ -191,16 +157,9 @@ fn e2e_self_test_generation_comprehensive() {
         .with_example("factorial(5)", "120");
 
     let suite = TestGenerator::generate(&req_unsigned);
-    assert!(
-        suite.tests.len() >= 4,
-        "Should have examples + boundary tests: got {}",
-        suite.tests.len()
-    );
+    assert!(suite.tests.len() >= 4, "Should have examples + boundary tests: got {}", suite.tests.len());
     assert!(suite.source.contains("boundary_n_zero"), "Should test n=0");
-    assert!(
-        suite.source.contains("assert_eq!(factorial(0), 1)"),
-        "Should test example 0"
-    );
+    assert!(suite.source.contains("assert_eq!(factorial(0), 1)"), "Should test example 0");
 
     // String parameters
     let req_string = SynthesisRequest::new("rust", "reverse", "Reverse a string")
@@ -208,10 +167,7 @@ fn e2e_self_test_generation_comprehensive() {
         .with_example("reverse(\"hello\")", "\"olleh\"");
 
     let suite = TestGenerator::generate(&req_string);
-    assert!(
-        suite.source.contains("boundary_s_empty"),
-        "Should test empty string"
-    );
+    assert!(suite.source.contains("boundary_s_empty"), "Should test empty string");
 
     // Vector parameters
     let req_vec = SynthesisRequest::new("rust", "sum", "Sum a vector")
@@ -219,10 +175,7 @@ fn e2e_self_test_generation_comprehensive() {
         .with_example("sum(&[1, 2, 3])", "6");
 
     let suite = TestGenerator::generate(&req_vec);
-    assert!(
-        suite.source.contains("boundary_v_empty"),
-        "Should test empty vec"
-    );
+    assert!(suite.source.contains("boundary_v_empty"), "Should test empty vec");
 
     // No signature → minimal tests
     let req_minimal = SynthesisRequest::new("rust", "mystery", "Unknown function");
@@ -256,20 +209,11 @@ fn e2e_immune_evolution_vdj_recombination() {
     });
 
     assert_eq!(evolver.generation(), 1);
-    assert!(
-        evolver.stats().antibodies_created > initial_pop,
-        "Should create new antibodies"
-    );
-    assert!(
-        evolver.stats().recombinations > 0,
-        "Should perform V(D)J recombinations"
-    );
+    assert!(evolver.stats().antibodies_created > initial_pop, "Should create new antibodies");
+    assert!(evolver.stats().recombinations > 0, "Should perform V(D)J recombinations");
 
     // Check cytokine status
-    assert!(
-        !evolver.cytokines().is_inflamed(),
-        "Should not be inflamed on first gen"
-    );
+    assert!(!evolver.cytokines().is_inflamed(), "Should not be inflamed on first gen");
 }
 
 // ==================================================================================
@@ -281,10 +225,7 @@ fn e2e_immune_negative_selection() {
     let evolver = ImmuneCodeEvolver::new();
 
     // Anti-pattern library should be seeded with dangerous patterns
-    assert!(
-        evolver.anti_patterns().len() >= 10,
-        "Should have 10+ anti-patterns"
-    );
+    assert!(evolver.anti_patterns().len() >= 10, "Should have 10+ anti-patterns");
 
     // A safe pattern should not be rejected
     let encoder = CodeHDEncoder::default_dim();
@@ -313,25 +254,16 @@ fn e2e_cytokine_inflammation_and_recovery() {
     for _ in 0..20 {
         cytokines.record_outcome(false);
     }
-    assert!(
-        cytokines.is_inflamed(),
-        "Should be inflamed after 20 failures"
-    );
+    assert!(cytokines.is_inflamed(), "Should be inflamed after 20 failures");
 
     let boosted_rate = cytokines.effective_mutation_rate(0.05);
-    assert!(
-        boosted_rate > 0.05,
-        "Mutation rate should be boosted: {boosted_rate}"
-    );
+    assert!(boosted_rate > 0.05, "Mutation rate should be boosted: {boosted_rate}");
 
     // Recovery via successes
     for _ in 0..30 {
         cytokines.record_outcome(true);
     }
-    assert!(
-        !cytokines.is_inflamed(),
-        "Should recover after sustained success"
-    );
+    assert!(!cytokines.is_inflamed(), "Should recover after sustained success");
 }
 
 // ==================================================================================
@@ -376,10 +308,7 @@ fn e2e_primitive_evolution_hybrid() {
     let result = evolver.evolve_hybrid("binary_search", "hash_lookup");
 
     assert!(result.generations > 0, "Should run evolution");
-    assert!(
-        result.best_fitness > 0.0,
-        "Hybrid should have positive fitness"
-    );
+    assert!(result.best_fitness > 0.0, "Hybrid should have positive fitness");
 }
 
 // ==================================================================================
@@ -402,10 +331,7 @@ fn e2e_self_modification_error_clustering() {
         );
     }
 
-    assert!(
-        gen.stats().clusters_detected > 0,
-        "Should detect error cluster"
-    );
+    assert!(gen.stats().clusters_detected > 0, "Should detect error cluster");
 }
 
 // ==================================================================================
@@ -435,10 +361,7 @@ fn e2e_self_modification_rule_generation_gated() {
 
     // Gate 2: Low calibration → blocked
     let rules = gen.try_generate_rules(0.5, 0.3);
-    assert!(
-        rules.is_empty(),
-        "Low calibration should block self-modification"
-    );
+    assert!(rules.is_empty(), "Low calibration should block self-modification");
     assert!(gen.stats().calibration_gates > 0);
 
     // Gate 3: Both passing → generates rule
@@ -464,14 +387,7 @@ fn e2e_self_modification_full_lifecycle() {
 
     // Phase 1: Accumulate failures
     for _ in 0..7 {
-        gen.observe_error(
-            "E0277",
-            "MissingImport",
-            "HashMap not found",
-            "none",
-            false,
-            "HashMap::new()",
-        );
+        gen.observe_error("E0277", "MissingImport", "HashMap not found", "none", false, "HashMap::new()");
     }
 
     // Phase 2: Generate rule
@@ -486,10 +402,7 @@ fn e2e_self_modification_full_lifecycle() {
 
     // Phase 4: Rule should be promoted (>70% success, 5+ applications)
     let rule = gen.all_rules().iter().find(|r| r.id == rule_id).unwrap();
-    assert!(
-        rule.is_proven(),
-        "Rule should be proven after 6/6 successes"
-    );
+    assert!(rule.is_proven(), "Rule should be proven after 6/6 successes");
     assert!(rule.promoted, "Rule should be auto-promoted");
     assert!(!rule.demoted, "Rule should not be demoted");
     assert!(rule.success_rate() > 0.8);
@@ -526,13 +439,19 @@ fn e2e_hv_bridge_cross_type_similarity() {
 #[test]
 fn e2e_verification_policy_ordering() {
     assert!(
-        VerificationPolicy::SafetyCritical.threshold() > VerificationPolicy::Standard.threshold()
+        VerificationPolicy::SafetyCritical.threshold()
+            > VerificationPolicy::Standard.threshold()
     );
-    assert!(VerificationPolicy::Standard.threshold() > VerificationPolicy::Exploratory.threshold());
+    assert!(
+        VerificationPolicy::Standard.threshold()
+            > VerificationPolicy::Exploratory.threshold()
+    );
 
     // Safety-critical should be strictest
-    let safety_verifier =
-        CodeVerifier::with_policy(CodeHDEncoder::new(512), VerificationPolicy::SafetyCritical);
+    let safety_verifier = CodeVerifier::with_policy(
+        CodeHDEncoder::new(512),
+        VerificationPolicy::SafetyCritical,
+    );
     assert!((safety_verifier.threshold() - 0.85).abs() < 1e-6);
 }
 
@@ -542,8 +461,7 @@ fn e2e_verification_policy_ordering() {
 
 #[test]
 fn e2e_certificate_tamper_detection() {
-    let source =
-        "fn fibonacci(n: u64) -> u64 { if n <= 1 { n } else { fibonacci(n-1) + fibonacci(n-2) } }";
+    let source = "fn fibonacci(n: u64) -> u64 { if n <= 1 { n } else { fibonacci(n-1) + fibonacci(n-2) } }";
     let cert = CodeCertificate::new(source, "CodeGenerator", 0.85)
         .with_topology(1, 1, 0)
         .with_sheaf_coherent(true);
@@ -588,18 +506,12 @@ fn e2e_distillation_jsonl_format() {
     if !orchestrator.distillation_buffer().is_empty() {
         // Parse each line as JSON to verify format
         for line in jsonl.lines() {
-            let parsed: serde_json::Value =
-                serde_json::from_str(line).expect("Each distillation line should be valid JSON");
+            let parsed: serde_json::Value = serde_json::from_str(line)
+                .expect("Each distillation line should be valid JSON");
 
             assert!(parsed.get("channels").is_some(), "Must have channels field");
-            assert!(
-                parsed.get("target_text").is_some(),
-                "Must have target_text field"
-            );
-            assert!(
-                parsed.get("target_ids").is_some(),
-                "Must have target_ids field"
-            );
+            assert!(parsed.get("target_text").is_some(), "Must have target_text field");
+            assert!(parsed.get("target_ids").is_some(), "Must have target_ids field");
 
             let channels = parsed["channels"].as_array().unwrap();
             assert_eq!(channels.len(), 43, "Channel vector must be 43D");
@@ -663,26 +575,13 @@ fn e2e_recursive_loop_multiple_iterations() {
     }
 
     // After 5 iterations, system should have state
-    assert_eq!(
-        magi.stats().total_predictions,
-        5,
-        "Should have 5 predictions"
-    );
-    assert!(
-        orchestrator.attempt_history().len() >= 5,
-        "Should have 5+ attempts"
-    );
-    assert!(
-        orchestrator.energy_spent() > 0.0,
-        "Should have spent energy"
-    );
+    assert_eq!(magi.stats().total_predictions, 5, "Should have 5 predictions");
+    assert!(orchestrator.attempt_history().len() >= 5, "Should have 5+ attempts");
+    assert!(orchestrator.energy_spent() > 0.0, "Should have spent energy");
 
     // Calibration summary should reflect history
     let summary = magi.calibration_summary();
-    assert!(
-        !summary.contains("No code predictions yet"),
-        "Should have prediction data"
-    );
+    assert!(!summary.contains("No code predictions yet"), "Should have prediction data");
 }
 
 // ==================================================================================

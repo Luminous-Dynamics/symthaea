@@ -26,6 +26,18 @@ pub use symthaea_vision_manifold as vision_manifold;
 // Audio perception - Speech recognition via symthaea-stt
 pub mod audio;
 
+// Live microphone capture → STT → ContinuousHV (feature-gated, opt-in).
+// Runs on a background thread so the cognitive loop never blocks on audio I/O.
+#[cfg(feature = "voice-stt-live")]
+pub mod audio_stream;
+#[cfg(feature = "voice-stt-live")]
+pub use audio_stream::{MicCaptureConfig, MicCaptureHandle};
+
+// Physical-sensor fusion → ContinuousHV (feature-gated).
+// Each sensor subtype is independently gated under `sensor-fusion`.
+#[cfg(feature = "sensor-fusion")]
+pub mod sensor_fusion;
+
 // SHA-256 integrity verification for model weight files
 pub mod model_integrity;
 

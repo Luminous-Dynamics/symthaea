@@ -1,1 +1,0 @@
-../shared/plos2015.bst

@@ -43,7 +43,10 @@ pub struct GeneralizedEigenResult {
 /// Compute the canonical orthogonalization matrix X from overlap matrix S.
 ///
 /// Returns (X, n_independent, n_discarded) where X is n_basis × n_independent.
-pub fn canonical_orthogonalization(s_matrix: &[f64], n: usize) -> (Vec<f64>, usize, usize) {
+pub fn canonical_orthogonalization(
+    s_matrix: &[f64],
+    n: usize,
+) -> (Vec<f64>, usize, usize) {
     canonical_orthogonalization_with_threshold(s_matrix, n, CANONICAL_ORTH_THRESHOLD)
 }
 
@@ -109,7 +112,8 @@ pub fn solve_generalized_eigen(
         for mu in 0..n_basis {
             let mut sum = 0.0;
             for k in 0..n_independent {
-                sum += x_matrix[mu * n_independent + k] * eigvecs_prime[k * n_independent + orig_i];
+                sum += x_matrix[mu * n_independent + k]
+                    * eigvecs_prime[k * n_independent + orig_i];
             }
             coefficients[mu * n_independent + i] = sum;
         }

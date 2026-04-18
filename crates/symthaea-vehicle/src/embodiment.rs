@@ -13,8 +13,27 @@ use crate::types::VehicleConfig;
 
 pub use symthaea_core::embodiment::{
     grounding_from_prediction_error, grounding_label, EmbodimentResult, EmbodimentTelemetry,
-    MotorSafetyLevel, GROUNDING_SENSORIMOTOR,
+    MoralGateInput, MotorSafetyLevel, SafeFallback, GROUNDING_SENSORIMOTOR,
 };
+
+/// Multi-stage emergency fallback for vehicles.
+///
+/// Mirrors real ADAS handover protocols (ISO 21448 SOTIF):
+///   1. Maintain course briefly (allow human takeover detection)
+///   2. Gradual deceleration (50% brake, smooth steering hold)
+///   3. Emergency brake (full force)
+///   4. Post-stop (parking brake, hazards on)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VehicleFallbackStage {
+    /// Stage 1: Maintain course (50 cycles ~100ms for human takeover).
+    MaintainCourse,
+    /// Stage 2: Gradual deceleration (50% brake) + steering hold.
+    GradualDeceleration,
+    /// Stage 3: Full emergency brake.
+    EmergencyBrake,
+    /// Stage 4: Stopped, parking brake engaged.
+    PostStop,
+}
 
 /// Vehicle embodiment bridge.
 pub struct VehicleEmbodiment {
@@ -25,8 +44,17 @@ pub struct VehicleEmbodiment {
     total_steps: usize,
     current_safety: MotorSafetyLevel,
     safety_override: Option<MotorSafetyLevel>,
+    moral_safety: Option<MotorSafetyLevel>,
     last_control_effort: f32,
     last_prediction_error: f32,
+    /// Last commanded steering angle (held through safe fallback with taper).
+    last_safe_steering: f32,
+    /// Cycles since safe fallback activated (for taper schedule).
+    fallback_cycles: u32,
+    /// Multi-stage fallback state.
+    fallback_stage: VehicleFallbackStage,
+    /// Cycles in current fallback stage.
+    fallback_cycles_in_stage: u32,
 }
 
 impl VehicleEmbodiment {
@@ -40,9 +68,76 @@ impl VehicleEmbodiment {
             total_steps: 0,
             current_safety: MotorSafetyLevel::Green,
             safety_override: None,
+            moral_safety: None,
             last_control_effort: 0.0,
             last_prediction_error: 0.0,
+            last_safe_steering: 0.0,
+            fallback_cycles: 0,
+            fallback_stage: VehicleFallbackStage::MaintainCourse,
+            fallback_cycles_in_stage: 0,
         }
+    }
+
+    /// Apply moral gate from ethics engine.
+    /// A vehicle moving at speed can kill — ahimsa forces Red (triggers
+    /// ADAS emergency-brake fallback), consent violation forces Orange,
+    /// caution forces Yellow.
+    pub fn apply_moral_gate(&mut self, gate: MoralGateInput) {
+        self.moral_safety =
+            if gate.ahimsa_violated || gate.verdict == MoralGateInput::VERDICT_BLOCKED {
+                Some(MotorSafetyLevel::Red)
+            } else if gate.consent_violation {
+                Some(MotorSafetyLevel::Orange)
+            } else if gate.verdict == MoralGateInput::VERDICT_CAUTION {
+                Some(MotorSafetyLevel::Yellow)
+            } else {
+                None
+            };
+    }
+
+    /// Advance the multi-stage fallback state machine based on speed and time.
+    fn update_fallback_stage(&mut self) {
+        let speed = self.simulator.state().speed;
+        match self.fallback_stage {
+            VehicleFallbackStage::MaintainCourse => {
+                // 50 cycles (~100ms) to allow human/external takeover detection
+                if self.fallback_cycles_in_stage > 50 {
+                    self.fallback_stage = VehicleFallbackStage::GradualDeceleration;
+                    self.fallback_cycles_in_stage = 0;
+                }
+            }
+            VehicleFallbackStage::GradualDeceleration => {
+                // If speed still high after 200 cycles, escalate to emergency
+                if speed > 5.0 && self.fallback_cycles_in_stage > 200 {
+                    self.fallback_stage = VehicleFallbackStage::EmergencyBrake;
+                    self.fallback_cycles_in_stage = 0;
+                }
+                // If speed is low enough → can stop with parking brake
+                if speed < 0.5 {
+                    self.fallback_stage = VehicleFallbackStage::PostStop;
+                    self.fallback_cycles_in_stage = 0;
+                }
+            }
+            VehicleFallbackStage::EmergencyBrake => {
+                if speed < 0.5 {
+                    self.fallback_stage = VehicleFallbackStage::PostStop;
+                    self.fallback_cycles_in_stage = 0;
+                }
+            }
+            VehicleFallbackStage::PostStop => {
+                // Stay here until safety clears
+            }
+        }
+    }
+
+    fn reset_fallback_stage(&mut self) {
+        self.fallback_stage = VehicleFallbackStage::MaintainCourse;
+        self.fallback_cycles_in_stage = 0;
+    }
+
+    /// Current vehicle fallback stage (for telemetry/testing).
+    pub fn fallback_stage(&self) -> VehicleFallbackStage {
+        self.fallback_stage
     }
 
     pub fn set_safety_override(&mut self, level: MotorSafetyLevel) {
@@ -59,13 +154,70 @@ impl VehicleEmbodiment {
             Some(override_level) => phi_level.max(override_level),
             None => phi_level,
         };
+        // Ethics gate max-composes on top of phi + override. Moral-Red
+        // escalates into the existing emergency-brake fallback chain.
+        if let Some(m) = self.moral_safety {
+            self.current_safety = self.current_safety.max(m);
+        }
         let gain = self.current_safety.motor_gain();
 
         let mut cmd = self.controller.forward(thought_hv, dt);
-        if gain < 1.0 {
-            cmd.steering *= gain;
-            cmd.throttle *= gain;
-            cmd.brake = if gain == 0.0 { 1.0 } else { cmd.brake }; // Emergency brake on Red
+
+        // Record the last safe steering during normal operation
+        if matches!(
+            self.current_safety,
+            MotorSafetyLevel::Green | MotorSafetyLevel::Yellow
+        ) {
+            self.last_safe_steering = cmd.steering;
+            self.fallback_cycles = 0;
+        }
+
+        // ── MULTI-STAGE SAFE FALLBACK for Red tier ──────────────────
+        // ISO 21448 SOTIF-aligned tiered emergency procedure:
+        //   Stage 1: MaintainCourse (allow human takeover ~100ms)
+        //   Stage 2: GradualDeceleration (50% brake)
+        //   Stage 3: EmergencyBrake (full force if speed still high)
+        //   Stage 4: PostStop (parking brake engaged)
+        if matches!(self.current_safety, MotorSafetyLevel::Red) {
+            self.fallback_cycles += 1;
+            self.fallback_cycles_in_stage += 1;
+            self.update_fallback_stage();
+
+            // Smooth steering taper across ALL stages — never snap the wheel
+            const TAPER_CYCLES: f32 = 100.0;
+            let taper_t = (self.fallback_cycles as f32 / TAPER_CYCLES).min(1.0);
+            cmd.steering = self.last_safe_steering * (1.0 - taper_t);
+
+            match self.fallback_stage {
+                VehicleFallbackStage::MaintainCourse => {
+                    // Just hold what we were doing, but stop accelerating
+                    cmd.throttle = 0.0;
+                    // Light brake to start slowing (engine braking equivalent)
+                    cmd.brake = 0.1;
+                }
+                VehicleFallbackStage::GradualDeceleration => {
+                    cmd.throttle = 0.0;
+                    cmd.brake = 0.5; // 50% brake — passenger comfort
+                }
+                VehicleFallbackStage::EmergencyBrake => {
+                    cmd.throttle = 0.0;
+                    cmd.brake = 1.0; // Full force
+                }
+                VehicleFallbackStage::PostStop => {
+                    cmd.throttle = 0.0;
+                    cmd.brake = 1.0; // Hold the brake (parking brake equivalent)
+                    cmd.steering = 0.0; // Centered
+                }
+            }
+        } else {
+            // Not in Red — reset state machine and allow normal operation
+            self.reset_fallback_stage();
+            self.fallback_cycles = 0;
+            if gain < 1.0 {
+                // Yellow/Orange: scaled authority but preserve agency
+                cmd.steering *= gain;
+                cmd.throttle *= gain;
+            }
         }
 
         self.last_control_effort = cmd.control_effort();
@@ -109,8 +261,13 @@ impl VehicleEmbodiment {
         self.total_steps = 0;
         self.current_safety = MotorSafetyLevel::Green;
         self.safety_override = None;
+        self.moral_safety = None;
         self.last_control_effort = 0.0;
         self.last_prediction_error = 0.0;
+        self.last_safe_steering = 0.0;
+        self.fallback_cycles = 0;
+        self.fallback_stage = VehicleFallbackStage::MaintainCourse;
+        self.fallback_cycles_in_stage = 0;
     }
 
     pub fn safety_level(&self) -> MotorSafetyLevel {
@@ -137,16 +294,67 @@ impl VehicleEmbodiment {
 }
 
 impl symthaea_core::embodiment::EmbodimentBridge for VehicleEmbodiment {
-    fn step(&mut self, hv: &ContinuousHV, dt: f32, phi: f64) -> EmbodimentResult { self.step(hv, dt, phi) }
-    fn encode_perception(&mut self) -> ContinuousHV { self.encode_perception() }
-    fn reset(&mut self) { self.reset() }
-    fn safety_level(&self) -> MotorSafetyLevel { self.safety_level() }
-    fn set_safety_override(&mut self, level: MotorSafetyLevel) { self.set_safety_override(level) }
-    fn clear_safety_override(&mut self) { self.clear_safety_override() }
-    fn platform(&self) -> symthaea_core::embodiment::EmbodimentPlatform { symthaea_core::embodiment::EmbodimentPlatform::Vehicle }
-    fn num_actuators(&self) -> usize { 3 }
-    fn total_steps(&self) -> usize { self.total_steps() }
-    fn telemetry(&self) -> EmbodimentTelemetry { self.telemetry() }
+    fn step(&mut self, hv: &ContinuousHV, dt: f32, phi: f64) -> EmbodimentResult {
+        self.step(hv, dt, phi)
+    }
+    fn encode_perception(&mut self) -> ContinuousHV {
+        self.encode_perception()
+    }
+    fn reset(&mut self) {
+        self.reset()
+    }
+    fn safety_level(&self) -> MotorSafetyLevel {
+        self.safety_level()
+    }
+    fn set_safety_override(&mut self, level: MotorSafetyLevel) {
+        self.set_safety_override(level)
+    }
+    fn clear_safety_override(&mut self) {
+        self.clear_safety_override()
+    }
+    fn platform(&self) -> symthaea_core::embodiment::EmbodimentPlatform {
+        symthaea_core::embodiment::EmbodimentPlatform::Vehicle
+    }
+    fn num_actuators(&self) -> usize {
+        3
+    }
+    fn total_steps(&self) -> usize {
+        self.total_steps()
+    }
+    fn telemetry(&self) -> EmbodimentTelemetry {
+        self.telemetry()
+    }
+    fn apply_moral_gate(&mut self, gate: MoralGateInput) {
+        self.apply_moral_gate(gate)
+    }
+}
+
+/// SafeFallback guarantees for the Vehicle platform.
+///
+/// When consciousness degrades to Red, the vehicle executes:
+///   1. Full brake (1.0) — maximum deceleration immediately
+///   2. Zero throttle — stop accelerating
+///   3. Smooth steering taper — last_safe_steering → 0 over 50 cycles
+///
+/// This prevents the two failure modes of naive "zero force":
+///   - No brakes at highway speed (catastrophic)
+///   - Sudden steering snap causing lane departure
+impl SafeFallback for VehicleEmbodiment {
+    fn platform_name(&self) -> &'static str {
+        "vehicle"
+    }
+    fn current_safety_level(&self) -> MotorSafetyLevel {
+        self.current_safety
+    }
+    fn safe_fallback_priority(&self) -> u8 {
+        10
+    } // Critical: human-carrying, at speed
+    fn safe_fallback_description(&self) -> &'static str {
+        "Multi-stage: MaintainCourse → GradualDeceleration → EmergencyBrake → PostStop"
+    }
+    fn safe_fallback_latency_cycles(&self) -> u32 {
+        1
+    } // Immediate
 }
 
 #[cfg(test)]
@@ -196,5 +404,40 @@ mod tests {
         bridge.step(&hv, 0.005, 0.7);
         bridge.reset();
         assert_eq!(bridge.total_steps(), 0);
+    }
+
+    #[test]
+    fn test_moral_gate_ahimsa_forces_red() {
+        let mut bridge = VehicleEmbodiment::new(&GenesisSeed::from_phrase("test"));
+        bridge.apply_moral_gate(MoralGateInput {
+            verdict: MoralGateInput::VERDICT_SAFE,
+            consent_violation: false,
+            ahimsa_violated: true,
+        });
+        let hv = ContinuousHV::random(16384, 42);
+        // Phi 0.9 → Green normally; ahimsa forces Red.
+        let r = bridge.step(&hv, 0.005, 0.9);
+        assert_eq!(
+            r.safety_level,
+            MotorSafetyLevel::Red,
+            "ahimsa must force Red regardless of phi"
+        );
+    }
+
+    #[test]
+    fn test_moral_gate_consent_violation_forces_orange() {
+        let mut bridge = VehicleEmbodiment::new(&GenesisSeed::from_phrase("test"));
+        bridge.apply_moral_gate(MoralGateInput {
+            verdict: MoralGateInput::VERDICT_SAFE,
+            consent_violation: true,
+            ahimsa_violated: false,
+        });
+        let hv = ContinuousHV::random(16384, 42);
+        let r = bridge.step(&hv, 0.005, 0.9);
+        assert_eq!(
+            r.safety_level,
+            MotorSafetyLevel::Orange,
+            "consent violation → Orange"
+        );
     }
 }

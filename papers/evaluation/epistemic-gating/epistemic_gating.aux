@@ -1,0 +1,112 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\citation{ji2023survey,maynez2020faithfulness}
+\citation{lin2022truthfulqa}
+\citation{ouyang2022training}
+\citation{bai2022constitutional}
+\citation{lewis2020retrieval}
+\citation{wei2022chain}
+\citation{wang2023selfconsistency}
+\citation{thorne2018fever}
+\citation{kadavath2022language}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{1}{section.1}\protected@file@percent }
+\citation{hagoort2005broca,fedorenko2014role}
+\citation{levelt1989speaking}
+\citation{ji2023survey}
+\citation{bender2021dangers}
+\citation{maynez2020faithfulness}
+\citation{lin2022truthfulqa}
+\citation{ji2023survey}
+\citation{kanerva2009hyperdimensional}
+\@writefile{toc}{\contentsline {section}{\numberline {2}Background}{2}{section.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}Hallucination in Language Models}{2}{subsection.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Hyperdimensional Computing for Representation}{2}{subsection.2.2}\protected@file@percent }
+\citation{kanerva2009hyperdimensional}
+\citation{friston2010free}
+\citation{friston2010free}
+\citation{baars1988cognitive,dehaene2014consciousness}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}Active Inference and Consciousness}{3}{subsection.2.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3}Architecture}{3}{section.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}System Overview}{3}{subsection.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}ThoughtEncoder: 43-Channel Cognitive Encoding}{4}{subsection.3.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces ThoughtEncoder channels and their cognitive sources.}}{4}{table.caption.1}\protected@file@percent }
+\providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
+\newlabel{tab:channels}{{1}{4}{ThoughtEncoder channels and their cognitive sources}{table.caption.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}HDC Binding Layer}{4}{subsection.3.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Epistemic Gating}{4}{subsection.3.4}\protected@file@percent }
+\newlabel{eq:epistemic-support}{{2}{4}{Epistemic Gating}{equation.2}{}}
+\@writefile{toc}{\contentsline {paragraph}{What ES is and is not.}{5}{section*.2}\protected@file@percent }
+\newlabel{eq:threshold}{{3}{5}{What ES is and is not}{equation.3}{}}
+\newlabel{eq:masking}{{4}{5}{What ES is and is not}{equation.4}{}}
+\citation{hasani2021liquid}
+\citation{gu2024mamba}
+\@writefile{loa}{\contentsline {algorithm}{\numberline {1}{\ignorespaces Epistemic Gating for Token Generation}}{6}{algorithm.1}\protected@file@percent }
+\newlabel{alg:epistemic-gate}{{1}{6}{Epistemic Gating for Token Generation}{algorithm.1}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.5}Coherence Feedback and Semantic Veto}{6}{subsection.3.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.6}Adaptive Cadence}{6}{subsection.3.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.7}Liquid-Mamba Fusion Backend}{6}{subsection.3.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4}Experimental Evaluation}{7}{section.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Setup}{7}{subsection.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Hallucination Prevention}{7}{subsection.4.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Hallucination rates across generation conditions. ``Baseline'' uses raw logits without epistemic gating. ``EG'' adds the EpistemicGate. ``EG+CF'' adds CoherenceFeedback. ``Full'' includes adaptive cadence.}}{7}{table.caption.3}\protected@file@percent }
+\newlabel{tab:hallucination}{{2}{7}{Hallucination rates across generation conditions. ``Baseline'' uses raw logits without epistemic gating. ``EG'' adds the EpistemicGate. ``EG+CF'' adds CoherenceFeedback. ``Full'' includes adaptive cadence}{table.caption.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}Epistemic Support Distribution}{7}{subsection.4.3}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Epistemic support statistics during generation. $|\mathcal  {V}_{\text  {pass}}|$ denotes the number of tokens passing the epistemic gate.}}{8}{table.caption.4}\protected@file@percent }
+\newlabel{tab:epistemic-dist}{{3}{8}{Epistemic support statistics during generation. $|\mathcal {V}_{\text {pass}}|$ denotes the number of tokens passing the epistemic gate}{table.caption.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4}Semantic Veto Frequency}{8}{subsection.4.4}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Semantic veto statistics across 500 generation episodes.}}{8}{table.caption.5}\protected@file@percent }
+\newlabel{tab:veto}{{4}{8}{Semantic veto statistics across 500 generation episodes}{table.caption.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5}Adaptive Cadence Behavior}{8}{subsection.4.5}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Generation cadence across cognitive states. ``Cycles/gen'' indicates the number of cognitive cycles between generation events.}}{8}{table.caption.6}\protected@file@percent }
+\newlabel{tab:cadence}{{5}{8}{Generation cadence across cognitive states. ``Cycles/gen'' indicates the number of cognitive cycles between generation events}{table.caption.6}{}}
+\citation{ji2023survey}
+\citation{dehaene2014consciousness}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.6}Comparison with Post-Hoc Methods}{9}{subsection.4.6}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces Comparison with post-hoc hallucination mitigation methods.}}{9}{table.caption.7}\protected@file@percent }
+\newlabel{tab:comparison}{{6}{9}{Comparison with post-hoc hallucination mitigation methods}{table.caption.7}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5}Discussion}{9}{section.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Prevention versus Detection}{9}{subsection.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Consciousness-Awareness as a Feature}{9}{subsection.5.2}\protected@file@percent }
+\citation{levelt1989speaking}
+\citation{friston2010free}
+\citation{lin2022truthfulqa}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}HDC as Epistemic Infrastructure}{10}{subsection.5.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}Active Inference Interpretation}{10}{subsection.5.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.5}Limitations}{10}{subsection.5.5}\protected@file@percent }
+\newlabel{sec:limitations}{{5.5}{10}{Limitations}{subsection.5.5}{}}
+\citation{hagoort2005broca}
+\citation{levelt1989speaking}
+\citation{ji2023survey}
+\citation{lewis2020retrieval}
+\citation{kadavath2022language}
+\citation{kanerva2009hyperdimensional}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.6}Relationship to Neuroscience}{11}{subsection.5.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6}Related Work}{11}{section.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7}Conclusion}{12}{section.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {8}Reproducibility}{12}{section.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {9}Extension: The Epistemic Cube}{12}{section.9}\protected@file@percent }
+\bibstyle{plainnat}
+\bibcite{baars1988cognitive}{{1}{1988}{{Baars}}{{}}}
+\bibcite{bai2022constitutional}{{2}{2022}{{Bai et~al.}}{{}}}
+\bibcite{bender2021dangers}{{3}{2021}{{Bender et~al.}}{{}}}
+\bibcite{dehaene2014consciousness}{{4}{2014}{{Dehaene}}{{}}}
+\bibcite{fedorenko2014role}{{5}{2014}{{Fedorenko et~al.}}{{}}}
+\bibcite{friston2010free}{{6}{2010}{{Friston}}{{}}}
+\bibcite{gu2024mamba}{{7}{2024}{{Gu and Dao}}{{}}}
+\bibcite{hagoort2005broca}{{8}{2005}{{Hagoort}}{{}}}
+\bibcite{hasani2021liquid}{{9}{2021}{{Hasani et~al.}}{{}}}
+\bibcite{ji2023survey}{{10}{2023}{{Ji et~al.}}{{}}}
+\bibcite{kadavath2022language}{{11}{2022}{{Kadavath et~al.}}{{}}}
+\bibcite{kanerva2009hyperdimensional}{{12}{2009}{{Kanerva}}{{}}}
+\bibcite{levelt1989speaking}{{13}{1989}{{Levelt}}{{}}}
+\bibcite{lewis2020retrieval}{{14}{2020}{{Lewis et~al.}}{{}}}
+\bibcite{lin2022truthfulqa}{{15}{2022}{{Lin et~al.}}{{}}}
+\bibcite{maynez2020faithfulness}{{16}{2020}{{Maynez et~al.}}{{}}}
+\bibcite{ouyang2022training}{{17}{2022}{{Ouyang et~al.}}{{}}}
+\bibcite{wang2023selfconsistency}{{18}{2023}{{Wang et~al.}}{{}}}
+\bibcite{wei2022chain}{{19}{2022}{{Wei et~al.}}{{}}}
+\bibcite{thorne2018fever}{{20}{2018}{{Thorne et~al.}}{{}}}
+\bibcite{tononi2004information}{{21}{2004}{{Tononi}}{{}}}
+\gdef \@abspage@last{15}

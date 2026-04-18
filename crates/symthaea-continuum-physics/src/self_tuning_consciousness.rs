@@ -52,14 +52,12 @@ impl SelfTuningNetwork {
         window: usize,
     ) -> Self {
         let mut net = OscillatorNetwork {
-            oscillators: (0..n)
-                .map(|i| {
-                    let mut osc = crate::nonlinear_waves::FitzHughNagumo::new();
-                    osc.i_ext = drives[i];
-                    osc.v = -1.0 + 0.2 * (i as f64 / n as f64);
-                    osc
-                })
-                .collect(),
+            oscillators: (0..n).map(|i| {
+                let mut osc = crate::nonlinear_waves::FitzHughNagumo::new();
+                osc.i_ext = drives[i];
+                osc.v = -1.0 + 0.2 * (i as f64 / n as f64);
+                osc
+            }).collect(),
             coupling: base_coupling.iter().map(|&c| c * initial_g).collect(),
             n,
         };
@@ -138,8 +136,7 @@ impl SelfTuningNetwork {
                 // Apply new coupling
                 for i in 0..self.n {
                     for j in 0..self.n {
-                        self.net.coupling[i * self.n + j] =
-                            self.base_coupling[i * self.n + j] * self.g;
+                        self.net.coupling[i * self.n + j] = self.base_coupling[i * self.n + j] * self.g;
                     }
                 }
             }
@@ -152,9 +149,9 @@ impl SelfTuningNetwork {
         let len = self.voltage_buffer.len();
 
         // Build per-oscillator time series from buffer
-        let traces: Vec<Vec<f64>> = (0..n)
-            .map(|i| self.voltage_buffer.iter().map(|snap| snap[i]).collect())
-            .collect();
+        let traces: Vec<Vec<f64>> = (0..n).map(|i| {
+            self.voltage_buffer.iter().map(|snap| snap[i]).collect()
+        }).collect();
 
         // Integration: mean pairwise correlation
         let mut integration = 0.0;
@@ -170,25 +167,20 @@ impl SelfTuningNetwork {
         integration /= n_pairs.max(1) as f64;
 
         // Differentiation: variance of mean voltages
-        let means: Vec<f64> = traces
-            .iter()
-            .map(|tr| tr.iter().sum::<f64>() / len as f64)
-            .collect();
+        let means: Vec<f64> = traces.iter().map(|tr| tr.iter().sum::<f64>() / len as f64).collect();
         let grand_mean = means.iter().sum::<f64>() / n as f64;
-        let differentiation =
-            means.iter().map(|m| (m - grand_mean).powi(2)).sum::<f64>() / n as f64;
+        let differentiation = means.iter()
+            .map(|m| (m - grand_mean).powi(2))
+            .sum::<f64>() / n as f64;
 
         // Also use firing rate variance as a second differentiation measure
-        let rates: Vec<f64> = traces
-            .iter()
-            .map(|tr| tr.windows(2).filter(|w| w[0] < 0.0 && w[1] >= 0.0).count() as f64)
-            .collect();
+        let rates: Vec<f64> = traces.iter().map(|tr| {
+            tr.windows(2).filter(|w| w[0] < 0.0 && w[1] >= 0.0).count() as f64
+        }).collect();
         let rate_mean = rates.iter().sum::<f64>() / n as f64;
         let rate_diff = if n > 1 {
             rates.iter().map(|r| (r - rate_mean).powi(2)).sum::<f64>() / n as f64
-        } else {
-            0.0
-        };
+        } else { 0.0 };
 
         // Combine: use firing rate differentiation (more robust)
         let d_combined = (rate_diff * 0.1).min(1.0);
@@ -200,9 +192,7 @@ impl SelfTuningNetwork {
     pub fn mean_id(&self, last_n: usize) -> f64 {
         let start = self.id_history.len().saturating_sub(last_n);
         let slice = &self.id_history[start..];
-        if slice.is_empty() {
-            return 0.0;
-        }
+        if slice.is_empty() { return 0.0; }
         slice.iter().sum::<f64>() / slice.len() as f64
     }
 
@@ -253,21 +243,17 @@ pub fn compare_self_tuning_vs_fixed(
     for &g in &fixed_gs {
         let coupling: Vec<f64> = base_coupling.iter().map(|&c| c * g).collect();
         let mut net = OscillatorNetwork {
-            oscillators: (0..n)
-                .map(|i| {
-                    let mut osc = crate::nonlinear_waves::FitzHughNagumo::new();
-                    osc.i_ext = drives[i];
-                    osc.v = -1.0 + 0.2 * (i as f64 / n as f64);
-                    osc
-                })
-                .collect(),
+            oscillators: (0..n).map(|i| {
+                let mut osc = crate::nonlinear_waves::FitzHughNagumo::new();
+                osc.i_ext = drives[i];
+                osc.v = -1.0 + 0.2 * (i as f64 / n as f64);
+                osc
+            }).collect(),
             coupling,
             n,
         };
 
-        for _ in 0..warmup {
-            net.step(dt);
-        }
+        for _ in 0..warmup { net.step(dt); }
 
         // Measure I×D at this fixed coupling
         let mut traces: Vec<Vec<f64>> = vec![Vec::with_capacity(n_steps); n];
@@ -289,27 +275,18 @@ pub fn compare_self_tuning_vs_fixed(
         }
         integration /= n_pairs.max(1) as f64;
 
-        let rates: Vec<f64> = traces
-            .iter()
-            .map(|tr| tr.windows(2).filter(|w| w[0] < 0.0 && w[1] >= 0.0).count() as f64)
-            .collect();
+        let rates: Vec<f64> = traces.iter().map(|tr| {
+            tr.windows(2).filter(|w| w[0] < 0.0 && w[1] >= 0.0).count() as f64
+        }).collect();
         let rate_mean = rates.iter().sum::<f64>() / n as f64;
         let differentiation = if n > 1 {
             (rates.iter().map(|r| (r - rate_mean).powi(2)).sum::<f64>() / n as f64 * 0.1).min(1.0)
-        } else {
-            0.0
-        };
+        } else { 0.0 };
 
-        fixed_results.push((
-            g,
-            integration,
-            differentiation,
-            integration * differentiation,
-        ));
+        fixed_results.push((g, integration, differentiation, integration * differentiation));
     }
 
-    let best_fixed = fixed_results
-        .iter()
+    let best_fixed = fixed_results.iter()
         .max_by(|a, b| a.3.partial_cmp(&b.3).unwrap())
         .cloned()
         .unwrap_or((0.0, 0.0, 0.0, 0.0));
@@ -340,21 +317,15 @@ pub struct ComparisonResult {
 
 fn pearson_abs(x: &[f64], y: &[f64]) -> f64 {
     let n = x.len().min(y.len()) as f64;
-    if n < 3.0 {
-        return 0.0;
-    }
+    if n < 3.0 { return 0.0; }
     let mx = x.iter().sum::<f64>() / n;
     let my = y.iter().sum::<f64>() / n;
     let (mut cov, mut vx, mut vy) = (0.0, 0.0, 0.0);
     for (xi, yi) in x.iter().zip(y.iter()) {
         let (dx, dy) = (xi - mx, yi - my);
-        cov += dx * dy;
-        vx += dx * dx;
-        vy += dy * dy;
+        cov += dx * dy; vx += dx * dx; vy += dy * dy;
     }
-    if vx < 1e-15 || vy < 1e-15 {
-        return 0.0;
-    }
+    if vx < 1e-15 || vy < 1e-15 { return 0.0; }
     (cov / (vx * vy).sqrt()).abs().min(1.0)
 }
 
@@ -367,24 +338,15 @@ mod tests {
     fn test_self_tuning_runs() {
         let n = 10;
         let base = build_hierarchical(n, 1.0); // Normalized base coupling
-                                               // Renormalize so base represents topology, g scales it
+        // Renormalize so base represents topology, g scales it
         let max_c = base.iter().cloned().fold(0.0_f64, f64::max).max(1e-10);
         let normalized: Vec<f64> = base.iter().map(|c| c / max_c).collect();
         let drives = uniform_drives(n);
 
         let mut tuning = SelfTuningNetwork::new(n, normalized, drives, 0.1, 0.01, 100);
-        for _ in 0..500 {
-            tuning.step(0.1);
-        }
+        for _ in 0..500 { tuning.step(0.1); }
 
-        assert!(
-            !tuning.id_history.is_empty(),
-            "Should have I×D measurements"
-        );
-        assert!(
-            tuning.g > 0.0 && tuning.g < 3.0,
-            "Coupling should stay bounded: g={}",
-            tuning.g
-        );
+        assert!(!tuning.id_history.is_empty(), "Should have I×D measurements");
+        assert!(tuning.g > 0.0 && tuning.g < 3.0, "Coupling should stay bounded: g={}", tuning.g);
     }
 }

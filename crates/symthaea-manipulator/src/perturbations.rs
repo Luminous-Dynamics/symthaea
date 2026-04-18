@@ -11,7 +11,10 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ManipulatorPerturbation {
     /// External force push on the end-effector (Newtons, 3D).
-    ExternalForce { force: [f64; 3], at_step: usize },
+    ExternalForce {
+        force: [f64; 3],
+        at_step: usize,
+    },
     /// Sudden joint friction increase (multiplier on damping).
     JointFriction {
         joint: usize,
@@ -19,9 +22,15 @@ pub enum ManipulatorPerturbation {
         at_step: usize,
     },
     /// Payload mass change (added mass at end-effector, kg).
-    PayloadMass { mass_kg: f64, at_step: usize },
+    PayloadMass {
+        mass_kg: f64,
+        at_step: usize,
+    },
     /// Single joint failure (locked at current angle).
-    JointFailure { joint: usize, at_step: usize },
+    JointFailure {
+        joint: usize,
+        at_step: usize,
+    },
     /// Collision force from obstacle contact.
     CollisionForce {
         force: [f64; 3],

@@ -118,8 +118,9 @@ impl CognitiveGoalSignal {
             return false;
         }
         let alpha = (self.learning_rate * confidence * sim).clamp(0.0, 0.5);
-        *task_hv = ContinuousHV::weighted_bundle(&[task_hv, recognized_hv], &[1.0 - alpha, alpha])
-            .normalize();
+        *task_hv =
+            ContinuousHV::weighted_bundle(&[task_hv, recognized_hv], &[1.0 - alpha, alpha])
+                .normalize();
         true
     }
 }
@@ -319,8 +320,7 @@ impl VisionBridge {
         recognized_hv: &ContinuousHV,
         confidence: f32,
     ) -> bool {
-        self.goal_signal
-            .update_from_recognition(recognized_hv, confidence)
+        self.goal_signal.update_from_recognition(recognized_hv, confidence)
     }
 
     /// Process a raw frame and return a ContinuousHV ready for `cycle_with_hv()`.
@@ -1264,10 +1264,7 @@ mod tests {
         let orthogonal = ContinuousHV::random(16_384, 999_999);
         // In 16,384D, random unit vectors have cos_sim ≈ 0 — well below 0.3
         let updated = sig.update_from_recognition(&orthogonal, 0.95);
-        assert!(
-            !updated,
-            "Near-orthogonal patch should not trigger template update"
-        );
+        assert!(!updated, "Near-orthogonal patch should not trigger template update");
     }
 
     // === P2-C: Temporal Patch Binding ===

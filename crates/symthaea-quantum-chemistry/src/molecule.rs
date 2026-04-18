@@ -147,11 +147,7 @@ impl Molecule {
             .map_err(|_| "First line must be atom count".to_string())?;
 
         if lines.len() < 2 + n_atoms {
-            return Err(format!(
-                "Expected {} atom lines, got {}",
-                n_atoms,
-                lines.len() - 2
-            ));
+            return Err(format!("Expected {} atom lines, got {}", n_atoms, lines.len() - 2));
         }
 
         let mut atoms = Vec::with_capacity(n_atoms);
@@ -161,8 +157,8 @@ impl Molecule {
                 return Err(format!("Bad atom line: '{}'", line));
             }
 
-            let atomic_number =
-                symbol_to_z(parts[0]).ok_or_else(|| format!("Unknown element: {}", parts[0]))?;
+            let atomic_number = symbol_to_z(parts[0])
+                .ok_or_else(|| format!("Unknown element: {}", parts[0]))?;
             let x: f64 = parts[1].parse().map_err(|_| "Bad x coordinate")?;
             let y: f64 = parts[2].parse().map_err(|_| "Bad y coordinate")?;
             let z: f64 = parts[3].parse().map_err(|_| "Bad z coordinate")?;
@@ -213,7 +209,10 @@ impl Molecule {
     /// HeH⁺ at R = 1.4632 Bohr.
     pub fn heh_plus() -> Self {
         Self::with_charge(
-            vec![Atom::new(2, 0.0, 0.0, 0.0), Atom::new(1, 0.0, 0.0, 1.4632)],
+            vec![
+                Atom::new(2, 0.0, 0.0, 0.0),
+                Atom::new(1, 0.0, 0.0, 1.4632),
+            ],
             1,
             1,
         )
@@ -225,14 +224,14 @@ impl Molecule {
         Self::new(vec![
             Atom::from_angstrom(8, -1.6487, 0.6571, -0.0104), // O (carbonyl)
             Atom::from_angstrom(8, -0.4837, -1.2934, -0.0005), // O (hydroxyl)
-            Atom::from_angstrom(7, 1.9006, -0.0812, -0.0090), // N (amino)
-            Atom::from_angstrom(6, 0.7341, 0.7867, 0.0079),   // C (alpha)
-            Atom::from_angstrom(6, -0.5023, -0.0691, 0.0120), // C (carbonyl)
-            Atom::from_angstrom(1, 0.7326, 1.4215, -0.8824),  // H
-            Atom::from_angstrom(1, 0.7464, 1.4088, 0.9069),   // H
-            Atom::from_angstrom(1, 1.8743, -0.6844, -0.8301), // H
-            Atom::from_angstrom(1, 1.8887, -0.6969, 0.8031),  // H
-            Atom::from_angstrom(1, -2.4447, 0.0839, -0.0260), // H (OH)
+            Atom::from_angstrom(7, 1.9006, -0.0812, -0.0090),  // N (amino)
+            Atom::from_angstrom(6, 0.7341, 0.7867, 0.0079),    // C (alpha)
+            Atom::from_angstrom(6, -0.5023, -0.0691, 0.0120),   // C (carbonyl)
+            Atom::from_angstrom(1, 0.7326, 1.4215, -0.8824),   // H
+            Atom::from_angstrom(1, 0.7464, 1.4088, 0.9069),    // H
+            Atom::from_angstrom(1, 1.8743, -0.6844, -0.8301),  // H
+            Atom::from_angstrom(1, 1.8887, -0.6969, 0.8031),   // H
+            Atom::from_angstrom(1, -2.4447, 0.0839, -0.0260),  // H (OH)
         ])
     }
 
@@ -256,7 +255,12 @@ impl Molecule {
         Self::new(vec![
             Atom::from_angstrom(8, 0.0, 0.0, 0.0),
             Atom::from_angstrom(1, oh_dist, 0.0, 0.0),
-            Atom::from_angstrom(1, oh_dist * angle.cos(), oh_dist * angle.sin(), 0.0),
+            Atom::from_angstrom(
+                1,
+                oh_dist * angle.cos(),
+                oh_dist * angle.sin(),
+                0.0,
+            ),
         ])
     }
 }

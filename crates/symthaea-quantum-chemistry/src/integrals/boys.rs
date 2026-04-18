@@ -119,7 +119,11 @@ mod tests {
 
         // F_0(10) ≈ 0.27995 (asymptotic region boundary)
         let f0_10 = boys_function(0, 10.0);
-        assert!((f0_10 - 0.279_95).abs() < 1e-3, "F_0(10) = {}", f0_10);
+        assert!(
+            (f0_10 - 0.279_95).abs() < 1e-3,
+            "F_0(10) = {}",
+            f0_10
+        );
     }
 
     #[test]

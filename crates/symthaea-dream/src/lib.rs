@@ -37,6 +37,8 @@ println!("Gained {} insights from dreaming", insights);
 
 #![deny(unsafe_code)]
 
+pub mod motor_trajectory;
+
 use anyhow::Result;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::fmt::Debug;
