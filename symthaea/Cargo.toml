@@ -1103,6 +1103,10 @@ name = "nix_eval_benchmark_rag"
 required-features = ["code_generation"]
 
 [[example]]
+name = "nix_kg_override_demo"
+required-features = ["code_generation"]
+
+[[example]]
 name = "benchmark_exercism"
 required-features = ["code_generation"]
 

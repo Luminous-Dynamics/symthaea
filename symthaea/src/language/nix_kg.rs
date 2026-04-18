@@ -90,8 +90,15 @@ impl NixKg {
     /// Try to load from `~/.cache/symthaea/nix-kg.json`; merge into defaults.
     /// Falls back to pure defaults if file absent or malformed.
     pub fn from_disk_or_default() -> Self {
+        Self::from_path_or_default(&default_path())
+    }
+
+    /// Try to load from an explicit path; merge into defaults. Useful for
+    /// tests, demos, and shipping a per-deployment override file outside
+    /// the user's home directory.
+    pub fn from_path_or_default(path: &std::path::Path) -> Self {
         let mut kg = Self::default();
-        if let Some(file) = load_from_default_path() {
+        if let Some(file) = load_from_path(path) {
             kg.merge_from_file(&file);
         }
         kg
@@ -297,15 +304,19 @@ fn default_path() -> PathBuf {
         .join("nix-kg.json")
 }
 
-fn load_from_default_path() -> Option<NixKgFile> {
-    let path = default_path();
-    let bytes = std::fs::read(&path).ok()?;
+fn load_from_path(path: &std::path::Path) -> Option<NixKgFile> {
+    let bytes = std::fs::read(path).ok()?;
     let parsed: NixKgFile = serde_json::from_slice(&bytes).ok()?;
     if parsed.version != KG_VERSION {
         return None;
     }
     Some(parsed)
 }
+
+/// Public schema version — write this into the `version` field of any
+/// `~/.cache/symthaea/nix-kg.json` override file. Loader rejects mismatches
+/// to make schema migrations explicit rather than silent.
+pub const SCHEMA_VERSION: u32 = KG_VERSION;
 
 /// Parse the Debug-name of a `NixIntent` variant back into the enum.
 fn parse_intent(name: &str) -> Option<NixIntent> {
