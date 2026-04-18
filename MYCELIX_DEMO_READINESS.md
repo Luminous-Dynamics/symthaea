@@ -108,37 +108,53 @@ A demo with empty screens feels dead. Each cluster needs realistic seed data —
 
 ---
 
-## Part 5 — Design system direction (opinionated first draft)
+## Part 5 — Design system direction
 
-### Color palette
-- **Base**: near-black (`#0a0e14`) background, not pure black. Carbon, with warmth.
-- **Foreground**: off-white (`#c9d1d9`), high-contrast but not glare.
-- **Accent-1 — "signal"**: a specific cyan (`#00d4ff`) for live/moving data.
-- **Accent-2 — "consensus"**: a gold (`#f0b72f`) for governance/verified states.
-- **Accent-3 — "care"**: a warm green (`#7ee787`) for hearth/care/growth.
-- **Accent-4 — "alarm"**: an amber-red (`#ff7b72`) used sparingly.
+### Part 5a — What already exists (CORRECTION: earlier draft was blind to this)
 
-No drop shadows. No gradients except data-heat maps. No rounded corners beyond 2px.
+`crates/mycelix-leptos-core/` is a **3,452-LOC shared-component crate** adopted by **14 of the 27 cluster frontends** (climate, commons, craft, energy, finance, governance, health, hearth, identity, knowledge, music, praxis, pulse, supplychain). It already provides:
 
-### Typography
-- **Headers**: monospace (Iosevka, JetBrains Mono, Berkeley Mono). Reads as infrastructure.
-- **Body**: variable sans (Inter, Geist). Tight letter-spacing, unforgiving line-height.
-- **Data**: tabular-num variant, always. Numbers must align.
+**Indlela design system** (`indlela.rs`, named after isiZulu *izindlela* — "pathways"): a botanical-growth metaphor. `GrowthStage::{Seed, Sprout, Sapling, Tree}` maps progress to visual representation (radius, opacity, CSS class). `community_warmth()` turns peer counts into trust metrics. `knowledge_freshness()` uses Ebbinghaus decay. **This is the organic/relational layer of the design language** — handles credentials (seed → tree = novice → master), kinship strength, knowledge decay, community embeddedness.
 
-### Motion
+**Primitives present**: `loading`, `modal`, `progress_bar`, `search_bar`, `spore_bridge`, `stat_card` (67 LOC), `tabs`, `theme` (per-app trait-based theme framework with localStorage + data-theme attribute), `toasts`, `trust_badge`, `sovereign_radar` (**294 LOC — radial 8D civic-score plot**), `thermodynamic`, `tier_gate` (consciousness-tier gating), `zome_call_button`, `local_identity`, `provider`.
+
+**The color layer is distributed**: `theme.rs` is a framework — each app defines its own theme enum and CSS variables keyed off `data-theme="..."`. There's no central color palette.
+
+### Part 5b — What's missing (the real gap for Type 1 civ aesthetic)
+
+Indlela handles the organic/relational half of Type 1 civ feel. The **control-room / telemetry half** doesn't yet exist as shared primitives. Adding those to `mycelix-leptos-core` — not replacing Indlela — gives the full spectrum. Proposal:
+
+**New primitives to add** (complementing existing ones):
+- **`TelemetryLine`** — thin horizontal strip showing one stream of data over time. Building block of observatory dashboards and cluster-vitals panels. Distinct from `stat_card` (which is a static number).
+- **`DataTable`** — 1-line-per-row, zero padding, sort/filter inline. The backbone of flow-logs, audit trails, dispatch queues.
+- **`GraphNode` + `GraphEdge`** — dot-with-label that auto-connects to neighbors. Used for kinship, reciprocity, credentials, orbital traffic — SAME component, different data. Indlela's GrowthStage drives visual size.
+- **`ClusterCard`** — cross-cluster navigation primitive. Shows cluster name + live signal density, not a logo.
+- **`FlowIndicator`** — animated arrow/pulse showing resource/credential/message moving between two clusters. Ties the "connections visible" commitment concretely.
+
+**Color token conventions** (proposed CSS-variable names for per-app themes to standardize on, not hardcode):
+- `--md-base`: carbon-black background
+- `--md-signal`: cyan for live/moving data
+- `--md-consensus`: gold for governance/verified states
+- `--md-care`: green for hearth/growth
+- `--md-alarm`: amber-red (used sparingly)
+- `--md-growth-seed/sprout/sapling/tree`: Indlela stages
+- `--md-mono`: monospace font stack for headers/data (Iosevka/JetBrains/Berkeley Mono)
+
+Each cluster theme maps its own colors to these semantic tokens; apps using `mycelix-leptos-core` components reference the tokens uniformly.
+
+### Part 5c — Motion + information density (unchanged from earlier draft)
+
 - Nothing decorative. Animation serves to show *state change* or *data arrival*.
-- Arrival pulse: data enters with a 180ms cyan sweep, not a fade-up.
+- Arrival pulse: data enters with a 180ms signal-color sweep, not a fade-up.
 - No bouncy easings. `cubic-bezier(.22,.61,.36,1)` or linear for data.
+- Every full-screen view: 3 live signals, 1 graph (Indlela or telemetry), 1 data table, 1 cluster-context indicator.
+- "Simple" single-purpose views fine for sub-routes but never for top-level cluster pages.
 
-### Layout primitives
-- **TelemetryLine** — a thin horizontal strip showing one stream of data over time. Building block of every dashboard.
-- **GraphNode** — a dot-with-label that auto-connects to its neighbors. Used for kinship, reciprocity, credentials, orbital traffic — same component, different data.
-- **DataTable** — 1-line-per-row, zero padding, sort/filter inline. The backbone of lists.
-- **ClusterCard** — the cross-cluster navigation primitive. Always shows cluster name + live signal density, not a logo.
+### Part 5d — Adoption gap (the work item)
 
-### Information density rules
-- Every full-screen view shows at minimum: 3 live signals, 1 graph, 1 data table, 1 cluster-context indicator.
-- "Simple" single-purpose views are fine for sub-routes but never for top-level cluster pages.
+14 of 27 frontends use `mycelix-leptos-core`. **13 don't**. Those 13 either roll their own CSS (symthaea-web, nixforhumanity-web, prism-ui, sol-atlas-leptos, symthaea-sim-ui, portal-shell) — which is fine, they're outside the Mycelix cluster family — or are stub/minimal (probably civic which doesn't have a frontend at all).
+
+The adoption task in Week 3 of the execution path isn't "build the crate" — it's "add the 5 missing primitives + per-cluster semantic-color-token conventions, and drive reference-impl adoption in Praxis first." Much smaller scope than my earlier draft implied.
 
 ---
 
