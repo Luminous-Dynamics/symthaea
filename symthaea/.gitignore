@@ -3,6 +3,14 @@ target/
 target-test/
 symthaea-core/target/
 
+# JS/TS build output and deps (for standalone-repo cleanliness;
+# the parent monorepo already gitignores node_modules globally, but
+# sync-to-standalone ships symthaea/ without the parent gitignore).
+node_modules/
+*/node_modules/
+dist/
+.next/
+
 # Python cache
 __pycache__/
 __pyphi_cache__/

@@ -124,6 +124,12 @@ RSYNC_EXCLUDE=(
     --exclude='checkpoints/'
     --exclude='android/demo/build/'
     --exclude='build/'
+    # node_modules is gitignored in the monorepo parent (/srv/luminous-dynamics/.gitignore)
+    # but not in symthaea/.gitignore — exclude here so every npm install doesn't push
+    # ~52MB to the standalone public repo on each sync.
+    --exclude='node_modules/'
+    --exclude='.next/'
+    --exclude='dist/'
 )
 RSYNC_OPTS=(-a --delete "${RSYNC_EXCLUDE[@]}")
 if $DRY_RUN; then
