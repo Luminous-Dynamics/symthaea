@@ -104,6 +104,21 @@ enum Command {
     /// Ping the conductor's `legal_did.ping` zome as a liveness check.
     /// Requires the `conductor` build feature.
     Ping,
+
+    /// Request a fresh nonce from `cross_did_zkp.request_nonce`. Always
+    /// live — nonces cannot be staged. Requires the `conductor` build
+    /// feature.
+    RequestNonce {
+        /// DID of the verifier requesting the nonce.
+        verifier_did: String,
+    },
+
+    /// Look up the latest tier classification for an issuer DID on the
+    /// running conductor. Requires the `conductor` build feature.
+    LookupTier {
+        /// Issuer DID to query (e.g. `did:web:state.gov`).
+        issuer_did: String,
+    },
 }
 
 fn main() -> ExitCode {
@@ -275,6 +290,10 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         }
 
         Command::Ping => do_live_ping()?,
+
+        Command::RequestNonce { verifier_did } => do_live_request_nonce(&verifier_did)?,
+
+        Command::LookupTier { issuer_did } => do_live_lookup_tier(&issuer_did)?,
     }
 
     Ok(())
@@ -397,6 +416,16 @@ fn do_live_ping() -> Result<(), Box<dyn std::error::Error>> {
     live_unavailable()
 }
 
+#[cfg(not(feature = "conductor"))]
+fn do_live_request_nonce(_verifier: &str) -> Result<(), Box<dyn std::error::Error>> {
+    live_unavailable()
+}
+
+#[cfg(not(feature = "conductor"))]
+fn do_live_lookup_tier(_issuer: &str) -> Result<(), Box<dyn std::error::Error>> {
+    live_unavailable()
+}
+
 #[cfg(feature = "conductor")]
 fn do_live_ping() -> Result<(), Box<dyn std::error::Error>> {
     live_runtime().block_on(async {
@@ -478,6 +507,50 @@ fn do_live_classify_issuer(
             wire_tier.as_str(),
             result.action_hash
         );
+        Ok::<_, Box<dyn std::error::Error>>(())
+    })
+}
+
+#[cfg(feature = "conductor")]
+fn do_live_request_nonce(verifier_did: &str) -> Result<(), Box<dyn std::error::Error>> {
+    live_runtime().block_on(async {
+        let conn = live::LiveConductor::connect(
+            live::default_admin_addr(),
+            live::default_app_addr(),
+            live::DEFAULT_APP_ID,
+        )
+        .await?;
+        let result = conn.request_nonce(verifier_did).await?;
+        println!(
+            "Nonce issued for {verifier_did}:\n  nonce_b64 = {}\n  action    = {}",
+            result.nonce_b64, result.action_hash
+        );
+        Ok::<_, Box<dyn std::error::Error>>(())
+    })
+}
+
+#[cfg(feature = "conductor")]
+fn do_live_lookup_tier(issuer_did: &str) -> Result<(), Box<dyn std::error::Error>> {
+    live_runtime().block_on(async {
+        let conn = live::LiveConductor::connect(
+            live::default_admin_addr(),
+            live::default_app_addr(),
+            live::DEFAULT_APP_ID,
+        )
+        .await?;
+        match conn.lookup_tier(issuer_did).await? {
+            Some(view) => println!(
+                "{} → {} (classified_at={}){}",
+                view.issuer_did,
+                view.tier,
+                view.classified_at,
+                match view.rationale {
+                    Some(r) => format!("\n  rationale: {r}"),
+                    None => String::new(),
+                }
+            ),
+            None => println!("No classification found for {issuer_did} (defaults to Peer)."),
+        }
         Ok::<_, Box<dyn std::error::Error>>(())
     })
 }

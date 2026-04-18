@@ -163,7 +163,7 @@ impl LiveConductor {
     }
 
     /// Call `issuer_trust_tier.lookup_tier`.
-    pub async fn lookup_tier(&self, issuer_did: &str) -> Result<Option<serde_json::Value>> {
+    pub async fn lookup_tier(&self, issuer_did: &str) -> Result<Option<IssuerClassificationView>> {
         self.call(
             "issuer_trust_tier",
             "lookup_tier",
@@ -173,7 +173,7 @@ impl LiveConductor {
     }
 
     /// Call `cross_did_zkp.request_nonce`.
-    pub async fn request_nonce(&self, verifier_did: &str) -> Result<serde_json::Value> {
+    pub async fn request_nonce(&self, verifier_did: &str) -> Result<RequestNonceOutput> {
         self.call(
             "cross_did_zkp",
             "request_nonce",
@@ -223,6 +223,24 @@ pub struct CreateLegalDidOutput {
 #[derive(Debug, serde::Deserialize)]
 pub struct ClassifyIssuerOutput {
     pub action_hash: holochain_types::prelude::ActionHash,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct RequestNonceOutput {
+    pub nonce_b64: String,
+    pub action_hash: holochain_types::prelude::ActionHash,
+}
+
+/// Client-side view of the `IssuerClassification` entry as returned by
+/// `lookup_tier`. The zome's integrity struct uses the `IssuerTier`
+/// enum which serializes as a tagged variant (`"Sovereign"`, etc.);
+/// we deserialize it as a string for display simplicity.
+#[derive(Debug, serde::Deserialize)]
+pub struct IssuerClassificationView {
+    pub issuer_did: String,
+    pub tier: String,
+    pub classified_at: String,
+    pub rationale: Option<String>,
 }
 
 #[derive(Debug, serde::Deserialize)]
