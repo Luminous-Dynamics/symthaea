@@ -13,17 +13,25 @@
 //! filter-passed pool does the Rust-native parser+translator
 //! actually handle without any tuning for specific fixture shapes?
 //!
-//! The Lake-verification stage (step 3 of the three-tier scorecard)
-//! is NOT run here. It's expensive, requires the `elan` flake, and
-//! is already covered end-to-end by `prove_minif2f_curated` on the
-//! hand-translated subset. This harness measures parser + translator
-//! stages only. A follow-up can chain into `render_fol_ext_file`
-//! + `lake env lean` for the full three-tier number.
+//! When `LAKE_ENV=1` is set AND `lake` is on PATH, this harness also
+//! runs the **tier-3 Lake verification** stage: every successfully
+//! translated problem gets rendered through `render_fol_ext_file`
+//! and passed to `lake env lean` for external Mathlib-backed proof
+//! checking. Tier 3 is the end-to-end number that matters: "how
+//! many of the auto-ingested problems does the cascade actually
+//! close under Mathlib's tactics". Without `LAKE_ENV=1`, only
+//! tiers 1-2 (parse + translate) are measured; tier 3 rows report
+//! `not_run`.
 //!
 //! # Usage
 //!
 //! ```bash
+//! # Tiers 1-2 only (fast):
 //! cargo run -p symthaea-lean-bridge --example ingest_minif2f_baseline
+//!
+//! # Full 3-tier (slow; needs elan/lake and Mathlib-resolved project):
+//! LAKE_ENV=1 cargo run -p symthaea-lean-bridge \
+//!     --example ingest_minif2f_baseline
 //!
 //! # Larger slice, different seed:
 //! MINIF2F_N=100 MINIF2F_SEED=1337 cargo run -p symthaea-lean-bridge \
@@ -32,21 +40,25 @@
 //!
 //! # CSV columns
 //!
-//! `name, stage, error_category, error_message`
+//! `name, stage, error_category, error_message, lake_check`
 //!
 //! - `stage` ∈ {`parsed`, `translated`, `not_parsed`, `not_translated`}
 //! - `error_category` ∈ {`parse`, `translate`, ""} — "" when the row
 //!   succeeded through both stages
 //! - `error_message` is the `Display` form of the `IngestError`, empty
 //!   on success. CSV-escaped (commas and quotes).
+//! - `lake_check` ∈ {`accepted`, `rejected`, `lake_error`, `not_run`} —
+//!   `not_run` when `LAKE_ENV=1` was not set or `lake` is unavailable.
 
 use std::collections::BTreeMap;
 use std::env;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::ExitCode;
+use std::process::{Command, ExitCode};
+use std::time::Duration;
 
+use symthaea_lean_bridge::fol_ext_bridge::render_fol_ext_file;
 use symthaea_lean_bridge::minif2f_ingest::{parse_theorem, translate_theorem, IngestError};
 
 fn main() -> ExitCode {
@@ -70,9 +82,34 @@ fn main() -> ExitCode {
         .and_then(|s| s.parse::<u64>().ok())
         .unwrap_or(42);
 
+    let use_lake = lake_env_available();
+    let lake_project_dir = PathBuf::from("lean-proofs/phase2");
+    // Emitted `.lean` files go here when tier 3 is active. Allowing an
+    // override via env var lets CI store them under `target/` without
+    // polluting the worktree.
+    let emit_dir = env::var("MINIF2F_EMIT_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from("proofs/minif2f_baseline"));
+    if use_lake {
+        if let Err(e) = fs::create_dir_all(&emit_dir) {
+            eprintln!(
+                "warn: mkdir {} failed ({e}); tier 3 disabled",
+                emit_dir.display()
+            );
+        }
+    }
+
     eprintln!("miniF2F ingest baseline");
     eprintln!("  corpus: {}", root.display());
     eprintln!("  n={n}, seed={seed}");
+    eprintln!(
+        "  tier 3 (Lake): {}",
+        if use_lake {
+            "enabled"
+        } else {
+            "disabled (set LAKE_ENV=1 + have `lake` on PATH)"
+        }
+    );
 
     let mut candidates = gather_candidates(&root);
     shuffle_with_seed(&mut candidates, seed);
@@ -85,10 +122,13 @@ fn main() -> ExitCode {
 
     // CSV header.
     let mut out = std::io::stdout().lock();
-    let _ = writeln!(out, "name,stage,error_category,error_message");
+    let _ = writeln!(out, "name,stage,error_category,error_message,lake_check");
 
     let mut parsed = 0usize;
     let mut translated = 0usize;
+    let mut lake_accepted = 0usize;
+    let mut lake_rejected = 0usize;
+    let mut lake_error = 0usize;
     // Parse-failure distribution by error-variant discriminant; gives
     // us a histogram of what's blocking the biggest class of rejects.
     let mut parse_fail_buckets: BTreeMap<&'static str, usize> = BTreeMap::new();
@@ -100,7 +140,7 @@ fn main() -> ExitCode {
             Err(e) => {
                 let _ = writeln!(
                     out,
-                    "{name},read_error,io,\"{}\"",
+                    "{name},read_error,io,\"{}\",not_run",
                     csv_escape(&e.to_string())
                 );
                 continue;
@@ -113,7 +153,7 @@ fn main() -> ExitCode {
                     .or_insert(0) += 1;
                 let _ = writeln!(
                     out,
-                    "{name},not_parsed,{},\"{}\"",
+                    "{name},not_parsed,{},\"{}\",not_run",
                     e.category(),
                     csv_escape(&e.to_string())
                 );
@@ -124,14 +164,32 @@ fn main() -> ExitCode {
                     Err(e) => {
                         let _ = writeln!(
                             out,
-                            "{name},not_translated,{},\"{}\"",
+                            "{name},not_translated,{},\"{}\",not_run",
                             e.category(),
                             csv_escape(&e.to_string())
                         );
                     }
-                    Ok(_f) => {
+                    Ok(phi) => {
                         translated += 1;
-                        let _ = writeln!(out, "{name},translated,,");
+                        let lake_label = if use_lake {
+                            match run_lake_check(&name, &phi, &emit_dir, &lake_project_dir) {
+                                LakeOutcome::Accepted => {
+                                    lake_accepted += 1;
+                                    "accepted"
+                                }
+                                LakeOutcome::Rejected => {
+                                    lake_rejected += 1;
+                                    "rejected"
+                                }
+                                LakeOutcome::Error => {
+                                    lake_error += 1;
+                                    "lake_error"
+                                }
+                            }
+                        } else {
+                            "not_run"
+                        };
+                        let _ = writeln!(out, "{name},translated,,,{lake_label}");
                     }
                 }
             }
@@ -155,6 +213,21 @@ fn main() -> ExitCode {
     eprintln!(
         "  translated (of total):   {translated:3} / {total}  ({translate_rate_overall:5.1}%)"
     );
+    if use_lake {
+        let lake_accept_over_translated = if translated > 0 {
+            100.0 * lake_accepted as f64 / translated as f64
+        } else {
+            0.0
+        };
+        let lake_accept_overall = 100.0 * lake_accepted as f64 / total as f64;
+        eprintln!(
+            "  Lake accepted (of translated): {lake_accepted:3} / {translated:3}  ({lake_accept_over_translated:5.1}%)"
+        );
+        eprintln!(
+            "  Lake accepted (of total):      {lake_accepted:3} / {total}  ({lake_accept_overall:5.1}%)"
+        );
+        eprintln!("  Lake rejected:                 {lake_rejected:3} | errors: {lake_error:3}");
+    }
     if !parse_fail_buckets.is_empty() {
         eprintln!();
         eprintln!("  parse-failure histogram (top classes):");
@@ -320,4 +393,82 @@ fn error_variant_name(e: &IngestError) -> &'static str {
 /// stripped (the format's Display values are single-line).
 fn csv_escape(s: &str) -> String {
     s.replace('"', "\"\"").replace('\n', " ").replace('\r', " ")
+}
+
+// ─── Tier-3 Lake verification ────────────────────────────────────────
+
+enum LakeOutcome {
+    Accepted,
+    Rejected,
+    Error,
+}
+
+fn lake_env_available() -> bool {
+    if env::var("LAKE_ENV").ok().as_deref() != Some("1") {
+        return false;
+    }
+    Command::new("lake")
+        .arg("--version")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
+/// Render `phi` through the Phase 2+ cascade, write to `emit_dir/<name>.lean`,
+/// then invoke `lake env lean` from `project_dir`. Returns whether Lake
+/// accepted the proof.
+fn run_lake_check(
+    name: &str,
+    phi: &symthaea_core::hdc::fol_formula_ext::FolFormulaExt,
+    emit_dir: &Path,
+    project_dir: &Path,
+) -> LakeOutcome {
+    let contents = render_fol_ext_file(name, phi);
+    let file_path = emit_dir.join(format!("{}.lean", name));
+    if fs::write(&file_path, &contents).is_err() {
+        return LakeOutcome::Error;
+    }
+    // Canonicalize to absolute path — `lake env lean` cd's into the
+    // project_dir, so relative paths from cwd break.
+    let abs_lean_file = match fs::canonicalize(&file_path) {
+        Ok(p) => p,
+        Err(_) => return LakeOutcome::Error,
+    };
+    // Bound the lake invocation: some `.lean` files can hit Lean's
+    // heartbeat limit on NRA problems and take tens of seconds. 60s is
+    // generous enough to accommodate the slow cases without letting a
+    // single runaway stall the whole harness.
+    let mut child = match Command::new("lake")
+        .arg("env")
+        .arg("lean")
+        .arg(&abs_lean_file)
+        .current_dir(project_dir)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+    {
+        Ok(c) => c,
+        Err(_) => return LakeOutcome::Error,
+    };
+    let start = std::time::Instant::now();
+    let timeout = Duration::from_secs(60);
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                return if status.success() {
+                    LakeOutcome::Accepted
+                } else {
+                    LakeOutcome::Rejected
+                };
+            }
+            Ok(None) => {
+                if start.elapsed() > timeout {
+                    let _ = child.kill();
+                    return LakeOutcome::Error;
+                }
+                std::thread::sleep(Duration::from_millis(100));
+            }
+            Err(_) => return LakeOutcome::Error,
+        }
+    }
 }
