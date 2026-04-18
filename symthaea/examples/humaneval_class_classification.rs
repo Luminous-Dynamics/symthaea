@@ -15,8 +15,8 @@
 
 use symthaea::language::algorithm_encoder::{AlgorithmClass, AlgorithmEncoder};
 use symthaea::language::algorithm_training::{
-    build_channels_from_purpose_public, build_training_pairs, hybrid_classify,
-    strong_keyword_class, train_linear_classifier, LearnedProjection,
+    build_channels_from_purpose_public, build_training_pairs, hybrid_classify, hybrid_classify_knn,
+    knn_hdc_classify, strong_keyword_class, train_linear_classifier, LearnedProjection,
 };
 
 struct HEvProblem {
@@ -176,41 +176,54 @@ fn main() {
     let encoder = AlgorithmEncoder::new();
     let projection = LearnedProjection::fit(&pairs);
 
-    let mut correct = 0usize;
+    let mut linear_correct = 0usize;
+    let mut knn_correct = 0usize;
     let mut keyword_used = 0usize;
-    let mut by_class: std::collections::HashMap<AlgorithmClass, (usize, usize)> =
+    let mut by_class: std::collections::HashMap<AlgorithmClass, (usize, usize, usize)> =
         std::collections::HashMap::new();
 
-    println!("\n=== Per-problem results ===");
+    println!("\n=== Per-problem results (Linear vs k-NN HDC) ===");
     for problem in &problems {
         let purpose = extract_purpose(&problem.prompt);
         let signature = extract_signature(&problem.prompt, &problem.entry_point);
 
         let truth = ground_truth_class(problem);
 
-        // System 1: hybrid classify
+        // System 1: both classifiers
         let channels = symthaea::language::algorithm_training::build_channels_from_purpose_public(
             &purpose, &signature,
         );
         let hv = encoder.encode(&channels);
         let projected = projection.project(&hv);
-        let predicted = hybrid_classify(&purpose, &projected.values, &classifier);
+        let predicted_lin = hybrid_classify(&purpose, &projected.values, &classifier);
+        let predicted_knn = hybrid_classify_knn(&purpose, &hv, &pairs, 5);
 
         let used_keyword = strong_keyword_class(&purpose).is_some();
         if used_keyword {
             keyword_used += 1;
         }
 
-        let mark = if predicted == truth { "✓" } else { "✗" };
-        if predicted == truth {
-            correct += 1;
+        let mark_lin = if predicted_lin == truth { "✓" } else { "✗" };
+        let mark_knn = if predicted_knn == truth { "✓" } else { "✗" };
+        if predicted_lin == truth {
+            linear_correct += 1;
+        }
+        if predicted_knn == truth {
+            knn_correct += 1;
         }
 
-        let entry = by_class.entry(truth).or_insert((0, 0));
-        entry.1 += 1;
-        if predicted == truth {
+        let entry = by_class.entry(truth).or_insert((0, 0, 0));
+        entry.2 += 1;
+        if predicted_lin == truth {
             entry.0 += 1;
         }
+        if predicted_knn == truth {
+            entry.1 += 1;
+        }
+        // Use the linear prediction for printout consistency
+        let predicted = predicted_lin;
+        let mark = mark_lin;
+        let _ = mark_knn;
 
         println!(
             "  {} {:14} truth={:?} predicted={:?}{}",
@@ -222,12 +235,18 @@ fn main() {
         );
     }
 
-    println!("\n=== Summary ===");
+    println!("\n=== Summary: Cross-Language Classification ===");
     println!(
-        "Overall accuracy: {}/{} ({:.1}%)",
-        correct,
+        "Linear classifier:  {}/{} ({:.1}%)",
+        linear_correct,
         problems.len(),
-        correct as f32 / problems.len() as f32 * 100.0
+        linear_correct as f32 / problems.len() as f32 * 100.0
+    );
+    println!(
+        "k-NN HDC voting:    {}/{} ({:.1}%)",
+        knn_correct,
+        problems.len(),
+        knn_correct as f32 / problems.len() as f32 * 100.0
     );
     println!(
         "Keyword priors used: {}/{} ({:.0}%)",
@@ -235,14 +254,17 @@ fn main() {
         problems.len(),
         keyword_used as f32 / problems.len() as f32 * 100.0
     );
-    println!("\nPer-class accuracy:");
-    for (class, (correct, total)) in &by_class {
+    println!("\nPer-class (linear / k-NN):");
+    for (class, (lin, knn, total)) in &by_class {
         println!(
-            "  {:?}: {}/{} ({:.0}%)",
+            "  {:?}: linear={}/{} ({:.0}%) | k-NN={}/{} ({:.0}%)",
             class,
-            correct,
+            lin,
             total,
-            *correct as f32 / *total as f32 * 100.0
+            *lin as f32 / *total as f32 * 100.0,
+            knn,
+            total,
+            *knn as f32 / *total as f32 * 100.0
         );
     }
 }

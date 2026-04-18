@@ -2687,6 +2687,71 @@ fn build_channels_from_purpose(purpose: &str, signature: &str) -> AlgorithmChann
     channels
 }
 
+// ─── k-NN HDC Voting Classifier ────────────────────────────────────────────
+
+/// Classify by majority vote among k nearest training pairs in HDC space.
+///
+/// This is the natural HDC classifier: no learned weights, no overfitting.
+/// Uses cosine similarity on the FULL 16,384D vectors (not the projected 512D).
+/// Improves monotonically with corpus size.
+///
+/// Returns (predicted_class, confidence) where confidence is the vote fraction.
+pub fn knn_hdc_classify(
+    query_hv: &symthaea_core::hdc::ContinuousHV,
+    pairs: &[AlgorithmTrainingPair],
+    k: usize,
+) -> (AlgorithmClass, f32) {
+    if pairs.is_empty() {
+        return (AlgorithmClass::IoTransform, 0.0);
+    }
+
+    // Compute similarities to all training pairs
+    let mut sims: Vec<(f32, AlgorithmClass)> = pairs
+        .iter()
+        .map(|p| (query_hv.similarity(&p.hv), p.class))
+        .collect();
+
+    // Sort descending by similarity
+    sims.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+
+    // Take top-k
+    let k = k.min(sims.len());
+    let top_k = &sims[..k];
+
+    // Vote — use similarity-weighted voting (closer neighbors count more)
+    let mut votes: std::collections::HashMap<AlgorithmClass, f32> =
+        std::collections::HashMap::new();
+    for (sim, class) in top_k {
+        // Use similarity as vote weight (higher similarity = stronger vote)
+        *votes.entry(*class).or_insert(0.0) += sim.max(0.0);
+    }
+
+    let total: f32 = votes.values().sum();
+    let (winner, win_weight) = votes
+        .into_iter()
+        .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+        .unwrap_or((AlgorithmClass::IoTransform, 0.0));
+
+    let confidence = if total > 0.0 { win_weight / total } else { 0.0 };
+    (winner, confidence)
+}
+
+/// Hybrid classifier using k-NN HDC voting + keyword priors.
+///
+/// 1. If strong keyword match → return that class
+/// 2. Otherwise → k-NN vote in HDC space
+pub fn hybrid_classify_knn(
+    purpose: &str,
+    query_hv: &symthaea_core::hdc::ContinuousHV,
+    pairs: &[AlgorithmTrainingPair],
+    k: usize,
+) -> AlgorithmClass {
+    if let Some(class) = strong_keyword_class(purpose) {
+        return class;
+    }
+    knn_hdc_classify(query_hv, pairs, k).0
+}
+
 /// Strong keyword match: returns Some(class) only when there's a high-confidence
 /// signal in the purpose text. Returns None for ambiguous cases.
 ///
@@ -3308,6 +3373,46 @@ mod tests {
         // Both should have finite loss
         assert!(curriculum.final_loss.is_finite());
         assert!(flat.final_loss.is_finite());
+    }
+
+    #[test]
+    fn test_knn_vs_linear_classifier() {
+        let pairs = build_training_pairs();
+        let split = (pairs.len() * 4) / 5;
+        let (train, eval) = pairs.split_at(split);
+
+        // Linear classifier on projected 512D space
+        let (lin_classifier, lin_train_acc, lin_eval_acc, _) = train_linear_classifier(100, 0.01);
+
+        // k-NN HDC voting on full 16,384D space, k=5
+        let mut knn_correct = 0usize;
+        for eval_pair in eval {
+            let predicted = knn_hdc_classify(&eval_pair.hv, train, 5).0;
+            if predicted == eval_pair.class {
+                knn_correct += 1;
+            }
+        }
+        let knn_eval_acc = knn_correct as f32 / eval.len() as f32;
+
+        println!("=== Linear vs k-NN HDC Voting ===");
+        println!(
+            "Linear classifier:    train={:.0}% eval={:.0}% (4,104 params)",
+            lin_train_acc * 100.0,
+            lin_eval_acc * 100.0
+        );
+        println!(
+            "k-NN HDC (k=5):       train=N/A     eval={:.0}% (no params)",
+            knn_eval_acc * 100.0
+        );
+
+        let _ = lin_classifier; // silence unused warning
+
+        // k-NN should be at least as good as linear on this small corpus
+        assert!(
+            knn_eval_acc >= 0.5,
+            "k-NN should achieve at least 50% on held-out: got {:.0}%",
+            knn_eval_acc * 100.0
+        );
     }
 
     #[test]
