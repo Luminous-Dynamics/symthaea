@@ -18,6 +18,7 @@ symthaea-core = { path = "../../../symthaea/symthaea-core" }
 symtropy-robotics-bridge = { path = "../symtropy-robotics-bridge" }
 symtropy-consciousness-physics = { path = "../symtropy-consciousness-physics" }
 symtropy-physics = { path = "../symtropy-physics" }
+symtropy-demo-capture = { path = "../symtropy-demo-capture" }
 
 bevy = { version = "0.18", default-features = false, features = [
     "bevy_asset", "bevy_core_pipeline", "bevy_render",

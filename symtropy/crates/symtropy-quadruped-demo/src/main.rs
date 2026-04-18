@@ -43,5 +43,6 @@ fn main() {
             ..default()
         }))
         .add_plugins(QuadrupedDemoPlugin)
+        .add_plugins(symtropy_demo_capture::CapturePlugin::new("quadruped"))
         .run();
 }

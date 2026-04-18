@@ -1,0 +1,19 @@
+[package]
+name = "symtropy-demo-capture"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+description = "Headless screenshot scheduler for symtropy Bevy demos (env-gated on SYMTROPY_DEMO_CAPTURE_DIR)"
+
+# Standalone — excluded from /srv/luminous-dynamics/symtropy workspace
+# because it pulls Bevy at the same version as the demos.
+[workspace]
+
+[dependencies]
+bevy = { version = "0.18", default-features = false, features = [
+    "bevy_asset", "bevy_core_pipeline", "bevy_render",
+    "bevy_log",
+] }
+
+[lints.clippy]
+all = "warn"

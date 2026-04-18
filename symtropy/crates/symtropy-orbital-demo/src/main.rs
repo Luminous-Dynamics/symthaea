@@ -43,5 +43,6 @@ fn main() {
             ..default()
         }))
         .add_plugins(OrbitalDemoPlugin)
+        .add_plugins(symtropy_demo_capture::CapturePlugin::new("orbital"))
         .run();
 }

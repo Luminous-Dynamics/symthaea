@@ -35,5 +35,6 @@ fn main() {
             ..default()
         }))
         .add_plugins(AuvDemoPlugin)
+        .add_plugins(symtropy_demo_capture::CapturePlugin::new("auv"))
         .run();
 }

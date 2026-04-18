@@ -46,5 +46,6 @@ fn main() {
             ..default()
         }))
         .add_plugins(ExoskeletonDemoPlugin)
+        .add_plugins(symtropy_demo_capture::CapturePlugin::new("exoskeleton"))
         .run();
 }

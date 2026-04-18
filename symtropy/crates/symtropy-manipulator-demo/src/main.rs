@@ -39,5 +39,6 @@ fn main() {
             ..default()
         }))
         .add_plugins(ManipulatorDemoPlugin)
+        .add_plugins(symtropy_demo_capture::CapturePlugin::new("manipulator"))
         .run();
 }

@@ -44,5 +44,6 @@ fn main() {
             ..default()
         }))
         .add_plugins(SurgicalDemoPlugin)
+        .add_plugins(symtropy_demo_capture::CapturePlugin::new("surgical"))
         .run();
 }

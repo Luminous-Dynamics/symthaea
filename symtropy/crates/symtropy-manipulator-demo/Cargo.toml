@@ -26,6 +26,7 @@ symtropy-robotics-bridge = { path = "../symtropy-robotics-bridge" }
 symtropy-consciousness-physics = { path = "../symtropy-consciousness-physics" }
 symtropy-physics = { path = "../symtropy-physics" }
 symtropy-math = { path = "../symtropy-math" }
+symtropy-demo-capture = { path = "../symtropy-demo-capture" }
 
 # Bevy — 3D PBR + UI + windowing (x11 for NixOS)
 bevy = { version = "0.18", default-features = false, features = [

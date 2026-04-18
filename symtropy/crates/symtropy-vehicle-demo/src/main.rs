@@ -37,5 +37,6 @@ fn main() {
             ..default()
         }))
         .add_plugins(VehicleDemoPlugin)
+        .add_plugins(symtropy_demo_capture::CapturePlugin::new("vehicle"))
         .run();
 }

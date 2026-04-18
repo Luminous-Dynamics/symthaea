@@ -38,5 +38,6 @@ fn main() {
             ..default()
         }))
         .add_plugins(HelicopterDemoPlugin)
+        .add_plugins(symtropy_demo_capture::CapturePlugin::new("helicopter"))
         .run();
 }
