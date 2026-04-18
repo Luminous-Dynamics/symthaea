@@ -22,6 +22,7 @@
 //! - [`StatCard`] — Labeled statistic card (static number)
 //! - [`TelemetryLine`] — Horizontal sparkline strip for streaming metrics (complements StatCard)
 //! - [`GraphNode`] + [`GraphEdge`] — Relational graph primitives (kinship, reciprocity, credentials)
+//! - [`FlowIndicator`] — Animated pulse showing cross-cluster dispatch / value flow
 //!
 //! # Providers
 //!
@@ -52,6 +53,7 @@ pub mod cluster_launcher;
 pub mod data_table;
 pub mod empty_state;
 pub mod error_boundary;
+pub mod flow_indicator;
 pub mod forms;
 pub mod graph_node;
 pub mod indlela;
@@ -120,6 +122,7 @@ pub use badge::{Badge, BadgeVariant, StatusDot};
 pub use cluster_launcher::{default_clusters, ClusterLauncher, ClusterLink};
 pub use data_table::{Column, DataTable, Pagination};
 pub use empty_state::EmptyState;
+pub use flow_indicator::FlowIndicator;
 pub use forms::{Checkbox, FormField, Select, SelectOption, TextArea, TextInput};
 pub use graph_node::{GraphEdge, GraphNode, NodeEmphasis};
 pub use indlela::{community_warmth, knowledge_freshness, GrowthStage};
