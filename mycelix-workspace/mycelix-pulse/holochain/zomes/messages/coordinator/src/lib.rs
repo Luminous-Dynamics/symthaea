@@ -694,6 +694,118 @@ pub fn mark_as_read(input: (ActionHash, bool)) -> ExternResult<Option<ActionHash
     Ok(None)
 }
 
+// ==================== DELIVERY RECEIPTS (Phase 1.1) ====================
+
+/// Acknowledge that an email has been delivered to the recipient's node.
+///
+/// This is distinct from `mark_as_read`: a `DeliveryReceipt` proves the
+/// envelope reached recipient's DHT cell; a `ReadReceipt` proves the
+/// recipient's UI rendered it. Mirrors Gmail's "delivered" vs "read"
+/// distinction.
+///
+/// Phase 1.1 of PULSE_READINESS_PLAN.md. The `DeliveryReceipt` entry type
+/// and the `delivery_receipt_signing_content(...)` helper already lived in
+/// the integrity zome — this extern is what produces the entry. Ed25519
+/// signature is server-side via the recipient's lair (the recipient's own
+/// conductor signs on behalf of the recipient — same trust boundary as
+/// `mark_as_read`).
+///
+/// Idempotency: calling twice for the same `email_hash` will create two
+/// receipts. Sender-side dedup happens by latest-receipt-wins. The DHT does
+/// not naturally dedupe entries with different timestamps. Clients should
+/// only call this once per email on first inbox observation.
+#[hdk_extern]
+pub fn acknowledge_delivery(email_hash: ActionHash) -> ExternResult<ActionHash> {
+    let my_agent = agent_info()?.agent_initial_pubkey;
+
+    // Verify the email exists and that we're actually the named recipient.
+    // Without this check, anyone could write delivery receipts for any email
+    // and pollute the sender's confirmation view.
+    let email_record = get(email_hash.clone(), GetOptions::default())?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("email not found".into())))?;
+    let email = email_record
+        .entry()
+        .to_app_option::<EncryptedEmail>()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "target record is not an EncryptedEmail".into()
+            ))
+        })?;
+
+    if email.recipient != my_agent {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "cannot acknowledge delivery of email not addressed to you".into()
+        )));
+    }
+
+    // Server-signed receipt — same pattern as mark_as_read for ReadReceipt.
+    let delivered_at = sys_time()?;
+    let signing_content = delivery_receipt_signing_content(&email_hash, &my_agent, &delivered_at);
+    let receipt = DeliveryReceipt {
+        email_hash: email_hash.clone(),
+        recipient: my_agent.clone(),
+        delivered_at,
+        signature: sign_raw(my_agent.clone(), signing_content)?.0.to_vec(),
+    };
+
+    let receipt_hash = create_entry(EntryTypes::DeliveryReceipt(receipt.clone()))?;
+
+    // Link from email to receipt for sender-side discovery via
+    // get_links(email_hash, EmailToDeliveryReceipts).
+    create_link(
+        email_hash.clone(),
+        receipt_hash.clone(),
+        LinkTypes::EmailToDeliveryReceipts,
+        LinkTag::new("delivered"),
+    )?;
+
+    // Best-effort wake-up signal to the sender. Sender's UI can flip a
+    // "delivered" indicator without polling get_links. Lossy by design —
+    // the durable proof lives in the DHT entry + link above.
+    let signal = MailSignal::DeliveryConfirmed {
+        email_hash: receipt.email_hash,
+        recipient: receipt.recipient,
+        delivered_at: receipt.delivered_at,
+    };
+    if let Ok(encoded) = ExternIO::encode(signal) {
+        let _ = send_remote_signal(encoded, vec![email.sender]);
+    }
+
+    Ok(receipt_hash)
+}
+
+/// Sender-side query: list all delivery receipts attached to one of my sent
+/// emails. Returns the receipt action hashes; caller dereferences via
+/// `get_email` style for full content.
+#[hdk_extern]
+pub fn get_delivery_receipts(email_hash: ActionHash) -> ExternResult<Vec<DeliveryReceipt>> {
+    let links = get_links(
+        LinkQuery::try_new(email_hash, LinkTypes::EmailToDeliveryReceipts)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut receipts = Vec::with_capacity(links.len());
+    for link in links {
+        let target_hash = ActionHash::try_from(link.target).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "delivery receipt link target is not an ActionHash".into()
+            ))
+        })?;
+        if let Some(record) = get(target_hash, GetOptions::default())? {
+            if let Some(receipt) = record
+                .entry()
+                .to_app_option::<DeliveryReceipt>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            {
+                receipts.push(receipt);
+            }
+        }
+    }
+    receipts.sort_by(|a, b| a.delivered_at.cmp(&b.delivered_at));
+    Ok(receipts)
+}
+
 // ==================== DRAFTS ====================
 
 /// Save a draft
