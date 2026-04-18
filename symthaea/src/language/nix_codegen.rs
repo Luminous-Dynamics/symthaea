@@ -283,6 +283,17 @@ pub struct NixIdiom {
 /// Returns None if no idiom matches; falls through to template assembly.
 pub fn nix_idiom_body(prompt: &str) -> Option<String> {
     let lower = prompt.to_lowercase();
+
+    // Fast path: prompts like "set time zone to Africa/Johannesburg"
+    // map to `time.timeZone = "..."`. Detected here (before intent
+    // classification) rather than adding a new NixIntent variant —
+    // time-zone prompts are rare and the taxonomy is stable at 10
+    // variants. Uses the ORIGINAL prompt casing so IANA zone names
+    // emit verbatim, not lowercased.
+    if let Some(body) = emit_time_zone(prompt, &lower) {
+        return Some(body);
+    }
+
     let intent = classify_nix_intent(&lower);
 
     match intent {
@@ -297,6 +308,38 @@ pub fn nix_idiom_body(prompt: &str) -> Option<String> {
         NixIntent::FlakeTemplate => emit_flake_template(&lower),
         NixIntent::Generic => None,
     }
+}
+
+/// Emit a `time.timeZone = "..."` config when the prompt is a time-zone
+/// set request. Returns None if the prompt doesn't look time-zone-shaped.
+/// Uses both the original-cased `prompt` (to recover IANA zone names
+/// with their proper capitalization) and the pre-lowercased `lower`
+/// (for matching).
+fn emit_time_zone(prompt: &str, lower: &str) -> Option<String> {
+    if !(lower.contains("time zone") || lower.contains("timezone")) {
+        return None;
+    }
+    // Scan the ORIGINAL prompt for an IANA-zone token: looks like
+    // `Africa/Johannesburg`, `America/New_York`, `Asia/Tokyo`. Must
+    // contain `/` and be composed of ASCII alpha + underscores.
+    let zone = prompt.split_whitespace().find_map(|w| {
+        let cleaned = w.trim_end_matches(',').trim_end_matches('.');
+        if cleaned.contains('/')
+            && cleaned
+                .chars()
+                .all(|c| c.is_ascii_alphabetic() || c == '/' || c == '_')
+        {
+            Some(cleaned.to_string())
+        } else {
+            None
+        }
+    })?;
+    Some(format!(
+        r#"{{
+  time.timeZone = "{zone}";
+}}
+"#
+    ))
 }
 
 // ── Dev Shell Emitters ──
@@ -862,32 +905,43 @@ fn emit_user_group(lower: &str) -> Option<String> {
 // ── Networking Emitters ──
 
 fn emit_networking(lower: &str) -> Option<String> {
-    // Extract port numbers from prompt
-    let mut tcp_ports = Vec::new();
+    // Extract port numbers from prompt.
+    let mut ports = Vec::new();
     for word in lower.split_whitespace() {
         if let Ok(p) = word.trim_end_matches(',').parse::<u16>() {
             if p >= 1 {
-                tcp_ports.push(p);
+                ports.push(p);
             }
         }
     }
-    if tcp_ports.is_empty() && (lower.contains("port 80") || lower.contains("http")) {
-        tcp_ports.push(80);
+    if ports.is_empty() && (lower.contains("port 80") || lower.contains("http")) {
+        ports.push(80);
     }
-    if tcp_ports.is_empty() && lower.contains("https") {
-        tcp_ports.push(443);
+    if ports.is_empty() && lower.contains("https") {
+        ports.push(443);
     }
-    if tcp_ports.is_empty() {
+    if ports.is_empty() {
         return None;
     }
-    let port_list = tcp_ports
+    let port_list = ports
         .iter()
         .map(|p| p.to_string())
         .collect::<Vec<_>>()
         .join(" ");
+    // Protocol detection: prompts mentioning "udp" or wireguard (which
+    // is UDP-only) emit `allowedUDPPorts`; everything else defaults to
+    // TCP. Structural scorer surfaced this defect on
+    // "open udp port 51820 for wireguard" — the prior emitter always
+    // emitted TCP regardless of the explicit UDP mention.
+    let option_name =
+        if lower.contains("udp") || lower.contains("wireguard") || lower.contains("quic") {
+            "allowedUDPPorts"
+        } else {
+            "allowedTCPPorts"
+        };
     Some(format!(
         r#"{{
-  networking.firewall.allowedTCPPorts = [ {port_list} ];
+  networking.firewall.{option_name} = [ {port_list} ];
 }}
 "#
     ))
