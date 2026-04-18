@@ -6,10 +6,9 @@ edition = "2021"
 [dependencies]
 bevy = "0.18"
 
-# Published on crates.io.
-symtropy-bevy = "0.2"
-
-# Unpublished as of writing — git URLs until the next release lands on
-# crates.io. Switch to versioned dependencies once available.
-symtropy-bevy-scene = { git = "https://github.com/luminous-dynamics/symtropy", branch = "main" }
-symtropy-devconsole = { git = "https://github.com/luminous-dynamics/symtropy", branch = "main", features = ["phi-panel"] }
+# The Symtropy distribution: re-exports symtropy-bevy + symtropy-bevy-scene
+# + symtropy-devconsole. One dep instead of three.
+#
+# Currently unpublished — git URL until next release lands on crates.io.
+# Once published: `symtropy = { version = "0.1", features = ["devconsole-phi"] }`.
+symtropy = { git = "https://github.com/luminous-dynamics/symtropy", branch = "main", features = ["devconsole-phi"] }

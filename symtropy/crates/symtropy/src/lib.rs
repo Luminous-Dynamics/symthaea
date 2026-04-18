@@ -67,11 +67,19 @@ pub use symtropy_physics as physics;
 /// ```
 ///
 /// Brings in Bevy's prelude plus the Symtropy-specific items most user code
-/// reaches for: the three plugins, the camera helper, and the consciousness
-/// inputs / physics handle types.
+/// reaches for: the three plugins, the camera helper, the physics primitives
+/// (Point, Sphere, BodyHandle, RigidBody, DistanceConstraint).
 pub mod prelude {
     pub use bevy::prelude::*;
     pub use symtropy_bevy::{PhysicsBody, SymtropyPhysics, SymtropyPhysicsPlugin};
     pub use symtropy_bevy_scene::{fixed_camera, fixed_light, SymtropyScenePlugin};
     pub use symtropy_devconsole::{DevConsoleVisible, SymtropyDevConsolePlugin};
+    // Physics + math primitives so common scene-setup code doesn't need
+    // additional `use` lines. `Sphere` is aliased to `PhysicsSphere` to
+    // avoid colliding with Bevy's `Sphere` mesh primitive — the convention
+    // existing Symtropy examples follow.
+    pub use symtropy_math::Point;
+    pub use symtropy_math::Sphere as PhysicsSphere;
+    pub use symtropy_physics::constraint::DistanceConstraint;
+    pub use symtropy_physics::{BodyHandle, RigidBody};
 }

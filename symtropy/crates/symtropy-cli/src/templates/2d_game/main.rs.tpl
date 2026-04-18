@@ -3,11 +3,8 @@
 //! A single bouncing physics-bodied sprite. Click anywhere to give it a kick.
 //! Press F1 for the dev console (Φ Inspector + Scene controls).
 
-use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
-use symtropy_bevy::{PhysicsBody, SymtropyPhysics, SymtropyPhysicsPlugin};
-use symtropy_devconsole::SymtropyDevConsolePlugin;
-use symtropy_math::Point;
+use symtropy::prelude::*;
 
 const BOB_RADIUS: f32 = 20.0;
 const SHOCK_VELOCITY: f64 = 400.0;

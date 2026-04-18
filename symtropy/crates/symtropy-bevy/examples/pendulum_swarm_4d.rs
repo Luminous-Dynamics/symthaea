@@ -27,6 +27,7 @@ use bevy::render::view::screenshot::{save_to_disk, Screenshot};
 use symthaea_consciousness_equation::ConsciousnessInputs;
 use symtropy_bevy::{PhysicsBody, SymtropyPhysics, SymtropyPhysicsPlugin};
 use symtropy_bevy_scene::{fixed_camera, SymtropyScenePlugin};
+use symtropy_devconsole::SymtropyDevConsolePlugin;
 use symtropy_math::{Point, Sphere as PhysicsSphere};
 use symtropy_physics::constraint::DistanceConstraint;
 use symtropy_physics::{BodyHandle, RigidBody};
@@ -122,6 +123,7 @@ fn main() {
     .add_plugins(SymtropyPhysicsPlugin::<4>::with_gravity([
         0.0, -9.81, 0.0, 0.0,
     ]))
+    .add_plugins(SymtropyDevConsolePlugin)
     .add_systems(Startup, (setup_camera, spawn_swarm, setup_hud))
     .add_systems(
         FixedUpdate,

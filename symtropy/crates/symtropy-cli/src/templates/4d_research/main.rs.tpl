@@ -5,13 +5,7 @@
 //! The full 4D simulation always runs — only the rendered cross-section moves.
 //! Press F1 for the dev console.
 
-use bevy::prelude::*;
-use symtropy_bevy::{PhysicsBody, SymtropyPhysics, SymtropyPhysicsPlugin};
-use symtropy_bevy_scene::{fixed_camera, SymtropyScenePlugin};
-use symtropy_devconsole::SymtropyDevConsolePlugin;
-use symtropy_math::{Point, Sphere as PhysicsSphere};
-use symtropy_physics::constraint::DistanceConstraint;
-use symtropy_physics::{BodyHandle, RigidBody};
+use symtropy::prelude::*;
 
 const ARM: f64 = 1.0;
 const BOB_RADIUS: f32 = 0.10;

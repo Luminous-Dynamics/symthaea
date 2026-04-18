@@ -24,10 +24,13 @@ bevy = { version = "0.18", default-features = false }
 symtropy-bevy = { version = "0.2.0", path = "../symtropy-bevy" }
 symtropy-bevy-scene = { version = "0.1.0", path = "../symtropy-bevy-scene" }
 symtropy-devconsole = { version = "0.1.0", path = "../symtropy-devconsole" }
-
-# Feature-gated optional integrations.
-symtropy-physics = { version = "0.2.0", path = "../symtropy-physics", optional = true }
-symtropy-math = { version = "0.2.0", path = "../symtropy-math", optional = true }
+# Physics + math primitives are always pulled in so the prelude can re-export
+# Point, Sphere, BodyHandle, RigidBody, DistanceConstraint without users
+# adding extra dependencies. The `low-level` feature surfaces them as
+# `symtropy::physics::*` / `symtropy::math::*` modules in addition to the
+# prelude items.
+symtropy-physics = { version = "0.2.0", path = "../symtropy-physics" }
+symtropy-math = { version = "0.2.0", path = "../symtropy-math" }
 
 [features]
 default = ["devconsole-phi"]
@@ -36,7 +39,7 @@ default = ["devconsole-phi"]
 # `symtropy-bevy` (AGPL transitively).
 devconsole-phi = ["symtropy-devconsole/phi-panel"]
 
-# Re-export raw `symtropy-physics` and `symtropy-math` types in
-# `symtropy::physics::*` / `symtropy::math::*` so users who want low-level
-# access don't need to add those crates separately.
-low-level = ["dep:symtropy-physics", "dep:symtropy-math"]
+# Surface `symtropy::physics::*` / `symtropy::math::*` modules in addition
+# to the prelude items. Useful for low-level work that goes beyond the
+# common-case primitives.
+low-level = []

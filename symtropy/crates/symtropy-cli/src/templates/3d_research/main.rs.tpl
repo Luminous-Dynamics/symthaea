@@ -3,13 +3,7 @@
 //! One swinging pendulum, PBR rendering, dev console toggleable on F1.
 //! Generated from `symtropy new --template 3d-research`.
 
-use bevy::prelude::*;
-use symtropy_bevy::{PhysicsBody, SymtropyPhysics, SymtropyPhysicsPlugin};
-use symtropy_bevy_scene::{fixed_camera, SymtropyScenePlugin};
-use symtropy_devconsole::SymtropyDevConsolePlugin;
-use symtropy_math::{Point, Sphere as PhysicsSphere};
-use symtropy_physics::constraint::DistanceConstraint;
-use symtropy_physics::{BodyHandle, RigidBody};
+use symtropy::prelude::*;
 
 const ARM_LENGTH: f64 = 1.0;
 const BOB_RADIUS: f32 = 0.10;

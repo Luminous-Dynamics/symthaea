@@ -19,6 +19,7 @@ use bevy::render::view::screenshot::{save_to_disk, Screenshot};
 use bevy::window::PrimaryWindow;
 use symthaea_consciousness_equation::ConsciousnessInputs;
 use symtropy_bevy::{PhysicsBody, SymtropyPhysics, SymtropyPhysicsPlugin};
+use symtropy_devconsole::SymtropyDevConsolePlugin;
 use symtropy_math::{Point, Sphere};
 use symtropy_physics::constraint::DistanceConstraint;
 use symtropy_physics::{BodyHandle, RigidBody};
@@ -92,6 +93,7 @@ fn main() {
     .insert_resource(ClearColor(Color::srgb(0.04, 0.04, 0.06)))
     .insert_resource(GridHandles::default())
     .add_plugins(SymtropyPhysicsPlugin::<2>::with_gravity([0.0, -981.0]))
+    .add_plugins(SymtropyDevConsolePlugin)
     .add_systems(Startup, (setup_camera, spawn_swarm))
     .add_systems(
         FixedUpdate,
