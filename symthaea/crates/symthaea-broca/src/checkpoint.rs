@@ -195,25 +195,45 @@ impl BrocaCheckpoint {
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer)?;
 
-        // Try MessagePack (current format) first
-        let checkpoint: Self = if let Ok(ckpt) = rmp_serde::from_slice::<Self>(&buffer) {
-            // MessagePack checkpoint — verify integrity
-            if !ckpt.verify() {
-                tracing::warn!(
-                    "Checkpoint checksum mismatch (schema evolution) — proceeding with loaded data"
-                );
+        // Try MessagePack (current format) first. On failure, keep the error so
+        // we can surface BOTH msgpack and bincode failure reasons if bincode
+        // fallback also fails — silent error swallowing here made checkpoint
+        // drift invisible (Phase 0 validation 2026-04-18: epistemic-v1 and
+        // round5/6/7 all reported a generic "tried msgpack + bincode" without
+        // any indication of which field or type caused the failure).
+        let msgpack_err = match rmp_serde::from_slice::<Self>(&buffer) {
+            Ok(ckpt) => {
+                if !ckpt.verify() {
+                    tracing::warn!(
+                        "Checkpoint checksum mismatch (schema evolution) — proceeding with loaded data"
+                    );
+                }
+                return Self::finalize_loaded(ckpt, path.as_ref());
             }
-            ckpt
-        } else {
-            // Fall back to bincode (legacy format) — skip verify since hash format changed
-            let ckpt = bincode::deserialize::<Self>(&buffer)
-                .context("Failed to deserialize BrocaCheckpoint (tried msgpack + bincode)")?;
-            tracing::warn!(
-                "Loaded legacy bincode Broca checkpoint — will be re-saved as MessagePack"
-            );
-            ckpt
+            Err(e) => e,
         };
 
+        // Fall back to bincode (legacy format) — skip verify since hash format changed
+        let checkpoint: Self = match bincode::deserialize::<Self>(&buffer) {
+            Ok(ckpt) => {
+                tracing::warn!(
+                    "Loaded legacy bincode Broca checkpoint — will be re-saved as MessagePack"
+                );
+                ckpt
+            }
+            Err(bincode_err) => {
+                anyhow::bail!(
+                    "Failed to deserialize BrocaCheckpoint:\n  msgpack: {}\n  bincode: {}",
+                    msgpack_err,
+                    bincode_err
+                );
+            }
+        };
+
+        Self::finalize_loaded(checkpoint, path.as_ref())
+    }
+
+    fn finalize_loaded(checkpoint: Self, path: &Path) -> Result<Self> {
         if checkpoint.version > CHECKPOINT_VERSION {
             anyhow::bail!(
                 "Broca checkpoint version {} is newer than supported (max: {})",
@@ -232,7 +252,7 @@ impl BrocaCheckpoint {
         }
 
         tracing::info!(
-            path = %path.as_ref().display(),
+            path = %path.display(),
             epoch = checkpoint.training_epoch,
             loss = checkpoint.training_loss,
             vocab_size = checkpoint.token_embeddings.len(),
