@@ -1105,6 +1105,10 @@ name = "nix_scorer_sample"
 required-features = ["code_generation"]
 
 [[example]]
+name = "harvest_nix_distillation"
+required-features = ["code_generation"]
+
+[[example]]
 name = "nix_codegen_api"
 required-features = ["code_generation"]
 
