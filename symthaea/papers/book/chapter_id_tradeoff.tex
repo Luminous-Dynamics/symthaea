@@ -7,7 +7,7 @@
 \label{ch:id-tradeoff}
 % ========================================================================
 
-Consciousness is neither pure integration---a monolithic blob where all information is maximally correlated---nor pure differentiation, where specialized modules operate in isolation. Instead, the brain achieves a delicate balance. The phenomenon of consciousness requires \textit{both} properties simultaneously: the capacity to bind information across systems (integration) \textit{and} the capacity to maintain specialized, independent processing (differentiation). This chapter formalizes that intuition as a mathematical theorem and validates it on FitzHugh-Nagumo oscillator networks.
+Consciousness is neither pure integration---a monolithic blob where all information is maximally correlated---nor pure differentiation, where specialized modules operate in isolation. Instead, the brain achieves a delicate balance. The phenomenon of consciousness requires \textit{both} properties simultaneously: the capacity to bind information across systems (integration) \textit{and} the capacity to maintain specialized, independent processing (differentiation). This chapter formalizes that intuition as a mathematical theorem and tests it computationally on small FitzHugh-Nagumo oscillator networks ($N=20$). A 98\% compliance rate with the monotonicity claim leaves 2\% of cases in hierarchical networks where the theorem statement requires caveats rather than holding without qualification.
 
 The central result is elegant: for any network of coupled heterogeneous oscillators, the \textit{product} of integration and differentiation---which we call consciousness capacity---has a unique maximum at a critical coupling strength. This maximum is topology-dependent: hierarchical networks achieve the highest capacity, while homogeneous all-to-all networks achieve lower peaks. The same principle connects to real neural data: wakefulness (consciousness) corresponds to more distributed eigenvalue spectra and higher integration-differentiation products than sleep.
 
@@ -131,7 +131,7 @@ But molecules lack the organizational complexity needed for consciousness to eme
 
 Molecules obey the second law: they equilibrate, lose coherence, dissipate structure. Neural networks resist equilibration through \textbf{active homeostasis}: they maintain coupling at the critical point $g \approx g^*$ through continuous metabolic work. This is the reason brains consume 20\% of the body's energy despite comprising only 2\% of mass. The energy goes to maintaining hierarchical structure and operation near criticality---not, as often assumed, merely to firing action potentials.
 
-The same physics that explains why hierarchical networks achieve optimal consciousness capacity also explains why biological brains are hierarchical: evolution discovered the same mathematical optimum that our theorem derives.
+In our $N=20$ simulations, hierarchical networks achieve $2.1\times$ the $I \times D$ product of all-to-all networks. Whether biological brains are hierarchical \emph{because} of this optimum, or whether the optimum is an artifact of fitting a theorem to brain-like topologies, remains an open empirical question. The $2.1\times$ advantage has not been verified in larger networks or under alternative coupling types.
 
 \section{Relation to Prior Chapters}
 
