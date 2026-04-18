@@ -6,10 +6,7 @@ use leptos::prelude::*;
 
 /// A toggle switch with label.
 #[component]
-pub fn Toggle(
-    label: &'static str,
-    checked: RwSignal<bool>,
-) -> impl IntoView {
+pub fn Toggle(label: &'static str, checked: RwSignal<bool>) -> impl IntoView {
     view! {
         <div class="toggle-row">
             <span class="toggle-label">{label}</span>
@@ -25,10 +22,7 @@ pub fn Toggle(
 
 /// A slider with label and value display.
 #[component]
-pub fn Slider(
-    label: &'static str,
-    value: RwSignal<f64>,
-) -> impl IntoView {
+pub fn Slider(label: &'static str, value: RwSignal<f64>) -> impl IntoView {
     view! {
         <div class="slider-row">
             <label>{label}</label>
@@ -47,10 +41,7 @@ pub fn Slider(
 
 /// A metric display card.
 #[component]
-pub fn MetricCard(
-    label: &'static str,
-    value: &'static str,
-) -> impl IntoView {
+pub fn MetricCard(label: &'static str, value: &'static str) -> impl IntoView {
     view! {
         <div class="metric-card">
             <div class="value">{value}</div>
@@ -61,7 +52,7 @@ pub fn MetricCard(
 
 /// Helper: get checked state from checkbox event.
 pub fn event_target_checked(ev: &leptos::ev::Event) -> bool {
-    use wasm_bindgen::JsCast;
+    use leptos::wasm_bindgen::JsCast;
     ev.target()
         .and_then(|t| t.dyn_into::<web_sys::HtmlInputElement>().ok())
         .map(|el| el.checked())

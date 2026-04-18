@@ -6,7 +6,7 @@ license = "AGPL-3.0-or-later"
 description = "Leptos web UI for the Mycelix Civilization Simulator toggle matrix"
 
 [dependencies]
-leptos = { version = "0.7", features = ["csr"] }
+leptos = { version = "0.8", features = ["csr"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 toml = "0.8"
