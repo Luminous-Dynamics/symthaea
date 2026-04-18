@@ -63,20 +63,32 @@ This mechanism works identically for:
 If you're using Bevy:
 
 ```toml
-symtropy-bevy = "0.2"    # Apache-2.0 OR MIT
+symtropy-bevy = "0.2"         # AGPL-3.0-or-later (Phi-coupled physics)
+# Or, for permissive licensing without the Phi-coupling layer:
+# symtropy-bevy-core = "0.1"  # Apache-2.0 OR MIT
 ```
 
 ```rust
 use bevy::prelude::*;
-use symtropy_bevy::SymtropyPlugin;
+use symtropy_bevy::SymtropyPhysicsPlugin;
 
 App::new()
     .add_plugins(DefaultPlugins)
-    .add_plugins(SymtropyPlugin::<2>::default())
+    .add_plugins(SymtropyPhysicsPlugin::<2>::with_gravity([0.0, -9.81]))
     .run();
 ```
 
-See [Bevy integration](../getting-started/first-body.md) for the full setup.
+See [Bevy integration](../getting-started/first-body.md) for the full setup,
+or jump straight to a runnable demo:
+
+```bash
+cargo run -p symtropy-bevy --example pendulum_swarm --release
+```
+
+`pendulum_swarm` spawns a 10×10 grid of pendulums where Phi — computed from
+neighborhood velocity variance — modulates each bob's damping. Click to
+inject velocity into the nearest bob. Source + design notes live in
+`crates/symtropy-bevy/examples/`.
 
 ## Next up
 
