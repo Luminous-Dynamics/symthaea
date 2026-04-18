@@ -29,12 +29,29 @@ pub struct LearnedIdiom {
     pub prompt: String,
     /// The verified code (parses + evals + 0 unknown options).
     pub code: String,
-    /// Classified intent at record time.
+    /// Classified intent at record time. Stored as Debug-format string
+    /// for schema stability (adding new NixIntent variants doesn't
+    /// break old caches).
     pub intent: String,
     /// Unix epoch seconds at last verification.
     pub verified_at: u64,
     /// How many times this idiom has been retrieved successfully.
     pub hit_count: u32,
+    /// nixpkgs revision at record time (best-effort; None if not
+    /// detected). A later rev mismatch should invalidate — see plan P2.
+    /// Schema carve-out: currently wildcarded on None, strict compare
+    /// when both sides populated.
+    #[serde(default)]
+    pub nixpkgs_rev: Option<String>,
+    /// Days after `verified_at` beyond which the entry is stale.
+    /// Default 30. Checked on every `find_match`; expired entries are
+    /// skipped (not deleted — prune explicitly via `prune_expired`).
+    #[serde(default = "default_ttl_days")]
+    pub ttl_days: u32,
+}
+
+fn default_ttl_days() -> u32 {
+    30
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
@@ -43,7 +60,10 @@ struct CacheFile {
     idioms: Vec<LearnedIdiom>,
 }
 
-const CACHE_VERSION: u32 = 1;
+/// Bumped to 2 when adding `nixpkgs_rev` + `ttl_days` fields. v1 entries
+/// are dropped on load (no backward-compat migration — the cache is
+/// regenerative by design, so one extra cold-start is cheap).
+const CACHE_VERSION: u32 = 2;
 /// Minimum Jaccard overlap on keyword sets to accept a match.
 /// 0.4 means at least 40% of the union of {prompt, idiom} keywords
 /// must overlap. Tuned to be selective: empirically catches paraphrases
@@ -158,34 +178,43 @@ impl LearnedIdiomCache {
         self.len() == 0
     }
 
-    /// Find the best-matching learned idiom for `prompt`, or None if no
-    /// stored idiom clears `MIN_OVERLAP`. Increments `hit_count` on success.
-    pub fn find_match(&self, prompt: &str) -> Option<LearnedIdiom> {
+    /// Find the best-matching learned idiom for `prompt` under `intent`,
+    /// or None if nothing clears `MIN_OVERLAP` or all candidates are
+    /// intent-mismatched / expired. Increments `hit_count` on success.
+    ///
+    /// **Intent-gated** (P2): a cached idiom recorded with intent X
+    /// will never serve a prompt classified as intent Y. Defense-in-depth
+    /// against wrong-intent collisions on top of the subset-Jaccard rule.
+    ///
+    /// **TTL-gated** (P2): entries past `verified_at + ttl_days` are
+    /// skipped. Callers should `prune_expired()` periodically to reclaim
+    /// disk; find_match alone only hides them.
+    pub fn find_match(&self, prompt: &str, intent: NixIntent) -> Option<LearnedIdiom> {
         let keywords = extract_keywords(prompt);
         if keywords.is_empty() {
             return None;
         }
         let prompt_set: HashSet<&String> = keywords.iter().collect();
+        let intent_str = format!("{intent:?}");
+        let now = now_secs();
 
         let mut inner = self.inner.lock().ok()?;
 
         // Find the highest-scoring idiom that clears MIN_OVERLAP AND
-        // satisfies subset containment: every keyword in the new prompt
-        // must appear in the cached idiom's keyword set. Without this,
-        // "rust dev with sccache" would Jaccard-match a cached "rust dev
-        // with rust-analyzer" entry (overlap 2/3 ≥ MIN_OVERLAP) and
-        // serve the rust-analyzer answer that doesn't mention sccache.
-        //
-        // The subset rule treats cached idioms as supersets — if every
-        // ask in the new prompt is covered by what the cached prompt
-        // asked for, the cached answer is plausibly fit. Adds false
-        // negatives when the cached answer is actually a superset of the
-        // new ask but the cache prompt lacks a keyword the new prompt
-        // mentions; we accept that to avoid the silent wrong-answer
-        // failure mode.
+        // satisfies subset containment AND matches intent AND is not
+        // TTL-expired. Subset rule protects against wrong-answer
+        // collisions (e.g. "rust dev with sccache" Jaccard-matching a
+        // cached "rust dev with rust-analyzer" without mentioning
+        // sccache). Intent gate is additional defense-in-depth.
         let mut best_idx: Option<usize> = None;
         let mut best_score: f32 = -1.0;
         for (idx, idiom) in inner.idioms.iter().enumerate() {
+            if idiom.intent != intent_str {
+                continue;
+            }
+            if is_expired(idiom, now) {
+                continue;
+            }
             let score = jaccard(&keywords, &idiom.keywords);
             if score < MIN_OVERLAP {
                 continue;
@@ -222,6 +251,42 @@ impl LearnedIdiomCache {
         Some(result)
     }
 
+    /// Remove a specific idiom from the cache. Matched by `(prompt,
+    /// code)` pair — more precise than keyword overlap so re-verification
+    /// failures only evict the one stale entry, not adjacent good ones.
+    ///
+    /// Called by the codegen pipeline when `nixpkgs_index::verify_options`
+    /// reports unknown paths on a cache-hit's code (indicates the cached
+    /// answer is stale against current nixpkgs).
+    pub fn invalidate(&self, prompt: &str, code: &str) -> bool {
+        if let Ok(mut inner) = self.inner.lock() {
+            let before = inner.idioms.len();
+            inner
+                .idioms
+                .retain(|i| !(i.prompt == prompt && i.code == code));
+            let removed = before > inner.idioms.len();
+            if removed {
+                let _ = save_cache(&self.cache_path, &inner);
+            }
+            removed
+        } else {
+            false
+        }
+    }
+
+    /// Drop every idiom past its TTL. Call periodically; find_match
+    /// hides expired entries but doesn't evict them.
+    pub fn prune_expired(&self) {
+        let now = now_secs();
+        if let Ok(mut inner) = self.inner.lock() {
+            let before = inner.idioms.len();
+            inner.idioms.retain(|i| !is_expired(i, now));
+            if inner.idioms.len() != before {
+                let _ = save_cache(&self.cache_path, &inner);
+            }
+        }
+    }
+
     /// Record a verified idiom. If a near-identical one already exists
     /// (same keyword set + same code), bump its hit_count instead of
     /// duplicating.
@@ -230,10 +295,7 @@ impl LearnedIdiomCache {
         if keywords.is_empty() {
             return;
         }
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
+        let now = now_secs();
 
         if let Ok(mut inner) = self.inner.lock() {
             // De-dup: same keyword set + same code → bump.
@@ -253,6 +315,8 @@ impl LearnedIdiomCache {
                 intent: format!("{intent:?}"),
                 verified_at: now,
                 hit_count: 1,
+                nixpkgs_rev: detect_nixpkgs_rev(),
+                ttl_days: default_ttl_days(),
             });
             let _ = save_cache(&self.cache_path, &inner);
         }
@@ -277,6 +341,42 @@ impl LearnedIdiomCache {
 }
 
 // ─── Internals ──────────────────────────────────────────────────────────────
+
+fn now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+fn is_expired(idiom: &LearnedIdiom, now: u64) -> bool {
+    if idiom.ttl_days == 0 {
+        // ttl_days==0 is sentinel for "expires immediately" (test-only).
+        return true;
+    }
+    let ttl_secs = (idiom.ttl_days as u64).saturating_mul(86_400);
+    now.saturating_sub(idiom.verified_at) > ttl_secs
+}
+
+/// Best-effort nixpkgs revision detection. Reads env var
+/// `SYMTHAEA_NIXPKGS_REV` first (cheap, scriptable), falls back to
+/// `/run/current-system/nixos-version` (NixOS), else None. Never
+/// spawns subprocesses — we care about throughput, not accuracy, and
+/// a wrong rev only costs a cache miss on first re-verify.
+fn detect_nixpkgs_rev() -> Option<String> {
+    if let Ok(v) = std::env::var("SYMTHAEA_NIXPKGS_REV") {
+        if !v.trim().is_empty() {
+            return Some(v);
+        }
+    }
+    if let Ok(v) = std::fs::read_to_string("/run/current-system/nixos-version") {
+        let s = v.trim();
+        if !s.is_empty() {
+            return Some(s.to_string());
+        }
+    }
+    None
+}
 
 fn default_cache_path() -> PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
@@ -393,7 +493,7 @@ mod tests {
 
         // Strict subset of #1's keywords — should match (cached idiom is a
         // superset of what the new prompt asks for, so the answer fits).
-        let m = cache.find_match("postgresql pgvector");
+        let m = cache.find_match("postgresql pgvector", NixIntent::Service);
         assert!(m.is_some(), "subset paraphrase should match: {:?}", m);
         assert!(
             m.unwrap().code.contains("postgresql"),
@@ -404,7 +504,8 @@ mod tests {
         // Without this rejection, "install postgresql for vector database"
         // would Jaccard-match the postgresql idiom and return code that
         // doesn't address the "vector database" specifics.
-        let m_extra = cache.find_match("install postgresql for vector database");
+        let m_extra =
+            cache.find_match("install postgresql for vector database", NixIntent::Service);
         assert!(
             m_extra.is_none(),
             "prompt with extra keywords should NOT match: {:?}",
@@ -412,7 +513,7 @@ mod tests {
         );
 
         // Unrelated → None.
-        let m2 = cache.find_match("enable wayland with sway");
+        let m2 = cache.find_match("enable wayland with sway", NixIntent::Desktop);
         assert!(m2.is_none(), "should not falsely match: {:?}", m2);
 
         let _ = std::fs::remove_file(&path);
@@ -434,7 +535,7 @@ mod tests {
             1,
             "identical record() calls should de-duplicate"
         );
-        let m = cache.find_match(prompt).unwrap();
+        let m = cache.find_match(prompt, NixIntent::DevShell).unwrap();
         // 3 records + 1 hit from find_match = 4
         assert_eq!(m.hit_count, 4, "hit count should increment on each touch");
 
@@ -463,10 +564,145 @@ mod tests {
             "{ virtualisation.docker.enable = true; }",
             NixIntent::Service,
         );
-        let _ = cache.find_match("configure docker daemon");
-        let m = cache.find_match("docker daemon").unwrap();
+        let _ = cache.find_match("configure docker daemon", NixIntent::Service);
+        let m = cache
+            .find_match("docker daemon", NixIntent::Service)
+            .unwrap();
         // 1 record + 2 find_match = 3
         assert_eq!(m.hit_count, 3);
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn intent_mismatch_rejects_match() {
+        // Record a DevShell idiom. Query with Service intent — must
+        // NOT match, even though keywords overlap perfectly. This is
+        // the P2 defense-in-depth against cache poisoning by intent.
+        let path = tmp_cache("intent_mismatch");
+        let _ = std::fs::remove_file(&path);
+        let cache = LearnedIdiomCache::with_cache_path(path.clone());
+
+        cache.record(
+            "set up postgresql service",
+            "{ services.postgresql.enable = true; }",
+            NixIntent::Service,
+        );
+
+        let hit = cache.find_match("set up postgresql service", NixIntent::Service);
+        assert!(hit.is_some(), "matching intent should hit");
+
+        let miss = cache.find_match("set up postgresql service", NixIntent::DevShell);
+        assert!(
+            miss.is_none(),
+            "intent mismatch must reject even on keyword overlap"
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn ttl_zero_expires_immediately() {
+        let path = tmp_cache("ttl_zero");
+        let _ = std::fs::remove_file(&path);
+        let cache = LearnedIdiomCache::with_cache_path(path.clone());
+        cache.record(
+            "enable nginx web server",
+            "{ services.nginx.enable = true; }",
+            NixIntent::Service,
+        );
+        // Mutate the just-recorded entry to ttl_days=0 (sentinel for
+        // "already expired"). Easier than sleeping 30 days.
+        {
+            let mut inner = cache.inner.lock().unwrap();
+            inner.idioms[0].ttl_days = 0;
+        }
+        let m = cache.find_match("enable nginx web server", NixIntent::Service);
+        assert!(m.is_none(), "ttl_days=0 entry must be treated as expired");
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn invalidate_removes_only_matching_entry() {
+        let path = tmp_cache("invalidate");
+        let _ = std::fs::remove_file(&path);
+        let cache = LearnedIdiomCache::with_cache_path(path.clone());
+
+        cache.record(
+            "enable nginx web server",
+            "{ services.nginx.enable = true; }",
+            NixIntent::Service,
+        );
+        cache.record(
+            "enable redis cache server",
+            "{ services.redis.enable = true; }",
+            NixIntent::Service,
+        );
+        assert_eq!(cache.len(), 2);
+
+        // Invalidate only the nginx entry — redis must survive.
+        let removed = cache.invalidate(
+            "enable nginx web server",
+            "{ services.nginx.enable = true; }",
+        );
+        assert!(
+            removed,
+            "invalidate must return true when it removed an entry"
+        );
+        assert_eq!(cache.len(), 1);
+
+        let redis_hit = cache.find_match("enable redis cache server", NixIntent::Service);
+        assert!(
+            redis_hit.is_some(),
+            "unrelated entry must survive invalidation"
+        );
+
+        // Invalidating a non-existent entry returns false.
+        let noop = cache.invalidate("something else entirely", "{}");
+        assert!(!noop, "invalidate of missing entry must return false");
+        assert_eq!(cache.len(), 1);
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn v1_cache_entries_are_dropped_on_load() {
+        // Schema bump v1→v2 is not migrated — v1 caches load as empty.
+        // The cache is regenerative, so one cold-start is cheap and
+        // this sidesteps forward-compat of the LearnedIdiom schema.
+        let path = tmp_cache("v1_drop");
+        let _ = std::fs::remove_file(&path);
+        let v1_json = r#"{
+            "version": 1,
+            "idioms": [
+                {
+                    "keywords": ["nginx", "web"],
+                    "prompt": "enable nginx web server",
+                    "code": "{ services.nginx.enable = true; }",
+                    "intent": "Service",
+                    "verified_at": 1700000000,
+                    "hit_count": 5
+                }
+            ]
+        }"#;
+        std::fs::write(&path, v1_json).unwrap();
+
+        let cache = LearnedIdiomCache::with_cache_path(path.clone());
+        assert_eq!(cache.len(), 0, "v1 entries must not load into v2 cache");
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn prune_expired_drops_ttl_zero() {
+        let path = tmp_cache("prune_expired");
+        let _ = std::fs::remove_file(&path);
+        let cache = LearnedIdiomCache::with_cache_path(path.clone());
+        cache.record("test prompt alpha", "{ alpha = true; }", NixIntent::Generic);
+        cache.record("test prompt beta", "{ beta = true; }", NixIntent::Generic);
+        {
+            let mut inner = cache.inner.lock().unwrap();
+            // Expire only alpha.
+            inner.idioms[0].ttl_days = 0;
+        }
+        cache.prune_expired();
+        assert_eq!(cache.len(), 1, "only expired entries should be pruned");
         let _ = std::fs::remove_file(&path);
     }
 

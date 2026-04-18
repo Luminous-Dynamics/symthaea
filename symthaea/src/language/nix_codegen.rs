@@ -1870,22 +1870,38 @@ pub fn generate_nix_with_cache(
     max_iterations: usize,
     cache: &LearnedIdiomCache,
 ) -> (NixGenWithIndexResult, SelfImproveSource) {
-    if let Some(idiom) = cache.find_match(prompt) {
-        let intent = classify_nix_intent(&prompt.to_lowercase());
-        let result = NixGenWithIndexResult {
-            base: NixGenResult {
-                prompt: prompt.to_string(),
-                intent,
-                code: idiom.code.clone(),
-                iterations: 0,
-                parses: true,
-                last_error: None,
-                source: NixGenSource::Idiom,
-            },
-            unknown_options: Vec::new(),
-        };
-        return (result, SelfImproveSource::LearnedCache);
+    // P2 cache integrity: classify intent BEFORE query so find_match
+    // can enforce the intent gate. A prompt for Service intent must
+    // never receive a DevShell cache hit.
+    let intent = classify_nix_intent(&prompt.to_lowercase());
+
+    if let Some(idiom) = cache.find_match(prompt, intent) {
+        // P2 re-verification: option-index may have drifted since the
+        // cached entry was recorded (nixpkgs rename, option removed).
+        // Re-run verify_options on the cached code. If still clean,
+        // serve the hit. If stale, invalidate and fall through to
+        // fresh generation.
+        let unknown = validate_options(&idiom.code, shared_nixpkgs_index());
+        if unknown.is_empty() {
+            let result = NixGenWithIndexResult {
+                base: NixGenResult {
+                    prompt: prompt.to_string(),
+                    intent,
+                    code: idiom.code.clone(),
+                    iterations: 0,
+                    parses: true,
+                    last_error: None,
+                    source: NixGenSource::Idiom,
+                },
+                unknown_options: Vec::new(),
+            };
+            return (result, SelfImproveSource::LearnedCache);
+        }
+        // Stale — evict this entry and fall through. Other entries
+        // stay intact (invalidate is prompt+code-specific).
+        cache.invalidate(&idiom.prompt, &idiom.code);
     }
+
     let result = generate_nix_with_index_verify(prompt, max_iterations);
     // Only cache idiom-sourced results. Skeleton ("no idea, here's `{ }`")
     // would Jaccard-match anything later and poison the cache.
@@ -2094,22 +2110,27 @@ pub fn generate_nix_with_rag(
     prompt: &str,
     max_iterations: usize,
 ) -> (NixGenWithIndexResult, SelfImproveSource) {
-    // Step 1: cache.
-    if let Some(idiom) = shared_learned_cache().find_match(prompt) {
-        let intent = classify_nix_intent(&prompt.to_lowercase());
-        let result = NixGenWithIndexResult {
-            base: NixGenResult {
-                prompt: prompt.to_string(),
-                intent,
-                code: idiom.code.clone(),
-                iterations: 0,
-                parses: true,
-                last_error: None,
-                source: NixGenSource::Idiom,
-            },
-            unknown_options: Vec::new(),
-        };
-        return (result, SelfImproveSource::LearnedCache);
+    // Step 1: cache. Intent-gated + re-verified on hit (P2 integrity).
+    let intent = classify_nix_intent(&prompt.to_lowercase());
+    let cache = shared_learned_cache();
+    if let Some(idiom) = cache.find_match(prompt, intent) {
+        let unknown = validate_options(&idiom.code, shared_nixpkgs_index());
+        if unknown.is_empty() {
+            let result = NixGenWithIndexResult {
+                base: NixGenResult {
+                    prompt: prompt.to_string(),
+                    intent,
+                    code: idiom.code.clone(),
+                    iterations: 0,
+                    parses: true,
+                    last_error: None,
+                    source: NixGenSource::Idiom,
+                },
+                unknown_options: Vec::new(),
+            };
+            return (result, SelfImproveSource::LearnedCache);
+        }
+        cache.invalidate(&idiom.prompt, &idiom.code);
     }
 
     // Step 2: standard pipeline.
@@ -2183,22 +2204,26 @@ pub fn generate_nix_with_rag_fast_using(
     max_iterations: usize,
     cache: &LearnedIdiomCache,
 ) -> (NixGenWithIndexResult, SelfImproveSource) {
-    // Step 1: cache.
-    if let Some(idiom) = cache.find_match(prompt) {
-        let intent = classify_nix_intent(&prompt.to_lowercase());
-        let result = NixGenWithIndexResult {
-            base: NixGenResult {
-                prompt: prompt.to_string(),
-                intent,
-                code: idiom.code.clone(),
-                iterations: 0,
-                parses: true,
-                last_error: None,
-                source: NixGenSource::Idiom,
-            },
-            unknown_options: Vec::new(),
-        };
-        return (result, SelfImproveSource::LearnedCache);
+    // Step 1: cache. Intent-gated + re-verified on hit (P2 integrity).
+    let intent = classify_nix_intent(&prompt.to_lowercase());
+    if let Some(idiom) = cache.find_match(prompt, intent) {
+        let unknown = validate_options(&idiom.code, shared_nixpkgs_index());
+        if unknown.is_empty() {
+            let result = NixGenWithIndexResult {
+                base: NixGenResult {
+                    prompt: prompt.to_string(),
+                    intent,
+                    code: idiom.code.clone(),
+                    iterations: 0,
+                    parses: true,
+                    last_error: None,
+                    source: NixGenSource::Idiom,
+                },
+                unknown_options: Vec::new(),
+            };
+            return (result, SelfImproveSource::LearnedCache);
+        }
+        cache.invalidate(&idiom.prompt, &idiom.code);
     }
 
     // Step 2: idiom + parse-only verification (no eval).
