@@ -182,24 +182,32 @@ Detail per system:
    - `physics.field.update_entity(handle, &inputs, Point::new([pos.x, pos.y]))`.
 
 3. **`phi_modulates_damping` (FixedUpdate)** — for each pendulum:
-   - `let phi = physics.field.phi(handle)` → `f64` in [0, 1].
-   - Map Phi to per-body damping: `damping = LERP(HIGH_DAMP, LOW_DAMP, phi)`
-     where `HIGH_DAMP = 0.5` (strong, kills motion in ~1 sec) and
-     `LOW_DAMP = 0.001` (essentially conservative; oscillates a long time).
-     500× ratio ensures the visible difference is dramatic.
-   - Write back:
+   - `let phi = physics.field.phi(handle)` → `f64` actually in [0, ~0.314].
+     The `MasterConsciousnessEquation` response to uniform unit
+     `ConsciousnessInputs` is heavily compressed (see landmine
+     "Phi magnitude ≠ [0, 1]"). We MUST normalize against the
+     empirical maximum before mapping to damping, or the dynamic
+     range collapses from 500× to ~1.5×.
+   - Named constant: `const PHI_NORMALIZE: f64 = 0.314;`  // see spike
+   - Map normalized Phi to per-body damping:
      ```rust
+     const LOW_DAMP: f64 = 0.001;   // phi≈max → essentially conservative
+     const HIGH_DAMP: f64 = 0.5;    // phi=0 → dies in ~4 sec via PBD sleep
+
      if let Some(body) = physics.world.body_mut(handle) {
-         let damp = HIGH_DAMP + (LOW_DAMP - HIGH_DAMP) * (phi as f64).clamp(0.0, 1.0);
-         body.linear_damping = damp;
+         let phi = physics.field.phi(handle);
+         let phi_norm = (phi / PHI_NORMALIZE).clamp(0.0, 1.0);
+         body.linear_damping = HIGH_DAMP + (LOW_DAMP - HIGH_DAMP) * phi_norm;
      }
      ```
-   - The positive-feedback loop: shocked pendulum → high KE → high
-     coherence → high Phi → low damping → energy persists → still high KE.
-     Outside the shocked region: low KE → low Phi → high damping → quickly
-     stilled.
+   - The positive-feedback loop: shocked pendulum → high KE → low
+     angular-velocity variance in neighborhood → high coherence →
+     high Phi → low damping → energy persists → still high KE.
+     Outside the shocked region: low KE → high variance → low Phi →
+     high damping → PBD sleep freezes the bob in ~4 sec.
    - Note: do NOT use anti-damping (negative values) — PBD goes unstable.
-     The 500× damping ratio plus the shock energy is enough for the visual.
+     The 500× damping ratio (after normalization) plus the shock energy
+     is enough for the visual.
 
 4. **`color_by_phi` (Update)** — query `(&Pendulum, &mut Sprite)`:
    - Read `physics.field.phi(p.body)`; map to color via
@@ -325,6 +333,33 @@ Nice-to-haves (not gating):
 ---
 
 ## Known landmines
+
+0. **Phi magnitude is NOT in [0, 1].** The `MasterConsciousnessEquation`
+   in `symtropy-consciousness-physics` 0.1.0 heavily compresses uniform
+   inputs. Empirically measured response to uniform `ConsciousnessInputs`
+   (all 8 fields = coherence scalar c):
+
+   | c | phi | | c | phi |
+   |---|---|---|---|---|
+   | 0.00 | 0.000 | | 0.60 | 0.116 |
+   | 0.25 | 0.019 | | 0.75 | 0.180 |
+   | 0.50 | 0.080 | | 1.00 | **0.314** |
+
+   Non-uniform patterns do NOT exceed this max — we tried "only phi=1"
+   (phi_out=0), "only working_memory+attention=1" (phi_out=0),
+   "all=1 except phi=0" (phi_out=0.131). Max achievable phi under any
+   input pattern in this demo appears to be ~0.314.
+
+   **Consequence:** code that treats `field.phi()` as if it reached 1.0
+   will see only ~30% of intended dynamic range. Normalize via
+   `phi_norm = (phi / 0.314).clamp(0.0, 1.0)` before mapping to damping
+   or any other physics parameter. See system 3 for the formula.
+
+   **If `MasterConsciousnessEquation` changes upstream**, re-measure
+   with the spike logic in the memory record of this session. The
+   0.314 constant is a snapshot of the equation's current shape, not
+   a mathematical invariant.
+
 
 1. **Constraint type choice.** De-risked by Step 0 above. The doc assumes
    `DistanceConstraint<2>` between body and a static "pivot body" (mass =
