@@ -57,6 +57,48 @@ SCRIPT_START="$(date +%s)"
 mkdir -p "$BASE_CAPTURE"
 rm -rf "$BASE_CAPTURE"/*
 
+# ─── Pre-build pass ─────────────────────────────────────────────────
+# Bevy 0.18 cold-builds take minutes per demo — larger than
+# HARD_TIMEOUT. Without this pre-pass every demo would time out
+# during compilation and never reach runtime. We `cargo build`
+# each crate serially BEFORE the timed loop so the subsequent
+# `cargo run` is a cached no-op and the 45s budget covers runtime only.
+# Skip the pre-pass with SYMTROPY_VERIFY_SKIP_BUILD=1 (useful for
+# re-runs after a successful initial build).
+if [ "${SYMTROPY_VERIFY_SKIP_BUILD:-0}" != "1" ]; then
+    echo "pre-building all demo binaries (Bevy cold-build can be slow)…"
+    build_start="$(date +%s)"
+    build_failed=()
+    for demo in "${DEMOS[@]}"; do
+        crate_dir="$REPO/symtropy/crates/symtropy-${demo}-demo"
+        if [ ! -f "$crate_dir/Cargo.toml" ]; then
+            continue
+        fi
+        printf "  building %-15s ... " "$demo"
+        per_start="$(date +%s)"
+        if cargo build --release --manifest-path "$crate_dir/Cargo.toml" \
+                --bin "${demo}-demo" > "$BASE_CAPTURE/build_${demo}.log" 2>&1; then
+            per_elapsed=$(($(date +%s) - per_start))
+            echo "ok (${per_elapsed}s)"
+        else
+            per_elapsed=$(($(date +%s) - per_start))
+            echo "FAILED (${per_elapsed}s, see $BASE_CAPTURE/build_${demo}.log)"
+            build_failed+=("$demo")
+        fi
+    done
+    build_elapsed=$(($(date +%s) - build_start))
+    echo "pre-build total: ${build_elapsed}s"
+    if [ ${#build_failed[@]} -gt 0 ]; then
+        echo ""
+        echo "cannot verify ${#build_failed[@]} demo(s) due to build failure:"
+        for d in "${build_failed[@]}"; do
+            echo "  - $d"
+        done
+        # Continue anyway — runtime pass will report them as RED.
+    fi
+    echo ""
+fi
+
 printf "%-15s | %-6s | %-4s | %s\n" "demo" "exit" "pngs" "status"
 printf -- "--------------- | ------ | ---- | -----------\n"
 
