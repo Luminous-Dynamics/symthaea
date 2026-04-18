@@ -59,6 +59,65 @@ impl SafetyTier {
     }
 }
 
+/// Minimal 2-part Φ → gain mapping, empirically derived.
+///
+/// For a given platform the consciousness equation tends to produce Φ
+/// values concentrated in a narrow band rather than spanning [0, 1].
+/// The 5-variant Monte Carlo study in
+/// `symtropy-manipulator-demo/examples/manipulator_benchmark.rs`
+/// (see commits `38dc8b1fd9` through `317baad595`, Apr 2026) found
+/// that a Φ→gain mapping beats binary ISO/TS 15066 SSM (if at all)
+/// only when it satisfies **both**:
+///
+///   1. A **sprint threshold**: a Φ value at or below the top of the
+///      platform's empirical band, above which `gain = 1.0` so the
+///      controller commits to full authority in brief confident windows.
+///   2. A **crawl-rate floor**: a non-zero gain below the sprint
+///      threshold, large enough to keep IK convergence alive. The
+///      surgical/manipulator demos use 0.3; adjust for your
+///      convergence-tolerance vs controller-gains.
+///
+/// Intermediate tiers (0.6, 0.3 steps as in `SafetyTier::motor_gain`)
+/// proved empirically superfluous in the manipulator study — a
+/// two-level `sprint_floor_gain` matched the 4-tier `Recalibrated`
+/// variant to three decimal places.
+///
+/// **`SafetyTier::from_phi` uses hardcoded Φ thresholds (0.6 / 0.3 /
+/// 0.1) that are unlikely to match any platform's empirical Φ band.**
+/// For a working Φ-gated demo, measure your platform's Φ distribution
+/// first (e.g. via the `MANIP_BENCH_PHI_TRACE=1` pattern in the
+/// manipulator benchmark), then pass your platform-specific
+/// `sprint_phi` and `floor_gain` to this function.
+///
+/// # Example
+///
+/// ```
+/// use symtropy_consciousness_physics::safety::sprint_floor_gain;
+///
+/// // Platform's empirical Φ band is [0.099, 0.145].
+/// // Pick sprint threshold near the top, floor above the crawl limit.
+/// let gain = sprint_floor_gain(0.14, 0.135, 0.3);
+/// assert!((gain - 1.0).abs() < 1e-9);  // Φ above sprint → full authority.
+///
+/// let gain = sprint_floor_gain(0.11, 0.135, 0.3);
+/// assert!((gain - 0.3).abs() < 1e-9);  // Φ below sprint → floor.
+/// ```
+///
+/// # Panics
+///
+/// Does not panic. `floor` outside [0, 1] is accepted but the caller
+/// is responsible for choosing a physically sensible value — typically
+/// above whatever gain floor the inverse-kinematics loop needs to
+/// converge, and below 1.0.
+#[inline]
+pub fn sprint_floor_gain(phi: f64, sprint_phi: f64, floor: f64) -> f64 {
+    if phi > sprint_phi {
+        1.0
+    } else {
+        floor
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -99,7 +158,54 @@ mod tests {
             assert!(
                 gain_high >= gain_low,
                 "phi {} (gain {}) > phi {} (gain {})",
-                window[1], gain_high, window[0], gain_low
+                window[1],
+                gain_high,
+                window[0],
+                gain_low
+            );
+        }
+    }
+
+    // ── sprint_floor_gain (empirically-derived minimal mapping) ────────
+
+    #[test]
+    fn sprint_floor_gain_full_above_threshold() {
+        // Strictly above the sprint threshold → full authority.
+        assert_eq!(sprint_floor_gain(0.14, 0.135, 0.3), 1.0);
+        assert_eq!(sprint_floor_gain(1.0, 0.135, 0.3), 1.0);
+        assert_eq!(sprint_floor_gain(0.50, 0.13, 0.25), 1.0);
+    }
+
+    #[test]
+    fn sprint_floor_gain_floor_at_and_below_threshold() {
+        // At exactly the sprint threshold, strict inequality keeps us at floor
+        // (the safety margin that would let a paranoid reviewer confirm
+        // "sprint doesn't fire until Φ STRICTLY exceeds the threshold").
+        assert_eq!(sprint_floor_gain(0.135, 0.135, 0.3), 0.3);
+        assert_eq!(sprint_floor_gain(0.134, 0.135, 0.3), 0.3);
+        assert_eq!(sprint_floor_gain(0.0, 0.135, 0.3), 0.3);
+    }
+
+    #[test]
+    fn sprint_floor_gain_with_zero_floor_still_sprints() {
+        // Floor of 0.0 is allowed (recovers a sharp-cutoff binary mapping).
+        assert_eq!(sprint_floor_gain(0.14, 0.135, 0.0), 1.0);
+        assert_eq!(sprint_floor_gain(0.10, 0.135, 0.0), 0.0);
+    }
+
+    #[test]
+    fn sprint_floor_gain_is_two_level_only() {
+        // No intermediate values — every output is either floor or 1.0.
+        // This is the "middle tiers are superfluous" finding locked in.
+        let floor = 0.3;
+        for phi_x100 in 0..200 {
+            let phi = phi_x100 as f64 / 100.0;
+            let g = sprint_floor_gain(phi, 0.135, floor);
+            assert!(
+                (g - 1.0).abs() < 1e-12 || (g - floor).abs() < 1e-12,
+                "sprint_floor_gain produced intermediate value {} at phi={}",
+                g,
+                phi
             );
         }
     }
