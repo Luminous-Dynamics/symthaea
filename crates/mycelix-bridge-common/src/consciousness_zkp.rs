@@ -65,7 +65,11 @@ impl ConsciousnessAttestation {
             return Err("Empty proof bytes".to_string());
         }
         if self.proof_bytes.len() > MAX_CONSCIOUSNESS_PROOF_SIZE {
-            return Err(format!("Proof too large: {} > {}", self.proof_bytes.len(), MAX_CONSCIOUSNESS_PROOF_SIZE));
+            return Err(format!(
+                "Proof too large: {} > {}",
+                self.proof_bytes.len(),
+                MAX_CONSCIOUSNESS_PROOF_SIZE
+            ));
         }
         if self.score_commitment == [0u8; 32] {
             return Err("Zero commitment".to_string());
@@ -84,6 +88,27 @@ impl ConsciousnessAttestation {
     /// Check if this attestation has expired.
     pub fn is_expired(&self, current_time: u64) -> bool {
         current_time > self.generated_at + ATTESTATION_VALIDITY_SECS
+    }
+
+    /// Validate that this attestation is fresh: not expired, not future-dated.
+    ///
+    /// Used for replay prevention in cross-cluster attested calls (e.g. voting).
+    /// `epoch` is the current Unix timestamp in seconds. Allows up to 60s of
+    /// clock skew before rejecting future-dated attestations.
+    pub fn validate_with_freshness(&self, epoch: u64) -> Result<(), String> {
+        if self.is_expired(epoch) {
+            return Err(format!(
+                "attestation expired (generated_at={}, now={}, validity={}s)",
+                self.generated_at, epoch, ATTESTATION_VALIDITY_SECS
+            ));
+        }
+        if self.generated_at > epoch.saturating_add(60) {
+            return Err(format!(
+                "attestation dated in the future (generated_at={}, now={})",
+                self.generated_at, epoch
+            ));
+        }
+        Ok(())
     }
 
     /// Get the tier name.
@@ -144,7 +169,7 @@ mod tests {
     #[test]
     fn test_valid_attestation() {
         let att = ConsciousnessAttestation {
-            tier: 3, // Steward
+            tier: 3,                       // Steward
             proof_bytes: vec![1, 2, 3, 4], // Minimal non-empty
             score_commitment: [0xAA; 32],
             generated_at: 1700000000,
