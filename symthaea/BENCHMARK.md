@@ -3,6 +3,52 @@
 Honest measurement log. Each entry: date, commit, scorer used, result. Don't
 amend historical rows — if numbers change, append a new row and note why.
 
+## 2026-04-19 — #3 retraining experiment: **0/13 baseline, 0/13 extended** (data alone doesn't help — but prefix length 2×)
+
+Follow-up to the earlier 0/9 entry (same day). Probe showed the M7
+checkpoint emits bare-identifier prefixes only (avg 9 bytes parseable).
+Shipped `nix_corpus_scrape.rs` + `nix_corpus_accept.rs` and built a
+56-pair combined corpus (26 existing harvest + 30 scraper-derived
+pairs from `/etc/nixos` + `_infrastructure/nixos`). Hash re-bucketed
+the 26-pair holdout as 13/13 instead of 17/9 (same hash, different
+random bucketing luck — apples-to-apples comparison still valid as
+long as both runs use the same 13-pair holdout).
+
+Two GPU runs (RTX 2070 with Max-Q, CUDA 12.9 via vendored cudarc
+patch + `LD_LIBRARY_PATH=/run/opengl-driver/lib`), both 10 epochs:
+
+| Run | Train pairs | Final loss | Hold-out pass (structural) | Avg parseable prefix |
+|---|---|---|---|---|
+| Baseline | 13 | 6.00 → 0.93 | **0/13** | 23 bytes |
+| Extended | 43 (13 + 30) | 5.58 → 1.18 | **0/13** | 47 bytes |
+
+**Both 0/13 on full-parse** — data scaling from 13 to 43 pairs did
+not produce parse-valid hold-out output. The #3 hypothesis ("more
+pairs = generalization") is **rejected at this scale**.
+
+**But: prefix-parse length grew 2× (23 → 47 bytes).** The model's
+prefix-emission is learning grammar even though sequence-completion
+isn't. This is a weak positive — the signal is real but single-
+sample; multi-seed confirmation deferred.
+
+**Reprioritization of the "make this even better" list:**
+- ~~#3 alone~~ — rejected (this entry)
+- #1 (rnix-gated decoding) — **now viable**: 47-byte prefixes are
+  enough signal to extend. The original probe's 9-byte verdict
+  ("nothing to extend") was on less-trained M7; with 43-pair training
+  the per-token mask has real material to work with
+- #2 (structure-aware loss) — still worth testing. Could accelerate
+  the grammar-acquisition curve the prefix length is already showing
+
+**Training runs extraordinarily fast on GPU**: 13 pairs × 10 epochs
+= ~22 seconds; 43 pairs × 10 epochs = ~110 seconds. Multi-seed
+experiments are session-tractable. The earlier memory entry's "CPU
+~20 min / 26 pairs / 1 epoch" numbers hold; GPU is ~80× faster for
+this tiny-corpus regime.
+
+**Commits**: `57b4df5d0d` prefix probe, `39abb83e76` scraper,
+`aa2dfcd713` accept filter, this entry.
+
 ## 2026-04-19 — Hold-out generalization: **0/9 (0%)** (the honest number)
 
 First held-out test. Split: 26 harvested pairs → 17 train + 9 holdout
