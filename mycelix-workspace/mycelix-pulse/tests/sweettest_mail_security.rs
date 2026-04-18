@@ -1958,3 +1958,204 @@ async fn phase0_forged_inbox_link_rejected() {
     // the next session's unit of work once the debug extern lands.
     assert_ne!(eve_cell.agent_pubkey(), bob_cell.agent_pubkey());
 }
+
+// ============================================================================
+// Mirror types for get_inbox query (needed by the Phase 0.2 happy-path test)
+// ============================================================================
+
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+pub struct EmailQuery {
+    pub folder: Option<ActionHash>,
+    pub is_read: Option<bool>,
+    pub is_starred: Option<bool>,
+    pub is_archived: Option<bool>,
+    pub since: Option<Timestamp>,
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct EmailListItem {
+    pub hash: ActionHash,
+    pub sender: AgentPubKey,
+    pub encrypted_subject: Vec<u8>,
+    pub timestamp: Timestamp,
+    pub priority: EmailPriority,
+    pub is_read: bool,
+    pub is_starred: bool,
+    pub has_attachments: bool,
+    pub thread_id: Option<String>,
+}
+
+/// Compute the canonical `email_signing_content` bytes that the integrity
+/// zome's `validate_encrypted_email` verifies against. This duplicates the
+/// function at `holochain/zomes/messages/integrity/src/lib.rs:22` — keep in
+/// lock-step with that definition. Any change to the canonical format there
+/// must mirror here or all signature tests will break.
+fn compute_signing_content(
+    sender: &AgentPubKey,
+    recipient: &AgentPubKey,
+    encrypted_subject: &[u8],
+    encrypted_body: &[u8],
+    nonce: &[u8; 24],
+    message_id: &str,
+    timestamp: Timestamp,
+) -> Vec<u8> {
+    let mut content = Vec::with_capacity(256);
+    content.push(0x01); // version byte
+    content.extend_from_slice(sender.get_raw_39());
+    content.extend_from_slice(recipient.get_raw_39());
+    content.extend_from_slice(&(encrypted_subject.len() as u32).to_le_bytes());
+    content.extend_from_slice(encrypted_subject);
+    content.extend_from_slice(&(encrypted_body.len() as u32).to_le_bytes());
+    content.extend_from_slice(encrypted_body);
+    content.extend_from_slice(nonce);
+    content.extend_from_slice(&(message_id.len() as u32).to_le_bytes());
+    content.extend_from_slice(message_id.as_bytes());
+    content.extend_from_slice(&timestamp.as_micros().to_le_bytes());
+    content
+}
+
+/// Phase 0.2 happy path — `alice_sends_bob_receives`.
+///
+/// This is the test whose absence invalidated every "working" claim in the
+/// pulse repo at audit time. It was structurally impossible before Phase 0.8
+/// because the coordinator's sys_time() injection made client signatures
+/// unreachable. Now that `SendEmailInput.timestamp` is client-authoritative,
+/// we can compute `email_signing_content(...)` exactly as the integrity zome
+/// will, sign it with Alice's agent key via the conductor's lair, and send.
+///
+/// Flow:
+///   1. Two conductors boot + install pulse DNA + reach DHT consistency
+///   2. Alice constructs envelope, computes canonical signing content,
+///      signs it with her Ed25519 agent key (`conductor.keystore().sign`)
+///   3. Alice calls `send_email` → coordinator creates entry → Phase 0.3
+///      integrity zome validates sig + skew + ToInbox link + all length
+///      checks
+///   4. `await_consistency` for DHT gossip
+///   5. Bob calls `get_inbox` — must return exactly one item, from Alice
+///
+/// If this passes, the audit's killer gap ("nobody has verified that Alice
+/// sending a message results in Bob receiving it") is closed.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "Phase 0.2 — requires running Holochain conductor; env prereqs in Appendix A"]
+async fn phase0_alice_sends_bob_receives() {
+    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
+        .await
+        .expect("DNA bundle must load");
+
+    let apps = conductors
+        .setup_app("pulse-ph0-delivery", &[dna_file.clone()])
+        .await
+        .expect("setup_app on both conductors");
+
+    let cells = apps.cells_flattened();
+    let alice_cell = cells[0].clone();
+    let bob_cell = cells[1].clone();
+
+    // Peers must discover each other before any send — otherwise Bob won't
+    // see Alice's DHT ops during validation.
+    await_consistency(30, [&alice_cell, &bob_cell])
+        .await
+        .expect("pre-send consistency");
+
+    // Client-authoritative fields — Alice decides these.
+    let timestamp = Timestamp::now();
+    let message_id = "phase0-happy-001";
+    let encrypted_subject = vec![1u8, 2, 3];
+    let encrypted_body = vec![4u8, 5, 6];
+    let nonce = [1u8; 24];
+
+    // Compute canonical content and sign via Alice's agent key in lair.
+    let content = compute_signing_content(
+        alice_cell.agent_pubkey(),
+        bob_cell.agent_pubkey(),
+        &encrypted_subject,
+        &encrypted_body,
+        &nonce,
+        message_id,
+        timestamp,
+    );
+
+    let signature = conductors[0]
+        .keystore()
+        .sign(alice_cell.agent_pubkey().clone(), content.into())
+        .await
+        .expect("lair sign must succeed");
+
+    let input = SendEmailInput {
+        recipients: vec![bob_cell.agent_pubkey().clone()],
+        cc: vec![],
+        bcc: vec![],
+        encrypted_subject: vec![1, 2, 3],
+        encrypted_body: vec![4, 5, 6],
+        encrypted_attachments: vec![],
+        ephemeral_pubkey: vec![0u8; 32], // X25519 length, content unimportant for this test
+        nonce,
+        signature: signature.0.to_vec(),
+        crypto_suite: CryptoSuite {
+            key_exchange: "x25519".to_string(),
+            symmetric: "chacha20-poly1305".to_string(),
+            signature: "ed25519".to_string(),
+        },
+        message_id: message_id.to_string(),
+        in_reply_to: None,
+        references: vec![],
+        priority: EmailPriority::Normal,
+        read_receipt_requested: false,
+        expires_at: None,
+        timestamp,
+    };
+
+    // Alice sends. If integrity zome rejects here, Phase 0.3/0.8 have bugs.
+    let output: SendEmailOutput = conductors[0]
+        .call(&alice_cell.zome("mail_messages"), "send_email", input)
+        .await;
+
+    assert!(
+        output.failed_deliveries.is_empty(),
+        "no delivery should fail; got: {:?}",
+        output.failed_deliveries
+    );
+    assert_eq!(
+        output.delivered_to.len(),
+        1,
+        "exactly one recipient (Bob); got: {:?}",
+        output.delivered_to
+    );
+
+    // Wait for DHT gossip to carry the ToInbox link + EncryptedEmail entry
+    // to Bob's conductor.
+    await_consistency(30, [&alice_cell, &bob_cell])
+        .await
+        .expect("post-send consistency");
+
+    // Bob queries his inbox. Must return exactly Alice's one email.
+    let query = EmailQuery {
+        limit: Some(10),
+        ..Default::default()
+    };
+    let inbox: Vec<EmailListItem> = conductors[1]
+        .call(&bob_cell.zome("mail_messages"), "get_inbox", query)
+        .await;
+
+    assert_eq!(
+        inbox.len(),
+        1,
+        "Bob's inbox must contain exactly Alice's one email; got {} items",
+        inbox.len()
+    );
+    let received = &inbox[0];
+    assert_eq!(
+        received.sender,
+        *alice_cell.agent_pubkey(),
+        "inbox entry sender must be Alice"
+    );
+    assert_eq!(
+        received.encrypted_subject,
+        vec![1u8, 2, 3],
+        "encrypted_subject must round-trip byte-for-byte"
+    );
+    assert_eq!(received.timestamp, timestamp, "client timestamp preserved");
+}
