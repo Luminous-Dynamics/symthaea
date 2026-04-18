@@ -1710,8 +1710,19 @@ pub fn generate_nix_with_self_improve(
     prompt: &str,
     max_iterations: usize,
 ) -> (NixGenWithIndexResult, SelfImproveSource) {
-    // Tier 3.1: cache hit?
-    if let Some(idiom) = shared_learned_cache().find_match(prompt) {
+    generate_nix_with_cache(prompt, max_iterations, shared_learned_cache())
+}
+
+/// Lower-level self-improve entry point with an injectable cache. Used by
+/// `generate_nix_with_self_improve` (with the process-wide singleton) and
+/// by benchmarks that need a per-run cache to avoid polluting the user's
+/// real `~/.cache/symthaea/learned-idioms.json`.
+pub fn generate_nix_with_cache(
+    prompt: &str,
+    max_iterations: usize,
+    cache: &LearnedIdiomCache,
+) -> (NixGenWithIndexResult, SelfImproveSource) {
+    if let Some(idiom) = cache.find_match(prompt) {
         let intent = classify_nix_intent(&prompt.to_lowercase());
         let result = NixGenWithIndexResult {
             base: NixGenResult {
@@ -1727,11 +1738,9 @@ pub fn generate_nix_with_self_improve(
         };
         return (result, SelfImproveSource::LearnedCache);
     }
-
-    // Tier 3.4: regenerate + record on full success.
     let result = generate_nix_with_index_verify(prompt, max_iterations);
     let recorded = if result.base.parses && result.unknown_options.is_empty() {
-        shared_learned_cache().record(prompt, &result.base.code, result.base.intent);
+        cache.record(prompt, &result.base.code, result.base.intent);
         true
     } else {
         false
