@@ -24,22 +24,56 @@ pub enum AssetType {
 }
 
 /// Input for registering collateral against a loan or stake.
+///
+/// Cross-hApp-addressable via `source_happ` + `asset_id` so assets registered
+/// in e.g. `mycelix-property` can back financial obligations without the
+/// finance cluster needing to know that hApp's internal entry model.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RegisterCollateralInput {
     pub owner_did: String,
+    /// Source hApp ID that authoritatively owns this asset entry
+    /// (e.g. "mycelix-property", "mycelix-energy").
+    pub source_happ: String,
     pub asset_type: AssetType,
-    pub description: String,
-    pub estimated_value_sap: u64,
-    pub property_id: Option<String>,
+    /// Opaque, `source_happ`-local asset identifier (e.g. "property:lot:42").
+    pub asset_id: String,
+    /// Estimated value in `currency` micro-units.
+    pub value_estimate: u64,
+    /// Currency of `value_estimate` (typically "SAP").
+    pub currency: String,
 }
 
 /// Response for SAP balance queries.
+///
+/// Exposes both the raw stored balance and the effective balance after
+/// pending demurrage has been netted out, so callers can display both
+/// "what's on file" and "what's currently spendable" without calling twice.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SapBalanceResponse {
-    pub did: String,
+    pub member_did: String,
+    /// Balance as last persisted (before pending demurrage).
+    pub raw_balance: u64,
+    /// Effective balance = `raw_balance - pending_demurrage`.
+    pub effective_balance: u64,
+    /// Demurrage accrued since `last_demurrage_at`, not yet persisted.
+    pub pending_demurrage: u64,
+    /// Microsecond timestamp of last persisted demurrage application.
+    /// Signed to match Holochain's `Timestamp::as_micros()` return type.
+    pub last_demurrage_at: i64,
+}
+
+/// Generic balance response used by the finance bridge for any currency.
+///
+/// Distinguished from [`SapBalanceResponse`] because the bridge may serve
+/// TEND / MYCEL / SAP uniformly — this shape works for all three.
+/// `available=false` signals the underlying zome was unreachable and the
+/// returned balance is a permissive fallback (bootstrap mode).
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BalanceResponse {
+    pub member_did: String,
+    pub currency: String,
     pub balance: u64,
-    pub pending_in: u64,
-    pub pending_out: u64,
+    pub available: bool,
 }
 
 // =============================================================================
@@ -408,14 +442,127 @@ pub struct ListInput {
 ///
 /// Provides the caller's member context and resolved resource IDs
 /// for the connected DAO/treasury/commons pool.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct FinanceRuntimeDiscovery {
-    /// The authenticated member's DID
+    /// The authenticated member's DID.
     pub member_did: String,
-    /// Resolved DAO DID (if member belongs to one)
-    pub dao_did: Option<String>,
-    /// Resolved treasury ID for the member's DAO
+    /// Default DAO for this member (first entry of `dao_dids`, or None).
+    pub default_dao_did: Option<String>,
+    /// All DAOs the member is a confirmed participant in.
+    pub dao_dids: Vec<String>,
+    /// Resolved treasury ID for the member's DAO.
     pub treasury_id: Option<String>,
-    /// Resolved commons pool ID for the member's DAO
+    /// Resolved commons pool ID for the member's DAO.
     pub commons_pool_id: Option<String>,
+}
+
+// =============================================================================
+// BRIDGE + HEALTH + CROSS-CLUSTER I/O
+// =============================================================================
+
+/// Standard bridge health response.
+///
+/// Returned from `finance_bridge::health_check` for cross-cluster monitoring.
+/// Mirrors the health-response shape used by other cluster bridges.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FinanceBridgeHealth {
+    pub healthy: bool,
+    /// DID of the agent running this bridge.
+    pub agent: String,
+    /// Names of coordinator zomes this bridge can dispatch to locally.
+    pub zomes: Vec<String>,
+}
+
+/// Input for the finance bridge's cross-hApp payment entrypoint.
+///
+/// `source_happ` is the caller's hApp ID (for attribution + fee tiering);
+/// `reference` is a free-form memo (invoice ID, rent period, etc.).
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ProcessPaymentInput {
+    pub source_happ: String,
+    pub from_did: String,
+    pub to_did: String,
+    pub amount: u64,
+    pub currency: String,
+    pub reference: String,
+}
+
+/// Input for the simpler collateral-deposit path (raw collateral-type string
+/// instead of the richer [`RegisterCollateralInput`] + `AssetType` enum).
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DepositCollateralInput {
+    pub depositor_did: String,
+    /// Collateral asset identifier (e.g. "ETH", "USDC").
+    pub collateral_type: String,
+    /// Collateral amount in micro-units.
+    pub collateral_amount: u64,
+    /// Oracle exchange rate used for SAP minting (collateral → SAP).
+    pub oracle_rate: f64,
+}
+
+/// Input for recomputing a collateral position's LTV + health status.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UpdateCollateralHealthInput {
+    pub collateral_id: String,
+    /// Current obligation the collateral backs (in SAP micro-units).
+    pub obligation_amount: u64,
+}
+
+/// Member fee-tier lookup response (derived from MYCEL recognition score).
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FeeTierResponse {
+    pub member_did: String,
+    /// MYCEL recognition score; f64 to match the oracle return type.
+    pub mycel_score: f64,
+    /// Human-readable tier name (Bronze/Silver/Gold/...).
+    pub tier_name: String,
+    /// Fee rate applied to this tier, as a fraction (0.0–1.0).
+    pub base_fee_rate: f64,
+}
+
+// =============================================================================
+// DEMURRAGE + GOVERNANCE MINTING
+// =============================================================================
+
+/// Input for applying demurrage to a single member's balance.
+///
+/// When deduction > 0, the deducted amount is redistributed as compost
+/// to local (70%) / regional (20%) / global (10%) commons pools per the
+/// constitutional compost rule. The caller supplies the target pool IDs
+/// so the caller (not this zome) controls which pools receive the compost.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ApplyDemurrageInput {
+    pub member_did: String,
+    /// Currency to apply demurrage to (typically "SAP").
+    pub currency_id: String,
+    /// Local commons pool for 70% of deducted compost. None ⇒ queue until set.
+    pub local_commons_pool_id: Option<String>,
+    /// Regional commons pool for 20% of deducted compost.
+    pub regional_commons_pool_id: Option<String>,
+    /// Global commons pool for 10% of deducted compost.
+    pub global_commons_pool_id: Option<String>,
+}
+
+/// Result of a demurrage application (production path).
+///
+/// `deducted` is the amount removed from the member's balance (0 when
+/// the balance is below the exempt floor). `redistributed` is true iff
+/// all three target pools accepted their compost share; false means one
+/// or more shares were queued for retry.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DemurrageResult {
+    pub deducted: u64,
+    pub redistributed: bool,
+}
+
+/// Input for minting new SAP authorized by a governance proposal.
+///
+/// The ONLY path for new SAP to enter circulation outside collateral deposits.
+/// `proposal_id` is the governance proposal that authorized this mint;
+/// `recipient_did` is the member receiving the new SAP.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct MintSapFromGovernanceInput {
+    pub amount: u64,
+    pub proposal_id: String,
+    pub recipient_did: String,
 }

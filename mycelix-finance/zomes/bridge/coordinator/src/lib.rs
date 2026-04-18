@@ -260,7 +260,7 @@ pub struct BroadcastFinanceEventInput {
 /// Get payment history for a DID (paginated, default limit 100)
 #[hdk_extern]
 pub fn get_payment_history(input: GetPaymentHistoryInput) -> ExternResult<Vec<Record>> {
-    let limit = input.limit.unwrap_or(100);
+    let limit = input.limit.unwrap_or(100) as usize;
     let query = LinkQuery::try_new(anchor_hash(&input.did)?, LinkTypes::DidToPayments)?;
     let links = get_links(query, GetStrategy::default())?;
 

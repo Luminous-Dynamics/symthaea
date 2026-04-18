@@ -1326,7 +1326,7 @@ pub struct ChannelTransferInput {
 /// Uses follow_update_chain because payments are mutable (status transitions).
 #[hdk_extern]
 pub fn get_payment_history(input: GetPaymentHistoryInput) -> ExternResult<Vec<Record>> {
-    let max = input.limit.unwrap_or(100);
+    let max = input.limit.unwrap_or(100) as usize;
     let mut payments = Vec::new();
     // Get sent payments
     let query = LinkQuery::try_new(anchor_hash(&input.did)?, LinkTypes::SenderToPayments)?;
