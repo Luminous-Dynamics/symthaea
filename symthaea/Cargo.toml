@@ -1114,6 +1114,10 @@ required-features = ["code_generation"]
 name = "nix_holdout_score"
 required-features = ["code_generation"]
 
+[[example]]
+name = "compose_eval_benchmark"
+required-features = ["code_generation"]
+
 
 [[example]]
 name = "nix_codegen_api"
