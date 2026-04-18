@@ -30,12 +30,16 @@ pub enum NixIntent {
     HomeManager,
     /// Networking / firewall.
     Networking,
+    /// Secrets management (sops-nix, agenix).
+    Secrets,
+    /// Flake template (full project / system scaffolding).
+    FlakeTemplate,
     /// Generic / unknown.
     Generic,
 }
 
 impl NixIntent {
-    pub const ALL: [Self; 8] = [
+    pub const ALL: [Self; 10] = [
         Self::DevShell,
         Self::Service,
         Self::Hardware,
@@ -43,6 +47,8 @@ impl NixIntent {
         Self::User,
         Self::HomeManager,
         Self::Networking,
+        Self::Secrets,
+        Self::FlakeTemplate,
         Self::Generic,
     ];
 }
@@ -66,8 +72,8 @@ pub enum NixTarget {
 /// algorithm encoder because Nix domain is more bounded.
 #[derive(Clone, Debug, Default)]
 pub struct NixChannels {
-    /// 8 intent class one-hot (matches NixIntent::ALL order).
-    pub intent: [f32; 8],
+    /// 10 intent class one-hot (matches NixIntent::ALL order).
+    pub intent: [f32; 10],
     /// Which programming language is mentioned (for dev shells).
     /// 0=none, 1=rust, 2=python, 3=node, 4=go, 5=haskell, 6=other
     pub language: f32,
@@ -95,7 +101,7 @@ pub fn build_nix_channels(prompt: &str) -> NixChannels {
     let idx = NixIntent::ALL
         .iter()
         .position(|i| *i == intent)
-        .unwrap_or(7);
+        .unwrap_or(9);
     ch.intent[idx] = 1.0;
 
     // ── Language detection ──
@@ -185,6 +191,22 @@ pub fn classify_nix_intent(lower: &str) -> NixIntent {
             || lower.contains("node.js")
             || lower.contains("node development")
             || lower.contains("haskell"));
+    // Secrets management — check before generic Service so "encrypt" etc. routes here
+    if lower.contains("sops") || lower.contains("agenix") || lower.contains("secret")
+        || lower.contains("encrypted") || lower.contains("encrypt password")
+        || lower.contains("manage credentials") || lower.contains("age key")
+    {
+        return NixIntent::Secrets;
+    }
+    // Flake template — full project/system scaffolding
+    if lower.contains("flake template") || lower.contains("flake.nix template")
+        || lower.contains("project scaffold") || lower.contains("complete flake")
+        || (lower.contains("full") && lower.contains("flake"))
+        || (lower.contains("system flake") || lower.contains("nixosconfigurations"))
+    {
+        return NixIntent::FlakeTemplate;
+    }
+
     if dev_kw || lang_with_env || setup_lang {
         NixIntent::DevShell
     } else if lower.contains("nvidia")
@@ -262,6 +284,8 @@ pub fn nix_idiom_body(prompt: &str) -> Option<String> {
         NixIntent::User => emit_user_group(&lower),
         NixIntent::Networking => emit_networking(&lower),
         NixIntent::HomeManager => emit_home_manager(&lower),
+        NixIntent::Secrets => emit_secrets(&lower),
+        NixIntent::FlakeTemplate => emit_flake_template(&lower),
         NixIntent::Generic => None,
     }
 }
@@ -495,7 +519,35 @@ fn emit_hardware(lower: &str) -> Option<String> {
 // ── Desktop Emitters ──
 
 fn emit_desktop(lower: &str) -> Option<String> {
-    // Sway / Wayland
+    // Hyprland — check first so "hyprland wayland" doesn't match Sway via "wayland"
+    if lower.contains("hyprland") {
+        let fonts = if lower.contains("font") {
+            "  fonts.packages = with pkgs; [\n    nerd-fonts.fira-code\n    noto-fonts\n    noto-fonts-emoji\n  ];\n"
+        } else {
+            ""
+        };
+        return Some(format!(
+            r#"{{ config, pkgs, ... }}: {{
+  programs.hyprland = {{
+    enable = true;
+    xwayland.enable = true;
+  }};
+  xdg.portal = {{
+    enable = true;
+    extraPortals = with pkgs; [
+      xdg-desktop-portal-hyprland
+      xdg-desktop-portal-gtk
+    ];
+  }};
+  environment.systemPackages = with pkgs; [
+    waybar wofi mako kitty grim slurp wl-clipboard
+  ];
+{fonts}}}
+"#
+        ));
+    }
+
+    // Sway / Wayland (without Hyprland keyword)
     if lower.contains("sway") || lower.contains("wayland") {
         let fonts = if lower.contains("font") {
             r#"  fonts.packages = with pkgs; [
@@ -538,6 +590,29 @@ fn emit_desktop(lower: &str) -> Option<String> {
 "#
             .to_string(),
         );
+    }
+
+    // Hyprland is now handled at the top of the function — keep a marker
+    if false {
+        return Some(String::new());
+    }
+
+    // GNOME desktop
+    if lower.contains("gnome") {
+        let extra = if lower.contains("extension") {
+            "  environment.systemPackages = with pkgs; [\n    gnomeExtensions.appindicator\n    gnomeExtensions.dash-to-dock\n    gnome-tweaks\n  ];\n"
+        } else {
+            ""
+        };
+        return Some(format!(
+            r#"{{ config, pkgs, ... }}: {{
+  services.xserver.enable = true;
+  services.xserver.displayManager.gdm.enable = true;
+  services.xserver.desktopManager.gnome.enable = true;
+  services.gnome.gnome-keyring.enable = true;
+{extra}}}
+"#
+        ));
     }
 
     None
@@ -629,6 +704,182 @@ fn emit_home_manager(lower: &str) -> Option<String> {
             .to_string(),
         );
     }
+    None
+}
+
+// ── Secrets Emitters ──
+
+fn emit_secrets(lower: &str) -> Option<String> {
+    // sops-nix — declarative encrypted secrets backed by sops + age/PGP
+    if lower.contains("sops") {
+        return Some(
+            r#"{ config, pkgs, ... }: {
+  imports = [ <sops-nix/modules/sops> ];
+
+  sops = {
+    defaultSopsFile = ./secrets.yaml;
+    age = {
+      keyFile = "/var/lib/sops-nix/key.txt";
+      generateKey = true;
+    };
+    secrets = {
+      "example_secret" = {
+        owner = config.users.users.tstoltz.name;
+        mode = "0400";
+      };
+    };
+  };
+}
+"#
+            .to_string(),
+        );
+    }
+
+    // agenix — age-encrypted secrets (simpler than sops-nix)
+    if lower.contains("agenix") || lower.contains("age key") {
+        return Some(
+            r#"{ config, pkgs, ... }: {
+  imports = [
+    (builtins.fetchTarball
+      "https://github.com/ryantm/agenix/archive/main.tar.gz"
+      + "/modules/age.nix")
+  ];
+
+  age = {
+    identityPaths = [ "/home/tstoltz/.ssh/id_ed25519" ];
+    secrets = {
+      example_secret = {
+        file = ./secrets/example.age;
+        owner = "tstoltz";
+        mode = "0400";
+      };
+    };
+  };
+}
+"#
+            .to_string(),
+        );
+    }
+
+    // Generic secret hint — give them sops-nix as the recommended default
+    if lower.contains("secret") || lower.contains("encrypted") || lower.contains("credential") {
+        return Some(
+            r#"{ config, pkgs, ... }: {
+  # Recommended: use sops-nix for declarative encrypted secrets.
+  # See https://github.com/Mic92/sops-nix
+  imports = [ <sops-nix/modules/sops> ];
+
+  sops = {
+    defaultSopsFile = ./secrets.yaml;
+    age.keyFile = "/var/lib/sops-nix/key.txt";
+    secrets.example = {
+      owner = config.users.users.tstoltz.name;
+      mode = "0400";
+    };
+  };
+}
+"#
+            .to_string(),
+        );
+    }
+    None
+}
+
+fn emit_flake_template(lower: &str) -> Option<String> {
+    // Dev-project flake — multi-language devShells
+    if lower.contains("dev") || lower.contains("project") || lower.contains("devshell") {
+        let mut langs: Vec<&str> = Vec::new();
+        if lower.contains("rust") {
+            langs.push("rust");
+        }
+        if lower.contains("python") {
+            langs.push("python");
+        }
+        if lower.contains("node") || lower.contains("typescript") {
+            langs.push("nodejs");
+        }
+        if lower.contains("go ") || lower.contains("golang") {
+            langs.push("go");
+        }
+        if langs.is_empty() {
+            langs.push("rust");
+        }
+
+        // Build buildInputs list
+        let mut inputs: Vec<&str> = Vec::new();
+        for lang in &langs {
+            match *lang {
+                "rust" => inputs.extend_from_slice(&["rustc", "cargo", "rustfmt", "rust-analyzer"]),
+                "python" => inputs.push("python311"),
+                "nodejs" => inputs.extend_from_slice(&["nodejs_20", "nodePackages.npm"]),
+                "go" => inputs.push("go"),
+                _ => {}
+            }
+        }
+        let inputs_str = inputs.join(" ");
+        let lang_summary = langs.join(", ");
+
+        return Some(format!(
+            r#"{{
+  description = "Dev project: {lang_summary}";
+
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+
+  outputs = {{ self, nixpkgs }}:
+    let
+      system = "x86_64-linux";
+      pkgs = import nixpkgs {{ inherit system; }};
+    in {{
+      devShells.${{system}}.default = pkgs.mkShell {{
+        buildInputs = with pkgs; [ {inputs_str} ];
+        shellHook = ''
+          echo "Dev shell: {lang_summary}"
+        '';
+      }};
+    }};
+}}
+"#
+        ));
+    }
+
+    // Full NixOS system flake — combines configuration.nix + home-manager
+    if lower.contains("system") || lower.contains("nixos") || lower.contains("complete") {
+        return Some(
+            r#"{
+  description = "NixOS system flake";
+
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    home-manager = {
+      url = "github:nix-community/home-manager";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+  };
+
+  outputs = { self, nixpkgs, home-manager, ... }@inputs:
+    let
+      system = "x86_64-linux";
+    in {
+      nixosConfigurations.default = nixpkgs.lib.nixosSystem {
+        inherit system;
+        specialArgs = { inherit inputs; };
+        modules = [
+          ./configuration.nix
+          home-manager.nixosModules.home-manager
+          {
+            home-manager.useGlobalPkgs = true;
+            home-manager.useUserPackages = true;
+            home-manager.users.tstoltz = import ./home.nix;
+          }
+        ];
+      };
+    };
+}
+"#
+            .to_string(),
+        );
+    }
+
     None
 }
 
@@ -819,6 +1070,8 @@ pub fn generate_nix(prompt: &str) -> NixGenResult {
         NixIntent::User => "{\n  users.users.tstoltz = {\n    isNormalUser = true;\n  };\n}\n",
         NixIntent::Networking => "{\n  networking = { };\n}\n",
         NixIntent::HomeManager => "{ pkgs, ... }: {\n  home.packages = [ ];\n}\n",
+        NixIntent::Secrets => "{\n  # secrets config — see sops-nix or agenix\n}\n",
+        NixIntent::FlakeTemplate => "{\n  description = \"flake\";\n  inputs.nixpkgs.url = \"github:NixOS/nixpkgs/nixos-unstable\";\n  outputs = { self, nixpkgs }: { };\n}\n",
         NixIntent::Generic => "{ }\n",
     };
     let verdict = try_nix_parse(skeleton);
@@ -904,6 +1157,79 @@ pub fn enrich_nix_channels_from_error(channels: &mut NixChannels, error: &str) {
         }
         NixErrorKind::Other => {}
     }
+}
+
+// ─── Causal Validation (conflict detection) ────────────────────────────────
+
+/// A known conflict between two Nix options. If both are enabled the system
+/// won't boot or will misbehave.
+#[derive(Clone, Debug)]
+pub struct CausalConflict {
+    pub a: &'static str,
+    pub b: &'static str,
+    pub reason: &'static str,
+}
+
+/// Curated conflict patterns extracted from the symthaea-nix causal graph.
+/// These catch common foot-guns at generation time, before deploy.
+pub fn known_conflicts() -> Vec<CausalConflict> {
+    vec![
+        CausalConflict {
+            a: "boot.loader.grub.enable = true",
+            b: "boot.loader.systemd-boot.enable = true",
+            reason: "two boot loaders enabled simultaneously",
+        },
+        CausalConflict {
+            a: "services.displayManager.gdm.enable = true",
+            b: "services.displayManager.sddm.enable = true",
+            reason: "two display managers conflict",
+        },
+        CausalConflict {
+            a: "services.xserver.displayManager.gdm.enable = true",
+            b: "services.xserver.displayManager.sddm.enable = true",
+            reason: "two display managers conflict",
+        },
+        CausalConflict {
+            a: "networking.networkmanager.enable = true",
+            b: "networking.wireless.enable = true",
+            reason: "NetworkManager and wpa_supplicant both manage wireless",
+        },
+        CausalConflict {
+            a: "services.desktopManager.plasma6.enable = true",
+            b: "services.xserver.desktopManager.gnome.enable = true",
+            reason: "two desktop environments conflict",
+        },
+        CausalConflict {
+            a: "programs.sway.enable = true",
+            b: "services.xserver.enable = true",
+            reason: "Sway is a Wayland compositor — xserver is unnecessary and may conflict",
+        },
+        CausalConflict {
+            a: "programs.hyprland.enable = true",
+            b: "services.xserver.enable = true",
+            reason: "Hyprland is Wayland-only — xserver shouldn't be enabled alongside",
+        },
+        CausalConflict {
+            a: "services.openssh.enable = true",
+            b: "services.openssh.enable = false",
+            reason: "contradictory openssh settings",
+        },
+    ]
+}
+
+/// Scan a generated Nix expression for known conflicts.
+/// Returns a list of (conflict, true_if_both_present) — a warning record.
+pub fn validate_conflicts(code: &str) -> Vec<CausalConflict> {
+    known_conflicts()
+        .into_iter()
+        .filter(|c| {
+            // Normalize whitespace for substring matching
+            let norm = code.split_whitespace().collect::<Vec<_>>().join(" ");
+            let a_norm = c.a.split_whitespace().collect::<Vec<_>>().join(" ");
+            let b_norm = c.b.split_whitespace().collect::<Vec<_>>().join(" ");
+            norm.contains(&a_norm) && norm.contains(&b_norm)
+        })
+        .collect()
 }
 
 /// Generate Nix with a self-repair loop that uses semantic verification.
@@ -1092,6 +1418,42 @@ mod tests {
         // Eval should NOT accept undefined `pkgs.firefoxxxx_does_not_exist`
         assert!(parse_ok, "parse should accept syntactically valid input");
         assert!(!eval_ok, "eval should reject undefined attribute reference");
+    }
+
+    #[test]
+    fn test_validate_conflicts_catches_dual_bootloader() {
+        let code = r#"{
+  boot.loader.grub.enable = true;
+  boot.loader.systemd-boot.enable = true;
+}"#;
+        let conflicts = validate_conflicts(code);
+        assert_eq!(
+            conflicts.len(),
+            1,
+            "should detect grub vs systemd-boot conflict"
+        );
+        assert!(conflicts[0].reason.contains("boot loader"));
+    }
+
+    #[test]
+    fn test_validate_conflicts_no_false_positive() {
+        // Generated config from our pipeline should not flag conflicts
+        let code = "{ services.postgresql.enable = true; }";
+        assert!(
+            validate_conflicts(code).is_empty(),
+            "single-service config should have no conflicts"
+        );
+    }
+
+    #[test]
+    fn test_validate_conflicts_dual_dm() {
+        let code = r#"{
+  services.displayManager.gdm.enable = true;
+  services.displayManager.sddm.enable = true;
+}"#;
+        let conflicts = validate_conflicts(code);
+        assert_eq!(conflicts.len(), 1);
+        assert!(conflicts[0].reason.contains("display manager"));
     }
 
     #[test]

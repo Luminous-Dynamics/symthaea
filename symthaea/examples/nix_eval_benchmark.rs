@@ -174,6 +174,117 @@ fn problems() -> Vec<NixProblem> {
             forbidden_substrings: &[],
             require_parse: true,
         },
+        // ── Hyprland + GNOME (Task 1) ──
+        NixProblem {
+            prompt: "set up hyprland with fonts",
+            expected_intent: NixIntent::Desktop,
+            expected_substrings: &["programs.hyprland", "xdg.portal"],
+            forbidden_substrings: &["sway", "kde"],
+            require_parse: true,
+        },
+        NixProblem {
+            prompt: "enable hyprland wayland compositor",
+            expected_intent: NixIntent::Desktop,
+            expected_substrings: &["programs.hyprland", "xwayland"],
+            forbidden_substrings: &["plasma"],
+            require_parse: true,
+        },
+        NixProblem {
+            prompt: "enable gnome desktop with extensions",
+            expected_intent: NixIntent::Desktop,
+            expected_substrings: &["gnome", "gdm", "gnomeExtensions"],
+            forbidden_substrings: &["plasma", "sway"],
+            require_parse: true,
+        },
+        NixProblem {
+            prompt: "set up gnome desktop environment",
+            expected_intent: NixIntent::Desktop,
+            expected_substrings: &["desktopManager.gnome", "gdm"],
+            forbidden_substrings: &["plasma"],
+            require_parse: true,
+        },
+        // ── Secrets (Task 2) ──
+        NixProblem {
+            prompt: "set up sops secrets management",
+            expected_intent: NixIntent::Secrets,
+            expected_substrings: &["sops", "defaultSopsFile", "age"],
+            forbidden_substrings: &["agenix"],
+            require_parse: true,
+        },
+        NixProblem {
+            prompt: "configure agenix for encrypted secrets",
+            expected_intent: NixIntent::Secrets,
+            expected_substrings: &["agenix", "age", "secrets"],
+            forbidden_substrings: &[],
+            require_parse: true,
+        },
+        NixProblem {
+            prompt: "manage credentials with encrypted secret store",
+            expected_intent: NixIntent::Secrets,
+            expected_substrings: &["sops"],
+            forbidden_substrings: &[],
+            require_parse: true,
+        },
+        // ── Flake templates (Task 3) ──
+        NixProblem {
+            prompt: "complete flake template for rust and python project",
+            expected_intent: NixIntent::FlakeTemplate,
+            expected_substrings: &["devShells", "rustc", "python311", "nixpkgs"],
+            forbidden_substrings: &[],
+            require_parse: true,
+        },
+        NixProblem {
+            prompt: "system flake with home-manager",
+            expected_intent: NixIntent::FlakeTemplate,
+            expected_substrings: &["nixosConfigurations", "home-manager", "nixosSystem"],
+            forbidden_substrings: &[],
+            require_parse: true,
+        },
+        NixProblem {
+            prompt: "flake template for nodejs and typescript devshell",
+            expected_intent: NixIntent::FlakeTemplate,
+            expected_substrings: &["devShells", "nodejs"],
+            forbidden_substrings: &["python311"],
+            require_parse: true,
+        },
+        // ── Tricky cases — multi-keyword overlap ──
+        NixProblem {
+            prompt: "set up rust dev environment with sccache",
+            expected_intent: NixIntent::DevShell,
+            expected_substrings: &["rustc", "sccache", "mkShell"],
+            forbidden_substrings: &["python", "nodejs"],
+            require_parse: true,
+        },
+        NixProblem {
+            prompt: "enable nginx and open ports 80 and 443",
+            // Service should win — nginx + the firewall is part of the service idiom
+            expected_intent: NixIntent::Service,
+            expected_substrings: &["services.nginx", "allowedTCPPorts", "80", "443"],
+            forbidden_substrings: &[],
+            require_parse: true,
+        },
+        NixProblem {
+            prompt: "configure postgresql service",
+            expected_intent: NixIntent::Service,
+            expected_substrings: &["services.postgresql", "enable"],
+            forbidden_substrings: &["pgvector", "postgis"],
+            require_parse: true,
+        },
+        NixProblem {
+            prompt: "open firewall port 22000",
+            expected_intent: NixIntent::Networking,
+            expected_substrings: &["allowedTCPPorts", "22000"],
+            forbidden_substrings: &[],
+            require_parse: true,
+        },
+        // ── Out of distribution — should still classify cleanly ──
+        NixProblem {
+            prompt: "what is the meaning of life",
+            expected_intent: NixIntent::Generic,
+            expected_substrings: &[],
+            forbidden_substrings: &["services", "hardware", "nvidia", "users"],
+            require_parse: true,
+        },
     ]
 }
 
