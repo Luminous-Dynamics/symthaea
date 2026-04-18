@@ -5,6 +5,11 @@ edition = "2021"
 license = "AGPL-3.0-or-later"
 description = "Split-screen demo: Φ-gated continuous safety gradient vs ISO/TS 15066 binary SSM"
 
+# Standalone package — excluded from symtropy workspace (which has Bevy runtime
+# deps this demo pulls in separately). Empty table marks it non-member so Cargo
+# doesn't try to inherit from /srv/luminous-dynamics/symtropy/Cargo.toml.
+[workspace]
+
 [[bin]]
 name = "manipulator-demo"
 path = "src/main.rs"
