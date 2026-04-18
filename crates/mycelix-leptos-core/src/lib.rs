@@ -23,6 +23,7 @@
 //! - [`TelemetryLine`] — Horizontal sparkline strip for streaming metrics (complements StatCard)
 //! - [`GraphNode`] + [`GraphEdge`] — Relational graph primitives (kinship, reciprocity, credentials)
 //! - [`FlowIndicator`] — Animated pulse showing cross-cluster dispatch / value flow
+//! - [`Showcase`] — Reference-impl page exercising every primitive on one cohesive scene
 //!
 //! # Providers
 //!
@@ -62,6 +63,7 @@ pub mod local_identity;
 pub mod modal;
 pub mod progress_bar;
 pub mod search_bar;
+pub mod showcase;
 pub mod sovereign_radar;
 pub mod spore_bridge;
 pub mod stat_card;
@@ -131,6 +133,7 @@ pub use local_identity::{
 };
 pub use modal::{ConfirmDialog, Modal, ModalSize};
 pub use search_bar::SearchBar;
+pub use showcase::Showcase;
 pub use sovereign_radar::{SovereignRadar, SovereignRadarSize};
 pub use spore_bridge::{provide_spore_bridge, use_spore, SporeState};
 pub use tabs::{TabPanel, Tabs};
