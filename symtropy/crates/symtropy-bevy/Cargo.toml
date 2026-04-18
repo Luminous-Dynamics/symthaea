@@ -34,6 +34,9 @@ debug-gizmos = []
 # symtropy-consciousness-physics; declare it here as a dev-dep so tests can
 # import it without adding a runtime dep.
 symthaea-consciousness-equation = { version = "0.1.0", path = "../../../symthaea/crates/symthaea-consciousness-equation" }
+# Used by `pendulum_swarm_3d` and `_4d` examples for opinionated camera +
+# light + clear-color scaffolding. Permissive (Apache/MIT) sibling crate.
+symtropy-bevy-scene = { version = "0.1.0", path = "../symtropy-bevy-scene" }
 # Examples (e.g., pendulum_swarm in PENDULUM_CAPTURE_DIR mode) use
 # `Screenshot::primary_window()` + `save_to_disk` which needs PNG support.
 # `bevy_ui` + `bevy_text` + `default_font` are used by `pendulum_swarm_4d`

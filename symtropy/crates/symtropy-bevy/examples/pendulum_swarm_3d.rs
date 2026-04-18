@@ -22,6 +22,7 @@ use bevy::render::view::screenshot::{save_to_disk, Screenshot};
 use bevy::window::PrimaryWindow;
 use symthaea_consciousness_equation::ConsciousnessInputs;
 use symtropy_bevy::{PhysicsBody, SymtropyPhysics, SymtropyPhysicsPlugin};
+use symtropy_bevy_scene::{fixed_camera, SymtropyScenePlugin};
 use symtropy_math::{Point, Sphere as PhysicsSphere};
 use symtropy_physics::constraint::DistanceConstraint;
 use symtropy_physics::{BodyHandle, RigidBody};
@@ -86,15 +87,10 @@ fn main() {
         }),
         ..default()
     }))
-    .insert_resource(ClearColor(Color::srgb(0.04, 0.04, 0.06)))
-    .insert_resource(bevy::light::GlobalAmbientLight {
-        color: Color::srgb(0.8, 0.85, 1.0),
-        brightness: 200.0,
-        ..default()
-    })
     .insert_resource(GridHandles::default())
+    .add_plugins(SymtropyScenePlugin::default())
     .add_plugins(SymtropyPhysicsPlugin::<3>::with_gravity([0.0, -9.81, 0.0]))
-    .add_systems(Startup, (setup_scene, spawn_swarm))
+    .add_systems(Startup, (setup_camera, spawn_swarm))
     .add_systems(
         FixedUpdate,
         (update_phi_from_neighborhood, phi_modulates_damping).chain(),
@@ -109,23 +105,13 @@ fn main() {
     app.run();
 }
 
-fn setup_scene(mut commands: Commands) {
+fn setup_camera(mut commands: Commands) {
     // Camera: positioned to see the grid hanging below the pivot plane (y=0)
-    // with clear depth perception from the front.
-    commands.spawn((
-        Camera3d::default(),
-        Transform::from_xyz(0.0, 1.5, 6.0).looking_at(Vec3::new(0.0, -1.0, 0.0), Vec3::Y),
-    ));
-
-    // Sun light from upper-front-right angle — sphere shading reads as 3D.
-    commands.spawn((
-        DirectionalLight {
-            illuminance: 8_000.0,
-            color: Color::linear_rgb(1.0, 0.98, 0.92),
-            shadows_enabled: false,
-            ..default()
-        },
-        Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, -0.7, 0.5, 0.0)),
+    // with clear depth perception from the front. ClearColor + ambient + sun
+    // are now handled by SymtropyScenePlugin.
+    commands.spawn(fixed_camera(
+        Vec3::new(0.0, 1.5, 6.0),
+        Vec3::new(0.0, -1.0, 0.0),
     ));
 }
 
