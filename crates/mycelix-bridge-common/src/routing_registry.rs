@@ -120,12 +120,7 @@ pub const CIVIC_LOCAL_ZOMES: &[&str] = &[
 ];
 
 /// Zomes allowed for local dispatch within the Music cluster.
-pub const MUSIC_LOCAL_ZOMES: &[&str] = &[
-    "catalog",
-    "plays",
-    "balances",
-    "trust",
-];
+pub const MUSIC_LOCAL_ZOMES: &[&str] = &["catalog", "plays", "balances", "trust"];
 
 /// Zomes allowed for local dispatch within the Hearth cluster.
 pub const HEARTH_LOCAL_ZOMES: &[&str] = &[
@@ -142,11 +137,7 @@ pub const HEARTH_LOCAL_ZOMES: &[&str] = &[
 ];
 
 /// Zomes allowed for local dispatch within the Personal cluster.
-pub const PERSONAL_LOCAL_ZOMES: &[&str] = &[
-    "identity_vault",
-    "health_vault",
-    "credential_wallet",
-];
+pub const PERSONAL_LOCAL_ZOMES: &[&str] = &["identity_vault", "health_vault", "credential_wallet"];
 
 // ============================================================================
 // Commons sub-cluster partitioning
@@ -255,11 +246,7 @@ pub const KNOWLEDGE_LOCAL_ZOMES: &[&str] = &[
 ];
 
 /// Zomes allowed for local dispatch within the Climate cluster.
-pub const CLIMATE_LOCAL_ZOMES: &[&str] = &[
-    "carbon",
-    "projects",
-    "bridge",
-];
+pub const CLIMATE_LOCAL_ZOMES: &[&str] = &["carbon", "projects", "bridge"];
 
 /// Zomes allowed for local dispatch within the Manufacturing cluster.
 pub const MANUFACTURING_LOCAL_ZOMES: &[&str] = &[
@@ -359,26 +346,13 @@ pub const GOVERNANCE_LOCAL_ZOMES: &[&str] = &[
 ];
 
 /// Zomes allowed for local dispatch within the Cafe cluster.
-pub const CAFE_LOCAL_ZOMES: &[&str] = &[
-    "cafe_pos",
-    "cafe_inventory",
-    "cafe_roster",
-    "cafe_bridge",
-];
+pub const CAFE_LOCAL_ZOMES: &[&str] = &["cafe_pos", "cafe_inventory", "cafe_roster", "cafe_bridge"];
 
 /// Zomes allowed for local dispatch within the Atlas cluster.
-pub const ATLAS_LOCAL_ZOMES: &[&str] = &[
-    "atlas_sites",
-    "atlas_infrastructure",
-    "atlas_bridge",
-];
+pub const ATLAS_LOCAL_ZOMES: &[&str] = &["atlas_sites", "atlas_infrastructure", "atlas_bridge"];
 
 /// Zomes allowed for local dispatch within the Attribution cluster.
-pub const ATTRIBUTION_LOCAL_ZOMES: &[&str] = &[
-    "reciprocity",
-    "registry",
-    "usage",
-];
+pub const ATTRIBUTION_LOCAL_ZOMES: &[&str] = &["reciprocity", "registry", "usage"];
 
 /// Zomes allowed for local dispatch within the Core cluster (0TML federated learning).
 pub const CORE_LOCAL_ZOMES: &[&str] = &[
@@ -391,12 +365,7 @@ pub const CORE_LOCAL_ZOMES: &[&str] = &[
 ];
 
 /// Zomes allowed for local dispatch within the DeSci cluster (REST API modules).
-pub const DESCI_LOCAL_ZOMES: &[&str] = &[
-    "claims",
-    "query",
-    "system",
-    "trust",
-];
+pub const DESCI_LOCAL_ZOMES: &[&str] = &["claims", "query", "system", "trust"];
 
 /// Zomes allowed for local dispatch within the Mail cluster (PQC-encrypted decentralized email).
 pub const MAIL_LOCAL_ZOMES: &[&str] = &[
@@ -429,11 +398,7 @@ pub const MARKETPLACE_LOCAL_ZOMES: &[&str] = &[
 ];
 
 /// Zomes allowed for local dispatch within the Position cluster (GPS-without-GPS).
-pub const POSITION_LOCAL_ZOMES: &[&str] = &[
-    "anchor_registry",
-    "position_estimates",
-    "ranging",
-];
+pub const POSITION_LOCAL_ZOMES: &[&str] = &["anchor_registry", "position_estimates", "ranging"];
 
 /// Zomes allowed for local dispatch within the Space cluster (orbital mechanics).
 pub const SPACE_LOCAL_ZOMES: &[&str] = &[
@@ -574,38 +539,22 @@ const PERSONAL_TO_CIVIC: &[&str] = &["civic_bridge"];
 const PERSONAL_TO_GOVERNANCE: &[&str] = &["governance_bridge"];
 
 /// Identity-side zomes that personal-bridge is allowed to call cross-cluster.
-const PERSONAL_TO_IDENTITY: &[&str] = &[
-    "identity_bridge",
-    "did_registry",
-    "verifiable_credential",
-];
+const PERSONAL_TO_IDENTITY: &[&str] = &["identity_bridge", "did_registry", "verifiable_credential"];
 
 // --- Group A: Routes already implemented in bridge code but not previously registered ---
 
 /// Governance-side zomes that finance-bridge is allowed to call cross-cluster.
-const FINANCE_TO_GOVERNANCE: &[&str] = &[
-    "governance_bridge",
-    "proposals",
-    "voting",
-    "councils",
-];
+const FINANCE_TO_GOVERNANCE: &[&str] = &["governance_bridge", "proposals", "voting", "councils"];
 
 /// Personal-side zomes that governance-bridge is allowed to call cross-cluster.
 const GOVERNANCE_TO_PERSONAL: &[&str] = &["personal_bridge"];
 
 /// Identity-side zomes that governance-bridge is allowed to call cross-cluster.
-const GOVERNANCE_TO_IDENTITY: &[&str] = &[
-    "identity_bridge",
-    "did_registry",
-    "verifiable_credential",
-];
+const GOVERNANCE_TO_IDENTITY: &[&str] =
+    &["identity_bridge", "did_registry", "verifiable_credential"];
 
 /// Finance-side zomes that energy-bridge is allowed to call cross-cluster.
-const ENERGY_TO_FINANCE: &[&str] = &[
-    "finance_bridge",
-    "payments",
-    "staking",
-];
+const ENERGY_TO_FINANCE: &[&str] = &["finance_bridge", "payments", "staking"];
 
 /// Supplychain-side zomes that energy-bridge is allowed to call cross-cluster.
 const ENERGY_TO_SUPPLYCHAIN: &[&str] = &[
@@ -622,10 +571,7 @@ const CLIMATE_TO_SUPPLYCHAIN: &[&str] = &[
 ];
 
 /// Commons-side zomes that manufacturing-bridge is allowed to call cross-cluster.
-const MANUFACTURING_TO_COMMONS: &[&str] = &[
-    "commons_bridge",
-    "resource_mesh",
-];
+const MANUFACTURING_TO_COMMONS: &[&str] = &["commons_bridge", "resource_mesh"];
 
 /// Supplychain-side zomes that manufacturing-bridge is allowed to call cross-cluster.
 const MANUFACTURING_TO_SUPPLYCHAIN: &[&str] = &[
@@ -645,52 +591,25 @@ const GOVERNANCE_TO_COMMONS: &[&str] = &[
 ];
 
 /// Civic-side zomes that governance-bridge is allowed to call cross-cluster.
-const GOVERNANCE_TO_CIVIC: &[&str] = &[
-    "civic_bridge",
-    "justice_cases",
-    "emergency_coordination",
-];
+const GOVERNANCE_TO_CIVIC: &[&str] = &["civic_bridge", "justice_cases", "emergency_coordination"];
 
 /// Finance-side zomes that governance-bridge is allowed to call cross-cluster.
-const GOVERNANCE_TO_FINANCE: &[&str] = &[
-    "finance_bridge",
-    "treasury",
-    "payments",
-];
+const GOVERNANCE_TO_FINANCE: &[&str] = &["finance_bridge", "treasury", "payments"];
 
 /// Commons-side zomes that finance-bridge is allowed to call cross-cluster.
-const FINANCE_TO_COMMONS: &[&str] = &[
-    "commons_bridge",
-    "housing_finances",
-    "mutualaid_pools",
-];
+const FINANCE_TO_COMMONS: &[&str] = &["commons_bridge", "housing_finances", "mutualaid_pools"];
 
 /// Civic-side zomes that finance-bridge is allowed to call cross-cluster.
-const FINANCE_TO_CIVIC: &[&str] = &[
-    "civic_bridge",
-    "justice_enforcement",
-];
+const FINANCE_TO_CIVIC: &[&str] = &["civic_bridge", "justice_enforcement"];
 
 /// Finance-side zomes that civic-bridge is allowed to call cross-cluster.
-const CIVIC_TO_FINANCE: &[&str] = &[
-    "finance_bridge",
-    "payments",
-    "treasury",
-];
+const CIVIC_TO_FINANCE: &[&str] = &["finance_bridge", "payments", "treasury"];
 
 /// Hearth-side zomes that civic-bridge is allowed to call cross-cluster.
-const CIVIC_TO_HEARTH: &[&str] = &[
-    "hearth_bridge",
-    "hearth_care",
-    "hearth_emergency",
-];
+const CIVIC_TO_HEARTH: &[&str] = &["hearth_bridge", "hearth_care", "hearth_emergency"];
 
 /// Hearth-side zomes that commons-bridge is allowed to call cross-cluster.
-const COMMONS_TO_HEARTH: &[&str] = &[
-    "hearth_bridge",
-    "hearth_care",
-    "hearth_resources",
-];
+const COMMONS_TO_HEARTH: &[&str] = &["hearth_bridge", "hearth_care", "hearth_resources"];
 
 // --- Group C: Cross-domain integration routes ---
 
@@ -770,6 +689,37 @@ const ATTRIBUTION_TO_IDENTITY: &[&str] = &["identity_bridge", "did_registry"];
 /// Finance-side zomes that attribution is allowed to call cross-cluster (reciprocity payments).
 const ATTRIBUTION_TO_FINANCE: &[&str] = &["finance_bridge", "payments"];
 
+// --- Group E: Sovereign Profile collector routes ---
+// identity-bridge aggregates 8D sovereign profile scores from sibling clusters.
+// These routes were active in identity-bridge code but not previously declared here.
+
+/// Knowledge-side zomes that identity-bridge queries for epistemic integrity score.
+const IDENTITY_TO_KNOWLEDGE: &[&str] = &["claims"];
+
+/// Attribution-side zomes that identity-bridge queries for stewardship-care score.
+const IDENTITY_TO_ATTRIBUTION: &[&str] = &["reciprocity"];
+
+/// Energy-side zomes that identity-bridge queries for thermodynamic-yield score.
+const IDENTITY_TO_ENERGY: &[&str] = &["grid"];
+
+// --- Group F: Finance outbound routes not previously declared ---
+
+/// Energy-side zomes that finance-bridge is allowed to call for project reconciliation.
+const FINANCE_TO_ENERGY: &[&str] = &["energy_bridge"];
+
+/// Hearth-side zomes that finance-payments queries for membership gating.
+const FINANCE_TO_HEARTH: &[&str] = &["hearth_bridge"];
+
+/// Identity-side zomes that finance uses for consciousness tier gating
+/// (price-oracle + shared participant checks).
+const FINANCE_TO_IDENTITY: &[&str] = &["identity_bridge", "consciousness_gating"];
+
+// --- Group G: Climate → Praxis (stake-claim credential verification) ---
+
+/// Praxis-side zomes that climate-bridge queries for credential verification
+/// when validating climate-stake educational prerequisites.
+const CLIMATE_TO_PRAXIS: &[&str] = &["credential_zome"];
+
 // ============================================================================
 // Public API
 // ============================================================================
@@ -785,7 +735,10 @@ pub const fn role_name(cluster: CrossClusterRole) -> &'static str {
 ///
 /// Returns an empty slice if there is no registered route between the two clusters,
 /// or if `initiator == target` (use the local allowlist for intra-cluster dispatch).
-pub const fn get_allowed_zomes(initiator: CrossClusterRole, target: CrossClusterRole) -> &'static [&'static str] {
+pub const fn get_allowed_zomes(
+    initiator: CrossClusterRole,
+    target: CrossClusterRole,
+) -> &'static [&'static str] {
     match (initiator, target) {
         // Commons outbound
         (CrossClusterRole::Commons, CrossClusterRole::Civic) => COMMONS_TO_CIVIC,
@@ -815,6 +768,9 @@ pub const fn get_allowed_zomes(initiator: CrossClusterRole, target: CrossCluster
         (CrossClusterRole::Finance, CrossClusterRole::Governance) => FINANCE_TO_GOVERNANCE,
         (CrossClusterRole::Finance, CrossClusterRole::Commons) => FINANCE_TO_COMMONS,
         (CrossClusterRole::Finance, CrossClusterRole::Civic) => FINANCE_TO_CIVIC,
+        (CrossClusterRole::Finance, CrossClusterRole::Energy) => FINANCE_TO_ENERGY,
+        (CrossClusterRole::Finance, CrossClusterRole::Hearth) => FINANCE_TO_HEARTH,
+        (CrossClusterRole::Finance, CrossClusterRole::Identity) => FINANCE_TO_IDENTITY,
 
         // Governance outbound
         (CrossClusterRole::Governance, CrossClusterRole::Personal) => GOVERNANCE_TO_PERSONAL,
@@ -828,6 +784,9 @@ pub const fn get_allowed_zomes(initiator: CrossClusterRole, target: CrossCluster
         (CrossClusterRole::Identity, CrossClusterRole::Civic) => IDENTITY_TO_CIVIC,
         (CrossClusterRole::Identity, CrossClusterRole::Finance) => IDENTITY_TO_FINANCE,
         (CrossClusterRole::Identity, CrossClusterRole::Governance) => IDENTITY_TO_GOVERNANCE,
+        (CrossClusterRole::Identity, CrossClusterRole::Knowledge) => IDENTITY_TO_KNOWLEDGE,
+        (CrossClusterRole::Identity, CrossClusterRole::Attribution) => IDENTITY_TO_ATTRIBUTION,
+        (CrossClusterRole::Identity, CrossClusterRole::Energy) => IDENTITY_TO_ENERGY,
 
         // Energy outbound
         (CrossClusterRole::Energy, CrossClusterRole::Finance) => ENERGY_TO_FINANCE,
@@ -835,10 +794,13 @@ pub const fn get_allowed_zomes(initiator: CrossClusterRole, target: CrossCluster
 
         // Climate outbound
         (CrossClusterRole::Climate, CrossClusterRole::Supplychain) => CLIMATE_TO_SUPPLYCHAIN,
+        (CrossClusterRole::Climate, CrossClusterRole::Praxis) => CLIMATE_TO_PRAXIS,
 
         // Manufacturing outbound
         (CrossClusterRole::Manufacturing, CrossClusterRole::Commons) => MANUFACTURING_TO_COMMONS,
-        (CrossClusterRole::Manufacturing, CrossClusterRole::Supplychain) => MANUFACTURING_TO_SUPPLYCHAIN,
+        (CrossClusterRole::Manufacturing, CrossClusterRole::Supplychain) => {
+            MANUFACTURING_TO_SUPPLYCHAIN
+        }
 
         // Health outbound
         (CrossClusterRole::Health, CrossClusterRole::Personal) => HEALTH_TO_PERSONAL,
@@ -1002,7 +964,10 @@ mod tests {
     #[test]
     fn commons_sub_clusters_partition_local() {
         // LAND + CARE must equal LOCAL (no overlap, no gaps)
-        let mut combined: Vec<&&str> = COMMONS_LAND_ZOMES.iter().chain(COMMONS_CARE_ZOMES.iter()).collect();
+        let mut combined: Vec<&&str> = COMMONS_LAND_ZOMES
+            .iter()
+            .chain(COMMONS_CARE_ZOMES.iter())
+            .collect();
         combined.sort();
         let mut local: Vec<&&str> = COMMONS_LOCAL_ZOMES.iter().collect();
         local.sort();
@@ -1374,36 +1339,82 @@ mod tests {
     #[test]
     fn get_local_zomes_returns_expected() {
         // All 29 clusters now have local zome lists
-        assert_eq!(get_local_zomes(CrossClusterRole::Commons).unwrap().len(), 40);
+        assert_eq!(
+            get_local_zomes(CrossClusterRole::Commons).unwrap().len(),
+            40
+        );
         assert_eq!(get_local_zomes(CrossClusterRole::Civic).unwrap().len(), 17);
         assert_eq!(get_local_zomes(CrossClusterRole::Hearth).unwrap().len(), 10);
-        assert_eq!(get_local_zomes(CrossClusterRole::Personal).unwrap().len(), 3);
+        assert_eq!(
+            get_local_zomes(CrossClusterRole::Personal).unwrap().len(),
+            3
+        );
         assert_eq!(get_local_zomes(CrossClusterRole::Music).unwrap().len(), 4);
         assert_eq!(get_local_zomes(CrossClusterRole::Health).unwrap().len(), 16);
         assert_eq!(get_local_zomes(CrossClusterRole::Energy).unwrap().len(), 5);
-        assert_eq!(get_local_zomes(CrossClusterRole::Knowledge).unwrap().len(), 8);
+        assert_eq!(
+            get_local_zomes(CrossClusterRole::Knowledge).unwrap().len(),
+            8
+        );
         assert_eq!(get_local_zomes(CrossClusterRole::Climate).unwrap().len(), 3);
         assert_eq!(get_local_zomes(CrossClusterRole::Craft).unwrap().len(), 6);
-        assert_eq!(get_local_zomes(CrossClusterRole::Manufacturing).unwrap().len(), 6);
-        assert_eq!(get_local_zomes(CrossClusterRole::Supplychain).unwrap().len(), 8);
+        assert_eq!(
+            get_local_zomes(CrossClusterRole::Manufacturing)
+                .unwrap()
+                .len(),
+            6
+        );
+        assert_eq!(
+            get_local_zomes(CrossClusterRole::Supplychain)
+                .unwrap()
+                .len(),
+            8
+        );
         assert_eq!(get_local_zomes(CrossClusterRole::Praxis).unwrap().len(), 12);
         assert_eq!(get_local_zomes(CrossClusterRole::Legacy).unwrap().len(), 5);
-        assert_eq!(get_local_zomes(CrossClusterRole::Identity).unwrap().len(), 12);
+        assert_eq!(
+            get_local_zomes(CrossClusterRole::Identity).unwrap().len(),
+            12
+        );
         assert_eq!(get_local_zomes(CrossClusterRole::Finance).unwrap().len(), 8);
-        assert_eq!(get_local_zomes(CrossClusterRole::Governance).unwrap().len(), 8);
+        assert_eq!(
+            get_local_zomes(CrossClusterRole::Governance).unwrap().len(),
+            8
+        );
         assert_eq!(get_local_zomes(CrossClusterRole::Cafe).unwrap().len(), 4);
         assert_eq!(get_local_zomes(CrossClusterRole::Atlas).unwrap().len(), 3);
-        assert_eq!(get_local_zomes(CrossClusterRole::Attribution).unwrap().len(), 3);
+        assert_eq!(
+            get_local_zomes(CrossClusterRole::Attribution)
+                .unwrap()
+                .len(),
+            3
+        );
         assert_eq!(get_local_zomes(CrossClusterRole::Core).unwrap().len(), 6);
         assert_eq!(get_local_zomes(CrossClusterRole::Desci).unwrap().len(), 4);
         assert_eq!(get_local_zomes(CrossClusterRole::Mail).unwrap().len(), 13);
-        assert_eq!(get_local_zomes(CrossClusterRole::Marketplace).unwrap().len(), 9);
-        assert_eq!(get_local_zomes(CrossClusterRole::Position).unwrap().len(), 3);
+        assert_eq!(
+            get_local_zomes(CrossClusterRole::Marketplace)
+                .unwrap()
+                .len(),
+            9
+        );
+        assert_eq!(
+            get_local_zomes(CrossClusterRole::Position).unwrap().len(),
+            3
+        );
         assert_eq!(get_local_zomes(CrossClusterRole::Space).unwrap().len(), 5);
         assert_eq!(get_local_zomes(CrossClusterRole::Lunar).unwrap().len(), 0);
-        assert_eq!(get_local_zomes(CrossClusterRole::MultiworldSim).unwrap().len(), 0);
+        assert_eq!(
+            get_local_zomes(CrossClusterRole::MultiworldSim)
+                .unwrap()
+                .len(),
+            0
+        );
         assert_eq!(get_local_zomes(CrossClusterRole::Portal).unwrap().len(), 0);
-        assert_eq!(get_local_zomes(CrossClusterRole::Workspace).unwrap().len(), 0);
+        assert_eq!(
+            get_local_zomes(CrossClusterRole::Workspace).unwrap().len(),
+            0
+        );
     }
 
     #[test]
@@ -1426,128 +1437,228 @@ mod tests {
         assert!(get_allowed_zomes(CrossClusterRole::Music, CrossClusterRole::Legacy).is_empty());
         assert!(get_allowed_zomes(CrossClusterRole::Climate, CrossClusterRole::Hearth).is_empty());
         assert!(get_allowed_zomes(CrossClusterRole::Lunar, CrossClusterRole::Music).is_empty());
-        assert!(get_allowed_zomes(CrossClusterRole::Commons, CrossClusterRole::Personal).is_empty());
-        assert!(get_allowed_zomes(CrossClusterRole::Finance, CrossClusterRole::Hearth).is_empty());
+        assert!(
+            get_allowed_zomes(CrossClusterRole::Commons, CrossClusterRole::Personal).is_empty()
+        );
+        // Finance → Hearth is now registered (Group F, 2026-04-18); use a still-unregistered pair.
+        assert!(get_allowed_zomes(CrossClusterRole::Hearth, CrossClusterRole::Music).is_empty());
     }
 
     // ---- New route count tests ----
 
     #[test]
     fn finance_to_governance_count() {
-        assert_eq!(get_allowed_zomes(CrossClusterRole::Finance, CrossClusterRole::Governance).len(), 4);
+        assert_eq!(
+            get_allowed_zomes(CrossClusterRole::Finance, CrossClusterRole::Governance).len(),
+            4
+        );
     }
 
     #[test]
     fn governance_to_commons_count() {
-        assert_eq!(get_allowed_zomes(CrossClusterRole::Governance, CrossClusterRole::Commons).len(), 4);
+        assert_eq!(
+            get_allowed_zomes(CrossClusterRole::Governance, CrossClusterRole::Commons).len(),
+            4
+        );
     }
 
     #[test]
     fn governance_to_finance_count() {
-        assert_eq!(get_allowed_zomes(CrossClusterRole::Governance, CrossClusterRole::Finance).len(), 3);
+        assert_eq!(
+            get_allowed_zomes(CrossClusterRole::Governance, CrossClusterRole::Finance).len(),
+            3
+        );
     }
 
     #[test]
     fn identity_outbound_counts() {
-        assert_eq!(get_allowed_zomes(CrossClusterRole::Identity, CrossClusterRole::Commons).len(), 1);
-        assert_eq!(get_allowed_zomes(CrossClusterRole::Identity, CrossClusterRole::Civic).len(), 1);
-        assert_eq!(get_allowed_zomes(CrossClusterRole::Identity, CrossClusterRole::Finance).len(), 1);
-        assert_eq!(get_allowed_zomes(CrossClusterRole::Identity, CrossClusterRole::Governance).len(), 1);
+        assert_eq!(
+            get_allowed_zomes(CrossClusterRole::Identity, CrossClusterRole::Commons).len(),
+            1
+        );
+        assert_eq!(
+            get_allowed_zomes(CrossClusterRole::Identity, CrossClusterRole::Civic).len(),
+            1
+        );
+        assert_eq!(
+            get_allowed_zomes(CrossClusterRole::Identity, CrossClusterRole::Finance).len(),
+            1
+        );
+        assert_eq!(
+            get_allowed_zomes(CrossClusterRole::Identity, CrossClusterRole::Governance).len(),
+            1
+        );
     }
 
     #[test]
     fn health_outbound_counts() {
-        assert_eq!(get_allowed_zomes(CrossClusterRole::Health, CrossClusterRole::Personal).len(), 2);
-        assert_eq!(get_allowed_zomes(CrossClusterRole::Health, CrossClusterRole::Identity).len(), 2);
+        assert_eq!(
+            get_allowed_zomes(CrossClusterRole::Health, CrossClusterRole::Personal).len(),
+            2
+        );
+        assert_eq!(
+            get_allowed_zomes(CrossClusterRole::Health, CrossClusterRole::Identity).len(),
+            2
+        );
     }
 
     #[test]
     fn energy_outbound_counts() {
-        assert_eq!(get_allowed_zomes(CrossClusterRole::Energy, CrossClusterRole::Finance).len(), 3);
-        assert_eq!(get_allowed_zomes(CrossClusterRole::Energy, CrossClusterRole::Supplychain).len(), 3);
+        assert_eq!(
+            get_allowed_zomes(CrossClusterRole::Energy, CrossClusterRole::Finance).len(),
+            3
+        );
+        assert_eq!(
+            get_allowed_zomes(CrossClusterRole::Energy, CrossClusterRole::Supplychain).len(),
+            3
+        );
     }
 
     #[test]
     fn manufacturing_outbound_counts() {
-        assert_eq!(get_allowed_zomes(CrossClusterRole::Manufacturing, CrossClusterRole::Commons).len(), 2);
-        assert_eq!(get_allowed_zomes(CrossClusterRole::Manufacturing, CrossClusterRole::Supplychain).len(), 3);
+        assert_eq!(
+            get_allowed_zomes(CrossClusterRole::Manufacturing, CrossClusterRole::Commons).len(),
+            2
+        );
+        assert_eq!(
+            get_allowed_zomes(
+                CrossClusterRole::Manufacturing,
+                CrossClusterRole::Supplychain
+            )
+            .len(),
+            3
+        );
     }
 
     #[test]
     fn praxis_to_identity_count() {
-        assert_eq!(get_allowed_zomes(CrossClusterRole::Praxis, CrossClusterRole::Identity).len(), 2);
+        assert_eq!(
+            get_allowed_zomes(CrossClusterRole::Praxis, CrossClusterRole::Identity).len(),
+            2
+        );
     }
 
     // ---- is_allowed positive tests for new routes ----
 
     #[test]
     fn is_allowed_finance_to_governance_proposals() {
-        assert!(is_allowed(CrossClusterRole::Finance, CrossClusterRole::Governance, "proposals"));
+        assert!(is_allowed(
+            CrossClusterRole::Finance,
+            CrossClusterRole::Governance,
+            "proposals"
+        ));
     }
 
     #[test]
     fn is_allowed_governance_to_commons_property_registry() {
-        assert!(is_allowed(CrossClusterRole::Governance, CrossClusterRole::Commons, "property_registry"));
+        assert!(is_allowed(
+            CrossClusterRole::Governance,
+            CrossClusterRole::Commons,
+            "property_registry"
+        ));
     }
 
     #[test]
     fn is_allowed_identity_to_commons_bridge() {
-        assert!(is_allowed(CrossClusterRole::Identity, CrossClusterRole::Commons, "commons_bridge"));
+        assert!(is_allowed(
+            CrossClusterRole::Identity,
+            CrossClusterRole::Commons,
+            "commons_bridge"
+        ));
     }
 
     #[test]
     fn is_allowed_health_to_personal_health_vault() {
-        assert!(is_allowed(CrossClusterRole::Health, CrossClusterRole::Personal, "health_vault"));
+        assert!(is_allowed(
+            CrossClusterRole::Health,
+            CrossClusterRole::Personal,
+            "health_vault"
+        ));
     }
 
     #[test]
     fn is_allowed_praxis_to_identity_verifiable_credential() {
-        assert!(is_allowed(CrossClusterRole::Praxis, CrossClusterRole::Identity, "verifiable_credential"));
+        assert!(is_allowed(
+            CrossClusterRole::Praxis,
+            CrossClusterRole::Identity,
+            "verifiable_credential"
+        ));
     }
 
     // ---- New cluster route count tests ----
 
     #[test]
     fn mail_to_identity_count() {
-        assert_eq!(get_allowed_zomes(CrossClusterRole::Mail, CrossClusterRole::Identity).len(), 3);
+        assert_eq!(
+            get_allowed_zomes(CrossClusterRole::Mail, CrossClusterRole::Identity).len(),
+            3
+        );
     }
 
     #[test]
     fn marketplace_to_finance_count() {
-        assert_eq!(get_allowed_zomes(CrossClusterRole::Marketplace, CrossClusterRole::Finance).len(), 2);
+        assert_eq!(
+            get_allowed_zomes(CrossClusterRole::Marketplace, CrossClusterRole::Finance).len(),
+            2
+        );
     }
 
     #[test]
     fn space_to_identity_count() {
-        assert_eq!(get_allowed_zomes(CrossClusterRole::Space, CrossClusterRole::Identity).len(), 2);
+        assert_eq!(
+            get_allowed_zomes(CrossClusterRole::Space, CrossClusterRole::Identity).len(),
+            2
+        );
     }
 
     #[test]
     fn attribution_outbound_counts() {
-        assert_eq!(get_allowed_zomes(CrossClusterRole::Attribution, CrossClusterRole::Identity).len(), 2);
-        assert_eq!(get_allowed_zomes(CrossClusterRole::Attribution, CrossClusterRole::Finance).len(), 2);
+        assert_eq!(
+            get_allowed_zomes(CrossClusterRole::Attribution, CrossClusterRole::Identity).len(),
+            2
+        );
+        assert_eq!(
+            get_allowed_zomes(CrossClusterRole::Attribution, CrossClusterRole::Finance).len(),
+            2
+        );
     }
 
     // ---- is_allowed positive tests for new cluster routes ----
 
     #[test]
     fn is_allowed_mail_to_identity_did_registry() {
-        assert!(is_allowed(CrossClusterRole::Mail, CrossClusterRole::Identity, "did_registry"));
+        assert!(is_allowed(
+            CrossClusterRole::Mail,
+            CrossClusterRole::Identity,
+            "did_registry"
+        ));
     }
 
     #[test]
     fn is_allowed_marketplace_to_finance_payments() {
-        assert!(is_allowed(CrossClusterRole::Marketplace, CrossClusterRole::Finance, "payments"));
+        assert!(is_allowed(
+            CrossClusterRole::Marketplace,
+            CrossClusterRole::Finance,
+            "payments"
+        ));
     }
 
     #[test]
     fn is_allowed_space_to_identity_trust_credential() {
-        assert!(is_allowed(CrossClusterRole::Space, CrossClusterRole::Identity, "trust_credential"));
+        assert!(is_allowed(
+            CrossClusterRole::Space,
+            CrossClusterRole::Identity,
+            "trust_credential"
+        ));
     }
 
     #[test]
     fn is_allowed_attribution_to_identity_did_registry() {
-        assert!(is_allowed(CrossClusterRole::Attribution, CrossClusterRole::Identity, "did_registry"));
+        assert!(is_allowed(
+            CrossClusterRole::Attribution,
+            CrossClusterRole::Identity,
+            "did_registry"
+        ));
     }
 
     // ---- Total route count ----
@@ -1562,11 +1673,15 @@ mod tests {
                 }
             }
         }
-        // 51 registered directional routes:
+        // 60 registered directional routes:
         //   36 original + 4 Cafe + 5 new (Mail→Identity, Marketplace→Finance,
         //   Space→Identity, Attribution→Identity, Attribution→Finance)
         //   + 2 additional routes added for Health↔Identity and Praxis
         //   + 4 Craft routes (Craft↔Praxis, Craft→Identity, Identity→Craft)
-        assert_eq!(count, 53, "Expected 53 registered cross-cluster routes");
+        //   + 7 code-vs-registry gap closes (2026-04-18, Groups E/F/G):
+        //     Identity→{Knowledge, Attribution, Energy},
+        //     Finance→{Energy, Hearth, Identity},
+        //     Climate→Praxis
+        assert_eq!(count, 60, "Expected 60 registered cross-cluster routes");
     }
 }
