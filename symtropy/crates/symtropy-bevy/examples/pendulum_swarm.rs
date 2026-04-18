@@ -15,6 +15,7 @@
 use std::collections::HashMap;
 
 use bevy::prelude::*;
+use bevy::render::view::screenshot::{save_to_disk, Screenshot};
 use bevy::window::PrimaryWindow;
 use symthaea_consciousness_equation::ConsciousnessInputs;
 use symtropy_bevy::{PhysicsBody, SymtropyPhysics, SymtropyPhysicsPlugin};
@@ -57,26 +58,53 @@ struct GridHandles {
     map: HashMap<(usize, usize), BodyHandle>,
 }
 
+/// Headless verification mode. Set `PENDULUM_CAPTURE_DIR=/some/dir` before
+/// running to schedule screenshots at fixed real-time intervals and exit
+/// the app afterward. Default behaviour (env unset) is unchanged.
+#[derive(Resource)]
+struct CaptureSchedule {
+    dir: String,
+    schedule: Vec<f32>, // seconds since startup, must be sorted
+    fired: usize,
+    exit_at: f32,
+}
+
+fn capture_schedule_from_env() -> Option<CaptureSchedule> {
+    let dir = std::env::var("PENDULUM_CAPTURE_DIR").ok()?;
+    Some(CaptureSchedule {
+        dir,
+        schedule: vec![1.5, 4.0, 7.0],
+        fired: 0,
+        exit_at: 8.5,
+    })
+}
+
 fn main() {
-    App::new()
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                title: "Symtropy: Pendulum Swarm (Phi-coupled physics)".into(),
-                resolution: bevy::window::WindowResolution::from((1280u32, 720u32)),
-                ..default()
-            }),
+    let mut app = App::new();
+    app.add_plugins(DefaultPlugins.set(WindowPlugin {
+        primary_window: Some(Window {
+            title: "Symtropy: Pendulum Swarm (Phi-coupled physics)".into(),
+            resolution: bevy::window::WindowResolution::from((1280u32, 720u32)),
             ..default()
-        }))
-        .insert_resource(ClearColor(Color::srgb(0.04, 0.04, 0.06)))
-        .insert_resource(GridHandles::default())
-        .add_plugins(SymtropyPhysicsPlugin::<2>::with_gravity([0.0, -981.0]))
-        .add_systems(Startup, (setup_camera, spawn_swarm))
-        .add_systems(
-            FixedUpdate,
-            (update_phi_from_neighborhood, phi_modulates_damping).chain(),
-        )
-        .add_systems(Update, (shock_on_click, color_by_phi, draw_arm_gizmo))
-        .run();
+        }),
+        ..default()
+    }))
+    .insert_resource(ClearColor(Color::srgb(0.04, 0.04, 0.06)))
+    .insert_resource(GridHandles::default())
+    .add_plugins(SymtropyPhysicsPlugin::<2>::with_gravity([0.0, -981.0]))
+    .add_systems(Startup, (setup_camera, spawn_swarm))
+    .add_systems(
+        FixedUpdate,
+        (update_phi_from_neighborhood, phi_modulates_damping).chain(),
+    )
+    .add_systems(Update, (shock_on_click, color_by_phi, draw_arm_gizmo));
+
+    if let Some(sched) = capture_schedule_from_env() {
+        app.insert_resource(sched);
+        app.add_systems(Update, headless_capture);
+    }
+
+    app.run();
 }
 
 fn setup_camera(mut commands: Commands) {
@@ -297,5 +325,28 @@ fn draw_arm_gizmo(mut gizmos: Gizmos, query: Query<(&Pendulum, &Transform)>) {
             t.translation.truncate(),
             Color::srgb(0.4, 0.4, 0.45),
         );
+    }
+}
+
+/// Headless verification: fires screenshots at scheduled times, exits when done.
+fn headless_capture(
+    mut commands: Commands,
+    time: Res<Time<Real>>,
+    mut sched: ResMut<CaptureSchedule>,
+    mut exit: MessageWriter<AppExit>,
+) {
+    let now = time.elapsed_secs();
+    while sched.fired < sched.schedule.len() && now >= sched.schedule[sched.fired] {
+        let label = sched.schedule[sched.fired];
+        let path = format!("{}/pswarm_t{:.1}.png", sched.dir, label);
+        commands
+            .spawn(Screenshot::primary_window())
+            .observe(save_to_disk(path.clone()));
+        info!("queued screenshot: {}", path);
+        sched.fired += 1;
+    }
+    if now >= sched.exit_at {
+        info!("headless capture done — exiting");
+        exit.write(AppExit::Success);
     }
 }
