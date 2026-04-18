@@ -33,6 +33,11 @@ pub mod audio_stream;
 #[cfg(feature = "voice-stt-live")]
 pub use audio_stream::{MicCaptureConfig, MicCaptureHandle};
 
+// Physical-sensor fusion → ContinuousHV (feature-gated).
+// Each sensor subtype is independently gated under `sensor-fusion`.
+#[cfg(feature = "sensor-fusion")]
+pub mod sensor_fusion;
+
 // SHA-256 integrity verification for model weight files
 pub mod model_integrity;
 

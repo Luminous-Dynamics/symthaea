@@ -131,6 +131,16 @@ impl CognitiveLoopService {
             aux_sensor_hvs.push(radio_hv);
         }
 
+        // IMU (sensor-imu): fuse the most-recent injected reading into an
+        // HV and treat it as another additive sensory modality. Skipped if
+        // either the fusion module or the reading is absent.
+        #[cfg(feature = "sensor-imu")]
+        if let (Some(ref fusion), Some(ref reading)) = (&self.imu_fusion, &self.latest_imu_reading)
+        {
+            let imu_chv = fusion.fuse(reading);
+            aux_sensor_hvs.push(crate::hdc::BinaryHV::from_bipolar(&imu_chv.values));
+        }
+
         if !aux_sensor_hvs.is_empty() {
             aux_sensor_hvs.insert(0, encoding.hv16_cached);
             encoding.hv16_cached = crate::hdc::BinaryHV::bundle(&aux_sensor_hvs);
@@ -312,9 +322,7 @@ impl CognitiveLoopService {
                     // dorsal surprise so the system stops re-foveating known regions.
                     // P3-B: Hebbian goal-template learning — recognized patches nudge
                     // the task HV toward what was actually seen (Hebb 1949).
-                    if let Some(ref mut bridge) =
-                        self.sensorimotor.vision_sensory.vision_bridge
-                    {
+                    if let Some(ref mut bridge) = self.sensorimotor.vision_sensory.vision_bridge {
                         for result in &collected {
                             bridge.dampen_patch_surprise(
                                 result.grid_row,

@@ -254,7 +254,19 @@ pub mod math_service;
 #[cfg(feature = "nurture")]
 pub mod nurture_bridge;
 
-#[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))]
+#[cfg(any(
+    feature = "humanoid",
+    feature = "helicopter",
+    feature = "flight",
+    feature = "vehicle",
+    feature = "auv",
+    feature = "manipulator",
+    feature = "exoskeleton",
+    feature = "surgical",
+    feature = "orbital",
+    feature = "quadruped",
+    feature = "phone"
+))]
 pub mod motor_bridge;
 
 #[cfg(feature = "safety-agents")]
@@ -574,6 +586,18 @@ pub struct CognitiveLoopService {
     /// Opt-in: call `start_stt_capture()` after construction.
     #[cfg(feature = "voice-stt-live")]
     pub(crate) stt_capture: Option<crate::perception::MicCaptureHandle>,
+
+    /// Optional IMU fusion module. When `Some`, the perception phase
+    /// fuses `latest_imu_reading` into an auxiliary sensory HV and bundles
+    /// it into the input encoding alongside STT/radio. Opt-in.
+    #[cfg(feature = "sensor-imu")]
+    pub(crate) imu_fusion: Option<Box<dyn crate::perception::sensor_fusion::ImuFusion>>,
+
+    /// Most recent IMU reading. Pushed from an external source (hardware
+    /// driver, ADB bridge, MAVLink adapter) via `inject_imu_reading()`.
+    /// The perception phase reads it each cycle.
+    #[cfg(feature = "sensor-imu")]
+    pub(crate) latest_imu_reading: Option<crate::perception::sensor_fusion::ImuReading>,
 
     /// Nurture/attachment bridge — Bowlby attachment -> neuromodulator modulation.
     /// When enabled, models caregiver presence/absence and modulates oxytocin, NE,

@@ -572,6 +572,13 @@ rdp-x11 = ["rdp-server"]                   # X11 SHM capture + XTest injection (
 voice-tts = ["ort", "hound", "hf-hub", "espeak-rs"]  # TTS with Kokoro (ONNX) + espeak-ng G2P
 voice-stt = ["symthaea-stt", "hound"]                 # STT with symthaea-stt crate (HDC + LTC + CfC)
 voice-stt-live = ["voice-stt", "cpal", "ringbuf"]     # Live microphone capture → STT → perception HV (cpal input + ring buffer)
+
+# ── Sensor Fusion (real sensors → perception HV) ────────────────────
+# Bridges physical/simulated sensor readings into the cognitive loop's
+# perception phase. Each sensor is independently gated so a platform
+# only pulls in the code for sensors it actually has.
+sensor-fusion = []        # Core SensorFusion trait + ContinuousHV bundler
+sensor-imu    = ["sensor-fusion"]  # 6-axis accel + gyro role-filler fusion
 audio = ["voice-tts", "rodio"]                        # Full audio including playback
 vocal-tract = ["hound", "symthaea-vocal-tract/hound"]  # LTC-driven articulatory synthesis pipeline + WAV output
 neural-vocoder = ["ort", "vocal-tract", "symthaea-vocal-tract/mel-conversion"]  # BigVGAN ONNX neural vocoder (Path A)

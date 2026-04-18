@@ -251,6 +251,39 @@ impl CognitiveLoopService {
         self.stt_capture.is_some()
     }
 
+    /// Install an IMU fusion module. Subsequent calls to `inject_imu_reading`
+    /// will be fused each cycle and bundled into the perception HV. Replaces
+    /// any previously-installed fusion.
+    #[cfg(feature = "sensor-imu")]
+    pub fn install_imu_fusion(
+        &mut self,
+        fusion: Box<dyn crate::perception::sensor_fusion::ImuFusion>,
+    ) {
+        self.imu_fusion = Some(fusion);
+    }
+
+    /// Remove the IMU fusion module. Pending readings are discarded.
+    #[cfg(feature = "sensor-imu")]
+    pub fn clear_imu_fusion(&mut self) {
+        self.imu_fusion = None;
+        self.latest_imu_reading = None;
+    }
+
+    /// Push a fresh IMU reading into the cognitive loop. Latest-wins: the
+    /// perception phase reads whatever reading was most recently injected.
+    /// No-op if no `ImuFusion` is installed (the reading is still stored
+    /// so a fusion installed later picks up the most recent value).
+    #[cfg(feature = "sensor-imu")]
+    pub fn inject_imu_reading(&mut self, reading: crate::perception::sensor_fusion::ImuReading) {
+        self.latest_imu_reading = Some(reading);
+    }
+
+    /// Whether an IMU fusion is currently installed.
+    #[cfg(feature = "sensor-imu")]
+    pub fn imu_fusion_active(&self) -> bool {
+        self.imu_fusion.is_some()
+    }
+
     /// Build a capability card from the current config and runtime stats.
     ///
     /// The card captures substrate type, cycle frequency, Phi, enabled features,

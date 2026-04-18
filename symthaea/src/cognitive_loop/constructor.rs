@@ -82,13 +82,18 @@ struct OptionalMonitors {
     predictive_mind: Option<crate::consciousness::predictive_processing::PredictiveMind>,
     cross_modal_binder: Option<crate::consciousness::cross_modal_binding::CrossModalBinder>,
     affective_bridge: Option<crate::brain::affective_bridge::AffectiveBridge>,
-    consciousness_thermodynamics: Option<crate::consciousness::consciousness_thermodynamics::ConsciousnessThermodynamicsAnalyzer>,
-    phenomenal_binding: Option<crate::consciousness::phenomenal_binding::TemporalSynchronizationAnalyzer>,
-    hierarchical_free_energy: Option<crate::consciousness::hierarchical_free_energy::HierarchicalFreeEnergy>,
+    consciousness_thermodynamics: Option<
+        crate::consciousness::consciousness_thermodynamics::ConsciousnessThermodynamicsAnalyzer,
+    >,
+    phenomenal_binding:
+        Option<crate::consciousness::phenomenal_binding::TemporalSynchronizationAnalyzer>,
+    hierarchical_free_energy:
+        Option<crate::consciousness::hierarchical_free_energy::HierarchicalFreeEnergy>,
     contextual_weights: Option<crate::consciousness::contextual_weights::ContextualWeights>,
     phi_attention: Option<crate::consciousness::phi_attention::AdaptiveThresholds>,
     negation_detector: Option<crate::consciousness::negation_detector::NegationDetector>,
-    metacognitive_monitor: Option<crate::consciousness::metacognitive_monitoring::MetacognitiveMonitor>,
+    metacognitive_monitor:
+        Option<crate::consciousness::metacognitive_monitoring::MetacognitiveMonitor>,
     safety_gateway: Option<crate::safety::SafetyGateway>,
 }
 
@@ -154,16 +159,20 @@ fn build_optional_monitors(config: &CognitiveLoopConfig) -> OptionalMonitors {
         None
     };
     let predictive_mind = if config.enable_predictive_processing {
-        Some(crate::consciousness::predictive_processing::PredictiveMind::new(
-            crate::consciousness::predictive_processing::PredictiveConfig::default(),
-        ))
+        Some(
+            crate::consciousness::predictive_processing::PredictiveMind::new(
+                crate::consciousness::predictive_processing::PredictiveConfig::default(),
+            ),
+        )
     } else {
         None
     };
     let cross_modal_binder = if config.enable_cross_modal_binding {
-        Some(crate::consciousness::cross_modal_binding::CrossModalBinder::new(
-            crate::consciousness::cross_modal_binding::CrossModalBindingConfig::default(),
-        ))
+        Some(
+            crate::consciousness::cross_modal_binding::CrossModalBinder::new(
+                crate::consciousness::cross_modal_binding::CrossModalBindingConfig::default(),
+            ),
+        )
     } else {
         None
     };
@@ -180,16 +189,20 @@ fn build_optional_monitors(config: &CognitiveLoopConfig) -> OptionalMonitors {
         None
     };
     let phenomenal_binding = if config.enable_phenomenal_binding {
-        Some(crate::consciousness::phenomenal_binding::TemporalSynchronizationAnalyzer::new(
-            crate::consciousness::phenomenal_binding::PhenomenalBindingConfig::default(),
-        ))
+        Some(
+            crate::consciousness::phenomenal_binding::TemporalSynchronizationAnalyzer::new(
+                crate::consciousness::phenomenal_binding::PhenomenalBindingConfig::default(),
+            ),
+        )
     } else {
         None
     };
     let hierarchical_free_energy = if config.enable_hierarchical_free_energy {
-        Some(crate::consciousness::hierarchical_free_energy::HierarchicalFreeEnergy::new(
-            crate::consciousness::hierarchical_free_energy::HierarchicalFEConfig::default(),
-        ))
+        Some(
+            crate::consciousness::hierarchical_free_energy::HierarchicalFreeEnergy::new(
+                crate::consciousness::hierarchical_free_energy::HierarchicalFEConfig::default(),
+            ),
+        )
     } else {
         None
     };
@@ -249,9 +262,13 @@ struct ConsciousnessMonitors {
     quantum_coherence: Option<crate::consciousness::quantum_coherence::QuantumCoherenceAnalyzer>,
     temporal: Option<TemporalConsciousnessAnalyzer>,
     embodied: Option<EmbodiedConsciousnessAnalyzer>,
-    thermodynamics: Option<crate::consciousness::consciousness_thermodynamics::ConsciousnessThermodynamicsAnalyzer>,
-    phenomenal_binding: Option<crate::consciousness::phenomenal_binding::TemporalSynchronizationAnalyzer>,
-    hierarchical_free_energy: Option<crate::consciousness::hierarchical_free_energy::HierarchicalFreeEnergy>,
+    thermodynamics: Option<
+        crate::consciousness::consciousness_thermodynamics::ConsciousnessThermodynamicsAnalyzer,
+    >,
+    phenomenal_binding:
+        Option<crate::consciousness::phenomenal_binding::TemporalSynchronizationAnalyzer>,
+    hierarchical_free_energy:
+        Option<crate::consciousness::hierarchical_free_energy::HierarchicalFreeEnergy>,
 }
 
 /// Build optional consciousness monitors from config flags.
@@ -301,12 +318,12 @@ struct ConsciousnessSubsystems {
 /// Build optional higher-level consciousness subsystems from config flags.
 fn build_consciousness_subsystems(config: &CognitiveLoopConfig) -> ConsciousnessSubsystems {
     ConsciousnessSubsystems {
-        narrative_gwt: config.enable_narrative_gwt.then(|| {
-            NarrativeGWTIntegration::default_config()
-        }),
-        dream_engine: config.enable_dream_replay.then(|| {
-            crate::consciousness::dream::DreamEngine::with_defaults()
-        }),
+        narrative_gwt: config
+            .enable_narrative_gwt
+            .then(|| NarrativeGWTIntegration::default_config()),
+        dream_engine: config
+            .enable_dream_replay
+            .then(|| crate::consciousness::dream::DreamEngine::with_defaults()),
         predictive_mind: config.enable_predictive_processing.then(|| {
             crate::consciousness::predictive_processing::PredictiveMind::new(
                 crate::consciousness::predictive_processing::PredictiveConfig::default(),
@@ -317,9 +334,9 @@ fn build_consciousness_subsystems(config: &CognitiveLoopConfig) -> Consciousness
                 crate::consciousness::cross_modal_binding::CrossModalBindingConfig::default(),
             )
         }),
-        affective_bridge: config.enable_affective_bridge.then(|| {
-            crate::brain::affective_bridge::AffectiveBridge::default()
-        }),
+        affective_bridge: config
+            .enable_affective_bridge
+            .then(|| crate::brain::affective_bridge::AffectiveBridge::default()),
     }
 }
 
@@ -328,28 +345,29 @@ struct EthicsComponents {
     contextual_weights: Option<crate::consciousness::contextual_weights::ContextualWeights>,
     phi_attention: Option<crate::consciousness::phi_attention::AdaptiveThresholds>,
     negation_detector: Option<crate::consciousness::negation_detector::NegationDetector>,
-    metacognitive_monitor: Option<crate::consciousness::metacognitive_monitoring::MetacognitiveMonitor>,
+    metacognitive_monitor:
+        Option<crate::consciousness::metacognitive_monitoring::MetacognitiveMonitor>,
     safety_gateway: Option<crate::safety::SafetyGateway>,
 }
 
 /// Build ethics and safety optional components from config flags.
 fn build_ethics_components(config: &CognitiveLoopConfig) -> EthicsComponents {
     EthicsComponents {
-        contextual_weights: config.enable_contextual_weights.then(|| {
-            crate::consciousness::contextual_weights::ContextualWeights::new()
-        }),
-        phi_attention: config.enable_phi_attention.then(|| {
-            crate::consciousness::phi_attention::AdaptiveThresholds::new(100)
-        }),
-        negation_detector: config.enable_negation_detection.then(|| {
-            crate::consciousness::negation_detector::NegationDetector::new()
-        }),
+        contextual_weights: config
+            .enable_contextual_weights
+            .then(|| crate::consciousness::contextual_weights::ContextualWeights::new()),
+        phi_attention: config
+            .enable_phi_attention
+            .then(|| crate::consciousness::phi_attention::AdaptiveThresholds::new(100)),
+        negation_detector: config
+            .enable_negation_detection
+            .then(|| crate::consciousness::negation_detector::NegationDetector::new()),
         metacognitive_monitor: config.enable_metacognitive_monitoring.then(|| {
             crate::consciousness::metacognitive_monitoring::MetacognitiveMonitor::new(0.001)
         }),
-        safety_gateway: config.enable_safety_gateway.then(|| {
-            crate::safety::SafetyGateway::new()
-        }),
+        safety_gateway: config
+            .enable_safety_gateway
+            .then(|| crate::safety::SafetyGateway::new()),
     }
 }
 
@@ -753,7 +771,19 @@ impl CognitiveLoopService {
                 },
             };
 
-            #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))]
+            #[cfg(any(
+                feature = "humanoid",
+                feature = "helicopter",
+                feature = "flight",
+                feature = "vehicle",
+                feature = "auv",
+                feature = "manipulator",
+                feature = "exoskeleton",
+                feature = "surgical",
+                feature = "orbital",
+                feature = "quadruped",
+                feature = "phone"
+            ))]
             let embodiment_bridge_init = {
                 use super::motor_bridge::EmbodimentPlatform;
                 match config.embodiment_platform {
@@ -771,84 +801,155 @@ impl CognitiveLoopService {
                     }
                     #[cfg(feature = "helicopter")]
                     EmbodimentPlatform::Helicopter => {
-                        let genesis = config.genesis_phrase.as_ref()
+                        let genesis = config
+                            .genesis_phrase
+                            .as_ref()
                             .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p))
-                            .unwrap_or_else(|| symthaea_core::genesis::GenesisSeed::from_phrase("default"));
-                        Some(Box::new(crate::helicopter::embodiment::HelicopterEmbodiment::new(&genesis))
-                            as Box<dyn super::motor_bridge::EmbodimentBridge>)
+                            .unwrap_or_else(|| {
+                                symthaea_core::genesis::GenesisSeed::from_phrase("default")
+                            });
+                        Some(
+                            Box::new(crate::helicopter::embodiment::HelicopterEmbodiment::new(
+                                &genesis,
+                            ))
+                                as Box<dyn super::motor_bridge::EmbodimentBridge>,
+                        )
                     }
                     #[cfg(feature = "flight")]
                     EmbodimentPlatform::Quadrotor => {
-                        let genesis = config.genesis_phrase.as_ref()
+                        let genesis = config
+                            .genesis_phrase
+                            .as_ref()
                             .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p))
-                            .unwrap_or_else(|| symthaea_core::genesis::GenesisSeed::from_phrase("default"));
-                        Some(Box::new(crate::flight::embodiment::FlightEmbodiment::new(&genesis))
-                            as Box<dyn super::motor_bridge::EmbodimentBridge>)
+                            .unwrap_or_else(|| {
+                                symthaea_core::genesis::GenesisSeed::from_phrase("default")
+                            });
+                        Some(
+                            Box::new(crate::flight::embodiment::FlightEmbodiment::new(&genesis))
+                                as Box<dyn super::motor_bridge::EmbodimentBridge>,
+                        )
                     }
                     #[cfg(feature = "vehicle")]
                     EmbodimentPlatform::Vehicle => {
-                        let genesis = config.genesis_phrase.as_ref()
+                        let genesis = config
+                            .genesis_phrase
+                            .as_ref()
                             .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p))
-                            .unwrap_or_else(|| symthaea_core::genesis::GenesisSeed::from_phrase("default"));
-                        Some(Box::new(crate::vehicle::embodiment::VehicleEmbodiment::new(&genesis))
-                            as Box<dyn super::motor_bridge::EmbodimentBridge>)
+                            .unwrap_or_else(|| {
+                                symthaea_core::genesis::GenesisSeed::from_phrase("default")
+                            });
+                        Some(
+                            Box::new(crate::vehicle::embodiment::VehicleEmbodiment::new(&genesis))
+                                as Box<dyn super::motor_bridge::EmbodimentBridge>,
+                        )
                     }
                     #[cfg(feature = "manipulator")]
                     EmbodimentPlatform::Manipulator => {
-                        let genesis = config.genesis_phrase.as_ref()
+                        let genesis = config
+                            .genesis_phrase
+                            .as_ref()
                             .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p))
-                            .unwrap_or_else(|| symthaea_core::genesis::GenesisSeed::from_phrase("default"));
-                        Some(Box::new(crate::manipulator::embodiment::ManipulatorEmbodiment::new(&genesis))
-                            as Box<dyn super::motor_bridge::EmbodimentBridge>)
+                            .unwrap_or_else(|| {
+                                symthaea_core::genesis::GenesisSeed::from_phrase("default")
+                            });
+                        Some(
+                            Box::new(crate::manipulator::embodiment::ManipulatorEmbodiment::new(
+                                &genesis,
+                            ))
+                                as Box<dyn super::motor_bridge::EmbodimentBridge>,
+                        )
                     }
                     #[cfg(feature = "auv")]
                     EmbodimentPlatform::Auv => {
-                        let genesis = config.genesis_phrase.as_ref()
+                        let genesis = config
+                            .genesis_phrase
+                            .as_ref()
                             .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p))
-                            .unwrap_or_else(|| symthaea_core::genesis::GenesisSeed::from_phrase("default"));
-                        Some(Box::new(crate::auv::embodiment::AuvEmbodiment::new(&genesis))
-                            as Box<dyn super::motor_bridge::EmbodimentBridge>)
+                            .unwrap_or_else(|| {
+                                symthaea_core::genesis::GenesisSeed::from_phrase("default")
+                            });
+                        Some(
+                            Box::new(crate::auv::embodiment::AuvEmbodiment::new(&genesis))
+                                as Box<dyn super::motor_bridge::EmbodimentBridge>,
+                        )
                     }
                     #[cfg(feature = "exoskeleton")]
                     EmbodimentPlatform::Exoskeleton => {
-                        let genesis = config.genesis_phrase.as_ref()
+                        let genesis = config
+                            .genesis_phrase
+                            .as_ref()
                             .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p))
-                            .unwrap_or_else(|| symthaea_core::genesis::GenesisSeed::from_phrase("default"));
-                        Some(Box::new(symthaea_exoskeleton::embodiment::ExoskeletonEmbodiment::new(&genesis))
+                            .unwrap_or_else(|| {
+                                symthaea_core::genesis::GenesisSeed::from_phrase("default")
+                            });
+                        Some(Box::new(
+                            symthaea_exoskeleton::embodiment::ExoskeletonEmbodiment::new(&genesis),
+                        )
                             as Box<dyn super::motor_bridge::EmbodimentBridge>)
                     }
                     #[cfg(feature = "surgical")]
                     EmbodimentPlatform::Surgical => {
-                        let genesis = config.genesis_phrase.as_ref()
+                        let genesis = config
+                            .genesis_phrase
+                            .as_ref()
                             .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p))
-                            .unwrap_or_else(|| symthaea_core::genesis::GenesisSeed::from_phrase("default"));
-                        Some(Box::new(symthaea_surgical::embodiment::SurgicalEmbodiment::new(&genesis))
-                            as Box<dyn super::motor_bridge::EmbodimentBridge>)
+                            .unwrap_or_else(|| {
+                                symthaea_core::genesis::GenesisSeed::from_phrase("default")
+                            });
+                        Some(
+                            Box::new(symthaea_surgical::embodiment::SurgicalEmbodiment::new(
+                                &genesis,
+                            ))
+                                as Box<dyn super::motor_bridge::EmbodimentBridge>,
+                        )
                     }
                     #[cfg(feature = "orbital")]
                     EmbodimentPlatform::Orbital => {
-                        let genesis = config.genesis_phrase.as_ref()
+                        let genesis = config
+                            .genesis_phrase
+                            .as_ref()
                             .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p))
-                            .unwrap_or_else(|| symthaea_core::genesis::GenesisSeed::from_phrase("default"));
-                        Some(Box::new(symthaea_orbital::embodiment::OrbitalEmbodiment::new(&genesis))
-                            as Box<dyn super::motor_bridge::EmbodimentBridge>)
+                            .unwrap_or_else(|| {
+                                symthaea_core::genesis::GenesisSeed::from_phrase("default")
+                            });
+                        Some(
+                            Box::new(symthaea_orbital::embodiment::OrbitalEmbodiment::new(
+                                &genesis,
+                            ))
+                                as Box<dyn super::motor_bridge::EmbodimentBridge>,
+                        )
                     }
                     #[cfg(feature = "quadruped")]
                     EmbodimentPlatform::Quadruped => {
-                        let genesis = config.genesis_phrase.as_ref()
+                        let genesis = config
+                            .genesis_phrase
+                            .as_ref()
                             .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p))
-                            .unwrap_or_else(|| symthaea_core::genesis::GenesisSeed::from_phrase("default"));
-                        Some(Box::new(symthaea_quadruped::embodiment::QuadrupedEmbodiment::new(&genesis))
-                            as Box<dyn super::motor_bridge::EmbodimentBridge>)
+                            .unwrap_or_else(|| {
+                                symthaea_core::genesis::GenesisSeed::from_phrase("default")
+                            });
+                        Some(
+                            Box::new(symthaea_quadruped::embodiment::QuadrupedEmbodiment::new(
+                                &genesis,
+                            ))
+                                as Box<dyn super::motor_bridge::EmbodimentBridge>,
+                        )
                     }
                     #[cfg(feature = "phone")]
                     EmbodimentPlatform::Phone => {
-                        let _genesis = config.genesis_phrase.as_ref()
+                        let _genesis = config
+                            .genesis_phrase
+                            .as_ref()
                             .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p))
-                            .unwrap_or_else(|| symthaea_core::genesis::GenesisSeed::from_phrase("default"));
+                            .unwrap_or_else(|| {
+                                symthaea_core::genesis::GenesisSeed::from_phrase("default")
+                            });
                         Some(Box::new(symthaea_phone_embodiment::PhoneBridge::new(
-                            "41201FDJG000UM", 1008, 2244,
-                        )) as Box<dyn super::motor_bridge::EmbodimentBridge>)
+                            "41201FDJG000UM",
+                            1008,
+                            2244,
+                        ))
+                            as Box<dyn super::motor_bridge::EmbodimentBridge>)
                     }
                     _ => None,
                 }
@@ -857,17 +958,56 @@ impl CognitiveLoopService {
             super::sensorimotor_execution::SensoriMotorExecution::new(
                 vision_sensory,
                 super::motor_rendering_manager::MotorRenderingManager::new_with_aesthetic_path(
-                    config.aesthetic_memory_path.as_deref().map(std::path::PathBuf::from),
+                    config
+                        .aesthetic_memory_path
+                        .as_deref()
+                        .map(std::path::PathBuf::from),
                 ),
                 somatic_bridge_instance,
                 Some(pain_sender),
                 thermal_bridge_instance,
                 Some(thermal_sender),
-                #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))]
+                #[cfg(any(
+                    feature = "humanoid",
+                    feature = "helicopter",
+                    feature = "flight",
+                    feature = "vehicle",
+                    feature = "auv",
+                    feature = "manipulator",
+                    feature = "exoskeleton",
+                    feature = "surgical",
+                    feature = "orbital",
+                    feature = "quadruped",
+                    feature = "phone"
+                ))]
                 embodiment_bridge_init,
-                #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))]
+                #[cfg(any(
+                    feature = "humanoid",
+                    feature = "helicopter",
+                    feature = "flight",
+                    feature = "vehicle",
+                    feature = "auv",
+                    feature = "manipulator",
+                    feature = "exoskeleton",
+                    feature = "surgical",
+                    feature = "orbital",
+                    feature = "quadruped",
+                    feature = "phone"
+                ))]
                 None,
-                #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))]
+                #[cfg(any(
+                    feature = "humanoid",
+                    feature = "helicopter",
+                    feature = "flight",
+                    feature = "vehicle",
+                    feature = "auv",
+                    feature = "manipulator",
+                    feature = "exoskeleton",
+                    feature = "surgical",
+                    feature = "orbital",
+                    feature = "quadruped",
+                    feature = "phone"
+                ))]
                 super::motor_bridge::EmbodimentTelemetry::default(),
             )
         };
@@ -1201,6 +1341,12 @@ impl CognitiveLoopService {
             // STT capture: opt-in, started post-construction via start_stt_capture().
             #[cfg(feature = "voice-stt-live")]
             stt_capture: None,
+            // IMU fusion: opt-in. Install a fusion via install_imu_fusion()
+            // and push readings via inject_imu_reading().
+            #[cfg(feature = "sensor-imu")]
+            imu_fusion: None,
+            #[cfg(feature = "sensor-imu")]
+            latest_imu_reading: None,
             #[cfg(feature = "nurture")]
             nurture_attachment: if enable_nurture_attachment {
                 Some(super::nurture_bridge::NurtureAttachmentBridge::new())
@@ -1825,10 +1971,7 @@ mod tests {
     fn constructor_applies_domain_profile_to_spectrum_manager() {
         let config = CognitiveLoopConfig::for_domain(DomainProfile::underwater());
         let service = CognitiveLoopService::new(config).unwrap();
-        assert_eq!(
-            service.spectrum_manager.domain_profile().kind,
-            "underwater"
-        );
+        assert_eq!(service.spectrum_manager.domain_profile().kind, "underwater");
     }
 
     #[test]
