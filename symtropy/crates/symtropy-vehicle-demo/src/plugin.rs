@@ -4,6 +4,7 @@
 
 use bevy::prelude::*;
 use symthaea_vehicle::simulator::VehiclePhysicsSimulator;
+use symtropy_consciousness_physics::safety::sprint_floor_gain;
 
 use crate::camera;
 use crate::consciousness_bridge;
@@ -11,6 +12,30 @@ use crate::controller::gain_scale;
 use crate::hud;
 use crate::resources::*;
 use crate::visualization;
+
+/// Per-platform Φ-gate thresholds for the autonomous-vehicle demo,
+/// using the `sprint_floor_gain` shape whose 2-part sufficiency was
+/// proven in the manipulator Monte Carlo study (commits
+/// `38dc8b1fd9..317baad595`, primitive at `52e3fb710f`, Φ-gated-safety
+/// paper `papers/phi-gated-safety/`). Flight-demo adopted the same
+/// pattern at `8d61e348d9`; this is the third platform consumer.
+///
+/// **Starting values**, inherited from the manipulator's measured Φ
+/// band [0.099, 0.145]. The `MasterConsciousnessEquation` aggregation
+/// is platform-invariant so Φ distributions should be similarly shaped,
+/// but the vehicle-demo's observation vector (speed / slip / friction)
+/// differs from the manipulator's (PE / danger / effort / stiffness),
+/// so the empirical band may drift.
+///
+/// To recalibrate: add a trace-capture block to `step_vehicle`
+/// mirroring `manipulator_benchmark`'s `MANIP_BENCH_PHI_TRACE=1`,
+/// record 40 s of Φ samples during a representative waypoint run
+/// (mix of straight-line and ice-patch segments), then set `SPRINT_PHI`
+/// near the 95th percentile of the observed band and `FLOOR_GAIN`
+/// above whatever throttle level keeps the car tracking waypoints
+/// under nominal friction.
+const SPRINT_PHI: f64 = 0.135;
+const FLOOR_GAIN: f64 = 0.3;
 
 pub struct VehicleDemoPlugin;
 
@@ -81,13 +106,18 @@ fn step_vehicle(
         ((state.tire_slip_front.abs() + state.tire_slip_rear.abs()) / 0.52).clamp(0.0, 1.0);
     let last_pe = vehicle.last_prediction_error;
     let danger = (intensity + slip_norm * 0.5).min(1.0);
-    let (phi, safety, gain) = consciousness_bridge::consciousness_tick(
+    let (phi, safety, _default_gain) = consciousness_bridge::consciousness_tick(
         &mut vehicle.robot_agent,
         last_pe,
         danger,
         speed_norm,
         slip_norm,
     );
+    // Use the empirically-validated SprintFloor mapping instead of the
+    // default `SafetyTier::motor_gain()` — whose hardcoded 0.6/0.3/0.1
+    // thresholds are known to pin Φ at a single tier for any platform
+    // whose Φ band sits below 0.1 (per the paper's Figure 1).
+    let gain = sprint_floor_gain(phi, SPRINT_PHI, FLOOR_GAIN);
     vehicle.current_phi = phi;
     vehicle.current_safety = safety;
     vehicle.current_motor_gain = gain;

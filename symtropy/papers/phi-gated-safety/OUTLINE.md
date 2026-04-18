@@ -178,11 +178,17 @@ required for single-point-of-failure hazardous actions (cautery).
   (`bcd80ef6aa`); 11 regression tests lock the invariant (`6773fa2a92`).
 
 ### §8. Cross-platform applicability
-- `sprint_floor_gain` primitive now wired into flight-demo (`8d61e348d9`)
-  as proof of transfer. Per-platform calibration required: each
+- `sprint_floor_gain` primitive wired into flight-demo (`8d61e348d9`)
+  and vehicle-demo (follow-up commit) as proof of mechanical transfer
+  — the change is ~5 lines per platform plus an updated doc-comment
+  for calibration provenance. Per-platform calibration required: each
   platform's Φ band may drift because the observation-vector channels
   differ.
-- Table: 10 platforms → which Φ-role → calibration status.
+- Table: 10 platforms → which Φ-role → calibration status. Current
+  adopters (manipulator / flight / vehicle) all use the same starting
+  SPRINT_PHI = 0.135, FLOOR_GAIN = 0.3 inherited from the manipulator
+  study's measured band [0.099, 0.145]. Each remains a starting point
+  subject to per-platform Φ-trace measurement.
 
 ### §9. Discussion & limitations
 - Φ is NOT a certified safety layer. SOTIF frame: it's a
