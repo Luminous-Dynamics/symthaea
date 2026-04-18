@@ -84,6 +84,8 @@ pub mod epistemic_generation;
 #[cfg(feature = "code_generation")]
 pub mod hv_code_decoder;
 #[cfg(feature = "code_generation")]
+pub mod learned_idioms;
+#[cfg(feature = "code_generation")]
 pub mod nix_code_parser;
 #[cfg(feature = "code_generation")]
 pub mod nix_codegen;

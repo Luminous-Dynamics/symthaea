@@ -9,6 +9,7 @@
 //! Idioms were extracted from the user's actual ~/etc/nixos/ flake-based
 //! config to ensure templates reflect real-world patterns.
 
+use crate::language::learned_idioms::LearnedIdiomCache;
 use crate::language::nixpkgs_index::NixpkgsIndex;
 use std::process::Command;
 use std::sync::OnceLock;
@@ -1659,6 +1660,66 @@ pub fn generate_nix_with_dry_build(
     }
 }
 
+// ─── Tier 3: self-improvement loop ────────────────────────────────────────
+
+/// Process-level shared cache of verified idioms.
+static SHARED_LEARNED: OnceLock<LearnedIdiomCache> = OnceLock::new();
+
+/// Get the shared learned-idiom cache (default disk path).
+pub fn shared_learned_cache() -> &'static LearnedIdiomCache {
+    SHARED_LEARNED.get_or_init(LearnedIdiomCache::default_cache)
+}
+
+/// Whether a generation result was retrieved from the learned cache or
+/// freshly generated (and possibly recorded back into the cache).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SelfImproveSource {
+    /// Found a matching learned idiom — used it directly.
+    LearnedCache,
+    /// No cache hit; regenerated via the standard pipeline. If `recorded` is
+    /// true, the result was written back into the cache for next time.
+    FreshlyGenerated { recorded: bool },
+}
+
+/// Self-improving wrapper: tries the learned-idiom cache first, falls
+/// through to `generate_nix_with_index_verify`, and records every fully
+/// verified output (parses + zero unknown options) back into the cache.
+///
+/// Subsequent calls with paraphrased prompts get the cached answer at
+/// O(keyword-set-overlap) instead of redoing the whole pipeline.
+pub fn generate_nix_with_self_improve(
+    prompt: &str,
+    max_iterations: usize,
+) -> (NixGenWithIndexResult, SelfImproveSource) {
+    // Tier 3.1: cache hit?
+    if let Some(idiom) = shared_learned_cache().find_match(prompt) {
+        let intent = classify_nix_intent(&prompt.to_lowercase());
+        let result = NixGenWithIndexResult {
+            base: NixGenResult {
+                prompt: prompt.to_string(),
+                intent,
+                code: idiom.code.clone(),
+                iterations: 0,
+                parses: true,
+                last_error: None,
+                source: NixGenSource::Idiom,
+            },
+            unknown_options: Vec::new(),
+        };
+        return (result, SelfImproveSource::LearnedCache);
+    }
+
+    // Tier 3.4: regenerate + record on full success.
+    let result = generate_nix_with_index_verify(prompt, max_iterations);
+    let recorded = if result.base.parses && result.unknown_options.is_empty() {
+        shared_learned_cache().record(prompt, &result.base.code, result.base.intent);
+        true
+    } else {
+        false
+    };
+    (result, SelfImproveSource::FreshlyGenerated { recorded })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1989,5 +2050,24 @@ pkgs.mkShell {
             "expected 'did you mean enable' hint, got: {}",
             verdict.message()
         );
+    }
+
+    #[test]
+    fn self_improve_smoke() {
+        // We can't easily inject a per-test cache (the function uses the
+        // process-wide SHARED_LEARNED). What we CAN verify here is that
+        // the function signature works end-to-end on a known-good prompt
+        // and returns a SelfImproveSource of either variant.
+        let (result, src) = generate_nix_with_self_improve(
+            "set up a rust dev environment with rust-analyzer and mold",
+            3,
+        );
+        assert!(result.base.parses, "rust dev shell should parse");
+        // Either we hit the cache (a previous test left it warm) or we
+        // generated fresh; both are valid outcomes.
+        match src {
+            SelfImproveSource::LearnedCache => {}
+            SelfImproveSource::FreshlyGenerated { recorded: _ } => {}
+        }
     }
 }
