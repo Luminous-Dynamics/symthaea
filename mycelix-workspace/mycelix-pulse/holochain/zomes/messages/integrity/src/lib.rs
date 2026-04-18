@@ -35,7 +35,11 @@ pub fn email_signing_content(email: &EncryptedEmail) -> Vec<u8> {
     content
 }
 
-pub fn receipt_signing_content(email_hash: &ActionHash, reader: &AgentPubKey, read_at: &Timestamp) -> Vec<u8> {
+pub fn receipt_signing_content(
+    email_hash: &ActionHash,
+    reader: &AgentPubKey,
+    read_at: &Timestamp,
+) -> Vec<u8> {
     let mut content = Vec::with_capacity(128);
     content.push(0x01);
     content.extend_from_slice(email_hash.get_raw_39());
@@ -44,7 +48,11 @@ pub fn receipt_signing_content(email_hash: &ActionHash, reader: &AgentPubKey, re
     content
 }
 
-pub fn delivery_receipt_signing_content(email_hash: &ActionHash, recipient: &AgentPubKey, delivered_at: &Timestamp) -> Vec<u8> {
+pub fn delivery_receipt_signing_content(
+    email_hash: &ActionHash,
+    recipient: &AgentPubKey,
+    delivered_at: &Timestamp,
+) -> Vec<u8> {
     let mut content = Vec::with_capacity(128);
     content.push(0x01);
     content.extend_from_slice(email_hash.get_raw_39());
@@ -314,12 +322,10 @@ pub fn genesis_self_check(_data: GenesisSelfCheckData) -> ExternResult<ValidateC
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
         FlatOp::StoreEntry(store_entry) => match store_entry {
-            OpEntry::CreateEntry { app_entry, action } => {
-                validate_create_entry(app_entry, action)
-            }
-            OpEntry::UpdateEntry { app_entry, action, .. } => {
-                validate_update_entry(app_entry, action)
-            }
+            OpEntry::CreateEntry { app_entry, action } => validate_create_entry(app_entry, action),
+            OpEntry::UpdateEntry {
+                app_entry, action, ..
+            } => validate_update_entry(app_entry, action),
             _ => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterCreateLink {
@@ -345,12 +351,10 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             action,
         ),
         FlatOp::StoreRecord(store_record) => match store_record {
-            OpRecord::CreateEntry { app_entry, action } => {
-                validate_create_entry(app_entry, action)
-            }
-            OpRecord::UpdateEntry { app_entry, action, .. } => {
-                validate_update_entry(app_entry, action)
-            }
+            OpRecord::CreateEntry { app_entry, action } => validate_create_entry(app_entry, action),
+            OpRecord::UpdateEntry {
+                app_entry, action, ..
+            } => validate_update_entry(app_entry, action),
             _ => Ok(ValidateCallbackResult::Valid),
         },
         _ => Ok(ValidateCallbackResult::Valid),
@@ -410,11 +414,9 @@ fn validate_update_entry(
             Ok(ValidateCallbackResult::Valid)
         }
         // Receipts are immutable
-        EntryTypes::ReadReceipt(_) | EntryTypes::DeliveryReceipt(_) => {
-            Ok(ValidateCallbackResult::Invalid(
-                "Receipts cannot be modified".to_string(),
-            ))
-        }
+        EntryTypes::ReadReceipt(_) | EntryTypes::DeliveryReceipt(_) => Ok(
+            ValidateCallbackResult::Invalid("Receipts cannot be modified".to_string()),
+        ),
         _ => Ok(ValidateCallbackResult::Valid),
     }
 }
@@ -486,28 +488,29 @@ fn validate_encrypted_email(
         "x25519" => X25519_KEY_LEN,
         "kyber1024" => KYBER1024_KEY_LEN,
         "kyber768" => KYBER768_KEY_LEN,
-        _ => return Ok(ValidateCallbackResult::Invalid(
-            "Unknown key exchange for ephemeral key validation".to_string(),
-        )),
+        _ => {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Unknown key exchange for ephemeral key validation".to_string(),
+            ))
+        }
     };
     if email.ephemeral_pubkey.len() != expected_key_len {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!(
-                "Ephemeral pubkey length {} does not match expected {} for {}",
-                email.ephemeral_pubkey.len(),
-                expected_key_len,
-                email.crypto_suite.key_exchange
-            ),
-        ));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Ephemeral pubkey length {} does not match expected {} for {}",
+            email.ephemeral_pubkey.len(),
+            expected_key_len,
+            email.crypto_suite.key_exchange
+        )));
     }
 
     // Validate signature length and verify for Ed25519
     match email.crypto_suite.signature.as_str() {
         "ed25519" => {
             if email.signature.len() != ED25519_SIG_LEN {
-                return Ok(ValidateCallbackResult::Invalid(
-                    format!("Ed25519 signature must be {} bytes", ED25519_SIG_LEN),
-                ));
+                return Ok(ValidateCallbackResult::Invalid(format!(
+                    "Ed25519 signature must be {} bytes",
+                    ED25519_SIG_LEN
+                )));
             }
             // Verify signature against signing content
             let signing_content = email_signing_content(email);
@@ -522,17 +525,19 @@ fn validate_encrypted_email(
         }
         "dilithium3" => {
             if email.signature.len() != DILITHIUM3_SIG_LEN {
-                return Ok(ValidateCallbackResult::Invalid(
-                    format!("Dilithium3 signature must be {} bytes", DILITHIUM3_SIG_LEN),
-                ));
+                return Ok(ValidateCallbackResult::Invalid(format!(
+                    "Dilithium3 signature must be {} bytes",
+                    DILITHIUM3_SIG_LEN
+                )));
             }
             // Dilithium verification requires PQC library, validated at application layer
         }
         "dilithium2" => {
             if email.signature.len() != DILITHIUM2_SIG_LEN {
-                return Ok(ValidateCallbackResult::Invalid(
-                    format!("Dilithium2 signature must be {} bytes", DILITHIUM2_SIG_LEN),
-                ));
+                return Ok(ValidateCallbackResult::Invalid(format!(
+                    "Dilithium2 signature must be {} bytes",
+                    DILITHIUM2_SIG_LEN
+                )));
             }
         }
         _ => {}
@@ -554,16 +559,18 @@ fn validate_attachment(
 
     // Chunk size limit
     if attachment.encrypted_content.len() > MAX_CHUNK_SIZE {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!("Attachment chunk exceeds maximum size of {} bytes", MAX_CHUNK_SIZE),
-        ));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Attachment chunk exceeds maximum size of {} bytes",
+            MAX_CHUNK_SIZE
+        )));
     }
 
     // Total chunks limit
     if attachment.total_chunks > MAX_TOTAL_CHUNKS {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!("Total chunks {} exceeds maximum of {}", attachment.total_chunks, MAX_TOTAL_CHUNKS),
-        ));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Total chunks {} exceeds maximum of {}",
+            attachment.total_chunks, MAX_TOTAL_CHUNKS
+        )));
     }
 
     // Chunk index must be valid
@@ -575,18 +582,16 @@ fn validate_attachment(
 
     // Must have SHA-256 content hash
     if attachment.content_hash.len() != SHA256_LEN {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!("Content hash must be {} bytes (SHA-256)", SHA256_LEN),
-        ));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Content hash must be {} bytes (SHA-256)",
+            SHA256_LEN
+        )));
     }
 
     Ok(ValidateCallbackResult::Valid)
 }
 
-fn validate_folder(
-    folder: &EmailFolder,
-    action: &Create,
-) -> ExternResult<ValidateCallbackResult> {
+fn validate_folder(folder: &EmailFolder, action: &Create) -> ExternResult<ValidateCallbackResult> {
     // Owner must be author
     if folder.owner != action.author {
         return Ok(ValidateCallbackResult::Invalid(
@@ -611,10 +616,7 @@ fn validate_email_state(
     Ok(ValidateCallbackResult::Valid)
 }
 
-fn validate_draft(
-    draft: &EmailDraft,
-    action: &Create,
-) -> ExternResult<ValidateCallbackResult> {
+fn validate_draft(draft: &EmailDraft, action: &Create) -> ExternResult<ValidateCallbackResult> {
     // Owner must be author
     if draft.owner != action.author {
         return Ok(ValidateCallbackResult::Invalid(
@@ -645,13 +647,15 @@ fn validate_read_receipt(
 
     // Must have Ed25519 signature of correct length
     if receipt.signature.len() != ED25519_SIG_LEN {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!("Read receipt signature must be {} bytes (Ed25519)", ED25519_SIG_LEN),
-        ));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Read receipt signature must be {} bytes (Ed25519)",
+            ED25519_SIG_LEN
+        )));
     }
 
     // Verify signature
-    let signing_content = receipt_signing_content(&receipt.email_hash, &receipt.reader, &receipt.read_at);
+    let signing_content =
+        receipt_signing_content(&receipt.email_hash, &receipt.reader, &receipt.read_at);
     let mut sig_bytes = [0u8; 64];
     sig_bytes.copy_from_slice(&receipt.signature);
     let sig = Signature(sig_bytes);
@@ -677,13 +681,18 @@ fn validate_delivery_receipt(
 
     // Must have Ed25519 signature of correct length
     if receipt.signature.len() != ED25519_SIG_LEN {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!("Delivery receipt signature must be {} bytes (Ed25519)", ED25519_SIG_LEN),
-        ));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Delivery receipt signature must be {} bytes (Ed25519)",
+            ED25519_SIG_LEN
+        )));
     }
 
     // Verify signature
-    let signing_content = delivery_receipt_signing_content(&receipt.email_hash, &receipt.recipient, &receipt.delivered_at);
+    let signing_content = delivery_receipt_signing_content(
+        &receipt.email_hash,
+        &receipt.recipient,
+        &receipt.delivered_at,
+    );
     let mut sig_bytes = [0u8; 64];
     sig_bytes.copy_from_slice(&receipt.signature);
     let sig = Signature(sig_bytes);
@@ -707,7 +716,7 @@ fn validate_thread(
 fn validate_create_link(
     link_type: LinkTypes,
     base_address: AnyLinkableHash,
-    _target_address: AnyLinkableHash,
+    target_address: AnyLinkableHash,
     _tag: LinkTag,
     action: CreateLink,
 ) -> ExternResult<ValidateCallbackResult> {
@@ -726,10 +735,7 @@ fn validate_create_link(
             }
             Ok(ValidateCallbackResult::Valid)
         }
-        LinkTypes::AgentToInbox => {
-            // Inbox links can be created by sender (delivering to recipient)
-            Ok(ValidateCallbackResult::Valid)
-        }
+        LinkTypes::AgentToInbox => validate_inbox_link(base_address, target_address, action),
         LinkTypes::FolderToEmails
         | LinkTypes::EmailToAttachments
         | LinkTypes::EmailToReadReceipts
@@ -742,6 +748,85 @@ fn validate_create_link(
             Ok(ValidateCallbackResult::Valid)
         }
     }
+}
+
+/// Validate `AgentToInbox` link creation.
+///
+/// This closes the spam hole: without these checks, any agent could write a link
+/// from ANY base AgentPubKey to ANY entry, polluting other users' inboxes with
+/// arbitrary content. Enforces the three invariants that make an inbox trustworthy:
+///
+/// 1. **Base is an AgentPubKey.** Inbox links address a recipient agent, not an entry.
+/// 2. **Target deserializes as `EncryptedEmail`.** Catches attempts to link
+///    unrelated entry types into the inbox namespace.
+/// 3. **Identity coherence.** The link's base must equal `email.recipient`, and
+///    the link's author must equal `email.sender` (which in turn already equals
+///    the email's `action.author` via `validate_encrypted_email`). This means
+///    Eve cannot deliver to Bob's inbox an envelope Alice authored.
+fn validate_inbox_link(
+    base_address: AnyLinkableHash,
+    target_address: AnyLinkableHash,
+    action: CreateLink,
+) -> ExternResult<ValidateCallbackResult> {
+    // 1. Base must be an AgentPubKey (inbox owner).
+    let inbox_owner = match base_address.into_agent_pub_key() {
+        Some(a) => a,
+        None => {
+            return Ok(ValidateCallbackResult::Invalid(
+                "AgentToInbox link base must be an AgentPubKey".to_string(),
+            ));
+        }
+    };
+
+    // 2. Target must be an ActionHash pointing at an EncryptedEmail.
+    let target_action_hash = match target_address.into_action_hash() {
+        Some(h) => h,
+        None => {
+            return Ok(ValidateCallbackResult::Invalid(
+                "AgentToInbox link target must be an ActionHash".to_string(),
+            ));
+        }
+    };
+
+    let record = must_get_valid_record(target_action_hash)?;
+    let entry = record.entry().as_option().ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "AgentToInbox target record has no entry".to_string()
+        ))
+    })?;
+
+    // Only app entries can be an EncryptedEmail; bail on Agent/Cap/CounterSign.
+    let Entry::App(app_bytes) = entry else {
+        return Ok(ValidateCallbackResult::Invalid(
+            "AgentToInbox target entry is not an app entry".to_string(),
+        ));
+    };
+
+    let email: EncryptedEmail =
+        match EncryptedEmail::try_from(SerializedBytes::from(app_bytes.clone())) {
+            Ok(e) => e,
+            Err(e) => {
+                return Ok(ValidateCallbackResult::Invalid(format!(
+                    "AgentToInbox target entry failed to deserialize as EncryptedEmail: {}",
+                    e
+                )));
+            }
+        };
+
+    // 3. Identity coherence — Eve cannot spam Bob's inbox.
+    if email.recipient != inbox_owner {
+        return Ok(ValidateCallbackResult::Invalid(
+            "AgentToInbox link base does not match envelope recipient".to_string(),
+        ));
+    }
+
+    if email.sender != action.author {
+        return Ok(ValidateCallbackResult::Invalid(
+            "AgentToInbox link author does not match envelope sender".to_string(),
+        ));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_delete_link(
