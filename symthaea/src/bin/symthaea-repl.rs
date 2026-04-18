@@ -35,9 +35,11 @@
 //! - High arousal: Higher pitch range, more emphasis
 //! - Uncertainty: Slower rate, longer pauses between phrases
 
-use std::io::{self, Write};
+use std::fs::{File, OpenOptions};
+use std::io::{self, BufRead, BufReader, Write};
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::Result;
 use clap::Parser;
@@ -108,6 +110,22 @@ struct Args {
     /// available locally. Override for larger models: `mistral:7b`.
     #[arg(long, value_name = "MODEL", default_value = "gemma4:e2b")]
     ollama_model: String,
+
+    /// Cross-session dialogue history file (JSONL, append-only). On start, the
+    /// last `--history-turns` exchanges are loaded and injected into the first
+    /// system prompt so Symthaea has context across REPL invocations. Pass an
+    /// empty string to disable persistence entirely.
+    #[arg(
+        long,
+        value_name = "PATH",
+        default_value = "~/.symthaea/repl-history.jsonl"
+    )]
+    history_file: String,
+
+    /// Number of prior-session exchanges to recall on start (0 disables recall
+    /// but keeps persisting new turns).
+    #[arg(long, value_name = "N", default_value = "5")]
+    history_turns: usize,
 }
 
 /// REPL state holding all integrated components
@@ -138,6 +156,15 @@ struct ReplState {
     /// This is the agent-loop feedback channel (LLM emits → tool runs →
     /// result returns to consciousness).
     pending_tool_results: Vec<String>,
+
+    /// Append-only JSONL dialogue log. Written per turn. Loaded on start so
+    /// Symthaea remembers across REPL sessions. `None` disables persistence.
+    history_path: Option<PathBuf>,
+
+    /// Prior-session exchanges recalled on start. Rendered into the first
+    /// system prompt as `# Prior conversation`, then drained so only the
+    /// current REPL session's running `history` field matters afterwards.
+    recalled_turns: Vec<(String, String)>,
 
     /// Whether voice output is enabled
     voice_enabled: bool,
@@ -172,6 +199,8 @@ impl ReplState {
         backend: &str,
         llm_backend: &str,
         ollama_model: &str,
+        history_file: &str,
+        history_turns: usize,
     ) -> Result<Self> {
         // Parse temporal backend
         let temporal_backend = match backend.to_lowercase().as_str() {
@@ -247,6 +276,27 @@ impl ReplState {
             .build()
             .map_err(|e| anyhow::anyhow!("Failed to create tokio runtime: {}", e))?;
 
+        // Resolve persistence path (`~` expansion + parent-dir creation) and
+        // load the last N turns for cross-session recall. Soft-fail on IO
+        // errors — persistence is a nice-to-have, not a blocker.
+        let history_path = resolve_history_path(history_file);
+        let recalled_turns = match history_path.as_ref() {
+            Some(p) if history_turns > 0 => {
+                load_recent_turns(p, history_turns).unwrap_or_else(|e| {
+                    warn!("Could not load history from {:?}: {}", p, e);
+                    Vec::new()
+                })
+            }
+            _ => Vec::new(),
+        };
+        if !recalled_turns.is_empty() {
+            info!(
+                "Recalled {} prior-session exchange(s) from {:?}",
+                recalled_turns.len(),
+                history_path
+            );
+        }
+
         Ok(Self {
             cognitive,
             llm,
@@ -255,6 +305,8 @@ impl ReplState {
             sandbox,
             action_executor: SimpleExecutor::from_env(),
             pending_tool_results: Vec::new(),
+            history_path,
+            recalled_turns,
             voice_enabled,
             #[cfg(feature = "voice-tts")]
             voice_output,
@@ -378,6 +430,16 @@ impl ReplState {
 
         let mut system_prompt = format!("{base_prompt}{tool_prompt}");
 
+        // Inject recalled prior-session exchanges on the very first turn so
+        // Symthaea has cross-session continuity. Drained after first use —
+        // later turns rely on the in-memory `history` (trimmed at 20).
+        if !self.recalled_turns.is_empty() {
+            system_prompt.push_str("\n\n# Prior conversation (earlier sessions)\n");
+            for (user, assistant) in self.recalled_turns.drain(..) {
+                system_prompt.push_str(&format!("User: {user}\nSymthaea: {assistant}\n\n"));
+            }
+        }
+
         // Inject pending tool results from the previous turn so Symthaea sees
         // what her actions returned. Clear after injection — results are
         // consumed in the turn immediately after emission.
@@ -480,6 +542,14 @@ impl ReplState {
         // Trim history if too long
         if self.history.len() > 20 {
             self.history.drain(0..10);
+        }
+
+        // Persist this exchange to the JSONL history log for future sessions.
+        // Soft-fail — we'd rather lose a turn than crash the REPL.
+        if let Some(ref path) = self.history_path {
+            if let Err(e) = append_turn(path, input, &response.text) {
+                warn!("Could not persist turn to {:?}: {}", path, e);
+            }
         }
 
         Ok(response.text)
@@ -642,6 +712,89 @@ impl ReplState {
                 )
             }
         }
+    }
+}
+
+/// Resolve a user-supplied history path — supports `~` expansion and returns
+/// `None` for the empty string (disables persistence). Creates parent
+/// directories eagerly so the first `append_turn` call doesn't race anyone.
+fn resolve_history_path(raw: &str) -> Option<PathBuf> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let expanded = if let Some(rest) = trimmed.strip_prefix("~/") {
+        match std::env::var_os("HOME") {
+            Some(home) => PathBuf::from(home).join(rest),
+            None => PathBuf::from(trimmed),
+        }
+    } else if trimmed == "~" {
+        std::env::var_os("HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from(trimmed))
+    } else {
+        PathBuf::from(trimmed)
+    };
+    if let Some(parent) = expanded.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    Some(expanded)
+}
+
+/// Append one (user_input, assistant_response) exchange to the JSONL log.
+/// Each line is a self-describing record — no header, tolerant of concurrent
+/// appends from multiple REPL invocations because each line is flushed whole.
+fn append_turn(path: &Path, user: &str, assistant: &str) -> io::Result<()> {
+    let ts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let record = serde_json::json!({
+        "ts": ts,
+        "user": user,
+        "assistant": assistant,
+    });
+    let mut file = OpenOptions::new().create(true).append(true).open(path)?;
+    writeln!(file, "{}", record)?;
+    file.flush()
+}
+
+/// Load the last `n` exchanges from the JSONL history log. Returns empty vec
+/// if the file is missing or unreadable. Malformed lines are skipped silently
+/// — we don't want a corrupt record mid-file to deny the user their recent
+/// context. Order is oldest-first (matches the order the LLM should see).
+fn load_recent_turns(path: &Path, n: usize) -> io::Result<Vec<(String, String)>> {
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let file = File::open(path)?;
+    let reader = BufReader::new(file);
+    let mut all: Vec<(String, String)> = Vec::new();
+    for line in reader.lines().map_while(Result::ok) {
+        if line.trim().is_empty() {
+            continue;
+        }
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(&line) {
+            let user = value
+                .get("user")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let assistant = value
+                .get("assistant")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            if !user.is_empty() || !assistant.is_empty() {
+                all.push((user, assistant));
+            }
+        }
+    }
+    let len = all.len();
+    if len > n {
+        Ok(all.drain(len - n..).collect())
+    } else {
+        Ok(all)
     }
 }
 
@@ -903,6 +1056,8 @@ fn main() -> Result<()> {
         &args.backend,
         &args.llm_backend,
         &args.ollama_model,
+        &args.history_file,
+        args.history_turns,
     )?;
 
     info!(
