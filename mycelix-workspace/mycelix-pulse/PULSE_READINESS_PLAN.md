@@ -539,6 +539,30 @@ that future Phase 0+ runtime work must resolve:
    for the canonical fix in a sibling cluster. This is a P0 blocker for
    actual WASM compilation of any pulse zome.
 
+4. **Orphan tests/ directory** — FIXED in commit `e8b12ff409`. The existing
+   1970-LOC sweettest file had no Cargo.toml owning it, so cargo never
+   compiled it and the "50+ security tests" it contained had never been
+   verified. Now owned by `mycelix-workspace/mycelix-pulse/tests/Cargo.toml`.
+
+5. **Client-side signing impossible by design** — tracked as Phase 0.8
+   (new task). The coordinator's `send_email` injects `sys_time()` into
+   `email.timestamp` which is part of the canonical signing content;
+   clients can't pre-compute a valid signature. **Every pre-existing
+   `#[ignore]`'d sweettest only proves rejection paths, never round-trip.**
+   Fix: either coordinator `sign_and_send_email` helper (signs via lair
+   under the hood), or accept `timestamp: Timestamp` on `SendEmailInput`
+   and stop overriding — matches RFC 5322 Date: semantics.
+
+6. **LIBCLANG_PATH not set for `bindgen`** — the sweettest crate transitively
+   depends on `datachannel-sys` (WebRTC, required by Kitsune2 transport in
+   Holochain 0.6). Its build script invokes `bindgen` which needs
+   `libclang.so`. On NixOS, this is provided by `nix develop` via
+   `llvmPackages.libclang.lib`. Adding a `shell.nix`/flake-dev-shell to
+   pulse that re-exports `LIBCLANG_PATH` would let direct cargo work, but
+   the simpler rule is: **sweettest compilation requires `nix develop`**
+   per project Rule #1 exception ("use nix develop ONLY when you need CUDA,
+   Python/PyPhi, ONNX — AND Holochain WebRTC native deps").
+
 ---
 
 ## Appendix B — research artifacts
