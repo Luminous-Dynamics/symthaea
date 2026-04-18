@@ -311,19 +311,29 @@ fn emit_dev_shell(lower: &str) -> Option<String> {
         if lower.contains("mold") {
             tools.push("mold");
         }
-        if lower.contains("sccache") {
+        let has_sccache = lower.contains("sccache");
+        if has_sccache {
             tools.push("sccache");
         }
         if !tools.contains(&"pkg-config") && lower.contains("openssl") {
             tools.extend_from_slice(&["pkg-config", "openssl", "openssl.dev"]);
         }
         let pkg_list = tools.join(" ");
+        // sccache is useless as a plain package — it must be set as
+        // RUSTC_WRAPPER for rustc to route through it. The scorer caught
+        // a case where sccache was added to buildInputs but the env var
+        // was missing, resulting in a silent-footgun shell.
+        let rustc_wrapper_line = if has_sccache {
+            "  RUSTC_WRAPPER = \"sccache\";\n"
+        } else {
+            ""
+        };
         return Some(format!(
             r#"{{ pkgs ? import <nixpkgs> {{}} }}:
 pkgs.mkShell {{
   name = "rust-dev-shell";
   buildInputs = with pkgs; [ {pkg_list} ];
-  shellHook = ''
+{rustc_wrapper_line}  shellHook = ''
     export RUST_BACKTRACE=1
   '';
 }}

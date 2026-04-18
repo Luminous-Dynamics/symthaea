@@ -20,6 +20,20 @@ amend historical rows — if numbers change, append a new row and note why.
 
 **Score: 5/6 (83%)**
 
+### 2026-04-18 — RUSTC_WRAPPER codegen fix (same-day follow-on)
+
+The 1/6 FAIL was a real generator defect the scorer surfaced. Fixed in
+`src/language/nix_codegen.rs::emit_dev_shell` — when `sccache` is
+requested, now emits `RUSTC_WRAPPER = "sccache";` alongside it. Prompt 6
+flipped to PASS.
+
+| # | Prompt | Verdict |
+|---|---|---|
+| 1–5 | (as above) | PASS |
+| 6 | rust dev shell with sccache and openssl | PASS |
+
+**Score: 6/6 (100%)**
+
 Reproduce: `cargo run --features code_generation --example nix_eval_benchmark -- --goldens-only`
 
 ### Context
@@ -73,16 +87,19 @@ us which problems the substring scorer was over-counting.
 
 ## Follow-ups surfaced by the scorer
 
-### Codegen: dev-shell missing RUSTC_WRAPPER
+### ~~Codegen: dev-shell missing RUSTC_WRAPPER~~ RESOLVED
 
-Prompt: `rust dev shell with sccache and openssl`
+~~Prompt: `rust dev shell with sccache and openssl`~~
 
-The generator puts `sccache` in `buildInputs` but doesn't wire the
-`RUSTC_WRAPPER = "sccache";` env var. A user taking that shell would
-have sccache installed but not actually wrapping compilation — silent
-footgun. Likely a gap in the `emit_dev_shell` idiom templates in
-`src/language/nix_codegen.rs`. Filed as a codegen task, not a scorer
-issue.
+~~The generator puts `sccache` in `buildInputs` but doesn't wire the
+`RUSTC_WRAPPER = "sccache";` env var.~~ Fixed 2026-04-18 in
+`emit_dev_shell` — when sccache is requested, the env var is now
+emitted. Prompt 6 now PASSes structural scoring.
+
+**Value of this workflow:** the structural scorer surfaced a bug that
+the substring scorer silently approved. A user taking that shell would
+have had sccache installed but not wrapping compilation — silent
+footgun. This is exactly the kind of defect an honest benchmark catches.
 
 ### Scorer: list semantics for non-package lists
 
