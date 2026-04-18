@@ -1,18 +1,19 @@
-# Phase 3 + Phase 4 — Empirical Measurement of Phase 2 Against miniF2F-v2
+# Phase 3 + Phase 4 + Phase 5 — Empirical Measurement of Phase 2 Against miniF2F-v2
 
-**Status:** complete. 2026-04-17.
+**Status:** complete. 2026-04-17 / updated 2026-04-18.
 
 ## Executive summary
 
-Phase 2 W4 closed 14/14 = 100% of hand-*crafted* arithmetic fixtures. Those fixtures were iterated until the cascade closed them, so that rate is a training-set number. Phase 3 (b) answers the honest question: *does the same cascade close problems it has never seen, drawn from real miniF2F-v2?* Phase 4 then applied the minimum-viable fixes suggested by Phase 3's failure-mode analysis.
+Phase 2 W4 closed 14/14 = 100% of hand-*crafted* arithmetic fixtures. Those fixtures were iterated until the cascade closed them, so that rate is a training-set number. Phase 3 (b) answers the honest question: *does the same cascade close problems it has never seen, drawn from real miniF2F-v2?* Phases 4 and 5 then applied the minimum-viable fixes suggested by Phase 3's failure-mode analysis.
 
 | Phase | Accept | Rate | Notes |
 |-------|--------|------|-------|
-| Phase 3 baseline | 25/32 | **78.1%** | Phase 2 W4 cascade, no changes |
+| Phase 3 baseline | 25/32 | 78.1% | Phase 2 W4 cascade, no changes |
 | Phase 4a (naive) | 28/32 | 87.5% | Widened `sq_nonneg` offsets + And-splitter. **2 regressions** (Lean heartbeat timeouts on `mathd_algebra_37`, `_141` from hint bloat) |
-| **Phase 4b (shipped)** | **30/32** | **93.8%** | Compact nlinarith first, widened as fallback, And-splitter gated on `conclusion_is_and`. **No regressions.** |
+| Phase 4b | 30/32 | 93.8% | Compact nlinarith first, widened as fallback, And-splitter gated on `conclusion_is_and`. No regressions. |
+| **Phase 5 (shipped)** | **31/32** | **96.9%** | Added `field_simp` cascade branch gated on `conclusion_has_division`. Closes `mathd_algebra_55` (`q/p = 2/3`). No regressions. |
 
-All three rates comfortably exceed the 15-30% target in `phase2-algebraic-reasoning-plan.md`. The number is honest in every direction: the translation was manual, the Lean verifier was external (`lake env lean`, not an in-house checker), the failures were counted, and the corpus is public.
+All four rates comfortably exceed the 15-30% target in `phase2-algebraic-reasoning-plan.md`. The number is honest in every direction: the translation was manual, the Lean verifier was external (`lake env lean`, not an in-house checker), the failures were counted, and the corpus is public.
 
 ## Methodology
 
@@ -107,11 +108,11 @@ A new `refine ⟨?_, ?_⟩ <;> first | (linarith; done) | (nlinarith [...]; done
 - **Pattern C (polynomial inequality needing offset `sq_nonneg` hints):** 3 Phase 3 failures (`mathd_algebra_113`, `_410`, and the second half of `_101`) — now closed by the widened-offset fallback.
 - **Bonus:** `mathd_numbertheory_326` (integer cubic root uniqueness, originally Pattern E / deferred) also closed — the widened `sq_nonneg` hints turned out to give nlinarith enough polynomial ammunition to factor the cubic.
 
-### Remaining (Phase 4b, the 2 rejections)
+### Resolved in Phase 5
 
-### Pattern B — field reasoning with division in the conclusion (1 failure: `mathd_algebra_55`)
+- **Pattern B (field reasoning with symbolic-denominator division in the conclusion):** 1 Phase 4b failure (`mathd_algebra_55`) — closed by the new `(try subst_eqs; try field_simp; first | norm_num | ring | linarith | nlinarith); done` cascade branch, gated on `conclusion_has_division`. `subst_eqs` collapses the `q = 2-4+…, p = 3-6+…` hypotheses in `mathd_algebra_55` to concrete rationals, then `norm_num` verifies `8/12 = 2/3`. The branch is conditional (emitted only when the AST contains symbolic division) so non-field goals pay no cost. **~60 LOC including the `conclusion_has_division` walker.**
 
-`q/p = 2/3` where `q` and `p` are expressions involving literals. This is decidable (clear denominators, then `ring`), but our cascade never touches `field_simp`. Mathlib's `field_simp [hp_ne_zero]` + `ring` is the closer. The tricky part is passing the nonzero hypothesis — our AST tracks `≠` but the cascade doesn't feed it to `field_simp` automatically. **Cost: ~30 LOC, plus a decision about how to collect nonzero-witness hypotheses.**
+### Remaining (Phase 5, the 1 rejection)
 
 ### Pattern D — nonlinear system with product conclusion (1 failure: `mathd_algebra_338`)
 

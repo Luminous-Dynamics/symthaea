@@ -17,6 +17,7 @@ theorem mathd_algebra_55 : (∀ q : ℝ, (∀ p : ℝ, ((q = (((((((2) - (4)) + 
     | (linarith; done)
     | (nlinarith [sq_nonneg q, mul_self_nonneg q, sq_nonneg (q - 1), sq_nonneg (q + 1), sq_nonneg p, mul_self_nonneg p, sq_nonneg (p - 1), sq_nonneg (p + 1), sq_nonneg (q - p), sq_nonneg (q + p)]; done)
     | (positivity; done)
+    | (try subst_eqs; try field_simp; first | (norm_num; done) | (ring; done) | (linarith; done) | (nlinarith [sq_nonneg q, mul_self_nonneg q, sq_nonneg (q - 1), sq_nonneg (q + 1), sq_nonneg p, mul_self_nonneg p, sq_nonneg (p - 1), sq_nonneg (p + 1), sq_nonneg (q - p), sq_nonneg (q + p)]; done); done)
     | (nlinarith [sq_nonneg q, mul_self_nonneg q, sq_nonneg (q - 10), sq_nonneg (q - 7), sq_nonneg (q - 5), sq_nonneg (q - 3), sq_nonneg (q - 1), sq_nonneg (q + 1), sq_nonneg (q + 3), sq_nonneg (q + 5), sq_nonneg (q + 7), sq_nonneg (q + 10), sq_nonneg p, mul_self_nonneg p, sq_nonneg (p - 10), sq_nonneg (p - 7), sq_nonneg (p - 5), sq_nonneg (p - 3), sq_nonneg (p - 1), sq_nonneg (p + 1), sq_nonneg (p + 3), sq_nonneg (p + 5), sq_nonneg (p + 7), sq_nonneg (p + 10), sq_nonneg (q - p), sq_nonneg (q + p)]; done)
     | (rcases lt_trichotomy q p with h | h | h <;> tauto; done)
     | (rcases le_total _ _ with h | h <;> first | linarith | tauto; done)

@@ -31,7 +31,7 @@
 //! choice matches fragment) is covered by this module's unit tests.
 
 use symthaea_core::hdc::fol_ext_smt::{detect_fragment, SmtFragment};
-use symthaea_core::hdc::fol_formula_ext::{FolFormulaExt, NumericType, Term};
+use symthaea_core::hdc::fol_formula_ext::{ArithOp, FolFormulaExt, NumericType, Term};
 
 use crate::bridge::render_lean_file;
 use crate::tactic::{LeanProofScript, LeanTactic};
@@ -208,6 +208,60 @@ fn conclusion_is_and(phi: &FolFormulaExt) -> bool {
             FolFormulaExt::Forall(_, _, body) | FolFormulaExt::Implies(_, body) => cur = body,
             FolFormulaExt::And(_, _) => return true,
             _ => return false,
+        }
+    }
+}
+
+/// Does any term in the conclusion contain a `Div` binop whose right side
+/// contains a free variable (i.e. division by a symbolic expression)?
+///
+/// Used to gate the Phase 5 `field_simp` cascade branch. Goals like
+/// `mathd_algebra_55` (`q / p = 2 / 3`) can't be closed by `linarith` or
+/// `nlinarith` because they don't reason about fields; they need
+/// `field_simp` to clear denominators first (plus, for the specific
+/// miniF2F-v2 shape where hypotheses evaluate the symbolic denominator
+/// to a numeric literal, `subst_eqs` to substitute first).
+///
+/// Division by a pure literal (`x/50 = 40` in `mathd_algebra_24`) is
+/// NOT flagged — `linarith` handles that case fine because the literal
+/// denominator is statically known nonzero. Only symbolic denominators
+/// trigger the field branch.
+fn conclusion_has_division(phi: &FolFormulaExt) -> bool {
+    fn term_has_sym_div(t: &Term) -> bool {
+        match t {
+            Term::Var(_) | Term::IntLit(_) | Term::RealLit(_) | Term::RatLit(_, _) => false,
+            Term::BinOp(ArithOp::Div, _a, b) => {
+                // Symbolic denominator = contains a free variable. We walk
+                // `b` looking for any `Var`. Nested Divs in `b` also count
+                // as "symbolic" (they're not pure literals).
+                !b.free_vars().is_empty() || term_has_sym_div(b)
+            }
+            Term::BinOp(_, a, b) => term_has_sym_div(a) || term_has_sym_div(b),
+            Term::Pow(base, _) => term_has_sym_div(base),
+            Term::Neg(a) => term_has_sym_div(a),
+        }
+    }
+    fn formula_has_sym_div(phi: &FolFormulaExt) -> bool {
+        match phi {
+            FolFormulaExt::Base(_) => false,
+            FolFormulaExt::Eq(a, b) | FolFormulaExt::Lt(a, b) | FolFormulaExt::Le(a, b) => {
+                term_has_sym_div(a) || term_has_sym_div(b)
+            }
+            FolFormulaExt::And(a, b) | FolFormulaExt::Or(a, b) | FolFormulaExt::Implies(a, b) => {
+                formula_has_sym_div(a) || formula_has_sym_div(b)
+            }
+            FolFormulaExt::Not(a) => formula_has_sym_div(a),
+            FolFormulaExt::Forall(_, _, body) | FolFormulaExt::Exists(_, _, body) => {
+                formula_has_sym_div(body)
+            }
+        }
+    }
+
+    let mut cur = phi;
+    loop {
+        match cur {
+            FolFormulaExt::Forall(_, _, body) | FolFormulaExt::Implies(_, body) => cur = body,
+            other => return formula_has_sym_div(other),
         }
     }
 }
@@ -401,6 +455,38 @@ fn synthesize_arith_tactic(phi: &FolFormulaExt, fragment: SmtFragment) -> (LeanT
         String::new()
     };
 
+    // **Phase 5 addition: field-simp branch.** Gated on the conclusion
+    // containing division by a symbolic expression. Targets goals like
+    // `mathd_algebra_55` (`q / p = 2 / 3` where `q`, `p` are universally
+    // bound) that linarith/nlinarith can't close. Strategy:
+    //
+    // 1. `try subst_eqs` — Mathlib tactic that substitutes every `var =
+    //    expr` hypothesis. For the miniF2F pattern where hypotheses
+    //    evaluate the symbolic numerator/denominator to numeric
+    //    literals, this collapses the goal to `(literal) / (literal) =
+    //    literal`, which `norm_num` then closes.
+    // 2. `try field_simp` — if `subst_eqs` didn't fully resolve the
+    //    symbolic denominators, clear fractions directly. Requires
+    //    nonzero hypotheses to be in-scope; if they are, the post-
+    //    field_simp goal is a polynomial equality that `ring`, `linarith`,
+    //    or `nlinarith` can close.
+    // 3. Closer cascade — try norm_num, ring, linarith, nlinarith in
+    //    order, each `; done`-terminated so partial simplification
+    //    doesn't trap us.
+    //
+    // Gated on `conclusion_has_division` because `subst_eqs` and
+    // `field_simp` do nontrivial goal rewrites; emitting this branch
+    // unconditionally risks the same kind of heartbeat blowup we saw
+    // with the unconditional And-splitter in Phase 4a.
+    let field_simp_alt = if conclusion_has_division(phi) {
+        format!(
+            "\n    | (try subst_eqs; try field_simp; first | (norm_num; done) | (ring; done) | (linarith; done) | (nlinarith [{hints_compact}]; done); done)",
+            hints_compact = hints_compact,
+        )
+    } else {
+        String::new()
+    };
+
     // Every alternative is `; done`-terminated. Reason: some Mathlib
     // tactics (notably `norm_num`) partially simplify the goal even when
     // they can't close it, which interferes with `first`'s backtracking.
@@ -423,7 +509,7 @@ fn synthesize_arith_tactic(phi: &FolFormulaExt, fragment: SmtFragment) -> (LeanT
     | (omega; done)
     | (linarith; done)
     | (nlinarith [{hints_compact}]; done)
-    | (positivity; done){and_splitter_alt}
+    | (positivity; done){field_simp_alt}{and_splitter_alt}
     | (nlinarith [{hints_widened}]; done)
     | {lt_trichotomy_alt}
     | (rcases le_total _ _ with h | h <;> first | linarith | tauto; done)
@@ -432,6 +518,7 @@ fn synthesize_arith_tactic(phi: &FolFormulaExt, fragment: SmtFragment) -> (LeanT
         intro_line,
         hints_compact = hints_compact,
         hints_widened = hints_widened,
+        field_simp_alt = field_simp_alt,
         and_splitter_alt = and_splitter_alt,
         lt_trichotomy_alt = lt_trichotomy_alt,
     );
