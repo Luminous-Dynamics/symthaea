@@ -134,3 +134,148 @@ impl CauteryProcedureController {
         (cmd, decision)
     }
 }
+
+// ─── Regression tests for the safety invariant ────────────────────────────
+//
+// These tests lock in the dual-channel interlock behavior so a future
+// refactor that silently collapses the logic back to single-channel
+// (e.g., by inlining `level.cautery_allowed()` without the HW gate, or
+// the reverse) fails CI. The invariant is simple enough to state directly:
+// **cautery fires only when BOTH channels approve**.
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Build a standing-pose `SurgicalState` with override hooks for the two
+    /// hardware-channel inputs. Anything unspecified defaults to "safe".
+    fn state_with(critical_structure_distance: f64, tip_force: [f64; 3]) -> SurgicalState {
+        let mut s = SurgicalState::home();
+        s.critical_structure_distance = critical_structure_distance;
+        s.tip_force = tip_force;
+        s
+    }
+
+    #[test]
+    fn hw_gate_passes_when_dist_and_force_are_safe() {
+        let s = state_with(20.0, [0.0, 0.0, 0.0]);
+        assert!(hardware_cautery_gate(&s));
+    }
+
+    #[test]
+    fn hw_gate_blocks_when_dist_at_boundary() {
+        // At exactly MIN_CRITICAL_STRUCTURE_MM the gate must NOT pass —
+        // strict inequality is load-bearing for the safety margin.
+        let s = state_with(MIN_CRITICAL_STRUCTURE_MM, [0.0, 0.0, 0.0]);
+        assert!(!hardware_cautery_gate(&s));
+    }
+
+    #[test]
+    fn hw_gate_blocks_when_dist_below_threshold() {
+        let s = state_with(MIN_CRITICAL_STRUCTURE_MM - 0.1, [0.0, 0.0, 0.0]);
+        assert!(!hardware_cautery_gate(&s));
+    }
+
+    #[test]
+    fn hw_gate_blocks_when_force_at_boundary() {
+        // force_magnitude() == MAX_TIP_FORCE_N must block — again the
+        // strict inequality is the safety margin.
+        let s = state_with(20.0, [MAX_TIP_FORCE_N, 0.0, 0.0]);
+        assert!(!hardware_cautery_gate(&s));
+    }
+
+    #[test]
+    fn hw_gate_blocks_when_force_above_threshold() {
+        let s = state_with(20.0, [MAX_TIP_FORCE_N + 0.5, 0.0, 0.0]);
+        assert!(!hardware_cautery_gate(&s));
+    }
+
+    #[test]
+    fn hw_gate_sums_force_components_as_magnitude() {
+        // A (1.5, 1.5, 0) force has magnitude ~2.12 > 2.0 — should block,
+        // even though each individual component is < MAX_TIP_FORCE_N.
+        let s = state_with(20.0, [1.5, 1.5, 0.0]);
+        assert!(!hardware_cautery_gate(&s));
+        // Similarly, (1.0, 1.0, 1.0) is magnitude ~1.73 < 2.0 — should pass.
+        let s2 = state_with(20.0, [1.0, 1.0, 1.0]);
+        assert!(hardware_cautery_gate(&s2));
+    }
+
+    // ── Full interlock decision: both channels must agree ──────────────
+    //
+    // We run the controller's `compute()` and inspect the `InterlockDecision`
+    // it returns. `compute()` itself takes a `SurgicalSafetyLevel` (the
+    // Φ channel) plus a state (for the HW channel), so we can independently
+    // drive each channel and check the combined outcome.
+
+    #[test]
+    fn both_channels_on_allows_cautery() {
+        // Full control + safe HW state → combined=true.
+        let ctrl = CauteryProcedureController::default();
+        // State at the controller's target pose AND safe HW conditions.
+        let mut s = SurgicalState::home();
+        s.joint_angles = ctrl.target_angles;
+        s.critical_structure_distance = 20.0;
+        s.tip_force = [0.0, 0.0, 0.0];
+        let (_, d) = ctrl.compute(&s, SurgicalSafetyLevel::FullControl);
+        assert!(d.phi_channel);
+        assert!(d.hardware_channel);
+        assert!(d.combined);
+    }
+
+    #[test]
+    fn phi_channel_off_blocks_even_with_safe_hw() {
+        // Reduced tier → Φ channel false, regardless of HW state.
+        let ctrl = CauteryProcedureController::default();
+        let mut s = SurgicalState::home();
+        s.joint_angles = ctrl.target_angles;
+        s.critical_structure_distance = 20.0;
+        s.tip_force = [0.0, 0.0, 0.0];
+        let (_, d) = ctrl.compute(&s, SurgicalSafetyLevel::Reduced);
+        assert!(!d.phi_channel);
+        assert!(d.hardware_channel);
+        assert!(!d.combined, "either channel's NO must block");
+    }
+
+    #[test]
+    fn hw_channel_off_blocks_even_with_full_phi() {
+        // Full control tier → Φ channel true, but HW blocks due to close
+        // critical structure. Combined must still be blocked.
+        let ctrl = CauteryProcedureController::default();
+        let mut s = SurgicalState::home();
+        s.joint_angles = ctrl.target_angles;
+        s.critical_structure_distance = MIN_CRITICAL_STRUCTURE_MM - 0.1;
+        s.tip_force = [0.0, 0.0, 0.0];
+        let (_, d) = ctrl.compute(&s, SurgicalSafetyLevel::FullControl);
+        assert!(d.phi_channel);
+        assert!(!d.hardware_channel);
+        assert!(!d.combined, "either channel's NO must block");
+    }
+
+    #[test]
+    fn both_channels_off_blocks() {
+        let ctrl = CauteryProcedureController::default();
+        let mut s = SurgicalState::home();
+        s.critical_structure_distance = 0.5; // too close
+        s.tip_force = [5.0, 0.0, 0.0]; // too hard
+        let (_, d) = ctrl.compute(&s, SurgicalSafetyLevel::Freeze);
+        assert!(!d.phi_channel);
+        assert!(!d.hardware_channel);
+        assert!(!d.combined);
+    }
+
+    #[test]
+    fn cautery_power_is_zero_when_combined_is_blocked() {
+        // When combined=false, the returned SurgicalCommand.cautery MUST be
+        // zero. This is the final wire-level assertion on the safety claim —
+        // the interlock reaches all the way to the physics input.
+        let ctrl = CauteryProcedureController::default();
+        let mut s = SurgicalState::home();
+        s.joint_angles = ctrl.target_angles;
+        s.critical_structure_distance = MIN_CRITICAL_STRUCTURE_MM - 0.1;
+        s.tip_force = [0.0, 0.0, 0.0];
+        let (cmd, d) = ctrl.compute(&s, SurgicalSafetyLevel::FullControl);
+        assert!(!d.combined);
+        assert_eq!(cmd.cautery, 0.0);
+    }
+}
