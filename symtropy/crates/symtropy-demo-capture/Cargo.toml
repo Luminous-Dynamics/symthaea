@@ -13,6 +13,10 @@ description = "Headless screenshot scheduler for symtropy Bevy demos (env-gated 
 bevy = { version = "0.18", default-features = false, features = [
     "bevy_asset", "bevy_core_pipeline", "bevy_render",
     "bevy_log",
+    # `png` enables the PNG image encoder that `save_to_disk()` needs.
+    # Adding it here rather than per-demo means Cargo feature unification
+    # propagates the encoder to every demo that depends on this crate.
+    "png",
 ] }
 
 [lints.clippy]

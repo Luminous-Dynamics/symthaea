@@ -6,6 +6,11 @@
 # t = 1.5, 4.0, 7.0 s and then exits cleanly at 8.5 s. We also wrap
 # in `timeout 45s` as a belt-and-braces fallback in case a demo hangs.
 #
+# NixOS runtime note: Bevy 0.18 needs libX11/libXi/vulkan-loader/libGL at
+# runtime. The monorepo flake at /srv/luminous-dynamics/flake.nix already
+# sets LD_LIBRARY_PATH for these, so this script auto-re-execs inside
+# `nix develop` when it isn't already.
+#
 # After each run we check:
 #   - exit code was 0 (or 124 which `timeout` reports on forced kill)
 #   - 3 PNG files landed in the capture dir
@@ -13,6 +18,21 @@
 #
 # Captured PNGs stay in /tmp/symtropy-verify/<demo>/ for eyeball inspection.
 # This script does NOT commit or push anything.
+
+# Ensure we're inside the nix develop shell (needed for libX11/vulkan on NixOS).
+if [ -z "${IN_NIX_SHELL:-}" ]; then
+    exec nix develop /srv/luminous-dynamics --command bash "$0" "$@"
+fi
+
+# Provide a virtual X display if DISPLAY isn't already set. Running against
+# Xvfb avoids popping windows on the user's real desktop.
+if [ -z "${DISPLAY:-}" ] || [ "${SYMTROPY_VERIFY_USE_XVFB:-0}" = "1" ]; then
+    Xvfb :99 -screen 0 1600x900x24 > /dev/null 2>&1 &
+    XVFB_PID=$!
+    trap 'kill $XVFB_PID 2>/dev/null || true' EXIT
+    export DISPLAY=:99
+    sleep 1
+fi
 
 set -uo pipefail
 
