@@ -252,16 +252,109 @@ pub fn formula_to_smt(phi: &FolFormulaExt) -> String {
 // Full obligation builder
 // ═════════════════════════════════════════════════════════════════════════
 
+/// Peel outer `∀`-bindings and `→`-chained hypotheses from `phi`. Returns
+/// a Skolem-form view: `(bindings, hypotheses, conclusion)` where
+///
+/// - `bindings` are the universally-quantified variables, now treated as
+///   free constants (Skolem constants) at the outer SMT level.
+/// - `hypotheses` are the left-hand sides of a right-associated `Implies`
+///   chain, to be asserted as-is.
+/// - `conclusion` is the innermost formula, to be asserted under `(not …)`.
+///
+/// For `∀ a b : ℝ, H0 → H1 → Goal` this returns
+/// `([("a", Real), ("b", Real)], [H0, H1], Goal)`. Inner `Forall`/`Implies`
+/// nodes that are not at the outer spine are left untouched.
+fn strip_outer_forall_implies(
+    phi: &FolFormulaExt,
+) -> (
+    Vec<(String, NumericType)>,
+    Vec<FolFormulaExt>,
+    FolFormulaExt,
+) {
+    let mut bindings: Vec<(String, NumericType)> = Vec::new();
+    let mut cur = phi;
+    while let FolFormulaExt::Forall(name, ty, body) = cur {
+        bindings.push((name.clone(), *ty));
+        cur = body;
+    }
+    let mut hypotheses: Vec<FolFormulaExt> = Vec::new();
+    while let FolFormulaExt::Implies(h, rest) = cur {
+        hypotheses.push((**h).clone());
+        cur = rest;
+    }
+    (bindings, hypotheses, cur.clone())
+}
+
 /// Build a complete SMT-LIB2 obligation that asserts `¬φ` and calls
 /// `(check-sat)`. A return of `unsat` from Z3 is a formal proof of `φ`.
 ///
-/// - Emits `(set-logic ...)` with the detected fragment.
-/// - Declares every free arithmetic variable with the inferred sort.
+/// **Phase 5a: outer-universal Skolemization.** Rather than emitting
+/// `(assert (not (forall vars. hyps → goal)))` — which forces Z3 to
+/// invoke its quantifier-instantiation machinery and timed out on
+/// 5/32 trivially linear fixtures in the Phase 4b measurement — we
+/// strip outer `∀`s to free Skolem constants and peel the `→`-chain
+/// into separate hypothesis assertions. The resulting obligation
+/// uses the quantifier-free fragment variant (`QF_LRA`, `QF_LIA`,
+/// etc.) and Z3 decides it in subsecond time.
+///
+/// Inner quantifiers (`∃`, or `∀` not on the outer spine) are left
+/// untouched and the fragment stays quantified (`LRA`, `LIA`, …).
+///
+/// - Emits `(set-logic ...)` with the QF variant when the Skolemized
+///   body is quantifier-free, else the original quantified fragment.
+/// - Declares every Skolem constant and every free arithmetic variable
+///   with its inferred sort.
 /// - For `Nat`-typed variables, emits the `(>= n 0)` side-constraint.
-/// - Asserts `(not φ)` and calls `(check-sat)`.
+/// - Asserts each peeled hypothesis.
+/// - Asserts `(not goal)` and calls `(check-sat)`.
 pub fn encode_as_query(phi: &FolFormulaExt) -> String {
-    let fragment = detect_fragment(phi);
-    let free = phi.free_arith_vars();
+    let (skolems, hypotheses, conclusion) = strip_outer_forall_implies(phi);
+
+    // Re-detect fragment on the Skolemized body. If we peeled the only
+    // outer universals away and neither the hypotheses nor the conclusion
+    // carry any remaining quantifier, the fragment collapses to its QF
+    // variant. We reconstruct a synthetic formula `hyps ∧ conclusion`
+    // for detection purposes so `contains_quantifier` sees both halves.
+    let body_for_detection = {
+        let mut f = conclusion.clone();
+        for h in hypotheses.iter().rev() {
+            f = FolFormulaExt::And(Box::new(h.clone()), Box::new(f));
+        }
+        f
+    };
+    // Peeling the outer `∀ x : Real, …` leaves a body with no Real
+    // literals for `formula_is_integral` to notice — the integrality
+    // flips to `true` spuriously and the fragment misreports as
+    // QF_LIA instead of QF_LRA. Guard by checking the Skolem bindings:
+    // any `Real` Skolem forces the non-integral fragment.
+    let detected = detect_fragment(&body_for_detection);
+    let has_real_skolem = skolems.iter().any(|(_, ty)| *ty == NumericType::Real);
+    let fragment = match (detected, has_real_skolem) {
+        (SmtFragment::QfLia, true) => SmtFragment::QfLra,
+        (SmtFragment::QfNia, true) => SmtFragment::QfNra,
+        (SmtFragment::Lia, true) => SmtFragment::Lra,
+        (SmtFragment::Nia, true) => SmtFragment::Nra,
+        (f, _) => f,
+    };
+
+    // Collect declarations: Skolem bindings + free arithmetic vars in
+    // either the hypotheses or the conclusion. Dedup preserves order:
+    // Skolems first, then any remaining free vars.
+    let mut decls: Vec<(String, NumericType)> = skolems.clone();
+    let mut declared: std::collections::BTreeSet<String> =
+        decls.iter().map(|(n, _)| n.clone()).collect();
+    for h in &hypotheses {
+        for (n, t) in h.free_arith_vars() {
+            if declared.insert(n.clone()) {
+                decls.push((n, t));
+            }
+        }
+    }
+    for (n, t) in conclusion.free_arith_vars() {
+        if declared.insert(n.clone()) {
+            decls.push((n, t));
+        }
+    }
 
     let mut out = String::new();
     writeln!(out, "(set-logic {})", fragment.logic_name()).unwrap();
@@ -271,17 +364,25 @@ pub fn encode_as_query(phi: &FolFormulaExt) -> String {
         "; obligation: prove φ by asserting ¬φ and checking UNSAT"
     )
     .unwrap();
+    writeln!(
+        out,
+        "; Phase 5a: outer-universal Skolemization for QF-fragment dispatch"
+    )
+    .unwrap();
     writeln!(out).unwrap();
-    for (name, ty) in &free {
+    for (name, ty) in &decls {
         writeln!(out, "(declare-const {} {})", name, ty.smt_sort()).unwrap();
     }
-    for (name, ty) in &free {
+    for (name, ty) in &decls {
         if let Some(c) = ty.constraint_for(name) {
             writeln!(out, "(assert {})", c).unwrap();
         }
     }
     writeln!(out).unwrap();
-    writeln!(out, "(assert (not {}))", formula_to_smt(phi)).unwrap();
+    for h in &hypotheses {
+        writeln!(out, "(assert {})", formula_to_smt(h)).unwrap();
+    }
+    writeln!(out, "(assert (not {}))", formula_to_smt(&conclusion)).unwrap();
     writeln!(out, "(check-sat)").unwrap();
     out
 }
@@ -390,26 +491,34 @@ mod tests {
     #[test]
     fn encodes_reflexivity_of_equality() {
         // ∀ x : Real, x = x
+        //
+        // Phase 5a: outer `∀` is Skolemized. The emitted form is now
+        // `(declare-const x Real) … (assert (not (= x x)))` under the
+        // QF_LRA fragment. UNSAT semantics are preserved.
         let phi = FolFormulaExt::forall("x", NumericType::Real, FolFormulaExt::eq(x(), x()));
         let smt = encode_as_query(&phi);
-        assert!(smt.contains("(set-logic LRA)"));
-        assert!(smt.contains("forall"));
-        assert!(smt.contains("(= x x)"));
+        assert!(smt.contains("(set-logic QF_LRA)"), "got: {}", smt);
+        assert!(smt.contains("(declare-const x Real)"), "got: {}", smt);
+        assert!(smt.contains("(assert (not (= x x)))"), "got: {}", smt);
         assert!(smt.contains("(check-sat)"));
     }
 
     #[test]
     fn nat_binding_adds_constraint_under_forall() {
         // ∀ n : Nat, 0 ≤ n
+        //
+        // Phase 5a: outer `∀` is Skolemized. The Nat constraint `(>= n 0)`
+        // is now emitted as a top-level assertion alongside the Skolem
+        // declaration, rather than as an implication guard inside a
+        // quantified body.
         let phi = FolFormulaExt::forall(
             "n",
             NumericType::Nat,
             FolFormulaExt::le(Term::IntLit(0), Term::var("n")),
         );
         let smt = encode_as_query(&phi);
-        // Under forall, the Nat constraint (≥ n 0) guards the body
-        // via implication: (forall ((n Int)) (=> (>= n 0) (<= 0 n)))
-        assert!(smt.contains("(=> (>= n 0)"), "got: {}", smt);
+        assert!(smt.contains("(declare-const n Int)"), "got: {}", smt);
+        assert!(smt.contains("(assert (>= n 0))"), "got: {}", smt);
     }
 
     #[test]

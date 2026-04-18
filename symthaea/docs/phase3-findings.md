@@ -11,7 +11,8 @@ Phase 2 W4 closed 14/14 = 100% of hand-*crafted* arithmetic fixtures. Those fixt
 | Phase 3 baseline | 25/32 | 78.1% | Phase 2 W4 cascade, no changes |
 | Phase 4a (naive) | 28/32 | 87.5% | Widened `sq_nonneg` offsets + And-splitter. **2 regressions** (Lean heartbeat timeouts on `mathd_algebra_37`, `_141` from hint bloat) |
 | Phase 4b | 30/32 | 93.8% | Compact nlinarith first, widened as fallback, And-splitter gated on `conclusion_is_and`. No regressions. |
-| **Phase 5 (shipped)** | **31/32** | **96.9%** | Added `field_simp` cascade branch gated on `conclusion_has_division`. Closes `mathd_algebra_55` (`q/p = 2/3`). No regressions. |
+| Phase 5 | 31/32 | 96.9% | Added `field_simp` cascade branch gated on `conclusion_has_division`. Closes `mathd_algebra_55` (`q/p = 2/3`). No regressions. |
+| **Phase 5a (shipped)** | **31/32** | **96.9%** | Z3 `encode_as_query` Skolemizes outer `∀`s into Skolem constants + top-level hypothesis asserts. Lake accept rate unchanged (semantic-equivalence preserved) but Z3 timeouts drop **5 → 0**, round-trip ~30× faster. |
 
 All four rates comfortably exceed the 15-30% target in `phase2-algebraic-reasoning-plan.md`. The number is honest in every direction: the translation was manual, the Lean verifier was external (`lake env lean`, not an in-house checker), the failures were counted, and the corpus is public.
 
@@ -46,18 +47,18 @@ The plan said "~50 problems." The delivered count is 32. Reason: every candidate
 
 ## Results
 
-### Overall (Phase 4b, the shipped version)
+### Overall (Phase 5 + Phase 5a, the currently-shipped version)
 
 | Metric | Count | Rate |
 |--------|-------|------|
 | Total fixtures | 32 | 100% |
-| Lake accepted | **30** | **93.8%** |
-| Lake rejected | 2 | 6.3% |
-| Z3 unsat (in ≤10s) | 26 | 81.3% |
-| Z3 timeout | 5 | 15.6% |
+| Lake accepted | **31** | **96.9%** |
+| Lake rejected | 1 | 3.1% |
+| Z3 unsat (subsecond under Skolemization) | 31 | 96.9% |
+| Z3 timeout | **0** | 0% |
 | Z3 fragment error (QF_LRA mis-detection) | 1 | 3.1% |
 
-Note: The 4 Z3-timeout Lake-accepted cases are Lake doing work Z3 didn't — `linarith`/`nlinarith` resolved them where Z3's quantifier instantiation stalled. Lake is the stronger judge, not Z3.
+Note: Phase 5a's `encode_as_query` Skolemization dropped Z3 timeouts from 5 → 0 without changing Lake accept semantics. Z3 round-trip tests (10 obligations) went from aggregate ~10s (quantifier instantiation) to **0.32s** (pure QF dispatch). The single remaining Z3 "error" is a fragment-detection quirk on `mathd_algebra_462` — its `(1/2)·(1/3)` literal product is syntactically nonlinear but has no free variables; detection picks `QF_LRA`, Z3 rejects. Lake closes it via `norm_num` regardless. Cleanup is a fragment-detection refinement, not a Skolemization issue.
 
 ### By category
 

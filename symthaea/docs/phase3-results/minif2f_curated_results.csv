@@ -1,6 +1,6 @@
 fixture,source,category,fragment,tactic,bytes,z3_result,lake_check,note
 mathd_algebra_109,Valid/mathd_algebra_109.lean,linear_real,LRA,linarith,1439,unsat,accepted,(a b : ℝ) (h₀ : 3a + 2b = 12) (h₁ : a = 4) : b = 0
-mathd_algebra_119,Valid/mathd_algebra_119.lean,linear_real,LRA,linarith,1453,timeout,accepted,(d e : ℝ) (h₀ : 2d = 17e - 8) (h₁ : 2e = d - 9) : e = 2
+mathd_algebra_119,Valid/mathd_algebra_119.lean,linear_real,LRA,linarith,1453,unsat,accepted,(d e : ℝ) (h₀ : 2d = 17e - 8) (h₁ : 2e = d - 9) : e = 2
 mathd_algebra_126,Valid/mathd_algebra_126.lean,linear_real,LRA,linarith,2287,unsat,accepted,(x y : ℝ) (h₀ : 2*3 = x - 9) (h₁ : 2*-5 = y + 1) : x = 15 ∧ y = -11
 mathd_algebra_142,Test/mathd_algebra_142.lean,linear_real,LRA,linarith,1447,unsat,accepted,(m b : ℝ) (h₀ : 7m + b = -1) (h₁ : -m + b = 7) : m + b = 5
 mathd_algebra_160,Test/mathd_algebra_160.lean,linear_real,LRA,linarith,1455,unsat,accepted,(n x : ℝ) (h₀ : n + x = 97) (h₁ : n + 5x = 265) : n + 2x = 139
@@ -12,7 +12,7 @@ mathd_algebra_455,Valid/mathd_algebra_455.lean,linear_real,LRA,linarith,1046,uns
 mathd_algebra_51,Valid/mathd_algebra_51.lean,linear_real,LRA,linarith,1487,unsat,accepted,(a b : ℝ) (h₀ : 0<a ∧ 0<b) (h₁ : a+b=35) (h₂ : a = 2/5 * b) : b - a = 15
 mathd_algebra_24,Test/mathd_algebra_24.lean,linear_real,LRA,linarith,1025,unsat,accepted,(x : ℝ) (h₀ : x/50 = 40) : x = 2000
 mathd_algebra_190,Valid/mathd_algebra_190.lean,closed_form_rational,QF_LRA,linarith,845,unsat,accepted,((3:ℝ)/8 + 7/8) / (4/5) = 25/16
-mathd_algebra_462,Valid/mathd_algebra_462.lean,closed_form_rational,QF_LRA,linarith,872,(error "line 6 column 70: logic does not support nonlinear arithmetic"),accepted,((1:ℚ)/2 + 1/3) * (1/2 - 1/3) = 5/36 (translated as ℝ)
+mathd_algebra_462,Valid/mathd_algebra_462.lean,closed_form_rational,QF_LRA,linarith,872,(error "line 7 column 70: logic does not support nonlinear arithmetic"),accepted,((1:ℚ)/2 + 1/3) * (1/2 - 1/3) = 5/36 (translated as ℝ)
 mathd_algebra_304,Test/mathd_algebra_304.lean,closed_form_rational,QF_LIA,omega,754,unsat,accepted,91^2 = 8281 (ℕ; translated as ℤ)
 mathd_algebra_104,Valid/mathd_algebra_104.lean,closed_form_rational,LRA,linarith,1066,unsat,accepted,(x : ℝ) (h₀ : 125/8 = x/12) : x = 375/2
 mathd_algebra_55,Valid/mathd_algebra_55.lean,closed_form_rational,NRA,nlinarith,1848,unsat,accepted,(q p : ℝ) (h₀ : q = 2-4+6-8+10-12+14) (h₁ : p = 3-6+9-12+15-18+21) : q/p = 2/3
