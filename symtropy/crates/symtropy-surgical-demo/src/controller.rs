@@ -1,9 +1,35 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Joint-space controller toward a target tissue pose. Cautery is a simple
-//! state-machine: OFF when retracting, ON (if allowed) when in contact.
+//! Joint-space controller + **dual-channel cautery interlock.**
+//!
+//! Per post-shipment industry research (see memory
+//! `symtropy_phase_c2_flight_demo.md`, Apr 18), regulators expect
+//! diverse redundancy on safety-critical interlocks: two independent
+//! channels that must BOTH agree before a hazardous action fires.
+//! The surgical demo's cautery energy delivery is exactly this class
+//! of action (ISO/IEC 80601-2-77 governs surgical robot safety; the
+//! foot-pedal deadman on production systems is a hardware-independent
+//! channel from the robot's own software).
+//!
+//! We therefore gate cautery on BOTH:
+//!   1. **Epistemic channel** — `SurgicalSafetyLevel::cautery_allowed()`,
+//!      which requires Φ > 0.6 (FullControl tier). This is the
+//!      "model-derived confidence" side.
+//!   2. **Hardware-limit channel** — a pure state-threshold check that
+//!      does NOT read Φ: distance-to-critical-structure > 5 mm AND
+//!      tip-force magnitude < 2 N. This is the "independent safety
+//!      envelope" side.
+//!
+//! Either channel returning `false` blocks cautery. Both channels'
+//! decisions are surfaced to the HUD so failure modes are legible.
 
 use symthaea_surgical::types::{SurgicalCommand, SurgicalSafetyLevel, SurgicalState, NUM_JOINTS};
+
+/// Hard-limit thresholds for the non-Φ channel. Deliberately simple:
+/// these are the values a safety case would argue for independently of
+/// whatever the consciousness engine is reporting.
+pub const MIN_CRITICAL_STRUCTURE_MM: f64 = 5.0;
+pub const MAX_TIP_FORCE_N: f64 = 2.0;
 
 pub struct CauteryProcedureController {
     /// Joint-space target (close to tissue, slight pitch for cautery angle).
@@ -24,8 +50,35 @@ impl Default for CauteryProcedureController {
     }
 }
 
+/// Independent hard-limit channel: returns `true` only when the pure
+/// geometric + contact-force state is within safe bounds. Does NOT read
+/// Φ — this is the diverse-redundancy second channel.
+pub fn hardware_cautery_gate(state: &SurgicalState) -> bool {
+    let dist_ok = state.critical_structure_distance > MIN_CRITICAL_STRUCTURE_MM;
+    let force_ok = state.force_magnitude() < MAX_TIP_FORCE_N;
+    dist_ok && force_ok
+}
+
+/// Result of one cautery interlock evaluation, exposed to the UI so both
+/// channels can be displayed.
+#[derive(Debug, Clone, Copy)]
+pub struct InterlockDecision {
+    pub phi_channel: bool,
+    pub hardware_channel: bool,
+    pub combined: bool,
+    pub hw_dist_mm: f64,
+    pub hw_force_n: f64,
+}
+
 impl CauteryProcedureController {
-    pub fn compute(&self, state: &SurgicalState, level: SurgicalSafetyLevel) -> SurgicalCommand {
+    /// Compute the motor command + interlock decision. Returning the
+    /// decision (instead of just baking it into the cautery power) means
+    /// the UI layer can show WHY cautery is armed or blocked.
+    pub fn compute(
+        &self,
+        state: &SurgicalState,
+        level: SurgicalSafetyLevel,
+    ) -> (SurgicalCommand, InterlockDecision) {
         let mut torques = [0.0f32; NUM_JOINTS];
         for i in 0..NUM_JOINTS {
             let err = self.target_angles[i] - state.joint_angles[i];
@@ -44,24 +97,40 @@ impl CauteryProcedureController {
             .sum();
         let jaw_target = if in_pose_err < 0.6 { 0.6 } else { 0.0 };
 
-        // Request cautery when in pose; the interlock below decides whether it fires.
+        // Request cautery when in pose; the TWO interlock channels below
+        // decide whether it actually fires.
         let cautery_request = if in_pose_err < 0.3 { 1.0 } else { 0.0 };
 
-        // Apply the platform's torque gain and cautery interlock directly.
+        // Apply the platform's torque gain (single-channel — torque
+        // scaling is not safety-critical in the same way energy delivery is).
         let gain = level.torque_gain();
         for t in &mut torques {
             *t *= gain;
         }
-        let cautery = if level.cautery_allowed() {
-            cautery_request
-        } else {
-            0.0
+
+        // Channel 1: epistemic (Φ-derived).
+        let phi_channel = level.cautery_allowed();
+        // Channel 2: hardware limits (Φ-independent).
+        let hardware_channel = hardware_cautery_gate(state);
+        // Combined: AND — either channel alone can block.
+        let combined = phi_channel && hardware_channel;
+
+        let cautery = if combined { cautery_request } else { 0.0 };
+
+        let decision = InterlockDecision {
+            phi_channel,
+            hardware_channel,
+            combined,
+            hw_dist_mm: state.critical_structure_distance,
+            hw_force_n: state.force_magnitude(),
         };
 
-        SurgicalCommand {
+        let cmd = SurgicalCommand {
             joint_torques: torques,
             jaw: jaw_target as f32,
             cautery,
-        }
+        };
+
+        (cmd, decision)
     }
 }

@@ -82,10 +82,11 @@ fn step_surgical(time: Res<Time>, mut surg: ResMut<SurgicalResources>) {
     let level = SurgicalSafetyLevel::from_phi(phi);
     surg.current_level = level;
 
-    let cmd = surg.controller.compute(&state, level);
+    let (cmd, decision) = surg.controller.compute(&state, level);
     surg.last_effort = cmd.control_effort();
     surg.last_cautery = cmd.cautery;
     surg.last_jaw = cmd.jaw;
+    surg.last_interlock = decision;
 
     surg.simulator.step(&cmd, dt);
 

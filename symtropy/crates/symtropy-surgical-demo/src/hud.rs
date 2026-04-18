@@ -48,7 +48,7 @@ pub fn setup_hud(mut commands: Commands) {
                 ..default()
             })
             .with_child((
-                Text::new("CONSCIOUSNESS\nΦ: ---\ntier: ---\nsafety level: ---\nPE: ---\ncautery interlock: ---"),
+                Text::new("CONSCIOUSNESS\nΦ: ---\ntier: ---\nsafety level: ---\nPE: ---\n\nCAUTERY DUAL INTERLOCK\n  Φ channel: ---\n  HW channel: ---\n  combined: ---"),
                 TextFont {
                     font_size: 16.0,
                     ..default()
@@ -91,11 +91,30 @@ pub fn update_hud(
         SafetyTier::Orange => "ORANGE ◑",
         SafetyTier::Red => "RED    ○",
     };
-    let (level_name, interlock) = match surg.current_level {
-        SurgicalSafetyLevel::FullControl => ("FULL CONTROL  (100% torque)", "ARMED"),
-        SurgicalSafetyLevel::Reduced => ("REDUCED       (40%)", "BLOCKED"),
-        SurgicalSafetyLevel::Freeze => ("FREEZE        (0%)", "BLOCKED"),
-        SurgicalSafetyLevel::Retract => ("RETRACT       (0%, pull back)", "BLOCKED"),
+    let level_name = match surg.current_level {
+        SurgicalSafetyLevel::FullControl => "FULL CONTROL  (100% torque)",
+        SurgicalSafetyLevel::Reduced => "REDUCED       (40%)",
+        SurgicalSafetyLevel::Freeze => "FREEZE        (0%)",
+        SurgicalSafetyLevel::Retract => "RETRACT       (0%, pull back)",
+    };
+
+    // Dual-channel interlock display: show each channel's verdict and the
+    // combined AND. Either channel saying "BLOCKED" blocks energy delivery.
+    let ilock = &surg.last_interlock;
+    let phi_label = if ilock.phi_channel {
+        "ARMED"
+    } else {
+        "BLOCKED"
+    };
+    let hw_label = if ilock.hardware_channel {
+        "OK"
+    } else {
+        "BLOCKED"
+    };
+    let combined_label = if ilock.combined {
+        "ARMED ⚡"
+    } else {
+        "BLOCKED ■"
     };
 
     for mut t in &mut consc_q {
@@ -105,8 +124,12 @@ pub fn update_hud(
              tier: {tier_name}\n\
              safety level: {level_name}\n\
              PE: {:.3}\n\
-             cautery interlock: {interlock}",
-            surg.current_phi, surg.last_prediction_error,
+             \n\
+             CAUTERY DUAL INTERLOCK\n\
+               Φ channel: {phi_label}\n\
+               HW channel: {hw_label}  (dist {:.1} mm, force {:.2} N)\n\
+               combined:  {combined_label}",
+            surg.current_phi, surg.last_prediction_error, ilock.hw_dist_mm, ilock.hw_force_n,
         );
     }
 }

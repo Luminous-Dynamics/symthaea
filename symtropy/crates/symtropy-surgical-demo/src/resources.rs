@@ -13,7 +13,7 @@ use symtropy_physics::body::BodyHandle;
 use symtropy_robotics_bridge::agent::RoboticAgent;
 use symtropy_robotics_bridge::platform::PlatformType;
 
-use crate::controller::CauteryProcedureController;
+use crate::controller::{CauteryProcedureController, InterlockDecision};
 
 #[derive(Resource)]
 pub struct SurgicalResources {
@@ -31,6 +31,8 @@ pub struct SurgicalResources {
     pub last_effort: f32,
     pub last_cautery: f32,
     pub last_jaw: f32,
+    /// Most recent dual-channel interlock decision (see controller docs).
+    pub last_interlock: InterlockDecision,
 }
 
 impl SurgicalResources {
@@ -51,6 +53,13 @@ impl SurgicalResources {
             last_effort: 0.0,
             last_cautery: 0.0,
             last_jaw: 0.0,
+            last_interlock: InterlockDecision {
+                phi_channel: true,
+                hardware_channel: true,
+                combined: true,
+                hw_dist_mm: 20.0,
+                hw_force_n: 0.0,
+            },
         }
     }
 }
