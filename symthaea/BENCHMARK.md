@@ -3,6 +3,45 @@
 Honest measurement log. Each entry: date, commit, scorer used, result. Don't
 amend historical rows — if numbers change, append a new row and note why.
 
+## 2026-04-19 — **Correction**: multi-seed check shows the "2× prefix" claim was noise
+
+Immediately after the entry below, ran 3 eval seeds per checkpoint to
+bound variance. Numbers:
+
+| Run | Baseline (13 train) | Extended (43 train) |
+|---|---|---|
+| seed 1 | 20 bytes | 18 bytes |
+| seed 2 | 25 bytes | 30 bytes |
+| seed 3 | 20 bytes | 22 bytes |
+| mean   | **21.7** | **23.3** |
+| std    | ≈2.4 | ≈5.0 |
+
+**Means are within 1 std of each other.** Single-seed "2× improvement"
+was sampling artifact — extended run 1 (=47 bytes, reported below) sat
+near the top of the extended distribution; baseline run 1 (=23 bytes,
+reported below) was the baseline mean. Cherry-picking accidentally.
+
+**Corrected verdict:**
+- Both models emit ~20-25 byte parseable prefixes on average
+- Data scaling 13→43 pairs at 10 epochs produces **no measurable
+  improvement** in prefix quality
+- Hold-out full-parse remains 0/13 for both (parse is binary → less
+  sampling noise → single-seed reliable)
+
+**Methodological lesson**: eval the prefix-parse metric always multi-
+seed (n≥3). Commit-frequently discipline served the correction well —
+the wrong entry is immutable below, the right entry is this one.
+
+**Reprioritization (again — the probe-only verdict is obsolete twice now):**
+- **#3 alone**: still rejected (0/13 holds)
+- **#1 rnix-gated decoding**: still plausibly viable. 20-25 byte
+  material is thinner than the retracted 47 suggested, but still
+  non-trivial (bare-identifier tokens). Implementation risk: thin.
+  Worth shipping a prototype to check if gating extends the median
+  20-byte prefix to 40+ bytes in practice.
+- **#2 structure-aware loss**: unchanged — the best single bet for
+  producing a model that emits structurally-valid Nix.
+
 ## 2026-04-19 — #3 retraining experiment: **0/13 baseline, 0/13 extended** (data alone doesn't help — but prefix length 2×)
 
 Follow-up to the earlier 0/9 entry (same day). Probe showed the M7
