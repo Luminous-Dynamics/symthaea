@@ -872,6 +872,17 @@ impl SymbolicRegressor {
             1.0
         };
 
+        // Pinned log-space candidates: exp-wrapped formulas discovered in
+        // log-space. These get inserted into the population AND tracked as
+        // guaranteed-available candidates, so tournament selection can't
+        // silently filter them out before we reach the top-k return. The
+        // original "insert one copy into a random slot" approach failed
+        // on `derangements`/`fubini`/`motzkin`/`stirling_sum` because the
+        // exp-wrapped formula has training_mse orders of magnitude worse
+        // than a GP-discovered polynomial approximation on the first few
+        // points — it loses tournament on partial fits even when it would
+        // dominate on the full sequence.
+        let mut log_space_pinned: Vec<Expr> = Vec::new();
         if all_positive && growth > 50.0 {
             let log_train: Vec<(f64, f64)> = train.iter().map(|(x, y)| (*x, y.ln())).collect();
             let log_seq =
@@ -899,14 +910,26 @@ impl SymbolicRegressor {
             });
             let log_results = log_regressor.fit(&log_seq, 2);
 
-            // If log-space fit is good, wrap in exp() and add to population
+            // Tightened acceptance: log-space training_mse < 0.1 means the
+            // predicted log differs from the real log by ≤ 0.1 on average,
+            // i.e. the exp-wrapped formula is within a factor of ~1.1×
+            // of the true value. That's a meaningful closed-form recovery.
+            // The old threshold (< 1.0) accepted factor-of-e errors.
             for lr in &log_results {
-                if lr.training_mse < 1.0 {
+                if lr.training_mse < 0.1 {
                     let exp_wrapped = Expr::Func(UnaryFn::Exp, Box::new(lr.formula.clone()));
-                    // Replace a random individual with the exp-wrapped log-space formula
-                    self.rng = lcg_step(self.rng);
-                    let idx = self.rng as usize % self.population.len();
-                    self.population[idx] = exp_wrapped;
+                    // Keep the exp-wrapped formula as a pinned candidate:
+                    // we'll re-evaluate it on the original training data
+                    // after GP evolution and include it in the top-k if
+                    // it beats the evolved population.
+                    log_space_pinned.push(exp_wrapped.clone());
+                    // Also inject into the population — 3 copies (was 1)
+                    // so tournament selection has more chances to keep it.
+                    for _ in 0..3 {
+                        self.rng = lcg_step(self.rng);
+                        let idx = self.rng as usize % self.population.len();
+                        self.population[idx] = exp_wrapped.clone();
+                    }
                 }
             }
         }
@@ -1197,7 +1220,8 @@ impl SymbolicRegressor {
             }
         }
 
-        results
+        // Build the GP-discovered top-k.
+        let mut candidates: Vec<Conjecture> = results
             .iter()
             .take(top_k)
             .filter(|(fit, _, _)| fit.is_finite() && *fit < 1e10)
@@ -1222,7 +1246,52 @@ impl SymbolicRegressor {
                     macro_promotion_tier: MacroPromotionTier::RecurrentNumerical,
                 }
             })
-            .collect()
+            .collect();
+
+        // Merge in log-space-pinned candidates. These are exp-wrapped
+        // formulas discovered in log-space that may have lost tournament
+        // selection in the original space. Evaluate each on the original
+        // training data; if its fitness beats the GP top-k's worst, it
+        // displaces the worst and we re-sort. This is the fix for the
+        // `derangements`/`fubini`/`motzkin`/`stirling_sum` cluster —
+        // super-exponential sequences where the log-space fit is the
+        // natural answer but tournament selection in linear space
+        // preferred polynomial approximants on partial data.
+        for pinned_expr in &log_space_pinned {
+            let mse = compute_mse(pinned_expr, &train);
+            if !mse.is_finite() {
+                continue;
+            }
+            let complexity = pinned_expr.complexity();
+            let fitness = mse + self.config.lambda * complexity as f64;
+            let conj = Conjecture {
+                formula: pinned_expr.clone(),
+                formula_str: format!("{}", pinned_expr),
+                source: seq.name.clone(),
+                domain: seq.domain,
+                training_mse: mse,
+                complexity,
+                fitness,
+                status: ConjectureStatus::Proposed,
+                confidence: if mse < 1e-6 {
+                    0.8
+                } else if mse < 1.0 {
+                    0.5
+                } else {
+                    0.1
+                },
+                macro_promotion_tier: MacroPromotionTier::RecurrentNumerical,
+            };
+            candidates.push(conj);
+        }
+        // Re-sort by fitness ascending (lower = better) and take top_k.
+        candidates.sort_by(|a, b| {
+            a.fitness
+                .partial_cmp(&b.fitness)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        candidates.truncate(top_k);
+        candidates
     }
 
     fn tournament_select(&mut self, scored: &[(usize, f64, f64)]) -> usize {
