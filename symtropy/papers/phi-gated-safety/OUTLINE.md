@@ -222,7 +222,9 @@ required for single-point-of-failure hazardous actions (cautery).
   ticks): we ran 1,000-tick traces across all six adopter platform
   types. All produce the identical band [0.1031, 0.1450] with mean
   0.131, p95 0.145. 48–51 % of frames sit above 0.135 for every
-  platform and every trial seed.
+  platform and every trial seed. **Figure 4** shows the overlaid Φ
+  traces and distribution histograms — the six platform lines lie
+  perfectly on top of each other.
 - **Mechanism (honest)**: the band is platform-invariant NOT because
   each platform's observation stream happens to induce similar Φ, but
   because `RoboticAgent::tick` (at `symtropy-robotics-bridge/src/

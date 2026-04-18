@@ -40,6 +40,11 @@ envelope, and shows the result replicates to a second platform
   on the quadrotor. TierGate 0.180 ± 0.078 N (20.8 % red-frames);
   SprintFloor 0.275 ± 0.040 N (0 % red-frames). Paired advantage
   **+71.4 %**, 95 % CI [+54.1, +88.6] at N=30.
+- `figures/figure4_phi_invariance.png` — Structural Φ-invariance
+  across platforms. 1,000-tick traces from 6 platforms overlaid —
+  all produce the identical band [0.103, 0.145]. Mechanism:
+  `RoboticAgent::tick` builds `ConsciousnessInputs` purely from
+  `danger_level`; observation vector is discarded. See §8.
 - `figures/render_figures.py` — Pure-matplotlib renderer for all three
   figures. Dependencies via `nix-shell` (see Reproducing below).
 

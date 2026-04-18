@@ -269,10 +269,103 @@ def render_flight_benchmark():
     print(f"wrote {out} (N={n}, sprint-floor advantage +{adv_m:.1f} %)")
 
 
+# ── Figure 4: Structural Φ-invariance across platforms ───────────────
+
+def render_phi_trace_multi():
+    """Overlay Φ traces captured by `phi_trace.rs` across six platforms.
+
+    The lines will lie on top of each other because the `RoboticAgent::tick`
+    implementation computes `ConsciousnessInputs` purely from `danger_level`
+    — the observation vector and platform type don't enter the
+    consciousness computation. Visualizing the overlap makes the §8
+    structural-transferability argument concrete.
+    """
+    trace_dir = DATA_DIR / "phi_trace_multi"
+    if not trace_dir.exists():
+        print(f"skipping figure4: {trace_dir} not found — "
+              "regenerate via `PT_CSV=… cargo run -p symtropy-robotics-"
+              "bridge --example phi_trace --release` per platform")
+        return
+
+    platforms = ["quadrotor", "vehicle", "humanoid", "manipulator",
+                 "auv", "helicopter"]
+    data = {}
+    for p in platforms:
+        csv_path = trace_dir / f"{p}.csv"
+        if not csv_path.exists():
+            continue
+        ts, phis = [], []
+        with open(csv_path) as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                ts.append(int(row["step"]))
+                phis.append(float(row["phi"]))
+        data[p] = (np.array(ts), np.array(phis))
+
+    if not data:
+        print("skipping figure4: no trace CSVs found")
+        return
+
+    fig, (ax_time, ax_hist) = plt.subplots(
+        1, 2, figsize=(11, 4.2), gridspec_kw={"width_ratios": [3, 1]}
+    )
+
+    colors = {
+        "quadrotor": "#1f6ead",
+        "vehicle": "#c0392b",
+        "humanoid": "#27ae60",
+        "manipulator": "#8e44ad",
+        "auv": "#16a085",
+        "helicopter": "#f39c12",
+    }
+
+    # Time-series panel — first 200 ticks for legibility
+    show_to = 200
+    for p, (ts, phis) in data.items():
+        mask = ts < show_to
+        ax_time.plot(ts[mask], phis[mask],
+                     color=colors.get(p, "#555"),
+                     linewidth=0.9, alpha=0.75, label=p)
+    # Threshold line
+    ax_time.axhline(0.135, color="#2c3e50", linestyle="--",
+                    linewidth=1.1, alpha=0.85,
+                    label="SPRINT_THRESHOLD = 0.135")
+    # Manipulator band shading
+    ax_time.axhspan(0.099, 0.145, color="#1f6ead", alpha=0.08)
+    ax_time.set_xlabel("tick")
+    ax_time.set_ylabel(r"$\Phi$ (consciousness-inspired scalar)")
+    ax_time.set_ylim(0.08, 0.16)
+    ax_time.set_title(
+        r"Figure 4 — $\Phi$ is structurally platform-invariant: "
+        r"all 6 traces overlap (first 200 ticks shown)", fontsize=10
+    )
+    ax_time.legend(loc="lower right", fontsize=7, framealpha=0.88, ncol=2)
+    ax_time.grid(alpha=0.25)
+
+    # Histogram panel — distribution of Φ across the full 1000 ticks
+    for p, (_, phis) in data.items():
+        ax_hist.hist(phis, bins=30, alpha=0.35,
+                     color=colors.get(p, "#555"), label=p,
+                     orientation="horizontal")
+    ax_hist.axhline(0.135, color="#2c3e50", linestyle="--", linewidth=1.1)
+    ax_hist.axhspan(0.099, 0.145, color="#1f6ead", alpha=0.08)
+    ax_hist.set_xlabel("count")
+    ax_hist.set_ylim(0.08, 0.16)
+    ax_hist.set_title("distribution (1000 ticks)", fontsize=10)
+    ax_hist.grid(alpha=0.25)
+
+    fig.tight_layout()
+    out = HERE / "figure4_phi_invariance.png"
+    fig.savefig(out, dpi=150)
+    plt.close(fig)
+    print(f"wrote {out} ({len(data)} platforms)")
+
+
 if __name__ == "__main__":
     render_phi_trace()
     render_sp_sweep()
     render_flight_benchmark()
+    render_phi_trace_multi()
     print("\nAll figures rendered. Files:")
     for p in sorted(HERE.glob("figure*.png")):
         print(f"  {p}  ({p.stat().st_size // 1024} KB)")
