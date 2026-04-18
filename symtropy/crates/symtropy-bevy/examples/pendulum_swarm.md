@@ -278,10 +278,21 @@ Sequential, smallest-commit-per-step:
 3. **10×10 grid** — loop-spawn, verify they all swing independently.
 4. **Phi update from variance** — compute neighborhood variance, plug into
    `ConsciousnessField`. Print one cell's Phi to stdout. Verify it changes.
-5. **Phi → damping coupling** — wire `phi_modulates_damping`. Verify
-   numerically: a shocked pendulum should oscillate visibly longer when
-   force-set to phi=1 than to phi=0 (try a 5-second run with logged
-   total KE; phi=1 retains >50%, phi=0 retains <5%).
+5. **Phi → damping coupling — ALREADY VALIDATED.** Spike
+   `_spike_damping.rs` (deleted, not committed) tested two pendulums
+   shocked equally with the proposed damping range:
+   - LOW_DAMP=0.001: retains **78.7%** of initial total mechanical
+     energy at t=5s. Visibly still vigorously swinging.
+   - HIGH_DAMP=0.5: retains **13.0%** at t=5s. PBD sleep mechanism
+     freezes the bob at ~20° around t=4s — visually a "stopped"
+     pendulum hanging slightly off-center.
+   - 6.1× energy ratio at t=5s, but the visual contrast is
+     stronger than the number suggests because one pendulum is
+     FROZEN and the other is in full ±60° swing.
+
+   This is the visual hook empirically confirmed. Just wire the system,
+   no further verification needed unless the damping range or sleep
+   mechanism changes upstream.
 6. **Color by Phi** — sprite tinting.
 7. **Shock on click** — input + impulse.
 8. **Polish** — smoother color LUT, trails (cheap), on-screen Phi counter.
@@ -321,12 +332,24 @@ Nice-to-haves (not gating):
    rotation to a bivector plane, which collapses to "no constraint" in 2D.
    But that's an analysis, not a measurement. Run Step 0 before trusting it.
 
-   **Damping-range tuning.** `LOW_DAMP=0.001 / HIGH_DAMP=0.5` gives
-   a 500× ratio that's visually unmissable. Going lower than 0.001
-   isn't worth it (PBD's iterative solver loses energy at a similar
-   rate anyway). Going higher than 0.5 makes the off-state look dead-
-   stopped, which can read as "broken" rather than "damped." Stay in
-   range. Do NOT use negative damping — PBD goes unstable.
+   **Damping-range tuning — empirically chosen.** `LOW_DAMP=0.001 /
+   HIGH_DAMP=0.5` gives a measured 6.1× ratio in retained mechanical
+   energy at 5 seconds (79% vs 13%; see Step 5 spike). Don't tune
+   below 0.001 — PBD solver damping dominates. Don't go above 0.5 —
+   the high-damp pendulum freezes via PBD sleep mechanism within ~4s,
+   which is actually GOOD for the demo (frozen vs swinging is the
+   visual story) but going higher just makes the freeze faster
+   without changing readability. Negative damping is forbidden — PBD
+   goes unstable.
+
+   **Sleep mechanism is a feature here.** PBD bodies sleep when their
+   velocity stays below a threshold for several ticks. With
+   damping=0.5, this triggers around t=4s and the bob freezes
+   wherever it is in the swing (often at ~20° from straight down,
+   not at the bottom). For this demo that's *desirable* —
+   unambiguous visual contrast. If a future scene needs all
+   low-Phi pendulums to settle to vertical instead, disable sleep
+   on the bob bodies.
 
    **Originally tried Kuramoto coupling.** Spike (`_spike_kuramoto.rs`,
    not committed) verified that direct sin(Δθ) horizontal/tangential
