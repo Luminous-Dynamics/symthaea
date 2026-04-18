@@ -73,6 +73,47 @@ the scorer doesn't yet walk. Filed as a scorer-capability follow-up.
 
 Reproduce: `cargo run --features code_generation --example nix_eval_benchmark -- --goldens-only`
 
+### 2026-04-18 — Goldens backfill round 2 (+13 → 26)
+
+Added 13 more goldens targeting the weakest intents + deliberately
+including goldens that surface known codegen gaps. **23/26 (88%)**.
+
+| # | Prompt | Verdict |
+|---|---|---|
+| 1-13 | (as in prior round) | PASS |
+| 14 | enable tailscale VPN | PASS |
+| 15 | configure prometheus monitoring | PASS |
+| 16 | grafana dashboard server | PASS |
+| 17 | configure CUPS printing service | PASS |
+| 18 | enable systemd-resolved for DNS | PASS |
+| 19 | enable nvidia hardware acceleration | PASS |
+| 20 | **configure intel hardware acceleration** | **FAIL** (generator emits `{ # hardware config }` — Intel idiom missing) |
+| 21 | enable hyprland wayland compositor | PASS |
+| 22 | set up hyprland with fonts | PASS |
+| 23 | set up gnome desktop environment | PASS |
+| 24 | open port 8080 in firewall | PASS |
+| 25 | **open udp port 51820 for wireguard** | **FAIL** (generator emits `allowedTCPPorts` instead of `allowedUDPPorts`) |
+| 26 | **set time zone to Africa/Johannesburg** | **FAIL** (generator emits `{ }` — no time-zone idiom) |
+
+**Score: 23/26 (88%)**
+
+The 3 structural failures are legitimate codegen defects surfaced
+by the honest scoring. Same pattern as the RUSTC_WRAPPER fix earlier
+this session: scorer catches what substring matching misses. Each is
+a small, tractable idiom-library addition:
+
+- Intel GPU: `emit_hardware` needs an Intel branch (`hardware.graphics
+  .enable = true;` + VA-API packages).
+- UDP port: `emit_networking` needs to detect "udp" in prompt and emit
+  `allowedUDPPorts` instead of `allowedTCPPorts`.
+- Time zone: no time/locale intent exists — likely needs a new `Time`
+  variant of `NixIntent` or a sub-branch of `Generic`.
+
+**Value-of-workflow demonstration:** the substring scorer approved the
+timezone-returns-empty case (empty config has no forbidden substrings,
+no required substrings either). The structural scorer demands a
+positive assertion. That's the whole point of P1.
+
 ### 2026-04-18 — Full-corpus run in `--structural` mode
 
 Same-day run across all 94 problems. Shows how the structural and

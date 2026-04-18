@@ -27,16 +27,37 @@ pub fn golden_for(prompt: &str) -> Option<&'static str> {
         "enable redis cache server" => Some(REDIS_ENABLE),
         "enable docker and add my user to the docker group" => Some(DOCKER_ENABLE),
         "set up ipfs kubo node" => Some(IPFS_KUBO),
+        "enable tailscale VPN" => Some(TAILSCALE_VPN),
+        "configure prometheus monitoring" => Some(PROMETHEUS_MONITORING),
+        "grafana dashboard server" => Some(GRAFANA_SERVER),
+        "configure CUPS printing service" => Some(CUPS_PRINTING),
+        "enable systemd-resolved for DNS" => Some(RESOLVED_DNS),
 
         // ── Hardware ──
         "configure nvidia gpu drivers" => Some(NVIDIA_DRIVERS),
+        "enable nvidia hardware acceleration" => Some(NVIDIA_DRIVERS),
+        // Expected FAIL: generator currently punts with `{ # hardware config }`.
+        // Keeping this entry surfaces the gap in --goldens-only output.
+        "configure intel hardware acceleration" => Some(INTEL_HW_ACCEL),
 
         // ── Desktop ──
         "set up sway window manager" => Some(SWAY_WM),
         "enable kde plasma desktop environment" => Some(KDE_PLASMA),
+        "enable hyprland wayland compositor" => Some(HYPRLAND_BASIC),
+        "set up hyprland with fonts" => Some(HYPRLAND_WITH_FONTS),
+        "set up gnome desktop environment" => Some(GNOME_BASIC),
 
         // ── Networking ──
         "open firewall ports 80 and 443" => Some(FIREWALL_80_443),
+        "open port 8080 in firewall" => Some(FIREWALL_8080),
+        // Expected FAIL: generator emits allowedTCPPorts instead of
+        // allowedUDPPorts. Surfaces a legitimate codegen defect.
+        "open udp port 51820 for wireguard" => Some(FIREWALL_UDP_51820),
+
+        // ── Time / locale ──
+        // Expected FAIL: generator currently emits `{ }`. Golden
+        // demands time.timeZone. Surfaces the gap.
+        "set time zone to Africa/Johannesburg" => Some(TIMEZONE_JHB),
 
         // ── Dev Shells ──
         "set up a rust dev environment with rust-analyzer and mold" => {
@@ -54,7 +75,7 @@ pub fn golden_for(prompt: &str) -> Option<&'static str> {
 /// scorer vs. falling through to substring.
 pub fn golden_count() -> usize {
     // Keep in sync with `golden_for` — one short function, manually audited.
-    13
+    26
 }
 
 // ── Service goldens ───────────────────────────────────────────────────────
@@ -120,10 +141,94 @@ const KDE_PLASMA: &str = r#"{
 }
 "#;
 
+// Extra service goldens (round 2).
+const TAILSCALE_VPN: &str = r#"{
+  services.tailscale.enable = true;
+}
+"#;
+
+const PROMETHEUS_MONITORING: &str = r#"{
+  services.prometheus.enable = true;
+}
+"#;
+
+const GRAFANA_SERVER: &str = r#"{
+  services.grafana.enable = true;
+}
+"#;
+
+const CUPS_PRINTING: &str = r#"{ pkgs, ... }:
+{
+  services.printing.enable = true;
+}
+"#;
+
+const RESOLVED_DNS: &str = r#"{
+  services.resolved.enable = true;
+}
+"#;
+
+// ── Extra hardware golden (round 2) ────────────────────────────────────
+
+// Intent: Intel GPU requires `hardware.graphics.enable = true` and VA-API
+// driver packages. Generator currently emits `{ # hardware config }`
+// (a comment-only attrset), so this golden is expected to FAIL the
+// structural check — and that's the point. The scorer surfacing the
+// gap is the signal we want.
+const INTEL_HW_ACCEL: &str = r#"{ pkgs, ... }:
+{
+  hardware.graphics.enable = true;
+}
+"#;
+
+// ── Extra desktop goldens (round 2) ────────────────────────────────
+
+const HYPRLAND_BASIC: &str = r#"{ config, pkgs, ... }:
+{
+  programs.hyprland.enable = true;
+}
+"#;
+
+const HYPRLAND_WITH_FONTS: &str = r#"{ config, pkgs, ... }:
+{
+  programs.hyprland.enable = true;
+  fonts.packages = with pkgs; [ noto-fonts ];
+}
+"#;
+
+const GNOME_BASIC: &str = r#"{ config, pkgs, ... }:
+{
+  services.xserver.enable = true;
+  services.xserver.desktopManager.gnome.enable = true;
+}
+"#;
+
 // ── Networking goldens ────────────────────────────────────────────────────
 
 const FIREWALL_80_443: &str = r#"{
   networking.firewall.allowedTCPPorts = [ 80 443 ];
+}
+"#;
+
+const FIREWALL_8080: &str = r#"{
+  networking.firewall.allowedTCPPorts = [ 8080 ];
+}
+"#;
+
+// Expected FAIL: generator emits allowedTCPPorts even when the prompt
+// says "udp". Real codegen defect that the structural scorer flags.
+const FIREWALL_UDP_51820: &str = r#"{
+  networking.firewall.allowedUDPPorts = [ 51820 ];
+}
+"#;
+
+// ── Time / locale golden ───────────────────────────────────────────────
+
+// Expected FAIL: generator currently emits `{ }` for time-zone prompts.
+// Requires a new idiom in `emit_*` to match. Golden gates on the
+// correct option path.
+const TIMEZONE_JHB: &str = r#"{
+  time.timeZone = "Africa/Johannesburg";
 }
 "#;
 
@@ -171,10 +276,23 @@ pub fn score_all_goldens() -> Vec<(&'static str, bool, String)> {
         "enable redis cache server",
         "enable docker and add my user to the docker group",
         "set up ipfs kubo node",
+        "enable tailscale VPN",
+        "configure prometheus monitoring",
+        "grafana dashboard server",
+        "configure CUPS printing service",
+        "enable systemd-resolved for DNS",
         "configure nvidia gpu drivers",
+        "enable nvidia hardware acceleration",
+        "configure intel hardware acceleration",
         "set up sway window manager",
         "enable kde plasma desktop environment",
+        "enable hyprland wayland compositor",
+        "set up hyprland with fonts",
+        "set up gnome desktop environment",
         "open firewall ports 80 and 443",
+        "open port 8080 in firewall",
+        "open udp port 51820 for wireguard",
+        "set time zone to Africa/Johannesburg",
         "set up a rust dev environment with rust-analyzer and mold",
         "rust dev shell with sccache and openssl",
         "set up a node development environment with typescript",
@@ -205,10 +323,22 @@ mod tests {
             REDIS_ENABLE,
             DOCKER_ENABLE,
             IPFS_KUBO,
+            TAILSCALE_VPN,
+            PROMETHEUS_MONITORING,
+            GRAFANA_SERVER,
+            CUPS_PRINTING,
+            RESOLVED_DNS,
             NVIDIA_DRIVERS,
+            INTEL_HW_ACCEL,
             SWAY_WM,
             KDE_PLASMA,
+            HYPRLAND_BASIC,
+            HYPRLAND_WITH_FONTS,
+            GNOME_BASIC,
             FIREWALL_80_443,
+            FIREWALL_8080,
+            FIREWALL_UDP_51820,
+            TIMEZONE_JHB,
             RUST_SHELL_ANALYZER_MOLD,
             RUST_SHELL_SCCACHE_OPENSSL,
             NODE_TYPESCRIPT_SHELL,
@@ -246,10 +376,23 @@ mod tests {
             "enable redis cache server",
             "enable docker and add my user to the docker group",
             "set up ipfs kubo node",
+            "enable tailscale VPN",
+            "configure prometheus monitoring",
+            "grafana dashboard server",
+            "configure CUPS printing service",
+            "enable systemd-resolved for DNS",
             "configure nvidia gpu drivers",
+            "enable nvidia hardware acceleration",
+            "configure intel hardware acceleration",
             "set up sway window manager",
             "enable kde plasma desktop environment",
+            "enable hyprland wayland compositor",
+            "set up hyprland with fonts",
+            "set up gnome desktop environment",
             "open firewall ports 80 and 443",
+            "open port 8080 in firewall",
+            "open udp port 51820 for wireguard",
+            "set time zone to Africa/Johannesburg",
             "set up a rust dev environment with rust-analyzer and mold",
             "rust dev shell with sccache and openssl",
             "set up a node development environment with typescript",
