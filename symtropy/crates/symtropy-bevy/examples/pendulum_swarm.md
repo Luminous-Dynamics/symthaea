@@ -9,20 +9,28 @@ and [GAME_ENGINE_COMPONENTS.md](../../../docs/GAME_ENGINE_COMPONENTS.md).
 ## What this demo shows
 
 A 10×10 grid of pendulums. Each pendulum is a physics body hinged to a fixed
-pivot point above it. **Phi modulates Kuramoto-style phase coupling** between
-neighbors — at low Phi each pendulum swings independently and the grid looks
-like noise; as Phi climbs, neighbors pull each other into phase-lock and the
-grid begins to oscillate as a single sheet.
+pivot point above it. **Phi controls dissipation in a positive-feedback loop**
+— a shocked pendulum has high local kinetic energy, which raises Phi in its
+neighborhood, which *suppresses damping* there, which lets the energy keep
+oscillating, which keeps Phi high. Outside that region, damping is high and
+any residual motion dies in ~1 second.
 
 Click anywhere to "shock" the nearest pendulum (inject angular velocity).
-Watch synchronization propagate across the grid as the shock raises local Phi
-and the coupling kernel kicks in.
+Watch a *sustained-motion wave* spread across the grid as Phi propagates
+through neighborhoods that have inherited some kinetic energy from the shock.
+Behind the wavefront, pendulums fall silent again as their KE bleeds out and
+Phi drops.
 
-Color encodes Phi per pendulum (cool → warm LUT).
+Color encodes Phi per pendulum (cool → warm LUT). The visible result is a
+travelling band of brightly-coloured, vigorously-swinging pendulums on a
+darker background of stilled ones.
 
 **The thing a visitor should feel:** "Consciousness isn't a metaphor in this
-engine — Φ literally changes how the physics behaves." The phase-lock effect
-reads in ~2 seconds; a damping-only effect would take 10+ seconds to notice.
+engine — Φ literally changes how the physics behaves." The shock-spreads-as-
+sustain-wave reads in 2-4 seconds and is empirically reliable (see Step 0.5
+spike notes; the Kuramoto phase-lock approach we tried first did not produce
+clean phase-lock with simple linear-velocity kicks on equal-frequency PBD
+pendulums).
 
 ---
 
@@ -92,7 +100,7 @@ struct Pendulum {
     body: BodyHandle,                // the swinging dynamic body
     pivot_body: BodyHandle,          // the static "pivot" body (mass=∞)
     pivot_pos: Vec2,                 // screen coords of the pivot, for input/visuals
-    neighbors: Vec<BodyHandle>,      // up to 8 grid neighbors for Kuramoto coupling
+    neighbors: Vec<BodyHandle>,      // up to 8 grid neighbors for Phi diffusion
 }
 
 #[derive(Component)]
@@ -145,7 +153,8 @@ default). User systems split:
 - `update_phi_from_neighborhood` — must run BEFORE physics_step picks up
   the field state. Acceptable to run after on some ticks (one-tick delay
   invisible at 60 Hz).
-- `phi_couples_neighbors` — applies Kuramoto impulses; same ordering note.
+- `phi_modulates_damping` — writes per-body `linear_damping` from Phi;
+  same ordering note (a one-tick stale damping value is invisible at 60 Hz).
 
 **Update (variable-rate, render-driven):**
 - `color_by_phi` — visual only, can interpolate.
@@ -172,23 +181,25 @@ Detail per system:
      scalar — deliberate simplification for demo clarity).
    - `physics.field.update_entity(handle, &inputs, Point::new([pos.x, pos.y]))`.
 
-3. **`phi_couples_neighbors` (FixedUpdate)** — for each pendulum:
+3. **`phi_modulates_damping` (FixedUpdate)** — for each pendulum:
    - `let phi = physics.field.phi(handle)` → `f64` in [0, 1].
-   - Read own position via `physics.world.body(handle).position()`; compute
-     swing angle `θ = atan2(pos.x - pivot.x, pivot.y - pos.y)` (zero when
-     hanging straight down).
-   - For each neighbor handle `n`, compute `Δθ = θ_n - θ` and apply a
-     horizontal impulse to self. There's no `apply_impulse` method —
-     mutate velocity directly:
+   - Map Phi to per-body damping: `damping = LERP(HIGH_DAMP, LOW_DAMP, phi)`
+     where `HIGH_DAMP = 0.5` (strong, kills motion in ~1 sec) and
+     `LOW_DAMP = 0.001` (essentially conservative; oscillates a long time).
+     500× ratio ensures the visible difference is dramatic.
+   - Write back:
      ```rust
-     if let Some(body) = physics.world.body_mut(self_handle) {
-         body.linear_velocity[0] += K * phi * (delta_theta).sin() / body.mass;
+     if let Some(body) = physics.world.body_mut(handle) {
+         let damp = HIGH_DAMP + (LOW_DAMP - HIGH_DAMP) * (phi as f64).clamp(0.0, 1.0);
+         body.linear_damping = damp;
      }
      ```
-   - `K` global tunable — start at 0.5, expect 0.1-2.0 range. See
-     landmine #1 for stability bounds.
-   - Keep `body.linear_damping = 0.05` (set once at spawn) so the scene
-     rests if left alone.
+   - The positive-feedback loop: shocked pendulum → high KE → high
+     coherence → high Phi → low damping → energy persists → still high KE.
+     Outside the shocked region: low KE → low Phi → high damping → quickly
+     stilled.
+   - Note: do NOT use anti-damping (negative values) — PBD goes unstable.
+     The 500× damping ratio plus the shock energy is enough for the visual.
 
 4. **`color_by_phi` (Update)** — query `(&Pendulum, &mut Sprite)`:
    - Read `physics.field.phi(p.body)`; map to color via
@@ -252,9 +263,10 @@ Sequential, smallest-commit-per-step:
      ≈ 2.37 s`. Measured 2.30 s is within 3% of physics. This is
      correct behavior, not a bug.
    - Energy drift: amplitude shrinks ~7% over 3 periods at default
-     PBD solve iterations. Fine for a demo where pendulums are
-     constantly being shocked + Kuramoto-coupled (which adds energy
-     at high Phi).
+     PBD solve iterations. Fine for a demo — high-Phi pendulums use
+     `linear_damping ≈ 0.001` (essentially conservative) so the demo's
+     visible shock-region stays vigorous; surrounding low-Phi pendulums
+     use `linear_damping ≈ 0.5` (intentionally damped fast).
 
    **Decision: DistanceConstraint locked in.** Skip Step 0 unless you
    changed the constraint solver.
@@ -266,9 +278,10 @@ Sequential, smallest-commit-per-step:
 3. **10×10 grid** — loop-spawn, verify they all swing independently.
 4. **Phi update from variance** — compute neighborhood variance, plug into
    `ConsciousnessField`. Print one cell's Phi to stdout. Verify it changes.
-5. **Phi → neighbor coupling** — wire `phi_couples_neighbors`. Verify
-   visually that two adjacent pendulums started 90° out of phase pull
-   into sync within ~3 seconds at phi=1, and ignore each other at phi=0.
+5. **Phi → damping coupling** — wire `phi_modulates_damping`. Verify
+   numerically: a shocked pendulum should oscillate visibly longer when
+   force-set to phi=1 than to phi=0 (try a 5-second run with logged
+   total KE; phi=1 retains >50%, phi=0 retains <5%).
 6. **Color by Phi** — sprite tinting.
 7. **Shock on click** — input + impulse.
 8. **Polish** — smoother color LUT, trails (cheap), on-screen Phi counter.
@@ -284,9 +297,10 @@ The demo ships when ALL of:
 
 - [ ] `cargo run --example pendulum_swarm --release` opens a window at 60 fps
 - [ ] 100 pendulums visible, swinging
-- [ ] Shocking a single pendulum produces a visible *phase-lock* wave
-      through neighbors as Phi climbs locally — the shock spreads as a
-      synchronization front, not just a color front
+- [ ] Shocking a single pendulum produces a visible *sustained-motion*
+      band that spreads through neighbors as Phi climbs locally — the
+      shocked region keeps swinging vigorously while the surrounding
+      grid (low-Phi, high-damping) is visibly stilled
 - [ ] Screenshot captured, saved to `examples/pendulum_swarm_screenshot.png`
 - [ ] README next to the example (this file, rewritten as a user-facing README)
 - [ ] Book chapter `symtropy/book/src/quickstart.md` updated to link this as the
@@ -307,11 +321,21 @@ Nice-to-haves (not gating):
    rotation to a bivector plane, which collapses to "no constraint" in 2D.
    But that's an analysis, not a measurement. Run Step 0 before trusting it.
 
-   **Coupling-impulse magnitude.** The Kuramoto kernel adds horizontal
-   impulses every frame. At K=0.5, phi=1, fully out-of-phase neighbors,
-   each pendulum gets ~4 N·s/sec — comparable to gravity's restoring
-   torque on a 60 px arm. If the grid goes unstable, halve K and check
-   the impulse-vs-mass ratio before adding more damping.
+   **Damping-range tuning.** `LOW_DAMP=0.001 / HIGH_DAMP=0.5` gives
+   a 500× ratio that's visually unmissable. Going lower than 0.001
+   isn't worth it (PBD's iterative solver loses energy at a similar
+   rate anyway). Going higher than 0.5 makes the off-state look dead-
+   stopped, which can read as "broken" rather than "damped." Stay in
+   range. Do NOT use negative damping — PBD goes unstable.
+
+   **Originally tried Kuramoto coupling.** Spike (`_spike_kuramoto.rs`,
+   not committed) verified that direct sin(Δθ) horizontal/tangential
+   velocity kicks do NOT produce phase-lock between equal-frequency
+   PBD pendulums — even at K=10 with proper tangential direction,
+   coupled mean |Δθ| was 0.71 rad vs uncoupled 0.74 rad (statistical
+   tie). Real coupled-oscillator demos like Huygens' clocks rely on
+   shared-medium coupling (a swaying wall). For a self-contained
+   demo, damping modulation is the right primitive.
 
 2. **Phi-neighborhood compute cost.** 100 pendulums × 9 neighbors = 900
    variance computations per frame. Trivial, but if we push to 1000
