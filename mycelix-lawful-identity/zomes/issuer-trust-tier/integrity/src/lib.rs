@@ -19,6 +19,16 @@ pub enum IssuerTier {
     Peer,
 }
 
+impl IssuerTier {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            IssuerTier::Sovereign => "sovereign",
+            IssuerTier::RegulatedIntermediary => "regulated_intermediary",
+            IssuerTier::Peer => "peer",
+        }
+    }
+}
+
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct IssuerClassification {
@@ -41,5 +51,42 @@ pub enum EntryTypes {
 #[hdk_link_types]
 pub enum LinkTypes {
     /// Per-tier anchor → classifications at that tier.
+    /// The anchor is a Path keyed by tier string (e.g., "tier/sovereign").
     TierAnchor,
+    /// Per-issuer anchor → classification history for that issuer.
+    /// The anchor is a Path keyed by issuer DID (e.g., "issuer/did:web:state.gov").
+    IssuerAnchor,
+}
+
+// ============================================================================
+// Validation
+// ============================================================================
+
+#[hdk_extern]
+pub fn genesis_self_check(_data: GenesisSelfCheckData) -> ExternResult<ValidateCallbackResult> {
+    Ok(ValidateCallbackResult::Valid)
+}
+
+#[hdk_extern]
+pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
+    match op.flattened::<EntryTypes, LinkTypes>()? {
+        FlatOp::StoreEntry(OpEntry::CreateEntry { app_entry, .. }) => match app_entry {
+            EntryTypes::IssuerClassification(entry) => validate_classification(&entry),
+        },
+        _ => Ok(ValidateCallbackResult::Valid),
+    }
+}
+
+fn validate_classification(entry: &IssuerClassification) -> ExternResult<ValidateCallbackResult> {
+    if entry.issuer_did.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "issuer_did empty".to_string(),
+        ));
+    }
+    if entry.classified_at.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "classified_at empty".to_string(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
 }

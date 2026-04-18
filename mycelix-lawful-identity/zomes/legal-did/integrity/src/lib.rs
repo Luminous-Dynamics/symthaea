@@ -66,3 +66,81 @@ pub enum LinkTypes {
     /// LegalDid → credentials held under it.
     LegalDidToCredential,
 }
+
+// ============================================================================
+// Validation
+// ============================================================================
+
+/// Genesis self-check — called when the app is installed. We have no
+/// membership gate; anyone running the cluster can create legal DIDs
+/// under their own agent key.
+#[hdk_extern]
+pub fn genesis_self_check(_data: GenesisSelfCheckData) -> ExternResult<ValidateCallbackResult> {
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate an `Op` against the integrity rules. The legal-did zome
+/// enforces a minimal ruleset: DID strings must start with the legal
+/// prefix, and credentials must reference a non-empty issuer DID.
+/// Richer validation (credential-signature verification, issuer-tier
+/// lookup) happens in the coordinator layer so it can call out to
+/// other zomes.
+#[hdk_extern]
+pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
+    match op.flattened::<EntryTypes, LinkTypes>()? {
+        FlatOp::StoreEntry(OpEntry::CreateEntry { app_entry, .. }) => match app_entry {
+            EntryTypes::LegalDid(did_entry) => validate_legal_did(&did_entry),
+            EntryTypes::LegalCredentialRecord(cred) => validate_credential_record(&cred),
+        },
+        _ => Ok(ValidateCallbackResult::Valid),
+    }
+}
+
+fn validate_legal_did(entry: &LegalDid) -> ExternResult<ValidateCallbackResult> {
+    const PREFIX: &str = "did:mycelix:legal:";
+    if !entry.did.starts_with(PREFIX) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "legal DID must start with \"{PREFIX}\""
+        )));
+    }
+    let suffix = &entry.did[PREFIX.len()..];
+    // Opaque id is 32 bytes = 64 hex chars.
+    if suffix.len() != 64 {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "legal DID opaque id must be 64 hex chars, got {}",
+            suffix.len()
+        )));
+    }
+    if !suffix.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Ok(ValidateCallbackResult::Invalid(
+            "legal DID opaque id must be hex".to_string(),
+        ));
+    }
+    if entry.created_at.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "created_at missing".to_string(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_credential_record(
+    entry: &LegalCredentialRecord,
+) -> ExternResult<ValidateCallbackResult> {
+    if entry.credential_hash.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "credential_hash missing".to_string(),
+        ));
+    }
+    if entry.issuer_did.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "issuer_did missing".to_string(),
+        ));
+    }
+    if entry.credential_type.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "credential_type missing".to_string(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
