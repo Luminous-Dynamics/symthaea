@@ -142,7 +142,7 @@ echo
 info "=== Syncing shared crates ==="
 
 # Direct path crates (same location in both repos)
-for crate_name in mycelix-bridge-common mycelix-bridge-entry-types; do
+for crate_name in mycelix-bridge-common mycelix-bridge-entry-types mycelix-leptos-core mycelix-leptos-client; do
     sync_dir \
         "${MONOREPO_ROOT}/crates/${crate_name}" \
         "${STANDALONE_REPO}/crates/${crate_name}"
