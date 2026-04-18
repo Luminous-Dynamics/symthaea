@@ -301,9 +301,58 @@ required for single-point-of-failure hazardous actions (cautery).
   2.25–2.5 m crossover band still shows ISO std > mean, so the
   exact crossover S_p is uncertain within ~0.25 m.
 - The `MasterConsciousnessEquation`'s monotonic compressive output
-  [0.099, 0.145] band is a source of fragility — the sprint threshold
-  is close to the empirical max. Widening the equation's dynamic range
-  at the source would make thresholds less sensitive.
+  band (pre-wiring [0.099, 0.145], post-wiring [0.088, 0.133]) is a
+  source of fragility — the sprint threshold is close to the
+  empirical max. Widening the equation's dynamic range at the source
+  would make thresholds less sensitive.
+
+#### §9.2 Post-wiring update — what shifts when FEP actually feeds Φ
+
+Between the paper's original measurements (N=30 runs committed as
+`ad43b0934c` and `c62d12c048`, under commit ≤`6517226491`) and the
+current state of `main` (commit `996750d12b`+), `RoboticAgent::tick`
+was rewritten to thread FEP signals into `ConsciousnessInputs`. Under
+the old implementation, four `ConsciousnessInputs` fields were
+hardcoded and the observation vector was passed to `fep.perceive()`
+but the return discarded — meaning Φ depended only on `danger_level`.
+The §8 first version of this paper treated the resulting platform-
+invariant Φ distribution as "structural transferability". We now
+recognize that framing as rationalizing a bug.
+
+**What re-running Figure 1 showed** (1,000 ticks, post-wiring code):
+
+  pre-wiring  band = [0.099, 0.145]   mean = 0.131   p50 = 0.134
+  post-wiring band = [0.088, 0.135]   mean = 0.117   p50 = 0.121
+
+SPRINT_THRESHOLD recalibrated 0.135 → 0.125 (commit `9a18244dc5`) to
+preserve the same relative position in the band.
+
+**What spot-check re-running §4 showed** (N=5 for sanity, not a paper
+number): Adaptive vs ISO SSM advantage remains negative at -82.9 %
+(was -75.7 % at N=30), direction unchanged. Φ-SprintFloor under
+post-wiring code is mean 1.0 cycles/100s, std 1.37 (was std 0.0).
+The "never dead-arms" story weakens — some trials now produce 0
+sprints because FEP-modulated Φ drops below even 0.125 on some
+trial seeds. The net advantage direction at S_p = 2.5 m is expected
+to still favor SprintFloor, but the tight +178.6 % number will
+likely shift (direction uncertain pending a full N=30 re-run,
+~60 min wall-clock).
+
+**What has NOT been re-run**: the full §6 S_p sweep (compute-heavy);
+the §4 5-variant Recalibrated-vs-SprintFloor equivalence (the paper's
+"matches to three decimal places" claim is likely no longer tight —
+post-wiring, Recalibrated's Green boundary at 0.135 almost never
+fires, so the two variants diverge).
+
+**Honest reading**: the paper's numbers in Figures 1/2 and §4/§5 are
+historical measurements under the pre-FEP-wiring supervisor. The
+current supervisor is genuinely platform-aware at the code level but
+the paper has not been re-measured end-to-end against it. For
+submission, either (a) re-run all benchmarks under current code and
+update every figure, or (b) explicitly scope the paper to "Phase 1:
+platform-agnostic supervisor" and frame the FEP-wiring result as
+"Phase 2: future work, shown here as code evidence that the
+observation channel is now live."
 
 #### §9.1 Hardware-validation plan (§9-inset, for ~¾-page)
 

@@ -77,8 +77,8 @@ def render_phi_trace():
                    label=f"empirical band [{phi_lo:.3f}, {phi_hi:.3f}]")
     # Sprint threshold the recalibrated mapping uses
     ax_phi.axhline(
-        0.135, color="#8e44ad", linewidth=1.5, linestyle=":",
-        label="SprintFloor threshold (0.135)"
+        0.125, color="#8e44ad", linewidth=1.5, linestyle=":",
+        label="SprintFloor threshold (0.125, post-FEP-wiring)"
     )
 
     ax_phi.set_ylabel(r"$\Phi$")
