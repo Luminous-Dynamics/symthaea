@@ -11,6 +11,18 @@
     --border: #2a3444;
     --warning: #eab308;
     --error: #ef4444;
+
+    /* === Mycelix Design-System semantic tokens (consumed by mycelix-leptos-core
+       primitives TelemetryLine, GraphNode, FlowIndicator).
+       Each cluster re-maps these to its own palette. === */
+    --md-base: var(--bg-primary);
+    --md-fg: var(--text-primary);
+    --md-fg-muted: var(--text-secondary);
+    --md-signal: #38bdf8;             /* sky-cyan, watershed live-flow */
+    --md-consensus: var(--warning);   /* gold, verified state */
+    --md-care: var(--accent);         /* commons' grow-green */
+    --md-alarm: var(--error);
+    --md-mono: ui-monospace, 'JetBrains Mono', 'Iosevka', 'Berkeley Mono', monospace;
 }
 
 @media (prefers-color-scheme: light) {
