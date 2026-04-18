@@ -212,21 +212,21 @@ fn conclusion_is_and(phi: &FolFormulaExt) -> bool {
     }
 }
 
-/// Does any term in the conclusion contain a `Div` binop whose right side
+/// Does any term in the formula contain a `Div` binop whose right side
 /// contains a free variable (i.e. division by a symbolic expression)?
 ///
-/// Used to gate the Phase 5 `field_simp` cascade branch. Goals like
-/// `mathd_algebra_55` (`q / p = 2 / 3`) can't be closed by `linarith` or
-/// `nlinarith` because they don't reason about fields; they need
-/// `field_simp` to clear denominators first (plus, for the specific
-/// miniF2F-v2 shape where hypotheses evaluate the symbolic denominator
-/// to a numeric literal, `subst_eqs` to substitute first).
+/// Checks the *entire* formula including hypotheses, not just the
+/// conclusion. Used to gate the Phase 5 `field_simp` cascade branch.
+/// `mathd_algebra_55` (`q / p = 2 / 3`) has division in the conclusion;
+/// `mathd_algebra_181` (`(n+5)/(n-3) = 2 → n = 11`) has division in a
+/// *hypothesis* with a linear conclusion. Both need `field_simp` to
+/// clear denominators; a conclusion-only check misses the second.
 ///
 /// Division by a pure literal (`x/50 = 40` in `mathd_algebra_24`) is
 /// NOT flagged — `linarith` handles that case fine because the literal
 /// denominator is statically known nonzero. Only symbolic denominators
 /// trigger the field branch.
-fn conclusion_has_division(phi: &FolFormulaExt) -> bool {
+fn formula_has_symbolic_division(phi: &FolFormulaExt) -> bool {
     fn term_has_sym_div(t: &Term) -> bool {
         match t {
             Term::Var(_) | Term::IntLit(_) | Term::RealLit(_) | Term::RatLit(_, _) => false,
@@ -241,29 +241,27 @@ fn conclusion_has_division(phi: &FolFormulaExt) -> bool {
             Term::Neg(a) => term_has_sym_div(a),
         }
     }
-    fn formula_has_sym_div(phi: &FolFormulaExt) -> bool {
+    fn go(phi: &FolFormulaExt) -> bool {
         match phi {
             FolFormulaExt::Base(_) => false,
             FolFormulaExt::Eq(a, b) | FolFormulaExt::Lt(a, b) | FolFormulaExt::Le(a, b) => {
                 term_has_sym_div(a) || term_has_sym_div(b)
             }
             FolFormulaExt::And(a, b) | FolFormulaExt::Or(a, b) | FolFormulaExt::Implies(a, b) => {
-                formula_has_sym_div(a) || formula_has_sym_div(b)
+                go(a) || go(b)
             }
-            FolFormulaExt::Not(a) => formula_has_sym_div(a),
-            FolFormulaExt::Forall(_, _, body) | FolFormulaExt::Exists(_, _, body) => {
-                formula_has_sym_div(body)
-            }
+            FolFormulaExt::Not(a) => go(a),
+            FolFormulaExt::Forall(_, _, body) | FolFormulaExt::Exists(_, _, body) => go(body),
         }
     }
+    go(phi)
+}
 
-    let mut cur = phi;
-    loop {
-        match cur {
-            FolFormulaExt::Forall(_, _, body) | FolFormulaExt::Implies(_, body) => cur = body,
-            other => return formula_has_sym_div(other),
-        }
-    }
+/// Compatibility alias — named after the Phase 5 semantics where only the
+/// conclusion was scanned. Now scans the whole formula; kept to minimize
+/// call-site churn inside existing tests.
+fn conclusion_has_division(phi: &FolFormulaExt) -> bool {
+    formula_has_symbolic_division(phi)
 }
 
 /// Offsets for the *widened* `sq_nonneg (x ± k)` hints used only in the
@@ -479,8 +477,20 @@ fn synthesize_arith_tactic(phi: &FolFormulaExt, fragment: SmtFragment) -> (LeanT
     // unconditionally risks the same kind of heartbeat blowup we saw
     // with the unconditional And-splitter in Phase 4a.
     let field_simp_alt = if conclusion_has_division(phi) {
+        // Two field sub-branches:
+        //
+        // 1. `subst_eqs + field_simp + closers` — the mathd_algebra_55
+        //    pattern (hypotheses evaluate the symbolic denominator to a
+        //    numeric literal; subst collapses it, then norm_num closes).
+        // 2. `field_simp at * + closers` — the mathd_algebra_181 pattern
+        //    (division in a *hypothesis* with linear goal; `field_simp
+        //    at *` clears denominators in every hypothesis + goal,
+        //    leaving a polynomial problem linarith/nlinarith can close).
+        //
+        // Both sub-branches are wrapped in `try`-guarded setups so the
+        // cascade skips cleanly when the precondition doesn't match.
         format!(
-            "\n    | (try subst_eqs; try field_simp; first | (norm_num; done) | (ring; done) | (linarith; done) | (nlinarith [{hints_compact}]; done); done)",
+            "\n    | (try subst_eqs; try field_simp; first | (norm_num; done) | (ring; done) | (linarith; done) | (nlinarith [{hints_compact}]; done); done)\n    | (try (field_simp at *); first | (linarith; done) | (ring; done) | (norm_num; done) | (nlinarith [{hints_compact}]; done); done)",
             hints_compact = hints_compact,
         )
     } else {

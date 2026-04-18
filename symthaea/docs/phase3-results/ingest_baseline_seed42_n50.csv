@@ -8,9 +8,9 @@ mathd_algebra_392,not_parsed,parse,"expected relation operator (= ≠ < ≤ > �
 mathd_algebra_440,translated,,,accepted
 mathd_algebra_119,translated,,,accepted
 mathd_algebra_568,translated,,,accepted
-mathd_algebra_338,translated,,,rejected
-mathd_algebra_69,translated,,,rejected
-mathd_algebra_421,translated,,,rejected
+mathd_algebra_338,translated,,,lake_error
+mathd_algebra_69,translated,,,lake_error
+mathd_algebra_421,translated,,,lake_error
 mathd_algebra_142,translated,,,accepted
 mathd_algebra_427,translated,,,accepted
 mathd_algebra_451,not_parsed,parse,"unknown character 'σ' at offset 112",not_run
@@ -21,7 +21,7 @@ mathd_numbertheory_296,not_parsed,parse,"unknown character '∃' at offset 157",
 mathd_algebra_756,not_parsed,parse,"expected `)` closing parenthesized term, found "":"" at offset 137",not_run
 mathd_algebra_437,not_parsed,parse,"unknown character '↑' at offset 201",not_run
 mathd_numbertheory_541,translated,,,rejected
-mathd_algebra_410,translated,,,lake_error
+mathd_algebra_410,translated,,,accepted
 mathd_algebra_101,translated,,,accepted
 mathd_algebra_33,translated,,,lake_error
 mathd_numbertheory_629,not_parsed,parse,"unknown character '{' at offset 126",not_run
