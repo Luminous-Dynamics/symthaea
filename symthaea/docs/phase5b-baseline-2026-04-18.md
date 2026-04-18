@@ -87,3 +87,17 @@ The numerator didn't change (57 translated) — the 79 excluded files were all f
 **Interpretation:** 60.2% is the honest number for "given a miniF2F file that's in `FolFormulaExt`'s scope, what fraction does the Rust parser read today?" The gap to 100% is now a small set of specific glyphs/grammar shapes (`∣`, `↑`, `∃`, nested `∀`, inline type ascription). Each is a ~20-80 LOC parser extension.
 
 This is the canonical baseline going forward. The 33.3% number from earlier should be cited only in archival context.
+
+## Update — divisibility `∣` support (same day)
+
+Added `∣` (U+2223 DIVIDES) handling: `TokenKind::Divides`, `RelOp::Divides`, translator lowers `a ∣ b` to `∃ _div_witness_N : ℤ, b = a * _div_witness_N` via a counter threaded through `TranslationCtx`. Artifact: `phase5b-baseline-2026-04-18-divisibility.csv`.
+
+| Stage | Before (60.2%) | After (63.3%) | Δ |
+|-------|----------------|---------------|---|
+| Parsed | 59 / 98 | **62 / 98** | +3 |
+| Translated (of parsed) | 57 / 59 (96.6%) | **60 / 62 (96.8%)** | +3 |
+| Translated (of total) | 57 / 98 (58.2%) | **60 / 98 (61.2%)** | +3 |
+
+The prediction was +5 rows; the delivered gain was +3. The shortfall is due to files that contain `∣` *plus* another unsupported construct (e.g. `↑` coercion), which still parse-fail on the secondary glyph. `UnknownChar` histogram dropped from 23 to 20 (matches the 3 `∣` rows now clean).
+
+Witness-counter design note: we thread an integer through `TranslationCtx` that bumps on each `Rel(Divides, _, _)` encountered in a single theorem. Two `∣` in the same formula (e.g. `3 ∣ n ∧ 5 ∣ m`) get `_div_witness_1` and `_div_witness_2`, preventing existential capture. Covered by `translate_multiple_divides_use_distinct_witness_names`.

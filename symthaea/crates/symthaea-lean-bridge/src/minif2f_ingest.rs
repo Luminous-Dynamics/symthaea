@@ -87,6 +87,10 @@ pub enum RelOp {
     Le,
     Gt,
     Ge,
+    /// `a ∣ b` — divisibility. Not a first-order FolFormulaExt
+    /// construct; the translator lowers it to `∃ c : ℤ, b = a * c`
+    /// at translate time with a fresh synthetic witness name.
+    Divides,
 }
 
 /// A logical statement — what appears after the `:` in a binder or as
@@ -281,6 +285,11 @@ pub enum TokenKind {
     /// fields; the parser lowers it to the latter at parse time.
     Reciprocal,
 
+    /// `∣` (U+2223 DIVIDES) — divisibility relation. Parsed as a
+    /// `RelOp` at the statement level; lowered to an existential
+    /// `∃ c : ℤ, b = a * c` by the translator.
+    Divides,
+
     /// End-of-input sentinel — simplifies parser lookahead.
     Eof,
 }
@@ -320,6 +329,7 @@ impl fmt::Display for TokenKind {
             Iff => write!(f, "↔"),
             Not => write!(f, "¬"),
             Reciprocal => write!(f, "⁻¹"),
+            Divides => write!(f, "∣"),
             Eof => write!(f, "<eof>"),
         }
     }
@@ -508,6 +518,7 @@ pub fn tokenize(src: &str) -> Result<Vec<Token>, IngestError> {
                 '→' => TokenKind::Implies,
                 '↔' => TokenKind::Iff,
                 '¬' => TokenKind::Not,
+                '∣' => TokenKind::Divides,
                 _ => return Err(IngestError::UnknownChar { ch, offset: start }),
             };
             out.push(Token {
@@ -836,9 +847,10 @@ impl<'a> Parser<'a> {
             TokenKind::Le => RelOp::Le,
             TokenKind::Gt => RelOp::Gt,
             TokenKind::Ge => RelOp::Ge,
+            TokenKind::Divides => RelOp::Divides,
             other => {
                 return Err(IngestError::Unexpected {
-                    expected: "relation operator (= ≠ < ≤ > ≥)",
+                    expected: "relation operator (= ≠ < ≤ > ≥ ∣)",
                     found: format!("{other}"),
                     offset: self.offset(),
                 })
@@ -981,11 +993,15 @@ impl<'a> Parser<'a> {
 /// Hypothesis binders become a right-associated implication chain
 /// whose final consequent is the translated goal.
 pub fn translate_theorem(t: &LeanTheorem) -> Result<FolFormulaExt, IngestError> {
+    // Translator context threaded through recursive helpers. Currently
+    // just tracks a counter for synthetic `_div_witness_N` names used
+    // to lower divisibility to existentials.
+    let mut ctx = TranslationCtx::default();
     // Body: hyp₁ → hyp₂ → … → goal (right-assoc).
-    let mut body = translate_statement(&t.goal)?;
+    let mut body = translate_statement(&t.goal, &mut ctx)?;
     for b in t.binders.iter().rev() {
         if let LeanBinder::Hyp { stmt, .. } = b {
-            let hyp = translate_statement(stmt)?;
+            let hyp = translate_statement(stmt, &mut ctx)?;
             body = hyp.implies(body);
         }
     }
@@ -999,6 +1015,17 @@ pub fn translate_theorem(t: &LeanTheorem) -> Result<FolFormulaExt, IngestError> 
     Ok(body)
 }
 
+/// Stateful counters threaded through the recursive translator.
+/// Currently just the divisibility-witness counter; expected to grow
+/// as other non-first-order constructs land.
+#[derive(Default)]
+struct TranslationCtx {
+    /// Next numeric suffix for synthetic `_div_witness_N` names emitted
+    /// when lowering `a ∣ b` to `∃ c, b = a * c`. Incremented per
+    /// occurrence so nested divisibility doesn't capture.
+    div_witness_counter: usize,
+}
+
 fn translate_type(t: LeanType) -> NumericType {
     match t {
         LeanType::Real => NumericType::Real,
@@ -1007,7 +1034,10 @@ fn translate_type(t: LeanType) -> NumericType {
     }
 }
 
-fn translate_statement(s: &LeanStatement) -> Result<FolFormulaExt, IngestError> {
+fn translate_statement(
+    s: &LeanStatement,
+    ctx: &mut TranslationCtx,
+) -> Result<FolFormulaExt, IngestError> {
     match s {
         LeanStatement::Rel(op, a, b) => {
             let a = translate_term(a)?;
@@ -1023,20 +1053,37 @@ fn translate_statement(s: &LeanStatement) -> Result<FolFormulaExt, IngestError> 
                 RelOp::Gt => FolFormulaExt::lt(b, a),
                 // `a ≥ b` ≡ `b ≤ a`; flip.
                 RelOp::Ge => FolFormulaExt::le(b, a),
+                // `a ∣ b` ≡ `∃ c : ℤ, b = a * c`. Synthetic witness
+                // name `_div_witness_N` — underscore prefix keeps it
+                // out of Lean's default display; N-suffix counter
+                // prevents capture when the same formula contains
+                // multiple `∣`. ℤ is the broadest common type that
+                // works for both ℕ- and ℤ-valued operands; Lean's
+                // elaborator handles any sub-type coercion.
+                RelOp::Divides => {
+                    ctx.div_witness_counter += 1;
+                    let fresh = format!("_div_witness_{}", ctx.div_witness_counter);
+                    let body = FolFormulaExt::eq(b, a.mul(Term::var(&fresh)));
+                    FolFormulaExt::exists(&fresh, NumericType::Int, body)
+                }
             })
         }
-        LeanStatement::And(p, q) => Ok(translate_statement(p)?.and(translate_statement(q)?)),
-        LeanStatement::Or(p, q) => Ok(translate_statement(p)?.or(translate_statement(q)?)),
+        LeanStatement::And(p, q) => {
+            Ok(translate_statement(p, ctx)?.and(translate_statement(q, ctx)?))
+        }
+        LeanStatement::Or(p, q) => {
+            Ok(translate_statement(p, ctx)?.or(translate_statement(q, ctx)?))
+        }
         LeanStatement::Implies(p, q) => {
-            Ok(translate_statement(p)?.implies(translate_statement(q)?))
+            Ok(translate_statement(p, ctx)?.implies(translate_statement(q, ctx)?))
         }
         LeanStatement::Iff(p, q) => {
             // `p ↔ q` ≡ `(p → q) ∧ (q → p)`; no direct constructor.
-            let p = translate_statement(p)?;
-            let q = translate_statement(q)?;
+            let p = translate_statement(p, ctx)?;
+            let q = translate_statement(q, ctx)?;
             Ok(p.clone().implies(q.clone()).and(q.implies(p)))
         }
-        LeanStatement::Not(p) => Ok(translate_statement(p)?.neg()),
+        LeanStatement::Not(p) => Ok(translate_statement(p, ctx)?.neg()),
     }
 }
 
@@ -1628,5 +1675,102 @@ mod tests {
         let src = "theorem t : 1 = 1 / 0 := by sorry";
         let err = ingest(src).unwrap_err();
         assert_eq!(err.category(), "translate");
+    }
+
+    // ─── divisibility (∣) ────────────────────────────────────────────
+
+    #[test]
+    fn tokenize_divides_is_distinct_from_ascii_pipe() {
+        // U+2223 ∣ lexes as `Divides`; ASCII `|` would currently be
+        // `UnknownChar` (not in our operator set).
+        assert_eq!(
+            kinds("a ∣ b"),
+            vec![
+                TokenKind::Ident("a".into()),
+                TokenKind::Divides,
+                TokenKind::Ident("b".into()),
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_divides_produces_rel_divides_statement() {
+        let src = "theorem t (n : ℕ) (h : 7 ∣ n) : n = 0 := by sorry";
+        let t = parse_theorem(src).unwrap();
+        match &t.binders[1] {
+            LeanBinder::Hyp { stmt, .. } => match stmt {
+                LeanStatement::Rel(RelOp::Divides, l, r) => {
+                    assert_eq!(*l, LeanTerm::IntLit(7));
+                    assert_eq!(*r, LeanTerm::Var("n".into()));
+                }
+                other => panic!("expected Rel(Divides,..), got {other:?}"),
+            },
+            other => panic!("expected Hyp, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn translate_divides_lowers_to_existential_multiplication() {
+        // `7 ∣ n` → `∃ _div_witness_1 : ℤ, n = 7 * _div_witness_1`
+        let src = "theorem t (n : ℕ) (h : 7 ∣ n) : n = 0 := by sorry";
+        let f = ingest(src).unwrap();
+        // Skip the two outer ∀ (for n) + Forall hypothesis chain to
+        // find the Exists introduced by the ∣ translation.
+        fn contains_div_witness_exists(f: &FolFormulaExt) -> bool {
+            match f {
+                FolFormulaExt::Exists(name, _ty, body) => {
+                    name.starts_with("_div_witness_") || contains_div_witness_exists(body)
+                }
+                FolFormulaExt::Forall(_, _, body) => contains_div_witness_exists(body),
+                FolFormulaExt::Implies(p, q)
+                | FolFormulaExt::And(p, q)
+                | FolFormulaExt::Or(p, q) => {
+                    contains_div_witness_exists(p) || contains_div_witness_exists(q)
+                }
+                FolFormulaExt::Not(inner) => contains_div_witness_exists(inner),
+                _ => false,
+            }
+        }
+        assert!(
+            contains_div_witness_exists(&f),
+            "expected _div_witness existential in {f:?}"
+        );
+    }
+
+    #[test]
+    fn translate_multiple_divides_use_distinct_witness_names() {
+        // Two ∣ in the same formula — the counter should give each a
+        // fresh name so the existentials don't capture.
+        let src = "theorem t (n m : ℕ) (h : 3 ∣ n ∧ 5 ∣ m) : n + m = 0 := by sorry";
+        let f = ingest(src).unwrap();
+        fn collect_exists_names(f: &FolFormulaExt, out: &mut Vec<String>) {
+            match f {
+                FolFormulaExt::Exists(name, _, body) => {
+                    out.push(name.clone());
+                    collect_exists_names(body, out);
+                }
+                FolFormulaExt::Forall(_, _, body) => collect_exists_names(body, out),
+                FolFormulaExt::Implies(p, q)
+                | FolFormulaExt::And(p, q)
+                | FolFormulaExt::Or(p, q) => {
+                    collect_exists_names(p, out);
+                    collect_exists_names(q, out);
+                }
+                FolFormulaExt::Not(inner) => collect_exists_names(inner, out),
+                _ => {}
+            }
+        }
+        let mut names = Vec::new();
+        collect_exists_names(&f, &mut names);
+        let witnesses: Vec<&String> = names
+            .iter()
+            .filter(|n| n.starts_with("_div_witness_"))
+            .collect();
+        assert_eq!(
+            witnesses.len(),
+            2,
+            "expected 2 witnesses, got {witnesses:?}"
+        );
+        assert_ne!(witnesses[0], witnesses[1], "witness names must be distinct");
     }
 }
