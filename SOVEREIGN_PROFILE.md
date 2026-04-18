@@ -147,11 +147,10 @@ Default baselines and half-lives are in `collectors.rs`. Communities can overrid
 
 ## TypeScript SDK
 
-Two TypeScript modules mirror the Rust crate:
-- `mycelix-sdk-ts/src/sovereign-profile.ts` — primary SDK
-- `mycelix-workspace/sdk-ts/src/core/sovereign-gate.ts` — workspace SDK with gate middleware
+TypeScript port of the Rust crate lives in the workspace SDK:
+- `mycelix-workspace/sdk-ts/src/core/sovereign-gate.ts` — gate middleware (drop-in replacement for the legacy consciousness-gate)
 
-Both provide: `SovereignProfile`, `CivicTier`, `combinedScore()`, `meetsRequirement()`, `decayScore()`, `daysUntilThreshold()`, `DIMENSION_LABELS`, `WEIGHTS_*` presets.
+Provides: `SovereignProfile`, `CivicTier`, `combinedScore()`, `meetsRequirement()`, `decayScore()`, `daysUntilThreshold()`, `DIMENSION_LABELS`, `WEIGHTS_*` presets.
 
 ## Frontend
 
