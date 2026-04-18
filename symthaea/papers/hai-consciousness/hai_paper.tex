@@ -352,7 +352,7 @@ where intrinsic reward is negative prediction error. The value function is $V_\t
 \subsection{Experimental Setup}
 
 \textbf{Implementation:} Rust, ${\sim}1{,}095$K LOC (93 workspace members, 86 sub-crates), 3,700+ lines core FEP.
-\textbf{Test suite:} 9,700+ tests in main crate, 24,800+ across workspace, 0 failures, 60 ignored (see Figure~\ref{fig:radar} for full validation radar).
+\textbf{Test suite:} 13,000+ tests in main crate, 36,500+ across workspace, 0 failures, 60 ignored (see Figure~\ref{fig:radar} for full validation radar).
 \textbf{HDC Dimension:} $d = 16{,}384$ (configurable).
 \textbf{Baseline:} pymdp v0.0.8~\cite{heins2022pymdp}.
 \textbf{Tasks:} T-Maze (context inference), Grid World 3$\times$3 and 5$\times$5 (navigation).
@@ -1052,7 +1052,7 @@ data using NumPy, Matplotlib, and SciPy. File:
 \textbf{Language:} Rust (Edition 2021)\par
 \textbf{Dependencies:} ndarray, nalgebra, rand, burn (optional GPU), duckdb\par
 \textbf{Lines of code:} ${\sim}1{,}095$K across 93 workspace members (86 sub-crates), ${\sim}3{,}700$ core FEP, ${\sim}17{,}700$ mathematical foundations, ${\sim}8{,}100$ code understanding\par
-\textbf{Test suite:} 9,700+ main crate tests, 24,800+ across workspace, 60 ignored, 0 failures\par
+\textbf{Test suite:} 13,000+ main crate tests, 36,500+ across workspace, 60 ignored, 0 failures\par
 \textbf{SIMD:} AVX2+FMA continuous HV acceleration enabled by default; runtime-dispatched AVX-512/AVX2/SSE4.1 for binary HV operations\par
 \textbf{Feature flags:} 47 (41 with cfg gates in source; remainder are binary-build bundles and meta-groups)\par
 \textbf{Test command:} \texttt{cargo test test\_fep\_active\_inference}\par

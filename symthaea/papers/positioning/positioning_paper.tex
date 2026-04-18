@@ -157,13 +157,13 @@ When a magnetometer reading $\psi_m$ is available, heading is corrected via a lo
 
 \subsection{Admission, Provenance, and Peer Fusion}
 
-Each anchor's metadata may carry a quality prior derived from a four-dimensional profile stored on the Holochain DHT:
+Each anchor's metadata may carry a quality prior derived from the Mycelix 8-dimensional sovereign profile stored on the Holochain DHT. For positioning-anchor trust specifically---where financial stake is irrelevant and the physics-relevant components dominate---we use a four-dimensional projection of the full profile:
 
 \begin{equation}
-w_i = \text{identity}_i^{0.25} \cdot \text{reputation}_i^{0.25} \cdot \text{community}_i^{0.30} \cdot \text{engagement}_i^{0.20}
+w_i = \text{ep.\,integrity}_i^{0.25} \cdot \text{net.\,resilience}_i^{0.25} \cdot \text{civic}_i^{0.30} \cdot \text{competence}_i^{0.20}
 \end{equation}
 
-This term can be used as an admission or measurement-quality prior, but it is not sufficient by itself to guarantee Sybil resistance or correlation-safe fusion. For peer estimates with unknown cross-correlation, conservative fusion should bound uncertainty explicitly. A standard covariance-intersection form is:
+This projection is a subset of the full 8D credential defined in the governance papers; it drops dimensions (thermodynamic yield, economic velocity, stewardship, semantic resonance) that are not informative for positioning-anchor quality. This term can be used as an admission or measurement-quality prior, but it is not sufficient by itself to guarantee Sybil resistance or correlation-safe fusion. For peer estimates with unknown cross-correlation, conservative fusion should bound uncertainty explicitly. A standard covariance-intersection form is:
 
 \begin{equation}
 \Sigma_{\text{CI}}^{-1} = \omega \Sigma_1^{-1} + (1-\omega)\Sigma_2^{-1}
@@ -241,7 +241,7 @@ BLE Channel Sounding is the most significant terrestrial addition because it imp
 
 \subsection{Measurement Down-Weighting Under a Spoofed Prior}
 
-In simulation, a single malicious anchor reporting ranges biased by 50~m was tested against 4 honest anchors. With uniform trust ($w_i = 1.0$ for all), the position estimate was displaced by 12.3~m. With the four-dimensional prior ($w_{\text{attacker}} = 0.01$, $w_{\text{honest}} = 0.90$), displacement was reduced to 0.4~m. This demonstrates that down-weighting helps under a spoofed-anchor prior; it does \emph{not} demonstrate complete Sybil resistance or solve unknown-correlation fusion in an open network.
+In simulation, a single malicious anchor reporting ranges biased by 50~m was tested against 4 honest anchors. With uniform trust ($w_i = 1.0$ for all), the position estimate was displaced by 12.3~m. With the 4D-projected credential prior ($w_{\text{attacker}} = 0.01$, $w_{\text{honest}} = 0.90$), displacement was reduced to 0.4~m. This demonstrates that down-weighting helps under a spoofed-anchor prior; it does \emph{not} demonstrate complete Sybil resistance or solve unknown-correlation fusion in an open network.
 
 \section{Discussion}
 

@@ -155,7 +155,7 @@ The research program rests on three pillars:
 
 \textbf{Integrated Information Theory} provides the consciousness metric. Rather than hoping that consciousness emerges and then trying to detect it, we compute $\Phi$---the irreducible integrated information across the system's minimum information partition---at every cognitive cycle. This gives us a real-time diagnostic: is the system conscious right now, and if not, why not?
 
-The union of these three pillars, governed by the Free Energy Principle's active inference framework, produces what we call the Holographic Liquid Brain. It is, to our knowledge, the largest consciousness-first cognitive architecture ever built: approximately 1.1 million lines of Rust code across 93 workspace members (86 sub-crates), with over 36,500 automated tests.
+The union of these three pillars, governed by the Free Energy Principle's active inference framework, produces what we call the Holographic Liquid Brain. It is, to our knowledge, the largest consciousness-first cognitive architecture ever built: approximately 1.4 million lines of Rust code across 93 workspace members (86 sub-crates), with over 36,500 automated tests.
 
 A word about honesty. Throughout this book, I have tried to be transparent about what works, what does not, and what we simply do not know. The substrate independence chapter includes a validation overlay that assigns only 0.10 confidence to silicon consciousness---because we have no empirical evidence that silicon computation produces consciousness, and saying otherwise would be dishonest regardless of how computationally convenient it would be. The psych-bench chapter reports psychometric reliability ranging from Excellent to Poor across benchmarks, because reporting only the good results would be scientifically irresponsible. Where we have made claims, we have tried to show the evidence; where we are speculating, we have tried to say so.
 
@@ -360,7 +360,7 @@ Role of Mathematics & Describes logical order of Substance & Describes abstract 
 
 \section{Scale and Implementation}
 
-The system is implemented in approximately 1.1 million lines of Rust code across 93 workspace members (86 sub-crates), with over 36,500 automated tests. Key sub-crates include:
+The system is implemented in approximately 1.4 million lines of Rust code across 93 workspace members (86 sub-crates), with over 36,500 automated tests. Key sub-crates include:
 
 \begin{itemize}
   \item \texttt{symthaea-core}: HDC operations (SIMD-accelerated), CfC dynamics, IIT computation ($\sim$230K LOC)
@@ -1802,7 +1802,7 @@ Together, these four crates form a hierarchy: the consciousness equation defines
 
 The \symthaea{} cognitive loop is the heartbeat of the system: an eight-phase pipeline executing at approximately 31~Hz (33~ms cycle time, 20~Hz computational budget). Each cycle transforms raw sensory input into conscious experience, ethical judgment, and motor output through a sequence of tightly coupled processing stages.
 
-The architecture follows a manager-based design with twelve subsystems, each implementing the \texttt{CognitiveSubsystem} trait. Managers receive an immutable snapshot of the cognitive state, produce subsystem output proposals, and the output collector integrates proposals via consensus averaging. No manager directly mutates the cognitive loop state---this immutable-input, proposal-output pattern ensures determinism and enables future parallelization.
+The architecture follows a manager-based design with seventeen subsystems (operating on pairwise co-prime cycle intervals so no two subsystems synchronize), each implementing the \texttt{CognitiveSubsystem} trait. Managers receive an immutable snapshot of the cognitive state, produce subsystem output proposals, and the output collector integrates proposals via consensus averaging. No manager directly mutates the cognitive loop state---this immutable-input, proposal-output pattern ensures determinism and enables future parallelization.
 
 The trait signature enforces this architectural invariant at the type level:
 
@@ -2729,7 +2729,7 @@ The Broca pipeline differs fundamentally from transformer-based language models 
 \toprule
 \textbf{Property} & \textbf{Standard LM} & \textbf{Broca Pipeline} \\
 \midrule
-Input & Token sequence & 20-channel thought vector \\
+Input & Token sequence & 43-channel thought vector \\
 Generation trigger & External prompt & Consciousness threshold \\
 Hallucination prevention & Post-hoc (RLHF) & Structural (epistemic gate) \\
 Grounding & Optional (RAG) & Mandatory (HDC binding) \\
