@@ -16,7 +16,26 @@
 "Φ-Gated Motor Authority: A Continuous Safety Supervisor over
 Rule-Based Envelopes (and What We Learned Building Ten Demos)"
 
-## Abstract sketch (draft 0)
+## Abstract (draft 1, 149 words)
+
+We study consciousness-gated motor authority across ten heterogeneous
+robotic platforms. A scalar Φ, computed from HDC prediction error and
+Active Inference, modulates each platform's motor command. Sweeping
+five Φ→gain mappings on a paired Monte Carlo cobot benchmark vs
+ISO/TS 15066 Speed-and-Separation Monitoring, we find (i) the default
+global `SafetyTier` thresholds produce zero throughput because the
+platform's empirical Φ lives in [0.099, 0.145] — never reaching the
+hardcoded 0.6 Green cutoff; (ii) the minimal sufficient mapping is a
+sprint threshold matched to the empirical band plus a crawl-rate floor,
+implementable as `if Φ > sprint { 1.0 } else { floor }`; (iii) this
+mapping loses to SSM at S_p ≈ 1 m by 85.7 % but **wins by +150 %**
+at S_p = 2.5 m and holds throughput where SSM collapses to zero at
+S_p ≥ 3 m. We frame Φ as an ISO 21448 / SOTIF triggering-condition
+monitor, not a replacement for certified envelopes.
+
+_(Word count: 149. IWAI cap: 150.)_
+
+## Abstract (draft 0, 220 words — retained for reference)
 
 We present an empirical study of consciousness-gated motor authority
 across ten heterogeneous robotic platforms. A scalar Φ ∈ [0,1],
@@ -158,14 +177,43 @@ required for single-point-of-failure hazardous actions (cautery).
 ### §9. Discussion & limitations
 - Φ is NOT a certified safety layer. SOTIF frame: it's a
   triggering-condition monitor.
-- Benchmark is simulation-only. Hardware validation (Crazyflie for
-  the flight path, Franka FR3 for the manipulator path) is the
-  obvious follow-up.
 - Paired-trial N=5 is thin; re-running N=30 tightens CIs.
 - The `MasterConsciousnessEquation`'s monotonic compressive output
   [0.099, 0.145] band is a source of fragility — the sprint threshold
   is close to the empirical max. Widening the equation's dynamic range
   at the source would make thresholds less sensitive.
+
+#### §9.1 Hardware-validation plan (§9-inset, for ~¾-page)
+
+The benchmark is simulation-only. A single hardware bring-up of the
+flight path is the cheapest path to validating that `sprint_floor_gain`
+produces legible authority modulation under real sensor noise:
+
+1. **Platform**: Bitcraze Crazyflie 2.1 (27 g, ≥ 300 Hz attitude,
+   matches the `SimplePhysicsSimulator`'s mass + rotor-lag constants
+   already in `symthaea-flight/src/simulator.rs`).
+2. **Integration**: `cflib-rs` + Crazyradio PA. The existing flight
+   demo plugin's 500 Hz physics tick maps 1:1 onto the Crazyflie
+   attitude-rate outer loop; the 25 Hz cognitive tick fits well
+   within the Crazyflie's onboard-to-radio latency budget.
+3. **Sanity procedure**: tune `SPRINT_PHI` and `FLOOR_GAIN` against
+   hover + nudge-rejection data (reset → push → observe) until the
+   in-the-air motor gain matches the in-sim trace. This is the same
+   `MANIP_BENCH_PHI_TRACE=1` protocol, moved to a physical substrate.
+4. **Stress**: ~2-3 m lateral gust via a box fan. Contrast Φ-gated
+   against a fixed attitude-rate cap.
+5. **Success metric**: recovery-time to hover after a 0.5 m lateral
+   displacement, and peak attitude excursion. A pre-registered
+   analysis plan writes the claim before the Crazyflie arrives.
+
+Budget: one Crazyflie 2.1 (~USD 250) + one Crazyradio PA (~USD 60)
++ one box fan. Roughly 2-4 weeks of integration time. This work
+also unlocks the §10 reproducibility story for a hardware-valid
+replication package, not just a simulator one.
+
+A manipulator-path validation (Franka FR3 + libfranka) is a
+larger reach — PLd-certified safety PLC negotiation, ROS2 bridge,
+workcell facility access. Deferred.
 
 ### §10. Reproducibility
 - All commits referenced. The benchmark is one `cargo run --release`
@@ -209,15 +257,20 @@ required for single-point-of-failure hazardous actions (cautery).
 
 ## Pre-writing checklist (to promote from outline → draft)
 
-- [ ] Render Figure 1 (Φ trace): 40 s of TRACE lines → matplotlib
-      line chart with SafetyTier thresholds overlaid.
-- [ ] Render Figure 2 (S_p sweep bar): 6 groups × 3 bars each
-      (ISO / Adaptive / Φ-SprintFloor).
-- [ ] Re-run §4 with N=30 trials to tighten CIs (currently N=5,
-      normal approx strained).
-- [ ] Run §6 sweep with N=30 trials (currently N=5).
-- [ ] Cross-reference all commit hashes against the main branch —
-      ensure none were rebased.
-- [ ] Add one paragraph on hardware-validation plan (Crazyflie 2.1,
-      cflib-rs, radio stack) — strengthens §9.
-- [ ] Dial abstract down to 150 words.
+- [x] **Render Figure 1 (Φ trace)** — committed `9ecb4f48c6` at
+      `figures/figure1_phi_trace.png`
+- [x] **Render Figure 2 (S_p sweep bar)** — committed `9ecb4f48c6` at
+      `figures/figure2_sp_sweep.png`
+- [ ] Re-run §4 with N=30 trials (in progress background this session;
+      writeup pending N=30 data landing)
+- [ ] Run §6 sweep with N=30 trials × 6 S_p points (~6× §4 cost;
+      deferred to writing session)
+- [x] **Verify all 15 commit hashes resolve against main** — all OK as of
+      post-`9ecb4f48c6` (verified with `git cat-file -e <sha>^{commit}`)
+- [x] **Add §9.1 hardware-validation paragraph** (this commit)
+- [x] **Dial abstract to 150 words** (draft 1 = 149 words, retained
+      draft 0 for reference)
+
+**5 of 7 checklist items done.** Remaining work for the writing
+session: (a) re-run §4 and §6 with N=30, (b) fill in paragraph text
+around every section header and figure/table, (c) final proofread.
