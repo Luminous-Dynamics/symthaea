@@ -37,7 +37,7 @@
 
 use std::fmt;
 
-use symthaea_core::hdc::fol_formula_ext::{ArithOp, FolFormulaExt, NumericType, Term};
+use symthaea_core::hdc::fol_formula_ext::{FolFormulaExt, NumericType, Term};
 
 // ════════════════════════════════════════════════════════════════════════
 // AST — what the parser produces
