@@ -1,0 +1,16 @@
+[package]
+name = "issuer_trust_tier"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+getrandom_03 = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+issuer_trust_tier_integrity = { path = "../integrity" }

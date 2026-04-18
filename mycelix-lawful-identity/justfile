@@ -1,0 +1,34 @@
+# mycelix-lawful-identity build recipes
+set shell := ["bash", "-uc"]
+
+default:
+    @just --list
+
+build:
+    cargo build --workspace --target wasm32-unknown-unknown --release
+
+test:
+    cargo test --workspace
+
+test-release:
+    cargo test --workspace --release
+
+pack-dna: build
+    hc dna pack dna/ -o dna/mycelix_lawful_identity.dna
+
+pack-happ: pack-dna
+    hc app pack . -o mycelix-lawful-identity.happ
+
+clean:
+    cargo clean
+    rm -f dna/*.dna *.happ
+
+check:
+    cargo check --workspace
+    cargo clippy --workspace -- -D warnings
+
+fmt:
+    cargo fmt --all
+
+deny:
+    cargo deny check

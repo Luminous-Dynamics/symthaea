@@ -1,0 +1,14 @@
+[package]
+name = "legal_did_integrity"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+holochain_serialized_bytes = { workspace = true }
+hdi = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

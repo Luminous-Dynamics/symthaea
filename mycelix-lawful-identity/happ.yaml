@@ -1,0 +1,15 @@
+---
+manifest_version: "0"
+name: mycelix-lawful-identity
+roles:
+  - name: lawful-identity
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: "./dna/mycelix_lawful_identity.dna"
+      modifiers:
+        network_seed: ~
+        properties: ~
+        origin_time: ~
+        quantum_time: ~

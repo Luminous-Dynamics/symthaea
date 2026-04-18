@@ -1,0 +1,26 @@
+manifest_version: "0"
+name: mycelix_lawful_identity
+
+integrity:
+  zomes:
+    - name: legal_did_integrity
+      path: ../target/wasm32-unknown-unknown/release/legal_did_integrity.wasm
+    - name: issuer_trust_tier_integrity
+      path: ../target/wasm32-unknown-unknown/release/issuer_trust_tier_integrity.wasm
+    - name: cross_did_zkp_integrity
+      path: ../target/wasm32-unknown-unknown/release/cross_did_zkp_integrity.wasm
+
+coordinator:
+  zomes:
+    - name: legal_did
+      path: ../target/wasm32-unknown-unknown/release/legal_did.wasm
+      dependencies:
+        - name: legal_did_integrity
+    - name: issuer_trust_tier
+      path: ../target/wasm32-unknown-unknown/release/issuer_trust_tier.wasm
+      dependencies:
+        - name: issuer_trust_tier_integrity
+    - name: cross_did_zkp
+      path: ../target/wasm32-unknown-unknown/release/cross_did_zkp.wasm
+      dependencies:
+        - name: cross_did_zkp_integrity
