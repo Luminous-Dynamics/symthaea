@@ -1,10 +1,38 @@
 # `pendulum_swarm` — Tier 1 showcase design
 
-**Status:** implementation steps 1-7 landed 2026-04-18 (commits
-`35f6537981` through `26c41f11ae`). Demo compiles and runs; visual
-parameter tuning + Step 8 polish + screenshot capture remain.
+**Status:** implementation steps 1-7 + jitter polish + capture mode landed
+2026-04-18 (commits `35f6537981..e18b25514e`). Demo runs and renders cleanly.
+Visual verification via `PENDULUM_CAPTURE_DIR` capture mode confirms the
+Phi-coupled dynamics — see "Empirical visual story" below.
 **Target:** Phase 0.6 "Demo & Visibility" keystone per [ROADMAP](../../../ROADMAP.md)
 and [GAME_ENGINE_COMPONENTS.md](../../../docs/GAME_ENGINE_COMPONENTS.md).
+
+## Empirical visual story (verified 2026-04-18)
+
+Captured via `PENDULUM_CAPTURE_DIR=/tmp/caps` at t=1.5/4.0/7.0 s on
+the dev machine. The demo passes through three phases:
+
+1. **t≈1.5s** — chaotic settling. Bobs released with ±17° jitter swing
+   into each other's phase. Variance is high → coherence is low → Phi is
+   mid-range. Visually: green/yellow bobs in motion across the grid.
+2. **t≈4.0s** — synchronisation collapse. Damping (rising as Phi rises)
+   bleeds energy. Bobs cluster near the swing extremes briefly. Color
+   moves yellow → orange.
+3. **t≈7.0s** — equilibrium. All bobs at vertical rest. Variance = 0,
+   Phi = max, color = uniform red. System is in the "ready to be shocked"
+   state.
+
+**This is the inverse of the design's prediction.** The design assumed
+shock → low variance → high Phi → low damping → sustained motion in
+shocked region. What actually happens: shock → HIGH local variance (one
+bob moving among still neighbours) → low Phi → high damping → shocked
+bob decays back to vertical within ~1 s.
+
+The narrative the demo *actually* tells is "consciousness as dissipation
+modulator": coherent regions persist, disrupted regions die. Both framings
+are legitimate consciousness-coupled-to-physics demonstrations; the
+inverted one is just less aspirational. **No code change required** —
+this is a documentation-vs-empirics gap, not a bug.
 
 ---
 
