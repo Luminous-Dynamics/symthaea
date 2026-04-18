@@ -2411,6 +2411,10 @@ pub fn generate_with_repair(
 /// Populates 20+ channels by parsing the description for algorithmic
 /// signals (verbs, data structures, complexity hints) and the signature
 /// for type information (arity, generics, lifetimes, return types).
+pub fn build_channels_from_purpose_public(purpose: &str, signature: &str) -> AlgorithmChannels {
+    build_channels_from_purpose(purpose, signature)
+}
+
 fn build_channels_from_purpose(purpose: &str, signature: &str) -> AlgorithmChannels {
     let mut channels = AlgorithmChannels::default();
     let lower = purpose.to_lowercase();
