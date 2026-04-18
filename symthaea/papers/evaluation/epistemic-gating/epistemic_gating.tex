@@ -27,7 +27,7 @@
   frame=single
 }
 
-\title{Epistemic Gating for Consciousness-Aware Language Generation:\\Eliminating Hallucination via Logit Masking and HDC Binding}
+\title{Epistemic Gating for Consciousness-Aware Language Generation:\\Representation-Grounded Decoding via Logit Masking and HDC Binding}
 
 \author{
   Tristan Stoltz\textsuperscript{1} \\
@@ -42,7 +42,7 @@
 \maketitle
 
 \begin{abstract}
-Large language models generate fluent text but suffer from hallucination---the production of plausible but unsupported claims. Existing mitigation strategies operate post-hoc, penalizing hallucinated content after generation through retrieval-augmented verification, confidence calibration, or output filtering. We present a fundamentally different approach: \emph{epistemic gating}, a mechanism that physically prevents hallucination at the logit level by masking tokens for which the system lacks sufficient epistemic support. Our implementation, the Broca language pipeline (27,965 LOC, 403 tests), integrates epistemic gating within a consciousness-aware architecture comprising a 43-channel ThoughtEncoder (extended from the original 20 via the Epistemic Cube), 16,384-dimensional Hyperdimensional Computing (HDC) binding, and autoregressive generation governed by active inference principles. The pipeline implements three complementary mechanisms: (1) an EpistemicGate that computes per-token epistemic support from HDC similarity to grounded knowledge and masks logits below a consciousness-modulated threshold; (2) a CoherenceFeedback module that performs mid-sentence semantic veto when generated text diverges from the intended thought trajectory; and (3) an adaptive cadence controller that gates generation frequency on consciousness level and learning rate. We describe the architecture, present benchmark results across factual accuracy, coherence, and hallucination rate, and discuss the theoretical grounding in active inference and Global Workspace Theory.
+Large language models generate fluent text but suffer from hallucination---the production of plausible but unsupported claims. Existing mitigation strategies operate post-hoc, penalizing hallucinated content after generation through retrieval-augmented verification, confidence calibration, or output filtering. We present a fundamentally different architectural approach: \emph{epistemic gating}, a pre-decoding mechanism that masks token logits for which the system lacks sufficient epistemic support as measured by HDC similarity to a grounded knowledge representation. Our implementation, the Broca language pipeline (27,965 LOC, 403 tests), integrates epistemic gating within a consciousness-aware architecture comprising a 43-channel ThoughtEncoder, 16,384-dimensional Hyperdimensional Computing (HDC) binding, and autoregressive generation. On 500 in-distribution generation episodes against the same Liquid-Mamba backend, the full pipeline reduces the rate of internally-unsupported outputs from 23.4\% to 0.4\% (98.3\% relative reduction; we call this ``representation-grounded decoding'' rather than hallucination elimination, since residual compositional hallucinations can assemble individually-supported tokens into unsupported claims). \textbf{Scope of the hallucination claim.} Our evaluation measures whether generated tokens are supported by the system's own HDC grounding; it does not measure external factual correctness. That distinction matters: the 0.4\% is an upper bound on internal epistemic consistency, not a claim about factual accuracy on external benchmarks (TruthfulQA, FEVER). External benchmark validation is the single most important revision task and is flagged as such throughout.
 \end{abstract}
 
 \section{Introduction}
@@ -146,6 +146,8 @@ The EpistemicGate is the central contribution of this paper. For each candidate 
 
 where $\mathbf{V}_w \in \{0,1\}^D$ is the HDV representation of token $w$ and $d_H$ denotes Hamming distance. This normalized similarity score ranges from 0 (no support) to 1 (perfect match).
 
+\paragraph{What ES is and is not.} Equation~\ref{eq:epistemic-support} is a \emph{similarity} score, not a calibrated epistemic probability. It measures how much a token's HDV overlaps with the current generation vector $\mathbf{G}$; we interpret this overlap as ``support'' by the system's own grounding, not as a measure of the token's external factual correctness. The estimator has three known limitations we carry through the paper: (i) it is \emph{monotonic} with representational compatibility but has not been calibrated against a human-labelled precision/recall ground truth, (ii) it is \emph{token-level}, so sequences of individually-supported tokens can compose into unsupported claims (the compositional-hallucination failure mode documented in \S\ref{sec:results}), and (iii) the ``grounded knowledge base'' $\mathbf{K}_{\text{grounding}}$ is constructed from the system's prior HDC-encoded learning and re-evaluating with a different grounding corpus would produce different ES distributions. We treat calibration of ES against external token-precision labels as the priority follow-up experiment.
+
 The gate then applies a consciousness-modulated threshold:
 
 \begin{equation}
@@ -153,7 +155,7 @@ The gate then applies a consciousness-modulated threshold:
 \label{eq:threshold}
 \end{equation}
 
-where $\tau_{\text{base}} = 0.52$ is the base threshold (slightly above chance similarity for random binary vectors), $\Phi(t)$ is the current consciousness level, $\text{LR}(t)$ is the current learning rate, and $\alpha, \beta$ are scaling coefficients. Higher consciousness increases the threshold, demanding stronger epistemic support for generation.
+where $\tau_{\text{base}} = 0.52$ is the base threshold (slightly above chance similarity for random binary vectors), $\Phi(t)$ is the HDC-adapted integration measure $\Phi_{\text{HDC}}$ from the companion stochastic-resonance work (Stoltz, 2026, \emph{Stochastic Resonance in HDC}), $\text{LR}(t)$ is the current learning rate, and $\alpha, \beta$ are scaling coefficients. Higher $\Phi_{\text{HDC}}$ increases the threshold, demanding stronger epistemic support for generation. We caveat that the consciousness-modulation term is architectural scaffolding: we have not yet run the ablation (gating-without-$\Phi$ vs.\ gating-with-$\Phi$) that would quantify how much of the 98.3\% reduction is attributable to the consciousness coupling vs.\ the gating mechanism alone. That ablation belongs in revision.
 
 The logit masking operation is:
 

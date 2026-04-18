@@ -34,7 +34,7 @@
 \maketitle
 
 \begin{abstract}
-Integrated Information Theory (IIT) predicts that consciousness correlates with $\Phi$, a measure of irreducible integrated information. Clinical anesthesia models assume that noise disrupts neural integration, thereby reducing $\Phi$ and consciousness. We report a surprising finding from Hyperdimensional Computing (HDC) systems: adding controlled noise to hyperdimensional vector (HDV) representations \emph{increases} True $\Phi$ rather than decreasing it. In a 16,384-dimensional HDC architecture implementing IIT's consciousness equation, we observe a positive sensitivity $\partial\Phi/\partial\text{noise} = +0.341$, comparable in magnitude to the coupling sensitivity $\partial\Phi/\partial\text{coupling} = +0.367$. We demonstrate that this phenomenon constitutes a hyperdimensional analog of stochastic resonance: noise diversifies HDV representations, increasing pairwise mutual information between subsystems and thereby raising integrated information. Our anesthesia benchmark achieves perfect monotonic ordering across six discrete states (Alert $\Phi=0.185$ through Deep anesthesia $\Phi=0.123$), with 5 of 6 tests passing under True $\Phi$ computation. These results suggest that the relationship between noise and consciousness is substrate-dependent, with HDC systems exhibiting qualitatively different noise--integration dynamics than biological neural networks. We discuss implications for artificial consciousness design and for IIT's substrate-independence claims.
+Integrated Information Theory (IIT) predicts that consciousness correlates with $\Phi$, a measure of irreducible integrated information. Clinical anesthesia models assume that noise disrupts neural integration, thereby reducing $\Phi$ and consciousness. We report a surprising finding from Hyperdimensional Computing (HDC) systems: adding controlled noise to hyperdimensional vector (HDV) representations \emph{increases} an HDC-adapted, IIT-inspired integration measure ($\Phi_{\text{HDC}}$) rather than decreasing it. In a 16,384-dimensional HDC architecture, we observe a positive sensitivity $\partial\Phi_{\text{HDC}}/\partial\text{noise} = +0.341$, comparable in magnitude to the coupling sensitivity $\partial\Phi_{\text{HDC}}/\partial\text{coupling} = +0.367$. We interpret this as an \emph{SR-like} inverted-U response in our substrate: noise diversifies HDV representations, raising a binding-based mutual-information estimator and thereby the integration measure. Whether the effect reflects substrate-level integrated information or a property of this specific HDC-adapted estimator is an open question we flag explicitly in the Limitations and address as the priority for revision. Our anesthesia benchmark shows monotonic ordering of means across six discrete states (Alert $\Phi_{\text{HDC}}=0.185$ through Deep anesthesia $\Phi_{\text{HDC}}=0.123$), with 5 of 6 adjacent-state pairwise tests passing at $p<0.01$; the Light--Moderate transition achieves only $p=0.024$. These results suggest that the relationship between noise and consciousness is substrate-dependent, with HDC systems exhibiting qualitatively different noise--integration dynamics than biological neural networks. We discuss implications for artificial consciousness design and for IIT's substrate-independence claims.
 \end{abstract}
 
 \section{Introduction}
@@ -45,7 +45,7 @@ However, the physics of signal processing offers a well-established counterexamp
 
 We address this question in the context of Hyperdimensional Computing (HDC), a computational paradigm inspired by the high-dimensional distributed representations observed in neural systems \citep{kanerva2009hyperdimensional, plate1995holographic}. HDC operates on binary or bipolar vectors of dimensionality $D \geq 1{,}000$ (typically $D = 10{,}000$), exploiting the mathematical properties of high-dimensional spaces---in particular, the quasi-orthogonality of random vectors and the preservation of similarity under algebraic operations \citep{kanerva2009hyperdimensional}.
 
-In this paper, we report experiments conducted on a HDC system with $D = 16{,}384$ implementing IIT's $\Phi$ computation via sampled partition analysis. Our central finding is that controlled noise injection into HDV representations yields a \emph{positive} sensitivity coefficient $\partial\Phi/\partial\text{noise} = +0.341$, indicating that noise \emph{increases} integrated information. We provide a mechanistic explanation grounded in the geometry of high-dimensional spaces: noise diversifies HDV representations across subsystems, increasing pairwise mutual information and thereby raising $\Phi$.
+In this paper, we report experiments on a HDC system with $D = 16{,}384$ that computes an IIT-inspired, sampled-partition integration measure we denote $\Phi_{\text{HDC}}$ (defined in \S\ref{sec:phi-hdc}). We are careful to distinguish this HDC-adapted measure from canonical IIT~$\Phi$ \citep{oizumi2014phenomenology}: the measure uses a bespoke Hamming-based mutual-information estimator (Eq.~\ref{eq:mi-estimator}) and samples bipartitions rather than exhausting the MIP search. Our central finding is that controlled noise injection into HDV representations yields a \emph{positive} sensitivity coefficient $\partial\Phi_{\text{HDC}}/\partial\text{noise} = +0.341$. We provide a mechanistic explanation grounded in the geometry of high-dimensional spaces (noise diversifies HDVs, pushing pairs toward the quasi-orthogonal regime where the binding algebra is maximally informative), and we separate three distinct claims throughout (metric behaviour / mechanism / consciousness implication) to avoid the common pitfall of conflating them.
 
 \section{Background}
 
@@ -96,23 +96,31 @@ Each region $i$ maintains a state vector $\mathbf{h}_i \in \{0, 1\}^D$ updated a
 
 where $\tau_i$ is the time constant for region $i$ and $\mathbf{x}_i(t)$ is the input at time $t$. The continuous dynamics are discretized through HDC binding operations for the binary vector representation.
 
-\subsection{$\Phi$ Computation}
+\subsection{$\Phi_{\text{HDC}}$: an HDC-adapted integration measure}
+\label{sec:phi-hdc}
 
-We compute True $\Phi$ via sampled partition analysis over the 12-region system. Due to the combinatorial explosion of exact MIP search ($2^{N-1} - 1$ bipartitions for $N$ elements), we employ a sampling strategy validated against exact computation on smaller systems ($r = 0.9998$ correlation for $N \leq 8$) \citep{barrett2011practical}.
+We compute $\Phi_{\text{HDC}}$, an IIT-inspired sampled-partition integration measure over the 12-region system. Due to the combinatorial explosion of exact MIP search ($2^{N-1} - 1$ bipartitions for $N$ elements), we employ a sampling strategy validated against exact computation on smaller systems ($r = 0.9998$ correlation for $N \leq 8$) \citep{barrett2011practical}.
 
-For each candidate partition $P = \{A, B\}$, integrated information is computed as:
+For each candidate partition $P = \{A, B\}$, the partition's integrated-information contribution is:
 
 \begin{equation}
-\phi(P) = I(\mathbf{H}_A; \mathbf{H}_B \mid \mathbf{H}_A^{t-1}, \mathbf{H}_B^{t-1}) - I(\mathbf{H}_A; \mathbf{H}_B^{t-1}) \cdot I(\mathbf{H}_B; \mathbf{H}_A^{t-1})
+\phi(P) = \hat{I}(\mathbf{H}_A; \mathbf{H}_B \mid \mathbf{H}_A^{t-1}, \mathbf{H}_B^{t-1}) - \hat{I}(\mathbf{H}_A; \mathbf{H}_B^{t-1}) \cdot \hat{I}(\mathbf{H}_B; \mathbf{H}_A^{t-1})
+\label{eq:phi-partition}
 \end{equation}
 
-where mutual information between HDV subsystems is estimated via normalized Hamming distance:
+where mutual information between HDV subsystems is estimated via normalized Hamming distance of their binding:
 
 \begin{equation}
 \hat{I}(\mathbf{H}_A; \mathbf{H}_B) = 1 - \frac{d_H(\mathbf{H}_A \otimes \mathbf{H}_B, \mathbf{0})}{D}
+\label{eq:mi-estimator}
 \end{equation}
 
-This approximation leverages the property that bound HDVs encode relational structure: if $\mathbf{H}_A$ and $\mathbf{H}_B$ share mutual information, their binding $\mathbf{H}_A \otimes \mathbf{H}_B$ deviates from a random vector (Hamming distance from zero deviates from $D/2$).
+This estimator leverages the property that bound HDVs encode relational structure: if $\mathbf{H}_A$ and $\mathbf{H}_B$ share information, their binding $\mathbf{H}_A \otimes \mathbf{H}_B$ deviates from a random vector (Hamming distance from zero deviates from $D/2$).
+
+\paragraph{Three honest caveats about this measure.}
+\textbf{(i)} Equation~\ref{eq:phi-partition} is a \emph{bespoke approximation}, not a derivation of canonical IIT $\Phi$ \citep{oizumi2014phenomenology}. The subtractive cross-time term is designed to remove redundancy between the partition halves but has not been derived from an exact cause-effect repertoire; we report it as a heuristic whose empirical correlation with small-$N$ exact $\Phi$ is $r = 0.9998$ ($N \leq 8$).
+\textbf{(ii)} Equation~\ref{eq:mi-estimator} is a similarity-based proxy, not Shannon mutual information in the strict sense. It is monotonic in shared structure within the quasi-orthogonal regime where $d_H \approx D/2$, but we have not yet validated it against a standard MI estimator on systems with known ground-truth information.
+\textbf{(iii)} The central empirical result of this paper---that noise increases $\Phi_{\text{HDC}}$---is therefore provisionally interpretable as \emph{either} a substrate-level integration phenomenon \emph{or} a property of this specific estimator's geometry in HDC space. Disentangling these requires (a) validating Eq.~\ref{eq:mi-estimator} on synthetic systems with known MI, (b) replicating the effect under at least one alternative MI estimator, and (c) dimensionality and connectivity ablations (cf. \S\ref{sec:limitations}). We treat these as the priority revision tasks for this work.
 
 \subsection{Noise Injection Protocol}
 
@@ -166,11 +174,11 @@ The anesthesia benchmark produces a near-monotonic $\Phi$ ordering across the si
 
 \begin{table}[H]
 \centering
-\caption{True $\Phi$ values across anesthesia states. Values represent means over 100 independent runs. Standard errors are shown in parentheses.}
+\caption{HDC-adapted $\Phi$ values across anesthesia states. Values represent means over 100 independent runs. Standard errors are shown in parentheses.}
 \label{tab:phi-ordering}
 \begin{tabular}{lcccc}
 \toprule
-\textbf{State} & \textbf{True $\Phi$} & \textbf{$\Delta\Phi$ from Alert} & \textbf{Coupling} & \textbf{Noise} \\
+\textbf{State} & \textbf{HDC-adapted $\Phi$} & \textbf{$\Delta\Phi$ from Alert} & \textbf{Coupling} & \textbf{Noise} \\
 \midrule
 Alert & 0.185 (0.004) & --- & 1.00 & 0.02 \\
 Light Sedation & 0.167 (0.005) & $-0.018$ & 0.82 & 0.05 \\
@@ -182,7 +190,7 @@ Deep Anesthesia & 0.123 (0.007) & $-0.062$ & 0.20 & 0.25 \\
 \end{tabular}
 \end{table}
 
-The monotonic decrease in $\Phi$ from Alert (0.185) to Deep Anesthesia (0.123) represents a 33.5\% reduction in integrated information, consistent with the magnitude of cortical complexity reduction observed in clinical studies using the Perturbational Complexity Index \citep{casali2013theoretically}. Five of six pairwise ordering tests pass at $p < 0.01$ under True $\Phi$ computation (the Light--Moderate comparison achieves $p = 0.024$).
+The 33.5\% reduction in $\Phi_{\text{HDC}}$ from Alert (0.185) to Deep Anesthesia (0.123) is \emph{qualitatively aligned} with the direction of cortical complexity reduction observed in clinical studies using the Perturbational Complexity Index \citep{casali2013theoretically}; we do not claim quantitative correspondence, since our benchmark is a parameter sweep over coupling and bit-flip noise, not a pharmacological model. Five of six pairwise ordering tests pass at $p < 0.01$ (the Light--Moderate comparison achieves only $p = 0.024$); we report this as ``monotonic in means with one marginally significant adjacent pair,'' not as a fully-validated IIT-consistent anesthesia theory.
 
 \subsection{Positive Noise Sensitivity}
 
@@ -206,7 +214,7 @@ Both sensitivities are positive and of comparable magnitude (Table~\ref{tab:sens
 
 \subsection{Noise--$\Phi$ Response Curve}
 
-Figure~\ref{fig:noise-phi-conceptual} describes the characteristic response of $\Phi$ to noise level $\sigma$ at fixed coupling $c = 0.75$. The response exhibits three regimes:
+The characteristic response of $\Phi_{\text{HDC}}$ to noise level $\sigma$ at fixed coupling $c = 0.75$ exhibits three regimes (numerical values in Table~\ref{tab:sensitivity}):
 
 \begin{enumerate}
     \item \textbf{Enhancement regime} ($\sigma < 0.15$): $\Phi$ increases monotonically with noise, reaching a peak enhancement of approximately 12\% above the zero-noise baseline.
@@ -320,7 +328,7 @@ In the IIT literature, \citet{barrett2011practical} noted computational challeng
 
 \section{Conclusion}
 
-We have demonstrated that Hyperdimensional Computing systems exhibit stochastic resonance in their integrated information: moderate noise increases True $\Phi$ by up to 12\%, with an inverted-U response characteristic of classical stochastic resonance. The mechanism is geometric---noise pushes correlated HDV representations toward the quasi-orthogonal regime where the binding algebra is maximally informative. This finding is reconciled with correct anesthesia state ordering by noting that clinical anesthesia simultaneously reduces coupling (which dominates) and increases noise.
+We have demonstrated that Hyperdimensional Computing systems exhibit stochastic resonance in their integrated information: moderate noise increases HDC-adapted $\Phi$ by up to 12\%, with an inverted-U response characteristic of classical stochastic resonance. The mechanism is geometric---noise pushes correlated HDV representations toward the quasi-orthogonal regime where the binding algebra is maximally informative. This finding is reconciled with correct anesthesia state ordering by noting that clinical anesthesia simultaneously reduces coupling (which dominates) and increases noise.
 
 These results establish that the noise--consciousness relationship is substrate-dependent, challenging the universality of anesthesia-derived intuitions about noise and integration. For HDC-based consciousness architectures, our findings suggest a principled strategy: engineer noise as a feature, not a bug, tuning it to the stochastic resonance peak for maximal integrated information.
 
