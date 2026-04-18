@@ -15,17 +15,34 @@ emission — none of which require matching LLM-scale to work.
 
 ## What runs today
 
+### Nix substrate (full pipeline)
+
 | Layer | Module | Tests | Demo |
 |---|---|---|---|
-| Structural scorer | `src/language/nix_scorer.rs` | 15 unit tests | `cargo run --features code_generation --example nix_scorer_diagnose -- "<prompt>"` |
-| Goldens | `src/language/nix_eval_goldens.rs` | 4 unit tests, 26 goldens | `cargo run --features code_generation --example nix_eval_benchmark -- --goldens-only` |
-| Self-repair loop | `src/language/nix_repair.rs` | 21 unit tests | `cargo run --features code_generation --example nix_eval_benchmark -- --goldens-only --repair` |
-| Tier 3 cache | `src/language/learned_idioms.rs` | 14 unit tests | Invoked automatically |
-| Module-eval cache | `src/language/nix_eval_cache.rs` | 9 unit tests | Invoked automatically |
-| Intent bridge (→ Broca) | `src/language/nix_broca_bridge.rs` | 9 unit tests | — |
+| Structural scorer | `src/language/nix_scorer.rs` | 15 | `cargo run --features code_generation --example nix_scorer_diagnose -- "<prompt>"` |
+| Goldens | `src/language/nix_eval_goldens.rs` | 4 (26 goldens) | `cargo run --features code_generation --example nix_eval_benchmark -- --goldens-only` |
+| Self-repair loop | `src/language/nix_repair.rs` | 21 | `cargo run --features code_generation --example nix_eval_benchmark -- --goldens-only --repair` |
+| Tier 3 cache | `src/language/learned_idioms.rs` | 14 | auto |
+| Module-eval cache | `src/language/nix_eval_cache.rs` | 9 | auto |
+| Intent bridge (→ Broca) | `src/language/nix_broca_bridge.rs` | 9 | — |
 | Distillation harvester | `examples/harvest_nix_distillation.rs` | — | `cargo run --features code_generation --example harvest_nix_distillation` |
-| Broca trainer adapter | `crates/symthaea-broca/src/bin/distill_nix_train.rs` | — | `cargo run --bin distill_nix_train -p symthaea-broca -- --epochs 10` |
+| Broca trainer | `crates/symthaea-broca/src/bin/distill_nix_train.rs` | — | `cargo run --bin distill_nix_train -p symthaea-broca -- --epochs 25` |
 | Generation demo | `crates/symthaea-broca/src/bin/distill_nix_generate.rs` | — | `cargo run --bin distill_nix_generate -p symthaea-broca` |
+
+### Substrate-independence (scorers for two more)
+
+| Substrate | Module | Parser backend | Tests |
+|---|---|---|---|
+| Docker Compose (YAML) | `src/language/compose_scorer.rs` | `serde_yaml` 0.9 | 8 |
+| Terraform (HCL) | `src/language/hcl_scorer.rs` | `hcl-rs` 0.18 | 13 (including heredocs, `var.x` traversals, `[for … in …]`, `a ? b : c`) |
+
+Same `flatten → compare → verdict` architecture across all three
+substrates. Each uses its own battle-tested parser (`rnix`,
+`serde_yaml`, `hcl-rs`) but converges on a shared `pass()` /
+`summary()` / `missing_required`/`value_mismatches`/`extraneous`
+interface. The substrate-independence claim isn't theoretical —
+three live scorers pass 36 tests covering the common-case shapes in
+each ecosystem.
 
 ## Honest benchmark numbers
 
@@ -74,9 +91,13 @@ LLMs win on all of these. Symthaea cannot and should not try.
   epistemic constraints from being emitted. LLMs don't have this
   because they don't have consciousness-level scalars.
 - **Substrate-independence.** The scorer + repair + KG pattern is
-  not Nix-specific. Ports to Terraform HCL, Docker Compose, or
-  Kubernetes manifests should exhibit the same "catches what
-  substring misses" behavior — the substrate-independence claim.
+  not Nix-specific. Ported to Docker Compose (`compose_scorer.rs`
+  via `serde_yaml`) and Terraform HCL (`hcl_scorer.rs` via
+  `hcl-rs` 0.18) — same flatten→compare→verdict architecture,
+  different parser backends, 21 tests across both new scorers green
+  including HCL heredocs, variable traversals, for-expressions, and
+  conditionals. Three substrates running; the independence claim is
+  defensible with running code, not projected.
 
 ## Reproducibility
 
