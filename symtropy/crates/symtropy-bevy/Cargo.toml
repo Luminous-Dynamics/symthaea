@@ -36,7 +36,11 @@ debug-gizmos = []
 symthaea-consciousness-equation = { version = "0.1.0", path = "../../../symthaea/crates/symthaea-consciousness-equation" }
 # Examples (e.g., pendulum_swarm in PENDULUM_CAPTURE_DIR mode) use
 # `Screenshot::primary_window()` + `save_to_disk` which needs PNG support.
-# The base symtropy-bevy build omits image-format features to stay slim;
-# Cargo merges dev-dep features so examples and tests get PNG without
-# affecting the published crate.
-bevy = { version = "0.18", default-features = false, features = ["png"] }
+# `bevy_ui` + `bevy_text` + `default_font` are used by `pendulum_swarm_4d`
+# for the on-screen w_slice HUD. The base symtropy-bevy build omits these
+# to stay slim; Cargo merges dev-dep features so examples and tests get
+# them without affecting the published crate.
+bevy = { version = "0.18", default-features = false, features = [
+    "png",
+    "bevy_ui", "bevy_ui_render", "bevy_text", "default_font",
+] }
