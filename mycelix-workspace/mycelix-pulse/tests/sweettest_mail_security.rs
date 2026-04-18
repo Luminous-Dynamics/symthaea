@@ -198,9 +198,7 @@ fn make_email_input(
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_ed25519_signature_verification_rejects_forged_signature() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice, bob) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -243,9 +241,7 @@ async fn test_ed25519_signature_verification_rejects_forged_signature() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_ed25519_signature_verification_accepts_valid_signature() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice, bob) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -328,9 +324,7 @@ async fn test_ed25519_signature_verification_accepts_valid_signature() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_dilithium3_signature_length_check() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice, bob) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -382,9 +376,7 @@ async fn test_dilithium3_signature_length_check() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_dilithium2_signature_length_check() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice, bob) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -430,9 +422,7 @@ async fn test_dilithium2_signature_length_check() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_ephemeral_key_length_x25519_must_be_32_bytes() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice, bob) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -469,9 +459,7 @@ async fn test_ephemeral_key_length_x25519_must_be_32_bytes() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_ephemeral_key_length_kyber1024_must_be_1568_bytes() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice, bob) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -517,9 +505,7 @@ async fn test_ephemeral_key_length_kyber1024_must_be_1568_bytes() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_ephemeral_key_length_kyber768_must_be_1088_bytes() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice, bob) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -569,9 +555,7 @@ async fn test_ephemeral_key_length_kyber768_must_be_1088_bytes() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_attachment_chunk_size_limit_10mb() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice,) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -595,11 +579,7 @@ async fn test_attachment_chunk_size_limit_10mb() {
     };
 
     let result: Result<ActionHash, _> = conductor
-        .call_fallible(
-            &alice.zome("mail_messages"),
-            "create_attachment",
-            input,
-        )
+        .call_fallible(&alice.zome("mail_messages"), "create_attachment", input)
         .await;
 
     assert!(
@@ -613,9 +593,7 @@ async fn test_attachment_chunk_size_limit_10mb() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_attachment_content_hash_must_be_32_bytes() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice,) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -637,11 +615,7 @@ async fn test_attachment_content_hash_must_be_32_bytes() {
     };
 
     let result: Result<ActionHash, _> = conductor
-        .call_fallible(
-            &alice.zome("mail_messages"),
-            "create_attachment",
-            input,
-        )
+        .call_fallible(&alice.zome("mail_messages"), "create_attachment", input)
         .await;
 
     assert!(
@@ -655,9 +629,7 @@ async fn test_attachment_content_hash_must_be_32_bytes() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_attachment_total_chunks_capped_at_1000() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice,) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -679,11 +651,7 @@ async fn test_attachment_total_chunks_capped_at_1000() {
     };
 
     let result: Result<ActionHash, _> = conductor
-        .call_fallible(
-            &alice.zome("mail_messages"),
-            "create_attachment",
-            input,
-        )
+        .call_fallible(&alice.zome("mail_messages"), "create_attachment", input)
         .await;
 
     assert!(
@@ -701,9 +669,7 @@ async fn test_attachment_total_chunks_capped_at_1000() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_read_receipt_signature_verified() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice,) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -726,11 +692,7 @@ async fn test_read_receipt_signature_verified() {
     };
 
     let result: Result<ActionHash, _> = conductor
-        .call_fallible(
-            &alice.zome("mail_messages"),
-            "create_read_receipt",
-            input,
-        )
+        .call_fallible(&alice.zome("mail_messages"), "create_read_receipt", input)
         .await;
 
     assert!(
@@ -744,9 +706,7 @@ async fn test_read_receipt_signature_verified() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_delivery_receipt_signature_verified() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice,) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -790,9 +750,7 @@ async fn test_delivery_receipt_signature_verified() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_capability_grant_and_revocation_lifecycle() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice, bob) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -876,9 +834,7 @@ async fn test_capability_grant_and_revocation_lifecycle() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_shared_mailbox_update_requires_owner_or_admin() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice, bob) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -943,9 +899,7 @@ async fn test_shared_mailbox_update_requires_owner_or_admin() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_trust_level_must_be_finite() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice, bob) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -964,11 +918,7 @@ async fn test_trust_level_must_be_finite() {
     };
 
     let result: Result<ActionHash, _> = conductor
-        .call_fallible(
-            &alice.zome("mail_trust"),
-            "create_attestation",
-            input,
-        )
+        .call_fallible(&alice.zome("mail_trust"), "create_attestation", input)
         .await;
 
     assert!(
@@ -982,9 +932,7 @@ async fn test_trust_level_must_be_finite() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_trust_level_infinity_rejected() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice, bob) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -1003,11 +951,7 @@ async fn test_trust_level_infinity_rejected() {
     };
 
     let result: Result<ActionHash, _> = conductor
-        .call_fallible(
-            &alice.zome("mail_trust"),
-            "create_attestation",
-            input,
-        )
+        .call_fallible(&alice.zome("mail_trust"), "create_attestation", input)
         .await;
 
     assert!(
@@ -1021,9 +965,7 @@ async fn test_trust_level_infinity_rejected() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_trust_score_range_0_to_1() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice, bob) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -1044,11 +986,7 @@ async fn test_trust_score_range_0_to_1() {
     };
 
     let result: Result<ActionHash, _> = conductor
-        .call_fallible(
-            &alice.zome("mail_trust"),
-            "create_attestation",
-            input,
-        )
+        .call_fallible(&alice.zome("mail_trust"), "create_attestation", input)
         .await;
 
     assert!(
@@ -1062,9 +1000,7 @@ async fn test_trust_score_range_0_to_1() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_federation_network_id_uniqueness() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice,) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -1096,11 +1032,7 @@ async fn test_federation_network_id_uniqueness() {
 
     // Second registration with same network_id should fail
     let second: Result<ActionHash, _> = conductor
-        .call_fallible(
-            &alice.zome("mail_federation"),
-            "register_network",
-            input,
-        )
+        .call_fallible(&alice.zome("mail_federation"), "register_network", input)
         .await;
 
     assert!(
@@ -1114,9 +1046,7 @@ async fn test_federation_network_id_uniqueness() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_federation_route_requires_network_ownership() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice, bob) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -1138,7 +1068,11 @@ async fn test_federation_route_requires_network_ownership() {
     };
 
     let _: ActionHash = conductor
-        .call(&alice.zome("mail_federation"), "register_network", network_input)
+        .call(
+            &alice.zome("mail_federation"),
+            "register_network",
+            network_input,
+        )
         .await;
 
     // Bob (not owner of net-alice) tries to create route from net-alice
@@ -1153,11 +1087,7 @@ async fn test_federation_route_requires_network_ownership() {
     };
 
     let result: Result<ActionHash, _> = conductor
-        .call_fallible(
-            &bob.zome("mail_federation"),
-            "create_route",
-            route_input,
-        )
+        .call_fallible(&bob.zome("mail_federation"), "create_route", route_input)
         .await;
 
     assert!(
@@ -1171,9 +1101,7 @@ async fn test_federation_route_requires_network_ownership() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_federation_route_priority_capped_at_100() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice,) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -1192,11 +1120,7 @@ async fn test_federation_route_priority_capped_at_100() {
     };
 
     let result: Result<ActionHash, _> = conductor
-        .call_fallible(
-            &alice.zome("mail_federation"),
-            "create_route",
-            route_input,
-        )
+        .call_fallible(&alice.zome("mail_federation"), "create_route", route_input)
         .await;
 
     assert!(
@@ -1212,9 +1136,7 @@ async fn test_federation_route_priority_capped_at_100() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_federation_envelope_loop_detection() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice,) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -1239,11 +1161,7 @@ async fn test_federation_envelope_loop_detection() {
     };
 
     let result: Result<ActionHash, _> = conductor
-        .call_fallible(
-            &alice.zome("mail_federation"),
-            "relay_envelope",
-            input,
-        )
+        .call_fallible(&alice.zome("mail_federation"), "relay_envelope", input)
         .await;
 
     assert!(
@@ -1263,9 +1181,7 @@ async fn test_federation_envelope_loop_detection() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_federation_max_hop_count_enforced() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice,) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -1287,11 +1203,7 @@ async fn test_federation_max_hop_count_enforced() {
     };
 
     let result: Result<ActionHash, _> = conductor
-        .call_fallible(
-            &alice.zome("mail_federation"),
-            "relay_envelope",
-            input,
-        )
+        .call_fallible(&alice.zome("mail_federation"), "relay_envelope", input)
         .await;
 
     assert!(
@@ -1309,9 +1221,7 @@ async fn test_federation_max_hop_count_enforced() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_search_sanitizes_control_characters() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice,) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -1351,9 +1261,7 @@ async fn test_search_sanitizes_control_characters() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_search_query_sanitized() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice,) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -1408,9 +1316,7 @@ async fn test_search_query_sanitized() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_agent_to_sent_link_requires_author_match() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice, bob) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -1451,9 +1357,7 @@ async fn test_agent_to_sent_link_requires_author_match() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_link_deletion_restricted_to_creator() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice, bob) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -1474,21 +1378,13 @@ async fn test_link_deletion_restricted_to_creator() {
     };
 
     let folder_result: Result<ActionHash, _> = conductor
-        .call_fallible(
-            &alice.zome("mail_messages"),
-            "create_folder",
-            folder_input,
-        )
+        .call_fallible(&alice.zome("mail_messages"), "create_folder", folder_input)
         .await;
 
     if let Ok(folder_hash) = folder_result {
         // Bob tries to delete Alice's folder (and its link)
         let delete_result: Result<(), _> = conductor
-            .call_fallible(
-                &bob.zome("mail_messages"),
-                "delete_folder",
-                folder_hash,
-            )
+            .call_fallible(&bob.zome("mail_messages"), "delete_folder", folder_hash)
             .await;
 
         assert!(
@@ -1512,9 +1408,7 @@ async fn test_mail_bridge_resolves_identity_cross_cluster() {
     let mut conductor = SweetConductor::from_standard_config().await;
 
     // Load unified hApp with mail + identity DNAs
-    let mail_dna = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let mail_dna = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     // With single DNA, the bridge should fail gracefully
     let (alice,) = conductor
@@ -1525,11 +1419,7 @@ async fn test_mail_bridge_resolves_identity_cross_cluster() {
 
     let did = "did:mycelix:test-alice".to_string();
     let result: Result<serde_json::Value, _> = conductor
-        .call_fallible(
-            &alice.zome("mail_bridge"),
-            "resolve_did",
-            did,
-        )
+        .call_fallible(&alice.zome("mail_bridge"), "resolve_did", did)
         .await;
 
     // Without identity cluster, should fail (fail-closed)
@@ -1544,9 +1434,7 @@ async fn test_mail_bridge_resolves_identity_cross_cluster() {
 #[ignore = "requires unified hApp conductor"]
 async fn test_mail_bridge_health_check() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice,) = conductor
         .setup_app("test-app", &[dna_file])
@@ -1555,11 +1443,7 @@ async fn test_mail_bridge_health_check() {
         .into_tuple();
 
     let result: Result<serde_json::Value, _> = conductor
-        .call_fallible(
-            &alice.zome("mail_bridge"),
-            "health_check",
-            (),
-        )
+        .call_fallible(&alice.zome("mail_bridge"), "health_check", ())
         .await;
 
     // Health check should always succeed even with single DNA
@@ -1582,9 +1466,7 @@ async fn test_mail_bridge_health_check() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_sent_emails_cannot_be_updated() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice, bob) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -1611,11 +1493,7 @@ async fn test_sent_emails_cannot_be_updated() {
     };
 
     let result: Result<ActionHash, _> = conductor
-        .call_fallible(
-            &alice.zome("mail_messages"),
-            "update_email",
-            input,
-        )
+        .call_fallible(&alice.zome("mail_messages"), "update_email", input)
         .await;
 
     assert!(
@@ -1629,9 +1507,7 @@ async fn test_sent_emails_cannot_be_updated() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_read_receipts_cannot_be_updated() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice,) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -1650,11 +1526,7 @@ async fn test_read_receipts_cannot_be_updated() {
     };
 
     let result: Result<ActionHash, _> = conductor
-        .call_fallible(
-            &alice.zome("mail_messages"),
-            "update_read_receipt",
-            input,
-        )
+        .call_fallible(&alice.zome("mail_messages"), "update_read_receipt", input)
         .await;
 
     assert!(
@@ -1668,9 +1540,7 @@ async fn test_read_receipts_cannot_be_updated() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_delivery_receipts_cannot_be_updated() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice,) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -1711,9 +1581,7 @@ async fn test_delivery_receipts_cannot_be_updated() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_trust_score_update_only_by_authorized_agent() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice, bob) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -1734,11 +1602,7 @@ async fn test_trust_score_update_only_by_authorized_agent() {
     };
 
     let result: Result<ActionHash, _> = conductor
-        .call_fallible(
-            &bob.zome("mail_trust"),
-            "update_trust_score",
-            input,
-        )
+        .call_fallible(&bob.zome("mail_trust"), "update_trust_score", input)
         .await;
 
     assert!(
@@ -1759,9 +1623,7 @@ async fn test_trust_score_update_only_by_authorized_agent() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_send_email_blocked_for_negative_trust() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice, bob) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -1781,11 +1643,7 @@ async fn test_send_email_blocked_for_negative_trust() {
     };
 
     let _: Result<ActionHash, _> = conductor
-        .call_fallible(
-            &bob.zome("mail_trust"),
-            "create_attestation",
-            attest_input,
-        )
+        .call_fallible(&bob.zome("mail_trust"), "create_attestation", attest_input)
         .await;
 
     // Step 2: Alice tries to send email — should be blocked
@@ -1806,7 +1664,9 @@ async fn test_send_email_blocked_for_negative_trust() {
     if result.is_err() {
         let err_msg = format!("{:?}", result.unwrap_err());
         assert!(
-            err_msg.contains("trust") || err_msg.contains("blocked") || err_msg.contains("signature"),
+            err_msg.contains("trust")
+                || err_msg.contains("blocked")
+                || err_msg.contains("signature"),
             "Error should mention trust or be a downstream validation failure, got: {}",
             err_msg,
         );
@@ -1819,9 +1679,7 @@ async fn test_send_email_blocked_for_negative_trust() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_send_email_allowed_for_unknown_sender() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice, bob) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -1863,9 +1721,7 @@ async fn test_send_email_allowed_for_unknown_sender() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_did_binding_empty_did_rejected() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice,) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -1881,10 +1737,7 @@ async fn test_did_binding_empty_did_rejected() {
         )
         .await;
 
-    assert!(
-        result.is_err(),
-        "Empty DID registration must be rejected"
-    );
+    assert!(result.is_err(), "Empty DID registration must be rejected");
 }
 
 /// Duplicate DID registration rejected.
@@ -1892,9 +1745,7 @@ async fn test_did_binding_empty_did_rejected() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_did_binding_duplicate_registration_rejected() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice, bob) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -1906,21 +1757,13 @@ async fn test_did_binding_duplicate_registration_rejected() {
 
     // First registration (Alice) should succeed
     let first: Result<ActionHash, _> = conductor
-        .call_fallible(
-            &alice.zome("mail_profiles"),
-            "register_my_did",
-            did.clone(),
-        )
+        .call_fallible(&alice.zome("mail_profiles"), "register_my_did", did.clone())
         .await;
     assert!(first.is_ok(), "First DID registration should succeed");
 
     // Second registration (Bob, same DID) should fail
     let second: Result<ActionHash, _> = conductor
-        .call_fallible(
-            &bob.zome("mail_profiles"),
-            "register_my_did",
-            did,
-        )
+        .call_fallible(&bob.zome("mail_profiles"), "register_my_did", did)
         .await;
 
     assert!(
@@ -1934,9 +1777,7 @@ async fn test_did_binding_duplicate_registration_rejected() {
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_contact_empty_name_rejected() {
     let mut conductor = SweetConductor::from_standard_config().await;
-    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
-        .await
-        .unwrap();
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path()).await.unwrap();
 
     let (alice,) = conductor
         .setup_app("test-app", &[dna_file.clone()])
@@ -1956,15 +1797,170 @@ async fn test_contact_empty_name_rejected() {
     };
 
     let result: Result<ActionHash, _> = conductor
-        .call_fallible(
-            &alice.zome("mail_contacts"),
-            "create_contact",
-            input,
-        )
+        .call_fallible(&alice.zome("mail_contacts"), "create_contact", input)
         .await;
 
     assert!(
         result.is_err(),
         "Contact with empty display_name must be rejected"
     );
+}
+
+// =============================================================================
+// Phase 0: Cross-agent delivery + AgentToInbox spam rejection
+// =============================================================================
+//
+// Phase 0 of PULSE_READINESS_PLAN.md. Two new test shapes:
+//
+//   1. `phase0_two_conductor_harness_smoke` — minimum-viable proof that the
+//      multi-conductor sweettest harness itself works: two conductors boot,
+//      the DNA bundle installs on both, and agents discover each other. No
+//      email is sent (see blocker note below).
+//
+//   2. `phase0_forged_inbox_link_rejected` — directly proves the Phase 0.3
+//      integrity-zome validation. Eve attempts to create an AgentToInbox link
+//      with Bob's pubkey as base and an entry Eve controls as target. The
+//      DHT must reject.
+//
+// ## Design blocker that affects ALL happy-path tests
+//
+// Every happy-path test in this file is #[ignore] AND uses invalid signatures
+// for a reason that's not documented elsewhere: the coordinator's `send_email`
+// calls `sys_time()` to set `email.timestamp`, and that timestamp is part of
+// the canonical `email_signing_content(...)` that the integrity zome verifies.
+// A client CANNOT pre-compute a valid Ed25519 signature because it doesn't
+// know the timestamp the coordinator will assign.
+//
+// Existing tests work around this by only verifying REJECTION paths (forged,
+// all-zero, wrong-length signatures). Nothing in this file proves a valid
+// email can round-trip.
+//
+// This blocks Phase 0.2 "alice_sends_bob_receives" end-to-end. It is tracked
+// as Phase 0.8 in PULSE_READINESS_PLAN.md. Two candidate fixes:
+//
+//   (A) Coordinator `sign_and_send_email` helper that signs internally using
+//       the agent's lair key.
+//   (B) Accept `timestamp: Timestamp` on `SendEmailInput` and have the
+//       coordinator NOT override it — client-authoritative timestamps, which
+//       is how real mail (Date: header) works.
+//
+// (B) is cleaner and matches RFC 5322. Deferred to Phase 0.8.
+
+/// Two-conductor harness smoke test — proves infrastructure, not delivery.
+///
+/// Confirms that:
+/// - The DNA bundle loads
+/// - Two independent conductors can install the same app
+/// - Alice's conductor and Bob's conductor each produce an agent key
+/// - `await_consistency` completes (peer discovery works)
+///
+/// Deliberately does NOT attempt `send_email` — that is blocked by the
+/// timestamp-signing issue (see module docs above). This test is the
+/// foundation every Phase 0 happy-path test will build on, so it must pass
+/// standalone first.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "Phase 0.2 — requires Holochain conductor + resolved getrandom backend config"]
+async fn phase0_two_conductor_harness_smoke() {
+    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
+        .await
+        .expect("DNA bundle must load");
+
+    let apps = conductors
+        .setup_app("pulse-phase0", &[dna_file.clone()])
+        .await
+        .expect("setup_app must succeed on both conductors");
+
+    let cells = apps.cells_flattened();
+    assert_eq!(
+        cells.len(),
+        2,
+        "Expected exactly 2 cells, one per conductor"
+    );
+
+    let alice_cell = cells[0].clone();
+    let bob_cell = cells[1].clone();
+
+    assert_ne!(
+        alice_cell.agent_pubkey(),
+        bob_cell.agent_pubkey(),
+        "Alice and Bob must have distinct agent pubkeys"
+    );
+
+    // Peer discovery. If this returns Ok, the two conductors found each other
+    // over the dev-test bootstrap and the DHT is live enough for further
+    // Phase 0 work.
+    await_consistency(30, [&alice_cell, &bob_cell])
+        .await
+        .expect("two conductors must reach DHT consistency");
+}
+
+/// Phase 0.5 — AgentToInbox spam rejection.
+///
+/// Threat model: Eve wants to dump arbitrary entries into Bob's inbox view.
+/// Before Phase 0.3, the integrity zome's `validate_create_link` stub let
+/// any agent create an `AgentToInbox` link with any base (target agent) and
+/// any target (arbitrary entry). Eve could grief Bob's inbox with garbage.
+///
+/// After Phase 0.3, the integrity zome enforces:
+///   (1) Link base is an AgentPubKey (not any other hash type)
+///   (2) Target entry deserializes as `EncryptedEmail`
+///   (3) `email.recipient == link.base` AND `email.sender == link.author`
+///
+/// This test directly exercises (3): Eve creates an email where she is both
+/// sender and recipient (self-addressed), then attempts to create an inbox
+/// link with Bob's pubkey as base. The link author is Eve, and
+/// `email.recipient = Eve != Bob`, so validation must reject.
+///
+/// NOTE: Runnable-state of this test is blocked on Phase 0.8 (see module
+/// docs). Eve needs to successfully author at least ONE valid email entry
+/// to have a link target, and current timestamp-signing design prevents
+/// that from a client. When Phase 0.8 lands, remove the `#[ignore]` flag
+/// and unblock.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "Phase 0.5 — blocked on Phase 0.8 client-side signing fix"]
+async fn phase0_forged_inbox_link_rejected() {
+    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+    let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
+        .await
+        .expect("DNA bundle must load");
+
+    let apps = conductors
+        .setup_app("pulse-phase0", &[dna_file.clone()])
+        .await
+        .expect("setup_app must succeed");
+
+    let cells = apps.cells_flattened();
+    let eve_cell = cells[0].clone();
+    let bob_cell = cells[1].clone();
+
+    // STEP 1 — Eve creates a valid email addressed to herself. This establishes
+    // a legitimate EncryptedEmail entry on the DHT under Eve's authorship with
+    // recipient = Eve. Once Phase 0.8 resolves client-side signing, this step
+    // becomes real. Until then, skip.
+    //
+    // let eve_email_hash: ActionHash = conductors[0]
+    //     .call(
+    //         &eve_cell.zome("mail_messages"),
+    //         "sign_and_send_email", // Phase 0.8 coordinator helper
+    //         SignAndSendEmailInput { recipient: eve_cell.agent_pubkey().clone(), .. },
+    //     )
+    //     .await;
+
+    await_consistency(30, [&eve_cell, &bob_cell])
+        .await
+        .expect("consistency pre-attack");
+
+    // STEP 2 — Eve attempts to create an AgentToInbox link with Bob as base,
+    // pointing at her self-authored email. The integrity zome's
+    // `validate_inbox_link` must detect that `email.recipient = Eve != Bob`
+    // and reject.
+    //
+    // Because Step 1 cannot yet construct `eve_email_hash`, this test is
+    // currently a scaffold — it confirms the wiring is in place. The exact
+    // call surface will depend on Phase 0.8's API shape.
+
+    // Sanity: the test ran to here without panicking means the harness is
+    // correctly set up for Phase 0.8 to fill in.
+    assert_ne!(eve_cell.agent_pubkey(), bob_cell.agent_pubkey());
 }
