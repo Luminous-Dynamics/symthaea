@@ -212,6 +212,36 @@ fn conclusion_is_and(phi: &FolFormulaExt) -> bool {
     }
 }
 
+/// Walk through outer `Forall`s, then collect the left-hand sides of the
+/// outer `Implies` chain. Returns the hypotheses in order of appearance.
+///
+/// For `∀ n : ℝ, (¬ n = 3) → ((n+5)/(n-3) = 2) → (n = 11)` returns
+/// `[¬n=3, (n+5)/(n-3) = 2]`. Used to count hypotheses for named-intro
+/// emission and to locate `≠` hypotheses for `sub_ne_zero` witness
+/// derivation in the Phase 6a field-reasoning branch.
+fn collect_outer_hypotheses(phi: &FolFormulaExt) -> Vec<FolFormulaExt> {
+    let mut cur = phi;
+    while let FolFormulaExt::Forall(_, _, body) = cur {
+        cur = body;
+    }
+    let mut out = Vec::new();
+    while let FolFormulaExt::Implies(h, rest) = cur {
+        out.push((**h).clone());
+        cur = rest;
+    }
+    out
+}
+
+/// Is this hypothesis `¬ (a = b)` shape? If so, `sub_ne_zero.mpr h`
+/// yields `a - b ≠ 0`, which `field_simp` can use to clear denominators.
+/// `mathd_algebra_181` (`h₀ : n ≠ 3`) is the canonical miniF2F case.
+fn is_ne_hypothesis(phi: &FolFormulaExt) -> bool {
+    matches!(
+        phi,
+        FolFormulaExt::Not(inner) if matches!(inner.as_ref(), FolFormulaExt::Eq(_, _))
+    )
+}
+
 /// Does any term in the formula contain a `Div` binop whose right side
 /// contains a free variable (i.e. division by a symbolic expression)?
 ///
@@ -414,17 +444,36 @@ fn synthesize_arith_tactic(phi: &FolFormulaExt, fragment: SmtFragment) -> (LeanT
     // names in `rcases lt_trichotomy` and nlinarith hints so the `_`
     // placeholders that failed to unify in W4 now resolve cleanly.
     let binders = collect_outer_forall_binders(phi);
-    // Introduce outer universals with concrete names, then `try intros`
-    // to additionally peel implication hypotheses (goals like
-    // `∀ x : ℝ, 0 < x → 0 ≤ x` need both: `intro x` for the universal
-    // and `intros` for the implication's antecedent).
-    let intro_line = if binders.is_empty() {
-        String::from("try intros\n  ")
-    } else {
-        format!("intro {}\n  try intros\n  ", binders.join(" "))
+    let hypotheses = collect_outer_hypotheses(phi);
+    // Introduce outer universals and hypotheses with concrete names so
+    // the field-reasoning branch can reference them for `sub_ne_zero`
+    // witness derivation. Phase 6a: naming hypotheses up front enables
+    // the `_181`-family fix (hypothesis `n ≠ 3` → explicit witness
+    // `n - 3 ≠ 0` passed to `field_simp`). Non-field branches don't
+    // reference these names, so the naming is harmless for them.
+    let hyp_names: Vec<String> = (0..hypotheses.len()).map(|i| format!("h{i}")).collect();
+    let intro_line = match (binders.is_empty(), hyp_names.is_empty()) {
+        (true, true) => String::from("try intros\n  "),
+        (false, true) => format!("intro {}\n  try intros\n  ", binders.join(" ")),
+        (true, false) => format!("intro {}\n  ", hyp_names.join(" ")),
+        (false, false) => format!("intro {} {}\n  ", binders.join(" "), hyp_names.join(" "),),
     };
     let hints_compact = build_nlinarith_hints(&binders);
     let hints_widened = build_nlinarith_hints_widened(&binders);
+
+    // Phase 6a: collect indices of `¬ _ = _` hypotheses. For each, the
+    // field branch emits `have ne_i := sub_ne_zero.mpr h_i`, giving
+    // `field_simp` an explicit `expr ≠ 0` witness. This closes the
+    // `_181`/`_251`/`_267` family identified in the Phase 6 Session 1b
+    // null: those goals have `h : x ≠ c` + division by `x - c`, but
+    // Mathlib's `field_simp` doesn't auto-derive `x - c ≠ 0` from
+    // `¬ x = c` (empirically, `simp made no progress`).
+    let ne_hyp_indices: Vec<usize> = hypotheses
+        .iter()
+        .enumerate()
+        .filter(|(_, h)| is_ne_hypothesis(h))
+        .map(|(i, _)| i)
+        .collect();
 
     // rcases lt_trichotomy needs the first two binders. If we have fewer
     // than 2, fall back to `_ _` placeholders (the original W4 form).
@@ -477,21 +526,61 @@ fn synthesize_arith_tactic(phi: &FolFormulaExt, fragment: SmtFragment) -> (LeanT
     // unconditionally risks the same kind of heartbeat blowup we saw
     // with the unconditional And-splitter in Phase 4a.
     let field_simp_alt = if conclusion_has_division(phi) {
-        // Two field sub-branches:
+        // Three field sub-branches, in order:
         //
-        // 1. `subst_eqs + field_simp + closers` — the mathd_algebra_55
-        //    pattern (hypotheses evaluate the symbolic denominator to a
-        //    numeric literal; subst collapses it, then norm_num closes).
-        // 2. `field_simp at * + closers` — the mathd_algebra_181 pattern
-        //    (division in a *hypothesis* with linear goal; `field_simp
-        //    at *` clears denominators in every hypothesis + goal,
-        //    leaving a polynomial problem linarith/nlinarith can close).
+        // 1. `subst_eqs + field_simp + closers` — the `_55` pattern:
+        //    hypotheses evaluate the symbolic denominator to a numeric
+        //    literal; subst collapses it, then norm_num closes.
+        // 2. `sub_ne_zero witnesses + field_simp [witnesses] + closers` —
+        //    Phase 6a, the `_181` pattern: hypothesis `h : x ≠ c` gets
+        //    converted to `x - c ≠ 0` via `sub_ne_zero.mpr h`, then
+        //    `field_simp [ne_witness] at *` clears the `(…)/(x - c)`
+        //    denominator. Needs named hypotheses (h0, h1, …) — that's
+        //    why the intro line was restructured to name everything up
+        //    front.
+        // 3. `field_simp at * + closers` — the generic fallback: no
+        //    explicit witness, let field_simp try its own derivation.
+        //    Keeps `_55` and closed-form-rational cases working.
         //
-        // Both sub-branches are wrapped in `try`-guarded setups so the
-        // cascade skips cleanly when the precondition doesn't match.
+        // All three are `try`-guarded so non-applicable cases fall
+        // through cleanly.
+        let witness_lines: String = if ne_hyp_indices.is_empty() {
+            String::new()
+        } else {
+            ne_hyp_indices
+                .iter()
+                .enumerate()
+                .map(|(w, h_idx)| format!("have ne{w} := sub_ne_zero.mpr h{h_idx}; "))
+                .collect()
+        };
+        let witness_args: String = (0..ne_hyp_indices.len())
+            .map(|w| format!("ne{w}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let witness_branch = if ne_hyp_indices.is_empty() {
+            String::new()
+        } else {
+            format!(
+                "\n    | ({witness_lines}try (field_simp [{witness_args}] at *); first | (linarith; done) | (ring; done) | (norm_num; done) | (nlinarith [{hints_compact}]; done); done)",
+                witness_lines = witness_lines,
+                witness_args = witness_args,
+                hints_compact = hints_compact,
+            )
+        };
+        // Phase 6a ordering lesson: the `subst_eqs+field_simp` branch
+        // uses `try`-guarded tactics that Lean's `first` interprets as
+        // "succeeded-with-unsolved-goals" (committing the outer `first`
+        // to this alternative even when inner closers fail). That
+        // commitment prevents a later witness-branch from ever firing.
+        // Fix: witness-branch must come FIRST among field branches —
+        // its `have` preamble only applies when there are `≠`
+        // hypotheses to extract witnesses from; for other goals,
+        // `ne_hyp_indices` is empty and `witness_branch` is an empty
+        // string, so this branch is skipped.
         format!(
-            "\n    | (try subst_eqs; try field_simp; first | (norm_num; done) | (ring; done) | (linarith; done) | (nlinarith [{hints_compact}]; done); done)\n    | (try (field_simp at *); first | (linarith; done) | (ring; done) | (norm_num; done) | (nlinarith [{hints_compact}]; done); done)",
+            "{witness_branch}\n    | (try subst_eqs; try field_simp; first | (norm_num; done) | (ring; done) | (linarith; done) | (nlinarith [{hints_compact}]; done); done)\n    | (try (field_simp at *); first | (linarith; done) | (ring; done) | (norm_num; done) | (nlinarith [{hints_compact}]; done); done)",
             hints_compact = hints_compact,
+            witness_branch = witness_branch,
         )
     } else {
         String::new()
