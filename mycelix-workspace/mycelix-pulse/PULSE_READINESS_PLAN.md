@@ -435,7 +435,113 @@ The plan is done when all of the following are simultaneously green:
 
 ---
 
-## Appendix: research artifacts
+## Appendix A — Phase 0.1 debug runbook: conductor auth timeout
+
+The frontend's `test-e2e.py` and Leptos client both report zome calls hanging
+after successful `AppAgentWebsocket` connection. This is the single blocker
+that currently makes the sweettest harness (Phase 0.2) unverifiable at
+runtime. What follows is the shortlist of hypotheses ranked by prior
+probability, with first-moves.
+
+### Hypothesis 1: `holochain_client` version skew vs. Holochain 0.6 conductor
+**Prior: HIGH.** Precedent from the 2026-04-18 lawful-identity session
+(memory `mycelix_state_coexistence_apr18.md`): connecting to a 0.6 conductor
+requires `holochain_client = "0.9-dev"` (pre-0.6 clients silently fail on
+the post-serialization payload format). Check:
+
+```bash
+grep -rn 'holochain_client' mycelix-workspace/mycelix-pulse/happ/backend-rs/Cargo.toml
+grep -rn 'holochain_client' mycelix-workspace/mycelix-pulse/apps/leptos/Cargo.toml
+```
+
+Fix: pin to the 0.9-dev version (per the cross-cluster workspace
+`nix/modules/holochain-versions.nix` exact-pin).
+
+### Hypothesis 2: `authorize_signing_credentials` ordering
+**Prior: HIGH.** Also from lawful-identity memory: after
+`authorize_signing_credentials`, the client must call `add_credentials(cell_id,
+creds)` **before** issuing any zome call. Skipping this yields
+"Provenance not found" on the first call. Test:
+
+```rust
+// In the Python or Leptos harness, immediately before first zome call:
+let creds = conductor.authorize_signing_credentials(cell_id).await?;
+conductor.add_credentials(cell_id, creds).await?;  // ← often forgotten
+let result = conductor.call_zome(...).await?;
+```
+
+### Hypothesis 3: Admin (33800) vs App (8888) port confusion
+**Prior: MEDIUM.** Admin operations (install-app, enable-app) go to
+`ws://localhost:33800`. Zome calls go to `ws://localhost:8888`. A test that
+opens an admin socket and then tries to `call_zome` on it will hang without
+error. Check which port the Python/Leptos harness opens — if it's 33800 for
+zome calls, that's the bug.
+
+### Hypothesis 4: AppAgent not enabled for this hApp
+**Prior: MEDIUM.** After `install-app`, the app must also be `enable-app`'d
+(per the installation recipe in the root `CLAUDE.md`). A disabled app accepts
+the WebSocket connection but rejects zome calls silently. Check:
+
+```bash
+hc sandbox call --running=33800 list-apps
+# mycelix_mail should show status = Running
+```
+
+If `Disabled`, run `hc sandbox call --running=33800 enable-app mycelix_mail`.
+
+### Hypothesis 5: Signing-key absence in lair
+**Prior: LOW.** The conductor's lair keystore must have the signing agent
+for the running cell. If lair is fresh / was restored from a partial backup,
+signatures fail and calls hang until TCP timeout (~30s). Check lair status:
+
+```bash
+lair-keystore list-all | grep -i mycelix
+```
+
+### First moves (run in order)
+
+1. `grep -rn holochain_client mycelix-workspace/mycelix-pulse/ --include=Cargo.toml` — confirm version (H1)
+2. `hc sandbox call --running=33800 list-apps` — confirm mycelix_mail status Running (H4)
+3. Read `apps/leptos/src/holochain.rs` and `apps/leptos/test-e2e.py` around first-zome-call site — check for `add_credentials` call after `authorize_signing_credentials` (H2)
+4. Confirm app port 8888 used for zome calls, not 33800 (H3)
+5. If all above look correct, attach `RUST_LOG=holochain=debug,holochain_client=debug` and re-run the test — the hang surface will become visible
+
+### Expected fix locations
+
+- `mycelix-workspace/mycelix-pulse/happ/backend-rs/Cargo.toml` (client version)
+- `mycelix-workspace/mycelix-pulse/apps/leptos/Cargo.toml` (client version)
+- `mycelix-workspace/mycelix-pulse/apps/leptos/src/holochain.rs` (credential flow, port choice)
+- `mycelix-workspace/mycelix-pulse/apps/leptos/test-e2e.py` (if that's the harness — same checks)
+
+### Exit criteria
+
+Phase 0.1 is done when:
+- `test-e2e.py send_email → get_inbox` returns the sent message
+- Runbook notes in this appendix updated with root cause + fix reference commit
+
+### Environmental follow-ups (not strictly Phase 0.1)
+
+Work done in this session uncovered three pre-existing environmental issues
+that future Phase 0+ runtime work must resolve:
+
+1. **`mycelix-zkp-core` path bug** — FIXED in commit `41f0cfc32b` (two
+   `Cargo.toml` paths were one `../` short; resolved to nonexistent
+   `mycelix-workspace/crates/` instead of repo-root `crates/`).
+2. **`constant_time_eq@0.4.3` requires rustc 1.95** — worktree on 1.94. Pin
+   to 0.4.2 via `cargo update -p constant_time_eq --precise 0.4.2` (not
+   committed; Cargo.lock regeneration is a cross-session concern).
+3. **Missing `.cargo/config.toml` with `getrandom_backend = "custom"`** — the
+   pulse workspace has no `.cargo/config.toml`, so `cargo build
+   --target wasm32-unknown-unknown` pulls wasm-bindgen via `getrandom 0.3`
+   default backend and fails. Per the workspace CLAUDE.md, the fix is a
+   `.cargo/config.toml` with `[target.wasm32-unknown-unknown] rustflags =
+   ["--cfg", "getrandom_backend=\"custom\""]`. See mycelix commit `1deaeb047`
+   for the canonical fix in a sibling cluster. This is a P0 blocker for
+   actual WASM compilation of any pulse zome.
+
+---
+
+## Appendix B — research artifacts
 
 Four deep-research reports produced during planning, summarized in this document:
 1. **Holochain DHT mail patterns** — Snapmail / delivery-zome precedent, link validation requirements, sweettest patterns, cross-conductor federation maturity (0.6 alpha), IPFS attachments, delivery receipts
