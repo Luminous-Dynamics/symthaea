@@ -114,6 +114,22 @@ timezone-returns-empty case (empty config has no forbidden substrings,
 no required substrings either). The structural scorer demands a
 positive assertion. That's the whole point of P1.
 
+### 2026-04-18 — UDP + time-zone codegen fixes (same-day follow-on)
+
+Landed fixes for 2 of the 3 gaps surfaced by round 2. Both are
+minimal, scoped fixes to `nix_codegen.rs`:
+
+- **UDP firewall ports**: `emit_networking` now branches on
+  `udp` / `wireguard` / `quic` in the prompt and emits
+  `allowedUDPPorts` instead of `allowedTCPPorts`.
+- **Time-zone idiom**: new `emit_time_zone` fast path at the top
+  of `nix_idiom_body`, runs BEFORE classify. Detects `time zone` /
+  `timezone`, extracts an IANA zone name from the original-cased
+  prompt, emits `time.timeZone = "..."`.
+
+**Score: 25/26 (96%)**. Only Intel GPU remains — a larger idiom
+addition tracked for a future session.
+
 ### 2026-04-18 — Full-corpus run in `--structural` mode
 
 Same-day run across all 94 problems. Shows how the structural and
