@@ -981,6 +981,124 @@ pub fn try_nix_eval(expr: &str) -> NixVerdict {
     }
 }
 
+/// Tier 1.3 — full NixOS module evaluation.
+///
+/// Wraps the snippet as an `imports = [ ... ]` entry inside a minimal
+/// configuration that's complete enough to evaluate (root filesystem,
+/// bootloader, stateVersion stubs), then runs
+/// `nix-instantiate '<nixpkgs/nixos>' -A system`. This is the strongest
+/// pre-build verification we can perform without actually realizing
+/// any derivations.
+///
+/// Catches:
+/// - All parse + eval errors
+/// - Option-name typos (`services.openssh.enabled` → suggests `enable`)
+/// - Type errors on option values
+/// - Cross-module assertion failures (most NixOS sanity checks)
+///
+/// Cost: ~5–30s on a warm nixpkgs eval cache, much longer cold. Should
+/// only be invoked when caller opts in (`generate_nix_with_dry_build`)
+/// AND the prompt is for a NixOS module (not a shell.nix or flake fragment).
+///
+/// Returns `Some(verdict)` if the verifier ran, `None` if the snippet is
+/// not a valid module shape (e.g. shell.nix that takes `pkgs ? import …`).
+pub fn try_nix_module_eval(snippet: &str) -> Option<NixVerdict> {
+    if !looks_like_module(snippet) {
+        return None;
+    }
+
+    let tmp = std::env::temp_dir();
+    let pid = std::process::id();
+    // Per-call nonce so concurrent calls (test threads, services) don't
+    // race on the same tempfile names.
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let snippet_path = tmp.join(format!("symthaea_nix_module_snippet_{pid}_{nonce}.nix"));
+    let wrapper_path = tmp.join(format!("symthaea_nix_module_wrap_{pid}_{nonce}.nix"));
+
+    if let Err(e) = std::fs::write(&snippet_path, snippet) {
+        return Some(NixVerdict::ParseError(format!("write snippet: {e}")));
+    }
+
+    // Minimal NixOS config that imports the snippet. The fileSystems +
+    // bootloader + stateVersion stubs are required for a NixOS eval to
+    // succeed; otherwise assertions fail before the snippet is checked.
+    let snippet_path_str = snippet_path.to_string_lossy();
+    let wrapper = format!(
+        r#"{{ pkgs, ... }}: {{
+  imports = [ {snippet_path_str} ];
+  fileSystems."/" = {{ device = "/dev/null"; fsType = "tmpfs"; }};
+  boot.loader.grub.device = "nodev";
+  system.stateVersion = "24.05";
+}}
+"#
+    );
+    if let Err(e) = std::fs::write(&wrapper_path, wrapper) {
+        let _ = std::fs::remove_file(&snippet_path);
+        return Some(NixVerdict::ParseError(format!("write wrapper: {e}")));
+    }
+
+    let out = Command::new("nix-instantiate")
+        .args([
+            "<nixpkgs/nixos>",
+            "-A",
+            "system",
+            "--arg",
+            "configuration",
+            wrapper_path.to_str().unwrap_or(""),
+        ])
+        .output();
+
+    let _ = std::fs::remove_file(&snippet_path);
+    let _ = std::fs::remove_file(&wrapper_path);
+
+    let verdict = match out {
+        Ok(o) if o.status.success() => NixVerdict::ParseOk,
+        Ok(o) => {
+            let stderr = String::from_utf8_lossy(&o.stderr).to_string();
+            // The most informative line for module-eval errors is usually the
+            // last `error: ...` line (which has the option-name suggestion).
+            let msg = stderr
+                .lines()
+                .rev()
+                .find(|l| l.trim_start().starts_with("error:"))
+                .or_else(|| stderr.lines().find(|l| l.contains("error")))
+                .unwrap_or(stderr.lines().next().unwrap_or(""))
+                .trim()
+                .to_string();
+            NixVerdict::ParseError(msg)
+        }
+        Err(e) => NixVerdict::ParseError(format!("nix-instantiate: {e}")),
+    };
+    Some(verdict)
+}
+
+/// Heuristic: does this snippet look like a NixOS module (vs. a shell.nix
+/// or flake.nix fragment)?
+///
+/// Module shapes we accept:
+/// - `{ ... }: { services.X = …; }`
+/// - `{ pkgs, ... }: { ... }`
+/// - bare attrset `{ services.X = …; }`
+///
+/// We reject:
+/// - `{ pkgs ? import <nixpkgs> {} }: pkgs.mkShell { … }` (shell.nix)
+/// - `{ description = …; outputs = …; }` (flake)
+fn looks_like_module(snippet: &str) -> bool {
+    let trimmed = snippet.trim_start();
+    let lower = snippet.to_lowercase();
+    if lower.contains("mkshell") || lower.contains("mkderivation") {
+        return false;
+    }
+    if lower.contains("description") && lower.contains("outputs") && lower.contains("inputs") {
+        return false;
+    }
+    // Either bare attrset or function-of-attrset
+    trimmed.starts_with('{') || trimmed.starts_with('(')
+}
+
 /// Verify a Nix expression by running `nix-instantiate --parse`.
 ///
 /// This is the fastest verification (millisecond) — checks syntax only,
@@ -1498,6 +1616,49 @@ pub fn generate_nix_with_index_verify(
     }
 }
 
+/// Result of running the generation pipeline with the full verification
+/// ladder (parse → eval → option-index → optional module-eval).
+#[derive(Debug)]
+pub struct NixGenWithDryBuildResult {
+    pub base: NixGenResult,
+    pub unknown_options: Vec<UnknownOption>,
+    /// Module-eval verdict. `None` if the snippet was not module-shaped
+    /// (e.g. a shell.nix), so the dry-build verifier was skipped.
+    pub module_eval: Option<NixVerdict>,
+}
+
+impl NixGenWithDryBuildResult {
+    /// True iff every available verification rung was clean.
+    pub fn fully_verified(&self) -> bool {
+        self.base.parses
+            && self.unknown_options.is_empty()
+            && match &self.module_eval {
+                Some(v) => v.is_ok(),
+                None => true, // not applicable for shell.nix etc.
+            }
+    }
+}
+
+/// Like `generate_nix_with_index_verify`, but adds the `try_nix_module_eval`
+/// rung when the snippet is module-shaped. SLOW: 5-30s per call (full
+/// `<nixpkgs/nixos>` evaluation), so callers should opt in explicitly.
+pub fn generate_nix_with_dry_build(
+    prompt: &str,
+    max_iterations: usize,
+) -> NixGenWithDryBuildResult {
+    let mid = generate_nix_with_index_verify(prompt, max_iterations);
+    let module_eval = if mid.base.parses {
+        try_nix_module_eval(&mid.base.code)
+    } else {
+        None
+    };
+    NixGenWithDryBuildResult {
+        base: mid.base,
+        unknown_options: mid.unknown_options,
+        module_eval,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1759,6 +1920,74 @@ pkgs.mkShell {
             result.unknown_options.is_empty(),
             "shell.nix idiom should have no NixOS option references, got {:?}",
             result.unknown_options
+        );
+    }
+
+    #[test]
+    fn looks_like_module_classifies_correctly() {
+        // Modules
+        assert!(looks_like_module("{ services.openssh.enable = true; }"));
+        assert!(looks_like_module(
+            "{ pkgs, ... }: { services.nginx.enable = true; }"
+        ));
+        assert!(looks_like_module(
+            "{ ... }: {\n  hardware.opengl.enable = true;\n}"
+        ));
+
+        // shell.nix — not a module
+        assert!(!looks_like_module(
+            "{ pkgs ? import <nixpkgs> {} }: pkgs.mkShell { buildInputs = [ ]; }"
+        ));
+        // flake.nix — not a module
+        assert!(!looks_like_module(
+            "{ description = \"x\"; inputs.nixpkgs.url = \"x\"; outputs = { ... }: { }; }"
+        ));
+    }
+
+    #[test]
+    fn try_nix_module_eval_skips_shell_nix() {
+        let shell = "{ pkgs ? import <nixpkgs> {} }:\npkgs.mkShell { buildInputs = [ ]; }\n";
+        // Returns None — caller knows to skip.
+        assert!(try_nix_module_eval(shell).is_none());
+    }
+
+    #[test]
+    #[ignore = "live: ~10-15s, slow even with warm cache"]
+    fn try_nix_module_eval_live_clean_module() {
+        if Command::new("nix-instantiate")
+            .arg("--version")
+            .output()
+            .is_err()
+        {
+            eprintln!("[skip] nix-instantiate not available");
+            return;
+        }
+        let module = "{ ... }: { services.openssh.enable = true; }";
+        let verdict = try_nix_module_eval(module).expect("module should be evaluated");
+        assert!(verdict.is_ok(), "clean module failed: {:?}", verdict);
+    }
+
+    #[test]
+    #[ignore = "live: ~10-15s, slow even with warm cache"]
+    fn try_nix_module_eval_live_catches_typo() {
+        if Command::new("nix-instantiate")
+            .arg("--version")
+            .output()
+            .is_err()
+        {
+            eprintln!("[skip] nix-instantiate not available");
+            return;
+        }
+        // 'enabled' is a typo for 'enable' — module-eval should reject and
+        // the error message should hint at the correct name.
+        let bad = "{ ... }: { services.openssh.enabled = true; }";
+        let verdict = try_nix_module_eval(bad).expect("module should be evaluated");
+        assert!(!verdict.is_ok(), "typo'd module should fail eval");
+        let msg = verdict.message().to_lowercase();
+        assert!(
+            msg.contains("enable") || msg.contains("does not exist"),
+            "expected 'did you mean enable' hint, got: {}",
+            verdict.message()
         );
     }
 }
