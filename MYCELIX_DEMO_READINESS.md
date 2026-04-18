@@ -88,11 +88,22 @@ These are the things that, if not fixed, prevent *any* version of this demo from
 
 **Path**: coordinate with the other session — they push, or we pull from the worktree with their blessing. Don't solo-fix (risk of divergence if they have more pending changes).
 
-### 2. **Unified hApp install hasn't been smoke-tested end-to-end** in this session's context
+### 2. **Unified hApp install hasn't been smoke-tested end-to-end** (partial progress 2026-04-18)
 
 `mycelix-workspace/happs/mycelix-unified-happ.yaml` lists 21 roles. No recent commit says "I installed this on a fresh conductor and got a running holon across all 21." Without that, the demo has a terrifying cliff on day-of.
 
-**Path**: spin up a fresh Holochain conductor, run `hc app install` against the unified bundle, walk through conductor logs for any role that fails to provision, fix each. Probably 1 full focused session.
+**Progress this session** (inside `nix develop` from `mycelix-praxis/flake.nix` which ships `hc 0.6.0`):
+  - ✅ Added `happs/happ.yaml → mycelix-unified-happ.yaml` symlink so `hc app pack happs` finds the manifest.
+  - ✅ Manifest YAML parses correctly — 21 roles recognized by the hc CLI.
+  - ❌ Pack fails at the first missing DNA: `mycelix-core/dna/mycelix_core.dna: No such file or directory`. None of the 21 DNAs are pre-packed.
+
+**Remaining path**:
+  1. For each of the 21 cluster DNAs: `cargo build --workspace --target wasm32-unknown-unknown --release` (produces zome WASM), then `hc dna pack <cluster>/dna/` (produces `.dna` bundle).
+  2. Retry `hc app pack happs` — should now produce a `.happ` bundle.
+  3. Spin up a fresh Holochain conductor, `hc app install mycelix-unified.happ`.
+  4. Walk conductor logs for any role that fails to provision; fix each.
+
+Probably 1 full focused session (~half a day) once the WASM builds don't regress. Worth automating as `just pack-unified`.
 
 ### 3. **Design system fragmentation across 27 Leptos frontends**
 
