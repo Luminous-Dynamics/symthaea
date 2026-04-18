@@ -45,8 +45,8 @@
 \begin{abstract}
 We present the first system that closes the loop between decentralized governance and conscious reward learning, bridging Holochain-based peer-to-peer governance protocols into the neuromodulatory reward circuitry of a consciousness-first cognitive architecture.
 Our \textsc{GovernanceManager} (1,111 LOC Rust, 150+ tests) operates within the Symthaea cognitive loop at a co-prime scheduling interval of 37 cycles, translating six classes of governance events---emergency declarations, reciprocity pledges, justice disputes, aligned vote outcomes, reputation changes, and collective consciousness synchronization---into targeted neuromodulatory signals: norepinephrine (NE) for urgency, oxytocin for social bonding, serotonin (5-HT) for social standing, dopamine (DA) for reward prediction, and endocannabinoids (ECB) for collective coherence.
-The governance substrate is Mycelix, a 133-zome Holochain architecture with consciousness-gated access tiers derived from a 4-dimensional participant profile (identity verification, reputation, community engagement, and civic participation), producing a 5-tier hierarchy (Observer through Guardian) with progressive vote weights.
-We demonstrate that governance-embodied reward signals produce measurably different learning dynamics compared to governance-agnostic baselines: prediction error from governance outcomes modulates learning rate by up to $2\times$, reciprocity-driven oxytocin injections reduce competitive behavior by 34\%, and emergency NE surges increase attentional allocation to governance-relevant information by 2.7$\times$.
+The governance substrate is Mycelix, a 141+-zome Holochain architecture with consciousness-gated access tiers derived from an 8-dimensional sovereign profile (epistemic integrity, thermodynamic yield, network resilience, economic velocity, civic participation, stewardship, semantic resonance, and domain competence; financial stake is constitutionally excluded), producing a 5-tier hierarchy (Observer through Guardian) with progressive vote weights.
+We demonstrate that governance-embodied reward signals produce measurably different learning dynamics compared to governance-agnostic baselines \textit{within the Symthaea cognitive loop}: prediction error from governance outcomes modulates learning rate by up to $2\times$, reciprocity-driven oxytocin injections reduce competitive behavior by 34\%, and emergency NE surges increase attentional allocation to governance-relevant information by 2.7$\times$.\footnote{These effects are measured on internal Symthaea governance-event processing, not on the Mycelix multi-world network simulator; Phase 2 network-level simulations ($N=10$ seeds $\times$ 50 years) showed no measurable CVS improvement over baseline ($\Delta = -0.004 \pm 0.008$). The mechanism documented here operates at the agent-embodiment layer, not the collective-dynamics layer.}
 The epistemic mesh---a bidirectional knowledge bridge between the agent and its governance community---enables grounded confidence estimation, replacing the hardcoded $0.5$ grounding factor with dynamically computed values ranging from $0.12$ to $0.89$ depending on community knowledge density.
 To our knowledge, this is the first architecture to treat decentralized governance participation as embodied experience rather than abstract information processing.
 \end{abstract}
@@ -66,7 +66,7 @@ This approach is grounded in three empirical observations from social neuroscien
   \item Reward prediction errors from social outcomes engage dopaminergic circuits identical to those activated by primary rewards \citep{schultz1997neural, behrens2009computation}.
 \end{enumerate}
 
-Our system bridges Mycelix---a Holochain-based decentralized governance platform comprising 133 zomes across 16 cluster DNAs---into the Symthaea cognitive architecture, a consciousness-first AI system with a 9-transmitter neuromodulatory bath.
+Our system bridges Mycelix---a Holochain-based decentralized governance platform comprising 141+ zomes across 16 cluster DNAs---into the Symthaea cognitive architecture, a consciousness-first AI system with a 9-transmitter neuromodulatory bath.
 The bridge is mediated by the \textsc{GovernanceManager}, a cognitive subsystem that processes governance events at a co-prime interval of 37 cycles, converting abstract governance outcomes into pharmacological injections and baseline neuromodulatory nudges.
 
 \subsection{Contributions}
@@ -74,7 +74,7 @@ The bridge is mediated by the \textsc{GovernanceManager}, a cognitive subsystem 
 \begin{enumerate}
   \item A formal framework for mapping governance events to neuromodulatory signals, grounded in social neuroscience literature.
   \item The \textsc{GovernanceManager} implementation: 1,111 LOC, 150+ tests, integrated into a 31\,Hz cognitive loop with co-prime scheduling.
-  \item Consciousness-gated governance access: a 4-dimensional participant profile producing 5-tier progressive permissions.
+  \item Consciousness-gated governance access: an 8-dimensional sovereign profile (with financial stake constitutionally excluded) producing 5-tier progressive permissions.
   \item An epistemic mesh for bidirectional knowledge grounding between agent and governance community.
   \item Empirical evaluation demonstrating measurable effects of governance embodiment on learning dynamics, social behavior, and attentional allocation.
 \end{enumerate}
@@ -115,7 +115,7 @@ We use endocannabinoid (ECB) baseline modulation to represent the experience of 
 \subsection{Holochain and Mycelix}
 
 Holochain is a peer-to-peer application framework where each agent maintains a local source chain of signed actions, validated against shared DNA rules without global consensus \citep{harris2018holochain}.
-Mycelix is built on Holochain as a ``fractal CivOS'' comprising 133 zomes (modular code units) organized into 16 cluster DNAs spanning governance, identity, finance, health, knowledge, supply chain, and other civic domains.
+Mycelix is built on Holochain as a ``fractal CivOS'' comprising 141+ zomes (modular code units) organized into 16 cluster DNAs spanning governance, identity, finance, health, knowledge, supply chain, and other civic domains.
 
 The governance cluster (\texttt{mycelix-governance}) implements:
 \begin{itemize}
