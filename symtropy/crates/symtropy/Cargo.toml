@@ -1,0 +1,42 @@
+[package]
+name = "symtropy"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+description = "The Symtropy distribution: an opinionated Bevy bundle with consciousness-coupled physics, scene scaffolding, and a built-in dev console. One dependency for the full Symtropy game-dev experience."
+repository = "https://github.com/luminous-dynamics/symtropy"
+keywords = ["bevy", "game-engine", "symtropy", "physics", "distribution"]
+categories = ["game-engines"]
+readme = "README.md"
+
+# This crate is intentionally tiny — it's a re-export bundle, not a
+# component. The work happens in the named sibling crates.
+
+[dependencies]
+# Bevy with NO default features. Audio backends (cpal/alsa) collide with
+# downstream consumers that pin a different cpal version (e.g. some
+# Symthaea crates), and most users want to opt into Bevy features
+# themselves. Users add `bevy = "0.18"` separately if they want defaults.
+bevy = { version = "0.18", default-features = false }
+
+# The four Symtropy distribution crates. Versions are tested-together per
+# meta-crate release.
+symtropy-bevy = { version = "0.2.0", path = "../symtropy-bevy" }
+symtropy-bevy-scene = { version = "0.1.0", path = "../symtropy-bevy-scene" }
+symtropy-devconsole = { version = "0.1.0", path = "../symtropy-devconsole" }
+
+# Feature-gated optional integrations.
+symtropy-physics = { version = "0.2.0", path = "../symtropy-physics", optional = true }
+symtropy-math = { version = "0.2.0", path = "../symtropy-math", optional = true }
+
+[features]
+default = ["devconsole-phi"]
+
+# Surface the Φ Inspector panel in the devconsole. Pulls in
+# `symtropy-bevy` (AGPL transitively).
+devconsole-phi = ["symtropy-devconsole/phi-panel"]
+
+# Re-export raw `symtropy-physics` and `symtropy-math` types in
+# `symtropy::physics::*` / `symtropy::math::*` so users who want low-level
+# access don't need to add those crates separately.
+low-level = ["dep:symtropy-physics", "dep:symtropy-math"]
