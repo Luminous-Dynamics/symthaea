@@ -214,6 +214,10 @@ fn gather_candidates(root: &Path) -> Vec<PathBuf> {
         "String",
         "Matrix",
         "Int.floor",
+        // 2026-04-18 baseline revealed ZMod problems leak through the
+        // bash filter (mathd_numbertheory_233, mathd_numbertheory_668);
+        // ZMod is modular-ring arithmetic and genuinely out of scope.
+        "ZMod",
     ];
 
     let mut out = Vec::new();

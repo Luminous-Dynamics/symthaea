@@ -275,6 +275,12 @@ pub enum TokenKind {
     Iff,     // ↔
     Not,     // ¬
 
+    /// `⁻¹` — postfix reciprocal operator. Lexed as the two-codepoint
+    /// pair U+207B + U+00B9 (superscript minus + superscript one).
+    /// Lean semantics: `x⁻¹` = `HPow.hPow x (-1 : ℤ)` = `1 / x` for
+    /// fields; the parser lowers it to the latter at parse time.
+    Reciprocal,
+
     /// End-of-input sentinel — simplifies parser lookahead.
     Eof,
 }
@@ -313,6 +319,7 @@ impl fmt::Display for TokenKind {
             Implies => write!(f, "→"),
             Iff => write!(f, "↔"),
             Not => write!(f, "¬"),
+            Reciprocal => write!(f, "⁻¹"),
             Eof => write!(f, "<eof>"),
         }
     }
@@ -472,6 +479,22 @@ pub fn tokenize(src: &str) -> Result<Vec<Token>, IngestError> {
                 ch: '\u{FFFD}',
                 offset: start,
             })?;
+            // Two-codepoint postfix: `⁻¹` = U+207B U+00B9. Handle
+            // before the single-char match so a U+207B with anything
+            // other than U+00B9 after it still errors cleanly.
+            if ch == '\u{207B}' {
+                if let Some((next_ch, next_len)) = next_char(&src[i + ch_len..]) {
+                    if next_ch == '\u{00B9}' {
+                        out.push(Token {
+                            kind: TokenKind::Reciprocal,
+                            offset: start,
+                        });
+                        i += ch_len + next_len;
+                        continue;
+                    }
+                }
+                return Err(IngestError::UnknownChar { ch, offset: start });
+            }
             let kind = match ch {
                 '∀' => TokenKind::Forall,
                 'ℝ' => TokenKind::TyReal,
@@ -901,7 +924,20 @@ impl<'a> Parser<'a> {
             }
             return Ok(LeanTerm::Neg(Box::new(inner)));
         }
-        self.parse_primary()
+        self.parse_postfix()
+    }
+
+    /// Primary then any number of trailing `⁻¹` postfix operators.
+    /// Lean precedence: `⁻¹` binds tighter than `^`, `*`, `/`, unary
+    /// `-`, and `+`. `-x⁻¹` = `-(x⁻¹)`; `x⁻¹^2` = `(x⁻¹)^2`. We
+    /// lower `x⁻¹` to `1 / x` at parse time so the translator never
+    /// needs to know about the reciprocal operator.
+    fn parse_postfix(&mut self) -> Result<LeanTerm, IngestError> {
+        let mut base = self.parse_primary()?;
+        while self.eat(&TokenKind::Reciprocal) {
+            base = LeanTerm::Bin(BinOp::Div, Box::new(LeanTerm::IntLit(1)), Box::new(base));
+        }
+        Ok(base)
     }
 
     fn parse_primary(&mut self) -> Result<LeanTerm, IngestError> {
@@ -1200,6 +1236,27 @@ mod tests {
     }
 
     #[test]
+    fn tokenize_reciprocal_is_a_single_token() {
+        // `⁻¹` is U+207B + U+00B9; must coalesce into one `Reciprocal`.
+        assert_eq!(
+            kinds("x⁻¹"),
+            vec![TokenKind::Ident("x".into()), TokenKind::Reciprocal,]
+        );
+    }
+
+    #[test]
+    fn tokenize_bare_superscript_minus_still_errors() {
+        // U+207B alone (without the following U+00B9) is not a valid
+        // token in our surface. Keeps the error crisp rather than
+        // swallowing partial postfix shapes.
+        let e = tokenize("\u{207B}").unwrap_err();
+        match e {
+            IngestError::UnknownChar { ch, .. } => assert_eq!(ch, '\u{207B}'),
+            other => panic!("expected UnknownChar, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn tokenize_unknown_char_errors() {
         // `%` is not in the in-scope operator set; the filter should
         // reject such files before they reach us, but we want a clean
@@ -1364,6 +1421,67 @@ mod tests {
                    theorem mathd_trivial : 1 = 1 := by sorry";
         let t = parse_theorem(src).unwrap();
         assert_eq!(t.name, "mathd_trivial");
+    }
+
+    #[test]
+    fn parse_reciprocal_lowers_to_div_one_by_x() {
+        // `x⁻¹` should parse as `LeanTerm::Bin(Div, IntLit(1), Var(x))`.
+        let src = "theorem t (x : ℝ) : x⁻¹ = 1 / x := by sorry";
+        let t = parse_theorem(src).unwrap();
+        let one_over_x = LeanTerm::Bin(
+            BinOp::Div,
+            Box::new(LeanTerm::IntLit(1)),
+            Box::new(LeanTerm::Var("x".into())),
+        );
+        let expected_rhs = LeanTerm::Bin(
+            BinOp::Div,
+            Box::new(LeanTerm::IntLit(1)),
+            Box::new(LeanTerm::Var("x".into())),
+        );
+        assert_eq!(
+            t.goal,
+            LeanStatement::Rel(RelOp::Eq, one_over_x, expected_rhs)
+        );
+    }
+
+    #[test]
+    fn parse_reciprocal_on_parenthesized_expression() {
+        // `(4 / x)⁻¹` — the canonical shape from mathd_algebra_245.
+        let src = "theorem t (x : ℝ) : (4 / x)⁻¹ = 0 := by sorry";
+        let t = parse_theorem(src).unwrap();
+        match t.goal {
+            LeanStatement::Rel(RelOp::Eq, lhs, _rhs) => {
+                // Expect Div(1, Div(4, x))
+                match lhs {
+                    LeanTerm::Bin(BinOp::Div, num, _den) => {
+                        assert_eq!(*num, LeanTerm::IntLit(1));
+                    }
+                    other => panic!("expected Div(1, _), got {other:?}"),
+                }
+            }
+            other => panic!("expected Rel(Eq,..), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_reciprocal_higher_precedence_than_pow() {
+        // `x⁻¹^2` parses as `(x⁻¹)^2`, i.e. Pow(Div(1,x), 2).
+        let src = "theorem t (x : ℝ) : x⁻¹^2 = 0 := by sorry";
+        let t = parse_theorem(src).unwrap();
+        match t.goal {
+            LeanStatement::Rel(RelOp::Eq, lhs, _) => match lhs {
+                LeanTerm::Bin(BinOp::Pow, base, exp) => {
+                    // base should be Div(1, x), exp should be IntLit(2)
+                    assert!(
+                        matches!(*base, LeanTerm::Bin(BinOp::Div, _, _)),
+                        "expected Pow base to be Div(1,x), got {base:?}"
+                    );
+                    assert_eq!(*exp, LeanTerm::IntLit(2));
+                }
+                other => panic!("expected Pow, got {other:?}"),
+            },
+            other => panic!("expected Rel, got {other:?}"),
+        }
     }
 
     #[test]

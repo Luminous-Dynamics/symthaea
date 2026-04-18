@@ -55,4 +55,18 @@ Following (1) + (2) + (4), a second measurement at the same seed should land aro
 
 - **Lake-acceptance on the 17 translated.** Next commit in the Phase 5b track can pipe each translated FolFormulaExt through `render_fol_ext_file` + `lake env lean` for the real third-tier number. Expected: ~90-100% accept on the 17, matching the 93.8% cascade rate on Phase 3's hand-translated set (same distribution of shapes).
 - **Seed variance.** One seed, one slice. Re-running with seeds 1337 and 7919 would give a ±1-3 point confidence interval on the 36% parse rate.
-- **178-file full-pool rate.** This slice is 50/178 = 28% of the filter-passed pool. Running `MINIF2F_N=178` gives the population number.
+
+## Update — same day, post-reciprocal + ZMod filter
+
+After adding `⁻¹` (reciprocal) tokenizer + parser support and extending the candidate filter to exclude `ZMod` (modular-ring arithmetic, genuinely out of `FolFormulaExt` scope), the **full-pool** rerun gives a sample-invariant number (artifact: `phase5b-baseline-2026-04-18-full-pool.csv`):
+
+| Stage | Count | Rate |
+|-------|-------|------|
+| Total (full filter-passed pool) | 177 | 100% |
+| Parsed | 59 | **33.3%** |
+| Translated (of parsed) | 57 | **96.6%** |
+| Translated (of total) | 57 | **32.2%** |
+
+Parse-failure histogram: 81× `UnknownChar`, 37× `Unexpected`. The reciprocal change didn't meaningfully move the parse rate because most `UnknownChar` failures are other glyphs (`∣`, `↑`, `σ`, etc.); divisibility + coercion are the bigger prizes. `translate-of-parsed` lifted from 94.4% to 96.6% — the two remaining translate failures are probably `^` with non-literal exponent and one variable-exponent shape.
+
+The 33.3% on 177 files is now the canonical "honest zero-shot" number for the Rust-native ingest. Every future parser extension should be measured against this baseline + seed 42 + `MINIF2F_N=200`.
