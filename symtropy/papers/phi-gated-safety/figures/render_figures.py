@@ -173,9 +173,106 @@ def render_sp_sweep():
     print(f"wrote {out} ({len(rows)} S_p points)")
 
 
+# ── Figure 3: Cross-platform flight benchmark (paired tier-vs-sprint) ─
+
+def render_flight_benchmark():
+    csv_path = DATA_DIR / "flight_benchmark_n30.csv"
+    if not csv_path.exists():
+        print(f"skipping figure3: {csv_path} not found — "
+              "regenerate via `cargo run -p symthaea-flight --example "
+              "flight_benchmark --release` with FB_CSV=…")
+        return
+    tier_means, sprint_means = [], []
+    tier_red, sprint_red = [], []
+    with open(csv_path) as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            if row["policy"] == "tier":
+                tier_means.append(float(row["mean_thrust"]))
+                tier_red.append(float(row["red_fraction"]))
+            else:
+                sprint_means.append(float(row["mean_thrust"]))
+                sprint_red.append(float(row["red_fraction"]))
+
+    n = min(len(tier_means), len(sprint_means))
+    tier_m = np.mean(tier_means)
+    tier_s = np.std(tier_means, ddof=1)
+    sprint_m = np.mean(sprint_means)
+    sprint_s = np.std(sprint_means, ddof=1)
+
+    paired = [100.0 * (s - t) / t if t > 1e-9 else 0.0
+              for t, s in zip(tier_means, sprint_means)]
+    adv_m = float(np.mean(paired))
+    adv_s = float(np.std(paired, ddof=1))
+    ci_half = 1.96 * adv_s / np.sqrt(n)
+
+    fig, (ax_thr, ax_red) = plt.subplots(
+        1, 2, figsize=(10, 4.5), gridspec_kw={"width_ratios": [3, 2]}
+    )
+
+    # Left panel: paired means with error bars
+    x = np.array([0, 1])
+    means = [tier_m, sprint_m]
+    stds = [tier_s, sprint_s]
+    bars = ax_thr.bar(
+        x,
+        means,
+        yerr=stds,
+        width=0.55,
+        color=["#e74c3c", "#1f6ead"],
+        capsize=6,
+    )
+    ax_thr.set_xticks(x)
+    ax_thr.set_xticklabels(["tier-gate\n(4-tier)", r"sprint-floor\n(2-level)"])
+    ax_thr.set_ylabel("mean thrust per frame (Newtons)")
+    ax_thr.set_title(
+        r"Figure 3 — Flight platform reproduces the headline: "
+        rf"sprint-floor wins +{adv_m:.1f} % (N={n}, 95 % CI "
+        rf"[+{adv_m-ci_half:.1f}, +{adv_m+ci_half:.1f}])",
+        fontsize=10,
+    )
+    ax_thr.grid(axis="y", alpha=0.3)
+    # Annotate bars with values
+    for bar, mean in zip(bars, means):
+        ax_thr.text(
+            bar.get_x() + bar.get_width() / 2,
+            mean + 0.005,
+            f"{mean:.3f}",
+            ha="center",
+            va="bottom",
+            fontsize=9,
+        )
+
+    # Right panel: red-frame fraction
+    ax_red.bar(
+        x,
+        [np.mean(tier_red), np.mean(sprint_red)],
+        width=0.55,
+        color=["#e74c3c", "#1f6ead"],
+    )
+    ax_red.set_xticks(x)
+    ax_red.set_xticklabels(["tier-gate", "sprint-floor"])
+    ax_red.set_ylabel("red-frame fraction")
+    ax_red.set_title(
+        "Red-frame fraction\n(gain≈0, lower is better)", fontsize=10
+    )
+    ax_red.set_ylim(0, 1)
+    ax_red.grid(axis="y", alpha=0.3)
+    for i, v in enumerate([np.mean(tier_red), np.mean(sprint_red)]):
+        ax_red.text(i, v + 0.02, f"{v:.2f}", ha="center", va="bottom",
+                    fontsize=9)
+
+    fig.tight_layout()
+    out = HERE / "figure3_flight_benchmark.png"
+    fig.savefig(out, dpi=150)
+    plt.close(fig)
+    print(f"wrote {out} (N={n}, sprint-floor advantage +{adv_m:.1f} %)")
+
+
 if __name__ == "__main__":
     render_phi_trace()
     render_sp_sweep()
+    render_flight_benchmark()
     print("\nAll figures rendered. Files:")
     for p in sorted(HERE.glob("figure*.png")):
         print(f"  {p}  ({p.stat().st_size // 1024} KB)")

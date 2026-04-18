@@ -179,16 +179,34 @@ required for single-point-of-failure hazardous actions (cautery).
 
 ### §8. Cross-platform applicability
 - `sprint_floor_gain` primitive wired into flight-demo (`8d61e348d9`)
-  and vehicle-demo (follow-up commit) as proof of mechanical transfer
+  and vehicle-demo (`c2f2fb46c8`) as proof of mechanical transfer
   — the change is ~5 lines per platform plus an updated doc-comment
   for calibration provenance. Per-platform calibration required: each
   platform's Φ band may drift because the observation-vector channels
   differ.
-- Table: 10 platforms → which Φ-role → calibration status. Current
-  adopters (manipulator / flight / vehicle) all use the same starting
-  SPRINT_PHI = 0.135, FLOOR_GAIN = 0.3 inherited from the manipulator
-  study's measured band [0.099, 0.145]. Each remains a starting point
-  subject to per-platform Φ-trace measurement.
+- Current adopters (manipulator / flight / vehicle) all use the same
+  starting SPRINT_PHI = 0.135, FLOOR_GAIN = 0.3 inherited from the
+  manipulator study's measured band [0.099, 0.145]. Each remains a
+  starting point subject to per-platform Φ-trace measurement.
+- **Flight benchmark (Figure 3, N=30 paired trials)**: a port of the
+  §4 harness to the quadrotor reproduces the §6 crossover headline
+  on a second platform. Tier-gate mean thrust 0.180 ± 0.078 N with
+  20.8 % red-frame fraction; sprint-floor mean thrust 0.275 ± 0.040 N
+  with 0 % red-frame fraction; **sprint-floor advantage +71.4 %
+  (95 % CI [+54.1, +88.6])** over 30 paired trials. The effect is
+  smaller than the manipulator's S_p = 2.5 m crossover (+178.6 %)
+  because the flight test doesn't sweep an ISO-style conservatism
+  parameter — the comparison is gating-shape only — but the
+  direction replicates and the zero-red-frame result for
+  sprint-floor matches the paper's "the arm never dead-arms" story.
+  Data: `data/flight_benchmark_n30.csv`; reproduce with
+  `FB_TRIALS=30 FB_STEPS=500 cargo run -p symthaea-flight --example
+  flight_benchmark --release`.
+- **Closing the 10-for-10 claim**: humanoid previously lacked an
+  `EmbodimentBridge` implementation (committed as `1a85fce8c8`). All
+  ten robot platforms now implement the trait uniformly — any future
+  benchmark, dispatch, or telemetry surface that polymorphizes over
+  `EmbodimentBridge` covers humanoid without shims.
 
 ### §9. Discussion & limitations
 - Φ is NOT a certified safety layer. SOTIF frame: it's a
