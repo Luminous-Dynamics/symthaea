@@ -309,9 +309,12 @@ configs/
 .claude/targets/
 
 # === External public sibling repos (Apr 2026) ===
-# xenia-wire and xenia-server are public standalone repos cloned as
-# siblings of the monorepo's existing subprojects for convenience.
-# They have their own git history — DO NOT commit them into the
-# monorepo. See memory/xenia_*_shipped.md for context.
+# xenia-wire, xenia-server, xenia-peer are public standalone repos
+# cloned as siblings of the monorepo's existing subprojects for
+# convenience. They have their own git history — DO NOT commit
+# them into the monorepo. See memory/xenia_*_shipped.md for context.
+# (xenia-server was renamed to xenia-peer per the M0 release; keep
+# both ignores so neither state resurfaces as untracked noise.)
 /xenia-wire/
 /xenia-server/
+/xenia-peer/
