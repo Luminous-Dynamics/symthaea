@@ -6,10 +6,10 @@
 //! empirical constants, and step-by-step implementation plan. This file is
 //! built incrementally per the plan's "Implementation steps" section.
 //!
-//! Current step: **2 — One pendulum.** Static pivot + dynamic bob hinged by a
-//! `DistanceConstraint`, released from horizontal. Should swing under gravity.
-//! Debug gizmo draws the constraint arm. Physics units = pixels (gravity scales
-//! to -981 px/s² so 100 px = 1 m).
+//! Current step: **3 — 10×10 grid.** All 100 pendulums spawned via loop, each
+//! released from horizontal. They swing independently (collision masks are 0,
+//! so they pass through each other). Layout: 64 px spacing, 60 px arm.
+//! Physics units = pixels (gravity = -981 px/s² so 100 px = 1 m).
 
 use bevy::prelude::*;
 use symtropy_bevy::{PhysicsBody, SymtropyPhysics, SymtropyPhysicsPlugin};
@@ -18,9 +18,10 @@ use symtropy_physics::constraint::DistanceConstraint;
 use symtropy_physics::{BodyHandle, RigidBody};
 
 const ARM_LENGTH: f64 = 60.0;
-const PIVOT_Y: f64 = 200.0;
 const BOB_RADIUS: f32 = 10.0;
 const PIVOT_RADIUS: f32 = 4.0;
+const GRID: usize = 10;
+const SPACING: f64 = 64.0;
 
 #[derive(Component)]
 struct Pendulum {
@@ -41,7 +42,7 @@ fn main() {
         }))
         .insert_resource(ClearColor(Color::srgb(0.04, 0.04, 0.06)))
         .add_plugins(SymtropyPhysicsPlugin::<2>::with_gravity([0.0, -981.0]))
-        .add_systems(Startup, (setup_camera, spawn_one_pendulum))
+        .add_systems(Startup, (setup_camera, spawn_swarm))
         .add_systems(Update, draw_arm_gizmo)
         .run();
 }
@@ -50,10 +51,23 @@ fn setup_camera(mut commands: Commands) {
     commands.spawn(Camera2d);
 }
 
-fn spawn_one_pendulum(mut commands: Commands, mut physics: ResMut<SymtropyPhysics<2>>) {
-    let pivot_x = 0.0_f64;
-    let pivot_y = PIVOT_Y;
+fn spawn_swarm(mut commands: Commands, mut physics: ResMut<SymtropyPhysics<2>>) {
+    let half = (GRID as f64 - 1.0) * SPACING * 0.5;
+    for i in 0..GRID {
+        for j in 0..GRID {
+            let pivot_x = (i as f64) * SPACING - half;
+            let pivot_y = (j as f64) * SPACING - half;
+            spawn_pendulum(&mut commands, &mut physics, pivot_x, pivot_y);
+        }
+    }
+}
 
+fn spawn_pendulum(
+    commands: &mut Commands,
+    physics: &mut SymtropyPhysics<2>,
+    pivot_x: f64,
+    pivot_y: f64,
+) {
     let pivot_handle = physics.world.add_body(RigidBody::<2>::static_body(
         BodyHandle(0),
         Point::new([pivot_x, pivot_y]),
