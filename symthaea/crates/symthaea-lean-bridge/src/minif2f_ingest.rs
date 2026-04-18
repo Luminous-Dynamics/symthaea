@@ -526,6 +526,409 @@ fn is_ident_continue(ch: char) -> bool {
 }
 
 // ════════════════════════════════════════════════════════════════════════
+// Parser
+// ════════════════════════════════════════════════════════════════════════
+
+/// Top-level entry point. Takes a full miniF2F `.lean` source, skips the
+/// `import Mathlib` preamble, locates the `theorem` declaration, and
+/// parses it into a `LeanTheorem`. Non-theorem lines (imports, `open`,
+/// `set_option`) are ignored; the parser is not a full Lean front-end.
+pub fn parse_theorem(src: &str) -> Result<LeanTheorem, IngestError> {
+    let toks = tokenize(src)?;
+    // Find the `theorem` keyword, skipping any preceding tokens. This
+    // lets callers pass a full `.lean` file without pre-stripping the
+    // `import Mathlib\nset_option …\nopen …` preamble.
+    let start = toks
+        .iter()
+        .position(|t| matches!(t.kind, TokenKind::Theorem))
+        .ok_or(IngestError::NotATheorem)?;
+    let mut p = Parser {
+        toks: &toks,
+        pos: start,
+    };
+    p.parse_theorem()
+}
+
+/// Stateful cursor over the token stream. The grammar is small enough
+/// that a plain recursive-descent / Pratt combo fits in ~300 LOC.
+struct Parser<'a> {
+    toks: &'a [Token],
+    pos: usize,
+}
+
+impl<'a> Parser<'a> {
+    fn peek(&self) -> &TokenKind {
+        &self.toks[self.pos].kind
+    }
+    fn peek_at(&self, k: usize) -> Option<&TokenKind> {
+        self.toks.get(self.pos + k).map(|t| &t.kind)
+    }
+    fn offset(&self) -> usize {
+        self.toks[self.pos].offset
+    }
+    fn advance(&mut self) -> &Token {
+        let t = &self.toks[self.pos];
+        if !matches!(t.kind, TokenKind::Eof) {
+            self.pos += 1;
+        }
+        t
+    }
+    /// Consume the next token iff it matches `kind`; return whether we
+    /// consumed. Useful for optional grammar positions.
+    fn eat(&mut self, kind: &TokenKind) -> bool {
+        if std::mem::discriminant(self.peek()) == std::mem::discriminant(kind) {
+            self.advance();
+            return true;
+        }
+        false
+    }
+    /// Consume the next token and assert it matches `kind`; otherwise
+    /// produce a positioned `IngestError::Unexpected`.
+    fn expect(&mut self, kind: &TokenKind, expected: &'static str) -> Result<(), IngestError> {
+        if std::mem::discriminant(self.peek()) == std::mem::discriminant(kind) {
+            self.advance();
+            Ok(())
+        } else if matches!(self.peek(), TokenKind::Eof) {
+            Err(IngestError::UnexpectedEof { expected })
+        } else {
+            Err(IngestError::Unexpected {
+                expected,
+                found: format!("{}", self.peek()),
+                offset: self.offset(),
+            })
+        }
+    }
+
+    fn parse_theorem(&mut self) -> Result<LeanTheorem, IngestError> {
+        self.expect(&TokenKind::Theorem, "`theorem`")?;
+        // Theorem name.
+        let name = match self.advance().kind.clone() {
+            TokenKind::Ident(s) => s,
+            other => {
+                return Err(IngestError::Unexpected {
+                    expected: "theorem name",
+                    found: format!("{other}"),
+                    offset: self.offset(),
+                })
+            }
+        };
+        // Binders: zero or more `(IDENT+ : BODY)` groups.
+        let mut binders = Vec::new();
+        while matches!(self.peek(), TokenKind::LParen) {
+            let group = self.parse_binder_group()?;
+            binders.extend(group);
+        }
+        // `: GOAL`
+        self.expect(&TokenKind::Colon, "`:` before goal")?;
+        let goal = self.parse_statement()?;
+        // `:= by sorry` — the Phase 4 ingestion path only cares about
+        // the statement; `sorry` is what we're replacing.
+        self.expect(&TokenKind::Assign, "`:=`")?;
+        self.expect(&TokenKind::By, "`by`")?;
+        self.expect(&TokenKind::Sorry, "`sorry`")?;
+        Ok(LeanTheorem {
+            name,
+            binders,
+            goal,
+        })
+    }
+
+    /// Parse `(name₁ name₂ … : BODY)`. One group can declare multiple
+    /// bound names sharing the same body; we splat them into separate
+    /// `LeanBinder` values in the enclosing list.
+    fn parse_binder_group(&mut self) -> Result<Vec<LeanBinder>, IngestError> {
+        self.expect(&TokenKind::LParen, "`(` to start binder")?;
+        let mut names = Vec::new();
+        loop {
+            match self.peek().clone() {
+                TokenKind::Ident(s) => {
+                    self.advance();
+                    names.push(s);
+                }
+                _ => break,
+            }
+        }
+        if names.is_empty() {
+            return Err(IngestError::Unexpected {
+                expected: "binder identifier",
+                found: format!("{}", self.peek()),
+                offset: self.offset(),
+            });
+        }
+        self.expect(&TokenKind::Colon, "`:` inside binder")?;
+        // Decide TypedVar vs Hyp by peeking: a bare type token that's
+        // immediately followed by `)` is a `LeanType` annotation; any
+        // other shape is a statement body.
+        let is_type_annotation = matches!(
+            self.peek(),
+            TokenKind::TyReal | TokenKind::TyInt | TokenKind::TyNat
+        ) && matches!(self.peek_at(1), Some(TokenKind::RParen));
+        let out = if is_type_annotation {
+            let ty = match self.advance().kind {
+                TokenKind::TyReal => LeanType::Real,
+                TokenKind::TyInt => LeanType::Int,
+                TokenKind::TyNat => LeanType::Nat,
+                _ => unreachable!(),
+            };
+            names
+                .into_iter()
+                .map(|n| LeanBinder::TypedVar { name: n, ty })
+                .collect()
+        } else {
+            let stmt = self.parse_statement()?;
+            names
+                .into_iter()
+                .map(|n| LeanBinder::Hyp {
+                    name: n,
+                    stmt: stmt.clone(),
+                })
+                .collect()
+        };
+        self.expect(&TokenKind::RParen, "`)` closing binder")?;
+        Ok(out)
+    }
+
+    // Statement precedence ladder (loosest first).
+    //
+    //   Statement → Implies
+    //   Implies   → Iff ('→' Implies)?            right-assoc
+    //   Iff       → Or ('↔' Or)?                  non-assoc; rare
+    //   Or        → And ('∨' And)*                left-assoc
+    //   And       → NotExpr ('∧' NotExpr)*        left-assoc
+    //   NotExpr   → '¬' NotExpr | Atom
+    //   Atom      → '(' Statement ')' | Relation
+    //   Relation  → Term RelOp Term                non-assoc
+    fn parse_statement(&mut self) -> Result<LeanStatement, IngestError> {
+        self.parse_implies()
+    }
+
+    fn parse_implies(&mut self) -> Result<LeanStatement, IngestError> {
+        let lhs = self.parse_iff()?;
+        if self.eat(&TokenKind::Implies) {
+            let rhs = self.parse_implies()?; // right-assoc
+            return Ok(LeanStatement::Implies(Box::new(lhs), Box::new(rhs)));
+        }
+        Ok(lhs)
+    }
+
+    fn parse_iff(&mut self) -> Result<LeanStatement, IngestError> {
+        let lhs = self.parse_or()?;
+        if self.eat(&TokenKind::Iff) {
+            let rhs = self.parse_or()?;
+            return Ok(LeanStatement::Iff(Box::new(lhs), Box::new(rhs)));
+        }
+        Ok(lhs)
+    }
+
+    fn parse_or(&mut self) -> Result<LeanStatement, IngestError> {
+        let mut lhs = self.parse_and()?;
+        while self.eat(&TokenKind::Or) {
+            let rhs = self.parse_and()?;
+            lhs = LeanStatement::Or(Box::new(lhs), Box::new(rhs));
+        }
+        Ok(lhs)
+    }
+
+    fn parse_and(&mut self) -> Result<LeanStatement, IngestError> {
+        let mut lhs = self.parse_not()?;
+        while self.eat(&TokenKind::And) {
+            let rhs = self.parse_not()?;
+            lhs = LeanStatement::And(Box::new(lhs), Box::new(rhs));
+        }
+        Ok(lhs)
+    }
+
+    fn parse_not(&mut self) -> Result<LeanStatement, IngestError> {
+        if self.eat(&TokenKind::Not) {
+            let inner = self.parse_not()?;
+            return Ok(LeanStatement::Not(Box::new(inner)));
+        }
+        self.parse_atom_stmt()
+    }
+
+    /// Either a parenthesized statement or a relation between terms.
+    /// We need one-token lookahead to decide: `(x + 1 = 2)` vs
+    /// `(x + 1) = 2`. We try-parse parens, then if the result isn't
+    /// followed by a relation, we treat it as a parenthesized
+    /// statement; otherwise we commit the inner content as a term's
+    /// LHS. To avoid backtracking, we parse a `Term` first, and if a
+    /// relation operator follows we finish the relation; if instead we
+    /// see a propositional connective, this was a nested statement
+    /// (and we reject — the grammar above doesn't generate this).
+    fn parse_atom_stmt(&mut self) -> Result<LeanStatement, IngestError> {
+        // Parenthesized statement: `(P)`. Distinguished from `(a + b)`
+        // by peeking for a statement-level token mid-body. The cheap
+        // rule: if the first inner token is `¬` or if a connective
+        // appears at depth 0, treat it as a nested statement.
+        if matches!(self.peek(), TokenKind::LParen) && self.looks_like_paren_stmt() {
+            self.advance(); // consume `(`
+            let inner = self.parse_statement()?;
+            self.expect(&TokenKind::RParen, "`)` closing parenthesized statement")?;
+            return Ok(inner);
+        }
+        self.parse_relation()
+    }
+
+    /// Peek ahead to decide whether the parens contain a statement
+    /// (has a connective at depth 0) or a term (doesn't). Cheap scan;
+    /// stops at a matching `)`.
+    fn looks_like_paren_stmt(&self) -> bool {
+        let mut depth = 0i32;
+        for i in self.pos.. {
+            let Some(tk) = self.toks.get(i).map(|t| &t.kind) else {
+                return false;
+            };
+            match tk {
+                TokenKind::LParen => depth += 1,
+                TokenKind::RParen => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return false;
+                    }
+                }
+                TokenKind::And
+                | TokenKind::Or
+                | TokenKind::Implies
+                | TokenKind::Iff
+                | TokenKind::Not
+                    if depth == 1 =>
+                {
+                    return true;
+                }
+                TokenKind::Eof => return false,
+                _ => {}
+            }
+        }
+        false
+    }
+
+    fn parse_relation(&mut self) -> Result<LeanStatement, IngestError> {
+        let lhs = self.parse_term()?;
+        let op = match self.peek() {
+            TokenKind::Eq => RelOp::Eq,
+            TokenKind::NotEq => RelOp::NotEq,
+            TokenKind::Lt => RelOp::Lt,
+            TokenKind::Le => RelOp::Le,
+            TokenKind::Gt => RelOp::Gt,
+            TokenKind::Ge => RelOp::Ge,
+            other => {
+                return Err(IngestError::Unexpected {
+                    expected: "relation operator (= ≠ < ≤ > ≥)",
+                    found: format!("{other}"),
+                    offset: self.offset(),
+                })
+            }
+        };
+        self.advance();
+        let rhs = self.parse_term()?;
+        Ok(LeanStatement::Rel(op, lhs, rhs))
+    }
+
+    // Term precedence: + − (lowest), * /, ^, unary −, atom (highest).
+    // Implicit multiplication lives at the Mul level: `3x^2` = `3 *
+    // (x^2)`, `3(a+b)` = `3 * (a+b)`.
+    fn parse_term(&mut self) -> Result<LeanTerm, IngestError> {
+        self.parse_addsub()
+    }
+
+    fn parse_addsub(&mut self) -> Result<LeanTerm, IngestError> {
+        let mut lhs = self.parse_muldiv()?;
+        loop {
+            let op = match self.peek() {
+                TokenKind::Plus => BinOp::Add,
+                TokenKind::Minus => BinOp::Sub,
+                _ => break,
+            };
+            self.advance();
+            let rhs = self.parse_muldiv()?;
+            lhs = LeanTerm::Bin(op, Box::new(lhs), Box::new(rhs));
+        }
+        Ok(lhs)
+    }
+
+    fn parse_muldiv(&mut self) -> Result<LeanTerm, IngestError> {
+        let mut lhs = self.parse_pow()?;
+        loop {
+            // Explicit * or /.
+            let op = match self.peek() {
+                TokenKind::Star => Some(BinOp::Mul),
+                TokenKind::Slash => Some(BinOp::Div),
+                _ => None,
+            };
+            if let Some(op) = op {
+                self.advance();
+                let rhs = self.parse_pow()?;
+                lhs = LeanTerm::Bin(op, Box::new(lhs), Box::new(rhs));
+                continue;
+            }
+            // Implicit multiplication. Valid only when the previous
+            // atom is a numeric literal and the next starts a primary
+            // that could be factor (Ident or LParen). `3x` and `3(x+1)`
+            // are accepted; we don't recognize `(x)(y)` or `xy` to
+            // avoid ambiguity with function application shapes we
+            // don't support.
+            let implicit_after_literal = matches!(lhs, LeanTerm::IntLit(_))
+                && matches!(self.peek(), TokenKind::Ident(_) | TokenKind::LParen);
+            if implicit_after_literal {
+                let rhs = self.parse_pow()?;
+                lhs = LeanTerm::Bin(BinOp::Mul, Box::new(lhs), Box::new(rhs));
+                continue;
+            }
+            break;
+        }
+        Ok(lhs)
+    }
+
+    fn parse_pow(&mut self) -> Result<LeanTerm, IngestError> {
+        let base = self.parse_unary()?;
+        if self.eat(&TokenKind::Caret) {
+            let exp = self.parse_pow()?; // right-assoc
+            return Ok(LeanTerm::Bin(BinOp::Pow, Box::new(base), Box::new(exp)));
+        }
+        Ok(base)
+    }
+
+    fn parse_unary(&mut self) -> Result<LeanTerm, IngestError> {
+        if self.eat(&TokenKind::Minus) {
+            let inner = self.parse_unary()?;
+            // Eager fold of `-IntLit(n)` → `IntLit(-n)` to simplify
+            // downstream matching (the hand-translator writes literal
+            // negative integers directly).
+            if let LeanTerm::IntLit(n) = inner {
+                return Ok(LeanTerm::IntLit(-n));
+            }
+            return Ok(LeanTerm::Neg(Box::new(inner)));
+        }
+        self.parse_primary()
+    }
+
+    fn parse_primary(&mut self) -> Result<LeanTerm, IngestError> {
+        match self.peek().clone() {
+            TokenKind::IntLit(n) => {
+                self.advance();
+                Ok(LeanTerm::IntLit(n))
+            }
+            TokenKind::Ident(s) => {
+                self.advance();
+                Ok(LeanTerm::Var(s))
+            }
+            TokenKind::LParen => {
+                self.advance();
+                let t = self.parse_term()?;
+                self.expect(&TokenKind::RParen, "`)` closing parenthesized term")?;
+                Ok(t)
+            }
+            TokenKind::Eof => Err(IngestError::UnexpectedEof { expected: "term" }),
+            other => Err(IngestError::Unexpected {
+                expected: "term (identifier, integer, or `(`)",
+                found: format!("{other}"),
+                offset: self.offset(),
+            }),
+        }
+    }
+}
+
+// ════════════════════════════════════════════════════════════════════════
 // Tests
 // ════════════════════════════════════════════════════════════════════════
 
@@ -672,6 +1075,157 @@ mod tests {
         assert_eq!(
             IngestError::UnsupportedTranslation { reason: "x".into() }.category(),
             "translate"
+        );
+    }
+
+    // ─── parser ─────────────────────────────────────────────────────
+
+    fn v(n: &str) -> LeanTerm {
+        LeanTerm::Var(n.into())
+    }
+    fn i(n: i64) -> LeanTerm {
+        LeanTerm::IntLit(n)
+    }
+    fn add(a: LeanTerm, b: LeanTerm) -> LeanTerm {
+        LeanTerm::Bin(BinOp::Add, Box::new(a), Box::new(b))
+    }
+    fn mul(a: LeanTerm, b: LeanTerm) -> LeanTerm {
+        LeanTerm::Bin(BinOp::Mul, Box::new(a), Box::new(b))
+    }
+    fn eq_stmt(a: LeanTerm, b: LeanTerm) -> LeanStatement {
+        LeanStatement::Rel(RelOp::Eq, a, b)
+    }
+
+    #[test]
+    fn parse_bare_theorem_no_binders() {
+        let src = "theorem trivial_eq : 1 = 1 := by sorry";
+        let t = parse_theorem(src).unwrap();
+        assert_eq!(t.name, "trivial_eq");
+        assert!(t.binders.is_empty());
+        assert_eq!(t.goal, eq_stmt(i(1), i(1)));
+    }
+
+    #[test]
+    fn parse_mathd_algebra_109_shape() {
+        // The canonical linear_real signature.
+        let src = "theorem mathd_algebra_109 (a b : ℝ) (h₀ : 3 * a + 2 * b = 12) \
+                   (h₁ : a = 4) : b = 0 := by sorry";
+        let t = parse_theorem(src).unwrap();
+        assert_eq!(t.name, "mathd_algebra_109");
+        assert_eq!(t.binders.len(), 4);
+        assert!(matches!(
+            t.binders[0],
+            LeanBinder::TypedVar { ref name, ty: LeanType::Real } if name == "a"
+        ));
+        assert!(matches!(
+            t.binders[1],
+            LeanBinder::TypedVar { ref name, ty: LeanType::Real } if name == "b"
+        ));
+        // h₀: 3 * a + 2 * b = 12
+        match &t.binders[2] {
+            LeanBinder::Hyp { name, stmt } => {
+                assert_eq!(name, "h₀");
+                assert_eq!(
+                    *stmt,
+                    eq_stmt(add(mul(i(3), v("a")), mul(i(2), v("b"))), i(12))
+                );
+            }
+            _ => panic!("expected Hyp, got {:?}", t.binders[2]),
+        }
+        assert_eq!(t.goal, eq_stmt(v("b"), i(0)));
+    }
+
+    #[test]
+    fn parse_implicit_multiplication_on_literal() {
+        // `3a` without explicit `*` — common in miniF2F.
+        let src = "theorem t (a : ℝ) : 3a = 3 * a := by sorry";
+        let t = parse_theorem(src).unwrap();
+        assert_eq!(t.goal, eq_stmt(mul(i(3), v("a")), mul(i(3), v("a"))));
+    }
+
+    #[test]
+    fn parse_conjunction_goal() {
+        let src = "theorem t (x y : ℝ) : x = 1 ∧ y = 2 := by sorry";
+        let t = parse_theorem(src).unwrap();
+        assert_eq!(
+            t.goal,
+            LeanStatement::And(
+                Box::new(eq_stmt(v("x"), i(1))),
+                Box::new(eq_stmt(v("y"), i(2)))
+            )
+        );
+    }
+
+    #[test]
+    fn parse_negative_literal_folds_into_intlit() {
+        // `-11` should lex as Minus+IntLit(11) and fold to IntLit(-11).
+        let src = "theorem t : -11 = -11 := by sorry";
+        let t = parse_theorem(src).unwrap();
+        assert_eq!(t.goal, eq_stmt(i(-11), i(-11)));
+    }
+
+    #[test]
+    fn parse_right_assoc_implication() {
+        // `a → b → c` parses as `a → (b → c)`.
+        let src = "theorem t (a b c : ℝ) : a = 0 → b = 0 → c = 0 := by sorry";
+        let t = parse_theorem(src).unwrap();
+        // Outer Implies lhs is `a = 0`; outer rhs is Implies(b=0, c=0).
+        match t.goal {
+            LeanStatement::Implies(lhs, rhs) => {
+                assert_eq!(*lhs, eq_stmt(v("a"), i(0)));
+                match *rhs {
+                    LeanStatement::Implies(b_eq, c_eq) => {
+                        assert_eq!(*b_eq, eq_stmt(v("b"), i(0)));
+                        assert_eq!(*c_eq, eq_stmt(v("c"), i(0)));
+                    }
+                    other => panic!("expected nested Implies, got {other:?}"),
+                }
+            }
+            other => panic!("expected Implies, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_left_assoc_and() {
+        // `a ∧ b ∧ c` = `(a ∧ b) ∧ c`.
+        let src = "theorem t (x : ℝ) : x = 1 ∧ x = 1 ∧ x = 1 := by sorry";
+        let t = parse_theorem(src).unwrap();
+        match t.goal {
+            LeanStatement::And(outer_l, _outer_r) => {
+                assert!(matches!(*outer_l, LeanStatement::And(_, _)));
+            }
+            other => panic!("expected And, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_multi_name_binder_group() {
+        // `(a b : ℝ)` declares two TypedVars sharing the same type.
+        let src = "theorem t (a b : ℝ) : a = b := by sorry";
+        let t = parse_theorem(src).unwrap();
+        assert_eq!(t.binders.len(), 2);
+        assert!(matches!(&t.binders[0], LeanBinder::TypedVar { .. }));
+        assert!(matches!(&t.binders[1], LeanBinder::TypedVar { .. }));
+    }
+
+    #[test]
+    fn parse_skips_full_file_preamble() {
+        // Real miniF2F files have `import Mathlib\nset_option …\nopen …`
+        // before the theorem. The parser skips to `theorem`.
+        let src = "import Mathlib\n\
+                   set_option maxHeartbeats 0\n\
+                   open BigOperators Real Nat Topology Rat\n\
+                   \n\
+                   theorem mathd_trivial : 1 = 1 := by sorry";
+        let t = parse_theorem(src).unwrap();
+        assert_eq!(t.name, "mathd_trivial");
+    }
+
+    #[test]
+    fn parse_rejects_non_theorem_source() {
+        assert_eq!(
+            parse_theorem("example : 1 = 1 := by rfl").unwrap_err(),
+            IngestError::NotATheorem
         );
     }
 }
