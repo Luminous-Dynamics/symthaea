@@ -33,9 +33,15 @@
 //!     intervals."
 
 use std::time::Instant;
+use symthaea_core::genesis::GenesisSeed;
+use symthaea_core::hdc::ContinuousHV;
+use symthaea_manipulator::encoder::ManipulatorHdcEncoder;
 use symthaea_manipulator::kinematics::ManipulatorKinematics;
 use symthaea_manipulator::simulator::{ManipulatorPhysicsSimulator, SimpleManipulatorSimulator};
 use symthaea_manipulator::types::NUM_JOINTS;
+use symtropy_physics::body::BodyHandle;
+use symtropy_robotics_bridge::agent::RoboticAgent;
+use symtropy_robotics_bridge::platform::PlatformType;
 
 // ── Scenario constants ──
 
@@ -192,6 +198,107 @@ fn run_trial_arm(policy: Policy, params: &TrialParams) -> u32 {
     cycles
 }
 
+/// Run the Φ-gated policy for one trial — this is the arm that exercises
+/// the **actual `RoboticAgent.tick()` path**, not a proximity-keyed
+/// stand-in.
+///
+/// The gain is updated at a cognitive rate (`COG_HZ = 25`, so every 20th
+/// physics step at 500 Hz) from `RoboticAgent.tick(observation,
+/// danger_level)`. The observation vector is
+/// `[pe, danger, human_norm, effort_norm]` where `pe` is the cosine
+/// dissimilarity of the current state's HDC encoding vs the previous
+/// cognitive-tick encoding. In between cognitive ticks the last gain is
+/// held, matching the real platform's multi-rate control architecture
+/// (500 Hz motor / 25 Hz cognitive).
+///
+/// This is more expensive per trial than [`run_trial_arm`] — about
+/// 10× — so the harness runs fewer Φ trials (`PHI_TRIALS`) over a
+/// shorter sim time (`PHI_STEPS`) to keep total runtime reasonable.
+fn run_trial_phi(params: &TrialParams) -> u32 {
+    const COG_INTERVAL: usize = 20; // 500 Hz / 25 Hz = 20 physics steps per cognitive tick.
+    let kinematics = ManipulatorKinematics::default_7dof();
+    let mut sim = SimpleManipulatorSimulator::new();
+    let genesis = GenesisSeed::from_phrase("manipulator-benchmark-phi");
+    let mut encoder = ManipulatorHdcEncoder::new(&genesis, 32);
+    let mut agent = RoboticAgent::new(BodyHandle(0), PlatformType::Manipulator, "bench-phi");
+
+    let mut cycles = 0u32;
+    let mut phase = 0;
+    let mut target = [PICK[0], PICK[1], APPROACH_H];
+    let mut last_gain = 1.0_f64;
+    let mut last_perception: Option<ContinuousHV> = None;
+
+    for step in 0..PHI_STEPS {
+        let t = step as f64 * DT;
+        let human_dist = params.human_dist(t);
+
+        // Cognitive tick at 25 Hz: update gain from the RoboticAgent.
+        if step % COG_INTERVAL == 0 {
+            let state = sim.state();
+            let hv = encoder.encode(state);
+            let pe = match &last_perception {
+                Some(prev) => (1.0 - hv.similarity(prev).max(0.0) as f64).clamp(0.0, 1.0),
+                None => 0.0,
+            };
+            // Danger: closer human → higher danger. Linear in (2 m − dist), clamped.
+            let danger = ((2.0 - human_dist) / 2.0).clamp(0.0, 1.0);
+            let human_norm = (1.0 / (1.0 + human_dist)).clamp(0.0, 1.0);
+            let effort_norm = (state
+                .joint_velocities
+                .iter()
+                .map(|v| v * v)
+                .sum::<f64>()
+                .sqrt()
+                / 5.0)
+                .clamp(0.0, 1.0);
+            let obs = [pe, danger, human_norm, effort_norm];
+            last_gain = agent.tick(&obs, danger);
+            last_perception = Some(hv);
+        }
+
+        let state = sim.state();
+        let gain = last_gain;
+        if gain > 0.0 {
+            if let Some(q_target) = kinematics.ik_dls(&target, &state.joint_angles, 0.1, 30, 0.01) {
+                let mut cmd = symthaea_manipulator::ManipulatorCommand::zero();
+                for i in 0..NUM_JOINTS {
+                    let err = q_target[i] - state.joint_angles[i];
+                    let vel = state.joint_velocities[i];
+                    cmd.joint_torques[i] =
+                        (gain as f32 * (8.0 * err - 2.0 * vel) as f32).clamp(-1.0, 1.0);
+                }
+                sim.step(&cmd, DT);
+            }
+        }
+
+        let ee = sim.state().end_effector_position;
+        let dist = ((ee[0] - target[0]).powi(2)
+            + (ee[1] - target[1]).powi(2)
+            + (ee[2] - target[2]).powi(2))
+        .sqrt();
+        if dist < 0.02 {
+            phase = (phase + 1) % 4;
+            target = match phase {
+                0 => [PICK[0], PICK[1], APPROACH_H],
+                1 => [PLACE[0], PLACE[1], APPROACH_H],
+                2 => [PLACE[0], PLACE[1], APPROACH_H],
+                _ => [PICK[0], PICK[1], APPROACH_H],
+            };
+            if phase == 0 {
+                cycles += 1;
+            }
+        }
+    }
+
+    cycles
+}
+
+// Φ-gated trials use fewer steps because each cognitive tick is ~10× the
+// cost of a pure physics step. Keeps the full benchmark well under 30 min
+// total wall time even with the Φ policy enabled.
+const PHI_STEPS: usize = 20_000; // 40 s of sim at 500 Hz.
+const DEFAULT_PHI_TRIALS: usize = 10;
+
 // ── Monte Carlo harness ──
 
 #[derive(Clone, Copy)]
@@ -335,4 +442,87 @@ fn main() {
             r.advantage_pct,
         );
     }
+
+    // ── Φ-gated policy sweep (opt-in) ──────────────────────────────────
+    //
+    // Opt-in because each Φ trial is ~10× the cost of a proximity-keyed
+    // trial (cognitive tick at 25 Hz runs the HDC encoder + FEP inference).
+    // Enabled by setting `MANIP_BENCH_PHI=1`. Scale-matched to
+    // `DEFAULT_PHI_TRIALS` × `PHI_STEPS` so the section adds ~a few minutes
+    // of wall time, not an hour.
+    let run_phi = std::env::var("MANIP_BENCH_PHI")
+        .ok()
+        .map(|v| v != "0" && !v.is_empty())
+        .unwrap_or(false);
+    if !run_phi {
+        println!();
+        println!("(Φ-gated sweep skipped — set MANIP_BENCH_PHI=1 to include the actual");
+        println!(" RoboticAgent.tick()/HDC-PE policy path in the comparison.)");
+        return;
+    }
+
+    let phi_trials: usize = std::env::var("MANIP_BENCH_PHI_TRIALS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(DEFAULT_PHI_TRIALS);
+
+    println!();
+    println!(
+        "━━━ Φ-gated sweep ({} trials × {} steps = {} s sim each) ━━━",
+        phi_trials,
+        PHI_STEPS,
+        (PHI_STEPS as f64 * DT) as usize,
+    );
+    let phi_start = Instant::now();
+    let mut phi_cycles_vec: Vec<f64> = Vec::with_capacity(phi_trials);
+    // Φ runs over a shorter sim so we can't meaningfully compare counts to
+    // the 100 s Adaptive/ISO numbers. We instead rate-normalize to "cycles
+    // per 100 s" for apples-to-apples comparison.
+    let scale = TOTAL_STEPS as f64 / PHI_STEPS as f64;
+    for i in 0..phi_trials {
+        let params = TrialParams::from_index(i);
+        let phi_raw = run_trial_phi(&params);
+        let phi_scaled = phi_raw as f64 * scale;
+        phi_cycles_vec.push(phi_scaled);
+        println!(
+            "  trial {:>3}: period={:>5.2}s closest={:.2}m farthest={:.2}m — phi_raw={:>2} → {:.2} cycles/100s",
+            i + 1,
+            params.human_approach_period,
+            params.human_closest,
+            params.human_farthest,
+            phi_raw,
+            phi_scaled,
+        );
+    }
+    let phi_elapsed = phi_start.elapsed();
+
+    let phi_mean = mean(&phi_cycles_vec);
+    let phi_std = std_dev(&phi_cycles_vec);
+    let phi_se = if phi_cycles_vec.len() >= 2 {
+        phi_std / (phi_cycles_vec.len() as f64).sqrt()
+    } else {
+        0.0
+    };
+    println!();
+    println!(
+        "  Φ-gated cycles (rate-normalized to 100 s):  mean = {:6.2}  std = {:5.2}",
+        phi_mean, phi_std,
+    );
+    let iso_cycles_100 = mean(&iso_vals); // ISO already at 100 s scale
+    if iso_cycles_100 > 0.0 {
+        let phi_vs_iso = (phi_mean - iso_cycles_100) / iso_cycles_100 * 100.0;
+        let se_vs_iso = 1.96 * phi_se / iso_cycles_100 * 100.0;
+        println!(
+            "  Φ vs ISO:  mean = {:+6.1} %   95 % CI ≈ [{:+6.1} %, {:+6.1} %]",
+            phi_vs_iso,
+            phi_vs_iso - se_vs_iso,
+            phi_vs_iso + se_vs_iso,
+        );
+    }
+    println!(
+        "  (Φ sweep wall time: {:.1}s, {} trials × {:.0}s sim)",
+        phi_elapsed.as_secs_f64(),
+        phi_trials,
+        PHI_STEPS as f64 * DT,
+    );
 }
