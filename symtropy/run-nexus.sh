@@ -26,5 +26,5 @@ exec nix-shell -p \
     export LD_LIBRARY_PATH=\"/run/opengl-driver/lib:\${NIXLIBS}\${LD_LIBRARY_PATH:-}\"
     unset WAYLAND_DISPLAY
     export WINIT_UNIX_BACKEND=x11
-    exec ./target/release/symtropy $EXTRA_ARGS
+    exec ./target/release/symtropy-launcher $EXTRA_ARGS
   "

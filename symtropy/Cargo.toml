@@ -1,9 +1,14 @@
 [package]
-name = "symtropy"
+# Renamed 2026-04-18 from `symtropy` → `symtropy-launcher` to free up the
+# `symtropy` name for the new meta-crate at `crates/symtropy/`. The launcher
+# is genuinely a launcher (multi-experience: The Room + Sol Atlas), so the
+# new name is more accurate. Desktop brand `Name=Symtropy` is unchanged.
+name = "symtropy-launcher"
 version = "0.1.0"
 edition = "2021"
-description = "Symtropy Engine — consciousness-first technology platform"
+description = "Symtropy Launcher — host application for The Room That Remembers You and Sol Atlas experiences"
 license = "AGPL-3.0-or-later"
+publish = false # application crate, not for crates.io
 
 [dependencies]
 # Game engine — disable wayland for now (X11 only on NixOS dev)

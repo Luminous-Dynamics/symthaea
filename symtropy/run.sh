@@ -41,15 +41,17 @@ for arg in "$@"; do
 done
 
 # Choose debug or release binary
+# (binary renamed 2026-04-18: symtropy → symtropy-launcher to free the
+# `symtropy` name for the new meta-crate / CLI binary)
 if [[ "${1:-}" == "--release" ]] || [[ "${2:-}" == "--release" ]]; then
-    BIN="target/release/symtropy"
+    BIN="target/release/symtropy-launcher"
     if [[ ! -f "$BIN" ]]; then
         echo "Building release binary..."
         PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-}:/nix/store/47crwj8zckj6l1d4rgz3dk1mwqpym9is-alsa-lib-1.2.15.1-dev/lib/pkgconfig" \
             cargo build --release $FEATURES
     fi
 else
-    BIN="target/debug/symtropy"
+    BIN="target/debug/symtropy-launcher"
     if [[ ! -f "$BIN" ]]; then
         echo "Building debug binary..."
         PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-}:/nix/store/47crwj8zckj6l1d4rgz3dk1mwqpym9is-alsa-lib-1.2.15.1-dev/lib/pkgconfig" \
