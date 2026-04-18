@@ -23,6 +23,7 @@ use bevy::window::PrimaryWindow;
 use symthaea_consciousness_equation::ConsciousnessInputs;
 use symtropy_bevy::{PhysicsBody, SymtropyPhysics, SymtropyPhysicsPlugin};
 use symtropy_bevy_scene::{fixed_camera, SymtropyScenePlugin};
+use symtropy_devconsole::SymtropyDevConsolePlugin;
 use symtropy_math::{Point, Sphere as PhysicsSphere};
 use symtropy_physics::constraint::DistanceConstraint;
 use symtropy_physics::{BodyHandle, RigidBody};
@@ -90,6 +91,7 @@ fn main() {
     .insert_resource(GridHandles::default())
     .add_plugins(SymtropyScenePlugin::default())
     .add_plugins(SymtropyPhysicsPlugin::<3>::with_gravity([0.0, -9.81, 0.0]))
+    .add_plugins(SymtropyDevConsolePlugin)
     .add_systems(Startup, (setup_camera, spawn_swarm))
     .add_systems(
         FixedUpdate,

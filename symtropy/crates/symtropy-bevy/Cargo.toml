@@ -37,6 +37,10 @@ symthaea-consciousness-equation = { version = "0.1.0", path = "../../../symthaea
 # Used by `pendulum_swarm_3d` and `_4d` examples for opinionated camera +
 # light + clear-color scaffolding. Permissive (Apache/MIT) sibling crate.
 symtropy-bevy-scene = { version = "0.1.0", path = "../symtropy-bevy-scene" }
+# Drop-in dev console (F1 toggle: world inspector + scene controls + Φ panel).
+# Examples enable the `phi-panel` feature so visitors see the differentiated
+# Φ Inspector immediately. The base devconsole crate is permissive.
+symtropy-devconsole = { version = "0.1.0", path = "../symtropy-devconsole", features = ["phi-panel"] }
 # Examples (e.g., pendulum_swarm in PENDULUM_CAPTURE_DIR mode) use
 # `Screenshot::primary_window()` + `save_to_disk` which needs PNG support.
 # `bevy_ui` + `bevy_text` + `default_font` are used by `pendulum_swarm_4d`
