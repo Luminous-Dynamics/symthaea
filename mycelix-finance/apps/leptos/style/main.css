@@ -6,6 +6,18 @@
    ================================================================ */
 :root {
     --primary: #c49564;
+
+    /* === Mycelix Design-System semantic tokens (consumed by mycelix-leptos-core
+       primitives TelemetryLine, GraphNode, FlowIndicator).
+       Finance maps gold → consensus (verified payments), cyan → live flows. === */
+    --md-base: var(--bg-primary, #0a0e14);
+    --md-fg: var(--text-primary, #e8edf5);
+    --md-fg-muted: var(--text-muted, #6e7681);
+    --md-signal: #38bdf8;                /* cyan for live TEND/SAP telemetry */
+    --md-consensus: var(--primary);      /* finance's gold IS the consensus color */
+    --md-care: #22c55e;                  /* healthy collateral, growing reputation */
+    --md-alarm: #ef4444;                 /* liquidation warnings */
+    --md-mono: ui-monospace, 'JetBrains Mono', 'Iosevka', 'Berkeley Mono', monospace;
 }
 
 /* ================================================================
