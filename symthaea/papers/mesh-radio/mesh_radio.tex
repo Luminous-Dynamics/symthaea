@@ -70,8 +70,8 @@ mesh consensus), Trust (post-quantum peer authentication), SocialFabric
 operation when disconnected from centralized infrastructure. The architecture
 implements Clark \& Chalmers' (1998) Extended Mind thesis: the mesh network is
 not merely a communication channel but a constitutive element of the cognitive
-system. Implementation comprises 6,045~LOC in the Radio Dispatcher ($\sim$180
-tests) and 9,787~LOC in the mesh modules (145 tests), integrated into Symthaea's
+system. Implementation comprises 6,309~LOC in the Radio Dispatcher (151
+tests) and 10,120~LOC in the mesh modules (222 tests), integrated into Symthaea's
 cognitive loop at interval 53.
 \end{abstract}
 
@@ -88,7 +88,7 @@ cognitive state space itself.
 
 This paper describes how the Symthaea consciousness engine~\cite{symthaea2026}
 integrates radio communication as a first-class cognitive modality. The Radio
-Dispatcher (6,045~LOC, $\sim$180 tests) and Spectrum Manager (cognitive
+Dispatcher (6,309~LOC, 151 tests; refactored April 2026 into 7-file module at \texttt{src/cognitive\_loop/managers/radio\_dispatcher/}) and Spectrum Manager (cognitive
 subsystem at interval~53) treat electromagnetic spectrum the way sensory cortex
 treats photons: as information to be predicted, compressed, and actively sampled.
 
@@ -546,7 +546,7 @@ consciousness sharing at light-speed delay. You share wisdom, not state.
 %% ════════════════════════════════════════════════════════════════════════════
 \section{Mesh Modules}
 
-The mesh subsystem (9,787~LOC across 12 source files) implements the
+The mesh subsystem (10,120~LOC across 15 source files) implements the
 physical-layer infrastructure that the Radio Dispatcher orchestrates.
 
 \subsection{Dual-Layer Transport}
@@ -851,7 +851,7 @@ per cognitive cycle:
 \toprule
 \textbf{Module} & \textbf{LOC} & \textbf{Tests} \\
 \midrule
-Radio Dispatcher (\texttt{radio\_dispatcher.rs}) & 6,045 & $\sim$180 \\
+Radio Dispatcher (\texttt{managers/radio\_dispatcher/}, 7 files) & 6,309 & 151 \\
 Mesh core (\texttt{swarm/mesh/mod.rs}) & 3,615 & --- \\
 Mesh receiver (\texttt{mesh\_receiver.rs}) & 1,181 & --- \\
 Dual-layer transport (\texttt{dual\_layer.rs}) & 996 & --- \\

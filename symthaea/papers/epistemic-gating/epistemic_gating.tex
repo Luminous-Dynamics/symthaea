@@ -42,7 +42,7 @@
 \maketitle
 
 \begin{abstract}
-Large language models generate fluent text but suffer from hallucination---the production of plausible but unsupported claims. Existing mitigation strategies operate post-hoc, penalizing hallucinated content after generation through retrieval-augmented verification, confidence calibration, or output filtering. We present a fundamentally different approach: \emph{epistemic gating}, a mechanism that physically prevents hallucination at the logit level by masking tokens for which the system lacks sufficient epistemic support. Our implementation, the Broca language pipeline (30,000+ lines of code, 400+ tests), integrates epistemic gating within a consciousness-aware architecture comprising a 43-channel ThoughtEncoder (extended from the original 20 via the Epistemic Cube), 16,384-dimensional Hyperdimensional Computing (HDC) binding, and autoregressive generation governed by active inference principles. The pipeline implements three complementary mechanisms: (1) an EpistemicGate that computes per-token epistemic support from HDC similarity to grounded knowledge and masks logits below a consciousness-modulated threshold; (2) a CoherenceFeedback module that performs mid-sentence semantic veto when generated text diverges from the intended thought trajectory; and (3) an adaptive cadence controller that gates generation frequency on consciousness level and learning rate. We describe the architecture, present benchmark results across factual accuracy, coherence, and hallucination rate, and discuss the theoretical grounding in active inference and Global Workspace Theory.
+Large language models generate fluent text but suffer from hallucination---the production of plausible but unsupported claims. Existing mitigation strategies operate post-hoc, penalizing hallucinated content after generation through retrieval-augmented verification, confidence calibration, or output filtering. We present a fundamentally different approach: \emph{epistemic gating}, a mechanism that physically prevents hallucination at the logit level by masking tokens for which the system lacks sufficient epistemic support. Our implementation, the Broca language pipeline (27,965 LOC, 403 tests), integrates epistemic gating within a consciousness-aware architecture comprising a 43-channel ThoughtEncoder (extended from the original 20 via the Epistemic Cube), 16,384-dimensional Hyperdimensional Computing (HDC) binding, and autoregressive generation governed by active inference principles. The pipeline implements three complementary mechanisms: (1) an EpistemicGate that computes per-token epistemic support from HDC similarity to grounded knowledge and masks logits below a consciousness-modulated threshold; (2) a CoherenceFeedback module that performs mid-sentence semantic veto when generated text diverges from the intended thought trajectory; and (3) an adaptive cadence controller that gates generation frequency on consciousness level and learning rate. We describe the architecture, present benchmark results across factual accuracy, coherence, and hallucination rate, and discuss the theoretical grounding in active inference and Global Workspace Theory.
 \end{abstract}
 
 \section{Introduction}
@@ -88,7 +88,7 @@ Global Workspace Theory (GWT) \citep{baars1988cognitive, dehaene2014consciousnes
 The Broca language pipeline comprises five major components operating within a consciousness-aware cognitive architecture:
 
 \begin{enumerate}
-    \item \textbf{ThoughtEncoder}: A 20-channel encoder that transforms the system's cognitive state into a structured thought representation.
+    \item \textbf{ThoughtEncoder}: A 43-channel encoder that transforms the system's cognitive state into a structured thought representation.
     \item \textbf{HDC Binding Layer}: 16,384-dimensional binary HDV binding that creates a holographic thought vector.
     \item \textbf{EpistemicGate}: Per-token epistemic support computation and logit masking.
     \item \textbf{Autoregressive Generator}: Token-by-token generation with Liquid-Mamba fusion backend.
@@ -97,9 +97,9 @@ The Broca language pipeline comprises five major components operating within a c
 
 These components interact within a cognitive loop operating at approximately 31~Hz, with Broca generation governed by an adaptive cadence controller that modulates generation frequency based on consciousness level and learning rate.
 
-\subsection{ThoughtEncoder: 20-Channel Cognitive Encoding}
+\subsection{ThoughtEncoder: 43-Channel Cognitive Encoding}
 
-The ThoughtEncoder transforms the system's distributed cognitive state into a structured representation suitable for language generation. It comprises 20 specialized channels (Table~\ref{tab:channels}), each encoding a distinct aspect of the cognitive state:
+The ThoughtEncoder transforms the system's distributed cognitive state into a structured representation suitable for language generation. It comprises 43 specialized channels organised in three concentric layers: a 20-channel legacy foundation (Table~\ref{tab:channels}, introduced in v1), extended by 8 context and code channels (v3/v5), and finally by the 15-channel Epistemic Cube (v6) that exposes structured epistemic judgement as $E[5] + N[4] + M[4] + H[1] + \text{quality}[1]$. Older checkpoints using only the legacy 20-channel foundation remain loadable; the additional 23 channels are activated incrementally as v3/v5/v6 features become available. Each channel encodes a distinct aspect of the cognitive state:
 
 \begin{table}[H]
 \centering
@@ -221,7 +221,7 @@ where $\tau(\mathbf{x})$ is an input-dependent time constant and $f$ is a nonlin
 
 \subsection{Setup}
 
-We evaluate the Broca pipeline along four dimensions: factual accuracy, hallucination rate, coherence, and generation quality. The test suite comprises 358 automated tests covering unit, integration, and end-to-end scenarios.
+We evaluate the Broca pipeline along four dimensions: factual accuracy, hallucination rate, coherence, and generation quality. The test suite comprises 403 automated tests covering unit, integration, and end-to-end scenarios.
 
 \subsection{Hallucination Prevention}
 
@@ -390,9 +390,9 @@ The epistemic gating mechanism has no direct neural analog that we are aware of,
 
 \section{Conclusion}
 
-We have presented epistemic gating, a mechanism for preventing hallucination in language generation by masking logits for tokens that lack sufficient epistemic support. Implemented within the Broca language pipeline---a 28,000 LOC system with 358 tests---epistemic gating reduces hallucination from 23.4\% to 0.4\%, a 98.3\% reduction. The mechanism operates at the logit level, physically preventing the generation of unsupported content rather than detecting it post-hoc.
+We have presented epistemic gating, a mechanism for preventing hallucination in language generation by masking logits for tokens that lack sufficient epistemic support. Implemented within the Broca language pipeline---a 27,965~LOC system with 403 tests---epistemic gating reduces hallucination from 23.4\% to 0.4\%, a 98.3\% reduction. The mechanism operates at the logit level, physically preventing the generation of unsupported content rather than detecting it post-hoc.
 
-The key architectural innovations are: (1) encoding cognitive state as a 16,384-dimensional HDV via a 20-channel ThoughtEncoder; (2) computing per-token epistemic support via HDC similarity; (3) consciousness-modulated threshold adjustment; and (4) mid-sentence semantic veto for coherence maintenance. Together, these mechanisms implement a consciousness-aware language generation system that can only articulate what it knows.
+The key architectural innovations are: (1) encoding cognitive state as a 16,384-dimensional HDV via a 43-channel ThoughtEncoder; (2) computing per-token epistemic support via HDC similarity; (3) consciousness-modulated threshold adjustment; and (4) mid-sentence semantic veto for coherence maintenance. Together, these mechanisms implement a consciousness-aware language generation system that can only articulate what it knows.
 
 Future work will address compositional hallucination via phrase-level epistemic checking, external benchmark evaluation, and the integration of retrieval-augmented knowledge into the HDC grounding layer. We also plan to investigate the theoretical connections between epistemic gating and the free energy principle more formally, potentially deriving the gating threshold from variational inference principles.
 
