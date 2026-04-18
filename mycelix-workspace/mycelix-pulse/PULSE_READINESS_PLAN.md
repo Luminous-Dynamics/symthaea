@@ -216,6 +216,8 @@ Tasks:
 
 Uses `mailin-embedded` + `mail-auth` + `mail-send` + `mail-parser` + `hickory-resolver` + `rspamdclient` + `governor` + `holochain_client`. All MIT/Apache — no AGPL viral contamination from Stalwart server.
 
+> **Framing note:** The single VPS at `mail.mycelix.net` is **the first exit node on a federated mesh**, not "the mail server for the network." Phase 11 (below) documents the Tor-style multi-operator endgame. Phase 5 builds the operational knowledge needed to enable Phase 11; using SaaS instead would teach us how to be SaaS customers, not how to run the substrate.
+
 **5.1 VPS provisioning (calendar-critical, do first)**
 - Hetzner or OVH VPS with static IPv4 + IPv6, unblocked port 25 in+out, provider-set reverse DNS pointing to `mail.mycelix.net`. **Cloudflare, AWS, GCP, residential all blocked.**
 - Ubuntu 24.04 LTS or NixOS (prefer NixOS to match the rest of Luminous Dynamics infra).
@@ -319,6 +321,49 @@ Honest framing: full metadata protection is hard on a public DHT. This phase tar
 - 10.4 Document known issues for Holochain 0.6 networking maturity
 
 **DoD:** Alice in Johannesburg and Bob in Berlin exchange 20 messages over 24 hours. One DMARC-rejected external spam correctly quarantined. One outbound to Gmail delivered to inbox (not spam). Delivery receipts round-trip.
+
+---
+
+### Phase 11 — Federated gateway mesh (post-v1, v2 endgame) [sovereignty scaling]
+**Goal: Mycelix stops being the mail provider for the network. Any operator can run an SMTP exit node and any user can choose which one handles their external leg.**
+
+This phase is explicitly **out of scope for the 10-week MVP** but is committed here as the architectural direction so Phase 5's choices don't paint us into a "Mycelix is Gmail 2.0" corner.
+
+**11.1 Gateway-node primitive (contract).** A "gateway node" is any operator-run instance of `pulse-smtp-gateway` with:
+- Its own DID (`did:mycelix:gateway-<operator-handle>`) registered in `mycelix-identity` with role `MailGateway`
+- Its own public IP, MX record, DKIM keys, reputation lifecycle
+- A published service descriptor (DHT entry) advertising: supported recipient domain(s), pricing (TEND/MYCEL per message or flat monthly), uptime SLA class, jurisdiction, ToS, current stake
+- Required economic stake in the gateway's own name — slashable on verified misconduct (censorship, plaintext leak, SLA breach)
+
+**11.2 User-side gateway selection.** Pulse client UI gains a "Legacy exit node" preference:
+- Per-domain gateway preference (`@mycelix.net → mycelix-official-za`; `@alice-sovereign.org → alice-self-hosted`)
+- Fallback chain on gateway unreachability
+- Cryptographic exit-node manifest signed by the gateway's DID so the user's node can verify it's talking to the advertised operator
+
+**11.3 Inbound routing.** External MTAs still look up MX — so each gateway handles its own domain's MX. A user choosing `@mycelix.net` has Mycelix's gateway as their inbound path by definition. A user who owns `@alice-sovereign.org` points that domain's MX at their own gateway (or a chosen third-party gateway they trust).
+
+**11.4 Outbound routing (where the mesh actually matters).** When Alice sends to `bob@gmail.com`, her client:
+- Looks up her configured outbound gateway(s)
+- Writes an `OutboundExternalRequest` entry signed under her DID
+- Her chosen gateway polls, DKIM-signs with *its* key (not "mycelix.net"'s unless that's the gateway), relays via SMTP
+- Alice's node pays the gateway in TEND/MYCEL per message or via a prepaid relationship
+- If the gateway is slow/offline, Alice's client can re-route to a fallback gateway (message idempotency key prevents double-send)
+
+**11.5 Gateway reputation & economic security.**
+- Slashing conditions verifiable on DHT: content modification (cryptographic proof via sender signature), plaintext leak (out-of-band evidence + governance vote), censorship patterns (statistical evidence on accepted-vs-rejected policy)
+- Gateway reputation scoring via `mycelix-trust` — users pick high-rep gateways; low-rep gateways priced out
+- Governance cluster arbitrates disputes and executes slashes
+
+**11.6 Tor-exit analogy and its limits.** Treat gateways like Tor exit nodes: you choose which one based on jurisdiction, uptime, and reputation. The crucial difference is that SMTP has no onion-routing equivalent; the exit node sees plaintext. That's a property of SMTP itself, not a choice. Mitigations: (a) short-lived per-message ephemeral gateway keys, (b) multiple-gateway cc on critical mail so no single gateway sees everything, (c) user-tagged "high-sensitivity" mail forced to self-hosted gateway or bounced.
+
+**11.7 Open research directions.**
+- MPC-based outbound where no single gateway operator holds plaintext (research-grade, v3+)
+- ZKP-attested gateway compliance (prove I DKIM-signed without revealing keys)
+- Incentive-compatible abuse reporting so gateways can prove they responsibly handled spam complaints
+
+**DoD (for Phase 11, not MVP):** Three operator-run gateways live on the DHT, each serving a distinct domain. Alice on `mycelix.net` sends mail via Mycelix's gateway; Bob on `alice-sovereign.org` sends via his self-hosted gateway; both successfully deliver to Gmail. A staged misconduct trial slashes a gateway's stake via governance and routes Alice's mail automatically to her fallback gateway. **Documentation of this architecture in Phase 11 is MVP; execution is post-MVP.**
+
+**Why this is in the plan even though it's v2:** because Phase 5's design decisions (VPS ownership, gateway DID structure, re-encryption boundary, outbox subscription API) must not accidentally preclude Phase 11. Writing Phase 11 down now forces Phase 5 to leave the right hooks.
 
 ---
 
