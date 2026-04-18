@@ -4,6 +4,7 @@
 
 use bevy::prelude::*;
 use symthaea_humanoid::simulator::HumanoidPhysicsSimulator;
+use symtropy_consciousness_physics::safety::sprint_floor_gain;
 
 use crate::camera;
 use crate::consciousness_bridge;
@@ -11,6 +12,21 @@ use crate::controller::gain_scale;
 use crate::hud;
 use crate::resources::*;
 use crate::visualization;
+
+/// Per-platform Φ-gate thresholds for the bipedal humanoid demo, using
+/// the empirically-validated `sprint_floor_gain` primitive from the
+/// Φ-gated-safety paper (commits `38dc8b1fd9..317baad595`, promoted
+/// to library at `52e3fb710f`). Mirrors flight-demo (`8d61e348d9`),
+/// vehicle-demo (`c2f2fb46c8`), AUV-demo, and helicopter-demo.
+///
+/// **Starting values** inherited from the manipulator study's measured
+/// Φ band [0.099, 0.145]. Humanoid observation vector (uprightness /
+/// push-norm) differs from the manipulator's (danger / PE / effort /
+/// stiffness), so the empirical band may drift — recalibrate with a
+/// `MANIP_BENCH_PHI_TRACE`-style capture under a representative
+/// standing + perturbation schedule.
+const SPRINT_PHI: f64 = 0.135;
+const FLOOR_GAIN: f64 = 0.3;
 
 pub struct HumanoidDemoPlugin;
 
@@ -73,13 +89,17 @@ fn step_humanoid(
     // Danger rises as uprightness falls or push grows. Uprightness=1
     // means upright; 0 means horizontal; (1 - upright) is the fall risk.
     let danger = ((1.0 - upright) * 0.65 + push_norm * 0.35).min(1.0);
-    let (phi, safety, gain) = consciousness_bridge::consciousness_tick(
+    let (phi, safety, _default_gain) = consciousness_bridge::consciousness_tick(
         &mut h.robot_agent,
         last_pe,
         danger,
         upright,
         push_norm,
     );
+    // Use the empirically-validated SprintFloor mapping instead of the
+    // default `SafetyTier::motor_gain()` — hardcoded 0.6/0.3/0.1
+    // thresholds don't match this platform's empirical Φ band.
+    let gain = sprint_floor_gain(phi, SPRINT_PHI, FLOOR_GAIN);
     h.current_phi = phi;
     h.current_safety = safety;
     h.current_motor_gain = gain;
