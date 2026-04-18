@@ -537,6 +537,7 @@ tree-sitter-nix = { workspace = true }
 tree-sitter-rust = { version = "0.23", optional = true }    # Rust grammar for code understanding
 tree-sitter-python = { version = "0.23", optional = true }  # Python grammar for code understanding
 rnix = { version = "0.11", optional = true }                # Structural Nix AST walk for nix_scorer
+serde_yaml = { version = "0.9", optional = true }           # YAML parser for Docker Compose scorer (Phase 3 substrate-independence)
 
 # Desktop Notifications (E1)
 zbus = { version = "4.0", optional = true }  # D-Bus for notifications
@@ -715,7 +716,7 @@ reasoning_engine = ["magi_loop", "symthaea-causal-reasoning/counterfactual"]
 
 # ── Code Understanding & Generation ─────────────────────────────────
 # Subsumes former code_understanding feature (tree-sitter parsers + code generation).
-code_generation = ["tree-sitter-rust", "tree-sitter-python", "rnix", "symthaea-core/synthesis-trait"]
+code_generation = ["tree-sitter-rust", "tree-sitter-python", "rnix", "serde_yaml", "symthaea-core/synthesis-trait"]
 geodesic_synthesis = ["dep:symthaea-geodesic"]  # GCS verification gate for CodingAgent (PDG topology + execution oracle)
 wasm-sandbox = ["dep:wasmtime"]
 

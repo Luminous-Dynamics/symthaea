@@ -78,6 +78,8 @@ pub mod code_parser;
 #[cfg(feature = "code_generation")]
 pub mod code_verifier;
 #[cfg(feature = "code_generation")]
+pub mod compose_scorer;
+#[cfg(feature = "code_generation")]
 pub mod emitters;
 #[cfg(feature = "code_generation")]
 pub mod epistemic_generation;
