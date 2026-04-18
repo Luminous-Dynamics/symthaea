@@ -82,11 +82,17 @@ What each cluster owes the demo, and what it has today.
 
 These are the things that, if not fixed, prevent *any* version of this demo from shipping:
 
-### 1. **Finance regression** (coordination-blocked)
+### 1. ~~Finance regression~~ ✅ RESOLVED (`0478d04d31`, 2026-04-18)
 
-`finance-wire-types` on main is out of sync with the consumer crates on main; the richer shape lives in a concurrent session's worktree (`session-substrate-wiring`). Every demo flow that touches TEND, SAP, treasury, staking, or recognition is red.
-
-**Path**: coordinate with the other session — they push, or we pull from the worktree with their blessing. Don't solo-fix (risk of divergence if they have more pending changes).
+Wire-types rehydrated to match consumer expectations: 9 new types added
+(ApplyDemurrageInput, DemurrageResult, MintSapFromGovernanceInput,
+BalanceResponse, DepositCollateralInput, FeeTierResponse, FinanceBridgeHealth,
+ProcessPaymentInput, UpdateCollateralHealthInput). Three existing structs
+reshaped to match consumer construction sites. Four pre-existing
+`u32 → usize` drift sites cleaned up. `cargo check --workspace` in
+mycelix-finance goes from 50+ errors to zero. Every economic demo flow
+(TEND / SAP / MYCEL / treasury / staking / recognition) now has a green
+build to run against.
 
 ### 2. **Unified hApp install hasn't been smoke-tested end-to-end** (partial progress 2026-04-18)
 
@@ -169,10 +175,10 @@ Each cluster theme maps its own colors to these semantic tokens; apps using `myc
 
 The adoption task in Week 3 of the execution path isn't "build the crate" — it was "add the 3 true-gap primitives + semantic-color-token conventions, then drive reference-impl adoption in Praxis first." **The 3 primitives are now shipped** (see Part 5b). Remaining adoption work:
 
-1. **Propose per-cluster `--md-*` color-token mappings** — each Leptos app's theme CSS defines its concrete palette that maps to the semantic tokens.
-2. ✅ **Reference implementation** (`473f16a72d`) — delivered as a portable `<Showcase />` component in `mycelix-leptos-core` itself. Composes StatCard + TelemetryLine + GraphNode/Edge + FlowIndicator + semantic-color chips on one scene (Kagiso's morning watershed survey from the Part 2 storyboard). Any Leptos app can render it via `view! { <Showcase /> }` — no Trunk/build wiring needed. Portable instead of bound to one cluster, so every adopter can diff their own page against it.
-3. **Migrate 3-5 other cluster frontends** to the same palette + component usage rhythm. Commons + Hearth + Finance are good candidates.
-4. **Civic Leptos frontend** — currently zero UI for a Tier-2 cluster with 20 zomes + 2,276 tests. Writing it from scratch on top of the full primitive set gives the cleanest "greenfield exemplar."
+1. ✅ **Per-cluster `--md-*` color-token mappings** — commons (`48ae42aeb4`), hearth (`16aa825b25`), finance (`9ff01c9ac9`) each now define the full semantic-token set (signal, consensus, care, alarm, mono, fg/fg-muted, base) keyed to their existing palettes. Pattern established; the remaining 11+ clusters copy in ~30 seconds each.
+2. ✅ **Reference implementation** (`473f16a72d`) — portable `<Showcase />` component in `mycelix-leptos-core` itself. Any Leptos app renders it via `view! { <Showcase /> }` with no Trunk/build wiring.
+3. **Migrate 3-5 other cluster frontends** to the same rhythm. Commons + Hearth + Finance already have the tokens (done above). Remaining work: actually *adopt* TelemetryLine/GraphNode/FlowIndicator on existing cluster pages by swapping hand-rolled visuals. Per-cluster scope.
+4. ✅ **Civic Leptos frontend** greenfield scaffold (commit in this session) — standalone crate under `mycelix-civic/apps/leptos/`. Trunk serves on :8102 per PORTS.md. Landing page renders `<Showcase />` through civic-specific semantic tokens (media-cyan signal, justice-gold consensus, justice-resolved-green care, emergency-red alarm). Zero UI → running frontend in one `trunk serve`. Subsequent commits replace Showcase with real civic pages (justice docket, emergency coordination, media verification).
 
 ---
 
