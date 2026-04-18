@@ -2,6 +2,59 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Robotic agent: FEP-driven entity with consciousness-gated motor authority.
+//!
+//! # Safety positioning (SOTIF / ISO 21448)
+//!
+//! The scalar `motor_gain` returned by [`RoboticAgent::tick`] is a
+//! **Φ-derived triggering-condition monitor** in the SOTIF sense (ISO
+//! 21448:2022 *Road vehicles — Safety of the intended functionality*).
+//! It is an advisory, continuous, model-based *confidence* signal —
+//! **not** a substitute for safety-rated hardware envelopes. Concretely:
+//!
+//! - SOTIF §5 defines triggering conditions as "specific conditions of
+//!   a scenario that serve as an initiator for a subsequent system
+//!   reaction contributing to either a hazardous behavior or an
+//!   absence of prevention". The HDC prediction-error surge that
+//!   drives Φ down is exactly such a triggering-condition signal.
+//!
+//! - A system that uses `tick()`'s `motor_gain` as its *only* safety
+//!   layer will **not** satisfy ISO 13849-1 PLd Cat.3, ISO 26262
+//!   ASIL-D, or IEC 80601-2-77 on its own. The recommended
+//!   architecture is:
+//!
+//!     ```text
+//!     [ rule-based hard envelope  ]  ← ISO 13849 / 26262 certified
+//!     [   (speed limits, e-stop,  ]    single-failure-tolerant,
+//!     [    PFL force caps, etc.)  ]    microsecond-deterministic
+//!              ▲
+//!              │ Φ *augments* but never overrides
+//!     [ RoboticAgent::tick motor_gain  ] ← this crate
+//!     [  (advisory / attenuating only) ]
+//!     ```
+//!
+//! - For actions where a single-point failure is catastrophic (energy
+//!   delivery, irreversible tissue contact, etc.), the Φ channel
+//!   **must** be paired with an independent diverse-redundancy hard
+//!   gate. `symtropy-surgical-demo`'s `hardware_cautery_gate()` is the
+//!   canonical example: cautery fires iff Φ *and* distance-to-critical
+//!   *and* tip-force all agree.
+//!
+//! Three legitimate roles for the Φ signal have been observed across
+//! the C-series platform demos:
+//!
+//!   1. **Magnitude attenuation** — scale a commanded torque / thrust
+//!      down when Φ drops. Appropriate when the underlying controller
+//!      has no "safer action" carve-outs (flight, humanoid, quadrotor
+//!      attitude).
+//!   2. **Mode selection** — pick from a discrete set of operating
+//!      modes whose factors + interlocks are pre-certified individually
+//!      (exoskeleton `AssistanceMode`, surgical `SurgicalSafetyLevel`).
+//!   3. **Mission-phase tracking** — gate authority on external-world
+//!      temporal windows (orbital comm/solar).
+//!
+//! See `memory/symtropy_phase_c2_flight_demo.md` for the empirical
+//! positioning against 2024-2026 industry practice (PX4 discrete
+//! failsafes, Franka 3-zone, Waymo rule-based fallback, etc.).
 
 use nalgebra::SVector;
 use symthaea_consciousness_equation::{
@@ -75,6 +128,30 @@ impl RoboticAgent {
     /// 4. Gate motor output by safety tier
     ///
     /// Returns the motor gain [0.0, 1.0] for this tick.
+    ///
+    /// # Safety contract (SOTIF)
+    ///
+    /// The returned `motor_gain` is **advisory** — it is a Φ-derived
+    /// scalar whose semantics are:
+    ///
+    /// > "Given the internal HDC/FEP prediction-error state at this
+    /// > tick, the model's confidence in the intended behavior is `g`;
+    /// > downstream actuation should be scaled by at most `g` of its
+    /// > nominal authority."
+    ///
+    /// Critically, this method has **no visibility into hardware
+    /// envelopes** (joint limits, PFL force caps, ISO/TS 15066
+    /// protective distance, FDA-cleared interlocks). Callers that
+    /// need safety-rated behavior **must** combine this gain with an
+    /// independent hard-envelope check — see the surgical demo's
+    /// `hardware_cautery_gate` for the canonical dual-channel pattern.
+    ///
+    /// In terms of the ISO 21448 (SOTIF) functional-insufficiency
+    /// framework: `tick()` is a *triggering-condition monitor* — it
+    /// detects scenarios where the model's own prediction is likely
+    /// wrong. It is **not** a safety function in the ISO 26262 sense,
+    /// and should never be the sole gate on a single-point-of-failure
+    /// hazardous action.
     pub fn tick(&mut self, observation: &[f64], danger_level: f64) -> f64 {
         // FEP perception-action cycle
         let obs = Observation::new(
