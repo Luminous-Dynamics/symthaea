@@ -1101,6 +1101,10 @@ name = "nix_scorer_diagnose"
 required-features = ["code_generation"]
 
 [[example]]
+name = "nix_scorer_sample"
+required-features = ["code_generation"]
+
+[[example]]
 name = "nix_codegen_api"
 required-features = ["code_generation"]
 

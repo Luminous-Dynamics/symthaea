@@ -34,6 +34,39 @@ flipped to PASS.
 
 **Score: 6/6 (100%)**
 
+### 2026-04-18 — Goldens backfill round 1 (13 prompts)
+
+Added 7 more goldens covering services (ipfs, postgres-basic), hardware
+(nvidia), desktop (sway, kde plasma), networking (firewall 80/443), and
+a node/typescript dev shell.
+
+| # | Prompt | Verdict |
+|---|---|---|
+| 1–6 | (as above) | PASS |
+| 7 | configure postgresql service | PASS |
+| 8 | set up ipfs kubo node | PASS |
+| 9 | configure nvidia gpu drivers | PASS |
+| 10 | set up sway window manager | PASS |
+| 11 | enable kde plasma desktop environment | PASS |
+| 12 | open firewall ports 80 and 443 | PASS |
+| 13 | set up a node development environment with typescript | PASS |
+
+**Score: 13/13 (100%)**
+
+**Honest caveat on this number:** goldens were written *minimally* —
+they assert only the semantically required paths. The "extraneous is
+warning" rule makes the generator's extras (e.g. `hardware.graphics
+.enable`, `services.displayManager.sddm.wayland.enable`) not count
+against PASS. A more comprehensive golden that asserted ALL of a
+battle-tested config's paths would likely fail in places the minimal
+one doesn't. The 13/13 proves the **scorer and codegen meet at the
+required-path level**, not that the generator produces ideal configs.
+
+Skipped prompts (boundary): `configure a python data-science
+environment with jupyter and pandas` — semantic content is in a
+`let`-binding (`pythonEnv = pkgs.python311.withPackages ...`) which
+the scorer doesn't yet walk. Filed as a scorer-capability follow-up.
+
 Reproduce: `cargo run --features code_generation --example nix_eval_benchmark -- --goldens-only`
 
 ### Context
