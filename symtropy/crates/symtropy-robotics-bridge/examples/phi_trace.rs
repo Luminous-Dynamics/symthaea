@@ -183,13 +183,14 @@ fn main() {
     println!(" p95    = {:.4}", s.p95);
     println!();
     println!("────────── sprint-threshold diagnostic ──────────");
-    let thresh = 0.135; // current hardcoded SPRINT_THRESHOLD on all 6 adopters
+    let thresh = 0.125; // current SPRINT_THRESHOLD on all 6 adopters
     let above = phi_samples.iter().filter(|&&x| x > thresh).count();
     let pct = 100.0 * above as f64 / s.n as f64;
-    println!(" SPRINT_THRESHOLD = 0.135 (manipulator-inherited)");
-    println!(" Φ > 0.135 fraction : {:.1} %  ({} / {})", pct, above, s.n);
+    println!(" SPRINT_THRESHOLD = 0.125 (2026-04-19 recalibration)");
+    println!(" Φ > 0.125 fraction : {:.1} %  ({} / {})", pct, above, s.n);
     println!();
-    println!(" Manipulator paper's empirical band: [0.099, 0.145]");
+    println!(" Pre-FEP-wiring band (commit ≤6517226491): [0.099, 0.145]");
+    println!(" Post-FEP-wiring band (commit 996750d12b+): [0.088, 0.133]");
     println!(
         " This run's range:                   [{:.4}, {:.4}]",
         s.min, s.max

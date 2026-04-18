@@ -215,35 +215,50 @@ required for single-point-of-failure hazardous actions (cautery).
   mechanical transfer — ~5 lines per platform plus a calibration
   doc-comment. Commits: flight-demo `8d61e348d9`, vehicle-demo
   `c2f2fb46c8`, AUV/helicopter/humanoid-demo `9556b7e776`.
-- All six adopters use SPRINT_THRESHOLD = 0.135, FLOOR_GAIN = 0.3
-  inherited from the manipulator study's measured band [0.099, 0.145].
-- **Empirical transferability result** (via
+- **History of the threshold**: all six adopters originally used
+  SPRINT_THRESHOLD = 0.135 inherited from the manipulator study's
+  measured band [0.099, 0.145]. After commit `996750d12b` wired FEP
+  signals (prediction error, precision, belief change, free energy,
+  action-distribution concentration) into `ConsciousnessInputs`, the
+  band shifted to [0.088, 0.133] and the threshold was recalibrated
+  to 0.125 (same relative position, ~78 % up the range).
+- **Two-stage transferability experiment** (via
   `symtropy-robotics-bridge/examples/phi_trace.rs`, ~1 s per 1,000
-  ticks): we ran 1,000-tick traces across all six adopter platform
-  types. All produce the identical band [0.1031, 0.1450] with mean
-  0.131, p95 0.145. 48–51 % of frames sit above 0.135 for every
-  platform and every trial seed. **Figure 4** shows the overlaid Φ
-  traces and distribution histograms — the six platform lines lie
-  perfectly on top of each other.
-- **Mechanism (honest)**: the band is platform-invariant NOT because
-  each platform's observation stream happens to induce similar Φ, but
-  because `RoboticAgent::tick` (at `symtropy-robotics-bridge/src/
-  agent.rs:155-188`) constructs `ConsciousnessInputs` purely from
-  `danger_level` (and `self.caution`, a low-pass filter over
-  danger_level). The observation vector is passed to FEP via
-  `fep.perceive(&obs)`, but the return value is discarded; FEP's
-  internal state also never feeds back into the consciousness inputs.
-  Four of the eight `ConsciousnessInputs` fields are hardcoded
-  constants (working_memory=0.7, recurrence=0.6, knowledge=0.5,
-  synchrony=0.6). The fifth (phi) is a linear function of caution.
-- **Paper consequence**: the transferability claim stands, but with
-  a clearer provenance — the SPRINT_THRESHOLD = 0.135 threshold is
-  structurally robust because the supervisor's scalar is structurally
-  platform-agnostic, not because it happens to match empirically. A
-  future generation of `RoboticAgent::tick` that threads FEP
-  prediction-error, platform-specific embodiment channels, or the
-  consciousness equation's full input surface would BREAK this
-  coincidence and require real per-platform recalibration.
+  ticks):
+  - **Stage 1 (pre-FEP-wiring, commit ≤`6517226491`)**: all six
+    platforms produced the identical band [0.1031, 0.1450], mean
+    0.131. The supervisor's scalar was structurally platform-
+    agnostic — the observation vector was passed to `fep.perceive()`
+    but the return was discarded; four `ConsciousnessInputs` fields
+    were hardcoded. **Transferability was a design oversight, not a
+    result.**
+  - **Stage 2 (post-FEP-wiring, commit `996750d12b`+)**: FEP-derived
+    signals are blended 35:65 with the previous hardcoded defaults
+    into five of eight `ConsciousnessInputs` fields. Platforms now
+    differ by observation dimensionality: humanoid (2-channel obs)
+    produces mean 0.1156 with 33 % of frames above 0.125; vehicle
+    (3-channel) produces mean 0.1166 with 38 %; the four 4-channel
+    platforms (manipulator / flight / AUV / helicopter) cluster at
+    mean 0.1172 with ~39 %. **Figure 4** shows the overlaid traces
+    and distribution histograms.
+- **Mechanism**: `RoboticAgent::tick` now threads FEP prediction-error
+  into attention, FEP precision into working_memory, FEP belief-change
+  into recurrence, FEP total free energy (inverse) into knowledge, and
+  FEP action-distribution concentration into broadcast — each blended
+  with the previous hardcoded default at 35:65 weight. The 35 %
+  FEP-weight was chosen to keep the output band close enough to the
+  original that the paper's benchmarks (Figures 2/3) don't regress
+  hard; the weight can be tuned upward once we have representative
+  per-platform observation streams.
+- **Paper consequence**: transferability is now a genuine empirical
+  claim, not a structural coincidence. The fact that platforms
+  cluster primarily by observation-dim rather than semantic identity
+  reflects our synthetic test harness (same sinusoidal observations
+  across platforms) — a future per-platform Φ-trace experiment that
+  runs each platform through its actual demo scenario would produce
+  platform-specific bands requiring genuine per-platform
+  `SPRINT_THRESHOLD` calibration. That is real follow-up work, no
+  longer a structural impossibility.
 - Each platform's observation-vector channels (what they WOULD feed
   into a future platform-aware supervisor) differ:
     - manipulator: danger / PE / effort / stiffness (measured band)

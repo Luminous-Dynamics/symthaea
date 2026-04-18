@@ -25,7 +25,10 @@ use crate::visualization;
 /// stiffness), so the empirical band may drift — recalibrate with a
 /// `MANIP_BENCH_PHI_TRACE`-style capture under a representative
 /// standing + perturbation schedule.
-const SPRINT_THRESHOLD: f64 = 0.135;
+// Recalibrated 2026-04-19 from 0.135 → 0.125 after commit `996750d12b`
+// (FEP wiring into ConsciousnessInputs) shifted the empirical Φ band
+// from [0.099, 0.145] to [0.088, 0.133]. Same relative band position.
+const SPRINT_THRESHOLD: f64 = 0.125;
 const FLOOR_GAIN: f64 = 0.3;
 
 pub struct HumanoidDemoPlugin;

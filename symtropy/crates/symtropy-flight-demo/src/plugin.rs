@@ -32,7 +32,12 @@ use crate::visualization;
 /// record 40 s of Φ samples, then set `SPRINT_THRESHOLD` to a value near
 /// the 95th percentile of the observed band and `FLOOR_GAIN` above
 /// whatever thrust level keeps altitude held in a light wind.
-const SPRINT_THRESHOLD: f64 = 0.135;
+// Recalibrated 2026-04-19 from 0.135 → 0.125 after commit `996750d12b`
+// (FEP wiring into ConsciousnessInputs) shifted the empirical Φ band
+// from [0.099, 0.145] to [0.088, 0.133]. The new value sits at the
+// same relative position within the new band as 0.135 did in the old
+// one (~78 % up the range). See `phi_trace_multi/` CSVs for data.
+const SPRINT_THRESHOLD: f64 = 0.125;
 const FLOOR_GAIN: f64 = 0.3;
 
 pub struct FlightDemoPlugin;

@@ -327,17 +327,18 @@ def render_phi_trace_multi():
                      color=colors.get(p, "#555"),
                      linewidth=0.9, alpha=0.75, label=p)
     # Threshold line
-    ax_time.axhline(0.135, color="#2c3e50", linestyle="--",
+    ax_time.axhline(0.125, color="#2c3e50", linestyle="--",
                     linewidth=1.1, alpha=0.85,
-                    label="SPRINT_THRESHOLD = 0.135")
-    # Manipulator band shading
-    ax_time.axhspan(0.099, 0.145, color="#1f6ead", alpha=0.08)
+                    label="SPRINT_THRESHOLD = 0.125 (post-FEP-wiring)")
+    # Post-FEP-wiring empirical band
+    ax_time.axhspan(0.088, 0.133, color="#1f6ead", alpha=0.08)
     ax_time.set_xlabel("tick")
     ax_time.set_ylabel(r"$\Phi$ (consciousness-inspired scalar)")
     ax_time.set_ylim(0.08, 0.16)
     ax_time.set_title(
-        r"Figure 4 — $\Phi$ is structurally platform-invariant: "
-        r"all 6 traces overlap (first 200 ticks shown)", fontsize=10
+        r"Figure 4 — Post-FEP-wiring $\Phi$ traces diverge by observation "
+        r"dim: humanoid (dim=2) lowest, dim=4 platforms clustered top",
+        fontsize=10,
     )
     ax_time.legend(loc="lower right", fontsize=7, framealpha=0.88, ncol=2)
     ax_time.grid(alpha=0.25)
@@ -347,8 +348,8 @@ def render_phi_trace_multi():
         ax_hist.hist(phis, bins=30, alpha=0.35,
                      color=colors.get(p, "#555"), label=p,
                      orientation="horizontal")
-    ax_hist.axhline(0.135, color="#2c3e50", linestyle="--", linewidth=1.1)
-    ax_hist.axhspan(0.099, 0.145, color="#1f6ead", alpha=0.08)
+    ax_hist.axhline(0.125, color="#2c3e50", linestyle="--", linewidth=1.1)
+    ax_hist.axhspan(0.088, 0.133, color="#1f6ead", alpha=0.08)
     ax_hist.set_xlabel("count")
     ax_hist.set_ylim(0.08, 0.16)
     ax_hist.set_title("distribution (1000 ticks)", fontsize=10)

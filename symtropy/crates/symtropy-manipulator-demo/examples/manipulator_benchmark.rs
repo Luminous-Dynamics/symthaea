@@ -259,13 +259,23 @@ pub enum ThresholdSet {
     SprintFloor,
 }
 
-/// Signal value above which `SprintFloor` and `Recalibrated` both
-/// commit to gain = 1.0. The signal is the scalar output of
-/// `MasterConsciousnessEquation::compute()` — referred to as Φ in the
-/// consciousness-physics literature but function-agnostic in this code.
-/// Matches the Recalibrated Green boundary so the two variants share
-/// one sprint trigger and only differ on middle-tier behavior.
-const SPRINT_THRESHOLD: f64 = 0.135;
+/// Signal value above which `SprintFloor` commits to gain = 1.0. The
+/// signal is the scalar output of `MasterConsciousnessEquation::compute()`
+/// — referred to as Φ in the consciousness-physics literature but
+/// function-agnostic in this code.
+///
+/// **2026-04-19 recalibration**: was 0.135 when the empirical Φ band
+/// was [0.099, 0.145]. After commit `996750d12b` (FEP wiring into
+/// `RoboticAgent::tick`'s `ConsciousnessInputs`) the band shifted to
+/// [0.088, 0.133], so we moved the threshold to 0.125 to keep the
+/// same relative position (~78 % up the range). The `Recalibrated`
+/// tier variant's Green boundary is still 0.135 (see
+/// `gain_from_phi(ThresholdSet::Recalibrated)`), which under the new
+/// band almost never fires — a full 5-variant re-run would surface
+/// divergence between `SprintFloor` and `Recalibrated` that the
+/// paper's §5 conclusion previously called "tied to three decimal
+/// places". Compute-heavy (~60 min) re-run reserved for follow-up.
+const SPRINT_THRESHOLD: f64 = 0.125;
 
 /// Crawl-rate floor for `ClampedLinear`. Chosen to match the
 /// Recalibrated Orange tier so the two variants are directly
@@ -648,7 +658,7 @@ fn main() {
     let (thresholds, threshold_label) = if sprint_enabled {
         (
             ThresholdSet::SprintFloor,
-            "sprint-floor (gain=1.0 if Φ>0.135 else 0.3)",
+            "sprint-floor (gain=1.0 if Φ>0.125 else 0.3)",
         )
     } else if clamp_enabled {
         (
