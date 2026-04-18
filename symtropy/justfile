@@ -45,6 +45,10 @@ test:
 test-pendulum-swarm:
     cargo test -p symtropy-bevy --test pendulum_swarm_invariants --release -- --nocapture
 
+# Run the pendulum_swarm demo (100-pendulum Phi-coupled physics scene)
+run-pendulum-swarm:
+    cargo run -p symtropy-bevy --example pendulum_swarm --release
+
 # Run biometrics tests
 test-biometrics:
     cd ../symthaea && cargo test -p symthaea-biometrics --features muse-bridge
