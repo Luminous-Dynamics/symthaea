@@ -1118,6 +1118,10 @@ required-features = ["code_generation"]
 name = "compose_eval_benchmark"
 required-features = ["code_generation"]
 
+[[example]]
+name = "nix_prefix_parse_probe"
+required-features = ["code_generation"]
+
 
 [[example]]
 name = "nix_codegen_api"
