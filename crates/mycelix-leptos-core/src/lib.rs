@@ -19,7 +19,8 @@
 //! - [`AppErrorBoundary`] — Styled error boundary with retry
 //! - [`ZomeCallButton`] — Button with loading/success/error states
 //! - [`ProgressBar`] — Configurable progress bar
-//! - [`StatCard`] — Labeled statistic card
+//! - [`StatCard`] — Labeled statistic card (static number)
+//! - [`TelemetryLine`] — Horizontal sparkline strip for streaming metrics (complements StatCard)
 //!
 //! # Providers
 //!
@@ -39,49 +40,50 @@
 //! - [`use_homeostasis`] — Retrieve homeostasis (all-pending-zero) state
 
 // --- Core transport ---
-pub mod provider;
-pub mod holochain_provider;
 pub mod connection_status;
+pub mod holochain_provider;
+pub mod provider;
 
 // --- UI components ---
-pub mod trust_badge;
-pub mod loading;
-pub mod error_boundary;
-pub mod zome_call_button;
-pub mod progress_bar;
-pub mod stat_card;
-pub mod tier_gate;
 pub mod app_shell;
-pub mod forms;
-pub mod modal;
-pub mod data_table;
-pub mod tabs;
-pub mod empty_state;
-pub mod search_bar;
 pub mod badge;
 pub mod cluster_launcher;
+pub mod data_table;
+pub mod empty_state;
+pub mod error_boundary;
+pub mod forms;
 pub mod indlela;
+pub mod loading;
+pub mod local_identity;
+pub mod modal;
+pub mod progress_bar;
+pub mod search_bar;
 pub mod sovereign_radar;
 pub mod spore_bridge;
-pub mod local_identity;
+pub mod stat_card;
+pub mod tabs;
+pub mod telemetry_line;
+pub mod tier_gate;
+pub mod trust_badge;
+pub mod zome_call_button;
 
 // --- Reactive systems ---
-pub mod theme;
 pub mod consciousness;
 pub mod consciousness_ui;
-pub mod thermodynamic;
 pub mod homeostasis;
+pub mod theme;
+pub mod thermodynamic;
 pub mod toasts;
 
 // --- Utilities ---
 pub mod util;
 
 // Re-exports for convenience — transport
-pub use provider::{HolochainProvider, use_holochain, use_zome_call};
 pub use holochain_provider::{
-    HolochainProviderAuto, HolochainProviderConfig, HolochainCtx,
-    ConnectionStatus, ConnectStrategy, ConnectionBadge,
+    ConnectStrategy, ConnectionBadge, ConnectionStatus, HolochainCtx, HolochainProviderAuto,
+    HolochainProviderConfig,
 };
+pub use provider::{use_holochain, use_zome_call, HolochainProvider};
 // Note: holochain_provider::use_holochain() returns concrete HolochainCtx,
 // while provider::use_holochain::<T>() is generic. Access the concrete one
 // via mycelix_leptos_core::holochain_provider::use_holochain().
@@ -91,39 +93,41 @@ pub use personal_leptos_types::TrustTier;
 
 // Re-exports — UI components
 pub use connection_status::ConnectionStatusIndicator;
-pub use trust_badge::TrustBadge;
-pub use loading::LoadingSkeleton;
 pub use error_boundary::AppErrorBoundary;
-pub use zome_call_button::ZomeCallButton;
+pub use loading::LoadingSkeleton;
 pub use progress_bar::ProgressBar;
 pub use stat_card::StatCard;
+pub use telemetry_line::TelemetryLine;
 pub use tier_gate::TierGate;
+pub use trust_badge::TrustBadge;
+pub use zome_call_button::ZomeCallButton;
 
 // Re-exports — reactive systems
-pub use theme::{AppTheme, ThemeState, provide_theme_context, use_theme_state};
 pub use consciousness::{
-    ConsciousnessProfile, ConsciousnessState,
-    provide_consciousness_context, use_consciousness,
+    provide_consciousness_context, use_consciousness, ConsciousnessProfile, ConsciousnessState,
 };
 pub use consciousness_ui::init_consciousness_ui;
-pub use thermodynamic::{ThermodynamicState, provide_thermodynamic_context, use_thermodynamic};
-pub use homeostasis::{HomeostasisState, provide_homeostasis_context, use_homeostasis};
-pub use toasts::{Toast, ToastKind, ToastState, ToastContainer, provide_toast_context, use_toasts};
+pub use homeostasis::{provide_homeostasis_context, use_homeostasis, HomeostasisState};
+pub use theme::{provide_theme_context, use_theme_state, AppTheme, ThemeState};
+pub use thermodynamic::{provide_thermodynamic_context, use_thermodynamic, ThermodynamicState};
+pub use toasts::{provide_toast_context, use_toasts, Toast, ToastContainer, ToastKind, ToastState};
 
 // Re-exports — new components
-pub use app_shell::{AppShell, AppNav, MobileBottomNav, NavLink, NavTab};
-pub use forms::{FormField, TextInput, TextArea, Select, Checkbox, SelectOption};
-pub use modal::{Modal, ConfirmDialog, ModalSize};
-pub use data_table::{DataTable, Column, Pagination};
-pub use tabs::{Tabs, TabPanel};
-pub use empty_state::EmptyState;
-pub use search_bar::SearchBar;
+pub use app_shell::{AppNav, AppShell, MobileBottomNav, NavLink, NavTab};
 pub use badge::{Badge, BadgeVariant, StatusDot};
-pub use cluster_launcher::{ClusterLauncher, ClusterLink, default_clusters};
-pub use indlela::{GrowthStage, community_warmth, knowledge_freshness};
-pub use spore_bridge::{SporeState, provide_spore_bridge, use_spore};
+pub use cluster_launcher::{default_clusters, ClusterLauncher, ClusterLink};
+pub use data_table::{Column, DataTable, Pagination};
+pub use empty_state::EmptyState;
+pub use forms::{Checkbox, FormField, Select, SelectOption, TextArea, TextInput};
+pub use indlela::{community_warmth, knowledge_freshness, GrowthStage};
+pub use local_identity::{
+    load_json, local_did, provide_local_identity, save_json, use_local_identity, LocalIdentity,
+};
+pub use modal::{ConfirmDialog, Modal, ModalSize};
+pub use search_bar::SearchBar;
 pub use sovereign_radar::{SovereignRadar, SovereignRadarSize};
-pub use local_identity::{LocalIdentity, local_did, provide_local_identity, use_local_identity, load_json, save_json};
+pub use spore_bridge::{provide_spore_bridge, use_spore, SporeState};
+pub use tabs::{TabPanel, Tabs};
 
 // Re-exports — utilities
 pub use util::{set_css_var, set_root_attribute};
