@@ -220,7 +220,49 @@ fn run_trial_arm(policy: Policy, params: &TrialParams) -> u32 {
 /// tick of trial 0 containing `t, human_dist, pe, danger, phi, gain`.
 /// Use this to distinguish "Φ pinned at Red" from "Φ oscillating but
 /// below activation threshold" when the Φ policy produces zero cycles.
-fn run_trial_phi(params: &TrialParams, trace: bool) -> u32 {
+/// Threshold set for mapping Φ → motor_gain. Defaults track the
+/// out-of-the-box `symtropy-consciousness-physics::SafetyTier::from_phi`
+/// thresholds (Green > 0.6, Yellow > 0.3, Orange > 0.1). The
+/// "recalibrated" set is fit to the empirical Φ distribution observed
+/// in this benchmark ([0.099, 0.145]) so the arm can actually reach
+/// the Green tier in practice.
+#[derive(Clone, Copy)]
+pub enum ThresholdSet {
+    Default,
+    Recalibrated,
+}
+
+fn gain_from_phi(phi: f64, set: ThresholdSet) -> f64 {
+    match set {
+        ThresholdSet::Default => {
+            // Matches SafetyTier::from_phi + motor_gain exactly.
+            if phi > 0.6 {
+                1.0
+            } else if phi > 0.3 {
+                0.6
+            } else if phi > 0.1 {
+                0.3
+            } else {
+                0.0
+            }
+        }
+        ThresholdSet::Recalibrated => {
+            // Fit to empirical Φ range [0.099, 0.145] observed in the
+            // 40 s trace. Top of the band → Green; bottom → Red.
+            if phi > 0.135 {
+                1.0
+            } else if phi > 0.120 {
+                0.6
+            } else if phi > 0.105 {
+                0.3
+            } else {
+                0.0
+            }
+        }
+    }
+}
+
+fn run_trial_phi(params: &TrialParams, trace: bool, thresholds: ThresholdSet) -> u32 {
     const COG_INTERVAL: usize = 20; // 500 Hz / 25 Hz = 20 physics steps per cognitive tick.
     let total_steps = phi_steps();
     let kinematics = ManipulatorKinematics::default_7dof();
@@ -263,7 +305,14 @@ fn run_trial_phi(params: &TrialParams, trace: bool) -> u32 {
                 / 5.0)
                 .clamp(0.0, 1.0);
             let obs = [pe, danger, human_norm, effort_norm];
-            last_gain = agent.tick(&obs, danger);
+            // Always run the tick — it updates internal state AND returns
+            // the default-threshold gain (which we may ignore in
+            // Recalibrated mode).
+            let default_gain = agent.tick(&obs, danger);
+            last_gain = match thresholds {
+                ThresholdSet::Default => default_gain,
+                ThresholdSet::Recalibrated => gain_from_phi(agent.phi(), thresholds),
+            };
             last_perception = Some(hv);
 
             if trace {
@@ -501,12 +550,27 @@ fn main() {
         .unwrap_or(DEFAULT_PHI_TRIALS);
 
     let phi_n_steps = phi_steps();
+    let recal_enabled = std::env::var("MANIP_BENCH_PHI_RECAL")
+        .ok()
+        .map(|v| v != "0" && !v.is_empty())
+        .unwrap_or(false);
+    let thresholds = if recal_enabled {
+        ThresholdSet::Recalibrated
+    } else {
+        ThresholdSet::Default
+    };
+    let threshold_label = if recal_enabled {
+        "recalibrated [0.105/0.120/0.135]"
+    } else {
+        "default SafetyTier [0.1/0.3/0.6]"
+    };
     println!();
     println!(
-        "━━━ Φ-gated sweep ({} trials × {} steps = {} s sim each) ━━━",
+        "━━━ Φ-gated sweep ({} trials × {} steps = {} s sim each, thresholds = {}) ━━━",
         phi_trials,
         phi_n_steps,
         (phi_n_steps as f64 * DT) as usize,
+        threshold_label,
     );
     let phi_start = Instant::now();
     let mut phi_cycles_vec: Vec<f64> = Vec::with_capacity(phi_trials);
@@ -520,7 +584,7 @@ fn main() {
         .unwrap_or(false);
     for i in 0..phi_trials {
         let params = TrialParams::from_index(i);
-        let phi_raw = run_trial_phi(&params, trace_enabled && i == 0);
+        let phi_raw = run_trial_phi(&params, trace_enabled && i == 0, thresholds);
         let phi_scaled = phi_raw as f64 * scale;
         phi_cycles_vec.push(phi_scaled);
         println!(
