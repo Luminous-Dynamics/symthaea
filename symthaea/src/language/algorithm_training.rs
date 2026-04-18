@@ -3089,6 +3089,172 @@ fn try_compile(code: &str) -> Result<(), String> {
     })
 }
 
+/// A single test case for execution feedback.
+#[derive(Debug, Clone)]
+pub struct TestCase {
+    /// Rust expression that calls the function (e.g., "fib(10)").
+    pub call: String,
+    /// Expected result expression (e.g., "55").
+    pub expected: String,
+}
+
+impl TestCase {
+    pub fn new(call: &str, expected: &str) -> Self {
+        Self {
+            call: call.to_string(),
+            expected: expected.to_string(),
+        }
+    }
+}
+
+/// Result of compile + execute test cycle.
+#[derive(Debug)]
+pub enum TestOutcome {
+    /// All test cases passed.
+    AllPass,
+    /// Code did not compile.
+    CompileError(String),
+    /// Code compiled but a test case failed.
+    TestFailure {
+        case: TestCase,
+        actual: Option<String>,
+        message: String,
+    },
+}
+
+impl TestOutcome {
+    pub fn is_pass(&self) -> bool {
+        matches!(self, TestOutcome::AllPass)
+    }
+    pub fn error_message(&self) -> String {
+        match self {
+            TestOutcome::AllPass => String::new(),
+            TestOutcome::CompileError(e) => format!("compile: {e}"),
+            TestOutcome::TestFailure {
+                case,
+                message,
+                actual,
+            } => format!(
+                "test failed: {} expected {} {}{message}",
+                case.call,
+                case.expected,
+                actual
+                    .as_deref()
+                    .map(|a| format!("got {a} "))
+                    .unwrap_or_default(),
+            ),
+        }
+    }
+}
+
+/// Compile code with embedded test cases and execute.
+///
+/// Builds a small main() wrapper that runs each assertion. Returns
+/// AllPass if every assertion succeeds, otherwise CompileError or
+/// TestFailure with the specific failing case.
+pub fn try_compile_and_test(code: &str, tests: &[TestCase]) -> TestOutcome {
+    use std::process::Command;
+
+    let tmp = std::env::temp_dir();
+    let src = tmp.join("symthaea_test_run.rs");
+    let bin = tmp.join("symthaea_test_run");
+
+    // Build wrapper: function code + main() with assertions
+    let mut full = String::from(code);
+    full.push_str("\n\nfn main() {\n");
+    for (i, t) in tests.iter().enumerate() {
+        full.push_str(&format!(
+            "    let __actual_{i} = {};\n    let __expected_{i} = {};\n    if __actual_{i} != __expected_{i} {{\n        eprintln!(\"FAIL {} expected {} got {{:?}}\", __actual_{i});\n        std::process::exit(1);\n    }}\n",
+            t.call, t.expected, t.call, t.expected
+        ));
+    }
+    full.push_str("    println!(\"OK\");\n}\n");
+
+    if std::fs::write(&src, &full).is_err() {
+        return TestOutcome::CompileError("write failed".to_string());
+    }
+
+    let compile_out = Command::new("rustc")
+        .args([
+            "--edition",
+            "2021",
+            src.to_str().unwrap_or(""),
+            "-o",
+            bin.to_str().unwrap_or(""),
+        ])
+        .output();
+
+    let compile_out = match compile_out {
+        Ok(o) => o,
+        Err(e) => {
+            let _ = std::fs::remove_file(&src);
+            return TestOutcome::CompileError(format!("rustc spawn: {e}"));
+        }
+    };
+
+    if !compile_out.status.success() {
+        let stderr = String::from_utf8_lossy(&compile_out.stderr).to_string();
+        let _ = std::fs::remove_file(&src);
+        let errs: Vec<&str> = stderr
+            .lines()
+            .filter(|l| l.contains("error[E") || l.starts_with("error:"))
+            .collect();
+        let msg = if errs.is_empty() {
+            stderr
+        } else {
+            errs.join("\n")
+        };
+        return TestOutcome::CompileError(msg);
+    }
+
+    let run_out = Command::new(&bin).output();
+    let _ = std::fs::remove_file(&src);
+    let _ = std::fs::remove_file(&bin);
+
+    let run_out = match run_out {
+        Ok(o) => o,
+        Err(e) => return TestOutcome::CompileError(format!("exec spawn: {e}")),
+    };
+
+    if run_out.status.success() {
+        return TestOutcome::AllPass;
+    }
+
+    let stderr = String::from_utf8_lossy(&run_out.stderr).to_string();
+    // Parse "FAIL <call> expected <expected> got <actual>"
+    if let Some(line) = stderr.lines().find(|l| l.starts_with("FAIL")) {
+        let parts: Vec<&str> = line.splitn(5, ' ').collect();
+        if parts.len() >= 5 {
+            let call = parts[1].to_string();
+            let expected = parts[3].to_string();
+            let actual = parts[4].trim_start_matches("got ").to_string();
+            // Find the matching TestCase
+            if let Some(case) = tests.iter().find(|t| t.call == call) {
+                return TestOutcome::TestFailure {
+                    case: case.clone(),
+                    actual: Some(actual),
+                    message: line.to_string(),
+                };
+            }
+            return TestOutcome::TestFailure {
+                case: TestCase::new(&call, &expected),
+                actual: Some(actual),
+                message: line.to_string(),
+            };
+        }
+    }
+
+    // Generic failure
+    TestOutcome::TestFailure {
+        case: tests
+            .first()
+            .cloned()
+            .unwrap_or_else(|| TestCase::new("?", "?")),
+        actual: None,
+        message: stderr.lines().take(2).collect::<Vec<_>>().join(" | "),
+    }
+}
+
 /// Enrich algorithm channels based on compiler errors.
 ///
 /// This is the "learn from failure" feedback — compiler errors reveal
@@ -3120,6 +3286,144 @@ fn enrich_channels_from_errors(channels: &mut AlgorithmChannels, errors: &str) {
     // Iterator errors → adjust data flow
     if lower.contains("iterator") || lower.contains("collect") {
         channels.set_map_count(1.0_f32.max(channels.channels[20]));
+    }
+}
+
+/// Enrich channels from a logical (test) failure.
+///
+/// Test failures are different from compile errors — they tell us the SHAPE
+/// of the function is wrong, not the syntax. We boost complexity hints so
+/// the next iteration tries a richer idiom or template.
+pub fn enrich_channels_from_test_failure(channels: &mut AlgorithmChannels, failure: &TestOutcome) {
+    if let TestOutcome::TestFailure { case, actual, .. } = failure {
+        // The function returned wrong values — needs more state/logic
+        channels.set_state_variables((channels.channels[28] + 1.0).min(10.0));
+        channels.set_cyclomatic_complexity((channels.channels[27] + 1.0).min(20.0));
+
+        // Inspect actual vs expected to guess what's missing
+        if let Some(act) = actual {
+            // Returning empty Vec → needs a loop/iterator
+            if act == "[]" || act == "Vec::new()" || act == "0" {
+                channels.set_loop_depth((channels.channels[0] + 1.0).min(5.0));
+            }
+            // Returning false when expecting true → branch logic missing
+            if act == "false" && case.expected != "false" {
+                channels.set_branch_depth((channels.channels[1] + 1.0).min(5.0));
+            }
+            // Returning input unchanged → no transformation happened
+            if act.contains(&case.call) {
+                channels.set_map_count((channels.channels[20] + 1.0).min(5.0));
+            }
+        }
+    }
+}
+
+/// Generate code with test-driven repair.
+///
+/// Goes beyond compile-only repair: when tests fail, enriches features
+/// with logical-failure signal and tries different idioms.
+pub fn generate_with_test_repair(
+    purpose: &str,
+    signature: &str,
+    tests: &[TestCase],
+    pairs: &[AlgorithmTrainingPair],
+    classifier: &AlgorithmClassifier,
+    max_iterations: usize,
+) -> RepairResult {
+    let encoder = AlgorithmEncoder::new();
+    let projection = LearnedProjection::fit(pairs);
+
+    let mut channels = build_channels_from_purpose(purpose, signature);
+    let mut error_history = Vec::new();
+    let mut current_code = String::new();
+    let mut compiles = false;
+    let mut class = AlgorithmClass::IoTransform;
+
+    for iteration in 0..max_iterations {
+        let hv = encoder.encode(&channels);
+        let projected = projection.project(&hv);
+        class = hybrid_classify(purpose, &projected.values, classifier);
+
+        // Tier 1: Try class+signature idiom
+        let idiom_attempt = class_idiom_body(class, purpose, signature)
+            .map(|body| format!("{signature} {{\n{body}\n}}"));
+
+        // Tier 2: Try 1-NN body retrieval
+        let nn_attempt = if iteration == 0 {
+            generate_via_nearest_neighbor(purpose, signature, pairs, classifier)
+        } else {
+            None
+        };
+
+        // Try each candidate against test cases
+        for candidate in idiom_attempt.iter().chain(nn_attempt.iter()) {
+            let outcome = try_compile_and_test(candidate, tests);
+            if outcome.is_pass() {
+                return RepairResult {
+                    purpose: purpose.to_string(),
+                    signature: signature.to_string(),
+                    iterations: iteration + 1,
+                    compiles: true,
+                    final_code: candidate.clone(),
+                    error_history,
+                    class,
+                };
+            }
+            current_code = candidate.clone();
+            // Enrich channels for next iteration based on what failed
+            match &outcome {
+                TestOutcome::CompileError(e) => {
+                    error_history.push(format!("compile: {e}"));
+                    enrich_channels_from_errors(&mut channels, e);
+                }
+                TestOutcome::TestFailure { .. } => {
+                    error_history.push(outcome.error_message());
+                    enrich_channels_from_test_failure(&mut channels, &outcome);
+                }
+                _ => {}
+            }
+        }
+
+        // Tier 3: template fallback with current channels
+        channels.set_class(class);
+        let template_actions = class_to_plan(class, &channels);
+        let plan_steps = to_plan_steps(&template_actions);
+        let template_code = assemble_from_plan(signature, &plan_steps, &channels);
+        let outcome = try_compile_and_test(&template_code, tests);
+        current_code = template_code;
+        if outcome.is_pass() {
+            compiles = true;
+            return RepairResult {
+                purpose: purpose.to_string(),
+                signature: signature.to_string(),
+                iterations: iteration + 1,
+                compiles: true,
+                final_code: current_code,
+                error_history,
+                class,
+            };
+        }
+        match &outcome {
+            TestOutcome::CompileError(e) => {
+                error_history.push(format!("template: {e}"));
+                enrich_channels_from_errors(&mut channels, e);
+            }
+            TestOutcome::TestFailure { .. } => {
+                error_history.push(outcome.error_message());
+                enrich_channels_from_test_failure(&mut channels, &outcome);
+            }
+            _ => {}
+        }
+    }
+
+    RepairResult {
+        purpose: purpose.to_string(),
+        signature: signature.to_string(),
+        iterations: error_history.len(),
+        compiles,
+        final_code: current_code,
+        error_history,
+        class,
     }
 }
 
@@ -3463,6 +3767,87 @@ mod tests {
         // Both should have finite loss
         assert!(curriculum.final_loss.is_finite());
         assert!(flat.final_loss.is_finite());
+    }
+
+    #[test]
+    fn test_compile_and_test_pipeline() {
+        // Verify try_compile_and_test correctly identifies pass/fail
+        let pass_code = r#"
+pub fn add(a: i32, b: i32) -> i32 { a + b }
+"#;
+        let fail_code = r#"
+pub fn add(a: i32, b: i32) -> i32 { a - b }
+"#;
+
+        let tests = vec![
+            TestCase::new("add(2, 3)", "5"),
+            TestCase::new("add(10, 7)", "17"),
+        ];
+
+        let pass_result = try_compile_and_test(pass_code, &tests);
+        println!("Pass case: {:?}", pass_result);
+        assert!(pass_result.is_pass(), "correct add should pass tests");
+
+        let fail_result = try_compile_and_test(fail_code, &tests);
+        println!("Fail case: {}", fail_result.error_message());
+        assert!(!fail_result.is_pass(), "wrong add should fail tests");
+        if let TestOutcome::TestFailure { actual, .. } = &fail_result {
+            assert!(actual.is_some(), "should report actual value");
+        }
+    }
+
+    #[test]
+    fn test_test_driven_generation() {
+        let (classifier, _, _, _) = train_linear_classifier(100, 0.01);
+        let pairs = build_training_pairs();
+
+        // Real test cases — the system must generate code that passes them
+        let problems = vec![
+            (
+                "compute the nth fibonacci number",
+                "pub fn fib(n: u64) -> u64",
+                vec![
+                    TestCase::new("fib(0)", "0"),
+                    TestCase::new("fib(1)", "1"),
+                    TestCase::new("fib(10)", "55"),
+                ],
+            ),
+            (
+                "check if a number is prime",
+                "pub fn is_prime(n: u64) -> bool",
+                vec![
+                    TestCase::new("is_prime(2)", "true"),
+                    TestCase::new("is_prime(7)", "true"),
+                    TestCase::new("is_prime(10)", "false"),
+                ],
+            ),
+            (
+                "sort a list of integers ascending",
+                "pub fn sort_nums(nums: Vec<i32>) -> Vec<i32>",
+                vec![TestCase::new("sort_nums(vec![3, 1, 2])", "vec![1, 2, 3]")],
+            ),
+        ];
+
+        println!("\n=== Test-Driven Generation ===");
+        let mut passing = 0usize;
+        for (purpose, sig, tests) in &problems {
+            let result = generate_with_test_repair(purpose, sig, tests, &pairs, &classifier, 3);
+            let status = if result.compiles { "✓" } else { "✗" };
+            println!(
+                "  {} '{}'\n     → {:?} | iter={} | tests pass: {}",
+                status, purpose, result.class, result.iterations, result.compiles
+            );
+            if result.compiles {
+                passing += 1;
+            } else if let Some(last) = result.error_history.last() {
+                println!("     last error: {}", last.lines().next().unwrap_or(""));
+            }
+        }
+        println!("\nTest-driven pass rate: {}/{}", passing, problems.len());
+        assert!(
+            passing >= 2,
+            "at least 2/3 should pass tests, got {passing}"
+        );
     }
 
     #[test]
