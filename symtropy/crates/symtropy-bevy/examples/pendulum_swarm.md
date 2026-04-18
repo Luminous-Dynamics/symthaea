@@ -1,6 +1,8 @@
 # `pendulum_swarm` — Tier 1 showcase design
 
-**Status:** scaffolded 2026-04-18, awaiting implementation.
+**Status:** implementation steps 1-7 landed 2026-04-18 (commits
+`35f6537981` through `26c41f11ae`). Demo compiles and runs; visual
+parameter tuning + Step 8 polish + screenshot capture remain.
 **Target:** Phase 0.6 "Demo & Visibility" keystone per [ROADMAP](../../../ROADMAP.md)
 and [GAME_ENGINE_COMPONENTS.md](../../../docs/GAME_ENGINE_COMPONENTS.md).
 
@@ -471,17 +473,26 @@ Once pendulum_swarm ships:
 
 ## Kickstart for next session
 
+Steps 1-7 are landed. Open the example, run it, and iterate on visual
+parameters from there.
+
 ```bash
-cd /srv/luminous-dynamics/symtropy/crates/symtropy-bevy
-# Implementation goes in:
-$EDITOR examples/pendulum_swarm.rs
-
-# Iterate with:
-cargo run --example pendulum_swarm
-
-# When ready to polish:
-cargo run --example pendulum_swarm --release
+cd /srv/luminous-dynamics/symtropy
+cargo run --example pendulum_swarm --release   # verify the visual
 ```
 
-Read this doc, read step 1 of "Implementation steps," write the hello-Bevy
-version, commit, then step 2. Don't try to do all eight in one commit.
+Most likely tuning targets after first visual run:
+- `VARIANCE_SCALE` (currently 1e-4) — controls how aggressively variance
+  collapses coherence. If everything stays red even after a shock, scale
+  is too low.
+- `SHOCK_VELOCITY` (currently 400 px/s) — if shock doesn't visibly break
+  neighborhood synchrony, raise it.
+- Initial conditions — all bobs released horizontally start in lockstep,
+  so background variance is 0. Consider per-(i, j) angle jitter (~5°) so
+  the baseline isn't perfectly synced.
+- Step 8 polish: trails (Sprite::with_alpha or a TrailComponent), an
+  on-screen Phi readout (egui or simple text node), smoother color LUT.
+
+Stop conditions still apply: if a tuning attempt takes >1 hour with no
+visible improvement, pause and reconsider the metric (variance vs.
+mean KE vs. phase-coherence).
