@@ -10,9 +10,18 @@
 //! config to ensure templates reflect real-world patterns.
 
 use crate::language::learned_idioms::LearnedIdiomCache;
+use crate::language::nix_kg::{ConflictClaim, NixKg};
 use crate::language::nixpkgs_index::NixpkgsIndex;
 use std::process::Command;
 use std::sync::OnceLock;
+
+/// Process-level shared knowledge graph (loads once, reuses bundled defaults
+/// merged with `~/.cache/symthaea/nix-kg.json` if present).
+static SHARED_KG: OnceLock<NixKg> = OnceLock::new();
+
+pub fn shared_nix_kg() -> &'static NixKg {
+    SHARED_KG.get_or_init(NixKg::from_disk_or_default)
+}
 
 // ─── Nix Intent Categories ─────────────────────────────────────────────────
 
@@ -242,36 +251,10 @@ pub fn classify_nix_intent(lower: &str) -> NixIntent {
         || lower.contains("user-level")
     {
         NixIntent::HomeManager
-    } else if lower.contains("enable ")
-        || lower.contains("service")
-        || lower.contains("postgres")
-        || lower.contains("nginx")
-        || lower.contains("redis")
-        || lower.contains("docker")
-        || lower.contains("ipfs")
-        || lower.contains("kubo")
-        || lower.contains("avahi")
-        // Common services that earlier classified as Generic
-        || lower.contains("openssh")
-        || lower.contains("tailscale")
-        || lower.contains("prometheus")
-        || lower.contains("grafana")
-        || lower.contains("jellyfin")
-        || lower.contains("plex")
-        || lower.contains("podman")
-        || lower.contains("libvirt")
-        || lower.contains("steam")
-        || lower.contains("cups")
-        || lower.contains("printing")
-        || lower.contains("systemd-resolved")
-        || lower.contains("resolved")
-        || lower.contains("monitoring")
-        || lower.contains("vpn")
-        || lower.contains("media server")
-        || lower.contains("set up postgres")
-        || lower.contains("set up ipfs")
-        || lower.contains("set up redis")
-    {
+    } else if lower.contains("enable ") || shared_nix_kg().matches_service_keyword(lower) {
+        // Service keywords (postgres, nginx, tailscale, prometheus, …) live
+        // in the shared knowledge graph — extend via
+        // ~/.cache/symthaea/nix-kg.json without recompiling.
         NixIntent::Service
     } else if lower.contains("user")
         || lower.contains("group")
@@ -1521,51 +1504,25 @@ pub struct CausalConflict {
     pub reason: &'static str,
 }
 
-/// Curated conflict patterns extracted from the symthaea-nix causal graph.
-/// These catch common foot-guns at generation time, before deploy.
+/// Conflict patterns sourced from the shared knowledge graph.
+/// The `&'static str` form is preserved so existing callers don't break.
+/// Strings are leaked exactly once via `OnceLock` — KG entries don't change
+/// at runtime so this is bounded.
 pub fn known_conflicts() -> Vec<CausalConflict> {
-    vec![
-        CausalConflict {
-            a: "boot.loader.grub.enable = true",
-            b: "boot.loader.systemd-boot.enable = true",
-            reason: "two boot loaders enabled simultaneously",
-        },
-        CausalConflict {
-            a: "services.displayManager.gdm.enable = true",
-            b: "services.displayManager.sddm.enable = true",
-            reason: "two display managers conflict",
-        },
-        CausalConflict {
-            a: "services.xserver.displayManager.gdm.enable = true",
-            b: "services.xserver.displayManager.sddm.enable = true",
-            reason: "two display managers conflict",
-        },
-        CausalConflict {
-            a: "networking.networkmanager.enable = true",
-            b: "networking.wireless.enable = true",
-            reason: "NetworkManager and wpa_supplicant both manage wireless",
-        },
-        CausalConflict {
-            a: "services.desktopManager.plasma6.enable = true",
-            b: "services.xserver.desktopManager.gnome.enable = true",
-            reason: "two desktop environments conflict",
-        },
-        CausalConflict {
-            a: "programs.sway.enable = true",
-            b: "services.xserver.enable = true",
-            reason: "Sway is a Wayland compositor — xserver is unnecessary and may conflict",
-        },
-        CausalConflict {
-            a: "programs.hyprland.enable = true",
-            b: "services.xserver.enable = true",
-            reason: "Hyprland is Wayland-only — xserver shouldn't be enabled alongside",
-        },
-        CausalConflict {
-            a: "services.openssh.enable = true",
-            b: "services.openssh.enable = false",
-            reason: "contradictory openssh settings",
-        },
-    ]
+    static CACHED: OnceLock<Vec<CausalConflict>> = OnceLock::new();
+    CACHED
+        .get_or_init(|| {
+            shared_nix_kg()
+                .conflicts
+                .iter()
+                .map(|c: &ConflictClaim| CausalConflict {
+                    a: Box::leak(c.a.clone().into_boxed_str()),
+                    b: Box::leak(c.b.clone().into_boxed_str()),
+                    reason: Box::leak(c.reason.clone().into_boxed_str()),
+                })
+                .collect()
+        })
+        .clone()
 }
 
 /// Scan a generated Nix expression for known conflicts.
@@ -1669,33 +1626,9 @@ pub struct UnknownOption {
     pub nearest_known_prefix: Option<String>,
 }
 
-/// Top-level NixOS option roots we know about. Used to gate which `a.b.c`
-/// dotted paths we even attempt to verify (reduces false positives — e.g.
-/// `pkgs.python3.withPackages` is NOT an option path).
-const KNOWN_OPTION_ROOTS: &[&str] = &[
-    "services",
-    "hardware",
-    "programs",
-    "networking",
-    "boot",
-    "users",
-    "systemd",
-    "security",
-    "virtualisation",
-    "nix",
-    "nixpkgs",
-    "fileSystems",
-    "swapDevices",
-    "fonts",
-    "i18n",
-    "time",
-    "xdg",
-    "console",
-    "sound",
-    "powerManagement",
-    "documentation",
-    "system",
-];
+/// Top-level NixOS option roots — sourced from `shared_nix_kg().option_roots`.
+/// Replaces the previous `KNOWN_OPTION_ROOTS` constant array; see
+/// `language::nix_kg` for the canonical list and how user overrides extend it.
 
 /// Extract candidate NixOS option paths from a Nix source fragment.
 ///
@@ -1746,7 +1679,7 @@ pub fn extract_option_paths(code: &str) -> Vec<String> {
                 && !span.starts_with('.')
             {
                 let root = span.split('.').next().unwrap_or("");
-                if KNOWN_OPTION_ROOTS.iter().any(|r| *r == root) {
+                if shared_nix_kg().is_known_option_root(root) {
                     // Skip if it looks like a function call (followed by `(`)
                     // or attr selection from pkgs (`pkgs.xxx`).
                     out.push(span.to_string());
@@ -2034,18 +1967,9 @@ fn rag_keywords(prompt: &str) -> Vec<String> {
 }
 
 /// Prefixes we'll try when querying the option index. Caller intent guides
-/// which we hit first.
-fn rag_prefixes_for_intent(intent: NixIntent) -> &'static [&'static str] {
-    match intent {
-        NixIntent::Service => &["services."],
-        NixIntent::Hardware => &["hardware.", "boot."],
-        NixIntent::Networking => &["networking."],
-        NixIntent::Desktop => &["services.xserver.", "services.displayManager."],
-        NixIntent::User => &["users."],
-        NixIntent::HomeManager => &["programs."],
-        NixIntent::Secrets => &[],
-        NixIntent::DevShell | NixIntent::FlakeTemplate | NixIntent::Generic => &[],
-    }
+/// which we hit first. Sourced from `shared_nix_kg().rag_prefixes_for(intent)`.
+fn rag_prefixes_for_intent(intent: NixIntent) -> Vec<String> {
+    shared_nix_kg().rag_prefixes_for(intent).to_vec()
 }
 
 /// Build a draft Nix snippet from RAG search hits. Marks every line as a
@@ -2099,9 +2023,14 @@ pub fn rag_draft_from_search(prompt: &str) -> Option<String> {
         || lower.contains("enable")
         || lower.contains("configure")
         || lower.contains("provision");
-    let mut prefixes: Vec<&'static str> = rag_prefixes_for_intent(intent).to_vec();
+    let mut prefixes: Vec<String> = rag_prefixes_for_intent(intent);
     if prefixes.is_empty() && intent == NixIntent::Generic && setup_like {
-        prefixes = vec!["services.", "programs.", "hardware.", "networking."];
+        prefixes = vec![
+            "services.".to_string(),
+            "programs.".to_string(),
+            "hardware.".to_string(),
+            "networking.".to_string(),
+        ];
     }
     if prefixes.is_empty() {
         return None;
