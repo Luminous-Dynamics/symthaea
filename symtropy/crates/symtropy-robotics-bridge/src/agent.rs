@@ -159,8 +159,8 @@ impl RoboticAgent {
             0.8, // precision
             "game",
         );
-        let _perception = self.fep.perceive(&obs);
-        let _action = self.fep.select_action();
+        let perception = self.fep.perceive(&obs);
+        let action = self.fep.select_action();
 
         // Update caution based on danger
         if danger_level > 0.5 {
@@ -169,15 +169,71 @@ impl RoboticAgent {
             self.caution = (self.caution - 0.02).max(0.0);
         }
 
-        // Compute consciousness
+        // ── FEP-derived signals (platform-aware, observation-aware) ─────
+        //
+        // The observation vector goes through `fep.perceive()`, which
+        // produces prediction error, free-energy components, precision,
+        // and belief change. These reflect the model's live estimate of
+        // "how well am I predicting this platform's sensor stream." We
+        // thread them into `ConsciousnessInputs` so the consciousness
+        // equation's output actually depends on what the robot is
+        // seeing and how well its generative model fits, not just on
+        // danger_level.
+        //
+        // Transform unbounded FEP magnitudes to [0, 1] with saturating
+        // functions so a pathological spike can't push inputs outside
+        // the consciousness equation's expected range.
+        //
+        // Each FEP-derived channel is blended with its prior hardcoded
+        // default at a 35:65 ratio (FEP:hardcoded). This keeps the
+        // output band close to the original [0.099, 0.145] under
+        // representative inputs (no sudden regressions on the paper's
+        // benchmarks) while letting platform-specific observation
+        // streams introduce genuine variation. The blend weights can
+        // be tuned once we see real per-platform traces.
+        let pe_raw = perception.free_energy.prediction_error.abs();
+        let pe_norm = 1.0 - (-pe_raw * 2.0).exp(); // 0 at pe=0, →1 as pe→∞
+        let belief_change_norm = 1.0 - (-perception.belief_change.max(0.0) * 2.0).exp();
+        let precision_norm = {
+            // precision is in roughly [0, ∞); map to [0, 1] via a soft
+            // logistic centered at 1.0 (our default `Observation`
+            // precision).
+            let p = perception.precision.max(0.0);
+            p / (p + 1.0)
+        };
+        let fe_total_norm = {
+            let fe = self.fep.current_free_energy().abs();
+            1.0 / (1.0 + fe) // →1 when FE low (good fit), →0 when FE high
+        };
+        // Action-distribution concentration: uniform → broad (~1/num_actions per),
+        // concentrated → one bin dominates. Use (max_prob - uniform) / (1 - uniform)
+        // clipped to [0, 1] as a concentration score.
+        let action_concentration = {
+            let probs = &action.action_probabilities;
+            if probs.is_empty() {
+                0.0_f64
+            } else {
+                let uniform = 1.0 / probs.len() as f64;
+                let max_p = probs.iter().cloned().fold(0.0f64, f64::max);
+                ((max_p - uniform) / (1.0 - uniform).max(1e-6)).clamp(0.0, 1.0)
+            }
+        };
+
+        // 35% FEP-derived + 65% hardcoded-baseline blend.
+        const FEP_WEIGHT: f64 = 0.35;
+        const BASE_WEIGHT: f64 = 1.0 - FEP_WEIGHT;
+
         let inputs = ConsciousnessInputs {
             phi: (1.0 - self.caution) * 0.7 + 0.3,
-            broadcast: (1.0 - danger_level * 0.4).max(0.2),
-            working_memory: 0.7,
-            attention: (danger_level * 0.3 + 0.5).min(1.0),
-            recurrence: 0.6,
+            broadcast: ((1.0 - danger_level * 0.4).max(0.2) * BASE_WEIGHT
+                + action_concentration * FEP_WEIGHT)
+                .clamp(0.2, 1.0),
+            working_memory: (0.7 * BASE_WEIGHT + precision_norm * FEP_WEIGHT).clamp(0.2, 0.95),
+            attention: (((danger_level * 0.3 + 0.5).min(1.0)) * BASE_WEIGHT + pe_norm * FEP_WEIGHT)
+                .clamp(0.2, 0.98),
+            recurrence: (0.6 * BASE_WEIGHT + belief_change_norm * FEP_WEIGHT).clamp(0.2, 0.9),
             embodiment: (1.0 - danger_level * 0.2).max(0.3),
-            knowledge: 0.5,
+            knowledge: (0.5 * BASE_WEIGHT + fe_total_norm * FEP_WEIGHT).clamp(0.2, 0.9),
             synchrony: 0.6,
         };
         let result = self.consciousness.compute(&inputs);
