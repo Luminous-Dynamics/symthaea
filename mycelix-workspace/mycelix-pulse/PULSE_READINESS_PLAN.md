@@ -563,6 +563,20 @@ that future Phase 0+ runtime work must resolve:
    per project Rule #1 exception ("use nix develop ONLY when you need CUDA,
    Python/PyPhi, ONNX — AND Holochain WebRTC native deps").
 
+   **Verified workaround (Apr 2026):** setting `LIBCLANG_PATH` directly to a
+   nix-store clang-lib path lets cargo check run without entering `nix
+   develop`:
+
+   ```bash
+   LIBCLANG_PATH=/nix/store/hal3i0mcgsrkpharzpdjz6m10hxnxnvr-clang-21.1.8-lib/lib \
+     cargo check -p mycelix-pulse-sweettests --tests
+   ```
+
+   Confirmed green on 2026-04-19 (1m 02s full-tree compile, 0 errors, 2
+   warnings in pre-existing code). Phase 0.2/0.5 scaffolds are now
+   structurally verified. A non-volatile path (via `nix eval` at build time
+   or a committed `shell.nix`) is Phase 0.1 cleanup.
+
 ---
 
 ## Appendix B — research artifacts
