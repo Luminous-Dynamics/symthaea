@@ -49,6 +49,7 @@
 
 pub mod benchmarks;
 pub mod controller;
+pub mod embodiment;
 pub mod encoder;
 pub mod fep_agent;
 pub mod gait;
@@ -61,6 +62,7 @@ pub mod transfer;
 pub mod types;
 
 pub use controller::{ControllerCheckpoint, HumanoidController};
+pub use embodiment::{HumanoidEmbodiment, HumanoidFallbackStage};
 pub use encoder::HumanoidHdcEncoder;
 pub use fep_agent::{ActiveInferenceHumanoidAgent, HumanoidFepConfig};
 pub use gait::GaitAnalyzer;
