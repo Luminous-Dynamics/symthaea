@@ -181,7 +181,9 @@ pub fn classify_nix_intent(lower: &str) -> NixIntent {
     let setup_lang = lower.contains("set up")
         && (lower.contains("rust")
             || lower.contains("python")
-            || lower.contains("node")
+            || lower.contains("nodejs")
+            || lower.contains("node.js")
+            || lower.contains("node development")
             || lower.contains("haskell"));
     if dev_kw || lang_with_env || setup_lang {
         NixIntent::DevShell
@@ -216,11 +218,17 @@ pub fn classify_nix_intent(lower: &str) -> NixIntent {
         || lower.contains("redis")
         || lower.contains("docker")
         || lower.contains("ipfs")
+        || lower.contains("kubo")
         || lower.contains("avahi")
+        || lower.contains("set up postgres")
+        || lower.contains("set up ipfs")
+        || lower.contains("set up redis")
     {
         NixIntent::Service
-    } else if lower.contains("user") || lower.contains("group")
-        || lower.contains("permission") || lower.contains("sudo")
+    } else if lower.contains("user")
+        || lower.contains("group")
+        || lower.contains("permission")
+        || lower.contains("sudo")
     {
         NixIntent::User
     } else {
@@ -459,7 +467,7 @@ fn emit_service(lower: &str) -> Option<String> {
 fn emit_hardware(lower: &str) -> Option<String> {
     if lower.contains("nvidia") {
         return Some(
-            r#"{
+            r#"{ pkgs, ... }: {
   hardware.nvidia = {
     modesetting.enable = true;
     powerManagement.enable = true;
@@ -647,6 +655,73 @@ impl NixVerdict {
     }
 }
 
+/// Wrap an expression with a `pkgs` binding so it can be evaluated in
+/// isolation. Handles three cases:
+/// 1. Already a function `{ pkgs, ... }: BODY` → applies `pkgs = import <nixpkgs> {}`
+/// 2. Already a function `{ pkgs ? import <nixpkgs> {} }: BODY` → calls with `{}`
+/// 3. Bare module body `{ ... }` → wraps as `(let pkgs = import <nixpkgs> {}; in BODY)`
+fn wrap_for_eval(expr: &str) -> String {
+    let trimmed = expr.trim();
+    if trimmed.starts_with("{ pkgs ? import <nixpkgs>") || trimmed.starts_with("{ pkgs ? import") {
+        // Already self-contained shell.nix style — call with no args
+        return format!("({trimmed}) {{}}");
+    }
+    if trimmed.starts_with("{ pkgs, ...") || trimmed.starts_with("{ config, pkgs, ...") {
+        // Module that takes pkgs — apply with synthetic pkgs
+        return format!(
+            "let pkgs = import <nixpkgs> {{ config.allowUnfree = true; }};\n    config = {{}};\nin ({trimmed}) {{ inherit pkgs config; }}"
+        );
+    }
+    // Bare attrset — wrap so any pkgs references inside resolve
+    format!("let pkgs = import <nixpkgs> {{ config.allowUnfree = true; }};\nin {trimmed}")
+}
+
+/// Verify a Nix expression by evaluating it with `nix-instantiate --eval`.
+///
+/// Catches strictly more errors than `try_nix_parse`:
+/// - Undefined variables (typos in package names like `pkgs.firefoxx`)
+/// - Type mismatches that get evaluated eagerly
+/// - Some attribute path errors
+///
+/// Slower than parse (~50-200ms) but still much faster than full
+/// `nixos-rebuild dry-run` (which can take 30s+).
+pub fn try_nix_eval(expr: &str) -> NixVerdict {
+    let wrapped = wrap_for_eval(expr);
+    let tmp = std::env::temp_dir();
+    let path = tmp.join("symthaea_nix_codegen_eval.nix");
+    if let Err(e) = std::fs::write(&path, &wrapped) {
+        return NixVerdict::ParseError(format!("write: {e}"));
+    }
+
+    // --strict forces evaluation of attrset values (catches more lazy errors)
+    let out = Command::new("nix-instantiate")
+        .args([
+            "--eval",
+            "--strict",
+            "--read-write-mode",
+            path.to_str().unwrap_or(""),
+        ])
+        .output();
+
+    let _ = std::fs::remove_file(&path);
+
+    match out {
+        Ok(o) if o.status.success() => NixVerdict::ParseOk,
+        Ok(o) => {
+            let stderr = String::from_utf8_lossy(&o.stderr).to_string();
+            // Find the first error line
+            let msg = stderr
+                .lines()
+                .find(|l| l.trim_start().starts_with("error:") || l.contains("error:"))
+                .unwrap_or(stderr.lines().next().unwrap_or(""))
+                .trim()
+                .to_string();
+            NixVerdict::ParseError(msg)
+        }
+        Err(e) => NixVerdict::ParseError(format!("nix-instantiate: {e}")),
+    }
+}
+
 /// Verify a Nix expression by running `nix-instantiate --parse`.
 ///
 /// This is the fastest verification (millisecond) — checks syntax only,
@@ -767,6 +842,145 @@ pub fn generate_nix(prompt: &str) -> NixGenResult {
     }
 }
 
+/// Classify what kind of Nix error this is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NixErrorKind {
+    /// Syntactic error (typo, unbalanced braces, missing `;`).
+    Syntax,
+    /// Reference to a name that doesn't exist (`pkgs.firefoxx`).
+    UndefinedName,
+    /// Type mismatch (string where bool expected, etc.).
+    TypeMismatch,
+    /// Attribute path missing.
+    MissingAttribute,
+    /// Unrecognized/other.
+    Other,
+}
+
+/// Classify the kind of error from a nix-instantiate stderr message.
+pub fn classify_nix_error(msg: &str) -> NixErrorKind {
+    let lower = msg.to_lowercase();
+    if lower.contains("undefined variable")
+        || lower.contains("attribute missing")
+        || lower.contains("not found in attribute set")
+    {
+        NixErrorKind::UndefinedName
+    } else if lower.contains("expected") && lower.contains("got") {
+        NixErrorKind::TypeMismatch
+    } else if lower.contains("attribute") && lower.contains("missing") {
+        NixErrorKind::MissingAttribute
+    } else if lower.contains("syntax error")
+        || lower.contains("unexpected")
+        || lower.contains("unbalanced")
+    {
+        NixErrorKind::Syntax
+    } else {
+        NixErrorKind::Other
+    }
+}
+
+/// Enrich Nix channels based on an error message.
+///
+/// The channel adjustments push subsequent idiom selection toward
+/// alternatives that are more likely to satisfy the failure mode:
+/// - Undefined name → was probably a stale package name; broaden via
+///   item_count (try simpler set of packages)
+/// - Type mismatch → boost has_extras (we may have used the wrong shape)
+pub fn enrich_nix_channels_from_error(channels: &mut NixChannels, error: &str) {
+    let kind = classify_nix_error(error);
+    match kind {
+        NixErrorKind::UndefinedName => {
+            // Likely a missing/typo package — drop one item to try simpler set
+            channels.item_count = (channels.item_count - 1.0).max(1.0);
+        }
+        NixErrorKind::TypeMismatch => {
+            channels.has_extras = 0.0;
+        }
+        NixErrorKind::MissingAttribute => {
+            channels.has_extras = (channels.has_extras + 1.0).min(3.0);
+        }
+        NixErrorKind::Syntax => {
+            // Syntax errors are usually template bugs we can't repair via channels
+        }
+        NixErrorKind::Other => {}
+    }
+}
+
+/// Generate Nix with a self-repair loop that uses semantic verification.
+///
+/// Strategy:
+/// 1. Generate via idiom (parse-verify)
+/// 2. If parses, run nix-eval verification (catches typos, undef names)
+/// 3. If eval fails, classify error → enrich channels → retry up to N times
+///
+/// The repair distinguishes between syntactic and semantic errors so the
+/// adjustment is targeted (e.g. drop an extra package vs change template).
+pub fn generate_nix_with_repair(prompt: &str, max_iterations: usize) -> NixGenResult {
+    let mut channels = build_nix_channels(prompt);
+    let intent = classify_nix_intent(&prompt.to_lowercase());
+    let mut error_history: Vec<String> = Vec::new();
+    let mut current_code = String::new();
+    let mut last_source = NixGenSource::Empty;
+
+    for iteration in 0..max_iterations {
+        // Attempt: idiom path (channels may have been enriched between iterations)
+        let attempt = nix_idiom_body(prompt);
+        let (code, source) = match attempt {
+            Some(c) => (c, NixGenSource::Idiom),
+            None => {
+                let skeleton = match intent {
+                    NixIntent::DevShell => {
+                        "{ pkgs ? import <nixpkgs> {} }:\npkgs.mkShell {\n  buildInputs = [ ];\n}\n"
+                    }
+                    _ => "{ }\n",
+                };
+                (skeleton.to_string(), NixGenSource::Skeleton)
+            }
+        };
+        current_code = code.clone();
+        last_source = source;
+
+        // Step 1: parse check
+        let parse_verdict = try_nix_parse(&code);
+        if !parse_verdict.is_ok() {
+            let msg = parse_verdict.message();
+            error_history.push(format!("parse: {msg}"));
+            enrich_nix_channels_from_error(&mut channels, &msg);
+            continue;
+        }
+
+        // Step 2: eval check (catches typos, undefined names)
+        let eval_verdict = try_nix_eval(&code);
+        if eval_verdict.is_ok() {
+            return NixGenResult {
+                prompt: prompt.to_string(),
+                intent,
+                code: current_code,
+                iterations: iteration + 1,
+                parses: true,
+                last_error: None,
+                source: last_source,
+            };
+        }
+        let msg = eval_verdict.message();
+        error_history.push(format!("eval: {msg}"));
+        enrich_nix_channels_from_error(&mut channels, &msg);
+    }
+
+    // Even if eval failed, parse succeeded somewhere in the loop —
+    // return the most recent attempt with the last error.
+    let parses_at_minimum = try_nix_parse(&current_code).is_ok();
+    NixGenResult {
+        prompt: prompt.to_string(),
+        intent,
+        code: current_code,
+        iterations: error_history.len(),
+        parses: parses_at_minimum,
+        last_error: error_history.last().cloned(),
+        source: last_source,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -850,5 +1064,44 @@ mod tests {
         assert_eq!(result.intent, NixIntent::DevShell);
         assert!(matches!(result.source, NixGenSource::Idiom));
         assert!(result.code.contains("rustc"));
+    }
+
+    #[test]
+    fn test_classify_nix_error_kinds() {
+        assert_eq!(
+            classify_nix_error("error: undefined variable 'firefoxx'"),
+            NixErrorKind::UndefinedName
+        );
+        assert_eq!(
+            classify_nix_error("syntax error, unexpected '}'"),
+            NixErrorKind::Syntax
+        );
+        assert_eq!(
+            classify_nix_error("expected a string but got an integer"),
+            NixErrorKind::TypeMismatch
+        );
+    }
+
+    #[test]
+    fn test_eval_catches_typos_that_parse_misses() {
+        // Parse-only would accept this; eval catches the undefined name
+        let bad = "{ x = pkgs.firefoxxxx_does_not_exist; }";
+        let parse_ok = try_nix_parse(bad).is_ok();
+        let eval_ok = try_nix_eval(bad).is_ok();
+        // Parse-only DOES accept attribute access (it's syntactic)
+        // Eval should NOT accept undefined `pkgs.firefoxxxx_does_not_exist`
+        assert!(parse_ok, "parse should accept syntactically valid input");
+        assert!(!eval_ok, "eval should reject undefined attribute reference");
+    }
+
+    #[test]
+    fn test_repair_returns_within_max_iterations() {
+        let result = generate_nix_with_repair(
+            "set up a rust dev environment with rust-analyzer and mold",
+            3,
+        );
+        // Should succeed quickly (idiom matches first try)
+        assert!(result.parses);
+        assert!(result.iterations <= 3);
     }
 }

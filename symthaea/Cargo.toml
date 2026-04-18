@@ -1087,6 +1087,10 @@ name = "nix_codegen"
 required-features = ["code_generation"]
 
 [[example]]
+name = "nix_eval_benchmark"
+required-features = ["code_generation"]
+
+[[example]]
 name = "benchmark_exercism"
 required-features = ["code_generation"]
 
