@@ -109,15 +109,18 @@ Static bodies are built via `RigidBody::static_body(handle, position, collider)`
 then handed to `world.add_body(body)`. For a pendulum pivot:
 
 ```rust
-use symtropy_physics::body::{RigidBody, BodyHandle};
-use symtropy_physics::shapes::Sphere;  // or whatever shape mod is named
+use symtropy_math::{Point, Sphere};                       // Sphere is in symtropy_math
+use symtropy_physics::{BodyHandle, RigidBody};
 
 let pivot_body = RigidBody::<2>::static_body(
-    BodyHandle::default(),  // re-assigned by world.add_body
+    BodyHandle(0),                                         // re-assigned by world.add_body
     Point::new([px, py]),
-    Box::new(Sphere::new(1.0)),  // collider — pivot won't actually collide
+    Box::new(Sphere::new(Point::origin(), 1.0)),           // Sphere::new(center, radius)
 );
 let pivot_handle = physics.world.add_body(pivot_body);
+// Optional: zero collision_mask on the pivot if you want bobs to swing
+// through it without contact resolution:
+//   physics.world.body_mut(pivot_handle).unwrap().collision_mask = 0;
 ```
 
 ### Constraint construction (plain struct, no `new()`)
@@ -212,29 +215,49 @@ Detail per system:
 
 Sequential, smallest-commit-per-step:
 
-0. **Constraint spike (15 min, throwaway).** Build one pendulum and verify
-   it swings under gravity. Concretely:
+0. **Constraint spike — ALREADY RUN, RESULT: PASS.** No need to redo
+   unless you've changed `symtropy-physics`. Reference run committed
+   only as result-summary; the spike `.rs` file was deleted.
+
+   Setup: pivot at origin, bob at (1.0, 0.0), arm length 1.0, gravity
+   (0, -9.81), `DistanceConstraint<2>` with `stiffness: 1.0`, dt=1/240,
+   no damping, simulated 6 s.
 
    ```rust
-   let mut world = PhysicsWorld::<2>::new(SVector::from([0.0, -9.81]));
-   let pivot = world.add_body(RigidBody::static_body(
-       BodyHandle::default(),
+   // Key API shapes proven by the spike:
+   use symtropy_math::{Point, Sphere};                       // Sphere lives in symtropy_math
+   use symtropy_physics::{BodyHandle, PhysicsWorld, RigidBody};
+   use symtropy_physics::constraint::DistanceConstraint;
+
+   let pivot = world.add_body(RigidBody::<2>::static_body(
+       BodyHandle(0),                                        // re-assigned by add_body
        Point::new([0.0, 0.0]),
-       Box::new(Sphere::new(1.0)),
+       Box::new(Sphere::new(Point::origin(), 0.01)),         // Sphere::new(center, radius)
    ));
-   let bob = world.add_sphere(Point::new([60.0, 0.0]), 5.0, 1.0);  // start 60px to the side
+   let bob = world.add_sphere(Point::new([1.0, 0.0]), 0.05, 1.0);  // (pos, radius, mass)
    world.add_constraint(Box::new(DistanceConstraint::<2> {
-       body_a: pivot, body_b: bob, rest_length: 60.0, stiffness: 1.0,
+       body_a: pivot, body_b: bob, rest_length: 1.0, stiffness: 1.0,
    }));
-   for _ in 0..600 { world.step(1.0/60.0); }  // 10 sec
-   // Print bob.position() trajectory — should swing left-right through the bottom.
+   for _ in 0..(6*240) { world.step(1.0/240.0); }
    ```
 
-   No Bevy needed for this spike — pure `symtropy-physics`. If the bob
-   traces a clean pendulum arc, lock in `DistanceConstraint`. If it
-   drifts, breaks, or behaves nonphysically, try `HingeJoint<2>` next
-   (signature TBD — read `joints/hinge.rs`) and revise the architecture
-   section before writing Step 1. Don't commit the spike code.
+   Empirical results:
+   - `dist(pivot, bob) = 1.0000` for all 1,440 steps — constraint
+     rigidly holds (no drift in the constrained dimension).
+   - `x ∈ [-0.998, 1.000]` — full ±L swing, bob traces a clean
+     arc through (0, -1).
+   - Measured period **2.296 s**. The small-angle formula
+     `T₀ = 2π√(L/g) = 2.006 s` is NOT what you measure at 90°
+     amplitude — the exact large-angle period is `T₀ · K(sin 45°) / (π/2)
+     ≈ 2.37 s`. Measured 2.30 s is within 3% of physics. This is
+     correct behavior, not a bug.
+   - Energy drift: amplitude shrinks ~7% over 3 periods at default
+     PBD solve iterations. Fine for a demo where pendulums are
+     constantly being shocked + Kuramoto-coupled (which adds energy
+     at high Phi).
+
+   **Decision: DistanceConstraint locked in.** Skip Step 0 unless you
+   changed the constraint solver.
 
 1. **Hello Bevy + physics plugin** — `SymtropyPhysicsPlugin::<2>::default()`,
    empty scene, dark background, runs at 60 fps. Verify window opens.
