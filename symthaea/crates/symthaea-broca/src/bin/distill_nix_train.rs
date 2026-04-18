@@ -209,9 +209,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::fs::create_dir_all(parent)?;
     }
     let final_epoch = metrics.len();
-    // Best-effort loss extraction — metrics Debug-format varies; if
-    // anything fails we still want the checkpoint written.
-    let final_loss = 0.0_f32;
+    // Pull the final epoch's average loss into the checkpoint metadata
+    // so future reloads + retraining resume with a meaningful anchor.
+    // Fall back to 0.0 if training produced zero epochs (shouldn't
+    // happen — train() guarantees at least one pass).
+    let final_loss = metrics.last().map(|m| m.avg_loss).unwrap_or(0.0);
     generator
         .save_checkpoint(&out_path, final_epoch, final_loss, None, None, None)
         .map_err(|e| format!("save_checkpoint: {}", e))?;
