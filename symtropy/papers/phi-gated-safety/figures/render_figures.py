@@ -132,7 +132,7 @@ def render_sp_sweep():
                 label=r"$\Phi$-SprintFloor", color="#1f6ead", capsize=3)
 
     ax.set_xlabel(r"ISO protective distance $S_p$ (m)")
-    ax.set_ylabel("cycles per 100 s (5 trials, mean ± std)")
+    ax.set_ylabel("cycles per 100 s (N=30 ISO, N=10 Φ, mean ± std)")
     ax.set_xticks(x)
     ax.set_xticklabels(sp_labels)
     ax.set_title(
@@ -143,10 +143,10 @@ def render_sp_sweep():
     ax.grid(axis="y", alpha=0.3)
 
     # Annotate the crossover
-    # S_p = 2.5m: Φ (1.0) wins over ISO (0.4)
+    # S_p = 2.5m: Φ (1.30) wins over ISO (0.47) — N=30
     crossover_idx = sp_labels.index("2.50")
     ax.annotate(
-        "Φ wins +150 %\n(crossover)",
+        "Φ wins +179 %\n(crossover)",
         xy=(crossover_idx + width / 2, phi_means[crossover_idx]),
         xytext=(crossover_idx + 0.8, 4.0),
         fontsize=9,
