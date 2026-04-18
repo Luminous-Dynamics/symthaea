@@ -1107,6 +1107,10 @@ name = "nix_kg_override_demo"
 required-features = ["code_generation"]
 
 [[example]]
+name = "nix_kg_learn_from_config"
+required-features = ["code_generation"]
+
+[[example]]
 name = "benchmark_exercism"
 required-features = ["code_generation"]
 
