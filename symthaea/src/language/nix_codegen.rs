@@ -948,7 +948,15 @@ fn wrap_for_eval(expr: &str) -> String {
 pub fn try_nix_eval(expr: &str) -> NixVerdict {
     let wrapped = wrap_for_eval(expr);
     let tmp = std::env::temp_dir();
-    let path = tmp.join("symthaea_nix_codegen_eval.nix");
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let path = tmp.join(format!(
+        "symthaea_nix_codegen_eval_{}_{}.nix",
+        std::process::id(),
+        nonce
+    ));
     if let Err(e) = std::fs::write(&path, &wrapped) {
         return NixVerdict::ParseError(format!("write: {e}"));
     }
@@ -1107,7 +1115,15 @@ fn looks_like_module(snippet: &str) -> bool {
 /// repair signal.
 pub fn try_nix_parse(expr: &str) -> NixVerdict {
     let tmp = std::env::temp_dir();
-    let path = tmp.join("symthaea_nix_codegen_check.nix");
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let path = tmp.join(format!(
+        "symthaea_nix_codegen_check_{}_{}.nix",
+        std::process::id(),
+        nonce
+    ));
     if let Err(e) = std::fs::write(&path, expr) {
         return NixVerdict::ParseError(format!("write: {e}"));
     }
@@ -1148,12 +1164,15 @@ pub struct NixGenResult {
     pub source: NixGenSource,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NixGenSource {
     /// Idiom library matched + emitted directly.
     Idiom,
     /// No idiom match — used a fallback skeleton.
     Skeleton,
+    /// No idiom + no cache hit — drafted from `search.nixos.org` option
+    /// hits as commented suggestions. Caller MUST review (not verified).
+    RagDraft,
     /// All paths failed.
     Empty,
 }
@@ -1720,6 +1739,247 @@ pub fn generate_nix_with_self_improve(
     (result, SelfImproveSource::FreshlyGenerated { recorded })
 }
 
+// ─── Tier 3 (#42): RAG fallback — draft from option-index search ──────────
+
+use crate::language::nixos_search::NixosSearch;
+
+/// Process-level shared `NixosSearch` handle (lazy-init).
+static SHARED_SEARCH: OnceLock<NixosSearch> = OnceLock::new();
+
+/// Get the shared search.nixos.org handle (default disk cache path).
+pub fn shared_nixos_search() -> &'static NixosSearch {
+    SHARED_SEARCH.get_or_init(NixosSearch::default_cache)
+}
+
+/// Stop-words used during RAG keyword extraction. Same spirit as
+/// `learned_idioms::STOP` but tuned for option search (we want service
+/// names + verbs, not boilerplate).
+const RAG_STOP: &[&str] = &[
+    "a",
+    "an",
+    "the",
+    "and",
+    "or",
+    "to",
+    "for",
+    "with",
+    "of",
+    "in",
+    "on",
+    "at",
+    "set",
+    "up",
+    "configure",
+    "enable",
+    "make",
+    "please",
+    "i",
+    "want",
+    "need",
+    "this",
+    "that",
+    "my",
+    "me",
+    "do",
+    "can",
+    "you",
+    "should",
+    "will",
+    "would",
+    "could",
+    "is",
+    "be",
+    "as",
+    "by",
+];
+
+/// Pull short keywords from the prompt suitable for `prefix:services.X`-style
+/// option queries.
+fn rag_keywords(prompt: &str) -> Vec<String> {
+    let lower = prompt.to_lowercase();
+    let mut out: Vec<String> = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for tok in lower.split(|c: char| !c.is_ascii_alphanumeric() && c != '-' && c != '_') {
+        let t = tok.trim_matches(|c: char| !c.is_ascii_alphanumeric());
+        if t.len() < 3 {
+            continue;
+        }
+        if RAG_STOP.contains(&t) {
+            continue;
+        }
+        if seen.insert(t.to_string()) {
+            out.push(t.to_string());
+        }
+    }
+    out
+}
+
+/// Prefixes we'll try when querying the option index. Caller intent guides
+/// which we hit first.
+fn rag_prefixes_for_intent(intent: NixIntent) -> &'static [&'static str] {
+    match intent {
+        NixIntent::Service => &["services."],
+        NixIntent::Hardware => &["hardware.", "boot."],
+        NixIntent::Networking => &["networking."],
+        NixIntent::Desktop => &["services.xserver.", "services.displayManager."],
+        NixIntent::User => &["users."],
+        NixIntent::HomeManager => &["programs."],
+        NixIntent::Secrets => &[],
+        NixIntent::DevShell | NixIntent::FlakeTemplate | NixIntent::Generic => &[],
+    }
+}
+
+/// Build a draft Nix snippet from RAG search hits. Marks every line as a
+/// suggestion (commented) so the user knows it's not auto-verified.
+fn render_rag_draft(prompt: &str, hits: &[crate::language::nixos_search::SearchHit]) -> String {
+    let mut s = String::new();
+    s.push_str("# Draft generated from search.nixos.org option hits.\n");
+    s.push_str("# This is NOT verified — review each line before applying.\n");
+    s.push_str(&format!("# Prompt: {}\n", prompt));
+    s.push_str("# ────────────────────────────────────────────────────────\n");
+    s.push_str("{ ... }: {\n");
+    for h in hits {
+        // Skip nested attribute-set parents — only suggest leaf options.
+        if h.option_type.is_empty() || h.option_type.contains("submodule") {
+            continue;
+        }
+        let default = match h.option_type.to_lowercase().as_str() {
+            t if t.contains("boolean") => "true",
+            t if t.contains("string") => "\"\"",
+            t if t.contains("int") => "0",
+            t if t.contains("list") => "[ ]",
+            t if t.contains("attribute set") || t.contains("attrset") => "{ }",
+            _ => "null",
+        };
+        s.push_str(&format!(
+            "  # {} :: {}\n  # {} = {};\n",
+            h.option_name,
+            h.option_type.chars().take(60).collect::<String>(),
+            h.option_name,
+            default,
+        ));
+    }
+    s.push_str("}\n");
+    s
+}
+
+/// Try a RAG-style draft for prompts that the idiom library + cache both miss.
+/// Returns `None` if no useful options were found (e.g. prompt is OOD or
+/// the search backend is unreachable).
+pub fn rag_draft_from_search(prompt: &str) -> Option<String> {
+    let intent = classify_nix_intent(&prompt.to_lowercase());
+    let prefixes = rag_prefixes_for_intent(intent);
+    if prefixes.is_empty() {
+        return None;
+    }
+    let keywords = rag_keywords(prompt);
+    if keywords.is_empty() {
+        return None;
+    }
+
+    let search = shared_nixos_search();
+    let mut hits: Vec<crate::language::nixos_search::SearchHit> = Vec::new();
+
+    // Strategy: for each prefix × keyword, ask for top-5; merge + de-dup.
+    for prefix in prefixes {
+        for kw in &keywords {
+            let probe = format!("{prefix}{kw}");
+            for h in search.search_options_by_prefix(&probe, 5) {
+                if !hits.iter().any(|x| x.option_name == h.option_name) {
+                    hits.push(h);
+                }
+                if hits.len() >= 12 {
+                    break;
+                }
+            }
+            if hits.len() >= 12 {
+                break;
+            }
+        }
+        if hits.len() >= 12 {
+            break;
+        }
+    }
+
+    if hits.is_empty() {
+        return None;
+    }
+    Some(render_rag_draft(prompt, &hits))
+}
+
+/// Self-improve + RAG-fallback wrapper.
+///
+/// Pipeline order:
+/// 1. Cache hit → return immediately
+/// 2. `generate_nix_with_index_verify` — idiom library path
+/// 3. If unknown_options OR no idiom matched, try `rag_draft_from_search`
+/// 4. On full success (parses + zero unknown options), record into cache
+///
+/// RAG drafts are NOT recorded into the cache because they are not
+/// machine-verified — they're suggestions for the user to review.
+pub fn generate_nix_with_rag(
+    prompt: &str,
+    max_iterations: usize,
+) -> (NixGenWithIndexResult, SelfImproveSource) {
+    // Step 1: cache.
+    if let Some(idiom) = shared_learned_cache().find_match(prompt) {
+        let intent = classify_nix_intent(&prompt.to_lowercase());
+        let result = NixGenWithIndexResult {
+            base: NixGenResult {
+                prompt: prompt.to_string(),
+                intent,
+                code: idiom.code.clone(),
+                iterations: 0,
+                parses: true,
+                last_error: None,
+                source: NixGenSource::Idiom,
+            },
+            unknown_options: Vec::new(),
+        };
+        return (result, SelfImproveSource::LearnedCache);
+    }
+
+    // Step 2: standard pipeline.
+    let mut result = generate_nix_with_index_verify(prompt, max_iterations);
+
+    // Step 3: if the idiom path produced a Skeleton (or unknown options
+    // weakened the result), try a RAG draft.
+    let weak =
+        matches!(result.base.source, NixGenSource::Skeleton) || !result.unknown_options.is_empty();
+    if weak {
+        if let Some(draft) = rag_draft_from_search(prompt) {
+            // RAG draft replaces the weak result. We mark parses=true
+            // because the rendered draft is syntactically valid Nix
+            // (commented suggestions inside `{ ... }: { }`).
+            let intent = classify_nix_intent(&prompt.to_lowercase());
+            result = NixGenWithIndexResult {
+                base: NixGenResult {
+                    prompt: prompt.to_string(),
+                    intent,
+                    code: draft,
+                    iterations: result.base.iterations + 1,
+                    parses: true,
+                    last_error: None,
+                    source: NixGenSource::RagDraft,
+                },
+                unknown_options: Vec::new(),
+            };
+        }
+    }
+
+    // Step 4: record verified, non-RAG results.
+    let recorded = if result.base.parses
+        && result.unknown_options.is_empty()
+        && result.base.source != NixGenSource::RagDraft
+    {
+        shared_learned_cache().record(prompt, &result.base.code, result.base.intent);
+        true
+    } else {
+        false
+    };
+    (result, SelfImproveSource::FreshlyGenerated { recorded })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2068,6 +2328,96 @@ pkgs.mkShell {
         match src {
             SelfImproveSource::LearnedCache => {}
             SelfImproveSource::FreshlyGenerated { recorded: _ } => {}
+        }
+    }
+
+    #[test]
+    fn rag_keywords_filters_stop_and_short() {
+        let kw = rag_keywords("Please configure the redis server with persistence");
+        assert!(kw.contains(&"redis".to_string()));
+        assert!(kw.contains(&"server".to_string()));
+        assert!(kw.contains(&"persistence".to_string()));
+        assert!(!kw.contains(&"please".to_string()));
+        assert!(!kw.contains(&"configure".to_string()));
+        assert!(!kw.contains(&"the".to_string()));
+    }
+
+    #[test]
+    fn rag_prefixes_for_intent_matches_class() {
+        assert!(rag_prefixes_for_intent(NixIntent::Service)
+            .iter()
+            .any(|p| *p == "services."));
+        assert!(rag_prefixes_for_intent(NixIntent::Hardware)
+            .iter()
+            .any(|p| *p == "hardware."));
+        assert!(rag_prefixes_for_intent(NixIntent::DevShell).is_empty());
+    }
+
+    #[test]
+    fn render_rag_draft_includes_options_as_comments() {
+        use crate::language::nixos_search::SearchHit;
+        let hits = vec![
+            SearchHit {
+                option_name: "services.redis.servers".to_string(),
+                option_type: "attribute set of submodules".to_string(),
+                option_description: "Redis instances.".to_string(),
+            },
+            SearchHit {
+                option_name: "services.redis.vmOverCommit".to_string(),
+                option_type: "boolean".to_string(),
+                option_description: "Enable vm overcommit.".to_string(),
+            },
+        ];
+        let draft = render_rag_draft("enable redis", &hits);
+        // Submodules are skipped (caller would have to write nested config).
+        assert!(!draft.contains("services.redis.servers ="));
+        // Leaf boolean is suggested with a `true` default.
+        assert!(draft.contains("# services.redis.vmOverCommit = true;"));
+        // Header callout is present.
+        assert!(draft.contains("NOT verified"));
+        // Output is module-shaped so it parses.
+        assert!(try_nix_parse(&draft).is_ok(), "RAG draft must parse");
+    }
+
+    #[test]
+    fn rag_draft_returns_none_for_devshell() {
+        // DevShell intent has no RAG prefixes — we don't fall back to
+        // search for shell.nix prompts.
+        assert!(rag_draft_from_search("set up a rust dev shell").is_none());
+    }
+
+    #[test]
+    fn generate_with_rag_uses_idiom_for_known_prompt() {
+        // For a prompt the idiom library knows, the RAG path should NOT
+        // fire — we should get NixGenSource::Idiom (or LearnedCache hit).
+        let (result, _src) =
+            generate_nix_with_rag("set up a rust dev environment with rust-analyzer", 3);
+        assert!(result.base.parses);
+        assert_ne!(
+            result.base.source,
+            NixGenSource::RagDraft,
+            "known prompts should not invoke RAG"
+        );
+    }
+
+    #[test]
+    fn generate_with_rag_falls_back_for_unknown_service() {
+        // No idiom for jellyfin yet — RAG should fire if search.nixos.org
+        // is reachable, otherwise we get a Skeleton.
+        if Command::new("curl").arg("--version").output().is_err() {
+            eprintln!("[skip] curl not available");
+            return;
+        }
+        let (result, _src) = generate_nix_with_rag("set up jellyfin media server", 3);
+        // Must parse regardless of which path won.
+        assert!(result.base.parses);
+        // If we got RAG, the draft should mention jellyfin somewhere.
+        if result.base.source == NixGenSource::RagDraft {
+            assert!(
+                result.base.code.to_lowercase().contains("jellyfin"),
+                "RAG draft for 'jellyfin' should include the keyword: {}",
+                result.base.code
+            );
         }
     }
 }
