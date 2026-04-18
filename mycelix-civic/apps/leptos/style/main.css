@@ -1,0 +1,54 @@
+/* Mycelix Civic — Leptos frontend stylesheet.
+ *
+ * Civic's domain: justice cases, emergency coordination, media verification.
+ * Palette leans toward "institutional-serious" — slate base, alarm amber for
+ * emergencies, consensus gold for verified civic decisions, care green for
+ * resolved-restorative outcomes. Not cold or corporate; grave and clear.
+ */
+
+:root {
+    /* === Base palette === */
+    --bg-primary: #0b0f14;       /* near-black with cool tint */
+    --bg-raised: #131821;
+    --bg-card: #1a2030;
+    --text-primary: #e5e9f0;
+    --text-secondary: #a6b1c2;
+    --text-muted: #6b778a;
+    --border: #2a3244;
+
+    /* Civic-semantic colors */
+    --justice-pending: #eab308;   /* gold — awaiting deliberation */
+    --justice-resolved: #22c55e;  /* green — restorative outcome */
+    --emergency-active: #f97316;  /* amber — live emergency */
+    --emergency-red: #ef4444;     /* red — critical/escalated */
+    --media-verified: #38bdf8;    /* cyan — verified source */
+    --media-contested: #a78bfa;   /* violet — disputed / under review */
+
+    /* === Mycelix Design-System semantic tokens (consumed by
+       mycelix-leptos-core primitives TelemetryLine, GraphNode,
+       FlowIndicator). Civic's domain makes alarm prominent. === */
+    --md-base: var(--bg-primary);
+    --md-fg: var(--text-primary);
+    --md-fg-muted: var(--text-secondary);
+    --md-signal: var(--media-verified);     /* cyan for live-dispatch telemetry */
+    --md-consensus: var(--justice-pending); /* gold for verified civic decisions */
+    --md-care: var(--justice-resolved);     /* restorative-outcome green */
+    --md-alarm: var(--emergency-red);
+    --md-mono: ui-monospace, 'JetBrains Mono', 'Iosevka', 'Berkeley Mono', monospace;
+
+    /* Optional glow tokens used by FlowIndicator drop-shadow */
+    --md-signal-glow: rgba(56, 189, 248, 0.5);
+    --md-consensus-glow: rgba(234, 179, 8, 0.5);
+    --md-care-glow: rgba(34, 197, 94, 0.5);
+    --md-alarm-glow: rgba(239, 68, 68, 0.5);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.5;
+    min-height: 100vh;
+}

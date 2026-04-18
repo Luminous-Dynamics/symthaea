@@ -1,0 +1,17 @@
+[build]
+target = "index.html"
+dist = "dist"
+
+[watch]
+ignore = ["dist"]
+
+# Optimize WASM binary size after build
+[[hooks]]
+stage = "post_build"
+command = "sh"
+command_arguments = ["-c", "for f in dist/*.wasm; do wasm-opt -Oz --zero-filled-memory --enable-bulk-memory \"$f\" -o \"$f\" 2>/dev/null || true; done"]
+
+[serve]
+# Port per .claude/rules/PORTS.md — 8102 reserved for mycelix-civic frontend.
+address = "127.0.0.1"
+port = 8102
