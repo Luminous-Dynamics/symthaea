@@ -1816,7 +1816,11 @@ pub fn generate_nix_with_dry_build(
 ) -> NixGenWithDryBuildResult {
     let mid = generate_nix_with_index_verify(prompt, max_iterations);
     let module_eval = if mid.base.parses {
-        try_nix_module_eval(&mid.base.code)
+        // P3: route through the process-wide content-hash cache.
+        // First call per (snippet, nixpkgs_rev) pays ~5–30s; repeats
+        // are effectively free. Transient errors (nix-instantiate
+        // missing, IO failures) are deliberately NOT cached.
+        crate::language::nix_eval_cache::cached_module_eval(&mid.base.code)
     } else {
         None
     };

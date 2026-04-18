@@ -90,6 +90,8 @@ pub mod nix_code_parser;
 #[cfg(feature = "code_generation")]
 pub mod nix_codegen;
 #[cfg(feature = "code_generation")]
+pub mod nix_eval_cache;
+#[cfg(feature = "code_generation")]
 pub mod nix_eval_corpus;
 #[cfg(feature = "code_generation")]
 pub mod nix_eval_goldens;
