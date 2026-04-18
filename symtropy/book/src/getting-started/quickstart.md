@@ -79,16 +79,30 @@ App::new()
 ```
 
 See [Bevy integration](../getting-started/first-body.md) for the full setup,
-or jump straight to a runnable demo:
+or jump straight to a runnable demo. The `pendulum_swarm` series shows the
+same Phi-coupled physics at three dimensions:
 
 ```bash
-cargo run -p symtropy-bevy --example pendulum_swarm --release
+cargo run -p symtropy-bevy --example pendulum_swarm     --release  # 2D, Sprite + Camera2d
+cargo run -p symtropy-bevy --example pendulum_swarm_3d  --release  # 3D, PBR Mesh3d
+cargo run -p symtropy-bevy --example pendulum_swarm_4d  --release  # 4D, hyperplane slicing
 ```
 
-`pendulum_swarm` spawns a 10×10 grid of pendulums where Phi — computed from
+The 2D version spawns a 10×10 grid of pendulums where Phi — computed from
 neighborhood velocity variance — modulates each bob's damping. Click to
-inject velocity into the nearest bob. Source + design notes live in
-`crates/symtropy-bevy/examples/`.
+inject velocity into the nearest bob.
+
+The 3D version is the same coupling, rendered with `Camera3d` +
+`Mesh3d(Sphere)` + `StandardMaterial` + `DirectionalLight`. Bobs swing
+freely in 3D paths, not just one plane.
+
+The 4D version runs full 4D physics across 5×5×3 = 75 bobs. Only one
+3D cross-section is rendered at a time — press `[` and `]` to move the
+hyperplane slice along the W axis and watch one layer fade in as another
+fades out. (The full 4D simulation keeps running for ALL bobs; only the
+viewport changes.)
+
+Source + design notes live in `crates/symtropy-bevy/examples/`.
 
 ## Next up
 

@@ -60,18 +60,27 @@ SymtropyPhysicsPlugin::<4>::default()  // 4D physics (projects to 3D)
 
 ## Examples
 
-`examples/pendulum_swarm.rs` — 100-pendulum 2D scene where Phi (computed
-from neighborhood velocity variance) modulates each bob's `linear_damping`.
-Coherent neighborhoods get near-conservative damping; incoherent ones damp
-fast. Click to inject horizontal velocity into the nearest bob.
+The `pendulum_swarm` series demonstrates Phi-coupled physics at 2D, 3D,
+and 4D — same coupling (neighborhood velocity variance → coherence →
+Phi → per-body damping), three rendering targets:
 
 ```bash
-cargo run --example pendulum_swarm --release
+cargo run --example pendulum_swarm     --release  # 2D, 100 bobs, Sprite + Camera2d
+cargo run --example pendulum_swarm_3d  --release  # 3D, 100 bobs, PBR Mesh3d + Camera3d
+cargo run --example pendulum_swarm_4d  --release  # 4D, 75 bobs across 3 W-layers,
+                                                  # hyperplane slicing + [/] keys to move slice
 ```
 
-Design notes, empirical constants, and tuning targets live in
-`examples/pendulum_swarm.md`. Regression guards on the load-bearing
-constants live in `tests/pendulum_swarm_invariants.rs`:
+Each example has a side-by-side design doc (`examples/pendulum_swarm{,_3d,_4d}.md`)
+covering layout, coupling formulas, known polish targets, and headless capture
+mode for visual verification:
+
+```bash
+PENDULUM_CAPTURE_DIR=/tmp/caps cargo run --example pendulum_swarm_3d --release
+# Saves three timed PNGs and auto-exits at t=8.5 s.
+```
+
+Regression guards on the 2D demo's load-bearing physics constants:
 
 ```bash
 cargo test -p symtropy-bevy --test pendulum_swarm_invariants --release

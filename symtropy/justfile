@@ -49,6 +49,14 @@ test-pendulum-swarm:
 run-pendulum-swarm:
     cargo run -p symtropy-bevy --example pendulum_swarm --release
 
+# Run the 3D pendulum_swarm demo (PBR meshes + Camera3d)
+run-pendulum-swarm-3d:
+    cargo run -p symtropy-bevy --example pendulum_swarm_3d --release
+
+# Run the 4D pendulum_swarm demo (hyperplane slicing, [/] to move slice)
+run-pendulum-swarm-4d:
+    cargo run -p symtropy-bevy --example pendulum_swarm_4d --release
+
 # Run biometrics tests
 test-biometrics:
     cd ../symthaea && cargo test -p symthaea-biometrics --features muse-bridge
