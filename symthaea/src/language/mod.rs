@@ -87,6 +87,8 @@ pub mod algorithm_encoder;
 #[cfg(feature = "code_generation")]
 pub mod algorithm_training;
 #[cfg(feature = "code_generation")]
+pub mod nix_codegen;
+#[cfg(feature = "code_generation")]
 pub mod analogy_generation;
 #[cfg(feature = "code_generation")]
 pub mod code_discovery;

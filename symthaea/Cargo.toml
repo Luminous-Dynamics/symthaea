@@ -1083,6 +1083,10 @@ name = "brain_codegen"
 required-features = ["code_generation"]
 
 [[example]]
+name = "nix_codegen"
+required-features = ["code_generation"]
+
+[[example]]
 name = "benchmark_exercism"
 required-features = ["code_generation"]
 
