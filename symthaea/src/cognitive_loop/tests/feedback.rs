@@ -751,6 +751,9 @@ fn test_psi_attestation_disabled_by_default() {
 
 #[test]
 fn test_psi_attestation_enabled_produces_records() {
+    // Attestation emit cadence is `total_cycles % 10 == 0` (introduced
+    // 2026-04-04 commit e271ad63924). Run 30 cycles → expect 3 records
+    // at cycle_ids 10, 20, 30.
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
         enable_psi_attestation: true,
         agent_did: Some("did:key:z6MkTest123".to_string()),
@@ -758,8 +761,7 @@ fn test_psi_attestation_enabled_produces_records() {
     })
     .unwrap();
 
-    // Run 3 cycles
-    for _ in 0..3 {
+    for _ in 0..30 {
         let r = service.cycle("test input");
         assert!(r.prediction_error.is_finite());
     }
@@ -767,24 +769,21 @@ fn test_psi_attestation_enabled_produces_records() {
     assert_eq!(
         service.psi_attestation_count(),
         3,
-        "should have 3 attestation records"
+        "cadence is every 10th cycle; 30 cycles → 3 records (10, 20, 30)"
     );
 
-    // Verify latest record
     let latest = service.latest_psi_attestation().unwrap();
     assert!(
         latest.psi >= 0.0 && latest.psi <= 1.0,
         "psi should be in [0, 1]"
     );
-    assert_eq!(
-        latest.cycle_id, 3,
-        "cycle_id matches total_cycles (1-indexed)"
-    );
+    assert_eq!(latest.cycle_id, 30, "latest record should be cycle 30");
     assert!(latest.captured_at_us > 0, "timestamp should be set");
 }
 
 #[test]
 fn test_psi_attestation_drain() {
+    // Every-10th-cycle cadence: 50 cycles → 5 records (cycle_ids 10, 20, 30, 40, 50).
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
         enable_psi_attestation: true,
         agent_did: Some("did:key:z6MkTest456".to_string()),
@@ -792,31 +791,35 @@ fn test_psi_attestation_drain() {
     })
     .unwrap();
 
-    for _ in 0..5 {
+    for _ in 0..50 {
         let r = service.cycle("test");
         assert!(r.prediction_error.is_finite());
     }
 
     let records = service.drain_psi_attestations();
-    assert_eq!(records.len(), 5, "should drain all 5 records");
+    assert_eq!(records.len(), 5, "should drain all 5 cadence-gated records");
     assert_eq!(
         service.psi_attestation_count(),
         0,
         "buffer should be empty after drain"
     );
 
-    // Verify records are ordered by cycle_id (1-indexed: 1, 2, 3, 4, 5)
+    // cycle_ids must be [10, 20, 30, 40, 50].
     for (i, record) in records.iter().enumerate() {
         assert_eq!(
             record.cycle_id,
-            (i + 1) as u64,
-            "records should be in order"
+            ((i + 1) * 10) as u64,
+            "record {} should have cycle_id {}",
+            i,
+            (i + 1) * 10
         );
     }
 }
 
 #[test]
 fn test_psi_attestation_buffer_capacity() {
+    // With capacity=3 and every-10th-cycle cadence: 50 cycles emits 5 records
+    // (at cycles 10, 20, 30, 40, 50). Oldest two evicted, buffer keeps 30/40/50.
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
         enable_psi_attestation: true,
         agent_did: Some("did:key:z6MkCapTest".to_string()),
@@ -825,7 +828,7 @@ fn test_psi_attestation_buffer_capacity() {
     })
     .unwrap();
 
-    for _ in 0..10 {
+    for _ in 0..50 {
         let r = service.cycle("test");
         assert!(r.prediction_error.is_finite());
     }
@@ -835,10 +838,9 @@ fn test_psi_attestation_buffer_capacity() {
         3,
         "should not exceed capacity"
     );
-    // Oldest records evicted — remaining should be cycles 8, 9, 10 (1-indexed)
     let records = service.drain_psi_attestations();
-    assert_eq!(records[0].cycle_id, 8);
-    assert_eq!(records[2].cycle_id, 10);
+    assert_eq!(records[0].cycle_id, 30, "oldest surviving is cycle 30");
+    assert_eq!(records[2].cycle_id, 50, "newest is cycle 50");
 }
 
 #[test]
