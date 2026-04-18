@@ -236,13 +236,24 @@ fn run_trial_arm(policy: Policy, params: &TrialParams) -> u32 {
 ///   arm never fully stalls. Tests the hypothesis (from the
 ///   Recalibrated vs Continuous comparison) that the *floor* is what
 ///   makes the gain mapping beat binary SSM, not the smoothness.
+/// - `SprintFloor` — minimal two-level mapping: gain = 1.0 above the
+///   sprint threshold (0.135), gain = `FLOOR_GAIN` below. Strips
+///   Recalibrated down to ONLY the sprint + floor elements to isolate
+///   whether the middle tiers (0.6, 0.3) contribute anything.
 #[derive(Clone, Copy)]
 pub enum ThresholdSet {
     Default,
     Recalibrated,
     Continuous,
     ClampedLinear,
+    SprintFloor,
 }
+
+/// The Φ value above which `SprintFloor` and `Recalibrated` both
+/// commit to gain = 1.0. Matches the Recalibrated Green boundary so
+/// the two variants share one sprint trigger and only differ on the
+/// middle-tier behavior.
+const SPRINT_PHI: f64 = 0.135;
 
 /// Crawl-rate floor for `ClampedLinear`. Chosen to match the
 /// Recalibrated Orange tier so the two variants are directly
@@ -300,6 +311,16 @@ fn gain_from_phi(phi: f64, set: ThresholdSet) -> f64 {
             let linear = ((phi - PHI_BAND_LOW) / span).clamp(0.0, 1.0);
             linear.max(FLOOR_GAIN)
         }
+        ThresholdSet::SprintFloor => {
+            // Minimal two-level: sprint above threshold, floor below.
+            // Tests whether Recalibrated's middle tiers (0.6, 0.3)
+            // contribute beyond just the sprint + floor elements.
+            if phi > SPRINT_PHI {
+                1.0
+            } else {
+                FLOOR_GAIN
+            }
+        }
     }
 }
 
@@ -354,7 +375,8 @@ fn run_trial_phi(params: &TrialParams, trace: bool, thresholds: ThresholdSet) ->
                 ThresholdSet::Default => default_gain,
                 ThresholdSet::Recalibrated
                 | ThresholdSet::Continuous
-                | ThresholdSet::ClampedLinear => gain_from_phi(agent.phi(), thresholds),
+                | ThresholdSet::ClampedLinear
+                | ThresholdSet::SprintFloor => gain_from_phi(agent.phi(), thresholds),
             };
             last_perception = Some(hv);
 
@@ -593,7 +615,11 @@ fn main() {
         .unwrap_or(DEFAULT_PHI_TRIALS);
 
     let phi_n_steps = phi_steps();
-    // Threshold-set selection: MANIP_BENCH_PHI_CLAMP > CONT > RECAL > Default.
+    // Threshold-set selection: SPRINT > CLAMP > CONT > RECAL > Default.
+    let sprint_enabled = std::env::var("MANIP_BENCH_PHI_SPRINT")
+        .ok()
+        .map(|v| v != "0" && !v.is_empty())
+        .unwrap_or(false);
     let clamp_enabled = std::env::var("MANIP_BENCH_PHI_CLAMP")
         .ok()
         .map(|v| v != "0" && !v.is_empty())
@@ -606,7 +632,12 @@ fn main() {
         .ok()
         .map(|v| v != "0" && !v.is_empty())
         .unwrap_or(false);
-    let (thresholds, threshold_label) = if clamp_enabled {
+    let (thresholds, threshold_label) = if sprint_enabled {
+        (
+            ThresholdSet::SprintFloor,
+            "sprint-floor (gain=1.0 if Φ>0.135 else 0.3)",
+        )
+    } else if clamp_enabled {
         (
             ThresholdSet::ClampedLinear,
             "clamped-linear Φ→gain (floor=0.3, linear above)",
