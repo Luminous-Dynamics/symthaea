@@ -25,7 +25,7 @@ use crate::visualization;
 /// PE / effort / stiffness), so the empirical band may drift —
 /// recalibrate with a `MANIP_BENCH_PHI_TRACE`-style capture under a
 /// representative Dryden gust schedule.
-const SPRINT_PHI: f64 = 0.135;
+const SPRINT_THRESHOLD: f64 = 0.135;
 const FLOOR_GAIN: f64 = 0.3;
 
 pub struct HelicopterDemoPlugin;
@@ -98,7 +98,7 @@ fn step_helicopter(time: Res<Time>, mut heli: ResMut<HelicopterResources>) {
     // Use the empirically-validated SprintFloor mapping instead of the
     // default `SafetyTier::motor_gain()` — hardcoded 0.6/0.3/0.1
     // thresholds don't match this platform's empirical Φ band.
-    let gain = sprint_floor_gain(phi, SPRINT_PHI, FLOOR_GAIN);
+    let gain = sprint_floor_gain(phi, SPRINT_THRESHOLD, FLOOR_GAIN);
     heli.current_phi = phi;
     heli.current_safety = safety;
     heli.current_motor_gain = gain;

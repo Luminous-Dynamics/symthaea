@@ -259,11 +259,13 @@ pub enum ThresholdSet {
     SprintFloor,
 }
 
-/// The Φ value above which `SprintFloor` and `Recalibrated` both
-/// commit to gain = 1.0. Matches the Recalibrated Green boundary so
-/// the two variants share one sprint trigger and only differ on the
-/// middle-tier behavior.
-const SPRINT_PHI: f64 = 0.135;
+/// Signal value above which `SprintFloor` and `Recalibrated` both
+/// commit to gain = 1.0. The signal is the scalar output of
+/// `MasterConsciousnessEquation::compute()` — referred to as Φ in the
+/// consciousness-physics literature but function-agnostic in this code.
+/// Matches the Recalibrated Green boundary so the two variants share
+/// one sprint trigger and only differ on middle-tier behavior.
+const SPRINT_THRESHOLD: f64 = 0.135;
 
 /// Crawl-rate floor for `ClampedLinear`. Chosen to match the
 /// Recalibrated Orange tier so the two variants are directly
@@ -325,7 +327,7 @@ fn gain_from_phi(phi: f64, set: ThresholdSet) -> f64 {
             // Minimal two-level: sprint above threshold, floor below.
             // Tests whether Recalibrated's middle tiers (0.6, 0.3)
             // contribute beyond just the sprint + floor elements.
-            if phi > SPRINT_PHI {
+            if phi > SPRINT_THRESHOLD {
                 1.0
             } else {
                 FLOOR_GAIN

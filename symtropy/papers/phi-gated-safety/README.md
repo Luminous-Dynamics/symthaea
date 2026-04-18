@@ -1,11 +1,22 @@
 # Φ-gated motor authority — paper artifacts
 
 Supporting code, data, and figures for the IWAI / Active Inference Journal
-paper on consciousness-gated motor authority across heterogeneous robot
-platforms. The paper establishes a minimal 2-part sufficient condition
-for a Φ→gain supervisor that beats binary ISO/TS 15066 SSM under
-epistemic uncertainty about the human-motion envelope, and shows the
-result replicates to a second platform (quadrotor).
+paper on consciousness-inspired supervisory control across heterogeneous
+robot platforms. The paper establishes a minimal 2-part sufficient
+condition for a scalar-signal → gain supervisor that beats binary
+ISO/TS 15066 SSM under epistemic uncertainty about the human-motion
+envelope, and shows the result replicates to a second platform
+(quadrotor).
+
+> **Terminology**: "Φ" in this paper is shorthand for the scalar output
+> of `MasterConsciousnessEquation::compute()` — a *consciousness-inspired
+> integration index* aggregating 10 sub-signals. It is **not** Tononi
+> IIT Φ in the phenomenological sense, and the method's empirical
+> validity does not depend on IIT's axioms being correct. The library
+> primitive `sprint_floor_gain(signal, sprint_threshold, floor)` takes
+> an arbitrary scalar — any correlate that discriminates "confident
+> cognitive state" from "uncertain" would fill the same role. See the
+> "Note on terminology" section in `OUTLINE.md` for the full framing.
 
 ## Contents
 

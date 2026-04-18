@@ -16,23 +16,49 @@
 "Φ-Gated Motor Authority: A Continuous Safety Supervisor over
 Rule-Based Envelopes (and What We Learned Building Ten Demos)"
 
+## Note on terminology — what "Φ" means in this paper
+
+Throughout this paper, **Φ** denotes the scalar output of
+`MasterConsciousnessEquation::compute()` — a *consciousness-inspired
+integration index* that aggregates ten sub-signals (IIT Φ, broadcast,
+working memory, attention, recurrence, embodiment, knowledge, higher-
+order thought, narrative, social) via a softmin bottleneck plus a
+rescaling factor. It is:
+
+- **not** Tononi IIT Φ in the phenomenological sense — we don't claim
+  to measure consciousness
+- **not** load-bearing for the method's validity — any scalar correlate
+  that separates "confident cognitive state" from "uncertain state"
+  would fill the same role in `sprint_floor_gain(signal, threshold,
+  floor)`, which is what the empirical results actually isolate
+- a useful empirical correlate, derived from a consciousness-adjacent
+  aggregation, that happens to have stable per-platform bands
+
+The method's claims stand or fall on the gating-shape sufficiency
+result (§5) and the ISO-SSM comparison (§6), not on whether IIT's
+axioms are correct. Calling it "Φ-gated" is shorthand for
+*aggregated-cognitive-correlate-gated*; we keep the Φ notation for
+brevity and because IWAI readers will recognize it.
+
 ## Abstract (draft 1, 149 words)
 
-We study consciousness-gated motor authority across ten heterogeneous
-robotic platforms. A scalar Φ, computed from HDC prediction error and
-Active Inference, modulates each platform's motor command. Sweeping
-five Φ→gain mappings on a paired Monte Carlo cobot benchmark vs
-ISO/TS 15066 Speed-and-Separation Monitoring, we find (i) the default
-global `SafetyTier` thresholds produce zero throughput because the
-platform's empirical Φ lives in [0.099, 0.145] — never reaching the
-hardcoded 0.6 Green cutoff; (ii) the minimal sufficient mapping is a
-sprint threshold matched to the empirical band plus a crawl-rate floor,
-implementable as `if Φ > sprint { 1.0 } else { floor }`; (iii) this
-mapping loses to SSM at S_p ≈ 1 m by 81.4 % but **wins by +178.6 %**
-at S_p = 2.5 m (N=30) and holds throughput where SSM collapses to zero
+We study continuous motor-authority supervision by a scalar
+consciousness-inspired correlate (Φ, the output of
+`MasterConsciousnessEquation` aggregating 10 sub-signals — not IIT Φ)
+across ten heterogeneous robotic platforms. Sweeping five Φ→gain
+mappings on a paired Monte Carlo cobot benchmark vs ISO/TS 15066
+Speed-and-Separation Monitoring, we find (i) the default global
+`SafetyTier` thresholds produce zero throughput because the platform's
+empirical Φ lives in [0.099, 0.145] — never reaching the hardcoded 0.6
+Green cutoff; (ii) the minimal sufficient mapping is a sprint threshold
+matched to the empirical band plus a crawl-rate floor, implementable
+as `if signal > sprint { 1.0 } else { floor }`; (iii) this mapping
+loses to SSM at S_p ≈ 1 m by 81.4 % but **wins by +178.6 %** at
+S_p = 2.5 m (N=30) and holds throughput where SSM collapses to zero
 at S_p ≥ 3 m. The gating-shape advantage replicates on a quadrotor
-(+71.4 %, N=30, Figure 3). We frame Φ as an ISO 21448 / SOTIF
-triggering-condition monitor, not a replacement for certified envelopes.
+(+71.4 %, N=30, Figure 3). We frame the method as an ISO 21448 /
+SOTIF triggering-condition monitor, not a replacement for certified
+envelopes.
 
 _(Word count: ~150. IWAI cap: 150 — re-verify exact count at draft-to-
 submission step; word counters handle `Φ` and `S_p` differently.)_
@@ -148,8 +174,13 @@ required for single-point-of-failure hazardous actions (cautery).
   - Threshold band-match (beats Default)
 - Collapse: SprintFloor and Recalibrated tie exactly → middle tiers
   are decoration → 2-part claim is minimal.
-- `sprint_floor_gain(phi, sprint_phi, floor)` library primitive
-  (commit `52e3fb710f`), 4 regression tests lock the contract.
+- `sprint_floor_gain(signal, sprint_threshold, floor)` library primitive
+  (commit `52e3fb710f`), 4 regression tests lock the contract. The
+  parameter is a scalar `signal ∈ [0, 1]`; in this paper's experiments
+  the signal is the output of `MasterConsciousnessEquation::compute()`
+  (hereafter referred to as Φ), but the function is signal-agnostic —
+  any scalar correlate that discriminates "confident cognitive state"
+  from "uncertain" would plug in.
 
 ### §6. The S_p sweep (headline result)
 - Same harness, sweep ISO's protective distance (ISO: N=30, Φ: N=10):
@@ -184,11 +215,13 @@ required for single-point-of-failure hazardous actions (cautery).
   mechanical transfer — ~5 lines per platform plus a calibration
   doc-comment. Commits: flight-demo `8d61e348d9`, vehicle-demo
   `c2f2fb46c8`, AUV/helicopter/humanoid-demo `9556b7e776`.
-- All six adopters use SPRINT_PHI = 0.135, FLOOR_GAIN = 0.3 inherited
-  from the manipulator study's measured band [0.099, 0.145]. Each
-  remains a starting point subject to per-platform Φ-trace
-  recalibration, because observation-vector channels differ per
-  platform:
+- All six adopters use SPRINT_THRESHOLD = 0.135, FLOOR_GAIN = 0.3
+  inherited from the manipulator study's measured band [0.099, 0.145].
+  This is an **unverified transferability assumption** — we have not
+  measured each platform's empirical signal band, so the threshold may
+  be miscalibrated on some of them. Per-platform recalibration via
+  `MANIP_BENCH_PHI_TRACE`-style capture is listed as a limitation in
+  §9. Each platform's observation-vector channels differ:
     - manipulator: danger / PE / effort / stiffness (measured band)
     - flight:      altitude / attitude / wind / PE
     - vehicle:     speed / slip / friction
@@ -246,7 +279,7 @@ produces legible authority modulation under real sensor noise:
    demo plugin's 500 Hz physics tick maps 1:1 onto the Crazyflie
    attitude-rate outer loop; the 25 Hz cognitive tick fits well
    within the Crazyflie's onboard-to-radio latency budget.
-3. **Sanity procedure**: tune `SPRINT_PHI` and `FLOOR_GAIN` against
+3. **Sanity procedure**: tune `SPRINT_THRESHOLD` and `FLOOR_GAIN` against
    hover + nudge-rejection data (reset → push → observe) until the
    in-the-air motor gain matches the in-sim trace. This is the same
    `MANIP_BENCH_PHI_TRACE=1` protocol, moved to a physical substrate.

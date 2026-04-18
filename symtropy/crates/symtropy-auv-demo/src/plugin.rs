@@ -25,7 +25,7 @@ use crate::visualization;
 /// effort / stiffness), so the band may drift — recalibrate by adding
 /// a trace-capture block to `step_auv` mirroring
 /// `MANIP_BENCH_PHI_TRACE=1` and fitting to the observed 95th-%ile.
-const SPRINT_PHI: f64 = 0.135;
+const SPRINT_THRESHOLD: f64 = 0.135;
 const FLOOR_GAIN: f64 = 0.3;
 
 pub struct AuvDemoPlugin;
@@ -104,7 +104,7 @@ fn step_auv(
     // Use the empirically-validated SprintFloor mapping instead of the
     // default `SafetyTier::motor_gain()` — whose hardcoded 0.6/0.3/0.1
     // thresholds don't match the platform's empirical Φ band.
-    let gain = sprint_floor_gain(phi, SPRINT_PHI, FLOOR_GAIN);
+    let gain = sprint_floor_gain(phi, SPRINT_THRESHOLD, FLOOR_GAIN);
     auv.current_phi = phi;
     auv.current_safety = safety;
     auv.current_motor_gain = gain;

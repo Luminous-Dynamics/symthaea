@@ -59,48 +59,63 @@ impl SafetyTier {
     }
 }
 
-/// Minimal 2-part Φ → gain mapping, empirically derived.
+/// Minimal 2-part signal → gain mapping, empirically derived.
 ///
-/// For a given platform the consciousness equation tends to produce Φ
-/// values concentrated in a narrow band rather than spanning [0, 1].
-/// The 5-variant Monte Carlo study in
+/// # What `signal` actually is
+///
+/// The function takes an arbitrary scalar `signal ∈ [0, 1]` and gates
+/// motor authority on whether it exceeds `sprint_threshold`. In the
+/// Φ-gated-safety paper the signal is the output of
+/// `MasterConsciousnessEquation::compute()` — a consciousness-inspired
+/// integration index that aggregates 10 sub-signals (IIT Φ, broadcast,
+/// working memory, attention, recurrence, embodiment, knowledge, HOT,
+/// narrative, social) via softmin bottleneck plus rescaling. The
+/// function is **signal-agnostic**: any scalar correlate that
+/// separates "confident cognitive state" from "uncertain state" works.
+/// We documented it with IIT-adjacent Φ because that's what the
+/// consciousness equation produces, but the method stands or falls on
+/// the empirical gating behavior, not on IIT axioms.
+///
+/// # Sufficient condition (empirical)
+///
+/// For a given platform the consciousness equation tends to produce
+/// signal values concentrated in a narrow band rather than spanning
+/// [0, 1]. The 5-variant Monte Carlo study in
 /// `symtropy-manipulator-demo/examples/manipulator_benchmark.rs`
-/// (see commits `38dc8b1fd9` through `317baad595`, Apr 2026) found
-/// that a Φ→gain mapping beats binary ISO/TS 15066 SSM (if at all)
-/// only when it satisfies **both**:
+/// (commits `38dc8b1fd9` through `317baad595`, Apr 2026) found that a
+/// signal → gain mapping beats binary ISO/TS 15066 SSM only when it
+/// satisfies **both**:
 ///
-///   1. A **sprint threshold**: a Φ value at or below the top of the
-///      platform's empirical band, above which `gain = 1.0` so the
+///   1. A **sprint threshold**: at or below the top of the platform's
+///      empirical signal band, above which `gain = 1.0` so the
 ///      controller commits to full authority in brief confident windows.
 ///   2. A **crawl-rate floor**: a non-zero gain below the sprint
 ///      threshold, large enough to keep IK convergence alive. The
-///      surgical/manipulator demos use 0.3; adjust for your
-///      convergence-tolerance vs controller-gains.
+///      surgical/manipulator demos use 0.3.
 ///
 /// Intermediate tiers (0.6, 0.3 steps as in `SafetyTier::motor_gain`)
-/// proved empirically superfluous in the manipulator study — a
-/// two-level `sprint_floor_gain` matched the 4-tier `Recalibrated`
-/// variant to three decimal places.
+/// proved empirically superfluous — a two-level `sprint_floor_gain`
+/// matched the 4-tier `Recalibrated` variant to three decimal places.
 ///
-/// **`SafetyTier::from_phi` uses hardcoded Φ thresholds (0.6 / 0.3 /
-/// 0.1) that are unlikely to match any platform's empirical Φ band.**
-/// For a working Φ-gated demo, measure your platform's Φ distribution
+/// **`SafetyTier::from_phi` uses hardcoded thresholds (0.6 / 0.3 /
+/// 0.1) that don't match any real platform's empirical signal band.**
+/// For a working demo, measure your platform's signal distribution
 /// first (e.g. via the `MANIP_BENCH_PHI_TRACE=1` pattern in the
-/// manipulator benchmark), then pass your platform-specific
-/// `sprint_phi` and `floor_gain` to this function.
+/// manipulator benchmark), then pass a platform-specific
+/// `sprint_threshold` and `floor` to this function.
 ///
 /// # Example
 ///
 /// ```
 /// use symtropy_consciousness_physics::safety::sprint_floor_gain;
 ///
-/// // Platform's empirical Φ band is [0.099, 0.145].
+/// // Platform's empirical signal band is [0.099, 0.145].
 /// // Pick sprint threshold near the top, floor above the crawl limit.
 /// let gain = sprint_floor_gain(0.14, 0.135, 0.3);
-/// assert!((gain - 1.0).abs() < 1e-9);  // Φ above sprint → full authority.
+/// assert!((gain - 1.0).abs() < 1e-9);  // signal above sprint → full authority.
 ///
 /// let gain = sprint_floor_gain(0.11, 0.135, 0.3);
-/// assert!((gain - 0.3).abs() < 1e-9);  // Φ below sprint → floor.
+/// assert!((gain - 0.3).abs() < 1e-9);  // signal below sprint → floor.
 /// ```
 ///
 /// # Panics
@@ -110,8 +125,8 @@ impl SafetyTier {
 /// above whatever gain floor the inverse-kinematics loop needs to
 /// converge, and below 1.0.
 #[inline]
-pub fn sprint_floor_gain(phi: f64, sprint_phi: f64, floor: f64) -> f64 {
-    if phi > sprint_phi {
+pub fn sprint_floor_gain(signal: f64, sprint_threshold: f64, floor: f64) -> f64 {
+    if signal > sprint_threshold {
         1.0
     } else {
         floor

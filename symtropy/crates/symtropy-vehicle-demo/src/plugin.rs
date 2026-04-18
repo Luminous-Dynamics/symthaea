@@ -30,11 +30,11 @@ use crate::visualization;
 /// To recalibrate: add a trace-capture block to `step_vehicle`
 /// mirroring `manipulator_benchmark`'s `MANIP_BENCH_PHI_TRACE=1`,
 /// record 40 s of Φ samples during a representative waypoint run
-/// (mix of straight-line and ice-patch segments), then set `SPRINT_PHI`
+/// (mix of straight-line and ice-patch segments), then set `SPRINT_THRESHOLD`
 /// near the 95th percentile of the observed band and `FLOOR_GAIN`
 /// above whatever throttle level keeps the car tracking waypoints
 /// under nominal friction.
-const SPRINT_PHI: f64 = 0.135;
+const SPRINT_THRESHOLD: f64 = 0.135;
 const FLOOR_GAIN: f64 = 0.3;
 
 pub struct VehicleDemoPlugin;
@@ -117,7 +117,7 @@ fn step_vehicle(
     // default `SafetyTier::motor_gain()` — whose hardcoded 0.6/0.3/0.1
     // thresholds are known to pin Φ at a single tier for any platform
     // whose Φ band sits below 0.1 (per the paper's Figure 1).
-    let gain = sprint_floor_gain(phi, SPRINT_PHI, FLOOR_GAIN);
+    let gain = sprint_floor_gain(phi, SPRINT_THRESHOLD, FLOOR_GAIN);
     vehicle.current_phi = phi;
     vehicle.current_safety = safety;
     vehicle.current_motor_gain = gain;
