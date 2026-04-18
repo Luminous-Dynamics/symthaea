@@ -763,6 +763,49 @@ fn emit_hardware(lower: &str) -> Option<String> {
             .to_string(),
         );
     }
+    if lower.contains("intel") {
+        // Intel integrated graphics + VA-API hardware acceleration.
+        // `hardware.graphics.enable` is the modern option;
+        // `intel-media-driver` covers Gen8+ iGPUs (Broadwell and newer).
+        // Structural scorer surfaced this gap — the prior emitter
+        // punted with `{ # hardware config }`, which the Phase 1 repair
+        // loop had to patch via `expected_for_hardware`. This idiom
+        // closes the gap natively.
+        return Some(
+            r#"{ pkgs, ... }: {
+  hardware.graphics = {
+    enable = true;
+    enable32Bit = true;
+    extraPackages = with pkgs; [
+      intel-media-driver
+      vaapiVdpau
+      libvdpau-va-gl
+    ];
+  };
+}
+"#
+            .to_string(),
+        );
+    }
+    if lower.contains("amd") {
+        // AMD Radeon: same hardware.graphics stack, different driver
+        // packages. Native idiom removes the repair-loop dependency.
+        return Some(
+            r#"{ pkgs, ... }: {
+  hardware.graphics = {
+    enable = true;
+    enable32Bit = true;
+    extraPackages = with pkgs; [
+      rocmPackages.clr.icd
+      amdvlk
+    ];
+  };
+  services.xserver.videoDrivers = [ "amdgpu" ];
+}
+"#
+            .to_string(),
+        );
+    }
     None
 }
 
