@@ -52,6 +52,8 @@ pub struct SendEmailInput {
     pub priority: EmailPriority,
     pub read_receipt_requested: bool,
     pub expires_at: Option<Timestamp>,
+    /// Client-authoritative timestamp (Phase 0.8). Mirror of coordinator struct.
+    pub timestamp: Timestamp,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -182,6 +184,9 @@ fn make_email_input(
         priority: EmailPriority::Normal,
         read_receipt_requested: false,
         expires_at: None,
+        // Phase 0.8: client-authoritative. Use a fresh Timestamp::now() so the
+        // integrity zome's ±window skew check passes.
+        timestamp: Timestamp::now(),
     }
 }
 
@@ -353,6 +358,7 @@ async fn test_dilithium3_signature_length_check() {
         priority: EmailPriority::Normal,
         read_receipt_requested: false,
         expires_at: None,
+        timestamp: Timestamp::now(),
     };
 
     let result: Result<SendEmailOutput, _> = conductor
@@ -405,6 +411,7 @@ async fn test_dilithium2_signature_length_check() {
         priority: EmailPriority::Normal,
         read_receipt_requested: false,
         expires_at: None,
+        timestamp: Timestamp::now(),
     };
 
     let result: Result<SendEmailOutput, _> = conductor
@@ -488,6 +495,7 @@ async fn test_ephemeral_key_length_kyber1024_must_be_1568_bytes() {
         priority: EmailPriority::Normal,
         read_receipt_requested: false,
         expires_at: None,
+        timestamp: Timestamp::now(),
     };
 
     let result: Result<SendEmailOutput, _> = conductor
@@ -534,6 +542,7 @@ async fn test_ephemeral_key_length_kyber768_must_be_1088_bytes() {
         priority: EmailPriority::Normal,
         read_receipt_requested: false,
         expires_at: None,
+        timestamp: Timestamp::now(),
     };
 
     let result: Result<SendEmailOutput, _> = conductor
@@ -1822,29 +1831,21 @@ async fn test_contact_empty_name_rejected() {
 //      with Bob's pubkey as base and an entry Eve controls as target. The
 //      DHT must reject.
 //
-// ## Design blocker that affects ALL happy-path tests
+// ## Phase 0.8 resolution (now landed)
 //
-// Every happy-path test in this file is #[ignore] AND uses invalid signatures
-// for a reason that's not documented elsewhere: the coordinator's `send_email`
-// calls `sys_time()` to set `email.timestamp`, and that timestamp is part of
-// the canonical `email_signing_content(...)` that the integrity zome verifies.
-// A client CANNOT pre-compute a valid Ed25519 signature because it doesn't
-// know the timestamp the coordinator will assign.
+// The original design had the coordinator inject `sys_time()` into
+// `email.timestamp` — part of the canonical signing content — making client
+// signatures structurally impossible. Phase 0.8 flipped to option (B) from
+// the plan: `SendEmailInput.timestamp` is now client-authoritative (RFC 5322
+// `Date:` semantics). The coordinator uses `input.timestamp` verbatim, and
+// the integrity zome bounds the skew between `email.timestamp` and
+// `action.timestamp` (commit) within [-30d, +5min] to block future-dated spam
+// and stale-replay while accepting legitimate offline composition.
 //
-// Existing tests work around this by only verifying REJECTION paths (forged,
-// all-zero, wrong-length signatures). Nothing in this file proves a valid
-// email can round-trip.
-//
-// This blocks Phase 0.2 "alice_sends_bob_receives" end-to-end. It is tracked
-// as Phase 0.8 in PULSE_READINESS_PLAN.md. Two candidate fixes:
-//
-//   (A) Coordinator `sign_and_send_email` helper that signs internally using
-//       the agent's lair key.
-//   (B) Accept `timestamp: Timestamp` on `SendEmailInput` and have the
-//       coordinator NOT override it — client-authoritative timestamps, which
-//       is how real mail (Date: header) works.
-//
-// (B) is cleaner and matches RFC 5322. Deferred to Phase 0.8.
+// Consequence: clients can now pre-compute `email_signing_content(...)` and
+// produce valid signatures. The pre-existing `test_ed25519_*_accepts_valid`
+// and `test_dilithium3_*` rejection tests are still rejection-only, but
+// happy-path tests (and `phase0_forged_inbox_link_rejected`) become runnable.
 
 /// Two-conductor harness smoke test — proves infrastructure, not delivery.
 ///
@@ -1912,13 +1913,28 @@ async fn phase0_two_conductor_harness_smoke() {
 /// link with Bob's pubkey as base. The link author is Eve, and
 /// `email.recipient = Eve != Bob`, so validation must reject.
 ///
-/// NOTE: Runnable-state of this test is blocked on Phase 0.8 (see module
-/// docs). Eve needs to successfully author at least ONE valid email entry
-/// to have a link target, and current timestamp-signing design prevents
-/// that from a client. When Phase 0.8 lands, remove the `#[ignore]` flag
-/// and unblock.
+/// NOTE: Runnable-state of this test now requires a small test-only zome
+/// helper that bypasses the coordinator's link-creation guard. The test
+/// goes:
+///
+///   1. Eve self-signs an email (sender=Eve, recipient=Eve). After Phase
+///      0.8, this is a normal `send_email` with client-set timestamp and
+///      a canonical Ed25519 signature Eve computes over
+///      `email_signing_content(...)`.
+///   2. Eve calls a test-only zome function `debug_create_forged_inbox_link(
+///      base: AgentPubKey, target: ActionHash)` that just does `create_link`
+///      with `LinkTypes::AgentToInbox` using `base = Bob`'s pubkey and
+///      `target = eve_self_email_hash`. The coordinator has no such
+///      function in production — it's gated behind `#[cfg(feature =
+///      "sweettest")]` so real builds can't spam.
+///   3. The integrity zome's `validate_inbox_link` (Phase 0.3) runs during
+///      DHT propagation and rejects because `email.recipient = Eve != Bob`.
+///
+/// Left as a scaffold: step 2 needs the debug extern added to the
+/// coordinator zome, which is a small but deliberate change. Until then,
+/// this test documents the attack and its defense.
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "Phase 0.5 — blocked on Phase 0.8 client-side signing fix"]
+#[ignore = "Phase 0.5 — blocked on test-only debug_create_forged_inbox_link coordinator extern"]
 async fn phase0_forged_inbox_link_rejected() {
     let mut conductors = SweetConductorBatch::from_standard_config(2).await;
     let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
@@ -1934,33 +1950,11 @@ async fn phase0_forged_inbox_link_rejected() {
     let eve_cell = cells[0].clone();
     let bob_cell = cells[1].clone();
 
-    // STEP 1 — Eve creates a valid email addressed to herself. This establishes
-    // a legitimate EncryptedEmail entry on the DHT under Eve's authorship with
-    // recipient = Eve. Once Phase 0.8 resolves client-side signing, this step
-    // becomes real. Until then, skip.
-    //
-    // let eve_email_hash: ActionHash = conductors[0]
-    //     .call(
-    //         &eve_cell.zome("mail_messages"),
-    //         "sign_and_send_email", // Phase 0.8 coordinator helper
-    //         SignAndSendEmailInput { recipient: eve_cell.agent_pubkey().clone(), .. },
-    //     )
-    //     .await;
-
     await_consistency(30, [&eve_cell, &bob_cell])
         .await
         .expect("consistency pre-attack");
 
-    // STEP 2 — Eve attempts to create an AgentToInbox link with Bob as base,
-    // pointing at her self-authored email. The integrity zome's
-    // `validate_inbox_link` must detect that `email.recipient = Eve != Bob`
-    // and reject.
-    //
-    // Because Step 1 cannot yet construct `eve_email_hash`, this test is
-    // currently a scaffold — it confirms the wiring is in place. The exact
-    // call surface will depend on Phase 0.8's API shape.
-
-    // Sanity: the test ran to here without panicking means the harness is
-    // correctly set up for Phase 0.8 to fill in.
+    // Sanity: harness wiring is live. Filling in the two steps above is
+    // the next session's unit of work once the debug extern lands.
     assert_ne!(eve_cell.agent_pubkey(), bob_cell.agent_pubkey());
 }

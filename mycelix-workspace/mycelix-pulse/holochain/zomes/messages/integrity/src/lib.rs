@@ -19,6 +19,13 @@ const X25519_KEY_LEN: usize = 32;
 const KYBER1024_KEY_LEN: usize = 1568;
 const KYBER768_KEY_LEN: usize = 1088;
 
+// Phase 0.8 client-authoritative timestamp bounds.
+// `email.timestamp` is client-signed (RFC 5322 Date:). `action.timestamp` is
+// hc-chain-assigned when the entry is committed. We bound the skew between
+// them to prevent spoofing without rejecting legitimate offline mail.
+const MAX_FUTURE_SKEW_MICROS: i64 = 5 * 60 * 1_000_000; // 5 min — clock drift tolerance
+const MAX_PAST_SKEW_MICROS: i64 = 30 * 86_400 * 1_000_000; // 30 days — offline compose tolerance
+
 pub fn email_signing_content(email: &EncryptedEmail) -> Vec<u8> {
     let mut content = Vec::with_capacity(256);
     content.push(0x01);
@@ -460,6 +467,27 @@ fn validate_encrypted_email(
                 "Expiration must be after timestamp".to_string(),
             ));
         }
+    }
+
+    // Phase 0.8 — bound client-set timestamp against chain-assigned action
+    // timestamp. Future-dated emails (> 5 min ahead) are a spam vector (always
+    // top of inbox). Unreasonably-old emails (> 30 d behind) are a replay
+    // vector. Legitimate offline mail composed hours/days ago still validates.
+    let email_ts = email.timestamp.as_micros();
+    let action_ts = action.timestamp.as_micros();
+    let future_skew = email_ts.saturating_sub(action_ts);
+    if future_skew > MAX_FUTURE_SKEW_MICROS {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Email timestamp is {} us in the future (max {})",
+            future_skew, MAX_FUTURE_SKEW_MICROS
+        )));
+    }
+    let past_skew = action_ts.saturating_sub(email_ts);
+    if past_skew > MAX_PAST_SKEW_MICROS {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Email timestamp is {} us in the past (max {})",
+            past_skew, MAX_PAST_SKEW_MICROS
+        )));
     }
 
     // Validate crypto suite
