@@ -35,7 +35,7 @@
 use std::path::PathBuf;
 
 use symthaea_broca::encoder::ThoughtChannels;
-use symthaea_broca::generator::BrocaGenerator;
+use symthaea_broca::generator::{BrocaGenerator, SamplingStrategy};
 use symthaea_core::genesis::GenesisSeed;
 
 /// NixIntent::ALL order — keep in lockstep with nix_codegen.rs.
@@ -129,6 +129,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Loaded. Vocab: {} tokens (NIX_TOKENS restored from checkpoint).",
         generator.tokenizer().vocab_size()
     );
+
+    // Override sampling: checkpoint was trained under `BrocaConfig::
+    // default()` which uses `SamplingStrategy::Greedy` + no repetition
+    // penalty. Greedy on an over-fit 26-pair model produces loops like
+    // `services.services.` and `config config`. Swap to top-k + a
+    // stronger repetition penalty so token diversity kicks in.
+    generator.set_sampling(SamplingStrategy::TopK {
+        k: 20,
+        temperature: 0.7,
+    });
+    generator.config_mut().repetition_penalty = 1.3;
+    println!("Sampling: TopK(k=20, temp=0.7), repetition_penalty=1.3");
 
     // Three canonical intents to demonstrate that (a) different
     // channels produce different outputs (signal propagation works)
