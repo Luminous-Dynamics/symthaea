@@ -101,20 +101,43 @@ Protection is against **mass passive on-chain surveillance**. Not against **targ
 
 ---
 
-## File map
+## Implementation status — 14 commits on main, live on shared conductor
+
+As of 2026-04-18 the three subsystems are complete and the happ is
+installed + enabled on the Mycelix shared ecosystem conductor. The
+`lawful-id` CLI exercises all seven zome functions via `--live`.
+
+### File map (what shipped)
 
 | Path | What |
 |------|------|
-| `mycelix-workspace/observatory/src/lib/tax-export.ts` | Existing entry point, extended |
-| `mycelix-workspace/observatory/src/lib/classification.ts` | NEW — user-held transaction classification |
-| `mycelix-workspace/observatory/src/lib/fmv-anchor.ts` | NEW — per-transaction FMV |
-| `mycelix-workspace/observatory/src/lib/novel-position.ts` | NEW — cite-able tax-position framework |
-| `mycelix-workspace/observatory/src/lib/templates/` | NEW — US Schedule C, SA SARS IT12 |
-| `crates/mycelix-zkp-core/src/circuits/jurisdiction_proof.rs` | NEW — STARK jurisdiction proof |
-| `crates/mycelix-zkp-core/src/location_attestation.rs` | NEW — T0-T4 attestation tiers |
-| `crates/mycelix-zkp-core/src/jurisdiction_registry.rs` | NEW — community-published polygon commitments |
-| `mycelix-finance/zomes/price-oracle/coordinator/src/fiat_feeds.rs` | NEW — user-selected fiat feeds |
-| `mycelix-lawful-identity/` | NEW cluster — legal DID, issuer tiers, cross-DID ZKP, CLI |
+| `mycelix-workspace/observatory/src/lib/tax-export.ts` | Existing SA-SARS module, extended with dual-DID guard |
+| `mycelix-workspace/observatory/src/lib/classification.ts` | 8-category transaction classification overlay (22 tests) |
+| `mycelix-workspace/observatory/src/lib/novel-position.ts` | Cite-able tax-position framework, 4 novel questions (12 tests) |
+| `mycelix-workspace/observatory/src/lib/fiat-feeds.ts` | 5 feed adapters, user-selected, client-side only (22 tests) |
+| `mycelix-workspace/observatory/src/lib/fmv-anchor.ts` | Per-transaction FMV, immutable once set (18 tests) |
+| `mycelix-workspace/observatory/src/lib/coexistence-golden-path.test.ts` | End-to-end integration test (13 tests) |
+| `crates/mycelix-zkp-core/src/circuits/jurisdiction_proof.rs` | STARK jurisdiction containment proof (8 tests) |
+| `crates/mycelix-zkp-core/src/location_attestation.rs` | T0-T4 attestation trust tiers (8 tests) |
+| `crates/mycelix-zkp-core/src/jurisdiction_registry.rs` | US + SA seed registries (9 tests) |
+| `mycelix-lawful-identity/` | Cluster — 3 zomes, `lawful-id` CLI with live conductor wiring |
+| `mycelix-lawful-identity/tests/src/link_resistance.rs` | 1000-proof Vector-1 sweep (10 tests) |
+| `mycelix-lawful-identity/tests/src/unlinkability.rs` | Vector-2 byte-distinctness + chi-squared (5 tests) |
+| `mycelix-lawful-identity/QUICKSTART.md` | End-to-end install + CLI walkthrough |
+| `mycelix-lawful-identity/docs/THREAT_MODEL.md` | Four adversary vectors with honest caveats |
+| `mycelix-lawful-identity/docs/GOV_ID_CLAIM_SHAPES.md` | Claim-key conventions for passport / mDL / SSN |
+
+### What changed vs the original plan
+
+- **Subsystem 1 — fiat feeds**: originally planned as a Rust zome module inside `mycelix-finance/zomes/price-oracle/`, but WASM zomes can't do HTTP and the price-oracle is TEND-focused. Reshaped as client-side TypeScript modules in observatory — user-local by design, no central fiat-feed choice ever lands on chain.
+- **Tax-export cluster**: the original plan called for a new `mycelix-tax-export` Rust cluster. Superseded by extending the existing `mycelix-workspace/observatory/src/lib/tax-export.ts` (SA-SARS, tested, production). No parallel cluster scaffolded.
+- **Gov-ID schemas crate**: originally planned. Superseded by extending the existing `mycelix-identity/crates/eidas-zkp/` which already handles W3C VC 2.0 + DASTARK + Dilithium5 + Merkle selective disclosure. Gov-ID credentials are just eIDAS credentials with specific claim keys; see `mycelix-lawful-identity/docs/GOV_ID_CLAIM_SHAPES.md`.
+
+### Test totals
+
+- **Rust**: 56+ structural tests (8 jurisdiction + 8 attestation + 9 registry + 10 link-resistance + 5 unlinkability + 1 smoke + 6 CLI + additional zome-level unit tests).
+- **TypeScript**: 292 tests across 14 observatory test files, 0 failures.
+- **Live conductor**: all 7 zome functions exercised via `lawful-id --live` against the shared ecosystem conductor.
 
 Port reservations (in `.claude/rules/PORTS.md`):
 - 8132 — tax-export frontend (extends observatory)
