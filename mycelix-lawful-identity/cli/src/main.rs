@@ -22,6 +22,8 @@ use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 
 mod disclosure;
+#[cfg(feature = "conductor")]
+mod live;
 mod state;
 
 #[derive(Parser, Debug)]
@@ -59,16 +61,26 @@ enum Command {
     /// Print the user's current state (legal DIDs, issuer tiers, etc.).
     Status,
 
-    /// Record intent to create a new legal DID. Emits the conductor
-    /// call the user must run once the happ is installed.
+    /// Record intent to create a new legal DID (or `--live` to call
+    /// the conductor directly).
     NewLegalDid {
         /// Optional human-readable label. Local-only; never disclosed.
         #[arg(long)]
         label: Option<String>,
+        /// Make a live zome call instead of just staging locally.
+        /// Requires the `conductor` build feature and a running
+        /// conductor on ws://localhost:33800 (admin) + ws://localhost:8888 (app).
+        #[arg(long)]
+        live: bool,
     },
 
-    /// List the legal DIDs the CLI knows about locally.
-    ListDids,
+    /// List the legal DIDs the CLI knows about locally (or `--live`
+    /// to query the conductor directly).
+    ListDids {
+        /// Query the running conductor instead of local state.
+        #[arg(long)]
+        live: bool,
+    },
 
     /// Classify an external issuer.
     ClassifyIssuer {
@@ -80,11 +92,18 @@ enum Command {
         /// Freeform rationale stored in the classification entry.
         #[arg(long)]
         rationale: Option<String>,
+        /// Make a live zome call instead of just staging locally.
+        #[arg(long)]
+        live: bool,
     },
 
     /// Print the zome call sheet — the ready-to-paste conductor calls
     /// for everything the CLI currently stages locally.
     CallSheet,
+
+    /// Ping the conductor's `legal_did.ping` zome as a liveness check.
+    /// Requires the `conductor` build feature.
+    Ping,
 }
 
 fn main() -> ExitCode {
@@ -93,6 +112,11 @@ fn main() -> ExitCode {
         Ok(()) => ExitCode::SUCCESS,
         Err(err) => {
             eprintln!("lawful-id: {err}");
+            let mut source = err.source();
+            while let Some(cause) = source {
+                eprintln!("  caused by: {cause}");
+                source = cause.source();
+            }
             ExitCode::FAILURE
         }
     }
@@ -179,19 +203,28 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
-        Command::NewLegalDid { label } => {
-            let entry = state::StagedDid {
-                label,
-                staged_at: chrono_like_iso()?,
-            };
-            state.staged_legal_dids.push(entry);
-            state.save(&dirs.state_dir)?;
-            println!("Legal DID intent staged. Run `lawful-id call-sheet` for the conductor call.");
+        Command::NewLegalDid { label, live } => {
+            if live {
+                do_live_new_legal_did(label.clone())?;
+            } else {
+                let entry = state::StagedDid {
+                    label,
+                    staged_at: chrono_like_iso()?,
+                };
+                state.staged_legal_dids.push(entry);
+                state.save(&dirs.state_dir)?;
+                println!(
+                    "Legal DID intent staged. Run `lawful-id call-sheet` for the conductor \
+                     call, or pass `--live` next time to call directly."
+                );
+            }
         }
 
-        Command::ListDids => {
-            if state.staged_legal_dids.is_empty() {
-                println!("No staged DIDs. Use `lawful-id new-legal-did`.");
+        Command::ListDids { live } => {
+            if live {
+                do_live_list_dids()?;
+            } else if state.staged_legal_dids.is_empty() {
+                println!("No staged DIDs. Use `lawful-id new-legal-did` or `--live` to query.");
             } else {
                 for (idx, did) in state.staged_legal_dids.iter().enumerate() {
                     println!(
@@ -208,6 +241,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             issuer_did,
             tier,
             rationale,
+            live,
         } => {
             let tier_normalized = match tier.to_lowercase().as_str() {
                 "sovereign" | "regulated" | "peer" => tier.to_lowercase(),
@@ -217,23 +251,30 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                     )
                 }
             };
-            state
-                .staged_issuer_classifications
-                .push(state::StagedIssuerClassification {
-                    issuer_did,
-                    tier: tier_normalized,
-                    rationale,
-                    staged_at: chrono_like_iso()?,
-                });
-            state.save(&dirs.state_dir)?;
-            println!(
-                "Issuer classification staged. Run `lawful-id call-sheet` for the conductor call."
-            );
+            if live {
+                do_live_classify_issuer(&issuer_did, &tier_normalized, rationale.clone())?;
+            } else {
+                state
+                    .staged_issuer_classifications
+                    .push(state::StagedIssuerClassification {
+                        issuer_did,
+                        tier: tier_normalized,
+                        rationale,
+                        staged_at: chrono_like_iso()?,
+                    });
+                state.save(&dirs.state_dir)?;
+                println!(
+                    "Issuer classification staged. Run `lawful-id call-sheet` for the conductor \
+                     call, or pass `--live` next time to call directly."
+                );
+            }
         }
 
         Command::CallSheet => {
             print_call_sheet(&state);
         }
+
+        Command::Ping => do_live_ping()?,
     }
 
     Ok(())
@@ -318,3 +359,133 @@ fn print_call_sheet(state: &state::CliState) {
 #[derive(Serialize, Deserialize)]
 #[allow(dead_code)]
 struct _KeepSerdeLinked;
+
+// ============================================================================
+// Live conductor dispatchers
+// ============================================================================
+
+#[cfg(not(feature = "conductor"))]
+fn live_unavailable() -> Result<(), Box<dyn std::error::Error>> {
+    Err(
+        "--live / ping commands require the `conductor` build feature: \
+         cargo build --features conductor"
+            .into(),
+    )
+}
+
+#[cfg(not(feature = "conductor"))]
+fn do_live_new_legal_did(_label: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
+    live_unavailable()
+}
+
+#[cfg(not(feature = "conductor"))]
+fn do_live_list_dids() -> Result<(), Box<dyn std::error::Error>> {
+    live_unavailable()
+}
+
+#[cfg(not(feature = "conductor"))]
+fn do_live_classify_issuer(
+    _issuer: &str,
+    _tier: &str,
+    _rationale: Option<String>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    live_unavailable()
+}
+
+#[cfg(not(feature = "conductor"))]
+fn do_live_ping() -> Result<(), Box<dyn std::error::Error>> {
+    live_unavailable()
+}
+
+#[cfg(feature = "conductor")]
+fn do_live_ping() -> Result<(), Box<dyn std::error::Error>> {
+    live_runtime().block_on(async {
+        let conn = live::LiveConductor::connect(
+            live::default_admin_addr(),
+            live::default_app_addr(),
+            live::DEFAULT_APP_ID,
+        )
+        .await?;
+        let pong = conn.ping_legal_did().await?;
+        println!("{pong}");
+        Ok::<_, Box<dyn std::error::Error>>(())
+    })
+}
+
+#[cfg(feature = "conductor")]
+fn do_live_new_legal_did(label: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
+    live_runtime().block_on(async {
+        let conn = live::LiveConductor::connect(
+            live::default_admin_addr(),
+            live::default_app_addr(),
+            live::DEFAULT_APP_ID,
+        )
+        .await?;
+        let out = conn.create_legal_did(label).await?;
+        println!("Created legal DID: {}", out.did);
+        Ok::<_, Box<dyn std::error::Error>>(())
+    })
+}
+
+#[cfg(feature = "conductor")]
+fn do_live_list_dids() -> Result<(), Box<dyn std::error::Error>> {
+    live_runtime().block_on(async {
+        let conn = live::LiveConductor::connect(
+            live::default_admin_addr(),
+            live::default_app_addr(),
+            live::DEFAULT_APP_ID,
+        )
+        .await?;
+        let dids = conn.list_my_legal_dids().await?;
+        if dids.is_empty() {
+            println!("No legal DIDs yet. Use `lawful-id new-legal-did --live`.");
+        } else {
+            for (idx, d) in dids.iter().enumerate() {
+                println!(
+                    "{}. {} label={} created_at={}",
+                    idx + 1,
+                    d.did,
+                    d.label.as_deref().unwrap_or("(none)"),
+                    d.created_at
+                );
+            }
+        }
+        Ok::<_, Box<dyn std::error::Error>>(())
+    })
+}
+
+#[cfg(feature = "conductor")]
+fn do_live_classify_issuer(
+    issuer_did: &str,
+    tier: &str,
+    rationale: Option<String>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let wire_tier = live::IssuerTierWire::parse(tier)
+        .ok_or_else(|| format!("unknown tier: {tier}. Use sovereign/regulated/peer."))?;
+    live_runtime().block_on(async {
+        let conn = live::LiveConductor::connect(
+            live::default_admin_addr(),
+            live::default_app_addr(),
+            live::DEFAULT_APP_ID,
+        )
+        .await?;
+        let result = conn
+            .classify_issuer(issuer_did, wire_tier, rationale)
+            .await?;
+        println!(
+            "Classified {} as {}. Action: {}",
+            issuer_did,
+            wire_tier.as_str(),
+            result.action_hash
+        );
+        Ok::<_, Box<dyn std::error::Error>>(())
+    })
+}
+
+#[cfg(feature = "conductor")]
+fn live_runtime() -> tokio::runtime::Runtime {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("failed to build tokio runtime")
+}

@@ -9,14 +9,34 @@ description = "Command-line interface for mycelix-lawful-identity — create leg
 name = "lawful-id"
 path = "src/main.rs"
 
+[features]
+default = []
+# Live conductor integration via holochain_client. Pulls in ~200MB of
+# transitive deps (tokio, ws crates, holochain_types). Off by default
+# so the CLI stays ~5MB for users who only need the call-sheet path.
+conductor = [
+    "dep:holochain_client",
+    "dep:holochain_types",
+    "dep:holochain_conductor_api",
+    "dep:tokio",
+    "dep:anyhow",
+]
+
 [dependencies]
-# No holochain_client dependency yet — the conductor integration is
-# deferred per plan notes. The CLI ships the onboarding disclosure and
-# local-only helpers today; conductor round-trip lands once the happ is
-# packed + installed in a dev session.
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 clap = { version = "4.5", features = ["derive"] }
 directories = "5"
 thiserror = "2"
 sha2 = "0.10"
+
+# Optional: live conductor round-trip.
+# Targets Holochain 0.6.x (shared ecosystem conductor per monorepo
+# CLAUDE.md). Older holochain_client 0.7 / types 0.5 fails to
+# deserialize the 0.6-era `Enabled` app-status variant. The 0.9-dev
+# line tracks the 0.7-dev types pre-release.
+holochain_client = { version = "0.9.0-dev.20", optional = true }
+holochain_types = { version = "0.7.0-dev.19", optional = true }
+holochain_conductor_api = { version = "0.7.0-dev.19", optional = true }
+tokio = { version = "1.40", features = ["full"], optional = true }
+anyhow = { version = "1", optional = true }
