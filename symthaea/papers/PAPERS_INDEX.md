@@ -97,7 +97,3 @@ Pre-LaTeX drafts in `archive/`:
 - `archive/fusion-manuscript/` — Complete fusion energy manuscript
 
 Do NOT edit archive — all active work is in named subdirectories.
-
-## `latex/` Subdirectory (Stale Copies)
-
-The `latex/` subdirectory contains parallel copies of several papers. Some have diverged from the canonical versions in named subdirectories. **The named subdirectories are canonical.** The `latex/` copies are pending consolidation (see Phase 4 of improvement plan).
