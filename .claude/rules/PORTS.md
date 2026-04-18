@@ -79,7 +79,9 @@ Alphabetical by cluster short name. Port = 81XX.
 | 8129 | **mycelix-craft** | **craft.mycelix.net** | **Built** |
 | 8130 | **prism** | **prism.mycelix.net** | **LIVE** |
 | 8131 | prism-proxy | (internal CORS proxy) | **LIVE** |
-| 8132-8139 | (spare) | Future clusters | Reserved |
+| 8132 | mycelix-tax-export (extends observatory) | — | Reserved |
+| 8133 | mycelix-lawful-identity | lawful.mycelix.net | Reserved |
+| 8134-8139 | (spare) | Future clusters | Reserved |
 | 8140 | **infin-love** | **infin.love** | **LIVE** |
 | 8141-8149 | (spare) | Future clusters | Reserved |
 
