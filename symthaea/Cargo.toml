@@ -459,6 +459,11 @@ ed25519-dalek = { version = "2.1", features = ["serde", "rand_core"], optional =
 sha2 = { version = "0.10", optional = true }   # MFDI credential hashing
 chrono = { workspace = true }
 regex = { workspace = true }
+# Note: wasmtime 29.x has a critical CVE affecting aarch64 with the Winch
+# compiler backend (sandbox-escape memory access, fix: 36.0.7). NOT
+# exploitable in this build — the Winch feature is not enabled and the
+# default Cranelift backend is unaffected. Version staying at 29.0 until
+# we land the 29→36 migration (significant API break).
 wasmtime = { version = "29.0", optional = true }
 
 # bumpalo removed from main crate: only used in symthaea-core

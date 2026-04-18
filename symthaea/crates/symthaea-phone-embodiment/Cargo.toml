@@ -31,7 +31,9 @@ ffmpeg-next = { version = "7", optional = true }
 rav1d = { version = "0.1", optional = true }
 
 # h264-fallback feature dep
-openh264 = { version = "0.6", optional = true }
+# Bumped 0.6 → 0.8 to resolve heap-overflow vuln in decoding functions
+# (GHSA, fix: 0.8.0). Feature-gated behind `h264-fallback`.
+openh264 = { version = "0.8", optional = true }
 
 [[example]]
 name = "record_scrcpy_sample"
