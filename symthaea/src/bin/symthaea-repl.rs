@@ -440,6 +440,18 @@ impl ReplState {
             }
         }
 
+        // RAG: inject top-5 grounded facts from the knowledge graph so the
+        // LLM sees what the cognitive loop has actually learned, not just
+        // what's in-context. Empty when the knowledge engine isn't enabled
+        // in the config; a no-op in that case.
+        let grounded = self.cognitive.top_grounded_facts(5);
+        if !grounded.is_empty() {
+            system_prompt.push_str("\n\n# Relevant knowledge (from cognitive loop)\n");
+            for fact in grounded {
+                system_prompt.push_str(&format!("- {fact}\n"));
+            }
+        }
+
         // Inject pending tool results from the previous turn so Symthaea sees
         // what her actions returned. Clear after injection — results are
         // consumed in the turn immediately after emission.

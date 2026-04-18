@@ -1895,6 +1895,21 @@ impl CognitiveLoopService {
     pub fn temporal_backend(&self) -> TemporalBackend {
         self.temporal_network.backend_type()
     }
+
+    /// Top `k` grounded facts from the knowledge graph, most-confident first.
+    ///
+    /// Empty vec if the knowledge engine isn't enabled in this config. Used
+    /// by the REPL (and any other consumer) for retrieval-augmented context
+    /// — strings are ready to paste into a system prompt as `# Relevant
+    /// knowledge`. Cheap: no HDC search, just a sorted slice from the
+    /// manager's in-memory fact table.
+    pub fn top_grounded_facts(&self, k: usize) -> Vec<String> {
+        self.memory
+            .knowledge_manager
+            .as_ref()
+            .map(|km| km.top_grounded_facts(k))
+            .unwrap_or_default()
+    }
 }
 
 #[cfg(test)]
