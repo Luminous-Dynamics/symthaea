@@ -30,13 +30,13 @@ The protocol integrates four components:
 \begin{equation}
 E ::= x_i \mid C \mid E + E \mid E \cdot E \mid -E \mid E^k \mid \sqrt{E} \mid \ln E \mid \sin E \mid \cos E \mid \frac{1}{E}
 \end{equation}
-where $x_i$ are state variables, $C \in \{-2, -1, 1, 2, 3\}$ are integer constants, and trees are depth- and size-constrained. Typical runs use population size 250, 80--500 generations depending on problem difficulty, and a fixed seed (42) to ensure deterministic reproducibility. Every reader can regenerate the exact table from the paper by running `./papers/ramanujan/reproduce.sh`.
+where $x_i$ are state variables, $C \in \{-2, -1, 1, 2, 3\}$ are integer constants, and trees are depth- and size-constrained. Typical runs use population size 250, 80--500 generations depending on problem difficulty, and a fixed seed (42) to ensure deterministic reproducibility. Every reader can regenerate the exact table from the paper by running \texttt{./papers/ramanujan/reproduce.sh}.
 
 \textbf{(2) Fitness function: trajectory variance with Occam penalty.} For a sampled trajectory $\{\mathbf{x}(t_i)\}_{i=1}^N$ and candidate $C$, the raw fitness is
 \begin{equation}
 \text{fitness}(C) = \text{Var}_i C(\mathbf{x}(t_i)) + \lambda \cdot |C|
 \end{equation}
-where $|C|$ is the size (number of nodes) in the expression tree, and $\lambda$ is a small penalty (Akaike Information Criterion-style pruning). Candidates are only retained if variance is below $10^{-6}$. However, as Sessions 18-31 discovered, this naive variance-based fitness is gameable: a 1D expression that happens to be nearly constant on a particular trajectory (by accident, not because it is conserved) will score artificially well. The protocol was repeatedly redesigned to address this, introducing diverse-trajectory sampling, pinned priors, prior-composition mutation, fragment-match bonuses, and finally Lie-derivative fitness (measuring $\nabla C \cdot \mathbf{f}$ instead of $C$ itself). Each refinement closed a specific ceiling; Session 30 added `use_lie_fitness: true`, making the fitness function physics-aware rather than data-luck-aware.
+where $|C|$ is the size (number of nodes) in the expression tree, and $\lambda$ is a small penalty (Akaike Information Criterion-style pruning). Candidates are only retained if variance is below $10^{-6}$. However, as Sessions 18-31 discovered, this naive variance-based fitness is gameable: a 1D expression that happens to be nearly constant on a particular trajectory (by accident, not because it is conserved) will score artificially well. The protocol was repeatedly redesigned to address this, introducing diverse-trajectory sampling, pinned priors, prior-composition mutation, fragment-match bonuses, and finally Lie-derivative fitness (measuring $\nabla C \cdot \mathbf{f}$ instead of $C$ itself). Each refinement closed a specific ceiling; Session 30 added \texttt{use\_lie\_fitness: true}, making the fitness function physics-aware rather than data-luck-aware.
 
 \textbf{(3) Symbolic chain-rule verification.} When a candidate $C$ is proposed, the engine computes the total derivative
 \begin{equation}
@@ -44,7 +44,7 @@ where $|C|$ is the size (number of nodes) in the expression tree, and $\lambda$ 
 \end{equation}
 symbolically via differentiation and simplification (polynomial expansion, logarithmic identity application, common-factor cancellation). If the normalized form is exactly zero, the candidate earns a symbolic proof without invoking any external solver. This handles both polynomial and transcendental invariants---e.g., Lotka--Volterra's $\ln$-based invariant---and is the fastest verification tier.
 
-\textbf{(4) Formal SMT delegation.} For polynomial invariants where symbolic normalization is inconclusive, the engine emits the SMT-LIB2 query $\neg(\mathrm{d}C/\mathrm{d}t = 0)$ in the non-linear real arithmetic fragment (QF\_NRA) and delegates to Z3. An \texttt{unsat} verdict is a formal proof that no real number assignment can make the derivative nonzero---that is, the quantity is conserved for all trajectories. The witness `.smt2` files are committed to the repository; any reader can verify them independently with any SMT-LIB2-compliant solver.
+\textbf{(4) Formal SMT delegation.} For polynomial invariants where symbolic normalization is inconclusive, the engine emits the SMT-LIB2 query $\neg(\mathrm{d}C/\mathrm{d}t = 0)$ in the non-linear real arithmetic fragment (QF\_NRA) and delegates to Z3. An \texttt{unsat} verdict is a formal proof that no real number assignment can make the derivative nonzero---that is, the quantity is conserved for all trajectories. The witness \texttt{.smt2} files are committed to the repository; any reader can verify them independently with any SMT-LIB2-compliant solver.
 
 % ========================================================================
 \section{Verification Tiers: From Symbolic to Formal}
@@ -103,7 +103,7 @@ Running the Ramanujan protocol on PCR3BP (Circular Restricted Three-Body) with K
 
 \subsection{Session 19: Trig ablation falsifies Session 18}
 
-Adding a configuration flag `exclude_trig: true` (disabling sine/cosine operators) revealed that Session 18's 10× improvement was an artifact: primed runs with trig disabled showed no acceleration over cold. The prior mechanism itself was working, but the improvement came from discovering trig-polynomial coincidences on the sampled trajectory, not actual structural transfer. This was the first explicit falsification in the arc: a hypothesis that seemed confirmed was overturned by a simple ablation.
+Adding a configuration flag \texttt{exclude\_trig: true} (disabling sine/cosine operators) revealed that Session 18's 10$\times$ improvement was an artifact: primed runs with trig disabled showed no acceleration over cold. The prior mechanism itself was working, but the improvement came from discovering trig-polynomial coincidences on the sampled trajectory, not actual structural transfer. This was the first explicit falsification in the arc: a hypothesis that seemed confirmed was overturned by a simple ablation.
 
 \subsection{Session 20: Cheat-prior test shows fitness is the ceiling}
 
@@ -123,7 +123,7 @@ Running with 8.3× higher compute budget (pop 300, gen 100, depth 6) reduced med
 
 \subsection{Session 24: Prior-composition mutation discovers multi-piece structures}
 
-A new mutation operator (15\% of children are `op(prior_A, prior_B)` for random distinct priors) generated the first 2-piece composition in the arc on seed 2718: $1/\sqrt{(x+\mu)^2+y^2} - 1/\sqrt{x^2+y^2}$, which is a partial of the full Jacobi integral. However, only 1/5 runs retained a compositional survivor, as the fitness landscape still preferred lower-variance single-term partials.
+A new mutation operator (15\% of children are \texttt{op(prior\_A, prior\_B)} for random distinct priors) generated the first 2-piece composition in the arc on seed 2718: $1/\sqrt{(x+\mu)^2+y^2} - 1/\sqrt{x^2+y^2}$, which is a partial of the full Jacobi integral. However, only 1/5 runs retained a compositional survivor, as the fitness landscape still preferred lower-variance single-term partials.
 
 \subsection{Session 25: Fragment-match bonus rewards structural richness}
 
@@ -135,7 +135,7 @@ Running the Sessions 19--25 pipeline on Kepler (an in-distribution control probl
 
 \subsection{Sessions 27--29: Gradient orthogonality, Lie-derivative fitness, arc closure}
 
-Session 27 bundled the machinery into a reusable preset `RegressorConfig::for_autonomous_discovery()`. Sessions 28--30 diagnosed why multi-invariant discovery failed: variance gaps (14 orders of magnitude favoring angular momentum) made lower-ranked invariants invisible in the top-10 output. Sessions 29--30 added gradient-independence via Gram-Schmidt projection and switched to Lie-derivative fitness (measuring $\nabla C \cdot \mathbf{f}$ rather than $C$ itself), making fitness physics-aware. The arc closed on Session 31 with a fitness bug fix in `compute_trajectory_variance` and the first public memory handoff document for future sessions.
+Session 27 bundled the machinery into a reusable preset \texttt{RegressorConfig::for\_autonomous\_discovery()}. Sessions 28--30 diagnosed why multi-invariant discovery failed: variance gaps (14 orders of magnitude favoring angular momentum) made lower-ranked invariants invisible in the top-10 output. Sessions 29--30 added gradient-independence via Gram-Schmidt projection and switched to Lie-derivative fitness (measuring $\nabla C \cdot \mathbf{f}$ rather than $C$ itself), making fitness physics-aware. The arc closed on Session 31 with a fitness bug fix in \texttt{compute\_trajectory\_variance} and the first public memory handoff document for future sessions.
 
 This arc illustrates a core principle: when machinery hits a ceiling, the first step is honest diagnosis (ablation, cheat tests, memory logging). Often the bottleneck is not the search algorithm but the objective function. Fixing the objective is more powerful than searching harder.
 
@@ -145,7 +145,7 @@ This arc illustrates a core principle: when machinery hits a ceiling, the first 
 To validate that the Sessions 19--25 pipeline was correct (and not just lucky on Harmonic Oscillator), we ran the full discovery process on Kepler two-body motion, a problem where the ground truth is known: angular momentum $L = xv_y - yv_x$.
 
 \begin{theorem}[Kepler Angular Momentum Recovery]
-Running the Ramanujan protocol with `for_autonomous_discovery()` settings (diverse fitness, pinned priors, prior composition, fragment bonus, Lie-derivative fitness) on the 2D Kepler two-body system with seed permutations $\{42, 1337, 2718, 31415, 99999\}$ yields:
+Running the Ramanujan protocol with \texttt{for\_autonomous\_discovery()} settings (diverse fitness, pinned priors, prior composition, fragment bonus, Lie-derivative fitness) on the 2D Kepler two-body system with seed permutations $\{42, 1337, 2718, 31415, 99999\}$ yields:
 \begin{itemize}
   \item \textbf{All five seeds recover the exact formula} $L = x \cdot v_y - y \cdot v_x$.
   \item \textbf{Variance is at machine epsilon} ($1.01 \times 10^{-29}$ to $1 \times 10^{-30}$ depending on seed and FP summation order).
@@ -167,23 +167,23 @@ All results are deterministic under seed 42. Readers can regenerate the full pap
   docker build -t ramanujan-repro .
   docker run --rm ramanujan-repro
 \end{verbatim}
-The container outputs `results_table.tex` and `showcase_stdout.txt`, which can be diffed against the committed versions. Total time: under 30 minutes.
+The container outputs \texttt{results\_table.tex} and \texttt{showcase\_stdout.txt}, which can be diffed against the committed versions. Total time: under 30 minutes.
 
 \textbf{(2) Local Rust toolchain:}
 \begin{verbatim}
   cd papers/ramanujan
   ./reproduce.sh
 \end{verbatim}
-Requires Rust ≥ 1.75 and Z3 ≥ 4.13 on PATH. Same output as Docker, typically faster on a local machine.
+Requires Rust $\geq$ 1.75 and Z3 $\geq$ 4.13 on PATH. Same output as Docker, typically faster on a local machine.
 
 \textbf{(3) SMT-only verification (no Rust required):}
-Every `.smt2` witness file in `papers/ramanujan/proofs/` is a standalone formal proof obligation:
+Every \texttt{.smt2} witness file in \texttt{papers/ramanujan/proofs/} is a standalone formal proof obligation:
 \begin{verbatim}
   for f in papers/ramanujan/proofs/*.smt2; do
     z3 -smt2 "$f" | tail -1
   done
 \end{verbatim}
-Expected output: `unsat` on all nine files (harmonic oscillator, Kepler, Hénon-Heiles, mystery ODE, plus the newer Duffing and isotropic discoveries from Sessions 32+). The witness files are checked into the repository and machine-verifiable on any architecture.
+Expected output: \texttt{unsat} on all nine files (harmonic oscillator, Kepler, Hénon-Heiles, mystery ODE, plus the newer Duffing and isotropic discoveries from Sessions 32+). The witness files are checked into the repository and machine-verifiable on any architecture.
 
 The Docker image pins Rust version, Z3 version, and CPU instruction set, ensuring bit-identical reproduction. Readers on ARM or other architectures can use the local Rust path with the understanding that floating-point summation order may differ slightly (typically imperceptible in variance, except for candidates very close to the $10^{-6}$ threshold).
 
@@ -211,7 +211,7 @@ All seven problems have dimensionality $\leq 6$. Real-world physical systems (gr
 
 The Ramanujan Protocol demonstrates that conservation laws can be discovered autonomously from dynamical equations, without analytic solutions, without textbooks, without human-crafted features. The protocol integrates symbolic regression, symbolic verification, and formal SMT proof into a single pipeline, and is committed to reproducibility: every result is deterministic, every hypothesis is explicitly tested, and every failure is honestly reported.
 
-The twelve-session acceleration arc (Sessions 18--31) is a case study in scientific debugging. Rather than inventing new search algorithms, we repeatedly diagnosed the fitness function, the priors, the selection mechanism. Each diagnosis led to a concrete fix: diverse trajectories, pinned priors, composition operators, structural bonuses, physics-aware (Lie-derivative) fitness. The final protocol is not a one-shot innovation but a distilled, reusable preset (`for_autonomous_discovery()`) that future work can build on.
+The twelve-session acceleration arc (Sessions 18--31) is a case study in scientific debugging. Rather than inventing new search algorithms, we repeatedly diagnosed the fitness function, the priors, the selection mechanism. Each diagnosis led to a concrete fix: diverse trajectories, pinned priors, composition operators, structural bonuses, physics-aware (Lie-derivative) fitness. The final protocol is not a one-shot innovation but a distilled, reusable preset (\texttt{for\_autonomous\_discovery()}) that future work can build on.
 
 The Kepler sanity validation proves that the pipeline is robust and reproducible. The PCR3BP failure is a honest ceiling that remains open for future work. Together, they demonstrate that the protocol is not overfit to one problem, but has learned a generalizable method for autonomous physics discovery.
 
