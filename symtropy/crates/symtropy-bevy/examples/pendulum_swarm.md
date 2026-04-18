@@ -336,6 +336,28 @@ Nice-to-haves (not gating):
 
 ---
 
+## Regression guards
+
+Four empirical constants in this doc are CI-protected by
+`tests/pendulum_swarm_invariants.rs`. Each test is named for the
+section it guards. Run them anytime you change the physics engine
+or consciousness equation:
+
+```bash
+# From symtropy/ directory:
+just test-pendulum-swarm
+
+# Or directly:
+cargo test -p symtropy-bevy --test pendulum_swarm_invariants --release
+```
+
+The tests must run in `--release` mode — the perf guard is noise
+in debug builds and skips itself there. If a test fails, its
+error message points at which spike to re-run and which section
+of this doc to update.
+
+---
+
 ## Known landmines
 
 0. **Phi magnitude is NOT in [0, 1].** The `MasterConsciousnessEquation`

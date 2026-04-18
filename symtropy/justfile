@@ -31,6 +31,20 @@ run-x11: build
 check:
     cargo check
 
+# Run all symtropy workspace tests in release mode (required for perf guards)
+test:
+    cargo test --workspace --release
+
+# Run just the pendulum_swarm demo design guards
+# Protects four empirical constants documented in
+# crates/symtropy-bevy/examples/pendulum_swarm.md:
+#   - DistanceConstraint pendulum behavior
+#   - LOW/HIGH damping visual contrast
+#   - MasterConsciousnessEquation phi response magnitude
+#   - 100-body physics step fits 60 Hz budget
+test-pendulum-swarm:
+    cargo test -p symtropy-bevy --test pendulum_swarm_invariants --release -- --nocapture
+
 # Run biometrics tests
 test-biometrics:
     cd ../symthaea && cargo test -p symthaea-biometrics --features muse-bridge
