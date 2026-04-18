@@ -119,38 +119,75 @@ impl StructuralVerdict {
     }
 }
 
-/// Walk a parsed Nix `Root` and collect every `(attrpath, value)` assignment.
+/// Walk a parsed Nix tree and collect every `(attrpath, value)` leaf.
 ///
-/// Only **static** attrpaths are collected — dynamic keys like `${foo}` or
-/// `"literal str"` as a key are skipped. A real Nix evaluator would need
-/// them; a scorer for curated option configs does not.
+/// Flattens nested attrset forms: `services.nginx = { enable = true; };`
+/// produces `services.nginx.enable = true` — matching the flat form
+/// `services.nginx.enable = true;`. This is essential because NixOS
+/// module generators use both forms interchangeably.
+///
+/// Only **static** attrpaths are collected — dynamic keys like `${foo}`
+/// or `"literal str"` as a key are skipped. A real Nix evaluator would
+/// need them; a scorer for curated option configs does not.
 fn walk_attrpaths(root: &SyntaxNode) -> Vec<FlatOption> {
     let mut out = Vec::new();
-    for node in root.descendants() {
-        if node.kind() != SyntaxKind::NODE_ATTRPATH_VALUE {
-            continue;
-        }
-        // Children of NODE_ATTRPATH_VALUE: a NODE_ATTRPATH, then the `=`
-        // token, then the value expression node. We want the attrpath's
-        // identifier sequence and the value node.
-        let mut child_nodes = node.children();
-        let key_node = match child_nodes.next() {
-            Some(n) if n.kind() == SyntaxKind::NODE_ATTRPATH => n,
-            _ => continue,
-        };
-        let value_node = match child_nodes.next() {
-            Some(n) => n,
-            None => continue,
-        };
-
-        let Some(path) = extract_static_attrpath(&key_node) else {
-            continue;
-        };
-        let value = canonicalize_value(&value_node);
-
-        out.push(FlatOption { path, value });
-    }
+    walk_with_prefix(root, &[], &mut out);
     out
+}
+
+/// Recursive walker that accumulates the enclosing attrpath prefix.
+/// Visits `NODE_ATTRPATH_VALUE` leaves and recurses through structural
+/// nodes (attrset literals, let-bindings, lambdas, function applications,
+/// parens, with-scopes) without consuming path context.
+fn walk_with_prefix(node: &SyntaxNode, prefix: &[String], out: &mut Vec<FlatOption>) {
+    for child in node.children() {
+        match child.kind() {
+            SyntaxKind::NODE_ATTRPATH_VALUE => {
+                let mut sub_children = child.children();
+                let Some(key_node) = sub_children.next() else {
+                    continue;
+                };
+                if key_node.kind() != SyntaxKind::NODE_ATTRPATH {
+                    continue;
+                }
+                let Some(value_node) = sub_children.next() else {
+                    continue;
+                };
+                let Some(segs) = extract_static_attrpath(&key_node) else {
+                    continue;
+                };
+
+                let mut full_path: Vec<String> = prefix.to_vec();
+                full_path.extend(segs);
+
+                if value_node.kind() == SyntaxKind::NODE_ATTR_SET {
+                    // Nested attrset: recurse with the extended prefix.
+                    // Don't emit a leaf for the container itself — the
+                    // leaves inside carry the semantic content.
+                    walk_with_prefix(&value_node, &full_path, out);
+                } else {
+                    out.push(FlatOption {
+                        path: full_path,
+                        value: canonicalize_value(&value_node),
+                    });
+                }
+            }
+            // Structural nodes: recurse but keep prefix as-is. These
+            // wrap the module body without adding attrpath context.
+            SyntaxKind::NODE_ATTR_SET
+            | SyntaxKind::NODE_LET_IN
+            | SyntaxKind::NODE_LAMBDA
+            | SyntaxKind::NODE_APPLY
+            | SyntaxKind::NODE_PAREN
+            | SyntaxKind::NODE_WITH => {
+                walk_with_prefix(&child, prefix, out);
+            }
+            _ => {
+                // Leaf-ish nodes (literals, strings, selects, etc.) —
+                // don't descend.
+            }
+        }
+    }
 }
 
 /// NODE_ATTRPATH children are a sequence of NODE_IDENTs (for `a.b.c = x`)
@@ -435,6 +472,27 @@ mod tests {
         let v = score(&gen, &gold);
         assert!(!v.pass());
         assert!(v.parse_error.is_some());
+    }
+
+    #[test]
+    fn nested_attrset_equals_flat_dotted_form() {
+        // `services.nginx = { enable = true; }` must be structurally
+        // equivalent to `services.nginx.enable = true`. Both are valid
+        // NixOS module idioms; a hand-written golden in one form must
+        // not reject a generator that uses the other.
+        let flat = wrap("services.nginx.enable = true;");
+        let nested = wrap("services.nginx = {\n    enable = true;\n  };");
+        let v = score(&nested, &flat);
+        assert!(v.pass(), "nested form must match flat form; got {:?}", v);
+    }
+
+    #[test]
+    fn deep_nesting_flattens_correctly() {
+        // Triple-nested: `a = { b = { c = 1; }; }` → a.b.c = 1
+        let nested = wrap("a = {\n    b = {\n      c = 1;\n    };\n  };");
+        let flat = wrap("a.b.c = 1;");
+        let v = score(&nested, &flat);
+        assert!(v.pass(), "deep nesting should flatten; got {:?}", v);
     }
 
     #[test]

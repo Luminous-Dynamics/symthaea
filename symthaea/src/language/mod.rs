@@ -92,6 +92,8 @@ pub mod nix_codegen;
 #[cfg(feature = "code_generation")]
 pub mod nix_eval_corpus;
 #[cfg(feature = "code_generation")]
+pub mod nix_eval_goldens;
+#[cfg(feature = "code_generation")]
 pub mod nix_kg;
 #[cfg(feature = "code_generation")]
 pub mod nix_scorer;
