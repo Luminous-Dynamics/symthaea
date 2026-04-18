@@ -1,8 +1,18 @@
 # Five-Component Model: Canonical Definitions
 
-**Version**: 1.0
+**Version**: 1.1
 **Created**: 2026-01-16
+**Last reviewed**: 2026-04-18 — still canonical
 **Purpose**: Resolve definitional inconsistencies across papers
+
+> **Scope note.** This document canonicalises the **theoretical five-component
+> consciousness model** $(\Phi, B, W, A, R)$ from the neuroscience literature.
+> It is **not** the governance credential system. The Mycelix sovereign
+> governance credential is an 8-dimensional profile (epistemic integrity,
+> thermodynamic yield, network resilience, economic velocity, civic participation,
+> stewardship, semantic resonance, domain competence) — see
+> `sovereignty-papers/essay-07-on-the-eight-dimensions.md` and
+> `governance/embodied-governance/` for that system.
 
 ---
 

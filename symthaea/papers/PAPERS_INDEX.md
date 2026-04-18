@@ -121,11 +121,12 @@ Domain-specific uses of the architecture.
 
 ## Reference Documents
 
-- `GLOSSARY.md` — Term definitions (needs audit, 91+ days old)
-- `NORMALIZATION_STANDARDS.md` — Data normalization conventions (needs audit, 91+ days old)
+- `GLOSSARY.md` — Canonical definitions for the theoretical 5-component consciousness model (Φ, B, W, A, R). Distinct from the 8D sovereign governance credential — see scope note at top of file.
 - `PAPER_CODE_TRACEABILITY.md` — Maps paper claims to source code locations
 - `PAPER_METHODS_DETAILED.md` — Expanded methodology notes
 - `CO_AUTHOR_OUTREACH.md` — Co-author venue/contact tracking
+
+(`NORMALIZATION_STANDARDS.md` was archived 2026-04-18 — it specified normalizations for a 5-component neural measurement pipeline, PCI and meta-d', that is no longer part of the codebase. See `archive/NORMALIZATION_STANDARDS_Jan2026.md` for the historical snapshot.)
 
 ## Infrastructure Directories
 
