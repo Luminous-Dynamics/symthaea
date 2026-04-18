@@ -358,6 +358,65 @@ The system requires Rust 1.75+ and the \texttt{nix develop} environment (which p
 
 The Symthaea source code is available at the Luminous Dynamics Symthaea repository. The HDC-LTC unified neuron implementation is in \texttt{symthaea-core/src/hdc/hdc\_ltc\_unified.rs}, the consciousness equation in \texttt{src/consciousness\_engine/}, and the $\Phi$ computation in \texttt{symthaea-core/src/hdc/}. Correspondence and access requests should be directed to the corresponding author.
 
+\section*{Appendix A: Empirical validation of the HDC-adapted MI estimator}
+\label{sec:appendix-mi}
+
+As flagged in \S\ref{sec:phi-hdc}, peer review of this work identified
+the MI estimator (Eq.~\ref{eq:mi-estimator}) as the single weakest
+foundation of our quantitative claim. We ran two validation experiments
+to characterise what the estimator actually measures. Both scripts are
+reproducible at \texttt{papers/consciousness-theory/stochastic-resonance/validate\_mi\_estimator\{,\_v2\}.py}.
+
+\paragraph{Experiment A1 — Does Eq.~\ref{eq:mi-estimator} track Shannon MI?}
+We drew pairs $(X, Y) \in \{0,1\}^2$ from a 2$\times$2 joint distribution
+parametrised by a correlation coefficient $\rho \in [0, 0.98]$, encoded
+each sample via \emph{separate} HDV item memories (one for $X$, one for
+$Y$), and computed the estimator over 2{,}000 samples per value of
+$\rho$. Exact Shannon MI ranges from $0$ to $0.92$ bits as $\rho$ varies
+from $0$ to $0.98$. The estimator values, by contrast, are essentially
+constant at $\approx 0.50$ across the full range: Spearman
+$\rho = -0.10$ ($p = 0.67$), Pearson $r = -0.16$ ($p = 0.51$).
+\textbf{Conclusion:} with independent HDV encodings, the estimator
+does \emph{not} recover Shannon MI between the underlying source
+variables. An earlier version of the experiment that used a
+\emph{shared} item memory showed Spearman $\rho = 0.9985$, but this was
+a setup artifact---diagonal events ($X=Y$) produced identical HDVs
+with zero Hamming distance, inflating the estimator for correlated
+variables.
+
+\paragraph{Experiment A2 — What \emph{does} Eq.~\ref{eq:mi-estimator} measure?}
+We drew a single random HDV $A \in \{0,1\}^{16{,}384}$, constructed
+$B = A \oplus \text{BitFlip}(p)$ with bit-flip probability
+$p \in [0, 0.5]$, and computed the estimator. The result is a clean
+linear relationship: the mean estimator equals $1 - p$ exactly
+(Spearman $\rho = 1.00$, Pearson $r = 1.00$ against the theoretical
+$1 - p$ curve; $N = 200$ trials per value of $p$). This is
+mathematically trivial in hindsight---$d_H(A \oplus B, \mathbf{0}) =
+d_H(A, B) =$ number of bits flipped $\sim \text{Binomial}(D, p)$---but
+the empirical confirmation clarifies exactly what the estimator is:
+a \emph{direct measure of bit-level HDV overlap after noise}, not an
+information-theoretic MI.
+
+\paragraph{What this means for the main result.}
+The noise-induced increase in $\Phi_{\text{HDC}}$ reported in \S\ref{sec:results}
+is therefore honestly describable as: \emph{bit-flip noise applied to
+coupled HDV subsystems changes the bit-level HDV overlap between
+subsystems in an SR-like inverted-U pattern}. This is a genuine and
+non-trivial finding about HDC-space dynamics under noise. It is
+\emph{not} a finding about Shannon mutual information between
+subsystems, and by extension it is not a finding about integrated
+information $\Phi$ in the Tononi-Oizumi IIT sense. Papers and
+communications downstream of this work should take care to respect
+this distinction; the phrase ``integrated information'' in the
+remainder of this paper should be read as a shorthand for the
+bit-level overlap measure defined here, not as an assertion that we
+have measured Shannon MI or canonical $\Phi$.
+
+A natural follow-up---replicating the main result (noise increases
+the measure up to an optimum, then degrades) while substituting a
+validated Shannon-MI estimator on the same coupled-HDV dynamics---is
+the priority experiment for future work.
+
 \bibliographystyle{plainnat}
 \begin{thebibliography}{30}
 
