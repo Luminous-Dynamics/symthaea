@@ -3,6 +3,42 @@
 Honest measurement log. Each entry: date, commit, scorer used, result. Don't
 amend historical rows — if numbers change, append a new row and note why.
 
+## 2026-04-19 — Hold-out generalization: **0/9 (0%)** (the honest number)
+
+First held-out test. Split: 26 harvested pairs → 17 train + 9 holdout
+(deterministic FNV-1a hash bucket). Trained 25 epochs on 17-pair
+subset (loss 6.10 → 0.38), evaluated the 9 held-out prompts through
+the structural scorer.
+
+**All 9 outputs parse-invalid.** Sample held-out output for
+"enable redis cache server":
+```
+your{
+! ~! A super G#[allow([while;c e    enable = true l c p p and services.r and.4
+ing an 6 true g services.t}
+enable = true 3 3 2}
+.;o re s true c way v er true an do y y{ config, pkgs, ... }>g.ing
+```
+
+Real Nix tokens present (`enable = true`, `services.`, `{ config,
+pkgs, ... }`) interspersed with `!`, `~`, random subword fragments.
+Sequence does not parse as Nix.
+
+**Interpretation:** 25-epoch training on 17 pairs learned **lexical**
+knowledge (which tokens are Nix-specific) but not **syntactic**
+knowledge (how they compose). That's memorization-only; there's no
+generalization signal in 17 pairs for the model to discover.
+
+**The prior claim "end-to-end pipeline produces Nix" was only true
+on prompts in the training set.** On held-out data, 0%. Honest.
+
+**Commits**: harness `315c2ab1f7`, result this entry.
+
+**What would move the needle (not in scope this session):**
+- ≥200 training pairs so each attrpath shape is rehearsed many times.
+- Structure-aware training loss — penalize parse-invalid emission.
+- Beam search with rnix-gated decoding at generation time.
+
 ## NixEval — 94-problem corpus (`src/language/nix_eval_corpus.rs`)
 
 (Corpus size corrected: 94 entries, not 95. The plan's "95" was an off-by-one

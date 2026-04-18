@@ -13,6 +13,23 @@ The scorer is AST-based, the repair loop is scorer-in-the-loop, and
 the training stack feeds PASS-filtered pairs into consciousness-gated
 emission — none of which require matching LLM-scale to work.
 
+## Honest caveat (added 2026-04-19)
+
+**The Broca distillation does not generalize at 26-pair training.**
+Hold-out test (17 train / 9 held-out): 0/9 PASS. The trained model
+learned lexical knowledge (which tokens are Nix) but not compositional
+grammar. The research-claim-relevant components are the **scorer +
+repair loop + substrate-independence proof** (all three validated on
+held-out inputs by design); the **distilled generator is a
+demonstration of infrastructure**, not yet a useful generator. See
+`BENCHMARK.md` 2026-04-19 entry for the full honest-number story.
+
+What this means: statements like "Symthaea emits Nix" should be read as
+"the scorer + repair loop emits Nix (and catches bugs LLMs miss); the
+Broca distillation is wired up end-to-end but needs ≥200 training pairs
+before its output generalizes." The infrastructure claim is sound. The
+trained-model claim is narrower than previously framed.
+
 ## What runs today
 
 ### Nix substrate (full pipeline)
