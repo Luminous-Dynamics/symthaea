@@ -1072,6 +1072,10 @@ name = "humaneval_class_classification"
 required-features = ["code_generation"]
 
 [[example]]
+name = "brain_codegen"
+required-features = ["code_generation"]
+
+[[example]]
 name = "benchmark_exercism"
 required-features = ["code_generation"]
 
