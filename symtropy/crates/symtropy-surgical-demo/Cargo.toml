@@ -1,0 +1,33 @@
+[package]
+name = "symtropy-surgical-demo"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+description = "Consciousness-gated surgical demo — Φ selects SafetyLevel (FullControl → Reduced → Freeze → Retract); cautery is a hard interlock"
+
+[workspace]
+
+[[bin]]
+name = "surgical-demo"
+path = "src/main.rs"
+
+[dependencies]
+symthaea-surgical = { path = "../../../symthaea/crates/symthaea-surgical" }
+symthaea-core = { path = "../../../symthaea/symthaea-core" }
+
+symtropy-robotics-bridge = { path = "../symtropy-robotics-bridge" }
+symtropy-consciousness-physics = { path = "../symtropy-consciousness-physics" }
+symtropy-physics = { path = "../symtropy-physics" }
+
+bevy = { version = "0.18", default-features = false, features = [
+    "bevy_asset", "bevy_core_pipeline", "bevy_render",
+    "bevy_pbr",
+    "bevy_text", "bevy_ui", "bevy_ui_render",
+    "bevy_winit", "bevy_color", "bevy_state",
+    "bevy_log", "bevy_mesh",
+    "multi_threaded", "x11",
+    "default_font",
+] }
+
+[lints.clippy]
+all = "warn"
