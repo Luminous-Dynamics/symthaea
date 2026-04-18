@@ -171,7 +171,13 @@ fn main() {
         .and_then(|s| s.parse().ok())
         .unwrap_or(1000);
     // New name, with backwards-compat read of `FB_SPRINT_PHI` so pre-
-    // reframe scripts still work.
+    // reframe scripts still work. Default 0.135 is intentionally
+    // decoupled from RoboticAgent's Φ band (this harness synthesizes a
+    // signal in [0.05, 0.95] to isolate the gating-policy comparison
+    // from the cognitive pipeline). Unlike the demo plugins, this
+    // threshold is NOT affected by the 2026-04-19 FEP-wiring
+    // recalibration in commit `996750d12b` — it's about where to slice
+    // a synthetic sinusoid, not where to sit in a measured Φ band.
     let sprint_threshold: f32 = std::env::var("FB_SPRINT_THRESHOLD")
         .or_else(|_| std::env::var("FB_SPRINT_PHI"))
         .ok()
