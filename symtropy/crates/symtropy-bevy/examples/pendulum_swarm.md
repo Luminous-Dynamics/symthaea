@@ -350,6 +350,18 @@ Nice-to-haves (not gating):
    "all=1 except phi=0" (phi_out=0.131). Max achievable phi under any
    input pattern in this demo appears to be ~0.314.
 
+   **Warmup caveat.** The 0.314 figure is STEADY-STATE. A single
+   `update_entity()` call after `register()` gives ~0.256 (measured
+   by the regression test in `tests/pendulum_swarm_invariants.rs`).
+   `EntityConsciousness` carries memory that converges over ~60
+   frames of sustained input. The demo runs at 60 Hz so this
+   is invisible — by the time any visitor looks, phi has settled.
+   But: if you bring up 100 pendulums with identical high inputs and
+   immediately read phi, you'll see values in the low-0.2s for the
+   first second. Color + damping will visibly "warm up" during that
+   second. Either accept this (arguably on-theme) or fade-in the
+   demo over the first second with a gated shock.
+
    **Consequence:** code that treats `field.phi()` as if it reached 1.0
    will see only ~30% of intended dynamic range. Normalize via
    `phi_norm = (phi / 0.314).clamp(0.0, 1.0)` before mapping to damping
