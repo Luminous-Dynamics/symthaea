@@ -38,10 +38,11 @@ use symthaea_broca::encoder::ThoughtChannels;
 use symthaea_broca::generator::{BrocaGenerator, SamplingStrategy};
 use symthaea_core::genesis::GenesisSeed;
 
-/// NixIntent::ALL order — keep in lockstep with nix_codegen.rs.
-/// Index of each variant in the 10D one-hot block.
+/// Broca-aligned intent slot (post-projection 10→8-way). Keep in
+/// lockstep with `nix_broca_bridge::project_intent` in the main
+/// crate.
 #[allow(dead_code)]
-enum NixIntentIdx {
+enum BrocaIntentSlot {
     DevShell = 0,
     Service = 1,
     Hardware = 2,
@@ -50,32 +51,32 @@ enum NixIntentIdx {
     Networking = 5,
     HomeManager = 6,
     Secrets = 7,
-    FlakeTemplate = 8,
-    Generic = 9,
 }
 
-/// Build a 17D Nix intent vector. Channels 0-9 are one-hot intent,
-/// 10-16 are context scalars. Mirrors `nix_channels_as_slice` in the
-/// main crate's nix_broca_bridge module.
-fn make_channels_17(intent: NixIntentIdx, language: f32, has_hw: f32) -> [f32; 17] {
-    let mut out = [0.0_f32; 17];
-    out[intent as usize] = 1.0;
-    out[10] = language;
-    // [11]=item_count, [12]=has_extras, [13]=has_network_spec,
-    // [14]=has_hardware, [15]=has_permission, [16]=has_wayland
-    out[14] = has_hw;
-    out
-}
-
-/// Pack the 17D intent vector into Broca's 43D ThoughtChannels. First
-/// 17 positions carry the Nix signal; the remaining 26 default to
-/// zero. The channel-semantics mismatch (Broca 0-7 = general intent,
-/// our 0-9 = Nix intent) is acknowledged in the lib.rs docstring of
-/// the main crate's bridge — full alignment is future work.
-fn pack(flat: [f32; 17]) -> ThoughtChannels {
+/// Build a Broca-aligned 43D ThoughtChannels for a canonical Nix
+/// intent. Intent at positions 0-7 (one-hot), context scalars at
+/// 24-27 (code channels), emotional/consciousness/epistemic blocks
+/// left at zero. Matches the layout produced by
+/// `nix_broca_bridge::nix_channels_as_broca` in the main crate.
+///
+/// Parameters:
+/// - `intent`: projected 8-way Broca intent slot.
+/// - `language_norm`: 0..1, where Rust=1/6, Python=2/6, etc.
+/// - `has_hardware_flag`: 1.0 if the prompt mentions gpu/hardware.
+fn make_broca_channels(
+    intent: BrocaIntentSlot,
+    language_norm: f32,
+    has_hardware_flag: f32,
+) -> ThoughtChannels {
     let mut tc = ThoughtChannels::default();
-    let n = tc.channels.len().min(flat.len());
-    tc.channels[..n].copy_from_slice(&flat[..n]);
+    // 0..8 — intent one-hot.
+    tc.channels[intent as usize] = 1.0;
+    // 24..28 — code-channel-packed Nix context.
+    // syntax_complexity (item_count/5); leaving at 0 for smoke demo.
+    tc.channels[24] = 0.0;
+    tc.channels[25] = 0.0; // has_extras — smoke demo leaves 0
+    tc.channels[26] = language_norm; // algorithm_pattern = language / 6.0
+    tc.channels[27] = has_hardware_flag * 0.5; // hardware gets top bit of the 4-flag pack
     tc
 }
 
@@ -145,26 +146,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Three canonical intents to demonstrate that (a) different
     // channels produce different outputs (signal propagation works)
     // and (b) the full emission pipeline runs without panics.
+    // Language norm: rust = 1/6 ≈ 0.167 for the dev-shell case.
     let cases = [
         (
             "service: nginx",
-            make_channels_17(NixIntentIdx::Service, 0.0, 0.0),
+            make_broca_channels(BrocaIntentSlot::Service, 0.0, 0.0),
         ),
         (
             "dev-shell: rust",
-            make_channels_17(NixIntentIdx::DevShell, 1.0, 0.0),
+            make_broca_channels(BrocaIntentSlot::DevShell, 1.0 / 6.0, 0.0),
         ),
         (
             "hardware: nvidia",
-            make_channels_17(NixIntentIdx::Hardware, 0.0, 1.0),
+            make_broca_channels(BrocaIntentSlot::Hardware, 0.0, 1.0),
         ),
     ];
 
-    for (label, flat) in cases {
+    for (label, tc) in cases {
         println!("\n── {} ──", label);
-        println!("  channels[0..10] (intent): {:?}", &flat[..10]);
-        println!("  channels[10..17] (context): {:?}", &flat[10..17]);
-        let tc = pack(flat);
+        println!("  channels[0..8] (intent): {:?}", &tc.channels[..8]);
+        println!(
+            "  channels[24..28] (code/context): {:?}",
+            &tc.channels[24..28]
+        );
         let result = generator.generate(&tc);
         println!("  → {} bytes emitted", result.text.len());
         println!("  ▽ {}", result.text.replace('\n', "\n    "));

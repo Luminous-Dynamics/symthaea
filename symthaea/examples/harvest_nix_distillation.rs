@@ -30,7 +30,7 @@
 use std::io::Write;
 use std::path::PathBuf;
 
-use symthaea::language::nix_broca_bridge::{nix_channels_flat, NIX_CHANNEL_COUNT};
+use symthaea::language::nix_broca_bridge::broca_channels_for_nix_prompt;
 use symthaea::language::nix_codegen::classify_nix_intent;
 use symthaea::language::nix_eval_goldens::golden_for;
 use symthaea::language::nix_repair::generate_nix_with_scorer_repair;
@@ -93,8 +93,14 @@ struct DistillPair<'a> {
     prompt: &'a str,
     /// Debug-format of `NixIntent` — cheap string match for the trainer.
     intent: String,
-    /// `NIX_CHANNEL_COUNT`-long float vector (17D by default).
-    channels: [f32; NIX_CHANNEL_COUNT],
+    /// Broca-aligned channel vector (43D — matches Broca's
+    /// `ThoughtChannels` layout directly). Intent lives in positions
+    /// 0-7, context scalars packed into Broca's code channels at
+    /// 24-27, emotional/consciousness/epistemic blocks untouched.
+    /// Serialized as Vec because serde's array Serialize impl caps
+    /// at 32 elements; downstream reader reconstructs 43-element
+    /// array from length.
+    channels: Vec<f32>,
     /// Structurally PASS-verified generated Nix source.
     code: String,
     /// How many scorer→repair iterations the loop took before PASS.
@@ -152,11 +158,11 @@ fn main() {
             continue;
         }
         let intent = classify_nix_intent(&prompt.to_lowercase());
-        let channels = nix_channels_flat(prompt);
+        let channels = broca_channels_for_nix_prompt(prompt);
         let pair = DistillPair {
             prompt,
             intent: format!("{intent:?}"),
-            channels,
+            channels: channels.to_vec(),
             code: result.code,
             iterations: result.iterations,
             repair_steps: result.steps.len(),

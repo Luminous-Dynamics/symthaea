@@ -30,6 +30,14 @@
 
 use crate::language::nix_codegen::{build_nix_channels, NixChannels, NixIntent};
 
+/// Broca's default `NUM_CHANNELS`. Intentionally duplicated rather than
+/// imported from symthaea-broca — this main-crate module deliberately
+/// avoids a broca dep (the ssm_language/broca_lite mutual-exclusion
+/// keeps broca optional). Must stay in lockstep with broca's
+/// `encoder.rs::NUM_CHANNELS` (currently 43 for the default build,
+/// 47 with `therapeutic` — we target 43).
+pub const BROCA_CHANNEL_COUNT: usize = 43;
+
 /// Number of channels in the flat Nix → Broca intent vector.
 /// Matches the byte-layout of `nix_channels_as_slice`.
 pub const NIX_CHANNEL_COUNT: usize = 17;
@@ -84,6 +92,100 @@ pub fn intent_from_channels(channels: &[f32]) -> Option<NixIntent> {
 /// saves a length check when calling with `nix_channels_flat` output.
 pub fn intent_from_flat(channels: &[f32; NIX_CHANNEL_COUNT]) -> Option<NixIntent> {
     intent_from_channels(channels)
+}
+
+// ─── Broca-aligned channel layout (M7.c channel-alignment fix) ──────────
+//
+// The 17-channel flat layout above OVERLAPS Broca's native channel
+// semantics: positions 0-7 are Broca's general 8-way intent, 8-19 are
+// emotional + consciousness + relational, 20-23 V3 context, 24-27 code
+// channels, 28-42 epistemic cube. Putting our 10-way Nix intent at
+// positions 0-9 bleeds two intents into Broca's emotional block.
+// Putting our 7 context scalars at 10-16 collides with emotional tone.
+//
+// The aligned function below maps our 17-channel Nix signal into
+// Broca's existing 43-channel ThoughtChannels without stomping:
+//
+//   broca[0..8]   ← projected 10-way Nix intent (lossy projection; see
+//                   below) one-hot.
+//   broca[8..24]  ← zero (emotional + consciousness + relational + V3
+//                   context — Broca's existing semantics).
+//   broca[24]     ← syntax_complexity ← nix.item_count / 5.0 (clamped)
+//   broca[25]     ← type_confidence   ← nix.has_extras
+//   broca[26]     ← algorithm_pattern ← nix.language / 6.0 (6 language
+//                                        ids; clamped to [0,1])
+//   broca[27]     ← error_likelihood  ← has_hardware * 0.5 +
+//                                        has_network * 0.25 +
+//                                        has_permission * 0.125 +
+//                                        has_wayland * 0.0625
+//                   (bit-packed 4 flags in [0, 15/16])
+//   broca[28..43] ← zero (epistemic cube — Broca's hallucination gate;
+//                   we don't perturb it).
+//
+// The lossy 10→8 intent projection (FlakeTemplate → DevShell,
+// Generic → DevShell) is deliberate: FlakeTemplate prompts produce
+// dev-shell-ish scaffolding, Generic is the fallback — both can
+// plausibly share DevShell's Broca intent slot.
+
+pub const BROCA_INTENT_DIM: usize = 8;
+
+/// Map a `NixIntent` (10-way) into Broca's 8-way intent index.
+/// FlakeTemplate and Generic fold into DevShell (index 0).
+fn project_intent(intent: NixIntent) -> usize {
+    match intent {
+        NixIntent::DevShell => 0,
+        NixIntent::Service => 1,
+        NixIntent::Hardware => 2,
+        NixIntent::Desktop => 3,
+        NixIntent::User => 4,
+        NixIntent::Networking => 5,
+        NixIntent::HomeManager => 6,
+        NixIntent::Secrets => 7,
+        NixIntent::FlakeTemplate => 0, // collapse with DevShell
+        NixIntent::Generic => 0,       // default/fallback
+    }
+}
+
+/// Convert a `NixChannels` struct into a Broca-aligned 43-channel
+/// array. This is what the harvester + trainer should use going
+/// forward — the old `nix_channels_as_slice` remains for backward
+/// compat / tests.
+pub fn nix_channels_as_broca(channels: &NixChannels) -> [f32; BROCA_CHANNEL_COUNT] {
+    let mut out = [0.0_f32; BROCA_CHANNEL_COUNT];
+
+    // 0..8 — projected Nix intent, one-hot into Broca's 8-way slot.
+    // Find which NixIntent index was set (first 1.0 in the 10D block),
+    // then project to 0-7.
+    if let Some(src_idx) = channels.intent.iter().position(|&v| v > 0.5) {
+        if let Some(src_intent) = NixIntent::ALL.get(src_idx).copied() {
+            let dst = project_intent(src_intent);
+            if dst < BROCA_INTENT_DIM {
+                out[dst] = 1.0;
+            }
+        }
+    }
+
+    // 24..28 — Nix context, packed into Broca's code-channel slots.
+    let item_norm = (channels.item_count / 5.0).clamp(0.0, 1.0);
+    out[24] = item_norm;
+    out[25] = channels.has_extras.clamp(0.0, 1.0);
+    let lang_norm = (channels.language / 6.0).clamp(0.0, 1.0);
+    out[26] = lang_norm;
+    // Bit-pack four flags into [0, ~0.94] range.
+    let flags = channels.has_hardware * 0.5
+        + channels.has_network_spec * 0.25
+        + channels.has_permission * 0.125
+        + channels.has_wayland * 0.0625;
+    out[27] = flags.clamp(0.0, 1.0);
+
+    out
+}
+
+/// Convenience: prompt → Broca-aligned 43-channel array. This is what
+/// `harvest_nix_distillation` and the generation demo should call
+/// instead of `nix_channels_flat`.
+pub fn broca_channels_for_nix_prompt(prompt: &str) -> [f32; BROCA_CHANNEL_COUNT] {
+    nix_channels_as_broca(&build_nix_channels(prompt))
 }
 
 #[cfg(test)]
@@ -165,6 +267,97 @@ mod tests {
         chans[9] = 0.1; // Generic
         let recovered = intent_from_flat(&chans);
         assert_eq!(recovered, Some(NixIntent::ALL[2]));
+    }
+
+    // ── Broca-aligned layout tests ────────────────────────────────
+
+    #[test]
+    fn broca_aligned_has_43_channels() {
+        assert_eq!(BROCA_CHANNEL_COUNT, 43);
+        let out = broca_channels_for_nix_prompt("enable nginx web server");
+        assert_eq!(out.len(), 43);
+    }
+
+    #[test]
+    fn broca_aligned_intent_one_hot_in_first_8() {
+        let out = broca_channels_for_nix_prompt("enable nginx web server");
+        // Service projects to Broca index 1.
+        assert_eq!(out[1], 1.0);
+        // Rest of the 0-7 block must be zero.
+        for i in 0..BROCA_INTENT_DIM {
+            if i != 1 {
+                assert_eq!(out[i], 0.0, "position {} must be 0", i);
+            }
+        }
+    }
+
+    #[test]
+    fn broca_aligned_flaketemplate_and_generic_collapse_to_devshell() {
+        // Both FlakeTemplate and Generic project to 0 (same slot as
+        // DevShell) — lossy but acceptable per the documented
+        // projection.
+        let flake =
+            broca_channels_for_nix_prompt("complete flake template for rust and python project");
+        assert_eq!(
+            flake[0], 1.0,
+            "flake template should land on Broca intent 0"
+        );
+
+        let generic = broca_channels_for_nix_prompt("hello world");
+        assert_eq!(generic[0], 1.0, "generic should land on Broca intent 0");
+    }
+
+    #[test]
+    fn broca_aligned_does_not_touch_emotional_block() {
+        // Positions 8-23 must stay at 0.0 — those are Broca's
+        // emotional/consciousness/relational/V3 channels. Our Nix
+        // signal has no business perturbing them.
+        let out = broca_channels_for_nix_prompt("configure nvidia gpu drivers");
+        for i in 8..24 {
+            assert_eq!(out[i], 0.0, "Broca semantic channel {} stomped", i);
+        }
+    }
+
+    #[test]
+    fn broca_aligned_code_channels_encode_nix_context() {
+        // Hardware prompt → has_hardware flag → error_likelihood
+        // channel carries 0.5 (top bit of the 4-flag pack).
+        let hw = broca_channels_for_nix_prompt("configure nvidia gpu drivers");
+        assert!(
+            hw[27] >= 0.5,
+            "hardware prompt should set error_likelihood ≥ 0.5; got {}",
+            hw[27]
+        );
+
+        // Networking → has_network_spec → error_likelihood carries 0.25.
+        let net = broca_channels_for_nix_prompt("open firewall ports 80 and 443");
+        assert!(
+            (net[27] - 0.25).abs() < 1e-6,
+            "networking should set error_likelihood to 0.25; got {}",
+            net[27]
+        );
+
+        // Rust dev-shell → language=1.0 → algorithm_pattern at
+        // position 26 gets 1.0/6.0 ≈ 0.167.
+        let rust =
+            broca_channels_for_nix_prompt("set up a rust dev environment with rust-analyzer");
+        let expected = 1.0 / 6.0;
+        assert!(
+            (rust[26] - expected).abs() < 1e-3,
+            "rust → algorithm_pattern ≈ 0.167; got {}",
+            rust[26]
+        );
+    }
+
+    #[test]
+    fn broca_aligned_preserves_epistemic_cube_block() {
+        // Positions 28-42 are Broca's Epistemic Cube — the
+        // hallucination-prevention gate. Our bridge must NEVER
+        // perturb these or we'd defeat the gate's purpose.
+        let out = broca_channels_for_nix_prompt("configure postgresql service");
+        for i in 28..BROCA_CHANNEL_COUNT {
+            assert_eq!(out[i], 0.0, "epistemic cube channel {} perturbed", i);
+        }
     }
 
     #[test]
