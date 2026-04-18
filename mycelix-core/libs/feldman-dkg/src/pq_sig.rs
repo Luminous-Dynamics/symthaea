@@ -17,7 +17,7 @@
 //! assert!(verify(&kp.verifying_key_bytes(), message, &signature).is_ok());
 //! ```
 
-use ml_dsa::signature::{SignatureEncoding, Signer, Verifier};
+use ml_dsa::signature::{Keypair, SignatureEncoding, Signer, Verifier};
 use ml_dsa::{EncodedVerifyingKey, KeyGen, MlDsa65, SigningKey, VerifyingKey};
 
 /// An ML-DSA-65 keypair for post-quantum digital signatures.
@@ -46,9 +46,10 @@ pub fn generate_signing_keypair() -> MlDsaKeyPair {
     let mut seed = ml_dsa::B32::default();
     getrandom::fill(&mut seed).expect("OS CSPRNG unavailable");
     let kp = MlDsa65::from_seed(&seed);
+    let verifying_key = kp.verifying_key();
     MlDsaKeyPair {
-        signing_key: kp.signing_key().clone(),
-        verifying_key: kp.verifying_key().clone(),
+        signing_key: kp,
+        verifying_key,
     }
 }
 
