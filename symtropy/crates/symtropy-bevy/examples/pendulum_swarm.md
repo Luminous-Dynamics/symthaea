@@ -46,14 +46,30 @@ pendulum_swarm` away from a visitor seeing what the engine does.
 
 ### Dependencies
 Already in `symtropy-bevy`'s dep graph:
-- `symtropy-bevy` — the plugin
-- `symtropy-physics` (re-exported) — ND rigid bodies
+- `symtropy-bevy` — provides `SymtropyPhysicsPlugin<D>` and the `SymtropyPhysics<D>`
+  Resource (which bundles `world: PhysicsWorld<D>` + `field: ConsciousnessField<D>`)
+- `symtropy-bevy-core` — provides `PhysicsBody` Bevy `Component` (re-exported)
+- `symtropy-physics` (re-exported) — `BodyHandle`, `RigidBody`, `DistanceConstraint`,
+  `BodyType` (Static/Dynamic/Kinematic), joint types
 - `symtropy-consciousness-physics` (re-exported) — `ConsciousnessField`, `ConsciousnessInputs`
 - `symtropy-math` (re-exported) — `Point<D>`
 - `bevy = "0.18"` — rendering, input, time
 
 No new deps required. This matters: the example must run by cloning the repo
 and running one command.
+
+### Resource access pattern
+The plugin owns one `SymtropyPhysics<D>` Resource. User systems take
+`ResMut<SymtropyPhysics<D>>` and reach into `physics.world` and
+`physics.field`. Example:
+
+```rust
+fn my_system(mut physics: ResMut<SymtropyPhysics<2>>) {
+    let h = physics.world.add_sphere(Point::new([0.0, 0.0]), 10.0, 1.0);
+    physics.field.register(h, 100.0, 32.0);
+    let phi = physics.field.phi(h);
+}
+```
 
 ### Dimensionality
 **2D (`SymtropyPhysicsPlugin::<2>`).** Reasons: grid of pendulums is inherently
@@ -68,61 +84,123 @@ the visual is cleaner without perspective.
   factor (~100 px/m).
 
 ### Core components (Bevy entities)
+Each of the 100 pendulum entities carries THREE components:
+
 ```rust
 #[derive(Component)]
 struct Pendulum {
-    body: BodyHandle,
-    pivot: Vec2,                 // screen coords of the fixed pivot
-    neighbors: Vec<BodyHandle>,  // up to 8 grid neighbors for Kuramoto coupling
+    body: BodyHandle,                // the swinging dynamic body
+    pivot_body: BodyHandle,          // the static "pivot" body (mass=∞)
+    pivot_pos: Vec2,                 // screen coords of the pivot, for input/visuals
+    neighbors: Vec<BodyHandle>,      // up to 8 grid neighbors for Kuramoto coupling
 }
 
 #[derive(Component)]
-struct PendulumVisual;  // the sphere sprite, one per pendulum
+struct PendulumVisual;  // marker for the sprite
+
+// PLUS: PhysicsBody (re-exported by symtropy-bevy) — REQUIRED for sync_transforms
+//       to copy world.body(handle).position() into the entity's Transform.
+//       Construct with: PhysicsBody::new(handle, visual_radius)
 ```
 
-### Systems (Bevy `Update` schedule)
+### Pivot construction (no `BodyType::Static` constructor)
 
-1. **`spawn_swarm` (Startup)** — builds 100 pendulums:
-   - For each (i, j) in 10×10: compute pivot position, spawn rigid body at
-     `pivot + (0, -60)` (pendulum hanging), register with `ConsciousnessField`
-     via `field.register(handle, max_energy=100.0, sanctuary_radius=32.0)`,
-     wire a `HingeJoint` or `DistanceConstraint` from body → pivot.
-   - (Note: `HingeJoint` in `symtropy-physics` constrains rotation plane.
-     For 2D planar swinging we actually want `DistanceConstraint` pinning
-     the body to a fixed point — simpler and gives ideal pendulum motion.)
-   - Spawn matching Bevy sprite entity with `Pendulum`, `PendulumVisual`,
-     and default `Transform`.
+Static bodies are built via `RigidBody::static_body(handle, position, collider)`
+then handed to `world.add_body(body)`. For a pendulum pivot:
 
-2. **`update_phi_from_neighborhood` (Update)** — for each pendulum:
-   - Compute local angular-velocity variance across the 3×3 neighborhood.
-     Low variance → coherent → high Phi. High variance → chaotic → low Phi.
-   - Map variance to `ConsciousnessInputs` (all 8 fields set from a single
-     coherence scalar; this is a deliberate simplification for demo clarity).
-   - Call `field.update_entity(handle, &inputs, Point::new([pos_x, pos_y]))`.
+```rust
+use symtropy_physics::body::{RigidBody, BodyHandle};
+use symtropy_physics::shapes::Sphere;  // or whatever shape mod is named
 
-3. **`phi_couples_neighbors` (Update)** — for each pendulum:
-   - Read `field.phi(handle)` → `phi`
-   - Compute own swing angle `θ = atan2(pos.x - pivot.x, pivot.y - pos.y)`
+let pivot_body = RigidBody::<2>::static_body(
+    BodyHandle::default(),  // re-assigned by world.add_body
+    Point::new([px, py]),
+    Box::new(Sphere::new(1.0)),  // collider — pivot won't actually collide
+);
+let pivot_handle = physics.world.add_body(pivot_body);
+```
+
+### Constraint construction (plain struct, no `new()`)
+
+```rust
+use symtropy_physics::constraint::DistanceConstraint;
+
+physics.world.add_constraint(Box::new(DistanceConstraint::<2> {
+    body_a: pivot_handle,
+    body_b: bob_handle,
+    rest_length: 60.0,  // arm length in world units (px)
+    stiffness: 1.0,
+}));
+```
+
+### Systems
+
+The plugin's physics_step + sync_transforms run on **`FixedUpdate`** (60 Hz
+default). User systems split:
+
+**FixedUpdate (deterministic, 60 Hz):**
+- `update_phi_from_neighborhood` — must run BEFORE physics_step picks up
+  the field state. Acceptable to run after on some ticks (one-tick delay
+  invisible at 60 Hz).
+- `phi_couples_neighbors` — applies Kuramoto impulses; same ordering note.
+
+**Update (variable-rate, render-driven):**
+- `color_by_phi` — visual only, can interpolate.
+- `shock_on_click` — input read; impulse application via
+  `ResMut<SymtropyPhysics<2>>` lands in next FixedUpdate.
+
+Detail per system:
+
+1. **`spawn_swarm` (Startup)** — for each (i, j) in 10×10:
+   - Compute pivot position; build a static pivot body (see snippet above).
+   - Spawn the dynamic bob at `pivot + (0, -60)` via `world.add_sphere(...)`.
+   - `field.register(bob_handle, 100.0, 32.0)`.
+   - `world.add_constraint(Box::new(DistanceConstraint { ... }))`.
+   - Spawn the Bevy entity bundling `(Pendulum { body, pivot_body, pivot_pos,
+     neighbors }, PendulumVisual, PhysicsBody::new(bob_handle, 10.0),
+     Sprite { ... }, Transform::default())`.
+   - After all 100 spawned, do a second pass to fill `neighbors` (handles
+     aren't known until all bobs are added).
+
+2. **`update_phi_from_neighborhood` (FixedUpdate)** — for each pendulum:
+   - Read `physics.world.body(handle).linear_velocity` for self + neighbors.
+   - Compute neighborhood variance (low variance → coherent → high Phi).
+   - Map to `ConsciousnessInputs` (all 8 fields set from a single coherence
+     scalar — deliberate simplification for demo clarity).
+   - `physics.field.update_entity(handle, &inputs, Point::new([pos.x, pos.y]))`.
+
+3. **`phi_couples_neighbors` (FixedUpdate)** — for each pendulum:
+   - `let phi = physics.field.phi(handle)` → `f64` in [0, 1].
+   - Read own position via `physics.world.body(handle).position()`; compute
+     swing angle `θ = atan2(pos.x - pivot.x, pivot.y - pos.y)` (zero when
+     hanging straight down).
    - For each neighbor handle `n`, compute `Δθ = θ_n - θ` and apply a
-     horizontal impulse `K * phi * sin(Δθ)` to self (Kuramoto coupling
-     kernel). `K` is a global tunable — start at 0.5, expect 0.1-2.0 range.
-   - Net effect: at high Phi, neighbors pull each other into phase-lock;
-     at low Phi the coupling vanishes and each pendulum runs free under
-     gravity alone.
-   - Keep a small constant `linear_damping = 0.05` on every body so the
-     scene eventually rests if left alone.
+     horizontal impulse to self. There's no `apply_impulse` method —
+     mutate velocity directly:
+     ```rust
+     if let Some(body) = physics.world.body_mut(self_handle) {
+         body.linear_velocity[0] += K * phi * (delta_theta).sin() / body.mass;
+     }
+     ```
+   - `K` global tunable — start at 0.5, expect 0.1-2.0 range. See
+     landmine #1 for stability bounds.
+   - Keep `body.linear_damping = 0.05` (set once at spawn) so the scene
+     rests if left alone.
 
-4. **`color_by_phi` (Update)** — for each `PendulumVisual`:
-   - Map `phi ∈ [0, 1]` to a color via a simple viridis-style LUT (or
-     just `Color::hsl(240.0 - phi * 240.0, 1.0, 0.5)` — blue→red).
-   - Write to the sprite's material/color.
+4. **`color_by_phi` (Update)** — query `(&Pendulum, &mut Sprite)`:
+   - Read `physics.field.phi(p.body)`; map to color via
+     `Color::hsl(240.0 - phi * 240.0, 1.0, 0.5)` (blue→red).
+   - Write to `sprite.color`.
 
-5. **`shock_on_click` (Update)** — on mouse click:
-   - Raycast from cursor to 2D world space
-   - Find nearest pendulum within `50 px`
-   - Inject angular velocity (or linear impulse) via `body_mut`
+5. **`shock_on_click` (Update)** — on `MouseButton::Left` press:
+   - Read cursor position from `Window` → world coords.
+   - Find nearest pendulum within 50 px (linear scan; 100 entities is fine).
+   - `physics.world.body_mut(handle).linear_velocity[0] += 50.0`
+     (or apply via the impulse pattern from system 3).
 
-6. **`sync_transforms`** — already provided by `SymtropyPhysicsPlugin`.
+6. **`sync_transforms` (FixedUpdate, plugin-owned)** — already provided by
+   `SymtropyPhysicsPlugin`. Queries `(&PhysicsBody, &mut Transform)` —
+   THIS is why every pendulum entity needs the `PhysicsBody` component.
 
 ### File layout
 - `examples/pendulum_swarm.rs` — single file, all of the above (~330 LOC)
@@ -134,13 +212,29 @@ struct PendulumVisual;  // the sphere sprite, one per pendulum
 
 Sequential, smallest-commit-per-step:
 
-0. **Constraint spike (15 min, throwaway).** Build one pendulum two ways:
-   `DistanceConstraint<2>` between body and a static pivot body, vs
-   `HingeJoint<2>` if it has a 2D analogue. Pick whichever swings cleanly
-   under gravity. Don't commit this — it's a de-risk for landmine #1
-   before the design is locked in. If `DistanceConstraint` wins (the
-   doc's assumption), proceed. If `HingeJoint` wins or both are awkward,
-   revise the architecture section before writing Step 1.
+0. **Constraint spike (15 min, throwaway).** Build one pendulum and verify
+   it swings under gravity. Concretely:
+
+   ```rust
+   let mut world = PhysicsWorld::<2>::new(SVector::from([0.0, -9.81]));
+   let pivot = world.add_body(RigidBody::static_body(
+       BodyHandle::default(),
+       Point::new([0.0, 0.0]),
+       Box::new(Sphere::new(1.0)),
+   ));
+   let bob = world.add_sphere(Point::new([60.0, 0.0]), 5.0, 1.0);  // start 60px to the side
+   world.add_constraint(Box::new(DistanceConstraint::<2> {
+       body_a: pivot, body_b: bob, rest_length: 60.0, stiffness: 1.0,
+   }));
+   for _ in 0..600 { world.step(1.0/60.0); }  // 10 sec
+   // Print bob.position() trajectory — should swing left-right through the bottom.
+   ```
+
+   No Bevy needed for this spike — pure `symtropy-physics`. If the bob
+   traces a clean pendulum arc, lock in `DistanceConstraint`. If it
+   drifts, breaks, or behaves nonphysically, try `HingeJoint<2>` next
+   (signature TBD — read `joints/hinge.rs`) and revise the architecture
+   section before writing Step 1. Don't commit the spike code.
 
 1. **Hello Bevy + physics plugin** — `SymtropyPhysicsPlugin::<2>::default()`,
    empty scene, dark background, runs at 60 fps. Verify window opens.
