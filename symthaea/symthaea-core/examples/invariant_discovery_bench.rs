@@ -34,10 +34,14 @@
 use std::time::Instant;
 
 use symthaea_core::hdc::conjecture_engine::{
-    observe_balmer_series, observe_bell_numbers, observe_blackbody_peak, observe_catalan,
-    observe_central_binomial_limit, observe_derangement_ratio, observe_fibonacci_ratios,
-    observe_hydrogen_energy_levels, observe_kepler_third_law, observe_partitions,
-    observe_prime_counting, observe_quantum_harmonic_oscillator, observe_stefan_boltzmann, Expr,
+    observe_balmer_series, observe_bell_numbers, observe_bell_stirling_residual,
+    observe_blackbody_peak, observe_catalan, observe_central_binomial_limit,
+    observe_derangement_ratio, observe_derangements, observe_fibonacci_ratios, observe_fubini,
+    observe_gr_correction, observe_hydrogen_energy_levels, observe_inverse_square_law,
+    observe_kepler_third_law, observe_maximal_prime_gap, observe_motzkin,
+    observe_nuclear_binding_energy, observe_partitions, observe_perm_det_ratio,
+    observe_prime_counting, observe_prime_gaps, observe_quantum_harmonic_oscillator,
+    observe_relativistic_kinetic_energy, observe_stefan_boltzmann, observe_stirling_sum, Expr,
     ObservedSequence, RegressorConfig, SymbolicRegressor,
 };
 
@@ -120,6 +124,68 @@ fn main() {
             name: "prime_counting",
             expected_shape: "π(n) ~ n / ln(n)",
             seq: observe_prime_counting(100),
+        },
+        Problem {
+            name: "prime_gaps",
+            expected_shape: "g(p) ~ ln(p) (Cramér's conjecture); mean behavior",
+            seq: observe_prime_gaps(10000),
+        },
+        Problem {
+            name: "maximal_prime_gap",
+            expected_shape: "G(n) ~ (ln n)² (Shanks conjecture)",
+            seq: observe_maximal_prime_gap(100000),
+        },
+        // ─── Extended combinatorics ────────────────────────────────────
+        Problem {
+            name: "derangements",
+            expected_shape: "!n = n! · Σ_{k=0..n} (-1)^k / k! ~ n!/e",
+            seq: observe_derangements(15),
+        },
+        Problem {
+            name: "bell_stirling_residual",
+            expected_shape: "B(n) - Σ S(n,k) = 0 (identity residual — exactly zero)",
+            seq: observe_bell_stirling_residual(15),
+        },
+        Problem {
+            name: "stirling_sum",
+            expected_shape: "Σ_{k=0..n} S(n,k) = B(n) (Stirling → Bell)",
+            seq: observe_stirling_sum(15),
+        },
+        Problem {
+            name: "fubini",
+            expected_shape: "a(n) = ordered Bell number ~ n!/2·(ln 2)^{-n-1}",
+            seq: observe_fubini(15),
+        },
+        Problem {
+            name: "motzkin",
+            expected_shape: "M(n) ~ 3^n / (n^{3/2} · √(3π/2)/2)",
+            seq: observe_motzkin(20),
+        },
+        Problem {
+            name: "perm_det_ratio",
+            expected_shape: "per(A)/det(A) ratio on random matrices (growth class TBD)",
+            seq: observe_perm_det_ratio(10),
+        },
+        // ─── Extended physics ──────────────────────────────────────────
+        Problem {
+            name: "inverse_square_law",
+            expected_shape: "F(r) ~ 1 / r^2 (gravitation / Coulomb)",
+            seq: observe_inverse_square_law(30),
+        },
+        Problem {
+            name: "relativistic_kinetic_energy",
+            expected_shape: "E_k(v) = (γ − 1) m c² with γ = 1/√(1 − v²/c²)",
+            seq: observe_relativistic_kinetic_energy(20),
+        },
+        Problem {
+            name: "nuclear_binding_energy",
+            expected_shape: "SEMF: ~ a_v·A − a_s·A^{2/3} − a_c·Z²/A^{1/3} − …",
+            seq: observe_nuclear_binding_energy(100),
+        },
+        Problem {
+            name: "gr_correction",
+            expected_shape: "Δφ per orbit ~ 6π GM / (c² a (1 − e²))",
+            seq: observe_gr_correction(1.0, 2.0, 10.0, 20),
         },
     ];
 

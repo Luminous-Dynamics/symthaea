@@ -1,0 +1,52 @@
+name,stage,error_category,error_message,lake_check
+mathd_algebra_10,not_parsed,parse,"expected relation operator (= ≠ < ≤ > ≥ ∣), found ""("" at offset 116",not_run
+mathd_algebra_33,translated,,,rejected
+mathd_algebra_275,not_parsed,parse,"expected `)` closing parenthesized term, found "":"" at offset 134",not_run
+mathd_algebra_400,translated,,,accepted
+mathd_numbertheory_430,translated,,,rejected
+mathd_numbertheory_690,not_parsed,parse,"unknown character '{' at offset 130",not_run
+mathd_algebra_176,translated,,,accepted
+mathd_algebra_245,translated,,,accepted
+mathd_algebra_160,translated,,,accepted
+mathd_algebra_190,not_parsed,parse,"expected `)` closing parenthesized term, found "":"" at offset 117",not_run
+mathd_algebra_114,not_parsed,parse,"expected `)` closing parenthesized term, found "":"" at offset 165",not_run
+mathd_numbertheory_320,translated,,,accepted
+mathd_algebra_59,not_parsed,parse,"expected `)` closing parenthesized term, found "":"" at offset 131",not_run
+mathd_numbertheory_207,translated,,,accepted
+mathd_algebra_314,not_translated,translate,"unsupported translation: non-literal exponent",not_run
+mathd_algebra_419,translated,,,accepted
+mathd_algebra_327,not_parsed,parse,"expected relation operator (= ≠ < ≤ > ≥ ∣), found ""("" at offset 141",not_run
+mathd_numbertheory_234,translated,,,rejected
+mathd_algebra_756,not_parsed,parse,"expected `)` closing parenthesized term, found "":"" at offset 137",not_run
+mathd_numbertheory_629,not_parsed,parse,"unknown character '{' at offset 126",not_run
+mathd_algebra_296,not_parsed,parse,"expected relation operator (= ≠ < ≤ > ≥ ∣), found ""("" at offset 119",not_run
+mathd_algebra_13,not_parsed,parse,"expected term (identifier, integer, or `(`), found ""∀"" at offset 132",not_run
+mathd_numbertheory_227,not_parsed,parse,"unknown character '↑' at offset 143",not_run
+mathd_algebra_104,translated,,,accepted
+mathd_algebra_323,not_parsed,parse,"unknown character 'σ' at offset 112",not_run
+mathd_algebra_451,not_parsed,parse,"unknown character 'σ' at offset 112",not_run
+mathd_numbertheory_64,not_parsed,parse,"unknown character '{' at offset 125",not_run
+mathd_algebra_113,translated,,,accepted
+mathd_algebra_80,translated,,,rejected
+mathd_algebra_37,translated,,,accepted
+mathd_algebra_137,not_parsed,parse,"unknown character '↑' at offset 133",not_run
+mathd_numbertheory_136,translated,,,accepted
+mathd_algebra_125,not_parsed,parse,"unknown character '↑' at offset 184",not_run
+mathd_algebra_11,translated,,,accepted
+mathd_numbertheory_284,translated,,,accepted
+mathd_algebra_129,translated,,,accepted
+mathd_algebra_181,translated,,,accepted
+mathd_algebra_44,translated,,,accepted
+mathd_numbertheory_85,translated,,,accepted
+mathd_algebra_234,translated,,,accepted
+mathd_algebra_421,translated,,,rejected
+mathd_algebra_247,not_translated,translate,"unsupported translation: non-literal exponent",not_run
+mathd_algebra_302,not_parsed,parse,"unknown character '.' at offset 123",not_run
+mathd_numbertheory_22,not_parsed,parse,"unknown character '.' at offset 154",not_run
+mathd_algebra_107,translated,,,accepted
+mathd_algebra_109,translated,,,accepted
+mathd_numbertheory_541,translated,,,rejected
+mathd_algebra_141,translated,,,accepted
+mathd_algebra_55,translated,,,accepted
+d
+mathd_algebra_410,translated,,,accepted
