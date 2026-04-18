@@ -85,6 +85,19 @@ fn parse_out_arg() -> PathBuf {
     default_out_path()
 }
 
+/// Parse `--holdout N` (0 = no split, 6 = reserve 6 for eval).
+fn parse_holdout_arg() -> usize {
+    let args: Vec<String> = std::env::args().collect();
+    for w in args.windows(2) {
+        if w[0] == "--holdout" {
+            if let Ok(n) = w[1].parse::<usize>() {
+                return n;
+            }
+        }
+    }
+    0
+}
+
 /// One training pair in on-disk form. Channels is a fixed-size array
 /// rather than Vec<f32> so the downstream trainer doesn't need to
 /// runtime-check width each load.
@@ -110,10 +123,35 @@ struct DistillPair<'a> {
     /// — zero-step pairs are "easy"; multi-step pairs taught the
     /// repair heuristics something.
     repair_steps: usize,
+    /// **Hold-out flag** (#1 of the "make this even better" list):
+    /// when true, this pair is withheld from training and used to
+    /// measure generalization. The trainer filters on `!holdout`;
+    /// the evaluator filters on `holdout`.
+    holdout: bool,
+}
+
+/// Mark entry `i` as holdout if it falls in the deterministic
+/// holdout subset. Seeded pseudo-random by prompt hash so the split
+/// is reproducible across harvester runs.
+fn is_holdout(prompt: &str, holdout_count: usize, total: usize) -> bool {
+    if holdout_count == 0 || holdout_count >= total {
+        return false;
+    }
+    // Simple but deterministic: hash the prompt bytes, take modulo
+    // `total`, keep the first `holdout_count` hash-ranked prompts.
+    // Hashing all prompts at caller, then bucketing, would be more
+    // precise; for 26-pair corpus the simpler approach is fine.
+    let mut h: u64 = 14695981039346656037; // FNV-1a offset
+    for b in prompt.bytes() {
+        h ^= b as u64;
+        h = h.wrapping_mul(1099511628211);
+    }
+    (h % total as u64) < holdout_count as u64
 }
 
 fn main() {
     let out_path = parse_out_arg();
+    let holdout_count = parse_holdout_arg();
     if let Some(parent) = out_path.parent() {
         if let Err(e) = std::fs::create_dir_all(parent) {
             eprintln!(
@@ -137,6 +175,12 @@ fn main() {
     println!("│ Nix Distillation Harvester (Phase 2 M7)");
     println!("│ Output: {}", out_path.display());
     println!("│ Candidates: {} prompts", HARVEST_PROMPTS.len());
+    if holdout_count > 0 {
+        println!(
+            "│ Holdout: {} prompts reserved for generalization eval",
+            holdout_count
+        );
+    }
     println!("└─────────────────────────────────────────────────────────");
 
     let mut harvested = 0usize;
@@ -159,6 +203,7 @@ fn main() {
         }
         let intent = classify_nix_intent(&prompt.to_lowercase());
         let channels = broca_channels_for_nix_prompt(prompt);
+        let holdout = is_holdout(prompt, holdout_count, HARVEST_PROMPTS.len());
         let pair = DistillPair {
             prompt,
             intent: format!("{intent:?}"),
@@ -166,6 +211,7 @@ fn main() {
             code: result.code,
             iterations: result.iterations,
             repair_steps: result.steps.len(),
+            holdout,
         };
         match serde_json::to_string(&pair) {
             Ok(line) => {

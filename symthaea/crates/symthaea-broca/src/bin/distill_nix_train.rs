@@ -47,6 +47,10 @@ struct HarvestPair {
     iterations: usize,
     #[serde(default)]
     repair_steps: usize,
+    /// When true, this pair is a holdout reserved for generalization
+    /// evaluation — the trainer silently skips it.
+    #[serde(default)]
+    holdout: bool,
 }
 
 fn default_in_path() -> PathBuf {
@@ -135,6 +139,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         initial.len(),
         repaired.len()
     );
+
+    // Filter out holdout pairs — reserved for generalization eval.
+    let holdout_count = harvest.iter().filter(|p| p.holdout).count();
+    let harvest: Vec<HarvestPair> = harvest.into_iter().filter(|p| !p.holdout).collect();
+    if holdout_count > 0 {
+        println!(
+            "  · {} holdout pairs skipped (training on {} only)",
+            holdout_count,
+            harvest.len()
+        );
+    }
 
     // ── Adapt to Broca's TrainingPair format ──
     // The harvester emits 17-channel intent vectors; Broca auto-pads to
