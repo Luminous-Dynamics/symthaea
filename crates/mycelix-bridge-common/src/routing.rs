@@ -502,7 +502,7 @@ impl CrossClusterRole {
             Self::Cafe => "cafe",
             Self::Atlas => "atlas",
             Self::Attribution => "attribution",
-            Self::Core => "core",
+            Self::Core => "core_fl",
             Self::Desci => "desci",
             Self::Mail => "mail",
             Self::Marketplace => "marketplace",
@@ -718,11 +718,24 @@ fn resolve_support(qt: &str) -> CommonsZome {
 }
 
 fn resolve_waste(qt: &str) -> CommonsZome {
-    if qt.contains("collection") || qt.contains("pickup") || qt.contains("run") || qt.contains("vehicle") {
+    if qt.contains("collection")
+        || qt.contains("pickup")
+        || qt.contains("run")
+        || qt.contains("vehicle")
+    {
         CommonsZome::WasteCollection
-    } else if qt.contains("compost") || qt.contains("batch") || qt.contains("reading") || qt.contains("nutrient") {
+    } else if qt.contains("compost")
+        || qt.contains("batch")
+        || qt.contains("reading")
+        || qt.contains("nutrient")
+    {
         CommonsZome::CompostControl
-    } else if qt.contains("marketplace") || qt.contains("listing") || qt.contains("order") || qt.contains("demand") || qt.contains("secondary") {
+    } else if qt.contains("marketplace")
+        || qt.contains("listing")
+        || qt.contains("order")
+        || qt.contains("demand")
+        || qt.contains("secondary")
+    {
         CommonsZome::CircularMarketplace
     } else {
         CommonsZome::WasteRegistry

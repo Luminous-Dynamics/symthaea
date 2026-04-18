@@ -702,6 +702,10 @@ const IDENTITY_TO_ATTRIBUTION: &[&str] = &["reciprocity"];
 /// Energy-side zomes that identity-bridge queries for thermodynamic-yield score.
 const IDENTITY_TO_ENERGY: &[&str] = &["grid"];
 
+/// Core-FL side zomes that identity-bridge queries for FL participation status
+/// (domain-competence signal in the 8D sovereign profile).
+const IDENTITY_TO_CORE: &[&str] = &["h_fl"];
+
 // --- Group F: Finance outbound routes not previously declared ---
 
 /// Energy-side zomes that finance-bridge is allowed to call for project reconciliation.
@@ -787,6 +791,7 @@ pub const fn get_allowed_zomes(
         (CrossClusterRole::Identity, CrossClusterRole::Knowledge) => IDENTITY_TO_KNOWLEDGE,
         (CrossClusterRole::Identity, CrossClusterRole::Attribution) => IDENTITY_TO_ATTRIBUTION,
         (CrossClusterRole::Identity, CrossClusterRole::Energy) => IDENTITY_TO_ENERGY,
+        (CrossClusterRole::Identity, CrossClusterRole::Core) => IDENTITY_TO_CORE,
 
         // Energy outbound
         (CrossClusterRole::Energy, CrossClusterRole::Finance) => ENERGY_TO_FINANCE,
@@ -1199,7 +1204,7 @@ mod tests {
         assert_eq!(role_name(CrossClusterRole::Legacy), "legacy");
         assert_eq!(role_name(CrossClusterRole::Atlas), "atlas");
         assert_eq!(role_name(CrossClusterRole::Attribution), "attribution");
-        assert_eq!(role_name(CrossClusterRole::Core), "core");
+        assert_eq!(role_name(CrossClusterRole::Core), "core_fl");
         assert_eq!(role_name(CrossClusterRole::Desci), "desci");
         assert_eq!(role_name(CrossClusterRole::Mail), "mail");
         assert_eq!(role_name(CrossClusterRole::Marketplace), "marketplace");
@@ -1678,10 +1683,10 @@ mod tests {
         //   Space→Identity, Attribution→Identity, Attribution→Finance)
         //   + 2 additional routes added for Health↔Identity and Praxis
         //   + 4 Craft routes (Craft↔Praxis, Craft→Identity, Identity→Craft)
-        //   + 7 code-vs-registry gap closes (2026-04-18, Groups E/F/G):
-        //     Identity→{Knowledge, Attribution, Energy},
+        //   + 8 code-vs-registry gap closes (2026-04-18, Groups E/F/G):
+        //     Identity→{Knowledge, Attribution, Energy, Core},
         //     Finance→{Energy, Hearth, Identity},
         //     Climate→Praxis
-        assert_eq!(count, 60, "Expected 60 registered cross-cluster routes");
+        assert_eq!(count, 61, "Expected 61 registered cross-cluster routes");
     }
 }
