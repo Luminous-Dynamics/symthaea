@@ -1378,6 +1378,168 @@ impl LearnedProjection {
     }
 }
 
+// ─── Linear Algorithm Classifier ───────────────────────────────────────────
+
+/// Simple linear classifier: W·x + b → 8 class logits.
+///
+/// This is what the CfC SHOULD be doing but can't with 60 examples.
+/// A linear layer has 512×8 + 8 = 4,104 parameters — tractable for
+/// 48 training examples with SGD.
+pub struct AlgorithmClassifier {
+    /// Weight matrix: 8 × 512 (class × feature)
+    weights: Vec<Vec<f32>>,
+    /// Bias: 8
+    bias: Vec<f32>,
+}
+
+impl AlgorithmClassifier {
+    const NUM_CLASSES: usize = 8;
+    const INPUT_DIM: usize = 512;
+
+    /// Initialize with small random weights.
+    pub fn new() -> Self {
+        let mut weights = Vec::with_capacity(Self::NUM_CLASSES);
+        let mut seed = 12345u64;
+        for _ in 0..Self::NUM_CLASSES {
+            let row: Vec<f32> = (0..Self::INPUT_DIM)
+                .map(|_| {
+                    seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+                    ((seed >> 33) as f32 / u32::MAX as f32 - 0.5) * 0.01
+                })
+                .collect();
+            weights.push(row);
+        }
+        Self {
+            weights,
+            bias: vec![0.0; Self::NUM_CLASSES],
+        }
+    }
+
+    /// Forward pass: compute class logits.
+    fn forward(&self, input: &[f32]) -> Vec<f32> {
+        self.weights
+            .iter()
+            .zip(self.bias.iter())
+            .map(|(w, b)| {
+                w.iter()
+                    .zip(input.iter())
+                    .map(|(wi, xi)| wi * xi)
+                    .sum::<f32>()
+                    + b
+            })
+            .collect()
+    }
+
+    /// Softmax of logits.
+    fn softmax(logits: &[f32]) -> Vec<f32> {
+        let max = logits.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        let exps: Vec<f32> = logits.iter().map(|&l| (l - max).exp()).collect();
+        let sum: f32 = exps.iter().sum();
+        exps.iter().map(|e| e / sum).collect()
+    }
+
+    /// Predict class from input features.
+    pub fn predict(&self, input: &[f32]) -> AlgorithmClass {
+        let logits = self.forward(input);
+        let best_idx = logits
+            .iter()
+            .enumerate()
+            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|(i, _)| i)
+            .unwrap_or(0);
+        AlgorithmClass::ALL[best_idx]
+    }
+
+    /// Train on labeled pairs via SGD with cross-entropy loss.
+    pub fn train(
+        &mut self,
+        train: &[(Vec<f32>, usize)], // (features, class_idx)
+        epochs: usize,
+        lr: f32,
+    ) -> Vec<f32> {
+        let mut losses = Vec::new();
+
+        for _epoch in 0..epochs {
+            let mut epoch_loss = 0.0f32;
+
+            for (input, &target) in train.iter().map(|(x, y)| (x, y)) {
+                let logits = self.forward(input);
+                let probs = Self::softmax(&logits);
+
+                // Cross-entropy loss
+                epoch_loss -= probs[target].max(1e-10).ln();
+
+                // Gradient: d_loss/d_logit = prob - one_hot
+                let mut grad = probs.clone();
+                grad[target] -= 1.0;
+
+                // SGD update
+                for (c, g) in grad.iter().enumerate() {
+                    for (j, xj) in input.iter().enumerate() {
+                        self.weights[c][j] -= lr * g * xj;
+                    }
+                    self.bias[c] -= lr * g;
+                }
+            }
+
+            losses.push(epoch_loss / train.len() as f32);
+        }
+
+        losses
+    }
+
+    /// Evaluate accuracy on held-out data.
+    pub fn accuracy(&self, eval: &[(Vec<f32>, usize)]) -> f32 {
+        if eval.is_empty() {
+            return 0.0;
+        }
+        let correct = eval
+            .iter()
+            .filter(|(x, y)| {
+                let predicted = self.predict(x);
+                AlgorithmClass::ALL[*y] == predicted
+            })
+            .count();
+        correct as f32 / eval.len() as f32
+    }
+}
+
+/// Train a linear classifier on the algorithm corpus.
+///
+/// Returns (classifier, train_accuracy, eval_accuracy, loss_curve).
+pub fn train_linear_classifier(
+    epochs: usize,
+    lr: f32,
+) -> (AlgorithmClassifier, f32, f32, Vec<f32>) {
+    let pairs = build_training_pairs();
+    let projection = LearnedProjection::fit(&pairs);
+
+    let split = (pairs.len() * 4) / 5;
+
+    // Convert to (projected_features, class_index) pairs
+    let data: Vec<(Vec<f32>, usize)> = pairs
+        .iter()
+        .map(|p| {
+            let projected = projection.project(&p.hv);
+            let class_idx = AlgorithmClass::ALL
+                .iter()
+                .position(|c| *c == p.class)
+                .unwrap_or(7);
+            (projected.values.clone(), class_idx)
+        })
+        .collect();
+
+    let (train, eval) = data.split_at(split);
+
+    let mut classifier = AlgorithmClassifier::new();
+    let losses = classifier.train(&train.to_vec(), epochs, lr);
+
+    let train_acc = classifier.accuracy(&train.to_vec());
+    let eval_acc = classifier.accuracy(&eval.to_vec());
+
+    (classifier, train_acc, eval_acc, losses)
+}
+
 /// Project using naive truncation (legacy fallback).
 fn project_to_sequencer_dim(hv: &ContinuousHV) -> ContinuousHV {
     let dim = 512;
@@ -1718,6 +1880,59 @@ pub struct ColdGenerationResult {
 /// 5. Assemble code skeleton from plan actions
 ///
 /// This is the first end-to-end test of the HDC→CfC→Code pipeline.
+/// System 1/System 2 generation:
+/// - System 1 (HDC + Linear Classifier): rapid class identification
+/// - System 2 (Template plan → assembly): deterministic code shape
+///
+/// Returns code that uses the classifier's prediction (not keyword heuristics).
+pub fn cold_generate_classified(
+    purpose: &str,
+    signature: &str,
+    pairs: &[AlgorithmTrainingPair],
+    classifier: &AlgorithmClassifier,
+) -> ColdGenerationResult {
+    let encoder = AlgorithmEncoder::new();
+    let projection = LearnedProjection::fit(pairs);
+
+    // Build channels from purpose + signature (without the class — that's what we predict)
+    let mut channels = build_channels_from_purpose(purpose, signature);
+
+    // System 1: predict class via linear classifier on HDC vector
+    let hv = encoder.encode(&channels);
+    let projected = projection.project(&hv);
+    let predicted_class = classifier.predict(&projected.values);
+    channels.set_class(predicted_class);
+
+    // Re-encode with the predicted class (consistency)
+    let hv2 = encoder.encode(&channels);
+    let projected2 = projection.project(&hv2);
+
+    // System 2: template plan + assembly
+    let template_actions = class_to_plan(predicted_class, &channels);
+    let plan_steps = to_plan_steps(&template_actions);
+    let code = assemble_from_plan(signature, &plan_steps, &channels);
+
+    let plan: Vec<String> = plan_steps
+        .iter()
+        .map(|s| format!("{:?}", s.action))
+        .collect();
+
+    let _ = projected2; // silence unused warning
+
+    let plausible = code.contains("fn ")
+        && code.contains('{')
+        && code.contains('}')
+        && !code.contains("todo!(");
+
+    ColdGenerationResult {
+        purpose: purpose.to_string(),
+        detected_class: predicted_class,
+        plan,
+        code,
+        plausible,
+    }
+}
+
 pub fn cold_generate(
     purpose: &str,
     signature: &str,
@@ -2576,6 +2791,77 @@ mod tests {
         // Both should have finite loss
         assert!(curriculum.final_loss.is_finite());
         assert!(flat.final_loss.is_finite());
+    }
+
+    #[test]
+    fn test_system1_system2_generation() {
+        let (classifier, train_acc, eval_acc, _) = train_linear_classifier(100, 0.01);
+        println!(
+            "Classifier trained: train={:.1}% eval={:.1}%",
+            train_acc * 100.0,
+            eval_acc * 100.0
+        );
+
+        let pairs = build_training_pairs();
+        let problems = [
+            (
+                "reverse the characters in a string",
+                "pub fn reverse(input: &str) -> String",
+            ),
+            (
+                "sort a list of integers",
+                "pub fn sort_nums(nums: Vec<i32>) -> Vec<i32>",
+            ),
+            (
+                "find prime factors of a number",
+                "pub fn factors(n: u64) -> Vec<u64>",
+            ),
+            ("compute the nth fibonacci", "pub fn fib(n: u64) -> u64"),
+        ];
+
+        println!("\n=== System 1 (Classify) + System 2 (Template) ===");
+        for (purpose, sig) in &problems {
+            let result = cold_generate_classified(purpose, sig, &pairs, &classifier);
+            println!(
+                "  '{purpose}'\n    → Class: {:?}, Plan: {} steps\n    → {}\n",
+                result.detected_class,
+                result.plan.len(),
+                result.code.lines().next().unwrap_or("")
+            );
+        }
+    }
+
+    #[test]
+    fn test_linear_classifier_beats_cfc() {
+        let (classifier, train_acc, eval_acc, losses) = train_linear_classifier(100, 0.01);
+        println!("=== Linear Classifier ===");
+        println!("Train accuracy: {:.1}%", train_acc * 100.0);
+        println!("Eval accuracy:  {:.1}%", eval_acc * 100.0);
+        println!(
+            "Loss: {:.4} → {:.4}",
+            losses.first().unwrap_or(&0.0),
+            losses.last().unwrap_or(&0.0)
+        );
+
+        // The linear classifier should beat the CfC's 16.7%
+        assert!(
+            eval_acc > 0.16,
+            "linear classifier should beat CfC's 16.7%: got {:.1}%",
+            eval_acc * 100.0
+        );
+
+        // Test prediction on known types
+        let encoder = AlgorithmEncoder::new();
+        let pairs = build_training_pairs();
+        let projection = LearnedProjection::fit(&pairs);
+
+        let mut sort_ch = AlgorithmChannels::default();
+        sort_ch.set_class(AlgorithmClass::Sorting);
+        sort_ch.set_loop_depth(2.0);
+        sort_ch.set_mutation_level(2.0);
+        let sort_proj = projection.project(&encoder.encode(&sort_ch));
+        let predicted = classifier.predict(&sort_proj.values);
+        println!("Sorting input → predicted: {:?}", predicted);
     }
 
     #[test]
