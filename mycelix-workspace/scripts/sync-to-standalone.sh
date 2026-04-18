@@ -82,6 +82,12 @@ RSYNC_EXCLUDE=(
     --exclude='artifacts/'
     --exclude='coverage/'
     --exclude='.conductor/'
+    # Build outputs that regenerate on every trunk/cargo build — exclude so
+    # content-hashed artifacts (e.g. dist/main-<hash>.css) don't accumulate
+    # in the public standalone with every sync.
+    --exclude='dist/'
+    --exclude='.svelte-kit/'
+    --exclude='.stage/'
 )
 RSYNC_OPTS=(-a --delete "${RSYNC_EXCLUDE[@]}")
 if $DRY_RUN; then
