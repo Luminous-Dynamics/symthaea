@@ -535,4 +535,125 @@ mod tests {
         let smt = encode_as_query(&phi);
         assert!(smt.contains("(assert (not (= 1 1)))"), "got: {}", smt);
     }
+
+    // ─── Phase 4/5/5a regression lockdowns ─────────────────────────────
+    //
+    // These tests lock in the specific encoding shapes that prior phases
+    // depend on. Each test cites the fixture it protects, so future
+    // edits to fragment detection or Skolemization that regress any of
+    // these behaviors will fail loudly.
+
+    #[test]
+    fn skolemization_peels_nested_forall() {
+        // `∀ a b : ℝ, a + b = b + a` — two outer universals. Phase 5a
+        // Skolemization should emit both `declare-const` lines, no
+        // `forall` keyword, and place the conclusion under `(not …)`.
+        // Regression target: anything that re-introduces `(not (forall
+        // …))` on pure-outer-`∀` goals.
+        let phi = FolFormulaExt::forall(
+            "a",
+            NumericType::Real,
+            FolFormulaExt::forall(
+                "b",
+                NumericType::Real,
+                FolFormulaExt::eq(
+                    Term::var("a").add(Term::var("b")),
+                    Term::var("b").add(Term::var("a")),
+                ),
+            ),
+        );
+        let smt = encode_as_query(&phi);
+        assert!(smt.contains("(set-logic QF_LRA)"), "got: {}", smt);
+        assert!(smt.contains("(declare-const a Real)"), "got: {}", smt);
+        assert!(smt.contains("(declare-const b Real)"), "got: {}", smt);
+        assert!(!smt.contains("forall"), "forall leaked through: {}", smt);
+    }
+
+    #[test]
+    fn skolemization_peels_implication_chain() {
+        // `∀ a b : ℝ, a + b = 12 → a = 4 → b = 8` — outer `∀` + 2-deep
+        // `→` chain (mathd_algebra_109-shape). Expect both hypotheses
+        // as separate `(assert …)` lines and the conclusion as `(assert
+        // (not …))`. Regression target: anything that re-nests the
+        // implications inside a single assertion.
+        let phi = FolFormulaExt::forall(
+            "a",
+            NumericType::Real,
+            FolFormulaExt::forall(
+                "b",
+                NumericType::Real,
+                FolFormulaExt::eq(Term::var("a").add(Term::var("b")), Term::IntLit(12)).implies(
+                    FolFormulaExt::eq(Term::var("a"), Term::IntLit(4))
+                        .implies(FolFormulaExt::eq(Term::var("b"), Term::IntLit(8))),
+                ),
+            ),
+        );
+        let smt = encode_as_query(&phi);
+        assert!(smt.contains("(set-logic QF_LRA)"), "got: {}", smt);
+        // both hypotheses as top-level asserts
+        assert!(
+            smt.contains("(assert (= (+ a b) 12))"),
+            "first hypothesis missing: {}",
+            smt
+        );
+        assert!(
+            smt.contains("(assert (= a 4))"),
+            "second hypothesis missing: {}",
+            smt
+        );
+        // conclusion negated at top level
+        assert!(
+            smt.contains("(assert (not (= b 8)))"),
+            "negated conclusion missing: {}",
+            smt
+        );
+    }
+
+    #[test]
+    fn compound_times_compound_routes_to_nra() {
+        // `(1/2 + 1/3) * (1/2 - 1/3) = 5/36` — mathd_algebra_462-shape.
+        // Both factors are compound expressions with no free variables.
+        // Pre-fix-c4e62aa492 this routed to QF_LRA, which Z3's parser
+        // rejects with "logic does not support nonlinear arithmetic".
+        // The fix (`both_compound` branch in `Term::is_non_linear`)
+        // routes it to QF_NRA instead. Regression target: anything
+        // that reverts the compound×compound rule.
+        let phi = FolFormulaExt::eq(
+            Term::rat(1, 2)
+                .add(Term::rat(1, 3))
+                .mul(Term::rat(1, 2).sub(Term::rat(1, 3))),
+            Term::rat(5, 36),
+        );
+        let smt = encode_as_query(&phi);
+        assert!(smt.contains("(set-logic QF_NRA)"), "got: {}", smt);
+    }
+
+    #[test]
+    fn strip_outer_forall_implies_view() {
+        // Direct test of the helper itself: `∀ x y : ℝ, H1 → H2 → G`
+        // should split into (bindings=[(x,Real),(y,Real)],
+        // hypotheses=[H1, H2], conclusion=G). Regression target: any
+        // change that folds `∀` binders into hypotheses or misorders.
+        let h1 = FolFormulaExt::lt(Term::IntLit(0), Term::var("x"));
+        let h2 = FolFormulaExt::lt(Term::IntLit(0), Term::var("y"));
+        let g = FolFormulaExt::lt(Term::IntLit(0), Term::var("x").mul(Term::var("y")));
+        let phi = FolFormulaExt::forall(
+            "x",
+            NumericType::Real,
+            FolFormulaExt::forall(
+                "y",
+                NumericType::Real,
+                h1.clone().implies(h2.clone().implies(g.clone())),
+            ),
+        );
+        let (bindings, hypotheses, conclusion) = strip_outer_forall_implies(&phi);
+        assert_eq!(bindings.len(), 2);
+        assert_eq!(bindings[0].0, "x");
+        assert_eq!(bindings[0].1, NumericType::Real);
+        assert_eq!(bindings[1].0, "y");
+        assert_eq!(hypotheses.len(), 2);
+        assert_eq!(hypotheses[0], h1);
+        assert_eq!(hypotheses[1], h2);
+        assert_eq!(conclusion, g);
+    }
 }

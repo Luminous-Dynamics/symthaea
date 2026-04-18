@@ -644,4 +644,129 @@ mod tests {
         // No Mathlib import for pure prop.
         assert!(!file.contains("import Mathlib"));
     }
+
+    // ─── Phase 4/5 cascade-gating regression lockdowns ─────────────────
+    //
+    // `conclusion_is_and` and `conclusion_has_division` gate two
+    // optional cascade branches. These tests lock in the gating
+    // predicates so the gates stay aligned with the cascade emitter.
+
+    #[test]
+    fn conclusion_is_and_detects_outer_and() {
+        // `∀ x : ℝ, h → (A ∧ B)` — conclusion is syntactically `And`
+        // after stripping Forall+Implies. mathd_algebra_101-shape.
+        let phi = FolFormulaExt::forall(
+            "x",
+            NumericType::Real,
+            FolFormulaExt::lt(Term::IntLit(0), x()).implies(
+                FolFormulaExt::lt(Term::IntLit(0), x())
+                    .and(FolFormulaExt::lt(x(), Term::IntLit(10))),
+            ),
+        );
+        assert!(conclusion_is_and(&phi));
+    }
+
+    #[test]
+    fn conclusion_is_and_rejects_non_and() {
+        // `∀ x : ℝ, h → goal` where `goal` is `Eq(x, 0)` — not And.
+        // Regression: gating must NOT emit the refine branch for
+        // non-And goals, otherwise Phase 4a's heartbeat timeouts on
+        // `mathd_algebra_37`, `_141` return.
+        let phi = FolFormulaExt::forall(
+            "x",
+            NumericType::Real,
+            FolFormulaExt::lt(Term::IntLit(0), x())
+                .implies(FolFormulaExt::eq(x(), Term::IntLit(0))),
+        );
+        assert!(!conclusion_is_and(&phi));
+    }
+
+    #[test]
+    fn conclusion_has_division_detects_symbolic_denom() {
+        // `∀ p q : ℝ, p = 12 → q = 8 → q/p = 2/3` — mathd_algebra_55-shape.
+        // Conclusion contains `Div(q, p)` where `p` is a free variable.
+        let p = Term::var("p");
+        let q = Term::var("q");
+        let phi = FolFormulaExt::forall(
+            "p",
+            NumericType::Real,
+            FolFormulaExt::forall(
+                "q",
+                NumericType::Real,
+                FolFormulaExt::eq(p.clone(), Term::IntLit(12)).implies(
+                    FolFormulaExt::eq(q.clone(), Term::IntLit(8))
+                        .implies(FolFormulaExt::eq(q.div(p), Term::rat(2, 3))),
+                ),
+            ),
+        );
+        assert!(conclusion_has_division(&phi));
+    }
+
+    #[test]
+    fn conclusion_has_division_rejects_literal_denom() {
+        // `∀ x : ℝ, x / 50 = 40 → x = 2000` — mathd_algebra_24-shape.
+        // `50` is a literal, not symbolic. The field_simp branch
+        // should NOT fire here; linarith handles it fine. Regression
+        // target: anything that flips this case positive.
+        let phi = FolFormulaExt::forall(
+            "x",
+            NumericType::Real,
+            FolFormulaExt::eq(x().div(Term::IntLit(50)), Term::IntLit(40))
+                .implies(FolFormulaExt::eq(x(), Term::IntLit(2000))),
+        );
+        assert!(!conclusion_has_division(&phi));
+    }
+
+    #[test]
+    fn and_splitter_branch_emitted_when_gated() {
+        // Verify that when `conclusion_is_and` returns true, the
+        // cascade emits the `refine ⟨?_, ?_⟩` branch; when false, it
+        // doesn't. Locks the gate-to-emit path end-to-end.
+        let and_phi = FolFormulaExt::forall(
+            "x",
+            NumericType::Real,
+            FolFormulaExt::eq(x(), Term::IntLit(1))
+                .and(FolFormulaExt::eq(x().add(Term::IntLit(1)), Term::IntLit(2))),
+        );
+        let and_file = render_fol_ext_file("t_and", &and_phi);
+        assert!(
+            and_file.contains("refine ⟨?_, ?_⟩"),
+            "And conclusion should emit refine branch: {}",
+            and_file
+        );
+
+        let non_and_phi =
+            FolFormulaExt::forall("x", NumericType::Real, FolFormulaExt::eq(x(), x()));
+        let non_and_file = render_fol_ext_file("t_refl", &non_and_phi);
+        assert!(
+            !non_and_file.contains("refine ⟨?_, ?_⟩"),
+            "Non-And conclusion should NOT emit refine branch: {}",
+            non_and_file
+        );
+    }
+
+    #[test]
+    fn field_simp_branch_emitted_when_gated() {
+        // Verify `conclusion_has_division` gates the field_simp branch.
+        let field_phi = FolFormulaExt::forall(
+            "p",
+            NumericType::Real,
+            FolFormulaExt::eq(Term::var("q").div(Term::var("p")), Term::rat(2, 3)),
+        );
+        let field_file = render_fol_ext_file("t_field", &field_phi);
+        assert!(
+            field_file.contains("field_simp"),
+            "division-in-conclusion should emit field_simp branch: {}",
+            field_file
+        );
+
+        let no_field_phi =
+            FolFormulaExt::forall("x", NumericType::Real, FolFormulaExt::eq(x(), x()));
+        let no_field_file = render_fol_ext_file("t_refl_nofield", &no_field_phi);
+        assert!(
+            !no_field_file.contains("field_simp"),
+            "No-division conclusion should NOT emit field_simp: {}",
+            no_field_file
+        );
+    }
 }
