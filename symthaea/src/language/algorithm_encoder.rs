@@ -766,6 +766,8 @@ pub struct AlgorithmTrainingPair {
     pub class: AlgorithmClass,
     /// Problem purpose/description (for the decoder path).
     pub purpose: String,
+    /// Source code for 1-NN body retrieval.
+    pub source: String,
 }
 
 // ─── Tests ─────────────────────────────────────────────────────────────────

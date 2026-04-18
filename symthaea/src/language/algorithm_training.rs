@@ -1052,6 +1052,7 @@ pub fn build_training_pairs() -> Vec<AlgorithmTrainingPair> {
                 hv,
                 class: sol.class,
                 purpose: format!("Exercism: {}", sol.name),
+                source: sol.source.to_string(),
             }
         })
         .collect()
@@ -1880,6 +1881,99 @@ pub struct ColdGenerationResult {
 /// 5. Assemble code skeleton from plan actions
 ///
 /// This is the first end-to-end test of the HDC→CfC→Code pipeline.
+/// Find the nearest training solution by HDC similarity within the same class.
+fn nearest_in_class<'a>(
+    query_hv: &symthaea_core::hdc::ContinuousHV,
+    class: AlgorithmClass,
+    pairs: &'a [AlgorithmTrainingPair],
+) -> Option<(f32, &'a AlgorithmTrainingPair)> {
+    pairs
+        .iter()
+        .filter(|p| p.class == class)
+        .map(|p| (query_hv.similarity(&p.hv), p))
+        .max_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal))
+}
+
+/// Extract the body of a function from its source code (between {} braces).
+fn extract_function_body(source: &str) -> Option<String> {
+    let open = source.find('{')?;
+    let mut depth = 0i32;
+    let bytes = source.as_bytes();
+    for (i, &b) in bytes.iter().enumerate().skip(open) {
+        match b {
+            b'{' => depth += 1,
+            b'}' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(source[open + 1..i].trim().to_string());
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// Whole-word replacement of `old_param` with `new_param` in `body`.
+fn adapt_body_param(body: &str, old_param: &str, new_param: &str) -> String {
+    if old_param == new_param || old_param.is_empty() {
+        return body.to_string();
+    }
+    let mut result = String::with_capacity(body.len());
+    let bytes = body.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        let at_start = i == 0 || (!bytes[i - 1].is_ascii_alphanumeric() && bytes[i - 1] != b'_');
+        if at_start
+            && i + old_param.len() <= bytes.len()
+            && &body[i..i + old_param.len()] == old_param
+        {
+            let after = i + old_param.len();
+            let at_end = after >= bytes.len()
+                || (!bytes[after].is_ascii_alphanumeric() && bytes[after] != b'_');
+            if at_end {
+                result.push_str(new_param);
+                i = after;
+                continue;
+            }
+        }
+        result.push(bytes[i] as char);
+        i += 1;
+    }
+    result
+}
+
+/// Generate code via 1-NN body retrieval, adapted to the target signature.
+///
+/// Finds the most similar training example (same class), extracts its body,
+/// and renames the parameter to match the new signature.
+pub fn generate_via_nearest_neighbor(
+    purpose: &str,
+    signature: &str,
+    pairs: &[AlgorithmTrainingPair],
+    classifier: &AlgorithmClassifier,
+) -> Option<String> {
+    let encoder = AlgorithmEncoder::new();
+    let projection = LearnedProjection::fit(pairs);
+
+    let channels = build_channels_from_purpose(purpose, signature);
+    let hv = encoder.encode(&channels);
+    let projected = projection.project(&hv);
+    let predicted_class = hybrid_classify(purpose, &projected.values, classifier);
+
+    let (_sim, nearest) = nearest_in_class(&hv, predicted_class, pairs)?;
+    let body = extract_function_body(&nearest.source)?;
+
+    let target_param = first_param_name(signature);
+    let source_param = first_param_name(&nearest.source);
+    let adapted = adapt_body_param(&body, &source_param, &target_param);
+
+    Some(format!(
+        "{signature} {{\n    {}\n}}",
+        adapted.replace('\n', "\n    ")
+    ))
+}
+
 /// System 1/System 2 generation:
 /// - System 1 (HDC + Linear Classifier): rapid class identification
 /// - System 2 (Template plan → assembly): deterministic code shape
@@ -3129,6 +3223,48 @@ mod tests {
         // Both should have finite loss
         assert!(curriculum.final_loss.is_finite());
         assert!(flat.final_loss.is_finite());
+    }
+
+    #[test]
+    fn test_nearest_neighbor_body_retrieval() {
+        let (classifier, _, _, _) = train_linear_classifier(100, 0.01);
+        let pairs = build_training_pairs();
+
+        let problems = [
+            (
+                "reverse the characters in a string",
+                "pub fn reverse(input: &str) -> String",
+            ),
+            (
+                "sort a list of integers",
+                "pub fn sort_nums(nums: Vec<i32>) -> Vec<i32>",
+            ),
+            ("compute the nth fibonacci", "pub fn fib(n: u64) -> u64"),
+        ];
+
+        println!("\n=== 1-NN Body Retrieval ===");
+        let mut compiles = 0;
+        for (purpose, sig) in &problems {
+            if let Some(code) = generate_via_nearest_neighbor(purpose, sig, &pairs, &classifier) {
+                println!("--- '{purpose}' ---");
+                println!("{code}");
+                if try_compile(&code).is_ok() {
+                    compiles += 1;
+                    println!("✓ COMPILES\n");
+                } else {
+                    println!("✗ does not compile\n");
+                }
+            } else {
+                println!("'{purpose}' → no nearest neighbor found\n");
+            }
+        }
+        println!("Compile rate: {}/{}", compiles, problems.len());
+
+        // At minimum, we should retrieve something for each
+        assert!(
+            compiles >= 1,
+            "at least 1/3 NN-retrieved bodies should compile"
+        );
     }
 
     #[test]
