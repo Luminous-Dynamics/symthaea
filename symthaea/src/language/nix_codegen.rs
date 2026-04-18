@@ -440,6 +440,22 @@ fn emit_service(lower: &str) -> Option<String> {
         ));
     }
 
+    // Podman — check BEFORE docker since "podman as docker alternative"
+    // contains both keywords and the user wants podman.
+    if lower.contains("podman") {
+        return Some(
+            r#"{
+  virtualisation.podman = {
+    enable = true;
+    dockerCompat = true;
+    defaultNetwork.settings.dns_enabled = true;
+  };
+}
+"#
+            .to_string(),
+        );
+    }
+
     // Docker — combines virtualisation.docker + user group
     if lower.contains("docker") {
         let user_block =
@@ -503,6 +519,178 @@ fn emit_service(lower: &str) -> Option<String> {
     };
   };
   networking.firewall.allowedTCPPorts = [ 8081 4001 ];
+}
+"#
+            .to_string(),
+        );
+    }
+
+    // OpenSSH
+    if lower.contains("openssh") || lower.contains("ssh server") {
+        return Some(
+            r#"{
+  services.openssh = {
+    enable = true;
+    settings = {
+      PasswordAuthentication = false;
+      PermitRootLogin = "no";
+      KbdInteractiveAuthentication = false;
+    };
+  };
+  networking.firewall.allowedTCPPorts = [ 22 ];
+}
+"#
+            .to_string(),
+        );
+    }
+
+    // Tailscale
+    if lower.contains("tailscale") {
+        return Some(
+            r#"{
+  services.tailscale = {
+    enable = true;
+    openFirewall = true;
+  };
+}
+"#
+            .to_string(),
+        );
+    }
+
+    // Prometheus
+    if lower.contains("prometheus") {
+        return Some(
+            r#"{
+  services.prometheus = {
+    enable = true;
+    port = 9090;
+    exporters.node = {
+      enable = true;
+      enabledCollectors = [ "systemd" ];
+      port = 9100;
+    };
+  };
+  networking.firewall.allowedTCPPorts = [ 9090 9100 ];
+}
+"#
+            .to_string(),
+        );
+    }
+
+    // Grafana
+    if lower.contains("grafana") {
+        return Some(
+            r#"{
+  services.grafana = {
+    enable = true;
+    settings.server = {
+      http_addr = "127.0.0.1";
+      http_port = 3000;
+    };
+  };
+}
+"#
+            .to_string(),
+        );
+    }
+
+    // Jellyfin / Plex media server
+    if lower.contains("jellyfin") {
+        return Some(
+            r#"{
+  services.jellyfin = {
+    enable = true;
+    openFirewall = true;
+  };
+}
+"#
+            .to_string(),
+        );
+    }
+    if lower.contains("plex") {
+        return Some(
+            r#"{
+  services.plex = {
+    enable = true;
+    openFirewall = true;
+  };
+}
+"#
+            .to_string(),
+        );
+    }
+
+    // (podman moved up — checked BEFORE docker)
+
+    // Libvirtd / QEMU virtual machines
+    if lower.contains("libvirt") || lower.contains("virtual machine") {
+        return Some(
+            r#"{ pkgs, ... }: {
+  virtualisation.libvirtd = {
+    enable = true;
+    qemu = {
+      package = pkgs.qemu_kvm;
+      runAsRoot = true;
+      swtpm.enable = true;
+      ovmf = {
+        enable = true;
+        packages = [ pkgs.OVMFFull.fd ];
+      };
+    };
+  };
+  programs.virt-manager.enable = true;
+}
+"#
+            .to_string(),
+        );
+    }
+
+    // CUPS printing
+    if lower.contains("cups") || lower.contains("printing") {
+        return Some(
+            r#"{ pkgs, ... }: {
+  services.printing = {
+    enable = true;
+    drivers = with pkgs; [ gutenprint hplip ];
+  };
+  services.avahi = {
+    enable = true;
+    nssmdns4 = true;
+    openFirewall = true;
+  };
+}
+"#
+            .to_string(),
+        );
+    }
+
+    // systemd-resolved (DNS)
+    if lower.contains("systemd-resolved") || lower.contains("resolved") {
+        return Some(
+            r#"{
+  services.resolved = {
+    enable = true;
+    dnssec = "true";
+    fallbackDns = [ "1.1.1.1" "9.9.9.9" ];
+  };
+}
+"#
+            .to_string(),
+        );
+    }
+
+    // Steam (gaming)
+    if lower.contains("steam") {
+        return Some(
+            r#"{
+  programs.steam = {
+    enable = true;
+    remotePlay.openFirewall = true;
+    dedicatedServer.openFirewall = true;
+    gamescopeSession.enable = true;
+  };
+  hardware.graphics.enable32Bit = true;
 }
 "#
             .to_string(),
