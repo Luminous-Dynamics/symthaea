@@ -114,6 +114,24 @@ timezone-returns-empty case (empty config has no forbidden substrings,
 no required substrings either). The structural scorer demands a
 positive assertion. That's the whole point of P1.
 
+### 2026-04-18 — Phase 1 M3: no-golden self-repair
+
+Phase 1 M3 closes the loop: `generate_nix_with_self_repair(prompt, max_iters)`
+runs production-viable repair using only the prompt's classified intent
++ KG service keywords — **no hand-written golden required**.
+
+`expected_paths_for(prompt)` computes:
+- Service intent → `<root>.<kw>.enable` per keyword (with virtualisation.*
+  overrides for docker/podman/libvirtd)
+- Networking → `networking.firewall.allowed{TCP,UDP}Ports` (UDP on
+  wireguard/udp/quic mention)
+- Hardware → nvidia-specific or `hardware.graphics.enable` for intel/amd
+
+Integration test `self_repair_closes_intel_gap_without_golden` proves
+the full loop: prompt → intent → expected paths → compare to
+generated → repair → PASS. The Intel GPU gap closes with no human
+curation in the loop.
+
 ### 2026-04-18 — Phase 1 M2: scorer-in-the-loop repair (`--repair`)
 
 First milestone of the coding-AI roadmap
