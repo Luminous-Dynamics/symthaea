@@ -1122,6 +1122,10 @@ required-features = ["code_generation"]
 name = "nix_prefix_parse_probe"
 required-features = ["code_generation"]
 
+[[example]]
+name = "nix_corpus_scrape"
+required-features = ["code_generation"]
+
 
 [[example]]
 name = "nix_codegen_api"
