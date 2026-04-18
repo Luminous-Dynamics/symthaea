@@ -29,6 +29,8 @@ out/
 target/
 .codex-test-targets/
 .phase1c-target/
+.svelte-kit/
+.stage/
 *.o
 *.so
 *.dylib
