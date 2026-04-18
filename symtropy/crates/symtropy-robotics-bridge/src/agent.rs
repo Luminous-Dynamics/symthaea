@@ -46,11 +46,7 @@ pub struct RoboticAgent {
 
 impl RoboticAgent {
     /// Create a new robotic agent.
-    pub fn new(
-        body: BodyHandle,
-        platform: PlatformType,
-        name: impl Into<String>,
-    ) -> Self {
+    pub fn new(body: BodyHandle, platform: PlatformType, name: impl Into<String>) -> Self {
         let config = ActiveInferenceAgentConfig {
             state_dim: 8,
             obs_dim: 4,
@@ -79,11 +75,7 @@ impl RoboticAgent {
     /// 4. Gate motor output by safety tier
     ///
     /// Returns the motor gain [0.0, 1.0] for this tick.
-    pub fn tick(
-        &mut self,
-        observation: &[f64],
-        danger_level: f64,
-    ) -> f64 {
+    pub fn tick(&mut self, observation: &[f64], danger_level: f64) -> f64 {
         // FEP perception-action cycle
         let obs = Observation::new(
             observation.to_vec(),
@@ -185,11 +177,7 @@ pub fn spawn_robot<const D: usize>(
     position: symtropy_math::Point<D>,
     name: impl Into<String>,
 ) -> RoboticAgent {
-    let handle = physics.add_sphere(
-        position,
-        platform.default_radius(),
-        platform.default_mass(),
-    );
+    let handle = physics.add_sphere(position, platform.default_radius(), platform.default_mass());
     RoboticAgent::new(handle, platform, name)
 }
 
@@ -199,11 +187,7 @@ mod tests {
 
     #[test]
     fn create_quadrotor_agent() {
-        let agent = RoboticAgent::new(
-            BodyHandle(0),
-            PlatformType::Quadrotor,
-            "Drone-1",
-        );
+        let agent = RoboticAgent::new(BodyHandle(0), PlatformType::Quadrotor, "Drone-1");
         assert_eq!(agent.platform, PlatformType::Quadrotor);
         assert_eq!(agent.name, "Drone-1");
         assert_eq!(agent.safety_tier, SafetyTier::Green);
@@ -212,11 +196,7 @@ mod tests {
 
     #[test]
     fn tick_produces_motor_gain() {
-        let mut agent = RoboticAgent::new(
-            BodyHandle(0),
-            PlatformType::Vehicle,
-            "Car-1",
-        );
+        let mut agent = RoboticAgent::new(BodyHandle(0), PlatformType::Vehicle, "Car-1");
         let gain = agent.tick(&[0.5, 0.3, 0.1, 0.2], 0.0);
         // With low danger, should have reasonable consciousness → positive gain
         assert!(gain >= 0.0);
@@ -225,11 +205,7 @@ mod tests {
 
     #[test]
     fn high_danger_increases_caution() {
-        let mut agent = RoboticAgent::new(
-            BodyHandle(0),
-            PlatformType::Humanoid,
-            "Bot-1",
-        );
+        let mut agent = RoboticAgent::new(BodyHandle(0), PlatformType::Humanoid, "Bot-1");
         let initial_caution = agent.caution;
         agent.tick(&[0.5, 0.3, 0.9, 0.8], 0.9);
         assert!(agent.caution > initial_caution);
@@ -237,11 +213,7 @@ mod tests {
 
     #[test]
     fn player_control_transfer() {
-        let mut agent = RoboticAgent::new(
-            BodyHandle(0),
-            PlatformType::Quadrotor,
-            "Drone",
-        );
+        let mut agent = RoboticAgent::new(BodyHandle(0), PlatformType::Quadrotor, "Drone");
         assert!(!agent.player_controlled);
         agent.set_player_controlled(true);
         assert!(agent.player_controlled);
@@ -251,9 +223,8 @@ mod tests {
 
     #[test]
     fn spawn_robot_creates_body() {
-        let mut physics = symtropy_physics::PhysicsWorld::<3>::new(
-            SVector::from([0.0, -9.81, 0.0]),
-        );
+        let mut physics =
+            symtropy_physics::PhysicsWorld::<3>::new(SVector::from([0.0, -9.81, 0.0]));
         let agent = spawn_robot(
             &mut physics,
             PlatformType::Quadrotor,
@@ -271,9 +242,8 @@ mod tests {
 
     #[test]
     fn spawn_robot_4d() {
-        let mut physics = symtropy_physics::PhysicsWorld::<4>::new(
-            SVector::from([0.0, -9.81, 0.0, 0.0]),
-        );
+        let mut physics =
+            symtropy_physics::PhysicsWorld::<4>::new(SVector::from([0.0, -9.81, 0.0, 0.0]));
         let agent = spawn_robot(
             &mut physics,
             PlatformType::Auv,
@@ -286,11 +256,7 @@ mod tests {
 
     #[test]
     fn tick_motor_commands_humanoid_produces_21_dof() {
-        let mut agent = RoboticAgent::new(
-            BodyHandle(0),
-            PlatformType::Humanoid,
-            "Humanoid-1",
-        );
+        let mut agent = RoboticAgent::new(BodyHandle(0), PlatformType::Humanoid, "Humanoid-1");
         let cmds = agent.tick_motor_commands(&[0.5, 0.3, 0.1, 0.2], 0.1);
         assert_eq!(cmds.len(), 21, "humanoid should emit 21 per-joint commands");
         // All joints should get the same scalar gain from the uniform planner.
@@ -303,11 +269,7 @@ mod tests {
 
     #[test]
     fn tick_motor_commands_scales_with_danger() {
-        let mut agent = RoboticAgent::new(
-            BodyHandle(0),
-            PlatformType::Humanoid,
-            "Humanoid-1",
-        );
+        let mut agent = RoboticAgent::new(BodyHandle(0), PlatformType::Humanoid, "Humanoid-1");
         // After many high-danger ticks, caution saturates → low phi → Red tier → 0 gain
         for _ in 0..100 {
             agent.tick_motor_commands(&[0.5, 0.3, 0.9, 0.8], 0.95);
@@ -331,11 +293,7 @@ mod tests {
             }
         }
 
-        let mut agent = RoboticAgent::new(
-            BodyHandle(0),
-            PlatformType::Manipulator,
-            "Arm-1",
-        );
+        let mut agent = RoboticAgent::new(BodyHandle(0), PlatformType::Manipulator, "Arm-1");
         let mut planner = HalfPlanner;
         let cmds = agent.tick_motor_commands_with(&[0.5, 0.3, 0.1, 0.2], 0.0, &mut planner);
         assert_eq!(cmds.len(), 8, "manipulator has 8 actuators");
@@ -347,12 +305,37 @@ mod tests {
     }
 
     #[test]
+    fn tick_motor_commands_every_platform() {
+        // Coverage test for the full 10-platform enum — verifies every
+        // PlatformType value flows through the FEP + consciousness +
+        // UniformGainPlanner pipeline and emits the expected number of
+        // per-actuator commands. Catches regressions when PlatformType is
+        // extended but num_actuators() forgets a new variant.
+        for p in PlatformType::ALL {
+            let mut agent = RoboticAgent::new(BodyHandle(0), p, p.name());
+            let cmds = agent.tick_motor_commands(&[0.5, 0.3, 0.1, 0.2], 0.1);
+            assert_eq!(
+                cmds.len(),
+                p.num_actuators(),
+                "{:?}: planner emitted {} commands, expected {}",
+                p,
+                cmds.len(),
+                p.num_actuators(),
+            );
+            for c in &cmds {
+                assert!(
+                    (0.0..=1.0).contains(c),
+                    "{:?}: motor gain {c} outside [0, 1]",
+                    p,
+                );
+            }
+            assert!(agent.consciousness_result.is_some(), "{:?}: no phi", p);
+        }
+    }
+
+    #[test]
     fn consciousness_computed_after_tick() {
-        let mut agent = RoboticAgent::new(
-            BodyHandle(0),
-            PlatformType::Helicopter,
-            "Heli-1",
-        );
+        let mut agent = RoboticAgent::new(BodyHandle(0), PlatformType::Helicopter, "Heli-1");
         assert!(agent.consciousness_result.is_none());
 
         agent.tick(&[0.5, 0.3, 0.1, 0.2], 0.2);
@@ -372,9 +355,8 @@ mod tests {
             PlatformType::Manipulator,
         ];
 
-        let mut physics = symtropy_physics::PhysicsWorld::<3>::new(
-            SVector::from([0.0, -9.81, 0.0]),
-        );
+        let mut physics =
+            symtropy_physics::PhysicsWorld::<3>::new(SVector::from([0.0, -9.81, 0.0]));
 
         for (i, platform) in platforms.iter().enumerate() {
             let agent = spawn_robot(
