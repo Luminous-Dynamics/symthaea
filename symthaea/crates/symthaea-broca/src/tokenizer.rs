@@ -135,7 +135,7 @@ pub const CODE_TOKENS: &[&str] = &[
     "Err(",
     "Some(",
     "unwrap()",
-    // ── Nix keywords ──
+    // ── Nix general-purpose (shared with Rust/Python section) ──
     "pkgs",
     "mkDerivation",
     "buildInputs",
@@ -246,6 +246,130 @@ pub const CODE_TOKENS: &[&str] = &[
     "Vec::new()",
     "HashMap::new()",
     "HashSet::new()",
+];
+
+/// Nix-specific tokens for structured NixOS-module generation (Phase 2 M5
+/// of the coding-AI roadmap). Distinct from the general `CODE_TOKENS` list
+/// because Nix's syntax + module-system vocabulary is large enough to
+/// matter in its own right — consciousness-gated code emission needs the
+/// generator to be able to emit `services.nginx.enable` as a unit, not
+/// spell it out character-by-character.
+///
+/// Tokens are assigned IDs after CODE_TOKENS when added to a builder.
+/// `BpeTokenizer::add_nix_tokens` wires this up with idempotent
+/// insertion (re-entry is a no-op).
+pub const NIX_TOKENS: &[&str] = &[
+    // ── Nix keywords not already in CODE_TOKENS ──
+    "rec",
+    "inherit",
+    "null",
+    "or",
+    "then",
+    "throw",
+    "abort",
+    "assert",
+    // ── Module-signature tokens ──
+    "config",
+    "...",
+    "@",
+    // ── Common value-position functions / selectors ──
+    "import",
+    "fetchurl",
+    "fetchzip",
+    "fetchgit",
+    "runCommand",
+    "writeText",
+    "writeShellScript",
+    "writeShellScriptBin",
+    "symlinkJoin",
+    "makeWrapper",
+    "wrapProgram",
+    "mkShell",
+    "mkOption",
+    "mkIf",
+    "mkMerge",
+    "mkEnableOption",
+    "mkPackageOption",
+    "mkDefault",
+    "mkForce",
+    "mkOverride",
+    "optionals",
+    "optional",
+    "getAttr",
+    "hasAttr",
+    "attrNames",
+    "attrValues",
+    "recursiveUpdate",
+    "filterAttrs",
+    "mapAttrs",
+    // ── Operators specific to Nix ──
+    "//",
+    "++",
+    "?",
+    "${",
+    "}${",
+    "''",
+    // ── Top-level attrpath roots (these appear verbatim thousands of times) ──
+    "services.",
+    "hardware.",
+    "programs.",
+    "networking.",
+    "virtualisation.",
+    "boot.",
+    "security.",
+    "environment.",
+    "fonts.",
+    "time.",
+    "systemd.",
+    "users.",
+    "nix.",
+    "nixpkgs.",
+    "xdg.",
+    "home.",
+    // ── High-frequency sub-paths ──
+    "firewall.",
+    "loader.",
+    "systemPackages",
+    "extraPackages",
+    "buildInputs",
+    "propagatedBuildInputs",
+    "openFirewall",
+    "allowedTCPPorts",
+    "allowedUDPPorts",
+    "videoDrivers",
+    "modesetting",
+    "extraPortals",
+    "withPackages",
+    // ── Common value idioms ──
+    "enable = true",
+    "enable = false",
+    "enable32Bit = true",
+    "with pkgs;",
+    "with pkgs.pkgs;",
+    "{ config, pkgs, ... }",
+    "{ pkgs, ... }",
+    "{ config, lib, pkgs, ... }",
+    "pkgs.mkShell",
+    "pkgs.writeText",
+    "imports = [",
+    "imports = [ ];",
+    "# inherit from",
+    // ── Common string idioms (module args / attrset keys in strings) ──
+    "\"ext4\"",
+    "\"nodev\"",
+    "\"nvidia\"",
+    "\"amdgpu\"",
+    "\"modesetting\"",
+    "\"intel\"",
+    "\"wireguard\"",
+    "\"UTC\"",
+    // ── Version stubs we see in every config ──
+    "system.stateVersion",
+    "nixos",
+    "24.05",
+    "24.11",
+    "25.05",
+    "unstable",
 ];
 
 /// Special token IDs.
@@ -811,6 +935,35 @@ impl BpeTokenizer {
         }
     }
 
+    /// Add all Nix-specific tokens from `NIX_TOKENS` to the vocabulary.
+    /// Idempotent — tokens already present (e.g. those overlapping with
+    /// `CODE_TOKENS`) are skipped. Returns the number of new tokens.
+    ///
+    /// Call this AFTER `add_code_tokens` so Nix tokens land at stable
+    /// IDs after the general code-token range.
+    pub fn add_nix_tokens(&mut self) -> usize {
+        let mut added = 0;
+        for &token in NIX_TOKENS {
+            if !self.token_to_id.contains_key(token) {
+                self.add_token(token);
+                added += 1;
+            }
+        }
+        added
+    }
+
+    /// Check if a token is one of the Nix-specific vocabulary entries.
+    /// Used by epistemic gating to identify when code-token emission
+    /// needs extra constraints (e.g. an attrpath root that isn't in
+    /// the known-option set should be gated off at logit level).
+    pub fn is_nix_token(&self, id: u32) -> bool {
+        if let Some(token_str) = self.id_to_token.get(id as usize) {
+            NIX_TOKENS.contains(&token_str.as_str())
+        } else {
+            false
+        }
+    }
+
     /// Add a new token to the vocabulary (for swarm vocabulary extension).
     /// Returns the new token's ID.
     pub fn add_token(&mut self, token: &str) -> u32 {
@@ -1189,6 +1342,87 @@ mod tests {
             ids.contains(&it_id),
             "Merges should combine 'i'+'t' into 'it': {:?}",
             ids.iter().map(|&id| tok.token_str(id)).collect::<Vec<_>>()
+        );
+    }
+
+    // ── NIX_TOKENS tests (Phase 2 M5 of the coding-AI roadmap) ────
+
+    #[test]
+    fn nix_tokens_are_non_empty_and_unique() {
+        // Every NIX_TOKEN must be non-empty; list must be dedup'd.
+        let mut seen = std::collections::HashSet::new();
+        for t in NIX_TOKENS {
+            assert!(!t.is_empty(), "NIX_TOKENS entry must not be empty");
+            assert!(
+                seen.insert(*t),
+                "NIX_TOKENS contains duplicate entry: {:?}",
+                t
+            );
+        }
+    }
+
+    #[test]
+    fn add_nix_tokens_is_idempotent() {
+        let mut tok = BpeTokenizer::default_minimal();
+        let first = tok.add_nix_tokens();
+        let second = tok.add_nix_tokens();
+        assert!(first > 0, "first call should add at least one token");
+        assert_eq!(second, 0, "second call must be a no-op");
+    }
+
+    #[test]
+    fn add_nix_tokens_covers_headline_vocabulary() {
+        let mut tok = BpeTokenizer::default_minimal();
+        tok.add_code_tokens();
+        tok.add_nix_tokens();
+        for expected in [
+            "services.",
+            "hardware.",
+            "networking.",
+            "allowedTCPPorts",
+            "allowedUDPPorts",
+            "mkShell",
+            "with pkgs;",
+            "{ config, pkgs, ... }",
+            "system.stateVersion",
+        ] {
+            assert_ne!(
+                tok.token_id(expected),
+                tok.unk_id,
+                "{} must be a real token after add_nix_tokens, not <unk>",
+                expected
+            );
+        }
+    }
+
+    #[test]
+    fn is_nix_token_flags_only_nix_vocabulary() {
+        let mut tok = BpeTokenizer::default_minimal();
+        tok.add_code_tokens();
+        tok.add_nix_tokens();
+        // Sample a Nix-specific token
+        let nix_id = tok.token_id("services.");
+        assert_ne!(nix_id, tok.unk_id);
+        assert!(tok.is_nix_token(nix_id));
+        // Sample a generic code token that is NOT in NIX_TOKENS
+        let rust_id = tok.token_id("fn");
+        assert_ne!(rust_id, tok.unk_id);
+        assert!(!tok.is_nix_token(rust_id));
+    }
+
+    #[test]
+    fn nix_tokens_do_not_clobber_code_token_ids() {
+        // Adding Nix tokens must NOT reassign IDs of previously-added
+        // code tokens — downstream training checkpoints depend on
+        // stable ID ranges for the general-code vocabulary.
+        let mut tok = BpeTokenizer::default_minimal();
+        tok.add_code_tokens();
+        let fn_id_before = tok.token_id("fn");
+        tok.add_nix_tokens();
+        let fn_id_after = tok.token_id("fn");
+        assert_eq!(
+            fn_id_before, fn_id_after,
+            "adding Nix tokens must not renumber existing code tokens"
         );
     }
 }
