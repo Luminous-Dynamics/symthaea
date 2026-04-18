@@ -25,7 +25,9 @@
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 
-use symthaea::language::nix_codegen::{generate_nix_with_repair, NixIntent};
+use symthaea::language::nix_codegen::{
+    generate_nix_with_rag, shared_learned_cache, NixIntent, SelfImproveSource,
+};
 
 /// Minimal JSON encoder for our response shape.
 fn json_escape(s: &str) -> String {
@@ -106,28 +108,46 @@ fn handle_generate_nix(body: &str) -> String {
     };
     let max_iter = extract_int_field(body, "max_iterations").unwrap_or(3) as usize;
 
-    let result = generate_nix_with_repair(&prompt, max_iter);
+    // Tier 3 + RAG path: cache hit → idiom → RAG draft fallback. Records
+    // verified results into ~/.cache/symthaea/learned-idioms.json.
+    let (result, src) = generate_nix_with_rag(&prompt, max_iter);
+    let base = result.base;
+    let unknowns_count = result.unknown_options.len();
+    let unknowns = result
+        .unknown_options
+        .iter()
+        .map(|u| format!("\"{}\"", json_escape(&u.path)))
+        .collect::<Vec<_>>()
+        .join(",");
+    let cache_status = match src {
+        SelfImproveSource::LearnedCache => "\"cache_hit\"",
+        SelfImproveSource::FreshlyGenerated { recorded: true } => "\"fresh_recorded\"",
+        SelfImproveSource::FreshlyGenerated { recorded: false } => "\"fresh_not_recorded\"",
+    };
 
     let body = format!(
-        r#"{{"intent":"{intent}","code":"{code}","parses":{parses},"iterations":{iter},"source":"{source}","last_error":{last_err}}}"#,
-        intent = intent_to_str(result.intent),
-        code = json_escape(&result.code),
-        parses = result.parses,
-        iter = result.iterations,
-        source = format!("{:?}", result.source),
-        last_err = match &result.last_error {
+        r#"{{"intent":"{intent}","code":"{code}","parses":{parses},"iterations":{iter},"source":"{source}","last_error":{last_err},"cache_status":{cache_status},"unknown_options_count":{uc},"unknown_options":[{u}]}}"#,
+        intent = intent_to_str(base.intent),
+        code = json_escape(&base.code),
+        parses = base.parses,
+        iter = base.iterations,
+        source = format!("{:?}", base.source),
+        last_err = match &base.last_error {
             Some(e) => format!("\"{}\"", json_escape(e)),
             None => "null".to_string(),
         },
+        uc = unknowns_count,
+        u = unknowns,
     );
     json_response(200, &body)
 }
 
 fn handle_health() -> String {
-    json_response(
-        200,
-        r#"{"status":"ok","version":"1.0","service":"symthaea-nix-codegen"}"#,
-    )
+    let cache_size = shared_learned_cache().len();
+    let body = format!(
+        r#"{{"status":"ok","version":"1.1","service":"symthaea-nix-codegen","learned_idioms_cached":{cache_size},"pipeline":"cache+idiom+index+rag"}}"#
+    );
+    json_response(200, &body)
 }
 
 fn json_response(status: u16, body: &str) -> String {
