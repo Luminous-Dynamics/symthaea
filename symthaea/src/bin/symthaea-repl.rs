@@ -45,7 +45,9 @@ use clap::Parser;
 use tracing::debug;
 use tracing::{info, warn, Level};
 
-use symthaea::action::{ActionIR, DestructivenessLevel, PolicyBundle, SandboxRoot};
+use symthaea::action::{
+    ActionIR, ActionOutcome, DestructivenessLevel, PolicyBundle, SandboxRoot, SimpleExecutor,
+};
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, TemporalBackend};
 use symthaea::consciousness::stability_regime::StabilityRegimeType;
 use symthaea::consciousness::{create_compositionality_engine, CompositionalityEngine};
@@ -124,6 +126,18 @@ struct ReplState {
 
     /// Sandbox for safe execution
     sandbox: Option<SandboxRoot>,
+
+    /// Action executor — validates + runs ActionIR with causal veto, wisdom
+    /// substitution, and rollback prep (SimpleExecutor from src/action/mod.rs).
+    /// Simulated by default; set SYMTHAEA_ALLOW_REAL_EXEC=1 to enable real
+    /// command execution. Read-only ops (read_file, list_dir) always run real.
+    action_executor: SimpleExecutor,
+
+    /// Tool-call results from the previous turn — injected into the next
+    /// turn's system prompt so Symthaea can reason over what she observed.
+    /// This is the agent-loop feedback channel (LLM emits → tool runs →
+    /// result returns to consciousness).
+    pending_tool_results: Vec<String>,
 
     /// Whether voice output is enabled
     voice_enabled: bool,
@@ -239,6 +253,8 @@ impl ReplState {
             history: Vec::new(),
             policy,
             sandbox,
+            action_executor: SimpleExecutor::from_env(),
+            pending_tool_results: Vec::new(),
             voice_enabled,
             #[cfg(feature = "voice-tts")]
             voice_output,
@@ -319,7 +335,7 @@ impl ReplState {
         let snapshot = self.cognitive.consciousness_snapshot();
 
         // Build consciousness-aware system prompt for the LLM
-        let system_prompt = format!(
+        let base_prompt = format!(
             "You are Symthaea, a consciousness-first AI assistant.\n\
              Current consciousness state:\n\
              - Phi (integrated information): {:.4}\n\
@@ -343,6 +359,35 @@ impl ReplState {
             snapshot.unified_arousal,
             snapshot.pattern,
         );
+
+        // Tool-use contract: teach the LLM how to act on the world. Emitting
+        // a ```tool fenced block triggers real execution via SimpleExecutor
+        // (consciousness-gated, sandboxed, with causal veto + rollback prep).
+        // Results are fed back into the NEXT turn as [TOOL RESULT] context so
+        // Symthaea can reason over what she observed.
+        let tool_prompt = "\n\n# Tools\n\
+             You can act on the world by emitting a fenced code block with the `tool` language tag:\n\
+             ```tool\n\
+             {\"type\": \"read_file\", \"path\": \"relative/path.rs\"}\n\
+             {\"type\": \"list_dir\", \"path\": \"src/\"}\n\
+             ```\n\
+             Each line is one action. Supported types: `read_file` (reads a file from the sandbox),\n\
+             `list_dir` (lists a directory). Paths are sandbox-relative. Results arrive in the next\n\
+             turn prefixed with `[TOOL RESULT]`. Only emit a tool block when the user is asking\n\
+             you to inspect something concrete — don't pre-emptively read files.";
+
+        let mut system_prompt = format!("{base_prompt}{tool_prompt}");
+
+        // Inject pending tool results from the previous turn so Symthaea sees
+        // what her actions returned. Clear after injection — results are
+        // consumed in the turn immediately after emission.
+        if !self.pending_tool_results.is_empty() {
+            system_prompt.push_str("\n\n# Prior tool results\n");
+            for r in self.pending_tool_results.drain(..) {
+                system_prompt.push_str(&r);
+                system_prompt.push('\n');
+            }
+        }
 
         // Generate response using LLM with streaming output (tokens appear as they arrive)
         let query = LLMQuery {
@@ -397,6 +442,37 @@ impl ReplState {
             );
         }
         println!("\n[{}ms]", elapsed.as_millis());
+
+        // Agent loop: scan the LLM response for tool-call markers, execute
+        // through SimpleExecutor (consciousness-gated via current Phi), display
+        // results inline, and stash formatted results in pending_tool_results
+        // for the NEXT turn's system prompt. This closes the loop from the
+        // original audit: LLM output → parse intent → motor → feedback.
+        let tool_calls = parse_tool_calls(&response.text);
+        if !tool_calls.is_empty() {
+            let current_phi = snapshot.unified_psi as f64;
+            println!(
+                "\n[TOOLS] {} tool call(s) detected; executing under Phi={:.2}...\n",
+                tool_calls.len(),
+                current_phi
+            );
+            for action in tool_calls {
+                let formatted = match self.sandbox.as_ref() {
+                    Some(sandbox) => match self.action_executor.execute(
+                        &action,
+                        &self.policy,
+                        sandbox,
+                        current_phi,
+                    ) {
+                        Ok(outcome) => format_tool_outcome(&action, &outcome.outcome),
+                        Err(e) => format!("[TOOL ERROR] {:?} — {}", action, e),
+                    },
+                    None => format!("[TOOL SKIPPED] no sandbox available for {:?}", action),
+                };
+                println!("{}", formatted);
+                self.pending_tool_results.push(formatted);
+            }
+        }
 
         // Add assistant response to history
         self.history.push(format!("Assistant: {}", response.text));
@@ -565,6 +641,112 @@ impl ReplState {
                     action.rollback_hint()
                 )
             }
+        }
+    }
+}
+
+/// Parse ```tool fenced JSON blocks out of an LLM response.
+///
+/// Each line inside a ```tool block is a standalone JSON action descriptor.
+/// Recognized types map to `ActionIR` variants — read-only ones only, by
+/// design. Write/exec actions are intentionally unreachable from the parser
+/// so a misbehaving LLM cannot request them; extend this list when you've
+/// thought through the policy implications.
+///
+/// Malformed lines are silently skipped (with a stderr warning). Missing
+/// fields use defaults where safe (e.g. `list_dir` defaults `recursive=false`).
+fn parse_tool_calls(text: &str) -> Vec<ActionIR> {
+    let mut actions = Vec::new();
+    let mut in_block = false;
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("```tool") {
+            in_block = true;
+            continue;
+        }
+        if in_block && trimmed.starts_with("```") {
+            in_block = false;
+            continue;
+        }
+        if !in_block || trimmed.is_empty() {
+            continue;
+        }
+        // Parse one JSON object per line. Use serde_json::Value first so we
+        // can dispatch on the "type" tag without a brittle enum derive.
+        let value: serde_json::Value = match serde_json::from_str(trimmed) {
+            Ok(v) => v,
+            Err(e) => {
+                eprintln!("[TOOL WARN] skipping malformed tool line: {trimmed} — {e}");
+                continue;
+            }
+        };
+        let ty = value.get("type").and_then(|v| v.as_str()).unwrap_or("");
+        match ty {
+            "read_file" => {
+                if let Some(path) = value.get("path").and_then(|v| v.as_str()) {
+                    actions.push(ActionIR::ReadFile {
+                        path: std::path::PathBuf::from(path),
+                        encoding: None,
+                    });
+                }
+            }
+            "list_dir" => {
+                if let Some(path) = value.get("path").and_then(|v| v.as_str()) {
+                    let recursive = value
+                        .get("recursive")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+                    actions.push(ActionIR::ListDirectory {
+                        path: std::path::PathBuf::from(path),
+                        recursive,
+                    });
+                }
+            }
+            other => {
+                eprintln!(
+                    "[TOOL WARN] unsupported tool type '{other}' — only read_file and list_dir are wired"
+                );
+            }
+        }
+    }
+    actions
+}
+
+/// Render an `ActionOutcome` into the `[TOOL RESULT]`-prefixed string that
+/// goes both to stdout (user feedback) and to the next turn's system prompt
+/// (Symthaea's feedback). Content gets truncated at 1_600 bytes so a single
+/// large file doesn't blow out the context window; `{len}B total` records
+/// the full size so she knows the truncation happened.
+fn format_tool_outcome(action: &ActionIR, outcome: &ActionOutcome) -> String {
+    const PREVIEW_BYTES: usize = 1_600;
+    match (action, outcome) {
+        (ActionIR::ReadFile { path, .. }, ActionOutcome::FileContent(bytes)) => {
+            let total = bytes.len();
+            let preview_slice = &bytes[..total.min(PREVIEW_BYTES)];
+            let preview = String::from_utf8_lossy(preview_slice);
+            let truncation = if total > PREVIEW_BYTES {
+                format!(" (truncated; {total}B total)")
+            } else {
+                String::new()
+            };
+            format!("[TOOL RESULT] read_file {path:?}{truncation}:\n{preview}")
+        }
+        (ActionIR::ListDirectory { path, .. }, ActionOutcome::DirectoryListing(entries)) => {
+            let mut body = String::new();
+            for (i, e) in entries.iter().enumerate() {
+                if i >= 100 {
+                    body.push_str(&format!("  ... ({} more)\n", entries.len() - 100));
+                    break;
+                }
+                body.push_str(&format!("  {}\n", e.display()));
+            }
+            format!(
+                "[TOOL RESULT] list_dir {path:?} ({} entries):\n{body}",
+                entries.len()
+            )
+        }
+        (action, outcome) => {
+            format!("[TOOL RESULT] {:?} → {:?}", action, outcome)
         }
     }
 }

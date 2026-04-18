@@ -118,13 +118,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // from_checkpoint needs the genesis seed used at training time.
     // Must match the seed used by distill_nix_train.rs or the
-    // hypervector table will decorrelate.
+    // hypervector table will decorrelate. The vocabulary is restored
+    // from the checkpoint's `vocab` field (including any NIX_TOKENS
+    // augmentation the trainer applied), so nothing extra to do here.
     let genesis = GenesisSeed::from_phrase("symthaea-nix-distillation-m7b");
     let (mut generator, _adam, _proj, _liquid_mamba_cfg) =
         BrocaGenerator::from_checkpoint(&checkpoint, &genesis)
             .map_err(|e| format!("from_checkpoint: {}", e))?;
     println!(
-        "Loaded. Vocab: {} tokens.",
+        "Loaded. Vocab: {} tokens (NIX_TOKENS restored from checkpoint).",
         generator.tokenizer().vocab_size()
     );
 

@@ -30,6 +30,7 @@ use std::path::PathBuf;
 
 use serde::Deserialize;
 use symthaea_broca::generator::{BrocaConfig, BrocaGenerator};
+use symthaea_broca::tokenizer::BpeTokenizer;
 use symthaea_broca::training::{train, TrainingConfig, TrainingDataset, TrainingPair};
 use symthaea_core::genesis::GenesisSeed;
 
@@ -151,19 +152,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .collect();
     let mut dataset = TrainingDataset { pairs };
 
-    // ── Construct Broca ──
-    // Note: BrocaGenerator::new hardcodes its tokenizer to
-    // `BpeTokenizer::default_minimal()`, which doesn't include
-    // NIX_TOKENS (M5) yet. Augmenting the in-generator tokenizer is
-    // a followup — for the M7.b smoke test, the default BPE will
-    // reconstruct Nix tokens from subword pieces (slower but
-    // semantically equivalent). Actual quality gains from M5's
-    // vocabulary arrive with M7.c when the tokenizer → controller
-    // wiring supports custom vocabularies at construction time.
+    // ── Construct Broca with the Nix-augmented vocabulary ──
+    // Use `BrocaGenerator::with_tokenizer` (the same path
+    // `from_checkpoint` uses) so the controller is sized to the
+    // post-augmentation vocab. `add_nix_tokens()` grows the BPE
+    // vocabulary with M5's NIX_TOKENS list: Nix keywords, attrpath
+    // roots (`services.`, `hardware.`, etc.), call-site identifiers
+    // (`mkShell`, `mkOption`), common idioms. Each becomes a single
+    // token rather than a char-by-char BPE reconstruction — major
+    // quality + speed win at training time.
     let genesis = GenesisSeed::from_phrase("symthaea-nix-distillation-m7b");
-    let mut generator = BrocaGenerator::new(&genesis, BrocaConfig::default());
+    let mut tokenizer = BpeTokenizer::default_minimal();
+    let before = tokenizer.vocab_size();
+    let added = tokenizer.add_nix_tokens();
     println!(
-        "Built BrocaGenerator. Vocab size: {} tokens (default minimal).",
+        "Built Nix-augmented vocab: {} tokens (default minimal) + {} NIX_TOKENS = {} total.",
+        before,
+        added,
+        tokenizer.vocab_size()
+    );
+    let mut generator = BrocaGenerator::with_tokenizer(&genesis, BrocaConfig::default(), tokenizer);
+    println!(
+        "Built BrocaGenerator. Controller sized to {} vocab entries.",
         generator.tokenizer().vocab_size()
     );
 
