@@ -24,6 +24,47 @@ import {
 } from './community';
 
 // ============================================================================
+// Dual-DID guard — see MYCELIX_STATE_COEXISTENCE.md
+// ============================================================================
+
+/**
+ * Raised when tax-export is called under the primary DID. State-facing
+ * output must be generated under `did:mycelix:legal:<opaque>` to keep
+ * it cryptographically unlinked from the user's pseudonymous identity.
+ * See `mycelix-lawful-identity/docs/THREAT_MODEL.md`.
+ */
+export class PrimaryDidStateInteropError extends Error {
+  constructor(did: string) {
+    super(
+      `tax-export refuses to run under primary DID "${did}". ` +
+      `State-facing exports must use did:mycelix:legal:* to preserve the ` +
+      `on-chain separation between consciousness-gated identity and ` +
+      `state-facing identity. See MYCELIX_STATE_COEXISTENCE.md.`,
+    );
+    this.name = 'PrimaryDidStateInteropError';
+  }
+}
+
+/**
+ * Assert that a DID is NOT the primary consciousness-gated identity.
+ *
+ * Rules:
+ * - `did:mycelix:primary:*` → REJECTED (hard error).
+ * - `did:mycelix:legal:*`   → accepted.
+ * - anything else           → accepted (legacy DIDs, external DIDs).
+ *
+ * The legacy-accept carveout exists because the existing tax-export
+ * callers use unqualified `did:mycelix:<agent>` strings. A future
+ * migration pass should tighten this to require the `legal:` prefix
+ * explicitly.
+ */
+export function assertLegalDid(did: string): void {
+  if (did.startsWith('did:mycelix:primary:') || did === 'did:mycelix:primary') {
+    throw new PrimaryDidStateInteropError(did);
+  }
+}
+
+// ============================================================================
 // Types
 // ============================================================================
 
@@ -103,6 +144,10 @@ export function generateTaxExport(
   daoDid: string,
   taxYear: string,
 ): TaxExportSummary {
+  // State-facing output MUST NOT run under the primary DID. See
+  // MYCELIX_STATE_COEXISTENCE.md for the dual-DID rule.
+  assertLegalDid(memberDid);
+
   const config = getCommunityConfig();
   const hourlyRate = config.labor_hour_value;
   const { start, end } = getTaxYearBounds(taxYear);

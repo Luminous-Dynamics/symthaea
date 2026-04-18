@@ -46,8 +46,57 @@ vi.mock('./community', () => ({
 }));
 
 import type { ExchangeRecord } from './resilience-client';
-import { generateTaxExport, exportToCsv, exportToJson } from './tax-export';
+import {
+  generateTaxExport,
+  exportToCsv,
+  exportToJson,
+  assertLegalDid,
+  PrimaryDidStateInteropError,
+} from './tax-export';
 import type { TaxExportSummary } from './tax-export';
+
+describe('dual-DID guard', () => {
+  it('accepts did:mycelix:legal:* DIDs', () => {
+    expect(() => assertLegalDid('did:mycelix:legal:a1b2c3')).not.toThrow();
+  });
+
+  it('accepts legacy unqualified did:mycelix:* DIDs (carveout)', () => {
+    expect(() => assertLegalDid('did:mycelix:holder001')).not.toThrow();
+  });
+
+  it('accepts external DIDs', () => {
+    expect(() => assertLegalDid('did:web:state.gov')).not.toThrow();
+    expect(() => assertLegalDid('did:key:z6Mk')).not.toThrow();
+  });
+
+  it('rejects did:mycelix:primary:* DIDs with typed error', () => {
+    expect(() => assertLegalDid('did:mycelix:primary:abc123')).toThrow(
+      PrimaryDidStateInteropError,
+    );
+  });
+
+  it('rejects bare did:mycelix:primary', () => {
+    expect(() => assertLegalDid('did:mycelix:primary')).toThrow(
+      PrimaryDidStateInteropError,
+    );
+  });
+
+  it('generateTaxExport refuses primary DID', () => {
+    expect(() =>
+      generateTaxExport([], 'did:mycelix:primary:xyz', 'test-dao', '2026'),
+    ).toThrow(PrimaryDidStateInteropError);
+  });
+
+  it('error message points at the coexistence doc', () => {
+    try {
+      assertLegalDid('did:mycelix:primary:abc');
+      throw new Error('expected throw');
+    } catch (e) {
+      expect(e).toBeInstanceOf(PrimaryDidStateInteropError);
+      expect((e as Error).message).toContain('MYCELIX_STATE_COEXISTENCE.md');
+    }
+  });
+});
 
 // ============================================================================
 // Helpers
