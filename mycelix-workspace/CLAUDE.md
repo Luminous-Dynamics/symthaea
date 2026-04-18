@@ -26,6 +26,7 @@ just status          # Check status
 | Production | 3 | mail (12 zomes), desci (141 tests, REST not hApp), space (5 zomes + orbital-mechanics) |
 | **Cluster** | **5** | **commons** (39 zomes, 5,276 tests), **civic** (18 zomes, 2,273 tests), **hearth** (11 zomes, 1,023 tests), **personal** (3 zomes, 20 tests), **attribution** (3 zomes, 17 tests) |
 | Built | 6 | energy (5 zomes, 10K LOC), climate (3 zomes, 7K LOC), music (4 zomes + 14 crates, 33K LOC), knowledge (8 zomes, 15K LOC), health (15 zomes, 81K LOC), finance (8 zomes) |
+| **State Interop** | **1** | **lawful-identity** (3 zomes, 16 structural tests, live-verified on shared conductor — dual-DID airlock for state-facing credentials; see `MYCELIX_STATE_COEXISTENCE.md` at repo root) |
 | Beta | 7 | marketplace, supplychain, observatory, epistemic-markets, fabrication, praxis, consensus |
 | Stub/Other | 2 | bots (Python), symthaea-bridge |
 
