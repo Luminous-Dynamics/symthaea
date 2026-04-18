@@ -37,6 +37,18 @@
     --tier-elevated: #a78bfa;
     --tier-guardian: #fbbf24;
 
+    /* === Mycelix Design-System semantic tokens (consumed by mycelix-leptos-core
+       primitives TelemetryLine, GraphNode, FlowIndicator).
+       Hearth is the warm-amber "care" cluster — map accordingly. === */
+    --md-base: var(--bg);
+    --md-fg: var(--text-primary);
+    --md-fg-muted: var(--text-muted);
+    --md-signal: var(--primary);           /* hearth's warm amber IS the live signal */
+    --md-consensus: var(--gratitude-glow); /* gold for verified/acknowledged */
+    --md-care: var(--bond-healthy);        /* hearth IS the care cluster */
+    --md-alarm: var(--emergency-red);
+    --md-mono: ui-monospace, 'JetBrains Mono', 'Iosevka', 'Berkeley Mono', monospace;
+
     /* === Consciousness Modulation === */
     --consciousness-warmth: 0;
     --consciousness-bond-glow: 0;
