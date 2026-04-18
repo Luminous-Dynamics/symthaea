@@ -119,6 +119,41 @@ enum Command {
         /// Issuer DID to query (e.g. `did:web:state.gov`).
         issuer_did: String,
     },
+
+    /// Attach an imported credential (passport, mDL, SSN-derived
+    /// attestation) to a legal DID you own. The actual credential
+    /// body is not transmitted — only a hash commitment + issuer
+    /// pointer. Requires the `conductor` build feature.
+    ImportCredential {
+        /// Legal DID you own that will hold this credential.
+        #[arg(long)]
+        legal_did: String,
+        /// BLAKE3/SHA-256 hash commitment to the underlying VC.
+        #[arg(long)]
+        credential_hash: String,
+        /// Issuer DID (e.g. `did:web:home.affairs.gov.za`).
+        #[arg(long)]
+        issuer_did: String,
+        /// Credential type (`PassportCredential`, `MobileDriversLicense`, etc.).
+        #[arg(long)]
+        credential_type: String,
+        /// ISO 8601 issuance date.
+        #[arg(long)]
+        issued_at: String,
+        /// Optional ISO 8601 expiry date.
+        #[arg(long)]
+        expires_at: Option<String>,
+        /// Optional revocation-check URL.
+        #[arg(long)]
+        revocation_check_url: Option<String>,
+    },
+
+    /// List credentials attached to one of your legal DIDs.
+    /// Requires the `conductor` build feature.
+    ListCredentials {
+        /// Legal DID to query.
+        legal_did: String,
+    },
 }
 
 fn main() -> ExitCode {
@@ -294,6 +329,26 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         Command::RequestNonce { verifier_did } => do_live_request_nonce(&verifier_did)?,
 
         Command::LookupTier { issuer_did } => do_live_lookup_tier(&issuer_did)?,
+
+        Command::ImportCredential {
+            legal_did,
+            credential_hash,
+            issuer_did,
+            credential_type,
+            issued_at,
+            expires_at,
+            revocation_check_url,
+        } => do_live_import_credential(
+            legal_did,
+            credential_hash,
+            issuer_did,
+            credential_type,
+            issued_at,
+            expires_at,
+            revocation_check_url,
+        )?,
+
+        Command::ListCredentials { legal_did } => do_live_list_credentials(&legal_did)?,
     }
 
     Ok(())
@@ -426,6 +481,25 @@ fn do_live_lookup_tier(_issuer: &str) -> Result<(), Box<dyn std::error::Error>> 
     live_unavailable()
 }
 
+#[cfg(not(feature = "conductor"))]
+#[allow(clippy::too_many_arguments)]
+fn do_live_import_credential(
+    _legal_did: String,
+    _credential_hash: String,
+    _issuer_did: String,
+    _credential_type: String,
+    _issued_at: String,
+    _expires_at: Option<String>,
+    _revocation_check_url: Option<String>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    live_unavailable()
+}
+
+#[cfg(not(feature = "conductor"))]
+fn do_live_list_credentials(_legal_did: &str) -> Result<(), Box<dyn std::error::Error>> {
+    live_unavailable()
+}
+
 #[cfg(feature = "conductor")]
 fn do_live_ping() -> Result<(), Box<dyn std::error::Error>> {
     live_runtime().block_on(async {
@@ -550,6 +624,80 @@ fn do_live_lookup_tier(issuer_did: &str) -> Result<(), Box<dyn std::error::Error
                 }
             ),
             None => println!("No classification found for {issuer_did} (defaults to Peer)."),
+        }
+        Ok::<_, Box<dyn std::error::Error>>(())
+    })
+}
+
+#[cfg(feature = "conductor")]
+#[allow(clippy::too_many_arguments)]
+fn do_live_import_credential(
+    legal_did: String,
+    credential_hash: String,
+    issuer_did: String,
+    credential_type: String,
+    issued_at: String,
+    expires_at: Option<String>,
+    revocation_check_url: Option<String>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    live_runtime().block_on(async {
+        let conn = live::LiveConductor::connect(
+            live::default_admin_addr(),
+            live::default_app_addr(),
+            live::DEFAULT_APP_ID,
+        )
+        .await?;
+        let out = conn
+            .import_credential(live::ImportCredentialInput {
+                legal_did,
+                credential_hash: credential_hash.clone(),
+                issuer_did,
+                credential_type,
+                issued_at,
+                expires_at,
+                revocation_check_url,
+            })
+            .await?;
+        println!(
+            "Imported credential (hash {}). Action: {}",
+            out.credential_hash, out.record_action_hash
+        );
+        Ok::<_, Box<dyn std::error::Error>>(())
+    })
+}
+
+#[cfg(feature = "conductor")]
+fn do_live_list_credentials(legal_did: &str) -> Result<(), Box<dyn std::error::Error>> {
+    live_runtime().block_on(async {
+        let conn = live::LiveConductor::connect(
+            live::default_admin_addr(),
+            live::default_app_addr(),
+            live::DEFAULT_APP_ID,
+        )
+        .await?;
+        let creds = conn.get_credentials_for_did(legal_did).await?;
+        if creds.is_empty() {
+            println!("No credentials on {legal_did}.");
+        } else {
+            println!("{legal_did} — {} credential(s):", creds.len());
+            for (i, c) in creds.iter().enumerate() {
+                println!(
+                    "  {}. {} from {} (issued {}){}{}",
+                    i + 1,
+                    c.credential_type,
+                    c.issuer_did,
+                    c.issued_at,
+                    match &c.expires_at {
+                        Some(e) => format!(", expires {e}"),
+                        None => String::new(),
+                    },
+                    match &c.revocation_check_url {
+                        Some(u) => format!("\n     revocation: {u}"),
+                        None => String::new(),
+                    },
+                );
+                println!("     hash: {}", c.credential_hash);
+            }
         }
         Ok::<_, Box<dyn std::error::Error>>(())
     })

@@ -143,6 +143,32 @@ impl LiveConductor {
             .await
     }
 
+    /// Call `legal_did.import_credential`.
+    pub async fn import_credential(
+        &self,
+        input: ImportCredentialInput,
+    ) -> Result<ImportCredentialOutput> {
+        self.call(
+            "legal_did",
+            "import_credential",
+            serde_json::to_value(input)?,
+        )
+        .await
+    }
+
+    /// Call `legal_did.get_credentials_for_did`.
+    pub async fn get_credentials_for_did(
+        &self,
+        legal_did: &str,
+    ) -> Result<Vec<LegalCredentialView>> {
+        self.call(
+            "legal_did",
+            "get_credentials_for_did",
+            serde_json::json!({ "legal_did": legal_did }),
+        )
+        .await
+    }
+
     /// Call `issuer_trust_tier.classify_issuer`.
     pub async fn classify_issuer(
         &self,
@@ -241,6 +267,33 @@ pub struct IssuerClassificationView {
     pub tier: String,
     pub classified_at: String,
     pub rationale: Option<String>,
+}
+
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct ImportCredentialInput {
+    pub legal_did: String,
+    pub credential_hash: String,
+    pub issuer_did: String,
+    pub credential_type: String,
+    pub issued_at: String,
+    pub expires_at: Option<String>,
+    pub revocation_check_url: Option<String>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct ImportCredentialOutput {
+    pub credential_hash: String,
+    pub record_action_hash: holochain_types::prelude::ActionHash,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct LegalCredentialView {
+    pub credential_hash: String,
+    pub issuer_did: String,
+    pub credential_type: String,
+    pub issued_at: String,
+    pub expires_at: Option<String>,
+    pub revocation_check_url: Option<String>,
 }
 
 #[derive(Debug, serde::Deserialize)]
