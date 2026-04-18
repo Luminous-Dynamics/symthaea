@@ -275,12 +275,12 @@ Implementing just items (1), (2), (3) would materially change whether a new visi
 
 ---
 
-## Open questions
+## Strategic decisions (resolved 2026-04-18)
 
-1. **Does the mobile/XR narrative contradict the "research tool" framing?** XR hero demo = 4D in a headset. Mobile = casual adoption. Are these compatible with the dual-track story, or should mobile explicitly be "Will NOT Do"?
-2. **How much Mycelix do we want to REQUIRE?** A user opting into `symtropy-bevy` (AGPL) doesn't automatically pull Mycelix. Should there be a reference game showing the full stack (`symtropy-mycelix-bridge` scenario → real DID → real economy), or does that cement the AGPL commitment too hard?
-3. **Symthaea's heaviness.** `symthaea-bevy-brain` pulls the full cognitive loop. For a 50-NPC scene this is ~30 Hz × 50 = 1,500 cycles/s. Is that tolerable? Benchmark needed before recommending it as "the AI solution."
-4. **Bevy major-version cadence.** Symtropy currently targets Bevy 0.18. Each Bevy release breaks ecosystem crates. What's the upgrade cadence we commit to?
+1. **Mobile/XR narrative.** Mobile (iOS/Android) is **"Will NOT Do"** for the core engine — standard mobile gaming dilutes the focus on high-fidelity simulation and decentralized trust. WebXR and OpenXR stay in scope; the 4D-in-a-headset hero demo is the research payoff.
+2. **Mycelix requirement.** **Opt-in, first-class.** `symtropy-bevy` remains standalone (AGPL); `symtropy-mycelix-bridge` is an official add-on plugin, not a transitive dep. The starter template includes a commented-out Mycelix section with identity + cloud-save enablement as a one-line opt-in.
+3. **Symthaea performance budget.** `symthaea-bevy-brain`'s ~30 Hz cognitive loop is heavy by design. Reserve it for **Hero NPCs or complex procedural agents** where full consciousness-driven behavior earns its CPU cost. For generic NPCs (guards, orcs, mob spawns), recommend **`big-brain`** (utility-theory AI, lightweight). Two-tier AI strategy — Symthaea for the few, `big-brain` for the many — is the documented guidance.
+4. **Bevy major-version cadence.** **N−1 cadence.** Always target current stable Bevy (today: 0.18), but do not rush to update on release day. Wait until core community crates (`leafwing-input-manager`, `oxidized_navigation`, `bevy_tnua`, `bevy_hanabi`) have stabilized their ports before Symtropy itself moves. Accepts ~8-week lag in exchange for reduced breakage.
 
 ---
 
