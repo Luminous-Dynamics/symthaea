@@ -31,21 +31,25 @@
 pub mod backend;
 pub mod circuits;
 pub mod consciousness;
-pub mod sovereign;
-#[cfg(feature = "backend-miden")]
-pub mod miden_consciousness;
-pub mod miden_parameterized;
 #[cfg(feature = "dilithium")]
 pub mod dilithium;
 pub mod domain;
 pub mod error;
 pub mod fixed_point;
+#[cfg(feature = "backend-winterfell")]
+pub mod jurisdiction_registry;
+#[cfg(feature = "backend-winterfell")]
+pub mod location_attestation;
+#[cfg(feature = "backend-miden")]
+pub mod miden_consciousness;
+pub mod miden_parameterized;
 pub mod pogq;
+pub mod sovereign;
 pub mod types;
 
 // Re-exports
 pub use backend::ProofBackend;
-pub use consciousness::{ConsciousnessProofRequest, ConsciousnessProofResult, CivicTier};
+pub use consciousness::{CivicTier, ConsciousnessProofRequest, ConsciousnessProofResult};
 #[cfg(feature = "dilithium")]
 pub use dilithium::DilithiumKeypair;
 pub use domain::DomainTag;
