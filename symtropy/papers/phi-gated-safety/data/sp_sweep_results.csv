@@ -1,0 +1,7 @@
+sp_m,iso_cycles_mean,iso_cycles_std,adaptive_cycles_mean,adaptive_cycles_std,phi_sprintfloor_cycles_mean,phi_sprintfloor_cycles_std,phi_vs_iso_pct
+0.50,7.00,0.00,1.20,1.10,1.00,0.00,-85.7
+1.00,7.00,0.00,1.20,1.10,1.00,0.00,-85.7
+2.00,2.60,3.58,1.20,1.10,1.00,0.00,-61.5
+2.25,1.60,2.30,1.20,1.10,1.00,0.00,-37.5
+2.50,0.40,0.89,1.20,1.10,1.00,0.00,150.0
+3.00,0.00,0.00,1.20,1.10,1.00,0.00,
