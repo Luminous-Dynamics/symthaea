@@ -220,17 +220,30 @@ fn run_trial_arm(policy: Policy, params: &TrialParams) -> u32 {
 /// tick of trial 0 containing `t, human_dist, pe, danger, phi, gain`.
 /// Use this to distinguish "Φ pinned at Red" from "Φ oscillating but
 /// below activation threshold" when the Φ policy produces zero cycles.
-/// Threshold set for mapping Φ → motor_gain. Defaults track the
-/// out-of-the-box `symtropy-consciousness-physics::SafetyTier::from_phi`
-/// thresholds (Green > 0.6, Yellow > 0.3, Orange > 0.1). The
-/// "recalibrated" set is fit to the empirical Φ distribution observed
-/// in this benchmark ([0.099, 0.145]) so the arm can actually reach
-/// the Green tier in practice.
+/// Threshold set for mapping Φ → motor_gain. Three shapes:
+///
+/// - `Default` — tracks `symtropy-consciousness-physics::SafetyTier`
+///   out-of-the-box thresholds (Green > 0.6, Yellow > 0.3, Orange > 0.1,
+///   else Red). This is what any downstream consumer of `RoboticAgent`
+///   gets for free.
+/// - `Recalibrated` — tier boundaries refit to the empirical Φ range
+///   [0.099, 0.145] observed in this benchmark. Still quantized into
+///   4 tiers; gains are 0 / 0.3 / 0.6 / 1.0.
+/// - `Continuous` — linear map of the empirical band [0.099, 0.145] →
+///   [0.0, 1.0], clamped outside. Eliminates tier hysteresis; Φ flows
+///   directly into motor authority.
 #[derive(Clone, Copy)]
 pub enum ThresholdSet {
     Default,
     Recalibrated,
+    Continuous,
 }
+
+/// Empirical Φ distribution band observed in 40 s trace. If the
+/// consciousness-equation aggregation changes, re-run with
+/// `MANIP_BENCH_PHI_TRACE=1` and update these to the new min/max.
+const PHI_BAND_LOW: f64 = 0.099;
+const PHI_BAND_HIGH: f64 = 0.145;
 
 fn gain_from_phi(phi: f64, set: ThresholdSet) -> f64 {
     match set {
@@ -247,8 +260,9 @@ fn gain_from_phi(phi: f64, set: ThresholdSet) -> f64 {
             }
         }
         ThresholdSet::Recalibrated => {
-            // Fit to empirical Φ range [0.099, 0.145] observed in the
-            // 40 s trace. Top of the band → Green; bottom → Red.
+            // Fit to empirical Φ range [PHI_BAND_LOW, PHI_BAND_HIGH].
+            // Top of the band → Green; bottom → Red. Still tier-quantized
+            // (4 discrete gain levels), same as Default's shape.
             if phi > 0.135 {
                 1.0
             } else if phi > 0.120 {
@@ -258,6 +272,14 @@ fn gain_from_phi(phi: f64, set: ThresholdSet) -> f64 {
             } else {
                 0.0
             }
+        }
+        ThresholdSet::Continuous => {
+            // Linear map [PHI_BAND_LOW, PHI_BAND_HIGH] → [0, 1], clamped.
+            // No tier quantization; every Φ sample maps to a distinct
+            // gain. Uses the full dynamic range of the consciousness
+            // equation's output on this task.
+            let span = PHI_BAND_HIGH - PHI_BAND_LOW;
+            ((phi - PHI_BAND_LOW) / span).clamp(0.0, 1.0)
         }
     }
 }
@@ -307,11 +329,13 @@ fn run_trial_phi(params: &TrialParams, trace: bool, thresholds: ThresholdSet) ->
             let obs = [pe, danger, human_norm, effort_norm];
             // Always run the tick — it updates internal state AND returns
             // the default-threshold gain (which we may ignore in
-            // Recalibrated mode).
+            // Recalibrated / Continuous modes).
             let default_gain = agent.tick(&obs, danger);
             last_gain = match thresholds {
                 ThresholdSet::Default => default_gain,
-                ThresholdSet::Recalibrated => gain_from_phi(agent.phi(), thresholds),
+                ThresholdSet::Recalibrated | ThresholdSet::Continuous => {
+                    gain_from_phi(agent.phi(), thresholds)
+                }
             };
             last_perception = Some(hv);
 
@@ -550,19 +574,28 @@ fn main() {
         .unwrap_or(DEFAULT_PHI_TRIALS);
 
     let phi_n_steps = phi_steps();
+    // Threshold-set selection: MANIP_BENCH_PHI_CONT takes precedence
+    // over MANIP_BENCH_PHI_RECAL. Default if neither set.
+    let cont_enabled = std::env::var("MANIP_BENCH_PHI_CONT")
+        .ok()
+        .map(|v| v != "0" && !v.is_empty())
+        .unwrap_or(false);
     let recal_enabled = std::env::var("MANIP_BENCH_PHI_RECAL")
         .ok()
         .map(|v| v != "0" && !v.is_empty())
         .unwrap_or(false);
-    let thresholds = if recal_enabled {
-        ThresholdSet::Recalibrated
+    let (thresholds, threshold_label) = if cont_enabled {
+        (
+            ThresholdSet::Continuous,
+            "continuous Φ→gain [0.099, 0.145] → [0, 1]",
+        )
+    } else if recal_enabled {
+        (
+            ThresholdSet::Recalibrated,
+            "recalibrated tiers [0.105/0.120/0.135]",
+        )
     } else {
-        ThresholdSet::Default
-    };
-    let threshold_label = if recal_enabled {
-        "recalibrated [0.105/0.120/0.135]"
-    } else {
-        "default SafetyTier [0.1/0.3/0.6]"
+        (ThresholdSet::Default, "default SafetyTier [0.1/0.3/0.6]")
     };
     println!();
     println!(
