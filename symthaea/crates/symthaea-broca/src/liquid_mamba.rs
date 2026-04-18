@@ -578,6 +578,7 @@ impl LiquidMambaGenerator {
                     hallucination_flag: false,
                     output_hvs: Vec::new(),
                     semantic_pe: 0.0,
+                    nsm_prime_coverage: 0.0,
                 }
             }
         }
@@ -610,6 +611,7 @@ impl LiquidMambaGenerator {
                     hallucination_flag: false,
                     output_hvs: Vec::new(),
                     semantic_pe: 0.0,
+                    nsm_prime_coverage: 0.0,
                 }
             }
         }
@@ -815,6 +817,7 @@ impl LiquidMambaGenerator {
                         hallucination_flag: false,
                         output_hvs,
                         semantic_pe,
+                        nsm_prime_coverage: 0.0,
                     });
                 }
 
@@ -843,6 +846,9 @@ impl LiquidMambaGenerator {
                 hallucination_flag: false,
                 output_hvs,
                 semantic_pe,
+                // NSM prime coverage is tracked in the CfC-HDC generator path;
+                // Liquid-Mamba fusion does not run the NSM tracker, so report 0.
+                nsm_prime_coverage: 0.0,
             })
         })();
 
@@ -1232,7 +1238,7 @@ impl LiquidMambaGenerator {
             let Some(tp) = self.temporal_proj.as_mut() else {
                 // temporal_projection enabled in config but struct not initialized;
                 // skip gradient computation rather than crashing the cognitive loop.
-                return result;
+                return;
             };
             if self.config.temporal_directional_loss {
                 tp.compute_directional_gradients(&thought_hv, None);

@@ -55,6 +55,17 @@ impl Clone for GpuEmbeddingCache {
     }
 }
 
+#[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+impl GpuEmbeddingCache {
+    pub fn device(&self) -> &candle_core::Device {
+        &self.device
+    }
+
+    pub fn embeddings(&self) -> &candle_core::Tensor {
+        &self.embeddings
+    }
+}
+
 /// Configuration for the language controller.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LanguageControllerConfig {
