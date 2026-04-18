@@ -21,6 +21,7 @@
 //! - [`ProgressBar`] — Configurable progress bar
 //! - [`StatCard`] — Labeled statistic card (static number)
 //! - [`TelemetryLine`] — Horizontal sparkline strip for streaming metrics (complements StatCard)
+//! - [`GraphNode`] + [`GraphEdge`] — Relational graph primitives (kinship, reciprocity, credentials)
 //!
 //! # Providers
 //!
@@ -52,6 +53,7 @@ pub mod data_table;
 pub mod empty_state;
 pub mod error_boundary;
 pub mod forms;
+pub mod graph_node;
 pub mod indlela;
 pub mod loading;
 pub mod local_identity;
@@ -119,6 +121,7 @@ pub use cluster_launcher::{default_clusters, ClusterLauncher, ClusterLink};
 pub use data_table::{Column, DataTable, Pagination};
 pub use empty_state::EmptyState;
 pub use forms::{Checkbox, FormField, Select, SelectOption, TextArea, TextInput};
+pub use graph_node::{GraphEdge, GraphNode, NodeEmphasis};
 pub use indlela::{community_warmth, knowledge_freshness, GrowthStage};
 pub use local_identity::{
     load_json, local_did, provide_local_identity, save_json, use_local_identity, LocalIdentity,
