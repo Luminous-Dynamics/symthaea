@@ -1881,6 +1881,87 @@ pub struct ColdGenerationResult {
 /// 5. Assemble code skeleton from plan actions
 ///
 /// This is the first end-to-end test of the HDC→CfC→Code pipeline.
+/// Generate code via the hybrid System 1/System 2 path with self-repair.
+///
+/// Strategy:
+/// 1. Try 1-NN body retrieval (high quality if a similar example exists)
+/// 2. If 1-NN fails to compile, fall back to template assembly
+/// 3. If template fails too, run repair iterations enriching channels from errors
+pub fn generate_with_repair_hybrid(
+    purpose: &str,
+    signature: &str,
+    pairs: &[AlgorithmTrainingPair],
+    classifier: &AlgorithmClassifier,
+    max_iterations: usize,
+) -> RepairResult {
+    let encoder = AlgorithmEncoder::new();
+    let projection = LearnedProjection::fit(pairs);
+
+    let mut channels = build_channels_from_purpose(purpose, signature);
+    let mut error_history = Vec::new();
+    let mut current_code = String::new();
+    let mut compiles = false;
+    let mut class;
+
+    // Iteration 0: Try 1-NN retrieval first (highest quality)
+    if let Some(nn_code) = generate_via_nearest_neighbor(purpose, signature, pairs, classifier) {
+        current_code = nn_code;
+        match try_compile(&current_code) {
+            Ok(()) => {
+                let hv = encoder.encode(&channels);
+                let projected = projection.project(&hv);
+                class = hybrid_classify(purpose, &projected.values, classifier);
+                return RepairResult {
+                    purpose: purpose.to_string(),
+                    signature: signature.to_string(),
+                    iterations: 1,
+                    compiles: true,
+                    final_code: current_code,
+                    error_history,
+                    class,
+                };
+            }
+            Err(e) => {
+                error_history.push(format!("1-NN: {e}"));
+                enrich_channels_from_errors(&mut channels, &e);
+            }
+        }
+    }
+
+    // Iterations 1..max: hybrid classify + template assembly + repair
+    let hv = encoder.encode(&channels);
+    let projected = projection.project(&hv);
+    class = hybrid_classify(purpose, &projected.values, classifier);
+
+    for _iteration in 0..max_iterations {
+        channels.set_class(class);
+        let template_actions = class_to_plan(class, &channels);
+        let plan_steps = to_plan_steps(&template_actions);
+        current_code = assemble_from_plan(signature, &plan_steps, &channels);
+
+        match try_compile(&current_code) {
+            Ok(()) => {
+                compiles = true;
+                break;
+            }
+            Err(e) => {
+                error_history.push(e.clone());
+                enrich_channels_from_errors(&mut channels, &e);
+            }
+        }
+    }
+
+    RepairResult {
+        purpose: purpose.to_string(),
+        signature: signature.to_string(),
+        iterations: error_history.len() + if compiles { 1 } else { 0 },
+        compiles,
+        final_code: current_code,
+        error_history,
+        class,
+    }
+}
+
 /// Find the nearest training solution by HDC similarity within the same class.
 fn nearest_in_class<'a>(
     query_hv: &symthaea_core::hdc::ContinuousHV,
@@ -3223,6 +3304,65 @@ mod tests {
         // Both should have finite loss
         assert!(curriculum.final_loss.is_finite());
         assert!(flat.final_loss.is_finite());
+    }
+
+    #[test]
+    fn test_hybrid_repair_full_pipeline() {
+        let (classifier, _, _, _) = train_linear_classifier(100, 0.01);
+        let pairs = build_training_pairs();
+
+        let problems = [
+            (
+                "reverse the characters in a string",
+                "pub fn reverse(input: &str) -> String",
+            ),
+            (
+                "sort a list of integers",
+                "pub fn sort_nums(nums: Vec<i32>) -> Vec<i32>",
+            ),
+            ("compute the nth fibonacci", "pub fn fib(n: u64) -> u64"),
+            (
+                "count vowels in a string",
+                "pub fn count_vowels(s: &str) -> usize",
+            ),
+            (
+                "check if a number is even",
+                "pub fn is_even(n: u64) -> bool",
+            ),
+        ];
+
+        println!("\n=== Hybrid System 1/System 2 + Self-Repair ===");
+        let mut compiles = 0;
+        let mut nn_wins = 0;
+        let mut template_wins = 0;
+        for (purpose, sig) in &problems {
+            let result = generate_with_repair_hybrid(purpose, sig, &pairs, &classifier, 3);
+            let label = if result.iterations == 1 && result.compiles {
+                nn_wins += 1;
+                "NN"
+            } else if result.compiles {
+                template_wins += 1;
+                "TEMPLATE"
+            } else {
+                "FAIL"
+            };
+            println!(
+                "  '{}'\n    → {:?} | {} | iter={} | compiles={}",
+                purpose, result.class, label, result.iterations, result.compiles
+            );
+            if result.compiles {
+                compiles += 1;
+            }
+        }
+        println!(
+            "\nTotal: {}/{} compile (NN={}, Template={})",
+            compiles,
+            problems.len(),
+            nn_wins,
+            template_wins
+        );
+
+        assert!(compiles >= 3, "at least 3/5 should compile, got {compiles}");
     }
 
     #[test]
