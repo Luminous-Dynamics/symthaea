@@ -70,3 +70,20 @@ After adding `⁻¹` (reciprocal) tokenizer + parser support and extending the c
 Parse-failure histogram: 81× `UnknownChar`, 37× `Unexpected`. The reciprocal change didn't meaningfully move the parse rate because most `UnknownChar` failures are other glyphs (`∣`, `↑`, `σ`, etc.); divisibility + coercion are the bigger prizes. `translate-of-parsed` lifted from 94.4% to 96.6% — the two remaining translate failures are probably `^` with non-literal exponent and one variable-exponent shape.
 
 The 33.3% on 177 files is now the canonical "honest zero-shot" number for the Rust-native ingest. Every future parser extension should be measured against this baseline + seed 42 + `MINIF2F_N=200`.
+
+## Update — extended filter (same day)
+
+The 177-file baseline's 33.3% parse rate was dominated by denominator inflation: 42 files contained `%` (modular arithmetic, no `mod` in `FolFormulaExt`), 6 used `ℂ` (complex), 2 used `ℚ` (rational type), and ~25 declared function-typed binders `(f : ℝ → ℝ)` — all Phase 5c territory. Added them to the Rust harness's out-of-scope list (artifact: `phase5b-baseline-2026-04-18-extended-filter.csv`):
+
+| Stage | Count | Rate |
+|-------|-------|------|
+| Total (extended-filter pool) | 98 | 100% |
+| Parsed | **59** | **60.2%** |
+| Translated (of parsed) | 57 | 96.6% |
+| Translated (of total) | **57** | **58.2%** |
+
+The numerator didn't change (57 translated) — the 79 excluded files were all failing anyway. The denominator dropped from 177 to 98 because the filter now matches FolFormulaExt's actual scope. Parse rate lifted from 33.3% to 60.2%, end-to-end from 32.2% to 58.2%. Parse-failure histogram shrank to 23× UnknownChar, 16× Unexpected — tractable size for targeted next increments.
+
+**Interpretation:** 60.2% is the honest number for "given a miniF2F file that's in `FolFormulaExt`'s scope, what fraction does the Rust parser read today?" The gap to 100% is now a small set of specific glyphs/grammar shapes (`∣`, `↑`, `∃`, nested `∀`, inline type ascription). Each is a ~20-80 LOC parser extension.
+
+This is the canonical baseline going forward. The 33.3% number from earlier should be cited only in archival context.

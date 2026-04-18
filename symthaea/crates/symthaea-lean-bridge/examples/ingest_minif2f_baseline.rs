@@ -218,6 +218,25 @@ fn gather_candidates(root: &Path) -> Vec<PathBuf> {
         // bash filter (mathd_numbertheory_233, mathd_numbertheory_668);
         // ZMod is modular-ring arithmetic and genuinely out of scope.
         "ZMod",
+        // 2026-04-18 full-pool histogram: 42/81 UnknownChar failures
+        // were `%` (modular arithmetic). FolFormulaExt has no `mod`
+        // operator; these are Phase 5c AST-extension territory. Putting
+        // them in the filter cleans the denominator by ~23% (42/177).
+        "%",
+        // Complex and rational types — out of FolFormulaExt scope.
+        "ℂ",
+        "ℚ",
+        // Function-typed binders `(f : ℝ → ℝ)` produce `Unexpected
+        // found "ℝ"` at parse-time because our binder parser only
+        // recognizes bare type annotations. Function abstraction +
+        // application needs AST extension (Phase 5c); filter them
+        // out for now via the arrow-to-type pattern — these strings
+        // only appear in function-type declarations, never in
+        // `→` as logical implication (whose consequent is a
+        // proposition, not a bare type name).
+        "→ ℝ",
+        "→ ℕ",
+        "→ ℤ",
     ];
 
     let mut out = Vec::new();
