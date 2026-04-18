@@ -17,7 +17,7 @@ arxiv + venue submission after author-contact polishing.
 | Paper | Venue target | Work remaining | Critical reviewer risk |
 |-------|-------------|----------------|------------------------|
 | `physics-math/ramanujan/` | ICML / NeurIPS workshop (scientific discovery) | cover letter | Machinery ceilings are named in the paper; Kepler-only sanity check is a strength not a weakness |
-| `consciousness-theory/stochastic-resonance/` | Consciousness and Cognition | verify Φ-approximation footnote mentions n=12 limit clearly | Reviewer will test against exact Φ for small n |
+| `consciousness-theory/stochastic-resonance/` | Consciousness and Cognition, or Entropy | none — empirical validation of the MI estimator is now committed as Appendix A (see commit e2bd…) | Lower — the Appendix A negative result (estimator is not Shannon MI; it is bit-level HDV overlap) resolves the #1 reviewer concern. Residual risk is the inverted-U claim itself, which now reads honestly as an HDC-geometry phenomenon rather than an integration-theory result. |
 | `theory-foundations/hai-consciousness/` | arXiv cs.AI (preprint) | abstract tightening; target Nature Machine Intelligence after arxiv | Butlin scope caveat needs to survive review — cannot be removed |
 | `evaluation/epistemic-gating/` | ACL / EMNLP | recompile PDF with new caveats | Reviewer will want TruthfulQA or FEVER external eval; hedge via "future work" is acceptable for first submission |
 
@@ -91,17 +91,31 @@ via the project's public channels.
    strong; the 12-session arc of honest failure analysis is what
    reviewers want to see.
 
-2. **Run the 30-seed Psych-Bench resampling.** This moves psych-bench
+2. **Submit Stochastic Resonance to Entropy (or Consciousness and Cognition).**
+   After commit `e2bd…` added Appendix A (empirical MI-estimator
+   validation), this paper now meets the reviewers' ``validate the
+   estimator'' ask. The finding is scoped honestly: bit-level HDV
+   overlap, not Shannon MI. Ready for submission.
+
+3. **Run the alternative-estimator replication for stoch-res.** This
+   is the single highest-value follow-up experiment: replicate the
+   inverted-U curve using a validated Shannon-MI estimator (e.g.,
+   k-NN MI) on the same coupled-HDV dynamics. If the inverted-U
+   survives, the paper's strong claim is re-enabled. If not, the
+   bit-level-overlap reframe stands. Either outcome is publishable.
+
+4. **Run the 30-seed Psych-Bench resampling.** Moves psych-bench
    from Tier B to Tier A and fixes the single strongest reviewer
    objection. Run time: ~8 hours of compute.
 
-3. **LoRa hardware deployment for mesh-radio.** Single-weekend project
-   with a Pixel 8 + Raspberry Pi + LoRa HAT. Would produce real
-   power-consumption + OTA data. Tier B → Tier A.
+5. **LoRa hardware deployment for mesh-radio.** Single-weekend project
+   with a Pixel 8 + Raspberry Pi + LoRa HAT. Tier B → Tier A.
 
-4. **Do nothing more on Tier D papers.** They're corpus material, not
+6. **Do nothing more on Tier D papers.** They're corpus material, not
    publication candidates. Archive or leave as-is.
 
 The strongest move for the corpus as a whole is to submit Ramanujan first,
 observe real peer-review response, and let the reviewer feedback inform
-how much further hedging the other Tier A papers need.
+how much further hedging the other Tier A papers need. Stochastic
+Resonance is now the second-strongest submission candidate after its
+Appendix A validation addressed both reviewers' central concern.
