@@ -212,10 +212,17 @@ fn run_trial_arm(policy: Policy, params: &TrialParams) -> u32 {
 /// (500 Hz motor / 25 Hz cognitive).
 ///
 /// This is more expensive per trial than [`run_trial_arm`] — about
-/// 10× — so the harness runs fewer Φ trials (`PHI_TRIALS`) over a
-/// shorter sim time (`PHI_STEPS`) to keep total runtime reasonable.
-fn run_trial_phi(params: &TrialParams) -> u32 {
+/// 10× — so the default Φ sim time is shorter (40 s) than
+/// Adaptive/ISO's 100 s. Override via `MANIP_BENCH_PHI_STEPS=50000` for
+/// a fair 100 s comparison.
+///
+/// Set `MANIP_BENCH_PHI_TRACE=1` to dump one CSV-ready line per cognitive
+/// tick of trial 0 containing `t, human_dist, pe, danger, phi, gain`.
+/// Use this to distinguish "Φ pinned at Red" from "Φ oscillating but
+/// below activation threshold" when the Φ policy produces zero cycles.
+fn run_trial_phi(params: &TrialParams, trace: bool) -> u32 {
     const COG_INTERVAL: usize = 20; // 500 Hz / 25 Hz = 20 physics steps per cognitive tick.
+    let total_steps = phi_steps();
     let kinematics = ManipulatorKinematics::default_7dof();
     let mut sim = SimpleManipulatorSimulator::new();
     let genesis = GenesisSeed::from_phrase("manipulator-benchmark-phi");
@@ -228,7 +235,11 @@ fn run_trial_phi(params: &TrialParams) -> u32 {
     let mut last_gain = 1.0_f64;
     let mut last_perception: Option<ContinuousHV> = None;
 
-    for step in 0..PHI_STEPS {
+    if trace {
+        println!("# Φ-trace trial_0: t,human_dist,pe,danger,phi,gain");
+    }
+
+    for step in 0..total_steps {
         let t = step as f64 * DT;
         let human_dist = params.human_dist(t);
 
@@ -254,6 +265,21 @@ fn run_trial_phi(params: &TrialParams) -> u32 {
             let obs = [pe, danger, human_norm, effort_norm];
             last_gain = agent.tick(&obs, danger);
             last_perception = Some(hv);
+
+            if trace {
+                // Emit: t,human_dist,pe,danger,phi,gain — one row per cognitive tick.
+                // `phi` is the raw consciousness_level from the last compute,
+                // `gain` is what the SafetyTier::from_phi→motor_gain pipeline returned.
+                println!(
+                    "TRACE,{:.3},{:.3},{:.4},{:.4},{:.4},{:.4}",
+                    t,
+                    human_dist,
+                    pe,
+                    danger,
+                    agent.phi(),
+                    last_gain,
+                );
+            }
         }
 
         let state = sim.state();
@@ -295,9 +321,17 @@ fn run_trial_phi(params: &TrialParams) -> u32 {
 
 // Φ-gated trials use fewer steps because each cognitive tick is ~10× the
 // cost of a pure physics step. Keeps the full benchmark well under 30 min
-// total wall time even with the Φ policy enabled.
-const PHI_STEPS: usize = 20_000; // 40 s of sim at 500 Hz.
+// total wall time even with the Φ policy enabled. Configurable via
+// `MANIP_BENCH_PHI_STEPS` — raise to 50_000 for a fair 100 s comparison.
+const DEFAULT_PHI_STEPS: usize = 20_000; // 40 s of sim at 500 Hz.
 const DEFAULT_PHI_TRIALS: usize = 10;
+
+fn phi_steps() -> usize {
+    std::env::var("MANIP_BENCH_PHI_STEPS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(DEFAULT_PHI_STEPS)
+}
 
 // ── Monte Carlo harness ──
 
@@ -448,7 +482,7 @@ fn main() {
     // Opt-in because each Φ trial is ~10× the cost of a proximity-keyed
     // trial (cognitive tick at 25 Hz runs the HDC encoder + FEP inference).
     // Enabled by setting `MANIP_BENCH_PHI=1`. Scale-matched to
-    // `DEFAULT_PHI_TRIALS` × `PHI_STEPS` so the section adds ~a few minutes
+    // `DEFAULT_PHI_TRIALS` × `DEFAULT_PHI_STEPS` so the section adds ~a few minutes
     // of wall time, not an hour.
     let run_phi = std::env::var("MANIP_BENCH_PHI")
         .ok()
@@ -466,22 +500,27 @@ fn main() {
         .and_then(|s| s.parse().ok())
         .unwrap_or(DEFAULT_PHI_TRIALS);
 
+    let phi_n_steps = phi_steps();
     println!();
     println!(
         "━━━ Φ-gated sweep ({} trials × {} steps = {} s sim each) ━━━",
         phi_trials,
-        PHI_STEPS,
-        (PHI_STEPS as f64 * DT) as usize,
+        phi_n_steps,
+        (phi_n_steps as f64 * DT) as usize,
     );
     let phi_start = Instant::now();
     let mut phi_cycles_vec: Vec<f64> = Vec::with_capacity(phi_trials);
-    // Φ runs over a shorter sim so we can't meaningfully compare counts to
-    // the 100 s Adaptive/ISO numbers. We instead rate-normalize to "cycles
-    // per 100 s" for apples-to-apples comparison.
-    let scale = TOTAL_STEPS as f64 / PHI_STEPS as f64;
+    // Φ runs over a (possibly) shorter sim; rate-normalize to "cycles per
+    // 100 s" for apples-to-apples comparison vs Adaptive/ISO at 100 s.
+    let scale = TOTAL_STEPS as f64 / phi_n_steps as f64;
+    // Only trace trial 0 so the output stays readable.
+    let trace_enabled = std::env::var("MANIP_BENCH_PHI_TRACE")
+        .ok()
+        .map(|v| v != "0" && !v.is_empty())
+        .unwrap_or(false);
     for i in 0..phi_trials {
         let params = TrialParams::from_index(i);
-        let phi_raw = run_trial_phi(&params);
+        let phi_raw = run_trial_phi(&params, trace_enabled && i == 0);
         let phi_scaled = phi_raw as f64 * scale;
         phi_cycles_vec.push(phi_scaled);
         println!(
@@ -523,6 +562,6 @@ fn main() {
         "  (Φ sweep wall time: {:.1}s, {} trials × {:.0}s sim)",
         phi_elapsed.as_secs_f64(),
         phi_trials,
-        PHI_STEPS as f64 * DT,
+        phi_n_steps as f64 * DT,
     );
 }
