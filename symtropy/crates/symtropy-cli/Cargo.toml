@@ -1,0 +1,18 @@
+[package]
+name = "symtropy-cli"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+description = "Project scaffolding for Symtropy. `symtropy new my-game --template 3d-research` produces a runnable starter project that pulls in symtropy-bevy + symtropy-bevy-scene + symtropy-devconsole with sensible defaults."
+repository = "https://github.com/luminous-dynamics/symtropy"
+keywords = ["symtropy", "scaffolding", "cli", "bevy", "template"]
+categories = ["command-line-utilities", "game-engines"]
+readme = "README.md"
+
+[[bin]]
+name = "symtropy"
+path = "src/main.rs"
+
+[dependencies]
+# Zero non-std runtime deps. Templates are embedded as string constants
+# in src/templates.rs so the binary works offline with nothing to download.

@@ -78,6 +78,7 @@ members = [
     "crates/symtropy-bevy-core",
     "crates/symtropy-bevy-scene",
     "crates/symtropy-devconsole",
+    "crates/symtropy-cli",
 ]
 # Excluded: depend on Mycelix, Holochain, Lightyear, or require Bevy runtime
 exclude = [
