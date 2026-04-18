@@ -599,6 +599,20 @@ that future Phase 0+ runtime work must resolve:
    structurally verified. A non-volatile path (via `nix eval` at build time
    or a committed `shell.nix`) is Phase 0.1 cleanup.
 
+7. **`mycelix-zkp-core` pulls `rand 0.8.6` → `getrandom 0.2.17`**, which
+   fails on `wasm32-unknown-unknown` even with our `getrandom_backend =
+   "custom"` config (that config only affects `getrandom 0.3`, not 0.2).
+   Blocks `cargo check -p mail_bridge --target wasm32-unknown-unknown`.
+   Host target works fine. Fix options: (A) upstream — bump
+   `mycelix-zkp-core` deps to `rand 0.9` / `getrandom 0.3`; (B) gate
+   `mycelix-zkp-core` behind a non-wasm32 cfg in mail-bridge's Cargo.toml;
+   (C) replace the real ZKP verify (currently a stub returning
+   `verified: true` iff `proof_bytes.len() > 0 && commitment.len() == 32`)
+   with an inline length check and drop the dep entirely. (C) is the most
+   honest — when real ZKP verify lands, a WASM-compatible proof crate can
+   be chosen deliberately. Deferred; documented in mail-bridge commit
+   message `ae397e79c1`.
+
 ---
 
 ## Appendix B — research artifacts
