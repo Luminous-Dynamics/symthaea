@@ -407,13 +407,32 @@ describe('Golden path adversarial checks', () => {
     );
   });
 
-  it('refuses export if primary passed as DAO DID too (defensive)', () => {
-    // Even though the guard is currently only on member_did, primary
-    // DIDs in dao_did are an obvious smell. This documents the gap
-    // and forces a conscious decision before closing it.
-    const summary = generateTaxExport(exchanges, LEGAL_DID, PRIMARY_DID, '2026');
-    // For now: not guarded. If you see this fail because we added
-    // the guard, that's the right direction — update the assertion.
-    expect(summary.dao_did).toBe(PRIMARY_DID);
+  it('refuses export if primary is passed as DAO DID', () => {
+    // Closed: the dual-DID guard now covers dao_did too. Forcing-
+    // function from the earlier session's E2E did its job — gap
+    // surfaced, then closed.
+    expect(() =>
+      generateTaxExport(exchanges, LEGAL_DID, PRIMARY_DID, '2026'),
+    ).toThrow(PrimaryDidStateInteropError);
+  });
+
+  it('refuses export if BOTH DIDs are primary (the worst case)', () => {
+    expect(() =>
+      generateTaxExport(exchanges, PRIMARY_DID, PRIMARY_DID, '2026'),
+    ).toThrow(PrimaryDidStateInteropError);
+  });
+
+  it('accepts two different legal DIDs (member != dao)', () => {
+    // Common real case: member is an individual, DAO is the
+    // cooperative under which they file. Both legal, both different.
+    const cooperative_legal = 'did:mycelix:legal:cafecafecafecafecafecafecafecafecafecafecafecafecafecafecafecafe';
+    const summary = generateTaxExport(
+      exchanges,
+      LEGAL_DID,
+      cooperative_legal,
+      '2026',
+    );
+    expect(summary.member_did).toBe(LEGAL_DID);
+    expect(summary.dao_did).toBe(cooperative_legal);
   });
 });

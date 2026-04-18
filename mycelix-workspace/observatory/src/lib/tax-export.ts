@@ -144,9 +144,13 @@ export function generateTaxExport(
   daoDid: string,
   taxYear: string,
 ): TaxExportSummary {
-  // State-facing output MUST NOT run under the primary DID. See
-  // MYCELIX_STATE_COEXISTENCE.md for the dual-DID rule.
+  // State-facing output MUST NOT run under the primary DID — not as
+  // the member (that would deanonymize the filer) and not as the
+  // DAO id (that would embed a primary DID in the taxable-entity
+  // reference, a subtler but equally bad leak).
+  // See MYCELIX_STATE_COEXISTENCE.md for the dual-DID rule.
   assertLegalDid(memberDid);
+  assertLegalDid(daoDid);
 
   const config = getCommunityConfig();
   const hourlyRate = config.labor_hour_value;
