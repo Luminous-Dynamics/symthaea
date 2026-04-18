@@ -74,16 +74,25 @@ Two paths:
 
 **Path D.1 — explicit solve via gaussian elimination.** Extract the linear parts of the hypotheses and goal, build a matrix, RREF it, emit the coefficients. Much heavier — roughly what a CAS does. ~100+ LOC.
 
-**Path D.2 — use Mathlib's `polyrith` instead.** `polyrith` is already in our cascade (last alternative). It *should* be able to close `mathd_algebra_338` via Gröbner basis. The fact that it didn't in our Phase 3 measurement suggests either:
-- `polyrith` hit a resource limit (`polyrith` can be slow),
-- the cascade ordering means earlier branches simplified the goal in a way that broke `polyrith`,
-- `polyrith` needs explicit coefficients like `linear_combination` does.
+**Path D.2 — use Mathlib's `polyrith`.** **INVESTIGATED AND REJECTED (2026-04-18).** Mathlib's `polyrith` is not a standalone tactic — it shells out to Sage Cell via `polyrith_sage.py`, making an HTTPS POST to `https://sagecell.sagemath.org/service`. In an offline / air-gapped environment (which is ours), the request fails with a JSON-decode error and `polyrith` returns an error. This is why `polyrith` has been a silent no-op as the last cascade alternative since Phase 2. No amount of heartbeat budget bumping can fix this without network access.
 
-**Recommendation: try D.2 first.** Give `polyrith` more heartbeat budget explicitly in the emitter (`set_option maxHeartbeats 400000 in polyrith`). If that doesn't close 338, fall back to D.1.
+**Path D.3 — explicit `have …; subst; norm_num`.** Verified to close the goal when given the concrete solution values `(a = -4, b = 2, c = 7)` derived by linarith:
+
+```lean
+have ha : a = -4 := by linarith
+have hb : b = 2 := by linarith
+have hc : c = 7 := by linarith
+subst ha; subst hb; subst hc
+norm_num
+```
+
+The emitter would need to solve the linear sub-system symbolically to know `-4, 2, 7`. This is a Rust-side 3×3 RREF — collapses to D.1 in effort terms.
+
+**Also investigated and rejected: `nlinarith` with `sq_nonneg (a+4), sq_nonneg (b-2), sq_nonneg (c-7)` hints.** Even given the *right* solution values as hints, nlinarith fails — "linarith failed to find a contradiction". The cubic conclusion `abc = -56` isn't reachable via non-negativity combinations of linear facts, with or without the magic hints.
 
 ### Expected cost
 
-If D.2 works: ~20 LOC (bump heartbeat budget for the `polyrith` branch, or introduce a separate late-cascade `polyrith_strong` alternative). If D.1 is needed: 100+ LOC including a linear-system extractor and RREF.
+D.1 is the only viable path: **~100+ LOC** for a linear-system extractor (walks the hypothesis chain for `Σ aᵢ·xᵢ = c` shape), a 3×3 (or N×N) RREF, and an emitter that writes the `have x = v₁ := by linarith` lines. Plus the existing `subst_eqs; norm_num` tail to close after substitution.
 
 ### Gain
 
@@ -111,15 +120,15 @@ Phase 2 scoping doc's option (c). Write a Lake executable in Lean that parses `.
 
 Past 10-15% of miniF2F-v2, we need `abs`, `mod`, `Finset`, function abstraction, and more in `FolFormulaExt`. Each is a significant type-system extension. Scope and value TBD.
 
-## Ranked plan
+## Status after Phase 5 (2026-04-18)
 
-1. **Pattern B (`field_simp`)** — ~30 LOC → 96.9%
-2. **Pattern D.2 (`polyrith` with bigger budget)** — ~20 LOC → possibly 100%
-3. **5a (Z3 Skolemization)** — ~50 LOC → no Lake delta, better Z3 oracle
-4. **5b (Lean ingestion)** — 2-3 weeks → fixture set 32 → ~60, continuous measurement
-5. **5c (AST extension)** — scoping work, deferred
+1. **Pattern B (`field_simp`)** — **SHIPPED** (`e65e5b9f17`). 31/32 = 96.9%. ~60 LOC.
+2. **Pattern D** — **BLOCKED on 100+ LOC RREF emitter**. polyrith is offline-incompatible (Sage Cell dependency); nlinarith with hints fails; only path is Rust-side linear solving. Deferred until demonstrated value outweighs cost (single fixture).
+3. **5a (Z3 Skolemization)** — ~50 LOC → no Lake delta, better Z3 oracle. Still open.
+4. **5b (Lean ingestion)** — **IN PROGRESS by parallel session**. Tokenizer + parser + translator landed `0cb90d6f53`, `4ab3c6cedf`, `3ff718ac10`, `5af21a8401`. Will expand the 32-fixture set to ~50-70 auto-ingested.
+5. **5c (AST extension)** — scoping work, deferred.
 
-Items 1 and 2 are single-sitting fixes. Item 5b is where the real research value sits.
+**Natural stopping point:** Phase 5 closed at 96.9% on the hand-curated 32 with one irreducible rejection. Further headroom on this set requires either Pattern D's 100+ LOC commitment or accepting 96.9% as the ceiling for the hand-curated corpus and re-measuring on 5b's auto-ingested expansion.
 
 ## What Phase 5 does NOT cover
 
