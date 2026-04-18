@@ -1,20 +1,40 @@
 # Symthaea Papers Index
 
-**Last updated**: 2026-04-11
+**Last updated**: 2026-04-18
 
 ## Submission-Ready Papers (7)
 
 | Directory | Title | Venue | Status |
 |-----------|-------|-------|--------|
 | `hai-consciousness/` | Toward Machine Consciousness | arXiv cs.AI | **Ready** (tarball) |
-| `psych-bench/` | Psych-Bench: 136+ Benchmarks | Behavior Research Methods | **Ready** (tarball) |
+| `psych-bench/` | Psych-Bench: 143 Benchmarks | Behavior Research Methods | **Ready** (tarball) |
 | `kosmic-theory/` | The Grammar of Reality | Philosophy of Mind | **Ready** (tarball) |
 | `stochastic-resonance/` | Stochastic Resonance in HDC | Consciousness and Cognition | **Ready** (tarball) |
 | `epistemic-gating/` | Epistemic Gating for Language | ACL/EMNLP | **Ready** (tarball) |
 | `mesh-radio/` | Consciousness-Aware Mesh Radio | IEEE INFOCOM | **Ready** (tarball) |
 | `stewardship/` | Species Stewardship | AI & Ethics | **Ready** |
 
-## Draft Papers with Compiled PDF (20)
+## Papers with Compiled PDF
+
+### Core theory (Apr 7+ additions)
+
+| Directory | Title | Venue | Notes |
+|-----------|-------|-------|-------|
+| `ramanujan/` | The Ramanujan Protocol | Math/CS venue | Apr 17 canonical, 9 Tier-B formally-proven invariants |
+| `bandwidth-paradox/` | The Bandwidth Paradox | — | Apr 7 |
+| `biosphere-coherence/` | Biosphere Coherence B(t) | — | Apr 7, Sepkoski r=0.92 |
+| `kt-coherence/` | KT Coherence | — | Apr 7 |
+| `seti-workspace/` | SETI Workspace | — | Apr 7 |
+| `unified-ct/` | Unified Consciousness Theory | — | Apr 7 |
+| `integration-differentiation/` | The I-D Tradeoff Monograph | — | Consolidated Apr 12 |
+| `binius-hdc/` | Binius HDC | — | |
+| `cfc-zkp/` | CfC ZKP | — | |
+| `nuclear-mass/` | Nuclear Mass | — | |
+| `positioning/` | Positioning | — | |
+| `geodesic-code-synthesis/` | Geodesic Code Synthesis | — | |
+| `consciousness-robotics-2026/` | 2026 Robotics Update | — | Results supplement |
+
+### Earlier drafts (Mar 28 freeze)
 
 | Directory | Title | Venue | Pages |
 |-----------|-------|-------|-------|
@@ -48,18 +68,25 @@
 | `organoid-consciousness-ethics/` | Organoid Consciousness Ethics | AJOB Neuroscience | MD draft + PDF |
 | `pgx-health-equity/` | PGx Health Equity | CPT: PSP | MD draft + PDF |
 
-## Outline Only (4)
+## Outline Only (3)
 
 | Directory | Title | Venue |
 |-----------|-------|-------|
-| `consciousness-gated-finance/` | Consciousness-Gated Finance | — |
 | `digital-twin-psychiatry/` | Digital Twin Psychiatry | Comp Psychiatry |
 | `space-debris-conjunction/` | Space Debris Conjunction | Acta Astronautica |
 | `desci-reproducibility/` | DeSci Reproducibility | Royal Society Open Science |
 
+## Root-Level Standalone Documents
+
+- `molecular_consciousness_from_first_principles.md` — Quantum chemistry grounding (Apr 12, standalone)
+- `phase_1a_results.md` — Holon-Soma Phase I.A measurement results (Apr 14)
+- `preregistration.md` — Preregistration template
+- `consciousness_gated_epistemic_validation.md` — Epistemic validation analysis
+
 ## Book
 
-- `book/` — **The Holographic Liquid Brain** (40 chapters, 15,296 lines, 512-page PDF)
+- `book/` — **The Holographic Liquid Brain** (44+ chapters including Ramanujan, Biosphere, I-D Tradeoff; recompile pending)
+- Chapter source files: `book/symthaea_book.tex` + `book/chapter_*.tex` inputs
 
 ## The Sovereignty Papers (CC0-1.0)
 
@@ -73,11 +100,10 @@
 
 ## Reference Documents
 
-- `GLOSSARY.md` — Term definitions used across papers
-- `NORMALIZATION_STANDARDS.md` — Data normalization conventions
+- `GLOSSARY.md` — Term definitions used across papers (needs audit, 91+ days old)
+- `NORMALIZATION_STANDARDS.md` — Data normalization conventions (needs audit, 91+ days old)
 - `PAPER_CODE_TRACEABILITY.md` — Maps paper claims to source code locations
 - `PAPER_METHODS_DETAILED.md` — Expanded methodology notes
-- `PAPERS_INVENTORY.md` — Cross-repo paper tracker with priority actions
 
 ## Data and Figures
 
@@ -87,7 +113,7 @@
 
 ## Archive
 
-Pre-LaTeX drafts in `archive/`:
+Pre-LaTeX drafts and superseded work in `archive/`:
 
 - `archive/legacy-markdown/` — 12 markdown paper drafts (superseded by LaTeX)
 - `archive/legacy-drafts/` — 6 early draft fragments
@@ -95,5 +121,6 @@ Pre-LaTeX drafts in `archive/`:
 - `archive/legacy-submission/` — Original HAI arxiv tarball + cover letter
 - `archive/legacy-docs-papers/` — Files moved from `docs/papers/`
 - `archive/fusion-manuscript/` — Complete fusion energy manuscript
+- `archive/ramanujan-protocol-apr14/` — Apr 14 broader-scope Ramanujan paper, superseded by `ramanujan/` (Apr 17)
 
 Do NOT edit archive — all active work is in named subdirectories.
