@@ -162,7 +162,7 @@ for $\theta \in \{c, \sigma\}$ and $\epsilon = 0.01$. Bootstrap confidence inter
 
 \subsection{Anesthesia Benchmark: Monotonic $\Phi$ Ordering}
 
-The anesthesia benchmark produces a perfectly monotonic $\Phi$ ordering across the six discrete states, consistent with clinical expectations (Table~\ref{tab:phi-ordering}).
+The anesthesia benchmark produces a near-monotonic $\Phi$ ordering across the six discrete states: five of six adjacent-state pairwise tests pass the strong threshold $p < 0.01$, and the Light-to-Moderate transition achieves only $p = 0.024$ (Table~\ref{tab:phi-ordering}). We report this as monotonic with one marginally significant pair, not as a fully-validated IIT-consistent anesthesia theory. The benchmark is a minimal simulator (linear coupling reduction plus Gaussian noise injection) and does not capture known anesthetic pharmacodynamics---EEG oscillatory signatures, receptor kinetics, cerebral blood flow. The result validates that our architectural response surface has the right sign under two control knobs, not that it reproduces clinical anesthesia.
 
 \begin{table}[H]
 \centering

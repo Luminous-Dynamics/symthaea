@@ -934,6 +934,26 @@ as a constitutive element of a computational cognitive architecture
 rather than merely a communication channel.
 
 %% ════════════════════════════════════════════════════════════════════════════
+\section{Scope of Validation}
+
+We want to be explicit about what this paper does and does not show.
+The Radio Dispatcher, Spectrum Manager, and Mesh subsystem are
+implemented in Rust (\S\ref{sec:implementation}) and pass their unit
+and integration tests; the tier-selection, AIMD congestion control,
+and semantic-delta-compression primitives are exercised against
+simulated link characteristics (LoRa at $\sim250$~bps, 802.11s at
+$\sim$ms latency, HF~NVIS, and S/X-band satellite) rather than over
+deployed physical hardware. We have not yet measured end-to-end
+power consumption on a Raspberry~Pi~4 with a LoRa HAT, nor captured
+over-the-air packet traces, nor demonstrated a quantitative
+improvement in $\Phi$ (IIT) attributable to mesh coupling. The
+Extended Mind framing (\S\ref{sec:extended-mind}) motivates the
+architecture but the claim that radio is a ``first-class cognitive
+modality'' is at present architectural, not empirical. AIMD (Jacobson,
+1988) and delta compression are well-established techniques; our
+contribution is the integration of these with consciousness-gated
+tier selection, not the compression scheme itself.
+
 \section{Conclusion}
 
 The consciousness-aware mesh radio architecture demonstrates that
