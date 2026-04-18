@@ -7,6 +7,7 @@
 //   - DistanceConstraint produces a clean pendulum arc (Step 0 spike)
 //   - linear_damping range 0.001 ↔ 0.5 gives visible motion contrast (Step 5 spike)
 //   - MasterConsciousnessEquation response to uniform unit inputs (landmine 0)
+//   - 100-body scene fits the 60 Hz budget (Success Criterion #1)
 //
 // Tolerances are chosen generously (within 2× the measured value) so
 // cosmetic upstream changes don't trigger false alarms — only
@@ -255,5 +256,86 @@ fn phi_max_at_uniform_unit_inputs_matches_pendulum_swarm_constant() {
          pendulum_swarm.md assumes multi-channel interaction is \
          required for phi > 0. Re-evaluate the design.",
         single_channel
+    );
+}
+
+/// Success Criterion #1: 100 pendulums + constraints step fast enough to
+/// hold 60 Hz. We build the full 10×10 grid (100 bobs, 100 static pivots,
+/// 100 DistanceConstraints, all with collision disabled per the demo
+/// spec) and measure how long 60 physics ticks take. The 60 Hz budget
+/// is 16.7 ms per tick; we allow 10× that (167 ms / 60 ticks = 2.8 ms
+/// mean per tick on unloaded hardware) as a loose upper bound that
+/// still catches catastrophic regression (e.g. O(N²) where it used
+/// to be O(N log N)).
+///
+/// Release builds only — debug is uselessly slow for physics.
+#[test]
+fn scene_100_pendulums_fits_60hz_budget_release() {
+    // Skip the perf guard in debug; it's not meaningful there.
+    if cfg!(debug_assertions) {
+        eprintln!("[perf] skipped in debug build (run with --release for meaningful numbers)");
+        return;
+    }
+
+    let mut world = PhysicsWorld::<2>::new(SVector::from([0.0, -9.81]));
+
+    // 10×10 grid, pivots 1 unit apart
+    for row in 0..10 {
+        for col in 0..10 {
+            let pivot_x = col as f64 * 2.0;
+            let pivot_y = row as f64 * 2.0;
+            let pivot = world.add_body(RigidBody::<2>::static_body(
+                BodyHandle(0),
+                Point::new([pivot_x, pivot_y]),
+                Box::new(Sphere::new(Point::origin(), 0.01)),
+            ));
+            let bob = world.add_sphere(Point::new([pivot_x + 1.0, pivot_y]), 0.05, 1.0);
+            {
+                let b = world.body_mut(bob).unwrap();
+                b.linear_damping = 0.01;
+                b.collision_mask = 0;
+            }
+            world.body_mut(pivot).unwrap().collision_mask = 0;
+            world.add_constraint(Box::new(DistanceConstraint::<2> {
+                body_a: pivot,
+                body_b: bob,
+                rest_length: 1.0,
+                stiffness: 1.0,
+            }));
+        }
+    }
+
+    let dt = 1.0 / 60.0;
+    // Warmup: let broadphase trees build without counting first-tick cost.
+    for _ in 0..10 {
+        world.step(dt);
+    }
+
+    let n_ticks = 60usize;
+    let start = std::time::Instant::now();
+    for _ in 0..n_ticks {
+        world.step(dt);
+    }
+    let elapsed = start.elapsed();
+    let mean_ms = elapsed.as_secs_f64() * 1000.0 / n_ticks as f64;
+
+    // Hard upper bound — 10× the 60 Hz budget. Any regression that
+    // blows past this is a real problem. Log mean so CI output shows
+    // the current number for tracking.
+    eprintln!(
+        "[perf] 100-pendulum step: {:.3} ms mean over {} ticks ({:.1}% of 16.67 ms budget)",
+        mean_ms,
+        n_ticks,
+        100.0 * mean_ms / 16.67
+    );
+    assert!(
+        mean_ms < 16.67,
+        "100-pendulum step mean {:.3} ms exceeds 60 Hz budget 16.67 ms. \
+         The demo can't hit Success Criterion #1 on this hardware. \
+         Either the physics engine regressed (broadphase, constraint \
+         solver) or the demo needs to drop pendulum count. Profile \
+         with `cargo flamegraph --example _spike_100_pendulums` \
+         after writing that spike.",
+        mean_ms
     );
 }

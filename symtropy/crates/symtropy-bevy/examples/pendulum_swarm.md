@@ -315,6 +315,10 @@ scope is right. Expected total: 4-6 hours of focused work.
 The demo ships when ALL of:
 
 - [ ] `cargo run --example pendulum_swarm --release` opens a window at 60 fps
+      (physics step measured at 1.4 ms / 60 ticks for 100 bodies +
+      constraints on the dev machine — 8.7% of the 16.67 ms budget,
+      leaving ~91% for rendering, Phi compute, and input. Guarded by
+      `tests/pendulum_swarm_invariants.rs::scene_100_pendulums_fits_60hz_budget_release`.)
 - [ ] 100 pendulums visible, swinging
 - [ ] Shocking a single pendulum produces a visible *sustained-motion*
       band that spreads through neighbors as Phi climbs locally — the
