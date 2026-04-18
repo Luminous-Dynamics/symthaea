@@ -6,15 +6,15 @@
 //! empirical constants, and step-by-step implementation plan. This file is
 //! built incrementally per the plan's "Implementation steps" section.
 //!
-//! Current step: **5 — Phi → damping.** The positive-feedback loop closes:
-//! coherent neighborhood → high Phi → low damping → motion persists → still
-//! coherent. Per the design doc's empirical landmine, Phi tops out around 0.314
-//! (not 1.0), so we normalize before mapping to `linear_damping`. LOW_DAMP=0.001
-//! (essentially conservative) ↔ HIGH_DAMP=0.5 (PBD sleep within ~4 s).
+//! Current step: **7 — Shock on click.** Left-click adds horizontal velocity
+//! to the nearest pendulum bob within 50 px of the cursor. This is what kicks
+//! a region out of the all-synced equilibrium so the Phi → damping feedback
+//! loop has something to chew on.
 
 use std::collections::HashMap;
 
 use bevy::prelude::*;
+use bevy::window::PrimaryWindow;
 use symthaea_consciousness_equation::ConsciousnessInputs;
 use symtropy_bevy::{PhysicsBody, SymtropyPhysics, SymtropyPhysicsPlugin};
 use symtropy_math::{Point, Sphere};
@@ -38,6 +38,8 @@ const VARIANCE_SCALE: f64 = 1.0e-4;
 const PHI_NORMALIZE: f64 = 0.314;
 const LOW_DAMP: f64 = 0.001; // phi ≈ max → essentially conservative
 const HIGH_DAMP: f64 = 0.5; // phi = 0 → PBD sleep within ~4 s
+const SHOCK_RADIUS: f32 = 50.0;
+const SHOCK_VELOCITY: f64 = 400.0;
 
 #[derive(Component)]
 struct Pendulum {
@@ -69,7 +71,7 @@ fn main() {
             FixedUpdate,
             (update_phi_from_neighborhood, phi_modulates_damping).chain(),
         )
-        .add_systems(Update, draw_arm_gizmo)
+        .add_systems(Update, (shock_on_click, color_by_phi, draw_arm_gizmo))
         .run();
 }
 
@@ -218,6 +220,62 @@ fn phi_modulates_damping(mut physics: ResMut<SymtropyPhysics<2>>, pendulums: Que
         if let Some(body) = physics.world.body_mut(p.bob) {
             body.linear_damping = damping;
         }
+    }
+}
+
+/// On left-click, find the nearest pendulum bob within `SHOCK_RADIUS` of the
+/// cursor (in world coords) and add `SHOCK_VELOCITY` horizontal kick. Linear
+/// scan over 100 entries — trivial.
+fn shock_on_click(
+    mouse: Res<ButtonInput<MouseButton>>,
+    windows: Query<&Window, With<PrimaryWindow>>,
+    cameras: Query<(&Camera, &GlobalTransform), With<Camera2d>>,
+    grid_handles: Res<GridHandles>,
+    mut physics: ResMut<SymtropyPhysics<2>>,
+) {
+    if !mouse.just_pressed(MouseButton::Left) {
+        return;
+    }
+    let Ok(window) = windows.single() else {
+        return;
+    };
+    let Some(cursor_pos) = window.cursor_position() else {
+        return;
+    };
+    let Ok((camera, camera_xform)) = cameras.single() else {
+        return;
+    };
+    let Ok(world_pos) = camera.viewport_to_world_2d(camera_xform, cursor_pos) else {
+        return;
+    };
+
+    let mut nearest: Option<(BodyHandle, f32)> = None;
+    for (_, &h) in grid_handles.map.iter() {
+        if let Some(body) = physics.world.body(h) {
+            let pos = body.position();
+            let dx = pos.coord(0) as f32 - world_pos.x;
+            let dy = pos.coord(1) as f32 - world_pos.y;
+            let d = (dx * dx + dy * dy).sqrt();
+            if d < SHOCK_RADIUS && nearest.map_or(true, |(_, nd)| d < nd) {
+                nearest = Some((h, d));
+            }
+        }
+    }
+    if let Some((h, _)) = nearest {
+        if let Some(body) = physics.world.body_mut(h) {
+            body.linear_velocity[0] += SHOCK_VELOCITY;
+        }
+    }
+}
+
+/// Sprite color reflects current Phi: blue (cool, Phi=0) → red (warm, Phi=max).
+/// Updates every frame via `Update` so visual stays smooth even between
+/// FixedUpdate physics ticks.
+fn color_by_phi(physics: Res<SymtropyPhysics<2>>, mut query: Query<(&Pendulum, &mut Sprite)>) {
+    for (p, mut sprite) in &mut query {
+        let phi = physics.field.phi(p.bob);
+        let phi_norm = (phi / PHI_NORMALIZE).clamp(0.0, 1.0) as f32;
+        sprite.color = Color::hsl(240.0 - phi_norm * 240.0, 1.0, 0.5);
     }
 }
 
