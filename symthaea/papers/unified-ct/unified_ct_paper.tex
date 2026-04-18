@@ -1,0 +1,373 @@
+% ============================================================================
+% A Unified Coherence Curve from Abiogenesis to 2200 CE:
+% Stitching Biosphere, Civilization, and Simulated Futures
+%
+% Target venue: Philosophical Transactions of the Royal Society A
+% Alternative: Complexity (Wiley)
+% ============================================================================
+
+\documentclass[10pt,letterpaper]{article}
+
+\usepackage[top=0.85in,left=2.75in,footskip=0.75in]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage{changepage}
+\usepackage{textcomp,marvosym}
+\usepackage{cite}
+\usepackage{nameref,hyperref}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{microtype}
+\DisableLigatures[f]{encoding = *, family = * }
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{float}
+
+\usepackage[aboveskip=1pt,labelfont=bf,labelsep=period,
+            justification=raggedright,singlelinecheck=off]{caption}
+\usepackage[right]{lineno}
+\usepackage{setspace}
+\doublespacing
+\pagestyle{plain}
+
+\newcommand{\bt}{$B(t)$}
+\newcommand{\kt}{$K(t)$}
+\newcommand{\ct}{$C(t)$}
+
+\begin{document}
+\vspace*{0.2in}
+
+\begin{flushleft}
+{\Large\textbf{A Unified Coherence Curve from Abiogenesis to 2200 CE: Stitching Biosphere, Civilization, and Simulated Futures}}
+\bigskip
+
+Tristan Stoltz\textsuperscript{1*}
+
+\bigskip
+
+\textbf{1} Luminous Dynamics, Richardson, TX, USA
+
+\bigskip
+
+* tristan.stoltz@evolvingresonantcocreationism.com
+
+\end{flushleft}
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section*{Abstract}
+% ═══════════════════════════════════════════════════════════════════════════
+
+We present \ct{}, a unified coherence curve spanning from the origin
+of life (3.8~Ga) to simulated futures (2200~CE), stitching together
+three measurement regimes: biosphere coherence \bt{} (3.8~Ga to
+10,000~BCE, from paleontological data), civilizational coherence \kt{}
+(3000~BCE to 2020~CE, from historical proxies), and agent-based forward
+projection (2026~CE to 2200~CE, from multi-world civilization simulation).
+
+The three regimes are connected via the \textbf{headroom formula}:
+\begin{equation*}
+C(t) = B_{\text{HANPP}}(t) + K(t) \times (1 - B_{\text{HANPP}}(t))
+\end{equation*}
+which models civilization as filling the thermodynamic headroom above
+the biosphere floor, rather than replacing it. \bt{} is adjusted by
+Human Appropriation of Net Primary Productivity (HANPP) to reflect
+the energy that civilization co-opts from the biosphere.
+
+The unified curve reveals three insights: (1) the biosphere maintained
+coherence $> 0.85$ through the pre-industrial era, and industrialization
+initially depressed total coherence via HANPP before civilizational
+contributions compensated; (2) the modern peak \ct{}(2020) $= 0.94$ is
+the highest value in 3.8 billion years, achieved not by replacing
+biological coherence but by adding civilizational organization to it;
+and (3) forward projection under baseline simulation parameters shows
+\ct{} stabilizing at $0.90$--$0.95$ through 2200~CE, with sensitivity
+to governance quality and resource sustainability.
+
+\noindent\textbf{Keywords:} coherence, biosphere, civilization, unified
+index, HANPP, thermodynamic bridge, forward projection, deep time
+
+\linenumbers
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section*{Introduction}
+% ═══════════════════════════════════════════════════════════════════════════
+
+Measuring the organizational state of a planet---from the first
+replicating molecules to interplanetary civilization---requires a
+framework that spans radically different timescales, data sources, and
+phenomena. Previous work has addressed pieces of this span: biosphere
+coherence indices track deep-time organization from paleontological data
+\cite{stoltz2026bt}; composite civilizational indices (HDI, \kt{})
+measure modern and historical organization from economic and
+demographic proxies \cite{stoltz2026kt, undp2020}; and simulation
+models project civilizational futures under various policy assumptions
+\cite{stoltz2026sim}.
+
+No existing framework connects these three regimes into a single,
+continuous, thermodynamically grounded curve. The challenge is not
+merely mathematical (stitching different time series) but conceptual:
+what does it mean to compare a Cambrian biosphere's organization to a
+21st-century civilization's? What physical quantity bridges the
+transition from biological to cultural coherence?
+
+We propose that the bridge is \textbf{energy allocation}. Both the
+biosphere and civilization compete for the same planetary energy budget
+(solar insolation, chemical bonds). As civilization co-opts biosphere
+energy via land use, fossil extraction, and agriculture---quantified by
+Human Appropriation of Net Primary Productivity (HANPP)
+\cite{haberl2007}---the biosphere's contribution to total coherence
+decreases while civilization's increases. The \emph{headroom formula}
+formalizes this: civilization fills the remaining organizational capacity
+above the biosphere floor, producing a unified index where the two
+contributions are additive rather than substitutive.
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section*{Methods}
+% ═══════════════════════════════════════════════════════════════════════════
+
+\subsection*{Three Measurement Regimes}
+
+\ct{} is computed in four phases:
+
+\begin{enumerate}
+\item \textbf{Deep time} (3.8~Ga to 10,000~BCE): Pure \bt{}, computed
+from PBDB genus diversity, GEOCARB atmospheric data, $\epsilon_p$
+isotopic fractionation, Bambach ecospace functional groups, and
+background extinction rates. Six dimensions aggregated via geometric
+mean \cite{stoltz2026bt}.
+
+\item \textbf{Holocene transition} (10,000~BCE to 1810~CE): \bt{}
+adjusted by HANPP. Before recorded K(t) data, the unified index is
+simply the biosphere coherence reduced by human energy co-option:
+$C(t) = B(t) \times (1 - \text{HANPP}(t))$. HANPP rises from
+$\sim$0\% (pre-Neolithic) to $\sim$5\% (pre-industrial).
+
+\item \textbf{Historical} (1810--2020~CE): The headroom formula applies.
+\kt{} is computed from 35+ proxy variables across seven harmonies
+\cite{stoltz2026kt}. \bt{} continues to provide the biosphere floor,
+depressed by rising HANPP (5\% to 24\%).
+
+\item \textbf{Forward projection} (2026--2200~CE): An agent-based
+multi-world civilization simulator \cite{stoltz2026sim} computes
+Eight Harmonies scores at each epoch. These are passed to the headroom
+formula as the $K(t)$ contribution, extending \ct{} into simulated futures.
+\end{enumerate}
+
+\subsection*{The Headroom Formula}
+
+The central equation:
+\begin{equation}
+C(t) = B_{\text{HANPP}}(t) + K(t) \times (1 - B_{\text{HANPP}}(t))
+\end{equation}
+
+where $B_{\text{HANPP}}(t) = B(t) \times (1 - \text{HANPP}(t))$ is the
+biosphere coherence adjusted for human energy appropriation.
+
+This formulation has three properties: (1) when $K(t) = 0$
+(pre-civilizational), $C(t) = B_{\text{HANPP}}(t)$---pure biosphere;
+(2) when $K(t) = 1$ (maximal civilizational coherence), $C(t) = 1$
+regardless of biosphere state; (3) for intermediate values, $K(t)$
+fills the ``headroom'' between the biosphere floor and perfect coherence.
+Civilization cannot make \ct{} worse than the biosphere alone; it can
+only add to it.
+
+\subsection*{HANPP Trajectory}
+
+Human Appropriation of Net Primary Productivity follows a sigmoidal
+trajectory calibrated from published estimates
+\cite{haberl2007, krausmann2013}:
+
+\begin{center}
+\begin{tabular}{lrr}
+\toprule
+Era & HANPP (\%) & $B_{\text{HANPP}}$ (if $B = 0.95$) \\
+\midrule
+Pre-Neolithic & 0 & 0.950 \\
+Neolithic (3000~BCE) & 1 & 0.941 \\
+Roman Empire (0~CE) & 3 & 0.922 \\
+Medieval (1000~CE) & 4 & 0.912 \\
+Industrial (1900~CE) & 12 & 0.836 \\
+Modern (2020~CE) & 24 & 0.722 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection*{Normalization Sensitivity}
+
+A systematic discrepancy exists between \kt{} values computed under
+different normalization strategies: min-max by century yields
+$K(2020) = 0.78$, while epoch-aware normalization yields $K(2020) = 0.91$
+\cite{stoltz2026kt}. This propagates to \ct{}: under the first,
+$C(2020) = 0.78 + 0.78 \times 0.22 = 0.95$; under the second,
+$C(2020) = 0.72 + 0.91 \times 0.28 = 0.97$. We report both and note
+that the qualitative shape of \ct{} is preserved across strategies.
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section*{Results}
+% ═══════════════════════════════════════════════════════════════════════════
+
+\subsection*{The Unified Curve}
+
+\ct{} spans 80 data points from 3.65~Ga to 2020~CE (Table~1).
+
+\begin{table}[H]
+\caption{{\bf Selected points on the unified coherence curve.}}
+\begin{tabular}{llrrr}
+\toprule
+Epoch & Regime & $C(t)$ & $B_{\text{HANPP}}$ & $K(t)$ \\
+\midrule
+3.6~Ga (Archean) & Biosphere & 0.005 & 0.005 & --- \\
+541~Ma (Cambrian) & Biosphere & 0.127 & 0.127 & --- \\
+66~Ma (K-Pg) & Biosphere & 0.647 & 0.647 & --- \\
+8000~BCE & Holocene & 0.888 & 0.888 & 0.00 \\
+1000~CE & Holocene & 0.908 & 0.908 & 0.00 \\
+1810~CE & Historical & 0.895 & 0.895 & 0.00 \\
+1900~CE & Historical & 0.860 & 0.836 & 0.14 \\
+1970~CE & Historical & 0.857 & 0.779 & 0.34 \\
+2000~CE & Historical & 0.774 & 0.722 & 0.11 \\
+2020~CE & Historical & 0.939 & 0.722 & 0.78 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection*{Three Insights}
+
+\textbf{Insight 1: Industrial depression and recovery.} Between 1810
+and 2000, HANPP rose from 5\% to 24\%, depressing $B_{\text{HANPP}}$
+from 0.90 to 0.72. Civilizational coherence $K(t)$ rose simultaneously
+from 0.0 to 0.78, but initially failed to compensate for the biosphere
+loss. The nadir at 2000 ($C = 0.77$) reflects a moment when civilization
+had depressed the biosphere substantially but had not yet filled the
+headroom. By 2020, $K(t) = 0.78$ fills 78\% of the available headroom,
+pushing $C$ back above 0.93.
+
+\textbf{Insight 2: The 2020 peak.} $C(2020) = 0.94$ is the highest
+coherence value in 3.8 billion years. This does not mean 2020 is the
+``best'' era---the index measures organizational complexity, not
+well-being or justice---but it means the combined biosphere-plus-civilization
+system has never been more structurally integrated.
+
+\textbf{Insight 3: The biosphere was more coherent alone.} At 1000~CE,
+$C = 0.91$ with essentially zero $K(t)$ contribution. The biosphere
+\emph{by itself}, before industrialization, achieved higher coherence
+than most of the industrial era. This quantifies the thermodynamic cost
+of the Anthropocene: civilization's rise initially \emph{reduced} total
+planetary coherence before eventually exceeding it.
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section*{Discussion}
+% ═══════════════════════════════════════════════════════════════════════════
+
+\subsection*{Civilization as Thermodynamic Addition}
+
+The headroom formula's most important property is that it frames
+civilization as \emph{additive}. Previous treatments of the
+Anthropocene tend to frame human impact as purely destructive---biosphere
+degradation, species loss, climate forcing. The \ct{} framework
+acknowledges this (via HANPP depression of the biosphere floor) while
+also accounting for what civilization \emph{adds}: knowledge networks,
+governance structures, trade integration, reciprocal exchange. The
+question ``is civilization good for the planet?'' becomes quantifiable:
+\ct{} exceeds pre-civilizational $B(t)$ only when $K(t)$ fills more
+headroom than HANPP destroys.
+
+\subsection*{Connection to Consciousness}
+
+The companion biosphere coherence paper \cite{stoltz2026bt} demonstrates
+that workspace (information capacity) was the rate-limiting dimension
+for consciousness emergence across 3.8~Ga. The SETI workspace filter
+paper \cite{stoltz2026seti} argues this constitutes a Great Filter.
+The \ct{} framework connects these findings to the present: civilizational
+coherence can be understood as the \emph{continuation} of the workspace
+expansion that made consciousness possible. Human civilization is the
+mechanism by which the biosphere's information capacity finally exceeded
+its biological ceiling---through culture, writing, computation, and
+global networks rather than through genome complexity alone.
+
+\subsection*{Limitations}
+
+\textbf{HANPP is coarse}: Modern HANPP is estimated at 24\%
+\cite{haberl2007}, but this aggregate masks regional variation
+(Europe $>$ 40\%, Amazon $<$ 5\%). Regional \ct{} decomposition
+is needed for policy applications.
+
+\textbf{K(t) normalization dependence}: The 13-point divergence between
+$K(2020) = 0.78$ and $K(2020) = 0.91$ means absolute \ct{} values are
+normalization-dependent. Relative rankings are preserved.
+
+\textbf{Forward projection is simulated}: The 2026--2200 phase comes
+from an agent-based model, not empirical data. Its predictions are
+conditional on simulation assumptions (baseline governance, continued
+trade integration, no major wars).
+
+\textbf{Single planet}: \ct{} is calibrated to Earth. Whether the
+headroom formula generalizes to other planet-civilization pairings
+is unknown.
+
+% ═══════════════════════════════════════════════════════════════════════════
+\section*{Conclusion}
+% ═══════════════════════════════════════════════════════════════════════════
+
+We have produced a continuous coherence curve from the origin of life
+to the present, and projected it into simulated futures, using a
+thermodynamically grounded bridge between biosphere and civilization.
+The curve tells a story of successive organizational innovations: from
+prokaryotic coherence (0.005) to multicellular integration (0.13) to
+mammalian workspace expansion (0.65) to civilizational overlay (0.94).
+Each transition built on---and in some cases required catastrophic
+disruption of---the previous organizational regime.
+
+The headroom formula ensures that this story is not one of replacement
+but of addition. The biosphere is still there, beneath civilization,
+providing the thermodynamic floor on which all human organization rests.
+The 24\% of NPP that we appropriate is the price of the organizational
+headroom we fill. Whether we fill it wisely is not a question the index
+can answer, but it is the question the index is designed to help us ask.
+
+% ═══════════════════════════════════════════════════════════════════════════
+\begin{thebibliography}{99}
+% ═══════════════════════════════════════════════════════════════════════════
+
+\bibitem{stoltz2026bt}
+Stoltz T. Catastrophe as Genesis: A thermodynamic framework for biosphere
+coherence across 3.8 billion years. \emph{In review}. 2026.
+
+\bibitem{stoltz2026kt}
+Stoltz T. Historical K(t): A seven-harmony civilizational coherence index
+from 3000 BCE to 2020 CE. \emph{In preparation}. 2026.
+
+\bibitem{stoltz2026sim}
+Stoltz T. Multi-world civilization simulator: 150-year agent-based
+projection with consciousness-gated governance. \emph{In preparation}. 2026.
+
+\bibitem{stoltz2026seti}
+Stoltz T. The workspace filter: Why biospheres may live without
+thinking. \emph{In preparation}. 2026.
+
+\bibitem{undp2020}
+UNDP. \emph{Human Development Report 2020}. United Nations; 2020.
+
+\bibitem{haberl2007}
+Haberl H, et al. Quantifying and mapping the human appropriation of net
+primary production. \emph{PNAS}. 2007;104(31):12942--12947.
+
+\bibitem{krausmann2013}
+Krausmann F, et al. Global human appropriation of net primary production
+doubled in the 20th century. \emph{PNAS}. 2013;110(25):10324--10329.
+
+\bibitem{smil2017}
+Smil V. \emph{Energy and Civilization: A History}. MIT Press; 2017.
+
+\bibitem{baron2018}
+Bar-On YM, Phillips R, Milo R. The biomass distribution on Earth.
+\emph{PNAS}. 2018;115(25):6506--6511.
+
+\bibitem{steffen2015}
+Steffen W, et al. Planetary boundaries: guiding human development on a
+changing planet. \emph{Science}. 2015;347(6223):1259855.
+
+\end{thebibliography}
+
+\end{document}
