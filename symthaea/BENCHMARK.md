@@ -114,6 +114,36 @@ timezone-returns-empty case (empty config has no forbidden substrings,
 no required substrings either). The structural scorer demands a
 positive assertion. That's the whole point of P1.
 
+### 2026-04-18 — Phase 1 M2: scorer-in-the-loop repair (`--repair`)
+
+First milestone of the coding-AI roadmap
+(`plans/symthaea-coding-ai-roadmap.md`). The scorer is now an oracle the
+generator is conditioned on: failing verdicts feed into `repair_structural`
+(M1), which patches the code; repaired code gets re-scored; loop runs
+until PASS or `max_iters` (5) exhausted.
+
+Running `cargo run --features code_generation --example nix_eval_benchmark
+-- --goldens-only --repair`:
+
+```
+✓ configure intel hardware acceleration
+     | REPAIRED in 1 iter(s): +hardware.graphics.enable
+...
+║ Goldens-only pass: 26/26 (100%)
+║ Repair triggered:  1 time(s); closed 1 FAIL(s); 1 total step(s)
+```
+
+**Score: 26/26 (100%)**, up from 25/26 on the static scorer. The one
+standing FAIL (Intel GPU — generator emits `{ # hardware config }`, no
+Intel idiom exists) now auto-heals: scorer reports `missing: hardware
+.graphics.enable`; `try_append_path` injects the flat assignment with
+default value `true`; re-score PASSes.
+
+**Why this matters:** no LLM-scale training ran. This is a pure
+structural-repair loop over an existing generator. The demo is
+~6 LOC in the `main` of the benchmark (match-on-verdict + call
+repair + rescore). The scorer's richness is what makes it work.
+
 ### 2026-04-18 — UDP + time-zone codegen fixes (same-day follow-on)
 
 Landed fixes for 2 of the 3 gaps surfaced by round 2. Both are

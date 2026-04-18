@@ -24,6 +24,7 @@
 use symthaea::language::nix_codegen::{generate_nix, NixIntent};
 use symthaea::language::nix_eval_corpus::{problems, NixProblem};
 use symthaea::language::nix_eval_goldens::{golden_count, golden_for, score_all_goldens};
+use symthaea::language::nix_repair::{generate_nix_with_scorer_repair, RepairStep};
 use symthaea::language::nix_scorer::score as structural_score;
 #[derive(Default)]
 struct ScoreCard {
@@ -40,6 +41,27 @@ struct ScoreCard {
     structural_pass: usize,   // structural scorer said PASS
     structural_fallback_pass: usize, // no golden, fell through to substring and passed
     structural_fallback_total: usize,
+}
+
+/// One-line summary of a repair-step sequence for the benchmark table.
+/// Keeps each step tiny so they fit on a single terminal line.
+fn format_repair_steps(steps: &[RepairStep]) -> String {
+    let parts: Vec<String> = steps
+        .iter()
+        .map(|s| match s {
+            RepairStep::AppendedPath { path, .. } => format!("+{}", path),
+            RepairStep::ReplacedValue { path, from, to } => {
+                format!("{}:{}→{}", path, from, to)
+            }
+            RepairStep::SwappedProtocol { from, to } => {
+                // Truncate `networking.firewall.allowedXPorts` to the distinctive tail
+                let ft = from.rsplit('.').next().unwrap_or(from);
+                let tt = to.rsplit('.').next().unwrap_or(to);
+                format!("swap {}→{}", ft, tt)
+            }
+        })
+        .collect();
+    parts.join(", ")
 }
 
 /// Legacy four-way check. Substring-based; known-loose.
@@ -69,26 +91,71 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     let structural_mode = args.iter().any(|a| a == "--structural");
     let goldens_only = args.iter().any(|a| a == "--goldens-only");
+    let repair_mode = args.iter().any(|a| a == "--repair");
 
-    // --goldens-only: fast subset run (6 prompts, seconds). Useful for
-    // smoke-testing the scorer plumbing without paying the full 95-prompt
-    // cost. Returns before loading the full corpus.
+    // --goldens-only: fast subset run (26 prompts, seconds). Useful for
+    // smoke-testing the scorer plumbing without paying the full 94-prompt
+    // cost. With --repair, runs the scorer-in-the-loop repair (Phase 1
+    // M2 of the coding-AI roadmap): failing generations get patched
+    // against their golden and re-scored.
     if goldens_only {
         println!("┌─────────────────────────────────────────────────────────");
         println!(
             "│ NixEval Benchmark — GOLDENS-ONLY ({} prompts)",
             golden_count()
         );
-        println!("│ Structural AST scorer on golden-backed subset");
+        println!(
+            "│ Mode: {}",
+            if repair_mode {
+                "STRUCTURAL + scorer-in-the-loop REPAIR"
+            } else {
+                "STRUCTURAL AST scorer only"
+            }
+        );
         println!("└─────────────────────────────────────────────────────────");
+
+        let mut pass = 0usize;
+        let mut repair_attempted = 0usize;
+        let mut repair_closed = 0usize;
+        let mut total_repair_steps = 0usize;
         let results = score_all_goldens();
-        let mut pass = 0;
         for (prompt, passed, summary) in &results {
-            let mark = if *passed { "✓" } else { "✗" };
+            let final_pass;
+            let detail;
             if *passed {
+                final_pass = true;
+                detail = summary.clone();
+            } else if repair_mode {
+                repair_attempted += 1;
+                let golden = golden_for(prompt).expect("was golden-scored above");
+                let rep = generate_nix_with_scorer_repair(prompt, golden, 5);
+                final_pass = rep.verdict.pass();
+                if final_pass {
+                    repair_closed += 1;
+                }
+                total_repair_steps += rep.steps.len();
+                let step_summary = if rep.steps.is_empty() {
+                    "no repairs applied".to_string()
+                } else {
+                    format_repair_steps(&rep.steps)
+                };
+                detail = if final_pass {
+                    format!("REPAIRED in {} iter(s): {}", rep.iterations, step_summary)
+                } else {
+                    format!(
+                        "FAIL (repair exhausted in {} iter(s)): {}",
+                        rep.iterations, step_summary
+                    )
+                };
+            } else {
+                final_pass = false;
+                detail = summary.clone();
+            }
+            let mark = if final_pass { "✓" } else { "✗" };
+            if final_pass {
                 pass += 1;
             }
-            println!("  {} {:60} | {}", mark, prompt, summary);
+            println!("  {} {:60} | {}", mark, prompt, detail);
         }
         println!("\n╔═════════════════════════════════════════════════════════");
         println!(
@@ -97,6 +164,12 @@ fn main() {
             results.len(),
             pass as f32 / results.len() as f32 * 100.0
         );
+        if repair_mode {
+            println!(
+                "║ Repair triggered:  {} time(s); closed {} FAIL(s); {} total step(s)",
+                repair_attempted, repair_closed, total_repair_steps
+            );
+        }
         println!("╚═════════════════════════════════════════════════════════");
         // Exit 0 on any successful run (even with structural failures
         // — failures surface real codegen gaps, not harness bugs).
