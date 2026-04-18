@@ -10,7 +10,7 @@
 //!
 //! Policies compared on the same trial seeds:
 //!   A. `TierGate`  — phi → MotorSafetyLevel → 4-tier motor_gain (0.0/0.3/0.6/1.0)
-//!   B. `SprintFloor` — phi → binary `if phi > SPRINT_PHI { 1.0 } else { FLOOR }`
+//!   B. `SprintFloor` — signal → binary `if signal > SPRINT_THRESHOLD { 1.0 } else { FLOOR }`
 //!
 //! Both are applied on top of the SAME 16,384D → 4D HDC-LTC projection
 //! (Symthaea's FlightController). The benchmark does NOT compare Symthaea
@@ -29,7 +29,8 @@
 //! Env:
 //!     FB_TRIALS=N           — paired trials per policy (default 20)
 //!     FB_STEPS=N            — sim steps per trial (default 1000, at dt=0.01 = 10 s)
-//!     FB_SPRINT_PHI=X       — sprint threshold (default 0.135)
+//!     FB_SPRINT_THRESHOLD=X — sprint threshold (default 0.135); also
+//!                             reads `FB_SPRINT_PHI` for backwards-compat
 //!     FB_FLOOR_GAIN=X       — floor gain (default 0.3)
 //!     FB_CSV=path           — dump per-trial rows
 
@@ -44,10 +45,12 @@ use symthaea_flight::types::{FlightConfig, QuadrotorCommand};
 /// The sprint-floor mapping from the Φ-gated safety paper. Inlined here
 /// to avoid a circular crate dependency; functionally identical to
 /// `symtropy_consciousness_physics::safety::sprint_floor_gain` (commit
-/// `52e3fb710f`).
+/// `52e3fb710f`). The parameter is a generic scalar `signal` —
+/// canonically the output of `MasterConsciousnessEquation` but the
+/// function is signal-agnostic.
 #[inline]
-fn sprint_floor_gain(phi: f32, sprint_phi: f32, floor: f32) -> f32 {
-    if phi > sprint_phi {
+fn sprint_floor_gain(signal: f32, sprint_threshold: f32, floor: f32) -> f32 {
+    if signal > sprint_threshold {
         1.0
     } else {
         floor
@@ -61,10 +64,10 @@ enum Policy {
 }
 
 impl Policy {
-    fn gain(&self, phi: f32, sprint_phi: f32, floor: f32) -> f32 {
+    fn gain(&self, signal: f32, sprint_threshold: f32, floor: f32) -> f32 {
         match self {
-            Policy::TierGate => MotorSafetyLevel::from_phi(phi as f64).motor_gain(),
-            Policy::SprintFloor => sprint_floor_gain(phi, sprint_phi, floor),
+            Policy::TierGate => MotorSafetyLevel::from_phi(signal as f64).motor_gain(),
+            Policy::SprintFloor => sprint_floor_gain(signal, sprint_threshold, floor),
         }
     }
 }
@@ -91,7 +94,7 @@ fn run_trial(
     steps: usize,
     dt: f32,
     policy: Policy,
-    sprint_phi: f32,
+    sprint_threshold: f32,
     floor: f32,
 ) -> TrialResult {
     let seed = trial_seed(trial_idx);
@@ -105,18 +108,21 @@ fn run_trial(
     let mut red_frames = 0_usize;
 
     for i in 0..steps {
-        // Phi schedule: sinusoidal between 0.05 and 0.95 with trial-
+        // Signal schedule: sinusoidal between 0.05 and 0.95 with trial-
         // specific phase offset, so different trials hit different
-        // tier-transition patterns.
+        // tier-transition patterns. `signal` is canonically the scalar
+        // output of `MasterConsciousnessEquation`; here we synthesize it
+        // to isolate the gating-policy comparison from the cognitive
+        // pipeline.
         let phase = (seed as f32 / u64::MAX as f32) * std::f32::consts::TAU;
         let t = i as f32 * dt;
-        let phi = 0.5 + 0.45 * (t * 0.6 + phase).sin();
+        let signal = 0.5 + 0.45 * (t * 0.6 + phase).sin();
 
         // Deterministic thought HV per (trial, step).
         let hv = ContinuousHV::random(16384, seed.wrapping_add(i as u64));
         let cmd: QuadrotorCommand = controller.forward(&hv, dt);
 
-        let gain = policy.gain(phi, sprint_phi, floor);
+        let gain = policy.gain(signal, sprint_threshold, floor);
         let scaled = QuadrotorCommand {
             thrust: cmd.thrust * gain,
             roll_moment: cmd.roll_moment * gain,
@@ -164,7 +170,10 @@ fn main() {
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(1000);
-    let sprint_phi: f32 = std::env::var("FB_SPRINT_PHI")
+    // New name, with backwards-compat read of `FB_SPRINT_PHI` so pre-
+    // reframe scripts still work.
+    let sprint_threshold: f32 = std::env::var("FB_SPRINT_THRESHOLD")
+        .or_else(|_| std::env::var("FB_SPRINT_PHI"))
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(0.135);
@@ -183,7 +192,7 @@ fn main() {
         " dt            : {dt:.3}s   ({} s sim per trial)",
         steps as f32 * dt
     );
-    println!(" SPRINT_PHI    : {sprint_phi:.3}");
+    println!(" SPRINT_THRESHOLD : {sprint_threshold:.3}");
     println!(" FLOOR_GAIN    : {floor:.3}");
     println!();
 
@@ -198,8 +207,8 @@ fn main() {
     });
 
     for i in 0..trials {
-        let tier = run_trial(i, steps, dt, Policy::TierGate, sprint_phi, floor);
-        let sprint = run_trial(i, steps, dt, Policy::SprintFloor, sprint_phi, floor);
+        let tier = run_trial(i, steps, dt, Policy::TierGate, sprint_threshold, floor);
+        let sprint = run_trial(i, steps, dt, Policy::SprintFloor, sprint_threshold, floor);
 
         if let Some(w) = csv_file.as_mut() {
             writeln!(
