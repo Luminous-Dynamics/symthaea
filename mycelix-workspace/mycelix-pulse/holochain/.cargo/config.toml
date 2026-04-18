@@ -1,0 +1,20 @@
+# Phase 0 fix for env blocker #3 in PULSE_READINESS_PLAN.md Appendix A.
+#
+# Without this file, `cargo build --target wasm32-unknown-unknown` pulls
+# getrandom 0.3's default backend, which tries to pull wasm-bindgen —
+# incompatible with Holochain's WASM runtime. HDK 0.6 provides the custom
+# backend (__getrandom_v03_custom) and expects the cfg below to be set.
+#
+# Canonical fix per mycelix commit 1deaeb047 for sibling clusters
+# (commons, civic, hearth, etc.). Pulse was missing it.
+#
+# We deliberately do NOT set `[build] target = "wasm32-unknown-unknown"`
+# at this level — pulse's holochain/ workspace also contains host-target
+# crates (crates/rate_limiter, crates/stake, fuzz/). Host cargo check
+# must remain possible.
+
+[target.wasm32-unknown-unknown]
+rustflags = [
+    "-C", "opt-level=z",
+    "--cfg", "getrandom_backend=\"custom\"",
+]
