@@ -18,10 +18,22 @@ pub enum PlatformType {
     Helicopter,
     /// Industrial robot arm (7+1 DOF).
     Manipulator,
+    /// Surgical robot (8 actuators: cart-arm + precision tool).
+    Surgical,
+    /// Orbital platform (7 thrusters for attitude + translation).
+    Orbital,
+    /// Quadruped (4 legs × 3 joints = 12 DOF).
+    Quadruped,
+    /// Full-frame exoskeleton (6 powered joints, human-worn).
+    Exoskeleton,
 }
 
 impl PlatformType {
     /// Number of actuators for this platform.
+    ///
+    /// Values sourced from each `symthaea-<platform>` crate's `NUM_ACTUATORS`
+    /// constant (or equivalent). Update here AND in the symthaea crate when
+    /// changing actuator counts.
     pub fn num_actuators(&self) -> usize {
         match self {
             Self::Quadrotor => 4,
@@ -30,18 +42,26 @@ impl PlatformType {
             Self::Auv => 8,
             Self::Helicopter => 6,
             Self::Manipulator => 8,
+            Self::Surgical => 8,
+            Self::Orbital => 7,
+            Self::Quadruped => 12,
+            Self::Exoskeleton => 6,
         }
     }
 
     /// Default mass in kg.
     pub fn default_mass(&self) -> f64 {
         match self {
-            Self::Quadrotor => 0.027,  // Crazyflie
-            Self::Vehicle => 1500.0,   // Car
-            Self::Humanoid => 70.0,    // Adult
-            Self::Auv => 50.0,        // REMUS-class
+            Self::Quadrotor => 0.027,   // Crazyflie
+            Self::Vehicle => 1500.0,    // Car
+            Self::Humanoid => 70.0,     // Adult
+            Self::Auv => 50.0,          // REMUS-class
             Self::Helicopter => 2500.0, // SAR helicopter
-            Self::Manipulator => 20.0, // Robot arm
+            Self::Manipulator => 20.0,  // Robot arm
+            Self::Surgical => 50.0,     // Cart + articulated arm
+            Self::Orbital => 500.0,     // Small satellite
+            Self::Quadruped => 12.0,    // Spot / ANYmal class
+            Self::Exoskeleton => 25.0,  // Full-frame powered suit
         }
     }
 
@@ -54,6 +74,10 @@ impl PlatformType {
             Self::Auv => 1.0,
             Self::Helicopter => 5.0,
             Self::Manipulator => 1.0,
+            Self::Surgical => 1.5,
+            Self::Orbital => 5.0,
+            Self::Quadruped => 0.5,
+            Self::Exoskeleton => 1.0,
         }
     }
 
@@ -66,8 +90,26 @@ impl PlatformType {
             Self::Auv => "AUV",
             Self::Helicopter => "Helicopter",
             Self::Manipulator => "Manipulator",
+            Self::Surgical => "Surgical",
+            Self::Orbital => "Orbital",
+            Self::Quadruped => "Quadruped",
+            Self::Exoskeleton => "Exoskeleton",
         }
     }
+
+    /// All platform variants (for iteration).
+    pub const ALL: [PlatformType; 10] = [
+        Self::Quadrotor,
+        Self::Vehicle,
+        Self::Humanoid,
+        Self::Auv,
+        Self::Helicopter,
+        Self::Manipulator,
+        Self::Surgical,
+        Self::Orbital,
+        Self::Quadruped,
+        Self::Exoskeleton,
+    ];
 }
 
 #[cfg(test)]
@@ -76,18 +118,33 @@ mod tests {
 
     #[test]
     fn all_platforms_have_actuators() {
-        let platforms = [
-            PlatformType::Quadrotor,
-            PlatformType::Vehicle,
-            PlatformType::Humanoid,
-            PlatformType::Auv,
-            PlatformType::Helicopter,
-            PlatformType::Manipulator,
-        ];
-        for p in platforms {
+        for p in PlatformType::ALL {
             assert!(p.num_actuators() > 0, "{:?} has 0 actuators", p);
             assert!(p.default_mass() > 0.0);
             assert!(p.default_radius() > 0.0);
+            assert!(!p.name().is_empty());
         }
+    }
+
+    #[test]
+    fn all_constant_has_every_variant() {
+        // Ensures PlatformType::ALL stays in sync with the enum. If you add a
+        // new variant, the match-exhaustiveness here forces you to add it to
+        // ALL as well — no silent drift.
+        for p in PlatformType::ALL {
+            match p {
+                PlatformType::Quadrotor
+                | PlatformType::Vehicle
+                | PlatformType::Humanoid
+                | PlatformType::Auv
+                | PlatformType::Helicopter
+                | PlatformType::Manipulator
+                | PlatformType::Surgical
+                | PlatformType::Orbital
+                | PlatformType::Quadruped
+                | PlatformType::Exoskeleton => {}
+            }
+        }
+        assert_eq!(PlatformType::ALL.len(), 10);
     }
 }
