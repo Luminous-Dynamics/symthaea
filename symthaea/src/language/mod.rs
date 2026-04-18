@@ -98,6 +98,8 @@ pub mod nix_eval_goldens;
 #[cfg(feature = "code_generation")]
 pub mod nix_kg;
 #[cfg(feature = "code_generation")]
+pub mod nix_repair;
+#[cfg(feature = "code_generation")]
 pub mod nix_scorer;
 #[cfg(feature = "code_generation")]
 pub mod nixos_search;
