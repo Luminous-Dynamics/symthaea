@@ -9,3 +9,8 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 hdi = "0.7"
 serde = { version = "1.0", features = ["derive"] }
+# Required by hdk_entry_helper macro expansion — without this, every
+# #[hdk_entry_helper] struct fails to derive TryFrom<SerializedBytes>.
+# Pre-existing bug; sibling messages integrity zome had it; mail-bridge
+# missed it, blocking the entire zome from compiling.
+holochain_serialized_bytes = { workspace = true }
