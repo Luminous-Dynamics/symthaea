@@ -367,6 +367,28 @@ This phase is explicitly **out of scope for the 10-week MVP** but is committed h
 
 ---
 
+### Phase 12 — Native mobile (post-v1, conditional)
+**Goal (maybe): native Android + iOS apps if PWA isn't enough.**
+
+Short answer: **the Leptos frontend is already mobile.** Pulse ships as a PWA that installs from `mail.mycelix.net` to Android/iOS home screens. Service-worker caching gives offline compose. PWA crypto (WebCrypto + wasm-bindgen) runs Kyber1024/Dilithium3 at acceptable speeds on 2022+ phones. No new code needed for "pulse on phones."
+
+**Native mobile earns its scope only when the PWA stops being enough.** Two realistic triggers:
+
+1. **Device keystore integration for PQC private keys.** Browser IndexedDB storage is vulnerable to XSS — a successful script injection can exfiltrate Alice's Dilithium signing key and impersonate her indefinitely. iOS Keychain and Android Keystore hold keys behind OS-enforced app sandboxing and, on modern devices, hardware-backed StrongBox / Secure Enclave. For a civilization-substrate mail system where identity compromise is catastrophic, the browser is arguably the wrong keystore. This alone might justify native wrappers.
+
+2. **Push notifications.** PWA push works on Android but has been historically flaky on iOS (only enabled in iOS 16.4+ via installed PWAs, delivery not guaranteed). If we need reliable "new mail" signal without the user having the app open, native is less fragile.
+
+**Recommended approach when triggered:** **Tauri Mobile** (Rust-native, reuses the exact same Leptos frontend codebase via `#[cfg(target_os)]` for keystore FFI). Not Kotlin/Swift — forking the frontend is ~3× the ongoing cost and breaks the "one implementation per feature" rule. Not Capacitor — adds a JS shim layer we don't need.
+
+**Explicit scope note:** Phase 12 is **not a committed MVP scope item**. It's listed so that Phase 5 and Phase 3 don't accidentally preclude it. Specifically:
+- Pulse crypto APIs must stay backend-agnostic (no assumption about where keys live)
+- Epoch ratchet key storage must have a pluggable trait so `BrowserIndexedDBBackend` and `IOSKeychainBackend` can both implement it
+- HolochainProvider in Leptos must work against both `ws://` (desktop PWA) and a Tauri-IPC backend
+
+**DoD (if Phase 12 is ever triggered):** Pulse runs as a Tauri Mobile app on Pixel 8 Pro (the team's test device per CLAUDE.md) with Dilithium private key stored in Android Keystore StrongBox, HMAC-verified on every signing operation. Same codepath on iOS via Secure Enclave. Decision to actually execute Phase 12 waits on real user feedback — no speculative native build.
+
+---
+
 ## 5. Infrastructure requirements
 
 **Hardware / cloud (one-time setup, recurring cost):**
