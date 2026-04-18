@@ -149,6 +149,17 @@ impl NixKg {
         self.service_keywords.iter().any(|k| lower.contains(k))
     }
 
+    /// Return every service keyword present in `lower`, in the order
+    /// they were registered. Used by the self-repair loop (Phase 1 M3)
+    /// to derive expected option paths without a hand-written golden.
+    pub fn matching_service_keywords<'a>(&'a self, lower: &str) -> Vec<&'a str> {
+        self.service_keywords
+            .iter()
+            .filter(|k| lower.contains(k.as_str()))
+            .map(String::as_str)
+            .collect()
+    }
+
     /// True if `root` (the first segment of a dotted option path) is a known
     /// NixOS module-root namespace.
     pub fn is_known_option_root(&self, root: &str) -> bool {

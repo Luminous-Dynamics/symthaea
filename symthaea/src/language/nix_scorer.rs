@@ -164,6 +164,22 @@ fn walk_attrpaths(root: &SyntaxNode) -> Vec<FlatOption> {
     out
 }
 
+/// Public helper: return the set of attrpaths present in a Nix
+/// snippet. Used by the self-repair loop (no-golden mode) to compare
+/// against intent-derived expected paths. Parse failures return an
+/// empty set — callers should treat that as "trust the generator."
+pub fn attrpath_set_of(code: &str) -> std::collections::BTreeSet<String> {
+    let stripped = strip_line_comments(code);
+    let parsed = Root::parse(&stripped);
+    if !parsed.errors().is_empty() {
+        return std::collections::BTreeSet::new();
+    }
+    walk_attrpaths(&parsed.syntax())
+        .into_iter()
+        .map(|opt| opt.path.join("."))
+        .collect()
+}
+
 /// Recursive walker that accumulates the enclosing attrpath prefix.
 /// Visits `NODE_ATTRPATH_VALUE` leaves and recurses through structural
 /// nodes (attrset literals, let-bindings, lambdas, function applications,

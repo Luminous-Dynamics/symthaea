@@ -27,8 +27,10 @@
 //!
 //! Feature-gated behind `code_generation` (matches scorer).
 
-use crate::language::nix_codegen::generate_nix;
-use crate::language::nix_scorer::{score, CanonValue, StructuralVerdict, ValueMismatch};
+use crate::language::nix_codegen::{classify_nix_intent, generate_nix, shared_nix_kg, NixIntent};
+use crate::language::nix_scorer::{
+    attrpath_set_of, score, CanonValue, StructuralVerdict, ValueMismatch,
+};
 
 /// Result of a repair attempt.
 #[derive(Debug, Clone)]
@@ -256,6 +258,163 @@ fn default_value_for(path: &str) -> String {
         // timeZone expects a string — can't guess the zone.
         "timeZone" => "\"UTC\"".to_string(),
         _ => "true".to_string(),
+    }
+}
+
+// ─── M3: Intent-based pseudo-golden (production-viable, no golden) ─────
+
+/// Overrides for service keywords whose option-path doesn't follow the
+/// `services.<keyword>` convention. Small hand-curated table — keep
+/// here rather than bloating the KG schema with a new field.
+const NON_SERVICES_ROOTS: &[(&str, &str)] = &[
+    ("docker", "virtualisation.docker"),
+    ("podman", "virtualisation.podman"),
+    ("libvirt", "virtualisation.libvirtd"),
+    ("libvirtd", "virtualisation.libvirtd"),
+    ("lxd", "virtualisation.lxd"),
+    ("waydroid", "virtualisation.waydroid"),
+];
+
+/// Derive the set of attrpaths we expect a well-formed generation
+/// to emit, based purely on the prompt — no golden required.
+///
+/// Covers the 3 intents where the expected-path mapping is obvious:
+/// - **Service**: for each known service keyword in the prompt,
+///   require `<root>.<kw>.enable`. `<root>` is `services` by default,
+///   with small overrides for virtualisation.
+/// - **Networking**: `networking.firewall.allowedTCPPorts` unless the
+///   prompt mentions `udp` / `wireguard` / `quic`, in which case UDP.
+/// - **Hardware**: nvidia → `hardware.nvidia.modesetting.enable`;
+///   intel/amd → `hardware.graphics.enable`.
+///
+/// Other intents (DevShell, Desktop, Secrets, FlakeTemplate, HomeManager,
+/// Generic, User) return empty — their output shape isn't uniform
+/// enough for a single expected-path to be right.
+///
+/// The returned list is the *minimum viable contract*, not a full
+/// golden. A generator that emits more is fine (`extraneous` is
+/// warning-only per scorer contract); a generator that emits less
+/// has a gap that repair can close.
+pub fn expected_paths_for(prompt: &str) -> Vec<String> {
+    let lower = prompt.to_lowercase();
+    let intent = classify_nix_intent(&lower);
+    match intent {
+        NixIntent::Service => expected_for_service(&lower),
+        NixIntent::Networking => expected_for_networking(&lower),
+        NixIntent::Hardware => expected_for_hardware(&lower),
+        _ => Vec::new(),
+    }
+}
+
+fn expected_for_service(lower: &str) -> Vec<String> {
+    let kg = shared_nix_kg();
+    let keywords = kg.matching_service_keywords(lower);
+    let mut out = Vec::new();
+    for kw in keywords {
+        let root = NON_SERVICES_ROOTS
+            .iter()
+            .find(|(k, _)| *k == kw)
+            .map(|(_, r)| (*r).to_string())
+            .unwrap_or_else(|| format!("services.{}", kw));
+        out.push(format!("{}.enable", root));
+    }
+    out
+}
+
+fn expected_for_networking(lower: &str) -> Vec<String> {
+    // Only fire if the prompt actually mentions ports/firewall — other
+    // networking-intent prompts (DNS, NetworkManager) won't benefit
+    // from this heuristic.
+    if !(lower.contains("port") || lower.contains("firewall")) {
+        return Vec::new();
+    }
+    let udp = lower.contains("udp") || lower.contains("wireguard") || lower.contains("quic");
+    let leaf = if udp {
+        "allowedUDPPorts"
+    } else {
+        "allowedTCPPorts"
+    };
+    vec![format!("networking.firewall.{}", leaf)]
+}
+
+fn expected_for_hardware(lower: &str) -> Vec<String> {
+    if lower.contains("nvidia") {
+        return vec!["hardware.nvidia.modesetting.enable".to_string()];
+    }
+    if lower.contains("intel") || lower.contains("amd") {
+        return vec!["hardware.graphics.enable".to_string()];
+    }
+    Vec::new()
+}
+
+/// Generate for `prompt`, then use intent-derived expected paths
+/// (no golden) to detect and repair gaps. Production-viable —
+/// callers don't need a hand-written reference for each prompt.
+///
+/// Limitation: only repairs **missing paths**. Bool-value mismatches
+/// and protocol swaps need a golden for the wanted value, which
+/// this function doesn't have. Those fixes still work in the
+/// `generate_nix_with_scorer_repair` path.
+pub fn generate_nix_with_self_repair(prompt: &str, max_iters: usize) -> ScorerRepairResult {
+    let initial = generate_nix(prompt);
+    let mut code = initial.code;
+    let mut all_steps: Vec<RepairStep> = Vec::new();
+    let mut iterations = 0;
+    let expected = expected_paths_for(prompt);
+
+    // If nothing to expect, return immediately — this is an
+    // untargeted intent, not a failure.
+    if expected.is_empty() {
+        return ScorerRepairResult {
+            verdict: score(&code, &code), // self-pass
+            code,
+            steps: all_steps,
+            iterations,
+        };
+    }
+
+    loop {
+        let present = attrpath_set_of(&code);
+        let missing: Vec<String> = expected
+            .iter()
+            .filter(|p| !present.contains(p.as_str()))
+            .cloned()
+            .collect();
+        if missing.is_empty() || iterations >= max_iters {
+            // Construct a representative verdict for reporting.
+            let final_verdict = StructuralVerdict {
+                missing_required: missing,
+                ..Default::default()
+            };
+            return ScorerRepairResult {
+                code,
+                verdict: final_verdict,
+                steps: all_steps,
+                iterations,
+            };
+        }
+        // Build a synthetic verdict from the missing set so the same
+        // repair_structural code path handles both golden and
+        // pseudo-golden callers.
+        let synthetic = StructuralVerdict {
+            missing_required: missing,
+            ..Default::default()
+        };
+        match repair_structural(&code, &synthetic) {
+            Some(repaired) => {
+                code = repaired.code;
+                all_steps.extend(repaired.steps);
+                iterations += 1;
+            }
+            None => {
+                return ScorerRepairResult {
+                    code,
+                    verdict: synthetic,
+                    steps: all_steps,
+                    iterations,
+                };
+            }
+        }
     }
 }
 
@@ -496,6 +655,101 @@ mod tests {
     }
 
     // ── M2: scorer-in-the-loop integration tests ──────────────────
+
+    // ── M3: intent-based pseudo-golden ────────────────────────────
+
+    #[test]
+    fn expected_paths_for_service_prompts() {
+        let p = expected_paths_for("install nginx web server");
+        assert!(
+            p.contains(&"services.nginx.enable".to_string()),
+            "nginx service should require services.nginx.enable; got {:?}",
+            p
+        );
+    }
+
+    #[test]
+    fn expected_paths_for_virtualisation_overrides_services() {
+        let p = expected_paths_for("enable docker containers");
+        assert!(
+            p.contains(&"virtualisation.docker.enable".to_string()),
+            "docker goes under virtualisation, not services; got {:?}",
+            p
+        );
+    }
+
+    #[test]
+    fn expected_paths_for_udp_firewall() {
+        let p = expected_paths_for("open udp port 51820 for wireguard");
+        assert!(
+            p.contains(&"networking.firewall.allowedUDPPorts".to_string()),
+            "udp/wireguard should require UDP port list; got {:?}",
+            p
+        );
+    }
+
+    #[test]
+    fn expected_paths_for_tcp_firewall_default() {
+        let p = expected_paths_for("open firewall ports 80 and 443");
+        assert!(
+            p.contains(&"networking.firewall.allowedTCPPorts".to_string()),
+            "default firewall should be TCP; got {:?}",
+            p
+        );
+    }
+
+    #[test]
+    fn expected_paths_for_hardware_intel() {
+        let p = expected_paths_for("configure intel hardware acceleration");
+        assert!(
+            p.contains(&"hardware.graphics.enable".to_string()),
+            "intel should require hardware.graphics.enable; got {:?}",
+            p
+        );
+    }
+
+    #[test]
+    fn expected_paths_for_dev_shell_is_empty() {
+        // Dev-shell prompts don't have a stable expected-path contract
+        // — the output is a mkShell, not an option config. Heuristic
+        // returns empty and self-repair no-ops.
+        let p = expected_paths_for("set up a rust dev environment with rust-analyzer");
+        assert!(
+            p.is_empty(),
+            "dev shells should return no expected paths; got {:?}",
+            p
+        );
+    }
+
+    #[test]
+    fn self_repair_closes_intel_gap_without_golden() {
+        // The big one: no golden, no human curation — just the prompt
+        // and intent-derived expected paths. Structural repair should
+        // still close the Intel GPU gap.
+        let result = generate_nix_with_self_repair("configure intel hardware acceleration", 5);
+        assert!(
+            result.verdict.missing_required.is_empty(),
+            "self-repair should close intel gap; got missing: {:?}",
+            result.verdict.missing_required
+        );
+        assert_eq!(result.iterations, 1, "single append iter");
+        assert!(result.steps.iter().any(|s| matches!(
+            s,
+            RepairStep::AppendedPath { path, .. } if path == "hardware.graphics.enable"
+        )));
+    }
+
+    #[test]
+    fn self_repair_no_ops_when_nothing_expected() {
+        // DevShell intent returns empty expected paths; loop must
+        // immediately return.
+        let result = generate_nix_with_self_repair(
+            "set up a rust dev environment with rust-analyzer and mold",
+            5,
+        );
+        assert_eq!(result.iterations, 0);
+        assert!(result.steps.is_empty());
+    }
 
     #[test]
     fn loop_no_ops_when_initial_passes() {
