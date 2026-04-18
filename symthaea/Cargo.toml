@@ -1761,3 +1761,13 @@ required-features = ["code_generation"]
 
 [patch.crates-io]
 serde_core = { path = "crates/serde-core-shim" }
+
+# cudarc 0.13.9's hand-maintained CUDA-toolkit version table stops at
+# 12.8. On CUDA 12.9 (current dev toolkit), the un-patched build.rs
+# panics at compile time with "Unsupported cuda toolkit version: `12.9`".
+# CUDA 12.x is ABI-backward-compatible, so the vendored copy just adds
+# `"12.9" => (12, 9)` to the match arm and reuses the 12.x library-path
+# resolution. Unblocks Broca's `gpu` feature (and therefore Phase 2 M7
+# distillation training) without waiting on upstream cudarc or candle-core.
+# Remove this patch once candle-core bumps to cudarc 0.18+.
+cudarc = { path = "vendor/cudarc-0.13.9-cuda129" }
