@@ -1,6 +1,6 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! NixEval Benchmark — 95 prompts, legacy-substring and structural scorers.
+//! NixEval Benchmark — 94 prompts, legacy-substring and structural scorers.
 //!
 //! Each problem specifies:
 //! - prompt: natural language request

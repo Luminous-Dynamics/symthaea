@@ -3,7 +3,11 @@
 Honest measurement log. Each entry: date, commit, scorer used, result. Don't
 amend historical rows — if numbers change, append a new row and note why.
 
-## NixEval — 95-problem corpus (`src/language/nix_eval_corpus.rs`)
+## NixEval — 94-problem corpus (`src/language/nix_eval_corpus.rs`)
+
+(Corpus size corrected: 94 entries, not 95. The plan's "95" was an off-by-one
+I carried through the scoring work — scorer itself is fine, the count in
+earlier plan commits is wrong.)
 
 ### 2026-04-18 — Structural scorer landed (`bcb2c3acd3`)
 
@@ -68,6 +72,51 @@ environment with jupyter and pandas` — semantic content is in a
 the scorer doesn't yet walk. Filed as a scorer-capability follow-up.
 
 Reproduce: `cargo run --features code_generation --example nix_eval_benchmark -- --goldens-only`
+
+### 2026-04-18 — Full-corpus run in `--structural` mode
+
+Same-day run across all 94 problems. Shows how the structural and
+legacy scorers compare on the corpus as a whole.
+
+| Metric | Value |
+|---|---|
+| Legacy substring FULL PASS (all 4 checks) | **84/94 (89%)** |
+| Intent classification | 89/94 (95%) |
+| Parses successfully | 94/94 (100%) |
+| Expected substrings | 88/94 (94%) |
+| No forbidden leakage | 94/94 (100%) |
+| | |
+| Golden-backed problems | 13/94 |
+| **Structural PASS on gold subset** | **13/13 (100%)** |
+| Legacy substring pass on ungolden subset | 71/81 |
+
+**Interpretation:** the 84/94 legacy number matches the prior session's
+reported score (confirms the corpus + generator are stable). The 13/13
+structural number on the golden subset is an honest upper-bound — goldens
+were written minimally, and expanding their scope would likely reveal
+more structural gaps. To push structural coverage wider, backfill the
+remaining 81 prompts in `nix_eval_goldens.rs`.
+
+Per-intent (legacy scorer) full-pass:
+
+| Intent | Pass/Total |
+|---|---|
+| Service | 22/23 (96%) |
+| User | 4/4 (100%) |
+| HomeManager | 2/2 (100%) |
+| Secrets | 6/6 (100%) |
+| FlakeTemplate | 6/6 (100%) |
+| Networking | 6/7 (86%) |
+| Generic | 12/14 (86%) |
+| DevShell | 12/14 (86%) |
+| Desktop | 9/11 (82%) |
+| Hardware | 5/7 (71%) |
+
+Hardware (71%) is the weakest intent. Next backfill priorities: the 2
+Hardware fails + the 2 Desktop fails + the ungolden services to widen
+structural coverage beyond 13/94.
+
+Reproduce (full): `cargo run --release --features code_generation --example nix_eval_benchmark -- --structural`
 
 ### Context
 
