@@ -203,17 +203,43 @@ impl Term {
         }
     }
 
-    /// Does this term contain multiplication of two sub-terms that both
-    /// contain a free variable? If so, we're in the non-linear fragment
-    /// (`QF_NIA` / `QF_NRA`) rather than linear (`QF_LIA` / `QF_LRA`).
+    /// Is this term a "simple" leaf from the SMT-LIB linear-fragment
+    /// perspective — i.e. a variable or a single numeric literal?
+    /// Compound expressions (sums, products, powers, negations) are NOT
+    /// simple. Used by `is_non_linear` to detect cases Z3's `QF_LRA`
+    /// parser rejects even when mathematically linear.
+    fn is_simple_leaf(&self) -> bool {
+        matches!(
+            self,
+            Term::Var(_) | Term::IntLit(_) | Term::RealLit(_) | Term::RatLit(_, _)
+        )
+    }
+
+    /// Does this term fall outside the linear SMT fragment? Rule is
+    /// conservative for Z3's benefit:
+    ///
+    /// - `Mul`: non-linear if both sides contain variables (classic
+    ///   `x * y` case), OR if both sides are compound expressions.
+    ///   Z3's `QF_LRA` parser rejects `(* (+ a b) (+ c d))` even when
+    ///   the arguments evaluate to constants, because the parser
+    ///   doesn't do constant folding up front. `mathd_algebra_462`
+    ///   (`(1/2 + 1/3) * (1/2 - 1/3) = 5/36`) hit exactly this case:
+    ///   both operands are `Add`/`Sub` compounds with no free variables,
+    ///   but Z3 still errored with "logic does not support nonlinear
+    ///   arithmetic". Flagging `(compound * compound)` as non-linear
+    ///   routes the obligation through `QF_NRA`, which Z3 accepts.
+    /// - `Div`: non-linear if the denominator contains a free variable.
+    /// - `Pow`: non-linear if the base contains a variable and the
+    ///   exponent is ≥ 2.
     pub fn is_non_linear(&self) -> bool {
         match self {
             Term::Var(_) | Term::IntLit(_) | Term::RealLit(_) | Term::RatLit(_, _) => false,
             Term::BinOp(ArithOp::Mul, a, b) => {
-                // both sides must contain variables for non-linearity
                 let a_has = !a.free_vars().is_empty();
                 let b_has = !b.free_vars().is_empty();
-                (a_has && b_has) || a.is_non_linear() || b.is_non_linear()
+                let both_vars = a_has && b_has;
+                let both_compound = !a.is_simple_leaf() && !b.is_simple_leaf();
+                both_vars || both_compound || a.is_non_linear() || b.is_non_linear()
             }
             Term::BinOp(ArithOp::Div, a, b) => {
                 // division by a variable is non-linear
