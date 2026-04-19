@@ -2,8 +2,16 @@
 name = "mycelix-leptos-client"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.85"
 license = "AGPL-3.0-or-later"
-description = "Browser-compatible Holochain client for Leptos frontends"
+description = "Browser-compatible Holochain client for Leptos frontends. Pure-Rust replacement for @holochain/client using web-sys::WebSocket + rmp-serde."
+authors = ["Tristan Stoltz <tristan.stoltz@evolvingresonantcocreationism.com>"]
+repository = "https://github.com/Luminous-Dynamics/mycelix-leptos-client"
+homepage = "https://github.com/Luminous-Dynamics/mycelix-leptos-client"
+documentation = "https://docs.rs/mycelix-leptos-client"
+readme = "README.md"
+keywords = ["holochain", "leptos", "wasm", "websocket", "client"]
+categories = ["wasm", "web-programming::websocket", "api-bindings"]
 
 [dependencies]
 base64 = "0.22"
