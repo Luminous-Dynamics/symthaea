@@ -29,6 +29,7 @@ pub mod config;
 pub mod error;
 pub mod outbound;
 pub mod parser;
+pub mod pipeline;
 pub mod rate_limit;
 pub mod receiver;
 pub mod signing_content;
