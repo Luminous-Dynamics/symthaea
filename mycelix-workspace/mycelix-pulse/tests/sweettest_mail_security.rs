@@ -1862,7 +1862,7 @@ async fn test_contact_empty_name_rejected() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "Phase 0.2 — requires Holochain conductor + resolved getrandom backend config"]
 async fn phase0_two_conductor_harness_smoke() {
-    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+    let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
     let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
         .await
         .expect("DNA bundle must load");
@@ -1934,7 +1934,7 @@ async fn phase0_two_conductor_harness_smoke() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "Phase 0.5 — requires running Holochain conductor; env prereqs in Appendix A"]
 async fn phase0_forged_inbox_link_rejected() {
-    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+    let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
     let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
         .await
         .expect("DNA bundle must load");
@@ -2152,7 +2152,7 @@ fn compute_signing_content(
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "Phase 0.2 — requires running Holochain conductor; env prereqs in Appendix A"]
 async fn phase0_alice_sends_bob_receives() {
-    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+    let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
     let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
         .await
         .expect("DNA bundle must load");
@@ -2323,7 +2323,7 @@ fn compute_delivery_receipt_signing_content(
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "Phase 1.1 — requires running Holochain conductor; env prereqs in Appendix A"]
 async fn phase1_delivery_receipt_roundtrip() {
-    let mut conductors = SweetConductorBatch::from_standard_config(2).await;
+    let mut conductors = SweetConductorBatch::from_standard_config_rendezvous(2).await;
     let dna_file = SweetDnaFile::from_bundle(&mail_dna_path())
         .await
         .expect("DNA bundle must load");
