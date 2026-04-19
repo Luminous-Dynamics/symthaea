@@ -372,11 +372,108 @@ def render_phi_trace_multi():
     print(f"wrote {out} ({len(data)} platforms)")
 
 
+# ── Figure 5: Cross-platform paired live-Φ replication ───────────────
+
+def render_paired_benchmark_live():
+    """Cross-platform paired TierGate vs SprintFloor replication
+    (commit `a8d965773a`, data in `data/paired_benchmark_live_n30.csv`).
+
+    Shows every one of 6 platforms with CI-bounded SprintFloor
+    advantage, at each platform's applied SPRINT_THRESHOLD. All CIs
+    exclude zero; advantages span +89 % (auv) to +231 % (vehicle).
+    """
+    csv_path = DATA_DIR / "paired_benchmark_live_n30.csv"
+    if not csv_path.exists():
+        print(f"skipping figure5: {csv_path} not found — "
+              "regenerate via `PBL_CSV=… cargo run -p symtropy-robotics-"
+              "bridge --example paired_benchmark_live --release`")
+        return
+    rows = []
+    with open(csv_path) as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            rows.append(row)
+    if not rows:
+        print("skipping figure5: paired_benchmark_live_n30.csv is empty")
+        return
+
+    # Sort by advantage (ascending) so the bar chart reads small-to-large.
+    rows.sort(key=lambda r: float(r["adv_mean"]))
+    names = [r["platform"] for r in rows]
+    tier_means = [float(r["tier_mean"]) for r in rows]
+    sprint_means = [float(r["sprint_mean"]) for r in rows]
+    adv_means = [float(r["adv_mean"]) for r in rows]
+    ci_lows = [float(r["ci_low"]) for r in rows]
+    ci_highs = [float(r["ci_high"]) for r in rows]
+    thresholds = [float(r["sprint_threshold"]) for r in rows]
+
+    fig, (ax_gains, ax_adv) = plt.subplots(
+        1, 2, figsize=(12, 4.8), gridspec_kw={"width_ratios": [5, 4]}
+    )
+
+    # ── Left panel: mean gains per platform, TierGate vs SprintFloor ──
+    x = np.arange(len(names))
+    width = 0.38
+    ax_gains.bar(
+        x - width / 2, tier_means, width, color="#e74c3c", label="TierGate"
+    )
+    ax_gains.bar(
+        x + width / 2, sprint_means, width, color="#1f6ead", label="SprintFloor"
+    )
+    ax_gains.set_xticks(x)
+    ax_gains.set_xticklabels(names, fontsize=9)
+    ax_gains.set_ylabel("mean gain (per frame)")
+    ax_gains.set_title(
+        r"Figure 5 — Cross-platform paired live-$\Phi$ replication "
+        r"(N=30 per platform)",
+        fontsize=10,
+    )
+    ax_gains.grid(axis="y", alpha=0.3)
+    ax_gains.legend(loc="upper left", fontsize=8, framealpha=0.85)
+    # Annotate threshold below each pair
+    for xi, t in zip(x, thresholds):
+        ax_gains.text(
+            xi, -0.04, f"θ={t:.3f}",
+            ha="center", va="top", fontsize=7, color="#555"
+        )
+    ax_gains.set_ylim(-0.08, max(sprint_means) * 1.15)
+
+    # ── Right panel: advantage with 95 % CI per platform ──
+    adv_errs_low = [m - lo for m, lo in zip(adv_means, ci_lows)]
+    adv_errs_high = [hi - m for m, hi in zip(adv_means, ci_highs)]
+    yerr = np.array([adv_errs_low, adv_errs_high])
+    ax_adv.barh(
+        x, adv_means, color="#27ae60", alpha=0.85,
+        xerr=yerr, capsize=4, error_kw={"elinewidth": 1.2},
+    )
+    ax_adv.set_yticks(x)
+    ax_adv.set_yticklabels(names, fontsize=9)
+    ax_adv.set_xlabel(r"SprintFloor vs TierGate advantage (%)")
+    ax_adv.set_title("Advantage + 95 % CI\n(every platform excludes 0)",
+                     fontsize=10)
+    ax_adv.grid(axis="x", alpha=0.3)
+    ax_adv.axvline(0, color="#2c3e50", linestyle="-", linewidth=0.8)
+    # Annotate value on each bar
+    for xi, v in zip(x, adv_means):
+        ax_adv.text(
+            v + 2, xi, f"+{v:.1f}%",
+            va="center", fontsize=8, color="#27ae60"
+        )
+
+    fig.tight_layout()
+    out = HERE / "figure5_paired_live.png"
+    fig.savefig(out, dpi=150)
+    plt.close(fig)
+    mean_adv = sum(adv_means) / len(adv_means)
+    print(f"wrote {out} ({len(rows)} platforms, mean adv +{mean_adv:.1f} %)")
+
+
 if __name__ == "__main__":
     render_phi_trace()
     render_sp_sweep()
     render_flight_benchmark()
     render_phi_trace_multi()
+    render_paired_benchmark_live()
     print("\nAll figures rendered. Files:")
     for p in sorted(HERE.glob("figure*.png")):
         print(f"  {p}  ({p.stat().st_size // 1024} KB)")

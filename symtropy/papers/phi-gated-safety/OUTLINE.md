@@ -477,9 +477,9 @@ per platform:
   vehicle       0.101       0.185      0.611         +230.5 %    [+230.5, +230.5]
 
 **Mean advantage across 6 platforms: +170.6 %.** Every platform's
-95 % CI excludes zero. Every platform's SprintFloor gain ends up in
-the 0.53-0.73 range (target ~0.65 = 0.5×1.0 + 0.5×0.3). The spread
-in advantage magnitudes (+89 % to +231 %) tracks TierGate's
+95 % CI excludes zero (**Figure 5**). Every platform's SprintFloor
+gain ends up in the 0.53-0.73 range (target ~0.65 = 0.5×1.0 + 0.5×0.3).
+The spread in advantage magnitudes (+89 % to +231 %) tracks TierGate's
 variance — platforms whose Φ distribution keeps the arm in
 Orange/Yellow tiers most of the time (vehicle, humanoid, manipulator)
 give TierGate a lower baseline, so SprintFloor's win looks larger.

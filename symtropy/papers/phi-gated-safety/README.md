@@ -46,6 +46,12 @@ envelope, and shows the result replicates to a second platform
   all produce the identical band [0.103, 0.145]. Mechanism:
   `RoboticAgent::tick` builds `ConsciousnessInputs` purely from
   `danger_level`; observation vector is discarded. See §8.
+- `figures/figure5_paired_live.png` — Cross-platform paired live-Φ
+  replication. Six platforms × 30 trials each × TierGate vs
+  SprintFloor at each platform's applied SPRINT_THRESHOLD. All 6
+  advantages positive, all CIs exclude zero. Range +89 % (auv) to
+  +231 % (vehicle), mean +170.6 %. Data: `data/paired_benchmark_
+  live_n30.csv`, reproducer: `paired_benchmark_live.rs` example.
 - `figures/render_figures.py` — Pure-matplotlib renderer for all three
   figures. Dependencies via `nix-shell` (see Reproducing below).
 
