@@ -106,6 +106,13 @@ pub struct StructuralVerdict {
     /// A parse error in either side; if present, the verdict is
     /// `pass = false` regardless of the other fields.
     pub parse_error: Option<String>,
+    /// Set when the golden parses but flattens to zero static attrpaths —
+    /// happens when the golden uses only dynamic keys like
+    /// `services.redis.servers."".enable = true;`. Without static paths
+    /// there's nothing to require of the generation, so every parse-valid
+    /// generation would trivially "pass" (empty missing_required set).
+    /// That's a scorer failure, not a real pass — `pass()` returns false.
+    pub golden_unscorable: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -126,6 +133,7 @@ impl StructuralVerdict {
     /// `path_jaccard` stays on the verdict for telemetry/reporting.
     pub fn pass(&self) -> bool {
         self.parse_error.is_none()
+            && !self.golden_unscorable
             && self.value_mismatches.is_empty()
             && self.missing_required.is_empty()
     }
@@ -405,6 +413,16 @@ pub fn score(generated: &str, golden: &str) -> StructuralVerdict {
     let gen_opts = walk_attrpaths(&gen_parse.syntax());
     let gold_opts = walk_attrpaths(&gold_parse.syntax());
 
+    // Guard: if the golden has zero static attrpaths we can't evaluate
+    // the generation against it — any parse-valid output would trivially
+    // satisfy an empty `missing_required`. Mark the verdict unscorable
+    // and return early so `pass()` fails closed. This catches goldens
+    // using dynamic keys like `services.redis.servers."".enable`.
+    if gold_opts.is_empty() {
+        verdict.golden_unscorable = true;
+        return verdict;
+    }
+
     // Build path→value maps for quick lookup. Duplicate paths (possible in
     // nested `{ a.b = 1; a.b = 2; }` — a Nix error but let's be robust)
     // keep the last seen value, matching Nix eval semantics.
@@ -656,6 +674,32 @@ mod tests {
         assert!(
             v.pass(),
             "whitespace differences should not fail; got {:?}",
+            v
+        );
+    }
+
+    #[test]
+    fn golden_with_only_dynamic_attrpaths_fails_closed() {
+        // Regression: the redis golden uses `services.redis.servers."".enable`
+        // where `""` is a dynamic (quoted) segment. `walk_attrpaths` correctly
+        // skips dynamic paths, which left the golden's flat-options empty —
+        // and that let any parse-valid gibberish trivially satisfy the empty
+        // `missing_required` set, producing a false PASS.
+        //
+        // This test locks in the fail-closed behavior: when the golden
+        // flattens to zero static paths, `pass()` must return false even if
+        // the generated output parses cleanly.
+        let golden = "{ services.redis.servers.\"\".enable = true; }";
+        let generated = "{ unrelated.thing.x = true; }";
+        let v = score(generated, golden);
+        assert!(
+            !v.pass(),
+            "golden with only dynamic paths should NOT silently pass; got {:?}",
+            v
+        );
+        assert!(
+            v.golden_unscorable,
+            "verdict should flag golden_unscorable; got {:?}",
             v
         );
     }
