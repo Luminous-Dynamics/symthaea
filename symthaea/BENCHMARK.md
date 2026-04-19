@@ -3,6 +3,58 @@
 Honest measurement log. Each entry: date, commit, scorer used, result. Don't
 amend historical rows — if numbers change, append a new row and note why.
 
+## 2026-04-19 — Best-of-20 rnix selection: **1/13 full-parse** — first ever
+
+First time in this pipeline's history that any generation has
+fully parsed.
+
+`distill_nix_evaluate --samples 20` generates 20 candidate outputs
+per holdout prompt (260 total for 13 prompts × 20). `nix_best_of_n`
+loads them, scores each via (full_parse_with_path_overlap,
+longest_parseable_prefix), picks best per prompt.
+
+Result on m7c 43-train 25-epoch (best regime from earlier curve):
+
+| Metric | Value |
+|---|---|
+| Avg median prefix across seeds | 32 bytes |
+| Avg best-of-20 prefix | **200 bytes** |
+| Best-of-N lift | **+530%** |
+| Prompts with fully-parseable best | **1/13** |
+| Full-parse-with-path-overlap | 0/13 |
+
+The 1/13 full-parse is the CUPS prompt. Output:
+
+    -- boot.ly" by ment nixpkgs.v hasAttr R nix.services.services.
+    G 8 G P programs.and man h p networking.services.T and
+    allowedTCPPorts.l x l dis way s C man C s you s T q
+    networking.services.services.T d er S b i"networking.
+    programs.programs.u man able and networking.er u and
+
+**Syntactically valid Nix.** Parses clean. But semantically
+gibberish — no path overlap with the `services.printing` golden.
+The scorer still reads 0/13; only the prefix-probe (which checks
+full parse without path match) reads 1/13.
+
+**Interpretations:**
+- **Sampling variance is huge** and contains real signal — the
+  outlier 200-byte avg-best is 6.25× the 32-byte median. Single-
+  seed numbers under-sell what the trained model CAN produce.
+- **Grammar ceiling is SOFT**: best-of-20 crosses "1 valid parse"
+  that was unreachable in single-seed. More samples + better
+  selection would likely push this higher.
+- **Semantic ceiling is HARD**: across all 260 sampled outputs,
+  NONE had paths matching their golden. Architecture/data limits
+  remain for the semantic-alignment task.
+
+**Updated priority read**:
+- **#1 best-of-N is a shippable tool now** (commit `e19f3ae136`).
+  Can be used as the default generation mode without retraining.
+- Pure per-token rnix-gating (true #1 in the original sense) would
+  likely push the 1/13 higher but won't touch semantic alignment.
+- **#3 data scaling + #2 structure-aware loss remain the path for
+  semantic gains.**
+
 ## 2026-04-19 — m7c epoch curve + data-scaling re-test: partial flip of "#3 rejected"
 
 Followed the tokenizer fix with the two open questions: does data-
