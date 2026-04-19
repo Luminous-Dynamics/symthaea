@@ -223,7 +223,7 @@ Fractal CivOS with 5 tiers, consolidated into cluster DNAs (single DNA = cross-d
 |---------|------|-------|--------|
 | **mycelix-finance** | `mycelix-finance/` | 8 (payments SAP/TEND/MYCEL, treasury, staking, recognition) | Built |
 | **mycelix-health** | `mycelix-health/` | 15 (7 MVP + 8 Tier 2: trials, insurance, FHIR, CDS, telehealth, nutrition) | Built |
-| **mycelix-mail** | `mycelix-workspace/mycelix-pulse/` | 13 internal + 2 packed (PQC-encrypted decentralized email; hApp bundle name `mycelix_mail`) | Built |
+| **mycelix-mail (Pulse)** | `mycelix-workspace/mycelix-pulse/` | 13 internal + 2 packed (PQC-encrypted decentralized email; hApp bundle name `mycelix_mail`) + SMTP gateway (Phase 5A landed Apr 19 2026, merged `22623cf066`) | Built, Phase 5A green |
 | **mycelix-supplychain** | `mycelix-supplychain/` | 8 (provenance tracking) | Built |
 | **mycelix-marketplace** | `mycelix-marketplace/` | 8 (arbitration) | Built |
 | **mycelix-knowledge** | `mycelix-knowledge/` | 8 (claims, graph, query, inference, factcheck, markets, DKG, bridge) | Built |
@@ -245,6 +245,14 @@ Fractal CivOS with 5 tiers, consolidated into cluster DNAs (single DNA = cross-d
 - **Dashboards**: LUCID (SvelteKit + Tauri, 40+ components, 95% Symthaea bridge), Observatory (SvelteKit)
 - **Build**: `just build-commons` / `just build-civic` (or `cargo build --release --target wasm32-unknown-unknown`)
 - **Tests**: 8,600+ Rust workspace tests across clusters + 295+ bridge-common + 1,036 SDK Rust + 6,316 SDK TS
+
+### Pulse SMTP gateway (Phase 5A — landed Apr 19 2026)
+- **Path**: `mycelix-workspace/mycelix-pulse/crates/pulse-smtp-gateway/` (13 modules, ~1,050 LOC)
+- **Plan**: `mycelix-workspace/mycelix-pulse/PULSE_READINESS_PLAN.md` (10 phases + Phase 11 federated-gateway-mesh endgame + Phase 12 mobile)
+- **Run tests**: `cargo test -p pulse-smtp-gateway` (12 unit + 1 integration smtp_roundtrip, <1s)
+- **Run VM test**: `cd mycelix-workspace/mycelix-pulse && nix build .#checks.x86_64-linux.gateway-smoke` (~5 min cached, proves full deployment shape — systemd-hardened service, SMTP listener on 2525, happy-path + 4 negative-path assertions)
+- **Compile gotcha**: pulse workspace Cargo.lock is v3 (not v4). Nix build uses `rust-bin.stable.latest.default` via `makeRustPlatform` override because stock nixos-24.05 cargo (1.77) is too old for transitive `edition2024` deps. See `flake.nix` comment.
+- **Not yet deployed**: Phase 5B (real Hetzner CX22, own MX/DKIM, real `holochain_client` swap for `StubZomeBridge`) waits on funded Hetzner account + 1-month customer-age rule before port-25 unblock. Philosophy gate: no bridged Big Tech accounts (SaaS pivot was rejected).
 
 ### Kosmic Lab
 - **Path**: `kosmic-lab/`
