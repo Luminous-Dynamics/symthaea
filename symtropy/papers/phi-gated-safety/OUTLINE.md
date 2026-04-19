@@ -293,15 +293,33 @@ required for single-point-of-failure hazardous actions (cautery).
     **Figure 4** (post-platform-aware) shows the overlaid traces.
     The platform-lines no longer cluster — they fan out across the
     full band width.
-- **Implication**: SPRINT_THRESHOLD = 0.125 is miscalibrated for
-  at least quadrotor and helicopter, which never exceed 0.125 under
-  their representative observation dynamics. Those platforms' demo
-  plugins currently run at `FLOOR = 0.3` continuously — motor
-  authority capped at 30 % regardless of Φ. A proper per-platform
-  calibration (tune SPRINT_THRESHOLD to each platform's p95) would
-  restore full-authority sprint windows on the stable-hover
-  platforms. This is no longer theoretical follow-up — it's a
-  documented gap in the current code's per-platform setup.
+- **Implication & fix**: SPRINT_THRESHOLD = 0.125 is miscalibrated
+  for the stable-hover platforms — quadrotor and helicopter — whose
+  Φ distributions under representative observation dynamics (hover
+  + wind gusts) never exceed 0.125. At the legacy threshold, those
+  demos ran at `FLOOR = 0.3` continuously.
+  **Per-platform recalibration shipped** (next commit): set
+  `SPRINT_THRESHOLD = 0.110` in both platforms' demo plugins,
+  matching each platform's observed p50. Empirical verification
+  on the same 1,000-tick traces: quadrotor 50.2 % of frames now
+  above threshold (was 0 %); helicopter 51.5 % (was 0 %). Sprint
+  windows restored.
+- **General recipe for new platforms** (now a real part of the
+  recommended production workflow):
+
+    1. Wire `sprint_floor_gain(phi, SPRINT_THRESHOLD, FLOOR_GAIN)`
+       into the demo's plugin (~5 lines, see `8d61e348d9`).
+    2. Run `PT_PLATFORM=<platform> PT_PLATFORM_OBS=1 cargo run -p
+       symtropy-robotics-bridge --example phi_trace --release`
+       to capture the platform's empirical Φ distribution.
+    3. Set `SPRINT_THRESHOLD` to the observed p50 (for ~50 %
+       sprint frames) or p95 (for rare, high-confidence sprints).
+    4. Verify the fraction above threshold with `awk` on the CSV.
+
+    The four platforms currently using SPRINT_THRESHOLD = 0.125
+    (vehicle, auv, humanoid, manipulator) all have their p50 close
+    enough to 0.125 that recalibration isn't urgent, but the same
+    recipe applies if their observation dynamics change.
 - **Mechanism**: `RoboticAgent::tick` now threads FEP prediction-error
   into attention, FEP precision into working_memory, FEP belief-change
   into recurrence, FEP total free energy (inverse) into knowledge, and
