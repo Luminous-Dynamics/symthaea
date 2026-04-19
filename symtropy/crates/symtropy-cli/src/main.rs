@@ -93,6 +93,7 @@ USAGE:
     symtropy templates
     symtropy demos
     symtropy run <demo-name> [-- <extra args passed to demo>]
+    symtropy calibrate <platform> [--steps N]
     symtropy --help
 
 OPTIONS:
@@ -150,6 +151,13 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         },
+        "calibrate" => match cmd_calibrate(args) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(e) => {
+                eprintln!("error: {e}");
+                ExitCode::FAILURE
+            }
+        },
         "new" => match cmd_new(args) {
             Ok(()) => ExitCode::SUCCESS,
             Err(e) => {
@@ -162,6 +170,149 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+fn cmd_calibrate(mut args: impl Iterator<Item = String>) -> Result<(), String> {
+    const PLATFORMS: &[&str] = &[
+        "quadrotor",
+        "vehicle",
+        "humanoid",
+        "manipulator",
+        "auv",
+        "helicopter",
+    ];
+
+    let platform = args
+        .next()
+        .ok_or_else(|| format!("missing <platform>. Available: {}", PLATFORMS.join(", ")))?;
+    if !PLATFORMS.contains(&platform.as_str()) {
+        return Err(format!(
+            "unknown platform `{platform}`. Available: {}",
+            PLATFORMS.join(", ")
+        ));
+    }
+
+    let mut steps = 1000u32;
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "--steps" => {
+                steps = args
+                    .next()
+                    .ok_or_else(|| "--steps requires a value".to_string())?
+                    .parse()
+                    .map_err(|e| format!("invalid --steps value: {e}"))?;
+            }
+            other => {
+                return Err(format!("unexpected argument `{other}`"));
+            }
+        }
+    }
+
+    // Locate the repo root so we can invoke phi_trace via cargo.
+    let repo = locate_repo_root()?;
+
+    eprintln!("→ running phi_trace on {platform} with PT_PLATFORM_OBS=1, {steps} steps …");
+    let output = Command::new("cargo")
+        .current_dir(&repo)
+        .env("PT_PLATFORM", &platform)
+        .env("PT_PLATFORM_OBS", "1")
+        .env("PT_STEPS", steps.to_string())
+        .arg("run")
+        .arg("--release")
+        .arg("--quiet")
+        .arg("-p")
+        .arg("symtropy-robotics-bridge")
+        .arg("--example")
+        .arg("phi_trace")
+        .output()
+        .map_err(|e| format!("failed to spawn cargo: {e}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "phi_trace failed:\n{}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Parse the distribution lines emitted by phi_trace.
+    let p50 = parse_stat(&stdout, "p50")?;
+    let p95 = parse_stat(&stdout, "p95")?;
+    let min = parse_stat(&stdout, "min")?;
+    let max = parse_stat(&stdout, "max")?;
+
+    let suggested = (p50 * 1000.0).round() / 1000.0;
+    let suggested_p95 = (p95 * 1000.0).round() / 1000.0;
+
+    println!();
+    println!("════════════════════════════════════════════════════════════════════");
+    println!(" SPRINT_THRESHOLD calibration for `{platform}`");
+    println!("════════════════════════════════════════════════════════════════════");
+    println!(" observed Φ distribution ({steps} ticks, platform-aware obs):");
+    println!("   min    = {min:.4}");
+    println!("   max    = {max:.4}");
+    println!("   p50    = {p50:.4}");
+    println!("   p95    = {p95:.4}");
+    println!();
+    println!(" Suggested thresholds:");
+    println!("   SPRINT_THRESHOLD = {suggested:.3}   (at p50 — ~50 % sprint frames)");
+    println!(
+        "   SPRINT_THRESHOLD = {suggested_p95:.3}   (at p95 — ~5 %  sprint frames, rare high-confidence)"
+    );
+    println!();
+    println!(" To apply: edit `symtropy-{platform}-demo/src/plugin.rs` and set:");
+    println!("   const SPRINT_THRESHOLD: f64 = {suggested:.3};");
+    println!();
+    Ok(())
+}
+
+fn parse_stat(stdout: &str, key: &str) -> Result<f64, String> {
+    for line in stdout.lines() {
+        let trimmed = line.trim_start();
+        if let Some(rest) = trimmed
+            .strip_prefix(key)
+            .and_then(|s| s.trim_start().strip_prefix('='))
+        {
+            return rest
+                .trim()
+                .parse::<f64>()
+                .map_err(|e| format!("parse {key} failed: {e}"))
+                .map(|v| v);
+        }
+    }
+    Err(format!("could not find `{key}=` in phi_trace output"))
+}
+
+/// Locate the symtropy workspace dir (contains `symtropy/Cargo.toml` with
+/// a `[workspace]` member list). Cargo commands need to run from inside
+/// a workspace root, not from the monorepo root. Walks up from CWD; the
+/// env var `SYMTROPY_MONOREPO_ROOT` points at the monorepo root and we
+/// append `symtropy/` for the workspace.
+fn locate_repo_root() -> Result<PathBuf, String> {
+    if let Ok(root) = std::env::var("SYMTROPY_MONOREPO_ROOT") {
+        let ws = PathBuf::from(root).join("symtropy");
+        if ws.join("Cargo.toml").exists() {
+            return Ok(ws);
+        }
+    }
+    let cwd = std::env::current_dir().map_err(|e| format!("cannot read CWD: {e}"))?;
+    for ancestor in cwd.ancestors() {
+        // Look for the symtropy workspace Cargo.toml directly.
+        if ancestor.ends_with("symtropy")
+            && ancestor.join("Cargo.toml").exists()
+            && ancestor.join("crates/symtropy-robotics-bridge").exists()
+        {
+            return Ok(ancestor.to_path_buf());
+        }
+        // Or a monorepo parent with symtropy/ inside.
+        let ws = ancestor.join("symtropy");
+        if ws.join("Cargo.toml").exists() && ws.join("crates/symtropy-robotics-bridge").exists() {
+            return Ok(ws);
+        }
+    }
+    Err(
+        "could not locate symtropy workspace. Set SYMTROPY_MONOREPO_ROOT=/path/to/luminous-dynamics"
+            .to_string(),
+    )
 }
 
 fn cmd_run(mut args: impl Iterator<Item = String>) -> Result<(), String> {
