@@ -3,6 +3,52 @@
 Honest measurement log. Each entry: date, commit, scorer used, result. Don't
 amend historical rows — if numbers change, append a new row and note why.
 
+## 2026-04-19 — Best-of-100 scaling: **8/13 full-parse (62%)**
+
+Scaling the best-of-N approach from 20 → 100 samples per prompt.
+Extremely cheap on GPU (100 samples × 13 prompts = 1300 gens in
+~3 min; the picker is <1 sec).
+
+| Setup | Avg best prefix | Full-parse | Structural pass |
+|---|---|---|---|
+| Single-seed | 32 bytes | 0/13 | 0/13 |
+| Best-of-20 | 200 bytes | 1/13 | 0/13 |
+| **Best-of-100** | **295 bytes** | **8/13 (62%)** | **0/13** |
+
+Full-parse count **scales strongly with N**: 1 → 8 going 20× → 100×.
+The training distribution contains **far more parse-valid outputs**
+than single-seed runs suggested.
+
+Structural pass remains 0/13 across all regimes — none of the 1300
+best-of-100 samples produce paths that match their golden. This
+splits the ceiling cleanly:
+
+- **Parse ceiling is sampling-bound.** More samples → more parses.
+  The architecture/training can produce valid Nix syntax; we just
+  need to sample enough.
+- **Semantic ceiling is architectural.** The distribution does not
+  center on paths that match held-out golden semantics. No amount
+  of sampling will produce `services.printing.enable = true` when
+  the trained distribution emits random Nix-shaped-but-wrong
+  content.
+
+**This changes the research narrative on the "0/13" zeros.** The
+honest numbers were always right — but "architecture can't produce
+valid Nix" is now **false**. The architecture CAN produce valid
+Nix; it just doesn't match goldens semantically. The 0/13
+structural pass rate is a semantic-alignment failure, not a syntax
+failure.
+
+**Path forward clarified:**
+- **#3 data scaling + #2 structure-aware loss** attack the semantic
+  ceiling. This is still the main research path.
+- **Best-of-N with more samples** (e.g., N=1000) might squeeze out
+  a rare structural pass via lucky alignment, but it's not a
+  foundation — more like a lottery. Not the main path.
+- **Per-token rnix-gating during training** (not decoding) could
+  shape the training distribution toward paths in the KG, making
+  lucky-matches happen more often.
+
 ## 2026-04-19 — Best-of-20 rnix selection: **1/13 full-parse** — first ever
 
 First time in this pipeline's history that any generation has
