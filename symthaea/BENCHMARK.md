@@ -3,6 +3,71 @@
 Honest measurement log. Each entry: date, commit, scorer used, result. Don't
 amend historical rows — if numbers change, append a new row and note why.
 
+## 2026-04-19 — **Tokenizer fix: for_nix_distillation**, prefix length 31→68 bytes (2.2×)
+
+Diagnostic pivot. The 25-epoch 0/13 result (entry below) prompted a
+look at WHY generations were gibberish. Sample output:
+
+    impl Into#[#[allow(~while-ed# inherit from()wrapProgram way S A...
+
+Not random. `#[`, `impl`, `->`, `::`, `&str`, `Vec<`, `Option`,
+`unwrap()`, `#[derive`, `fn new`, `-> Result` — these are
+**Rust/Python tokens** that `BpeTokenizer::default_minimal()`
+pre-loads via CODE_TOKENS (~200 entries, originally designed for
+general-purpose code generation). 43 Nix training pairs cannot
+overcome the base-distribution bias when the vocabulary is tuned
+for Rust.
+
+Fix in `2362d900b5`: new constructor
+`BpeTokenizer::for_nix_distillation()` — same base as
+`default_minimal` (special tokens + ASCII + common English) but
+**CODE_TOKENS excluded**, `add_nix_tokens()` called automatically.
+Wired into `distill_nix_train` + `distill_nix_evaluate` with
+genesis-phrase bump `-m7b` → `-m7c` to keep old incompatible
+checkpoints from being loaded.
+
+**Result** (43 train × 25 epochs × 3 eval seeds):
+
+| Tokenizer | Seed 1 | Seed 2 | Seed 3 | mean |
+|---|---|---|---|---|
+| m7b (CODE_TOKENS included) | 29 | 47* | 18 | ~31 |
+| m7c (Nix-only) | 44 | **105** | 55 | **~68** |
+
+(*the m7b 47 was a false-PASS from the scorer bug fixed in
+`7a6c0714a8`.)
+
+**Prefix length 2.2× longer.** Seed 2 hit 105 bytes — a substantial
+Nix-looking prefix. Full-parse still **0/13** (still short of
+well-formed attrsets) but the generated tokens are now
+predominantly Nix-specific:
+
+    runCommand boot. which but programs.propagatedBuildInputs
+    ful however we virtualisation.hasAttr services. ...
+    imports = [ ]; wireguard openFirewall modesetting allowedTCPPorts
+
+Compare the pre-fix gibberish above. The emission is finally
+pointing at the right language. `imports = [ ];` in particular is a
+valid Nix fragment.
+
+**This invalidates the "#3 rejected" verdict by partially lifting
+one architectural confound.** The rejection held data-volume
+constant while varying training-regime (10 ep, 25 ep) — but the
+VOCABULARY was always Rust-biased. With m7c as the clean starting
+point, the next data-scaling experiment would be the real test of
+whether more pairs help. (Not run this session.)
+
+**Current priority list (updated):**
+- **#2 structure-aware loss**: still valuable. The m7c model
+  emits valid Nix fragments but not valid sequences — an explicit
+  grammar signal would close that gap.
+- **#1 rnix-gated decoding**: the 68-byte median is strong material
+  for per-token masking. Much better starting point than the
+  m7b 31-byte median.
+- **Multi-epoch curve on m7c**: prefix length may still be climbing
+  at 25 epochs. Run 50/100-epoch experiments to find the plateau.
+- **Re-run #3 data-scaling on m7c**: the rejection might flip given
+  a clean vocabulary. Quick to verify.
+
 ## 2026-04-19 — **Second correction**: 25-epoch test + scorer bug fix
 
 After the multi-seed correction below, ran a 25-epoch extended training
