@@ -52,6 +52,14 @@ hickory-resolver = "0.25"
 # Per-IP rate limiting pre-rspamd.
 governor = "0.10"
 
+# HTTP API for Option 3 (gateway-mediated zome calls). Phase 5B scaffold —
+# the API is disabled in the TOML default and the route handler today calls
+# the stub `GenericZomeDispatch`. Wired against axum 0.8 + the workspace's
+# existing tokio + hyper transitive deps so we don't bring in a second HTTP
+# stack. See `PULSE_REAL_MODE_PLAN.md` §"Option 3" for the endgame.
+axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio"] }
+tower = { version = "0.5", default-features = false }
+
 # Async runtime.
 tokio = { version = "1", features = ["full"] }
 
@@ -81,6 +89,9 @@ sha2 = "0.10"
 
 # Content hashing.
 blake3 = "1"
+
+# Base64 for the HTTP API's opaque-payload encoding.
+base64 = "0.22"
 
 # Idempotency cache for (Message-ID, From) — 7 day TTL.
 moka = { version = "0.12", features = ["future"] }

@@ -93,8 +93,53 @@
     })();
     </script>
 
-    <!-- Connection handled by WASM (Rust BrowserWsTransport, like Prism) -->
-    <!-- No JS bridge needed — auth token from /api/token, conductor via WS -->
+    <!-- Holochain bridge — ported from Praxis pattern.
+         Sets the conductor URL override for WASM based on hostname, then
+         probes it with a short timeout. On success: __HC_STATUS='connected'
+         and WASM connects for real. On timeout/error: __HC_STATUS='mock'
+         and the UI degrades gracefully to mock data so remote visitors
+         still see a usable demo instead of an indefinite spinner. -->
+    <script id="holochain-bridge">
+    (function() {
+        // Choose conductor URL by hostname:
+        //   - Production public hosts use the Cloudflare Tunnel WSS route
+        //   - Local dev / same-machine access uses direct loopback
+        var host = window.location.hostname;
+        if (!window.__HC_CONDUCTOR_URL) {
+            if (host === 'mail.mycelix.net' || host === 'mail.luminousdynamics.io') {
+                window.__HC_CONDUCTOR_URL = 'wss://mail-conductor.luminousdynamics.io';
+            } else {
+                window.__HC_CONDUCTOR_URL = 'ws://localhost:8888';
+            }
+        }
+
+        window.__HC_STATUS = 'connecting';
+        var WS_URL = window.__HC_CONDUCTOR_URL;
+        var TIMEOUT_MS = 3000;
+        try {
+            var ws = new WebSocket(WS_URL);
+            var timer = setTimeout(function() {
+                try { ws.close(); } catch (_) {}
+                window.__HC_STATUS = 'mock';
+                console.warn('[pulse] conductor probe timed out at ' + WS_URL + ' — using mock mode');
+            }, TIMEOUT_MS);
+            ws.onopen = function() {
+                clearTimeout(timer);
+                window.__HC_STATUS = 'connected';
+                try { ws.close(); } catch (_) {}
+                console.info('[pulse] conductor reachable at ' + WS_URL);
+            };
+            ws.onerror = function() {
+                clearTimeout(timer);
+                window.__HC_STATUS = 'mock';
+                console.warn('[pulse] conductor unreachable at ' + WS_URL + ' — using mock mode');
+            };
+        } catch (e) {
+            window.__HC_STATUS = 'mock';
+            console.warn('[pulse] conductor probe threw: ' + e + ' — using mock mode');
+        }
+    })();
+    </script>
 
     <!-- Hide loading screen when WASM app renders -->
     <script>

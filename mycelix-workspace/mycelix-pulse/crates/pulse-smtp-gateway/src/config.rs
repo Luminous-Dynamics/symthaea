@@ -29,6 +29,13 @@ pub struct GatewayConfig {
     /// through a real cluster.
     #[serde(default)]
     pub test_aliases: std::collections::BTreeMap<String, String>,
+
+    /// HTTP API for Option 3 — gateway-mediated zome calls. Disabled by
+    /// default; enabling it exposes `POST /api/zome/{zome}/{fn}` locally,
+    /// which the tunnel in front of the gateway can then publish. Scaffold
+    /// shape; Phase 5B hardens with per-DID JWT auth + TLS + timeouts.
+    #[serde(default)]
+    pub http_api: HttpApiConfig,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -169,6 +176,47 @@ pub struct VerpConfig {
 
 fn default_verp_prefix() -> String {
     "bounce".into()
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct HttpApiConfig {
+    /// Master switch. Default false — the SMTP gateway runs standalone
+    /// until Option 3 is wired end-to-end (auth + TLS + observability).
+    #[serde(default)]
+    pub enabled: bool,
+    /// Bind address. Default `127.0.0.1` — the local hop. A fronting
+    /// reverse-proxy (Cloudflare Tunnel) is expected to publish it.
+    #[serde(default = "default_http_bind")]
+    pub bind: IpAddr,
+    /// Listener port. Default 8444 — off the mycelix 81XX frontend block
+    /// and the 82XX/83XX conductor block.
+    #[serde(default = "default_http_port")]
+    pub port: u16,
+    /// Max request body bytes. Default 1 MiB — zome calls rarely need
+    /// more; larger payloads should use signals or DHT writes.
+    #[serde(default = "default_http_max_body")]
+    pub max_body_bytes: usize,
+}
+
+impl Default for HttpApiConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            bind: default_http_bind(),
+            port: default_http_port(),
+            max_body_bytes: default_http_max_body(),
+        }
+    }
+}
+
+fn default_http_bind() -> IpAddr {
+    "127.0.0.1".parse().unwrap()
+}
+fn default_http_port() -> u16 {
+    8444
+}
+fn default_http_max_body() -> usize {
+    1 << 20
 }
 
 impl GatewayConfig {

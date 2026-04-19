@@ -68,6 +68,37 @@ pub trait ZomeBridge: Send + Sync {
 
 use tokio::sync::Mutex;
 
+/// Generic zome dispatch — the surface the HTTP API exposes.
+///
+/// This is deliberately distinct from [`ZomeBridge`]: `ZomeBridge` is the
+/// narrow, typed surface the inbound/outbound mail pipeline uses (four
+/// specific externs). `GenericZomeDispatch` is the wide, untyped surface
+/// that Option 3 of PULSE_REAL_MODE_PLAN.md proxies via HTTP. A real
+/// Phase 5B impl will satisfy both by delegating the typed calls to
+/// well-known `(zome_name, fn_name, payload)` triples. Keeping them
+/// separate lets the SMTP path stay type-safe while the HTTP path can
+/// carry arbitrary JSON→msgpack→zome dispatches.
+#[async_trait]
+pub trait GenericZomeDispatch: Send + Sync {
+    /// Invoke `fn_name` on `zome_name` with the serialized `payload` bytes.
+    /// The return is the raw zome response bytes — the HTTP layer echoes
+    /// them back to the client as base64-encoded JSON.
+    async fn call_raw_zome(
+        &self,
+        zome_name: &str,
+        fn_name: &str,
+        payload: &[u8],
+    ) -> crate::GatewayResult<Vec<u8>>;
+}
+
+/// Captured HTTP→zome call for test assertions.
+#[derive(Debug, Clone)]
+pub struct StubZomeCall {
+    pub zome_name: String,
+    pub fn_name: String,
+    pub payload: Vec<u8>,
+}
+
 /// Test/development stub. Captures all inbound operations in memory so
 /// `nixosTest` integration tests can assert on them.
 #[derive(Default)]
@@ -76,6 +107,12 @@ pub struct StubZomeBridge {
     pub outbox_updates: Mutex<Vec<StubOutboxUpdate>>,
     pub bounces: Mutex<Vec<StubBounce>>,
     pub alias_map: Mutex<std::collections::HashMap<String, String>>,
+    pub generic_calls: Mutex<Vec<StubZomeCall>>,
+    /// Optional programmed response for `call_raw_zome`. If set and the
+    /// (zome, fn) tuple matches, the stub returns the bytes. Otherwise it
+    /// returns `b"stub-ok"` so the HTTP scaffold tests have something to
+    /// echo back.
+    pub programmed_response: Mutex<std::collections::HashMap<(String, String), Vec<u8>>>,
 }
 
 #[derive(Debug, Clone)]
@@ -109,6 +146,49 @@ impl StubZomeBridge {
     /// Pre-populate alias → DID mapping for tests.
     pub async fn set_alias(&self, alias: impl Into<String>, did: impl Into<String>) {
         self.alias_map.lock().await.insert(alias.into(), did.into());
+    }
+
+    /// Program a response for an HTTP→zome call. Next matching
+    /// `call_raw_zome(zome, fn, _)` returns these bytes.
+    pub async fn program_response(
+        &self,
+        zome_name: impl Into<String>,
+        fn_name: impl Into<String>,
+        bytes: Vec<u8>,
+    ) {
+        self.programmed_response
+            .lock()
+            .await
+            .insert((zome_name.into(), fn_name.into()), bytes);
+    }
+}
+
+#[async_trait]
+impl GenericZomeDispatch for StubZomeBridge {
+    async fn call_raw_zome(
+        &self,
+        zome_name: &str,
+        fn_name: &str,
+        payload: &[u8],
+    ) -> crate::GatewayResult<Vec<u8>> {
+        tracing::debug!(
+            %zome_name, %fn_name, payload_len = payload.len(),
+            "stub call_raw_zome"
+        );
+        self.generic_calls.lock().await.push(StubZomeCall {
+            zome_name: zome_name.to_string(),
+            fn_name: fn_name.to_string(),
+            payload: payload.to_vec(),
+        });
+        if let Some(bytes) = self
+            .programmed_response
+            .lock()
+            .await
+            .get(&(zome_name.to_string(), fn_name.to_string()))
+        {
+            return Ok(bytes.clone());
+        }
+        Ok(b"stub-ok".to_vec())
     }
 }
 

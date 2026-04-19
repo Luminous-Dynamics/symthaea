@@ -27,6 +27,7 @@ pub mod auth;
 pub mod bounce;
 pub mod config;
 pub mod error;
+pub mod http_api;
 pub mod outbound;
 pub mod parser;
 pub mod pipeline;

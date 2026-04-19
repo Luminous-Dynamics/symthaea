@@ -94,7 +94,8 @@ async fn serve(cfg: GatewayConfig) -> GatewayResult<()> {
     use pulse_smtp_gateway::rate_limit::PerIpLimiter;
     use pulse_smtp_gateway::receiver::SmtpReceiver;
     use pulse_smtp_gateway::verp::VerpCodec;
-    use pulse_smtp_gateway::zome::StubZomeBridge;
+    use pulse_smtp_gateway::zome::{GenericZomeDispatch, StubZomeBridge};
+    use std::sync::Arc;
 
     let limiter = PerIpLimiter::new(&cfg.rate_limit)?;
 
@@ -110,6 +111,12 @@ async fn serve(cfg: GatewayConfig) -> GatewayResult<()> {
     })?;
     let _verp = VerpCodec::new(hmac_key, cfg.verp.prefix.clone(), cfg.domain.name.clone());
 
+    // SMTP pipeline owns its own stub. In Phase 5B this will be the real
+    // holochain_client-backed bridge; the real bridge will impl both
+    // `ZomeBridge` (SMTP pipeline) and `GenericZomeDispatch` (HTTP API),
+    // and `serve()` will share a single Arc of it across both paths.
+    // For now (Phase 5A) the scaffold runs two independent stubs so the
+    // type plumbing stays straightforward.
     let zome = StubZomeBridge::new();
 
     // Pre-populate stub aliases from config — Phase 5A nixosTest path.
@@ -126,6 +133,19 @@ async fn serve(cfg: GatewayConfig) -> GatewayResult<()> {
         tokio::runtime::Handle::current(),
     );
     let receiver = SmtpReceiver::new(pipeline);
+
+    // Stand up the HTTP API task if the operator enabled it. Disabled by
+    // default, so the existing SMTP-only deployment is unaffected.
+    let http_handle: Option<tokio::task::JoinHandle<GatewayResult<()>>> = if cfg.http_api.enabled {
+        let http_bridge: Arc<dyn GenericZomeDispatch> = Arc::new(StubZomeBridge::new());
+        let http_cfg = cfg.http_api.clone();
+        Some(tokio::spawn(async move {
+            pulse_smtp_gateway::http_api::serve(http_bridge, &http_cfg).await
+        }))
+    } else {
+        tracing::info!("http_api disabled — skipping (set [http_api] enabled=true to enable)");
+        None
+    };
 
     let hostname = cfg.domain.hostname.clone();
     let bind_addr = format!("{}:{}", cfg.listener.bind, cfg.listener.port);
@@ -148,7 +168,18 @@ async fn serve(cfg: GatewayConfig) -> GatewayResult<()> {
 
     tracing::info!(bind = %bind_addr_for_log, "SMTP listener bound");
 
-    // Race: shutdown signal or server exit (probably panic).
+    // Race: shutdown signal, SMTP server exit (probably panic), or HTTP
+    // API exit. Any of the three drops the whole process so systemd
+    // restarts us into a clean state. `http_wait` is a pending future
+    // when the HTTP API is disabled, so it never fires.
+    let http_wait = async {
+        match http_handle {
+            Some(h) => h.await,
+            None => std::future::pending().await,
+        }
+    };
+    tokio::pin!(http_wait);
+
     tokio::select! {
         _ = tokio::signal::ctrl_c() => {
             tracing::info!("shutdown signal received");
@@ -158,6 +189,14 @@ async fn serve(cfg: GatewayConfig) -> GatewayResult<()> {
                 Ok(Ok(())) => tracing::warn!("SMTP server returned cleanly"),
                 Ok(Err(e)) => tracing::error!(error = %e, "SMTP server exited with error"),
                 Err(e) => tracing::error!(error = %e, "SMTP server task panicked"),
+            }
+        }
+        res = &mut http_wait => {
+            match res {
+                Ok(Ok(())) => tracing::warn!("http_api returned cleanly"),
+                Ok(Err(e)) => tracing::error!(error = %e, "http_api exited with error"),
+                Err(e) if e.is_cancelled() => {}
+                Err(e) => tracing::error!(error = %e, "http_api task panicked"),
             }
         }
     }
