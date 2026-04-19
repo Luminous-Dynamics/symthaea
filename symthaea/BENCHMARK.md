@@ -3,6 +3,76 @@
 Honest measurement log. Each entry: date, commit, scorer used, result. Don't
 amend historical rows — if numbers change, append a new row and note why.
 
+## 2026-04-19 — **Architectural pivot: grounded truth** — retrieval 12/13 struct but only 5/13 compiler-valid
+
+User directive: Option 1 (retrieval-augmented composition) + Option 2
+(compiler-grounded reward loop). First step was to measure what the
+EXISTING retrieval pipeline (`generate_nix_with_self_repair`) scores
+on the same 13 held-out prompts the Broca distillation failed 0/13.
+
+**Shock finding** (commit `3bf81ae7d1`):
+- Broca distillation best-of-100: 0/13 structural, 8/13 parse, 2/13 keyword
+- **Existing retrieval + idiom + repair: 12/13 structural (92%), 13/13 parse**
+
+The entire distillation arc was a race to replace a pipeline that was
+already 92% correct without any Broca in the loop. All 10 commits
+`50194abfbb`..`e36db09c10` targeting Broca training were optimizing
+the wrong path.
+
+**Second shock** (commit `a14f706205`): piped every generation through
+`nix-instantiate` via `cached_module_eval`. Three signals:
+
+| Prompt | Struct | Parse | Grounded |
+|---|---|---|---|
+| configure postgresql service | ✓ | ✓ | ✗ `services.postgres' does not exist` |
+| enable redis cache server | ✗ | ✓ | ✓ |
+| enable docker + user to group | ✓ | ✓ | ✗ eval error |
+| set up ipfs kubo node | ✓ | ✓ | ✓ |
+| configure prometheus monitoring | ✓ | ✓ | ✗ `services.monitoring' does not exist` |
+| configure CUPS printing service | ✓ | ✓ | ✗ `services.cups' does not exist` |
+| configure nvidia gpu drivers | ✓ | ✓ | ✗ unfree refused |
+| configure intel hardware acceleration | ✓ | ✓ | ✗ `vaapiVdpau` renamed |
+| enable kde plasma desktop | ✓ | ✓ | ✓ |
+| open port 8080 in firewall | ✓ | ✓ | ✓ |
+| set time zone to Africa/Johannesburg | ✓ | ✓ | ✓ |
+| rust dev (both) | ✓ | ✓ | N/A (mkShell — not a module) |
+
+**Totals: 12/13 structural, 5/13 grounded.** Six outputs pass the
+structural scorer but nix-instantiate rejects them — meaning our
+**goldens themselves contain incorrect attrpaths**:
+
+- postgres vs postgresql (real option is `services.postgresql`)
+- prometheus golden uses `services.monitoring` which doesn't exist
+- CUPS golden uses `services.cups`; real is `services.printing`
+- intel golden uses `vaapiVdpau`, renamed in current nixpkgs
+
+**Three compounding implications:**
+
+1. **The 92% structural claim was INFLATED by ~54 percentage points.**
+   True compiler-grounded correctness is 38%.
+2. **The KG has wrong entries** that were baked into goldens. Any
+   production user of `services.postgres` would get a nixpkgs eval
+   failure identical to our grounded test.
+3. **The Broca 0/13 was MORE HONEST than the retrieval 12/13.**
+   Broca failed to produce the wrong paths the goldens encode; it
+   just failed everywhere-else too.
+
+**Architectural pivot (the clean research path now):**
+- **Option 1 validated**: retrieval > distillation as the backbone.
+  Broca's future role is composition WITHIN retrieval, not replacement.
+- **Option 2 validated**: the compiler is the right training signal.
+  Using it would have caught the wrong-golden KG entries automatically.
+- **KG audit needed**: go fix postgres→postgresql, CUPS→printing,
+  monitoring→prometheus-exporter-*, vaapiVdpau→libva-vdpau. Easy,
+  high-impact correctness repairs.
+- **Grounded reward for future training**: every candidate evaluated
+  through `nix-instantiate`. Reward = `is_ok()`. No cross-entropy
+  guessing, no wrong-golden drag.
+
+This is the cleanest "the compiler tells the truth" demonstration
+possible. The next concrete move: audit + fix the KG entries, re-run
+grounded baseline, expect 11-12/13 grounded.
+
 ## 2026-04-19 — NIX_TOKENS expansion (m7d): keyword presence **2/13**
 
 Hypothesis test for the semantic-gap diagnosis: if the 0/13 keyword
