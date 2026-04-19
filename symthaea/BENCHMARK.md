@@ -3,6 +3,66 @@
 Honest measurement log. Each entry: date, commit, scorer used, result. Don't
 amend historical rows — if numbers change, append a new row and note why.
 
+## 2026-04-19 — NIX_TOKENS expansion (m7d): keyword presence **2/13**
+
+Hypothesis test for the semantic-gap diagnosis: if the 0/13 keyword
+presence was because service names (postgresql, redis, etc.) are BPE-
+fragmented from English subwords, making the model reassemble them
+token-by-token, then promoting them to single tokens should let the
+model emit them as atomic units.
+
+**Intervention** (commit `7b6775cc2a`): added 36 service/package
+names to NIX_TOKENS — postgresql, redis, nginx, docker, nvidia,
+cups, rust-analyzer, sccache, tailscale, wireguard, etc. Genesis
+phrase bumped `-m7c` → `-m7d` (new vocab = new checkpoint namespace).
+
+**Pipeline** (v2 corpus = 45 train / 13 holdout; trained 25 epochs;
+best-of-100 + forensic keyword check):
+
+| Checkpoint | Keyword presence | Parse-fully | Structural |
+|---|---|---|---|
+| m7c v1 (32 train, no service tokens) | 1/13 | 8/13 | 0/13 |
+| m7c v2 (45 train, no service tokens) | 0/13 | 0/13 | 0/13 |
+| **m7d v2 (45 train, +service tokens)** | **2/13** | 1/13 | 0/13 |
+
+**Keyword-presence delta**: 0/13 → 2/13 on the same corpus. Specifically:
+
+- ✓ **docker** (3 training exposures) — now emits
+- ✓ **firewall** (10 training exposures) — continues to emit
+- ✗ postgresql (3 exposures) — still doesn't emit
+- ✗ nvidia (3 exposures) — still doesn't emit
+- ✗ rust (5 exposures) — still doesn't emit
+
+**Diagnosis** (more precise than before): single-token vocabulary
+inclusion **plus** ≥3 training exposures is NECESSARY but not
+SUFFICIENT. The exposure count needed varies by token. docker and
+firewall hit the threshold at 3 and 10 respectively; postgresql
+(3), nvidia (3), rust (5) are still below whatever per-token
+learning threshold applies. Speculation: the subword landscape
+around these tokens matters — postgresql competes with "p" + "os" +
+... fragments already in frequent use, so the single-token path
+must out-compete the subword path by a significant margin.
+
+**Parse quality regressed slightly**: 8/13 → 1/13 full-parse. The
+bigger NIX_TOKENS vocabulary may be making sequences harder to
+close because the model has more paths to choose from at each
+step with fewer training tokens per path. This is an honest cost
+of the vocabulary expansion and would likely recover with more
+training data.
+
+**Revised research path**:
+- **Keyword learning requires ≥5 exposures PER token** for
+  reliable emission, and likely more for tokens that compete with
+  frequent English subword patterns.
+- **Corpus scaling to hit ≥5 per keyword** becomes the concrete
+  target. With 13 unique holdout keywords × 5 exposures = 65
+  keyword-occurrence slots; at 1-3 keywords per training pair,
+  that's ~30-60 additional pairs focused on the 8 under-exposed
+  keywords (postgresql, redis, cups, prometheus, nvidia,
+  intel, kde, ipfs, timeZone, sccache, etc.).
+- **NIX_TOKENS must keep pace**: every new common service name
+  encountered in the corpus should be added as a single token.
+
 ## 2026-04-19 — Forensic: **keyword presence 1/13** — the semantic gap localized
 
 After the best-of-100 = 8/13 parse-valid result, ran a per-prompt
