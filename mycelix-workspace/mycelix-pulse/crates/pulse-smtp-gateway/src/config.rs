@@ -21,6 +21,14 @@ pub struct GatewayConfig {
     pub zome: ZomeConfig,
     pub rate_limit: RateLimitConfig,
     pub verp: VerpConfig,
+    /// Pre-populated alias→DID map. Honored ONLY when the StubZomeBridge
+    /// is in use (Phase 5A — no real conductor). Phase 5B reads aliases
+    /// from the identity cluster's alias_registry zome and ignores this
+    /// section even if present. Used by the nixosTest harness to seed
+    /// `alice@mycelix.test → did:mycelix:alice` without round-tripping
+    /// through a real cluster.
+    #[serde(default)]
+    pub test_aliases: std::collections::BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

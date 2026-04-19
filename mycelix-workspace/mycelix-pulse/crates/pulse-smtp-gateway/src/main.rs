@@ -112,6 +112,13 @@ async fn serve(cfg: GatewayConfig) -> GatewayResult<()> {
 
     let zome = StubZomeBridge::new();
 
+    // Pre-populate stub aliases from config — Phase 5A nixosTest path.
+    // Phase 5B (real holochain_client) ignores this map entirely.
+    for (alias, did) in &cfg.test_aliases {
+        zome.set_alias(alias.clone(), did.clone()).await;
+        tracing::debug!(%alias, %did, "registered test alias");
+    }
+
     let pipeline = RealInboundPipeline::new(
         limiter,
         zome,

@@ -18,19 +18,22 @@ with lib;
 let
   cfg = config.services.pulse-smtp-gateway;
 
-  gatewayPkg = pkgs.rustPlatform.buildRustPackage {
+  # The gateway binary. Default is the stock-rustPlatform inline build
+  # (works in nixos-25.05+ where cargo is recent enough). Hosts on older
+  # nixpkgs (24.05 and below) must override `cfg.package` with a build
+  # using rust-overlay's stable.latest — see the flake.nix at this
+  # repository's root for the canonical approach.
+  defaultGatewayPkg = pkgs.rustPlatform.buildRustPackage {
     pname = "pulse-smtp-gateway";
     version = "0.1.0-alpha.1";
-    # In Phase 5A VM tests, the source is copied in from the repo tree. In
-    # Phase 5B production, this'll be a pinned flake input.
     src = ../../crates/pulse-smtp-gateway;
     cargoLock.lockFile = ../../crates/pulse-smtp-gateway/Cargo.lock;
-    # C deps needed by transitive crates (rustls, sha2 asm, etc.).
     nativeBuildInputs = with pkgs; [ pkg-config ];
-    buildInputs = with pkgs; [ openssl ];
-    # No network during build — vendor deps.
-    doCheck = true;
+    buildInputs = [ ];
+    doCheck = false;
   };
+
+  gatewayPkg = cfg.package;
 
   configTOML = pkgs.writeText "pulse-gateway-config.toml" ''
     [domain]
@@ -70,11 +73,30 @@ let
     [verp]
     hmac_secret_path = "/run/credentials/pulse-smtp-gateway.service/verp-hmac"
     prefix = "bounce"
+
+    ${optionalString (cfg.testAliases != {}) ''
+      [test_aliases]
+      ${concatStringsSep "\n" (mapAttrsToList (alias: did: ''"${alias}" = "${did}"'') cfg.testAliases)}
+    ''}
   '';
 
 in {
   options.services.pulse-smtp-gateway = {
     enable = mkEnableOption "Pulse SMTP gateway daemon";
+
+    package = mkOption {
+      type = types.package;
+      default = defaultGatewayPkg;
+      defaultText = lib.literalExpression ''
+        rustPlatform.buildRustPackage { pname = "pulse-smtp-gateway"; ... }
+      '';
+      description = ''
+        The pulse-smtp-gateway package to use. Override on hosts running
+        nixpkgs older than 25.05 to supply a build with a recent rustc
+        (1.85+ for edition2024 deps). The flake.nix at the repository root
+        wires rust-overlay's stable.latest for this purpose.
+      '';
+    };
 
     domain = mkOption {
       type = types.str;
@@ -180,6 +202,18 @@ in {
       description = ''
         Paths to secret files. Keys: "dkim-rsa", "dkim-ed25519",
         "dilithium", "verp-hmac". Loaded via systemd LoadCredential=.
+      '';
+    };
+
+    testAliases = mkOption {
+      type = types.attrsOf types.str;
+      default = {};
+      example = { "alice@mycelix.test" = "did:mycelix:alice"; };
+      description = ''
+        Pre-populated alias→DID map for the StubZomeBridge (Phase 5A
+        nixosTest only). Phase 5B with real holochain_client ignores
+        this entirely. Used to seed the smoke test without needing a
+        running identity cluster.
       '';
     };
 

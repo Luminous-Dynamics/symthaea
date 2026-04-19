@@ -147,6 +147,47 @@
 
         # Package definitions
         packages = {
+          # Phase 5A — sovereign SMTP gateway. The library + binary that
+          # bridges legacy RFC 5322 mail to the Pulse DHT.
+          #
+          # Uses rust-overlay's latest stable toolchain. nixos-24.05's stock
+          # cargo (1.77) is too old for several transitive deps that need
+          # edition2024 (cargo 1.85+). The toolchain bundle exposes
+          # `cargo` + `rustc` symlinks through one derivation; `makeRustPlatform`
+          # accepts both pointing at the same combined toolchain — the
+          # cargoSetupHook actually runs `cargo --version` from the bundle's
+          # /bin so the bundle wins over the rustPlatform default.
+          pulse-smtp-gateway = let
+            rustToolchainForBuild = pkgs.rust-bin.stable.latest.default;
+          in (pkgs.makeRustPlatform {
+            cargo = rustToolchainForBuild;
+            rustc = rustToolchainForBuild;
+          }).buildRustPackage {
+            pname = "pulse-smtp-gateway";
+            version = "0.1.0-alpha.1";
+            src = ./crates/pulse-smtp-gateway;
+            cargoLock.lockFile = ./crates/pulse-smtp-gateway/Cargo.lock;
+            # Prepend the rust-overlay toolchain to PATH so `cargo` + `rustc`
+            # resolve to it before the rustPlatform's stock 1.77 versions
+            # win the lookup. Without this, makeRustPlatform's substitution
+            # only affects metadata; the build hook still finds the older
+            # cargo from elsewhere on PATH.
+            nativeBuildInputs = [ pkgs.pkg-config rustToolchainForBuild ];
+            # rustls path — no openssl required at runtime. Add `pkgs.openssl`
+            # to buildInputs if a transitive dep regresses.
+            buildInputs = [ ];
+            # Skip cargo test in the nix-build sandbox. The integration
+            # test (smtp_roundtrip) binds a TCP port + spawns a server
+            # thread; we exercise it outside the sandbox via
+            # `cargo test --test smtp_roundtrip` in the dev workflow.
+            doCheck = false;
+            meta = with pkgs.lib; {
+              description = "Sovereign SMTP gateway for Mycelix Pulse";
+              license = licenses.agpl3Plus;
+              platforms = platforms.linux;
+            };
+          };
+
           # Backend binary
           backend = pkgs.rustPlatform.buildRustPackage {
             pname = "mycelix-mail-backend";
@@ -228,6 +269,24 @@
             '';
           };
         };
+
+        # Phase 5A.3.a smoke test — single VM, module activated, real
+        # systemd service, real TCP listener on :2525, smtplib client
+        # round-trip through StubZomeBridge. Run via:
+        #   nix build .#checks.x86_64-linux.gateway-smoke -L
+        # First run takes ~10 min cold (NixOS image + crate build);
+        # cached after.
+        checks = {
+          gateway-smoke = import ./tests/pulse-gateway-smoke.nix {
+            inherit pkgs;
+            pulseModule = ./_infrastructure/nixos/pulse-gateway-host.nix;
+          };
+        };
       }
-    );
+    ) // {
+      # System-independent outputs go outside eachDefaultSystem.
+      # NixOS modules are per-NixOS-version, not per-host-arch.
+      nixosModules.pulse-smtp-gateway = ./_infrastructure/nixos/pulse-gateway-host.nix;
+      nixosModules.default = self.nixosModules.pulse-smtp-gateway;
+    };
 }
