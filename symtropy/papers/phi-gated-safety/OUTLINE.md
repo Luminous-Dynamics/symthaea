@@ -459,31 +459,39 @@ some trial seeds (std of Φ-SprintFloor went from 0.0 → 0.42). The
 claim "Φ-SprintFloor never dead-arms" is also weaker post-wiring
 because some trials do produce 0 sprints.
 
-**Flight benchmark live-Φ supplement — DONE** (data in
-`data/flight_benchmark_live_n30.csv`, example at
-`symtropy-robotics-bridge/examples/flight_benchmark_live.rs`):
+**Cross-platform paired live-Φ benchmark — DONE** (data in
+`data/paired_benchmark_live_n30.csv`, example at
+`symtropy-robotics-bridge/examples/paired_benchmark_live.rs`).
+Generalizes `flight_benchmark_live.rs` across all 6 `sprint_floor_gain`
+adopter platforms using each platform's applied per-platform
+SPRINT_THRESHOLD + platform-aware observations. N=30 paired trials
+per platform:
 
-Figure 3's `flight_benchmark` synthesizes a sinusoidal signal in
-[0.05, 0.95] to isolate the gating-policy choice from the cognitive
-pipeline. The live-Φ variant uses `RoboticAgent::tick` on Quadrotor
-with flight-platform-aware observations (altitude / attitude /
-wind / PE) — Φ comes from the actual `MasterConsciousnessEquation`
-at the applied SPRINT_THRESHOLD = 0.110:
+  platform      threshold   TierGate   SprintFloor   advantage   95 % CI
+  -----------   ---------   --------   -----------   ---------   ---------------
+  auv           0.130       0.279      0.527         +89.3 %     [+85.1, +93.6]
+  quadrotor     0.110       0.280      0.633         +125.8 %    [+125.1, +126.5]
+  helicopter    0.110       0.241      0.655         +171.2 %    [+170.2, +172.1]
+  manipulator   0.114       0.213      0.645         +202.6 %    [+202.3, +202.9]
+  humanoid      0.130       0.241      0.734         +204.2 %    [+201.8, +206.6]
+  vehicle       0.101       0.185      0.611         +230.5 %    [+230.5, +230.5]
 
-  Tier gate    mean gain = 0.281 ± 0.002
-  Sprint-floor mean gain = 0.633 ± 0.009
-  Sprint-floor advantage = +125.8 % ± 1.9   95 % CI [+125.1, +126.5]  (N=30)
+**Mean advantage across 6 platforms: +170.6 %.** Every platform's
+95 % CI excludes zero. Every platform's SprintFloor gain ends up in
+the 0.53-0.73 range (target ~0.65 = 0.5×1.0 + 0.5×0.3). The spread
+in advantage magnitudes (+89 % to +231 %) tracks TierGate's
+variance — platforms whose Φ distribution keeps the arm in
+Orange/Yellow tiers most of the time (vehicle, humanoid, manipulator)
+give TierGate a lower baseline, so SprintFloor's win looks larger.
 
-The live-Φ advantage is nearly twice the synthetic-signal version's
-+71.4 %, and the CI is ~25× tighter. Direction replicates cleanly;
-magnitude is larger because the platform-aware Φ distribution is
-more tightly clustered than the synthetic sinusoid, which makes
-both the TierGate's near-zero mean and the SprintFloor's ~0.65
-mean more stable across trials.
+This is the cross-platform replication that the paper's §8
+"transferability is platform-dependent" claim now backs empirically.
+Single-threshold critics can see directly that per-platform p50
+calibration works — not just on quadrotor + helicopter, on all six.
 
-This doesn't replace Figure 3 (the synthetic version deliberately
-tests gating-shape independently of cognition), but it's the
-on-manifold companion: same comparison, real Φ.
+The single-platform flight_benchmark_live (`data/flight_benchmark_
+live_n30.csv`) remains as the focused +125.8 % reproducer; the new
+paired_benchmark_live is its cross-platform generalization.
 
 **§4 5-variant comparison — DONE** (data in
 `data/five_variant_post_wiring/`, §4/§5 rewritten):
