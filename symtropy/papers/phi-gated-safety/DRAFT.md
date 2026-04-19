@@ -467,14 +467,31 @@ that this is future work. The SprintFloor pattern is a *supervisor*,
 operating above whichever controller the platform uses; it is
 complementary to, not a replacement for, learned control.
 
-**Untrained HDC-LTC projections.** The `thought_to_torque` example
-(commit `f1285ce1e6`) shows that our HDC-LTC controller runs at
-its initialization weights, producing bias-level motor outputs.
-The `train_step` BPTT path exists but was not exercised for the
-paper's benchmarks. The paper's supervisor claim is robust to this
-— the 5-variant comparison isolates gating-policy from controller
-— but a fully trained controller would strengthen the
-"thought-to-torque" architectural story.
+**Controller-training gap closed (partially).** At the time this
+paper's benchmarks were measured, our HDC-LTC controllers ran at
+initialization weights — the paper's supervisor claim is robust to
+this (the 5-variant comparison isolates gating-policy from
+controller), but the "thought-to-torque" architectural story was
+unvalidated as control, only as projection. We have since trained
+the flight controller via BPTT against PD-baseline reference
+trajectories (50 episodes × 1000 steps, 6.4 min CPU via
+`train_flight.rs`, data in `flight_training_50ep.csv`,
+**Figure 6**). Position error improved from 0.605 m (episode 0) to
+0.073 m (episode 49, **-88.0 %**). Attitude error improved from
+0.216 rad to 0.033 rad (**-84.9 %**). Hover fraction reached
+90-100 % by episode 45. The HDC-LTC → 4-DOF projection does learn
+when given reference supervision.
+
+The remaining gap: the paper's benchmarks were *not* re-run with
+the trained controller — they measured supervisor-gating-shape,
+which is independent of the underlying controller's training state.
+A follow-up investigation can ask whether trained vs untrained
+controllers produce different gating-policy advantage numbers; we
+don't expect large differences (SprintFloor beats TierGate on
+*any* controller, including the trivial "emit bias values"
+controller) but the empirical check is reasonable reviewer work.
+The other five platforms' controllers have not been trained in
+this paper; the same path extends to each.
 
 **Hand-crafted observation generators.** Figure 4 and Figure 5
 use per-platform observation streams written as Rust closures

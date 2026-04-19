@@ -54,6 +54,12 @@ envelope, and shows the result replicates to a second platform
   advantages positive, all CIs exclude zero. Range +89 % (auv) to
   +231 % (vehicle), mean +170.6 %. Data: `data/paired_benchmark_
   live_n30.csv`, reproducer: `paired_benchmark_live.rs` example.
+- `figures/figure6_flight_training.png` — Flight controller BPTT
+  training curve. 50 episodes × 1000 steps, CPU, 6.4 min wall.
+  Position error -88.0 %, attitude error -84.9 %, hover fraction
+  → 90-100 % by episode 45. Closes the §9 "untrained controllers"
+  limitation with concrete convergence evidence. Data:
+  `data/flight_training_50ep.csv`, reproducer: `train_flight.rs`.
 - `figures/render_figures.py` — Pure-matplotlib renderer for all three
   figures. Dependencies via `nix-shell` (see Reproducing below).
 

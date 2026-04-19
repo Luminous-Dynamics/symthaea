@@ -468,12 +468,100 @@ def render_paired_benchmark_live():
     print(f"wrote {out} ({len(rows)} platforms, mean adv +{mean_adv:.1f} %)")
 
 
+# ── Figure 6: Flight BPTT training curve ─────────────────────────────
+
+def render_flight_training():
+    """Flight controller BPTT training curve from
+    `data/flight_training_50ep.csv` (commit [pending]).
+
+    Closes the §9 "untrained controllers" limitation with concrete
+    evidence that the HDC-LTC → 4D motor projection converges when
+    trained via BPTT against PD-baseline targets.
+    """
+    csv_path = DATA_DIR / "flight_training_50ep.csv"
+    if not csv_path.exists():
+        print(f"skipping figure6: {csv_path} not found — "
+              "regenerate via `TF_EPISODES=50 TF_STEPS=1000 TF_CSV=… "
+              "cargo run -p symthaea-flight --example train_flight --release`")
+        return
+    eps, pos, att, fe, hover = [], [], [], [], []
+    with open(csv_path) as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            eps.append(int(row["episode"]))
+            pos.append(float(row["pos_err"]))
+            att.append(float(row["att_err"]))
+            fe.append(float(row["free_energy"]))
+            hover.append(float(row["hover_fraction"]))
+
+    fig, axes = plt.subplots(2, 2, figsize=(10, 5.5))
+    ax_pos, ax_att, ax_fe, ax_hover = axes.flatten()
+
+    ax_pos.plot(eps, pos, color="#c0392b", marker="o", markersize=3, linewidth=1.1)
+    ax_pos.set_ylabel("position error (m)")
+    ax_pos.set_title("avg position error per episode", fontsize=10)
+    ax_pos.grid(alpha=0.3)
+    if pos:
+        imp = 100.0 * (pos[0] - pos[-1]) / max(pos[0], 1e-9)
+        ax_pos.annotate(
+            f"{imp:+.1f}% (ep0→ep{eps[-1]})",
+            xy=(eps[-1], pos[-1]),
+            xytext=(eps[-1] * 0.5, pos[0] * 0.6),
+            fontsize=9,
+            color="#27ae60",
+            arrowprops=dict(arrowstyle="->", color="#27ae60", lw=1.1),
+        )
+
+    ax_att.plot(eps, att, color="#1f6ead", marker="o", markersize=3, linewidth=1.1)
+    ax_att.set_ylabel("attitude error (rad)")
+    ax_att.set_title("avg attitude error per episode", fontsize=10)
+    ax_att.grid(alpha=0.3)
+    if att:
+        imp = 100.0 * (att[0] - att[-1]) / max(att[0], 1e-9)
+        ax_att.annotate(
+            f"{imp:+.1f}% (ep0→ep{eps[-1]})",
+            xy=(eps[-1], att[-1]),
+            xytext=(eps[-1] * 0.5, att[0] * 0.6),
+            fontsize=9,
+            color="#27ae60",
+            arrowprops=dict(arrowstyle="->", color="#27ae60", lw=1.1),
+        )
+
+    ax_fe.plot(eps, fe, color="#8e44ad", marker="o", markersize=3, linewidth=1.1)
+    ax_fe.set_xlabel("episode")
+    ax_fe.set_ylabel("avg free energy")
+    ax_fe.set_title("FEP free energy per episode", fontsize=10)
+    ax_fe.grid(alpha=0.3)
+
+    ax_hover.plot(
+        eps, [h * 100 for h in hover], color="#27ae60",
+        marker="o", markersize=3, linewidth=1.1
+    )
+    ax_hover.set_xlabel("episode")
+    ax_hover.set_ylabel("hover fraction (%)")
+    ax_hover.set_title("hover within ±5 cm of setpoint", fontsize=10)
+    ax_hover.set_ylim(0, 105)
+    ax_hover.grid(alpha=0.3)
+
+    fig.suptitle(
+        r"Figure 6 — Flight BPTT training: HDC-LTC $\rightarrow$ 4-DOF quadrotor command "
+        rf"(50 episodes $\times$ 1000 steps, CPU, 6.4 min wall)",
+        fontsize=11,
+    )
+    fig.tight_layout()
+    out = HERE / "figure6_flight_training.png"
+    fig.savefig(out, dpi=150)
+    plt.close(fig)
+    print(f"wrote {out} ({len(eps)} episodes)")
+
+
 if __name__ == "__main__":
     render_phi_trace()
     render_sp_sweep()
     render_flight_benchmark()
     render_phi_trace_multi()
     render_paired_benchmark_live()
+    render_flight_training()
     print("\nAll figures rendered. Files:")
     for p in sorted(HERE.glob("figure*.png")):
         print(f"  {p}  ({p.stat().st_size // 1024} KB)")
