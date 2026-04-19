@@ -3,6 +3,56 @@
 Honest measurement log. Each entry: date, commit, scorer used, result. Don't
 amend historical rows — if numbers change, append a new row and note why.
 
+## 2026-04-19 — Forensic: **keyword presence 1/13** — the semantic gap localized
+
+After the best-of-100 = 8/13 parse-valid result, ran a per-prompt
+forensic check: does each generation contain the keyword implied
+by its prompt (e.g., "postgresql" for "configure postgresql
+service", "cups" for "configure CUPS printing service")?
+
+| Prompt | Keyword present | Parses |
+|---|---|---|
+| configure CUPS printing service | ✗ | 100% |
+| configure intel hardware acceleration | ✗ | 100% |
+| configure nvidia gpu drivers | ✗ | 92% |
+| configure postgresql service | ✗ | 98% |
+| configure prometheus monitoring | ✗ | 100% |
+| enable docker and add my user to the docker group | ✗ | 100% |
+| enable kde plasma desktop environment | ✗ | 97% |
+| enable redis cache server | ✗ | 100% |
+| **open port 8080 in firewall** | **✓** | 99% |
+| rust dev shell with sccache and openssl | ✗ | 100% |
+| set time zone to Africa/Johannesburg | ✗ | 100% |
+| set up a rust dev environment | ✗ | 94% |
+| set up ipfs kubo node | ✗ | 100% |
+
+**Keyword presence: 1/13. Parses near-100%: 13/13.**
+
+The model has learned **Nix syntax** (emit `services.`, `programs.`,
+`hardware.`, `imports = [ ]`, function-application chains that
+parse) but has NOT learned **prompt → service-keyword mapping**.
+Only "firewall" — which appears in 3 of the 26 existing training
+pairs — survived to emission. The 10 unique services (postgresql,
+redis, cups, etc.) each appear in 1-2 pairs, not enough for the
+model to learn the intent→keyword link.
+
+**This is the cleanest semantic-gap diagnostic.** The gap is not
+about structure (structure is solid). It's about **vocabulary-level
+intent-to-token association** — a classic few-shot problem that
+more training pairs would directly address.
+
+**Re-validates #3**: the earlier "#3 rejected" verdict was triple
+wrong:
+1. Vocabulary confound (CODE_TOKENS) — fixed via `for_nix_distillation`
+2. Single-seed noise — fixed via multi-seed discipline
+3. **Keyword-learning requires more per-keyword exposures** — only
+   fixable by scaling the corpus
+
+Practical take: the research path is more data, not more cleverness.
+200+ pairs with diverse service keywords would likely move keyword
+presence from 1/13 to most of 13 — at which point semantic scoring
+starts producing non-zero pass rates.
+
 ## 2026-04-19 — Best-of-100 scaling: **8/13 full-parse (62%)**
 
 Scaling the best-of-N approach from 20 → 100 samples per prompt.
