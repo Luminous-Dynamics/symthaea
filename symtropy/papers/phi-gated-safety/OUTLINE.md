@@ -316,10 +316,33 @@ required for single-point-of-failure hazardous actions (cautery).
        sprint frames) or p95 (for rare, high-confidence sprints).
     4. Verify the fraction above threshold with `awk` on the CSV.
 
-    The four platforms currently using SPRINT_THRESHOLD = 0.125
-    (vehicle, auv, humanoid, manipulator) all have their p50 close
-    enough to 0.125 that recalibration isn't urgent, but the same
-    recipe applies if their observation dynamics change.
+    **Full per-platform recommendation table** (from 1,000-tick
+    `PT_PLATFORM_OBS=1` traces in
+    `data/phi_trace_multi_platform_aware/*.csv`):
+
+      platform     p25     p50     p95     max     suggested
+      ----------   ------  ------  ------  ------  ---------
+      vehicle      0.0997  0.1005  0.1315  0.1321  0.101
+      quadrotor    0.1041  0.1100  0.1165  0.1195  0.110  ← applied
+      helicopter   0.1015  0.1104  0.1190  0.1216  0.110  ← applied
+      manipulator  0.0998  0.1136  0.1292  0.1299  0.114
+      humanoid     0.1169  0.1304  0.1306  0.1307  0.130
+      auv          0.1285  0.1300  0.1310  0.1352  0.130
+
+    Two applied in `ca5c5e1020` (quadrotor + helicopter), because
+    those platforms' Φ bands never exceeded the legacy 0.125 — they
+    were demonstrably mis-gated. The other four are "could tune but
+    aren't broken" — they cross the legacy threshold 25-80 % of the
+    time and still have usable sprint windows. Applying their
+    recommended values would require re-running Figures 2+§4 under
+    the new thresholds; deferred to a future polish session to keep
+    the paper's current numbers stable.
+
+    The table itself is the more-publishable result: per-platform
+    calibration is empirically necessary, the spread is meaningful
+    (0.101 to 0.130 across 6 platforms — a 30 % range in threshold
+    values), and a single constant 0.125 is a compromise that mis-
+    gates the stable-hover cases.
 - **Mechanism**: `RoboticAgent::tick` now threads FEP prediction-error
   into attention, FEP precision into working_memory, FEP belief-change
   into recurrence, FEP total free energy (inverse) into knowledge, and
@@ -330,13 +353,12 @@ required for single-point-of-failure hazardous actions (cautery).
   hard; the weight can be tuned upward once we have representative
   per-platform observation streams.
 - **Paper consequence**: transferability is platform-dependent, not
-  universal. A single SPRINT_THRESHOLD across six adopters is an
-  over-simplification that works only for platforms whose observation
-  stream produces a Φ distribution overlapping [0.125, top_of_band].
-  Quadrotor and helicopter's stable-hover + gust-burst dynamics
-  produce a Φ distribution compressed near the bottom of the band,
-  so their SPRINT_THRESHOLD should be lower (perhaps 0.115) to
-  preserve sprint windows. Humanoid and AUV's more dynamic
+  universal. A single SPRINT_THRESHOLD across six adopters spans a
+  30 % range when properly calibrated (0.101 for vehicle up to 0.130
+  for humanoid/AUV). Quadrotor and helicopter's stable-hover + gust-
+  burst dynamics produce a Φ distribution compressed near the bottom
+  of the band — at 0.110 they now sprint ~50 % of frames, up from
+  0 % at the legacy 0.125. Humanoid and AUV's more dynamic
   observations push Φ higher, so their current threshold could
   potentially move up. **The paper should recommend per-platform
   Φ-trace measurement + threshold calibration as a production
