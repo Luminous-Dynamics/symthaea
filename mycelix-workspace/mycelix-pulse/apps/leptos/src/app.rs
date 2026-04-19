@@ -9,17 +9,20 @@ use leptos_router::{
     path,
 };
 
-use crate::holochain::HolochainProvider;
-use crate::mail_context::provide_mail_context;
-use crate::toasts::{provide_toast_context, ToastContainer};
-use crate::keyboard::provide_keyboard_context;
-use crate::notifications::provide_notification_context;
-use crate::theme::provide_theme_context;
-use crate::offline::provide_offline_context;
-use crate::preferences::provide_preferences_context;
-use crate::pages::*;
+use crate::components::{
+    BottomNav, CommandPalette, ConductorSetup, KeyboardHelp, Nav, OnboardingTour, ProfileSetup,
+    PwaInstallPrompt, Sidebar, ThemePanel, WelcomeModal,
+};
 use crate::holochain::ConnectionStatus;
-use crate::components::{Nav, Sidebar, BottomNav, KeyboardHelp, CommandPalette, ThemePanel, WelcomeModal, ConductorSetup, OnboardingTour, ProfileSetup, PwaInstallPrompt};
+use crate::holochain::HolochainProvider;
+use crate::keyboard::provide_keyboard_context;
+use crate::mail_context::provide_mail_context;
+use crate::notifications::provide_notification_context;
+use crate::offline::provide_offline_context;
+use crate::pages::*;
+use crate::preferences::provide_preferences_context;
+use crate::theme::provide_theme_context;
+use crate::toasts::{provide_toast_context, ToastContainer};
 
 #[component]
 pub fn App() -> impl IntoView {
@@ -41,6 +44,13 @@ fn AppInner() -> impl IntoView {
     provide_notification_context();
     crate::karma::provide_karma_context();
 
+    // Symthaea Spore consciousness kernel — loaded client-side for local
+    // intent extraction (Athena) without shipping Big Tech model weights.
+    // No-op if /spore/symthaea_spore_bg.wasm is absent; the bridge falls
+    // back to the default 0.5 profile so existing UI keeps working.
+    // See SPORE_ROADMAP.md + ROADMAP.md "Symthaea Edge" section.
+    mycelix_leptos_core::provide_spore_bridge();
+
     // Favicon unread badge — updates tab title and favicon dynamically
     {
         let mail_fav = crate::mail_context::use_mail();
@@ -57,7 +67,11 @@ fn AppInner() -> impl IntoView {
 
                 // Generate favicon with badge via canvas
                 if unread > 0 {
-                    let badge_label = if unread > 9 { "9+".into() } else { unread.to_string() };
+                    let badge_label = if unread > 9 {
+                        "9+".into()
+                    } else {
+                        unread.to_string()
+                    };
                     let _ = js_sys::eval(&format!(
                         "((label)=>{{const c=document.createElement('canvas');c.width=32;c.height=32;const x=c.getContext('2d');\
                         x.font='20px sans-serif';x.textAlign='center';x.fillText('\\u2709',16,22);\
@@ -123,21 +137,27 @@ fn OfflineBanner() -> impl IntoView {
     let offline = crate::offline::use_offline();
 
     let is_online = RwSignal::new(
-        web_sys::window().map(|w| w.navigator().on_line()).unwrap_or(true)
+        web_sys::window()
+            .map(|w| w.navigator().on_line())
+            .unwrap_or(true),
     );
 
     // Listen for online/offline events
     Effect::new(move |_| {
-        let _ = js_sys::eval("
+        let _ = js_sys::eval(
+            "
             window.__mycelix_online_handler = () => window.__mycelix_online = navigator.onLine;
             window.addEventListener('online', window.__mycelix_online_handler);
             window.addEventListener('offline', window.__mycelix_online_handler);
-        ");
+        ",
+        );
     });
 
     // Poll navigator.onLine (events don't trigger Leptos reactivity)
     let check_online = move || {
-        web_sys::window().map(|w| w.navigator().on_line()).unwrap_or(true)
+        web_sys::window()
+            .map(|w| w.navigator().on_line())
+            .unwrap_or(true)
     };
 
     view! {

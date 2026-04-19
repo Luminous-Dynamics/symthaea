@@ -93,17 +93,29 @@
     })();
     </script>
 
+    <!-- Symthaea Spore WASM probe — synchronous HEAD request before app mount
+         so the Leptos provider can branch on availability without racing.
+         The Spore kernel (~5 MB, cached) runs the HDC-CfC-IIT consciousness
+         pipeline entirely in the browser. Pulse uses it for local intent
+         extraction (Athena) without shipping Big Tech model weights. -->
+    <script id="spore-loader">
+        window.__SPORE_AVAILABLE = false;
+        try {
+            var xhr = new XMLHttpRequest();
+            xhr.open('HEAD', '/spore/symthaea_spore_bg.wasm', false);
+            xhr.send();
+            if (xhr.status === 200) window.__SPORE_AVAILABLE = true;
+        } catch(e) {}
+    </script>
+
     <!-- Holochain bridge — ported from Praxis pattern.
          Sets the conductor URL override for WASM based on hostname, then
-         probes it with a short timeout. On success: __HC_STATUS='connected'
-         and WASM connects for real. On timeout/error: __HC_STATUS='mock'
-         and the UI degrades gracefully to mock data so remote visitors
-         still see a usable demo instead of an indefinite spinner. -->
+         fetches an authentication token from the SPA server's /api/token gate.
+         On success: __HC_AUTH_TOKEN and __HC_STATUS='connected'.
+         On failure/timeout: __HC_STATUS='mock' and the UI degrades gracefully. -->
     <script id="holochain-bridge">
-    (function() {
-        // Choose conductor URL by hostname:
-        //   - Production public hosts use the Cloudflare Tunnel WSS route
-        //   - Local dev / same-machine access uses direct loopback
+    (async function() {
+        // Choose conductor URL by hostname
         var host = window.location.hostname;
         if (!window.__HC_CONDUCTOR_URL) {
             if (host === 'mail.mycelix.net' || host === 'mail.luminousdynamics.io') {
@@ -115,28 +127,47 @@
 
         window.__HC_STATUS = 'connecting';
         var WS_URL = window.__HC_CONDUCTOR_URL;
-        var TIMEOUT_MS = 3000;
+        
         try {
-            var ws = new WebSocket(WS_URL);
+            // 1. Fetch auth token from the gate
+            console.info('[pulse] fetching auth token from /api/token...');
+            const tokenResp = await fetch('/api/token');
+            if (!tokenResp.ok) throw new Error('token_gate_failed');
+            const { token } = await tokenResp.json();
+            if (!token) throw new Error('no_token_received');
+            
+            window.__HC_AUTH_TOKEN = token;
+            console.info('[pulse] auth token acquired');
+
+            // 2. Probe conductor with token (Holochain 0.6 requires token in subprotocol or query)
+            // The mycelix-leptos-client expects it in the query param for the initial handshake 
+            // if we are doing a raw WebSocket probe, but real connection uses it in the protocol.
+            // For a simple probe, we just try to open it.
+            var probeUrl = WS_URL + '?token=' + token;
+            var ws = new WebSocket(probeUrl);
+            var TIMEOUT_MS = 5000;
+            
             var timer = setTimeout(function() {
                 try { ws.close(); } catch (_) {}
                 window.__HC_STATUS = 'mock';
-                console.warn('[pulse] conductor probe timed out at ' + WS_URL + ' — using mock mode');
+                console.warn('[pulse] conductor probe timed out — using mock mode');
             }, TIMEOUT_MS);
+
             ws.onopen = function() {
                 clearTimeout(timer);
                 window.__HC_STATUS = 'connected';
                 try { ws.close(); } catch (_) {}
-                console.info('[pulse] conductor reachable at ' + WS_URL);
+                console.info('[pulse] conductor verified reachable at ' + WS_URL);
             };
+
             ws.onerror = function() {
                 clearTimeout(timer);
                 window.__HC_STATUS = 'mock';
-                console.warn('[pulse] conductor unreachable at ' + WS_URL + ' — using mock mode');
+                console.warn('[pulse] conductor probe failed (WSS connection error) — using mock mode');
             };
         } catch (e) {
             window.__HC_STATUS = 'mock';
-            console.warn('[pulse] conductor probe threw: ' + e + ' — using mock mode');
+            console.warn('[pulse] real mode initialization failed: ' + e.message + ' — falling back to mock mode');
         }
     })();
     </script>
