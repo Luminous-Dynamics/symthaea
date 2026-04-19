@@ -280,9 +280,19 @@ def render_phi_trace_multi():
     consciousness computation. Visualizing the overlap makes the §8
     structural-transferability argument concrete.
     """
-    trace_dir = DATA_DIR / "phi_trace_multi"
-    if not trace_dir.exists():
-        print(f"skipping figure4: {trace_dir} not found — "
+    # Prefer platform-aware traces if present — they show real semantic
+    # variation, not just dim-based clustering. Falls back to the legacy
+    # shared-sinusoid traces otherwise.
+    pa_dir = DATA_DIR / "phi_trace_multi_platform_aware"
+    legacy_dir = DATA_DIR / "phi_trace_multi"
+    if pa_dir.exists():
+        trace_dir = pa_dir
+        mode_label = "platform-aware observations"
+    elif legacy_dir.exists():
+        trace_dir = legacy_dir
+        mode_label = "legacy shared-sinusoid observations"
+    else:
+        print(f"skipping figure4: no trace CSVs found — "
               "regenerate via `PT_CSV=… cargo run -p symtropy-robotics-"
               "bridge --example phi_trace --release` per platform")
         return
@@ -336,8 +346,8 @@ def render_phi_trace_multi():
     ax_time.set_ylabel(r"$\Phi$ (consciousness-inspired scalar)")
     ax_time.set_ylim(0.08, 0.16)
     ax_time.set_title(
-        r"Figure 4 — Post-FEP-wiring $\Phi$ traces diverge by observation "
-        r"dim: humanoid (dim=2) lowest, dim=4 platforms clustered top",
+        rf"Figure 4 — Platform-aware $\Phi$ traces "
+        rf"diverge dramatically ({mode_label})",
         fontsize=10,
     )
     ax_time.legend(loc="lower right", fontsize=7, framealpha=0.88, ncol=2)

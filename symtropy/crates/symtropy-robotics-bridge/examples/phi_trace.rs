@@ -24,6 +24,9 @@
 //!     PT_STEPS=N              number of ticks (default: 1000)
 //!     PT_CSV=path             dump per-step CSV
 //!     PT_SEED=N               RNG seed for observation synthesis (default: 42)
+//!     PT_PLATFORM_OBS=1       use hand-crafted platform-specific observation
+//!                             generators (vs legacy shared sinusoid). Produces
+//!                             genuinely different Φ distributions per platform.
 
 use std::io::Write;
 
@@ -107,9 +110,39 @@ fn observation_dim(platform: PlatformType) -> usize {
 /// Deterministic synthetic observation stream that covers a realistic
 /// range of danger/stability — NOT a re-run of the per-platform demo's
 /// scenario (that would require each demo's physics sim). We trade
-/// scenario-accuracy for portability: this is enough to surface whether
-/// the consciousness-equation aggregation is producing a narrow band in
-/// [0.099, 0.145] for all platforms or a platform-specific distribution.
+/// scenario-accuracy for portability.
+///
+/// **Platform-aware mode** (`PT_PLATFORM_OBS=1`): each platform gets a
+/// hand-crafted observation generator reflecting its actual sensor
+/// dynamics. This produces genuinely different Φ distributions per
+/// platform instead of dim-only variation. The generators model the
+/// dominant temporal pattern of each sensor channel:
+///
+///   quadrotor:    altitude (stable ~0.6, small perturb) +
+///                 attitude-x/y (gust-correlated spikes) +
+///                 wind-gust (Dryden-ish bursty sinusoid)
+///   vehicle:      speed (periodic figure-8) +
+///                 slip (bursty, spikes near friction changes) +
+///                 friction (step-changes during ice patches)
+///   humanoid:     uprightness (slow drift under push) +
+///                 push-norm (step-impulse perturbations)
+///   manipulator:  danger (smooth sinusoid) +
+///                 PE (rising during approach) +
+///                 effort (correlated with danger) +
+///                 stiffness (quasi-constant with small jitter)
+///   auv:          depth (descending then holding) +
+///                 current (slow rotation) +
+///                 chemical (bursty plume) +
+///                 PE (tracks current variation)
+///   helicopter:   altitude (hover-oscillation) +
+///                 wind (Dryden bursts) +
+///                 attitude (recovery-correlated) +
+///                 PE (rises during gusts)
+///
+/// **Legacy mode** (default, `PT_PLATFORM_OBS` unset): all platforms
+/// receive the same sinusoidal observation stream with platform-specific
+/// dimensionality only — the structural invariance test from the §8
+/// original discussion.
 fn synth_observation(dim: usize, step: usize, seed: u64) -> (Vec<f64>, f64) {
     let mut obs = vec![0.0; dim];
     let s = step as f64;
@@ -122,6 +155,85 @@ fn synth_observation(dim: usize, step: usize, seed: u64) -> (Vec<f64>, f64) {
     let danger_phase = seed as f64 * 0.31;
     let danger = (0.3 + 0.4 * (s * 0.05 + danger_phase).sin()).clamp(0.0, 1.0);
     (obs, danger)
+}
+
+/// Platform-aware observation generators. Each returns
+/// `(observation_vector, danger_level)` for a given step + seed.
+fn platform_observation(platform: PlatformType, step: usize, seed: u64) -> (Vec<f64>, f64) {
+    let s = step as f64;
+    let phase = (seed as f64 % 1000.0) * 0.001;
+    let clamp01 = |x: f64| x.clamp(0.0, 1.0);
+    match platform {
+        PlatformType::Quadrotor => {
+            // Stable altitude with mild perturbation; attitude correlated
+            // with wind gusts; wind-gust bursty.
+            let gust = clamp01(0.3 + 0.4 * (s * 0.08 + phase).sin().powi(2));
+            let alt = clamp01(0.6 + 0.1 * (s * 0.02).sin());
+            let att_x = clamp01(0.5 + 0.3 * gust * (s * 0.12).sin());
+            let att_y = clamp01(0.5 + 0.3 * gust * (s * 0.12 + 1.5).sin());
+            let danger = clamp01(gust * 0.7 + 0.2 * att_x);
+            (vec![alt, att_x, att_y, gust], danger)
+        }
+        PlatformType::Vehicle => {
+            // Periodic speed (figure-8); slip spikes near friction changes;
+            // friction step-changes (ice patches).
+            let speed = clamp01(0.5 + 0.35 * (s * 0.025).sin());
+            let friction = if (s * 0.013).sin() > 0.3 { 1.0 } else { 0.35 };
+            let slip = clamp01((1.0 - friction) * (0.3 + 0.5 * (s * 0.18).sin().abs()));
+            let danger = clamp01((1.0 - friction) * 0.8 + slip * 0.2);
+            (vec![speed, slip, friction], danger)
+        }
+        PlatformType::Humanoid => {
+            // Uprightness drifts during push impulses; push bursts at low freq.
+            let push = if ((s * 0.01 + phase) as f64).sin() > 0.85 {
+                0.9
+            } else {
+                0.05
+            };
+            let uprightness = clamp01(0.9 - 0.5 * push - 0.1 * (s * 0.04).sin().abs());
+            let danger = clamp01(push * 0.7 + (1.0 - uprightness) * 0.3);
+            (vec![uprightness, push], danger)
+        }
+        PlatformType::Manipulator => {
+            // Danger: smooth sinusoid (human obstacle approach);
+            // PE rises during approach; effort correlates with danger;
+            // stiffness quasi-constant with small jitter.
+            let approach = clamp01(0.5 + 0.4 * (s * 0.05 + phase).sin());
+            let pe = clamp01(0.15 + 0.3 * approach + 0.05 * (s * 0.09).cos());
+            let effort = clamp01(0.4 + 0.3 * approach);
+            let stiffness = clamp01(0.65 + 0.05 * (s * 0.023).sin());
+            (vec![approach, pe, effort, stiffness], approach * 0.9)
+        }
+        PlatformType::Auv => {
+            // Depth: descending then holding; current: slow rotation;
+            // chemical: bursty plume; PE tracks current variation.
+            let depth = clamp01(0.2 + 0.6 * (1.0 - (-s * 0.004).exp()));
+            let current = clamp01(0.3 + 0.3 * (s * 0.018).sin());
+            let chemical = if (s * 0.02 + phase).sin() > 0.7 {
+                0.8
+            } else {
+                0.1
+            };
+            let pe = clamp01(0.2 + 0.4 * current.abs());
+            let danger = clamp01(current * 0.5 + chemical * 0.3);
+            (vec![depth, current, chemical, pe], danger)
+        }
+        PlatformType::Helicopter => {
+            // Altitude: hover with oscillation; wind: Dryden bursts;
+            // attitude: recovery-correlated; PE: rises during gusts.
+            let wind = clamp01(0.25 + 0.5 * (s * 0.06 + phase).sin().powi(2));
+            let altitude = clamp01(0.7 + 0.1 * (s * 0.025).sin() - 0.15 * wind);
+            let attitude = clamp01(0.5 + 0.35 * wind * (s * 0.14).sin());
+            let pe = clamp01(0.15 + 0.5 * wind);
+            let danger = clamp01(wind * 0.7 + (1.0 - altitude) * 0.3);
+            (vec![altitude, wind, attitude, pe], danger)
+        }
+        _ => {
+            // Fallback: legacy synthetic stream for platforms without a
+            // hand-crafted generator.
+            synth_observation(observation_dim(platform), step, seed)
+        }
+    }
 }
 
 fn main() {
@@ -139,6 +251,10 @@ fn main() {
         .and_then(|s| s.parse().ok())
         .unwrap_or(42);
     let csv_path = std::env::var("PT_CSV").ok();
+    let platform_obs = std::env::var("PT_PLATFORM_OBS")
+        .ok()
+        .map(|v| v != "0" && !v.is_empty())
+        .unwrap_or(false);
     let dim = observation_dim(platform);
 
     println!();
@@ -147,6 +263,14 @@ fn main() {
     println!("════════════════════════════════════════════════════════════════════");
     println!(" platform         : {:?}", platform);
     println!(" observation dim  : {}", dim);
+    println!(
+        " observation mode : {}",
+        if platform_obs {
+            "PLATFORM-AWARE (hand-crafted)"
+        } else {
+            "legacy synthetic"
+        }
+    );
     println!(" steps            : {}", steps);
     println!(" seed             : {}", seed);
     println!();
@@ -162,7 +286,11 @@ fn main() {
     });
 
     for step in 0..steps {
-        let (obs, danger) = synth_observation(dim, step, seed);
+        let (obs, danger) = if platform_obs {
+            platform_observation(platform, step, seed)
+        } else {
+            synth_observation(dim, step, seed)
+        };
         let _gain = agent.tick(&obs, danger);
         let phi = agent.phi();
         phi_samples.push(phi);

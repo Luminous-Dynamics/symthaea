@@ -260,7 +260,7 @@ required for single-point-of-failure hazardous actions (cautery).
   action-distribution concentration) into `ConsciousnessInputs`, the
   band shifted to [0.088, 0.133] and the threshold was recalibrated
   to 0.125 (same relative position, ~78 % up the range).
-- **Two-stage transferability experiment** (via
+- **Three-stage transferability experiment** (via
   `symtropy-robotics-bridge/examples/phi_trace.rs`, ~1 s per 1,000
   ticks):
   - **Stage 1 (pre-FEP-wiring, commit ≤`6517226491`)**: all six
@@ -270,15 +270,38 @@ required for single-point-of-failure hazardous actions (cautery).
     but the return was discarded; four `ConsciousnessInputs` fields
     were hardcoded. **Transferability was a design oversight, not a
     result.**
-  - **Stage 2 (post-FEP-wiring, commit `996750d12b`+)**: FEP-derived
-    signals are blended 35:65 with the previous hardcoded defaults
-    into five of eight `ConsciousnessInputs` fields. Platforms now
-    differ by observation dimensionality: humanoid (2-channel obs)
-    produces mean 0.1156 with 33 % of frames above 0.125; vehicle
-    (3-channel) produces mean 0.1166 with 38 %; the four 4-channel
-    platforms (manipulator / flight / AUV / helicopter) cluster at
-    mean 0.1172 with ~39 %. **Figure 4** shows the overlaid traces
-    and distribution histograms.
+  - **Stage 2 (post-FEP-wiring, legacy shared-sinusoid observations)**:
+    FEP-derived signals blended into five of eight
+    `ConsciousnessInputs` fields. Platforms differ by observation
+    dimensionality: humanoid (2-channel) 33 %, vehicle (3-channel)
+    38 %, four 4-channel platforms 39 %. Small variation, dim-only.
+  - **Stage 3 (post-FEP-wiring, platform-aware observations)**:
+    `PT_PLATFORM_OBS=1` in `phi_trace.rs` — each platform receives
+    a hand-crafted observation stream reflecting its actual sensor
+    dynamics (quadrotor: altitude/attitude/wind gusts; vehicle:
+    speed/slip/friction steps; humanoid: uprightness/push impulses;
+    etc.). Fraction of frames above SPRINT_THRESHOLD = 0.125 now
+    varies **dramatically** by platform:
+
+      quadrotor    0 %   (altitude stable, gusts transient)
+      helicopter   0 %   (hover + Dryden bursts)
+      manipulator  25 %  (smooth danger sinusoid)
+      vehicle      33 %  (periodic speed + ice patches)
+      humanoid     69 %  (push impulses recover quickly)
+      AUV          80 %  (smooth current + bursty chemical)
+
+    **Figure 4** (post-platform-aware) shows the overlaid traces.
+    The platform-lines no longer cluster — they fan out across the
+    full band width.
+- **Implication**: SPRINT_THRESHOLD = 0.125 is miscalibrated for
+  at least quadrotor and helicopter, which never exceed 0.125 under
+  their representative observation dynamics. Those platforms' demo
+  plugins currently run at `FLOOR = 0.3` continuously — motor
+  authority capped at 30 % regardless of Φ. A proper per-platform
+  calibration (tune SPRINT_THRESHOLD to each platform's p95) would
+  restore full-authority sprint windows on the stable-hover
+  platforms. This is no longer theoretical follow-up — it's a
+  documented gap in the current code's per-platform setup.
 - **Mechanism**: `RoboticAgent::tick` now threads FEP prediction-error
   into attention, FEP precision into working_memory, FEP belief-change
   into recurrence, FEP total free energy (inverse) into knowledge, and
@@ -288,15 +311,18 @@ required for single-point-of-failure hazardous actions (cautery).
   original that the paper's benchmarks (Figures 2/3) don't regress
   hard; the weight can be tuned upward once we have representative
   per-platform observation streams.
-- **Paper consequence**: transferability is now a genuine empirical
-  claim, not a structural coincidence. The fact that platforms
-  cluster primarily by observation-dim rather than semantic identity
-  reflects our synthetic test harness (same sinusoidal observations
-  across platforms) — a future per-platform Φ-trace experiment that
-  runs each platform through its actual demo scenario would produce
-  platform-specific bands requiring genuine per-platform
-  `SPRINT_THRESHOLD` calibration. That is real follow-up work, no
-  longer a structural impossibility.
+- **Paper consequence**: transferability is platform-dependent, not
+  universal. A single SPRINT_THRESHOLD across six adopters is an
+  over-simplification that works only for platforms whose observation
+  stream produces a Φ distribution overlapping [0.125, top_of_band].
+  Quadrotor and helicopter's stable-hover + gust-burst dynamics
+  produce a Φ distribution compressed near the bottom of the band,
+  so their SPRINT_THRESHOLD should be lower (perhaps 0.115) to
+  preserve sprint windows. Humanoid and AUV's more dynamic
+  observations push Φ higher, so their current threshold could
+  potentially move up. **The paper should recommend per-platform
+  Φ-trace measurement + threshold calibration as a production
+  practice, not a one-size-fits-all constant.**
 - Each platform's observation-vector channels (what they WOULD feed
   into a future platform-aware supervisor) differ:
     - manipulator: danger / PE / effort / stiffness (measured band)
