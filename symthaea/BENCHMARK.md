@@ -3,6 +3,60 @@
 Honest measurement log. Each entry: date, commit, scorer used, result. Don't
 amend historical rows — if numbers change, append a new row and note why.
 
+## 2026-04-19 — Option 2 payoff: KG bugs fixed, grounded 5→8/13 (38%→62%)
+
+Follow-through on the Option 2 pivot (a14f706205). Used
+nix-instantiate's rejections as a bug list, fixed what it surfaced.
+
+Three concrete fixes in commit `3e16b5593d`:
+
+1. **KG service_keywords**: dropped `service`, `monitoring`, `vpn`,
+   `media server` — generic words the intent classifier wanted but
+   that the self-repair loop blindly turned into non-existent options
+   like `services.service.enable`.
+2. **NON_SERVICES_ROOTS**: added `postgres → services.postgresql` and
+   `cups → services.printing` overrides. Users still say "postgres"
+   in prompts; the KG routes it to the real option.
+3. **Intel idiom**: `vaapiVdpau` → `libva-vdpau-driver`, matching
+   the nixpkgs rename.
+
+Grounded delta:
+  Before (a14f706205): 5/13 (38%)
+  After  (3e16b5593d): **8/13 (62%)** — +24pp from 3 file edits
+
+Remaining 5 failures, categorized:
+- **docker** (isolation artifact): user-config issue, not an idiom
+  bug. Would pass in a full config with a declared user.
+- **nvidia** (policy): unfree-license refusal. User would need
+  `NIXPKGS_ALLOW_UNFREE=1` — not a generation bug.
+- **postgresql** (real bug): idiom over-specifies `listen_addresses`
+  which conflicts with `enableTCPIP` default. Fixable by dropping
+  that line or using `lib.mkForce`.
+- **intel** (stale golden): JSONL golden captured `vaapiVdpau` from
+  pre-fix harvest. Re-harvest would update it.
+- **rust dev shells** (correctly skipped): `mkShell` isn't a module.
+
+The Option 2 loop worked end-to-end:
+  (a) measure compiler pass/fail per generation
+  (b) inspect failures, extract concrete bug class
+  (c) fix at the source
+  (d) re-measure, confirm improvement
+
+No training involved; the fixes are rule-level corrections the
+compiler pointed us at. A future RL training loop using the same
+signal would make these fixes automatic — the model would learn not
+to emit `services.monitoring.enable` because every attempt gets
+negative reward.
+
+**Session total (Option 1 + Option 2, commits `3bf81ae7d1`..`3e16b5593d`)**:
+
+| Measurement | Pre-session | Post-session |
+|---|---|---|
+| Structural pass | 12/13 (inflated) | 11/13 (more-honest) |
+| Grounded pass | — | 8/13 (compiler-verified) |
+| KG keyword bugs | 4 phantom entries | 0 (cleaned) |
+| Idiom package-rename bugs | 1 (vaapiVdpau) | 0 (fixed) |
+
 ## 2026-04-19 — **Architectural pivot: grounded truth** — retrieval 12/13 struct but only 5/13 compiler-valid
 
 User directive: Option 1 (retrieval-augmented composition) + Option 2
