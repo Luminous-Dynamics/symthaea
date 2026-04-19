@@ -13,10 +13,46 @@ browsers (verified via raw `openssl s_client` handshake → `101
 Switching Protocols`, and a Python `websockets.connect` full handshake
 → OK). Cloudflared config was already correct after the `ws://` →
 `http://` fix; no `originRequest` overrides needed. `/api/token` is
-now gated: Origin whitelist (`mail.mycelix.net` +
-`mail.luminousdynamics.io` + local), per-IP 10/60s sliding-window rate
-limit, no CORS wildcard. Denials logged to the `mail-spa` journal.
-See `/etc/nixos/mail-services.nix` (gitignored deployment-only path).
+now gated: Origin-whitelist + Referer-fallback + per-IP 10/60s
+sliding-window rate limit, no CORS wildcard. Denials logged to the
+`mail-spa` journal. See `/etc/nixos/mail-services.nix` (gitignored
+deployment-only path).
+
+**Referer fallback gotcha.** First deploy was Origin-only. Browsers
+don't send `Origin` on *same-origin* GETs (fetch API default), so
+legitimate WASM token requests from `mail.mycelix.net/` got 403. Fix:
+accept if EITHER Origin is in the whitelist OR Referer starts with a
+whitelisted host. Verified via chromium headless: WASM now logs
+`[Mail] Auth token: 64 bytes` and `[Mail] Connecting to wss://... (token=true)`.
+
+**Known remaining gap (beyond step 1–2 scope).** With the token now
+delivered, the WASM successfully opens the wss and then calls
+`BrowserWsTransport::connect` which sends an `authenticate` request
+followed by `app_info`. The page's console never reaches `[Mail]
+Connected to conductor!` — the await hangs. The conductor has
+`mycelix_mail` installed+enabled with both `main` and `identity`
+cells provisioned, and the wss handshake completes (HTTP 101
+verified). The hang is post-101, somewhere in the
+authenticate/app_info round-trip — either the Holochain 0.6 wire
+format the client sends doesn't match what the 0.6 conductor expects,
+or the response is being routed to the wrong request promise in
+`BrowserWsTransport`. Diagnostic path for a future session:
+
+1. Instrument `BrowserWsTransport::send_request` to `console.log` the
+   outbound msgpack bytes (first 64) and the raw response bytes when
+   they arrive. Re-build + deploy + capture console.
+2. Compare against a known-good Holochain 0.6 client capture (Praxis
+   uses the same transport and is live — capture its wss from
+   `praxis.mycelix.net` and diff the authenticate envelope shape).
+3. If the formats match, the bug is in the conductor; check
+   `journalctl -u mail-conductor` for `authenticate` traces at
+   `RUST_LOG=holochain::conductor::interface::websocket=trace`.
+
+Until that's unblocked, remote visitors still see "Connecting to the
+Holochain network..." indefinitely. Option 3 (HTTP API scaffold
+landed in the same session) is an alternative path that sidesteps
+the wss auth dance entirely — clients would POST to
+`/api/zome/{zome}/{fn}` instead of opening wss.
 
 ## Three architectures, honest tradeoffs
 
