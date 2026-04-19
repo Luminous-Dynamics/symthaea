@@ -57,6 +57,7 @@ cargo login <token>   # Already configured in ~/.cargo/credentials.toml
 | 8124 | Portal UI | portal.mycelix.net |
 | 8129 | Craft UI | craft.mycelix.net |
 | 8130 | Prism (Epistemic Browser) | prism.mycelix.net |
+| 8134 | Xenia Admin (Mycelix Sovereign) | admin.sovereign.mycelix.net |
 | **82XX/83XX** | **Holochain Conductors** (admin/app) | |
 | 8400-8409 | Dev/test (ad-hoc) | — |
 
