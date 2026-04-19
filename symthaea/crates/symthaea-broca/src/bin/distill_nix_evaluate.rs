@@ -60,6 +60,11 @@ struct EvalRow {
     generated: String,
     /// Byte length of generation — simple sanity signal.
     generated_bytes: usize,
+    /// Sample index when `--samples N` > 1 is used. 0 for the default
+    /// single-sample run. Downstream picker (nix_best_of_n) filters by
+    /// sample_id to pick the best per prompt.
+    #[serde(default)]
+    sample_id: usize,
 }
 
 fn parse_path(flag: &str, default: PathBuf) -> PathBuf {
@@ -70,6 +75,18 @@ fn parse_path(flag: &str, default: PathBuf) -> PathBuf {
         }
     }
     default
+}
+
+fn parse_samples() -> usize {
+    let args: Vec<String> = std::env::args().collect();
+    for w in args.windows(2) {
+        if w[0] == "--samples" {
+            if let Ok(n) = w[1].parse::<usize>() {
+                return n.max(1);
+            }
+        }
+    }
+    1
 }
 
 fn home_path() -> PathBuf {
@@ -166,24 +183,47 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let file = std::fs::File::create(&out_path)?;
     let mut writer = std::io::BufWriter::new(file);
 
+    let samples = parse_samples();
+    if samples > 1 {
+        println!("Generating {samples} samples per prompt (for best-of-N selection).");
+    }
     for (i, pair) in holdouts.iter().enumerate() {
         let tc = pack_channels(&pair.channels);
-        let result = generator.generate(&tc);
-        let row = EvalRow {
-            prompt: pair.prompt.clone(),
-            intent: pair.intent.clone(),
-            golden: pair.code.clone(),
-            generated: result.text.clone(),
-            generated_bytes: result.text.len(),
-        };
-        writeln!(writer, "{}", serde_json::to_string(&row)?)?;
-        println!(
-            "  [{}/{}] {} → {} bytes",
-            i + 1,
-            holdouts.len(),
-            pair.prompt,
-            result.text.len()
-        );
+        // Generate `samples` candidates per prompt. Sampling randomness
+        // comes from the generator's internal RNG (seeded per-call when
+        // sampling_seed is set; unseeded otherwise → new sample each
+        // call). For best-of-N we WANT unseeded — re-seeding would
+        // collapse all N samples to the same output.
+        for s in 0..samples {
+            let result = generator.generate(&tc);
+            let row = EvalRow {
+                prompt: pair.prompt.clone(),
+                intent: pair.intent.clone(),
+                golden: pair.code.clone(),
+                generated: result.text.clone(),
+                generated_bytes: result.text.len(),
+                sample_id: s,
+            };
+            writeln!(writer, "{}", serde_json::to_string(&row)?)?;
+            if samples <= 1 {
+                println!(
+                    "  [{}/{}] {} → {} bytes",
+                    i + 1,
+                    holdouts.len(),
+                    pair.prompt,
+                    result.text.len()
+                );
+            }
+        }
+        if samples > 1 {
+            println!(
+                "  [{}/{}] {} → {} samples generated",
+                i + 1,
+                holdouts.len(),
+                pair.prompt,
+                samples
+            );
+        }
     }
     writer.flush()?;
 
