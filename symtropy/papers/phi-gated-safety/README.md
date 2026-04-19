@@ -34,8 +34,9 @@ envelope, and shows the result replicates to a second platform
   argument.
 - `figures/figure2_sp_sweep.png` — Headline S_p sweep. ISO SSM cycles
   collapse 7 → 0 across S_p ∈ {0.5, 1.0, 2.0, 2.25, 2.5, 3.0} m;
-  Φ-SprintFloor holds ~1.3 cyc/100s. Crossover at S_p = 2.5 m at
-  **+178.6 %** (N=30, 95 % CI wide at crossover).
+  Φ-SprintFloor holds ~0.8 cyc/100s. Crossover at S_p = 2.5 m at
+  **+71.4 %** (N=30, 95 % CI [+15.4, +127.4]) under post-FEP-wiring
+  code. Pre-wiring version claimed +178.6 %; see §9.2.
 - `figures/figure3_flight_benchmark.png` — Second-platform replication
   on the quadrotor. TierGate 0.180 ± 0.078 N (20.8 % red-frames);
   SprintFloor 0.275 ± 0.040 N (0 % red-frames). Paired advantage
@@ -117,15 +118,19 @@ any of these against `main` with `git cat-file -e <sha>^{commit}`:
 | `1a85fce8c8` | Humanoid `EmbodimentBridge` — closes 10-for-10 coverage      |
 | `babb112e9e` | `flight_benchmark` harness — paired TierGate vs SprintFloor  |
 | `c62d12c048` | Figure 3 — N=30 second-platform replication                  |
+| `996750d12b` | FEP wiring into `RoboticAgent::tick`'s `ConsciousnessInputs` |
+| `9a18244dc5` | SPRINT_THRESHOLD recalibration 0.135 → 0.125 + §8 rewrite    |
+| `2f889c2d37` | Figure 1 re-rendered under post-wiring code + §9.2 update     |
+| (pending)    | Figure 2 re-rendered under post-wiring code (this commit)    |
 
 ## The claim, in one sentence
 
 Φ-gated motor authority implemented as `if Φ > sprint { 1.0 } else { floor }`
 beats binary ISO/TS 15066 SSM under epistemic uncertainty about the
 human-motion envelope, and the result transfers from a 7-DOF manipulator
-to a 4-DOF quadrotor with no change to the supervisor code — by ~179 %
-at the S_p = 2.5 m crossover (manipulator) and by ~71 % gating-shape
-advantage (quadrotor).
+to a 4-DOF quadrotor with no change to the supervisor code — by +71 %
+at the S_p = 2.5 m crossover on each platform (manipulator N=30, CI
+[+15.4, +127.4]; quadrotor N=30, CI [+54.1, +88.6]).
 
 ## What this paper is NOT claiming
 

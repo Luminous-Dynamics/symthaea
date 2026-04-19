@@ -53,12 +53,12 @@ empirical Φ lives in [0.099, 0.145] — never reaching the hardcoded 0.6
 Green cutoff; (ii) the minimal sufficient mapping is a sprint threshold
 matched to the empirical band plus a crawl-rate floor, implementable
 as `if signal > sprint { 1.0 } else { floor }`; (iii) this mapping
-loses to SSM at S_p ≈ 1 m by 81.4 % but **wins by +178.6 %** at
-S_p = 2.5 m (N=30) and holds throughput where SSM collapses to zero
-at S_p ≥ 3 m. The gating-shape advantage replicates on a quadrotor
-(+71.4 %, N=30, Figure 3). We frame the method as an ISO 21448 /
-SOTIF triggering-condition monitor, not a replacement for certified
-envelopes.
+loses to SSM at S_p ≈ 1 m by 88.6 % but **wins by +71.4 %** at
+S_p = 2.5 m (N=30, 95 % CI [+15.4, +127.4]) and holds throughput
+where SSM collapses to zero at S_p ≥ 3 m. The gating-shape advantage
+replicates at +71.4 % (N=30, CI [+54.1, +88.6]) on a quadrotor
+(Figure 3). We frame the method as an ISO 21448 / SOTIF
+triggering-condition monitor, not a replacement for certified envelopes.
 
 _(Word count: ~150. IWAI cap: 150 — re-verify exact count at draft-to-
 submission step; word counters handle `Φ` and `S_p` differently.)_
@@ -79,9 +79,9 @@ a *sprint threshold* matched to the empirical Φ band plus a
 *crawl-rate floor* above the IK convergence limit — implemented in
 two lines as `if Φ > sprint { 1.0 } else { floor }`, **(iii)** this
 mapping loses throughput to ISO SSM in the standard cobot regime
-(S_p ≈ 1 m) by 81.4 % but **wins by +178.6 %** at S_p = 2.5 m and
-continues producing cycles where ISO catastrophically fails (0 cyc/100 s
-at S_p ≥ 3 m). We frame the method as an ISO 21448 / SOTIF
+(S_p ≈ 1 m) by 88.6 % but **wins by +71.4 %** at S_p = 2.5 m
+(95 % CI [+15.4, +127.4], N=30) and continues producing cycles where
+ISO catastrophically fails (0 cyc/100 s at S_p ≥ 3 m). We frame the method as an ISO 21448 / SOTIF
 *triggering-condition monitor*, not a replacement for certified
 hardware envelopes, and note the dual-channel safety composition
 required for single-point-of-failure hazardous actions (cautery).
@@ -183,25 +183,40 @@ required for single-point-of-failure hazardous actions (cautery).
   from "uncertain" would plug in.
 
 ### §6. The S_p sweep (headline result)
-- Same harness, sweep ISO's protective distance (ISO: N=30, Φ: N=10):
+- Same harness, sweep ISO's protective distance (ISO: N=30, Φ: N=10).
+  **Post-FEP-wiring numbers** (re-run via
+  `sp_sweep_n30_post_wiring.sh` — raw logs in
+  `data/sp_sweep_n30_post_wiring/`):
 
-    | S_p   | ISO cyc     | Φ cyc        | Φ vs ISO        |
-    |-------|-------------|--------------|-----------------|
-    | 0.5 m | 7.00 ± 0.00 | 1.30 ± 0.67  |  -81.4 %        |
-    | 1.0 m | 7.00 ± 0.00 | 1.30 ± 0.67  |  -81.4 %        |
-    | 2.0 m | 3.30 ± 3.10 | 1.30 ± 0.67  |  -60.6 %        |
-    | 2.25m | 1.70 ± 2.28 | 1.30 ± 0.67  |  -23.5 %        |
-    | 2.5 m | 0.47 ± 0.94 | 1.30 ± 0.67  | **+178.6 %**    |
-    | 3.0 m | 0.00 ± 0.00 | 1.30 ± 0.67  | catastrophic    |
+    | S_p   | ISO cyc     | Φ cyc        | Φ vs ISO     | 95 % CI         |
+    |-------|-------------|--------------|--------------|-----------------|
+    | 0.5 m | 7.00 ± 0.00 | 0.80 ± 0.42  |  -88.6 %     | [-92.3, -84.8]  |
+    | 1.0 m | 7.00 ± 0.00 | 0.80 ± 0.42  |  -88.6 %     | [-92.3, -84.8]  |
+    | 2.0 m | 3.30 ± 3.10 | 0.80 ± 0.42  |  -75.8 %     | [-83.7, -67.8]  |
+    | 2.25m | 1.70 ± 2.28 | 0.80 ± 0.42  |  -52.9 %     | [-68.3, -37.6]  |
+    | 2.5 m | 0.47 ± 0.94 | 0.80 ± 0.42  | **+71.4 %**  | [+15.4, +127.4] |
+    | 3.0 m | 0.00 ± 0.00 | 0.80 ± 0.42  | catastrophic | —               |
 
 - ISO is bimodal: full-throughput or dead-arm, depending on whether
-  S_p fits within the human motion envelope. Φ is flat at ~1.3 cyc/100 s
-  across the entire sweep.
+  S_p fits within the human motion envelope. Φ-SprintFloor is flat at
+  ~0.8 cyc/100 s across the entire sweep — robust to S_p changes by
+  construction (the supervisor doesn't know about S_p).
 - **Reframing**: "Φ-gated safety provides graceful degradation under
   epistemic uncertainty about the human-motion envelope." Real-world
   consequence: regulators mandating conservative S_p under epistemic
   uncertainty will drive throughput to zero with ISO; Φ-gated policies
-  survive.
+  survive — the crossover at S_p = 2.5 m (+71.4 %, 95 % CI
+  [+15.4, +127.4]) is the empirical anchor.
+- **Pre-wiring numbers for comparison** (original paper measurements,
+  commit ≤`6517226491`): Φ-SprintFloor was 1.30 ± 0.67 cyc/100s; the
+  crossover at S_p = 2.5 m was +178.6 %. The FEP-wiring commit
+  `996750d12b` shrank the Φ mean (1.30 → 0.80) because more FEP-
+  modulated trials now fall short of the recalibrated 0.125 threshold.
+  The headline survives — still a +71 % crossover — but the effect
+  size is ~40 % of its former magnitude. Full pre-wiring table
+  preserved at `data/sp_sweep_results_pre_wiring.csv` as a historical
+  reference for §9.2. **The paper's claim-of-record should use the
+  post-wiring +71.4 % because that's what current code produces.**
 
 ### §7. Dual-channel hazard composition (surgical cautery case)
 - Φ alone is single-channel → not ISO 13849 compliant for hazardous
@@ -327,32 +342,42 @@ recognize that framing as rationalizing a bug.
 SPRINT_THRESHOLD recalibrated 0.135 → 0.125 (commit `9a18244dc5`) to
 preserve the same relative position in the band.
 
-**What spot-check re-running §4 showed** (N=5 for sanity, not a paper
-number): Adaptive vs ISO SSM advantage remains negative at -82.9 %
-(was -75.7 % at N=30), direction unchanged. Φ-SprintFloor under
-post-wiring code is mean 1.0 cycles/100s, std 1.37 (was std 0.0).
-The "never dead-arms" story weakens — some trials now produce 0
-sprints because FEP-modulated Φ drops below even 0.125 on some
-trial seeds. The net advantage direction at S_p = 2.5 m is expected
-to still favor SprintFloor, but the tight +178.6 % number will
-likely shift (direction uncertain pending a full N=30 re-run,
-~60 min wall-clock).
+**§4 spot-check** (N=5, not a paper number): Adaptive vs ISO SSM
+advantage remains negative at -82.9 % (was -75.7 % at N=30 pre-
+wiring), direction unchanged.
 
-**What has NOT been re-run**: the full §6 S_p sweep (compute-heavy);
-the §4 5-variant Recalibrated-vs-SprintFloor equivalence (the paper's
-"matches to three decimal places" claim is likely no longer tight —
-post-wiring, Recalibrated's Green boundary at 0.135 almost never
-fires, so the two variants diverge).
+**§6 full re-run (N=30) — DONE** (data in
+`data/sp_sweep_n30_post_wiring/`, figure regenerated):
 
-**Honest reading**: the paper's numbers in Figures 1/2 and §4/§5 are
-historical measurements under the pre-FEP-wiring supervisor. The
-current supervisor is genuinely platform-aware at the code level but
-the paper has not been re-measured end-to-end against it. For
-submission, either (a) re-run all benchmarks under current code and
-update every figure, or (b) explicitly scope the paper to "Phase 1:
-platform-agnostic supervisor" and frame the FEP-wiring result as
-"Phase 2: future work, shown here as code evidence that the
-observation channel is now live."
+  S_p = 0.5 m :  -88.6 %  (was -81.4 %)
+  S_p = 1.0 m :  -88.6 %  (was -81.4 %)
+  S_p = 2.0 m :  -75.8 %  (was -60.6 %)
+  S_p = 2.25 m:  -52.9 %  (was -23.5 %)
+  S_p = 2.5 m :  **+71.4 %** 95 % CI [+15.4, +127.4]  (was +178.6 %)
+  S_p = 3.0 m :  ISO catastrophic (0 cyc), Φ alive (0.80 cyc)
+
+The crossover **survived** — still positive, still at S_p = 2.5 m,
+still dramatic at S_p = 3.0 m. The effect SIZE is ~40 % of its former
+magnitude because FEP-modulated Φ drops below the 0.125 threshold on
+some trial seeds (std of Φ-SprintFloor went from 0.0 → 0.42). The
+claim "Φ-SprintFloor never dead-arms" is also weaker post-wiring
+because some trials do produce 0 sprints.
+
+**What has still NOT been re-run**: the §4 5-variant comparison
+(`SprintFloor vs Recalibrated` equivalence). Post-wiring,
+Recalibrated's Green boundary is still at 0.135 while the new band
+tops out at ~0.135, so Recalibrated almost never commits to gain=1.0
+— the "matches to three decimal places" claim from the paper's §5 is
+likely broken. Re-running would likely show Recalibrated collapsing
+toward the old Default-tiers behavior while SprintFloor remains
+healthy. ~60 min compute, reserved for a follow-up.
+
+**Paper state of record**: Figures 1, 2, 3, 4 are all now current-
+code. The abstract and §6 carry the post-wiring +71.4 % number with
+CI. The only remaining inconsistency is §5's "SprintFloor matches
+Recalibrated" claim, which is now scope-for-revision. Either run the
+5-variant comparison to confirm/deny, or rewrite §5 to acknowledge
+the equivalence was a pre-wiring artifact.
 
 #### §9.1 Hardware-validation plan (§9-inset, for ~¾-page)
 

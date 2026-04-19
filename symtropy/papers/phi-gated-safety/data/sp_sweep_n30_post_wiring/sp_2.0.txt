@@ -1,0 +1,94 @@
+╔══════════════════════════════════════════════════════════════╗
+║  Manipulator Monte Carlo Benchmark                           ║
+║  Adaptive Safety Gradient vs ISO/TS 15066 SSM                ║
+║   30 paired trials × 100 s simulated,  ISO S_p = 2.00 m       ║
+╚══════════════════════════════════════════════════════════════╝
+
+  trial   1: period= 7.45s closest=0.26m farthest=2.96m — adaptive= 1 iso= 7 adv= -85.7%
+  trial   2: period= 4.21s closest=0.54m farthest=1.66m — adaptive= 3 iso= 0 adv=   NaN%
+  trial   3: period=11.77s closest=0.28m farthest=1.99m — adaptive= 0 iso= 0 adv=   NaN%
+  trial   4: period= 4.85s closest=0.35m farthest=1.76m — adaptive= 1 iso= 0 adv=   NaN%
+  trial   5: period= 6.62s closest=0.30m farthest=2.66m — adaptive= 1 iso= 6 adv= -83.3%
+  trial   6: period= 5.39s closest=0.48m farthest=1.87m — adaptive= 1 iso= 0 adv=   NaN%
+  trial   7: period=10.17s closest=0.32m farthest=2.93m — adaptive= 3 iso= 7 adv= -57.1%
+  trial   8: period= 5.97s closest=0.54m farthest=2.09m — adaptive= 4 iso= 0 adv=   NaN%
+  trial   9: period=11.62s closest=0.37m farthest=2.64m — adaptive= 3 iso= 7 adv= -57.1%
+  trial  10: period= 7.17s closest=0.48m farthest=2.29m — adaptive= 2 iso= 2 adv=  +0.0%
+  trial  11: period=10.09s closest=0.41m farthest=2.33m — adaptive= 2 iso= 2 adv=  +0.0%
+  trial  12: period= 8.19s closest=0.42m farthest=2.56m — adaptive= 0 iso= 6 adv=-100.0%
+  trial  13: period= 8.44s closest=0.46m farthest=2.28m — adaptive= 0 iso= 2 adv=-100.0%
+  trial  14: period= 9.67s closest=0.41m farthest=2.23m — adaptive= 1 iso= 1 adv=  +0.0%
+  trial  15: period= 8.15s closest=0.40m farthest=2.65m — adaptive= 1 iso= 6 adv= -83.3%
+  trial  16: period= 7.91s closest=0.48m farthest=1.81m — adaptive= 2 iso= 0 adv=   NaN%
+  trial  17: period=10.12s closest=0.31m farthest=2.77m — adaptive= 2 iso= 7 adv= -71.4%
+  trial  18: period= 5.64s closest=0.50m farthest=2.78m — adaptive= 4 iso= 7 adv= -42.9%
+  trial  19: period=10.75s closest=0.51m farthest=2.49m — adaptive= 3 iso= 5 adv= -40.0%
+  trial  20: period=10.84s closest=0.45m farthest=2.89m — adaptive= 0 iso= 7 adv=-100.0%
+  trial  21: period= 9.28s closest=0.53m farthest=1.99m — adaptive= 3 iso= 0 adv=   NaN%
+  trial  22: period=11.44s closest=0.35m farthest=2.80m — adaptive= 3 iso= 7 adv= -57.1%
+  trial  23: period= 6.63s closest=0.51m farthest=2.36m — adaptive= 3 iso= 3 adv=  +0.0%
+  trial  24: period=10.92s closest=0.42m farthest=2.12m — adaptive= 2 iso= 0 adv=   NaN%
+  trial  25: period= 8.61s closest=0.37m farthest=1.88m — adaptive= 2 iso= 0 adv=   NaN%
+  trial  26: period= 7.30s closest=0.33m farthest=2.45m — adaptive= 1 iso= 3 adv= -66.7%
+  trial  27: period= 6.03s closest=0.44m farthest=2.90m — adaptive= 1 iso= 7 adv= -85.7%
+  trial  28: period= 9.09s closest=0.53m farthest=2.91m — adaptive= 1 iso= 7 adv= -85.7%
+  trial  29: period=11.45s closest=0.53m farthest=1.83m — adaptive= 1 iso= 0 adv=   NaN%
+  trial  30: period=11.54s closest=0.32m farthest=1.57m — adaptive= 0 iso= 0 adv=   NaN%
+
+━━━ Summary (30 trials, 343.8s wall time) ━━━
+  Adaptive cycles:   mean =   1.70   std =  1.21
+  ISO/SSM cycles:    mean =   3.30   std =  3.10
+
+  THROUGHPUT ADVANTAGE (Adaptive over ISO/TS 15066 SSM):
+    mean  =  -58.7 %
+    sd    =  35.85 %   (paired sample, N = 19)
+    95 % CI ≈ [ -74.9 %,  -42.6 %]  (normal approx, z=1.96)
+
+━━━ CSV (per-trial) ━━━
+trial,approach_period_s,closest_m,farthest_m,adaptive_cycles,iso_cycles,advantage_pct
+1,7.4522,0.2579,2.9563,1,7,-85.7143
+2,4.2115,0.5413,1.6595,3,0,NaN
+3,11.7671,0.2819,1.9910,0,0,NaN
+4,4.8508,0.3482,1.7608,1,0,NaN
+5,6.6186,0.3022,2.6573,1,6,-83.3333
+6,5.3909,0.4815,1.8685,1,0,NaN
+7,10.1724,0.3237,2.9280,3,7,-57.1429
+8,5.9655,0.5356,2.0947,4,0,NaN
+9,11.6162,0.3689,2.6416,3,7,-57.1429
+10,7.1717,0.4783,2.2859,2,2,0.0000
+11,10.0883,0.4072,2.3328,2,2,0.0000
+12,8.1916,0.4166,2.5623,0,6,-100.0000
+13,8.4413,0.4625,2.2777,0,2,-100.0000
+14,9.6658,0.4055,2.2334,1,1,0.0000
+15,8.1479,0.3967,2.6473,1,6,-83.3333
+16,7.9113,0.4795,1.8070,2,0,NaN
+17,10.1190,0.3114,2.7662,2,7,-71.4286
+18,5.6376,0.5032,2.7832,4,7,-42.8571
+19,10.7532,0.5066,2.4903,3,5,-40.0000
+20,10.8439,0.4481,2.8943,0,7,-100.0000
+21,9.2817,0.5289,1.9939,3,0,NaN
+22,11.4363,0.3488,2.7978,3,7,-57.1429
+23,6.6340,0.5096,2.3635,3,3,0.0000
+24,10.9214,0.4227,2.1194,2,0,NaN
+25,8.6053,0.3739,1.8798,2,0,NaN
+26,7.3037,0.3260,2.4547,1,3,-66.6667
+27,6.0257,0.4409,2.8964,1,7,-85.7143
+28,9.0919,0.5293,2.9145,1,7,-85.7143
+29,11.4475,0.5329,1.8251,1,0,NaN
+30,11.5441,0.3150,1.5732,0,0,NaN
+
+━━━ Φ-gated sweep (10 trials × 50000 steps = 100 s sim each, thresholds = sprint-floor (gain=1.0 if Φ>0.125 else 0.3)) ━━━
+  trial   1: period= 7.45s closest=0.26m farthest=2.96m — phi_raw= 1 → 1.00 cycles/100s
+  trial   2: period= 4.21s closest=0.54m farthest=1.66m — phi_raw= 0 → 0.00 cycles/100s
+  trial   3: period=11.77s closest=0.28m farthest=1.99m — phi_raw= 1 → 1.00 cycles/100s
+  trial   4: period= 4.85s closest=0.35m farthest=1.76m — phi_raw= 0 → 0.00 cycles/100s
+  trial   5: period= 6.62s closest=0.30m farthest=2.66m — phi_raw= 1 → 1.00 cycles/100s
+  trial   6: period= 5.39s closest=0.48m farthest=1.87m — phi_raw= 1 → 1.00 cycles/100s
+  trial   7: period=10.17s closest=0.32m farthest=2.93m — phi_raw= 1 → 1.00 cycles/100s
+  trial   8: period= 5.97s closest=0.54m farthest=2.09m — phi_raw= 1 → 1.00 cycles/100s
+  trial   9: period=11.62s closest=0.37m farthest=2.64m — phi_raw= 1 → 1.00 cycles/100s
+  trial  10: period= 7.17s closest=0.48m farthest=2.29m — phi_raw= 1 → 1.00 cycles/100s
+
+  Φ-gated cycles (rate-normalized to 100 s):  mean =   0.80  std =  0.42
+  Φ vs ISO:  mean =  -75.8 %   95 % CI ≈ [ -83.7 %,  -67.8 %]
+  (Φ sweep wall time: 111.9s, 10 trials × 100s sim)

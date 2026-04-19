@@ -137,16 +137,16 @@ def render_sp_sweep():
     ax.set_xticklabels(sp_labels)
     ax.set_title(
         r"Figure 2 — ISO collapses 7→0 across $S_p$ sweep; "
-        r"$\Phi$-SprintFloor holds ~1.0 cycles/100s"
+        r"$\Phi$-SprintFloor holds ~0.8 cycles/100s (post-FEP-wiring)"
     )
     ax.legend(loc="upper right", fontsize=9)
     ax.grid(axis="y", alpha=0.3)
 
     # Annotate the crossover
-    # S_p = 2.5m: Φ (1.30) wins over ISO (0.47) — N=30
+    # S_p = 2.5m: Φ (0.80) wins over ISO (0.47) — N=30 post-FEP-wiring
     crossover_idx = sp_labels.index("2.50")
     ax.annotate(
-        "Φ wins +179 %\n(crossover)",
+        "Φ wins +71 %\n(crossover)",
         xy=(crossover_idx + width / 2, phi_means[crossover_idx]),
         xytext=(crossover_idx + 0.8, 4.0),
         fontsize=9,
