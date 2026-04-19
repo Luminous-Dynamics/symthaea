@@ -459,6 +459,32 @@ some trial seeds (std of Φ-SprintFloor went from 0.0 → 0.42). The
 claim "Φ-SprintFloor never dead-arms" is also weaker post-wiring
 because some trials do produce 0 sprints.
 
+**Flight benchmark live-Φ supplement — DONE** (data in
+`data/flight_benchmark_live_n30.csv`, example at
+`symtropy-robotics-bridge/examples/flight_benchmark_live.rs`):
+
+Figure 3's `flight_benchmark` synthesizes a sinusoidal signal in
+[0.05, 0.95] to isolate the gating-policy choice from the cognitive
+pipeline. The live-Φ variant uses `RoboticAgent::tick` on Quadrotor
+with flight-platform-aware observations (altitude / attitude /
+wind / PE) — Φ comes from the actual `MasterConsciousnessEquation`
+at the applied SPRINT_THRESHOLD = 0.110:
+
+  Tier gate    mean gain = 0.281 ± 0.002
+  Sprint-floor mean gain = 0.633 ± 0.009
+  Sprint-floor advantage = +125.8 % ± 1.9   95 % CI [+125.1, +126.5]  (N=30)
+
+The live-Φ advantage is nearly twice the synthetic-signal version's
++71.4 %, and the CI is ~25× tighter. Direction replicates cleanly;
+magnitude is larger because the platform-aware Φ distribution is
+more tightly clustered than the synthetic sinusoid, which makes
+both the TierGate's near-zero mean and the SprintFloor's ~0.65
+mean more stable across trials.
+
+This doesn't replace Figure 3 (the synthetic version deliberately
+tests gating-shape independently of cognition), but it's the
+on-manifold companion: same comparison, real Φ.
+
 **§4 5-variant comparison — DONE** (data in
 `data/five_variant_post_wiring/`, §4/§5 rewritten):
 
