@@ -25,18 +25,23 @@ use crate::visualization;
 /// PE / effort / stiffness), so the empirical band may drift —
 /// recalibrate with a `MANIP_BENCH_PHI_TRACE`-style capture under a
 /// representative Dryden gust schedule.
-// 2026-04-19 per-platform recalibration to 0.110.
+// 2026-04-19 per-platform recalibration to 0.100.
 //
 // History:
 //   - 0.135 (original, inherited from manipulator band)
 //   - 0.125 (post-FEP-wiring recalibration, commit `9a18244dc5`)
-//   - 0.110 (this line): platform-aware phi_trace (commit `e32de6270f`)
-//     showed the helicopter's Φ distribution under representative
-//     dynamics (hover + Dryden wind) has p50 ≈ 0.110, p95 ≈ 0.119. At
-//     threshold 0.125 the fraction of sprint frames was 0 %. Lowering
-//     to 0.110 restores ~50 % sprint windows. See
-//     `data/phi_trace_multi_platform_aware/helicopter.csv`.
-const SPRINT_THRESHOLD: f64 = 0.110;
+//   - 0.110 (commit `ca5c5e1020`, based on hand-crafted phi_trace
+//     generator which estimated helicopter p50 ≈ 0.110)
+//   - 0.100 (this line): sim-driven phi_trace (`phi_trace_sim_
+//     driven_helicopter` in commit `7b590232d8`) measured the real
+//     Φ distribution under `SimpleHelicopterSimulator` + hover +
+//     Dryden-ish wind. Actual p50 = 0.100, p95 = 0.109. At
+//     threshold 0.110 only 3 % of frames are sprint-eligible;
+//     lowering to 0.100 restores ~50 % sprint windows matching the
+//     design intent. The hand-crafted generator over-estimated
+//     helicopter's Φ by ~0.010. See
+//     `data/phi_trace_sim_driven_helicopter.csv`.
+const SPRINT_THRESHOLD: f64 = 0.100;
 const FLOOR_GAIN: f64 = 0.3;
 
 pub struct HelicopterDemoPlugin;

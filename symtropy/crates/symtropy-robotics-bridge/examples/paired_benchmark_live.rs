@@ -187,7 +187,7 @@ const SPECS: &[PlatformSpec] = &[
     PlatformSpec {
         name: "helicopter",
         pt: PlatformType::Helicopter,
-        sprint_threshold: 0.110,
+        sprint_threshold: 0.100, // post-sim-driven-validation correction (was 0.110)
         floor: 0.3,
     },
     PlatformSpec {
