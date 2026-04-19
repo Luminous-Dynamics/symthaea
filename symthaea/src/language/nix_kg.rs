@@ -271,8 +271,23 @@ fn bundled_defaults() -> NixKg {
 
         // Lowercased keywords that classify as Service intent. Mirrors the
         // hand-coded block in `classify_nix_intent`'s Service branch.
+        //
+        // ⚠️  Each entry here becomes `services.<entry>.enable` when the
+        // self-repair loop appends missing paths. Only include keywords
+        // whose literal string IS the real NixOS option root. Intent-
+        // classification hints that don't name a service (e.g. "service",
+        // "monitoring", "vpn", "media server") must NOT be in this list —
+        // they'd poison repair by inventing options like
+        // `services.service.enable` or `services.monitoring.enable` that
+        // nix-instantiate rejects. Grounded-compiler test 2026-04-19
+        // surfaced this bug: 6/13 holdouts struct-passed but compiler-
+        // rejected because of these phantom paths.
+        //
+        // Keywords that need a non-trivial mapping (e.g. "cups" →
+        // `services.printing`, "postgres" → `services.postgresql`)
+        // belong in `NON_SERVICES_ROOTS` in nix_repair.rs, not here.
         service_keywords: [
-            "service",
+            "postgresql",
             "postgres",
             "nginx",
             "redis",
@@ -293,9 +308,6 @@ fn bundled_defaults() -> NixKg {
             "printing",
             "systemd-resolved",
             "resolved",
-            "monitoring",
-            "vpn",
-            "media server",
         ]
         .into_iter()
         .map(String::from)

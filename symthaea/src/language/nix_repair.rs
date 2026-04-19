@@ -266,6 +266,11 @@ fn default_value_for(path: &str) -> String {
 /// Overrides for service keywords whose option-path doesn't follow the
 /// `services.<keyword>` convention. Small hand-curated table — keep
 /// here rather than bloating the KG schema with a new field.
+///
+/// Every entry is a bugfix for a keyword the intent-classifier knows
+/// about but whose literal string isn't the real NixOS option path.
+/// Grounded-compiler test (2026-04-19) surfaced the need to handle
+/// `postgres → postgresql`, `cups → printing`.
 const NON_SERVICES_ROOTS: &[(&str, &str)] = &[
     ("docker", "virtualisation.docker"),
     ("podman", "virtualisation.podman"),
@@ -273,6 +278,9 @@ const NON_SERVICES_ROOTS: &[(&str, &str)] = &[
     ("libvirtd", "virtualisation.libvirtd"),
     ("lxd", "virtualisation.lxd"),
     ("waydroid", "virtualisation.waydroid"),
+    // Bugfixes surfaced by nix_rag_grounded on 2026-04-19:
+    ("postgres", "services.postgresql"),
+    ("cups", "services.printing"),
 ];
 
 /// Derive the set of attrpaths we expect a well-formed generation
@@ -725,18 +733,32 @@ mod tests {
     fn self_repair_closes_intel_gap_without_golden() {
         // The big one: no golden, no human curation — just the prompt
         // and intent-derived expected paths. Structural repair should
-        // still close the Intel GPU gap.
+        // close the Intel GPU gap if the generator leaves one.
+        //
+        // Note: the idiom library has since been extended to emit
+        // `hardware.graphics.enable = true` directly for this prompt,
+        // so iterations == 0 is now the happy path. The test still
+        // validates the *end state* — missing_required is empty — and
+        // tolerates the generator-got-it-right case.
         let result = generate_nix_with_self_repair("configure intel hardware acceleration", 5);
         assert!(
             result.verdict.missing_required.is_empty(),
             "self-repair should close intel gap; got missing: {:?}",
             result.verdict.missing_required
         );
-        assert_eq!(result.iterations, 1, "single append iter");
-        assert!(result.steps.iter().any(|s| matches!(
-            s,
-            RepairStep::AppendedPath { path, .. } if path == "hardware.graphics.enable"
-        )));
+        assert!(
+            result.iterations <= 1,
+            "should need at most one append iter (got {})",
+            result.iterations
+        );
+        // If repair DID run, it must have appended the right path.
+        // If it didn't run (iterations==0), the generator already had it.
+        if result.iterations == 1 {
+            assert!(result.steps.iter().any(|s| matches!(
+                s,
+                RepairStep::AppendedPath { path, .. } if path == "hardware.graphics.enable"
+            )));
+        }
     }
 
     #[test]
@@ -769,10 +791,12 @@ mod tests {
 
     #[test]
     fn loop_closes_intel_gpu_gap_via_append() {
-        // The "configure intel hardware acceleration" prompt has
-        // generated `{ # hardware config }` all session. Golden
-        // demands `hardware.graphics.enable = true`. Repair loop
-        // should close the gap via the append branch.
+        // The "configure intel hardware acceleration" prompt historically
+        // emitted `{ # hardware config }` and relied on repair to append
+        // `hardware.graphics.enable`. The idiom library has since been
+        // extended to emit that path directly, so iterations == 0 is
+        // now the happy path. The test still validates the *outcome* —
+        // structural verdict must pass — and tolerates either route.
         let prompt = "configure intel hardware acceleration";
         let golden = "{ pkgs, ... }:\n{\n  hardware.graphics.enable = true;\n}\n";
         let result = generate_nix_with_scorer_repair(prompt, golden, 5);
@@ -782,11 +806,18 @@ mod tests {
             result.verdict,
             result.iterations
         );
-        assert_eq!(result.iterations, 1, "single append iteration suffices");
-        assert!(result.steps.iter().any(|s| matches!(
-            s,
-            RepairStep::AppendedPath { path, .. } if path == "hardware.graphics.enable"
-        )));
+        assert!(
+            result.iterations <= 1,
+            "at most one append iteration (got {})",
+            result.iterations
+        );
+        // If repair ran, it must have emitted the right path.
+        if result.iterations == 1 {
+            assert!(result.steps.iter().any(|s| matches!(
+                s,
+                RepairStep::AppendedPath { path, .. } if path == "hardware.graphics.enable"
+            )));
+        }
     }
 
     #[test]
