@@ -493,13 +493,29 @@ controller) but the empirical check is reasonable reviewer work.
 The other five platforms' controllers have not been trained in
 this paper; the same path extends to each.
 
-**Hand-crafted observation generators.** Figure 4 and Figure 5
-use per-platform observation streams written as Rust closures
-inside `phi_trace.rs` and `paired_benchmark_live.rs`. These
+**Hand-crafted observation generators, partially validated.**
+Figures 4 and 5 use per-platform observation streams written as Rust
+closures inside `phi_trace.rs` and `paired_benchmark_live.rs`. These
 approximate each platform's demo scenario but are not the actual
-physics-simulated observations. Hooking into each demo's full Bevy
-simulator would produce on-manifold observations; the hand-crafted
-streams are a scope-bounded compromise.
+physics-simulated observations. We ran a direct validation for flight
+(`phi_trace_sim_driven.rs`) that uses `SimplePhysicsSimulator` +
+`pd_baseline` controller + real wind-gust-driven observations, then
+compared distributions:
+
+  hand-crafted quadrotor: min=0.094 max=0.120 mean=0.109 p50=0.110
+  sim-driven  quadrotor:  min=0.096 max=0.121 mean=0.107 p50=0.106
+
+The two match to within **0.005 on p50**. Our hand-crafted generator
+is a reasonable approximation of the real dynamics. The applied
+SPRINT_THRESHOLD = 0.110 produces 34 % sprint under sim-driven
+observations (vs the 50 % the hand-crafted calibration predicted);
+the small shift suggests 0.106 would be a better per-platform
+calibration for flight going forward. The other five platforms'
+hand-crafted generators are not yet validated against sim-driven
+ground truth — direct validation for each is a natural follow-up
+(same template as `phi_trace_sim_driven.rs`, ~30-45 min per
+platform given the platform simulators already exist as
+standalone-callable APIs).
 
 **Crossover CI width.** The S_p = 2.5 m crossover advantage of
 +71.4 % has a 95 % CI of [+15.4, +127.4] — the lower bound is

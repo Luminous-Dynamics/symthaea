@@ -12,3 +12,9 @@ symtropy-consciousness-physics = { path = "../symtropy-consciousness-physics" }
 symthaea-fep = { path = "../../../symthaea/crates/symthaea-fep" }
 symthaea-consciousness-equation = { path = "../../../symthaea/crates/symthaea-consciousness-equation" }
 nalgebra = "0.34"
+
+# Used only by the `phi_trace_sim_driven` example for platform-truth
+# observation streams. Example-only; not part of the library API.
+[dev-dependencies]
+symthaea-core = { path = "../../../symthaea/symthaea-core" }
+symthaea-flight = { path = "../../../symthaea/crates/symthaea-flight" }
