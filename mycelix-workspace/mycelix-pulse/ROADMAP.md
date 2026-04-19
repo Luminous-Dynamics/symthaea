@@ -249,14 +249,92 @@ Features that require Symthaea-spore WASM kernel running in-browser.
 
 ---
 
+## On-Device Intelligence: "Symthaea Edge"
+
+**Principle:** no Big Tech model weights ship with Mycelix. The on-device
+intelligence layer — Athena — runs on Symthaea's own cognitive
+architecture (HDC binding + CfC dynamics + Broca decoder), not a
+quantized Gemma/Llama/Mistral drop-in. "Sovereign suite" means
+sovereign all the way down, including the weights.
+
+**Surface area for Pulse v0.x:** calendar NER (Quick Add extraction
+from natural-language utterances), recipient auto-complete, intent
+classification for inbox routing. None of this needs a generalized
+LLM — it needs a fast, rigid entity extractor with a closed
+output grammar.
+
+**Bundle target:**
+- ~50MB total on-disk footprint (checkpoint + kg + code)
+- ~80-120MB RAM resident (mmap'd checkpoint, lazy CfC init)
+- <50ms cold start (measured, not claimed)
+- Inference on `tokio::task::spawn_blocking`, UI stays 60fps
+
+**Architecture sketch** (`crates/symthaea-edge-calendar/`, not yet built):
+
+```
+symthaea-edge-calendar/
+├── src/
+│   ├── lib.rs              # pub: extract_intent(text) -> CalendarEvent
+│   ├── kg/
+│   │   ├── intents.bin     # ~200 retrieval blocks, rkyv-serialized
+│   │   └── contacts.rs     # user-local contacts index, loaded at boot
+│   ├── broca_lite.rs       # 4-channel encoder + 4,096D HDC binding
+│   └── decode.rs           # autoregressive head → structured output
+├── checkpoints/
+│   └── broca-calendar-v1.safetensors  # ~20MB Q8 quantized
+└── tests/
+    ├── in_distribution.rs
+    └── holdout.rs          # honest generalization eval — ship-gate
+```
+
+**Parameter reduction from research-build Broca:**
+- 43-channel ThoughtEncoder → 4-channel (time, intent, attendee, title).
+  Epistemic Cube (E/N/M/H axes) dropped — irrelevant for calendar NER.
+- 16,384D HDC → 4,096D. Calendar-intent grammar is small enough.
+- Vocabulary = calendar lexicon + personal contacts only.
+
+**Ship-gate (from Nix-codegen lesson, `symthaea_coding_ai_phase1_p2_m5`):**
+Holdout evaluation ≥90% PASS on 100+ prompts the model never saw during
+training. The Apr 19 Nix work demonstrated that in-distribution wins
+(12/13 with retrieval) can collapse to 0/9 on true holdout. Apply the
+same FNV-bucket split discipline here. Do not ship the edge bundle
+without a published holdout number.
+
+**Risk to validate before committing to the architecture:**
+The Nix codegen worked in part because `nix-instantiate` gave the
+scorer compiler ground-truth. Calendar NER has no equivalent oracle
+(intent extraction is judgment, not compilation). Prototype the
+evaluation harness before locking the architecture — if a retrieval-
+only approach without compiler ground-truth doesn't generalize, the
+answer may be a different shape (e.g., small distilled transformer
+trained on Mycelix-owned NER corpus, still 100% internal weights).
+
+**Cryptographic model provenance** (the marketing flex):
+Larger optional models — if we ever add them for heavier inference —
+distribute via IPFS CIDs, pinned by the attribution cluster. Users
+can audit the cryptographic hash of the exact weights loaded on
+their device. Provenance is a DHT fact, not a "trust us" claim.
+Competitors cannot tell this story because their models live behind
+closed serving infrastructure.
+
+**Not a replacement for the research-build Symthaea.** The full
+Broca + Epistemic Cube + full HDC stack continues to live in the
+main Symthaea workspace as the sovereignty-research platform.
+Symthaea Edge is a *ship target* — a stripped, calendar-specific
+artifact derived from that platform. The research build improves;
+the edge build re-distills periodically.
+
+---
+
 ## Principles
 
-1. **Local-first** — All computation happens on the user's device. No cloud AI.
+1. **Local-first** — All computation happens on the user's device. No cloud AI. No Big Tech model weights.
 2. **Economic alignment** — Communication has cost. Attention is valued.
 3. **Trust over filters** — Humans decide trust; machines enforce it.
 4. **Sovereignty** — Your keys, your data, your rules. Revocable forever.
 5. **Emergence** — Let organization arise from communication, not the reverse.
 6. **Ecological** — Make the true cost of communication visible.
+7. **Provenance is a fact, not a claim** — Model weights, message signatures, identity — all cryptographically verifiable on-device.
 
 ---
 
