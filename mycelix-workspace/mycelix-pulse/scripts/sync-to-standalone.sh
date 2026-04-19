@@ -96,8 +96,19 @@ rsync $RSYNC_FLAGS "$MAIL_DIR/tests/" "$STANDALONE_DIR/tests/" 2>/dev/null || tr
 # Sync scripts
 rsync $RSYNC_FLAGS "$MAIL_DIR/scripts/" "$STANDALONE_DIR/scripts/"
 
-# Sync config files
-for f in Cargo.toml flake.nix README.md LICENSE .gitignore; do
+# Sync non-zome Rust crates (Phase 5A: pulse-smtp-gateway + mail-leptos-types).
+# Note the target/ exclusion in RSYNC_FLAGS keeps this fast.
+if [ -d "$MAIL_DIR/crates" ]; then
+    rsync $RSYNC_FLAGS "$MAIL_DIR/crates/" "$STANDALONE_DIR/crates/"
+fi
+
+# Sync NixOS infrastructure modules (Phase 5A gateway host config lives here).
+if [ -d "$MAIL_DIR/_infrastructure" ]; then
+    rsync $RSYNC_FLAGS "$MAIL_DIR/_infrastructure/" "$STANDALONE_DIR/_infrastructure/"
+fi
+
+# Sync config files + top-level plan/doc files
+for f in Cargo.toml flake.nix flake.lock README.md LICENSE .gitignore PULSE_READINESS_PLAN.md CHANGELOG.md; do
     if [ -f "$MAIL_DIR/$f" ]; then
         cp "$MAIL_DIR/$f" "$STANDALONE_DIR/$f"
     fi
