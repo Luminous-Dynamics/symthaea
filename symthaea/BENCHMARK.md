@@ -3,6 +3,55 @@
 Honest measurement log. Each entry: date, commit, scorer used, result. Don't
 amend historical rows — if numbers change, append a new row and note why.
 
+## 2026-04-19 — m7c epoch curve + data-scaling re-test: partial flip of "#3 rejected"
+
+Followed the tokenizer fix with the two open questions: does data-
+scaling help on the clean m7c baseline, and where does training
+plateau.
+
+**Four-cell experiment, 3 eval seeds each (12 runs total):**
+
+| Config | Seed 1 | Seed 2 | Seed 3 | Mean | σ | Full-parse |
+|---|---|---|---|---|---|---|
+| 13 train × 25 ep | 17 | 31 | 30 | **26** | 8 | 0/13 |
+| 43 train × 25 ep | 44 | 105 | 55 | **68** | 32 | 0/13 |
+| 43 train × 50 ep | 16 | 62 | 81 | **53** | 34 | 0/13 |
+| 43 train × 100 ep | 35 | 40 | 59 | **45** | 13 | 0/13 |
+
+**Finding 1 (data scaling partially flips)**: at m7c × 25 ep, going
+from 13 → 43 train pairs moves mean prefix 26 → 68 bytes (**2.6×**).
+The earlier "#3 rejected at all regimes" verdict was standing on
+the vocabulary confound — CODE_TOKENS-biased emission masked any
+data-scaling signal. With clean vocab, more pairs DO help prefix
+emission.
+
+**Finding 2 (overfitting past 25 epochs)**: 43 train × {25, 50,
+100} ep produces means {68, 53, 45} bytes. More training makes the
+model WORSE on held-out prefix quality. 43 pairs × 25 epochs looks
+like the corpus-size-matched sweet spot; beyond that the model
+memorizes training sequences at the expense of held-out
+distribution.
+
+**Finding 3 (full-parse ceiling is real)**: 0/13 across all 12
+runs, regardless of data/epochs. The architecture (Broca CfC-HDC
+controller + 43-pair corpus) can learn to emit Nix-flavored tokens
+but not Nix-grammatical sequences. No amount of data/epoch tuning
+within this scale closes the sequence-validity gap — it's an
+architectural or loss-function ceiling.
+
+**Revised priority list (post-curve)**:
+1. **#3 data scaling continued**: not rejected, just unsaturated
+   at 43 pairs. Scraping 200+ pairs is now the right move — the
+   positive prefix-scaling signal means it would likely pay off.
+   The corpus scraper infrastructure (`39abb83e76`/`aa2dfcd713`)
+   is ready; just needs public-repo sources + human review.
+2. **#2 structure-aware loss**: still the best bet for closing
+   the full-parse gap specifically (architecture/loss, not data,
+   is the ceiling there).
+3. **#1 rnix-gated decoding**: 68-byte median is workable. Could
+   ship as a generation-time tool decoupled from training
+   improvements.
+
 ## 2026-04-19 — **Tokenizer fix: for_nix_distillation**, prefix length 31→68 bytes (2.2×)
 
 Diagnostic pivot. The 25-epoch 0/13 result (entry below) prompted a
