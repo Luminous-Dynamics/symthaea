@@ -789,15 +789,25 @@ impl CognitiveLoopService {
                 match config.embodiment_platform {
                     #[cfg(feature = "humanoid")]
                     EmbodimentPlatform::Humanoid => {
+                        // Use the trait-polymorphic HumanoidEmbodiment from
+                        // symthaea-humanoid (commit `1a85fce8c8`), mirroring
+                        // the pattern for the other 9 platforms. The older
+                        // ad-hoc MotorBridge (see `super::motor_bridge`) is
+                        // retained for backwards-compat but no longer used
+                        // in production construction paths.
                         let genesis = config
                             .genesis_phrase
                             .as_ref()
-                            .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p));
-                        let bridge =
-                            super::motor_bridge::MotorBridge::new(&genesis.unwrap_or_else(|| {
+                            .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p))
+                            .unwrap_or_else(|| {
                                 symthaea_core::genesis::GenesisSeed::from_phrase("default")
-                            }));
-                        Some(Box::new(bridge) as Box<dyn super::motor_bridge::EmbodimentBridge>)
+                            });
+                        Some(
+                            Box::new(crate::humanoid::embodiment::HumanoidEmbodiment::new(
+                                &genesis,
+                            ))
+                                as Box<dyn super::motor_bridge::EmbodimentBridge>,
+                        )
                     }
                     #[cfg(feature = "helicopter")]
                     EmbodimentPlatform::Helicopter => {

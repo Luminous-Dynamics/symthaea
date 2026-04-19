@@ -44,9 +44,30 @@ pub use symthaea_core::embodiment::{
 // implement EmbodimentBridge directly in their crate.
 
 /// Bridge between cognitive loop and humanoid motor system.
-#[cfg(feature = "humanoid")]
 ///
 /// Implements [`EmbodimentBridge`] for the 21-DOF bipedal humanoid.
+///
+/// # Deprecation notice (2026-04-19)
+///
+/// **Use [`symthaea_humanoid::embodiment::HumanoidEmbodiment`]
+/// instead.** That type lives in the `symthaea-humanoid` sub-crate
+/// alongside the other nine platforms' `*Embodiment` structs, matching
+/// a uniform architectural pattern (commit `1a85fce8c8`). Production
+/// construction paths in `constructor.rs` and
+/// `accessors/system.rs` both switched to `HumanoidEmbodiment` in
+/// commit `[THIS COMMIT]`.
+///
+/// `MotorBridge` is kept for backwards-compatibility — downstream
+/// code that already references it will keep working — but it
+/// receives no new features. All future humanoid-specific additions
+/// (moral-gate paths, safe fallbacks, telemetry fields) should land
+/// in `HumanoidEmbodiment` only.
+///
+/// This struct does not carry `#[deprecated]` because in-crate tests
+/// and external downstream references still use it and the
+/// deprecation warnings would be noisy without producing any signal
+/// the next reader doesn't already have from this doc-comment.
+#[cfg(feature = "humanoid")]
 pub struct MotorBridge {
     controller: HumanoidController,
     simulator: SimpleHumanoidSimulator,

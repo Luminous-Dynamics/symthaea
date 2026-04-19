@@ -648,7 +648,10 @@ impl CognitiveLoopService {
             match platform {
                 #[cfg(feature = "humanoid")]
                 EmbodimentPlatform::Humanoid => {
-                    let bridge = super::super::motor_bridge::MotorBridge::new(&genesis);
+                    // Use trait-polymorphic HumanoidEmbodiment matching
+                    // the pattern for the other 9 platforms
+                    // (commit `1a85fce8c8`).
+                    let bridge = crate::humanoid::embodiment::HumanoidEmbodiment::new(&genesis);
                     Some(Box::new(bridge))
                 }
                 // Platform crates now implement EmbodimentBridge directly
