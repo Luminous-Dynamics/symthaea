@@ -176,7 +176,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // (`mkShell`, `mkOption`), common idioms. Each becomes a single
     // token rather than a char-by-char BPE reconstruction — major
     // quality + speed win at training time.
-    let genesis = GenesisSeed::from_phrase("symthaea-nix-distillation-m7c");
+    let genesis = GenesisSeed::from_phrase("symthaea-nix-distillation-m7d");
     // Use the Nix-only tokenizer (no Rust/Python keywords). The prior
     // tokenizer (default_minimal + add_nix_tokens) left CODE_TOKENS in
     // place, biasing emission toward Rust gibberish (`impl Into#[...`)

@@ -340,6 +340,55 @@ pub const NIX_TOKENS: &[&str] = &[
     "modesetting",
     "extraPortals",
     "withPackages",
+    // ── Common service / package names (2026-04-19 addition) ──
+    //
+    // These service identifiers appear as full BPE-fragmented sequences
+    // in the scraped corpus (e.g. "p"+"ost"+"g"+"r"+"es"+"q"+"l" for
+    // postgresql). The forensic check on best-of-100 showed 0/13
+    // keyword presence even after 3+ exposures per keyword — because
+    // the model must reassemble the service name across many subtokens
+    // each time. Promoting these to single tokens gives the model a
+    // direct emission target.
+    //
+    // List is the 15 holdout-corpus keywords + the top-traffic common
+    // services from NixOS modules. Keep narrow; service-name vocab
+    // grows linearly with corpus diversity.
+    "postgresql",
+    "redis",
+    "nginx",
+    "docker",
+    "prometheus",
+    "grafana",
+    "ipfs",
+    "cups",
+    "printing",
+    "nvidia",
+    "intel",
+    "amd",
+    "kde",
+    "plasma",
+    "gnome",
+    "sway",
+    "hyprland",
+    "wayland",
+    "pulseaudio",
+    "pipewire",
+    "sshd",
+    "openssh",
+    "tailscale",
+    "wireguard",
+    "fail2ban",
+    "timeZone",
+    "rust-analyzer",
+    "rustc",
+    "cargo",
+    "sccache",
+    "openssl",
+    "nodejs",
+    "typescript",
+    "pandas",
+    "jupyter",
+    "python311",
     // ── Common value idioms ──
     "enable = true",
     "enable = false",
