@@ -34,10 +34,19 @@ use crate::visualization;
 /// near the 95th percentile of the observed band and `FLOOR_GAIN`
 /// above whatever throttle level keeps the car tracking waypoints
 /// under nominal friction.
-// Recalibrated 2026-04-19 from 0.135 → 0.125 after commit `996750d12b`
-// (FEP wiring into ConsciousnessInputs) shifted the empirical Φ band
-// from [0.099, 0.145] to [0.088, 0.133]. Same relative band position.
-const SPRINT_THRESHOLD: f64 = 0.125;
+// 2026-04-19 per-platform recalibration to 0.101.
+//
+// History:
+//   - 0.135 (original, inherited from manipulator band [0.099, 0.145])
+//   - 0.125 (post-FEP-wiring recalibration, commit `9a18244dc5`)
+//   - 0.101 (this line): platform-aware phi_trace (commit `e32de6270f`)
+//     showed the vehicle's Φ distribution under representative
+//     dynamics (speed periodic + ice patches + slip bursts) has
+//     p50 ≈ 0.101, p95 ≈ 0.132. At threshold 0.125, 33 % of frames
+//     were sprint-eligible. Lowering to 0.101 restores ~50 % sprint
+//     windows matching the design intent. See
+//     `data/phi_trace_multi_platform_aware/vehicle.csv`.
+const SPRINT_THRESHOLD: f64 = 0.101;
 const FLOOR_GAIN: f64 = 0.3;
 
 pub struct VehicleDemoPlugin;

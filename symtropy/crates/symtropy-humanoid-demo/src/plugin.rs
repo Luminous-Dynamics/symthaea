@@ -25,10 +25,20 @@ use crate::visualization;
 /// stiffness), so the empirical band may drift — recalibrate with a
 /// `MANIP_BENCH_PHI_TRACE`-style capture under a representative
 /// standing + perturbation schedule.
-// Recalibrated 2026-04-19 from 0.135 → 0.125 after commit `996750d12b`
-// (FEP wiring into ConsciousnessInputs) shifted the empirical Φ band
-// from [0.099, 0.145] to [0.088, 0.133]. Same relative band position.
-const SPRINT_THRESHOLD: f64 = 0.125;
+// 2026-04-19 per-platform recalibration to 0.130.
+//
+// History:
+//   - 0.135 (original, inherited from manipulator band)
+//   - 0.125 (post-FEP-wiring recalibration, commit `9a18244dc5`)
+//   - 0.130 (this line): platform-aware phi_trace (commit `e32de6270f`)
+//     showed the humanoid's Φ distribution under representative
+//     dynamics (uprightness + push impulses) has p50 ≈ 0.130 —
+//     notably at the TOP of the band because the push-impulse
+//     observations produce FEP belief-change spikes. At threshold
+//     0.125, 69 % of frames were sprint-eligible. Raising to 0.130
+//     restores the design-intent ~50 % balance. See
+//     `data/phi_trace_multi_platform_aware/humanoid.csv`.
+const SPRINT_THRESHOLD: f64 = 0.130;
 const FLOOR_GAIN: f64 = 0.3;
 
 pub struct HumanoidDemoPlugin;

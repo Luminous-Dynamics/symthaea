@@ -25,10 +25,20 @@ use crate::visualization;
 /// effort / stiffness), so the band may drift — recalibrate by adding
 /// a trace-capture block to `step_auv` mirroring
 /// `MANIP_BENCH_PHI_TRACE=1` and fitting to the observed 95th-%ile.
-// Recalibrated 2026-04-19 from 0.135 → 0.125 after commit `996750d12b`
-// (FEP wiring into ConsciousnessInputs) shifted the empirical Φ band
-// from [0.099, 0.145] to [0.088, 0.133]. Same relative band position.
-const SPRINT_THRESHOLD: f64 = 0.125;
+// 2026-04-19 per-platform recalibration to 0.130.
+//
+// History:
+//   - 0.135 (original, inherited from manipulator band)
+//   - 0.125 (post-FEP-wiring recalibration, commit `9a18244dc5`)
+//   - 0.130 (this line): platform-aware phi_trace (commit `e32de6270f`)
+//     showed the AUV's Φ distribution under representative
+//     dynamics (depth descent + slow current + bursty chemical plume)
+//     has p50 ≈ 0.130 — notably at the TOP of the band because
+//     the bursty chemical plume produces high prediction-error spikes.
+//     At threshold 0.125, 80 % of frames were sprint-eligible.
+//     Raising to 0.130 restores the design-intent ~50 % balance.
+//     See `data/phi_trace_multi_platform_aware/auv.csv`.
+const SPRINT_THRESHOLD: f64 = 0.130;
 const FLOOR_GAIN: f64 = 0.3;
 
 pub struct AuvDemoPlugin;

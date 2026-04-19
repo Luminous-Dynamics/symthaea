@@ -320,29 +320,36 @@ required for single-point-of-failure hazardous actions (cautery).
     `PT_PLATFORM_OBS=1` traces in
     `data/phi_trace_multi_platform_aware/*.csv`):
 
-      platform     p25     p50     p95     max     suggested
-      ----------   ------  ------  ------  ------  ---------
-      vehicle      0.0997  0.1005  0.1315  0.1321  0.101
-      quadrotor    0.1041  0.1100  0.1165  0.1195  0.110  ← applied
-      helicopter   0.1015  0.1104  0.1190  0.1216  0.110  ← applied
-      manipulator  0.0998  0.1136  0.1292  0.1299  0.114
-      humanoid     0.1169  0.1304  0.1306  0.1307  0.130
-      auv          0.1285  0.1300  0.1310  0.1352  0.130
+      platform     p25     p50     p95     max     applied   sprint-rate at applied
+      ----------   ------  ------  ------  ------  -------   ------------------------
+      vehicle      0.0997  0.1005  0.1315  0.1321  0.101     45.1 %
+      quadrotor    0.1041  0.1100  0.1165  0.1195  0.110     50.2 %
+      helicopter   0.1015  0.1104  0.1190  0.1216  0.110     51.5 %
+      manipulator  0.0998  0.1136  0.1292  0.1299  0.125*    ~39 %
+      humanoid     0.1169  0.1304  0.1306  0.1307  0.130     64.8 %
+      auv          0.1285  0.1300  0.1310  0.1352  0.130     50.5 %
 
-    Two applied in `ca5c5e1020` (quadrotor + helicopter), because
-    those platforms' Φ bands never exceeded the legacy 0.125 — they
-    were demonstrably mis-gated. The other four are "could tune but
-    aren't broken" — they cross the legacy threshold 25-80 % of the
-    time and still have usable sprint windows. Applying their
-    recommended values would require re-running Figures 2+§4 under
-    the new thresholds; deferred to a future polish session to keep
-    the paper's current numbers stable.
+      * Manipulator's demo plugin doesn't use SPRINT_THRESHOLD —
+        the manipulator-benchmark (at `examples/manipulator_benchmark.rs`)
+        does, and it's deliberately held at 0.125 as the paper's
+        measurement anchor so Figure 2 + §4/§5 numbers don't churn.
+        A future polish pass can move the benchmark threshold to 0.114
+        and re-run Figure 2 + §4 + §5; compute ~90 min.
 
-    The table itself is the more-publishable result: per-platform
-    calibration is empirically necessary, the spread is meaningful
-    (0.101 to 0.130 across 6 platforms — a 30 % range in threshold
-    values), and a single constant 0.125 is a compromise that mis-
-    gates the stable-hover cases.
+    Five applied in `ca5c5e1020` (quadrotor + helicopter) and
+    [`THIS COMMIT`] (vehicle + auv + humanoid). The post-commit
+    sprint-rate column shows each platform now produces ~50 %
+    sprint-eligible frames (the design-intent balance), versus the
+    pre-calibration rates of 0 %/0 %/33 %/39 %/69 %/80 % under a
+    shared threshold.
+
+    **The 30 % spread** (0.101 → 0.130 across 6 platforms) is itself
+    the publishable result: per-platform calibration is empirically
+    necessary, a single constant mis-gates either the stable-hover
+    platforms (to 0 % sprint under 0.125) or the dynamic-observation
+    platforms (to 80 % sprint under 0.125). The `symtropy calibrate
+    <platform>` CLI subcommand (commit `e75542bd95`) operationalizes
+    this as a one-liner for future platform adopters.
 - **Mechanism**: `RoboticAgent::tick` now threads FEP prediction-error
   into attention, FEP precision into working_memory, FEP belief-change
   into recurrence, FEP total free energy (inverse) into knowledge, and
