@@ -1,0 +1,111 @@
+[package]
+name = "pulse-smtp-gateway"
+version = "0.1.0-alpha.1"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+description = "Mycelix Pulse SMTP gateway — the sovereign exit node bridging RFC 5322 legacy email with the Holochain DHT"
+publish = false
+
+# ----------------------------------------------------------------------------
+# Phase 5 of PULSE_READINESS_PLAN.md. Standalone Rust daemon (not a zome, not
+# a WASM target). Runs on a dedicated VPS with unblocked TCP/25 or inside a
+# NixOS VM for Phase 5A testing. Entire threat model — including the
+# re-encryption boundary — is documented in
+# `mycelix-pulse/PULSE_READINESS_PLAN.md` §3.1.
+#
+# License is AGPL-3.0-or-later to match the rest of Pulse (the libraries we
+# depend on are MIT/Apache — Stalwart's library crates specifically; the
+# viral AGPL server binary is deliberately NOT used).
+# ----------------------------------------------------------------------------
+
+[[bin]]
+name = "pulse-smtp-gateway"
+path = "src/main.rs"
+
+[features]
+default = []
+# Enable real holochain_client integration (Phase 5B production). Without
+# this feature, the zome-bridge module uses a stub that logs and returns
+# success. Phase 5A nixosTest runs without it.
+holochain-bridge = ["dep:holochain_client", "dep:holo_hash"]
+
+[dependencies]
+# SMTP receiver — the Handler trait is exactly the hook shape we need.
+# Blocking I/O is fine at mail rates; wrap in tokio::task::spawn_blocking.
+# `rtls` = pure-Rust rustls TLS (no OpenSSL). The crate won't compile
+# without a TLS backend selected (upstream bug in 0.7.1's default set).
+mailin-embedded = { version = "0.7", features = ["rtls"] }
+
+# Authentication (SPF + DKIM + DMARC + ARC) — Stalwart's library crate,
+# MIT/Apache-2.0. Do NOT depend on `stalwart-mail` (AGPL-viral binary).
+mail-auth = "0.7"
+
+# Outbound SMTP client with DKIM hook integration.
+mail-send = "0.5"
+
+# RFC 5322 zero-copy parser, including multipart DSN (RFC 3464).
+mail-parser = "0.11"
+
+# DNS resolver for MX lookup, TXT records, PTR checks. trust-dns renamed.
+hickory-resolver = "0.25"
+
+# Per-IP rate limiting pre-rspamd.
+governor = "0.10"
+
+# Async runtime.
+tokio = { version = "1", features = ["full"] }
+
+# Async trait support for the zome-bridge abstraction.
+async-trait = "0.1"
+
+# Public-suffix list for DMARC organizational-domain extraction.
+psl = "2"
+
+# Logging.
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Config.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.9"
+
+# Errors.
+anyhow = "1"
+thiserror = "2"
+
+# VERP msg-id encoding + HMAC for bounce-ID forgery prevention.
+base32 = "0.5"
+hmac = "0.12"
+sha2 = "0.10"
+
+# Content hashing.
+blake3 = "1"
+
+# Idempotency cache for (Message-ID, From) — 7 day TTL.
+moka = { version = "0.12", features = ["future"] }
+
+# Clock for deadline bookkeeping.
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+
+# Gateway's own DID signing — PQ Dilithium3 matches what the Pulse envelope
+# uses, keeps the gateway's DID in the same sovereign cryptographic family.
+pqcrypto-dilithium = { version = "0.5", default-features = false }
+pqcrypto-traits = "0.3"
+
+# Optional: real holochain_client for Phase 5B. Gate with `holochain-bridge`
+# feature because the dep tree is heavy and the 0.9-dev version pin floats.
+holochain_client = { version = "0.9.0-dev.10", optional = true }
+holo_hash = { version = "0.6", optional = true }
+
+[dev-dependencies]
+# For unit tests that spin up an in-process SMTP client to exercise
+# mailin-embedded without a real network round-trip.
+lettre = { version = "0.11", default-features = false, features = [
+    "builder",
+    "smtp-transport",
+    "tokio1",
+    "tokio1-rustls-tls",
+] }
+tempfile = "3"
+tokio-test = "0.4"
