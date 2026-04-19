@@ -1,0 +1,18 @@
+/result
+/result-*
+/.direnv/
+/.envrc.local
+
+# Nix
+/.nix-*
+
+# Editor
+/.vscode/
+/.idea/
+*.swp
+*.swo
+
+# Local-only
+/.env
+/.env.local
+/secrets/
