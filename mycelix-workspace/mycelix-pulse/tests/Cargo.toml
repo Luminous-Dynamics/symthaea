@@ -1,0 +1,33 @@
+[package]
+name = "mycelix-pulse-sweettests"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+description = "Integration + sweettest suite for Mycelix Pulse. Phase 0 forward."
+publish = false
+
+# The integration tests live as loose .rs files alongside this Cargo.toml
+# (not in tests/). Each gets its own [[test]] entry so cargo can discover them.
+[[test]]
+name = "sweettest_mail_security"
+path = "sweettest_mail_security.rs"
+
+[dependencies]
+# empty — this crate is tests-only; all deps go under [dev-dependencies]
+
+[dev-dependencies]
+# Holochain sweettest harness. Version must match the conductor (0.6.0) per
+# mycelix-workspace/nix/modules/holochain-versions.nix.
+holochain = { version = "=0.6.0", features = ["sweettest"] }
+holochain_types = { version = "=0.6.0" }
+holo_hash = { version = "=0.6.0" }
+
+# hdi for integrity-zome types imported into tests (Timestamp, AgentPubKey, etc.)
+hdi = "0.7"
+
+# Async runtime for #[tokio::test]
+tokio = { version = "1", features = ["full"] }
+
+# Serde for mirror types
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

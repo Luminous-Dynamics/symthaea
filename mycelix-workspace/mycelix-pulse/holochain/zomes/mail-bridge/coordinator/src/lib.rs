@@ -1,5 +1,4 @@
 #![deny(unsafe_code)]
-
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -55,21 +54,26 @@ pub fn resolve_identity(did: String) -> ExternResult<Option<AgentPubKey>> {
     // Call the identity cluster via OtherRole
     let result = call(
         CallTargetCell::OtherRole("identity".into()),
-        "identity_registry".into(),
+        ZomeName::from("identity_registry"),
         "resolve_did".into(),
         None,
         did,
     );
 
+    // ZomeCallResponse is an enum — the Ok variant carries ExternIO which
+    // has `.decode()`. The previous code called `.decode()` on the enum
+    // itself, which doesn't exist. Match pattern matches messages-zome's
+    // cross-zome call pattern.
     match result {
-        Ok(response) => {
-            let agent: Option<AgentPubKey> = response
+        Ok(ZomeCallResponse::Ok(bytes)) => {
+            let agent: Option<AgentPubKey> = bytes
                 .decode()
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {}", e))))?;
             Ok(agent)
         }
-        Err(_) => {
-            // Identity cluster not available (standalone mode)
+        Ok(_) | Err(_) => {
+            // Identity cluster not available (standalone mode) or returned
+            // a non-Ok variant (Unauthorized, NetworkError, CountersigningSession…)
             Ok(None)
         }
     }
@@ -80,20 +84,20 @@ pub fn resolve_identity(did: String) -> ExternResult<Option<AgentPubKey>> {
 pub fn query_cross_cluster_trust(agent: AgentPubKey) -> ExternResult<Option<f64>> {
     let result = call(
         CallTargetCell::OtherRole("identity".into()),
-        "trust_credentials".into(),
+        ZomeName::from("trust_credentials"),
         "get_trust_score".into(),
         None,
         agent,
     );
 
     match result {
-        Ok(response) => {
-            let score: Option<f64> = response
+        Ok(ZomeCallResponse::Ok(bytes)) => {
+            let score: Option<f64> = bytes
                 .decode()
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {}", e))))?;
             Ok(score)
         }
-        Err(_) => Ok(None),
+        Ok(_) | Err(_) => Ok(None),
     }
 }
 
@@ -128,8 +132,27 @@ pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
 
 // ==================== SIGNAL HANDLING ====================
 
+/// Forward remote signals received by this bridge zome to the local UI.
+///
+/// Phase 1.4 — the original implementation was an `Ok(())` stub (research
+/// report audit finding). Remote signals reach this zome from other clusters
+/// via `send_remote_signal` on their side with this cell as the target. We
+/// have no typed enum here (mail-bridge is a router, not a domain zome), so
+/// we bubble the raw payload to the UI via `emit_signal`. Clients decode
+/// based on content.
+///
+/// Typical sources:
+/// - identity cluster announcing DID revocation ("someone's key was just
+///   invalidated — you may want to refuse further mail from them")
+/// - governance cluster tier transition ("user X moved Observer → Citizen,
+///   can now send to anyone")
+/// - trust cluster reputation decay event
+///
+/// The `ExternIO` payload is opaque; receivers deserialize via their own
+/// schemas.
 #[hdk_extern]
-pub fn recv_remote_signal(_signal: ExternIO) -> ExternResult<()> {
+pub fn recv_remote_signal(signal: ExternIO) -> ExternResult<()> {
+    emit_signal(signal)?;
     Ok(())
 }
 

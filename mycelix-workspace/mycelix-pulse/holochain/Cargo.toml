@@ -71,7 +71,7 @@ derive_more = "0.99"
 lazy_static = "1.5"
 
 # ZKP verification for sender authentication
-mycelix-zkp-core = { path = "../../crates/mycelix-zkp-core" }
+mycelix-zkp-core = { path = "../../../crates/mycelix-zkp-core" }
 
 [profile.dev]
 opt-level = "z"

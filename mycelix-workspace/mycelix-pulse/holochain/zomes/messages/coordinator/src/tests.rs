@@ -162,11 +162,7 @@ mod tests {
         #[test]
         fn test_send_email_input_creation() {
             let recipient = test_agent(2);
-            let input = test_send_email_input(
-                vec![recipient.clone()],
-                "Test Subject",
-                "Test Body",
-            );
+            let input = test_send_email_input(vec![recipient.clone()], "Test Subject", "Test Body");
 
             assert_eq!(input.recipients.len(), 1);
             assert_eq!(input.recipients[0], recipient);
@@ -179,11 +175,7 @@ mod tests {
 
         #[test]
         fn test_send_email_input_with_cc_bcc() {
-            let mut input = test_send_email_input(
-                vec![test_agent(2)],
-                "Subject",
-                "Body",
-            );
+            let mut input = test_send_email_input(vec![test_agent(2)], "Subject", "Body");
             input.cc = vec![test_agent(3)];
             input.bcc = vec![test_agent(4), test_agent(5)];
 
@@ -194,11 +186,8 @@ mod tests {
 
         #[test]
         fn test_send_email_input_with_reply() {
-            let mut input = test_send_email_input(
-                vec![test_agent(2)],
-                "Re: Original",
-                "Reply body",
-            );
+            let mut input =
+                test_send_email_input(vec![test_agent(2)], "Re: Original", "Reply body");
             input.in_reply_to = Some("<original@example.com>".to_string());
             input.references = vec!["<original@example.com>".to_string()];
 
@@ -208,11 +197,7 @@ mod tests {
 
         #[test]
         fn test_send_email_input_high_priority() {
-            let mut input = test_send_email_input(
-                vec![test_agent(2)],
-                "Urgent",
-                "Time sensitive",
-            );
+            let mut input = test_send_email_input(vec![test_agent(2)], "Urgent", "Time sensitive");
             input.priority = EmailPriority::Urgent;
 
             assert_eq!(input.priority, EmailPriority::Urgent);
@@ -220,11 +205,8 @@ mod tests {
 
         #[test]
         fn test_send_email_input_with_expiration() {
-            let mut input = test_send_email_input(
-                vec![test_agent(2)],
-                "Ephemeral",
-                "This message will expire",
-            );
+            let mut input =
+                test_send_email_input(vec![test_agent(2)], "Ephemeral", "This message will expire");
             input.expires_at = Some(test_timestamp(2000000));
 
             assert!(input.expires_at.is_some());
@@ -275,22 +257,14 @@ mod tests {
 
         #[test]
         fn test_encrypted_email_has_valid_nonce() {
-            let email = test_encrypted_email(
-                test_agent(1),
-                test_agent(2),
-                test_timestamp(1000000),
-            );
+            let email = test_encrypted_email(test_agent(1), test_agent(2), test_timestamp(1000000));
 
             assert_ne!(email.nonce, [0u8; 24]);
         }
 
         #[test]
         fn test_encrypted_email_crypto_suite() {
-            let email = test_encrypted_email(
-                test_agent(1),
-                test_agent(2),
-                test_timestamp(1000000),
-            );
+            let email = test_encrypted_email(test_agent(1), test_agent(2), test_timestamp(1000000));
 
             assert!(!email.crypto_suite.key_exchange.is_empty());
             assert!(!email.crypto_suite.symmetric.is_empty());
@@ -307,11 +281,8 @@ mod tests {
             ];
 
             for priority in priorities {
-                let mut email = test_encrypted_email(
-                    test_agent(1),
-                    test_agent(2),
-                    test_timestamp(1000000),
-                );
+                let mut email =
+                    test_encrypted_email(test_agent(1), test_agent(2), test_timestamp(1000000));
                 email.priority = priority.clone();
                 assert_eq!(email.priority, priority);
             }
@@ -319,11 +290,8 @@ mod tests {
 
         #[test]
         fn test_encrypted_email_with_attachments() {
-            let mut email = test_encrypted_email(
-                test_agent(1),
-                test_agent(2),
-                test_timestamp(1000000),
-            );
+            let mut email =
+                test_encrypted_email(test_agent(1), test_agent(2), test_timestamp(1000000));
             email.encrypted_attachments = vec![1, 2, 3, 4];
 
             assert!(!email.encrypted_attachments.is_empty());
@@ -331,11 +299,8 @@ mod tests {
 
         #[test]
         fn test_encrypted_email_threading() {
-            let mut email = test_encrypted_email(
-                test_agent(1),
-                test_agent(2),
-                test_timestamp(1000000),
-            );
+            let mut email =
+                test_encrypted_email(test_agent(1), test_agent(2), test_timestamp(1000000));
             email.in_reply_to = Some("<parent@example.com>".to_string());
             email.references = vec![
                 "<root@example.com>".to_string(),
@@ -1083,7 +1048,10 @@ mod tests {
             let unread: Vec<_> = items.into_iter().filter(|i| !i.is_read).collect();
 
             assert_eq!(unread.len(), 1);
-            assert_eq!(String::from_utf8_lossy(&unread[0].encrypted_subject), "Unread");
+            assert_eq!(
+                String::from_utf8_lossy(&unread[0].encrypted_subject),
+                "Unread"
+            );
         }
 
         #[test]
@@ -1134,12 +1102,16 @@ mod tests {
         #[test]
         fn test_email_expiration_check() {
             let now = test_timestamp(2000000);
-            let email_expired = test_encrypted_email(test_agent(1), test_agent(2), test_timestamp(1000000));
+            let email_expired =
+                test_encrypted_email(test_agent(1), test_agent(2), test_timestamp(1000000));
             let mut email_with_expiry = email_expired.clone();
             email_with_expiry.expires_at = Some(test_timestamp(1500000));
 
             // Check if expired
-            let is_expired = email_with_expiry.expires_at.map(|exp| exp < now).unwrap_or(false);
+            let is_expired = email_with_expiry
+                .expires_at
+                .map(|exp| exp < now)
+                .unwrap_or(false);
 
             assert!(is_expired);
         }
@@ -1152,7 +1124,11 @@ mod tests {
                 ..test_encrypted_email(test_agent(1), test_agent(2), test_timestamp(1000000))
             };
 
-            let thread_id = email.references.first().cloned().or(email.in_reply_to.clone());
+            let thread_id = email
+                .references
+                .first()
+                .cloned()
+                .or(email.in_reply_to.clone());
 
             assert_eq!(thread_id, Some("<root@example.com>".to_string()));
         }

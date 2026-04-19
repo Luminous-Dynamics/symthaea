@@ -81,8 +81,8 @@
 mod tests;
 
 use hdk::prelude::*;
-use std::collections::HashSet;
 use mail_messages_integrity::*;
+use std::collections::HashSet;
 
 /// Signal types for real-time notifications
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -120,9 +120,7 @@ pub enum MailSignal {
         sender: AgentPubKey,
     },
     /// Draft auto-saved
-    DraftSaved {
-        draft_hash: ActionHash,
-    },
+    DraftSaved { draft_hash: ActionHash },
     /// Scheduled email sent
     ScheduledEmailSent {
         email_hash: ActionHash,
@@ -164,6 +162,14 @@ pub struct SendEmailInput {
     pub priority: EmailPriority,
     pub read_receipt_requested: bool,
     pub expires_at: Option<Timestamp>,
+    /// Client-authoritative timestamp (RFC 5322 Date: semantics).
+    ///
+    /// The client sets this and signs over it as part of `email_signing_content`.
+    /// The integrity zome bounds it against `action.timestamp` to prevent
+    /// future-dated spam and unreasonably-old replay. See Phase 0.8 of
+    /// PULSE_READINESS_PLAN.md for the design rationale (coordinator-injected
+    /// sys_time() made valid client signatures impossible).
+    pub timestamp: Timestamp,
 }
 
 /// Output from sending an email
@@ -206,7 +212,11 @@ pub struct EmailListItem {
 #[hdk_extern]
 pub fn send_email(input: SendEmailInput) -> ExternResult<SendEmailOutput> {
     let my_agent = agent_info()?.agent_initial_pubkey;
-    let now = sys_time()?;
+
+    // Timestamp is now client-authoritative (Phase 0.8). The client sets
+    // `input.timestamp` and signs over it as part of email_signing_content.
+    // The integrity zome bounds this against action.timestamp to prevent
+    // spoofing. Use `input.timestamp` everywhere below instead of sys_time().
 
     // Combine all recipients (we'll send to each)
     let all_recipients: Vec<AgentPubKey> = input
@@ -253,7 +263,7 @@ pub fn send_email(input: SendEmailInput) -> ExternResult<SendEmailOutput> {
             message_id: input.message_id.clone(),
             in_reply_to: input.in_reply_to.clone(),
             references: input.references.clone(),
-            timestamp: now,
+            timestamp: input.timestamp,
             priority: input.priority.clone(),
             read_receipt_requested: input.read_receipt_requested,
             expires_at: input.expires_at,
@@ -301,7 +311,7 @@ pub fn send_email(input: SendEmailInput) -> ExternResult<SendEmailOutput> {
             email_hash: email_hash.clone(),
             sender: my_agent.clone(),
             encrypted_subject: input.encrypted_subject.clone(),
-            timestamp: now,
+            timestamp: input.timestamp,
             priority: input.priority.clone(),
         };
 
@@ -326,7 +336,10 @@ pub fn send_email(input: SendEmailInput) -> ExternResult<SendEmailOutput> {
     }
 
     // Return the hash of the first email (they're all essentially the same content)
-    let email_hash = get_links(LinkQuery::try_new(my_agent.clone(), LinkTypes::AgentToSent)?, GetStrategy::default())?
+    let email_hash = get_links(
+        LinkQuery::try_new(my_agent.clone(), LinkTypes::AgentToSent)?,
+        GetStrategy::default(),
+    )?
     .into_iter()
     .last()
     .map(|l| ActionHash::try_from(l.target).ok())
@@ -343,15 +356,15 @@ pub fn send_email(input: SendEmailInput) -> ExternResult<SendEmailOutput> {
 }
 
 /// Get or create a thread entry
-fn get_or_create_thread(
-    thread_id: &str,
-    encrypted_subject: &[u8],
-) -> ExternResult<ActionHash> {
+fn get_or_create_thread(thread_id: &str, encrypted_subject: &[u8]) -> ExternResult<ActionHash> {
     let my_agent = agent_info()?.agent_initial_pubkey;
 
     // Try to find existing thread
     let thread_anchor = anchor_for_thread(thread_id)?;
-    let existing = get_links(LinkQuery::try_new(thread_anchor.clone(), LinkTypes::ThreadToEmails)?, GetStrategy::default())?;
+    let existing = get_links(
+        LinkQuery::try_new(thread_anchor.clone(), LinkTypes::ThreadToEmails)?,
+        GetStrategy::default(),
+    )?;
 
     if let Some(link) = existing.first() {
         // Thread exists, return its action hash from the link target
@@ -395,14 +408,16 @@ fn anchor_for_thread(thread_id: &str) -> ExternResult<EntryHash> {
 pub fn get_inbox(query: EmailQuery) -> ExternResult<Vec<EmailListItem>> {
     let my_agent = agent_info()?.agent_initial_pubkey;
 
-    let links = get_links(LinkQuery::try_new(my_agent.clone(), LinkTypes::AgentToInbox)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(my_agent.clone(), LinkTypes::AgentToInbox)?,
+        GetStrategy::default(),
+    )?;
 
     let mut items: Vec<EmailListItem> = Vec::new();
 
     for link in links {
-        let email_hash = ActionHash::try_from(link.target).map_err(|_| {
-            wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string()))
-        })?;
+        let email_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string())))?;
 
         if let Some(record) = get(email_hash.clone(), GetOptions::default())? {
             if let Some(email) = record
@@ -444,7 +459,11 @@ pub fn get_inbox(query: EmailQuery) -> ExternResult<Vec<EmailListItem>> {
                     is_read: state.as_ref().map(|s| s.is_read).unwrap_or(false),
                     is_starred: state.as_ref().map(|s| s.is_starred).unwrap_or(false),
                     has_attachments: !email.encrypted_attachments.is_empty(),
-                    thread_id: email.references.first().cloned().or(email.in_reply_to.clone()),
+                    thread_id: email
+                        .references
+                        .first()
+                        .cloned()
+                        .or(email.in_reply_to.clone()),
                 });
             }
         }
@@ -466,14 +485,16 @@ pub fn get_inbox(query: EmailQuery) -> ExternResult<Vec<EmailListItem>> {
 pub fn get_sent(query: EmailQuery) -> ExternResult<Vec<EmailListItem>> {
     let my_agent = agent_info()?.agent_initial_pubkey;
 
-    let links = get_links(LinkQuery::try_new(my_agent.clone(), LinkTypes::AgentToSent)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(my_agent.clone(), LinkTypes::AgentToSent)?,
+        GetStrategy::default(),
+    )?;
 
     let mut items: Vec<EmailListItem> = Vec::new();
 
     for link in links {
-        let email_hash = ActionHash::try_from(link.target).map_err(|_| {
-            wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string()))
-        })?;
+        let email_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string())))?;
 
         if let Some(record) = get(email_hash.clone(), GetOptions::default())? {
             if let Some(email) = record
@@ -522,13 +543,15 @@ fn get_email_state_internal(
     email_hash: &ActionHash,
     owner: &AgentPubKey,
 ) -> ExternResult<Option<EmailState>> {
-    let links = get_links(LinkQuery::try_new(email_hash.clone(), LinkTypes::EmailToState)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(email_hash.clone(), LinkTypes::EmailToState)?,
+        GetStrategy::default(),
+    )?;
 
     for link in links {
         if let Some(record) = get(
-            ActionHash::try_from(link.target).map_err(|_| {
-                wasm_error!(WasmErrorInner::Guest("Invalid target".to_string()))
-            })?,
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid target".to_string())))?,
             GetOptions::default(),
         )? {
             if let Some(state) = record
@@ -589,11 +612,7 @@ pub fn update_email_state(input: (ActionHash, EmailStateUpdate)) -> ExternResult
             snoozed_until: None,
             is_archived: update.is_archived.unwrap_or(false),
             is_trashed,
-            trashed_at: if is_trashed {
-                Some(sys_time()?)
-            } else {
-                None
-            },
+            trashed_at: if is_trashed { Some(sys_time()?) } else { None },
         }
     };
 
@@ -644,10 +663,7 @@ pub fn mark_as_read(input: (ActionHash, bool)) -> ExternResult<Option<ActionHash
                     email_hash: email_hash.clone(),
                     reader: my_agent.clone(),
                     read_at,
-                    signature: sign_raw(
-                        my_agent.clone(),
-                        signing_content,
-                    )?.0.to_vec(),
+                    signature: sign_raw(my_agent.clone(), signing_content)?.0.to_vec(),
                 };
 
                 let receipt_hash = create_entry(EntryTypes::ReadReceipt(receipt.clone()))?;
@@ -666,7 +682,8 @@ pub fn mark_as_read(input: (ActionHash, bool)) -> ExternResult<Option<ActionHash
                     reader: receipt.reader,
                     read_at: receipt.read_at,
                 };
-                let encoded = ExternIO::encode(signal).map_err(|e| wasm_error!(WasmErrorInner::Serialize(e)))?;
+                let encoded = ExternIO::encode(signal)
+                    .map_err(|e| wasm_error!(WasmErrorInner::Serialize(e)))?;
                 let _ = send_remote_signal(encoded, vec![email.sender]);
 
                 return Ok(Some(receipt_hash));
@@ -675,6 +692,118 @@ pub fn mark_as_read(input: (ActionHash, bool)) -> ExternResult<Option<ActionHash
     }
 
     Ok(None)
+}
+
+// ==================== DELIVERY RECEIPTS (Phase 1.1) ====================
+
+/// Acknowledge that an email has been delivered to the recipient's node.
+///
+/// This is distinct from `mark_as_read`: a `DeliveryReceipt` proves the
+/// envelope reached recipient's DHT cell; a `ReadReceipt` proves the
+/// recipient's UI rendered it. Mirrors Gmail's "delivered" vs "read"
+/// distinction.
+///
+/// Phase 1.1 of PULSE_READINESS_PLAN.md. The `DeliveryReceipt` entry type
+/// and the `delivery_receipt_signing_content(...)` helper already lived in
+/// the integrity zome — this extern is what produces the entry. Ed25519
+/// signature is server-side via the recipient's lair (the recipient's own
+/// conductor signs on behalf of the recipient — same trust boundary as
+/// `mark_as_read`).
+///
+/// Idempotency: calling twice for the same `email_hash` will create two
+/// receipts. Sender-side dedup happens by latest-receipt-wins. The DHT does
+/// not naturally dedupe entries with different timestamps. Clients should
+/// only call this once per email on first inbox observation.
+#[hdk_extern]
+pub fn acknowledge_delivery(email_hash: ActionHash) -> ExternResult<ActionHash> {
+    let my_agent = agent_info()?.agent_initial_pubkey;
+
+    // Verify the email exists and that we're actually the named recipient.
+    // Without this check, anyone could write delivery receipts for any email
+    // and pollute the sender's confirmation view.
+    let email_record = get(email_hash.clone(), GetOptions::default())?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("email not found".into())))?;
+    let email = email_record
+        .entry()
+        .to_app_option::<EncryptedEmail>()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "target record is not an EncryptedEmail".into()
+            ))
+        })?;
+
+    if email.recipient != my_agent {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "cannot acknowledge delivery of email not addressed to you".into()
+        )));
+    }
+
+    // Server-signed receipt — same pattern as mark_as_read for ReadReceipt.
+    let delivered_at = sys_time()?;
+    let signing_content = delivery_receipt_signing_content(&email_hash, &my_agent, &delivered_at);
+    let receipt = DeliveryReceipt {
+        email_hash: email_hash.clone(),
+        recipient: my_agent.clone(),
+        delivered_at,
+        signature: sign_raw(my_agent.clone(), signing_content)?.0.to_vec(),
+    };
+
+    let receipt_hash = create_entry(EntryTypes::DeliveryReceipt(receipt.clone()))?;
+
+    // Link from email to receipt for sender-side discovery via
+    // get_links(email_hash, EmailToDeliveryReceipts).
+    create_link(
+        email_hash.clone(),
+        receipt_hash.clone(),
+        LinkTypes::EmailToDeliveryReceipts,
+        LinkTag::new("delivered"),
+    )?;
+
+    // Best-effort wake-up signal to the sender. Sender's UI can flip a
+    // "delivered" indicator without polling get_links. Lossy by design —
+    // the durable proof lives in the DHT entry + link above.
+    let signal = MailSignal::DeliveryConfirmed {
+        email_hash: receipt.email_hash,
+        recipient: receipt.recipient,
+        delivered_at: receipt.delivered_at,
+    };
+    if let Ok(encoded) = ExternIO::encode(signal) {
+        let _ = send_remote_signal(encoded, vec![email.sender]);
+    }
+
+    Ok(receipt_hash)
+}
+
+/// Sender-side query: list all delivery receipts attached to one of my sent
+/// emails. Returns the receipt action hashes; caller dereferences via
+/// `get_email` style for full content.
+#[hdk_extern]
+pub fn get_delivery_receipts(email_hash: ActionHash) -> ExternResult<Vec<DeliveryReceipt>> {
+    let links = get_links(
+        LinkQuery::try_new(email_hash, LinkTypes::EmailToDeliveryReceipts)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut receipts = Vec::with_capacity(links.len());
+    for link in links {
+        let target_hash = ActionHash::try_from(link.target).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "delivery receipt link target is not an ActionHash".into()
+            ))
+        })?;
+        if let Some(record) = get(target_hash, GetOptions::default())? {
+            if let Some(receipt) = record
+                .entry()
+                .to_app_option::<DeliveryReceipt>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            {
+                receipts.push(receipt);
+            }
+        }
+    }
+    receipts.sort_by(|a, b| a.delivered_at.cmp(&b.delivered_at));
+    Ok(receipts)
 }
 
 // ==================== DRAFTS ====================
@@ -709,7 +838,10 @@ pub fn save_draft(input: EmailDraft) -> ExternResult<ActionHash> {
 pub fn get_drafts(_: ()) -> ExternResult<Vec<(ActionHash, EmailDraft)>> {
     let my_agent = agent_info()?.agent_initial_pubkey;
 
-    let links = get_links(LinkQuery::try_new(my_agent, LinkTypes::AgentToDrafts)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(my_agent, LinkTypes::AgentToDrafts)?,
+        GetStrategy::default(),
+    )?;
 
     let mut drafts = Vec::new();
 
@@ -773,7 +905,10 @@ pub fn create_folder(input: (Vec<u8>, Option<Vec<u8>>, i32)) -> ExternResult<Act
 pub fn get_folders(_: ()) -> ExternResult<Vec<(ActionHash, EmailFolder)>> {
     let my_agent = agent_info()?.agent_initial_pubkey;
 
-    let links = get_links(LinkQuery::try_new(my_agent, LinkTypes::AgentToFolders)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(my_agent, LinkTypes::AgentToFolders)?,
+        GetStrategy::default(),
+    )?;
 
     let mut folders = Vec::new();
 
@@ -832,7 +967,10 @@ pub fn add_attachment(input: EncryptedAttachment) -> ExternResult<ActionHash> {
 /// Get attachments for email
 #[hdk_extern]
 pub fn get_attachments(email_hash: ActionHash) -> ExternResult<Vec<EncryptedAttachment>> {
-    let links = get_links(LinkQuery::try_new(email_hash, LinkTypes::EmailToAttachments)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(email_hash, LinkTypes::EmailToAttachments)?,
+        GetStrategy::default(),
+    )?;
 
     let mut attachments = Vec::new();
 
@@ -886,7 +1024,8 @@ pub fn send_typing_indicator(input: (Vec<AgentPubKey>, Option<String>)) -> Exter
         thread_id,
     };
 
-    let encoded = ExternIO::encode(signal).map_err(|e| wasm_error!(WasmErrorInner::Serialize(e)))?;
+    let encoded =
+        ExternIO::encode(signal).map_err(|e| wasm_error!(WasmErrorInner::Serialize(e)))?;
     send_remote_signal(encoded, recipients)?;
 
     Ok(())
@@ -930,9 +1069,10 @@ pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
     }
 
     // Set up capability grants for receiving signals
-    let functions = GrantedFunctions::Listed(HashSet::from([
-        (zome_info()?.name, "recv_remote_signal".into()),
-    ]));
+    let functions = GrantedFunctions::Listed(HashSet::from([(
+        zome_info()?.name,
+        "recv_remote_signal".into(),
+    )]));
 
     create_cap_grant(CapGrantEntry {
         tag: "recv_signals".to_string(),
@@ -941,4 +1081,44 @@ pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
     })?;
 
     Ok(InitCallbackResult::Pass)
+}
+
+// ==================== TEST-ONLY: FORGED-LINK HARNESS ====================
+
+/// Input to `debug_create_forged_inbox_link`.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DebugForgedLinkInput {
+    /// Base agent pubkey — whose inbox Eve is trying to spam.
+    pub base: AgentPubKey,
+    /// Target — an EncryptedEmail action hash Eve authored
+    /// (with herself as recipient, so the forgery is `link.base != email.recipient`).
+    pub target: ActionHash,
+}
+
+/// Attempt to create an `AgentToInbox` link directly, bypassing send_email's
+/// normal recipient-binding logic. Used by the Phase 0.5 sweettest
+/// (`phase0_forged_inbox_link_rejected`) to verify that the integrity zome's
+/// `validate_inbox_link` callback (Phase 0.3) rejects spam.
+///
+/// **This function is safe to ship in production**: it CANNOT actually spam
+/// anyone's inbox. Every forged link created here triggers
+/// `validate_inbox_link` during DHT propagation, which rejects unless
+/// `email.recipient == link.base` AND `email.sender == link.author`. The
+/// whole point is to give tests a way to *attempt* the attack and observe
+/// the rejection. The coordinator happily writes the CreateLink action to
+/// the local source chain; the DHT-side validator then refuses to propagate
+/// it, and any subsequent `get_links` from elsewhere returns empty.
+///
+/// Callers that want to verify the rejection should:
+/// 1. Use `call_fallible` (not `call`) to observe the error path
+/// 2. Or use `call` + `await_consistency` + `get_links` — the link will be
+///    absent from Bob's view even if Eve's local create succeeded
+#[hdk_extern]
+pub fn debug_create_forged_inbox_link(input: DebugForgedLinkInput) -> ExternResult<ActionHash> {
+    create_link(
+        input.base,
+        input.target,
+        LinkTypes::AgentToInbox,
+        LinkTag::new("forged-for-test"),
+    )
 }
