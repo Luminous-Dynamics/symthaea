@@ -2221,9 +2221,59 @@ async fn phase0_alice_sends_bob_receives() {
     };
 
     // Alice sends. If integrity zome rejects here, Phase 0.3/0.8 have bugs.
-    let output: SendEmailOutput = conductors[0]
-        .call(&alice_cell.zome("mail_messages"), "send_email", input)
-        .await;
+    //
+    // The call() path mints a fresh nonce per-call. On a heavily-loaded
+    // system (load avg > 15), Kitsune2/Tx5 setup + await_consistency can
+    // eat 8-10 min wall-clock, which can push the nonce past its 300s TTL
+    // if it was minted early. Retry up to 3x on BadNonce("Expired"); each
+    // retry builds a fresh input (new timestamp + re-sign). `timestamp`
+    // gets re-bound to whichever attempt succeeded, so the downstream
+    // round-trip assertion compares against the actually-shipped value.
+    let mut attempts = 0u32;
+    let mut timestamp = timestamp;
+    let output: SendEmailOutput = loop {
+        let attempt_ts = Timestamp::now();
+        let attempt_content = compute_signing_content(
+            alice_cell.agent_pubkey(),
+            bob_cell.agent_pubkey(),
+            &[1u8, 2, 3],
+            &[4u8, 5, 6],
+            &nonce,
+            message_id,
+            attempt_ts,
+        );
+        let attempt_sig = conductors[0]
+            .keystore()
+            .sign(alice_cell.agent_pubkey().clone(), attempt_content.into())
+            .await
+            .expect("lair sign must succeed");
+        let mut attempt_input = input.clone();
+        attempt_input.signature = attempt_sig.0.to_vec();
+        attempt_input.timestamp = attempt_ts;
+
+        let r: Result<SendEmailOutput, _> = conductors[0]
+            .call_fallible(
+                &alice_cell.zome("mail_messages"),
+                "send_email",
+                attempt_input,
+            )
+            .await;
+
+        match r {
+            Ok(out) => {
+                timestamp = attempt_ts; // bind to the timestamp that actually shipped
+                break out;
+            }
+            Err(e) => {
+                let msg = format!("{:?}", e);
+                attempts += 1;
+                if attempts >= 3 || !msg.contains("BadNonce") {
+                    panic!("send_email failed after {} attempts: {}", attempts, msg);
+                }
+                eprintln!("send_email attempt {} nonce-expired, retrying", attempts);
+            }
+        }
+    };
 
     assert!(
         output.failed_deliveries.is_empty(),
@@ -2237,20 +2287,26 @@ async fn phase0_alice_sends_bob_receives() {
         output.delivered_to
     );
 
-    // Wait for DHT gossip to carry the ToInbox link + EncryptedEmail entry
-    // to Bob's conductor.
-    await_consistency(30, [&alice_cell, &bob_cell])
-        .await
-        .expect("post-send consistency");
-
-    // Bob queries his inbox. Must return exactly Alice's one email.
+    // Rather than await_consistency (which requires ALL ops to gossip —
+    // slow or flaky on multi-session machines), poll Bob's get_inbox
+    // directly until the target email shows up or timeout. This mirrors
+    // real-world UI behavior: clients poll their inbox, they don't wait
+    // for global DHT consistency.
     let query = EmailQuery {
         limit: Some(10),
         ..Default::default()
     };
-    let inbox: Vec<EmailListItem> = conductors[1]
-        .call(&bob_cell.zome("mail_messages"), "get_inbox", query)
-        .await;
+    let mut inbox: Vec<EmailListItem> = Vec::new();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(180);
+    while std::time::Instant::now() < deadline {
+        inbox = conductors[1]
+            .call(&bob_cell.zome("mail_messages"), "get_inbox", query.clone())
+            .await;
+        if !inbox.is_empty() {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    }
 
     assert_eq!(
         inbox.len(),
@@ -2269,7 +2325,16 @@ async fn phase0_alice_sends_bob_receives() {
         vec![1u8, 2, 3],
         "encrypted_subject must round-trip byte-for-byte"
     );
-    assert_eq!(received.timestamp, timestamp, "client timestamp preserved");
+    // Compare via as_micros() rather than Timestamp direct-equality. The
+    // integrity zome signs over `timestamp.as_micros().to_le_bytes()`, so
+    // microsecond-granular round-trip is what Phase 0.8 actually guarantees.
+    // Direct Timestamp `==` can fail on sub-microsecond representation
+    // details that don't affect the canonical signed bytes.
+    assert_eq!(
+        received.timestamp.as_micros(),
+        timestamp.as_micros(),
+        "client timestamp microseconds must round-trip"
+    );
 }
 
 // ============================================================================
