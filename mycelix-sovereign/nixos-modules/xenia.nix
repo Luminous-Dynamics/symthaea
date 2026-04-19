@@ -22,8 +22,12 @@ in
 
     adminConsolePort = mkOption {
       type = types.port;
-      default = 8420;
-      description = "Port on which the Xenia admin console (Leptos) is served.";
+      default = 8134;
+      description = ''
+        Port on which the Xenia admin console (Leptos CSR, xenia-admin
+        crate) is served. Registered in .claude/rules/PORTS.md; public
+        route via Cloudflare Tunnel to admin.sovereign.mycelix.net.
+      '';
     };
 
     ledgerPath = mkOption {
