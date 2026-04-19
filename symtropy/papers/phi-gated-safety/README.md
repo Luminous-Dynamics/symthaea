@@ -23,9 +23,11 @@ envelope, and shows the result replicates to a second platform
 ### Prose
 - `OUTLINE.md` — 10-section paper outline with commit-map, bounded
   claims, abstract draft (149/150 words), pre-writing checklist (7/7
-  closed), and §9.1 Crazyflie hardware-validation plan. Drafting the
-  full prose from this outline is a pure-text session and is not yet
-  done.
+  closed), and §9.1 Crazyflie hardware-validation plan.
+- `DRAFT.md` — first prose draft of the full paper (~5000 words).
+  All §1–§10 written; every empirical number matches current-code
+  benchmarks; ready for review + submission-prep polish (LaTeX
+  conversion, bibliography formatting, word-count verification).
 
 ### Figures
 - `figures/figure1_phi_trace.png` — 40 s Φ trace showing the narrow
