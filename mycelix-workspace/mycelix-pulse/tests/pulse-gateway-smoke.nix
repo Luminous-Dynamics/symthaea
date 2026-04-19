@@ -160,6 +160,57 @@ gateway.succeed(
     "| grep -F 'did:mycelix:alice'"
 )
 
-print("Phase 5A.3.a smoke: GREEN")
+# ---- Negative paths ------------------------------------------------
+# The happy path passes. Now verify the error paths reject cleanly
+# AND don't pollute the stub zome with spurious persistence.
+
+# 7. Unknown alias on our domain → smtplib raises SMTPRecipientsRefused.
+#    `gateway.fail` asserts the shell command exits non-zero; smtplib's
+#    exception on 5xx gives us exactly that.
+gateway.fail(r"""
+python3 - <<'PY'
+import smtplib
+from email.message import EmailMessage
+msg = EmailMessage()
+msg["From"] = "external@example.org"
+msg["To"] = "bob@mycelix.test"  # NOT pre-registered in testAliases
+msg["Subject"] = "negative: unknown alias"
+msg.set_content("server must 5xx this")
+with smtplib.SMTP("127.0.0.1", 2525, timeout=15) as s:
+    refused = s.send_message(msg)
+    print(f"UNEXPECTED: accepted unknown alias, refused={refused}")
+PY
+""")
+
+# 8. Foreign domain (not mycelix.test) → same 5xx rejection path.
+gateway.fail(r"""
+python3 - <<'PY'
+import smtplib
+from email.message import EmailMessage
+msg = EmailMessage()
+msg["From"] = "external@example.org"
+msg["To"] = "carol@foreign.example"
+msg["Subject"] = "negative: foreign domain"
+msg.set_content("server must 5xx this")
+with smtplib.SMTP("127.0.0.1", 2525, timeout=15) as s:
+    refused = s.send_message(msg)
+    print(f"UNEXPECTED: accepted foreign domain, refused={refused}")
+PY
+""")
+
+# 9. Anti-leak: stub zome should STILL show exactly 1 persisted
+#    email (alice's one). The two rejected messages must NOT have
+#    reached receive_external.
+gateway.sleep(2)
+gateway.succeed(
+    "test $(journalctl -u pulse-smtp-gateway.service --no-pager "
+    "| grep -c 'stub receive_external') -eq 1"
+)
+
+# 10. Unit STILL active after multiple 5xx rejections. Defends
+#     against a regression where a rejection path panics.
+gateway.succeed("systemctl is-active --quiet pulse-smtp-gateway.service")
+
+print("Phase 5A.3.a smoke + negative paths: GREEN")
   '';
 }
