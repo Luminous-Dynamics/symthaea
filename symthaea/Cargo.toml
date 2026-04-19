@@ -1134,6 +1134,10 @@ required-features = ["code_generation"]
 name = "nix_best_of_n"
 required-features = ["code_generation"]
 
+[[example]]
+name = "nix_rag_holdout_baseline"
+required-features = ["code_generation"]
+
 
 [[example]]
 name = "nix_codegen_api"
