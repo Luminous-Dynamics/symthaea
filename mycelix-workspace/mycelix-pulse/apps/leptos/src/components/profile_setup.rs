@@ -58,9 +58,10 @@ pub fn ProfileSetup() -> impl IntoView {
                 // Small delay to let JS bridge initialize
                 gloo_timers::future::sleep(std::time::Duration::from_millis(500)).await;
 
-                match hc.call_zome::<(), serde_json::Value>(
-                    "mail_profiles", "get_my_profile", &()
-                ).await {
+                match hc
+                    .call_zome::<(), serde_json::Value>("mail_profiles", "get_my_profile", &())
+                    .await
+                {
                     Ok(val) if !val.is_null() => {
                         web_sys::console::log_1(&"[Mail] Profile exists".into());
                         step.set(SetupStep::HasProfile);
@@ -79,12 +80,17 @@ pub fn ProfileSetup() -> impl IntoView {
         } else if crate::mail_context::is_demo_mode() {
             // Demo mode — no profile needed
             step.set(SetupStep::HasProfile);
-        }
-        // On production with Mock status: show connecting UI after a delay
-        if !crate::mail_context::is_demo_mode() && status == ConnectionStatus::Mock
-            && current_step == SetupStep::Checking
+        } else if status == ConnectionStatus::Mock
+            && (current_step == SetupStep::Checking || current_step == SetupStep::Connecting)
         {
-            step.set(SetupStep::Connecting);
+            // Production + Mock (conductor unreachable): fall through to the
+            // full UI with mock data, same as demo mode. Previously this
+            // left the user stuck on "Connecting to the Holochain
+            // network..." forever — see the live-browser console log
+            // '[Mail] Could not connect: ConnectionFailed("WebSocket closed
+            // (code 1005)"). Running in mock mode.' which correctly reached
+            // Mock but the UI never escaped the connecting modal.
+            step.set(SetupStep::HasProfile);
         }
     });
 
@@ -94,7 +100,9 @@ pub fn ProfileSetup() -> impl IntoView {
         let toasts_create = toasts.clone();
         std::rc::Rc::new(move || {
             let name = display_name.get_untracked();
-            if name.trim().is_empty() { return; }
+            if name.trim().is_empty() {
+                return;
+            }
             let bio_val = bio.get_untracked();
             step.set(SetupStep::KeyGen);
             error_msg.set(String::new());
@@ -109,9 +117,14 @@ pub fn ProfileSetup() -> impl IntoView {
                     "avatar_url": "",
                     "bio": bio_val.trim(),
                 });
-                match hc.call_zome::<serde_json::Value, serde_json::Value>(
-                    "mail_profiles", "set_profile", &profile
-                ).await {
+                match hc
+                    .call_zome::<serde_json::Value, serde_json::Value>(
+                        "mail_profiles",
+                        "set_profile",
+                        &profile,
+                    )
+                    .await
+                {
                     Ok(_) => {
                         key_status.set("Profile created!".into());
                     }
@@ -126,9 +139,15 @@ pub fn ProfileSetup() -> impl IntoView {
 
                 // Create DID (decentralized identity) on the identity DNA
                 key_status.set("Creating your DSID...".into());
-                match hc.call_zome_on_role::<(), serde_json::Value>(
-                    "identity", "did_registry", "create_did", &()
-                ).await {
+                match hc
+                    .call_zome_on_role::<(), serde_json::Value>(
+                        "identity",
+                        "did_registry",
+                        "create_did",
+                        &(),
+                    )
+                    .await
+                {
                     Ok(_) => {
                         web_sys::console::log_1(&"[Mail] DSID created on identity DNA".into());
                     }
@@ -140,15 +159,18 @@ pub fn ProfileSetup() -> impl IntoView {
 
                 // Try key generation (non-critical)
                 key_status.set("Generating encryption keys...".into());
-                if let Ok(status_val) = hc.call_zome::<(), serde_json::Value>(
-                    "mail_keys", "needs_refresh", &()
-                ).await {
+                if let Ok(status_val) = hc
+                    .call_zome::<(), serde_json::Value>("mail_keys", "needs_refresh", &())
+                    .await
+                {
                     let needs = serde_json::to_string(&status_val).unwrap_or_default();
                     if needs.contains("NoBundle") || needs.contains("Expired") {
                         let identity_key = match crate::crypto::ensure_local_identity_keypair() {
                             Ok(key) => key,
                             Err(e) => {
-                                web_sys::console::warn_1(&format!("[Mail] identity key setup: {e}").into());
+                                web_sys::console::warn_1(
+                                    &format!("[Mail] identity key setup: {e}").into(),
+                                );
                                 Vec::new()
                             }
                         };
@@ -169,9 +191,13 @@ pub fn ProfileSetup() -> impl IntoView {
                             "created_at": created_at_us,
                             "expires_at": created_at_us + (30 * 24 * 3600 * 1_000_000u64),
                         });
-                        let _ = hc.call_zome::<serde_json::Value, serde_json::Value>(
-                            "mail_keys", "publish_pre_key_bundle", &bundle
-                        ).await;
+                        let _ = hc
+                            .call_zome::<serde_json::Value, serde_json::Value>(
+                                "mail_keys",
+                                "publish_pre_key_bundle",
+                                &bundle,
+                            )
+                            .await;
                     }
                 }
 
