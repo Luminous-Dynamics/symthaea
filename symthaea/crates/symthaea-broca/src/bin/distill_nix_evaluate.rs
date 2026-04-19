@@ -119,7 +119,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("└─────────────────────────────────────────────────────────");
 
     // ── Load the checkpoint ──
-    let genesis = GenesisSeed::from_phrase("symthaea-nix-distillation-m7b");
+    // Genesis phrase must match the trainer's. `-m7c` is the Nix-only
+    // tokenizer era (2026-04-19, for_nix_distillation). Older `-m7b`
+    // checkpoints use default_minimal + add_nix_tokens with a different
+    // vocabulary and can't be loaded here.
+    let genesis = GenesisSeed::from_phrase("symthaea-nix-distillation-m7c");
     let (mut generator, _adam, _proj, _lm) = BrocaGenerator::from_checkpoint(&checkpoint, &genesis)
         .map_err(|e| format!("from_checkpoint: {}", e))?;
     // Match distill_nix_generate's sampling so the comparison is

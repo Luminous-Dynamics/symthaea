@@ -176,14 +176,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // (`mkShell`, `mkOption`), common idioms. Each becomes a single
     // token rather than a char-by-char BPE reconstruction — major
     // quality + speed win at training time.
-    let genesis = GenesisSeed::from_phrase("symthaea-nix-distillation-m7b");
-    let mut tokenizer = BpeTokenizer::default_minimal();
-    let before = tokenizer.vocab_size();
-    let added = tokenizer.add_nix_tokens();
+    let genesis = GenesisSeed::from_phrase("symthaea-nix-distillation-m7c");
+    // Use the Nix-only tokenizer (no Rust/Python keywords). The prior
+    // tokenizer (default_minimal + add_nix_tokens) left CODE_TOKENS in
+    // place, biasing emission toward Rust gibberish (`impl Into#[...`)
+    // — see 2026-04-19 BENCHMARK entry. `for_nix_distillation` builds
+    // the same vocab MINUS those tokens. Genesis phrase bumped to
+    // -m7c so the new checkpoints can't be confused with m7b ones
+    // trained against a different vocabulary.
+    let tokenizer = BpeTokenizer::for_nix_distillation();
     println!(
-        "Built Nix-augmented vocab: {} tokens (default minimal) + {} NIX_TOKENS = {} total.",
-        before,
-        added,
+        "Built Nix-only vocab (CODE_TOKENS excluded, NIX_TOKENS included): {} tokens.",
         tokenizer.vocab_size()
     );
     let mut generator = BrocaGenerator::with_tokenizer(&genesis, BrocaConfig::default(), tokenizer);

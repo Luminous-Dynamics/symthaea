@@ -952,6 +952,49 @@ impl BpeTokenizer {
         added
     }
 
+    /// Build a tokenizer targeted at Nix-only distillation: ASCII + common
+    /// English + NIX_TOKENS, **no CODE_TOKENS**.
+    ///
+    /// Why this exists: `default_minimal()` pre-loads ~200 Rust/Python-
+    /// flavored tokens (`impl`, `struct`, `pub`, `->`, `::`, `#[`, `Vec`,
+    /// `Option`, etc.). When training data is tiny (43 Nix pairs), those
+    /// tokens dominate emission because the base distribution prefers
+    /// them. The 2026-04-19 hold-out experiment showed gibberish like
+    /// `impl Into#[#[allow(~while-ed# inherit from()wrapProgram...` —
+    /// not random, but the CODE_TOKENS vocabulary asserting itself.
+    ///
+    /// This constructor keeps the special tokens, printable ASCII, and
+    /// common English (useful for prompt-side processing) but drops the
+    /// Rust/Python keyword block. `add_nix_tokens()` is called
+    /// automatically so the caller gets a fully Nix-aligned vocab.
+    ///
+    /// Checkpoints trained with this tokenizer are NOT interchangeable
+    /// with those trained on `default_minimal()` — vocab sizes differ.
+    pub fn for_nix_distillation() -> Self {
+        // Start with the same base as default_minimal (specials + ASCII
+        // + English), then intentionally skip CODE_TOKENS.
+        let mut t = Self::default_minimal();
+        // Remove every CODE_TOKENS entry. We can't easily re-index token
+        // IDs after removal, so rebuild from scratch instead.
+        let code_set: std::collections::HashSet<&str> = CODE_TOKENS.iter().copied().collect();
+        let kept: Vec<String> = t
+            .id_to_token
+            .iter()
+            .filter(|tok| !code_set.contains(tok.as_str()))
+            .cloned()
+            .collect();
+        let mut token_to_id = HashMap::new();
+        for (i, token) in kept.iter().enumerate() {
+            token_to_id.insert(token.clone(), i as u32);
+        }
+        t.vocab_size = kept.len();
+        t.id_to_token = kept;
+        t.token_to_id = token_to_id;
+        // Special-token IDs are stable (always 0-4) per default_minimal.
+        t.add_nix_tokens();
+        t
+    }
+
     /// Check if a token is one of the Nix-specific vocabulary entries.
     /// Used by epistemic gating to identify when code-token emission
     /// needs extra constraints (e.g. an attrpath root that isn't in
@@ -1424,5 +1467,31 @@ mod tests {
             fn_id_before, fn_id_after,
             "adding Nix tokens must not renumber existing code tokens"
         );
+    }
+
+    #[test]
+    fn for_nix_distillation_excludes_code_tokens() {
+        // Rust/Python keywords must NOT be in the vocab — they were
+        // poisoning Nix emission (see 2026-04-19 BENCHMARK entry).
+        let tok = BpeTokenizer::for_nix_distillation();
+        for rust_word in &["impl", "struct", "pub", "fn", "trait", "extern", "#[", "->"] {
+            assert_eq!(
+                tok.token_id(rust_word),
+                tok.unk_id,
+                "{rust_word} should NOT be in the Nix-only tokenizer"
+            );
+        }
+        // But Nix-specific tokens MUST be present.
+        for nix_word in &["services.", "enable = true", "mkShell"] {
+            assert_ne!(
+                tok.token_id(nix_word),
+                tok.unk_id,
+                "{nix_word} must be in the Nix tokenizer (via add_nix_tokens)"
+            );
+        }
+        // Special tokens stay at their stable IDs.
+        assert_eq!(tok.bos_id, 0);
+        assert_eq!(tok.eos_id, 1);
+        assert_eq!(tok.unk_id, 3);
     }
 }
