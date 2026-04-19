@@ -2172,6 +2172,20 @@ async fn phase0_alice_sends_bob_receives() {
         .await
         .expect("pre-send consistency");
 
+    // Pre-warm the init cascade on both cells. The mail_messages zome's
+    // init() creates 7 system folders + a cap grant; it also chains into
+    // mail_trust's init via the first cross-zome call from send_email. If
+    // init runs lazily on the first timed call, it can exceed the 30s
+    // init timeout under load. Calling get_folders here forces both inits
+    // to run during untimed setup, so send_email later starts from a warm
+    // state.
+    let _: serde_json::Value = conductors[0]
+        .call(&alice_cell.zome("mail_messages"), "get_folders", ())
+        .await;
+    let _: serde_json::Value = conductors[1]
+        .call(&bob_cell.zome("mail_messages"), "get_folders", ())
+        .await;
+
     // Client-authoritative fields — Alice decides these.
     let timestamp = Timestamp::now();
     let message_id = "phase0-happy-001";
