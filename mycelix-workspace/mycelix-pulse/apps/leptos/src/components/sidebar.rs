@@ -3,9 +3,9 @@
 
 //! Dual sidebar — The Record (async mail) + The Pulse (real-time chat) + Spaces.
 
-use leptos::prelude::*;
 use crate::mail_context::use_mail;
 use crate::toasts::use_toasts;
+use leptos::prelude::*;
 
 #[component]
 pub fn Sidebar() -> impl IntoView {
@@ -164,8 +164,12 @@ pub fn Sidebar() -> impl IntoView {
             </div>
 
             // ── TRUST DASHBOARD ──
-            <div class="sidebar-section trust-section">
-                <h4 class="sidebar-section-title">"\u{1F6E1} Trust Network"</h4>
+            // Collapsible via native <details>. Telemetry panels default
+            // to open for power users, but can be folded away when the
+            // user just wants to read mail — addresses the "sidebar is
+            // doing a lot" UX friction without hiding the data.
+            <details class="sidebar-section trust-section collapsible" open=true>
+                <summary class="sidebar-section-title">"\u{1F6E1} Trust Network"</summary>
                 <div class="trust-summary">
                     {
                         let mail_trust = mail_trust_sidebar.clone();
@@ -203,11 +207,11 @@ pub fn Sidebar() -> impl IntoView {
                         }
                     }}
                 </div>
-            </div>
+            </details>
 
             // ── ATTENTION BUDGET ──
-            <div class="sidebar-section attention-section">
-                <h4 class="sidebar-section-title">"\u{1F9E0} Attention"</h4>
+            <details class="sidebar-section attention-section collapsible" open=true>
+                <summary class="sidebar-section-title">"\u{1F9E0} Attention"</summary>
                 {
                     let mail_att = mail_att_sidebar.clone();
                     move || {
@@ -229,7 +233,7 @@ pub fn Sidebar() -> impl IntoView {
                         </div>
                     }
                 }}
-            </div>
+            </details>
 
             <div class="sidebar-footer">
                 // User status
@@ -250,9 +254,10 @@ pub fn Sidebar() -> impl IntoView {
 #[component]
 fn UserStatus() -> impl IntoView {
     let status_text = RwSignal::new(
-        web_sys::window().and_then(|w| w.local_storage().ok().flatten())
+        web_sys::window()
+            .and_then(|w| w.local_storage().ok().flatten())
             .and_then(|s| s.get_item("mycelix_user_status").ok().flatten())
-            .unwrap_or_default()
+            .unwrap_or_default(),
     );
     let open = RwSignal::new(false);
 

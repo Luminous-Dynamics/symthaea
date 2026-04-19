@@ -44,6 +44,11 @@
     --text:        #e2e6f0;
     --text-secondary: #8890a8;
     --text-muted:  #5c6380;
+    /* Placeholder text — WCAG AA compliant against #08080c / #0f1118.
+       --text-muted (#5c6380) computes to ~3.8:1 which fails AA for small
+       text; this lighter shade clears 6.8:1 while still visibly distinct
+       from active input text (--text = #e2e6f0). */
+    --text-placeholder: #9098b0;
 
     /* Brand */
     --primary:     #06D6C8;
@@ -147,6 +152,56 @@ input, textarea, select {
 input:focus, textarea:focus {
     outline: none;
     border-color: var(--primary);
+    /* Soft teal halo instead of a hard 2px outline ring — the thick neon
+       glow was competing with the thinner lines used elsewhere. The
+       3px radius + 18% alpha matches the Indlela motion-design
+       principle of "visible but not shouting". */
+    box-shadow: 0 0 0 3px rgba(6, 214, 200, 0.18);
+}
+
+/* Global placeholder — single source of truth for input hint text.
+   Individual .*::placeholder rules still win, but this is the default
+   everything inherits from. */
+::placeholder {
+    color: var(--text-placeholder);
+    opacity: 1;
+}
+
+/* Collapsible sidebar sections — <details> with a summary that matches
+   the .sidebar-section-title typography and adds an unobtrusive caret.
+   Default ::-webkit-details-marker is hidden so we can control the
+   indicator consistently across Firefox/Chrome/Safari. */
+.sidebar-section.collapsible {
+    /* <details> collapses margin when open/closed; force consistent spacing. */
+    margin-bottom: var(--space-md);
+}
+.sidebar-section.collapsible > summary {
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    /* No outline on click; keyboard focus handled by :focus-visible below. */
+    user-select: none;
+}
+.sidebar-section.collapsible > summary::-webkit-details-marker {
+    display: none;
+}
+.sidebar-section.collapsible > summary::after {
+    /* Caret uses the muted palette so it doesn't compete with real content. */
+    content: "\25BE"; /* ▾ */
+    color: var(--text-muted);
+    font-size: 0.75em;
+    transition: transform var(--duration-fast) var(--ease);
+    margin-left: var(--space-sm);
+}
+.sidebar-section.collapsible:not([open]) > summary::after {
+    transform: rotate(-90deg); /* ▸ */
+}
+.sidebar-section.collapsible > summary:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
 }
 
 .skip-link {
@@ -2672,9 +2727,16 @@ kbd {
     outline: 2px solid var(--primary);
     outline-offset: 2px;
 }
-button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible {
+button:focus-visible, a:focus-visible {
     outline: 2px solid var(--primary);
     outline-offset: 2px;
+}
+/* Inputs + textareas use the softer halo from the :focus rule above;
+   re-asserting here makes keyboard-nav behavior consistent with pointer
+   focus so the UX doesn't change based on input device. */
+input:focus-visible, textarea:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(6, 214, 200, 0.30);
 }
 
 /* Reduced motion preference */
