@@ -3,6 +3,51 @@
 Honest measurement log. Each entry: date, commit, scorer used, result. Don't
 amend historical rows — if numbers change, append a new row and note why.
 
+## 2026-04-19 — **Second correction**: 25-epoch test + scorer bug fix
+
+After the multi-seed correction below, ran a 25-epoch extended training
+to match the original 0/9 setup (the 10-epoch runs may have been
+under-trained).
+
+**Training**: 43 train pairs × 25 epochs on GPU, loss 5.64 → 0.64.
+
+**First eval showed 1/13 pass on run 2** — seemingly a real
+generalization signal! Investigation revealed a **scorer bug**:
+
+The redis golden `{ services.redis.servers."".enable = true; }`
+uses a dynamic (quoted-empty-string) attrpath segment.
+`walk_attrpaths` correctly skips dynamic segments → golden flattens
+to zero static paths → empty `missing_required` → any parse-valid
+gibberish trivially PASSes.
+
+Commit `7a6c0714a8` fixes: `StructuralVerdict.golden_unscorable` is
+set when golden has no static paths; `pass()` now requires
+`!golden_unscorable`. Regression test locks the fix.
+
+**Post-fix numbers** (43 train × 25 epochs, 3 seeds, corrected scorer):
+
+| Seed | Full-parse | Prefix (bytes) |
+|---|---|---|
+| 1 | 0/13 | 29 |
+| 2 | 0/13 | (47 — was "passing" via bug) |
+| 3 | 0/13 | 18 |
+| mean | **0/13** | ~31 |
+
+**Definitive #3 verdict**:
+- 13 train × 10 ep: 0/13 (3 seeds)
+- 43 train × 10 ep: 0/13 (3 seeds)
+- 43 train × 25 ep: 0/13 (3 seeds, bug-fixed)
+- Prefix length no measurable change across regimes
+
+**#3 data scaling is rejected for this architecture**: tripling data
+AND 2.5× more epochs produce zero hold-out passes. The model's
+grammar ceiling is not about training-data volume at this scale.
+
+The corpus-scrape + accept-filter infrastructure still stands — it's
+validated, and produces the input format for a future #2 structure-
+aware loss or #1 rnix-gated-decoding experiment. What it does NOT
+do alone: make the model generalize.
+
 ## 2026-04-19 — **Correction**: multi-seed check shows the "2× prefix" claim was noise
 
 Immediately after the entry below, ran 3 eval seeds per checkpoint to
