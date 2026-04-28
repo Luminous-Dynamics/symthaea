@@ -20,7 +20,7 @@ use std::fmt;
 
 // Assuming Entity, Span, CodeStructure, CodeDiagnostic, and EntityKind are available
 // from the common library module (code_parser.rs)
-use crate::code_parser::{Entity, Span, CodeStructure, CodeDiagnostic, EntityKind, Relation, EntityRelation};
+use crate::code_parser::{Entity, Span, CodeStructure, CodeDiagnostic, EntityKind, Relation, EntityRelation, SemanticAnalyzer, SemanticConcept};
 
 
 /// Represents a structured configuration value.
@@ -77,4 +77,23 @@ pub struct ConfiguredCode {
     pub structure: CodeStructure, // Now uses the unified CodeStructure
     /// Diagnostics (errors, warnings)
     pub diagnostics: Vec<CodeDiagnostic>,
+}
+
+// Implementation of the SemanticAnalyzer trait for configuration data
+impl SemanticAnalyzer for ConfiguredCode {
+    /// Analyzes the configuration structure to infer high-level operational modes.
+    fn analyze_config(&self) -> Vec<SemanticConcept> {
+        // Placeholder implementation: In a real AGI, this would traverse the
+        // entity graph and relationship structure to infer concepts like
+        // "Initial State Definition" or "Simulation Boundary Conditions".
+        vec![SemanticConcept {
+            concept_name: "System Initialization".to_string(),
+            description: "Inferred initial state parameters from configuration map.".to_string(),
+            core_entities: self.entities.iter()
+                .filter(|e| e.kind == EntityKind::Variable || e.kind == EntityKind::Constant)
+                .map(|e| e.name.clone()).collect(),
+            inferred_relation: Relation::DependsOn,
+            span: self.structure.module_path.get(0).cloned().unwrap_or_default(),
+        }]
+    }
 }

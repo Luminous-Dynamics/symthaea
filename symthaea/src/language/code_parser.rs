@@ -338,6 +338,31 @@ impl ParsedCode {
     }
 }
 
+/// Represents a high-level, inferred semantic concept derived from the graph.
+#[derive(Debug, Clone)]
+pub struct SemanticConcept {
+    /// The name of the concept (e.g., "Plasma Stabilization Loop", "User Authentication Flow")
+    pub concept_name: String,
+    /// A description of the concept's function
+    pub description: String,
+    /// The entities that form the core of this concept
+    pub core_entities: Vec<String>,
+    /// The relationship type that defines the concept (e.g., "CausalChain", "DataFlow")
+    pub inferred_relation: Relation,
+    /// The span where the concept is primarily defined
+    pub span: Span,
+}
+
+/// Trait for performing deep semantic analysis on a parsed structure.
+pub trait SemanticAnalyzer {
+    /// Analyzes the parsed code and structure to infer high-level concepts.
+    /// This is the core AGI reasoning step.
+    fn analyze(&self, parsed: &ParsedCode) -> Vec<SemanticConcept>;
+
+    /// Analyzes the configuration and structure to infer high-level operational modes.
+    fn analyze_config(&self, configured: &ConfiguredCode) -> Vec<SemanticConcept>;
+}
+
 /// The unified code parser trait.
 ///
 /// Implement this for each language to enable code understanding via
