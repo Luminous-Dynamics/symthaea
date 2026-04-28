@@ -95,7 +95,6 @@ pub struct PhysicsWorld<const D: usize> {
     pub baumgarte: f64,
     /// Constraint compliance (softness). 0.0 = rigid (default). Higher values
     /// make contacts softer (spring-like). Applied as `α = compliance / dt²`.
-    pub compliance: f64,
     /// NetId → BodyHandle mapping for cross-machine replay determinism.
     net_id_map: BTreeMap<NetId, BodyHandle>,
     /// BodyHandle → Vec index for O(1) body lookup.
@@ -582,7 +581,7 @@ impl<const D: usize> PhysicsWorld<D> {
         }
 
     // Helper function to access the callback handler (assuming it's stored somewhere accessible)
-    fn get_callback(&self) -> Option<&mut dyn Fn(&ImpactEvent)> {
+    fn get_callback(&mut self) -> Option<&mut dyn Fn(&ImpactEvent)> {
         // In a real application, this would retrieve the registered callback.
         // For demonstration, we assume the callback is available.
         None
