@@ -11,7 +11,7 @@
 //!
 //! ```text
 //! Source Code → CodeParser::parse() → ParsedCode (AST + entities)
-//!                                         ↓
+//!                                        ↓
 //!                           CodeParser::to_hdv() → ContinuousHV (16,384D)
 //! ```
 
@@ -116,9 +116,9 @@ impl fmt::Display for EntityKind {
     }
 }
 
-/// A code entity extracted from an AST
+/// A unified representation of an extracted entity, regardless of source (Code or Config).
 #[derive(Debug, Clone)]
-pub struct CodeEntity {
+pub struct Entity {
     /// What kind of entity
     pub kind: EntityKind,
     /// Name of the entity (function name, struct name, etc.)
@@ -127,13 +127,15 @@ pub struct CodeEntity {
     pub span: Span,
     /// Raw source text of this entity
     pub source_text: String,
+    /// Value associated with this entity (used primarily for configuration data)
+    pub value: Option<String>,
     /// Child entities (e.g., methods inside a struct impl)
-    pub children: Vec<CodeEntity>,
+    pub children: Vec<Entity>,
     /// Arbitrary annotations (e.g., "visibility" → "pub", "async" → "true")
     pub annotations: HashMap<String, String>,
 }
 
-impl CodeEntity {
+impl Entity {
     /// Create a new entity
     pub fn new(kind: EntityKind, name: impl Into<String>, span: Span) -> Self {
         Self {
@@ -141,6 +143,7 @@ impl CodeEntity {
             name: name.into(),
             source_text: String::new(),
             span,
+            value: None,
             children: Vec::new(),
             annotations: HashMap::new(),
         }
@@ -152,6 +155,12 @@ impl CodeEntity {
         self
     }
 
+    /// Set an optional value (useful for config data)
+    pub fn with_value(mut self, value: impl Into<String>) -> Self {
+        self.value = Some(value.into());
+        self
+    }
+
     /// Add an annotation
     pub fn with_annotation(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
         self.annotations.insert(key.into(), value.into());
@@ -159,7 +168,7 @@ impl CodeEntity {
     }
 
     /// Add a child entity
-    pub fn with_child(mut self, child: CodeEntity) -> Self {
+    pub fn with_child(mut self, child: Entity) -> Self {
         self.children.push(child);
         self
     }
@@ -170,7 +179,7 @@ impl CodeEntity {
     }
 }
 
-/// Relationships between code entities
+/// Relationships between entities (Code or Config)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Relation {
     /// A calls B
@@ -193,7 +202,7 @@ pub enum Relation {
 
 /// A relationship between two entities
 #[derive(Debug, Clone)]
-pub struct CodeRelation {
+pub struct EntityRelation {
     /// Source entity name
     pub source: String,
     /// Relation type
@@ -202,11 +211,11 @@ pub struct CodeRelation {
     pub target: String,
 }
 
-/// Structure information about code (dependency graph, call graph)
+/// Structure information about code and configuration (dependency graph, call graph)
 #[derive(Debug, Clone, Default)]
 pub struct CodeStructure {
-    /// Relationships found in code
-    pub relations: Vec<CodeRelation>,
+    /// Relationships found between entities
+    pub relations: Vec<EntityRelation>,
     /// Module/namespace hierarchy
     pub module_path: Vec<String>,
 }
@@ -258,7 +267,7 @@ pub struct ParsedCode {
     /// Language name
     pub language: String,
     /// Extracted entities
-    pub entities: Vec<CodeEntity>,
+    pub entities: Vec<Entity>,
     /// Structural relationships
     pub structure: CodeStructure,
     /// Diagnostics (errors, warnings)
@@ -297,7 +306,7 @@ impl ParsedCode {
     }
 
     /// Get all entities of a specific kind
-    pub fn entities_of_kind(&self, kind: EntityKind) -> Vec<&CodeEntity> {
+    pub fn entities_of_kind(&self, kind: EntityKind) -> Vec<&Entity> {
         self.entities.iter().filter(|e| e.kind == kind).collect()
     }
 
@@ -314,9 +323,9 @@ impl ParsedCode {
     }
 
     /// Iterate all entities recursively (depth-first)
-    pub fn all_entities(&self) -> Vec<&CodeEntity> {
+    pub fn all_entities(&self) -> Vec<&Entity> {
         let mut result = Vec::new();
-        fn collect<'a>(entity: &'a CodeEntity, out: &mut Vec<&'a CodeEntity>) {
+        fn collect<'a>(entity: &'a Entity, out: &mut Vec<&'a Entity>) {
             out.push(entity);
             for child in &entity.children {
                 collect(child, out);
@@ -351,7 +360,7 @@ pub trait CodeParser: Send + Sync {
     }
 
     /// Extract high-level entities from parsed code
-    fn extract_entities(&self, parsed: &ParsedCode) -> Vec<CodeEntity>;
+    fn extract_entities(&self, parsed: &ParsedCode) -> Vec<Entity>;
 
     /// Detect errors and warnings beyond syntax (semantic analysis)
     fn detect_diagnostics(&self, parsed: &ParsedCode) -> Vec<CodeDiagnostic>;
@@ -413,7 +422,7 @@ mod tests {
     }
 
     #[test]
-    fn test_code_entity_builder() {
+    fn test_entity_builder() {
         let span = Span {
             start_byte: 0,
             end_byte: 50,
@@ -422,10 +431,9 @@ mod tests {
             end_line: 2,
             end_col: 1,
         };
-        let entity = CodeEntity::new(EntityKind::Function, "my_func", span)
+        let entity = Entity::new(EntityKind::Function, "my_func", span)
             .with_source("fn my_func() {}")
-            .with_annotation("visibility", "pub")
-            .with_annotation("async", "true");
+            .with_annotation("visibility", "pub");
 
         assert_eq!(entity.kind, EntityKind::Function);
         assert_eq!(entity.name, "my_func");
@@ -437,7 +445,7 @@ mod tests {
     }
 
     #[test]
-    fn test_code_entity_with_children() {
+    fn test_entity_with_children() {
         let span = Span {
             start_byte: 0,
             end_byte: 100,
@@ -455,13 +463,13 @@ mod tests {
             end_col: 5,
         };
 
-        let entity = CodeEntity::new(EntityKind::Struct, "MyStruct", span)
-            .with_child(CodeEntity::new(
+        let entity = Entity::new(EntityKind::Struct, "MyStruct", span)
+            .with_child(Entity::new(
                 EntityKind::Method,
                 "new",
                 child_span.clone(),
             ))
-            .with_child(CodeEntity::new(EntityKind::Method, "run", child_span));
+            .with_child(Entity::new(EntityKind::Method, "run", child_span));
 
         assert_eq!(entity.total_count(), 3);
     }
@@ -478,15 +486,9 @@ mod tests {
         };
 
         let mut parsed = ParsedCode::new("fn a() {} fn b() {} struct C {}", "rust");
-        parsed
-            .entities
-            .push(CodeEntity::new(EntityKind::Function, "a", span.clone()));
-        parsed
-            .entities
-            .push(CodeEntity::new(EntityKind::Function, "b", span.clone()));
-        parsed
-            .entities
-            .push(CodeEntity::new(EntityKind::Struct, "C", span));
+        parsed.entities.push(Entity::new(EntityKind::Function, "a", span.clone()));
+        parsed.entities.push(Entity::new(EntityKind::Function, "b", span.clone()));
+        parsed.entities.push(Entity::new(EntityKind::Struct, "C", span));
 
         assert_eq!(parsed.entities_of_kind(EntityKind::Function).len(), 2);
         assert_eq!(parsed.entities_of_kind(EntityKind::Struct).len(), 1);
@@ -506,9 +508,9 @@ mod tests {
 
         let mut parsed = ParsedCode::new("", "rust");
         parsed.entities.push(
-            CodeEntity::new(EntityKind::Struct, "S", span.clone())
-                .with_child(CodeEntity::new(EntityKind::Method, "m1", span.clone()))
-                .with_child(CodeEntity::new(EntityKind::Method, "m2", span)),
+            Entity::new(EntityKind::Struct, "S", span.clone())
+                .with_child(Entity::new(EntityKind::Method, "m1", span.clone()))
+                .with_child(Entity::new(EntityKind::Method, "m2", span)),
         );
 
         assert_eq!(parsed.all_entities().len(), 3);
