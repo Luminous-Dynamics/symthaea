@@ -15,6 +15,14 @@
 
 use symthaea_auv::types::{AuvCommand, AuvState};
 
+// Thruster indices for clarity
+const THRUSTER_SURGE_L: usize = 0;
+const THRUSTER_SURGE_R: usize = 1;
+const THRUSTER_SWAY_PORT: usize = 2;
+const THRUSTER_SWAY_STARBOARD: usize = 3;
+const THRUSTER_HEAVE_L: usize = 4;
+const THRUSTER_HEAVE_R: usize = 5;
+
 pub struct WaypointController {
     pub target: [f64; 3],
     pub kp_surge: f64,
@@ -67,14 +75,14 @@ impl WaypointController {
         // Map onto 8 thrusters. Sign convention for heave matches
         // `AuvCommand::descend`: negative values produce positive depth motion.
         let mut cmd = AuvCommand::zero();
-        cmd.thrusters[0] = surge;
-        cmd.thrusters[1] = surge;
+        cmd.thrusters[THRUSTER_SURGE_L] = surge;
+        cmd.thrusters[THRUSTER_SURGE_R] = surge;
         // yaw differential: thrusters 2 and 3 (opposing sign)
-        cmd.thrusters[2] = yaw_cmd;
-        cmd.thrusters[3] = -yaw_cmd;
+        cmd.thrusters[THRUSTER_SWAY_PORT] = yaw_cmd;
+        cmd.thrusters[THRUSTER_SWAY_STARBOARD] = -yaw_cmd;
         // heave (negate to match descend convention)
-        cmd.thrusters[4] = -depth_cmd;
-        cmd.thrusters[5] = -depth_cmd;
+        cmd.thrusters[THRUSTER_HEAVE_L] = -depth_cmd;
+        cmd.thrusters[THRUSTER_HEAVE_R] = -depth_cmd;
         cmd.clamped()
     }
 }
