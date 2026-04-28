@@ -252,6 +252,10 @@ impl<const D: usize> PhysicsWorld<D> {
         }
         for body in &mut self.bodies {
             if !body.sleeping {
+                if let Some(ref cb) = callback {
+                    body.force_accumulator =
+                        cb.modulate_force(body.handle, &body.force_accumulator);
+                }
                 integrator::integrate(body, &self.gravity, dt);
             }
         }
@@ -657,6 +661,28 @@ impl<const D: usize> PhysicsWorld<D> {
 mod tests {
     use super::*;
 
+    struct ForceScaleCallback {
+        gain: f64,
+    }
+
+    impl<const D: usize> PhysicsCallback<D> for ForceScaleCallback {
+        fn modulate_force(&self, _: BodyHandle, force: &SVector<f64, D>) -> SVector<f64, D> {
+            force * self.gain
+        }
+
+        fn modulate_impulse(&self, impulse: f64, _: &SVector<f64, D>) -> f64 {
+            impulse
+        }
+
+        fn friction_multiplier(&self, _: &SVector<f64, D>, _: BodyHandle) -> f64 {
+            1.0
+        }
+
+        fn on_collision(&mut self, _: &CollisionEvent<D>) {}
+
+        fn record_dissipation(&mut self, _: f64) {}
+    }
+
     #[test]
     fn empty_world_steps() {
         let mut world = PhysicsWorld::<3>::new(SVector::from([0.0, -9.81, 0.0]));
@@ -763,6 +789,37 @@ mod tests {
 
         let final_ke = world.total_kinetic_energy();
         assert!(final_ke < initial_ke, "KE should decrease with damping");
+    }
+
+    #[test]
+    fn callback_modulates_applied_forces_before_integration() {
+        let dt = 0.1;
+
+        let mut blocked = PhysicsWorld::<3>::new(SVector::zeros());
+        let h_blocked = blocked.add_sphere(Point::origin(), 1.0, 1.0);
+        blocked
+            .body_mut(h_blocked)
+            .unwrap()
+            .apply_force(SVector::from([10.0, 0.0, 0.0]));
+        let mut red_tier = ForceScaleCallback { gain: 0.0 };
+        blocked.step_with_callback(dt, &mut red_tier);
+        assert!(
+            blocked.body(h_blocked).unwrap().linear_velocity.norm() < 1e-12,
+            "zero-gain callback should block intended motor force"
+        );
+
+        let mut allowed = PhysicsWorld::<3>::new(SVector::zeros());
+        let h_allowed = allowed.add_sphere(Point::origin(), 1.0, 1.0);
+        allowed
+            .body_mut(h_allowed)
+            .unwrap()
+            .apply_force(SVector::from([10.0, 0.0, 0.0]));
+        let mut green_tier = ForceScaleCallback { gain: 1.0 };
+        allowed.step_with_callback(dt, &mut green_tier);
+        assert!(
+            allowed.body(h_allowed).unwrap().linear_velocity[0] > 0.9,
+            "unit-gain callback should preserve intended motor force"
+        );
     }
 
     #[test]
