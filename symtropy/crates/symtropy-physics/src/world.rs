@@ -580,23 +580,12 @@ impl<const D: usize> PhysicsWorld<D> {
 
             // ═══ CONSCIOUSNESS FEEDBACK: collision → prediction error ═══
             // 1. Call the general on_collision hook (for immediate reaction)
-            if let Some(callback) = &mut self.get_callback() {
+            if let Some(callback) = &mut callback {
                 callback.on_collision(&event);
             }
             // 2. Call the dedicated trauma/state update hook (for persistent state)
-            if let Some(callback) = &mut self.get_callback() {
+            if let Some(callback) = &mut callback {
                 callback.apply_trauma(&event);
             }
         }
-
-    // Helper function to access the callback handler (assuming it's stored somewhere accessible)
-    fn get_callback(&mut self) -> Option<&mut dyn PhysicsCallback<D>> {
-        // In a real application, this would retrieve the registered callback.
-        // For demonstration, we assume the callback is available.
-        // NOTE: This function signature is kept for structural compatibility,
-        // but the actual callback object should be passed down or stored in the world state.
-        // Since the callback is already passed into resolve_contact, we rely on that argument.
-        // We return None here to satisfy the compiler while acknowledging the structural limitation.
-        None
     }
-}
