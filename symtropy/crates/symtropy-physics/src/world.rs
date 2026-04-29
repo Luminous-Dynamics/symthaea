@@ -575,15 +575,8 @@ impl<const D: usize> PhysicsWorld<D> {
             // ═══ CONSCIOUSNESS FEEDBACK: collision → prediction error ═══
             // The callback receives the event data to calculate internal state changes
             // (e.g., trauma, shock, or energy expenditure) based on the impact.
-            if let Some(callback) = &mut self.get_callback() {
-                callback.handle_impact(event);
+            if let Some(cb) = callback.as_mut() {
+                cb.on_collision(&event);
             }
         }
-
-    // Helper function to access the callback handler (assuming it's stored somewhere accessible)
-    fn get_callback(&mut self) -> Option<&mut dyn Fn(&ImpactEvent)> {
-        // In a real application, this would retrieve the registered callback.
-        // For demonstration, we assume the callback is available.
-        None
     }
-}
