@@ -580,12 +580,12 @@ impl<const D: usize> PhysicsWorld<D> {
 
             // ═══ CONSCIOUSNESS FEEDBACK: collision → prediction error ═══
             // 1. Call the general on_collision hook (for immediate reaction)
-            if let Some(callback) = &mut callback {
-                callback.on_collision(&event);
+            if let Some(cb) = callback.as_mut() {
+                cb.on_collision(&event);
             }
             // 2. Call the dedicated trauma/state update hook (for persistent state)
-            if let Some(callback) = &mut callback {
-                callback.apply_trauma(&event);
+            if let Some(cb) = callback.as_mut() {
+                cb.apply_trauma(&event);
             }
         }
     }
