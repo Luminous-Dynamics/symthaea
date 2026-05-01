@@ -1,0 +1,6 @@
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+
+[build]
+# Use sccache from root config if present, or override here if needed.
+# The root config already sets rustc-wrapper = "sccache".

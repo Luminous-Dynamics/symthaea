@@ -1,0 +1,3 @@
+test_var := `echo alsa-lib`
+test:
+    echo {{test_var}}
