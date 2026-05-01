@@ -103,12 +103,15 @@ pub struct Tab {
 /// Uses ReadSignal/WriteSignal pairs (standard Leptos 0.8 CSR pattern).
 #[derive(Clone)]
 pub struct BrowserState {
+    // Core Navigation State
     pub current_url: ReadSignal<String>,
     pub set_current_url: WriteSignal<String>,
     pub page_title: ReadSignal<String>,
     pub set_page_title: WriteSignal<String>,
     pub view: ReadSignal<PageView>,
     pub set_view: WriteSignal<PageView>,
+    
+    // Security/Context State
     pub zone: ReadSignal<ContentZone>,
     pub set_zone: WriteSignal<ContentZone>,
     pub safety: ReadSignal<SafetyLevel>,
@@ -117,55 +120,56 @@ pub struct BrowserState {
     pub set_threat_count: WriteSignal<usize>,
     pub loading: ReadSignal<bool>,
     pub set_loading: WriteSignal<bool>,
+    
+    // Search State
     pub search_mode: ReadSignal<SearchMode>,
     pub set_search_mode: WriteSignal<SearchMode>,
-    /// History stack and cursor for back/forward navigation.
+    pub search_generation: ReadSignal<u64>,
+    pub set_search_generation: WriteSignal<u64>,
+    
+    // Epistemic/Spore State
+    pub consciousness: ReadSignal<f32>,
+    pub set_consciousness: WriteSignal<f32>,
+    pub epistemic_confidence: ReadSignal<f32>,
+    pub set_epistemic_confidence: WriteSignal<f32>,
+    pub prediction_error: ReadSignal<f32>,
+    pub set_prediction_error: WriteSignal<f32>,
+    pub spore_summary: ReadSignal<String>,
+    pub set_spore_summary: WriteSignal<String>,
+    
+    // Rendering/Tab State
+    pub render_mode: ReadSignal<RenderMode>,
+    pub set_render_mode: WriteSignal<RenderMode>,
+    pub tabs: ReadSignal<Vec<Tab>>,
+    pub set_tabs: WriteSignal<Vec<Tab>>,
+    pub active_tab: ReadSignal<u32>,
+    pub set_active_tab: WriteSignal<u32>,
+    next_tab_id: StoredValue<u32>,
+    
+    // Persistence State
+    pub bookmarks: ReadSignal<Vec<Bookmark>>,
+    pub set_bookmarks: WriteSignal<Vec<Bookmark>>,
+    
+    // History State
     history: StoredValue<Vec<HistoryEntry>>,
     history_cursor: ReadSignal<usize>,
     set_history_cursor: WriteSignal<usize>,
-    /// True while navigating via back/forward (suppresses push).
     navigating_history: StoredValue<bool>,
-    /// Generation counter to discard stale external search results.
-    pub search_generation: ReadSignal<u64>,
-    pub set_search_generation: WriteSignal<u64>,
-    /// Consciousness level (Psi) from the embedded Spore kernel.
-    pub consciousness: ReadSignal<f32>,
-    pub set_consciousness: WriteSignal<f32>,
-    /// Epistemic honest confidence (0.0-0.95).
-    pub epistemic_confidence: ReadSignal<f32>,
-    pub set_epistemic_confidence: WriteSignal<f32>,
-    /// Prediction error from last Spore cycle (surprise signal).
-    pub prediction_error: ReadSignal<f32>,
-    pub set_prediction_error: WriteSignal<f32>,
-    /// Spore-generated epistemic summary for the current search.
-    pub spore_summary: ReadSignal<String>,
-    pub set_spore_summary: WriteSignal<String>,
-    /// Page rendering mode (Reader vs Full Page).
-    pub render_mode: ReadSignal<RenderMode>,
-    pub set_render_mode: WriteSignal<RenderMode>,
-    /// Open tabs.
-    pub tabs: ReadSignal<Vec<Tab>>,
-    pub set_tabs: WriteSignal<Vec<Tab>>,
-    /// Active tab ID.
-    pub active_tab: ReadSignal<u32>,
-    pub set_active_tab: WriteSignal<u32>,
-    /// Next tab ID counter.
-    next_tab_id: StoredValue<u32>,
-    /// Bookmarks.
-    pub bookmarks: ReadSignal<Vec<Bookmark>>,
-    pub set_bookmarks: WriteSignal<Vec<Bookmark>>,
-}
-
-impl BrowserState {
-    pub fn new() -> Self {
+    
+    // Helper function to initialize all signals
+    fn initialize() -> Self {
+        // 1. Core Navigation State
         let (current_url, set_current_url) = signal("prism://welcome".to_string());
         let (page_title, set_page_title) = signal("Prism".to_string());
         let (view, set_view) = signal(PageView::Welcome);
+        
+        // 2. Security/Context State
         let (zone, set_zone) = signal(ContentZone::Local);
         let (safety, set_safety) = signal(SafetyLevel::Green);
         let (threat_count, set_threat_count) = signal(0usize);
         let (loading, set_loading) = signal(false);
 
+        // 3. Search State
         let initial_mode = crate::persistence::load::<String>("search-mode")
             .and_then(|s| match s.as_str() {
                 "Basic" => Some(SearchMode::Basic),
@@ -175,19 +179,15 @@ impl BrowserState {
             })
             .unwrap_or(SearchMode::Advanced);
         let (search_mode, set_search_mode) = signal(initial_mode);
-
-        let initial_entry = HistoryEntry {
-            url: "prism://welcome".to_string(),
-            title: "Prism".to_string(),
-        };
-        let history = StoredValue::new(vec![initial_entry]);
-        let (history_cursor, set_history_cursor) = signal(0usize);
-        let navigating_history = StoredValue::new(false);
         let (search_generation, set_search_generation) = signal(0u64);
+
+        // 4. Epistemic/Spore State
         let (consciousness, set_consciousness) = signal(0.0f32);
         let (epistemic_confidence, set_epistemic_confidence) = signal(0.0f32);
         let (prediction_error, set_prediction_error) = signal(0.0f32);
         let (spore_summary, set_spore_summary) = signal(String::new());
+
+        // 5. Rendering/Tab State
         let saved_mode =
             crate::persistence::load::<RenderMode>("render-mode").unwrap_or(RenderMode::Reader);
         let (render_mode, set_render_mode) = signal(saved_mode);
@@ -202,9 +202,19 @@ impl BrowserState {
         let (active_tab, set_active_tab) = signal(1u32);
         let next_tab_id = StoredValue::new(2u32);
 
+        // 6. Persistence State
         let saved_bookmarks =
             crate::persistence::load::<Vec<Bookmark>>("bookmarks").unwrap_or_default();
         let (bookmarks, set_bookmarks) = signal(saved_bookmarks);
+
+        // 7. History State
+        let initial_entry = HistoryEntry {
+            url: "prism://welcome".to_string(),
+            title: "Prism".to_string(),
+        };
+        let history = StoredValue::new(vec![initial_entry]);
+        let (history_cursor, set_history_cursor) = signal(0usize);
+        let navigating_history = StoredValue::new(false);
 
         Self {
             current_url,
@@ -223,10 +233,6 @@ impl BrowserState {
             set_loading,
             search_mode,
             set_search_mode,
-            history,
-            history_cursor,
-            set_history_cursor,
-            navigating_history,
             search_generation,
             set_search_generation,
             consciousness,
@@ -246,7 +252,16 @@ impl BrowserState {
             next_tab_id,
             bookmarks,
             set_bookmarks,
+            history,
+            history_cursor,
+            set_history_cursor,
+            navigating_history,
         }
+    }
+
+impl BrowserState {
+    pub fn new() -> Self {
+        Self::initialize()
     }
 
     /// Push a new page onto the history stack (called on every navigation).

@@ -60,6 +60,11 @@ pub struct PrismClient {
 impl PrismClient {
     /// Create a new client with default settings.
     pub fn new() -> Self {
+        Self::with_max_body_size(10 * 1024 * 1024) // 10MB max
+    }
+
+    /// Create a new client with a specified maximum body size.
+    pub fn with_max_body_size(max_body_size: u64) -> Self {
         let client = reqwest::Client::builder()
             .user_agent(PRISM_USER_AGENT)
             .gzip(true)
@@ -71,7 +76,7 @@ impl PrismClient {
 
         Self {
             client,
-            max_body_size: 10 * 1024 * 1024, // 10MB max
+            max_body_size,
         }
     }
 
