@@ -1,5 +1,5 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Semi-implicit Euler integrator for ND rigid body dynamics.
 //!
@@ -91,11 +91,17 @@ pub fn integrate<const D: usize>(body: &mut RigidBody<D>, gravity: &SVector<f64,
     // If any state became non-finite despite clamping, zero the offending values
     // rather than propagating corruption through the simulation.
     if !body.linear_velocity.iter().all(|v| v.is_finite()) {
-        debug_assert!(false, "NaN/Inf detected in linear_velocity after integration");
+        debug_assert!(
+            false,
+            "NaN/Inf detected in linear_velocity after integration"
+        );
         body.linear_velocity = SVector::zeros();
     }
     if !body.angular_velocity.is_finite() {
-        debug_assert!(false, "NaN/Inf detected in angular_velocity after integration");
+        debug_assert!(
+            false,
+            "NaN/Inf detected in angular_velocity after integration"
+        );
         body.angular_velocity = Bivector::zero();
     }
     if !body.transform.translation.0.iter().all(|v| v.is_finite()) {
@@ -109,30 +115,21 @@ pub fn integrate<const D: usize>(body: &mut RigidBody<D>, gravity: &SVector<f64,
 }
 
 /// Apply a position correction to separate overlapping bodies.
-pub fn separate<const D: usize>(
-    body: &mut RigidBody<D>,
-    correction: &SVector<f64, D>,
-) {
+pub fn separate<const D: usize>(body: &mut RigidBody<D>, correction: &SVector<f64, D>) {
     if body.is_dynamic() {
         body.transform.translation = Point(body.transform.translation.0 + correction);
     }
 }
 
 /// Apply an impulse to a body at its center of mass.
-pub fn apply_impulse<const D: usize>(
-    body: &mut RigidBody<D>,
-    impulse: &SVector<f64, D>,
-) {
+pub fn apply_impulse<const D: usize>(body: &mut RigidBody<D>, impulse: &SVector<f64, D>) {
     if body.is_dynamic() {
         body.linear_velocity += impulse * body.inv_mass;
     }
 }
 
 /// Apply an angular impulse (as a bivector) to a body.
-pub fn apply_angular_impulse<const D: usize>(
-    body: &mut RigidBody<D>,
-    impulse: &Bivector<D>,
-) {
+pub fn apply_angular_impulse<const D: usize>(body: &mut RigidBody<D>, impulse: &Bivector<D>) {
     if body.is_dynamic() {
         let inv_i_avg = body.inv_inertia.sum() / D as f64;
         body.angular_velocity = body.angular_velocity.add(&impulse.scale(inv_i_avg));
@@ -146,12 +143,7 @@ mod tests {
 
     #[test]
     fn free_fall_3d() {
-        let mut body = RigidBody::<3>::dynamic_sphere(
-            BodyHandle(0),
-            Point::origin(),
-            1.0,
-            1.0,
-        );
+        let mut body = RigidBody::<3>::dynamic_sphere(BodyHandle(0), Point::origin(), 1.0, 1.0);
         let gravity = SVector::from([0.0, -9.81, 0.0]);
         let dt = 0.01;
 
@@ -168,12 +160,8 @@ mod tests {
 
     #[test]
     fn stationary_without_forces() {
-        let mut body = RigidBody::<3>::dynamic_sphere(
-            BodyHandle(0),
-            Point::new([5.0, 5.0, 5.0]),
-            1.0,
-            1.0,
-        );
+        let mut body =
+            RigidBody::<3>::dynamic_sphere(BodyHandle(0), Point::new([5.0, 5.0, 5.0]), 1.0, 1.0);
         let zero_gravity = SVector::zeros();
         let dt = 0.01;
 
@@ -210,12 +198,7 @@ mod tests {
 
     #[test]
     fn angular_velocity_rotates_body() {
-        let mut body = RigidBody::<3>::dynamic_sphere(
-            BodyHandle(0),
-            Point::origin(),
-            1.0,
-            1.0,
-        );
+        let mut body = RigidBody::<3>::dynamic_sphere(BodyHandle(0), Point::origin(), 1.0, 1.0);
         // Set angular velocity in xy plane
         body.angular_velocity = Bivector::<3>::unit_plane(0, 1).scale(1.0);
 
@@ -248,25 +231,23 @@ mod tests {
 
     #[test]
     fn energy_conservation_no_damping() {
-        let mut body = RigidBody::<3>::dynamic_sphere(
-            BodyHandle(0),
-            Point::new([0.0, 100.0, 0.0]),
-            1.0,
-            1.0,
-        );
+        let mut body =
+            RigidBody::<3>::dynamic_sphere(BodyHandle(0), Point::new([0.0, 100.0, 0.0]), 1.0, 1.0);
         body.linear_damping = 0.0;
         body.angular_damping = 0.0;
 
         let gravity = SVector::from([0.0, -9.81, 0.0]);
         let dt = 0.001; // Small timestep for accuracy
 
-        let initial_energy = body.kinetic_energy() + body.mass * 9.81 * body.transform.translation.coord(1);
+        let initial_energy =
+            body.kinetic_energy() + body.mass * 9.81 * body.transform.translation.coord(1);
 
         for _ in 0..1000 {
             integrate(&mut body, &gravity, dt);
         }
 
-        let final_energy = body.kinetic_energy() + body.mass * 9.81 * body.transform.translation.coord(1);
+        let final_energy =
+            body.kinetic_energy() + body.mass * 9.81 * body.transform.translation.coord(1);
         let drift = ((final_energy - initial_energy) / initial_energy).abs();
         assert!(drift < 0.01, "energy drift {drift} > 1%");
     }
@@ -287,37 +268,34 @@ mod tests {
 
     #[test]
     fn nan_force_is_sanitized() {
-        let mut body = RigidBody::<3>::dynamic_sphere(
-            BodyHandle(0),
-            Point::new([1.0, 2.0, 3.0]),
-            1.0,
-            1.0,
-        );
+        let mut body =
+            RigidBody::<3>::dynamic_sphere(BodyHandle(0), Point::new([1.0, 2.0, 3.0]), 1.0, 1.0);
         // Apply a NaN force — should be zeroed, not propagated
         body.apply_force(SVector::from([f64::NAN, 0.0, 0.0]));
         let gravity = SVector::zeros();
         integrate(&mut body, &gravity, 0.01);
 
         // Position and velocity must remain finite
-        assert!(body.linear_velocity.iter().all(|v| v.is_finite()),
-            "NaN force propagated to velocity");
-        assert!(body.transform.translation.0.iter().all(|v| v.is_finite()),
-            "NaN force propagated to position");
+        assert!(
+            body.linear_velocity.iter().all(|v| v.is_finite()),
+            "NaN force propagated to velocity"
+        );
+        assert!(
+            body.transform.translation.0.iter().all(|v| v.is_finite()),
+            "NaN force propagated to position"
+        );
     }
 
     #[test]
     fn inf_force_is_sanitized() {
-        let mut body = RigidBody::<3>::dynamic_sphere(
-            BodyHandle(0),
-            Point::origin(),
-            1.0,
-            1.0,
-        );
+        let mut body = RigidBody::<3>::dynamic_sphere(BodyHandle(0), Point::origin(), 1.0, 1.0);
         body.apply_force(SVector::from([f64::INFINITY, 0.0, 0.0]));
         let gravity = SVector::zeros();
         integrate(&mut body, &gravity, 0.01);
 
-        assert!(body.linear_velocity.iter().all(|v| v.is_finite()),
-            "Inf force propagated to velocity");
+        assert!(
+            body.linear_velocity.iter().all(|v| v.is_finite()),
+            "Inf force propagated to velocity"
+        );
     }
 }

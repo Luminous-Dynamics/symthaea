@@ -68,7 +68,10 @@ fn render_markdown(text: &str) -> String {
         } else if trimmed == "---" || trimmed == "***" || trimmed == "___" {
             html.push_str("<hr>");
         } else if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
-            html.push_str(&format!("<li>{}</li>", inline_markdown(&html_escape(&trimmed[2..]))));
+            html.push_str(&format!(
+                "<li>{}</li>",
+                inline_markdown(&html_escape(&trimmed[2..]))
+            ));
         } else if trimmed.starts_with("```") {
             html.push_str("<pre><code>");
         } else {
@@ -77,7 +80,9 @@ fn render_markdown(text: &str) -> String {
         }
     }
     // Wrap consecutive <li> in <ul>
-    html = html.replace("<li>", "<ul><li>").replace("</li><br>", "</li></ul>");
+    html = html
+        .replace("<li>", "<ul><li>")
+        .replace("</li><br>", "</li></ul>");
     html
 }
 
@@ -86,27 +91,48 @@ fn inline_markdown(text: &str) -> String {
     let mut result = text.to_string();
     // Code (backticks) — must be before bold/italic
     while let Some(start) = result.find('`') {
-        if let Some(end) = result[start+1..].find('`') {
-            let code = &result[start+1..start+1+end];
+        if let Some(end) = result[start + 1..].find('`') {
+            let code = &result[start + 1..start + 1 + end];
             let replacement = format!("<code>{code}</code>");
-            result = format!("{}{}{}", &result[..start], replacement, &result[start+2+end..]);
-        } else { break; }
+            result = format!(
+                "{}{}{}",
+                &result[..start],
+                replacement,
+                &result[start + 2 + end..]
+            );
+        } else {
+            break;
+        }
     }
     // Bold **text**
     while let Some(start) = result.find("**") {
-        if let Some(end) = result[start+2..].find("**") {
-            let bold = &result[start+2..start+2+end];
+        if let Some(end) = result[start + 2..].find("**") {
+            let bold = &result[start + 2..start + 2 + end];
             let replacement = format!("<strong>{bold}</strong>");
-            result = format!("{}{}{}", &result[..start], replacement, &result[start+4+end..]);
-        } else { break; }
+            result = format!(
+                "{}{}{}",
+                &result[..start],
+                replacement,
+                &result[start + 4 + end..]
+            );
+        } else {
+            break;
+        }
     }
     // Italic *text*
     while let Some(start) = result.find('*') {
-        if let Some(end) = result[start+1..].find('*') {
-            let italic = &result[start+1..start+1+end];
+        if let Some(end) = result[start + 1..].find('*') {
+            let italic = &result[start + 1..start + 1 + end];
             let replacement = format!("<em>{italic}</em>");
-            result = format!("{}{}{}", &result[..start], replacement, &result[start+2+end..]);
-        } else { break; }
+            result = format!(
+                "{}{}{}",
+                &result[..start],
+                replacement,
+                &result[start + 2 + end..]
+            );
+        } else {
+            break;
+        }
     }
     result
 }
@@ -128,10 +154,16 @@ fn linkify(text: &str) -> String {
             // Collect the URL
             let mut url = buf[buf.len() - prefix_len..].to_string();
             while let Some(&nc) = chars.peek() {
-                if nc.is_whitespace() || nc == '&' { break; } // &lt; etc
+                if nc.is_whitespace() || nc == '&' {
+                    break;
+                } // &lt; etc
                 url.push(chars.next().unwrap());
             }
-            let display = if url.len() > 60 { format!("{}...", &url[..57]) } else { url.clone() };
+            let display = if url.len() > 60 {
+                format!("{}...", &url[..57])
+            } else {
+                url.clone()
+            };
             result.push_str(&format!(
                 "<a href=\"{}\" target=\"_blank\" rel=\"noopener noreferrer\">{}</a>",
                 url, display
@@ -151,9 +183,9 @@ fn linkify_rendered(html: &str) -> String {
 
 fn html_escape(s: &str) -> String {
     s.replace('&', "&amp;")
-     .replace('<', "&lt;")
-     .replace('>', "&gt;")
-     .replace('"', "&quot;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
 }
 
 /// Renders an email body with paragraph breaks, quoted-text collapsing, and linkification.

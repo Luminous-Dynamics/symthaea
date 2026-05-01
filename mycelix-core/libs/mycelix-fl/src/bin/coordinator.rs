@@ -25,8 +25,7 @@ use mycelix_fl::types::Gradient;
 #[cfg(feature = "grpc")]
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let addr_str =
-        std::env::var("MYCELIX_FL_ADDR").unwrap_or_else(|_| "[::1]:50051".to_string());
+    let addr_str = std::env::var("MYCELIX_FL_ADDR").unwrap_or_else(|_| "[::1]:50051".to_string());
     let addr: std::net::SocketAddr = addr_str.parse()?;
 
     println!("=====================================================");
@@ -67,8 +66,7 @@ fn main() {
     let config = CoordinatorConfig::default();
     let pogq_config = PoGQv41Config::default();
 
-    let mut coordinator =
-        FLCoordinator::new(config.clone(), Box::new(FedAvg), Some(pogq_config));
+    let mut coordinator = FLCoordinator::new(config.clone(), Box::new(FedAvg), Some(pogq_config));
 
     println!("Coordinator started:");
     println!("  Min nodes: {}", config.min_nodes);
@@ -88,7 +86,9 @@ fn main() {
             did: Some(format!("did:mycelix:node{}", i)),
             registered_at: 0,
         };
-        coordinator.register_node(cred).expect("registration failed");
+        coordinator
+            .register_node(cred)
+            .expect("registration failed");
     }
     println!("Registered {} nodes", coordinator.node_count());
 

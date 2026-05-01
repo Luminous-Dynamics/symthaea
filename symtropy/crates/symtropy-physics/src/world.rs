@@ -1,5 +1,5 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Physics world: owns bodies, steps simulation, resolves collisions.
 
@@ -7,12 +7,12 @@ use std::collections::BTreeMap;
 use std::collections::HashMap;
 
 use nalgebra::SVector;
-use symtropy_math::Point;
+use symtropy_math::{Capsule, HalfSpace, HyperBox, Point, Sphere};
 
 use crate::body::{BodyHandle, NetId, RigidBody};
 use crate::broadphase;
-use crate::contact::{CollisionEvent, ContactCache, ContactManifold};
 use crate::constraint::Constraint;
+use crate::contact::{CollisionEvent, ContactCache, ContactManifold};
 use crate::gjk;
 use crate::integrator;
 use crate::manifold_gen;
@@ -63,9 +63,15 @@ pub trait PhysicsCallback<const D: usize> {
 pub struct NoOpCallback;
 
 impl<const D: usize> PhysicsCallback<D> for NoOpCallback {
-    fn modulate_force(&self, _: BodyHandle, force: &SVector<f64, D>) -> SVector<f64, D> { *force }
-    fn modulate_impulse(&self, impulse: f64, _: &SVector<f64, D>) -> f64 { impulse }
-    fn friction_multiplier(&self, _: &SVector<f64, D>, _: BodyHandle) -> f64 { 1.0 }
+    fn modulate_force(&self, _: BodyHandle, force: &SVector<f64, D>) -> SVector<f64, D> {
+        *force
+    }
+    fn modulate_impulse(&self, impulse: f64, _: &SVector<f64, D>) -> f64 {
+        impulse
+    }
+    fn friction_multiplier(&self, _: &SVector<f64, D>, _: BodyHandle) -> f64 {
+        1.0
+    }
     fn on_collision(&mut self, _: &CollisionEvent<D>) {}
     fn record_dissipation(&mut self, _: f64) {}
     fn apply_trauma(&mut self, _: &CollisionEvent<D>) {}
@@ -101,6 +107,7 @@ pub struct PhysicsWorld<const D: usize> {
     pub baumgarte: f64,
     /// Constraint compliance (softness). 0.0 = rigid (default). Higher values
     /// make contacts softer (spring-like). Applied as `α = compliance / dt²`.
+    pub compliance: f64,
     /// NetId → BodyHandle mapping for cross-machine replay determinism.
     net_id_map: BTreeMap<NetId, BodyHandle>,
     /// BodyHandle → Vec index for O(1) body lookup.
@@ -139,12 +146,7 @@ impl<const D: usize> PhysicsWorld<D> {
     }
 
     /// Add a dynamic sphere body and return its handle.
-    pub fn add_sphere(
-        &mut self,
-        position: Point<D>,
-        radius: f64,
-        mass: f64,
-    ) -> BodyHandle {
+    pub fn add_sphere(&mut self, position: Point<D>, radius: f64, mass: f64) -> BodyHandle {
         let handle = self.allocate_handle();
         let body = RigidBody::dynamic_sphere(handle, position, radius, mass);
         let idx = self.bodies.len();
@@ -294,7 +296,8 @@ impl<const D: usize> PhysicsWorld<D> {
                         } else {
                             (pair.1, pair.0)
                         };
-                        self.sensor_events.push(crate::contact::SensorEvent { sensor, other });
+                        self.sensor_events
+                            .push(crate::contact::SensorEvent { sensor, other });
                         continue;
                     }
                     self.contacts.push(manifold);
@@ -316,7 +319,8 @@ impl<const D: usize> PhysicsWorld<D> {
                         } else {
                             (pair.1, pair.0)
                         };
-                        self.sensor_events.push(crate::contact::SensorEvent { sensor, other });
+                        self.sensor_events
+                            .push(crate::contact::SensorEvent { sensor, other });
                         continue;
                     }
 
@@ -354,7 +358,8 @@ impl<const D: usize> PhysicsWorld<D> {
             &self.constraints,
             &self.handle_to_index,
         );
-        let active_contact_indices: Vec<usize> = islands.iter()
+        let active_contact_indices: Vec<usize> = islands
+            .iter()
             .filter(|island| !island.sleeping)
             .flat_map(|island| island.contact_indices.iter().copied())
             .collect();
@@ -384,21 +389,23 @@ impl<const D: usize> PhysicsWorld<D> {
             if ci < self.contacts.len() {
                 let c = &self.contacts[ci];
                 let total_lambda: f64 = c.points.iter().map(|p| p.lambda).sum();
-                self.contact_cache.store(
-                    c.body_a, c.body_b, c.point(), total_lambda, 0.0,
-                );
+                self.contact_cache
+                    .store(c.body_a, c.body_b, c.point(), total_lambda, 0.0);
             }
         }
 
         // 6. Solve constraints (active islands only)
-        let active_constraint_indices: Vec<usize> = islands.iter()
+        let active_constraint_indices: Vec<usize> = islands
+            .iter()
             .filter(|island| !island.sleeping)
             .flat_map(|island| island.constraint_indices.iter().copied())
             .collect();
 
         for _ in 0..self.solver_iterations {
             for &ci in &active_constraint_indices {
-                if ci >= self.constraints.len() { continue; }
+                if ci >= self.constraints.len() {
+                    continue;
+                }
                 let (ha, hb) = self.constraints[ci].bodies();
                 let (idx_a, idx_b) = self.find_body_indices(ha, hb);
                 if let (Some(a), Some(b)) = (idx_a, idx_b) {
@@ -416,7 +423,9 @@ impl<const D: usize> PhysicsWorld<D> {
         // 6b. Velocity-level constraint solve (active islands only)
         for _ in 0..self.solver_iterations {
             for &ci in &active_constraint_indices {
-                if ci >= self.constraints.len() { continue; }
+                if ci >= self.constraints.len() {
+                    continue;
+                }
                 let (ha, hb) = self.constraints[ci].bodies();
                 let (idx_a, idx_b) = self.find_body_indices(ha, hb);
                 if let (Some(a), Some(b)) = (idx_a, idx_b) {
@@ -437,10 +446,10 @@ impl<const D: usize> PhysicsWorld<D> {
         for body in &mut self.bodies {
             body.try_sleep(threshold, ticks);
         }
-        
+
         // 8. State Decay: Apply natural recovery/decay to all conscious entities.
-        if let Some(callback) = &mut callback {
-            self.decay_state(callback, dt);
+        if let Some(cb) = callback.as_deref_mut() {
+            self.decay_state(cb, dt);
         }
     }
 
@@ -452,7 +461,7 @@ impl<const D: usize> PhysicsWorld<D> {
         // Note: In a real system, we would iterate over all conscious bodies
         // and update their individual state. Here, we assume the callback
         // handles the global state update for simplicity.
-        
+
         // Decay rates (per second):
         const TRAUMA_DECAY_RATE: f64 = 0.05; // 5% per second
         const FATIGUE_DECAY_RATE: f64 = 0.02; // 2% per second
@@ -460,23 +469,23 @@ impl<const D: usize> PhysicsWorld<D> {
 
         // The callback implementation must handle the actual state update.
         // We pass a dummy event since decay is time-based, not impact-based.
-        let dummy_event = CollisionEvent {
+        let dummy_event: CollisionEvent<D> = CollisionEvent {
             body_a: BodyHandle(0),
             body_b: BodyHandle(0),
             impulse: 0.0,
-            normal: SVector::new(0.0, 0.0, 1.0),
+            normal: SVector::zeros(),
             depth: 0.0,
         };
-        
+
         // We call a specialized decay method on the callback trait (if available)
         // or, for now, we rely on the callback's internal logic to handle time-based decay.
         // Since we cannot modify the trait signature here, we assume the callback
         // implements a method to handle time-based decay, or we simply log the intent.
-        
+
         // For demonstration, we assume the callback has a method to handle time decay.
         // If the trait were expanded, we would call:
         // callback.decay_state(dt);
-        
+
         // Since we cannot modify the trait here, we will leave this as a comment
         // and assume the callback implementation handles the time decay internally
         // based on the physics step time (dt).
@@ -489,10 +498,13 @@ impl<const D: usize> PhysicsWorld<D> {
     fn warm_start_contact(&mut self, ci: usize) {
         let contact = self.contacts[ci].clone();
         let (idx_a, idx_b) = self.find_body_indices(contact.body_a, contact.body_b);
-        let (Some(a), Some(b)) = (idx_a, idx_b) else { return; };
+        let (Some(a), Some(b)) = (idx_a, idx_b) else {
+            return;
+        };
 
         let primary_pt = contact.primary_point().position;
-        let cached_total = self.prev_cache
+        let cached_total = self
+            .prev_cache
             .lookup(contact.body_a, contact.body_b, &primary_pt)
             .map(|c| c.normal_impulse * 0.8) // 80% of previous frame
             .unwrap_or(0.0);
@@ -634,3 +646,102 @@ impl<const D: usize> PhysicsWorld<D> {
 
         contact
     }
+
+    #[inline]
+    fn allocate_handle(&mut self) -> BodyHandle {
+        let handle = BodyHandle(self.next_handle);
+        self.next_handle += 1;
+        handle
+    }
+
+    #[inline]
+    fn find_body_indices(
+        &self,
+        body_a: BodyHandle,
+        body_b: BodyHandle,
+    ) -> (Option<usize>, Option<usize>) {
+        (
+            self.handle_to_index.get(&body_a).copied(),
+            self.handle_to_index.get(&body_b).copied(),
+        )
+    }
+
+    fn try_halfspace_contact(
+        &self,
+        idx_a: usize,
+        idx_b: usize,
+        handle_a: BodyHandle,
+        handle_b: BodyHandle,
+    ) -> Option<ContactManifold<D>> {
+        let body_a = &self.bodies[idx_a];
+        let body_b = &self.bodies[idx_b];
+
+        if let Some(plane) = body_a.collider.as_any().downcast_ref::<HalfSpace<D>>() {
+            return self.contact_against_halfspace(plane, body_b, handle_a, handle_b, true);
+        }
+        if let Some(plane) = body_b.collider.as_any().downcast_ref::<HalfSpace<D>>() {
+            return self.contact_against_halfspace(plane, body_a, handle_a, handle_b, false);
+        }
+
+        None
+    }
+
+    fn contact_against_halfspace(
+        &self,
+        plane: &HalfSpace<D>,
+        other: &RigidBody<D>,
+        handle_a: BodyHandle,
+        handle_b: BodyHandle,
+        plane_is_a: bool,
+    ) -> Option<ContactManifold<D>> {
+        let other_pos = other.transform.translation.0;
+        let normal = if plane_is_a {
+            plane.normal
+        } else {
+            -plane.normal
+        };
+
+        if let Some(sphere) = other.collider.as_any().downcast_ref::<Sphere<D>>() {
+            let (point, depth) = plane.contact_sphere(&other_pos, sphere.radius)?;
+            return Some(ContactManifold::single(
+                handle_a, handle_b, normal, point, depth,
+            ));
+        }
+
+        if let Some(capsule) = other.collider.as_any().downcast_ref::<Capsule<D>>() {
+            let contacts = plane.contact_capsule(
+                &other_pos,
+                capsule.half_height,
+                capsule.radius,
+                capsule.axis,
+            );
+            return Self::manifold_from_contacts(handle_a, handle_b, normal, contacts);
+        }
+
+        if let Some(hyperbox) = other.collider.as_any().downcast_ref::<HyperBox<D>>() {
+            let contacts = plane.contact_box(&other_pos, &hyperbox.half_extents);
+            return Self::manifold_from_contacts(handle_a, handle_b, normal, contacts);
+        }
+
+        None
+    }
+
+    fn manifold_from_contacts(
+        body_a: BodyHandle,
+        body_b: BodyHandle,
+        normal: SVector<f64, D>,
+        contacts: Vec<(SVector<f64, D>, f64)>,
+    ) -> Option<ContactManifold<D>> {
+        let mut contacts = contacts.into_iter();
+        let (point, depth) = contacts.next()?;
+        let mut manifold = ContactManifold::single(body_a, body_b, normal, point, depth);
+        for (position, depth) in contacts {
+            manifold.points.push(crate::contact::ContactPoint {
+                position,
+                depth,
+                lambda: 0.0,
+            });
+        }
+        Some(manifold)
+    }
+}

@@ -4,13 +4,18 @@
 //! Calendar page — personal + community + hearth events.
 //! Day/week/month + agenda views. Event CRUD. Three-source unified calendar.
 
+use crate::components::{EventForm, MonthGrid, TimeGrid};
+use crate::toasts::use_toasts;
 use leptos::prelude::*;
 use mail_leptos_types::*;
-use crate::toasts::use_toasts;
-use crate::components::{TimeGrid, MonthGrid, EventForm};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum CalView { Day, Week, Month, Agenda }
+enum CalView {
+    Day,
+    Week,
+    Month,
+    Agenda,
+}
 
 #[component]
 pub fn CalendarPage() -> impl IntoView {
@@ -32,14 +37,16 @@ pub fn CalendarPage() -> impl IntoView {
     let current_month = RwSignal::new(now.get_month() as u32 + 1);
 
     let filtered_events = move || {
-        events.get().into_iter().filter(|e| {
-            match &e.source {
+        events
+            .get()
+            .into_iter()
+            .filter(|e| match &e.source {
                 CalendarSource::Personal => show_personal.get(),
                 CalendarSource::Community => show_community.get(),
                 CalendarSource::Hearth => show_hearth.get(),
                 CalendarSource::External(_) => true,
-            }
-        }).collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>()
     };
 
     let upcoming = move || {
@@ -51,13 +58,47 @@ pub fn CalendarPage() -> impl IntoView {
     // Event form uses signals directly — no closure callbacks needed
 
     let month_label = move || {
-        let months = ["January", "February", "March", "April", "May", "June",
-                       "July", "August", "September", "October", "November", "December"];
-        format!("{} {}", months[(current_month.get() - 1) as usize], current_year.get())
+        let months = [
+            "January",
+            "February",
+            "March",
+            "April",
+            "May",
+            "June",
+            "July",
+            "August",
+            "September",
+            "October",
+            "November",
+            "December",
+        ];
+        format!(
+            "{} {}",
+            months[(current_month.get() - 1) as usize],
+            current_year.get()
+        )
     };
 
-    let on_prev = move |_| current_month.update(|m| { if *m == 1 { *m = 12; current_year.update(|y| *y -= 1); } else { *m -= 1; } });
-    let on_next = move |_| current_month.update(|m| { if *m == 12 { *m = 1; current_year.update(|y| *y += 1); } else { *m += 1; } });
+    let on_prev = move |_| {
+        current_month.update(|m| {
+            if *m == 1 {
+                *m = 12;
+                current_year.update(|y| *y -= 1);
+            } else {
+                *m -= 1;
+            }
+        })
+    };
+    let on_next = move |_| {
+        current_month.update(|m| {
+            if *m == 12 {
+                *m = 1;
+                current_year.update(|y| *y += 1);
+            } else {
+                *m += 1;
+            }
+        })
+    };
     let on_today = move |_| {
         let now = js_sys::Date::new_0();
         current_year.set(now.get_full_year() as i32);
@@ -69,25 +110,34 @@ pub fn CalendarPage() -> impl IntoView {
     let toasts_nlp = toasts.clone();
     let on_nlp_create = move |_| {
         let text = nlp_input.get_untracked();
-        if text.trim().is_empty() { return; }
+        if text.trim().is_empty() {
+            return;
+        }
         if let Some(parsed) = crate::nlp_time::parse_natural_event(&text) {
             let now_ts = (js_sys::Date::now() / 1000.0) as u64;
             let start = now_ts + (parsed.start_offset_hours * 3600.0) as u64;
             let end = start + (parsed.duration_hours * 3600.0) as u64;
 
             // Conflict detection — check for overlapping events
-            let conflicts: Vec<String> = events.get_untracked().iter()
+            let conflicts: Vec<String> = events
+                .get_untracked()
+                .iter()
                 .filter(|e| e.start_time < end && e.end_time > start && !e.all_day)
                 .map(|e| e.title.clone())
                 .collect();
             if !conflicts.is_empty() {
                 let conflict_names = conflicts.join(", ");
                 let confirmed = web_sys::window()
-                    .and_then(|w| w.confirm_with_message(
-                        &format!("This event overlaps with: {conflict_names}. Create anyway?")
-                    ).ok())
+                    .and_then(|w| {
+                        w.confirm_with_message(&format!(
+                            "This event overlaps with: {conflict_names}. Create anyway?"
+                        ))
+                        .ok()
+                    })
                     .unwrap_or(true);
-                if !confirmed { return; }
+                if !confirmed {
+                    return;
+                }
             }
 
             events.update(|evts| {
@@ -96,7 +146,8 @@ pub fn CalendarPage() -> impl IntoView {
                     title: parsed.title,
                     description: None,
                     location: None,
-                    start_time: start, end_time: end,
+                    start_time: start,
+                    end_time: end,
                     all_day: parsed.duration_hours >= 24.0,
                     recurrence: parsed.recurrence,
                     category: "Personal".into(),
@@ -110,7 +161,10 @@ pub fn CalendarPage() -> impl IntoView {
             nlp_input.set(String::new());
             toasts_nlp.push("Event created from natural language", "success");
         } else {
-            toasts_nlp.push("Couldn't parse that — try 'Meeting tomorrow at 2pm'", "error");
+            toasts_nlp.push(
+                "Couldn't parse that — try 'Meeting tomorrow at 2pm'",
+                "error",
+            );
         }
     };
 
@@ -394,6 +448,13 @@ fn format_date(ts: u64) -> String {
     let d = js_sys::Date::new_0();
     d.set_time((ts as f64) * 1000.0);
     let days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    format!("{} {} {}", days[d.get_day() as usize], months[d.get_month() as usize], d.get_date())
+    let months = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
+    format!(
+        "{} {} {}",
+        days[d.get_day() as usize],
+        months[d.get_month() as usize],
+        d.get_date()
+    )
 }

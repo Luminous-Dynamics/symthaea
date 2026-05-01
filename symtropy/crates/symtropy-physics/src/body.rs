@@ -1,5 +1,5 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 use nalgebra::SVector;
 use symtropy_math::{Bivector, Point, Shape, Sphere, Transform};
@@ -24,6 +24,17 @@ pub enum BodyType {
     Static,
     /// Moved by user code, pushes dynamic bodies but isn't affected by them.
     Kinematic,
+}
+
+/// Invalid parameters supplied while constructing a rigid body.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BodyBuildError {
+    /// Dynamic bodies require a finite, strictly positive mass.
+    InvalidMass,
+    /// Sphere colliders require a finite, strictly positive radius.
+    InvalidRadius,
+    /// Dynamic bodies require finite, strictly positive principal inertia.
+    InvalidInertia,
 }
 
 /// A rigid body in D-dimensional space.
@@ -71,8 +82,31 @@ pub struct RigidBody<const D: usize> {
 
 impl<const D: usize> RigidBody<D> {
     /// Create a dynamic body with a sphere collider.
+    ///
+    /// Panics if `radius` or `mass` are not finite and strictly positive. Use
+    /// [`Self::try_dynamic_sphere`] when accepting untrusted input.
     pub fn dynamic_sphere(handle: BodyHandle, position: Point<D>, radius: f64, mass: f64) -> Self {
-        Self {
+        Self::try_dynamic_sphere(handle, position, radius, mass)
+            .expect("dynamic sphere requires finite positive radius and mass")
+    }
+
+    /// Create a dynamic sphere, returning an error instead of constructing a
+    /// body with infinite or NaN inverse mass/inertia.
+    pub fn try_dynamic_sphere(
+        handle: BodyHandle,
+        position: Point<D>,
+        radius: f64,
+        mass: f64,
+    ) -> Result<Self, BodyBuildError> {
+        if !radius.is_finite() || radius <= 0.0 {
+            return Err(BodyBuildError::InvalidRadius);
+        }
+        if !mass.is_finite() || mass <= 0.0 {
+            return Err(BodyBuildError::InvalidMass);
+        }
+        let inertia = 0.4 * mass * radius * radius; // 2/5 * m * r² (sphere, isotropic)
+
+        Ok(Self {
             handle,
             net_id: None,
             body_type: BodyType::Dynamic,
@@ -81,8 +115,8 @@ impl<const D: usize> RigidBody<D> {
             angular_velocity: Bivector::zero(),
             mass,
             inv_mass: 1.0 / mass,
-            inertia: SVector::from_element(0.4 * mass * radius * radius), // 2/5 * m * r² (sphere, isotropic)
-            inv_inertia: SVector::from_element(1.0 / (0.4 * mass * radius * radius)),
+            inertia: SVector::from_element(inertia),
+            inv_inertia: SVector::from_element(1.0 / inertia),
             restitution: 0.5,
             friction: 0.3,
             collider: Box::new(Sphere::new(Point::origin(), radius)),
@@ -95,11 +129,15 @@ impl<const D: usize> RigidBody<D> {
             collision_group: 0xFFFF_FFFF,
             collision_mask: 0xFFFF_FFFF,
             is_sensor: false,
-        }
+        })
     }
 
     /// Create a static body (infinite mass, zero velocity).
-    pub fn static_body(handle: BodyHandle, position: Point<D>, collider: Box<dyn Shape<D>>) -> Self {
+    pub fn static_body(
+        handle: BodyHandle,
+        position: Point<D>,
+        collider: Box<dyn Shape<D>>,
+    ) -> Self {
         Self {
             handle,
             net_id: None,
@@ -127,6 +165,9 @@ impl<const D: usize> RigidBody<D> {
     }
 
     /// Create a dynamic body with a custom collider (isotropic inertia).
+    ///
+    /// Panics if `mass` or `inertia` are not finite and strictly positive. Use
+    /// [`Self::try_dynamic`] when accepting untrusted input.
     pub fn dynamic(
         handle: BodyHandle,
         position: Point<D>,
@@ -134,7 +175,27 @@ impl<const D: usize> RigidBody<D> {
         inertia: f64,
         collider: Box<dyn Shape<D>>,
     ) -> Self {
-        Self {
+        Self::try_dynamic(handle, position, mass, inertia, collider)
+            .expect("dynamic body requires finite positive mass and inertia")
+    }
+
+    /// Create a dynamic body with a custom collider, returning an error instead
+    /// of constructing invalid inverse mass/inertia values.
+    pub fn try_dynamic(
+        handle: BodyHandle,
+        position: Point<D>,
+        mass: f64,
+        inertia: f64,
+        collider: Box<dyn Shape<D>>,
+    ) -> Result<Self, BodyBuildError> {
+        if !mass.is_finite() || mass <= 0.0 {
+            return Err(BodyBuildError::InvalidMass);
+        }
+        if !inertia.is_finite() || inertia <= 0.0 {
+            return Err(BodyBuildError::InvalidInertia);
+        }
+
+        Ok(Self {
             handle,
             net_id: None,
             body_type: BodyType::Dynamic,
@@ -157,7 +218,7 @@ impl<const D: usize> RigidBody<D> {
             collision_group: 0xFFFF_FFFF,
             collision_mask: 0xFFFF_FFFF,
             is_sensor: false,
-        }
+        })
     }
 
     /// Apply a force at the center of mass.
@@ -245,15 +306,49 @@ mod tests {
 
     #[test]
     fn dynamic_sphere_creation() {
-        let body = RigidBody::<3>::dynamic_sphere(
-            BodyHandle(0),
-            Point::new([1.0, 2.0, 3.0]),
-            1.0,
-            10.0,
-        );
+        let body =
+            RigidBody::<3>::dynamic_sphere(BodyHandle(0), Point::new([1.0, 2.0, 3.0]), 1.0, 10.0);
         assert!(body.is_dynamic());
         assert!((body.mass - 10.0).abs() < 1e-12);
         assert!((body.inv_mass - 0.1).abs() < 1e-12);
+    }
+
+    #[test]
+    fn dynamic_sphere_rejects_invalid_dimensions() {
+        assert_eq!(
+            RigidBody::<3>::try_dynamic_sphere(BodyHandle(0), Point::origin(), 0.0, 1.0).err(),
+            Some(BodyBuildError::InvalidRadius)
+        );
+        assert_eq!(
+            RigidBody::<3>::try_dynamic_sphere(BodyHandle(0), Point::origin(), 1.0, f64::NAN).err(),
+            Some(BodyBuildError::InvalidMass)
+        );
+    }
+
+    #[test]
+    fn dynamic_rejects_invalid_mass_and_inertia() {
+        assert_eq!(
+            RigidBody::<3>::try_dynamic(
+                BodyHandle(0),
+                Point::origin(),
+                0.0,
+                1.0,
+                Box::new(Sphere::<3>::unit()),
+            )
+            .err(),
+            Some(BodyBuildError::InvalidMass)
+        );
+        assert_eq!(
+            RigidBody::<3>::try_dynamic(
+                BodyHandle(0),
+                Point::origin(),
+                1.0,
+                f64::INFINITY,
+                Box::new(Sphere::<3>::unit()),
+            )
+            .err(),
+            Some(BodyBuildError::InvalidInertia)
+        );
     }
 
     #[test]
@@ -269,12 +364,7 @@ mod tests {
 
     #[test]
     fn force_accumulation() {
-        let mut body = RigidBody::<3>::dynamic_sphere(
-            BodyHandle(0),
-            Point::origin(),
-            1.0,
-            1.0,
-        );
+        let mut body = RigidBody::<3>::dynamic_sphere(BodyHandle(0), Point::origin(), 1.0, 1.0);
         body.apply_force(SVector::from([1.0, 0.0, 0.0]));
         body.apply_force(SVector::from([0.0, 2.0, 0.0]));
         assert!((body.force_accumulator[0] - 1.0).abs() < 1e-12);
@@ -285,23 +375,14 @@ mod tests {
 
     #[test]
     fn kinetic_energy_at_rest_is_zero() {
-        let body = RigidBody::<4>::dynamic_sphere(
-            BodyHandle(0),
-            Point::origin(),
-            1.0,
-            1.0,
-        );
+        let body = RigidBody::<4>::dynamic_sphere(BodyHandle(0), Point::origin(), 1.0, 1.0);
         assert!(body.kinetic_energy() < 1e-12);
     }
 
     #[test]
     fn world_support_translated() {
-        let body = RigidBody::<3>::dynamic_sphere(
-            BodyHandle(0),
-            Point::new([10.0, 0.0, 0.0]),
-            1.0,
-            1.0,
-        );
+        let body =
+            RigidBody::<3>::dynamic_sphere(BodyHandle(0), Point::new([10.0, 0.0, 0.0]), 1.0, 1.0);
         let dir = SVector::from([1.0, 0.0, 0.0]);
         let sp = body.world_support(&dir);
         // Sphere of radius 1 centered at (10,0,0), support in +x = (11,0,0)

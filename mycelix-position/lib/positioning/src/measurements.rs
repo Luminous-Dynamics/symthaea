@@ -5,13 +5,32 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum MeasurementModality { Rssi, LoraToA, UwbToF, WifiRtt, Gps, Barometric, Imu, Visual, Acoustic }
+pub enum MeasurementModality {
+    Rssi,
+    LoraToA,
+    UwbToF,
+    WifiRtt,
+    Gps,
+    Barometric,
+    Imu,
+    Visual,
+    Acoustic,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum MeasurementProvenance { Local, Peer, Infrastructure }
+pub enum MeasurementProvenance {
+    Local,
+    Peer,
+    Infrastructure,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ReferenceFrame { Ecef, Enu, Body, Local }
+pub enum ReferenceFrame {
+    Ecef,
+    Enu,
+    Body,
+    Local,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MeasurementValue {

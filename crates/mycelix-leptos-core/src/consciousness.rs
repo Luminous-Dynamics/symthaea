@@ -25,9 +25,9 @@
 use leptos::prelude::*;
 use personal_leptos_types::TrustTier;
 pub use sovereign_profile::{
-    CivicTier, SovereignDimension, SovereignProfile,
-    weights::DimensionWeights,
     i18n::{dimension_label, DIMENSION_LABELS},
+    weights::DimensionWeights,
+    CivicTier, SovereignDimension, SovereignProfile,
 };
 
 /// Backward-compatible alias — code that imported ConsciousnessProfile
@@ -86,9 +86,7 @@ pub fn provide_consciousness_context() -> ConsciousnessState {
     };
 
     let (profile, set_profile) = signal(default_profile);
-    let tier = Memo::new(move |_| {
-        trust_tier_from_civic(civic_tier(&profile.get()))
-    });
+    let tier = Memo::new(move |_| trust_tier_from_civic(civic_tier(&profile.get())));
     let (tier_signal, set_tier) = signal(TrustTier::Standard);
 
     Effect::new(move |_| {
@@ -124,7 +122,12 @@ pub fn refresh_consciousness_from_conductor(
     wasm_bindgen_futures::spawn_local(async move {
         // Try 8D sovereign credential first
         let result_8d: Result<ProfileWire, String> = hc
-            .call_zome("identity", "identity_bridge", "get_sovereign_credential", &())
+            .call_zome(
+                "identity",
+                "identity_bridge",
+                "get_sovereign_credential",
+                &(),
+            )
             .await;
 
         match result_8d {
@@ -133,7 +136,11 @@ pub fn refresh_consciousness_from_conductor(
                 let tier = civic_tier(&profile);
                 set_profile.set(profile);
                 web_sys::console::log_1(
-                    &format!("[Sovereign] 8D profile from conductor: tier={}", tier.label()).into()
+                    &format!(
+                        "[Sovereign] 8D profile from conductor: tier={}",
+                        tier.label()
+                    )
+                    .into(),
                 );
                 return;
             }
@@ -144,7 +151,12 @@ pub fn refresh_consciousness_from_conductor(
 
         // Fallback: legacy 4D consciousness profile → 8D mapping
         let result_4d: Result<ProfileWire, String> = hc
-            .call_zome("identity", "identity_bridge", "get_consciousness_credential", &())
+            .call_zome(
+                "identity",
+                "identity_bridge",
+                "get_consciousness_credential",
+                &(),
+            )
             .await;
 
         match result_4d {
@@ -153,7 +165,11 @@ pub fn refresh_consciousness_from_conductor(
                 let tier = civic_tier(&profile);
                 set_profile.set(profile);
                 web_sys::console::log_1(
-                    &format!("[Sovereign] 4D fallback from conductor: tier={}", tier.label()).into()
+                    &format!(
+                        "[Sovereign] 4D fallback from conductor: tier={}",
+                        tier.label()
+                    )
+                    .into(),
                 );
             }
             Err(_) => {
@@ -242,11 +258,26 @@ mod tests {
 
     #[test]
     fn civic_tier_maps_to_trust_tier() {
-        assert_eq!(trust_tier_from_civic(CivicTier::Observer), TrustTier::Observer);
-        assert_eq!(trust_tier_from_civic(CivicTier::Participant), TrustTier::Basic);
-        assert_eq!(trust_tier_from_civic(CivicTier::Citizen), TrustTier::Standard);
-        assert_eq!(trust_tier_from_civic(CivicTier::Steward), TrustTier::Elevated);
-        assert_eq!(trust_tier_from_civic(CivicTier::Guardian), TrustTier::Guardian);
+        assert_eq!(
+            trust_tier_from_civic(CivicTier::Observer),
+            TrustTier::Observer
+        );
+        assert_eq!(
+            trust_tier_from_civic(CivicTier::Participant),
+            TrustTier::Basic
+        );
+        assert_eq!(
+            trust_tier_from_civic(CivicTier::Citizen),
+            TrustTier::Standard
+        );
+        assert_eq!(
+            trust_tier_from_civic(CivicTier::Steward),
+            TrustTier::Elevated
+        );
+        assert_eq!(
+            trust_tier_from_civic(CivicTier::Guardian),
+            TrustTier::Guardian
+        );
     }
 
     #[test]
@@ -287,8 +318,8 @@ mod tests {
         };
         let p = wire.to_sovereign();
         assert!((p.epistemic_integrity - 0.7).abs() < 1e-10); // from identity
-        assert!((p.civic_participation - 0.9).abs() < 1e-10);  // from community
-        assert!((p.thermodynamic_yield - 0.3).abs() < 1e-10);  // from engagement
+        assert!((p.civic_participation - 0.9).abs() < 1e-10); // from community
+        assert!((p.thermodynamic_yield - 0.3).abs() < 1e-10); // from engagement
     }
 
     #[test]
@@ -309,7 +340,7 @@ mod tests {
         };
         let p = wire.to_sovereign();
         assert!((p.epistemic_integrity - 0.99).abs() < 1e-10); // 8D takes precedence
-        assert!((p.civic_participation - 0.11).abs() < 1e-10);  // 8D takes precedence
-        assert!((p.thermodynamic_yield - 0.3).abs() < 1e-10);   // falls back to legacy
+        assert!((p.civic_participation - 0.11).abs() < 1e-10); // 8D takes precedence
+        assert!((p.thermodynamic_yield - 0.3).abs() < 1e-10); // falls back to legacy
     }
 }

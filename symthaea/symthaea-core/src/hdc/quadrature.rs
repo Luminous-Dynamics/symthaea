@@ -763,17 +763,26 @@ pub fn gauss_kronrod_adaptive<F: Fn(f64) -> f64>(
     intervals = 1;
 
     if err <= abs_tol.max(rel_tol * val.abs()) || max_subdivisions == 0 {
-        return GaussKronrodResult { value: total_value, error: total_error, evaluations: total_evals, intervals };
+        return GaussKronrodResult {
+            value: total_value,
+            error: total_error,
+            evaluations: total_evals,
+            intervals,
+        };
     }
 
     // Push initial interval for subdivision
     heap.push((err, a, b, val));
 
     for _ in 0..max_subdivisions {
-        if heap.is_empty() { break; }
+        if heap.is_empty() {
+            break;
+        }
 
         // Find interval with largest error
-        let max_idx = heap.iter().enumerate()
+        let max_idx = heap
+            .iter()
+            .enumerate()
             .max_by(|(_, a), (_, b)| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(i, _)| i)
             .unwrap_or(0);
@@ -1195,8 +1204,11 @@ mod tests {
         // G-K 15-point should exactly integrate polynomials up to degree 29
         // Test with x^4 on [0,1]: exact = 1/5 = 0.2
         let result = gauss_kronrod_adaptive(&|x: f64| x.powi(4), 0.0, 1.0, 1e-14, 1e-14, 0);
-        assert!((result.value - 0.2).abs() < 1e-10,
-            "G-K 15 should exactly integrate x^4: got {}", result.value);
+        assert!(
+            (result.value - 0.2).abs() < 1e-10,
+            "G-K 15 should exactly integrate x^4: got {}",
+            result.value
+        );
     }
 
     #[test]
@@ -1204,36 +1216,61 @@ mod tests {
         // ∫₀¹ exp(x) dx = e - 1 ≈ 1.71828
         let expected = std::f64::consts::E - 1.0;
         let result = gauss_kronrod_adaptive(&|x: f64| x.exp(), 0.0, 1.0, 1e-12, 1e-12, 10);
-        assert!((result.value - expected).abs() < 1e-10,
-            "∫exp(x) from 0 to 1 = e-1: got {}, error {}", result.value, result.error);
+        assert!(
+            (result.value - expected).abs() < 1e-10,
+            "∫exp(x) from 0 to 1 = e-1: got {}, error {}",
+            result.value,
+            result.error
+        );
     }
 
     #[test]
     fn test_gk15_sin_integral() {
         // ∫₀^π sin(x) dx = 2
         let result = gauss_kronrod_adaptive(
-            &|x: f64| x.sin(), 0.0, std::f64::consts::PI, 1e-12, 1e-12, 10);
-        assert!((result.value - 2.0).abs() < 1e-8,
-            "∫sin(x) from 0 to π = 2: got {}", result.value);
+            &|x: f64| x.sin(),
+            0.0,
+            std::f64::consts::PI,
+            1e-12,
+            1e-12,
+            10,
+        );
+        assert!(
+            (result.value - 2.0).abs() < 1e-8,
+            "∫sin(x) from 0 to π = 2: got {}",
+            result.value
+        );
     }
 
     #[test]
     fn test_gk15_gaussian_integral() {
         // ∫₋₅⁵ exp(-x²) dx ≈ √π ≈ 1.7724538509
         let expected = std::f64::consts::PI.sqrt();
-        let result = gauss_kronrod_adaptive(
-            &|x: f64| (-x * x).exp(), -5.0, 5.0, 1e-10, 1e-10, 50);
-        assert!((result.value - expected).abs() < 1e-6,
-            "∫exp(-x²) ≈ √π: got {}, expected {}", result.value, expected);
+        let result = gauss_kronrod_adaptive(&|x: f64| (-x * x).exp(), -5.0, 5.0, 1e-10, 1e-10, 50);
+        assert!(
+            (result.value - expected).abs() < 1e-6,
+            "∫exp(-x²) ≈ √π: got {}, expected {}",
+            result.value,
+            expected
+        );
     }
 
     #[test]
     fn test_gk15_oscillatory() {
         // ∫₀^{2π} sin(10x) dx = 0 (by symmetry)
         let result = gauss_kronrod_adaptive(
-            &|x: f64| (10.0 * x).sin(), 0.0, 2.0 * std::f64::consts::PI, 1e-10, 1e-10, 100);
-        assert!(result.value.abs() < 1e-6,
-            "∫sin(10x) over full period = 0: got {}", result.value);
+            &|x: f64| (10.0 * x).sin(),
+            0.0,
+            2.0 * std::f64::consts::PI,
+            1e-10,
+            1e-10,
+            100,
+        );
+        assert!(
+            result.value.abs() < 1e-6,
+            "∫sin(10x) over full period = 0: got {}",
+            result.value
+        );
     }
 
     // ── Physics validation tests (known constants) ──────────────────────
@@ -1242,19 +1279,22 @@ mod tests {
     /// E₁ = -m_e * e⁴ / (2ℏ²) = -13.6 eV
     #[test]
     fn test_physics_hydrogen_ground_state() {
-        let m_e: f64 = 9.109_383_7015e-31;  // kg
-        let e_charge: f64 = 1.602_176_634e-19;  // C
-        let hbar: f64 = 1.054_571_817e-34;  // J·s
+        let m_e: f64 = 9.109_383_7015e-31; // kg
+        let e_charge: f64 = 1.602_176_634e-19; // C
+        let hbar: f64 = 1.054_571_817e-34; // J·s
         let eps0: f64 = 8.854_187_8128e-12; // F/m
-        let ev: f64 = 1.602_176_634e-19;  // J per eV
+        let ev: f64 = 1.602_176_634e-19; // J per eV
 
         // E₁ = -m_e * e⁴ / (2 * (4πε₀)² * ℏ²)
-        let e1_joules = -m_e * e_charge.powi(4) /
-            (2.0 * (4.0 * std::f64::consts::PI * eps0).powi(2) * hbar.powi(2));
+        let e1_joules = -m_e * e_charge.powi(4)
+            / (2.0 * (4.0 * std::f64::consts::PI * eps0).powi(2) * hbar.powi(2));
         let e1_ev = e1_joules / ev;
 
-        assert!((e1_ev - (-13.6)).abs() < 0.1,
-            "Hydrogen ground state should be -13.6 eV, got {:.1} eV", e1_ev);
+        assert!(
+            (e1_ev - (-13.6)).abs() < 0.1,
+            "Hydrogen ground state should be -13.6 eV, got {:.1} eV",
+            e1_ev
+        );
     }
 
     /// Bohr radius: a₀ = 4πε₀ℏ² / (m_e * e²) ≈ 0.529 Å
@@ -1268,8 +1308,11 @@ mod tests {
         let a0 = 4.0 * std::f64::consts::PI * eps0 * hbar.powi(2) / (m_e * e_charge.powi(2));
         let a0_angstrom = a0 * 1e10;
 
-        assert!((a0_angstrom - 0.529).abs() < 0.001,
-            "Bohr radius should be 0.529 Å, got {:.4} Å", a0_angstrom);
+        assert!(
+            (a0_angstrom - 0.529).abs() < 0.001,
+            "Bohr radius should be 0.529 Å, got {:.4} Å",
+            a0_angstrom
+        );
     }
 
     /// Fine structure constant: α = e²/(4πε₀ℏc) ≈ 1/137.036
@@ -1283,8 +1326,11 @@ mod tests {
         let alpha = e_charge.powi(2) / (4.0 * std::f64::consts::PI * eps0 * hbar * c);
         let alpha_inv = 1.0 / alpha;
 
-        assert!((alpha_inv - 137.036).abs() < 0.01,
-            "1/α should be 137.036, got {:.3}", alpha_inv);
+        assert!(
+            (alpha_inv - 137.036).abs() < 0.01,
+            "1/α should be 137.036, got {:.3}",
+            alpha_inv
+        );
     }
 
     /// Wien's displacement law: λ_max * T = b ≈ 2.898 × 10⁻³ m·K
@@ -1299,8 +1345,11 @@ mod tests {
         let x_wien = 4.965_114_231_74;
         let b = h * c / (k_b * x_wien);
 
-        assert!((b * 1e3 - 2.898).abs() < 0.001,
-            "Wien constant should be 2.898e-3 m·K, got {:.6e}", b);
+        assert!(
+            (b * 1e3 - 2.898).abs() < 0.001,
+            "Wien constant should be 2.898e-3 m·K, got {:.6e}",
+            b
+        );
     }
 
     /// Harmonic oscillator: ω = √(k/m), zero-point energy = ℏω/2
@@ -1314,9 +1363,16 @@ mod tests {
         let e_zero = 0.5 * hbar * omega;
 
         // ω = 10 rad/s, E₀ = 5.27e-34 J
-        assert!((omega - 10.0).abs() < 1e-10, "ω = √(k/m) = 10, got {}", omega);
-        assert!((e_zero - 5.272_859_085e-34).abs() < 1e-37,
-            "Zero-point energy ℏω/2 = 5.27e-34 J, got {:.3e}", e_zero);
+        assert!(
+            (omega - 10.0).abs() < 1e-10,
+            "ω = √(k/m) = 10, got {}",
+            omega
+        );
+        assert!(
+            (e_zero - 5.272_859_085e-34).abs() < 1e-37,
+            "Zero-point energy ℏω/2 = 5.27e-34 J, got {:.3e}",
+            e_zero
+        );
     }
 
     /// Stefan-Boltzmann: P = σT⁴ where σ = 2π⁵k⁴/(15h³c²)
@@ -1330,7 +1386,10 @@ mod tests {
         let sigma = 2.0 * pi.powi(5) * k_b.powi(4) / (15.0 * h.powi(3) * c.powi(2));
 
         // σ ≈ 5.670 × 10⁻⁸ W/(m²·K⁴)
-        assert!((sigma * 1e8 - 5.670).abs() < 0.01,
-            "Stefan-Boltzmann constant should be 5.670e-8, got {:.4e}", sigma);
+        assert!(
+            (sigma * 1e8 - 5.670).abs() < 0.01,
+            "Stefan-Boltzmann constant should be 5.670e-8, got {:.4e}",
+            sigma
+        );
     }
 }

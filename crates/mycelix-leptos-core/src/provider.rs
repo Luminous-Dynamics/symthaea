@@ -13,7 +13,7 @@
 //! `Action::new_unsync` to dispatch calls on the current thread.
 
 use leptos::prelude::*;
-use mycelix_leptos_client::{HolochainTransport, ClientError};
+use mycelix_leptos_client::{ClientError, HolochainTransport};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -114,14 +114,13 @@ where
         async move {
             set_loading.set(true);
             let result: Result<R, String> = async {
-                let encoded = mycelix_leptos_client::encode(&payload)
-                    .map_err(|e| e.to_string())?;
+                let encoded = mycelix_leptos_client::encode(&payload).map_err(|e| e.to_string())?;
                 let response_bytes = transport
                     .call_zome(role_name, zome_name, fn_name, encoded)
                     .await
                     .map_err(|e: ClientError| e.to_string())?;
-                let decoded: R = mycelix_leptos_client::decode(&response_bytes)
-                    .map_err(|e| e.to_string())?;
+                let decoded: R =
+                    mycelix_leptos_client::decode(&response_bytes).map_err(|e| e.to_string())?;
                 Ok(decoded)
             }
             .await;

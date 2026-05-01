@@ -74,7 +74,10 @@ impl SwarmConsciousness {
             .unwrap();
 
         let phi_swarm = strongest.collective_phi();
-        let conscious_count = coalitions.iter().filter(|c| c.is_conscious_collective()).count();
+        let conscious_count = coalitions
+            .iter()
+            .filter(|c| c.is_conscious_collective())
+            .count();
         let total_members: usize = coalitions.iter().map(|c| c.size()).sum();
 
         // Check if this robot is in the strongest coalition
@@ -165,8 +168,14 @@ mod tests {
         let sc = SwarmConsciousness::compute(&[coalition], 0.3, Some("self"));
 
         assert!(sc.delegation.in_conscious_collective);
-        assert!(sc.delegation.effective_phi > 0.3, "Should inherit from swarm");
-        assert!(sc.delegation.effective_phi < 0.8, "Should not fully equal swarm");
+        assert!(
+            sc.delegation.effective_phi > 0.3,
+            "Should inherit from swarm"
+        );
+        assert!(
+            sc.delegation.effective_phi < 0.8,
+            "Should not fully equal swarm"
+        );
         assert!(sc.delegation.delegation_ratio > 0.0);
     }
 

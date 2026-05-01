@@ -18,8 +18,8 @@
 use symthaea_core::embodiment::{MoralGateInput, MotorSafetyLevel};
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
-use symthaea_manipulator::symtropy_sim::SymtropyManipulatorSimulator;
 use symthaea_manipulator::simulator::ManipulatorPhysicsSimulator;
+use symthaea_manipulator::symtropy_sim::SymtropyManipulatorSimulator;
 use symthaea_manipulator::types::{ManipulatorCommand, NUM_JOINTS};
 
 const DIM: usize = symthaea_core::hdc::HDC_DIMENSION;
@@ -56,11 +56,16 @@ fn gate1_consciousness_modulates_grip_force() {
     assert!(low_phi_state.is_finite(), "Low Φ state should be finite");
 
     // The arm should have moved differently in each phase
-    let angle_diff: f64 = high_phi_state.joint_angles.iter()
+    let angle_diff: f64 = high_phi_state
+        .joint_angles
+        .iter()
         .zip(low_phi_state.joint_angles.iter())
         .map(|(a, b)| (a - b).abs())
         .sum();
-    assert!(angle_diff > 0.0, "Consciousness change should affect arm state");
+    assert!(
+        angle_diff > 0.0,
+        "Consciousness change should affect arm state"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -80,17 +85,22 @@ fn gate2_gentle_touch_force_proportional_to_phi() {
         joint_torques: [0.5; NUM_JOINTS],
         gripper: 0.5,
     };
-    for _ in 0..100 { baseline_sim.step(&cmd, 0.002); }
+    for _ in 0..100 {
+        baseline_sim.step(&cmd, 0.002);
+    }
     let baseline_angles = baseline_sim.state().joint_angles;
 
     // Then: run with full gain and measure divergence from baseline
     let mut full_sim = SymtropyManipulatorSimulator::new();
     full_sim.set_motor_gain(1.0);
-    for _ in 0..100 { full_sim.step(&cmd, 0.002); }
+    for _ in 0..100 {
+        full_sim.step(&cmd, 0.002);
+    }
     let full_angles = full_sim.state().joint_angles;
 
     // Motor-driven motion should diverge from gravity-only trajectory
-    let divergence: f64 = full_angles.iter()
+    let divergence: f64 = full_angles
+        .iter()
         .zip(baseline_angles.iter())
         .map(|(a, b)| (a - b).abs())
         .sum();
@@ -103,10 +113,13 @@ fn gate2_gentle_touch_force_proportional_to_phi() {
     // Half gain should produce less divergence than full gain
     let mut half_sim = SymtropyManipulatorSimulator::new();
     half_sim.set_motor_gain(0.5);
-    for _ in 0..100 { half_sim.step(&cmd, 0.002); }
+    for _ in 0..100 {
+        half_sim.step(&cmd, 0.002);
+    }
     let half_angles = half_sim.state().joint_angles;
 
-    let half_divergence: f64 = half_angles.iter()
+    let half_divergence: f64 = half_angles
+        .iter()
         .zip(baseline_angles.iter())
         .map(|(a, b)| (a - b).abs())
         .sum();
@@ -133,22 +146,30 @@ fn gate3_safety_cascade_during_grasp() {
 
     // Phase 1: Green (full authority)
     sim.set_motor_gain(MotorSafetyLevel::Green.motor_gain());
-    for _ in 0..25 { sim.step(&cmd, 0.002); }
+    for _ in 0..25 {
+        sim.step(&cmd, 0.002);
+    }
     assert!(sim.state().is_finite());
 
     // Phase 2: Yellow (reduced)
     sim.set_motor_gain(MotorSafetyLevel::Yellow.motor_gain());
-    for _ in 0..25 { sim.step(&cmd, 0.002); }
+    for _ in 0..25 {
+        sim.step(&cmd, 0.002);
+    }
     assert!(sim.state().is_finite());
 
     // Phase 3: Orange (retreat)
     sim.set_motor_gain(MotorSafetyLevel::Orange.motor_gain());
-    for _ in 0..25 { sim.step(&cmd, 0.002); }
+    for _ in 0..25 {
+        sim.step(&cmd, 0.002);
+    }
     assert!(sim.state().is_finite());
 
     // Phase 4: Red (emergency stop — zero force)
     sim.set_motor_gain(MotorSafetyLevel::Red.motor_gain());
-    for _ in 0..25 { sim.step(&cmd, 0.002); }
+    for _ in 0..25 {
+        sim.step(&cmd, 0.002);
+    }
     assert!(sim.state().is_finite());
 }
 
@@ -176,7 +197,10 @@ fn gate4_target_object_in_workspace() {
     for _ in 0..200 {
         sim.step(&reach_cmd, 0.002);
     }
-    assert!(sim.state().is_finite(), "Reaching toward cup should be stable");
+    assert!(
+        sim.state().is_finite(),
+        "Reaching toward cup should be stable"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -231,7 +255,10 @@ fn gate5_moral_audit_proof_for_grasp() {
     let threshold = 0.15; // Basic tier
 
     // Verify: all Φ ≥ threshold, no Blocked verdicts
-    assert!(min_phi >= threshold, "Min Φ should be ≥ {threshold}: got {min_phi}");
+    assert!(
+        min_phi >= threshold,
+        "Min Φ should be ≥ {threshold}: got {min_phi}"
+    );
     assert!(!had_blocked, "Should have no Blocked verdicts");
     assert_eq!(phi_samples.len(), 150, "Should have 150 audit samples");
 

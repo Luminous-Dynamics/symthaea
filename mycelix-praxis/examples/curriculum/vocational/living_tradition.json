@@ -1,0 +1,148 @@
+{
+  "metadata": {
+    "title": "Living Tradition: Modern Mastery & Ancient Truth",
+    "framework": "Global Tradition Mesh",
+    "source": "https://mycelix.org/tradition",
+    "grade_level": "Lifelong/Professional",
+    "subject_area": "Multi-Subject",
+    "domain": "Wisdom & Industry",
+    "version": "1.0",
+    "total_standards": 10,
+    "domains": [
+      "Cybersecurity",
+      "Data Analytics",
+      "Virtue Ethics",
+      "Systemic Harmony"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Integrating the highest-demand certs of today with the foundational logic of human history."
+  },
+  "nodes": [
+    {
+      "id": "CERT-CYBER-GOOGLE",
+      "title": "Google Cybersecurity Professional Certificate",
+      "description": "Foundations of cybersecurity, playbooks, SQL for security, and Linux for security. Preparing for the entry-level analyst role today.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Cybersecurity",
+      "subdomain": "Tradition Bridge",
+      "tags": ["google", "cybersecurity", "security-analyst", "standard"],
+      "estimated_hours": 120,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "CERT-DATA-MS-PL300",
+      "title": "Microsoft Power BI Data Analyst (PL-300)",
+      "description": "Preparing, modeling, and visualizing data. Deploying and maintaining deliverables. Directly linked to the Mycelial Oracle predictive engine.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Data Analytics",
+      "subdomain": "Tradition Bridge",
+      "tags": ["microsoft", "powerbi", "data-analytics", "standard"],
+      "estimated_hours": 90,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "ANC-MAAT-101",
+      "title": "Maat: The Logic of Cosmic Balance",
+      "description": "Ancient Egyptian jurisprudence. Truth, balance, order, harmony, law, morality, and justice. The historical root of the Symthaea Auditor's impartiality.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Virtue Ethics",
+      "subdomain": "Tradition Bridge",
+      "tags": ["maat", "philosophy", "justice", "audit"],
+      "estimated_hours": 45,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Humanities"
+    },
+    {
+      "id": "ANC-ICHING-201",
+      "title": "I Ching: The Binary Grammar of Change",
+      "description": "The oldest binary system. Permutations of Yin and Yang as a model for dynamic systems. Linking prehistoric patterns to HDC cyclic shifts.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Systemic Harmony",
+      "subdomain": "Tradition Bridge",
+      "tags": ["iching", "binary", "permutation", "systems"],
+      "estimated_hours": 60,
+      "grade_levels": ["Graduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics"
+    },
+    {
+      "id": "ANC-VIB-101",
+      "title": "The Principle of Vibration (Hermeticism)",
+      "description": "Nothing rests; everything moves; everything vibrates. The science of frequency and its role in social and physical coherence.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Systemic Harmony",
+      "subdomain": "Tradition Bridge",
+      "tags": ["vibration", "hermeticism", "physics", "coherence"],
+      "estimated_hours": 45,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Understand",
+      "subject_area": "Science"
+    },
+    {
+      "id": "CERT-CAP-TRADITION",
+      "title": "The Living Tradition Capstone",
+      "description": "Solve a modern data-integrity or security challenge (e.g. mesh firewall) using a framework derived from Maat or Aristotelian ethics. Verified by the Supreme Court.",
+      "node_type": "Capstone",
+      "difficulty": "Expert",
+      "domain": "Universal",
+      "subdomain": "Tradition Bridge",
+      "tags": ["capstone", "tradition", "security", "ethics"],
+      "estimated_hours": 180,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Create",
+      "subject_area": "Synthesis",
+      "holonic_capstone": {
+        "required_node_ids": ["CERT-CYBER-GOOGLE", "ANC-MAAT-101", "ANC-VIB-101"],
+        "deliverable": "A 'Resilient Protocol Audit' that demonstrates both technical security and ethical balance (Maat).",
+        "min_peer_endorsements": 8
+      },
+      "alignment_vector": {
+        "ahimsa": 990,
+        "truthfulness": 1000,
+        "reciprocity": 950,
+        "aesthetic_harmony": 980,
+        "epistemic_humility": 990
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "CERT-IT-GOOGLE-SUPPORT",
+      "to": "CERT-CYBER-GOOGLE",
+      "edge_type": "Recommended",
+      "strength_permille": 900,
+      "rationale": "Google IT Support is the established on-ramp for the Professional Cybersecurity certificate."
+    },
+    {
+      "from": "ANC-MAAT-101",
+      "to": "CERT-IT-ISACA-CISA",
+      "edge_type": "Recommended",
+      "strength_permille": 750,
+      "rationale": "The ancient logic of Maat provides the ethical context for modern information system auditing."
+    },
+    {
+      "from": "ANC-VIB-101",
+      "to": "ART-SON-101",
+      "edge_type": "Recommended",
+      "strength_permille": 850,
+      "rationale": "Understanding the principle of vibration is the prerequisite for sonic mesh-weaving."
+    },
+    {
+      "from": "ANC-ICHING-201",
+      "to": "SYM-201",
+      "edge_type": "Recommended",
+      "strength_permille": 600,
+      "rationale": "The I Ching's hexagram logic provides the prehistoric intuition for high-dimensional binary vectors."
+    }
+  ]
+}

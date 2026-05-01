@@ -1,0 +1,8 @@
+[package]
+name = "sensorium-domain-trait"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Domain module trait for Mycelix Sensorium — the contract every cluster implements"
+
+[dependencies]

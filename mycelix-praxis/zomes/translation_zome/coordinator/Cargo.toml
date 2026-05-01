@@ -11,6 +11,7 @@ crate-type = ["cdylib", "rlib"]
 name = "translation_coordinator"
 
 [dependencies]
+mycelix-zome-helpers = { workspace = true }
 hdk.workspace = true
 holochain_serialized_bytes.workspace = true
 serde.workspace = true

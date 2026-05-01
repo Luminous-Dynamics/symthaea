@@ -10,8 +10,8 @@
 //! - Governance: pending_proposals + pending_votes
 //! - Hearth: pending_care_tasks + pending_decisions
 
-use leptos::prelude::*;
 use crate::util::set_css_var;
+use leptos::prelude::*;
 
 /// Reactive state for homeostasis detection.
 #[derive(Clone)]
@@ -62,7 +62,10 @@ pub fn provide_homeostasis_context(
 
     // Provide write signals as context
     for (i, w) in write_signals.into_iter().enumerate() {
-        provide_context(PendingCountWriter { index: i, writer: w });
+        provide_context(PendingCountWriter {
+            index: i,
+            writer: w,
+        });
     }
 
     let state = HomeostasisState {

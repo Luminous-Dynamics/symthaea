@@ -29,13 +29,14 @@ impl Migratable for MockEntry {
                 // V1: only has "name" field
                 let parsed: serde_json::Value = serde_json::from_str(json)
                     .map_err(|e| MigrationError::DeserializationFailed(e.to_string()))?;
-                let name = parsed["name"]
-                    .as_str()
-                    .ok_or_else(|| MigrationError::MigrationStepFailed {
-                        from: 1,
-                        to: 3,
-                        reason: "missing 'name' field".into(),
-                    })?;
+                let name =
+                    parsed["name"]
+                        .as_str()
+                        .ok_or_else(|| MigrationError::MigrationStepFailed {
+                            from: 1,
+                            to: 3,
+                            reason: "missing 'name' field".into(),
+                        })?;
                 Ok(MockEntry {
                     full_name: name.to_string(),
                     email: String::new(), // Default for missing field
@@ -45,13 +46,14 @@ impl Migratable for MockEntry {
                 // V2: has "name" and "email"
                 let parsed: serde_json::Value = serde_json::from_str(json)
                     .map_err(|e| MigrationError::DeserializationFailed(e.to_string()))?;
-                let name = parsed["name"]
-                    .as_str()
-                    .ok_or_else(|| MigrationError::MigrationStepFailed {
-                        from: 2,
-                        to: 3,
-                        reason: "missing 'name' field".into(),
-                    })?;
+                let name =
+                    parsed["name"]
+                        .as_str()
+                        .ok_or_else(|| MigrationError::MigrationStepFailed {
+                            from: 2,
+                            to: 3,
+                            reason: "missing 'name' field".into(),
+                        })?;
                 let email = parsed["email"].as_str().unwrap_or("");
                 Ok(MockEntry {
                     full_name: name.to_string(),
@@ -62,11 +64,9 @@ impl Migratable for MockEntry {
                 // Current version: has "full_name" and "email"
                 let parsed: serde_json::Value = serde_json::from_str(json)
                     .map_err(|e| MigrationError::DeserializationFailed(e.to_string()))?;
-                let full_name = parsed["full_name"]
-                    .as_str()
-                    .ok_or_else(|| MigrationError::DeserializationFailed(
-                        "missing 'full_name' field".into(),
-                    ))?;
+                let full_name = parsed["full_name"].as_str().ok_or_else(|| {
+                    MigrationError::DeserializationFailed("missing 'full_name' field".into())
+                })?;
                 let email = parsed["email"].as_str().unwrap_or("");
                 Ok(MockEntry {
                     full_name: full_name.to_string(),
@@ -134,7 +134,10 @@ fn test_migrate_unknown_version() {
     let json = r#"{"data": "something"}"#;
     let err = MockEntry::migrate_from(json, 99).unwrap_err();
     match err {
-        MigrationError::UnknownVersion { found, max_supported } => {
+        MigrationError::UnknownVersion {
+            found,
+            max_supported,
+        } => {
             assert_eq!(found, 99);
             assert_eq!(max_supported, 3);
         }
@@ -219,7 +222,10 @@ fn test_migration_extra_fields_ignored() {
 
 #[test]
 fn test_error_display_formats() {
-    let e1 = MigrationError::UnknownVersion { found: 10, max_supported: 3 };
+    let e1 = MigrationError::UnknownVersion {
+        found: 10,
+        max_supported: 3,
+    };
     assert!(e1.to_string().contains("10"));
     assert!(e1.to_string().contains("3"));
 

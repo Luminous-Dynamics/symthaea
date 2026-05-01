@@ -81,9 +81,7 @@ impl ShieldingType {
                 (-0.018 * *thickness_cm as f64).exp().max(0.05)
             }
             Self::LavaTube => 0.01, // ~99% reduction
-            Self::Underground { depth_m } => {
-                (-0.6 * *depth_m as f64).exp().max(0.01)
-            }
+            Self::Underground { depth_m } => (-0.6 * *depth_m as f64).exp().max(0.01),
         }
     }
 }
@@ -118,11 +116,11 @@ impl WindowType {
     /// Applied per tick to agents assigned to this module.
     pub fn load_modifier(&self) -> f64 {
         match self {
-            Self::None => 0.003,           // +0.003/tick no-window stress
-            Self::Simulated => 0.001,      // Partial recovery
-            Self::WaterWindow => -0.001,   // Net beneficial (light + beauty)
+            Self::None => 0.003,         // +0.003/tick no-window stress
+            Self::Simulated => 0.001,    // Partial recovery
+            Self::WaterWindow => -0.001, // Net beneficial (light + beauty)
             Self::PressureWindow => -0.0005,
-            Self::Dome => -0.002,          // Best psychological outcome
+            Self::Dome => -0.002, // Best psychological outcome
         }
     }
 }
@@ -185,25 +183,25 @@ impl ModuleFunction {
     /// Which skill sector primarily works in this module (index 0-7).
     pub fn primary_sector(&self) -> usize {
         match self {
-            Self::Agriculture => 1,    // agriculture
-            Self::Medical => 2,        // medicine
-            Self::Command => 3,        // governance
-            Self::Laboratory => 4,     // science
-            Self::Workshop => 0,       // engineering
-            Self::Power => 0,          // engineering
-            Self::Commons => 6,        // art_culture
-            Self::LifeSupport => 0,    // engineering
-            Self::Habitation => 7,     // logistics (everyone)
-            Self::Storage => 7,        // logistics
+            Self::Agriculture => 1, // agriculture
+            Self::Medical => 2,     // medicine
+            Self::Command => 3,     // governance
+            Self::Laboratory => 4,  // science
+            Self::Workshop => 0,    // engineering
+            Self::Power => 0,       // engineering
+            Self::Commons => 6,     // art_culture
+            Self::LifeSupport => 0, // engineering
+            Self::Habitation => 7,  // logistics (everyone)
+            Self::Storage => 7,     // logistics
         }
     }
 
     /// Hours per day a worker spends in this module.
     pub fn work_hours(&self) -> f64 {
         match self {
-            Self::Habitation => 14.0,  // Sleep + off-duty
-            Self::Commons => 2.0,      // Meals + recreation
-            _ => 8.0,                  // Standard work shift
+            Self::Habitation => 14.0, // Sleep + off-duty
+            Self::Commons => 2.0,     // Meals + recreation
+            _ => 8.0,                 // Standard work shift
         }
     }
 }
@@ -219,11 +217,14 @@ pub struct HabitatComplex {
 }
 
 impl HabitatComplex {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     /// Total pressurized volume (operational modules only).
     pub fn total_volume(&self) -> f64 {
-        self.modules.iter()
+        self.modules
+            .iter()
             .filter(|m| m.operational)
             .map(|m| m.volume_m3)
             .sum()
@@ -231,7 +232,8 @@ impl HabitatComplex {
 
     /// Total habitation capacity.
     pub fn total_capacity(&self) -> u32 {
-        self.modules.iter()
+        self.modules
+            .iter()
             .filter(|m| m.operational)
             .map(|m| m.capacity)
             .sum()
@@ -244,18 +246,26 @@ impl HabitatComplex {
     ///
     /// Returns: dose_fraction [0, 1] — multiply by ambient dose to get actual dose.
     pub fn agent_dose_fraction(&self, primary_sector: usize) -> f64 {
-        if self.modules.is_empty() { return 1.0; } // No modules = surface
+        if self.modules.is_empty() {
+            return 1.0;
+        } // No modules = surface
 
         // Find the module where this agent works
-        let work_module = self.modules.iter()
+        let work_module = self
+            .modules
+            .iter()
             .filter(|m| m.operational)
             .find(|m| m.function.primary_sector() == primary_sector);
 
         // Find habitation and commons modules
-        let hab_module = self.modules.iter()
+        let hab_module = self
+            .modules
+            .iter()
             .filter(|m| m.operational)
             .find(|m| m.function == ModuleFunction::Habitation);
-        let commons_module = self.modules.iter()
+        let commons_module = self
+            .modules
+            .iter()
             .filter(|m| m.operational)
             .find(|m| m.function == ModuleFunction::Commons);
 
@@ -265,34 +275,50 @@ impl HabitatComplex {
         let hab_hours = 14.0;
         let total_hours = 24.0;
 
-        let work_dose = work_module.map(|m| m.shielding.dose_fraction())
+        let work_dose = work_module
+            .map(|m| m.shielding.dose_fraction())
             .unwrap_or(1.0); // If no work module, surface exposure
-        let hab_dose = hab_module.map(|m| m.shielding.dose_fraction())
+        let hab_dose = hab_module
+            .map(|m| m.shielding.dose_fraction())
             .unwrap_or(1.0);
-        let commons_dose = commons_module.map(|m| m.shielding.dose_fraction())
+        let commons_dose = commons_module
+            .map(|m| m.shielding.dose_fraction())
             .unwrap_or(hab_dose); // Default to hab if no commons
 
-        (work_hours * work_dose + commons_hours * commons_dose + hab_hours * hab_dose)
-            / total_hours
+        (work_hours * work_dose + commons_hours * commons_dose + hab_hours * hab_dose) / total_hours
     }
 
     /// Compute the psychological load modifier for an agent based on their daily module exposure.
     pub fn agent_psych_modifier(&self, primary_sector: usize) -> f64 {
-        if self.modules.is_empty() { return 0.003; } // No modules = no-window stress
+        if self.modules.is_empty() {
+            return 0.003;
+        } // No modules = no-window stress
 
-        let work_module = self.modules.iter()
+        let work_module = self
+            .modules
+            .iter()
             .filter(|m| m.operational)
             .find(|m| m.function.primary_sector() == primary_sector);
-        let hab_module = self.modules.iter()
+        let hab_module = self
+            .modules
+            .iter()
             .filter(|m| m.operational)
             .find(|m| m.function == ModuleFunction::Habitation);
-        let commons_module = self.modules.iter()
+        let commons_module = self
+            .modules
+            .iter()
             .filter(|m| m.operational)
             .find(|m| m.function == ModuleFunction::Commons);
 
-        let work_mod = work_module.map(|m| m.windows.load_modifier()).unwrap_or(0.003);
-        let hab_mod = hab_module.map(|m| m.windows.load_modifier()).unwrap_or(0.003);
-        let commons_mod = commons_module.map(|m| m.windows.load_modifier()).unwrap_or(0.001);
+        let work_mod = work_module
+            .map(|m| m.windows.load_modifier())
+            .unwrap_or(0.003);
+        let hab_mod = hab_module
+            .map(|m| m.windows.load_modifier())
+            .unwrap_or(0.003);
+        let commons_mod = commons_module
+            .map(|m| m.windows.load_modifier())
+            .unwrap_or(0.001);
 
         // Time-weighted
         (8.0 * work_mod + 2.0 * commons_mod + 14.0 * hab_mod) / 24.0
@@ -441,12 +467,17 @@ mod tests {
         let psych_with = complex.agent_psych_modifier(0);
         // A complex without commons defaults to hab windows
         let mut no_commons = complex.clone();
-        no_commons.modules.retain(|m| m.function != ModuleFunction::Commons);
+        no_commons
+            .modules
+            .retain(|m| m.function != ModuleFunction::Commons);
         let psych_without = no_commons.agent_psych_modifier(0);
 
-        assert!(psych_with < psych_without,
+        assert!(
+            psych_with < psych_without,
             "Water window commons should improve psychology: {} vs {}",
-            psych_with, psych_without);
+            psych_with,
+            psych_without
+        );
     }
 
     #[test]

@@ -9,6 +9,7 @@ crate-type = ["cdylib", "rlib"]
 name = "reputation_aggregator"
 
 [dependencies]
+mycelix-zome-helpers = { workspace = true }
 hdk = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

@@ -196,7 +196,10 @@ mod tests {
     fn duplicate_at_highest_rejected() {
         let mut w = ReplayWindow::new();
         assert!(w.accept(key(0x10), 5));
-        assert!(!w.accept(key(0x10), 5), "duplicate at highest should reject");
+        assert!(
+            !w.accept(key(0x10), 5),
+            "duplicate at highest should reject"
+        );
     }
 
     #[test]
@@ -249,7 +252,10 @@ mod tests {
         assert!(w.accept(key(0x10), 1000));
         // Replay of 0..5 should now all be too old.
         for seq in 0..=5 {
-            assert!(!w.accept(key(0x10), seq), "old seq {seq} after jump should reject");
+            assert!(
+                !w.accept(key(0x10), seq),
+                "old seq {seq} after jump should reject"
+            );
         }
         // Sequences just below 1000 in the new window are still acceptable
         // (they were never seen).

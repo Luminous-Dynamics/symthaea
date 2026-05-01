@@ -4,8 +4,8 @@
 //!
 //! Run: cargo run --release --bin ab_sweep
 
+use mycelix_multiworld_sim::config::{PolicyConfig, SimulationConfig};
 use mycelix_multiworld_sim::MultiWorldSimulator;
-use mycelix_multiworld_sim::config::{SimulationConfig, PolicyConfig};
 
 struct RunResult {
     seed: u64,
@@ -58,20 +58,35 @@ fn main() {
         println!("  --- {} ---", label);
         for &seed in &seeds {
             let r = run(policy.clone(), seed, years);
-            println!("    Seed {:>4}: CVS {:.3} | Pop {:>5} | Phi {:.3} | Wars {} | Turchin {} | {}",
-                r.seed, r.cvs, r.pop, r.phi, r.wars, r.turchin,
-                if r.survived { "OK" } else { "FAIL" });
+            println!(
+                "    Seed {:>4}: CVS {:.3} | Pop {:>5} | Phi {:.3} | Wars {} | Turchin {} | {}",
+                r.seed,
+                r.cvs,
+                r.pop,
+                r.phi,
+                r.wars,
+                r.turchin,
+                if r.survived { "OK" } else { "FAIL" }
+            );
             cvs_sum += r.cvs;
             pop_sum += r.pop;
             phi_sum += r.phi;
             wars_sum += r.wars;
-            if r.survived { survived_count += 1; }
+            if r.survived {
+                survived_count += 1;
+            }
         }
 
         let n = seeds.len() as f64;
-        println!("    MEAN:      CVS {:.3} | Pop {:>5} | Phi {:.3} | Wars {} | Survival {}/{}",
-            cvs_sum / n, pop_sum / seeds.len(), phi_sum / n,
-            wars_sum, survived_count, seeds.len());
+        println!(
+            "    MEAN:      CVS {:.3} | Pop {:>5} | Phi {:.3} | Wars {} | Survival {}/{}",
+            cvs_sum / n,
+            pop_sum / seeds.len(),
+            phi_sum / n,
+            wars_sum,
+            survived_count,
+            seeds.len()
+        );
         println!();
     }
 

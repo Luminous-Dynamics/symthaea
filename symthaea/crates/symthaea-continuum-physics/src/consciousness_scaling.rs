@@ -6,19 +6,19 @@
 //! V2: Fixed dead entropy metric, added genuinely independent measures,
 //! replaced sync-derived redundant metrics.
 
-use crate::nonlinear_waves::{FitzHughNagumo, OscillatorNetwork};
+use crate::nonlinear_waves::OscillatorNetwork;
 
 pub const N_THEORIES: usize = 8;
 
 pub const THEORY_NAMES: [&str; N_THEORIES] = [
-    "Synchrony",      // 0: Global sync order parameter r (GWT)
-    "Integration",    // 1: Mean pairwise cross-correlation (IIT)
-    "Differentiation",// 2: Variance of per-oscillator mean firing rates (Complexity)
-    "Coherence",      // 3: Autocorrelation of global field at lag 10 (Orch-OR)
-    "Metastability",  // 4: Variance of instantaneous sync index (HOT)
-    "Entropy",        // 5: TEMPORAL entropy of individual oscillators, averaged (Thermo)
-    "TransferEnt",    // 6: Directional info flow (Granger-like causality proxy)
-    "MultiScale",     // 7: Ratio of local to global integration
+    "Synchrony",       // 0: Global sync order parameter r (GWT)
+    "Integration",     // 1: Mean pairwise cross-correlation (IIT)
+    "Differentiation", // 2: Variance of per-oscillator mean firing rates (Complexity)
+    "Coherence",       // 3: Autocorrelation of global field at lag 10 (Orch-OR)
+    "Metastability",   // 4: Variance of instantaneous sync index (HOT)
+    "Entropy",         // 5: TEMPORAL entropy of individual oscillators, averaged (Thermo)
+    "TransferEnt",     // 6: Directional info flow (Granger-like causality proxy)
+    "MultiScale",      // 7: Ratio of local to global integration
 ];
 
 #[derive(Debug, Clone)]
@@ -44,7 +44,9 @@ pub fn compute_network_scores(
     for osc in &mut net.oscillators {
         osc.i_ext = i_ext;
     }
-    for _ in 0..warmup { net.step(dt); }
+    for _ in 0..warmup {
+        net.step(dt);
+    }
 
     let mut traces: Vec<Vec<f64>> = vec![Vec::with_capacity(measure); n_oscillators];
     let mut sync_trace = Vec::with_capacity(measure);
@@ -75,14 +77,19 @@ pub fn compute_network_scores(
 
     // === 2: Differentiation — variance of per-oscillator firing rates ===
     // Firing rate = number of upward zero-crossings per unit time
-    let rates: Vec<f64> = traces.iter().map(|tr| {
-        let crossings = tr.windows(2).filter(|w| w[0] < 0.0 && w[1] >= 0.0).count();
-        crossings as f64 / (measure as f64 * dt)
-    }).collect();
+    let rates: Vec<f64> = traces
+        .iter()
+        .map(|tr| {
+            let crossings = tr.windows(2).filter(|w| w[0] < 0.0 && w[1] >= 0.0).count();
+            crossings as f64 / (measure as f64 * dt)
+        })
+        .collect();
     let rate_mean = rates.iter().sum::<f64>() / n as f64;
     let differentiation = if n > 1 {
         rates.iter().map(|r| (r - rate_mean).powi(2)).sum::<f64>() / n as f64
-    } else { 0.0 };
+    } else {
+        0.0
+    };
 
     // === 3: Coherence — autocorrelation of global field at lag=20 ===
     let global: Vec<f64> = (0..measure)
@@ -92,9 +99,11 @@ pub fn compute_network_scores(
 
     // === 4: Metastability — variance of instantaneous sync index ===
     let sync_mean = sync_trace.iter().sum::<f64>() / sync_trace.len() as f64;
-    let metastability = sync_trace.iter()
+    let metastability = sync_trace
+        .iter()
         .map(|s| (s - sync_mean).powi(2))
-        .sum::<f64>() / sync_trace.len() as f64;
+        .sum::<f64>()
+        / sync_trace.len() as f64;
 
     // === 5: Entropy — TEMPORAL Shannon entropy of each oscillator, averaged ===
     // Bin the TIME SERIES of each oscillator into 30 bins over [-2.5, 2.5]
@@ -110,14 +119,23 @@ pub fn compute_network_scores(
             bins[idx] += 1;
         }
         let total = tr.len() as f64;
-        let h: f64 = bins.iter().filter(|&&b| b > 0)
-            .map(|&b| { let p = b as f64 / total; -p * p.ln() })
+        let h: f64 = bins
+            .iter()
+            .filter(|&&b| b > 0)
+            .map(|&b| {
+                let p = b as f64 / total;
+                -p * p.ln()
+            })
             .sum();
         mean_entropy += h;
     }
     mean_entropy /= n as f64;
     let max_h = (n_bins as f64).ln();
-    let entropy_norm = if max_h > 0.0 { mean_entropy / max_h } else { 0.0 };
+    let entropy_norm = if max_h > 0.0 {
+        mean_entropy / max_h
+    } else {
+        0.0
+    };
 
     // === 6: Transfer Entropy — directional information flow proxy ===
     // Simplified: for each pair (i→j), check if past of i predicts future of j
@@ -129,7 +147,9 @@ pub fn compute_network_scores(
     let step = (n / 10).max(1);
     for i in (0..n).step_by(step) {
         for j in (0..n).step_by(step) {
-            if i == j { continue; }
+            if i == j {
+                continue;
+            }
             let te = transfer_entropy_proxy(&traces[i], &traces[j], lag);
             transfer_sum += te;
             n_dir_pairs += 1;
@@ -163,7 +183,9 @@ pub fn compute_network_scores(
     // Multi-scale ratio: local much higher than global = modular; equal = homogeneous
     let multi_scale = if local_corr + global_corr > 1e-10 {
         (local_corr - global_corr) / (local_corr + global_corr)
-    } else { 0.0 };
+    } else {
+        0.0
+    };
 
     let scores = [
         synchrony.clamp(0.0, 1.0),
@@ -187,7 +209,9 @@ pub fn compute_network_scores(
 /// Transfer entropy proxy: does knowing x's past improve prediction of y's future?
 /// TE(x→y) ∝ |corr(x[t-lag], y[t]) - corr(y[t-lag], y[t])|
 fn transfer_entropy_proxy(x: &[f64], y: &[f64], lag: usize) -> f64 {
-    if lag >= x.len() || lag >= y.len() { return 0.0; }
+    if lag >= x.len() || lag >= y.len() {
+        return 0.0;
+    }
     let n = x.len() - lag;
 
     // corr(x_past, y_future)
@@ -220,23 +244,43 @@ pub fn network_correlation_matrix(results: &[NetworkScores]) -> [[f64; N_THEORIE
 pub fn effective_dimensionality(corr: &[[f64; N_THEORIES]; N_THEORIES]) -> (usize, Vec<f64>) {
     let n = N_THEORIES;
     let mut a = vec![0.0; n * n];
-    for i in 0..n { for j in 0..n { a[i * n + j] = corr[i][j]; } }
+    for i in 0..n {
+        for j in 0..n {
+            a[i * n + j] = corr[i][j];
+        }
+    }
 
     let mut eigenvalues = Vec::new();
     for _ in 0..n {
         let mut v = vec![1.0 / (n as f64).sqrt(); n];
         for _ in 0..300 {
             let mut av = vec![0.0; n];
-            for i in 0..n { for j in 0..n { av[i] += a[i * n + j] * v[j]; } }
+            for i in 0..n {
+                for j in 0..n {
+                    av[i] += a[i * n + j] * v[j];
+                }
+            }
             let norm = av.iter().map(|x| x * x).sum::<f64>().sqrt();
-            if norm < 1e-15 { break; }
-            for i in 0..n { v[i] = av[i] / norm; }
+            if norm < 1e-15 {
+                break;
+            }
+            for i in 0..n {
+                v[i] = av[i] / norm;
+            }
         }
         let mut av = vec![0.0; n];
-        for i in 0..n { for j in 0..n { av[i] += a[i * n + j] * v[j]; } }
+        for i in 0..n {
+            for j in 0..n {
+                av[i] += a[i * n + j] * v[j];
+            }
+        }
         let lambda: f64 = v.iter().zip(av.iter()).map(|(vi, avi)| vi * avi).sum();
         eigenvalues.push(lambda.abs());
-        for i in 0..n { for j in 0..n { a[i * n + j] -= lambda * v[i] * v[j]; } }
+        for i in 0..n {
+            for j in 0..n {
+                a[i * n + j] -= lambda * v[i] * v[j];
+            }
+        }
     }
     eigenvalues.sort_by(|a, b| b.partial_cmp(a).unwrap());
     let total: f64 = eigenvalues.iter().sum();
@@ -246,42 +290,67 @@ pub fn effective_dimensionality(corr: &[[f64; N_THEORIES]; N_THEORIES]) -> (usiz
 }
 
 pub fn scaling_experiment(sizes: &[usize], n_configs: usize) -> Vec<(usize, usize, Vec<f64>)> {
-    sizes.iter().map(|&n| {
-        let configs: Vec<NetworkScores> = (0..n_configs).map(|c| {
-            let coupling = 0.05 + (c as f64 / n_configs as f64) * 0.95;
-            let i_ext = 0.3 + (c as f64 / n_configs as f64) * 0.5;
-            compute_network_scores(n, coupling, i_ext, &format!("N{}_c{}", n, c))
-        }).collect();
-        let corr = network_correlation_matrix(&configs);
-        let (n_eff, eigenvalues) = effective_dimensionality(&corr);
-        (n, n_eff, eigenvalues)
-    }).collect()
+    sizes
+        .iter()
+        .map(|&n| {
+            let configs: Vec<NetworkScores> = (0..n_configs)
+                .map(|c| {
+                    let coupling = 0.05 + (c as f64 / n_configs as f64) * 0.95;
+                    let i_ext = 0.3 + (c as f64 / n_configs as f64) * 0.5;
+                    compute_network_scores(n, coupling, i_ext, &format!("N{}_c{}", n, c))
+                })
+                .collect();
+            let corr = network_correlation_matrix(&configs);
+            let (n_eff, eigenvalues) = effective_dimensionality(&corr);
+            (n, n_eff, eigenvalues)
+        })
+        .collect()
 }
 
-fn pearson_abs(x: &[f64], y: &[f64]) -> f64 { pearson_signed(x, y).abs() }
+fn pearson_abs(x: &[f64], y: &[f64]) -> f64 {
+    pearson_signed(x, y).abs()
+}
 
 fn pearson_signed(x: &[f64], y: &[f64]) -> f64 {
     let n = x.len().min(y.len()) as f64;
-    if n < 3.0 { return 0.0; }
+    if n < 3.0 {
+        return 0.0;
+    }
     let mx = x.iter().sum::<f64>() / n;
     let my = y.iter().sum::<f64>() / n;
     let (mut cov, mut vx, mut vy) = (0.0, 0.0, 0.0);
     for (xi, yi) in x.iter().zip(y.iter()) {
         let (dx, dy) = (xi - mx, yi - my);
-        cov += dx * dy; vx += dx * dx; vy += dy * dy;
+        cov += dx * dy;
+        vx += dx * dx;
+        vy += dy * dy;
     }
-    if vx < 1e-15 || vy < 1e-15 { return 0.0; }
+    if vx < 1e-15 || vy < 1e-15 {
+        return 0.0;
+    }
     let r = cov / (vx * vy).sqrt();
-    if r.is_nan() { 0.0 } else { r.clamp(-1.0, 1.0) }
+    if r.is_nan() {
+        0.0
+    } else {
+        r.clamp(-1.0, 1.0)
+    }
 }
 
 fn autocorrelation(x: &[f64], lag: usize) -> f64 {
-    if lag >= x.len() { return 0.0; }
+    if lag >= x.len() {
+        return 0.0;
+    }
     let mean = x.iter().sum::<f64>() / x.len() as f64;
     let var: f64 = x.iter().map(|xi| (xi - mean).powi(2)).sum::<f64>() / x.len() as f64;
-    if var < 1e-15 { return 0.0; }
-    let acov: f64 = x[..x.len() - lag].iter().zip(x[lag..].iter())
-        .map(|(a, b)| (a - mean) * (b - mean)).sum::<f64>() / (x.len() - lag) as f64;
+    if var < 1e-15 {
+        return 0.0;
+    }
+    let acov: f64 = x[..x.len() - lag]
+        .iter()
+        .zip(x[lag..].iter())
+        .map(|(a, b)| (a - mean) * (b - mean))
+        .sum::<f64>()
+        / (x.len() - lag) as f64;
     acov / var
 }
 
@@ -293,14 +362,23 @@ mod tests {
     fn test_scores_bounded() {
         let s = compute_network_scores(5, 0.3, 0.5, "test");
         for (i, &v) in s.scores.iter().enumerate() {
-            assert!(v >= 0.0 && v <= 1.0, "Theory {} = {:.4}", THEORY_NAMES[i], v);
+            assert!(
+                v >= 0.0 && v <= 1.0,
+                "Theory {} = {:.4}",
+                THEORY_NAMES[i],
+                v
+            );
         }
     }
 
     #[test]
     fn test_entropy_nonzero_for_oscillating() {
         let s = compute_network_scores(5, 0.3, 0.5, "test");
-        assert!(s.scores[5] > 0.01, "Entropy should be nonzero for oscillating network: {:.4}", s.scores[5]);
+        assert!(
+            s.scores[5] > 0.01,
+            "Entropy should be nonzero for oscillating network: {:.4}",
+            s.scores[5]
+        );
     }
 
     #[test]

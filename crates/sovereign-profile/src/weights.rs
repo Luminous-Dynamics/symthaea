@@ -18,7 +18,9 @@ pub struct DimensionWeights {
 impl DimensionWeights {
     /// Equal weights: each dimension contributes 12.5%.
     pub fn equal() -> Self {
-        Self { weights: [0.125; 8] }
+        Self {
+            weights: [0.125; 8],
+        }
     }
 
     /// Default governance weights — balanced with slight emphasis on

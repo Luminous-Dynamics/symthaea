@@ -69,7 +69,9 @@ fn json_to_log_event(v: &serde_json::Value) -> Option<LogEvent> {
         .unwrap_or(0) as u32;
 
     let level_str = obj.get("Level").and_then(|x| {
-        x.as_str().map(|s| s.to_string()).or_else(|| x.as_u64().map(|n| n.to_string()))
+        x.as_str()
+            .map(|s| s.to_string())
+            .or_else(|| x.as_u64().map(|n| n.to_string()))
     });
     let severity = level_str
         .as_deref()

@@ -25,7 +25,7 @@
 //! "Integral" = every literal is an `IntLit` and every free-var type is
 //! `Int` / `Nat` (i.e. no `RealLit`, `RatLit`, or `Real` bindings).
 
-use crate::hdc::fol_formula_ext::{ArithOp, FolFormulaExt, NumericType, Term};
+use crate::hdc::fol_formula_ext::{FolFormulaExt, NumericType, Term};
 use std::fmt::Write;
 
 // ═════════════════════════════════════════════════════════════════════════

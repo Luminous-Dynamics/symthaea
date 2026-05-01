@@ -3,10 +3,10 @@
 //! Ranging coordinator: ingest and query range measurements.
 
 use hdk::prelude::*;
-use ranging_integrity::*;
 use mycelix_position_shared::{
-    RangeMeasurement, RangingMethod, PositionTimestamp, PositionQuality,
+    PositionQuality, PositionTimestamp, RangeMeasurement, RangingMethod,
 };
+use ranging_integrity::*;
 
 fn anchor_for_node(node_id: &str) -> ExternResult<AnyLinkableHash> {
     let path = Path::from(format!("ranges.node.{}", node_id));
@@ -70,14 +70,23 @@ pub fn get_ranges_for_node(node_id: String) -> ExternResult<Vec<RangeMeasurement
     let node_anchor = anchor_for_node(&node_id)?;
     let links = get_links(
         LinkQuery::try_new(node_anchor, LinkTypes::RangesByNode)?,
-            GetStrategy::Network,
+        GetStrategy::Network,
     )?;
 
     let mut results = Vec::new();
     for link in links {
-        let Some(target) = link.target.into_action_hash() else { continue };
-        let Some(record) = get(target, GetOptions::default())? else { continue };
-        if let Some(m) = record.entry().to_app_option::<RangeMeasurement>().ok().flatten() {
+        let Some(target) = link.target.into_action_hash() else {
+            continue;
+        };
+        let Some(record) = get(target, GetOptions::default())? else {
+            continue;
+        };
+        if let Some(m) = record
+            .entry()
+            .to_app_option::<RangeMeasurement>()
+            .ok()
+            .flatten()
+        {
             results.push(m);
         }
     }

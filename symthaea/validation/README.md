@@ -9,11 +9,14 @@ Cross-validation with external implementations.
 ### Usage
 
 ```bash
-# Activate PyPhi environment
-source .venv-pyphi/bin/activate
+# Enter the Python research shell
+nix develop .#python-research
 
 # Run validation
 python validation/pyphi_crossvalidation.py
+
+# Run the lightweight package smoke lane
+./scripts/ci_check_lanes.sh python-research
 
 # Results output to results/pyphi_validation_results.csv
 ```

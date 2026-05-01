@@ -25,17 +25,13 @@
 //! cargo run --bin luminous_sim -- --sensitivity 5
 //! ```
 
-use mycelix_multiworld_sim::{
-    MultiWorldSimulator,
-    config::SimulationConfig,
-    unified_config_bridge,
-};
 use luminous_sim_core::{
-    UnifiedConfig,
-    StandardizedReport,
-    HonestAssessment,
-    report::{ExecutiveSummary, SimulationOutcome, ReproducibilityInfo},
     module_trait::ReportSection,
+    report::{ExecutiveSummary, ReproducibilityInfo, SimulationOutcome},
+    HonestAssessment, StandardizedReport, UnifiedConfig,
+};
+use mycelix_multiworld_sim::{
+    config::SimulationConfig, unified_config_bridge, MultiWorldSimulator,
 };
 
 fn main() {
@@ -84,15 +80,14 @@ fn main() {
     };
 
     // Convert to existing config types
-    let (mut sim_config, policy, _params) = match unified_config_bridge::from_unified_toml(
-        &unified.to_toml().unwrap_or_default()
-    ) {
-        Ok(v) => v,
-        Err(e) => {
-            eprintln!("Config conversion failed: {e}");
-            std::process::exit(1);
-        }
-    };
+    let (mut sim_config, policy, _params) =
+        match unified_config_bridge::from_unified_toml(&unified.to_toml().unwrap_or_default()) {
+            Ok(v) => v,
+            Err(e) => {
+                eprintln!("Config conversion failed: {e}");
+                std::process::exit(1);
+            }
+        };
 
     // Apply CLI overrides
     if let Some(years) = override_years {
@@ -107,7 +102,10 @@ fn main() {
     let seed = sim_config.seed;
 
     eprintln!("=== luminous-sim v0.1.0 ===");
-    eprintln!("Duration: {} years ({} ticks)", duration_years, sim_config.total_ticks);
+    eprintln!(
+        "Duration: {} years ({} ticks)",
+        duration_years, sim_config.total_ticks
+    );
     eprintln!("Seed: {}", seed);
     if let Some(ref path) = config_path {
         eprintln!("Config: {}", path);
@@ -139,12 +137,10 @@ fn main() {
 
     // Output
     match format.as_str() {
-        "json" => {
-            match std_report.to_json() {
-                Ok(json) => println!("{}", json),
-                Err(e) => eprintln!("JSON export failed: {e}"),
-            }
-        }
+        "json" => match std_report.to_json() {
+            Ok(json) => println!("{}", json),
+            Err(e) => eprintln!("JSON export failed: {e}"),
+        },
         "markdown" | "md" => {
             println!("{}", std_report.to_markdown());
         }
@@ -159,9 +155,13 @@ fn main() {
             // Epoch snapshots
             println!("\n=== EPOCH SNAPSHOTS ===");
             for snap in &report.epoch_snapshots {
-                println!("  Yr {:>5.1} | Pop {:>6} | Phi {:.3} | CVS {:.3}",
-                    snap.tick as f64 / 12.0, snap.total_population,
-                    snap.mean_phi, snap.civilization_viability_score);
+                println!(
+                    "  Yr {:>5.1} | Pop {:>6} | Phi {:.3} | CVS {:.3}",
+                    snap.tick as f64 / 12.0,
+                    snap.total_population,
+                    snap.mean_phi,
+                    snap.civilization_viability_score
+                );
             }
 
             // Narrative
@@ -183,7 +183,10 @@ fn main() {
 
     eprintln!("\n=== Completed in {:.1}s ===", wall_time);
     if report.survived {
-        eprintln!("RESULT: Civilization survived {} years (CVS: {:.4})", duration_years, report.final_cvs);
+        eprintln!(
+            "RESULT: Civilization survived {} years (CVS: {:.4})",
+            duration_years, report.final_cvs
+        );
     } else {
         eprintln!("RESULT: Civilization collapsed");
     }
@@ -197,27 +200,48 @@ fn build_standardized_report(
     wall_time: f64,
 ) -> StandardizedReport {
     let outcome = if report.final_cvs > 0.7 {
-        SimulationOutcome::Thrived { peak_cvs: report.final_cvs }
+        SimulationOutcome::Thrived {
+            peak_cvs: report.final_cvs,
+        }
     } else if report.survived {
-        SimulationOutcome::Survived { final_cvs: report.final_cvs }
+        SimulationOutcome::Survived {
+            final_cvs: report.final_cvs,
+        }
     } else {
-        SimulationOutcome::Collapsed { at_year: report.duration_years }
+        SimulationOutcome::Collapsed {
+            at_year: report.duration_years,
+        }
     };
     let worlds_surviving = sim.worlds.iter().filter(|w| w.population() > 0).count();
 
     let mut key_findings = Vec::new();
-    key_findings.push(format!("Final population: {} across {} worlds ({} surviving)",
-        report.final_population, sim.worlds.len(), worlds_surviving));
-    key_findings.push(format!("CVS: {:.4} ({})",
+    key_findings.push(format!(
+        "Final population: {} across {} worlds ({} surviving)",
+        report.final_population,
+        sim.worlds.len(),
+        worlds_surviving
+    ));
+    key_findings.push(format!(
+        "CVS: {:.4} ({})",
         report.final_cvs,
-        if report.final_cvs > 0.7 { "thriving" }
-        else if report.final_cvs > 0.3 { "surviving" }
-        else { "struggling" }
+        if report.final_cvs > 0.7 {
+            "thriving"
+        } else if report.final_cvs > 0.3 {
+            "surviving"
+        } else {
+            "struggling"
+        }
     ));
     if report.tech_milestones_achieved > 0 {
-        key_findings.push(format!("{} technology milestones achieved", report.tech_milestones_achieved));
+        key_findings.push(format!(
+            "{} technology milestones achieved",
+            report.tech_milestones_achieved
+        ));
     }
-    key_findings.push(format!("{} total disasters endured", report.total_disasters));
+    key_findings.push(format!(
+        "{} total disasters endured",
+        report.total_disasters
+    ));
 
     // Viability report section
     let viability_section = ReportSection {
@@ -264,7 +288,9 @@ fn build_standardized_report(
     };
 
     let mut sections = vec![viability_section];
-    if let Some(s) = earth_section { sections.push(s); }
+    if let Some(s) = earth_section {
+        sections.push(s);
+    }
 
     StandardizedReport {
         executive_summary: ExecutiveSummary {
@@ -272,6 +298,10 @@ fn build_standardized_report(
             outcome: outcome.to_string(),
             key_findings,
             wall_time_seconds: wall_time,
+            final_cvs: report.final_cvs,
+            final_population: report.final_population,
+            worlds_surviving,
+            critical_events: report.total_disasters, // Map total disasters as critical events
         },
         module_reports: sections,
         honest_assessment: HonestAssessment {
@@ -308,8 +338,10 @@ fn run_sensitivity_analysis(top_n: usize, base_config: &UnifiedConfig, years: u3
 
     let n = top_n.min(params.len());
     println!("Sensitivity Analysis: testing {} parameters\n", n);
-    println!("{:<30} {:>10} {:>10} {:>10} {:>10}",
-        "Parameter", "Low", "Default", "High", "|ΔCVS|");
+    println!(
+        "{:<30} {:>10} {:>10} {:>10} {:>10}",
+        "Parameter", "Low", "Default", "High", "|ΔCVS|"
+    );
     println!("{}", "-".repeat(75));
 
     for &(name, low, high) in params.iter().take(n) {
@@ -327,8 +359,10 @@ fn run_sensitivity_analysis(top_n: usize, base_config: &UnifiedConfig, years: u3
         let high_cvs = run_quick_sim(&high_config, years, base_seed);
 
         let delta = (high_cvs - low_cvs).abs();
-        println!("{:<30} {:>10.4} {:>10.4} {:>10.4} {:>10.4}",
-            name, low_cvs, base_cvs, high_cvs, delta);
+        println!(
+            "{:<30} {:>10.4} {:>10.4} {:>10.4} {:>10.4}",
+            name, low_cvs, base_cvs, high_cvs, delta
+        );
     }
 }
 
@@ -337,7 +371,11 @@ fn run_quick_sim(config: &UnifiedConfig, years: u32, seed: u64) -> f64 {
     let (mut sim_config, policy, _) = unified_config_bridge::from_unified_toml(&toml_str)
         .unwrap_or_else(|_| {
             let c = SimulationConfig::default_150_year();
-            (c.clone(), c.policy, mycelix_multiworld_sim::constants::SimulationParams::default())
+            (
+                c.clone(),
+                c.policy,
+                mycelix_multiworld_sim::constants::SimulationParams::default(),
+            )
         });
     sim_config.total_ticks = years.min(150) * 12; // Cap at 150yr for speed
     sim_config.seed = seed;
@@ -362,11 +400,14 @@ fn set_param(config: &mut UnifiedConfig, name: &str, value: f64) {
 }
 
 fn get_arg(args: &[String], flag: &str) -> Option<String> {
-    args.iter().position(|a| a == flag).and_then(|i| args.get(i + 1).cloned())
+    args.iter()
+        .position(|a| a == flag)
+        .and_then(|i| args.get(i + 1).cloned())
 }
 
 fn print_help() {
-    eprintln!("luminous-sim — Unified Civilizational Simulator
+    eprintln!(
+        "luminous-sim — Unified Civilizational Simulator
 
 USAGE:
     luminous-sim [OPTIONS]
@@ -385,5 +426,6 @@ EXAMPLES:
     luminous-sim --years 1000 --seed 123 --format json
     luminous-sim --sensitivity 5
     luminous-sim --export-config > my_scenario.toml
-");
+"
+    );
 }

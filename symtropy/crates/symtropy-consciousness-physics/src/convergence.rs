@@ -92,8 +92,11 @@ pub fn mann_whitney_u(a: &[f64], b: &[f64]) -> (f64, f64, f64) {
     let mut u_a = 0.0;
     for &ai in a {
         for &bj in b {
-            if ai > bj { u_a += 1.0; }
-            else if (ai - bj).abs() < 1e-15 { u_a += 0.5; }
+            if ai > bj {
+                u_a += 1.0;
+            } else if (ai - bj).abs() < 1e-15 {
+                u_a += 0.5;
+            }
         }
     }
     let u_b = na * nb - u_a;
@@ -102,7 +105,11 @@ pub fn mann_whitney_u(a: &[f64], b: &[f64]) -> (f64, f64, f64) {
     // Normal approximation for z-score (valid for n > 20)
     let mean_u = na * nb / 2.0;
     let std_u = (na * nb * (na + nb + 1.0) / 12.0).sqrt();
-    let z = if std_u > 1e-15 { (u - mean_u) / std_u } else { 0.0 };
+    let z = if std_u > 1e-15 {
+        (u - mean_u) / std_u
+    } else {
+        0.0
+    };
 
     // Two-tailed p-value from z-score (normal CDF approximation)
     let p = 2.0 * normal_cdf(-z.abs());
@@ -114,7 +121,9 @@ pub fn mann_whitney_u(a: &[f64], b: &[f64]) -> (f64, f64, f64) {
 pub fn cohens_d(a: &[f64], b: &[f64]) -> f64 {
     let na = a.len() as f64;
     let nb = b.len() as f64;
-    if na < 2.0 || nb < 2.0 { return 0.0; }
+    if na < 2.0 || nb < 2.0 {
+        return 0.0;
+    }
 
     let mean_a = a.iter().sum::<f64>() / na;
     let mean_b = b.iter().sum::<f64>() / nb;
@@ -122,7 +131,9 @@ pub fn cohens_d(a: &[f64], b: &[f64]) -> f64 {
     let var_b = b.iter().map(|x| (x - mean_b).powi(2)).sum::<f64>() / (nb - 1.0);
 
     let pooled_std = (((na - 1.0) * var_a + (nb - 1.0) * var_b) / (na + nb - 2.0)).sqrt();
-    if pooled_std < 1e-15 { return 0.0; }
+    if pooled_std < 1e-15 {
+        return 0.0;
+    }
     (mean_a - mean_b) / pooled_std
 }
 
@@ -138,11 +149,16 @@ pub fn cohens_d(a: &[f64], b: &[f64]) -> f64 {
 /// Ref: Holm, S. (1979). Scandinavian Journal of Statistics, 6(2), 65-70.
 pub fn holm_bonferroni<'a>(tests: &[(&'a str, f64)], alpha: f64) -> Vec<(&'a str, f64, bool)> {
     let m = tests.len();
-    if m == 0 { return vec![]; }
+    if m == 0 {
+        return vec![];
+    }
 
     // Sort by p-value (ascending), preserving original labels
-    let mut indexed: Vec<(usize, &str, f64)> = tests.iter().enumerate()
-        .map(|(i, (label, p))| (i, *label, *p)).collect();
+    let mut indexed: Vec<(usize, &str, f64)> = tests
+        .iter()
+        .enumerate()
+        .map(|(i, (label, p))| (i, *label, *p))
+        .collect();
     indexed.sort_by(|a, b| a.2.partial_cmp(&b.2).unwrap_or(std::cmp::Ordering::Equal));
 
     // Step-down: adjust p-values and determine significance
@@ -155,7 +171,9 @@ pub fn holm_bonferroni<'a>(tests: &[(&'a str, f64)], alpha: f64) -> Vec<(&'a str
 
         // Once we fail to reject, all subsequent tests also fail
         let significant = still_rejecting && adjusted_p < alpha;
-        if !significant { still_rejecting = false; }
+        if !significant {
+            still_rejecting = false;
+        }
 
         results[orig_idx] = (label, adjusted_p, significant);
     }
@@ -167,9 +185,15 @@ pub fn holm_bonferroni<'a>(tests: &[(&'a str, f64)], alpha: f64) -> Vec<(&'a str
 fn normal_cdf(x: f64) -> f64 {
     let t = 1.0 / (1.0 + 0.2316419 * x.abs());
     let d = 0.3989422804014327; // 1/sqrt(2*pi)
-    let p = d * (-x * x / 2.0).exp()
-        * (t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429)))));
-    if x >= 0.0 { 1.0 - p } else { p }
+    let p = d
+        * (-x * x / 2.0).exp()
+        * (t * (0.319381530
+            + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429)))));
+    if x >= 0.0 {
+        1.0 - p
+    } else {
+        p
+    }
 }
 
 #[cfg(test)]
@@ -182,7 +206,10 @@ mod tests {
         for _ in 0..10 {
             det.push(5.0);
         }
-        assert!(det.is_converged(), "Constant series should converge immediately");
+        assert!(
+            det.is_converged(),
+            "Constant series should converge immediately"
+        );
         assert!((det.rolling_mean() - 5.0).abs() < 1e-10);
         assert!(det.rolling_variance() < 1e-10);
     }
@@ -208,7 +235,10 @@ mod tests {
         for _ in 0..5 {
             det.push(10.0);
         }
-        assert!(det.is_converged(), "Should converge after window of constants");
+        assert!(
+            det.is_converged(),
+            "Should converge after window of constants"
+        );
     }
 
     #[test]
@@ -243,7 +273,10 @@ mod tests {
         let a = vec![1.0, 2.0, 3.0, 4.0, 5.0];
         let b = vec![10.0, 11.0, 12.0, 13.0, 14.0];
         let (_, _, p) = mann_whitney_u(&a, &b);
-        assert!(p < 0.05, "Very different samples should have low p-value: {p}");
+        assert!(
+            p < 0.05,
+            "Very different samples should have low p-value: {p}"
+        );
     }
 
     #[test]
@@ -259,16 +292,15 @@ mod tests {
         let a = vec![5.0, 5.0, 5.0, 5.0];
         let b = vec![5.0, 5.0, 5.0, 5.0];
         let d = cohens_d(&a, &b);
-        assert!((d - 0.0).abs() < 1e-10, "Identical means should give d=0: {d}");
+        assert!(
+            (d - 0.0).abs() < 1e-10,
+            "Identical means should give d=0: {d}"
+        );
     }
 
     #[test]
     fn holm_bonferroni_basic() {
-        let tests = vec![
-            ("A", 0.01),
-            ("B", 0.04),
-            ("C", 0.03),
-        ];
+        let tests = vec![("A", 0.01), ("B", 0.04), ("C", 0.03)];
         let results = holm_bonferroni(&tests, 0.05);
         // Sorted: A(0.01), C(0.03), B(0.04)
         // A: 0.01 × 3 = 0.03 < 0.05 → sig

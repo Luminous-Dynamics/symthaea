@@ -302,7 +302,13 @@ mod tests {
         for v in [0.0, 0.1, 0.25, 0.5, 0.75, 1.0] {
             let p = to_permille(v);
             let back = from_permille(p);
-            assert!((back - v).abs() < 0.002, "Roundtrip failed: {} -> {} -> {}", v, p, back);
+            assert!(
+                (back - v).abs() < 0.002,
+                "Roundtrip failed: {} -> {} -> {}",
+                v,
+                p,
+                back
+            );
         }
     }
 
@@ -421,7 +427,10 @@ mod tests {
     fn commitment_differs_by_model_id() {
         let c1 = compute_parameterized_commitment("4d-v1", &[800, 600], 940);
         let c2 = compute_parameterized_commitment("8d-v1", &[800, 600], 940);
-        assert_ne!(c1, c2, "Different model IDs should produce different commitments");
+        assert_ne!(
+            c1, c2,
+            "Different model IDs should produce different commitments"
+        );
     }
 
     #[test]

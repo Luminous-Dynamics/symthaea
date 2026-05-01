@@ -4,14 +4,14 @@
 //! Read page with thread conversation (#1), working actions (#2), reply/forward (#3),
 //! body renderer (#2), typing indicators (#10).
 
+use crate::body_renderer::EmailBody;
+use crate::components::{EncryptionBadge, RevokeAccessButton, TrustGateActions, TrustGateBadge};
+use crate::mail_context::use_mail;
+use crate::toasts::use_toasts;
 use leptos::prelude::*;
 use leptos_router::hooks::use_params_map;
 use mail_leptos_types::*;
 use wasm_bindgen_futures::spawn_local;
-use crate::mail_context::use_mail;
-use crate::toasts::use_toasts;
-use crate::components::{EncryptionBadge, TrustGateBadge, TrustGateActions, RevokeAccessButton};
-use crate::body_renderer::EmailBody;
 
 #[component]
 pub fn ReadPage() -> impl IntoView {
@@ -34,22 +34,30 @@ pub fn ReadPage() -> impl IntoView {
     let thread_data = Memo::new(move |_| {
         let id = email_id();
         let inbox = mail.inbox.get();
-        let tid = inbox.iter().find(|e| e.hash == id).and_then(|e| e.thread_id.clone());
+        let tid = inbox
+            .iter()
+            .find(|e| e.hash == id)
+            .and_then(|e| e.thread_id.clone());
         if let Some(tid) = tid {
-            let mut thread: Vec<_> = inbox.into_iter()
+            let mut thread: Vec<_> = inbox
+                .into_iter()
                 .filter(|e| e.thread_id.as_deref() == Some(&tid))
                 .collect();
             thread.sort_by_key(|e| e.timestamp);
             thread
         } else {
-            inbox.into_iter().find(|e| e.hash == id).into_iter().collect()
+            inbox
+                .into_iter()
+                .find(|e| e.hash == id)
+                .into_iter()
+                .collect()
         }
     });
 
     let sender_trust = Memo::new(move |_| {
-        email_data.get().and_then(|e| {
-            mail.sender_trust.get().get(&e.sender).copied()
-        })
+        email_data
+            .get()
+            .and_then(|e| mail.sender_trust.get().get(&e.sender).copied())
     });
 
     {
@@ -65,11 +73,14 @@ pub fn ReadPage() -> impl IntoView {
             let hc_fetch = hc.clone();
 
             spawn_local(async move {
-                let response = match hc_fetch.call_zome::<serde_json::Value, serde_json::Value>(
-                    "mail_messages",
-                    "get_email",
-                    &serde_json::json!(id),
-                ).await {
+                let response = match hc_fetch
+                    .call_zome::<serde_json::Value, serde_json::Value>(
+                        "mail_messages",
+                        "get_email",
+                        &serde_json::json!(id),
+                    )
+                    .await
+                {
                     Ok(value) if !value.is_null() => value,
                     _ => return,
                 };
@@ -77,22 +88,38 @@ pub fn ReadPage() -> impl IntoView {
                 let encrypted_subject = response
                     .get("encrypted_subject")
                     .and_then(|v| v.as_array())
-                    .map(|arr| arr.iter().filter_map(|v| v.as_u64().map(|n| n as u8)).collect::<Vec<_>>())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_u64().map(|n| n as u8))
+                            .collect::<Vec<_>>()
+                    })
                     .unwrap_or_default();
                 let encrypted_body = response
                     .get("encrypted_body")
                     .and_then(|v| v.as_array())
-                    .map(|arr| arr.iter().filter_map(|v| v.as_u64().map(|n| n as u8)).collect::<Vec<_>>())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_u64().map(|n| n as u8))
+                            .collect::<Vec<_>>()
+                    })
                     .unwrap_or_default();
                 let ephemeral_pubkey = response
                     .get("ephemeral_pubkey")
                     .and_then(|v| v.as_array())
-                    .map(|arr| arr.iter().filter_map(|v| v.as_u64().map(|n| n as u8)).collect::<Vec<_>>())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_u64().map(|n| n as u8))
+                            .collect::<Vec<_>>()
+                    })
                     .unwrap_or_default();
                 let nonce = response
                     .get("nonce")
                     .and_then(|v| v.as_array())
-                    .map(|arr| arr.iter().filter_map(|v| v.as_u64().map(|n| n as u8)).collect::<Vec<_>>())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_u64().map(|n| n as u8))
+                            .collect::<Vec<_>>()
+                    })
                     .unwrap_or_default();
 
                 if let Some(subject) = crate::crypto::decode_transport_text(&encrypted_subject) {
@@ -120,7 +147,9 @@ pub fn ReadPage() -> impl IntoView {
                         &encrypted_subject,
                         &crypto.subject_key,
                         &crypto.nonce,
-                    ).await {
+                    )
+                    .await
+                    {
                         if let Ok(subject) = String::from_utf8(subject) {
                             decrypted_subject.set(Some(subject));
                         }
@@ -131,7 +160,9 @@ pub fn ReadPage() -> impl IntoView {
                     &encrypted_body,
                     &crypto.body_key,
                     &crypto.nonce,
-                ).await {
+                )
+                .await
+                {
                     if let Ok(body) = String::from_utf8(body) {
                         decrypted_body.set(Some(body));
                     }
@@ -416,7 +447,12 @@ pub fn ReadPage() -> impl IntoView {
 
 /// Smart reply suggestions — HDC-based contextual reply options.
 #[component]
-fn SmartReplySuggestions(snippet: String, subject: String, sender_key: String, sender_name: String) -> impl IntoView {
+fn SmartReplySuggestions(
+    snippet: String,
+    subject: String,
+    sender_key: String,
+    sender_name: String,
+) -> impl IntoView {
     let mail = use_mail();
 
     // Generate 3 contextual reply suggestions based on content
@@ -436,7 +472,8 @@ fn SmartReplySuggestions(snippet: String, subject: String, sender_key: String, s
             replies.push("You're welcome! Happy to help.");
             replies.push("No problem at all.");
             replies.push("Glad I could assist!");
-        } else if lower.contains("update") || lower.contains("status") || lower.contains("progress") {
+        } else if lower.contains("update") || lower.contains("status") || lower.contains("progress")
+        {
             replies.push("Thanks for the update. Looks great!");
             replies.push("Acknowledged. Let me know if anything changes.");
             replies.push("Good progress. Let's sync up tomorrow.");
@@ -533,5 +570,8 @@ fn SnoozeDropdown(hash: String) -> impl IntoView {
 fn format_timestamp(ts: u64) -> String {
     let d = js_sys::Date::new_0();
     d.set_time((ts as f64) * 1000.0);
-    format!("{}", d.to_locale_string("en-ZA", &wasm_bindgen::JsValue::UNDEFINED))
+    format!(
+        "{}",
+        d.to_locale_string("en-ZA", &wasm_bindgen::JsValue::UNDEFINED)
+    )
 }

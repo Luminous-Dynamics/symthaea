@@ -74,18 +74,21 @@ pub trait SimulationModule {
     fn phase(&self) -> TickPhase;
 
     /// Execute one tick. Receives feedback from earlier-phase modules.
-    fn tick(
-        &mut self,
-        tick: u32,
-        feedback: &HashMap<String, f64>,
-    ) -> Result<ModuleOutputs, String>;
+    fn tick(&mut self, tick: u32, feedback: &HashMap<String, f64>)
+        -> Result<ModuleOutputs, String>;
 
     /// Optional report section for the final summary.
-    fn report_section(&self) -> Option<ReportSection> { None }
+    fn report_section(&self) -> Option<ReportSection> {
+        None
+    }
 
     /// Optional honest self-assessment of limitations.
-    fn honest_assessment(&self) -> Option<ModuleAssessment> { None }
+    fn honest_assessment(&self) -> Option<ModuleAssessment> {
+        None
+    }
 
     /// Optional sensitivity parameters for analysis.
-    fn sensitivity_params(&self) -> Vec<SensitivityParam> { Vec::new() }
+    fn sensitivity_params(&self) -> Vec<SensitivityParam> {
+        Vec::new()
+    }
 }

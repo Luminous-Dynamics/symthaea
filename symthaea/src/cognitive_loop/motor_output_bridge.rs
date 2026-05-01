@@ -382,7 +382,7 @@ impl MotorOutputBridge {
 /// `RobotActuatorCommand` that can be consumed by:
 /// - `symthaea-hal::HalRuntime` (real hardware: PCA9685 servos, IMU, e-stop)
 /// - `symthaea-humanoid::HumanoidController` (MuJoCo simulation)
-/// - `symthaea-flight::FlightController` (quadrotor simulation)
+/// - `symthaea-multirotor::FlightController` (quadrotor simulation)
 ///
 /// ## Safety
 ///

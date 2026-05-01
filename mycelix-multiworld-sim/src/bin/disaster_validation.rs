@@ -19,17 +19,15 @@ struct RunResult {
 }
 
 fn main() {
-    eprintln!("=== 777-YEAR DISASTER VALIDATION (5 seeds x {} ticks) ===\n", 777 * 12);
+    eprintln!(
+        "=== 777-YEAR DISASTER VALIDATION (5 seeds x {} ticks) ===\n",
+        777 * 12
+    );
 
     let mut results: Vec<RunResult> = Vec::with_capacity(SEEDS.len());
 
     for (i, &seed) in SEEDS.iter().enumerate() {
-        eprint!(
-            "  Running seed {:>5} ({}/{}) ...",
-            seed,
-            i + 1,
-            SEEDS.len()
-        );
+        eprint!("  Running seed {:>5} ({}/{}) ...", seed, i + 1, SEEDS.len());
 
         let mut config = SimulationConfig::default_777_year();
         config.seed = seed;
@@ -50,7 +48,11 @@ fn main() {
             report.final_worlds,
             report.total_disasters,
             report.carrington_events,
-            if report.survived { "SURVIVED" } else { "COLLAPSED" },
+            if report.survived {
+                "SURVIVED"
+            } else {
+                "COLLAPSED"
+            },
         );
 
         results.push(RunResult {
@@ -125,7 +127,11 @@ fn main() {
         / n)
         .sqrt();
 
-    let mean_disasters = results.iter().map(|r| r.total_disasters as f64).sum::<f64>() / n;
+    let mean_disasters = results
+        .iter()
+        .map(|r| r.total_disasters as f64)
+        .sum::<f64>()
+        / n;
     let std_disasters = (results
         .iter()
         .map(|r| (r.total_disasters as f64 - mean_disasters).powi(2))
@@ -133,7 +139,11 @@ fn main() {
         / n)
         .sqrt();
 
-    let mean_carrington = results.iter().map(|r| r.carrington_events as f64).sum::<f64>() / n;
+    let mean_carrington = results
+        .iter()
+        .map(|r| r.carrington_events as f64)
+        .sum::<f64>()
+        / n;
     let std_carrington = (results
         .iter()
         .map(|r| (r.carrington_events as f64 - mean_carrington).powi(2))
@@ -149,10 +159,7 @@ fn main() {
         results.len(),
         survived_count as f64 / n * 100.0,
     );
-    println!(
-        "  Mean population:    {:.0} +/- {:.0}",
-        mean_pop, std_pop
-    );
+    println!("  Mean population:    {:.0} +/- {:.0}", mean_pop, std_pop);
     println!("  Mean CVS:           {:.3} +/- {:.3}", mean_cvs, std_cvs);
     println!("  Mean Phi:           {:.3} +/- {:.3}", mean_phi, std_phi);
     println!(

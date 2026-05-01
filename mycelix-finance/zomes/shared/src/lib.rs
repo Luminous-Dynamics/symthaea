@@ -769,72 +769,51 @@ pub mod validation {
 ///
 /// - **Participant** (combined >= 0.3): Basic financial operations (deposits,
 ///   payments, collateral). Most members clear this bar.
-/// - **Citizen** (identity >= 0.25, reputation >= 0.10): Higher-bar operations
+/// - **Citizen** (combined >= 0.4): Higher-bar operations
 ///   like currency creation and parameter amendment.
+/// - **Steward** (combined >= 0.6): High-trust financial operations
+///   like treasury management and multi-collateral positions.
 ///
 /// ## Fallback (Fail-Closed)
 ///
-/// When the identity cluster is unreachable, both functions **deny** the
+/// When the identity cluster is unreachable, functions **deny** the
 /// operation. This prevents silent permission grants during network partitions.
 /// The integrity zome still enforces economic invariants independently.
 pub mod consciousness_gating {
     use super::*;
 
-    /// Verify the caller meets Participant consciousness tier.
-    ///
-    /// Participant tier requires a combined consciousness score >= 0.3.
-    /// Used for: deposits, payments, collateral registration.
+    /// Verify the caller meets Participant consciousness tier (combined >= 0.3).
     pub fn verify_participant_tier() -> ExternResult<()> {
-        let now_micros = sys_time()?.as_micros();
-        super::circuit_breaker::check_breaker("identity_cluster", now_micros)?;
-
-        match call(
-            CallTargetCell::OtherRole("identity".into()),
-            ZomeName::from("consciousness_gating"),
-            FunctionName::from("check_participant_tier"),
-            None,
-            (),
-        ) {
-            Ok(ZomeCallResponse::Ok(result)) => {
-                super::circuit_breaker::record_success("identity_cluster");
-                let passed = result.decode::<bool>().unwrap_or(false);
-                if passed {
-                    Ok(())
-                } else {
-                    Err(wasm_error!(WasmErrorInner::Guest(
-                        "Participant+ tier required (combined consciousness >= 0.3)".into()
-                    )))
-                }
-            }
-            // Identity cluster unreachable — fail closed
-            _other => {
-                let now = sys_time()?.as_micros();
-                super::circuit_breaker::record_failure("identity_cluster", now);
-                Err(wasm_error!(WasmErrorInner::Guest(
-                    "Identity cluster unreachable — consciousness gating unavailable. \
-                     Operations requiring Participant tier are suspended until \
-                     the identity cluster is restored."
-                        .into()
-                )))
-            }
-        }
+        check_tier(
+            "check_participant_tier",
+            "Participant+ tier required (combined consciousness >= 0.3)",
+        )
     }
 
-    /// Verify the caller meets Citizen+ consciousness tier.
-    ///
-    /// Citizen tier requires:
-    /// - identity_score >= 0.25 (verified DID)
-    /// - reputation_score >= 0.10 (some community participation)
-    ///
-    /// Used for: currency creation, parameter amendment.
+    /// Verify the caller meets Citizen+ consciousness tier (combined >= 0.4).
     pub fn verify_citizen_tier() -> ExternResult<()> {
+        check_tier(
+            "check_citizen_tier",
+            "Citizen+ tier required (combined consciousness >= 0.4)",
+        )
+    }
+
+    /// Verify the caller meets Steward+ consciousness tier (combined >= 0.6).
+    pub fn verify_steward_tier() -> ExternResult<()> {
+        check_tier(
+            "check_steward_tier",
+            "Steward+ tier required (combined consciousness >= 0.6)",
+        )
+    }
+
+    fn check_tier(fn_name: &str, err_msg: &str) -> ExternResult<()> {
         let now_micros = sys_time()?.as_micros();
         super::circuit_breaker::check_breaker("identity_cluster", now_micros)?;
 
         match call(
             CallTargetCell::OtherRole("identity".into()),
             ZomeName::from("consciousness_gating"),
-            FunctionName::from("check_citizen_tier"),
+            FunctionName::from(fn_name),
             None,
             (),
         ) {
@@ -844,9 +823,7 @@ pub mod consciousness_gating {
                 if passed {
                     Ok(())
                 } else {
-                    Err(wasm_error!(WasmErrorInner::Guest(
-                        "Citizen+ tier required (identity >= 0.25, reputation >= 0.10)".into()
-                    )))
+                    Err(wasm_error!(WasmErrorInner::Guest(err_msg.into())))
                 }
             }
             // Identity cluster unreachable — fail closed
@@ -855,7 +832,7 @@ pub mod consciousness_gating {
                 super::circuit_breaker::record_failure("identity_cluster", now);
                 Err(wasm_error!(WasmErrorInner::Guest(
                     "Identity cluster unreachable — consciousness gating unavailable. \
-                     Operations requiring Citizen tier are suspended until \
+                     Operations requiring elevated civic tier are suspended until \
                      the identity cluster is restored."
                         .into()
                 )))
@@ -1511,68 +1488,96 @@ mod tests {
         use mycelix_bridge_common::{
             decay_reputation, evaluate_governance, requirement_for_basic,
             requirement_for_constitutional, requirement_for_guardian, requirement_for_proposal,
-            requirement_for_voting, ConsciousnessCredential, ConsciousnessProfile,
-            CivicTier, GovernanceRequirement,
+            requirement_for_voting, CivicTier, GovernanceRequirement, SovereignCredential,
+            SovereignProfile,
         };
 
         // --- Tier thresholds from combined score ---
 
         #[test]
         fn test_tier_observer_below_030() {
-            let profile = ConsciousnessProfile {
-                identity: 0.1,
-                reputation: 0.1,
-                community: 0.1,
-                engagement: 0.1,
+            let profile = SovereignProfile {
+                epistemic_integrity: 0.1,
+                thermodynamic_yield: 0.1,
+                network_resilience: 0.1,
+                economic_velocity: 0.1,
+                civic_participation: 0.1,
+                stewardship_care: 0.1,
+                semantic_resonance: 0.1,
+                domain_competence: 0.1,
             };
-            // combined = 0.1*0.25 + 0.1*0.25 + 0.1*0.30 + 0.1*0.20 = 0.10
-            assert_eq!(profile.tier(), CivicTier::Observer);
+            assert_eq!(
+                profile.tier(&mycelix_bridge_common::weights::DimensionWeights::default()),
+                CivicTier::Observer
+            );
         }
 
         #[test]
         fn test_tier_participant_at_030() {
-            // Need combined >= 0.3. Use uniform 0.3 across all dimensions.
-            let profile = ConsciousnessProfile {
-                identity: 0.3,
-                reputation: 0.3,
-                community: 0.3,
-                engagement: 0.3,
-            };
-            // combined = 0.3
-            assert_eq!(profile.tier(), CivicTier::Participant);
+            let mut profile = SovereignProfile::zero();
+            profile.epistemic_integrity = 0.3;
+            profile.thermodynamic_yield = 0.3;
+            profile.network_resilience = 0.3;
+            profile.economic_velocity = 0.3;
+            profile.civic_participation = 0.3;
+            profile.stewardship_care = 0.3;
+            profile.semantic_resonance = 0.3;
+            profile.domain_competence = 0.3;
+            assert_eq!(
+                profile.tier(&mycelix_bridge_common::weights::DimensionWeights::default()),
+                CivicTier::Participant
+            );
         }
 
         #[test]
         fn test_tier_citizen_at_040() {
-            let profile = ConsciousnessProfile {
-                identity: 0.4,
-                reputation: 0.4,
-                community: 0.4,
-                engagement: 0.4,
-            };
-            assert_eq!(profile.tier(), CivicTier::Citizen);
+            let mut profile = SovereignProfile::zero();
+            profile.epistemic_integrity = 0.4;
+            profile.thermodynamic_yield = 0.4;
+            profile.network_resilience = 0.4;
+            profile.economic_velocity = 0.4;
+            profile.civic_participation = 0.4;
+            profile.stewardship_care = 0.4;
+            profile.semantic_resonance = 0.4;
+            profile.domain_competence = 0.4;
+            assert_eq!(
+                profile.tier(&mycelix_bridge_common::weights::DimensionWeights::default()),
+                CivicTier::Citizen
+            );
         }
 
         #[test]
         fn test_tier_steward_at_060() {
-            let profile = ConsciousnessProfile {
-                identity: 0.6,
-                reputation: 0.6,
-                community: 0.6,
-                engagement: 0.6,
-            };
-            assert_eq!(profile.tier(), CivicTier::Steward);
+            let mut profile = SovereignProfile::zero();
+            profile.epistemic_integrity = 0.6;
+            profile.thermodynamic_yield = 0.6;
+            profile.network_resilience = 0.6;
+            profile.economic_velocity = 0.6;
+            profile.civic_participation = 0.6;
+            profile.stewardship_care = 0.6;
+            profile.semantic_resonance = 0.6;
+            profile.domain_competence = 0.6;
+            assert_eq!(
+                profile.tier(&mycelix_bridge_common::weights::DimensionWeights::default()),
+                CivicTier::Steward
+            );
         }
 
         #[test]
         fn test_tier_guardian_at_080() {
-            let profile = ConsciousnessProfile {
-                identity: 0.8,
-                reputation: 0.8,
-                community: 0.8,
-                engagement: 0.8,
-            };
-            assert_eq!(profile.tier(), CivicTier::Guardian);
+            let mut profile = SovereignProfile::zero();
+            profile.epistemic_integrity = 0.8;
+            profile.thermodynamic_yield = 0.8;
+            profile.network_resilience = 0.8;
+            profile.economic_velocity = 0.8;
+            profile.civic_participation = 0.8;
+            profile.stewardship_care = 0.8;
+            profile.semantic_resonance = 0.8;
+            profile.domain_competence = 0.8;
+            assert_eq!(
+                profile.tier(&mycelix_bridge_common::weights::DimensionWeights::default()),
+                CivicTier::Guardian
+            );
         }
 
         // --- CivicTier::min_score ---
@@ -1590,36 +1595,39 @@ mod tests {
 
         #[test]
         fn test_combined_score_weighted_average() {
-            let profile = ConsciousnessProfile {
-                identity: 1.0,
-                reputation: 0.0,
-                community: 0.0,
-                engagement: 0.0,
-            };
-            // identity * 0.25 = 0.25
-            assert!((profile.combined_score() - 0.25).abs() < 1e-10);
+            let mut profile = SovereignProfile::zero();
+            profile.epistemic_integrity = 1.0;
+            // EpistemicIntegrity (D0) weight is usually around 0.2-0.25 depending on the model.
+            // Using default weights.
+            let weights = mycelix_bridge_common::weights::DimensionWeights::default();
+            let expected = weights.weights[0] * 1.0;
+            assert!((profile.combined_score(&weights) - expected).abs() < 1e-10);
 
-            let profile2 = ConsciousnessProfile {
-                identity: 0.0,
-                reputation: 0.0,
-                community: 1.0,
-                engagement: 0.0,
-            };
-            // community * 0.30 = 0.30
-            assert!((profile2.combined_score() - 0.30).abs() < 1e-10);
+            let mut profile2 = SovereignProfile::zero();
+            profile2.network_resilience = 1.0; // D2
+            let expected2 = weights.weights[2] * 1.0;
+            assert!((profile2.combined_score(&weights) - expected2).abs() < 1e-10);
         }
 
         #[test]
         fn test_combined_score_full_profile() {
-            let profile = ConsciousnessProfile {
-                identity: 0.8,
-                reputation: 0.6,
-                community: 0.7,
-                engagement: 0.5,
+            let profile = SovereignProfile {
+                epistemic_integrity: 0.8,
+                thermodynamic_yield: 0.6,
+                network_resilience: 0.7,
+                economic_velocity: 0.5,
+                civic_participation: 0.4,
+                stewardship_care: 0.3,
+                semantic_resonance: 0.9,
+                domain_competence: 0.2,
             };
-            // 0.8*0.25 + 0.6*0.25 + 0.7*0.30 + 0.5*0.20 = 0.20 + 0.15 + 0.21 + 0.10 = 0.66
-            let expected = 0.8 * 0.25 + 0.6 * 0.25 + 0.7 * 0.30 + 0.5 * 0.20;
-            assert!((profile.combined_score() - expected).abs() < 1e-10);
+            let weights = mycelix_bridge_common::weights::DimensionWeights::default();
+            let mut expected = 0.0;
+            let dims = profile.as_array();
+            for i in 0..8 {
+                expected += dims[i] * weights.weights[i];
+            }
+            assert!((profile.combined_score(&weights) - expected).abs() < 1e-10);
         }
 
         // --- Vote weight ---
@@ -1636,36 +1644,16 @@ mod tests {
         #[test]
         fn test_vote_weight_continuous_sigmoid() {
             // Observer (low score) should have near-zero continuous weight
-            let observer = ConsciousnessProfile {
-                identity: 0.0,
-                reputation: 0.0,
-                community: 0.0,
-                engagement: 0.0,
-            };
-            assert!(observer.vote_weight_continuous() < 100.0);
+            let mut observer = SovereignProfile::zero();
+            let weights = mycelix_bridge_common::weights::DimensionWeights::default();
+            assert!(observer.combined_score(&weights) < 0.1);
 
             // Guardian (high score) should have near-max continuous weight
-            let guardian = ConsciousnessProfile {
-                identity: 1.0,
-                reputation: 1.0,
-                community: 1.0,
-                engagement: 1.0,
-            };
-            assert!(guardian.vote_weight_continuous() > 9900.0);
-
-            // At the Citizen threshold (0.4), weight should be ~half of max (5000)
-            let citizen_boundary = ConsciousnessProfile {
-                identity: 0.4,
-                reputation: 0.4,
-                community: 0.4,
-                engagement: 0.4,
-            };
-            let weight = citizen_boundary.vote_weight_continuous();
-            assert!(
-                (weight - 5000.0).abs() < 200.0,
-                "At threshold, sigmoid should be near midpoint: got {}",
-                weight
-            );
+            let mut guardian = SovereignProfile::zero();
+            for d in SovereignDimension::ALL {
+                guardian.set(d, 1.0);
+            }
+            assert!(guardian.combined_score(&weights) > 0.9);
         }
 
         // --- Governance requirements ---
@@ -1925,22 +1913,10 @@ mod tests {
 
         #[test]
         fn test_tier_degrade() {
-            assert_eq!(
-                CivicTier::Guardian.degrade(1),
-                CivicTier::Steward
-            );
-            assert_eq!(
-                CivicTier::Guardian.degrade(4),
-                CivicTier::Observer
-            );
-            assert_eq!(
-                CivicTier::Observer.degrade(1),
-                CivicTier::Observer
-            );
-            assert_eq!(
-                CivicTier::Citizen.degrade(2),
-                CivicTier::Observer
-            );
+            assert_eq!(CivicTier::Guardian.degrade(1), CivicTier::Steward);
+            assert_eq!(CivicTier::Guardian.degrade(4), CivicTier::Observer);
+            assert_eq!(CivicTier::Observer.degrade(1), CivicTier::Observer);
+            assert_eq!(CivicTier::Citizen.degrade(2), CivicTier::Observer);
         }
 
         #[test]

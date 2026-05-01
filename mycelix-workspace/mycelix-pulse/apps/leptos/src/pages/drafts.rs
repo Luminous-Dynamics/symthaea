@@ -1,8 +1,8 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-use leptos::prelude::*;
 use crate::mail_context::use_mail;
+use leptos::prelude::*;
 
 #[component]
 pub fn DraftsPage() -> impl IntoView {

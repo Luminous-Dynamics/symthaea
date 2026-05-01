@@ -45,10 +45,13 @@
             pkg-config
             openssl
             libclang.lib
+            stdenv.cc.cc.lib
 
-            # WASM linker (required for wasm32-unknown-unknown target)
+            # WASM linker & Optimization
             lld
             llvmPackages.bintools
+            binaryen
+            trunk
 
             # Holochain 0.6 tools
             holonixPkgs.holochain
@@ -63,29 +66,28 @@
 
           shellHook = ''
             echo ""
-            echo "🎓 Mycelix EduNet Development Environment"
+            echo "\u{1F331} Mycelix Praxis Hardened Environment"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             echo ""
-            echo "  🦀  Rust $(rustc --version | cut -d' ' -f2)"
-            echo "  🌐  WASM target: available"
-            echo "  📦  Workspace members: 10"
+            echo "  \u{1F980}  Rust $(rustc --version | cut -d' ' -f2)"
+            echo "  \u{1F310}  WASM & PWA tools: ready"
+            echo "  \u{1F512}  Linker (LD_LIBRARY_PATH): hardened"
             echo ""
-            echo "  Quick commands:"
-            echo "    cargo build --release                      # Build all"
-            echo "    cargo build --target wasm32-unknown-unknown --release  # Build WASM"
-            echo "    cargo test --all                           # Run tests"
+            echo "  Final Quickening Commands:"
+            echo "    trunk build --release                      # Build PWA/WASM"
+            echo "    cargo test --all                           # E2E Validation"
             echo ""
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo "  Phase 7: E2E Testing ready"
-            echo ""
 
-            # Set LIBCLANG_PATH for bindgen
+            # Set environment for dynamic linking (survives non-NixOS)
+            export LD_LIBRARY_PATH="${pkgs.stdenv.cc.cc.lib}/lib:$LD_LIBRARY_PATH"
             export LIBCLANG_PATH="${pkgs.libclang.lib}/lib"
           '';
 
           # Rust environment variables
           RUST_BACKTRACE = "1";
           LIBCLANG_PATH = "${pkgs.libclang.lib}/lib";
+          LD_LIBRARY_PATH = "${pkgs.stdenv.cc.cc.lib}/lib";
         };
       });
 }

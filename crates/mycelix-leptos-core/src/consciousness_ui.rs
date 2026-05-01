@@ -7,10 +7,10 @@
 //! coupled with thermodynamic state. Torpor dims all consciousness-driven
 //! effects — the organism enters visual hibernation when energy is low.
 
-use leptos::prelude::*;
 use crate::consciousness::use_consciousness;
 use crate::thermodynamic::use_thermodynamic;
 use crate::util::set_css_var;
+use leptos::prelude::*;
 
 /// Wire consciousness and thermodynamic signals to CSS custom properties.
 ///
@@ -28,11 +28,17 @@ pub fn init_consciousness_ui() {
 
         // Base consciousness values
         set_css_var("--civic-warmth", &format!("{:.3}", warmth));
-        set_css_var("--civic-bond-glow", &format!("{:.3}", profile.semantic_resonance));
+        set_css_var(
+            "--civic-bond-glow",
+            &format!("{:.3}", profile.semantic_resonance),
+        );
 
         // Animation speed: consciousness drives intent, energy constrains capacity
         let anim_speed = (0.5 + warmth * 0.5) * energy * (1.0 - torpor * 0.8);
-        set_css_var("--civic-animation-speed", &format!("{:.3}", anim_speed.max(0.1)));
+        set_css_var(
+            "--civic-animation-speed",
+            &format!("{:.3}", anim_speed.max(0.1)),
+        );
 
         // Primary color saturation dims with torpor
         let saturation = (1.0 - torpor * 0.7) * 100.0;

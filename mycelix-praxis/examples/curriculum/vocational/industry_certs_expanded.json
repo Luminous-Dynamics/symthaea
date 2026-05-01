@@ -1,0 +1,137 @@
+{
+  "metadata": {
+    "title": "Global Professional Roster: Expanded Industry Mappings",
+    "framework": "Global Professional Mesh",
+    "source": "https://mycelix.org/certs-expanded",
+    "grade_level": "Professional",
+    "subject_area": "Multi-Sector",
+    "domain": "Professional Certification",
+    "version": "1.0",
+    "total_standards": 10,
+    "domains": [
+      "Engineering & CAD",
+      "Advanced Manufacturing",
+      "Emergency Healthcare",
+      "Global Finance",
+      "Digital Pedagogy"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Comprehensive mapping of global vocational and professional standards."
+  },
+  "nodes": [
+    {
+      "id": "CERT-ENG-IEEE-CSDP",
+      "title": "IEEE Software Development Professional (CSDP)",
+      "description": "Standard for software engineering excellence. Requirements, design, construction, testing, and maintenance. Mapping the Sovereign Protocol Design track to IEEE standards.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Engineering & CAD",
+      "subdomain": "Certification Bridge",
+      "tags": ["ieee", "engineering", "software", "standard"],
+      "estimated_hours": 150,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "CERT-CAD-SOLIDWORKS",
+      "title": "SolidWorks Associate (CSWA Mapping)",
+      "description": "3D modeling and mechanical design fundamentals. Assembly modeling, part design, and technical drawing. Linked to the Digital Fabrication track.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Engineering & CAD",
+      "subdomain": "Certification Bridge",
+      "tags": ["cad", "3d-modeling", "engineering", "standard"],
+      "estimated_hours": 90,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "CERT-MFG-NIMS-CNC",
+      "title": "NIMS CNC Operator Certification",
+      "description": "National Institute for Metalworking Skills standard. Machine setup, operation, and safety for CNC milling and turning. Linked to the Digital Trades track.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Advanced Manufacturing",
+      "subdomain": "Certification Bridge",
+      "tags": ["mfg", "cnc", "machining", "standard"],
+      "estimated_hours": 120,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "CERT-HEALTH-NREMT",
+      "title": "NREMT (EMT-Basic Mapping)",
+      "description": "Emergency medical technician fundamentals. Airway, breathing, and circulation; Trauma and medical emergencies; EMS operations. Linked to the Bioregional Vitality track.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Emergency Healthcare",
+      "subdomain": "Certification Bridge",
+      "tags": ["medical", "emt", "emergency", "standard"],
+      "estimated_hours": 200,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Health Sciences"
+    },
+    {
+      "id": "CERT-FIN-ACCA-FA",
+      "title": "ACCA Financial Accounting (FA)",
+      "description": "International standard for financial reporting. Recording transactions, preparing financial statements, and basic auditing. Mapping the TEND economy to ACCA standards.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Global Finance",
+      "subdomain": "Certification Bridge",
+      "tags": ["accounting", "acca", "finance", "standard"],
+      "estimated_hours": 120,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Social Studies"
+    },
+    {
+      "id": "CERT-EDU-GOOGLE",
+      "title": "Google Certified Educator Level 1",
+      "description": "Digital tools for the classroom. Using G-Suite and mesh-learning tools to enhance student engagement and efficiency. Relevant for Learning Pod stewards.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Digital Pedagogy",
+      "subdomain": "Certification Bridge",
+      "tags": ["education", "teaching", "digital-tools", "standard"],
+      "estimated_hours": 30,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Education"
+    }
+  ],
+  "edges": [
+    {
+      "from": "DIG-ADV-101",
+      "to": "CERT-ENG-IEEE-CSDP",
+      "edge_type": "Recommended",
+      "strength_permille": 700,
+      "rationale": "Sovereign protocol design provides the architectural foundation for IEEE software standards."
+    },
+    {
+      "from": "VOC-DT-101",
+      "to": "CERT-CAD-SOLIDWORKS",
+      "edge_type": "Recommended",
+      "strength_permille": 850,
+      "rationale": "Digital fabrication mastery covers the majority of the CSWA mechanical design syllabus."
+    },
+    {
+      "from": "VOC-DT-101",
+      "to": "CERT-MFG-NIMS-CNC",
+      "edge_type": "Recommended",
+      "strength_permille": 900,
+      "rationale": "CNC operation in a community fab-lab is directly aligned with NIMS industrial standards."
+    },
+    {
+      "from": "VITA-001",
+      "to": "CERT-HEALTH-NREMT",
+      "edge_type": "Recommended",
+      "strength_permille": 600,
+      "rationale": "First-line emergency care provides the first 30% of the EMT-Basic competency set."
+    }
+  ]
+}

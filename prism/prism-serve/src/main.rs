@@ -6,15 +6,15 @@
 //! Serves the WASM app from dist/ and proxies external API requests,
 //! eliminating the need for a separate proxy service and port.
 
+use axum::Router;
 use axum::extract::Query;
-use axum::http::header::HeaderValue;
 use axum::http::StatusCode;
+use axum::http::header::HeaderValue;
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
-use axum::Router;
 use tower_http::compression::CompressionLayer;
-use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::services::{ServeDir, ServeFile};
+use tower_http::set_header::SetResponseHeaderLayer;
 
 const MAX_RESPONSE_SIZE: usize = 10 * 1024 * 1024; // 10MB
 
@@ -52,19 +52,29 @@ fn validate_proxy_url(raw: &str) -> Result<url::Url, &'static str> {
                 return Err("Access to private/reserved IP addresses is forbidden");
             }
             let seg = ip.segments();
-            if seg[0] == 0 && seg[1] == 0 && seg[2] == 0 && seg[3] == 0
-                && seg[4] == 0 && seg[5] == 0xffff
+            if seg[0] == 0
+                && seg[1] == 0
+                && seg[2] == 0
+                && seg[3] == 0
+                && seg[4] == 0
+                && seg[5] == 0xffff
             {
                 let mapped = std::net::Ipv4Addr::new(
-                    (seg[6] >> 8) as u8, seg[6] as u8,
-                    (seg[7] >> 8) as u8, seg[7] as u8,
+                    (seg[6] >> 8) as u8,
+                    seg[6] as u8,
+                    (seg[7] >> 8) as u8,
+                    seg[7] as u8,
                 );
                 if is_private_ipv4(&mapped) {
                     return Err("Access to private/reserved IP addresses is forbidden");
                 }
             }
-            if (seg[0] & 0xffc0) == 0xfe80 { return Err("Access to private/reserved IP addresses is forbidden"); }
-            if (seg[0] & 0xfe00) == 0xfc00 { return Err("Access to private/reserved IP addresses is forbidden"); }
+            if (seg[0] & 0xffc0) == 0xfe80 {
+                return Err("Access to private/reserved IP addresses is forbidden");
+            }
+            if (seg[0] & 0xfe00) == 0xfc00 {
+                return Err("Access to private/reserved IP addresses is forbidden");
+            }
         }
         _ => {}
     }
@@ -95,7 +105,9 @@ fn internal_error_response() -> axum::response::Response<axum::body::Body> {
 // ═══════════════════════════════════════════════════════════════
 
 #[derive(serde::Deserialize)]
-struct ProxyParams { url: String }
+struct ProxyParams {
+    url: String,
+}
 
 async fn proxy_handler(Query(params): Query<ProxyParams>) -> impl IntoResponse {
     let validated = match validate_proxy_url(&params.url) {
@@ -109,12 +121,17 @@ async fn proxy_handler(Query(params): Query<ProxyParams>) -> impl IntoResponse {
     match client.get(validated.as_str()).send().await {
         Ok(resp) => {
             let status = resp.status().as_u16();
-            let content_type = resp.headers().get("content-type")
-                .and_then(|v| v.to_str().ok()).unwrap_or("text/html").to_string();
+            let content_type = resp
+                .headers()
+                .get("content-type")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("text/html")
+                .to_string();
             match resp.bytes().await {
                 Ok(body) => {
                     if body.len() > MAX_RESPONSE_SIZE {
-                        return (StatusCode::PAYLOAD_TOO_LARGE, "Response too large").into_response();
+                        return (StatusCode::PAYLOAD_TOO_LARGE, "Response too large")
+                            .into_response();
                     }
                     axum::response::Response::builder()
                         .status(status)
@@ -132,7 +149,9 @@ async fn proxy_handler(Query(params): Query<ProxyParams>) -> impl IntoResponse {
 }
 
 #[derive(serde::Deserialize)]
-struct DdgParams { q: String }
+struct DdgParams {
+    q: String,
+}
 
 async fn ddg_handler(Query(params): Query<DdgParams>) -> impl IntoResponse {
     let url = format!(
@@ -155,46 +174,32 @@ async fn ddg_handler(Query(params): Query<DdgParams>) -> impl IntoResponse {
 }
 
 #[derive(serde::Deserialize)]
-struct BraveParams { q: String }
+struct BraveParams {
+    q: String,
+}
 
 async fn brave_handler(
     headers: axum::http::HeaderMap,
     Query(params): Query<BraveParams>,
 ) -> impl IntoResponse {
-    let api_key = headers.get("X-Brave-Key").and_then(|v| v.to_str().ok()).unwrap_or("");
+    let api_key = headers
+        .get("X-Brave-Key")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
     if api_key.is_empty() {
         return (StatusCode::UNAUTHORIZED, "Missing X-Brave-Key header").into_response();
     }
-    let url = format!("https://api.search.brave.com/res/v1/web/search?q={}", params.q.replace(' ', "+"));
+    let url = format!(
+        "https://api.search.brave.com/res/v1/web/search?q={}",
+        params.q.replace(' ', "+")
+    );
     let client = build_client("Prism/0.3 (brave-proxy)", 15);
-    match client.get(&url).header("X-Subscription-Token", api_key).header("Accept", "application/json").send().await {
-        Ok(resp) => {
-            let status = resp.status().as_u16();
-            let body = resp.bytes().await.unwrap_or_default();
-            axum::response::Response::builder()
-                .status(status)
-                .header("content-type", "application/json")
-                .body(axum::body::Body::from(body))
-                .unwrap_or_else(|_| internal_error_response())
-                .into_response()
-        }
-        Err(e) => (StatusCode::BAD_GATEWAY, format!("Brave fetch failed: {}", e)).into_response(),
-    }
-}
-
-async fn perplexity_handler(
-    headers: axum::http::HeaderMap,
-    body: axum::body::Bytes,
-) -> impl IntoResponse {
-    let api_key = headers.get("X-Perplexity-Key").and_then(|v| v.to_str().ok()).unwrap_or("");
-    if api_key.is_empty() {
-        return (StatusCode::UNAUTHORIZED, "Missing X-Perplexity-Key header").into_response();
-    }
-    let client = build_client("Prism/0.3 (perplexity-proxy)", 30);
-    match client.post("https://api.perplexity.ai/chat/completions")
-        .header("Authorization", format!("Bearer {}", api_key))
-        .header("Content-Type", "application/json")
-        .body(body.to_vec()).send().await
+    match client
+        .get(&url)
+        .header("X-Subscription-Token", api_key)
+        .header("Accept", "application/json")
+        .send()
+        .await
     {
         Ok(resp) => {
             let status = resp.status().as_u16();
@@ -206,11 +211,55 @@ async fn perplexity_handler(
                 .unwrap_or_else(|_| internal_error_response())
                 .into_response()
         }
-        Err(e) => (StatusCode::BAD_GATEWAY, format!("Perplexity fetch failed: {}", e)).into_response(),
+        Err(e) => (
+            StatusCode::BAD_GATEWAY,
+            format!("Brave fetch failed: {}", e),
+        )
+            .into_response(),
     }
 }
 
-async fn health() -> &'static str { "Prism OK" }
+async fn perplexity_handler(
+    headers: axum::http::HeaderMap,
+    body: axum::body::Bytes,
+) -> impl IntoResponse {
+    let api_key = headers
+        .get("X-Perplexity-Key")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    if api_key.is_empty() {
+        return (StatusCode::UNAUTHORIZED, "Missing X-Perplexity-Key header").into_response();
+    }
+    let client = build_client("Prism/0.3 (perplexity-proxy)", 30);
+    match client
+        .post("https://api.perplexity.ai/chat/completions")
+        .header("Authorization", format!("Bearer {}", api_key))
+        .header("Content-Type", "application/json")
+        .body(body.to_vec())
+        .send()
+        .await
+    {
+        Ok(resp) => {
+            let status = resp.status().as_u16();
+            let body = resp.bytes().await.unwrap_or_default();
+            axum::response::Response::builder()
+                .status(status)
+                .header("content-type", "application/json")
+                .body(axum::body::Body::from(body))
+                .unwrap_or_else(|_| internal_error_response())
+                .into_response()
+        }
+        Err(e) => (
+            StatusCode::BAD_GATEWAY,
+            format!("Perplexity fetch failed: {}", e),
+        )
+            .into_response(),
+    }
+}
+
+async fn health() -> &'static str {
+    "Prism OK"
+}
 
 // ═══════════════════════════════════════════════════════════════
 // SERVER SETUP
@@ -228,10 +277,7 @@ fn build_app(dist_path: &str) -> Router {
         .route("/api/perplexity", post(perplexity_handler))
         .route("/health", get(health))
         // Static files with SPA fallback
-        .fallback_service(
-            ServeDir::new(dist_path)
-                .not_found_service(fallback)
-        )
+        .fallback_service(ServeDir::new(dist_path).not_found_service(fallback))
         .layer(CompressionLayer::new())
         .layer(tower::limit::ConcurrencyLimitLayer::new(100))
         .layer(SetResponseHeaderLayer::overriding(
@@ -279,7 +325,11 @@ mod tests {
 
     fn test_dist_dir() -> tempfile::TempDir {
         let dir = tempfile::tempdir().unwrap();
-        std::fs::write(dir.path().join("index.html"), "<html><body>Prism</body></html>").unwrap();
+        std::fs::write(
+            dir.path().join("index.html"),
+            "<html><body>Prism</body></html>",
+        )
+        .unwrap();
         std::fs::create_dir_all(dir.path().join("static")).unwrap();
         std::fs::write(dir.path().join("static/test.js"), "console.log('ok')").unwrap();
         dir
@@ -289,7 +339,10 @@ mod tests {
     async fn serves_index_html() {
         let dir = test_dist_dir();
         let app = build_app(dir.path().to_str().unwrap());
-        let resp = app.oneshot(Request::get("/").body(Body::empty()).unwrap()).await.unwrap();
+        let resp = app
+            .oneshot(Request::get("/").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
     }
 
@@ -297,17 +350,30 @@ mod tests {
     async fn spa_fallback_returns_index() {
         let dir = test_dist_dir();
         let app = build_app(dir.path().to_str().unwrap());
-        let resp = app.oneshot(Request::get("/nonexistent/path").body(Body::empty()).unwrap()).await.unwrap();
+        let resp = app
+            .oneshot(
+                Request::get("/nonexistent/path")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
         let status = resp.status();
-        assert!(status == StatusCode::OK || status == StatusCode::NOT_FOUND,
-            "Expected 200 or 404 for SPA fallback, got {}", status);
+        assert!(
+            status == StatusCode::OK || status == StatusCode::NOT_FOUND,
+            "Expected 200 or 404 for SPA fallback, got {}",
+            status
+        );
     }
 
     #[tokio::test]
     async fn serves_static_files() {
         let dir = test_dist_dir();
         let app = build_app(dir.path().to_str().unwrap());
-        let resp = app.oneshot(Request::get("/static/test.js").body(Body::empty()).unwrap()).await.unwrap();
+        let resp = app
+            .oneshot(Request::get("/static/test.js").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
     }
 
@@ -315,17 +381,38 @@ mod tests {
     async fn security_headers_present() {
         let dir = test_dist_dir();
         let app = build_app(dir.path().to_str().unwrap());
-        let resp = app.oneshot(Request::get("/").body(Body::empty()).unwrap()).await.unwrap();
-        assert_eq!(resp.headers().get("x-content-type-options").map(|v| v.to_str().unwrap()), Some("nosniff"));
-        assert_eq!(resp.headers().get("x-frame-options").map(|v| v.to_str().unwrap()), Some("DENY"));
-        assert_eq!(resp.headers().get("referrer-policy").map(|v| v.to_str().unwrap()), Some("strict-origin-when-cross-origin"));
+        let resp = app
+            .oneshot(Request::get("/").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(
+            resp.headers()
+                .get("x-content-type-options")
+                .map(|v| v.to_str().unwrap()),
+            Some("nosniff")
+        );
+        assert_eq!(
+            resp.headers()
+                .get("x-frame-options")
+                .map(|v| v.to_str().unwrap()),
+            Some("DENY")
+        );
+        assert_eq!(
+            resp.headers()
+                .get("referrer-policy")
+                .map(|v| v.to_str().unwrap()),
+            Some("strict-origin-when-cross-origin")
+        );
     }
 
     #[tokio::test]
     async fn health_endpoint() {
         let dir = test_dist_dir();
         let app = build_app(dir.path().to_str().unwrap());
-        let resp = app.oneshot(Request::get("/health").body(Body::empty()).unwrap()).await.unwrap();
+        let resp = app
+            .oneshot(Request::get("/health").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
     }
 

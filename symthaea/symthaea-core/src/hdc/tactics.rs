@@ -374,9 +374,7 @@ impl Goal {
             return true;
         }
         // Check if conclusion appears directly in hypotheses
-        self.hypotheses
-            .iter()
-            .any(|(_, h)| h == &self.conclusion)
+        self.hypotheses.iter().any(|(_, h)| h == &self.conclusion)
     }
 
     /// True if hypotheses contain a direct contradiction (P and ¬P).
@@ -616,7 +614,11 @@ pub fn tactic_rw(goal: &Goal, eq_hyp: &str, direction: bool) -> TacticResult {
         None => TacticResult::Failed(format!("rw: hypothesis '{}' not found", eq_hyp)),
         Some((_, expr)) => match expr.clone() {
             Expr::Eq(lhs, rhs) => {
-                let (from, to) = if direction { (*lhs, *rhs) } else { (*rhs, *lhs) };
+                let (from, to) = if direction {
+                    (*lhs, *rhs)
+                } else {
+                    (*rhs, *lhs)
+                };
                 let new_concl = rewrite_in(&goal.conclusion, &from, &to);
                 if new_concl == goal.conclusion {
                     TacticResult::Failed(format!(
@@ -635,10 +637,7 @@ pub fn tactic_rw(goal: &Goal, eq_hyp: &str, direction: bool) -> TacticResult {
                     }
                 }
             }
-            _ => TacticResult::Failed(format!(
-                "rw: hypothesis '{}' is not an equation",
-                eq_hyp
-            )),
+            _ => TacticResult::Failed(format!("rw: hypothesis '{}' is not an equation", eq_hyp)),
         },
     }
 }
@@ -811,7 +810,9 @@ pub fn tactic_omega(goal: &Goal) -> TacticResult {
     let simplified2 = conc_with_env.simplify();
     match &simplified2 {
         Expr::Bool(true) => TacticResult::Closed,
-        Expr::Bool(false) => TacticResult::Failed("omega: conclusion is false under current bindings".to_string()),
+        Expr::Bool(false) => {
+            TacticResult::Failed("omega: conclusion is false under current bindings".to_string())
+        }
         Expr::Eq(a, b) => {
             if let (Some(av), Some(bv)) = (a.eval(&env), b.eval(&env)) {
                 if av == bv {
@@ -863,7 +864,9 @@ pub fn tactic_norm_num(goal: &Goal) -> TacticResult {
     let simplified = goal.conclusion.simplify();
     match &simplified {
         Expr::Bool(true) => return TacticResult::Closed,
-        Expr::Bool(false) => return TacticResult::Failed("norm_num: evaluates to false".to_string()),
+        Expr::Bool(false) => {
+            return TacticResult::Failed("norm_num: evaluates to false".to_string())
+        }
         Expr::Eq(a, b) => {
             if let (Some(av), Some(bv)) = (a.eval(&env), b.eval(&env)) {
                 return if av == bv {
@@ -961,7 +964,10 @@ pub fn tactic_induction(goal: &Goal, var: &str) -> TacticResult {
     let ind_hyp = body.clone(); // P(n)
     let ind_concl = body.substitute(
         var,
-        &Expr::Add(Box::new(Expr::Var(var.to_string())), Box::new(Expr::Const(1))),
+        &Expr::Add(
+            Box::new(Expr::Var(var.to_string())),
+            Box::new(Expr::Const(1)),
+        ),
     );
     let mut step_hyps = goal.hypotheses.clone();
     step_hyps.push((format!("ih_{}", var), ind_hyp));
@@ -1043,10 +1049,7 @@ pub fn tactic_linear_diophantine(_goal: &Goal, a: i64, b: i64, c: i64) -> Tactic
                 ))
             }
         }
-        None => TacticResult::Failed(format!(
-            "no integer solution to {}x + {}y = {}",
-            a, b, c
-        )),
+        None => TacticResult::Failed(format!("no integer solution to {}x + {}y = {}", a, b, c)),
     }
 }
 
@@ -1157,9 +1160,7 @@ pub fn tactic_angle_chase(
             ));
         }
         None => {
-            return TacticResult::Failed(
-                "target references points not in state".to_string(),
-            );
+            return TacticResult::Failed("target references points not in state".to_string());
         }
         Some(true) => {}
     }
@@ -1233,10 +1234,7 @@ pub fn tactic_similar_triangles_sss(
     if (r1 - r2).abs() < 1e-7 && (r2 - r3).abs() < 1e-7 {
         TacticResult::Closed
     } else {
-        TacticResult::Failed(format!(
-            "side ratios differ: {} {} {}",
-            r1, r2, r3
-        ))
+        TacticResult::Failed(format!("side ratios differ: {} {} {}", r1, r2, r3))
     }
 }
 
@@ -1259,11 +1257,7 @@ pub fn tactic_barycentric_coerce(
         state.points.get(c_name),
     ) {
         (Some(p), Some(a), Some(b), Some(c)) => (p, a, b, c),
-        _ => {
-            return TacticResult::Failed(
-                "point or triangle vertices missing in state".into(),
-            )
-        }
+        _ => return TacticResult::Failed("point or triangle vertices missing in state".into()),
     };
     // Compute P's barycentric coordinates.
     let bary = match Barycentric::from_cartesian(p, a, b, c) {
@@ -1272,9 +1266,7 @@ pub fn tactic_barycentric_coerce(
     };
     // Compare against each classical center within tolerance.
     let eps = 1e-6;
-    let same = |p1: &Point2D, p2: &Point2D| {
-        (p1.x - p2.x).abs() < eps && (p1.y - p2.y).abs() < eps
-    };
+    let same = |p1: &Point2D, p2: &Point2D| (p1.x - p2.x).abs() < eps && (p1.y - p2.y).abs() < eps;
     let g = centroid(a, b, c);
     let i = incenter(a, b, c);
     let o = circumcenter(a, b, c);
@@ -1330,33 +1322,23 @@ pub fn tactic_cauchy_schwarz_check(_goal: &Goal, a: &[f64], b: &[f64]) -> Tactic
 
 /// Closes a goal asserting the power-mean inequality M_p ≤ M_q holds on a
 /// concrete non-negative slice.
-pub fn tactic_power_mean_check(
-    _goal: &Goal,
-    xs: &[f64],
-    p: f64,
-    q: f64,
-) -> TacticResult {
+pub fn tactic_power_mean_check(_goal: &Goal, xs: &[f64], p: f64, q: f64) -> TacticResult {
     if p > q {
-        return TacticResult::Failed(format!(
-            "power mean requires p ≤ q, got p={}, q={}",
-            p, q
-        ));
+        return TacticResult::Failed(format!("power mean requires p ≤ q, got p={}, q={}", p, q));
     }
     if power_mean_inequality_holds(xs, p, q) {
         TacticResult::Closed
     } else {
-        TacticResult::Failed(format!("power mean violated on {:?} at p={}, q={}", xs, p, q))
+        TacticResult::Failed(format!(
+            "power mean violated on {:?} at p={}, q={}",
+            xs, p, q
+        ))
     }
 }
 
 /// Closes a Jensen-inequality goal for a user-supplied convex function,
 /// weights (summing to 1), and sample points.
-pub fn tactic_jensen_check<F>(
-    _goal: &Goal,
-    f: F,
-    weights: &[f64],
-    points: &[f64],
-) -> TacticResult
+pub fn tactic_jensen_check<F>(_goal: &Goal, f: F, weights: &[f64], points: &[f64]) -> TacticResult
 where
     F: Fn(f64) -> f64,
 {
@@ -1482,10 +1464,7 @@ pub fn tactic_pigeonhole_count(
 /// invariant for the given trajectory. Returns Closed with the
 /// discovered coefficients (reported in the Failed message for audit,
 /// since TacticResult::Closed carries no payload).
-pub fn tactic_invariant_search(
-    _goal: &Goal,
-    trajectory: &[Vec<f64>],
-) -> TacticResult {
+pub fn tactic_invariant_search(_goal: &Goal, trajectory: &[Vec<f64>]) -> TacticResult {
     match find_linear_invariant(trajectory) {
         Some((_c, residual)) if residual < 1e-6 => TacticResult::Closed,
         Some((c, residual)) => TacticResult::Failed(format!(
@@ -1551,7 +1530,10 @@ impl TacticProver {
         // Try fast-path tactics first
         let fast_tactics: Vec<(&str, Box<dyn Fn(&Goal) -> TacticResult>)> = vec![
             ("assumption", Box::new(|g: &Goal| tactic_assumption(g))),
-            ("contradiction", Box::new(|g: &Goal| tactic_contradiction(g))),
+            (
+                "contradiction",
+                Box::new(|g: &Goal| tactic_contradiction(g)),
+            ),
             ("norm_num", Box::new(|g: &Goal| tactic_norm_num(g))),
             ("ring", Box::new(|g: &Goal| tactic_ring(g))),
             ("simp", Box::new(|g: &Goal| tactic_simp(g, &[]))),
@@ -1572,8 +1554,7 @@ impl TacticProver {
                     if new_goals.len() <= self.max_goals {
                         let mut new_trace = trace.clone();
                         new_trace.push(name.to_string());
-                        if let result @ Some(_) =
-                            self.prove_goals(new_goals, new_trace, depth + 1)
+                        if let result @ Some(_) = self.prove_goals(new_goals, new_trace, depth + 1)
                         {
                             return result;
                         }
@@ -1642,8 +1623,7 @@ impl TacticProver {
                     if new_goals.len() <= self.max_goals {
                         let mut new_trace = trace.clone();
                         new_trace.push(format!("cases {}", hyp_name));
-                        if let result @ Some(_) =
-                            self.prove_goals(new_goals, new_trace, depth + 1)
+                        if let result @ Some(_) = self.prove_goals(new_goals, new_trace, depth + 1)
                         {
                             return result;
                         }
@@ -1735,10 +1715,7 @@ mod tests {
         let y = || Box::new(Expr::Var("y".into()));
         let z = || Box::new(Expr::Var("z".into()));
         let lhs = Expr::Mul(x(), Box::new(Expr::Add(y(), z())));
-        let rhs = Expr::Add(
-            Box::new(Expr::Mul(x(), y())),
-            Box::new(Expr::Mul(x(), z())),
-        );
+        let rhs = Expr::Add(Box::new(Expr::Mul(x(), y())), Box::new(Expr::Mul(x(), z())));
         let goal = Goal::new(Expr::Eq(Box::new(lhs), Box::new(rhs)));
         assert!(matches!(tactic_ring(&goal), TacticResult::Closed));
     }
@@ -1746,7 +1723,10 @@ mod tests {
     #[test]
     fn test_norm_num_closes_2_plus_3_equals_5() {
         let goal = Goal::new(Expr::Eq(
-            Box::new(Expr::Add(Box::new(Expr::Const(2)), Box::new(Expr::Const(3)))),
+            Box::new(Expr::Add(
+                Box::new(Expr::Const(2)),
+                Box::new(Expr::Const(3)),
+            )),
             Box::new(Expr::Const(5)),
         ));
         assert!(matches!(tactic_norm_num(&goal), TacticResult::Closed));
@@ -1754,10 +1734,7 @@ mod tests {
 
     #[test]
     fn test_norm_num_fails_on_false_equality() {
-        let goal = Goal::new(Expr::Eq(
-            Box::new(Expr::Const(2)),
-            Box::new(Expr::Const(3)),
-        ));
+        let goal = Goal::new(Expr::Eq(Box::new(Expr::Const(2)), Box::new(Expr::Const(3))));
         assert!(matches!(tactic_norm_num(&goal), TacticResult::Failed(_)));
     }
 
@@ -1793,8 +1770,14 @@ mod tests {
             TacticResult::Subgoals(subs) => {
                 assert_eq!(subs.len(), 1);
                 // Should have both A and B as hypotheses
-                assert!(subs[0].hypotheses.iter().any(|(_, e)| e == &Expr::Var("A".into())));
-                assert!(subs[0].hypotheses.iter().any(|(_, e)| e == &Expr::Var("B".into())));
+                assert!(subs[0]
+                    .hypotheses
+                    .iter()
+                    .any(|(_, e)| e == &Expr::Var("A".into())));
+                assert!(subs[0]
+                    .hypotheses
+                    .iter()
+                    .any(|(_, e)| e == &Expr::Var("B".into())));
             }
             other => panic!("Expected Subgoals, got {:?}", other),
         }
@@ -1814,10 +1797,13 @@ mod tests {
             .with_hyp("h2", Expr::Var("P".into()));
         let prover = TacticProver::new(5);
         // Manual: apply h1, then assumption on P
-        let result = tactic_apply(&goal, &Expr::Implies(
-            Box::new(Expr::Var("P".into())),
-            Box::new(Expr::Var("Q".into())),
-        ));
+        let result = tactic_apply(
+            &goal,
+            &Expr::Implies(
+                Box::new(Expr::Var("P".into())),
+                Box::new(Expr::Var("Q".into())),
+            ),
+        );
         // Should produce a subgoal ⊢ P
         match result {
             TacticResult::Subgoals(subs) => {
@@ -1859,10 +1845,7 @@ mod tests {
     #[test]
     fn test_induction_produces_base_and_step() {
         // ∀n. P(n) → base ⊢ P(0) and {ih: P(n)} ⊢ P(n+1)
-        let goal = Goal::new(Expr::ForAll(
-            "n".into(),
-            Box::new(Expr::Var("P_n".into())),
-        ));
+        let goal = Goal::new(Expr::ForAll("n".into(), Box::new(Expr::Var("P_n".into()))));
         match tactic_induction(&goal, "n") {
             TacticResult::Subgoals(subs) => {
                 assert_eq!(subs.len(), 2, "Induction produces base + step");
@@ -1881,13 +1864,19 @@ mod tests {
         assert_eq!(e.simplify(), Expr::Var("x".into()));
 
         // x - x = 0
-        let e = Expr::Sub(Box::new(Expr::Var("x".into())), Box::new(Expr::Var("x".into())));
+        let e = Expr::Sub(
+            Box::new(Expr::Var("x".into())),
+            Box::new(Expr::Var("x".into())),
+        );
         assert_eq!(e.simplify(), Expr::Const(0));
     }
 
     #[test]
     fn test_expr_free_vars() {
-        let e = Expr::Add(Box::new(Expr::Var("x".into())), Box::new(Expr::Var("y".into())));
+        let e = Expr::Add(
+            Box::new(Expr::Var("x".into())),
+            Box::new(Expr::Var("y".into())),
+        );
         let fv = e.free_vars();
         assert!(fv.contains(&"x".to_string()));
         assert!(fv.contains(&"y".to_string()));
@@ -1896,14 +1885,8 @@ mod tests {
     // ── Phase 1 IMO number-theory tactics ───────────────────────────────
 
     fn exists_linear_goal(a: i64, b: i64, c: i64) -> Goal {
-        let x_times = Expr::Mul(
-            Box::new(Expr::Const(a)),
-            Box::new(Expr::Var("x".into())),
-        );
-        let y_times = Expr::Mul(
-            Box::new(Expr::Const(b)),
-            Box::new(Expr::Var("y".into())),
-        );
+        let x_times = Expr::Mul(Box::new(Expr::Const(a)), Box::new(Expr::Var("x".into())));
+        let y_times = Expr::Mul(Box::new(Expr::Const(b)), Box::new(Expr::Var("y".into())));
         let sum = Expr::Add(Box::new(x_times), Box::new(y_times));
         let eq = Expr::Eq(Box::new(sum), Box::new(Expr::Const(c)));
         let inner = Expr::Exists("y".into(), Box::new(eq));
@@ -2277,10 +2260,7 @@ mod tests {
             TacticResult::Closed
         ));
         // And direct AM ≥ GM via the AM-GM tactic
-        assert!(matches!(
-            tactic_amgm_check(&goal, xs),
-            TacticResult::Closed
-        ));
+        assert!(matches!(tactic_amgm_check(&goal, xs), TacticResult::Closed));
     }
 
     // ── Phase 3C functional equation classification tactic ─────────────
@@ -2358,11 +2338,7 @@ mod tests {
     fn test_tactic_invariant_search_closes() {
         let goal = Goal::new(Expr::Const(0));
         // (a, b) → (a-1, b+1): sum invariant
-        let trajectory = vec![
-            vec![5.0, 3.0],
-            vec![4.0, 4.0],
-            vec![3.0, 5.0],
-        ];
+        let trajectory = vec![vec![5.0, 3.0], vec![4.0, 4.0], vec![3.0, 5.0]];
         assert!(matches!(
             tactic_invariant_search(&goal, &trajectory),
             TacticResult::Closed
@@ -2373,11 +2349,7 @@ mod tests {
     fn test_tactic_invariant_search_rejects_no_invariant() {
         let goal = Goal::new(Expr::Const(0));
         // (a, b) → (2a, b+1): no linear invariant
-        let trajectory = vec![
-            vec![1.0, 0.0],
-            vec![2.0, 1.0],
-            vec![4.0, 2.0],
-        ];
+        let trajectory = vec![vec![1.0, 0.0], vec![2.0, 1.0], vec![4.0, 2.0]];
         assert!(matches!(
             tactic_invariant_search(&goal, &trajectory),
             TacticResult::Failed(_)

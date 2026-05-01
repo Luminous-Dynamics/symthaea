@@ -29,14 +29,14 @@ pub const STARFIELD_SEED: u32 = 0xDEAD_BEEF;
 // ─── Eight Harmonies palette (RGB 0.0-1.0) ──────────────────────
 
 pub const HARMONY_COLORS: [[f32; 3]; 8] = [
-    [0.40, 0.49, 0.92],  // 1. Resonant Coherence — #667eea
-    [0.91, 0.12, 0.39],  // 2. Pan-Sentient Flourishing — #E91E63
-    [0.00, 0.54, 0.48],  // 3. Integral Wisdom — #00897B
-    [1.00, 0.84, 0.00],  // 4. Infinite Play — #FFD700
-    [0.00, 0.87, 1.00],  // 5. Universal Interconnectedness — #00ddff
-    [0.49, 0.23, 0.93],  // 6. Sacred Reciprocity — #7c3aed
-    [0.23, 0.51, 0.96],  // 7. Evolutionary Progression — #3b82f6
-    [0.06, 0.09, 0.16],  // 8. Sacred Stillness — deep indigo
+    [0.40, 0.49, 0.92], // 1. Resonant Coherence — #667eea
+    [0.91, 0.12, 0.39], // 2. Pan-Sentient Flourishing — #E91E63
+    [0.00, 0.54, 0.48], // 3. Integral Wisdom — #00897B
+    [1.00, 0.84, 0.00], // 4. Infinite Play — #FFD700
+    [0.00, 0.87, 1.00], // 5. Universal Interconnectedness — #00ddff
+    [0.49, 0.23, 0.93], // 6. Sacred Reciprocity — #7c3aed
+    [0.23, 0.51, 0.96], // 7. Evolutionary Progression — #3b82f6
+    [0.06, 0.09, 0.16], // 8. Sacred Stillness — deep indigo
 ];
 
 // ─── Mycelix brand colors ───────────────────────────────────────

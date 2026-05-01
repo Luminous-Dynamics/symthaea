@@ -1,5 +1,5 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Replay CLI: write/read a versioned tape and print per-tick state hashes.
 //!
@@ -278,20 +278,37 @@ struct TapeFrame<const D: usize> {
 
 #[derive(Clone, Debug)]
 enum TapeCommand<const D: usize> {
-    ApplyForce { net_id: u64, force_bits: [u64; D] },
-    ApplyImpulse { net_id: u64, impulse_bits: [u64; D] },
-    SetLinearVelocity { net_id: u64, velocity_bits: [u64; D] },
+    ApplyForce {
+        net_id: u64,
+        force_bits: [u64; D],
+    },
+    ApplyImpulse {
+        net_id: u64,
+        impulse_bits: [u64; D],
+    },
+    SetLinearVelocity {
+        net_id: u64,
+        velocity_bits: [u64; D],
+    },
     SetAngularVelocity {
         net_id: u64,
         velocity_bits: Vec<u64>,
     },
-    Wake { net_id: u64 },
+    Wake {
+        net_id: u64,
+    },
 }
 
 fn demo_tape<const D: usize>(ticks: u32) -> TapeFile<D> {
     // Stable network IDs (sorted):
     // 1 = ground, 2 = a, 3 = b, 4 = c
-    let gravity = std::array::from_fn(|i| if i == 1 { (-10.0f64).to_bits() } else { 0.0f64.to_bits() });
+    let gravity = std::array::from_fn(|i| {
+        if i == 1 {
+            (-10.0f64).to_bits()
+        } else {
+            0.0f64.to_bits()
+        }
+    });
 
     let mut bodies = Vec::<BodyDef<D>>::new();
 
@@ -582,9 +599,8 @@ fn hash_tape<const D: usize>(
 }
 
 fn build_world_from_tape<const D: usize>(def: &WorldDef<D>) -> Result<PhysicsWorld<D>, String> {
-    let gravity = SVector::<f64, D>::from(std::array::from_fn(|i| {
-        f64::from_bits(def.gravity_bits[i])
-    }));
+    let gravity =
+        SVector::<f64, D>::from(std::array::from_fn(|i| f64::from_bits(def.gravity_bits[i])));
     let mut world = PhysicsWorld::<D>::new(gravity);
     world.solver_iterations = def.solver_iterations as usize;
     world.sleep_threshold = f64::from_bits(def.sleep_threshold_bits);
@@ -602,7 +618,9 @@ fn build_world_from_tape<const D: usize>(def: &WorldDef<D>) -> Result<PhysicsWor
         let linear_damping = f64::from_bits(b.linear_damping_bits);
         let angular_damping = f64::from_bits(b.angular_damping_bits);
 
-        let pos = Point::new(std::array::from_fn(|i| f64::from_bits(b.translation_bits[i])));
+        let pos = Point::new(std::array::from_fn(|i| {
+            f64::from_bits(b.translation_bits[i])
+        }));
         let lin_vel = SVector::<f64, D>::from(std::array::from_fn(|i| {
             f64::from_bits(b.linear_velocity_bits[i])
         }));
@@ -668,9 +686,8 @@ fn apply_command<const D: usize>(
     match cmd {
         TapeCommand::ApplyForce { net_id, force_bits } => {
             let handle = resolve(*net_id)?;
-            let force = SVector::<f64, D>::from(std::array::from_fn(|i| {
-                f64::from_bits(force_bits[i])
-            }));
+            let force =
+                SVector::<f64, D>::from(std::array::from_fn(|i| f64::from_bits(force_bits[i])));
             let Some(body) = world.body_mut(handle) else {
                 return Err(format!("missing body for net_id {net_id}"));
             };
@@ -681,9 +698,8 @@ fn apply_command<const D: usize>(
             impulse_bits,
         } => {
             let handle = resolve(*net_id)?;
-            let impulse = SVector::<f64, D>::from(std::array::from_fn(|i| {
-                f64::from_bits(impulse_bits[i])
-            }));
+            let impulse =
+                SVector::<f64, D>::from(std::array::from_fn(|i| f64::from_bits(impulse_bits[i])));
             let Some(body) = world.body_mut(handle) else {
                 return Err(format!("missing body for net_id {net_id}"));
             };
@@ -694,9 +710,8 @@ fn apply_command<const D: usize>(
             velocity_bits,
         } => {
             let handle = resolve(*net_id)?;
-            let vel = SVector::<f64, D>::from(std::array::from_fn(|i| {
-                f64::from_bits(velocity_bits[i])
-            }));
+            let vel =
+                SVector::<f64, D>::from(std::array::from_fn(|i| f64::from_bits(velocity_bits[i])));
             let Some(body) = world.body_mut(handle) else {
                 return Err(format!("missing body for net_id {net_id}"));
             };

@@ -52,7 +52,11 @@ struct TextField {
 
 impl TextField {
     fn new(text: &str) -> Self {
-        Self { content: text.to_string(), cursor: text.len(), focused: false }
+        Self {
+            content: text.to_string(),
+            cursor: text.len(),
+            focused: false,
+        }
     }
     fn insert(&mut self, ch: &str) {
         self.content.insert_str(self.cursor, ch);
@@ -158,7 +162,8 @@ fn navigate_url(
     match rt.block_on(client.fetch(url_str)) {
         Ok(page) => {
             let html = page.html.clone();
-            let (rects, security) = process_page(reflex, &page.dom, url_str, &page.metadata, vw, vh);
+            let (rects, security) =
+                process_page(reflex, &page.dom, url_str, &page.metadata, vw, vh);
             (url_str.to_string(), html, rects, security)
         }
         Err(e) => {
@@ -208,7 +213,8 @@ fn load_html(
     vh: f32,
 ) -> (String, String, Vec<PaintRect>, SecurityState) {
     let dom = prism_dom::parse_html(html);
-    let url = url::Url::parse(url_str).unwrap_or_else(|_| url::Url::parse("prism://error").unwrap());
+    let url =
+        url::Url::parse(url_str).unwrap_or_else(|_| url::Url::parse("prism://error").unwrap());
     let title = dom.title().unwrap_or_else(|| "Untitled".to_string());
     let pre = reflex.pre_fetch(&url, false, false);
     let post = reflex.post_parse(&dom, &pre);
@@ -260,10 +266,17 @@ fn process_page(
 fn hit_test_link(rects: &[PaintRect], mouse_x: f32, mouse_y: f32, scroll_y: f32) -> Option<String> {
     let content_y = mouse_y - renderer::TOTAL_CHROME as f32 + scroll_y;
     for rect in rects {
-        if mouse_x >= rect.x && mouse_x < rect.x + rect.width
-            && content_y >= rect.y && content_y < rect.y + rect.height
+        if mouse_x >= rect.x
+            && mouse_x < rect.x + rect.width
+            && content_y >= rect.y
+            && content_y < rect.y + rect.height
         {
-            if let PaintContent::Text { is_link: true, href: Some(ref url), .. } = rect.content {
+            if let PaintContent::Text {
+                is_link: true,
+                href: Some(ref url),
+                ..
+            } = rect.content
+            {
                 return Some(url.clone());
             }
         }
@@ -290,36 +303,59 @@ fn resolve_url(href: &str, current_url: &str) -> String {
 
 impl ApplicationHandler for PrismApp {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        if self.state.is_some() { return; }
+        if self.state.is_some() {
+            return;
+        }
 
         let window = Arc::new(
-            event_loop.create_window(
-                Window::default_attributes()
-                    .with_inner_size(LogicalSize::new(1024, 768))
-                    .with_title("Prism"),
-            ).expect("window"),
+            event_loop
+                .create_window(
+                    Window::default_attributes()
+                        .with_inner_size(LogicalSize::new(1024, 768))
+                        .with_title("Prism"),
+                )
+                .expect("window"),
         );
 
-        let surface = self.renderer.create_surface(window.clone()).expect("surface");
+        let surface = self
+            .renderer
+            .create_surface(window.clone())
+            .expect("surface");
         let size = window.inner_size();
         let (url, html, rects, security) = navigate(
-            &self.reflex, &self.search, &self.tokio_rt,
-            "prism://welcome", size.width as f32, size.height as f32,
+            &self.reflex,
+            &self.search,
+            &self.tokio_rt,
+            "prism://welcome",
+            size.width as f32,
+            size.height as f32,
         );
 
         self.state = Some(ActiveState {
-            surface: Box::new(surface), window,
-            paint_rects: rects, security, scroll_y: 0.0,
+            surface: Box::new(surface),
+            window,
+            paint_rects: rects,
+            security,
+            scroll_y: 0.0,
             address_bar: TextField::new(&url),
-            history: vec![], history_idx: 0,
-            current_html: html, current_url: url,
+            history: vec![],
+            history_idx: 0,
+            current_html: html,
+            current_url: url,
             mouse_pos: (0.0, 0.0),
         });
     }
 
-    fn suspended(&mut self, _el: &ActiveEventLoop) { self.state = None; }
+    fn suspended(&mut self, _el: &ActiveEventLoop) {
+        self.state = None;
+    }
 
-    fn window_event(&mut self, event_loop: &ActiveEventLoop, _wid: winit::window::WindowId, event: WindowEvent) {
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        _wid: winit::window::WindowId,
+        event: WindowEvent,
+    ) {
         let Some(state) = &mut self.state else { return };
 
         match event {
@@ -327,10 +363,17 @@ impl ApplicationHandler for PrismApp {
 
             WindowEvent::Resized(size) => {
                 if size.width > 0 && size.height > 0 {
-                    self.renderer.context.resize_surface(&mut state.surface, size.width, size.height);
+                    self.renderer.context.resize_surface(
+                        &mut state.surface,
+                        size.width,
+                        size.height,
+                    );
                     let dom = prism_dom::parse_html(&state.current_html);
                     state.paint_rects = prism_layout::layout_dom_with_config(
-                        &dom, size.width as f32, size.height as f32, &LAYOUT_CONFIG,
+                        &dom,
+                        size.width as f32,
+                        size.height as f32,
+                        &LAYOUT_CONFIG,
                     );
                     state.window.request_redraw();
                 }
@@ -349,7 +392,11 @@ impl ApplicationHandler for PrismApp {
                 state.mouse_pos = (position.x as f32, position.y as f32);
             }
 
-            WindowEvent::MouseInput { state: ElementState::Pressed, button: MouseButton::Left, .. } => {
+            WindowEvent::MouseInput {
+                state: ElementState::Pressed,
+                button: MouseButton::Left,
+                ..
+            } => {
                 let (mx, my) = state.mouse_pos;
 
                 // Click in chrome area → focus address bar
@@ -373,8 +420,12 @@ impl ApplicationHandler for PrismApp {
                     // Navigate
                     let size = state.window.inner_size();
                     let (url, html, rects, sec) = navigate(
-                        &self.reflex, &self.search, &self.tokio_rt,
-                        &resolved, size.width as f32, size.height as f32,
+                        &self.reflex,
+                        &self.search,
+                        &self.tokio_rt,
+                        &resolved,
+                        size.width as f32,
+                        size.height as f32,
                     );
                     state.current_url = url.clone();
                     state.current_html = html;
@@ -393,8 +444,14 @@ impl ApplicationHandler for PrismApp {
                 state.window.request_redraw();
             }
 
-            WindowEvent::KeyboardInput { event: ref key_event, is_synthetic: false, .. } => {
-                if !key_event.state.is_pressed() { return; }
+            WindowEvent::KeyboardInput {
+                event: ref key_event,
+                is_synthetic: false,
+                ..
+            } => {
+                if !key_event.state.is_pressed() {
+                    return;
+                }
 
                 // Global shortcuts
                 match key_event.logical_key.as_ref() {
@@ -411,7 +468,9 @@ impl ApplicationHandler for PrismApp {
                     match key_event.logical_key.as_ref() {
                         Key::Named(NamedKey::Enter) => {
                             let input = state.address_bar.content.clone();
-                            if input.is_empty() { return; }
+                            if input.is_empty() {
+                                return;
+                            }
                             // Push to history
                             state.history.push(HistoryEntry {
                                 url: state.current_url.clone(),
@@ -422,8 +481,12 @@ impl ApplicationHandler for PrismApp {
                             // Navigate or search
                             let size = state.window.inner_size();
                             let (url, html, rects, sec) = navigate(
-                                &self.reflex, &self.search, &self.tokio_rt,
-                                &input, size.width as f32, size.height as f32,
+                                &self.reflex,
+                                &self.search,
+                                &self.tokio_rt,
+                                &input,
+                                size.width as f32,
+                                size.height as f32,
                             );
                             state.current_url = url.clone();
                             state.current_html = html;
@@ -441,7 +504,9 @@ impl ApplicationHandler for PrismApp {
                         }
                         Key::Named(NamedKey::Backspace) => state.address_bar.backspace(),
                         Key::Named(NamedKey::ArrowLeft) => {
-                            if state.address_bar.cursor > 0 { state.address_bar.cursor -= 1; }
+                            if state.address_bar.cursor > 0 {
+                                state.address_bar.cursor -= 1;
+                            }
                         }
                         Key::Named(NamedKey::ArrowRight) => {
                             if state.address_bar.cursor < state.address_bar.content.len() {
@@ -449,7 +514,9 @@ impl ApplicationHandler for PrismApp {
                             }
                         }
                         Key::Named(NamedKey::Home) => state.address_bar.cursor = 0,
-                        Key::Named(NamedKey::End) => state.address_bar.cursor = state.address_bar.content.len(),
+                        Key::Named(NamedKey::End) => {
+                            state.address_bar.cursor = state.address_bar.content.len()
+                        }
                         _ => {
                             if let Some(text) = &key_event.text {
                                 if !text.chars().all(|c| c.is_control()) {
@@ -489,7 +556,10 @@ impl ApplicationHandler for PrismApp {
                     ..state.security.clone()
                 };
                 if let Err(e) = self.renderer.render(
-                    &mut state.surface, &state.paint_rects, state.scroll_y, &sec,
+                    &mut state.surface,
+                    &state.paint_rects,
+                    state.scroll_y,
+                    &sec,
                 ) {
                     log::error!("Render: {}", e);
                 }
@@ -520,17 +590,32 @@ fn run_text_mode() {
     print_content(&rects, 5);
 
     // Demo 2: Epistemic search
-    for query in &["ocean acidification", "consciousness", "rust programming", "quantum physics"] {
+    for query in &[
+        "ocean acidification",
+        "consciousness",
+        "rust programming",
+        "quantum physics",
+    ] {
         println!("\x1b[36m── Search: {} ──\x1b[0m\n", query);
         let results = search.search(query, 5);
-        println!("  {} results from {} claims:\n", results.len(), search.claim_count());
+        println!(
+            "  {} results from {} claims:\n",
+            results.len(),
+            search.claim_count()
+        );
         for (i, r) in results.iter().enumerate() {
             let e = match r.empirical_level {
                 prism_common::EmpiricalLevel::E4 => "\x1b[32mE4\x1b[0m",
                 prism_common::EmpiricalLevel::E3 => "\x1b[33mE3\x1b[0m",
                 _ => "E?",
             };
-            println!("  {}. [{}] ({:.0}%) {}", i + 1, e, r.rank_score() * 100.0, r.content);
+            println!(
+                "  {}. [{}] ({:.0}%) {}",
+                i + 1,
+                e,
+                r.rank_score() * 100.0,
+                r.content
+            );
             if let Some(src) = r.sources.first() {
                 println!("     Source: {}", src);
             }
@@ -548,7 +633,10 @@ fn run_text_mode() {
     println!("╔══════════════════════════════════════════════════════════════════╗");
     println!("║  1. Navigation    Type URL or search query → Enter             ║");
     println!("║  2. Links         Click <a> elements to navigate               ║");
-    println!("║  3. Search        {} claims indexed with 16,384-bit HDC    ║", format!("{:>3}", search.claim_count()));
+    println!(
+        "║  3. Search        {} claims indexed with 16,384-bit HDC    ║",
+        format!("{:>3}", search.claim_count())
+    );
     println!("║  4. Security      Reflex arc + 3-zone privacy + encoding gate  ║");
     println!("║  5. Reader mode   680px centered, 1.6 line height              ║");
     println!("╠══════════════════════════════════════════════════════════════════╣");
@@ -574,8 +662,17 @@ fn print_page_chrome(sec: &SecurityState) {
 fn print_content(rects: &[PaintRect], max_lines: usize) {
     let mut printed = 0;
     for rect in rects {
-        if printed >= max_lines { println!("  ..."); break; }
-        if let PaintContent::Text { text, bold, font_size, .. } = &rect.content {
+        if printed >= max_lines {
+            println!("  ...");
+            break;
+        }
+        if let PaintContent::Text {
+            text,
+            bold,
+            font_size,
+            ..
+        } = &rect.content
+        {
             if *bold && *font_size >= 28.0 {
                 println!("  \x1b[1;97m{}\x1b[0m", text);
             } else if *bold {

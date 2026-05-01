@@ -1,3 +1,4 @@
+use mycelix_zome_helpers as _;
 #![deny(unsafe_code)]
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later

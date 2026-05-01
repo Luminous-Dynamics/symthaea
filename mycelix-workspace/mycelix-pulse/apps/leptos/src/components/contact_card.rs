@@ -3,9 +3,9 @@
 
 //! Contact card with quick-compose (#6).
 
-use leptos::prelude::*;
-use mail_leptos_types::{ContactView, ComposeMode};
 use crate::mail_context::use_mail;
+use leptos::prelude::*;
+use mail_leptos_types::{ComposeMode, ContactView};
 
 #[component]
 pub fn ContactCard(contact: ContactView) -> impl IntoView {
@@ -20,11 +20,17 @@ pub fn ContactCard(contact: ContactView) -> impl IntoView {
     let agent_short = contact.short_agent();
     let agent_key = contact.agent_pub_key.clone().unwrap_or_default();
 
-    let trust_class = trust_score.map(|s| {
-        if s >= 0.8 { "trust-high" }
-        else if s >= 0.5 { "trust-medium" }
-        else { "trust-low" }
-    }).unwrap_or("trust-unknown");
+    let trust_class = trust_score
+        .map(|s| {
+            if s >= 0.8 {
+                "trust-high"
+            } else if s >= 0.5 {
+                "trust-medium"
+            } else {
+                "trust-low"
+            }
+        })
+        .unwrap_or("trust-unknown");
 
     // Quick-compose (#6)
     let compose_agent = agent_key.clone();
@@ -45,7 +51,9 @@ pub fn ContactCard(contact: ContactView) -> impl IntoView {
     // Presence — in production comes from remote_signal heartbeat
     // In demo mode, deterministic from agent key hash
     let presence = {
-        let hash: u32 = agent_key.bytes().fold(0u32, |a, b| a.wrapping_mul(31).wrapping_add(b as u32));
+        let hash: u32 = agent_key
+            .bytes()
+            .fold(0u32, |a, b| a.wrapping_mul(31).wrapping_add(b as u32));
         match hash % 3 {
             0 => ("presence-online", "Online"),
             1 => ("presence-away", "Away"),
@@ -96,7 +104,7 @@ fn ContactNotes(agent_key: String) -> impl IntoView {
         web_sys::window()
             .and_then(|w| w.local_storage().ok().flatten())
             .and_then(|s| s.get_item(&key).ok().flatten())
-            .unwrap_or_default()
+            .unwrap_or_default(),
     );
     let has_note = move || !note_text.get().is_empty();
 

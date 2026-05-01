@@ -11,6 +11,7 @@ crate-type = ["cdylib", "rlib"]
 name = "fl_coordinator"
 
 [dependencies]
+mycelix-zome-helpers = { workspace = true }
 # Holochain Development (HDK) for business logic
 hdk.workspace = true
 
@@ -28,7 +29,7 @@ serde_json.workspace = true
 # Cryptographic hashing
 blake3.workspace = true
 
-# Cross-cluster bridge (consciousness gating)
+# Cross-cluster bridge (epistemic gating)
 mycelix-bridge-common = { path = "../../../../crates/mycelix-bridge-common" }
 
 # Note: For randomness in Holochain zomes, use hdk::prelude::random_bytes()

@@ -167,14 +167,13 @@ impl SolutionLibrary {
                 continue; // Too complex — try next match
             }
 
-            let entry = self.entries.iter().find(|e| e.name == candidate.matched_name)?;
+            let entry = self
+                .entries
+                .iter()
+                .find(|e| e.name == candidate.matched_name)?;
 
-            let adapted_source = adapt_solution(
-                source,
-                &entry.signature,
-                target_fn_name,
-                target_signature,
-            );
+            let adapted_source =
+                adapt_solution(source, &entry.signature, target_fn_name, target_signature);
 
             // Sanity check: adapted source should have balanced braces
             let opens = adapted_source.matches('{').count();
@@ -243,13 +242,7 @@ impl SolutionLibrary {
             let signature = if let Ok(lib) = std::fs::read_to_string(&lib_path) {
                 lib.lines()
                     .find(|l| l.trim().starts_with("pub fn "))
-                    .map(|l| {
-                        l.split('{')
-                            .next()
-                            .unwrap_or(l)
-                            .trim()
-                            .to_string()
-                    })
+                    .map(|l| l.split('{').next().unwrap_or(l).trim().to_string())
                     .unwrap_or_default()
             } else {
                 String::new()
@@ -384,7 +377,8 @@ mod tests {
 
     #[test]
     fn test_adapt_solution() {
-        let source = "pub fn reverse(input: &str) -> String {\n    input.chars().rev().collect()\n}";
+        let source =
+            "pub fn reverse(input: &str) -> String {\n    input.chars().rev().collect()\n}";
         let adapted = adapt_solution(
             source,
             "pub fn reverse(input: &str) -> String",

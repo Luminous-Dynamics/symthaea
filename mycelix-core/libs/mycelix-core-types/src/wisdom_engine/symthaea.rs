@@ -2151,7 +2151,9 @@ impl SymthaeaCausalBridge {
         }
 
         best_id.map(|id| {
-            let pattern = self.patterns.get(&id)
+            let pattern = self
+                .patterns
+                .get(&id)
                 .expect("id came from iterating self.patterns keys");
             let decay_factor = decay_config.calculate_decay(pattern.last_used, timestamp);
             let days_since =

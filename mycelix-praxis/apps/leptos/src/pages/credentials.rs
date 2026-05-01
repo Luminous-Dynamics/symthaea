@@ -168,6 +168,7 @@ fn trophy_for_band(band: &str) -> &'static str {
 
 #[component]
 pub fn CredentialsPage() -> impl IntoView {
+    let (active_tab, set_active_tab) = signal("achievements");
     let hc = use_holochain();
 
     let credentials = LocalResource::new(move || {
@@ -191,57 +192,88 @@ pub fn CredentialsPage() -> impl IntoView {
 
     view! {
         <div class="credentials-page">
-            <h2>"Achievements"</h2>
-            <p class="credentials-subtitle">
-                "Certificates earned through hard work and learning. "
-                "Print them, share them, be proud!"
-            </p>
+            <div class="page-header-with-tabs">
+                <div>
+                    <h2>"Credential Center"</h2>
+                    <p class="credentials-subtitle">"Manage your sovereign proofs and professional visibility."</p>
+                </div>
+                
+                <div class="praxis-tabs">
+                    <button 
+                        class=move || if active_tab.get() == "achievements" { "praxis-tab active" } else { "praxis-tab" }
+                        on:click=move |_| { set_active_tab.set("achievements"); set_selected.set(None); }
+                    >
+                        "\u{1F3C6} Achievements"
+                    </button>
+                    <button 
+                        class=move || if active_tab.get() == "switchboard" { "praxis-tab active" } else { "praxis-tab" }
+                        on:click=move |_| { set_active_tab.set("switchboard"); set_selected.set(None); }
+                    >
+                        "\u{1F39B}\u{FE0F} Privacy Switchboard"
+                    </button>
+                    <button 
+                        class=move || if active_tab.get() == "records" { "praxis-tab active" } else { "praxis-tab" }
+                        on:click=move |_| { set_active_tab.set("records"); set_selected.set(None); }
+                    >
+                        "\u{1F4BC} Public Records"
+                    </button>
+                </div>
+            </div>
 
-            <Suspense fallback=move || view! { <CardLoading /> }>
-                {move || {
-                    credentials.get().map(|data| {
-                        let data: Vec<CredentialView> = data.clone();
-                        let selected_val = selected.get();
+            <div style="margin-top: 2rem">
+                {move || match active_tab.get() {
+                    "achievements" => view! {
+                        <Suspense fallback=move || view! { <CardLoading /> }>
+                            {move || {
+                                credentials.get().map(|data| {
+                                    let data: Vec<CredentialView> = data.clone();
+                                    let selected_val = selected.get();
 
-                        if let Some(idx) = selected_val {
-                            let cred = data[idx].clone();
-                            view! {
-                                <div>
-                                    <button
-                                        class="btn-back"
-                                        on:click=move |_| set_selected.set(None)
-                                    >
-                                        "< Back to achievements"
-                                    </button>
-                                    <AchievementDetail credential=cred />
-                                </div>
-                            }
-                            .into_any()
-                        } else {
-                            let cards = data
-                                .into_iter()
-                                .enumerate()
-                                .map(|(idx, cred)| {
-                                    view! {
-                                        <AchievementCard
-                                            credential=cred
-                                            on_select=move || set_selected.set(Some(idx))
-                                        />
+                                    if let Some(idx) = selected_val {
+                                        let cred = data[idx].clone();
+                                        view! {
+                                            <div>
+                                                <button
+                                                    class="btn-back"
+                                                    on:click=move |_| set_selected.set(None)
+                                                >
+                                                    "< Back to achievements"
+                                                </button>
+                                                <AchievementDetail credential=cred />
+                                            </div>
+                                        }
+                                        .into_any()
+                                    } else {
+                                        let cards = data
+                                            .into_iter()
+                                            .enumerate()
+                                            .map(|(idx, cred)| {
+                                                view! {
+                                                    <AchievementCard
+                                                        credential=cred
+                                                        on_select=move || set_selected.set(Some(idx))
+                                                    />
+                                                }
+                                            })
+                                            .collect_view();
+
+                                        view! {
+                                            <div class="credentials-section">
+                                                <h3 class="section-label">"My Achievements"</h3>
+                                                <div class="credentials-grid">{cards}</div>
+                                            </div>
+                                        }
+                                        .into_any()
                                     }
                                 })
-                                .collect_view();
-
-                            view! {
-                                <div class="credentials-section">
-                                    <h3 class="section-label">"My Achievements"</h3>
-                                    <div class="credentials-grid">{cards}</div>
-                                </div>
-                            }
-                            .into_any()
-                        }
-                    })
+                            }}
+                        </Suspense>
+                    }.into_any(),
+                    "switchboard" => view! { <PrivacySwitchboard credentials=credentials.clone() /> }.into_any(),
+                    "records" => view! { <PublicRecordsView /> }.into_any(),
+                    _ => view! { <p>"Not implemented"</p> }.into_any(),
                 }}
-            </Suspense>
+            </div>
         </div>
     }
 }
@@ -616,6 +648,168 @@ fn CardLoading() -> impl IntoView {
             <div class="skeleton-line wide"></div>
             <div class="skeleton-line medium"></div>
             <div class="skeleton-line narrow"></div>
+        </div>
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Privacy Switchboard — Selective Disclosure UI
+// ---------------------------------------------------------------------------
+
+#[component]
+fn PrivacySwitchboard(credentials: LocalResource<Vec<CredentialView>>) -> impl IntoView {
+    let (selected_creds, set_selected_creds) = signal(std::collections::HashSet::<String>::new());
+    let (clr_title, set_clr_title) = signal("My Professional Portfolio".to_string());
+    
+    view! {
+        <div class="privacy-switchboard">
+            <div class="switchboard-grid">
+                <div class="selection-panel">
+                    <h3>"Private Vault"</h3>
+                    <p class="panel-desc">"Select the credentials you want to make public."</p>
+                    
+                    <Suspense fallback=|| view! { <CardLoading /> }>
+                        {move || {
+                            credentials.get().map(|data| {
+                                data.into_iter().map(|cred| {
+                                    let id = cred.credential_id.clone();
+                                    let id_check = id.clone();
+                                    let id_toggle = id.clone();
+                                    let is_selected = move || selected_creds.get().contains(&id_check);
+                                    
+                                    view! {
+                                        <div class="vault-item" on:click=move |_| {
+                                            set_selected_creds.update(|set| {
+                                                if set.contains(&id_toggle) {
+                                                    set.remove(&id_toggle);
+                                                } else {
+                                                    set.insert(id_toggle.clone());
+                                                }
+                                            });
+                                        }>
+                                            <input 
+                                                type="checkbox" 
+                                                prop:checked=is_selected
+                                            />
+                                            <div class="vault-item-info">
+                                                <span class="vault-item-title">{cred.course_name}</span>
+                                                <span class="vault-item-date">{friendly_date(&cred.issuance_date)}</span>
+                                            </div>
+                                        </div>
+                                    }
+                                }).collect_view()
+                            })
+                        }}
+                    </Suspense>
+                </div>
+
+                <div class="portfolio-panel">
+                    <h3>"Public Portfolio Preview"</h3>
+                    <div class="portfolio-config">
+                        <div class="field-group">
+                            <label>"Portfolio Title"</label>
+                            <input 
+                                type="text" 
+                                prop:value=clr_title
+                                on:input=move |ev| set_clr_title.set(event_target_value(&ev))
+                            />
+                        </div>
+                    </div>
+
+                    <div class="portfolio-disclosure-list">
+                        {move || {
+                            let selected = selected_creds.get();
+                            if selected.is_empty() {
+                                view! { <p class="empty-state">"No credentials selected for this record."</p> }.into_any()
+                            } else {
+                                view! {
+                                    <div class="selected-summary">
+                                        <div class="summary-stats">
+                                            <strong>{selected.len()}" credentials"</strong>
+                                            <span>" ready for disclosure"</span>
+                                        </div>
+                                        <p class="summary-hint">"This will generate a CLR 2.0 record with an aggregate MATL trust score."</p>
+                                        <button 
+                                            class="btn-primary"
+                                            style="width: 100%; margin-top: 1rem"
+                                            on:click=move |_| {
+                                                // Trigger create_clr zome call logic
+                                            }
+                                        >
+                                            "Generate CLR 2.0 Record"
+                                        </button>
+                                    </div>
+                                }.into_any()
+                            }
+                        }}
+                    </div>
+
+                    // Sovereign Export (The Failsafe)
+                    <div class="sovereign-emancipation" style="margin-top: 3rem; padding: 1.5rem; background: var(--surface-low); border: 2px dashed var(--border); border-radius: 12px">
+                        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem">
+                            <span style="font-size: 1.5rem">"\u{1F513}"</span>
+                            <h4 style="margin: 0">"Sovereign Emancipation"</h4>
+                        </div>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.5">
+                            "True Ahimsa means no trapping. You have the absolute right to leave this ecosystem at any time with your full professional identity intact."
+                        </p>
+                        <button 
+                            class="btn-outline" 
+                            style="width: 100%; border-color: var(--error); color: var(--error); margin-top: 0.5rem"
+                            on:click=move |_| {
+                                // Trigger emancipate_my_data zome call and download JSON
+                            }
+                        >
+                            "\u{2913} Export & Emancipate Data"
+                        </button>
+                        <p style="font-size: 0.65rem; color: var(--text-tertiary); text-align: center; margin-top: 0.75rem">
+                            "This generates a portable SovereignDataBundle.json containing your entire knowledge graph."
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+#[component]
+fn PublicRecordsView() -> impl IntoView {
+    view! {
+        <div class="public-records">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem">
+                <h3>"Your Public Portfolios"</h3>
+                <span class="badge-clr">"CLR 2.0 Compliant"</span>
+            </div>
+            <p class="panel-desc">"These records are visible on the public DHT and can be shared with employers via their DIDs."</p>
+            
+            <div class="records-grid">
+                <div class="record-card">
+                    <div class="record-card-header">
+                        <span class="record-icon">"\u{1F4BC}"</span>
+                        <div>
+                            <h4>"Professional Portfolio"</h4>
+                            <p class="record-date">"Generated: March 20, 2026"</p>
+                        </div>
+                    </div>
+                    
+                    <div class="record-stats">
+                        <div class="record-stat">
+                            <span class="stat-label">"MATL Trust"</span>
+                            <span class="stat-value highlight">"850"</span>
+                        </div>
+                        <div class="record-stat">
+                            <span class="stat-label">"Credentials"</span>
+                            <span class="stat-value">"4"</span>
+                        </div>
+                    </div>
+
+                    <div class="record-actions">
+                        <button class="btn-sm">"Copy DID Link"</button>
+                        <button class="btn-sm btn-outline">"View"</button>
+                        <button class="btn-sm btn-danger">"Revoke"</button>
+                    </div>
+                </div>
+            </div>
         </div>
     }
 }

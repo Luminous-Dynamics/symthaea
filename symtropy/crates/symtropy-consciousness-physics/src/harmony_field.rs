@@ -218,12 +218,7 @@ impl<const D: usize> HarmonyField<D> {
 
     /// Laplacian of conformal parameter σ (for Ricci scalar, Fix 8).
     #[cfg(feature = "consciousness-curvature")]
-    pub fn sigma_laplacian(
-        &self,
-        point: &Point<D>,
-        curvature_scale: f64,
-        epsilon: f64,
-    ) -> f64 {
+    pub fn sigma_laplacian(&self, point: &Point<D>, curvature_scale: f64, epsilon: f64) -> f64 {
         let center = self.field_energy(point) * curvature_scale;
         let mut sum = 0.0;
         for i in 0..D {
@@ -333,7 +328,12 @@ mod tests {
 
         let near = field.sample(&Point::new([2.0, 0.0, 0.0]));
         let far = field.sample(&Point::new([10.0, 0.0, 0.0]));
-        assert!(near[7] > far[7], "near {} should be > far {}", near[7], far[7]);
+        assert!(
+            near[7] > far[7],
+            "near {} should be > far {}",
+            near[7],
+            far[7]
+        );
     }
 
     #[test]
@@ -352,7 +352,10 @@ mod tests {
         let a = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0];
         let b = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0];
         let res = HarmonyField::<3>::resonance(&a, &b);
-        assert!((res - 1.0).abs() < 1e-10, "identical harmonies should resonate");
+        assert!(
+            (res - 1.0).abs() < 1e-10,
+            "identical harmonies should resonate"
+        );
     }
 
     #[test]
@@ -360,7 +363,10 @@ mod tests {
         let a = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
         let b = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0];
         let res = HarmonyField::<3>::resonance(&a, &b);
-        assert!((res - 0.0).abs() < 1e-10, "orthogonal harmonies = zero resonance");
+        assert!(
+            (res - 0.0).abs() < 1e-10,
+            "orthogonal harmonies = zero resonance"
+        );
     }
 
     #[test]
@@ -372,7 +378,11 @@ mod tests {
         entity_harmonies[7] = 1.0; // Same harmony → resonance
 
         let mult = field.friction_multiplier(&Point::new([2.0, 0.0, 0.0]), &entity_harmonies);
-        assert!(mult < 1.0, "resonant friction mult {} should be < 1.0", mult);
+        assert!(
+            mult < 1.0,
+            "resonant friction mult {} should be < 1.0",
+            mult
+        );
     }
 
     #[test]
@@ -395,17 +405,25 @@ mod tests {
     #[test]
     fn multiple_sources_superpose() {
         let mut field = HarmonyField::<3>::new();
-        field.sources.push(stillness_source(Point::new([5.0, 0.0, 0.0])));
-        field.sources.push(stillness_source(Point::new([-5.0, 0.0, 0.0])));
+        field
+            .sources
+            .push(stillness_source(Point::new([5.0, 0.0, 0.0])));
+        field
+            .sources
+            .push(stillness_source(Point::new([-5.0, 0.0, 0.0])));
 
         let single_source = {
             let mut f = HarmonyField::<3>::new();
-            f.sources.push(stillness_source(Point::new([5.0, 0.0, 0.0])));
+            f.sources
+                .push(stillness_source(Point::new([5.0, 0.0, 0.0])));
             f.sample(&Point::origin())
         };
 
         let both = field.sample(&Point::origin());
-        assert!(both[7] > single_source[7], "superposition should be stronger");
+        assert!(
+            both[7] > single_source[7],
+            "superposition should be stronger"
+        );
     }
 
     #[test]
@@ -440,11 +458,14 @@ mod tests {
         let pos = nalgebra::SVector::<f64, 2>::from([0.0, 0.0]);
         let sources = vec![(
             nalgebra::SVector::<f64, 2>::from([5.0, 0.0]),
-            0.8,  // src_emotion
-            0.9,  // src_phi (high consciousness = strong broadcast)
+            0.8, // src_emotion
+            0.9, // src_phi (high consciousness = strong broadcast)
         )];
         let new_val = contagion_update(&pos, 0.0, 0.8, &sources, 1.0);
-        assert!(new_val > 0.0, "emotion should spread from nearby agent, got {new_val}");
+        assert!(
+            new_val > 0.0,
+            "emotion should spread from nearby agent, got {new_val}"
+        );
         assert!(new_val < 0.8, "should not fully equalise in one tick");
     }
 
@@ -453,7 +474,10 @@ mod tests {
         // Entity with emotion=0.6, no neighbors → decays toward zero
         let pos = nalgebra::SVector::<f64, 2>::from([0.0, 0.0]);
         let new_val = contagion_update(&pos, 0.6, 0.8, &[], 1.0);
-        assert!(new_val < 0.6, "isolated emotion should decay, got {new_val}");
+        assert!(
+            new_val < 0.6,
+            "isolated emotion should decay, got {new_val}"
+        );
         assert!(new_val > 0.0, "should not decay to zero in one tick");
     }
 
@@ -463,8 +487,8 @@ mod tests {
         let pos = nalgebra::SVector::<f64, 2>::from([0.0, 0.0]);
         let sources = vec![(
             nalgebra::SVector::<f64, 2>::from([3.0, 0.0]),
-            1.0,  // src_emotion
-            0.9,  // src_phi
+            1.0, // src_emotion
+            0.9, // src_phi
         )];
         let zombie_val = contagion_update(&pos, 0.0, 0.0, &sources, 1.0);
         let conscious_val = contagion_update(&pos, 0.0, 0.9, &sources, 1.0);
@@ -478,8 +502,8 @@ mod tests {
         let pos = nalgebra::SVector::<f64, 2>::from([0.0, 0.0]);
         let sources = vec![(
             nalgebra::SVector::<f64, 2>::from([EMOTIONAL_CONTAGION_RADIUS + 5.0, 0.0]),
-            1.0,  // src_emotion
-            1.0,  // src_phi
+            1.0, // src_emotion
+            1.0, // src_phi
         )];
         let new_val = contagion_update(&pos, 0.0, 1.0, &sources, 1.0);
         assert_eq!(new_val, 0.0, "out-of-radius source should have no effect");
@@ -495,7 +519,9 @@ mod tests {
         ];
         // Very large dt should still clamp output
         let new_val = contagion_update(&pos, 0.0, 1.0, &sources, 100.0);
-        assert!(new_val >= 0.0 && new_val <= 1.0,
-            "output must be in [0,1], got {new_val}");
+        assert!(
+            new_val >= 0.0 && new_val <= 1.0,
+            "output must be in [0,1], got {new_val}"
+        );
     }
 }

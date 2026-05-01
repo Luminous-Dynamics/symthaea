@@ -188,8 +188,7 @@ impl CreativeManager {
     pub fn new_with_path(path: Option<std::path::PathBuf>) -> Self {
         let memory_path = path.unwrap_or_else(|| std::path::PathBuf::from(AESTHETIC_MEMORY_PATH));
         let memory = AestheticMemory::load(&memory_path);
-        let tracker =
-            AestheticTracker::from_memory(AestheticConfig::default(), &memory);
+        let tracker = AestheticTracker::from_memory(AestheticConfig::default(), &memory);
         Self {
             atelier_config: AtelierConfig {
                 style: AtelierStyle::Composite,
@@ -388,51 +387,62 @@ impl CreativeManager {
                 // Priority: (1) Narrative episode, (2) arc from emotional history, (3) flat compose.
                 // C: Narrative autocompose — if an episode is active, let it drive the music.
                 // The episode is consumed after one use (each episode is unique).
-                let (mut composition, compose_mode) = if let Some(episode) = self.active_episode.take() {
-                    let bridge = symthaea_muse::narrative_bridge::NarrativeMusicBridge::new(
-                        self.default_bars,
-                    );
-                    let ec = bridge.compose_episode(
-                        &episode,
-                        &self.muse_config,
-                        &musical_state,
-                        self.seed_counter,
-                    );
-                    (ec.composition, "narrative-music")
-                } else if let Some(arc) = self.build_arc_from_history() {
-                    // F: Arc-driven composition — the music reflects Symthaea's recent
-                    // emotional journey rather than a single-frame snapshot.
-                    // I: Tuning system emerges from consciousness state — high Phi → just
-                    // intonation, negative valence → maqamat, positive calm → gamelan, etc.
-                    let arc = if tuning != symthaea_muse::pitch::TuningSystem::TwelveTET {
-                        arc.with_tuning(tuning.clone())
+                let (mut composition, compose_mode) =
+                    if let Some(episode) = self.active_episode.take() {
+                        let bridge = symthaea_muse::narrative_bridge::NarrativeMusicBridge::new(
+                            self.default_bars,
+                        );
+                        let ec = bridge.compose_episode(
+                            &episode,
+                            &self.muse_config,
+                            &musical_state,
+                            self.seed_counter,
+                        );
+                        (ec.composition, "narrative-music")
+                    } else if let Some(arc) = self.build_arc_from_history() {
+                        // F: Arc-driven composition — the music reflects Symthaea's recent
+                        // emotional journey rather than a single-frame snapshot.
+                        // I: Tuning system emerges from consciousness state — high Phi → just
+                        // intonation, negative valence → maqamat, positive calm → gamelan, etc.
+                        let arc = if tuning != symthaea_muse::pitch::TuningSystem::TwelveTET {
+                            arc.with_tuning(tuning.clone())
+                        } else {
+                            arc
+                        };
+                        let comp = symthaea_muse::arc::compose_with_arc(
+                            &self.muse_config,
+                            &musical_state,
+                            &arc,
+                            self.seed_counter,
+                        );
+                        (comp, "arc-music")
                     } else {
-                        arc
+                        (
+                            symthaea_muse::compose(
+                                &self.muse_config,
+                                &musical_state,
+                                self.seed_counter,
+                            ),
+                            "music",
+                        )
                     };
-                    let comp = symthaea_muse::arc::compose_with_arc(
-                        &self.muse_config,
-                        &musical_state,
-                        &arc,
-                        self.seed_counter,
-                    );
-                    (comp, "arc-music")
-                } else {
-                    (
-                        symthaea_muse::compose(&self.muse_config, &musical_state, self.seed_counter),
-                        "music",
-                    )
-                };
 
                 // B: Aesthetic reward signal — blend proxy score with CreativeQualityScore.
                 // CreativeQualityScore uses IDyOM-inspired melodic coherence, rhythmic
                 // regularity, emotional alignment, and form compliance — richer than
                 // the harmony-alignment proxy alone.
                 let target_va = symthaea_aesthetic::from_core_affect(
-                    snap.valence, snap.arousal, snap.dopamine, snap.serotonin, snap.noradrenaline,
+                    snap.valence,
+                    snap.arousal,
+                    snap.dopamine,
+                    snap.serotonin,
+                    snap.noradrenaline,
                 );
                 let proxy_score = score_composition(&composition, snap);
-                let quality =
-                    symthaea_muse::creative_bench::CreativeQualityScore::evaluate(&composition, target_va);
+                let quality = symthaea_muse::creative_bench::CreativeQualityScore::evaluate(
+                    &composition,
+                    target_va,
+                );
 
                 // Blend: proxy covers harmony/structure; quality covers melodic craft.
                 let blended_composite =
@@ -445,7 +455,9 @@ impl CreativeManager {
                     ..proxy_score
                 };
 
-                let mut feedback = self.tracker.process(&music_score, &snap.harmony_activations);
+                let mut feedback = self
+                    .tracker
+                    .process(&music_score, &snap.harmony_activations);
 
                 // Amplify dopamine by quality composite (beautiful music = stronger reward)
                 feedback.dopamine_delta += quality.composite * 0.05;

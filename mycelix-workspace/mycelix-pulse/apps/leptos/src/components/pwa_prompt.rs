@@ -13,12 +13,13 @@ pub fn PwaInstallPrompt() -> impl IntoView {
         web_sys::window()
             .and_then(|w| w.local_storage().ok().flatten())
             .and_then(|s| s.get_item("mycelix_pwa_dismissed").ok().flatten())
-            .is_some()
+            .is_some(),
     );
 
     // Capture beforeinstallprompt event
     Effect::new(move |_| {
-        let _ = js_sys::eval("
+        let _ = js_sys::eval(
+            "
             window.__pwa_deferred_prompt = null;
             window.addEventListener('beforeinstallprompt', function(e) {
                 e.preventDefault();
@@ -30,12 +31,15 @@ pub fn PwaInstallPrompt() -> impl IntoView {
                 window.__pwa_can_install = false;
                 window.__pwa_deferred_prompt = null;
             });
-        ");
+        ",
+        );
     });
 
     // Poll for install availability (JS events can't directly set Leptos signals)
     let check_install = move || {
-        if dismissed.get_untracked() { return; }
+        if dismissed.get_untracked() {
+            return;
+        }
         let available = web_sys::window()
             .and_then(|w| js_sys::Reflect::get(&w, &JsValue::from_str("__pwa_can_install")).ok())
             .and_then(|v| v.as_bool())
@@ -51,21 +55,22 @@ pub fn PwaInstallPrompt() -> impl IntoView {
     });
 
     let on_install = move |_| {
-        let _ = js_sys::eval("
+        let _ = js_sys::eval(
+            "
             if (window.__pwa_deferred_prompt) {
                 window.__pwa_deferred_prompt.prompt();
                 window.__pwa_deferred_prompt = null;
                 window.__pwa_can_install = false;
             }
-        ");
+        ",
+        );
         can_install.set(false);
     };
 
     let on_dismiss = move |_| {
         dismissed.set(true);
         can_install.set(false);
-        if let Some(storage) = web_sys::window()
-            .and_then(|w| w.local_storage().ok().flatten()) {
+        if let Some(storage) = web_sys::window().and_then(|w| w.local_storage().ok().flatten()) {
             let _ = storage.set_item("mycelix_pwa_dismissed", "1");
         }
     };

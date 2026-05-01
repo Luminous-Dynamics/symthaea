@@ -13,5 +13,8 @@ hdk = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 holochain_serialized_bytes = { workspace = true }
+base64 = "0.22"
 health_vault_integrity = { path = "../integrity" }
 personal-types = { workspace = true }
+personal-leptos-types = { workspace = true }
+getrandom = { workspace = true, features = ["custom"] }

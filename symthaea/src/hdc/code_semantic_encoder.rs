@@ -21,7 +21,11 @@ impl CodeSemanticEncoder {
                 .wrapping_mul(31)
                 .wrapping_add(window[2] as usize);
             let idx = hash % self.dim;
-            let sign = if (hash / self.dim) % 2 == 0 { 1.0f32 } else { -1.0f32 };
+            let sign = if (hash / self.dim) % 2 == 0 {
+                1.0f32
+            } else {
+                -1.0f32
+            };
             v[idx] += sign;
         }
         // Normalize

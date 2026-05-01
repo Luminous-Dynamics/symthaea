@@ -238,7 +238,7 @@ impl StreamingPhiGradient {
     pub fn new(config: GradientConfig) -> Self {
         Self {
             config,
-            phi_calc: TieredPhi::new(ApproximationTier::SpectralConnectivity),
+            phi_calc: TieredPhi::new(ApproximationTier::SampledPartition),
             last_gradient: None,
             last_update: Instant::now(),
             event_sender: None,
@@ -445,7 +445,7 @@ impl StreamingPhiGradient {
                 .collect();
 
             // Use fresh calculator to avoid state contamination
-            let mut calc = TieredPhi::new(ApproximationTier::SpectralConnectivity);
+            let mut calc = TieredPhi::new(ApproximationTier::SampledPartition);
             let phi_without = calc.compute(&remaining);
 
             // Gradient = how much Φ drops when we remove this component

@@ -257,7 +257,8 @@ pub fn tally_votes(
     current_tick: u32,
     rng: &mut StochasticEngine,
 ) {
-    let author_ideology = proposal.author_faction_id
+    let author_ideology = proposal
+        .author_faction_id
         .and_then(|id| factions.iter().find(|f| f.id == id))
         .map(|f| f.ideology);
 
@@ -279,7 +280,8 @@ pub fn tally_votes(
 
         // Compute vote direction from ideology alignment
         let direction = if let Some(author_ideo) = author_ideology {
-            let agent_ideo = agent.faction_id
+            let agent_ideo = agent
+                .faction_id
                 .and_then(|id| factions.iter().find(|f| f.id == id))
                 .map(|f| f.ideology)
                 .unwrap_or([0.5; 4]);
@@ -398,11 +400,11 @@ mod tests {
 
     #[test]
     fn mycel_to_weight_tiers() {
-        assert_eq!(mycel_to_weight(0.1), 0.0);    // Observer
-        assert_eq!(mycel_to_weight(0.35), 0.3);   // Participant
-        assert_eq!(mycel_to_weight(0.5), 0.6);    // Citizen
-        assert_eq!(mycel_to_weight(0.7), 0.85);   // Steward
-        assert_eq!(mycel_to_weight(0.9), 1.0);    // Guardian
+        assert_eq!(mycel_to_weight(0.1), 0.0); // Observer
+        assert_eq!(mycel_to_weight(0.35), 0.3); // Participant
+        assert_eq!(mycel_to_weight(0.5), 0.6); // Citizen
+        assert_eq!(mycel_to_weight(0.7), 0.85); // Steward
+        assert_eq!(mycel_to_weight(0.9), 1.0); // Guardian
     }
 
     #[test]

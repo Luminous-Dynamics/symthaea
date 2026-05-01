@@ -160,10 +160,7 @@ impl ShapleyDetector {
             values.push((gradients[i].node_id.clone(), shapley));
         }
 
-        Ok(ShapleyResult {
-            values,
-            suspicious,
-        })
+        Ok(ShapleyResult { values, suspicious })
     }
 
     // -----------------------------------------------------------------------

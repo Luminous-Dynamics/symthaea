@@ -30,8 +30,8 @@ impl PythonParser {
         &self,
         node: &tree_sitter::Node,
         source: &str,
-        entities: &mut Vec<CodeEntity>,
-        relations: &mut Vec<CodeRelation>,
+        entities: &mut Vec<Entity>,
+        relations: &mut Vec<EntityRelation>,
         depth: usize,
     ) {
         // Limit recursion depth for deeply nested code
@@ -74,21 +74,20 @@ impl PythonParser {
             }
             "match_statement" => {
                 let entity =
-                    CodeEntity::new(EntityKind::MatchStatement, "match", Span::from_node(node))
+                    Entity::new(EntityKind::MatchStatement, "match", Span::from_node(node))
                         .with_source(node_text(node, source).to_string());
                 entities.push(entity);
             }
             "with_statement" => {
-                let entity =
-                    CodeEntity::new(EntityKind::WithStatement, "with", Span::from_node(node))
-                        .with_source(node_text(node, source).to_string());
+                let entity = Entity::new(EntityKind::WithStatement, "with", Span::from_node(node))
+                    .with_source(node_text(node, source).to_string());
                 entities.push(entity);
             }
             "list_comprehension"
             | "set_comprehension"
             | "dictionary_comprehension"
             | "generator_expression" => {
-                let entity = CodeEntity::new(
+                let entity = Entity::new(
                     EntityKind::Comprehension,
                     node.kind(),
                     Span::from_node(node),
@@ -106,12 +105,12 @@ impl PythonParser {
         }
     }
 
-    fn parse_function(&self, node: &tree_sitter::Node, source: &str) -> Option<CodeEntity> {
+    fn parse_function(&self, node: &tree_sitter::Node, source: &str) -> Option<Entity> {
         let name = node
             .child_by_field_name("name")
             .map(|n| node_text(&n, source).to_string())?;
 
-        let mut entity = CodeEntity::new(EntityKind::Function, &name, Span::from_node(node))
+        let mut entity = Entity::new(EntityKind::Function, &name, Span::from_node(node))
             .with_source(node_text(node, source).to_string());
 
         // Check for async
@@ -160,13 +159,13 @@ impl PythonParser {
         &self,
         node: &tree_sitter::Node,
         source: &str,
-        relations: &mut Vec<CodeRelation>,
-    ) -> Option<CodeEntity> {
+        relations: &mut Vec<EntityRelation>,
+    ) -> Option<Entity> {
         let name = node
             .child_by_field_name("name")
             .map(|n| node_text(&n, source).to_string())?;
 
-        let mut entity = CodeEntity::new(EntityKind::Class, &name, Span::from_node(node))
+        let mut entity = Entity::new(EntityKind::Class, &name, Span::from_node(node))
             .with_source(node_text(node, source).to_string());
 
         // Extract base classes (superclass_list or argument_list after name)
@@ -184,7 +183,7 @@ impl PythonParser {
                 {
                     let base_name = node_text(&child, source).to_string();
                     if !base_name.is_empty() {
-                        relations.push(CodeRelation {
+                        relations.push(EntityRelation {
                             source: name.clone(),
                             relation: Relation::Extends,
                             target: base_name,
@@ -201,7 +200,7 @@ impl PythonParser {
                 match child.kind() {
                     "function_definition" => {
                         if let Some(method) = self.parse_function(&child, source) {
-                            let method = CodeEntity {
+                            let method = Entity {
                                 kind: EntityKind::Method,
                                 ..method
                             };
@@ -214,7 +213,7 @@ impl PythonParser {
                         if let Some(method) =
                             self.parse_decorated(&child, source, &mut dummy_relations)
                         {
-                            let method = CodeEntity {
+                            let method = Entity {
                                 kind: EntityKind::Method,
                                 ..method
                             };
@@ -235,22 +234,19 @@ impl PythonParser {
         Some(entity)
     }
 
-    fn parse_import(&self, node: &tree_sitter::Node, source: &str) -> Option<CodeEntity> {
+    fn parse_import(&self, node: &tree_sitter::Node, source: &str) -> Option<Entity> {
         let text = node_text(node, source).to_string();
         let import_path = text.trim().to_string();
 
-        Some(
-            CodeEntity::new(EntityKind::Import, &import_path, Span::from_node(node))
-                .with_source(text),
-        )
+        Some(Entity::new(EntityKind::Import, &import_path, Span::from_node(node)).with_source(text))
     }
 
     fn parse_decorated(
         &self,
         node: &tree_sitter::Node,
         source: &str,
-        relations: &mut Vec<CodeRelation>,
-    ) -> Option<CodeEntity> {
+        relations: &mut Vec<EntityRelation>,
+    ) -> Option<Entity> {
         // Collect decorators
         let mut decorators = Vec::new();
         let mut definition = None;
@@ -281,7 +277,7 @@ impl PythonParser {
         }
     }
 
-    fn parse_assignment(&self, node: &tree_sitter::Node, source: &str) -> Option<CodeEntity> {
+    fn parse_assignment(&self, node: &tree_sitter::Node, source: &str) -> Option<Entity> {
         let left = node
             .child_by_field_name("left")
             .map(|n| node_text(&n, source).to_string())?;
@@ -291,7 +287,7 @@ impl PythonParser {
             return None;
         }
 
-        let mut entity = CodeEntity::new(EntityKind::Variable, &left, Span::from_node(node))
+        let mut entity = Entity::new(EntityKind::Variable, &left, Span::from_node(node))
             .with_source(node_text(node, source).to_string());
 
         // Check for type annotation
@@ -305,7 +301,7 @@ impl PythonParser {
             .all(|c| c.is_uppercase() || c == '_' || c.is_numeric())
             && left.len() > 1
         {
-            entity = CodeEntity {
+            entity = Entity {
                 kind: EntityKind::Constant,
                 ..entity
             };
@@ -355,7 +351,7 @@ impl CodeParser for PythonParser {
         Ok(parsed)
     }
 
-    fn extract_entities(&self, parsed: &ParsedCode) -> Vec<CodeEntity> {
+    fn extract_entities(&self, parsed: &ParsedCode) -> Vec<Entity> {
         parsed.entities.clone()
     }
 
@@ -433,7 +429,7 @@ class Animal:
         assert_eq!(classes.len(), 1);
         assert_eq!(classes[0].name, "Animal");
 
-        let methods: Vec<&CodeEntity> = classes[0]
+        let methods: Vec<&Entity> = classes[0]
             .children
             .iter()
             .filter(|c| c.kind == EntityKind::Method)
@@ -530,7 +526,7 @@ async def fetch(url: str) -> bytes:
     }
 
     // Helper to get all functions from parsed result
-    fn parsed_functions(parsed: &ParsedCode) -> Vec<&CodeEntity> {
+    fn parsed_functions(parsed: &ParsedCode) -> Vec<&Entity> {
         parsed
             .all_entities()
             .into_iter()

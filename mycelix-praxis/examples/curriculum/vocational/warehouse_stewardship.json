@@ -1,0 +1,161 @@
+{
+  "metadata": {
+    "title": "Warehouse Stewardship: Connective Tissue",
+    "framework": "Mycelix Autonomous Ark",
+    "source": "https://mycelix.org",
+    "grade_level": "Vocational/Community",
+    "subject_area": "Applied Resilience",
+    "domain": "Stewardship",
+    "version": "1.0",
+    "total_standards": 10,
+    "domains": [
+      "Water Sovereignty",
+      "Network Resilience",
+      "Micro-Governance",
+      "Circular Artisanry"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Essential skills for maintaining a living building during systemic infrastructure failure."
+  },
+  "nodes": [
+    {
+      "id": "VOC-H2O-101",
+      "title": "The Greywater Loop & Catchment",
+      "description": "Surviving the dry taps. Building IBC tote rain catchments and gravity-fed sand/charcoal filtration. Wiring hydrostatic pressure sensors to monitor local reservoir levels.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Water Sovereignty",
+      "subdomain": "Connective Tissue",
+      "tags": ["water", "filtration", "plumbing", "iot"],
+      "estimated_hours": 20,
+      "grade_levels": ["Vocational"],
+      "bloom_level": "Apply",
+      "subject_area": "Applied Resilience"
+    },
+    {
+      "id": "VOC-NET-101",
+      "title": "The LoRaWAN Lifeline",
+      "description": "Off-grid emergency communication. Building solar-powered LoRa radio nodes from scrap antennas. Transmitting semantic vectors during ISP/Cell blackouts.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Network Resilience",
+      "subdomain": "Connective Tissue",
+      "tags": ["lora", "radio", "p2p", "hardware"],
+      "estimated_hours": 25,
+      "grade_levels": ["Vocational"],
+      "bloom_level": "Apply",
+      "subject_area": "Applied Resilience"
+    },
+    {
+      "id": "VOC-GOV-101",
+      "title": "Practical Consensus & The Proposal Ledger",
+      "description": "Mediating warehouse disputes using Ubuntu layer math. Drafting resource requests for the mk0-fabricator and managing the local Isibaya voting cycles.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Micro-Governance",
+      "subdomain": "Connective Tissue",
+      "tags": ["governance", "consensus", "ubuntu", "dao"],
+      "estimated_hours": 15,
+      "grade_levels": ["Vocational"],
+      "bloom_level": "Apply",
+      "subject_area": "Applied Resilience"
+    },
+    {
+      "id": "VOC-MAT-101",
+      "title": "Polymer Sorting & The Detritivore Feed",
+      "description": "Closing the material loop. Identifying scavenged plastics (ABS/PLA/PET) and preparing them for the mk0-detritivore without jamming or toxic fumes.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Circular Artisanry",
+      "subdomain": "Connective Tissue",
+      "tags": ["recycling", "plastics", "materials", "industrial"],
+      "estimated_hours": 15,
+      "grade_levels": ["Vocational"],
+      "bloom_level": "Understand",
+      "subject_area": "Applied Resilience"
+    },
+    {
+      "id": "VOC-INF-101",
+      "title": "Warehouse Synesthesia (LED Mapping)",
+      "description": "Translating the Thermodynamic Ledger into the physical environment. Mapping WS2812B strips to power/water telemetry for ambient building awareness.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Ambient Informatics",
+      "subdomain": "Connective Tissue",
+      "tags": ["led", "informatics", "telemetry", "ambient"],
+      "estimated_hours": 20,
+      "grade_levels": ["Vocational"],
+      "bloom_level": "Apply",
+      "subject_area": "Applied Resilience"
+    },
+    {
+      "id": "VOC-ECO-101",
+      "title": "The TEND-to-ZAR Liquidity Pool",
+      "description": "Economic realism in Gauteng. Interfacing internal mutual credit with the external fiat economy by pooling warehouse physical outputs for ZAR trade.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Applied Economics",
+      "subdomain": "Connective Tissue",
+      "tags": ["economics", "fiat", "zar", "liquidity"],
+      "estimated_hours": 30,
+      "grade_levels": ["Vocational"],
+      "bloom_level": "Analyze",
+      "subject_area": "Applied Resilience"
+    },
+    {
+      "id": "VOC-CAP-ARK",
+      "title": "The Autonomous Ark Capstone",
+      "description": "Lead the warehouse through a simulated 'Total Failure' cycle (No grid, No water, No ISP). Successfully maintain all metabolic loops using only local mesh and reserves.",
+      "node_type": "Capstone",
+      "difficulty": "Expert",
+      "domain": "Universal",
+      "subdomain": "Connective Tissue",
+      "tags": ["capstone", "survival", "ark", "integration"],
+      "estimated_hours": 120,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Create",
+      "subject_area": "Applied Resilience",
+      "holonic_capstone": {
+        "required_node_ids": ["VOC-H2O-101", "VOC-NET-101", "VOC-GOV-101", "VOC-INF-101"],
+        "deliverable": "48 hours of autonomous operation data verified by the Mycelial Oracle and the Isibaya Council.",
+        "min_peer_endorsements": 5
+      },
+      "alignment_vector": {
+        "ahimsa": 900,
+        "reciprocity": 980,
+        "resilience": 1000,
+        "collective_flourishing": 950
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "VOC-002",
+      "to": "VOC-H2O-101",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Water level monitoring requires the ESP32 mesh skills learned in the handshake course."
+    },
+    {
+      "from": "VOC-002",
+      "to": "VOC-NET-101",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Building radio nodes requires fundamental understanding of mesh networking."
+    },
+    {
+      "from": "VOC-H2O-101",
+      "to": "VOC-CAP-ARK",
+      "edge_type": "Requires",
+      "strength_permille": 1000,
+      "rationale": "An Ark cannot survive without sovereign water management."
+    },
+    {
+      "from": "VOC-NET-101",
+      "to": "VOC-CAP-ARK",
+      "edge_type": "Requires",
+      "strength_permille": 1000,
+      "rationale": "Autonomous operation requires a resilient, long-range communication spine."
+    }
+  ]
+}

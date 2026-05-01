@@ -181,6 +181,7 @@ impl BrowserBridge {
             num_actuators: 4,
             epistemic_grounding: grounding_label(GROUNDING_BROWSER).to_string(),
             observation_confidence: grounding_from_prediction_error(self.last_prediction_error),
+            platform_specific: Vec::new(),
         }
     }
 }

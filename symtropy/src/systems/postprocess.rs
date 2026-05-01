@@ -21,7 +21,9 @@ pub struct CameraTrauma {
 }
 
 impl Default for CameraTrauma {
-    fn default() -> Self { Self { trauma: 0.0 } }
+    fn default() -> Self {
+        Self { trauma: 0.0 }
+    }
 }
 
 impl CameraTrauma {
@@ -87,7 +89,9 @@ pub fn camera_shake_system(
     // Decay trauma
     trauma.trauma *= (1.0 - 2.0 * time.delta_secs()).max(0.0);
 
-    let Ok(mut cam_tf) = camera.single_mut() else { return };
+    let Ok(mut cam_tf) = camera.single_mut() else {
+        return;
+    };
 
     if trauma.trauma > 0.001 {
         // Shake intensity = trauma^2 (feels more natural)

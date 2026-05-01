@@ -202,7 +202,10 @@ impl BridgeMetrics {
         };
 
         // Check again for overflow key
-        let pos = self.call_counters.iter().position(|c| c.key == effective_key);
+        let pos = self
+            .call_counters
+            .iter()
+            .position(|c| c.key == effective_key);
         if let Some(idx) = pos {
             return &mut self.call_counters[idx];
         }
@@ -218,7 +221,10 @@ impl BridgeMetrics {
 
     /// Find or create an error counter for the given error code.
     fn get_or_create_error_counter(&mut self, error_code: &str) -> &mut ErrorCounter {
-        let pos = self.error_counters.iter().position(|c| c.code == error_code);
+        let pos = self
+            .error_counters
+            .iter()
+            .position(|c| c.code == error_code);
         if let Some(idx) = pos {
             return &mut self.error_counters[idx];
         }
@@ -229,7 +235,10 @@ impl BridgeMetrics {
             error_code
         };
 
-        let pos = self.error_counters.iter().position(|c| c.code == effective_code);
+        let pos = self
+            .error_counters
+            .iter()
+            .position(|c| c.code == effective_code);
         if let Some(idx) = pos {
             return &mut self.error_counters[idx];
         }
@@ -303,20 +312,24 @@ impl BridgeMetrics {
 
     /// Take a serializable snapshot of the current metrics.
     pub fn snapshot(&self) -> BridgeMetricsSnapshot {
-        let call_counts: Vec<CallCountSnapshot> = self.call_counters.iter().map(|c| {
-            CallCountSnapshot {
+        let call_counts: Vec<CallCountSnapshot> = self
+            .call_counters
+            .iter()
+            .map(|c| CallCountSnapshot {
                 key: c.key.clone(),
                 success_count: c.success_count,
                 error_count: c.error_count,
-            }
-        }).collect();
+            })
+            .collect();
 
-        let error_counts: Vec<ErrorCountSnapshot> = self.error_counters.iter().map(|c| {
-            ErrorCountSnapshot {
+        let error_counts: Vec<ErrorCountSnapshot> = self
+            .error_counters
+            .iter()
+            .map(|c| ErrorCountSnapshot {
                 code: c.code.clone(),
                 count: c.count,
-            }
-        }).collect();
+            })
+            .collect();
 
         BridgeMetricsSnapshot {
             total_success: self.total_success,
@@ -517,13 +530,17 @@ mod tests {
         assert_eq!(snap.total_errors, 0);
         assert_eq!(snap.call_counts.len(), 2);
 
-        let verify = snap.call_counts.iter()
+        let verify = snap
+            .call_counts
+            .iter()
             .find(|c| c.key == "property_registry::verify_ownership")
             .unwrap();
         assert_eq!(verify.success_count, 2);
         assert_eq!(verify.error_count, 0);
 
-        let get = snap.call_counts.iter()
+        let get = snap
+            .call_counts
+            .iter()
             .find(|c| c.key == "property_registry::get_property")
             .unwrap();
         assert_eq!(get.success_count, 1);
@@ -540,17 +557,23 @@ mod tests {
         assert_eq!(snap.total_errors, 3);
         assert_eq!(snap.total_success, 0);
 
-        let verify = snap.call_counts.iter()
+        let verify = snap
+            .call_counts
+            .iter()
             .find(|c| c.key == "property_registry::verify_ownership")
             .unwrap();
         assert_eq!(verify.error_count, 2);
 
-        let brg006 = snap.error_counts.iter()
+        let brg006 = snap
+            .error_counts
+            .iter()
             .find(|c| c.code == "BRG-006")
             .unwrap();
         assert_eq!(brg006.count, 2);
 
-        let brg003 = snap.error_counts.iter()
+        let brg003 = snap
+            .error_counts
+            .iter()
             .find(|c| c.code == "BRG-003")
             .unwrap();
         assert_eq!(brg003.count, 1);
@@ -567,7 +590,9 @@ mod tests {
         assert_eq!(snap.rate_limit_hits, 3);
         assert_eq!(snap.total_errors, 3);
 
-        let brg001 = snap.error_counts.iter()
+        let brg001 = snap
+            .error_counts
+            .iter()
             .find(|c| c.code == "BRG-001")
             .unwrap();
         assert_eq!(brg001.count, 3);
@@ -649,7 +674,9 @@ mod tests {
         m.record_success("zome_new", "fn", 10);
         // Should have one more entry for overflow
         assert_eq!(m.call_counters.len(), MAX_CALL_KEYS + 1);
-        let overflow = m.call_counters.iter()
+        let overflow = m
+            .call_counters
+            .iter()
             .find(|c| c.key == "_overflow::_overflow")
             .unwrap();
         assert_eq!(overflow.success_count, 1);
@@ -712,9 +739,7 @@ mod tests {
         assert_eq!(snap.total_success, 2);
         assert_eq!(snap.total_errors, 1);
 
-        let counter = snap.call_counts.iter()
-            .find(|c| c.key == "z::f")
-            .unwrap();
+        let counter = snap.call_counts.iter().find(|c| c.key == "z::f").unwrap();
         assert_eq!(counter.success_count, 2);
         assert_eq!(counter.error_count, 1);
     }

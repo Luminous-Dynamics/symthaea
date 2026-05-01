@@ -45,7 +45,7 @@ const EQUATORIAL_DV_BONUS: f64 = 0.46;
 const SPACEPORT_CONSTRUCTION_TICKS: u32 = 60; // 5 years
 
 /// Default Kessler syndrome duration range in ticks.
-const KESSLER_MIN_DURATION: u32 = 60;  // 5 years
+const KESSLER_MIN_DURATION: u32 = 60; // 5 years
 const KESSLER_MAX_DURATION: u32 = 120; // 10 years
 
 /// Off-world resource production penalty when supply line is cut.
@@ -258,11 +258,21 @@ pub fn instantiate_colonists(
             faction_id: None,
             generation: 0,
             trauma_level: 0.0,
-            cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
-            ethics: crate::agent::EthicalOrientation::from_culture(source_region.cultural_profile.individualism, rng),
+            cumulative_dose_sv: 0.0,
+            adversarial: None,
+            coordination_understanding: 0.0,
+            mycel_score: 0.1,
+            sap_balance: 100.0,
+            is_biological: true,
+            wounds: Vec::new(),
+            ethics: crate::agent::EthicalOrientation::from_culture(
+                source_region.cultural_profile.individualism,
+                rng,
+            ),
             // 8D sovereign profile sampled from colonist's source-region culture.
             sovereign_profile: crate::sovereign_profile::SovereignProfile::sample(
-                source_region.cultural_profile.individualism, rng,
+                source_region.cultural_profile.individualism,
+                rng,
             ),
             justice: crate::sub_passport::RestorativeJustice::new(),
         };
@@ -274,8 +284,9 @@ pub fn instantiate_colonists(
     apply_brain_drain(source_region, selection.count);
 
     // Deduct launch cost from region GDP.
-    let total_launch_cost =
-        selection.count as f64 * COLONIST_MASS_KG * source_region.gdp_per_capita.min(DEFAULT_LAUNCH_COST_PER_KG);
+    let total_launch_cost = selection.count as f64
+        * COLONIST_MASS_KG
+        * source_region.gdp_per_capita.min(DEFAULT_LAUNCH_COST_PER_KG);
     // Express as per-capita GDP reduction (spread across the whole population).
     let gdp_deduction = total_launch_cost / (source_region.population * 1_000_000.0);
     source_region.gdp_per_capita = (source_region.gdp_per_capita - gdp_deduction).max(100.0);
@@ -302,8 +313,7 @@ pub fn apply_brain_drain(region: &mut EarthRegion, count: usize) {
         region.phi_distribution_mean + COLONIST_PHI_SELECTION_BIAS * region.phi_distribution_sd;
     let brain_drain = (phi_of_departing - region.phi_distribution_mean)
         * (count as f64 / (region.population * 1_000_000.0));
-    region.phi_distribution_mean =
-        (region.phi_distribution_mean - brain_drain).max(0.05);
+    region.phi_distribution_mean = (region.phi_distribution_mean - brain_drain).max(0.05);
 
     // Also reduce population.
     let pop_loss = count as f64 / 1_000_000.0;
@@ -313,10 +323,7 @@ pub fn apply_brain_drain(region: &mut EarthRegion, count: usize) {
 /// Prepare a colonist selection from a specific region.
 ///
 /// Returns None if the region cannot supply colonists (too small, no access).
-pub fn prepare_selection(
-    region: &EarthRegion,
-    count: usize,
-) -> Option<ColonistSelection> {
+pub fn prepare_selection(region: &EarthRegion, count: usize) -> Option<ColonistSelection> {
     // Minimum population to avoid depopulation: 1M
     if region.population < 1.0 {
         return None;
@@ -403,20 +410,17 @@ mod tests {
     fn test_instantiate_colonists_correct_phi_distribution() {
         let mut regions = build_earth_regions();
         let mut rng = StochasticEngine::new(42);
-        let na = regions.iter().position(|r| r.name == "North America").unwrap();
+        let na = regions
+            .iter()
+            .position(|r| r.name == "North America")
+            .unwrap();
 
         let selection = prepare_selection(&regions[na], 50).unwrap();
         assert_eq!(selection.count, 50);
 
         let mut next_id = 0u64;
-        let agents = instantiate_colonists(
-            &selection,
-            &mut regions[na],
-            1,
-            0,
-            &mut next_id,
-            &mut rng,
-        );
+        let agents =
+            instantiate_colonists(&selection, &mut regions[na], 1, 0, &mut next_id, &mut rng);
 
         assert_eq!(agents.len(), 50);
         // Mean Phi of colonists should be above the region mean (self-selected).
@@ -432,7 +436,10 @@ mod tests {
     #[test]
     fn test_brain_drain_reduces_source_phi() {
         let mut regions = build_earth_regions();
-        let na = regions.iter().position(|r| r.name == "North America").unwrap();
+        let na = regions
+            .iter()
+            .position(|r| r.name == "North America")
+            .unwrap();
         let initial_phi = regions[na].phi_distribution_mean;
 
         apply_brain_drain(&mut regions[na], 10_000);

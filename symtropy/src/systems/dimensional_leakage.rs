@@ -53,17 +53,22 @@ pub fn spawn_leakage_points(
         commands.entity(entity).despawn();
     }
 
-    let walkable: Vec<Vec2> = tiles.iter()
+    let walkable: Vec<Vec2> = tiles
+        .iter()
         .filter(|(_, t)| t.walkable)
         .map(|(tf, _)| tf.translation.truncate())
         .collect();
 
-    if walkable.len() < 10 { return; }
+    if walkable.len() < 10 {
+        return;
+    }
 
     // Place 2 sink/source pairs (wormholes), seeded from dungeon
     let mut rng_seed = seed.0.wrapping_mul(7919);
     let nr = |s: &mut u64| -> f64 {
-        *s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        *s = s
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         (*s >> 11) as f64 / (1u64 << 53) as f64
     };
 
@@ -90,7 +95,10 @@ pub fn spawn_leakage_points(
                 w_depth,
                 total_transferred: 0.0,
             },
-            crate::systems::four_d_rendering::FourDBody::new(w_depth as f64, Color::srgba(0.4, 0.1, 0.8, 0.3)),
+            crate::systems::four_d_rendering::FourDBody::new(
+                w_depth as f64,
+                Color::srgba(0.4, 0.1, 0.8, 0.3),
+            ),
             crate::systems::four_d_rendering::FourDOnly,
         ));
 
@@ -108,12 +116,19 @@ pub fn spawn_leakage_points(
                 w_depth,
                 total_transferred: 0.0,
             },
-            crate::systems::four_d_rendering::FourDBody::new(w_depth as f64, Color::srgba(0.1, 0.8, 0.4, 0.3)),
+            crate::systems::four_d_rendering::FourDBody::new(
+                w_depth as f64,
+                Color::srgba(0.1, 0.8, 0.4, 0.3),
+            ),
             crate::systems::four_d_rendering::FourDOnly,
         ));
     }
 
-    info!("Spawned {} dimensional wormholes ({} leakage points)", num_pairs, num_pairs * 2);
+    info!(
+        "Spawned {} dimensional wormholes ({} leakage points)",
+        num_pairs,
+        num_pairs * 2
+    );
 }
 
 /// Apply dimensional leakage effects to nearby agents.
@@ -122,14 +137,22 @@ pub fn spawn_leakage_points(
 /// Agents near leakage points accumulate prediction errors — their 3D world model
 /// cannot explain the energy flow.
 pub fn dimensional_leakage_system(
-    mut leakage_points: Query<(&Transform, &mut LeakageMarker), (Without<Player>, Without<CrewNpc>)>,
-    agents: Query<(&Transform, &PhysicsBody), (Or<(With<Player>, With<CrewNpc>)>, Without<LeakageMarker>)>,
+    mut leakage_points: Query<
+        (&Transform, &mut LeakageMarker),
+        (Without<Player>, Without<CrewNpc>),
+    >,
+    agents: Query<
+        (&Transform, &PhysicsBody),
+        (Or<(With<Player>, With<CrewNpc>)>, Without<LeakageMarker>),
+    >,
     mut physics: ResMut<PhysicsWorldRes>,
     mut timer: ResMut<LeakageTimer>,
     time: Res<Time>,
 ) {
     timer.0 += time.delta_secs();
-    if timer.0 < 0.5 { return; } // every 0.5 seconds
+    if timer.0 < 0.5 {
+        return;
+    } // every 0.5 seconds
     timer.0 = 0.0;
 
     for (leak_tf, mut marker) in &mut leakage_points {
@@ -139,7 +162,9 @@ pub fn dimensional_leakage_system(
             let agent_pos = agent_tf.translation.truncate();
             let dist = leak_pos.distance(agent_pos);
 
-            if dist >= marker.radius { continue; }
+            if dist >= marker.radius {
+                continue;
+            }
 
             // 1/r² falloff, clamped at r=8 to avoid singularity
             let r = dist.max(8.0);
@@ -164,7 +189,10 @@ pub fn dimensional_leakage_system(
 
 /// Visual shimmer for active leakage points — pulses proportional to flow.
 pub fn leakage_visual_system(
-    mut leakage_points: Query<(&mut Sprite, &LeakageMarker), Without<crate::systems::consciousness_aura::AuraSprite>>,
+    mut leakage_points: Query<
+        (&mut Sprite, &LeakageMarker),
+        Without<crate::systems::consciousness_aura::AuraSprite>,
+    >,
     time: Res<Time>,
     player_c: Res<crate::systems::consciousness::PlayerConsciousness>,
 ) {

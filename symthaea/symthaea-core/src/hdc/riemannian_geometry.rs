@@ -10,8 +10,6 @@
 //! An Einstein manifold minimizes the traceless Ricci norm ‖Ric - (R/n)g‖².
 //! On S⁴, finding a NON-ROUND Einstein metric is an open problem in mathematics.
 
-use std::f64::consts::PI;
-
 // ─── Core types ──────────────────────────────────────────────────────────────
 
 /// A symmetric positive-definite metric tensor g_{ij} on an n-dimensional manifold,

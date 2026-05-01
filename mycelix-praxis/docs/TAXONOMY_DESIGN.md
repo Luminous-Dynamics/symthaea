@@ -270,7 +270,7 @@ A credential can require any combination of:
   10.3 Culinary Arts
 
 11 Meta-Learning (Luminous Dynamics)
-  11.1 Consciousness Computing (Symthaea)
+  11.1 Cognitive Computing (Symthaea)
   11.2 Decentralized Civic Infrastructure (Mycelix)
   11.3 Holographic Computing (HDC)
   11.4 Ethical AI & Value Alignment
@@ -310,7 +310,7 @@ Self-referential curriculum about the system itself:
 
 | Course | Level | Prerequisites | Nodes |
 |--------|-------|--------------|-------|
-| Consciousness Computing 101 | Undergraduate | None | ~20 |
+| Cognitive Computing 101 | Undergraduate | None | ~20 |
 | HDC Fundamentals | Undergraduate | Linear Algebra | ~15 |
 | IIT/Phi Theory | Graduate | Information Theory | ~12 |
 | Liquid Neural Networks | Graduate | Differential Equations | ~12 |
@@ -319,7 +319,7 @@ Self-referential curriculum about the system itself:
 | Symthaea Architecture | Graduate | All above | ~20 |
 | Holochain Fundamentals | Undergraduate | Distributed Systems | ~15 |
 | Mycelix Governance | Undergraduate | Political Science | ~12 |
-| Consciousness Gating | Graduate | IIT/Phi, Governance | ~10 |
+| Epistemic Gating | Graduate | IIT/Phi, Governance | ~10 |
 | Decentralized Education | Graduate | Holochain, Pedagogy | ~12 |
 
 ## Implementation Notes

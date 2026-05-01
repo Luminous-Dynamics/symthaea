@@ -103,8 +103,7 @@ impl DkgCost {
         let latency_ticks = cfg.rtt_ticks.saturating_mul(2);
         let message_count = 2 * n * n.saturating_sub(1);
         let per_survive = (1.0 - cfg.dropout_rate).powi(2);
-        let success_prob =
-            binomial_tail_ge(cfg.committee_size, cfg.threshold, per_survive);
+        let success_prob = binomial_tail_ge(cfg.committee_size, cfg.threshold, per_survive);
         Self {
             latency_ticks,
             message_count,

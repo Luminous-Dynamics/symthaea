@@ -9,11 +9,11 @@
 //! At what fraction does functional consciousness degrade?
 //! Is there hysteresis (different threshold up vs down)?
 
+use nalgebra::SVector;
+use symthaea_consciousness_equation::ConsciousnessInputs;
 use symtropy_consciousness_physics::{ConsciousnessField, ThermodynamicConstants};
 use symtropy_math::Point;
 use symtropy_physics::PhysicsWorld;
-use symthaea_consciousness_equation::ConsciousnessInputs;
-use nalgebra::SVector;
 
 const SEEDS: usize = 30;
 
@@ -31,7 +31,11 @@ fn measure_phi_at_energy_fraction(frac: f64, seed: u64) -> f64 {
 
     // Run for 100 ticks to let consciousness stabilize
     for _ in 0..100 {
-        let ef = consciousness.entities.get(&h).map(|e| e.energy.fraction_remaining()).unwrap_or(0.0);
+        let ef = consciousness
+            .entities
+            .get(&h)
+            .map(|e| e.energy.fraction_remaining())
+            .unwrap_or(0.0);
         let inputs = ConsciousnessInputs {
             phi: ef * 0.8 + 0.1, // Phi scales with energy availability
             broadcast: (0.3 + ef * 0.5).min(1.0),
@@ -46,7 +50,8 @@ fn measure_phi_at_energy_fraction(frac: f64, seed: u64) -> f64 {
 
         // Drain a tiny amount per tick (maintenance)
         if let Some(e) = consciousness.entities.get_mut(&h) {
-            e.energy.consume(consciousness.constants.consciousness_maintenance_per_tick * 0.5);
+            e.energy
+                .consume(consciousness.constants.consciousness_maintenance_per_tick * 0.5);
         }
     }
 
@@ -73,7 +78,8 @@ fn main() {
             phis.push(measure_phi_at_energy_fraction(frac, 42 + s as u64 * 997));
         }
         let mean = phis.iter().sum::<f64>() / SEEDS as f64;
-        let std = (phis.iter().map(|p| (p - mean).powi(2)).sum::<f64>() / (SEEDS as f64 - 1.0)).sqrt();
+        let std =
+            (phis.iter().map(|p| (p - mean).powi(2)).sum::<f64>() / (SEEDS as f64 - 1.0)).sqrt();
         println!("DOWN,{:.2},{:.6},{:.6}", frac, mean, std);
 
         // Detect functional threshold (Phi drops below 0.05 = ~Red tier equivalent)
@@ -94,7 +100,8 @@ fn main() {
             phis.push(measure_phi_at_energy_fraction(frac, 42 + s as u64 * 997));
         }
         let mean = phis.iter().sum::<f64>() / SEEDS as f64;
-        let std = (phis.iter().map(|p| (p - mean).powi(2)).sum::<f64>() / (SEEDS as f64 - 1.0)).sqrt();
+        let std =
+            (phis.iter().map(|p| (p - mean).powi(2)).sum::<f64>() / (SEEDS as f64 - 1.0)).sqrt();
         println!("UP,{:.2},{:.6},{:.6}", frac, mean, std);
 
         if !found_up && mean > 0.05 {
@@ -104,9 +111,18 @@ fn main() {
     }
 
     eprintln!("\n═══════════════════════════════════════════════════");
-    eprintln!("THRESHOLD (ramp down): {:.0}% of max energy", threshold_down * 100.0);
-    eprintln!("THRESHOLD (ramp up):   {:.0}% of max energy", threshold_up * 100.0);
-    eprintln!("HYSTERESIS:            {:.0}%", (threshold_down - threshold_up).abs() * 100.0);
+    eprintln!(
+        "THRESHOLD (ramp down): {:.0}% of max energy",
+        threshold_down * 100.0
+    );
+    eprintln!(
+        "THRESHOLD (ramp up):   {:.0}% of max energy",
+        threshold_up * 100.0
+    );
+    eprintln!(
+        "HYSTERESIS:            {:.0}%",
+        (threshold_down - threshold_up).abs() * 100.0
+    );
     eprintln!("BIOLOGY:               42% (Stender et al. 2015)");
     if (threshold_down * 100.0 - 42.0).abs() < 15.0 {
         eprintln!("  ✓ Within range of biological threshold");

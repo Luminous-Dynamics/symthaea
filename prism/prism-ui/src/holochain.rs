@@ -13,8 +13,8 @@
 //! 4. If disconnected → claims saved locally, queued for later sync
 
 use leptos::prelude::*;
+use mycelix_claim_types::{EmpiricalLevel, MaterialityLevel, NormativeLevel};
 use serde::{Deserialize, Serialize};
-use mycelix_claim_types::{EmpiricalLevel, NormativeLevel, MaterialityLevel};
 
 const CONDUCTOR_URL: &str = "ws://localhost:8888";
 const APP_ID: &str = "mycelix-knowledge";
@@ -71,7 +71,10 @@ pub async fn check_conductor() -> ConductorStatus {
         .await
     {
         Ok(resp) => {
-            log::info!("Holochain conductor detected on :8888 (status {})", resp.status());
+            log::info!(
+                "Holochain conductor detected on :8888 (status {})",
+                resp.status()
+            );
             ConductorStatus::Connected
         }
         Err(e) => {
@@ -83,7 +86,10 @@ pub async fn check_conductor() -> ConductorStatus {
 
 /// Publish a verified claim to the Knowledge DHT via WebSocket zome call.
 pub async fn publish_claim(claim: &DhtClaim) -> Result<String, String> {
-    log::info!("Publishing claim to DHT: {}", &claim.content[..claim.content.len().min(60)]);
+    log::info!(
+        "Publishing claim to DHT: {}",
+        &claim.content[..claim.content.len().min(60)]
+    );
 
     let status = check_conductor().await;
     if !status.is_connected() {
@@ -132,9 +138,10 @@ pub async fn publish_claim(claim: &DhtClaim) -> Result<String, String> {
 
     match client.connect(CONDUCTOR_URL, None).await {
         Ok(()) => {
-            match client.call_zome::<SubmitClaimInput, serde_json::Value>(
-                "claims", "submit_claim", &input,
-            ).await {
+            match client
+                .call_zome::<SubmitClaimInput, serde_json::Value>("claims", "submit_claim", &input)
+                .await
+            {
                 Ok(response) => {
                     log::info!("Claim published to DHT successfully");
                     Ok(format!("Published: {:?}", response))
@@ -157,10 +164,14 @@ pub async fn publish_claim(claim: &DhtClaim) -> Result<String, String> {
 /// Sync all locally queued claims to the DHT.
 pub async fn sync_pending_claims() -> usize {
     let claims = load_local_queue();
-    if claims.is_empty() { return 0; }
+    if claims.is_empty() {
+        return 0;
+    }
 
     let status = check_conductor().await;
-    if !status.is_connected() { return 0; }
+    if !status.is_connected() {
+        return 0;
+    }
 
     let mut synced = 0;
     for claim in &claims {
@@ -181,7 +192,9 @@ pub async fn sync_pending_claims() -> usize {
 fn save_claim_locally(claim: &DhtClaim) {
     let mut queue = load_local_queue();
     queue.push(claim.clone());
-    if queue.len() > 100 { queue = queue.split_off(queue.len() - 100); }
+    if queue.len() > 100 {
+        queue = queue.split_off(queue.len() - 100);
+    }
     save_queue(&queue);
     log::info!("Claim queued locally ({} pending)", queue.len());
 }

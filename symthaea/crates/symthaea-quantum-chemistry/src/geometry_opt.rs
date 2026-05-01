@@ -12,8 +12,8 @@
 
 use crate::basis::sto3g::Sto3g;
 use crate::basis::BasisSetProvider;
-use crate::molecule::{Atom, Molecule};
-use crate::scf::rhf::{restricted_hartree_fock, RhfConfig, RhfResult};
+use crate::molecule::Molecule;
+use crate::scf::rhf::{restricted_hartree_fock, RhfConfig};
 
 /// Configuration for geometry optimization.
 #[derive(Debug, Clone)]

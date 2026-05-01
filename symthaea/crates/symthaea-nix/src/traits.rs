@@ -20,7 +20,7 @@ use tree_sitter::Tree;
 pub trait CodeParser: Send + Sync {
     fn language_name(&self) -> &str;
     fn parse(&mut self, source: &str) -> Result<ParsedCode, CodeDiagnostic>;
-    fn extract_entities(&self, parsed: &ParsedCode) -> Vec<CodeEntity>;
+    fn extract_entities(&self, parsed: &ParsedCode) -> Vec<Entity>;
     fn detect_diagnostics(&self, parsed: &ParsedCode) -> Vec<CodeDiagnostic>;
     fn file_extensions(&self) -> &[&str];
 }
@@ -30,7 +30,7 @@ pub trait CodeParser: Send + Sync {
 pub struct ParsedCode {
     pub source: String,
     pub language: String,
-    pub entities: Vec<CodeEntity>,
+    pub entities: Vec<Entity>,
     pub diagnostics: Vec<CodeDiagnostic>,
     #[cfg(feature = "native")]
     tree: Option<Tree>,
@@ -54,7 +54,7 @@ impl ParsedCode {
         self
     }
 
-    pub fn entities_of_kind(&self, kind: EntityKind) -> Vec<&CodeEntity> {
+    pub fn entities_of_kind(&self, kind: EntityKind) -> Vec<&Entity> {
         self.entities.iter().filter(|e| e.kind == kind).collect()
     }
 }
@@ -65,16 +65,16 @@ impl ParsedCode {
 
 /// A structural entity extracted from parsed code.
 #[derive(Debug, Clone)]
-pub struct CodeEntity {
+pub struct Entity {
     pub kind: EntityKind,
     pub name: String,
     pub span: Span,
     pub source_text: Option<String>,
-    pub children: Vec<CodeEntity>,
+    pub children: Vec<Entity>,
     pub annotations: HashMap<String, String>,
 }
 
-impl CodeEntity {
+impl Entity {
     pub fn new(kind: EntityKind, name: &str, span: Span) -> Self {
         Self {
             kind,
@@ -152,7 +152,7 @@ pub enum DiagnosticSeverity {
 /// intent prototypes, prompts, and diagnostic capabilities.
 pub trait DomainPlugin: Send + Sync {
     fn domain_name(&self) -> &str;
-    fn extract_entities(&self, text: &str) -> Vec<Entity>;
+    fn extract_entities(&self, text: &str) -> Vec<DomainEntity>;
     fn intent_prototypes(&self) -> IntentPrototypes {
         IntentPrototypes::default()
     }
@@ -181,7 +181,7 @@ pub trait DomainPlugin: Send + Sync {
 
 /// A domain-level entity extracted from text.
 #[derive(Debug, Clone)]
-pub struct Entity {
+pub struct DomainEntity {
     pub entity_type: String,
     pub value: String,
     pub start: usize,
@@ -190,7 +190,7 @@ pub struct Entity {
     pub metadata: HashMap<String, String>,
 }
 
-impl Entity {
+impl DomainEntity {
     pub fn new(entity_type: &str, value: &str, start: usize, end: usize) -> Self {
         Self {
             entity_type: entity_type.to_string(),
@@ -444,20 +444,17 @@ impl CausalDiscoveryEngine {
 mod tests {
     use super::*;
 
-    // ── ParsedCode & CodeEntity ──
+    // ── ParsedCode & Entity ──
 
     #[test]
     fn test_parsed_code_entities_of_kind() {
         let mut code = ParsedCode::new("let x = 1;", "nix");
         code.entities
-            .push(CodeEntity::new(EntityKind::Variable, "x", Span::default()));
-        code.entities.push(CodeEntity::new(
-            EntityKind::Function,
-            "foo",
-            Span::default(),
-        ));
+            .push(Entity::new(EntityKind::Variable, "x", Span::default()));
         code.entities
-            .push(CodeEntity::new(EntityKind::Variable, "y", Span::default()));
+            .push(Entity::new(EntityKind::Function, "foo", Span::default()));
+        code.entities
+            .push(Entity::new(EntityKind::Variable, "y", Span::default()));
         let vars = code.entities_of_kind(EntityKind::Variable);
         assert_eq!(vars.len(), 2);
         assert_eq!(vars[0].name, "x");
@@ -466,7 +463,7 @@ mod tests {
 
     #[test]
     fn test_code_entity_builders() {
-        let entity = CodeEntity::new(EntityKind::Function, "main", Span::default())
+        let entity = Entity::new(EntityKind::Function, "main", Span::default())
             .with_source("fn main() {}".to_string())
             .with_annotation("visibility", "pub");
         assert_eq!(entity.source_text, Some("fn main() {}".to_string()));
@@ -477,7 +474,7 @@ mod tests {
 
     #[test]
     fn test_entity_builder() {
-        let entity = Entity::new("service", "nginx", 0, 5)
+        let entity = DomainEntity::new("service", "nginx", 0, 5)
             .with_confidence(0.9)
             .with_metadata("type", "web");
         assert_eq!(entity.entity_type, "service");

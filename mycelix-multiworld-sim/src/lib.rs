@@ -26,77 +26,77 @@
 //! 10. Epoch evaluation (milestone checks)
 
 pub mod agent;
-pub mod civic_dimensions;
-pub mod sovereign_profile;
-pub mod sub_passport;
-pub mod dkg;
-pub mod metabolism;
-pub mod wound_healing;
-pub mod currency;
-pub mod governance_hardening;
-pub mod sanctions;
-pub mod peer_recognition;
-pub mod proposals;
-pub mod scoring_bridge;
 pub mod biosphere;
 pub mod cascade;
+pub mod civic_dimensions;
+pub mod cliodynamics;
+pub mod cohort;
 pub mod config;
+pub mod config_loader;
 pub mod consciousness;
-pub mod counterfactual;
 pub mod consciousness_epidemiology;
+pub mod constants;
+pub mod counterfactual;
+pub mod csv_output;
+pub mod currency;
 pub mod disaster_cascade;
 pub mod disasters;
+pub mod dkg;
+pub mod earth_population;
 pub mod earth_regions;
-pub mod interplanetary_consciousness;
 pub mod economy;
 pub mod education;
-pub mod governance_models;
 pub mod empirical;
+pub mod engine_v2;
+pub mod epistemic_decay;
 pub mod epoch;
 pub mod events;
 pub mod factions;
+pub mod fusion_bridge;
+pub mod generation_ship;
 pub mod governance;
+pub mod governance_hardening;
+pub mod governance_models;
+pub mod habitat;
 pub mod harmony;
+pub mod interplanetary_consciousness;
 pub mod interworld;
+pub mod io;
 pub mod knowledge;
+pub mod live_metrics;
+pub mod maglev_network;
+pub mod metabolism;
+pub mod module_registry;
 pub mod mycelix_bridge;
 pub mod narrative;
 pub mod needs;
 pub mod observables;
+pub mod peer_recognition;
 pub mod population;
-pub mod cohort;
-pub mod constants;
-pub mod engine_v2;
-pub mod habitat;
-pub mod io;
+pub mod primitives;
 pub mod projects;
-pub mod robotics;
-pub mod supply_chain;
-pub mod symtropy_bridge;
+pub mod proposals;
+pub mod red_team;
+pub mod relativistic_dht;
 pub mod report;
 pub mod resontia;
+pub mod robotics;
+pub mod sanctions;
+pub mod scoring_bridge;
+pub mod skill_integrity;
+pub mod sovereign_profile;
 pub mod spaceport;
-pub mod module_registry;
-pub mod primitives;
-pub mod red_team;
+pub mod statistics;
 pub mod stochastic;
+pub mod stoichiometry;
+pub mod sub_passport;
+pub mod supply_chain;
+pub mod symtropy_bridge;
 pub mod unified_config_bridge;
 pub mod validation;
 pub mod viability;
-pub mod earth_population;
 pub mod world;
-pub mod maglev_network;
-pub mod generation_ship;
-pub mod fusion_bridge;
-pub mod cliodynamics;
-pub mod live_metrics;
-pub mod config_loader;
-pub mod stoichiometry;
-pub mod relativistic_dht;
-pub mod epistemic_decay;
-pub mod skill_integrity;
-pub mod statistics;
-pub mod csv_output;
+pub mod wound_healing;
 
 use config::{EpochId, SimulationConfig};
 use epoch::{EpochManager, EpochSnapshot};
@@ -276,9 +276,9 @@ impl MultiWorldSimulator {
             generation_ship_launch_tick: 0,
             generation_ship_launched: false,
             secular_cycles: std::collections::HashMap::new(),
-            disaster_config: config_loader::load_disaster_config(
-                std::path::Path::new("config/disasters.toml"),
-            ),
+            disaster_config: config_loader::load_disaster_config(std::path::Path::new(
+                "config/disasters.toml",
+            )),
             jsonl_output_path: None,
             csv_recorder: None,
             founding_ethics: std::collections::HashMap::new(),
@@ -324,9 +324,9 @@ impl MultiWorldSimulator {
     pub fn enable_hybrid_earth(&mut self) {
         self.earth_regions = earth_regions::build_earth_regions();
         // Phase 2: Initialize multi-resolution cohort model from aggregate regions
-        self.earth_pop_model = Some(
-            earth_population::EarthPopulationModel::from_regions(&self.earth_regions)
-        );
+        self.earth_pop_model = Some(earth_population::EarthPopulationModel::from_regions(
+            &self.earth_regions,
+        ));
         // Initialize six civilizational primitives for Earth.
         // Ecosystem health is derived from 3.8 Ga of biosphere evolution (B(t))
         // via the HANPP thermodynamic bridge, rather than hardcoded 1970 values.
@@ -340,7 +340,9 @@ impl MultiWorldSimulator {
             ocean_health: bt_health.ocean_health,
             freshwater: bt_health.freshwater,
         };
-        self.earth_primitives = Some(primitives::CivilizationalPrimitives::earth_from_biosphere(bt_ecosystem));
+        self.earth_primitives = Some(primitives::CivilizationalPrimitives::earth_from_biosphere(
+            bt_ecosystem,
+        ));
         self.spaceport = Some(spaceport::Spaceport::new_equatorial(0));
     }
 
@@ -353,11 +355,21 @@ impl MultiWorldSimulator {
     /// Inject adversarial agents into all worlds for red team testing.
     /// Call after `initialize()` and before `run()`.
     /// Marks `n` agents per world with the given strategy.
-    pub fn inject_adversaries(&mut self, strategy: red_team::AdversarialStrategy, n_per_world: usize) {
+    pub fn inject_adversaries(
+        &mut self,
+        strategy: red_team::AdversarialStrategy,
+        n_per_world: usize,
+    ) {
         for world in &mut self.worlds {
             let mut count = 0;
-            for agent in world.agents.iter_mut().filter(|a| a.is_alive() && a.adversarial.is_none()) {
-                if count >= n_per_world { break; }
+            for agent in world
+                .agents
+                .iter_mut()
+                .filter(|a| a.is_alive() && a.adversarial.is_none())
+            {
+                if count >= n_per_world {
+                    break;
+                }
                 agent.adversarial = Some(strategy);
                 count += 1;
             }
@@ -367,7 +379,9 @@ impl MultiWorldSimulator {
     /// Initialize worlds that should exist at tick 0.
     /// Public for experiment binaries that need to modify agents before run().
     pub fn run_initialization(&mut self) {
-        if !self.worlds.is_empty() { return; }
+        if !self.worlds.is_empty() {
+            return;
+        }
         self.initialize_worlds();
     }
 
@@ -419,7 +433,11 @@ impl MultiWorldSimulator {
             let skip_agents = self.config.policy.hybrid_earth && seed.location == "Earth";
 
             // Spawn initial population as adults (age 25-45)
-            let spawn_count = if skip_agents { 0 } else { seed.initial_population };
+            let spawn_count = if skip_agents {
+                0
+            } else {
+                seed.initial_population
+            };
             for _ in 0..spawn_count {
                 let sex = if self.rng.bernoulli(0.5) {
                     BiologicalSex::Male
@@ -443,7 +461,8 @@ impl MultiWorldSimulator {
                         s.learn(primary, self.rng.next_f64() * 0.5);
                         s
                     },
-                    education_level: (self.rng.next_f64() * 0.5) + self.config.policy.education_boost,
+                    education_level: (self.rng.next_f64() * 0.5)
+                        + self.config.policy.education_boost,
                     consciousness: {
                         let mut c = ConsciousnessState::nascent();
                         let boost = self.config.policy.consciousness_boost;
@@ -453,7 +472,8 @@ impl MultiWorldSimulator {
                             c.coherence = (c.coherence + boost * 0.6).min(1.0);
                             c.care_activation = (c.care_activation + boost * 0.5).min(1.0);
                             c.harmonic_alignment = (c.harmonic_alignment + boost * 0.4).min(1.0);
-                            c.epistemic_confidence = (c.epistemic_confidence + boost * 0.3).min(1.0);
+                            c.epistemic_confidence =
+                                (c.epistemic_confidence + boost * 0.3).min(1.0);
                         }
                         c
                     },
@@ -466,12 +486,24 @@ impl MultiWorldSimulator {
                     faction_id: None,
                     generation: 0,
                     trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0, adversarial: None,
-                    coordination_understanding: self.config.policy.coordination_understanding_initial, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
-                    ethics: agent::EthicalOrientation::from_culture(culture_individualism, &mut self.rng),
+                    cumulative_dose_sv: 0.0,
+                    adversarial: None,
+                    coordination_understanding: self
+                        .config
+                        .policy
+                        .coordination_understanding_initial,
+                    mycel_score: 0.1,
+                    sap_balance: 100.0,
+                    is_biological: true,
+                    wounds: Vec::new(),
+                    ethics: agent::EthicalOrientation::from_culture(
+                        culture_individualism,
+                        &mut self.rng,
+                    ),
                     // 8D sovereign profile: founder sample from cultural individualism.
                     sovereign_profile: crate::sovereign_profile::SovereignProfile::sample(
-                        culture_individualism, &mut self.rng,
+                        culture_individualism,
+                        &mut self.rng,
                     ),
                     justice: crate::sub_passport::RestorativeJustice::new(),
                 };
@@ -483,7 +515,10 @@ impl MultiWorldSimulator {
                 0,
                 Some(world.id),
                 CivEventType::WorldFounded,
-                format!("{} founded with {} colonists", world.name, seed.initial_population),
+                format!(
+                    "{} founded with {} colonists",
+                    world.name, seed.initial_population
+                ),
             ));
 
             self.worlds.push(world);
@@ -511,13 +546,7 @@ impl MultiWorldSimulator {
     }
 
     /// Found a new colony world, spawning settlers.
-    fn found_colony(
-        &mut self,
-        name: &str,
-        location: &str,
-        population: usize,
-        _resource_mult: f64,
-    ) {
+    fn found_colony(&mut self, name: &str, location: &str, population: usize, _resource_mult: f64) {
         let world_id = self.worlds.len() as u32;
         let resources = match location {
             "Mars" => {
@@ -579,11 +608,20 @@ impl MultiWorldSimulator {
                 faction_id: None,
                 generation: 0,
                 trauma_level: 0.0,
-                cumulative_dose_sv: 0.0, adversarial: None,
-                coordination_understanding: self.config.policy.coordination_understanding_initial, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
-                ethics: agent::EthicalOrientation::from_culture(world.culture.individualism, &mut self.rng),
+                cumulative_dose_sv: 0.0,
+                adversarial: None,
+                coordination_understanding: self.config.policy.coordination_understanding_initial,
+                mycel_score: 0.1,
+                sap_balance: 100.0,
+                is_biological: true,
+                wounds: Vec::new(),
+                ethics: agent::EthicalOrientation::from_culture(
+                    world.culture.individualism,
+                    &mut self.rng,
+                ),
                 sovereign_profile: crate::sovereign_profile::SovereignProfile::sample(
-                    world.culture.individualism, &mut self.rng,
+                    world.culture.individualism,
+                    &mut self.rng,
                 ),
                 justice: crate::sub_passport::RestorativeJustice::new(),
             };
@@ -595,7 +633,10 @@ impl MultiWorldSimulator {
             self.current_tick,
             Some(world_id),
             CivEventType::WorldFounded,
-            format!("{} founded at tick {} with {} settlers", name, self.current_tick, population),
+            format!(
+                "{} founded at tick {} with {} settlers",
+                name, self.current_tick, population
+            ),
         ));
 
         self.worlds.push(world);
@@ -612,14 +653,11 @@ impl MultiWorldSimulator {
         }
 
         // Check if any non-Earth world qualifies
-        let qualifies = self
-            .worlds
-            .iter()
-            .any(|w| {
-                w.location != "Earth"
-                    && w.population() >= MARS_FISSION_MIN_POP
-                    && w.resources.self_sufficiency() >= MARS_FISSION_MIN_SS
-            });
+        let qualifies = self.worlds.iter().any(|w| {
+            w.location != "Earth"
+                && w.population() >= MARS_FISSION_MIN_POP
+                && w.resources.self_sufficiency() >= MARS_FISSION_MIN_SS
+        });
 
         // Also check total off-Earth population
         let total_off_earth: usize = self
@@ -653,9 +691,16 @@ impl MultiWorldSimulator {
                 500,
             );
             self.events.push(CivEvent::new(
-                self.current_tick, None, CivEventType::EmergencyDeclared,
-                format!("GENERATION SHIP LAUNCHED → {} ({:.2} ly at {:.1}%c, {} passengers)",
-                    ship.destination.name(), ship.distance_ly, ship.cruise_velocity_c * 100.0, 500),
+                self.current_tick,
+                None,
+                CivEventType::EmergencyDeclared,
+                format!(
+                    "GENERATION SHIP LAUNCHED → {} ({:.2} ly at {:.1}%c, {} passengers)",
+                    ship.destination.name(),
+                    ship.distance_ly,
+                    ship.cruise_velocity_c * 100.0,
+                    500
+                ),
             ));
             self.generation_ship = Some(ship);
             self.generation_ship_launched = true;
@@ -664,26 +709,51 @@ impl MultiWorldSimulator {
             let disasters = ship.tick(&mut self.rng);
             for d in &disasters {
                 let desc = match d {
-                    generation_ship::InterstellarDisaster::CosmicRayBurst { severity } =>
-                        format!("Cosmic ray burst (severity {:.2}) on generation ship", severity),
-                    generation_ship::InterstellarDisaster::MicrometeoiteImpact { hull_damage } =>
-                        format!("Micrometeorite impact (hull damage {:.3}) on generation ship", hull_damage),
-                    generation_ship::InterstellarDisaster::NavigationDrift { correction_fuel_fraction } =>
-                        format!("Navigation drift (fuel cost {:.3}) on generation ship", correction_fuel_fraction),
-                    generation_ship::InterstellarDisaster::KnowledgeAttrition { skill_loss_fraction } =>
-                        format!("Knowledge attrition ({:.1}% skill loss) on generation ship", skill_loss_fraction * 100.0),
-                    generation_ship::InterstellarDisaster::SocialFracture { cohesion_loss } =>
-                        format!("Social fracture ({:.1}% cohesion loss) on generation ship", cohesion_loss * 100.0),
+                    generation_ship::InterstellarDisaster::CosmicRayBurst { severity } => format!(
+                        "Cosmic ray burst (severity {:.2}) on generation ship",
+                        severity
+                    ),
+                    generation_ship::InterstellarDisaster::MicrometeoiteImpact { hull_damage } => {
+                        format!(
+                            "Micrometeorite impact (hull damage {:.3}) on generation ship",
+                            hull_damage
+                        )
+                    }
+                    generation_ship::InterstellarDisaster::NavigationDrift {
+                        correction_fuel_fraction,
+                    } => format!(
+                        "Navigation drift (fuel cost {:.3}) on generation ship",
+                        correction_fuel_fraction
+                    ),
+                    generation_ship::InterstellarDisaster::KnowledgeAttrition {
+                        skill_loss_fraction,
+                    } => format!(
+                        "Knowledge attrition ({:.1}% skill loss) on generation ship",
+                        skill_loss_fraction * 100.0
+                    ),
+                    generation_ship::InterstellarDisaster::SocialFracture { cohesion_loss } => {
+                        format!(
+                            "Social fracture ({:.1}% cohesion loss) on generation ship",
+                            cohesion_loss * 100.0
+                        )
+                    }
                 };
                 self.events.push(CivEvent::new(
-                    self.current_tick, None, CivEventType::EmergencyDeclared, desc,
+                    self.current_tick,
+                    None,
+                    CivEventType::EmergencyDeclared,
+                    desc,
                 ));
             }
             if ship.phase == generation_ship::ShipPhase::Arrived {
                 self.events.push(CivEvent::new(
-                    self.current_tick, None, CivEventType::TradeEstablished,
-                    format!("GENERATION SHIP ARRIVED at {} — new human culture founded",
-                        ship.destination.name()),
+                    self.current_tick,
+                    None,
+                    CivEventType::TradeEstablished,
+                    format!(
+                        "GENERATION SHIP ARRIVED at {} — new human culture founded",
+                        ship.destination.name()
+                    ),
                 ));
             }
         }
@@ -696,20 +766,37 @@ impl MultiWorldSimulator {
             return;
         }
         if let Some(ref mut pop_model) = self.earth_pop_model {
-            let scaling: Vec<_> = self.earth_regions.iter()
+            let scaling: Vec<_> = self
+                .earth_regions
+                .iter()
                 .map(|r| viability::ScalingFactors::compute(r.population * 1_000_000.0))
                 .collect();
-            pop_model.tick(&self.earth_regions, &scaling, self.current_tick, &mut self.rng);
+            pop_model.tick(
+                &self.earth_regions,
+                &scaling,
+                self.current_tick,
+                &mut self.rng,
+            );
             pop_model.sync_to_regions(&mut self.earth_regions);
 
             if let Some(ref mut prims) = self.earth_primitives {
                 let total_pop: f64 = self.earth_regions.iter().map(|r| r.population).sum();
-                let mean_urban: f64 = self.earth_regions.iter()
-                    .map(|r| r.urbanization * r.population).sum::<f64>() / total_pop.max(1.0);
-                let mean_gdp: f64 = self.earth_regions.iter()
-                    .map(|r| r.gdp_per_capita * r.population).sum::<f64>() / total_pop.max(1.0);
+                let mean_urban: f64 = self
+                    .earth_regions
+                    .iter()
+                    .map(|r| r.urbanization * r.population)
+                    .sum::<f64>()
+                    / total_pop.max(1.0);
+                let mean_gdp: f64 = self
+                    .earth_regions
+                    .iter()
+                    .map(|r| r.gdp_per_capita * r.population)
+                    .sum::<f64>()
+                    / total_pop.max(1.0);
                 prims.tick(
-                    total_pop, mean_urban, mean_gdp,
+                    total_pop,
+                    mean_urban,
+                    mean_gdp,
                     EARTH_RD_WORKFORCE_FRACTION,
                     EARTH_ENVIRO_POLICY_BASELINE,
                     EARTH_INSTITUTIONAL_INVEST_FRACTION,
@@ -735,14 +822,16 @@ impl MultiWorldSimulator {
                 // 3. Knowledge network → innovation rate
                 let knowledge_mult = prims.knowledge.growth_rate().min(3.0);
                 for region in &mut self.earth_regions {
-                    region.education_index = (region.education_index
-                        + 0.00005 * knowledge_mult).min(0.98);
+                    region.education_index =
+                        (region.education_index + 0.00005 * knowledge_mult).min(0.98);
                 }
                 // 5. Ecosystem tipping points → disaster events
                 let tips = prims.ecosystem.tipping_points();
                 for tip in &tips {
                     self.events.push(CivEvent::new(
-                        self.current_tick, None, CivEventType::EmergencyDeclared,
+                        self.current_tick,
+                        None,
+                        CivEventType::EmergencyDeclared,
                         format!("ECOSYSTEM TIPPING POINT: {}", tip),
                     ));
                 }
@@ -759,7 +848,9 @@ impl MultiWorldSimulator {
                 let duration = spaceport::kessler_duration(&mut self.rng);
                 sp.activate_kessler(duration);
                 self.events.push(CivEvent::new(
-                    self.current_tick, None, CivEventType::EmergencyDeclared,
+                    self.current_tick,
+                    None,
+                    CivEventType::EmergencyDeclared,
                     "Kessler syndrome blocks spaceport — colonist launches suspended".to_string(),
                 ));
             }
@@ -775,14 +866,12 @@ impl MultiWorldSimulator {
             .worlds
             .iter()
             .filter(|w| {
-                w.location != "Earth"
-                    && w.population() > 0
-                    && w.resources.self_sufficiency() > 0.3
+                w.location != "Earth" && w.population() > 0 && w.resources.self_sufficiency() > 0.3
             })
             .collect();
-        let has_established_colony = viable_worlds.iter().any(|w| {
-            self.current_tick.saturating_sub(w.founded_tick) >= 12
-        });
+        let has_established_colony = viable_worlds
+            .iter()
+            .any(|w| self.current_tick.saturating_sub(w.founded_tick) >= 12);
         if viable_worlds.len() >= 2
             || (viable_worlds.len() >= 1 && has_established_colony && self.worlds.len() >= 3)
         {
@@ -833,18 +922,19 @@ impl MultiWorldSimulator {
             // Low collective consent erodes governance; high consent strengthens it.
             let mean_consent = {
                 let living: Vec<_> = world.agents.iter().filter(|a| a.is_alive()).collect();
-                if living.is_empty() { 0.5 } else {
-                    living.iter().map(|a| a.needs.affect.consent).sum::<f64>()
-                        / living.len() as f64
+                if living.is_empty() {
+                    0.5
+                } else {
+                    living.iter().map(|a| a.needs.affect.consent).sum::<f64>() / living.len() as f64
                 }
             };
             // Realism F: Communication latency degrades governance coherence.
             // Distant colonies can't participate in real-time deliberation.
             let latency_penalty = match world.location.as_str() {
-                "Earth" | "Moon" => 0.0,    // Real-time
-                "Mars" => 0.15,             // 4-22 min delay
-                "Europa" => 0.35,           // 33-54 min delay
-                "Titan" => 0.50,            // 67-90 min delay
+                "Earth" | "Moon" => 0.0, // Real-time
+                "Mars" => 0.15,          // 4-22 min delay
+                "Europa" => 0.35,        // 33-54 min delay
+                "Titan" => 0.50,         // 67-90 min delay
                 _ => 0.0,
             };
             let governance_stability = ((world.infrastructure_level * 0.4
@@ -891,8 +981,7 @@ impl MultiWorldSimulator {
                 );
                 // Affect momentum: blend new state with previous (α=0.3).
                 // Emotions persist — grief doesn't vanish, joy lingers.
-                agent.needs.affect = new_affect.blend_with_previous(
-                    &agent.needs.affect, 0.3);
+                agent.needs.affect = new_affect.blend_with_previous(&agent.needs.affect, 0.3);
             }
 
             self.needs_summaries.push(summary);
@@ -906,7 +995,9 @@ impl MultiWorldSimulator {
             return; // A/B comparison: skip education tick entirely
         }
         let events = education::tick_education_all_worlds(
-            &mut self.worlds, self.current_tick, &mut self.rng,
+            &mut self.worlds,
+            self.current_tick,
+            &mut self.rng,
         );
         self.events.extend(events);
     }
@@ -926,7 +1017,10 @@ impl MultiWorldSimulator {
             // Energy production is gated on fission/fusion tech milestones.
             // Without nuclear power, these colonies consume from reserves until death.
             let is_outer_system = world.location == "Europa" || world.location == "Titan";
-            let has_nuclear = self.disaster_engine.tech_tree.is_achieved("Fission Surface Power")
+            let has_nuclear = self
+                .disaster_engine
+                .tech_tree
+                .is_achieved("Fission Surface Power")
                 || self.disaster_engine.tech_tree.is_achieved("Fusion Demo");
 
             // Spaceport supply line cut: if Kessler active and hybrid model,
@@ -957,13 +1051,19 @@ impl MultiWorldSimulator {
 
                     let mut consumption = stock.consumption_rate * (pop / 100.0).max(0.1);
                     // Closed-Loop ECLSS: 40% reduction in water/oxygen/food consumption
-                    if self.disaster_engine.tech_tree.is_achieved("Closed-Loop ECLSS")
+                    if self
+                        .disaster_engine
+                        .tech_tree
+                        .is_achieved("Closed-Loop ECLSS")
                         && (*name == "water" || *name == "oxygen" || *name == "food")
                     {
                         consumption *= 0.6;
                     }
                     // Bioregenerative Agriculture: 50% more food production
-                    if self.disaster_engine.tech_tree.is_achieved("Bioregenerative Agriculture")
+                    if self
+                        .disaster_engine
+                        .tech_tree
+                        .is_achieved("Bioregenerative Agriculture")
                         && *name == "food"
                     {
                         production *= 1.5;
@@ -1013,8 +1113,7 @@ impl MultiWorldSimulator {
             for i in 0..8 {
                 world.economy.technology_multiplier[i] = tech;
             }
-            world.economy.infrastructure_capital =
-                (world.infrastructure_level * 50.0).max(1.0); // map 0-1 to 0-50
+            world.economy.infrastructure_capital = (world.infrastructure_level * 50.0).max(1.0); // map 0-1 to 0-50
 
             // Phase 1b: resource_priority biases sector productivity
             match world.policy_state.resource_priority {
@@ -1036,7 +1135,9 @@ impl MultiWorldSimulator {
             // Extended production: apply West-Bettencourt scaling + energy constraint
             let scaling = self.viability_engine.scaling.get(&world.id);
             let energy_avail = world.resources.stock_level("energy");
-            world.economy.tick_production_extended(scaling, energy_avail);
+            world
+                .economy
+                .tick_production_extended(scaling, energy_avail);
 
             // Ethics-modulated resource efficiency
             let mean_ethics = agent::EthicalOrientation::mean_of(&world.agents);
@@ -1049,7 +1150,8 @@ impl MultiWorldSimulator {
             let net_energy = world.resources.stock_level("energy").unwrap_or(0.0);
             if net_energy <= 0.0 {
                 for sector in 0..economy::NUM_SECTORS {
-                    if sector != 1 && sector != 2 { // agriculture=1, medicine=2
+                    if sector != 1 && sector != 2 {
+                        // agriculture=1, medicine=2
                         world.economy.sector_output[sector] *= 0.1;
                     }
                 }
@@ -1113,9 +1215,10 @@ impl MultiWorldSimulator {
                         }
                     }
                 }
-                world.economy.skill_gap_sectors.retain(|&s| {
-                    world.economy.skill_gap_recovery_ticks[s] > 0
-                });
+                world
+                    .economy
+                    .skill_gap_sectors
+                    .retain(|&s| world.economy.skill_gap_recovery_ticks[s] > 0);
             }
 
             // Mechanism 7 — Infrastructure Aging: natural entropy-driven degradation.
@@ -1123,7 +1226,8 @@ impl MultiWorldSimulator {
             // PLUS: Materials aging (cold welding, polymer embrittlement, whisker growth).
             // Older habitats degrade faster: rate increases with colony age.
             // Garner & Hamilton (2005): steel half-life ~150yr in radiation; polymers 30-300yr.
-            let colony_age_years = self.current_tick.saturating_sub(world.founded_tick) as f64 / 12.0;
+            let colony_age_years =
+                self.current_tick.saturating_sub(world.founded_tick) as f64 / 12.0;
             let materials_aging = if colony_age_years > 50.0 {
                 // Accelerating degradation after 50 years (polymer embrittlement onset)
                 0.0001 * (colony_age_years / 50.0).ln().max(0.0)
@@ -1131,7 +1235,8 @@ impl MultiWorldSimulator {
                 0.0
             };
             world.infrastructure_level =
-                (world.infrastructure_level - INFRASTRUCTURE_DEGRADATION_RATE - materials_aging).max(0.0);
+                (world.infrastructure_level - INFRASTRUCTURE_DEGRADATION_RATE - materials_aging)
+                    .max(0.0);
 
             // Mechanism 7 continued: if infrastructure drops below 0.3, ECLSS failure
             // rates double. This is handled by the disaster engine's mtbf_factor which
@@ -1175,10 +1280,16 @@ impl MultiWorldSimulator {
         // Fusion grid-scale achievement removes window constraints.
         // Fusion Drive eliminates transfer windows; Fusion Grid Scale relaxes them
         let has_fusion_drive = self.disaster_engine.tech_tree.is_achieved("Fusion Drive")
-            || self.disaster_engine.tech_tree.is_achieved("Fusion Grid Scale");
+            || self
+                .disaster_engine
+                .tech_tree
+                .is_achieved("Fusion Grid Scale");
         let leo_access = self.disaster_engine.orbital_debris.leo_access_multiplier;
         // Closed-Loop ECLSS halves resource consumption rates
-        let _has_closed_eclss = self.disaster_engine.tech_tree.is_achieved("Closed-Loop ECLSS");
+        let _has_closed_eclss = self
+            .disaster_engine
+            .tech_tree
+            .is_achieved("Closed-Loop ECLSS");
 
         if self.current_tick % 12 == 0 && self.worlds.len() >= 2 {
             // Calculate average self-sufficiency
@@ -1199,10 +1310,11 @@ impl MultiWorldSimulator {
                             let ss_j = self.worlds[j].resources.self_sufficiency();
                             if ss_j < avg_ss - 0.1 {
                                 // Transfer window check
-                                let (synodic, _transfer_time) = interworld::InterWorldEngine::orbital_params(
-                                    &self.worlds[i].location,
-                                    &self.worlds[j].location,
-                                );
+                                let (synodic, _transfer_time) =
+                                    interworld::InterWorldEngine::orbital_params(
+                                        &self.worlds[i].location,
+                                        &self.worlds[j].location,
+                                    );
                                 // Realism C: Transfer window cost curve (not binary).
                                 // At optimal window: 1.0x volume. Off-window: reduced but
                                 // non-zero (emergency transfers at higher delta-v cost).
@@ -1217,7 +1329,9 @@ impl MultiWorldSimulator {
                                 };
 
                                 // Phase 1c: trade_openness scales all trade
-                                let mut amount = (ss_i - ss_j) * 10.0 * window_efficiency
+                                let mut amount = (ss_i - ss_j)
+                                    * 10.0
+                                    * window_efficiency
                                     * self.worlds[i].policy_state.trade_openness;
 
                                 // Kessler degradation: reduce trade volume for Earth routes
@@ -1230,11 +1344,7 @@ impl MultiWorldSimulator {
                                 }
 
                                 if amount > 0.1 {
-                                    transfers.push((
-                                        self.worlds[i].id,
-                                        self.worlds[j].id,
-                                        amount,
-                                    ));
+                                    transfers.push((self.worlds[i].id, self.worlds[j].id, amount));
                                 }
                             }
                         }
@@ -1253,7 +1363,8 @@ impl MultiWorldSimulator {
                 if let (Some(fi), Some(ti)) = (from_idx, to_idx) {
                     for res_name in &trade_resources {
                         let (surplus, deficit) = {
-                            let from_frac = self.worlds[fi].resources.fraction_of_capacity(res_name);
+                            let from_frac =
+                                self.worlds[fi].resources.fraction_of_capacity(res_name);
                             let to_frac = self.worlds[ti].resources.fraction_of_capacity(res_name);
                             let surplus = (from_frac - 0.5).max(0.0);
                             let deficit = (0.5 - to_frac).max(0.0);
@@ -1272,8 +1383,12 @@ impl MultiWorldSimulator {
                     }
                     // Titan hydrocarbons: export to any world that needs materials
                     if self.worlds[fi].location == "Titan" {
-                        let hc_surplus = self.worlds[fi].resources.fraction_of_capacity("hydrocarbons");
-                        let mat_deficit = (0.5 - self.worlds[ti].resources.fraction_of_capacity("materials")).max(0.0);
+                        let hc_surplus = self.worlds[fi]
+                            .resources
+                            .fraction_of_capacity("hydrocarbons");
+                        let mat_deficit = (0.5
+                            - self.worlds[ti].resources.fraction_of_capacity("materials"))
+                        .max(0.0);
                         if hc_surplus > 0.3 && mat_deficit > 0.1 {
                             let hc_transfer = (mat_deficit * base_amount * 3.0).min(100.0);
                             if let Some(hc) = self.worlds[fi].resources.get_mut("hydrocarbons") {
@@ -1316,12 +1431,15 @@ impl MultiWorldSimulator {
                     .map(|(i, w)| (i, w.id, w.name.clone()))
                     .collect();
 
-                let monthly_cap = self.spaceport.as_ref().map_or(0, |sp| sp.monthly_capacity());
+                let monthly_cap = self
+                    .spaceport
+                    .as_ref()
+                    .map_or(0, |sp| sp.monthly_capacity());
 
                 for (dest_idx, dest_id, dest_name) in destinations {
                     let max_mig = self.config.policy.migration_max_per_cycle.max(1) as usize;
-                    let n_migrants = ((self.rng.next_u64() % max_mig as u64 + 1) as usize)
-                        .min(monthly_cap);
+                    let n_migrants =
+                        ((self.rng.next_u64() % max_mig as u64 + 1) as usize).min(monthly_cap);
                     if n_migrants == 0 {
                         continue;
                     }
@@ -1340,7 +1458,8 @@ impl MultiWorldSimulator {
                         .map(|(i, _)| i);
 
                     if let Some(ri) = best_region_idx {
-                        let selection = spaceport::prepare_selection(&self.earth_regions[ri], n_migrants);
+                        let selection =
+                            spaceport::prepare_selection(&self.earth_regions[ri], n_migrants);
                         if let Some(sel) = selection {
                             let mut next_id = self.worlds[dest_idx].next_agent_id as u64;
                             let new_agents = spaceport::instantiate_colonists(
@@ -1401,7 +1520,8 @@ impl MultiWorldSimulator {
                                 .iter()
                                 .filter(|a| {
                                     a.is_alive()
-                                        && a.life_stage(self.current_tick) == agent::LifeStage::Adult
+                                        && a.life_stage(self.current_tick)
+                                            == agent::LifeStage::Adult
                                 })
                                 .take(n_migrants)
                                 .map(|a| a.id)
@@ -1414,8 +1534,12 @@ impl MultiWorldSimulator {
 
                         for (migrant_ids, dest_idx, dest_id, dest_name) in migration_plans {
                             // O(1) lookup for migration
-                            let mig_map: std::collections::HashMap<u64, usize> = self.worlds[ei].agents.iter()
-                                .enumerate().map(|(i, a)| (a.id, i)).collect();
+                            let mig_map: std::collections::HashMap<u64, usize> = self.worlds[ei]
+                                .agents
+                                .iter()
+                                .enumerate()
+                                .map(|(i, a)| (a.id, i))
+                                .collect();
                             let mut migrants: Vec<CivAgent> = Vec::new();
                             for mid in &migrant_ids {
                                 if let Some(&idx) = mig_map.get(mid) {
@@ -1459,27 +1583,44 @@ impl MultiWorldSimulator {
             && self.worlds.len() >= 3
         {
             // Compute per-world mean conatus
-            let world_conatus: Vec<f64> = self.worlds.iter().map(|w| {
-                let living: Vec<_> = w.agents.iter().filter(|a| a.is_alive()).collect();
-                if living.is_empty() { return 0.0; }
-                living.iter().map(|a| a.needs.affect.net_conatus()).sum::<f64>()
-                    / living.len() as f64
-            }).collect();
+            let world_conatus: Vec<f64> = self
+                .worlds
+                .iter()
+                .map(|w| {
+                    let living: Vec<_> = w.agents.iter().filter(|a| a.is_alive()).collect();
+                    if living.is_empty() {
+                        return 0.0;
+                    }
+                    living
+                        .iter()
+                        .map(|a| a.needs.affect.net_conatus())
+                        .sum::<f64>()
+                        / living.len() as f64
+                })
+                .collect();
 
             // Find suffering worlds (conatus < -0.1) and refuge worlds (conatus > 0.1)
             let mut refugee_moves: Vec<(usize, usize, usize)> = Vec::new(); // (from, to, count)
             for (fi, &fc) in world_conatus.iter().enumerate() {
                 if fc < -0.1 && self.worlds[fi].population() > 20 {
                     // Find best refuge
-                    if let Some((ti, _)) = world_conatus.iter().enumerate()
-                        .filter(|&(i, &c)| i != fi && c > 0.1
-                            && self.worlds[i].population() < self.worlds[i].max_population)
+                    if let Some((ti, _)) = world_conatus
+                        .iter()
+                        .enumerate()
+                        .filter(|&(i, &c)| {
+                            i != fi
+                                && c > 0.1
+                                && self.worlds[i].population() < self.worlds[i].max_population
+                        })
                         .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
                     {
                         // Transfer window check
                         let (synodic, _) = interworld::InterWorldEngine::orbital_params(
-                            &self.worlds[fi].location, &self.worlds[ti].location);
-                        let window = has_fusion_drive || synodic == 0
+                            &self.worlds[fi].location,
+                            &self.worlds[ti].location,
+                        );
+                        let window = has_fusion_drive
+                            || synodic == 0
                             || self.current_tick % synodic as u32 == 0;
                         if window {
                             let n = (self.worlds[fi].population() as f64 * 0.02).ceil() as usize;
@@ -1497,21 +1638,28 @@ impl MultiWorldSimulator {
                 // Ethics-modulated refugee selection (Phase 2d):
                 // Consequentialist agents flee more readily (outcome-seeking).
                 // Relational agents resist leaving (community bonds hold them).
-                let ids: Vec<u64> = self.worlds[fi].agents.iter()
+                let ids: Vec<u64> = self.worlds[fi]
+                    .agents
+                    .iter()
                     .filter(|a| {
-                        if !a.is_alive() { return false; }
+                        if !a.is_alive() {
+                            return false;
+                        }
                         let conatus = a.needs.affect.net_conatus();
-                        let flee_threshold = -0.05
-                            + a.ethics.relational * 0.08
-                            - a.ethics.consequentialist * 0.05;
+                        let flee_threshold =
+                            -0.05 + a.ethics.relational * 0.08 - a.ethics.consequentialist * 0.05;
                         conatus < flee_threshold
                     })
                     .take(count)
                     .map(|a| a.id)
                     .collect();
                 // O(1) refugee lookup
-                let ref_map: std::collections::HashMap<u64, usize> = self.worlds[fi].agents.iter()
-                    .enumerate().map(|(i, a)| (a.id, i)).collect();
+                let ref_map: std::collections::HashMap<u64, usize> = self.worlds[fi]
+                    .agents
+                    .iter()
+                    .enumerate()
+                    .map(|(i, a)| (a.id, i))
+                    .collect();
                 for id in ids {
                     if let Some(&idx) = ref_map.get(&id) {
                         let mut refugee = self.worlds[fi].agents[idx].clone();
@@ -1525,8 +1673,13 @@ impl MultiWorldSimulator {
                 }
                 if moved > 0 {
                     self.events.push(CivEvent::new(
-                        self.current_tick, Some(dest_id), CivEventType::Migration,
-                        format!("{} refugees fled {} → {} (conatus crisis)", moved, from_name, dest_name),
+                        self.current_tick,
+                        Some(dest_id),
+                        CivEventType::Migration,
+                        format!(
+                            "{} refugees fled {} → {} (conatus crisis)",
+                            moved, from_name, dest_name
+                        ),
                     ));
                 }
             }
@@ -1547,63 +1700,92 @@ impl MultiWorldSimulator {
         if !self.config.policy.migration_enabled || self.current_tick % 12 != 0 {
             return;
         }
-        if self.worlds.len() < 2 { return; }
+        if self.worlds.len() < 2 {
+            return;
+        }
 
         let has_fusion_drive = self.disaster_engine.tech_tree.is_achieved("Fusion Drive")
-            || self.disaster_engine.tech_tree.is_achieved("Fusion Grid Scale");
+            || self
+                .disaster_engine
+                .tech_tree
+                .is_achieved("Fusion Grid Scale");
 
         // Identify colonies needing genetic rescue
-        let needs_rescue: Vec<(usize, f64)> = self.worlds.iter().enumerate()
+        let needs_rescue: Vec<(usize, f64)> = self
+            .worlds
+            .iter()
+            .enumerate()
             .filter(|(_, w)| w.location != "Earth" && w.population() > 0)
             .map(|(i, w)| (i, PopulationEngine::genetic_viability(w, self.current_tick)))
             .filter(|(_, v)| *v < 0.5)
             .collect();
 
         // Identify donor worlds (population > 1000, can spare settlers)
-        let donors: Vec<usize> = self.worlds.iter().enumerate()
+        let donors: Vec<usize> = self
+            .worlds
+            .iter()
+            .enumerate()
             .filter(|(_, w)| w.population() > 1000)
             .map(|(i, _)| i)
             .collect();
 
-        if donors.is_empty() || needs_rescue.is_empty() { return; }
+        if donors.is_empty() || needs_rescue.is_empty() {
+            return;
+        }
 
         for (recipient_idx, viability) in needs_rescue {
             // Find best donor with open transfer window
             for &donor_idx in &donors {
-                if donor_idx == recipient_idx { continue; }
+                if donor_idx == recipient_idx {
+                    continue;
+                }
 
                 let (synodic, _) = interworld::InterWorldEngine::orbital_params(
                     &self.worlds[donor_idx].location,
                     &self.worlds[recipient_idx].location,
                 );
-                let window_open = has_fusion_drive || synodic == 0
+                let window_open = has_fusion_drive
+                    || synodic == 0
                     || self.current_tick % synodic.max(1) as u32 == 0;
 
-                if !window_open { continue; }
+                if !window_open {
+                    continue;
+                }
 
                 // Send settlers: more when viability is lower
                 let n_settlers = if viability < 0.2 { 10 } else { 5 };
                 let n_settlers = n_settlers.min(self.worlds[donor_idx].population() / 50);
-                if n_settlers == 0 { continue; }
+                if n_settlers == 0 {
+                    continue;
+                }
 
                 // Select healthy young adults from donor
                 let dest_id = self.worlds[recipient_idx].id;
                 let dest_name = self.worlds[recipient_idx].name.clone();
                 let donor_name = self.worlds[donor_idx].name.clone();
 
-                let settler_ids: Vec<u64> = self.worlds[donor_idx].agents.iter()
-                    .filter(|a| a.is_alive() && a.health > 0.7
-                        && a.age_years(self.current_tick) > 20.0
-                        && a.age_years(self.current_tick) < 40.0
-                        && !a.is_immigrant)
+                let settler_ids: Vec<u64> = self.worlds[donor_idx]
+                    .agents
+                    .iter()
+                    .filter(|a| {
+                        a.is_alive()
+                            && a.health > 0.7
+                            && a.age_years(self.current_tick) > 20.0
+                            && a.age_years(self.current_tick) < 40.0
+                            && !a.is_immigrant
+                    })
                     .take(n_settlers)
                     .map(|a| a.id)
                     .collect();
 
                 // Collect settlers first, then modify both worlds to avoid double borrow.
                 // O(1) lookup for immigration pipeline
-                let settler_map: std::collections::HashMap<u64, usize> = self.worlds[donor_idx].agents.iter()
-                    .enumerate().map(|(i, a)| (a.id, i)).collect();
+                let settler_map: std::collections::HashMap<u64, usize> = self.worlds[donor_idx]
+                    .agents
+                    .iter()
+                    .enumerate()
+                    .map(|(i, a)| (a.id, i))
+                    .collect();
                 let mut settlers_to_move: Vec<agent::CivAgent> = Vec::new();
                 for id in &settler_ids {
                     if let Some(&idx) = settler_map.get(id) {
@@ -1625,9 +1807,16 @@ impl MultiWorldSimulator {
                 self.worlds[recipient_idx].agents.extend(settlers_to_move);
                 if moved > 0 {
                     self.events.push(CivEvent::new(
-                        self.current_tick, Some(dest_id), CivEventType::Migration,
-                        format!("GENETIC RESCUE: {} settlers from {} → {} (viability {:.0}%)",
-                            moved, donor_name, dest_name, viability * 100.0),
+                        self.current_tick,
+                        Some(dest_id),
+                        CivEventType::Migration,
+                        format!(
+                            "GENETIC RESCUE: {} settlers from {} → {} (viability {:.0}%)",
+                            moved,
+                            donor_name,
+                            dest_name,
+                            viability * 100.0
+                        ),
                     ));
                     break; // One donor per recipient per year
                 }
@@ -1639,40 +1828,51 @@ impl MultiWorldSimulator {
     /// pathogen pressure, trust dynamics, narrative identity, Earth funding.
     fn tick_structural_realism(&mut self) {
         let tick = self.current_tick;
-        let earth_id_cached = self.worlds.iter()
-            .find(|w| w.location == "Earth").map(|w| w.id);
+        let earth_id_cached = self
+            .worlds
+            .iter()
+            .find(|w| w.location == "Earth")
+            .map(|w| w.id);
 
         for world in &mut self.worlds {
             let pop = world.population().max(1) as f64;
-            let living_workers = world.agents.iter()
+            let living_workers = world
+                .agents
+                .iter()
                 .filter(|a| a.is_alive() && a.life_stage(tick).can_work())
                 .count() as f64;
 
             // === #1: POWER FLOW BUDGET (watts) ===
             // Each subsystem draws continuous power.
-            let eclss_kw = pop * 2.0;           // 2 kW/person for life support
+            let eclss_kw = pop * 2.0; // 2 kW/person for life support
             let heating_kw = match world.location.as_str() {
-                "Titan" => pop * 1.5,           // 199K ΔT relentless
-                "Europa" => pop * 0.5,          // Cold but not Titan-level
-                "Moon" => pop * 0.3,            // Lunar night heating
+                "Titan" => pop * 1.5,  // 199K ΔT relentless
+                "Europa" => pop * 0.5, // Cold but not Titan-level
+                "Moon" => pop * 0.3,   // Lunar night heating
                 _ => 0.0,
             };
-            let food_lighting_kw = pop * 0.5;   // Conservative estimate (research says 50-100 kW)
+            let food_lighting_kw = pop * 0.5; // Conservative estimate (research says 50-100 kW)
             let fabrication_kw = world.infrastructure_level * 20.0;
             let comms_kw = 5.0; // Baseline
 
-            world.power_demand_kw = eclss_kw + heating_kw + food_lighting_kw
-                + fabrication_kw + comms_kw;
+            world.power_demand_kw =
+                eclss_kw + heating_kw + food_lighting_kw + fabrication_kw + comms_kw;
 
             // Power generation based on location + tech
-            let has_fission = self.disaster_engine.tech_tree.is_achieved("Fission Surface Power");
-            let has_fusion = self.disaster_engine.tech_tree.is_achieved("Fusion Grid Scale");
+            let has_fission = self
+                .disaster_engine
+                .tech_tree
+                .is_achieved("Fission Surface Power");
+            let has_fusion = self
+                .disaster_engine
+                .tech_tree
+                .is_achieved("Fusion Grid Scale");
             // #6: Solar panel dust degradation (Mars: 0.3%/sol, ~9%/month).
             // Ref: Spirit/Opportunity dust accumulation data (NASA MER).
             // Cleaning resets degradation. Assumes monthly cleaning if maintenance available.
             let dust_penalty = match world.location.as_str() {
-                "Mars" => 0.95,   // 5% loss from dust between cleanings
-                "Moon" => 0.98,   // 2% from regolith electrostatic dust
+                "Mars" => 0.95, // 5% loss from dust between cleanings
+                "Moon" => 0.98, // 2% from regolith electrostatic dust
                 _ => 1.0,
             };
             let solar_kw = match world.location.as_str() {
@@ -1704,12 +1904,17 @@ impl MultiWorldSimulator {
             // Brownout events
             if brownouts > 0 {
                 self.events.push(CivEvent::new(
-                    tick, Some(world.id), CivEventType::EmergencyDeclared,
-                    format!("{}: BROWNOUT CASCADE — {} robots entered safe-mode. \
+                    tick,
+                    Some(world.id),
+                    CivEventType::EmergencyDeclared,
+                    format!(
+                        "{}: BROWNOUT CASCADE — {} robots entered safe-mode. \
                         Power deficit forces human labor in hazardous modules. \
                         Fleet operational: {:.0}%",
-                        world.name, brownouts,
-                        world.fleet.operational_fraction() * 100.0),
+                        world.name,
+                        brownouts,
+                        world.fleet.operational_fraction() * 100.0
+                    ),
                 ));
             }
 
@@ -1720,7 +1925,10 @@ impl MultiWorldSimulator {
             // Grows with engineering + manufacturing tech. Reduces labor requirements.
             // At automation 0.8, a colony of 200 can do work of 2000.
             let eng_level = world.knowledge.technology_levels[0];
-            let has_manufacturing = self.disaster_engine.tech_tree.is_achieved("Manufacturing Breakthrough");
+            let has_manufacturing = self
+                .disaster_engine
+                .tech_tree
+                .is_achieved("Manufacturing Breakthrough");
             let auto_target = if has_manufacturing {
                 ((eng_level - 1.0) / 5.0).clamp(0.0, 0.9) // Up to 90% automation
             } else {
@@ -1733,29 +1941,49 @@ impl MultiWorldSimulator {
             // Each robot takes ~6 months to build. Workshop can build 1 at a time.
             // Robot type selected by colony need (agriculture humanoid first,
             // then manipulators, then drones for exploration).
-            let has_fab_workshop = world.project_manager
+            let has_fab_workshop = world
+                .project_manager
                 .has_completed(projects::ProjectBlueprint::FabricationWorkshop);
             if has_fab_workshop && tick % 6 == 0 // Check every 6 months
-                && world.fleet.total_units() < ((pop as usize) / 50 + 1).max(2) // 1 robot per 50 people + 1
+                && world.fleet.total_units() < ((pop as usize) / 50 + 1).max(2)
+            // 1 robot per 50 people + 1
             {
                 // Choose robot type by need
-                let platform = if world.fleet.count_operational(robotics::RobotPlatform::Humanoid) == 0 {
+                let platform = if world
+                    .fleet
+                    .count_operational(robotics::RobotPlatform::Humanoid)
+                    == 0
+                {
                     robotics::RobotPlatform::Humanoid // First: Ag-Bay labor
-                } else if world.fleet.count_operational(robotics::RobotPlatform::Manipulator) < 2 {
+                } else if world
+                    .fleet
+                    .count_operational(robotics::RobotPlatform::Manipulator)
+                    < 2
+                {
                     robotics::RobotPlatform::Manipulator // Then: workshop/maintenance
-                } else if world.fleet.count_operational(robotics::RobotPlatform::Quadrotor) == 0 {
+                } else if world
+                    .fleet
+                    .count_operational(robotics::RobotPlatform::Quadrotor)
+                    == 0
+                {
                     robotics::RobotPlatform::Quadrotor // Then: exploration drone
                 } else {
                     robotics::RobotPlatform::Manipulator // Default: more maintenance capacity
                 };
                 world.fleet.deploy(platform);
                 self.events.push(CivEvent::new(
-                    tick, Some(world.id), CivEventType::EmergencyDeclared,
-                    format!("{}: ROBOT COMMISSIONED — {:?} unit #{} operational. \
+                    tick,
+                    Some(world.id),
+                    CivEventType::EmergencyDeclared,
+                    format!(
+                        "{}: ROBOT COMMISSIONED — {:?} unit #{} operational. \
                         Fleet power demand: {:.0}W, labor offset: {:.0} hr/day",
-                        world.name, platform, world.fleet.total_units(),
+                        world.name,
+                        platform,
+                        world.fleet.total_units(),
                         world.fleet.total_power_draw_w,
-                        world.fleet.total_labor_replaced / 30.0), // per day from monthly
+                        world.fleet.total_labor_replaced / 30.0
+                    ), // per day from monthly
                 ));
             }
 
@@ -1765,8 +1993,10 @@ impl MultiWorldSimulator {
             // Automation reduces human labor needed for maintenance.
             let tech_complexity = world.knowledge.mean_tech_level().max(1.0);
             let automation_reduction = 1.0 - world.automation_level * 0.8; // Up to 80% reduction
-            world.maintenance_hours_required =
-                world.infrastructure_level * tech_complexity * 80.0 * (pop / 100.0).max(1.0)
+            world.maintenance_hours_required = world.infrastructure_level
+                * tech_complexity
+                * 80.0
+                * (pop / 100.0).max(1.0)
                 * automation_reduction;
             // Available: workers × 160 hrs/month × fraction allocated to maintenance
             let maintenance_fraction = 0.3;
@@ -1774,8 +2004,8 @@ impl MultiWorldSimulator {
 
             // Maintenance trap: when demand > supply, infrastructure decays faster
             if world.maintenance_hours_required > world.maintenance_hours_available * 1.2 {
-                let deficit_ratio = world.maintenance_hours_required
-                    / world.maintenance_hours_available.max(1.0);
+                let deficit_ratio =
+                    world.maintenance_hours_required / world.maintenance_hours_available.max(1.0);
                 let extra_decay = 0.001 * (deficit_ratio - 1.2).max(0.0);
                 world.infrastructure_level = (world.infrastructure_level - extra_decay).max(0.0);
             }
@@ -1784,8 +2014,7 @@ impl MultiWorldSimulator {
             // Compute detailed per-system coverage from agent skills.
             // Systems with 0 operators actively fail (5%/tick infrastructure decay).
             // Systems with 1 operator are at critical risk (bus factor = 1).
-            let coverage = knowledge::CriticalSystemCoverage::compute(
-                &world.agents, tick);
+            let coverage = knowledge::CriticalSystemCoverage::compute(&world.agents, tick);
             world.bus_factor_critical = coverage.systems_at_risk;
             world.knowledge.critical_system_coverage = coverage;
 
@@ -1816,7 +2045,7 @@ impl MultiWorldSimulator {
                 // Pressure increases logarithmically (initial rapid adaptation, then slower)
                 world.pathogen_pressure = (sealed_years / 500.0).ln().max(0.0).min(1.0) * 0.5
                     + world.pathogen_pressure * 0.5; // EMA smoothing
-                // Larger populations have better immune diversity
+                                                     // Larger populations have better immune diversity
                 let immune_resistance = (pop / 1000.0).min(1.0);
                 world.pathogen_pressure *= 1.0 - immune_resistance * 0.5;
             }
@@ -1825,17 +2054,21 @@ impl MultiWorldSimulator {
             // Organizational redundancy: how many critical systems have bus_factor >= 3?
             let mut redundant_systems = 0u32;
             for sector in 0..8 {
-                let skilled = world.agents.iter()
+                let skilled = world
+                    .agents
+                    .iter()
                     .filter(|a| a.is_alive() && a.skills.as_slice()[sector] > 0.3)
                     .count();
-                if skilled >= 3 { redundant_systems += 1; }
+                if skilled >= 3 {
+                    redundant_systems += 1;
+                }
             }
             world.civilizational_phi = redundant_systems as f64 / 8.0;
 
             // === #8: TRUST DYNAMICS WITH HYSTERESIS ===
             // Trust builds at 0.002/tick (slow). Lost at 10× rate during crises.
-            let in_crisis = world.governance.stability_score < 0.4
-                || world.governance.constitutional_crisis;
+            let in_crisis =
+                world.governance.stability_score < 0.4 || world.governance.constitutional_crisis;
             if in_crisis {
                 world.trust_level = (world.trust_level - 0.02).max(0.0); // Fast loss
             } else {
@@ -1844,8 +2077,7 @@ impl MultiWorldSimulator {
             // Trust below 0.3 amplifies all negative effects
             if world.trust_level < 0.3 {
                 for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
-                    agent.needs.allostatic_load =
-                        (agent.needs.allostatic_load + 0.001).min(1.0);
+                    agent.needs.allostatic_load = (agent.needs.allostatic_load + 0.001).min(1.0);
                 }
             }
 
@@ -1874,14 +2106,20 @@ impl MultiWorldSimulator {
             // Tech milestones progressively reduce alpha (initial mortality),
             // beta (aging rate), and lambda (background mortality).
             {
-                let med_skill = world.agents.iter()
+                let med_skill = world
+                    .agents
+                    .iter()
                     .filter(|a| a.is_alive())
                     .map(|a| a.skills.as_slice()[2]) // medicine sector
-                    .sum::<f64>() / pop.max(1.0);
-                let sci_skill = world.agents.iter()
+                    .sum::<f64>()
+                    / pop.max(1.0);
+                let sci_skill = world
+                    .agents
+                    .iter()
                     .filter(|a| a.is_alive())
                     .map(|a| a.skills.as_slice()[4]) // science sector
-                    .sum::<f64>() / pop.max(1.0);
+                    .sum::<f64>()
+                    / pop.max(1.0);
 
                 // Era 1 (baseline): alpha=1.0, beta=1.0, lambda=1.0 → lifespan ~80
                 let mut alpha_m = 1.0_f64;
@@ -1898,13 +2136,23 @@ impl MultiWorldSimulator {
                     beta_m *= 0.82; // Mortality doubling time: 8yr → ~10yr
                 }
                 // Era 4 (genetic engineering milestone): further beta reduction
-                if self.disaster_engine.tech_tree.is_achieved("Genetic Engineering") {
+                if self
+                    .disaster_engine
+                    .tech_tree
+                    .is_achieved("Genetic Engineering")
+                {
                     beta_m *= 0.85;
                     alpha_m *= 0.5;
                 }
                 // Era 5 (bioregenerative + closed ECLSS): lambda near zero
-                if self.disaster_engine.tech_tree.is_achieved("Bioregenerative Agriculture")
-                    && self.disaster_engine.tech_tree.is_achieved("Closed-Loop ECLSS")
+                if self
+                    .disaster_engine
+                    .tech_tree
+                    .is_achieved("Bioregenerative Agriculture")
+                    && self
+                        .disaster_engine
+                        .tech_tree
+                        .is_achieved("Closed-Loop ECLSS")
                 {
                     lambda_m *= 0.3;
                 }
@@ -1940,11 +2188,17 @@ impl MultiWorldSimulator {
                 };
                 // Centrifuge habitats (Manufacturing Breakthrough) enable full-g reproduction.
                 // Genetic Engineering enables risky low-g reproduction (higher infant mortality).
-                let has_centrifuge = self.disaster_engine.tech_tree.is_achieved("Manufacturing Breakthrough");
-                let has_gene_therapy = self.disaster_engine.tech_tree.is_achieved("Genetic Engineering");
+                let has_centrifuge = self
+                    .disaster_engine
+                    .tech_tree
+                    .is_achieved("Manufacturing Breakthrough");
+                let has_gene_therapy = self
+                    .disaster_engine
+                    .tech_tree
+                    .is_achieved("Genetic Engineering");
                 // Mars (0.38g) is borderline — use >= 0.37 to avoid float jitter
-                world.reproduction_viable = gravity >= 0.37 || has_centrifuge
-                    || (has_gene_therapy && gravity >= 0.13);
+                world.reproduction_viable =
+                    gravity >= 0.37 || has_centrifuge || (has_gene_therapy && gravity >= 0.13);
                 // Low-gravity fertility penalty (Wakayama 2023, Lyons 2026).
                 // JAXA: mouse embryo survival <30% in microgravity vs >60% at 1g.
                 // No partial-g data exists — this is extrapolated conservatively.
@@ -1962,14 +2216,18 @@ impl MultiWorldSimulator {
             // Without active management, CO2 builds, O2 drops, trace contaminants accumulate.
             // Biosphere 2: lost 7% O2 in 16 months from soil microbe respiration.
             if world.location != "Earth" {
-                let has_eclss = self.disaster_engine.tech_tree.is_achieved("Closed-Loop ECLSS");
+                let has_eclss = self
+                    .disaster_engine
+                    .tech_tree
+                    .is_achieved("Closed-Loop ECLSS");
                 let decay_rate = if has_eclss { 0.00005 } else { 0.0002 }; // ECLSS slows decay 4×
                 world.ecosystem_balance = (world.ecosystem_balance - decay_rate).max(0.3);
                 // Low balance reduces food production and increases health stress
                 if world.ecosystem_balance < 0.7 {
                     let penalty = (0.7 - world.ecosystem_balance) * 0.01;
                     for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
-                        agent.needs.allostatic_load = (agent.needs.allostatic_load + penalty).min(1.0);
+                        agent.needs.allostatic_load =
+                            (agent.needs.allostatic_load + penalty).min(1.0);
                     }
                 }
             }
@@ -1978,9 +2236,11 @@ impl MultiWorldSimulator {
             // When a colony's population > 5000 AND self-sufficiency > 0.8 AND
             // cultural distance from Earth > 0.3, independence pressure rises.
             // Mars surpassing Earth (11,644 vs 10,859 in v8) is THE political event.
-            if world.location != "Earth" && pop > 5000.0
+            if world.location != "Earth"
+                && pop > 5000.0
                 && world.resources.self_sufficiency() > 0.7
-                && tick % 600 == 0 // Check every 50 years (was 10 — too spammy)
+                && tick % 600 == 0
+            // Check every 50 years (was 10 — too spammy)
             {
                 // Cultural distance from Earth (use individualism as proxy)
                 let cultural_dist = (world.culture.individualism - 0.5).abs()
@@ -1995,38 +2255,76 @@ impl MultiWorldSimulator {
                     let world_id = world.id;
 
                     // Escalation: count prior independence events for this world
-                    let prior_count = self.events.iter()
-                        .filter(|e| e.world_id == Some(world_id)
-                            && e.description.contains("INDEPENDENCE"))
+                    let prior_count = self
+                        .events
+                        .iter()
+                        .filter(|e| {
+                            e.world_id == Some(world_id) && e.description.contains("INDEPENDENCE")
+                        })
                         .count();
 
                     // Phase-based escalation
                     let (phase, description, trust_hit, diplo_hit) = match prior_count {
-                        0 => ("PETITION", format!(
-                            "{}: INDEPENDENCE PETITION — pressure {:.0}%. \
+                        0 => (
+                            "PETITION",
+                            format!(
+                                "{}: INDEPENDENCE PETITION — pressure {:.0}%. \
                             \"We respectfully request greater autonomy.\"",
-                            world_name, independence_pressure * 100.0), 0.02, 0.05),
-                        1 => ("MOVEMENT", format!(
-                            "{}: INDEPENDENCE MOVEMENT — organized political action. \
+                                world_name,
+                                independence_pressure * 100.0
+                            ),
+                            0.02,
+                            0.05,
+                        ),
+                        1 => (
+                            "MOVEMENT",
+                            format!(
+                                "{}: INDEPENDENCE MOVEMENT — organized political action. \
                             Pop {}, SS {:.0}%. Assemblies debate sovereignty.",
-                            world_name, pop as usize,
-                            world.resources.self_sufficiency() * 100.0), 0.05, 0.10),
-                        2 => ("DECLARATION", format!(
-                            "{}: INDEPENDENCE DECLARATION — \"We are sovereign.\" \
+                                world_name,
+                                pop as usize,
+                                world.resources.self_sufficiency() * 100.0
+                            ),
+                            0.05,
+                            0.10,
+                        ),
+                        2 => (
+                            "DECLARATION",
+                            format!(
+                                "{}: INDEPENDENCE DECLARATION — \"We are sovereign.\" \
                             Pop {}, fully self-sufficient. The break is formal.",
-                            world_name, pop as usize), 0.10, 0.20),
-                        3 => ("FEDERATION PROPOSAL", format!(
-                            "{}: FEDERATION PROPOSAL — equal partnership offered to Earth. \
+                                world_name, pop as usize
+                            ),
+                            0.10,
+                            0.20,
+                        ),
+                        3 => (
+                            "FEDERATION PROPOSAL",
+                            format!(
+                                "{}: FEDERATION PROPOSAL — equal partnership offered to Earth. \
                             \"Not subjects. Partners.\" Trade and defense alliance terms drafted.",
-                            world_name), 0.0, 0.05), // Federation improves relations
-                        _ => ("POLITICAL EVOLUTION", format!(
-                            "{}: sovereign governance matures. Gen {} leadership \
+                                world_name
+                            ),
+                            0.0,
+                            0.05,
+                        ), // Federation improves relations
+                        _ => (
+                            "POLITICAL EVOLUTION",
+                            format!(
+                                "{}: sovereign governance matures. Gen {} leadership \
                             shapes post-independence institutions.",
-                            world_name, (tick as f64 / 360.0) as u16), 0.0, 0.0),
+                                world_name,
+                                (tick as f64 / 360.0) as u16
+                            ),
+                            0.0,
+                            0.0,
+                        ),
                     };
 
                     self.events.push(CivEvent::new(
-                        tick, Some(world_id), CivEventType::ConstitutionalAmendment,
+                        tick,
+                        Some(world_id),
+                        CivEventType::ConstitutionalAmendment,
                         format!("INDEPENDENCE {}: {}", phase, description),
                     ));
 
@@ -2043,13 +2341,15 @@ impl MultiWorldSimulator {
             // === D: EXPLORATION MISSIONS ===
             // Colonies with sufficient population and tech can launch exploration missions.
             // Each mission costs resources but discovers new deposits + generates knowledge.
-            if pop > 100.0 && world.infrastructure_level > 0.5
-                && tick % 120 == 0 // Check every 10 years
+            if pop > 100.0 && world.infrastructure_level > 0.5 && tick % 120 == 0
+            // Check every 10 years
             {
                 // Base 3% + science bonus. Fires even at starting science level.
                 // Phase 1e: exploration_investment multiplies probability
                 let explore_mult = 1.0 + world.policy_state.exploration_investment * 5.0;
-                let exploration_prob = (0.03 + (world.knowledge.technology_levels[4] - 1.0).max(0.0) * 0.05) * explore_mult;
+                let exploration_prob = (0.03
+                    + (world.knowledge.technology_levels[4] - 1.0).max(0.0) * 0.05)
+                    * explore_mult;
                 if self.rng.bernoulli(exploration_prob.min(0.25)) {
                     world.explorations_completed += 1;
                     // Discovery boosts knowledge and resources
@@ -2067,12 +2367,19 @@ impl MultiWorldSimulator {
                         _ => "new mineral deposits surveyed and mapped",
                     };
                     let explorer = narrative::generate_character_name(
-                        &world.name, "scientist", (tick / 360) as u16);
+                        &world.name,
+                        "scientist",
+                        (tick / 360) as u16,
+                    );
                     self.events.push(CivEvent::new(
-                        tick, Some(world.id), CivEventType::EmergencyDeclared,
-                        format!("{}: EXPLORATION SUCCESS #{} — {}. \
+                        tick,
+                        Some(world.id),
+                        CivEventType::EmergencyDeclared,
+                        format!(
+                            "{}: EXPLORATION SUCCESS #{} — {}. \
                             Lead scientist: {}.",
-                            world.name, world.explorations_completed, discovery, explorer),
+                            world.name, world.explorations_completed, discovery, explorer
+                        ),
                     ));
                 }
             }
@@ -2085,9 +2392,10 @@ impl MultiWorldSimulator {
             // Generation counting
             let mean_generation = {
                 let living: Vec<_> = world.agents.iter().filter(|a| a.is_alive()).collect();
-                if living.is_empty() { 0.0 } else {
-                    living.iter().map(|a| a.generation as f64).sum::<f64>()
-                        / living.len() as f64
+                if living.is_empty() {
+                    0.0
+                } else {
+                    living.iter().map(|a| a.generation as f64).sum::<f64>() / living.len() as f64
                 }
             };
             world.narrative_identity.generations_since_founding = mean_generation as u32;
@@ -2104,10 +2412,14 @@ impl MultiWorldSimulator {
                 && tick % 120 == 0
             {
                 self.events.push(CivEvent::new(
-                    tick, Some(world.id), CivEventType::EmergencyDeclared,
-                    format!("{}: IDENTITY CRISIS — founding narrative rejected by generation {}. \
-                        Colony seeks new purpose.", world.name,
-                        world.narrative_identity.generations_since_founding),
+                    tick,
+                    Some(world.id),
+                    CivEventType::EmergencyDeclared,
+                    format!(
+                        "{}: IDENTITY CRISIS — founding narrative rejected by generation {}. \
+                        Colony seeks new purpose.",
+                        world.name, world.narrative_identity.generations_since_founding
+                    ),
                 ));
                 // Crisis can be productive: boost adaptability
                 world.narrative_identity.adaptability =
@@ -2118,26 +2430,39 @@ impl MultiWorldSimulator {
 
     /// Inter-world diplomatic relations (deferred from structural realism to avoid borrow).
     fn tick_diplomacy(&mut self) {
-        if self.worlds.len() < 2 || self.current_tick % 12 != 0 { return; }
+        if self.worlds.len() < 2 || self.current_tick % 12 != 0 {
+            return;
+        }
         let n = self.worlds.len();
         // Collect culture weights and self-sufficiency for all worlds
-        let world_data: Vec<(u32, [f64; 8], f64)> = self.worlds.iter()
-            .map(|w| (w.id, w.culture.harmony_weights, w.resources.self_sufficiency()))
+        let world_data: Vec<(u32, [f64; 8], f64)> = self
+            .worlds
+            .iter()
+            .map(|w| {
+                (
+                    w.id,
+                    w.culture.harmony_weights,
+                    w.resources.self_sufficiency(),
+                )
+            })
             .collect();
 
         for i in 0..n {
             for j in 0..n {
-                if i == j { continue; }
+                if i == j {
+                    continue;
+                }
                 let (_, cw_i, ss_i) = &world_data[i];
                 let (id_j, cw_j, ss_j) = &world_data[j];
                 // Cultural similarity (cosine-ish)
-                let culture_sim: f64 = cw_i.iter().zip(cw_j.iter())
-                    .map(|(a, b)| a * b).sum();
+                let culture_sim: f64 = cw_i.iter().zip(cw_j.iter()).map(|(a, b)| a * b).sum();
                 // Trade mutual benefit
                 let trade_benefit = (1.0 - ss_i) * (1.0 - ss_j);
                 let target = culture_sim * 0.5 + trade_benefit * 0.5;
-                let relation = self.worlds[i].diplomatic_relations
-                    .entry(*id_j).or_insert(0.5);
+                let relation = self.worlds[i]
+                    .diplomatic_relations
+                    .entry(*id_j)
+                    .or_insert(0.5);
                 *relation = *relation * 0.99 + target * 0.01;
                 *relation = relation.clamp(-1.0, 1.0);
             }
@@ -2170,7 +2495,6 @@ impl MultiWorldSimulator {
                     agent.skills.decay(0.001);
                 }
             }
-
         }
 
         // Run the Romer endogenous growth model for technology advancement.
@@ -2184,9 +2508,10 @@ impl MultiWorldSimulator {
             // Spinoza: desire (cupiditas) is the essence of human striving.
             let mean_desire = {
                 let living: Vec<_> = world.agents.iter().filter(|a| a.is_alive()).collect();
-                if living.is_empty() { 0.0 } else {
-                    living.iter().map(|a| a.needs.affect.desire).sum::<f64>()
-                        / living.len() as f64
+                if living.is_empty() {
+                    0.0
+                } else {
+                    living.iter().map(|a| a.needs.affect.desire).sum::<f64>() / living.len() as f64
                 }
             };
             // Desire > 0.5 gives up to 30% innovation boost (necessity drives invention)
@@ -2202,7 +2527,9 @@ impl MultiWorldSimulator {
             // specialized knowledge in small populations.
             for sector in 0..knowledge::NUM_SECTORS {
                 let sector_name = economy::WorldEconomy::sector_name(sector);
-                let skilled_count = world.agents.iter()
+                let skilled_count = world
+                    .agents
+                    .iter()
                     .filter(|a| {
                         a.is_alive()
                             && a.life_stage(tick).can_work()
@@ -2261,7 +2588,8 @@ impl MultiWorldSimulator {
                 .iter()
                 .any(|w| w.location != "Earth" && w.population() >= 20);
             if has_sizable {
-                self.epoch_manager.record_milestone("constitution", self.current_tick);
+                self.epoch_manager
+                    .record_milestone("constitution", self.current_tick);
                 self.constitution_granted = true;
                 self.events.push(CivEvent::new(
                     self.current_tick,
@@ -2280,15 +2608,23 @@ impl MultiWorldSimulator {
             let mut dunbar_worlds = Vec::new(); // Track which worlds need governance hit
             for world in &self.worlds {
                 let pop = world.population();
-                for (threshold, desc) in [(150, "direct trust to formal roles"), (1500, "community to bureaucracy")] {
+                for (threshold, desc) in [
+                    (150, "direct trust to formal roles"),
+                    (1500, "community to bureaucracy"),
+                ] {
                     let key = format!("dunbar_{}_{}", world.id, threshold);
-                    if pop >= threshold && pop < threshold + 50
+                    if pop >= threshold
+                        && pop < threshold + 50
                         && !self.events.iter().any(|e| e.description.contains(&key))
                     {
                         dunbar_events.push(CivEvent::new(
-                            self.current_tick, Some(world.id), CivEventType::ConstitutionalAmendment,
-                            format!("{}: DUNBAR TRANSITION at pop {} — {} required. [{}]",
-                                world.name, pop, desc, key),
+                            self.current_tick,
+                            Some(world.id),
+                            CivEventType::ConstitutionalAmendment,
+                            format!(
+                                "{}: DUNBAR TRANSITION at pop {} — {} required. [{}]",
+                                world.name, pop, desc, key
+                            ),
                         ));
                         dunbar_worlds.push(world.id);
                     }
@@ -2320,7 +2656,9 @@ impl MultiWorldSimulator {
                 let pop = world.population();
                 let mean_phi = world.mean_phi();
                 let stability = world.governance.stability_score;
-                world.governance.evolve_authority(epoch, pop, mean_phi, stability);
+                world
+                    .governance
+                    .evolve_authority(epoch, pop, mean_phi, stability);
                 // Phase 2a: refresh 8D sovereign profiles from current agent
                 // state before any gating decisions this tick. Skipped in
                 // A2 counterfactual mode so the baseline governance operates
@@ -2329,12 +2667,18 @@ impl MultiWorldSimulator {
                     world.refresh_sovereign_profiles();
                 }
                 let mut gov = std::mem::take(&mut world.governance);
-                let voting_suppression = self.phase_modifiers
+                let voting_suppression = self
+                    .phase_modifiers
                     .get(&world.id)
                     .map(|m| m.voting_suppression)
                     .unwrap_or(0.0);
                 let gov_events = gov.tick_governance_full(
-                    world, tick, rng, amendment_enabled, hostile_guardian, voting_suppression,
+                    world,
+                    tick,
+                    rng,
+                    amendment_enabled,
+                    hostile_guardian,
+                    voting_suppression,
                     self.config.policy.phase2_enabled,
                 );
                 world.governance = gov;
@@ -2365,7 +2709,12 @@ impl MultiWorldSimulator {
     ///    has forged a new shared understanding.
     fn tick_ethical_dynamics(&mut self) {
         let tick = self.current_tick;
-        let dimension_names = ["deontological", "consequentialist", "virtue_care", "relational"];
+        let dimension_names = [
+            "deontological",
+            "consequentialist",
+            "virtue_care",
+            "relational",
+        ];
 
         // ── 1. Moral Dilemma Detection (every 12 ticks = annually) ──────────
         if tick % 12 == 0 {
@@ -2415,12 +2764,15 @@ impl MultiWorldSimulator {
                     ));
 
                     // Queue moral memory for deferred push (can't mutate during & borrow)
-                    moral_memory_queue.push((world.id, crate::world::MoralMemory {
-                        tick,
-                        ethics_at_crisis: mean.as_vec(),
-                        lesson_dimension: idx_a,
-                        description: desc,
-                    }));
+                    moral_memory_queue.push((
+                        world.id,
+                        crate::world::MoralMemory {
+                            tick,
+                            ethics_at_crisis: mean.as_vec(),
+                            lesson_dimension: idx_a,
+                            description: desc,
+                        },
+                    ));
                 }
             }
             // Apply deferred moral memories
@@ -2454,7 +2806,11 @@ impl MultiWorldSimulator {
                 for (dim_idx, dim_name) in dimension_names.iter().enumerate() {
                     let shift = current[dim_idx] - founding[dim_idx];
                     if shift.abs() > 0.15 {
-                        let direction = if shift > 0.0 { "increased" } else { "decreased" };
+                        let direction = if shift > 0.0 {
+                            "increased"
+                        } else {
+                            "decreased"
+                        };
                         let desc = format!(
                             "{}: ETHICS SHIFT — {} moved from {:.2} to {:.2} ({})",
                             world.name, dim_name, founding[dim_idx], current[dim_idx], direction,
@@ -2548,8 +2904,14 @@ impl MultiWorldSimulator {
             const MAX_REVIVAL_BOOST: f64 = 0.08; // maximum virtue/deont boost per revival
 
             let narrator_names = [
-                "Amara Osei", "Yuki Tanaka", "Lena Kovač", "Omar Ndoye",
-                "Priya Rajan", "Seren Williams", "Mateo Cruz", "Freya Lindqvist",
+                "Amara Osei",
+                "Yuki Tanaka",
+                "Lena Kovač",
+                "Omar Ndoye",
+                "Priya Rajan",
+                "Seren Williams",
+                "Mateo Cruz",
+                "Freya Lindqvist",
             ];
 
             let mut revival_queue: Vec<(u32, String, f64, f64)> = Vec::new();
@@ -2571,16 +2933,21 @@ impl MultiWorldSimulator {
 
                 let n = living.len() as f64;
                 let mean_outrage = living.iter().map(|a| a.needs.affect.outrage).sum::<f64>() / n;
-                let mean_guilt   = living.iter().map(|a| a.needs.affect.guilt).sum::<f64>() / n;
+                let mean_guilt = living.iter().map(|a| a.needs.affect.guilt).sum::<f64>() / n;
 
                 if mean_outrage > OUTRAGE_THRESHOLD && mean_guilt > GUILT_THRESHOLD {
                     // Scale revival strength: how far above threshold are we?
                     let outrage_excess = (mean_outrage - OUTRAGE_THRESHOLD).min(0.30);
-                    let guilt_excess   = (mean_guilt   - GUILT_THRESHOLD  ).min(0.20);
-                    let revival_strength = (outrage_excess * 0.6 + guilt_excess * 0.4)
-                        .clamp(0.005, MAX_REVIVAL_BOOST);
+                    let guilt_excess = (mean_guilt - GUILT_THRESHOLD).min(0.20);
+                    let revival_strength =
+                        (outrage_excess * 0.6 + guilt_excess * 0.4).clamp(0.005, MAX_REVIVAL_BOOST);
 
-                    revival_queue.push((world.id, world.name.clone(), revival_strength, mean_outrage));
+                    revival_queue.push((
+                        world.id,
+                        world.name.clone(),
+                        revival_strength,
+                        mean_outrage,
+                    ));
                 }
             }
 
@@ -2594,15 +2961,12 @@ impl MultiWorldSimulator {
 
                     for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
                         // Boost virtue_care and deontological — the two care-oriented dimensions
-                        agent.ethics.virtue_care = (agent.ethics.virtue_care
-                            + revival_strength * 1.0)
-                            .min(0.95);
-                        agent.ethics.deontological = (agent.ethics.deontological
-                            + revival_strength * 0.6)
-                            .min(0.95);
+                        agent.ethics.virtue_care =
+                            (agent.ethics.virtue_care + revival_strength * 1.0).min(0.95);
+                        agent.ethics.deontological =
+                            (agent.ethics.deontological + revival_strength * 0.6).min(0.95);
                         // Drain some outrage (the revival is channeling it into action)
-                        agent.needs.affect.outrage =
-                            (agent.needs.affect.outrage * 0.60).max(0.0);
+                        agent.needs.affect.outrage = (agent.needs.affect.outrage * 0.60).max(0.0);
 
                         // Normalize: keep sum ≤ 2.05
                         let sum = agent.ethics.deontological
@@ -2611,10 +2975,10 @@ impl MultiWorldSimulator {
                             + agent.ethics.relational;
                         if sum > 2.05 {
                             let scale = 2.05 / sum;
-                            agent.ethics.deontological    *= scale;
+                            agent.ethics.deontological *= scale;
                             agent.ethics.consequentialist *= scale;
-                            agent.ethics.virtue_care      *= scale;
-                            agent.ethics.relational       *= scale;
+                            agent.ethics.virtue_care *= scale;
+                            agent.ethics.relational *= scale;
                         }
                     }
 
@@ -2677,9 +3041,12 @@ impl MultiWorldSimulator {
                 },
                 mean_tech_level: ((world.knowledge.mean_tech_level() - 1.0) / 9.0).clamp(0.0, 1.0),
                 innovation_rate: world.knowledge.innovation_rate,
-                art_per_capita: world.economy.sector_output[6]
-                    / world.population().max(1) as f64,
-                trade_connections: if world_count > 1 { (world_count - 1) as u32 } else { 0 },
+                art_per_capita: world.economy.sector_output[6] / world.population().max(1) as f64,
+                trade_connections: if world_count > 1 {
+                    (world_count - 1) as u32
+                } else {
+                    0
+                },
                 gini_coefficient: world.economy.gini_coefficient,
                 self_sufficiency: world.resources.self_sufficiency(),
                 knowledge_growth_rate: world.knowledge.innovation_rate,
@@ -2723,7 +3090,13 @@ impl MultiWorldSimulator {
                     let streak = self.depletion_streaks.entry(key.clone()).or_insert(0);
                     *streak += 1;
 
-                    if *streak >= 12 && !self.depletion_crisis_active.get(&key).copied().unwrap_or(false) {
+                    if *streak >= 12
+                        && !self
+                            .depletion_crisis_active
+                            .get(&key)
+                            .copied()
+                            .unwrap_or(false)
+                    {
                         self.depletion_crisis_active.insert(key.clone(), true);
                         self.events.push(CivEvent::new(
                             self.current_tick,
@@ -2738,7 +3111,12 @@ impl MultiWorldSimulator {
                 } else if fraction > 0.3 {
                     // Recovery
                     self.depletion_streaks.insert(key.clone(), 0);
-                    if self.depletion_crisis_active.get(&key).copied().unwrap_or(false) {
+                    if self
+                        .depletion_crisis_active
+                        .get(&key)
+                        .copied()
+                        .unwrap_or(false)
+                    {
                         self.depletion_crisis_active.insert(key, false);
                     }
                 }
@@ -2755,7 +3133,8 @@ impl MultiWorldSimulator {
         // worlds beyond the Moon.
         for world in &mut self.worlds {
             if world.governance.authority_level == governance::GovernanceAuthority::Federation
-                || world.governance.authority_level == governance::GovernanceAuthority::Confederation
+                || world.governance.authority_level
+                    == governance::GovernanceAuthority::Confederation
             {
                 let delay = match world.location.as_str() {
                     "Earth" | "Moon" => 0,
@@ -2784,10 +3163,14 @@ impl MultiWorldSimulator {
                 continue; // Small colonies don't have enough social mass for contagion
             }
 
-            let high_stress_count = world.agents.iter()
+            let high_stress_count = world
+                .agents
+                .iter()
                 .filter(|a| a.is_alive() && a.needs.allostatic_load > 0.7)
                 .count();
-            let low_stress_count = world.agents.iter()
+            let low_stress_count = world
+                .agents
+                .iter()
                 .filter(|a| a.is_alive() && a.needs.allostatic_load < 0.3)
                 .count();
 
@@ -2849,15 +3232,15 @@ impl MultiWorldSimulator {
 
             // Use the base_max from the original config (stored in carrying_capacity_base).
             // If not set yet, snapshot the current max_population as the base.
-            let base_max = *self.carrying_capacity_base.entry(world.id)
+            let base_max = *self
+                .carrying_capacity_base
+                .entry(world.id)
                 .or_insert(world.max_population);
 
             // Dynamic carrying capacity: base * infrastructure * (1 + tech * 0.5)
             let tech_level = world.knowledge.mean_tech_level();
-            let dynamic_capacity = (base_max as f64
-                * world.infrastructure_level
-                * (1.0 + tech_level * 0.5))
-                .max(10.0);
+            let dynamic_capacity =
+                (base_max as f64 * world.infrastructure_level * (1.0 + tech_level * 0.5)).max(10.0);
 
             let pop_fraction = pop as f64 / dynamic_capacity;
 
@@ -2875,7 +3258,10 @@ impl MultiWorldSimulator {
                     CivEventType::CarryingCapacityExceeded,
                     format!(
                         "{}: OVERCROWDING — pop {} exceeds carrying capacity {:.0} ({:.0}%)",
-                        world.name, pop, dynamic_capacity, pop_fraction * 100.0
+                        world.name,
+                        pop,
+                        dynamic_capacity,
+                        pop_fraction * 100.0
                     ),
                 ));
                 world.max_population = dynamic_capacity as usize;
@@ -2902,7 +3288,14 @@ impl MultiWorldSimulator {
                 .tick(&self.worlds, self.current_tick, &mut self.rng, &policy);
 
         // Phase 1d: defense_spending reduces disaster severity
-        let defense_mult = 1.0 - (self.worlds.first().map(|w| w.policy_state.defense_spending).unwrap_or(0.0) * 2.0).min(0.5);
+        let defense_mult = 1.0
+            - (self
+                .worlds
+                .first()
+                .map(|w| w.policy_state.defense_spending)
+                .unwrap_or(0.0)
+                * 2.0)
+                .min(0.5);
 
         for (effects, world_id, event) in disaster_results {
             // Dead Loop #8 fix: Cultural memory reduces disaster damage.
@@ -2933,8 +3326,12 @@ impl MultiWorldSimulator {
                 if let Some(world) = self.worlds.iter_mut().find(|w| w.id == wid) {
                     // Mechanism 1 — Non-Linear Cascade Failures: when a world has 3+
                     // active disasters, multiply ALL effects by 1.0 + 0.5 * (count - 2).
-                    let active_count = self.disaster_engine.active_per_world
-                        .get(&wid).copied().unwrap_or(0);
+                    let active_count = self
+                        .disaster_engine
+                        .active_per_world
+                        .get(&wid)
+                        .copied()
+                        .unwrap_or(0);
                     let cascade_mult = if active_count >= 3 {
                         let mult = 1.0 + 0.5 * (active_count as f64 - 2.0);
                         // Log the cascade event (once per disaster application, not per tick)
@@ -2962,12 +3359,11 @@ impl MultiWorldSimulator {
                     // Deontological: orderly evacuation protocols reduce panic
                     // Consequentialist: triage efficiency costs (some sacrificed for many)
                     let disaster_ethics = agent::EthicalOrientation::mean_of(&world.agents);
-                    let ethics_resilience = (
-                        disaster_ethics.virtue_care * 0.07
+                    let ethics_resilience = (disaster_ethics.virtue_care * 0.07
                         + disaster_ethics.relational * 0.06
                         + disaster_ethics.deontological * 0.04
-                        - disaster_ethics.consequentialist * 0.03
-                    ).clamp(-0.03, 0.12);
+                        - disaster_ethics.consequentialist * 0.03)
+                        .clamp(-0.03, 0.12);
                     let mut effective_loss = effects.population_loss_fraction
                         * cascade_mult
                         * (1.0 - mean_phi * 0.5)
@@ -2975,7 +3371,8 @@ impl MultiWorldSimulator {
 
                     // Resontia Earth-hardening: vaults reduce Earth casualties.
                     // Compute mitigation inline to avoid borrow conflicts.
-                    if world.location == "Earth" && self.resontia_config.enabled
+                    if world.location == "Earth"
+                        && self.resontia_config.enabled
                         && self.resontia_infra.vault_count > 0
                     {
                         let vault_cap = self.resontia_infra.vault_capacity;
@@ -2991,9 +3388,7 @@ impl MultiWorldSimulator {
                     // Population loss: kill a fraction of living agents (random selection)
                     if effective_loss > 0.0 {
                         let living_count = world.population();
-                        let to_kill =
-                            (living_count as f64 * effective_loss).round()
-                                as usize;
+                        let to_kill = (living_count as f64 * effective_loss).round() as usize;
                         if to_kill > 0 {
                             // Collect living agent ids, then kill the first `to_kill`
                             // (deterministic for reproducibility with the same RNG state)
@@ -3009,8 +3404,12 @@ impl MultiWorldSimulator {
                                 living_ids.swap(i, j);
                             }
                             // O(1) kill lookup + survivor trauma
-                            let kill_map: std::collections::HashMap<u64, usize> = world.agents.iter()
-                                .enumerate().map(|(i, a)| (a.id, i)).collect();
+                            let kill_map: std::collections::HashMap<u64, usize> = world
+                                .agents
+                                .iter()
+                                .enumerate()
+                                .map(|(i, a)| (a.id, i))
+                                .collect();
                             for &kill_id in living_ids.iter().take(to_kill) {
                                 if let Some(&idx) = kill_map.get(&kill_id) {
                                     world.agents[idx].death_tick = Some(self.current_tick);
@@ -3018,11 +3417,18 @@ impl MultiWorldSimulator {
                             }
                             // Survivor trauma: witnessing deaths
                             if to_kill > 0 {
-                                let survivors = world.agents.iter().filter(|a| a.is_alive()).count().max(1);
-                                let trauma_from_deaths = (to_kill as f64 / survivors as f64).min(0.3);
+                                let survivors =
+                                    world.agents.iter().filter(|a| a.is_alive()).count().max(1);
+                                let trauma_from_deaths =
+                                    (to_kill as f64 / survivors as f64).min(0.3);
                                 for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
-                                    agent.trauma_level = (agent.trauma_level + trauma_from_deaths).min(1.0);
-                                    agent.wounds.push(wound_healing::WoundState::new(trauma_from_deaths.min(0.5), wound_healing::WoundOrigin::Disaster, self.current_tick));
+                                    agent.trauma_level =
+                                        (agent.trauma_level + trauma_from_deaths).min(1.0);
+                                    agent.wounds.push(wound_healing::WoundState::new(
+                                        trauma_from_deaths.min(0.5),
+                                        wound_healing::WoundOrigin::Disaster,
+                                        self.current_tick,
+                                    ));
                                 }
                             }
                         }
@@ -3043,9 +3449,8 @@ impl MultiWorldSimulator {
                         };
                         // Infrastructure drops by full damage, but recovery (below)
                         // is scaled by how much material was available for repair.
-                        world.infrastructure_level = (world.infrastructure_level
-                            - infra_dmg)
-                            .max(0.0);
+                        world.infrastructure_level =
+                            (world.infrastructure_level - infra_dmg).max(0.0);
 
                         // Reduce the Sacred Stillness recovery bonus by material availability
                         let _ = actual_repair_fraction; // used implicitly via materials deduction
@@ -3062,7 +3467,9 @@ impl MultiWorldSimulator {
                     // Spinoza Ethics IV: "Nothing is more useful to man than man."
                     let mean_care = {
                         let living: Vec<_> = world.agents.iter().filter(|a| a.is_alive()).collect();
-                        if living.is_empty() { 0.0 } else {
+                        if living.is_empty() {
+                            0.0
+                        } else {
                             living.iter().map(|a| a.needs.affect.care).sum::<f64>()
                                 / living.len() as f64
                         }
@@ -3074,8 +3481,13 @@ impl MultiWorldSimulator {
                     // Up to 0.3%/tick additional recovery from collective coordination.
                     let mean_cu = {
                         let living: Vec<_> = world.agents.iter().filter(|a| a.is_alive()).collect();
-                        if living.is_empty() { 0.0 } else {
-                            living.iter().map(|a| a.coordination_understanding).sum::<f64>()
+                        if living.is_empty() {
+                            0.0
+                        } else {
+                            living
+                                .iter()
+                                .map(|a| a.coordination_understanding)
+                                .sum::<f64>()
                                 / living.len() as f64
                         }
                     };
@@ -3092,8 +3504,7 @@ impl MultiWorldSimulator {
                         for name in &["food", "water", "energy", "materials", "oxygen"] {
                             if let Some(stock) = world.resources.get_mut(name) {
                                 // Reduce production output this tick
-                                stock.current =
-                                    (stock.current * factor).max(0.0);
+                                stock.current = (stock.current * factor).max(0.0);
                             }
                         }
                     }
@@ -3110,9 +3521,8 @@ impl MultiWorldSimulator {
                     if effects.consciousness_shock > 0.0 {
                         let shock = effects.consciousness_shock * cascade_mult;
                         for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
-                            agent.consciousness.level = (agent.consciousness.level
-                                - shock)
-                                .max(0.0);
+                            agent.consciousness.level =
+                                (agent.consciousness.level - shock).max(0.0);
                         }
                     }
 
@@ -3120,9 +3530,8 @@ impl MultiWorldSimulator {
                     if effects.allostatic_load_increase > 0.0 {
                         let load_inc = effects.allostatic_load_increase * cascade_mult;
                         for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
-                            agent.needs.allostatic_load = (agent.needs.allostatic_load
-                                + load_inc)
-                                .min(1.0);
+                            agent.needs.allostatic_load =
+                                (agent.needs.allostatic_load + load_inc).min(1.0);
                         }
                     }
 
@@ -3130,9 +3539,8 @@ impl MultiWorldSimulator {
                     if effects.morale_impact != 0.0 {
                         let morale = effects.morale_impact * cascade_mult;
                         for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
-                            agent.needs.engagement = (agent.needs.engagement
-                                + morale)
-                                .clamp(0.0, 1.0);
+                            agent.needs.engagement =
+                                (agent.needs.engagement + morale).clamp(0.0, 1.0);
                         }
                     }
 
@@ -3155,7 +3563,13 @@ impl MultiWorldSimulator {
                     if trauma_inc > 0.0001 {
                         for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
                             agent.trauma_level = (agent.trauma_level + trauma_inc).min(1.0);
-                            if trauma_inc > 0.05 { agent.wounds.push(wound_healing::WoundState::new(trauma_inc.min(0.5), wound_healing::WoundOrigin::Disaster, self.current_tick)); }
+                            if trauma_inc > 0.05 {
+                                agent.wounds.push(wound_healing::WoundState::new(
+                                    trauma_inc.min(0.5),
+                                    wound_healing::WoundOrigin::Disaster,
+                                    self.current_tick,
+                                ));
+                            }
                             // Crisis ethical reorientation (replaces gentle Phase 3b nudge):
                             // When trauma exceeds 0.4, agents undergo wholesale ethical
                             // shift — not a nudge. Direction depends on crisis type:
@@ -3167,21 +3581,29 @@ impl MultiWorldSimulator {
                                 let shift = (trauma_inc * 0.15).min(0.08); // substantial but bounded
                                 if effects.population_loss_fraction > 0.01 {
                                     // Violence/death → crave rules and order
-                                    agent.ethics.deontological = (agent.ethics.deontological + shift).min(1.0);
-                                    agent.ethics.consequentialist = (agent.ethics.consequentialist - shift * 0.5).max(0.05);
+                                    agent.ethics.deontological =
+                                        (agent.ethics.deontological + shift).min(1.0);
+                                    agent.ethics.consequentialist =
+                                        (agent.ethics.consequentialist - shift * 0.5).max(0.05);
                                 } else if effects.allostatic_load_increase > 0.03 {
                                     // Resource stress → survival calculus
-                                    agent.ethics.consequentialist = (agent.ethics.consequentialist + shift).min(1.0);
-                                    agent.ethics.virtue_care = (agent.ethics.virtue_care - shift * 0.3).max(0.05);
+                                    agent.ethics.consequentialist =
+                                        (agent.ethics.consequentialist + shift).min(1.0);
+                                    agent.ethics.virtue_care =
+                                        (agent.ethics.virtue_care - shift * 0.3).max(0.05);
                                 } else if effects.morale_impact < -0.02 {
                                     // Isolation/morale collapse → crave community
-                                    agent.ethics.relational = (agent.ethics.relational + shift).min(1.0);
-                                    agent.ethics.deontological = (agent.ethics.deontological - shift * 0.3).max(0.05);
+                                    agent.ethics.relational =
+                                        (agent.ethics.relational + shift).min(1.0);
+                                    agent.ethics.deontological =
+                                        (agent.ethics.deontological - shift * 0.3).max(0.05);
                                 }
                             } else {
                                 // Below crisis threshold: gentle drift (original Phase 3b)
-                                agent.ethics.deontological = (agent.ethics.deontological + trauma_inc * 0.01).min(1.0);
-                                agent.ethics.consequentialist = (agent.ethics.consequentialist - trauma_inc * 0.005).max(0.05);
+                                agent.ethics.deontological =
+                                    (agent.ethics.deontological + trauma_inc * 0.01).min(1.0);
+                                agent.ethics.consequentialist =
+                                    (agent.ethics.consequentialist - trauma_inc * 0.005).max(0.05);
                             }
                         }
                     }
@@ -3195,38 +3617,62 @@ impl MultiWorldSimulator {
         // #3: Power-law cascade propagation.
         // After all disasters are applied, update domain stress and check for cascades.
         for (i, world) in self.worlds.iter().enumerate() {
-            if world.population() == 0 { continue; }
-            let resource_fracs: Vec<(&str, f64)> = ["food", "water", "oxygen", "energy"].iter()
+            if world.population() == 0 {
+                continue;
+            }
+            let resource_fracs: Vec<(&str, f64)> = ["food", "water", "oxygen", "energy"]
+                .iter()
                 .filter_map(|&name| {
                     world.resources.get(name).map(|s| {
-                        let frac = if s.capacity > 0.0 { s.current / s.capacity } else { 0.0 };
+                        let frac = if s.capacity > 0.0 {
+                            s.current / s.capacity
+                        } else {
+                            0.0
+                        };
                         (name, frac)
                     })
                 })
                 .collect();
             let gov_stability = if i < self.governance.len() {
                 self.governance[i].stability_score
-            } else { 0.5 };
-            self.cascade_engine.update_stress(i, world.infrastructure_level, &resource_fracs, gov_stability);
+            } else {
+                0.5
+            };
+            self.cascade_engine.update_stress(
+                i,
+                world.infrastructure_level,
+                &resource_fracs,
+                gov_stability,
+            );
 
             // Check if any recent disaster triggers a cascade
             if self.disaster_engine.total_disasters > 0 {
                 // Use infrastructure damage as severity proxy for cascade trigger
                 let severity = (1.0 - world.infrastructure_level).max(0.1);
-                let domain = if resource_fracs.iter().any(|(n, f)| *n == "energy" && *f < 0.3) {
+                let domain = if resource_fracs
+                    .iter()
+                    .any(|(n, f)| *n == "energy" && *f < 0.3)
+                {
                     cascade::CascadeDomain::Power
                 } else if resource_fracs.iter().any(|(n, f)| *n == "food" && *f < 0.3) {
                     cascade::CascadeDomain::Food
                 } else {
                     cascade::CascadeDomain::LifeSupport
                 };
-                if let Some(cascade_event) = self.cascade_engine.try_cascade(
-                    world.id, i, domain, severity, &mut self.rng
-                ) {
+                if let Some(cascade_event) =
+                    self.cascade_engine
+                        .try_cascade(world.id, i, domain, severity, &mut self.rng)
+                {
                     self.events.push(CivEvent::new(
-                        self.current_tick, Some(world.id), CivEventType::EmergencyDeclared,
-                        format!("CASCADE FAILURE: {} domains affected (depth {}), total severity {:.2}",
-                            cascade_event.affected.len(), cascade_event.depth, cascade_event.total_severity),
+                        self.current_tick,
+                        Some(world.id),
+                        CivEventType::EmergencyDeclared,
+                        format!(
+                            "CASCADE FAILURE: {} domains affected (depth {}), total severity {:.2}",
+                            cascade_event.affected.len(),
+                            cascade_event.depth,
+                            cascade_event.total_severity
+                        ),
                     ));
                 }
             }
@@ -3308,20 +3754,32 @@ impl MultiWorldSimulator {
         snap.faction_count = self.faction_engine.active_faction_count();
 
         // Elite persistence: max across worlds
-        snap.elite_persistence = self.worlds.iter()
+        snap.elite_persistence = self
+            .worlds
+            .iter()
             .map(|w| observables::elite_persistence_index(w, self.current_tick))
             .fold(0.0f64, f64::max);
 
         // Innovation stagnation: max across worlds
-        snap.innovation_stagnation = self.worlds.iter()
-            .map(|w| observables::innovation_stagnation_index(&w.knowledge.tech_history, self.current_tick, 120))
+        snap.innovation_stagnation = self
+            .worlds
+            .iter()
+            .map(|w| {
+                observables::innovation_stagnation_index(
+                    &w.knowledge.tech_history,
+                    self.current_tick,
+                    120,
+                )
+            })
             .fold(0.0f64, f64::max);
 
         // Inter-world divergence
         snap.inter_world_divergence = observables::inter_world_divergence(&self.worlds);
 
         // Consciousness Gini: compute across all living agents
-        let all_phis: Vec<f64> = self.worlds.iter()
+        let all_phis: Vec<f64> = self
+            .worlds
+            .iter()
             .flat_map(|w| w.agents.iter())
             .filter(|a| a.is_alive())
             .map(|a| a.consciousness.phi())
@@ -3330,20 +3788,24 @@ impl MultiWorldSimulator {
 
         // Phi trend: use combined phi_history from first world (proxy)
         // Or use mean phi from snapshots
-        let phi_values: Vec<f64> = self.epoch_snapshots.iter()
-            .map(|s| s.mean_phi)
-            .collect();
+        let phi_values: Vec<f64> = self.epoch_snapshots.iter().map(|s| s.mean_phi).collect();
         snap.phi_trend = format!("{}", observables::classify_phi_trend(&phi_values, 120));
 
         // Recovery count
         snap.recovery_count = observables::recovery_count(&self.epoch_snapshots);
 
         // Mean trauma across all worlds
-        let total_trauma: f64 = self.worlds.iter()
+        let total_trauma: f64 = self
+            .worlds
+            .iter()
             .map(|w| observables::trauma_level(w) * w.population() as f64)
             .sum();
         let total_pop: f64 = self.worlds.iter().map(|w| w.population() as f64).sum();
-        snap.trauma_level = if total_pop > 0.0 { total_trauma / total_pop } else { 0.0 };
+        snap.trauma_level = if total_pop > 0.0 {
+            total_trauma / total_pop
+        } else {
+            0.0
+        };
 
         // Speciation index
         snap.speciation_index = observables::speciation_index(&self.worlds, self.current_tick);
@@ -3360,7 +3822,9 @@ impl MultiWorldSimulator {
         }
 
         // Evaluate epoch checkpoints
-        let checkpoint_events = self.epoch_manager.evaluate_tick(self.current_tick, &self.worlds);
+        let checkpoint_events = self
+            .epoch_manager
+            .evaluate_tick(self.current_tick, &self.worlds);
         self.events.extend(checkpoint_events);
 
         // Check for epoch transitions
@@ -3368,12 +3832,10 @@ impl MultiWorldSimulator {
         let num_worlds = self.worlds.len();
         let ss = self.mean_self_sufficiency();
 
-        if let Some(new_epoch) = self.epoch_manager.check_epoch_transition(
-            self.current_tick,
-            total_pop,
-            num_worlds,
-            ss,
-        ) {
+        if let Some(new_epoch) =
+            self.epoch_manager
+                .check_epoch_transition(self.current_tick, total_pop, num_worlds, ss)
+        {
             // Take a snapshot at transition
             let snapshot = self
                 .epoch_manager
@@ -3435,7 +3897,11 @@ impl MultiWorldSimulator {
         if self.worlds.is_empty() {
             return 0.0;
         }
-        let sum: f64 = self.worlds.iter().map(|w| w.resources.self_sufficiency()).sum();
+        let sum: f64 = self
+            .worlds
+            .iter()
+            .map(|w| w.resources.self_sufficiency())
+            .sum();
         sum / self.worlds.len() as f64
     }
 
@@ -3470,11 +3936,18 @@ impl MultiWorldSimulator {
             // Phase 0.9: Viability Engine — thermodynamic axioms, EROI, scaling laws.
             // Must run BEFORE economy so scaling factors and energy budgets are available.
             {
-                let world_data: Vec<(u32, f64, f64, f64)> = self.worlds.iter()
+                let world_data: Vec<(u32, f64, f64, f64)> = self
+                    .worlds
+                    .iter()
                     .filter(|w| w.population() > 0)
                     .map(|w| {
                         let energy_prod = w.resources.stock_level("energy").unwrap_or(0.0);
-                        (w.id, energy_prod, w.population() as f64, w.infrastructure_level)
+                        (
+                            w.id,
+                            energy_prod,
+                            w.population() as f64,
+                            w.infrastructure_level,
+                        )
                     })
                     .collect();
                 self.viability_engine.tick(&world_data, self.current_tick);
@@ -3483,13 +3956,14 @@ impl MultiWorldSimulator {
             // Module registry: tick all registered plugin modules.
             // Runs alongside the existing tick loop during incremental migration.
             if self.module_registry.module_count() > 0 {
-                let _outputs = self.module_registry.tick_all(self.current_tick as u64 as u32);
+                let _outputs = self
+                    .module_registry
+                    .tick_all(self.current_tick as u64 as u32);
                 // TODO: apply outputs.mutations to world state as modules are migrated
             }
 
             // Phase 0.5: Metabolism — compute phase modifiers for this tick
-            self.phase_modifiers =
-                std::collections::HashMap::new();
+            self.phase_modifiers = std::collections::HashMap::new();
             if self.config.policy.metabolism.enabled {
                 for world in &mut self.worlds {
                     let mods = metabolism::compute_modifiers(
@@ -3542,11 +4016,11 @@ impl MultiWorldSimulator {
                 // cosmic rays", Living Reviews in Solar Physics 8(3).
                 let gcr_mult = self.disaster_engine.gcr_multiplier();
                 let ambient_dose_sv = match world.location.as_str() {
-                    "Earth" => 0.0002,            // Magnetosphere shields from GCR
+                    "Earth" => 0.0002, // Magnetosphere shields from GCR
                     "Moon" => self.params.radiation_moon_sv_month * gcr_mult,
                     "Mars" => self.params.radiation_mars_sv_month * gcr_mult,
                     "Europa" => self.params.radiation_europa_sv_month,
-                    "Titan" => 0.00005,            // Thick N2 atmosphere shields
+                    "Titan" => 0.00005, // Thick N2 atmosphere shields
                     _ => self.params.radiation_europa_sv_month * gcr_mult,
                 };
                 if world.habitat.modules.is_empty() {
@@ -3566,11 +4040,18 @@ impl MultiWorldSimulator {
                             (agent.needs.allostatic_load + psych_mod).clamp(0.0, 1.0);
                     }
                 }
-                let dem_events =
-                    PopulationEngine::tick_demographics(&mut world, &mut self.rng, self.current_tick);
+                let dem_events = PopulationEngine::tick_demographics(
+                    &mut world,
+                    &mut self.rng,
+                    self.current_tick,
+                );
                 // Fix 3: Genetic Engineering eliminates inbreeding depression.
                 // Newborns with health penalties from inbreeding get gene therapy.
-                if self.disaster_engine.tech_tree.is_achieved("Genetic Engineering") {
+                if self
+                    .disaster_engine
+                    .tech_tree
+                    .is_achieved("Genetic Engineering")
+                {
                     for agent in world.agents.iter_mut() {
                         if agent.birth_tick == self.current_tick && agent.health < 0.85 {
                             agent.health = agent.health.max(0.85);
@@ -3586,7 +4067,8 @@ impl MultiWorldSimulator {
 
             // Phase 1.5: Wound Healing — advance healing phases
             for world in &mut self.worlds {
-                let healing_mult = self.phase_modifiers
+                let healing_mult = self
+                    .phase_modifiers
                     .get(&world.id)
                     .map(|m| m.healing_mult)
                     .unwrap_or(1.0);
@@ -3602,8 +4084,12 @@ impl MultiWorldSimulator {
                         wound_healing::tick_wound(w, &ctx);
                         !w.is_healed()
                     });
-                    if wound_healing::attempt_kenosis(&mut agent.wounds, agent.consciousness.care_activation) {
-                        agent.consciousness.meta_awareness = (agent.consciousness.meta_awareness + 0.01).min(1.0);
+                    if wound_healing::attempt_kenosis(
+                        &mut agent.wounds,
+                        agent.consciousness.care_activation,
+                    ) {
+                        agent.consciousness.meta_awareness =
+                            (agent.consciousness.meta_awareness + 0.01).min(1.0);
                     }
                     // Trauma is the max of accumulated trauma (from disasters/deaths)
                     // and wound-derived trauma. Don't overwrite — wounds are a subset.
@@ -3624,11 +4110,16 @@ impl MultiWorldSimulator {
 
             // Metabolism: apply recovery multiplier to allostatic load
             for world in &mut self.worlds {
-                let mult = self.phase_modifiers.get(&world.id).map(|m| m.recovery_mult).unwrap_or(1.0);
+                let mult = self
+                    .phase_modifiers
+                    .get(&world.id)
+                    .map(|m| m.recovery_mult)
+                    .unwrap_or(1.0);
                 if (mult - 1.0).abs() > 0.01 {
                     let boost = (mult - 1.0) * 0.002;
                     for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
-                        agent.needs.allostatic_load = (agent.needs.allostatic_load - boost).max(0.0);
+                        agent.needs.allostatic_load =
+                            (agent.needs.allostatic_load - boost).max(0.0);
                     }
                 }
             }
@@ -3640,7 +4131,11 @@ impl MultiWorldSimulator {
 
             // Metabolism: modulate production output
             for world in &mut self.worlds {
-                let prod_mult = self.phase_modifiers.get(&world.id).map(|m| m.production_mult).unwrap_or(1.0);
+                let prod_mult = self
+                    .phase_modifiers
+                    .get(&world.id)
+                    .map(|m| m.production_mult)
+                    .unwrap_or(1.0);
                 if (prod_mult - 1.0).abs() > 0.01 {
                     for output in &mut world.economy.sector_output {
                         *output *= prod_mult;
@@ -3661,11 +4156,15 @@ impl MultiWorldSimulator {
 
                 // TEND bounds enforcement
                 for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
-                    agent.tend_balance = agent.tend_balance.clamp(-currency::TEND_LIMIT, currency::TEND_LIMIT);
+                    agent.tend_balance = agent
+                        .tend_balance
+                        .clamp(-currency::TEND_LIMIT, currency::TEND_LIMIT);
                 }
 
                 // SAP demurrage (per-agent)
-                let mut sap_balances: Vec<f64> = world.agents.iter()
+                let mut sap_balances: Vec<f64> = world
+                    .agents
+                    .iter()
                     .filter(|a| a.is_alive())
                     .map(|a| a.sap_balance)
                     .collect();
@@ -3685,17 +4184,20 @@ impl MultiWorldSimulator {
 
                 // Commons pool → public goods investment (Economic Charter)
                 let spending = currency::spend_commons(&mut world.currency_state, 0.1);
-                world.infrastructure_level = (world.infrastructure_level + spending.infrastructure * 0.001).min(1.0);
+                world.infrastructure_level =
+                    (world.infrastructure_level + spending.infrastructure * 0.001).min(1.0);
                 // Education effect: boost all agents' education_level slightly
                 if spending.education > 0.01 {
                     for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
-                        agent.education_level = (agent.education_level + spending.education * 0.00001).min(1.0);
+                        agent.education_level =
+                            (agent.education_level + spending.education * 0.00001).min(1.0);
                     }
                 }
                 // Medicine effect: reduce allostatic load for all agents
                 if spending.medicine > 0.01 {
                     for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
-                        agent.needs.allostatic_load = (agent.needs.allostatic_load - spending.medicine * 0.00001).max(0.0);
+                        agent.needs.allostatic_load =
+                            (agent.needs.allostatic_load - spending.medicine * 0.00001).max(0.0);
                     }
                 }
 
@@ -3704,10 +4206,12 @@ impl MultiWorldSimulator {
 
                 // MYCEL computation (now with real peer recognition)
                 for (orig_idx, agent) in world.agents.iter_mut().enumerate() {
-                    if !agent.is_alive() { continue; }
+                    if !agent.is_alive() {
+                        continue;
+                    }
                     let inputs = currency::MycelInputs {
                         participated: agent.needs.engagement > 0.3,
-                        recognition: recognition.score_for(orig_idx),  // Real agent-to-agent recognition
+                        recognition: recognition.score_for(orig_idx), // Real agent-to-agent recognition
                         quality: agent.consciousness.coherence * agent.education_level,
                         years_active: agent.age_years(self.current_tick),
                     };
@@ -3716,7 +4220,9 @@ impl MultiWorldSimulator {
 
                 // Jubilee (every 48 ticks = 4 years)
                 if self.current_tick >= world.currency_state.next_jubilee_tick {
-                    let mut scores: Vec<f64> = world.agents.iter()
+                    let mut scores: Vec<f64> = world
+                        .agents
+                        .iter()
                         .filter(|a| a.is_alive())
                         .map(|a| a.mycel_score)
                         .collect();
@@ -3734,10 +4240,13 @@ impl MultiWorldSimulator {
                 // Update aggregates
                 let living_count = world.agents.iter().filter(|a| a.is_alive()).count();
                 if living_count > 0 {
-                    world.currency_state.mycel_mean = world.agents.iter()
+                    world.currency_state.mycel_mean = world
+                        .agents
+                        .iter()
                         .filter(|a| a.is_alive())
                         .map(|a| a.mycel_score)
-                        .sum::<f64>() / living_count as f64;
+                        .sum::<f64>()
+                        / living_count as f64;
                 }
             }
 
@@ -3749,7 +4258,9 @@ impl MultiWorldSimulator {
 
             // Phase 5.3: Colony projects (multi-tick construction)
             for world in &mut self.worlds {
-                if world.population() == 0 { continue; }
+                if world.population() == 0 {
+                    continue;
+                }
 
                 // Auto-prioritize annually
                 if world.project_manager.active.is_empty()
@@ -3762,8 +4273,12 @@ impl MultiWorldSimulator {
                         world.resources.fraction_of_capacity("food"),
                         world.max_population,
                         world.population() > (world.max_population as f64 * 0.8) as usize,
-                        world.project_manager.has_completed(projects::ProjectBlueprint::MedicalFacility),
-                        world.project_manager.has_completed(projects::ProjectBlueprint::FabricationWorkshop),
+                        world
+                            .project_manager
+                            .has_completed(projects::ProjectBlueprint::MedicalFacility),
+                        world
+                            .project_manager
+                            .has_completed(projects::ProjectBlueprint::FabricationWorkshop),
                         &world.location,
                         &world.project_manager.completed,
                     );
@@ -3773,7 +4288,8 @@ impl MultiWorldSimulator {
                     match self.config.policy.project_strategy {
                         config::ProjectStrategy::SurvivalFirst => {
                             if !completed.contains(&projects::ProjectBlueprint::RadiationShelter) {
-                                strategy_priorities.push(projects::ProjectBlueprint::RadiationShelter);
+                                strategy_priorities
+                                    .push(projects::ProjectBlueprint::RadiationShelter);
                             }
                         }
                         config::ProjectStrategy::GrowthFirst => {
@@ -3781,13 +4297,16 @@ impl MultiWorldSimulator {
                             strategy_priorities.push(projects::ProjectBlueprint::GreenhouseModule);
                         }
                         config::ProjectStrategy::ScienceFirst => {
-                            if !completed.contains(&projects::ProjectBlueprint::ExplorationVehicle) {
-                                strategy_priorities.push(projects::ProjectBlueprint::ExplorationVehicle);
+                            if !completed.contains(&projects::ProjectBlueprint::ExplorationVehicle)
+                            {
+                                strategy_priorities
+                                    .push(projects::ProjectBlueprint::ExplorationVehicle);
                             }
                         }
                         config::ProjectStrategy::IndependenceFirst => {
                             if !completed.contains(&projects::ProjectBlueprint::FissionReactor) {
-                                strategy_priorities.push(projects::ProjectBlueprint::FissionReactor);
+                                strategy_priorities
+                                    .push(projects::ProjectBlueprint::FissionReactor);
                             }
                         }
                         config::ProjectStrategy::Balanced => {}
@@ -3802,15 +4321,21 @@ impl MultiWorldSimulator {
                 }
 
                 // Tick projects
-                let workers = world.agents.iter()
+                let workers = world
+                    .agents
+                    .iter()
                     .filter(|a| a.is_alive() && a.life_stage(self.current_tick).can_work())
                     .count() as f64;
                 let available_labor = workers * WORK_HOURS_PER_MONTH * PROJECT_LABOR_FRACTION;
-                let available_materials = world.resources.get("materials")
-                    .map(|s| s.current * PROJECT_MATERIALS_FRACTION).unwrap_or(0.0);
+                let available_materials = world
+                    .resources
+                    .get("materials")
+                    .map(|s| s.current * PROJECT_MATERIALS_FRACTION)
+                    .unwrap_or(0.0);
 
-                let (completed, _labor, mat_used) =
-                    world.project_manager.tick(available_labor, available_materials);
+                let (completed, _labor, mat_used) = world
+                    .project_manager
+                    .tick(available_labor, available_materials);
 
                 if mat_used > 0.0 {
                     if let Some(mat) = world.resources.get_mut("materials") {
@@ -3852,9 +4377,15 @@ impl MultiWorldSimulator {
                         _ => {}
                     }
                     self.events.push(CivEvent::new(
-                        self.current_tick, Some(world.id), CivEventType::EmergencyDeclared,
-                        format!("{}: PROJECT COMPLETE — {} after {} months",
-                            world.name, bp.name(), bp.duration()),
+                        self.current_tick,
+                        Some(world.id),
+                        CivEventType::EmergencyDeclared,
+                        format!(
+                            "{}: PROJECT COMPLETE — {} after {} months",
+                            world.name,
+                            bp.name(),
+                            bp.duration()
+                        ),
                     ));
                 }
             }
@@ -3865,14 +4396,22 @@ impl MultiWorldSimulator {
             // Apply supply multipliers to colony resource production
             for world in &mut self.worlds {
                 let supply_mult = match world.location.as_str() {
-                    "Moon" => colony_supply.get(&supply_chain::SupplyNode::LunarColony)
-                        .copied().unwrap_or(1.0),
-                    "Mars" => colony_supply.get(&supply_chain::SupplyNode::MarsColony)
-                        .copied().unwrap_or(1.0),
-                    "Europa" => colony_supply.get(&supply_chain::SupplyNode::EuropaStation)
-                        .copied().unwrap_or(1.0),
-                    "Titan" => colony_supply.get(&supply_chain::SupplyNode::TitanOutpost)
-                        .copied().unwrap_or(1.0),
+                    "Moon" => colony_supply
+                        .get(&supply_chain::SupplyNode::LunarColony)
+                        .copied()
+                        .unwrap_or(1.0),
+                    "Mars" => colony_supply
+                        .get(&supply_chain::SupplyNode::MarsColony)
+                        .copied()
+                        .unwrap_or(1.0),
+                    "Europa" => colony_supply
+                        .get(&supply_chain::SupplyNode::EuropaStation)
+                        .copied()
+                        .unwrap_or(1.0),
+                    "Titan" => colony_supply
+                        .get(&supply_chain::SupplyNode::TitanOutpost)
+                        .copied()
+                        .unwrap_or(1.0),
                     _ => 1.0,
                 };
                 // Low supply chain health degrades colony resource production
@@ -3887,14 +4426,22 @@ impl MultiWorldSimulator {
             // NASA doesn't expect colonies to invent fission; they deliver Kilopower units.
             // If Earth has engineering > 1.2 and an outer-system colony exists without
             // fission, the reactor is delivered via transfer window.
-            if !self.disaster_engine.tech_tree.is_achieved("Fission Surface Power")
-                && self.current_tick > 36 // FISSION_EARLIEST: year 3
+            if !self
+                .disaster_engine
+                .tech_tree
+                .is_achieved("Fission Surface Power")
+                && self.current_tick > 36
+            // FISSION_EARLIEST: year 3
             {
-                let earth_eng = self.worlds.iter()
+                let earth_eng = self
+                    .worlds
+                    .iter()
                     .find(|w| w.location == "Earth")
                     .map(|w| w.knowledge.technology_levels[0])
                     .unwrap_or(1.0);
-                let has_outer_colony = self.worlds.iter()
+                let has_outer_colony = self
+                    .worlds
+                    .iter()
                     .any(|w| w.location != "Earth" && w.location != "Moon" && w.population() > 0);
 
                 if earth_eng >= 1.2 && has_outer_colony {
@@ -3925,7 +4472,11 @@ impl MultiWorldSimulator {
 
             // Metabolism: modulate innovation rate
             for world in &mut self.worlds {
-                let innov_mult = self.phase_modifiers.get(&world.id).map(|m| m.innovation_mult).unwrap_or(1.0);
+                let innov_mult = self
+                    .phase_modifiers
+                    .get(&world.id)
+                    .map(|m| m.innovation_mult)
+                    .unwrap_or(1.0);
                 if (innov_mult - 1.0).abs() > 0.01 {
                     world.knowledge.innovation_rate *= innov_mult;
                 }
@@ -3933,15 +4484,12 @@ impl MultiWorldSimulator {
             // Phase 7: Governance
             self.tick_governance();
 
-
             // Phase 7.25: Proposal Governance — factions propose, citizens vote
             {
                 let tick = self.current_tick;
                 for world in &mut self.worlds {
-                    let factions_snapshot: Vec<crate::factions::Faction> = self.faction_engine
-                        .factions.iter()
-                        .cloned()
-                        .collect();
+                    let factions_snapshot: Vec<crate::factions::Faction> =
+                        self.faction_engine.factions.iter().cloned().collect();
                     let mut next_id = (tick * 100) as u32;
                     let mut new_proposals = proposals::generate_proposals(
                         &factions_snapshot,
@@ -4021,10 +4569,15 @@ impl MultiWorldSimulator {
                 // Update institutional ethics as EMA of current population
                 let pop_mean = agent::EthicalOrientation::mean_of(&world.agents);
                 let alpha = 0.02;
-                world.institutional_ethics.deontological += (pop_mean.deontological - world.institutional_ethics.deontological) * alpha;
-                world.institutional_ethics.consequentialist += (pop_mean.consequentialist - world.institutional_ethics.consequentialist) * alpha;
-                world.institutional_ethics.virtue_care += (pop_mean.virtue_care - world.institutional_ethics.virtue_care) * alpha;
-                world.institutional_ethics.relational += (pop_mean.relational - world.institutional_ethics.relational) * alpha;
+                world.institutional_ethics.deontological +=
+                    (pop_mean.deontological - world.institutional_ethics.deontological) * alpha;
+                world.institutional_ethics.consequentialist += (pop_mean.consequentialist
+                    - world.institutional_ethics.consequentialist)
+                    * alpha;
+                world.institutional_ethics.virtue_care +=
+                    (pop_mean.virtue_care - world.institutional_ethics.virtue_care) * alpha;
+                world.institutional_ethics.relational +=
+                    (pop_mean.relational - world.institutional_ethics.relational) * alpha;
 
                 // Socialization: agents drift toward institutional ethics
                 let inst = world.institutional_ethics.as_vec();
@@ -4040,7 +4593,9 @@ impl MultiWorldSimulator {
                 let tick = self.current_tick;
                 for mem in &world.moral_memories {
                     let strength = mem.strength(tick);
-                    if strength <= 0.0 { continue; }
+                    if strength <= 0.0 {
+                        continue;
+                    }
                     // If population is drifting away from the lesson dimension,
                     // apply resistance proportional to memory strength
                     let current_val = pop_mean.as_vec()[mem.lesson_dimension];
@@ -4049,7 +4604,9 @@ impl MultiWorldSimulator {
                         // Drifting away from the lesson — resist
                         let correction = (crisis_val - current_val) * 0.001 * strength;
                         for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
-                            agent.ethics.modify_with_sacred_resistance(mem.lesson_dimension, correction);
+                            agent
+                                .ethics
+                                .modify_with_sacred_resistance(mem.lesson_dimension, correction);
                         }
                     }
                 }
@@ -4063,7 +4620,9 @@ impl MultiWorldSimulator {
             // Unstable governance (fear, uncertainty) suppresses growth.
             // Constitution maturity lowers participation thresholds over time.
             for (i, gov) in self.governance.iter().enumerate() {
-                if i >= self.worlds.len() { break; }
+                if i >= self.worlds.len() {
+                    break;
+                }
                 let stability = gov.stability_score;
                 let stability_bonus = if stability > 0.7 {
                     0.001 // stable governance → mild consciousness boost
@@ -4089,24 +4648,29 @@ impl MultiWorldSimulator {
                 // Stress boost: classic allostatic load + Spinozist suffering.
                 // Negative net conatus (sadness > joy) amplifies faction recruitment.
                 // High desire + low care = Turchin elite overproduction dynamics.
-                let stress_boost: f64 = self.worlds.iter()
+                let stress_boost: f64 = self
+                    .worlds
+                    .iter()
                     .map(|w| {
                         let load = w.mean_allostatic_load();
                         let load_boost = if load > 0.8 { load - 0.8 } else { 0.0 };
                         // Spinozist amplifier: collective suffering drives faction emergence
                         let living: Vec<_> = w.agents.iter().filter(|a| a.is_alive()).collect();
                         let n = living.len().max(1) as f64;
-                        let mean_conatus = living.iter()
+                        let mean_conatus = living
+                            .iter()
                             .map(|a| a.needs.affect.net_conatus())
-                            .sum::<f64>() / n;
-                        let mean_desire = living.iter()
-                            .map(|a| a.needs.affect.desire)
-                            .sum::<f64>() / n;
-                        let mean_care = living.iter()
-                            .map(|a| a.needs.affect.care)
-                            .sum::<f64>() / n;
+                            .sum::<f64>()
+                            / n;
+                        let mean_desire =
+                            living.iter().map(|a| a.needs.affect.desire).sum::<f64>() / n;
+                        let mean_care = living.iter().map(|a| a.needs.affect.care).sum::<f64>() / n;
                         // Suffering (negative conatus) adds to faction pressure
-                        let suffering_boost = if mean_conatus < 0.0 { -mean_conatus * 0.5 } else { 0.0 };
+                        let suffering_boost = if mean_conatus < 0.0 {
+                            -mean_conatus * 0.5
+                        } else {
+                            0.0
+                        };
                         // High desire + low care = frustration → faction emergence
                         let frustration_boost = if mean_desire > 0.5 && mean_care < 0.3 {
                             (mean_desire - mean_care) * 0.3
@@ -4142,13 +4706,19 @@ impl MultiWorldSimulator {
                             agent.needs.allostatic_load =
                                 (agent.needs.allostatic_load + 0.001).min(1.0);
                         }
-                        if self.current_tick % 120 == 0 { // Log every 10 years
+                        if self.current_tick % 120 == 0 {
+                            // Log every 10 years
                             self.events.push(CivEvent::new(
-                                self.current_tick, Some(world.id),
+                                self.current_tick,
+                                Some(world.id),
                                 CivEventType::EmergencyDeclared,
-                                format!("{}: GENETIC BOTTLENECK — viability {:.0}%, pop {} (Ne ≈ {})",
-                                    world.name, viability * 100.0, world.population(),
-                                    (world.population() as f64 * 0.25) as usize),
+                                format!(
+                                    "{}: GENETIC BOTTLENECK — viability {:.0}%, pop {} (Ne ≈ {})",
+                                    world.name,
+                                    viability * 100.0,
+                                    world.population(),
+                                    (world.population() as f64 * 0.25) as usize
+                                ),
                             ));
                         }
                     }
@@ -4158,8 +4728,8 @@ impl MultiWorldSimulator {
                     // Small populations (<1000): mutual unintelligibility in ~300-500yr.
                     // Modeled as cultural distance acceleration for isolated worlds.
                     if world.location != "Earth" && world.population() < 1000 {
-                        let isolation_years = self.current_tick.saturating_sub(world.founded_tick)
-                            as f64 / 12.0;
+                        let isolation_years =
+                            self.current_tick.saturating_sub(world.founded_tick) as f64 / 12.0;
                         if isolation_years > 200.0 {
                             // Accelerate cultural drift for small isolated populations
                             // (already handled in culture.drift, but we add a bonus)
@@ -4233,43 +4803,64 @@ impl MultiWorldSimulator {
                     let world = &self.worlds[i];
                     let world_id = world.id;
                     let pop = world.population();
-                    if pop == 0 { continue; }
+                    if pop == 0 {
+                        continue;
+                    }
 
                     // Compute elite fraction: top 20% by consciousness + skills
                     // In the real sim, agents with phi >= 0.6 are rare.
                     // Elite = those whose economic influence (skills + education) puts
                     // them in the top quintile — they compete for governance positions.
-                    let alive: Vec<&agent::CivAgent> = world.agents.iter()
+                    let alive: Vec<&agent::CivAgent> = world
+                        .agents
+                        .iter()
                         .filter(|a| a.death_tick.is_none())
                         .collect();
                     let elite_threshold = if alive.len() >= 10 {
-                        let mut skill_scores: Vec<f64> = alive.iter()
+                        let mut skill_scores: Vec<f64> = alive
+                            .iter()
                             .map(|a| a.skills.total() + a.education_level * 2.0)
                             .collect();
-                        skill_scores.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+                        skill_scores
+                            .sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
                         let top_20_idx = (skill_scores.len() as f64 * 0.20) as usize;
                         skill_scores.get(top_20_idx).copied().unwrap_or(0.0)
                     } else {
                         f64::MAX // Too few people for elite dynamics
                     };
-                    let elite_count = alive.iter()
+                    let elite_count = alive
+                        .iter()
                         .filter(|a| a.skills.total() + a.education_level * 2.0 >= elite_threshold)
                         .count();
                     let elite_fraction = elite_count as f64 / pop.max(1) as f64;
 
                     // Compute non-elite mean phi and prediction error proxy
-                    let non_elites: Vec<&agent::CivAgent> = alive.iter()
+                    let non_elites: Vec<&agent::CivAgent> = alive
+                        .iter()
                         .filter(|a| a.skills.total() + a.education_level * 2.0 < elite_threshold)
                         .copied()
                         .collect();
-                    let non_elite_mean_phi = if non_elites.is_empty() { 0.5 } else {
-                        non_elites.iter().map(|a| a.consciousness.phi()).sum::<f64>() / non_elites.len() as f64
+                    let non_elite_mean_phi = if non_elites.is_empty() {
+                        0.5
+                    } else {
+                        non_elites
+                            .iter()
+                            .map(|a| a.consciousness.phi())
+                            .sum::<f64>()
+                            / non_elites.len() as f64
                     };
                     // FEP prediction error proxy: allostatic load × (1 - phi)
                     // High stress + low consciousness = high prediction error
-                    let non_elite_prediction_error = if self.config.policy.fep_immiseration_enabled {
-                        let mean_load = if non_elites.is_empty() { 0.0 } else {
-                            non_elites.iter().map(|a| a.needs.allostatic_load).sum::<f64>() / non_elites.len() as f64
+                    let non_elite_prediction_error = if self.config.policy.fep_immiseration_enabled
+                    {
+                        let mean_load = if non_elites.is_empty() {
+                            0.0
+                        } else {
+                            non_elites
+                                .iter()
+                                .map(|a| a.needs.allostatic_load)
+                                .sum::<f64>()
+                                / non_elites.len() as f64
                         };
                         mean_load * (1.0 - non_elite_mean_phi) * 2.0
                     } else {
@@ -4283,8 +4874,14 @@ impl MultiWorldSimulator {
                         population: pop,
                         self_sufficiency: world.resources.self_sufficiency(),
                         governance_quality: world.harmony.current_scores.iter().sum::<f64>() / 8.0,
-                        mean_allostatic_load: if non_elites.is_empty() { 0.0 } else {
-                            non_elites.iter().map(|a| a.needs.allostatic_load).sum::<f64>() / non_elites.len() as f64
+                        mean_allostatic_load: if non_elites.is_empty() {
+                            0.0
+                        } else {
+                            non_elites
+                                .iter()
+                                .map(|a| a.needs.allostatic_load)
+                                .sum::<f64>()
+                                / non_elites.len() as f64
                         },
                         non_elite_prediction_error,
                         non_elite_mean_phi,
@@ -4292,17 +4889,22 @@ impl MultiWorldSimulator {
                             && world.resources.self_sufficiency() > 0.7,
                         current_tick: self.current_tick,
                         mean_coordination_understanding: {
-                            let alive: Vec<&agent::CivAgent> = world.agents.iter()
-                                .filter(|a| a.is_alive())
-                                .collect();
-                            if alive.is_empty() { 0.0 } else {
-                                alive.iter().map(|a| a.coordination_understanding).sum::<f64>()
+                            let alive: Vec<&agent::CivAgent> =
+                                world.agents.iter().filter(|a| a.is_alive()).collect();
+                            if alive.is_empty() {
+                                0.0
+                            } else {
+                                alive
+                                    .iter()
+                                    .map(|a| a.coordination_understanding)
+                                    .sum::<f64>()
                                     / alive.len() as f64
                             }
                         },
                     };
 
-                    let cycle_state = self.secular_cycles
+                    let cycle_state = self
+                        .secular_cycles
                         .entry(world_id)
                         .or_insert_with(cliodynamics::SecularCycleState::default);
 
@@ -4311,24 +4913,39 @@ impl MultiWorldSimulator {
                     // Apply cycle events to world
                     for event in cycle_events {
                         match event {
-                            cliodynamics::CycleEvent::CivilWar { population_loss_fraction, infrastructure_damage } => {
+                            cliodynamics::CycleEvent::CivilWar {
+                                population_loss_fraction,
+                                infrastructure_damage,
+                            } => {
                                 let world = &mut self.worlds[i];
-                                let deaths = (world.population() as f64 * population_loss_fraction) as usize;
+                                let deaths =
+                                    (world.population() as f64 * population_loss_fraction) as usize;
                                 // Kill random agents
                                 let mut killed = 0;
                                 for agent in &mut world.agents {
-                                    if killed >= deaths { break; }
-                                    if agent.death_tick.is_none() && self.rng.next_f64() < population_loss_fraction * 3.0 {
+                                    if killed >= deaths {
+                                        break;
+                                    }
+                                    if agent.death_tick.is_none()
+                                        && self.rng.next_f64() < population_loss_fraction * 3.0
+                                    {
                                         agent.death_tick = Some(self.current_tick);
                                         killed += 1;
                                     }
                                 }
-                                world.infrastructure_level = (world.infrastructure_level - infrastructure_damage).max(0.0);
+                                world.infrastructure_level =
+                                    (world.infrastructure_level - infrastructure_damage).max(0.0);
                                 // Increase trauma for all survivors
                                 for agent in &mut world.agents {
                                     if agent.death_tick.is_none() {
-                                        agent.trauma_level = (agent.trauma_level + 0.3 * population_loss_fraction).min(1.0);
-                                        agent.wounds.push(wound_healing::WoundState::new((0.3 * population_loss_fraction).min(0.5), wound_healing::WoundOrigin::Faction, self.current_tick));
+                                        agent.trauma_level = (agent.trauma_level
+                                            + 0.3 * population_loss_fraction)
+                                            .min(1.0);
+                                        agent.wounds.push(wound_healing::WoundState::new(
+                                            (0.3 * population_loss_fraction).min(0.5),
+                                            wound_healing::WoundOrigin::Faction,
+                                            self.current_tick,
+                                        ));
                                     }
                                 }
                                 self.events.push(CivEvent::new(
@@ -4344,11 +4961,15 @@ impl MultiWorldSimulator {
                                     self.current_tick,
                                     Some(world_id),
                                     CivEventType::EmergencyDeclared,
-                                    format!("SECESSION: {} declares independence from Earth",
-                                        self.worlds[i].name),
+                                    format!(
+                                        "SECESSION: {} declares independence from Earth",
+                                        self.worlds[i].name
+                                    ),
                                 ));
                             }
-                            cliodynamics::CycleEvent::ElitePurge { agents_affected_fraction } => {
+                            cliodynamics::CycleEvent::ElitePurge {
+                                agents_affected_fraction,
+                            } => {
                                 let world = &mut self.worlds[i];
                                 for agent in &mut world.agents {
                                     if agent.death_tick.is_none()
@@ -4364,8 +4985,11 @@ impl MultiWorldSimulator {
                                     self.current_tick,
                                     Some(world_id),
                                     CivEventType::EmergencyDeclared,
-                                    format!("Elite purge on {} — {:.0}% of elites demoted",
-                                        self.worlds[i].name, agents_affected_fraction * 100.0),
+                                    format!(
+                                        "Elite purge on {} — {:.0}% of elites demoted",
+                                        self.worlds[i].name,
+                                        agents_affected_fraction * 100.0
+                                    ),
                                 ));
                             }
                             cliodynamics::CycleEvent::PhaseTransition { from, to } => {
@@ -4373,8 +4997,10 @@ impl MultiWorldSimulator {
                                     self.current_tick,
                                     Some(world_id),
                                     CivEventType::TradeEstablished, // Reuse event type for phase change
-                                    format!("Turchin cycle on {}: {:?} → {:?}",
-                                        self.worlds[i].name, from, to),
+                                    format!(
+                                        "Turchin cycle on {}: {:?} → {:?}",
+                                        self.worlds[i].name, from, to
+                                    ),
                                 ));
                             }
                             cliodynamics::CycleEvent::Recovery => {
@@ -4382,7 +5008,10 @@ impl MultiWorldSimulator {
                                     self.current_tick,
                                     Some(world_id),
                                     CivEventType::TradeEstablished,
-                                    format!("{} recovering from secular depression", self.worlds[i].name),
+                                    format!(
+                                        "{} recovering from secular depression",
+                                        self.worlds[i].name
+                                    ),
                                 ));
                             }
                         }
@@ -4393,16 +5022,32 @@ impl MultiWorldSimulator {
             // Phase 9.7: JSONL telemetry output
             if let Some(ref path) = self.jsonl_output_path {
                 let total_pop = self.worlds.iter().map(|w| w.population()).sum();
-                let mean_phi = if self.worlds.is_empty() { 0.0 } else {
-                    self.worlds.iter().map(|w| {
-                        let alive: Vec<_> = w.agents.iter().filter(|a| a.death_tick.is_none()).collect();
-                        if alive.is_empty() { 0.0 } else {
-                            alive.iter().map(|a| a.consciousness.phi()).sum::<f64>() / alive.len() as f64
-                        }
-                    }).sum::<f64>() / self.worlds.len() as f64
+                let mean_phi = if self.worlds.is_empty() {
+                    0.0
+                } else {
+                    self.worlds
+                        .iter()
+                        .map(|w| {
+                            let alive: Vec<_> =
+                                w.agents.iter().filter(|a| a.death_tick.is_none()).collect();
+                            if alive.is_empty() {
+                                0.0
+                            } else {
+                                alive.iter().map(|a| a.consciousness.phi()).sum::<f64>()
+                                    / alive.len() as f64
+                            }
+                        })
+                        .sum::<f64>()
+                        / self.worlds.len() as f64
                 };
-                let mean_gini = if self.worlds.is_empty() { 0.0 } else {
-                    self.worlds.iter().map(|w| w.economy.gini_coefficient).sum::<f64>() / self.worlds.len() as f64
+                let mean_gini = if self.worlds.is_empty() {
+                    0.0
+                } else {
+                    self.worlds
+                        .iter()
+                        .map(|w| w.economy.gini_coefficient)
+                        .sum::<f64>()
+                        / self.worlds.len() as f64
                 };
                 let first_world_cycle = self.secular_cycles.values().next();
                 let metrics = live_metrics::LiveMetrics::compute(
@@ -4413,10 +5058,10 @@ impl MultiWorldSimulator {
                     total_pop,
                     mean_phi,
                     mean_gini,
-                    0.0, // mean allostatic load
-                    0.0, // infrastructure mean
+                    0.0,   // mean allostatic load
+                    0.0,   // infrastructure mean
                     false, // solar cycle max
-                    1.0, // kessler density
+                    1.0,   // kessler density
                 );
                 let _ = metrics.append_jsonl(path);
             }
@@ -4451,24 +5096,36 @@ impl MultiWorldSimulator {
             self.tick_epoch_evaluation();
 
             // Phase 12: Narrative engine — generate memorable events from affect + disaster data
-            if self.current_tick % 12 == 0 { // Monthly narrative check (yearly)
-                let world_data: Vec<_> = self.worlds.iter().map(|w| {
-                    let living: Vec<_> = w.agents.iter().filter(|a| a.is_alive()).collect();
-                    let n = living.len().max(1) as f64;
-                    (
-                        w.name.clone(),
-                        w.location.clone(),
-                        w.population(),
-                        living.iter().map(|a| a.needs.affect.joy).sum::<f64>() / n,
-                        living.iter().map(|a| a.needs.affect.sadness).sum::<f64>() / n,
-                        living.iter().map(|a| a.needs.affect.desire).sum::<f64>() / n,
-                        living.iter().map(|a| a.needs.affect.care).sum::<f64>() / n,
-                        w.resources.self_sufficiency(),
-                    )
-                }).collect();
-                let cvs = self.epoch_snapshots.last()
-                    .map(|s| s.civilization_viability_score).unwrap_or(0.5);
-                let achieved: Vec<String> = self.disaster_engine.tech_tree.milestones.iter()
+            if self.current_tick % 12 == 0 {
+                // Monthly narrative check (yearly)
+                let world_data: Vec<_> = self
+                    .worlds
+                    .iter()
+                    .map(|w| {
+                        let living: Vec<_> = w.agents.iter().filter(|a| a.is_alive()).collect();
+                        let n = living.len().max(1) as f64;
+                        (
+                            w.name.clone(),
+                            w.location.clone(),
+                            w.population(),
+                            living.iter().map(|a| a.needs.affect.joy).sum::<f64>() / n,
+                            living.iter().map(|a| a.needs.affect.sadness).sum::<f64>() / n,
+                            living.iter().map(|a| a.needs.affect.desire).sum::<f64>() / n,
+                            living.iter().map(|a| a.needs.affect.care).sum::<f64>() / n,
+                            w.resources.self_sufficiency(),
+                        )
+                    })
+                    .collect();
+                let cvs = self
+                    .epoch_snapshots
+                    .last()
+                    .map(|s| s.civilization_viability_score)
+                    .unwrap_or(0.5);
+                let achieved: Vec<String> = self
+                    .disaster_engine
+                    .tech_tree
+                    .milestones
+                    .iter()
                     .filter(|m| m.achieved)
                     .map(|m| m.name.clone())
                     .collect();
@@ -4490,9 +5147,9 @@ impl MultiWorldSimulator {
             if self.current_tick % 600 == 0 && self.current_tick > 1200 {
                 let cutoff = self.current_tick - 1200;
                 for world in &mut self.worlds {
-                    world.agents.retain(|a| {
-                        a.death_tick.map_or(true, |dt| dt >= cutoff)
-                    });
+                    world
+                        .agents
+                        .retain(|a| a.death_tick.map_or(true, |dt| dt >= cutoff));
                 }
             }
 
@@ -4500,9 +5157,12 @@ impl MultiWorldSimulator {
             // ~83 years to fully decay. Ref: PTSD recovery timelines (Kessler 1995).
             // Care workers accelerate recovery. Slower decay = trauma persists meaningfully.
             for world in &mut self.worlds {
-                let care_ratio = world.agents.iter()
+                let care_ratio = world
+                    .agents
+                    .iter()
                     .filter(|a| a.is_alive() && a.skills.strongest() == "medicine")
-                    .count() as f64 / world.population().max(1) as f64;
+                    .count() as f64
+                    / world.population().max(1) as f64;
                 // Slower base decay: ~167 years to fully recover without care (was ~83yr).
                 // This ensures trauma accumulates meaningfully from repeated disasters
                 // and persists long enough to affect consciousness and governance.
@@ -4518,9 +5178,13 @@ impl MultiWorldSimulator {
             if self.current_tick % 120 == 0 {
                 for world in &self.worlds {
                     let cm = cohort::CohortManager::from_v1_agents(
-                        &world.agents, world.id, self.current_tick);
+                        &world.agents,
+                        world.id,
+                        self.current_tick,
+                    );
                     // Log cohort stats at key intervals
-                    if self.current_tick % 600 == 0 { // Every 50 years
+                    if self.current_tick % 600 == 0 {
+                        // Every 50 years
                         let _cohorts = cm.cohort_count();
                         let _workers = cm.worker_count();
                         let _load = cm.mean_load();
@@ -4540,7 +5204,11 @@ impl MultiWorldSimulator {
     fn build_final_report(&self) -> CivilizationReport {
         // Genetic diversity: focus on OFF-EARTH worlds only. Earth's 10K
         // population masks the bottleneck that matters — the colony's genetics.
-        let off_earth: Vec<_> = self.worlds.iter().filter(|w| w.location != "Earth").collect();
+        let off_earth: Vec<_> = self
+            .worlds
+            .iter()
+            .filter(|w| w.location != "Earth")
+            .collect();
         let genetic_diversity = if off_earth.is_empty() {
             // No off-Earth worlds yet — use all worlds
             if self.worlds.is_empty() {
@@ -4568,9 +5236,7 @@ impl MultiWorldSimulator {
             [0.0; 8]
         } else {
             let trackers: Vec<_> = self.worlds.iter().map(|w| w.harmony.clone()).collect();
-            harmony::HarmonyTracker::civilization_harmony(
-                &trackers,
-            )
+            harmony::HarmonyTracker::civilization_harmony(&trackers)
         };
         let love_coherence = if self.worlds.is_empty() {
             0.0
@@ -4583,7 +5249,9 @@ impl MultiWorldSimulator {
         // Bug #3 fix: Wire actual oppression index from governance system
         // instead of hardcoded 0.0. The oppression detector (governance.rs) uses
         // tier distribution to measure democratic health.
-        let max_oppression = self.governance.iter()
+        let max_oppression = self
+            .governance
+            .iter()
             .map(|g| g.oppression_index)
             .fold(0.0f64, f64::max);
 
@@ -4613,16 +5281,16 @@ impl MultiWorldSimulator {
         snapshots.push(final_snapshot);
 
         // Aggregate psychological needs from final snapshot
-        let (total_load, total_engagement, agent_count) = self.worlds.iter().fold(
-            (0.0f64, 0.0f64, 0usize),
-            |(load, eng, count), w| {
-                let living: Vec<_> = w.agents.iter().filter(|a| a.is_alive()).collect();
-                let n = living.len();
-                let l: f64 = living.iter().map(|a| a.needs.allostatic_load).sum();
-                let e: f64 = living.iter().map(|a| a.needs.engagement).sum();
-                (load + l, eng + e, count + n)
-            },
-        );
+        let (total_load, total_engagement, agent_count) =
+            self.worlds
+                .iter()
+                .fold((0.0f64, 0.0f64, 0usize), |(load, eng, count), w| {
+                    let living: Vec<_> = w.agents.iter().filter(|a| a.is_alive()).collect();
+                    let n = living.len();
+                    let l: f64 = living.iter().map(|a| a.needs.allostatic_load).sum();
+                    let e: f64 = living.iter().map(|a| a.needs.engagement).sum();
+                    (load + l, eng + e, count + n)
+                });
         let ac = agent_count.max(1) as f64;
         let mean_allostatic_load = total_load / ac;
         let mean_engagement = total_engagement / ac;
@@ -4667,16 +5335,20 @@ impl MultiWorldSimulator {
             .count();
 
         // Populate extended observable fields from snapshots
-        report.max_elite_persistence = snapshots.iter()
+        report.max_elite_persistence = snapshots
+            .iter()
             .map(|s| s.elite_persistence)
             .fold(0.0f64, f64::max);
-        report.max_innovation_stagnation = snapshots.iter()
+        report.max_innovation_stagnation = snapshots
+            .iter()
             .map(|s| s.innovation_stagnation)
             .fold(0.0f64, f64::max);
-        report.phi_trend_at_end = snapshots.last()
+        report.phi_trend_at_end = snapshots
+            .last()
             .map(|s| s.phi_trend.clone())
             .unwrap_or_else(|| "Unknown".into());
-        report.max_trauma = snapshots.iter()
+        report.max_trauma = snapshots
+            .iter()
             .map(|s| s.trauma_level)
             .fold(0.0f64, f64::max);
 
@@ -4712,7 +5384,10 @@ impl Default for World {
             knowledge: knowledge::WorldKnowledge::new(),
             economy: economy::WorldEconomy::new(),
             harmony: harmony::HarmonyTracker::new(),
-            governance: governance::WorldGovernance::new(), metabolism_state: crate::metabolism::MetabolismState::default(), currency_state: crate::currency::WorldCurrencyState::default(), policy_state: crate::proposals::PolicyState::default(),
+            governance: governance::WorldGovernance::new(),
+            metabolism_state: crate::metabolism::MetabolismState::default(),
+            currency_state: crate::currency::WorldCurrencyState::default(),
+            policy_state: crate::proposals::PolicyState::default(),
             power_generation_kw: 0.0,
             power_demand_kw: 0.0,
             narrative_identity: crate::world::NarrativeIdentity::default(),
@@ -4759,7 +5434,10 @@ mod tests {
         let report = sim.run();
 
         assert_eq!(report.total_ticks, 1800);
-        assert!(report.final_population > 0, "Population should survive 150 years");
+        assert!(
+            report.final_population > 0,
+            "Population should survive 150 years"
+        );
         assert!(report.final_worlds >= 2, "Should have at least 2 worlds");
         assert!(
             report.final_cvs > 0.0,
@@ -4787,7 +5465,10 @@ mod tests {
         let report = sim.run();
 
         assert_eq!(report.total_ticks, 120);
-        assert!(report.final_population > 0, "Should have surviving population");
+        assert!(
+            report.final_population > 0,
+            "Should have surviving population"
+        );
         // Population should grow from initial 10012 (Earth + Moon)
         assert!(
             report.final_population >= 100,
@@ -4826,8 +5507,7 @@ mod tests {
             r2.final_cvs
         );
         assert_eq!(
-            r1.total_events,
-            r2.total_events,
+            r1.total_events, r2.total_events,
             "Same seed should produce same event count"
         );
     }
@@ -4848,8 +5528,7 @@ mod tests {
         );
 
         // Verify WorldFounded event for Mars
-        let mars_founded = report
-            .worlds_founded;
+        let mars_founded = report.worlds_founded;
         assert!(
             mars_founded >= 3,
             "Should have at least 3 WorldFounded events (Earth, Moon, Mars), got {}",
@@ -4937,34 +5616,70 @@ mod tests {
         // === Print comparison ===
         eprintln!("\n=== EDUCATION GUILD A/B COMPARISON (150 years, with epistemic friction) ===");
         eprintln!("                          WITH guild    WITHOUT guild");
-        eprintln!("Population:              {:>10}    {:>10}", report_a.final_population, report_b.final_population);
-        eprintln!("Survived:                {:>10}    {:>10}", report_a.survived, report_b.survived);
-        eprintln!("CVS (viability):         {:>10.3}    {:>10.3}", report_a.final_cvs, report_b.final_cvs);
-        eprintln!("Mean allostatic load:    {:>10.3}    {:>10.3}", report_a.final_mean_allostatic_load, report_b.final_mean_allostatic_load);
-        eprintln!("Collective Phi:          {:>10.3}    {:>10.3}", report_a.final_collective_phi, report_b.final_collective_phi);
-        eprintln!("Mean engagement:         {:>10.3}    {:>10.3}", report_a.final_mean_engagement, report_b.final_mean_engagement);
-        eprintln!("Breakthroughs:           {:>10}    {:>10}", report_a.breakthroughs, report_b.breakthroughs);
-        eprintln!("Checkpoints passed:      {:>10}    {:>10}", report_a.checkpoints_passed, report_b.checkpoints_passed);
+        eprintln!(
+            "Population:              {:>10}    {:>10}",
+            report_a.final_population, report_b.final_population
+        );
+        eprintln!(
+            "Survived:                {:>10}    {:>10}",
+            report_a.survived, report_b.survived
+        );
+        eprintln!(
+            "CVS (viability):         {:>10.3}    {:>10.3}",
+            report_a.final_cvs, report_b.final_cvs
+        );
+        eprintln!(
+            "Mean allostatic load:    {:>10.3}    {:>10.3}",
+            report_a.final_mean_allostatic_load, report_b.final_mean_allostatic_load
+        );
+        eprintln!(
+            "Collective Phi:          {:>10.3}    {:>10.3}",
+            report_a.final_collective_phi, report_b.final_collective_phi
+        );
+        eprintln!(
+            "Mean engagement:         {:>10.3}    {:>10.3}",
+            report_a.final_mean_engagement, report_b.final_mean_engagement
+        );
+        eprintln!(
+            "Breakthroughs:           {:>10}    {:>10}",
+            report_a.breakthroughs, report_b.breakthroughs
+        );
+        eprintln!(
+            "Checkpoints passed:      {:>10}    {:>10}",
+            report_a.checkpoints_passed, report_b.checkpoints_passed
+        );
 
         // Count teaching events in scenario A
-        let teaching_events_a = sim_a.events.iter()
+        let teaching_events_a = sim_a
+            .events
+            .iter()
             .filter(|e| matches!(e.event_type, CivEventType::TeachingInteraction))
             .count();
-        let crisis_events_a = sim_a.events.iter()
+        let crisis_events_a = sim_a
+            .events
+            .iter()
             .filter(|e| matches!(e.event_type, CivEventType::SkillCrisis))
             .count();
-        let crisis_events_b = sim_b.events.iter()
+        let crisis_events_b = sim_b
+            .events
+            .iter()
             .filter(|e| matches!(e.event_type, CivEventType::SkillCrisis))
             .count();
 
         eprintln!("Teaching events (A):     {:>10}", teaching_events_a);
-        eprintln!("Skill crises (A):        {:>10}    {:>10}", crisis_events_a, crisis_events_b);
+        eprintln!(
+            "Skill crises (A):        {:>10}    {:>10}",
+            crisis_events_a, crisis_events_b
+        );
         eprintln!("================================================\n");
 
         // === Assertions: the education guild should help ===
         // Both should survive 50 years (this is a baseline sanity check)
         assert!(report_a.final_population > 0, "Guild world should survive");
-        assert!(report_b.final_population > 0, "Control world should survive 50 years");
+        assert!(
+            report_b.final_population > 0,
+            "Control world should survive 50 years"
+        );
 
         // The guild world should have peer teaching events
         assert!(
@@ -4980,8 +5695,14 @@ mod tests {
         assert!(!config.policy.hybrid_earth);
         let mut sim = MultiWorldSimulator::new(config);
         let report = sim.run();
-        assert!(sim.earth_regions.is_empty(), "hybrid_earth=false should not populate regions");
-        assert!(sim.spaceport.is_none(), "hybrid_earth=false should not create spaceport");
+        assert!(
+            sim.earth_regions.is_empty(),
+            "hybrid_earth=false should not populate regions"
+        );
+        assert!(
+            sim.spaceport.is_none(),
+            "hybrid_earth=false should not create spaceport"
+        );
         assert!(report.final_population > 0, "Classic model should work");
     }
 
@@ -5007,16 +5728,22 @@ mod tests {
         let _report = sim.run();
 
         // Viability engine should have tracked worlds
-        assert!(!sim.viability_engine.ledgers.is_empty(),
-            "Viability engine should have energy ledgers");
-        assert!(!sim.viability_engine.scaling.is_empty(),
-            "Viability engine should have scaling factors");
+        assert!(
+            !sim.viability_engine.ledgers.is_empty(),
+            "Viability engine should have energy ledgers"
+        );
+        assert!(
+            !sim.viability_engine.scaling.is_empty(),
+            "Viability engine should have scaling factors"
+        );
 
         // Entropy should have increased (2nd Law)
         for ledger in sim.viability_engine.ledgers.values() {
-            assert!(ledger.cumulative_entropy > 0.0,
+            assert!(
+                ledger.cumulative_entropy > 0.0,
                 "Entropy should be positive after 10 years: {}",
-                ledger.cumulative_entropy);
+                ledger.cumulative_entropy
+            );
         }
     }
 
@@ -5031,8 +5758,11 @@ mod tests {
         for world in &sim.worlds {
             if world.population() > 0 {
                 let scaling = sim.viability_engine.scaling_for(world.id);
-                assert!(scaling.population > 0.0,
-                    "Scaling should track population for world {}", world.name);
+                assert!(
+                    scaling.population > 0.0,
+                    "Scaling should track population for world {}",
+                    world.name
+                );
             }
         }
     }
@@ -5047,18 +5777,26 @@ mod tests {
         // DL#1: Disasters should cause some trauma OR wounds
         // With wound healing active, trauma_level may be 0.0 if all wounds healed.
         // Check for either non-zero trauma OR non-empty wound history.
-        let max_trauma: f64 = sim.worlds.iter()
+        let max_trauma: f64 = sim
+            .worlds
+            .iter()
             .flat_map(|w| w.agents.iter().filter(|a| a.is_alive()))
             .map(|a| a.trauma_level)
             .fold(0.0f64, f64::max);
-        let total_wounds: usize = sim.worlds.iter()
+        let total_wounds: usize = sim
+            .worlds
+            .iter()
             .flat_map(|w| w.agents.iter().filter(|a| a.is_alive()))
             .map(|a| a.wounds.len())
             .sum();
         if report.total_disasters > 10 {
-            assert!(max_trauma > 0.0 || total_wounds > 0,
+            assert!(
+                max_trauma > 0.0 || total_wounds > 0,
                 "DL#1: With {} disasters, should have trauma or wounds, got trauma={}, wounds={}",
-                report.total_disasters, max_trauma, total_wounds);
+                report.total_disasters,
+                max_trauma,
+                total_wounds
+            );
         }
 
         // Bug#3: CVS should use real oppression index (not hardcoded 0.0)
@@ -5073,22 +5811,34 @@ mod tests {
         let _report = sim.run();
 
         // Earth population model should be initialized
-        assert!(sim.earth_pop_model.is_some(),
-            "Earth population model should be initialized when hybrid_earth=true");
+        assert!(
+            sim.earth_pop_model.is_some(),
+            "Earth population model should be initialized when hybrid_earth=true"
+        );
 
         let pop_model = sim.earth_pop_model.as_ref().unwrap();
-        assert!(pop_model.total_population > 7000.0,
-            "Earth population should be >7 billion: {}M", pop_model.total_population);
-        assert_eq!(pop_model.demographics.len(), 12,
-            "Should have 12 regional demographics");
+        assert!(
+            pop_model.total_population > 7000.0,
+            "Earth population should be >7 billion: {}M",
+            pop_model.total_population
+        );
+        assert_eq!(
+            pop_model.demographics.len(),
+            12,
+            "Should have 12 regional demographics"
+        );
 
         // Climate model should have been ticked
-        assert!(pop_model.climate.cumulative_emissions_gt > 200.0,
+        assert!(
+            pop_model.climate.cumulative_emissions_gt > 200.0,
             "Cumulative emissions should exceed baseline (200 GtCO₂): {}",
-            pop_model.climate.cumulative_emissions_gt);
-        assert!(pop_model.climate.global_temp_anomaly > 0.0,
+            pop_model.climate.cumulative_emissions_gt
+        );
+        assert!(
+            pop_model.climate.global_temp_anomaly > 0.0,
             "Temperature anomaly should be positive: {}",
-            pop_model.climate.global_temp_anomaly);
+            pop_model.climate.global_temp_anomaly
+        );
     }
 
     #[test]
@@ -5123,17 +5873,31 @@ harmony_policy = true
         // DL#6: Agents with high joy should produce more than agents with high sadness
         let tick = 30 * 12; // Agent born at tick 0, now 30 years old
         let mut happy = CivAgent {
-            id: 1, birth_tick: 0, death_tick: None,
-            sex: BiologicalSex::Male, world_id: 0,
-            health: 1.0, skills: SkillVector::new(),
+            id: 1,
+            birth_tick: 0,
+            death_tick: None,
+            sex: BiologicalSex::Male,
+            world_id: 0,
+            health: 1.0,
+            skills: SkillVector::new(),
             education_level: 0.5,
             consciousness: ConsciousnessState::nascent(),
-            partner_id: None, children_ids: vec![],
+            partner_id: None,
+            children_ids: vec![],
             is_immigrant: false,
             needs: PsychologicalNeeds::new(),
-            tend_balance: 0.0, parent_ids: None,
-            faction_id: None, generation: 0,
-            trauma_level: 0.0, cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
+            tend_balance: 0.0,
+            parent_ids: None,
+            faction_id: None,
+            generation: 0,
+            trauma_level: 0.0,
+            cumulative_dose_sv: 0.0,
+            adversarial: None,
+            coordination_understanding: 0.0,
+            mycel_score: 0.1,
+            sap_balance: 100.0,
+            is_biological: true,
+            wounds: Vec::new(),
             ethics: crate::agent::EthicalOrientation::default(),
             sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
             justice: crate::sub_passport::RestorativeJustice::new(),
@@ -5150,9 +5914,17 @@ harmony_policy = true
         let happy_labor = happy.effective_labor(tick);
         let sad_labor = sad.effective_labor(tick);
 
-        assert!(happy_labor > sad_labor,
-            "DL#6: Happy agents should produce more: {} vs {}", happy_labor, sad_labor);
-        assert!(happy_labor > sad_labor * 1.3,
-            "DL#6: Effect should be >30% difference: {} vs {}", happy_labor, sad_labor);
+        assert!(
+            happy_labor > sad_labor,
+            "DL#6: Happy agents should produce more: {} vs {}",
+            happy_labor,
+            sad_labor
+        );
+        assert!(
+            happy_labor > sad_labor * 1.3,
+            "DL#6: Effect should be >30% difference: {} vs {}",
+            happy_labor,
+            sad_labor
+        );
     }
 }

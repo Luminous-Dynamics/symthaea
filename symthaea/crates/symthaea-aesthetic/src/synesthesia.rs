@@ -12,7 +12,7 @@
 //! - Cytowic, R. (2002). *Synesthesia: A Union of the Senses*. MIT Press.
 //! - Ward, J. (2013). Synesthesia. *Annual Review of Psychology*, 64, 49-75.
 
-use crate::{AestheticFeedback, AestheticScore};
+use crate::AestheticFeedback;
 
 /// Scriabin's pitch-class-to-hue mapping (degrees, C=0 through B=11).
 ///

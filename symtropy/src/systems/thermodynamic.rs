@@ -87,7 +87,9 @@ pub fn thermodynamic_enforcement_system(
         }
 
         for &(handle, agent_pos) in &agent_data {
-            let dist = agent_pos.truncate().distance(well_tf.translation.truncate());
+            let dist = agent_pos
+                .truncate()
+                .distance(well_tf.translation.truncate());
             if dist < well.radius {
                 let regen = well.regen_rate.min(well.remaining);
                 well.remaining -= regen;
@@ -108,7 +110,10 @@ pub fn thermodynamic_enforcement_system(
         .filter_map(|h| physics.consciousness.entities.get(h))
         .map(|e| e.energy.consumed_this_tick)
         .sum();
-    physics.consciousness.ledger.record_dissipation(total_maintenance);
+    physics
+        .consciousness
+        .ledger
+        .record_dissipation(total_maintenance);
 
     // --- Rule 4: Epistemic offloading (resonance REDUCES COSTS, not generates energy) ---
     // Thermodynamically honest: cooperation doesn't create energy.
@@ -157,12 +162,16 @@ pub fn thermodynamic_enforcement_system(
                     entity.prediction_error *= 1.0 - offload_factor * 0.1; // 10% faster decay per tick
                     entity.motor_precision = 1.0 / (1.0 + entity.prediction_error);
                     // Refund some of the maintenance cost (predictability reduces processing)
-                    entity.energy.regenerate(constants.consciousness_maintenance_per_tick * offload_factor * 0.5);
+                    entity.energy.regenerate(
+                        constants.consciousness_maintenance_per_tick * offload_factor * 0.5,
+                    );
                 }
                 if let Some(entity) = physics.consciousness.entities.get_mut(&hb) {
                     entity.prediction_error *= 1.0 - offload_factor * 0.1;
                     entity.motor_precision = 1.0 / (1.0 + entity.prediction_error);
-                    entity.energy.regenerate(constants.consciousness_maintenance_per_tick * offload_factor * 0.5);
+                    entity.energy.regenerate(
+                        constants.consciousness_maintenance_per_tick * offload_factor * 0.5,
+                    );
                 }
 
                 // Collapse recovery: epistemic offloading can't revive a dead agent

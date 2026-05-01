@@ -91,7 +91,11 @@ impl PhiDungeonConfig {
         let min_split_size = min_room_size * 2 + 2;
 
         // Corridor width: default 2, "embodiment" bottleneck → 1 (tighter)
-        let corridor_width = if params.bottleneck == "embodiment" { 1 } else { 2 };
+        let corridor_width = if params.bottleneck == "embodiment" {
+            1
+        } else {
+            2
+        };
 
         // Extra connections: phi=0 → 0 (tree), phi=1 → 3 (loops/integration)
         let extra_connections = (phi * 3.0) as usize;
@@ -145,15 +149,15 @@ pub fn scavenge_density_modifier(bottleneck: &str) -> f64 {
 /// to tint rooms based on the prevailing harmony.
 pub fn harmony_color_modulation(dominant_harmony: Option<usize>) -> (f32, f32) {
     match dominant_harmony {
-        Some(0) => (0.8, 0.6),  // Resonant Coherence → warm amber
-        Some(1) => (0.4, 0.7),  // Pan-Sentient Flourishing → cool green
-        Some(2) => (0.6, 0.5),  // Integral Wisdom → balanced
-        Some(3) => (0.7, 0.8),  // Infinite Play → warm, vivid
-        Some(4) => (0.3, 0.6),  // Universal Interconnectedness → cool blue
-        Some(5) => (0.5, 0.7),  // Sacred Reciprocity → balanced warm
-        Some(6) => (0.6, 0.9),  // Evolutionary Progression → vivid
-        Some(7) => (0.2, 0.3),  // Sacred Stillness → cool, muted
-        _ => (0.5, 0.5),        // No dominant → neutral
+        Some(0) => (0.8, 0.6), // Resonant Coherence → warm amber
+        Some(1) => (0.4, 0.7), // Pan-Sentient Flourishing → cool green
+        Some(2) => (0.6, 0.5), // Integral Wisdom → balanced
+        Some(3) => (0.7, 0.8), // Infinite Play → warm, vivid
+        Some(4) => (0.3, 0.6), // Universal Interconnectedness → cool blue
+        Some(5) => (0.5, 0.7), // Sacred Reciprocity → balanced warm
+        Some(6) => (0.6, 0.9), // Evolutionary Progression → vivid
+        Some(7) => (0.2, 0.3), // Sacred Stillness → cool, muted
+        _ => (0.5, 0.5),       // No dominant → neutral
     }
 }
 

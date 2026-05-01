@@ -12,8 +12,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// Default is `Local`. Content must be explicitly upgraded to `Public`
 /// via E3+/E4 epistemic classification or explicit user consent.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum ContentZone {
     /// Never encoded, never shared. Banks, email, corporate portals.
     Private,
@@ -23,7 +22,6 @@ pub enum ContentZone {
     /// Encoded and offered to DHT with E/N/M classification.
     Public,
 }
-
 
 /// NRC-inspired safety level (Nuclear Regulatory Commission graduated response).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -72,8 +70,8 @@ pub enum ThreatType {
 // Re-export unified epistemic types from the shared crate.
 // Previously defined locally as EmpiricalLevel only; now includes full E/N/M.
 pub use mycelix_claim_types::{
-    EmpiricalLevel, NormativeLevel, MaterialityLevel,
-    ClaimType, EpistemicClassification, UnifiedClaim,
+    ClaimType, EmpiricalLevel, EpistemicClassification, MaterialityLevel, NormativeLevel,
+    UnifiedClaim,
 };
 
 /// A search result from the epistemic knowledge engine.
@@ -147,7 +145,10 @@ mod tests {
 
     #[test]
     fn safety_level_max() {
-        assert_eq!(SafetyLevel::Green.max(SafetyLevel::Orange), SafetyLevel::Orange);
+        assert_eq!(
+            SafetyLevel::Green.max(SafetyLevel::Orange),
+            SafetyLevel::Orange
+        );
         assert_eq!(SafetyLevel::Red.max(SafetyLevel::Yellow), SafetyLevel::Red);
     }
 
@@ -166,7 +167,11 @@ mod tests {
         };
         // Max everything: 0.4*1.0 + 0.3*1.0 + 0.2*1.0 + 0.1*1.0 = 1.0
         let score = result.rank_score();
-        assert!((score - 1.0).abs() < 0.01, "max score should be ~1.0, got {}", score);
+        assert!(
+            (score - 1.0).abs() < 0.01,
+            "max score should be ~1.0, got {}",
+            score
+        );
     }
 
     #[test]
@@ -224,7 +229,11 @@ mod tests {
 
     #[test]
     fn content_zone_serde_roundtrip() {
-        for zone in [ContentZone::Private, ContentZone::Local, ContentZone::Public] {
+        for zone in [
+            ContentZone::Private,
+            ContentZone::Local,
+            ContentZone::Public,
+        ] {
             let json = serde_json::to_string(&zone).unwrap();
             let restored: ContentZone = serde_json::from_str(&json).unwrap();
             assert_eq!(zone, restored);
@@ -233,7 +242,12 @@ mod tests {
 
     #[test]
     fn safety_level_serde_roundtrip() {
-        for level in [SafetyLevel::Green, SafetyLevel::Yellow, SafetyLevel::Orange, SafetyLevel::Red] {
+        for level in [
+            SafetyLevel::Green,
+            SafetyLevel::Yellow,
+            SafetyLevel::Orange,
+            SafetyLevel::Red,
+        ] {
             let json = serde_json::to_string(&level).unwrap();
             let restored: SafetyLevel = serde_json::from_str(&json).unwrap();
             assert_eq!(level, restored);

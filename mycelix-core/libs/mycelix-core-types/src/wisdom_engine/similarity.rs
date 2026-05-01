@@ -1010,9 +1010,11 @@ impl SimilarityRegistry {
                     break;
                 }
 
-                let cluster_b = clusters.remove(&b)
+                let cluster_b = clusters
+                    .remove(&b)
                     .expect("cluster b exists since it was selected from cluster_ids");
-                clusters.get_mut(&a)
+                clusters
+                    .get_mut(&a)
                     .expect("cluster a exists since it was selected from cluster_ids")
                     .extend(cluster_b);
             } else {

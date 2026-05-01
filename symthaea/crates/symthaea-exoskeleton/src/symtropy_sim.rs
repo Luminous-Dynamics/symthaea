@@ -30,11 +30,17 @@ pub struct ConsciousnessExoCallback {
 }
 
 impl PhysicsCallback<3> for ConsciousnessExoCallback {
-    fn modulate_force(&self, _body: BodyHandle, force: &nalgebra::SVector<f64, 3>) -> nalgebra::SVector<f64, 3> {
+    fn modulate_force(
+        &self,
+        _body: BodyHandle,
+        force: &nalgebra::SVector<f64, 3>,
+    ) -> nalgebra::SVector<f64, 3> {
         // Exo forces scaled by consciousness-mediated stiffness
         *force * self.motor_gain as f64 * self.stiffness_factor
     }
-    fn modulate_impulse(&self, impulse: f64, _contact: &nalgebra::SVector<f64, 3>) -> f64 { impulse }
+    fn modulate_impulse(&self, impulse: f64, _contact: &nalgebra::SVector<f64, 3>) -> f64 {
+        impulse
+    }
     fn friction_multiplier(&self, _contact: &nalgebra::SVector<f64, 3>, _body: BodyHandle) -> f64 {
         // At low consciousness, reduce friction → more backdrivable
         0.5 + 0.5 * self.motor_gain as f64
@@ -70,19 +76,50 @@ impl SymtropyExoskeletonSimulator {
 
         // Exo leg spec: 3 joints per leg (hip, thigh, shank)
         let leg_spec = [
-            LinkSpec { mass: 1.5, length: 0.15, radius: 0.04, plane_a: 0, plane_b: 2, motor_max_force: Some(40.0), angle_limits: Some((-0.5, 1.5)), ..Default::default() },
-            LinkSpec { mass: 1.2, length: 0.40, radius: 0.035, plane_a: 1, plane_b: 2, motor_max_force: Some(30.0), angle_limits: Some((0.0, 2.4)), ..Default::default() },
-            LinkSpec { mass: 0.8, length: 0.40, radius: 0.03, plane_a: 1, plane_b: 2, motor_max_force: Some(20.0), angle_limits: Some((-0.5, 0.5)), ..Default::default() },
+            LinkSpec {
+                mass: 1.5,
+                length: 0.15,
+                radius: 0.04,
+                plane_a: 0,
+                plane_b: 2,
+                motor_max_force: Some(40.0),
+                angle_limits: Some((-0.5, 1.5)),
+                ..Default::default()
+            },
+            LinkSpec {
+                mass: 1.2,
+                length: 0.40,
+                radius: 0.035,
+                plane_a: 1,
+                plane_b: 2,
+                motor_max_force: Some(30.0),
+                angle_limits: Some((0.0, 2.4)),
+                ..Default::default()
+            },
+            LinkSpec {
+                mass: 0.8,
+                length: 0.40,
+                radius: 0.03,
+                plane_a: 1,
+                plane_b: 2,
+                motor_max_force: Some(20.0),
+                angle_limits: Some((-0.5, 0.5)),
+                ..Default::default()
+            },
         ];
 
         // Left leg at (0, 0.1, 0.9)
         let mut left_builder = ChainBuilder::new().base_position(Point::new([0.0, 0.1, 0.9]));
-        for spec in &leg_spec { left_builder = left_builder.add_link(spec.clone()); }
+        for spec in &leg_spec {
+            left_builder = left_builder.add_link(spec.clone());
+        }
         let left_exo = left_builder.build(&mut world);
 
         // Right leg at (0, -0.1, 0.9)
         let mut right_builder = ChainBuilder::new().base_position(Point::new([0.0, -0.1, 0.9]));
-        for spec in &leg_spec { right_builder = right_builder.add_link(spec.clone()); }
+        for spec in &leg_spec {
+            right_builder = right_builder.add_link(spec.clone());
+        }
         let right_exo = right_builder.build(&mut world);
 
         Self {
@@ -90,7 +127,10 @@ impl SymtropyExoskeletonSimulator {
             left_exo,
             right_exo,
             state: ExoskeletonState::standing(),
-            callback: ConsciousnessExoCallback { motor_gain: 1.0, stiffness_factor: 1.0 },
+            callback: ConsciousnessExoCallback {
+                motor_gain: 1.0,
+                stiffness_factor: 1.0,
+            },
             gait_phase: 0.0,
         }
     }
@@ -127,8 +167,11 @@ impl ExoskeletonPhysicsSimulator for SymtropyExoskeletonSimulator {
             let torque = cmd.joint_torques[j] as f64 * gain * cmd.stiffness_gain as f64;
             if let Some(body) = self.world.body_mut(link) {
                 let plane = if j == 0 { (0, 2) } else { (1, 2) };
-                body.angular_velocity.set(plane.0, plane.1,
-                    body.angular_velocity.get(plane.0, plane.1) + torque * dt);
+                body.angular_velocity.set(
+                    plane.0,
+                    plane.1,
+                    body.angular_velocity.get(plane.0, plane.1) + torque * dt,
+                );
             }
         }
 
@@ -137,8 +180,11 @@ impl ExoskeletonPhysicsSimulator for SymtropyExoskeletonSimulator {
             let torque = cmd.joint_torques[3 + j] as f64 * gain * cmd.stiffness_gain as f64;
             if let Some(body) = self.world.body_mut(link) {
                 let plane = if j == 0 { (0, 2) } else { (1, 2) };
-                body.angular_velocity.set(plane.0, plane.1,
-                    body.angular_velocity.get(plane.0, plane.1) + torque * dt);
+                body.angular_velocity.set(
+                    plane.0,
+                    plane.1,
+                    body.angular_velocity.get(plane.0, plane.1) + torque * dt,
+                );
             }
         }
 
@@ -153,13 +199,19 @@ impl ExoskeletonPhysicsSimulator for SymtropyExoskeletonSimulator {
         self.sync_state();
     }
 
-    fn state(&self) -> &ExoskeletonState { &self.state }
+    fn state(&self) -> &ExoskeletonState {
+        &self.state
+    }
 
-    fn reset(&mut self) { *self = Self::new(); }
+    fn reset(&mut self) {
+        *self = Self::new();
+    }
 }
 
 impl Default for SymtropyExoskeletonSimulator {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -177,7 +229,9 @@ mod tests {
     fn test_stepping_finite() {
         let mut sim = SymtropyExoskeletonSimulator::new();
         let cmd = ExoskeletonCommand::zero();
-        for _ in 0..200 { sim.step(&cmd, 0.005); }
+        for _ in 0..200 {
+            sim.step(&cmd, 0.005);
+        }
         assert!(sim.state().is_finite());
     }
 
@@ -188,7 +242,9 @@ mod tests {
         let mut cmd = ExoskeletonCommand::zero();
         cmd.joint_torques = [0.5; NUM_ACTUATORS];
         cmd.stiffness_gain = 1.0;
-        for _ in 0..50 { sim.step(&cmd, 0.005); }
+        for _ in 0..50 {
+            sim.step(&cmd, 0.005);
+        }
         // Should have moved joints
         let angles = &sim.state().joint_angles;
         let moved = angles.iter().any(|a| a.abs() > 0.001);
@@ -201,7 +257,9 @@ mod tests {
         sim.set_consciousness_impedance(0.0, 0.1); // Low Φ → transparent
         let mut cmd = ExoskeletonCommand::zero();
         cmd.joint_torques = [1.0; NUM_ACTUATORS]; // Max command
-        for _ in 0..50 { sim.step(&cmd, 0.005); }
+        for _ in 0..50 {
+            sim.step(&cmd, 0.005);
+        }
         assert!(sim.state().is_finite(), "Transparent mode should be stable");
     }
 
@@ -209,7 +267,9 @@ mod tests {
     fn test_reset() {
         let mut sim = SymtropyExoskeletonSimulator::new();
         let cmd = ExoskeletonCommand::zero();
-        for _ in 0..100 { sim.step(&cmd, 0.005); }
+        for _ in 0..100 {
+            sim.step(&cmd, 0.005);
+        }
         sim.reset();
         assert_eq!(sim.left_exo.num_joints, 3);
         assert!(sim.state().is_finite());

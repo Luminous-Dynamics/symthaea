@@ -204,7 +204,11 @@ mod tests {
     use super::*;
 
     fn grad(id: &str, values: Vec<f32>) -> Gradient {
-        Gradient { node_id: id.into(), values, round: 0 }
+        Gradient {
+            node_id: id.into(),
+            values,
+            round: 0,
+        }
     }
 
     #[test]
@@ -269,10 +273,7 @@ mod tests {
     #[test]
     fn test_dimension_mismatch() {
         let mut fg = FoolsGold::new();
-        let gradients = vec![
-            grad("a", vec![1.0, 2.0]),
-            grad("b", vec![1.0, 2.0, 3.0]),
-        ];
+        let gradients = vec![grad("a", vec![1.0, 2.0]), grad("b", vec![1.0, 2.0, 3.0])];
         assert!(fg.aggregate(&gradients).is_err());
     }
 

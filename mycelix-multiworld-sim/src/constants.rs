@@ -22,7 +22,6 @@ pub struct SimulationParams {
     // ========================================================================
     // PSYCHOLOGY (McEwen 1998, Palinkas 2008, Karasek 1979)
     // ========================================================================
-
     /// Baseline environmental stress per tick.
     /// Space habitats are inherently stressful: artificial light, recycled air.
     /// Ref: Palinkas & Suedfeld (2008) — Antarctic station stress baselines.
@@ -48,7 +47,6 @@ pub struct SimulationParams {
     // ========================================================================
     // TRAUMA (Van der Kolk 2014, Kessler 1995)
     // ========================================================================
-
     /// Trauma decay per tick. Full trauma (1.0) takes ~83 years to decay.
     /// Ref: Kessler (1995) — PTSD recovery timelines.
     pub trauma_decay_base: f64,
@@ -62,7 +60,6 @@ pub struct SimulationParams {
     // ========================================================================
     // RADIATION (Hassler 2014, Cucinotta 2014, NASA-STD-3001)
     // ========================================================================
-
     /// Mars surface dose in Sv/month.
     /// Ref: Hassler et al. (2014) MSL/RAD: 0.67 mSv/day = 20 mSv/month.
     pub radiation_mars_sv_month: f64,
@@ -81,7 +78,6 @@ pub struct SimulationParams {
     // ========================================================================
     // FERTILITY (Wakayama 2023, Lyons 2026)
     // ========================================================================
-
     /// Gravity threshold for reproduction viability.
     /// Below this, reproduction requires centrifuge or gene therapy.
     pub fertility_gravity_threshold: f64,
@@ -93,7 +89,6 @@ pub struct SimulationParams {
     // ========================================================================
     // RESOURCE SPOILAGE (NASA ISS data)
     // ========================================================================
-
     /// Food spoilage per tick (fraction lost).
     /// Perishable goods in controlled environment.
     pub spoilage_food: f64,
@@ -115,7 +110,6 @@ pub struct SimulationParams {
     // ========================================================================
     // PROJECTS (Flyvbjerg 2002)
     // ========================================================================
-
     /// Project duration variance (gaussian std as fraction of base).
     /// Ref: Flyvbjerg (2002) — construction overruns 20-50%.
     pub project_duration_variance: f64,
@@ -129,7 +123,6 @@ pub struct SimulationParams {
     // ========================================================================
     // ENVIRONMENTAL ENTROPY (NASA MER data)
     // ========================================================================
-
     /// Mars solar panel dust loss per tick (fraction).
     /// Ref: Spirit/Opportunity dust accumulation.
     pub solar_dust_mars: f64,
@@ -140,14 +133,12 @@ pub struct SimulationParams {
     // ========================================================================
     // CULTURAL MEMORY
     // ========================================================================
-
     /// Half-life of cultural memories in ticks (~100 years).
     pub memory_half_life_ticks: f64,
 
     // ========================================================================
     // HABITAT PSYCHOLOGY (Ulrich 1984, Palinkas 2008)
     // ========================================================================
-
     /// Allostatic load modifier for no-window modules per tick.
     /// Ref: Palinkas 2008 — 20-30% wellbeing loss after 90 days.
     pub habitat_no_window_stress: f64,
@@ -159,7 +150,6 @@ pub struct SimulationParams {
     // ========================================================================
     // ROBOTICS (NASA Robonaut, Boston Dynamics)
     // ========================================================================
-
     /// Manipulator power consumption (watts).
     pub robot_power_manipulator: f64,
     /// Humanoid power consumption (watts).

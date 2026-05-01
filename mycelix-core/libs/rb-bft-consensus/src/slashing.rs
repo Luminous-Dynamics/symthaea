@@ -5,8 +5,8 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::vote::{Vote, DoubleVoteEvidence};
 use crate::validator::SlashingSeverity;
+use crate::vote::{DoubleVoteEvidence, Vote};
 
 /// Types of slashable offenses
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,10 +52,7 @@ pub enum SlashableOffense {
     },
 
     /// Attempting to manipulate reputation scores
-    ReputationManipulation {
-        validator: String,
-        evidence: String,
-    },
+    ReputationManipulation { validator: String, evidence: String },
 
     /// H-02 remediation: Suspicious abstention pattern
     /// Coordinated abstention can manipulate consensus outcomes
@@ -74,14 +71,20 @@ impl SlashableOffense {
             SlashableOffense::DoubleVoting(_) => SlashingSeverity::Severe,
             SlashableOffense::DoubleProposing { .. } => SlashingSeverity::Severe,
             SlashableOffense::ConflictingCommit { .. } => SlashingSeverity::Critical,
-            SlashableOffense::MaliciousRejection { rejection_count, .. } => {
+            SlashableOffense::MaliciousRejection {
+                rejection_count, ..
+            } => {
                 if *rejection_count > 10 {
                     SlashingSeverity::Moderate
                 } else {
                     SlashingSeverity::Minor
                 }
             }
-            SlashableOffense::Inactivity { missed_rounds, total_rounds, .. } => {
+            SlashableOffense::Inactivity {
+                missed_rounds,
+                total_rounds,
+                ..
+            } => {
                 let rate = *missed_rounds as f32 / *total_rounds as f32;
                 if rate > 0.5 {
                     SlashingSeverity::Moderate
@@ -98,7 +101,9 @@ impl SlashableOffense {
             }
             SlashableOffense::ReputationManipulation { .. } => SlashingSeverity::Critical,
             // H-02 remediation: Suspicious abstention severity based on rate
-            SlashableOffense::SuspiciousAbstention { abstention_rate, .. } => {
+            SlashableOffense::SuspiciousAbstention {
+                abstention_rate, ..
+            } => {
                 if *abstention_rate > 0.5 {
                     SlashingSeverity::Moderate
                 } else {
@@ -132,11 +137,20 @@ impl SlashableOffense {
             SlashableOffense::ConflictingCommit { round, .. } => {
                 format!("Conflicting commits in round {}", round)
             }
-            SlashableOffense::MaliciousRejection { rejection_count, .. } => {
+            SlashableOffense::MaliciousRejection {
+                rejection_count, ..
+            } => {
                 format!("Malicious rejection ({} times)", rejection_count)
             }
-            SlashableOffense::Inactivity { missed_rounds, total_rounds, .. } => {
-                format!("Inactivity: missed {} of {} rounds", missed_rounds, total_rounds)
+            SlashableOffense::Inactivity {
+                missed_rounds,
+                total_rounds,
+                ..
+            } => {
+                format!(
+                    "Inactivity: missed {} of {} rounds",
+                    missed_rounds, total_rounds
+                )
             }
             SlashableOffense::InvalidProposals { invalid_count, .. } => {
                 format!("Invalid proposals ({} times)", invalid_count)
@@ -144,7 +158,11 @@ impl SlashableOffense {
             SlashableOffense::ReputationManipulation { .. } => {
                 "Reputation manipulation attempt".to_string()
             }
-            SlashableOffense::SuspiciousAbstention { abstention_rate, window_size, .. } => {
+            SlashableOffense::SuspiciousAbstention {
+                abstention_rate,
+                window_size,
+                ..
+            } => {
                 format!(
                     "Suspicious abstention pattern: {:.1}% over {} rounds",
                     abstention_rate * 100.0,
@@ -286,7 +304,11 @@ impl SlashingManager {
     }
 
     /// Report an offense
-    pub fn report_offense(&mut self, offense: SlashableOffense, reporter: String) -> &SlashingEvent {
+    pub fn report_offense(
+        &mut self,
+        offense: SlashableOffense,
+        reporter: String,
+    ) -> &SlashingEvent {
         let event = SlashingEvent::new(offense, reporter);
         self.pending.push(event);
         self.pending.last().expect("event just pushed above")

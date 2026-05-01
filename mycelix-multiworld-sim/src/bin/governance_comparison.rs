@@ -4,7 +4,9 @@
 //! Run all 5 governance models with the same seed and compare CVS outcomes.
 //! This is the honest test of the consciousness-gating hypothesis.
 
-use mycelix_multiworld_sim::{MultiWorldSimulator, config::SimulationConfig, governance_models::GovernanceModel};
+use mycelix_multiworld_sim::{
+    config::SimulationConfig, governance_models::GovernanceModel, MultiWorldSimulator,
+};
 
 fn main() {
     let seed = 42u64;
@@ -12,8 +14,10 @@ fn main() {
 
     println!("=== GOVERNANCE MODEL COMPARISON ===");
     println!("Seed: {seed}, Duration: {years} years, 5 models\n");
-    println!("{:<30} {:>8} {:>8} {:>8} {:>8} {:>8}",
-        "Model", "CVS", "Pop", "Worlds", "Disast", "Phi");
+    println!(
+        "{:<30} {:>8} {:>8} {:>8} {:>8} {:>8}",
+        "Model", "CVS", "Pop", "Worlds", "Disast", "Phi"
+    );
     println!("{}", "-".repeat(80));
 
     let mut results = Vec::new();
@@ -31,7 +35,9 @@ fn main() {
             GovernanceModel::EqualWeight => {
                 config.policy.trust_weighted_governance = false;
             }
-            GovernanceModel::Sortition | GovernanceModel::Meritocratic | GovernanceModel::ElderCouncil => {
+            GovernanceModel::Sortition
+            | GovernanceModel::Meritocratic
+            | GovernanceModel::ElderCouncil => {
                 // These models aren't wired into the tick loop yet —
                 // for now, approximate by disabling trust weighting
                 // (the voting_weight() function exists but isn't called by governance.rs)
@@ -43,12 +49,21 @@ fn main() {
         let mut sim = MultiWorldSimulator::new(config);
         let report = sim.run();
 
-        let mean_phi: f64 = sim.worlds.iter()
+        let mean_phi: f64 = sim
+            .worlds
+            .iter()
             .filter(|w| w.population() > 0)
             .map(|w| w.mean_phi())
-            .sum::<f64>() / sim.worlds.iter().filter(|w| w.population() > 0).count().max(1) as f64;
+            .sum::<f64>()
+            / sim
+                .worlds
+                .iter()
+                .filter(|w| w.population() > 0)
+                .count()
+                .max(1) as f64;
 
-        println!("{:<30} {:>8.4} {:>8} {:>8} {:>8} {:>8.3}",
+        println!(
+            "{:<30} {:>8.4} {:>8} {:>8} {:>8} {:>8.3}",
             model.name(),
             report.final_cvs,
             report.final_population,
@@ -62,19 +77,28 @@ fn main() {
 
     // Analysis
     println!("\n=== ANALYSIS ===");
-    let consciousness_cvs = results.iter()
+    let consciousness_cvs = results
+        .iter()
         .find(|(n, _, _)| *n == "Consciousness-Gated")
         .map(|(_, cvs, _)| *cvs)
         .unwrap_or(0.0);
-    let equal_cvs = results.iter()
+    let equal_cvs = results
+        .iter()
         .find(|(n, _, _)| *n == "Equal Weight (Democracy)")
         .map(|(_, cvs, _)| *cvs)
         .unwrap_or(0.0);
 
     let delta = consciousness_cvs - equal_cvs;
-    let pct = if equal_cvs > 0.0 { delta / equal_cvs * 100.0 } else { 0.0 };
+    let pct = if equal_cvs > 0.0 {
+        delta / equal_cvs * 100.0
+    } else {
+        0.0
+    };
 
-    println!("Consciousness-Gated vs Equal Weight: ΔCVS = {:+.4} ({:+.1}%)", delta, pct);
+    println!(
+        "Consciousness-Gated vs Equal Weight: ΔCVS = {:+.4} ({:+.1}%)",
+        delta, pct
+    );
     println!("Published claim: +6.9%. Observed: {:+.1}%", pct);
 
     if pct > 5.0 {

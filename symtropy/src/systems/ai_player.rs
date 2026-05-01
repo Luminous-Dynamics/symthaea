@@ -90,13 +90,22 @@ pub fn ai_player_system(
     // 4. Direction to nearest NPC (normalized, -1 to 1 for x and y)
     let nearest_npc = npc_query
         .iter()
-        .map(|tf| (tf.translation.truncate(), tf.translation.truncate().distance(player_pos)))
-        .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+        .map(|tf| {
+            (
+                tf.translation.truncate(),
+                tf.translation.truncate().distance(player_pos),
+            )
+        })
+        .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
 
     let (npc_dir_x, npc_dir_y, npc_dist_norm) = match nearest_npc {
         Some((npc_pos, dist)) if dist > 1.0 => {
             let dir = (npc_pos - player_pos).normalize();
-            (dir.x as f64, dir.y as f64, (1.0 - dist as f64 / 500.0).max(0.0))
+            (
+                dir.x as f64,
+                dir.y as f64,
+                (1.0 - dist as f64 / 500.0).max(0.0),
+            )
         }
         _ => (0.0, 0.0, 1.0), // Already at NPC
     };
@@ -105,8 +114,13 @@ pub fn ai_player_system(
     let nearest_well = well_query
         .iter()
         .filter(|(_, w)| w.is_active())
-        .map(|(tf, _)| (tf.translation.truncate(), tf.translation.truncate().distance(player_pos)))
-        .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+        .map(|(tf, _)| {
+            (
+                tf.translation.truncate(),
+                tf.translation.truncate().distance(player_pos),
+            )
+        })
+        .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
 
     let (_well_dir_x, _well_dir_y) = match nearest_well {
         Some((well_pos, dist)) if dist > 1.0 => {
@@ -152,41 +166,54 @@ pub fn ai_player_system(
     let pos = nalgebra::SVector::from([player_pos.x as f64, player_pos.y as f64]);
 
     // Get player's harmony activations
-    let harmony = physics.consciousness.entities.get(&player_body.handle)
+    let harmony = physics
+        .consciousness
+        .entities
+        .get(&player_body.handle)
         .map(|e| e.harmony_activations)
         .unwrap_or([0.5; 8]);
 
     // Build nearby agents list from NPCs
-    let nearby: Vec<_> = npc_query.iter()
+    let nearby: Vec<_> = npc_query
+        .iter()
         .filter_map(|tf| {
-            let npc_pos = nalgebra::SVector::from([
-                tf.translation.x as f64, tf.translation.y as f64
-            ]);
+            let npc_pos =
+                nalgebra::SVector::from([tf.translation.x as f64, tf.translation.y as f64]);
             // Try to find harmony data (use default if not available)
             Some((npc_pos, [0.5f64; 8]))
         })
         .collect();
 
     // Build energy well list
-    let wells_data: Vec<_> = well_query.iter()
+    let wells_data: Vec<_> = well_query
+        .iter()
         .filter(|(_, w)| w.is_active())
         .map(|(tf, w)| {
-            (nalgebra::SVector::from([tf.translation.x as f64, tf.translation.y as f64]),
-             w.fraction_remaining())
+            (
+                nalgebra::SVector::from([tf.translation.x as f64, tf.translation.y as f64]),
+                w.fraction_remaining(),
+            )
         })
         .collect();
 
     // Danger source (core position, where Leviathan spawns)
     let danger_src: Option<nalgebra::SVector<f64, 2>> = if danger > 0.1 {
-        core_query.iter().next().map(|tf| {
-            nalgebra::SVector::from([tf.translation.x as f64, tf.translation.y as f64])
-        })
+        core_query
+            .iter()
+            .next()
+            .map(|tf| nalgebra::SVector::from([tf.translation.x as f64, tf.translation.y as f64]))
     } else {
         None
     };
 
     let gradient = symtropy_consciousness_physics::fep_gradient::free_energy_gradient(
-        &pos, energy_frac, &harmony, &nearby, &wells_data, danger_src.as_ref(), danger,
+        &pos,
+        energy_frac,
+        &harmony,
+        &nearby,
+        &wells_data,
+        danger_src.as_ref(),
+        danger,
     );
 
     let dir = Vec2::new(gradient[0] as f32, gradient[1] as f32);

@@ -1,0 +1,141 @@
+{
+  "metadata": {
+    "title": "Global Citizen Seed: Universal Mobility Standards",
+    "framework": "Global Citizen Mesh",
+    "source": "https://mycelix.org/certs-citizen",
+    "grade_level": "Professional",
+    "subject_area": "Multi-Sector",
+    "domain": "Professional Certification",
+    "version": "1.0",
+    "total_standards": 6,
+    "domains": [
+      "Global Education",
+      "Learning Design",
+      "Cloud Architecture",
+      "NGO Leadership",
+      "Applied AI"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Focused on portable, high-utility certifications for global mobility and impact."
+  },
+  "nodes": [
+    {
+      "id": "CERT-EDU-TEFL",
+      "title": "TEFL/TESOL Certification Mapping",
+      "description": "Foundations of English language teaching. Lesson planning, classroom management, and language awareness. Mapping linguistic sovereignty to global education.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Global Education",
+      "subdomain": "Certification Bridge",
+      "tags": ["teaching", "education", "tefl", "language", "standard"],
+      "estimated_hours": 120,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Humanities",
+      "economic_signals": {
+        "average_starting_salary": 30000,
+        "market_demand": "High",
+        "growth_rate_percent": 5
+      }
+    },
+    {
+      "id": "CERT-EDU-ID",
+      "title": "Google / LinkedIn Instructional Design Certificate",
+      "description": "Designing effective learning experiences. Theory, technology, and evaluation of instructional programs. Linked to the Resonant Mentorship track.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Learning Design",
+      "subdomain": "Certification Bridge",
+      "tags": ["edtech", "instructional-design", "education", "standard"],
+      "estimated_hours": 150,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Create",
+      "subject_area": "Social Studies",
+      "economic_signals": {
+        "average_starting_salary": 65000,
+        "market_demand": "Steady",
+        "growth_rate_percent": 8
+      }
+    },
+    {
+      "id": "CERT-CLOUD-AWS-SAA",
+      "title": "AWS Certified Solutions Architect - Associate",
+      "description": "Designing resilient, high-performing, secure, and cost-optimized architectures on AWS. The industry standard for cloud engineering leadership.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Cloud Architecture",
+      "subdomain": "Certification Bridge",
+      "tags": ["aws", "cloud", "architecture", "solutions", "standard"],
+      "estimated_hours": 150,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "economic_signals": {
+        "average_starting_salary": 115000,
+        "market_demand": "Extreme",
+        "growth_rate_percent": 20
+      }
+    },
+    {
+      "id": "CERT-GOV-NGO-LEAD",
+      "title": "NGO Management & Leadership Professional",
+      "description": "Strategic planning, governance, and resource mobilization for NGOs. Mapping sovereign governance to professional social impact management.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "NGO Leadership",
+      "subdomain": "Certification Bridge",
+      "tags": ["ngo", "leadership", "non-profit", "impact", "standard"],
+      "estimated_hours": 60,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Social Studies",
+      "economic_signals": {
+        "average_starting_salary": 50000,
+        "market_demand": "High",
+        "growth_rate_percent": 7
+      }
+    },
+    {
+      "id": "CERT-AI-MS-APPLIED",
+      "title": "Microsoft Applied AI Skills",
+      "description": "Scenario-based AI development. Developing generative AI solutions, NLP solutions, and computer vision solutions. Linked to active inference tracks.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Applied AI",
+      "subdomain": "Certification Bridge",
+      "tags": ["ai", "microsoft", "applied-ai", "standard"],
+      "estimated_hours": 40,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "economic_signals": {
+        "average_starting_salary": 80000,
+        "market_demand": "Extreme",
+        "growth_rate_percent": 30
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "HUM-LANG-301",
+      "to": "CERT-EDU-TEFL",
+      "edge_type": "Recommended",
+      "strength_permille": 850,
+      "rationale": "Linguistic sovereignty and idiomatic awareness are the core foundations for global language education."
+    },
+    {
+      "from": "HUM-CAP-02",
+      "to": "CERT-GOV-NGO-LEAD",
+      "edge_type": "Recommended",
+      "strength_permille": 900,
+      "rationale": "Leading a flourishing-masterpiece capstone is the practical fulfillment of professional NGO leadership."
+    },
+    {
+      "from": "IT-SEC-101",
+      "to": "CERT-CLOUD-AWS-SAA",
+      "edge_type": "Recommended",
+      "strength_permille": 700,
+      "rationale": "Foundational mesh security provides the necessary intuition for secure cloud architecture design."
+    }
+  ]
+}

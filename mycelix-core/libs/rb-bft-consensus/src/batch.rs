@@ -39,8 +39,8 @@ use ed25519_dalek::{Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 
-use crate::error::{ConsensusError, ConsensusResult};
 use crate::crypto::ConsensusSignature;
+use crate::error::{ConsensusError, ConsensusResult};
 
 /// A single entry in the batch verifier
 #[derive(Clone)]
@@ -86,17 +86,19 @@ impl SignatureEntry {
         sig: &ConsensusSignature,
         message: Vec<u8>,
     ) -> ConsensusResult<Self> {
-        let public_key: [u8; 32] = sig.signer_pubkey.as_slice()
-            .try_into()
-            .map_err(|_| ConsensusError::InvalidSignature {
+        let public_key: [u8; 32] = sig.signer_pubkey.as_slice().try_into().map_err(|_| {
+            ConsensusError::InvalidSignature {
                 reason: "Public key must be 32 bytes".to_string(),
-            })?;
+            }
+        })?;
 
-        let signature: [u8; 64] = sig.signature.as_slice()
-            .try_into()
-            .map_err(|_| ConsensusError::InvalidSignature {
-                reason: "Signature must be 64 bytes".to_string(),
-            })?;
+        let signature: [u8; 64] =
+            sig.signature
+                .as_slice()
+                .try_into()
+                .map_err(|_| ConsensusError::InvalidSignature {
+                    reason: "Signature must be 64 bytes".to_string(),
+                })?;
 
         Ok(Self {
             public_key,
@@ -158,13 +160,9 @@ impl BatchVerificationResult {
 
     /// Get error message for entry at index (None if valid)
     pub fn get_error_by_index(&self, index: usize) -> Option<String> {
-        self.entry_errors.get(index).and_then(|e| {
-            if e.is_empty() {
-                None
-            } else {
-                Some(e.clone())
-            }
-        })
+        self.entry_errors
+            .get(index)
+            .and_then(|e| if e.is_empty() { None } else { Some(e.clone()) })
     }
 }
 
@@ -177,7 +175,9 @@ pub struct BatchVerifier {
 impl BatchVerifier {
     /// Create a new empty batch verifier
     pub fn new() -> Self {
-        Self { entries: Vec::new() }
+        Self {
+            entries: Vec::new(),
+        }
     }
 
     /// Create with initial capacity
@@ -277,10 +277,11 @@ impl BatchVerifier {
         let mut verifying_keys: Vec<VerifyingKey> = Vec::with_capacity(self.entries.len());
 
         for entry in &self.entries {
-            let verifying_key = VerifyingKey::from_bytes(&entry.public_key)
-                .map_err(|e| ConsensusError::InvalidSignature {
+            let verifying_key = VerifyingKey::from_bytes(&entry.public_key).map_err(|e| {
+                ConsensusError::InvalidSignature {
                     reason: format!("Invalid public key: {}", e),
-                })?;
+                }
+            })?;
 
             let signature = Signature::from_bytes(&entry.signature);
 
@@ -392,19 +393,25 @@ impl BatchVerifier {
     /// Verify and fail fast on first invalid signature
     pub fn verify_fail_fast(&self) -> ConsensusResult<()> {
         for entry in &self.entries {
-            let verifying_key = VerifyingKey::from_bytes(&entry.public_key)
-                .map_err(|e| ConsensusError::InvalidSignature {
+            let verifying_key = VerifyingKey::from_bytes(&entry.public_key).map_err(|e| {
+                ConsensusError::InvalidSignature {
                     reason: format!("Invalid public key: {}", e),
-                })?;
+                }
+            })?;
 
             let signature = Signature::from_bytes(&entry.signature);
 
             use ed25519_dalek::Verifier;
-            verifying_key.verify(&entry.message, &signature)
+            verifying_key
+                .verify(&entry.message, &signature)
                 .map_err(|e| ConsensusError::InvalidSignature {
                     reason: format!(
                         "Signature verification failed{}: {}",
-                        entry.label.as_ref().map(|l| format!(" ({})", l)).unwrap_or_default(),
+                        entry
+                            .label
+                            .as_ref()
+                            .map(|l| format!(" ({})", l))
+                            .unwrap_or_default(),
                         e
                     ),
                 })?;
@@ -502,9 +509,8 @@ mod tests {
 
     #[test]
     fn test_batch_verifier_multiple_valid() {
-        let keypairs: Vec<ValidatorKeypair> = (0..10)
-            .map(|_| ValidatorKeypair::generate())
-            .collect();
+        let keypairs: Vec<ValidatorKeypair> =
+            (0..10).map(|_| ValidatorKeypair::generate()).collect();
 
         let mut batch = BatchVerifier::new();
 
@@ -595,11 +601,11 @@ mod tests {
 
     #[test]
     fn test_batch_verify_votes() {
-        let keypairs: Vec<ValidatorKeypair> = (0..5)
-            .map(|_| ValidatorKeypair::generate())
-            .collect();
+        let keypairs: Vec<ValidatorKeypair> =
+            (0..5).map(|_| ValidatorKeypair::generate()).collect();
 
-        let votes: Vec<(ConsensusSignature, Vec<u8>)> = keypairs.iter()
+        let votes: Vec<(ConsensusSignature, Vec<u8>)> = keypairs
+            .iter()
             .enumerate()
             .map(|(i, kp)| {
                 let msg = format!("vote_{}", i).into_bytes();
@@ -639,7 +645,10 @@ mod tests {
             all_valid: false,
             failed_labels: vec!["sig_5".to_string(), "sig_12".to_string()],
             entry_validity: vec![true; 18].into_iter().chain(vec![false; 2]).collect(),
-            entry_errors: vec![String::new(); 18].into_iter().chain(vec!["error".to_string(); 2]).collect(),
+            entry_errors: vec![String::new(); 18]
+                .into_iter()
+                .chain(vec!["error".to_string(); 2])
+                .collect(),
         };
 
         stats.record(&result1);
@@ -653,9 +662,8 @@ mod tests {
 
     #[test]
     fn test_large_batch_performance() {
-        let keypairs: Vec<ValidatorKeypair> = (0..100)
-            .map(|_| ValidatorKeypair::generate())
-            .collect();
+        let keypairs: Vec<ValidatorKeypair> =
+            (0..100).map(|_| ValidatorKeypair::generate()).collect();
 
         let mut batch = BatchVerifier::with_capacity(100);
 

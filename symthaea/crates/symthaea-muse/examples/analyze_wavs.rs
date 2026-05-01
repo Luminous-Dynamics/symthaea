@@ -72,7 +72,10 @@ fn main() {
 
         // Convert to stereo pairs
         let stereo: Vec<[f32; 2]> = if channels == 2 {
-            samples.chunks(2).map(|c| [c[0], c.get(1).copied().unwrap_or(0.0)]).collect()
+            samples
+                .chunks(2)
+                .map(|c| [c[0], c.get(1).copied().unwrap_or(0.0)])
+                .collect()
         } else {
             samples.iter().map(|&s| [s, s]).collect()
         };
@@ -151,8 +154,11 @@ fn main() {
         for (name, score) in &with_issues {
             println!(
                 "    {}: clip={}, flat={:.3}, hnr={:.1}dB, crest={:.1}dB",
-                name, score.clipped_samples, score.spectral_flatness,
-                score.harmonic_to_noise_db, score.crest_db
+                name,
+                score.clipped_samples,
+                score.spectral_flatness,
+                score.harmonic_to_noise_db,
+                score.crest_db
             );
         }
     }
@@ -161,9 +167,14 @@ fn main() {
     if !all_scores.is_empty() {
         let mut sorted = all_scores.clone();
         sorted.sort_by(|a, b| b.1.composite.partial_cmp(&a.1.composite).unwrap());
-        println!("\n  Best quality: {} ({:.3})", sorted[0].0, sorted[0].1.composite);
-        println!("  Worst quality: {} ({:.3})",
+        println!(
+            "\n  Best quality: {} ({:.3})",
+            sorted[0].0, sorted[0].1.composite
+        );
+        println!(
+            "  Worst quality: {} ({:.3})",
             sorted.last().unwrap().0,
-            sorted.last().unwrap().1.composite);
+            sorted.last().unwrap().1.composite
+        );
     }
 }

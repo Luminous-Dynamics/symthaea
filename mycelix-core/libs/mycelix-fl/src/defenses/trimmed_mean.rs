@@ -123,10 +123,7 @@ mod tests {
 
     #[test]
     fn test_no_trimming_when_ratio_zero() {
-        let gradients = vec![
-            grad(vec![1.0, 2.0], "a"),
-            grad(vec![3.0, 4.0], "b"),
-        ];
+        let gradients = vec![grad(vec![1.0, 2.0], "a"), grad(vec![3.0, 4.0], "b")];
         let mut config = DefenseConfig::default();
         config.trim_ratio = 0.0;
 
@@ -138,10 +135,7 @@ mod tests {
     #[test]
     fn test_no_trimming_when_n_too_small() {
         // 2 nodes with trim_ratio=0.1 → n_trim = int(2*0.1) = 0
-        let gradients = vec![
-            grad(vec![1.0], "a"),
-            grad(vec![3.0], "b"),
-        ];
+        let gradients = vec![grad(vec![1.0], "a"), grad(vec![3.0], "b")];
         let config = DefenseConfig::default(); // trim_ratio = 0.1
 
         let result = TrimmedMean.aggregate(&gradients, &config).unwrap();

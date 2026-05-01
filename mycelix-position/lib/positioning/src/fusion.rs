@@ -6,9 +6,21 @@ use serde::{Deserialize, Serialize};
 
 /// Helper for accepting both scalar and array sigma.
 pub struct SigmaInput(pub [f64; 3]);
-impl From<[f64; 3]> for SigmaInput { fn from(v: [f64; 3]) -> Self { Self(v) } }
-impl From<f64> for SigmaInput { fn from(v: f64) -> Self { Self([v, v, v]) } }
-impl From<f32> for SigmaInput { fn from(v: f32) -> Self { Self([v as f64, v as f64, v as f64]) } }
+impl From<[f64; 3]> for SigmaInput {
+    fn from(v: [f64; 3]) -> Self {
+        Self(v)
+    }
+}
+impl From<f64> for SigmaInput {
+    fn from(v: f64) -> Self {
+        Self([v, v, v])
+    }
+}
+impl From<f32> for SigmaInput {
+    fn from(v: f32) -> Self {
+        Self([v as f64, v as f64, v as f64])
+    }
+}
 
 /// 3D Gaussian estimate with mean and covariance diagonal.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -21,15 +33,31 @@ pub struct GaussianEstimate3D {
 }
 
 impl GaussianEstimate3D {
-    pub fn new(mean: [f64; 3], cov: [f64; 3]) -> Self { Self { mean, covariance_diag: cov, covariance: cov } }
+    pub fn new(mean: [f64; 3], cov: [f64; 3]) -> Self {
+        Self {
+            mean,
+            covariance_diag: cov,
+            covariance: cov,
+        }
+    }
     pub fn from_diagonal_sigma(mean: [f64; 3], sigma: impl Into<SigmaInput>) -> Self {
         let s: SigmaInput = sigma.into();
-        let c = [s.0[0]*s.0[0], s.0[1]*s.0[1], s.0[2]*s.0[2]];
-        Self { mean, covariance_diag: c, covariance: c }
+        let c = [s.0[0] * s.0[0], s.0[1] * s.0[1], s.0[2] * s.0[2]];
+        Self {
+            mean,
+            covariance_diag: c,
+            covariance: c,
+        }
     }
-    pub fn uncertainty(&self) -> f64 { (self.covariance_diag.iter().sum::<f64>() / 3.0).sqrt() }
+    pub fn uncertainty(&self) -> f64 {
+        (self.covariance_diag.iter().sum::<f64>() / 3.0).sqrt()
+    }
     pub fn diagonal_sigma_m(&self) -> [f64; 3] {
-        [self.covariance_diag[0].sqrt(), self.covariance_diag[1].sqrt(), self.covariance_diag[2].sqrt()]
+        [
+            self.covariance_diag[0].sqrt(),
+            self.covariance_diag[1].sqrt(),
+            self.covariance_diag[2].sqrt(),
+        ]
     }
 }
 
@@ -40,9 +68,15 @@ impl PartialEq for GaussianEstimate3D {
 }
 
 impl PublishableEstimate3D for GaussianEstimate3D {
-    fn estimate(&self) -> &GaussianEstimate3D { self }
-    fn source_count(&self) -> usize { 1 }
-    fn timestamp_us(&self) -> u64 { 0 }
+    fn estimate(&self) -> &GaussianEstimate3D {
+        self
+    }
+    fn source_count(&self) -> usize {
+        1
+    }
+    fn timestamp_us(&self) -> u64 {
+        0
+    }
 }
 
 /// A peer's position estimate with trust weight.
@@ -56,16 +90,22 @@ pub struct PeerEstimate3D {
 }
 
 impl PeerEstimate3D {
-    pub fn peer_estimate(&self) -> &GaussianEstimate3D { &self.estimate }
+    pub fn peer_estimate(&self) -> &GaussianEstimate3D {
+        &self.estimate
+    }
 }
 
 /// Trait for estimates that can be published to DHT.
 pub trait PublishableEstimate3D {
     fn estimate(&self) -> &GaussianEstimate3D;
-    fn peer_estimate(&self) -> &GaussianEstimate3D { self.estimate() }
+    fn peer_estimate(&self) -> &GaussianEstimate3D {
+        self.estimate()
+    }
     fn source_count(&self) -> usize;
     fn timestamp_us(&self) -> u64;
-    fn confidence(&self) -> f64 { 1.0 }
+    fn confidence(&self) -> f64 {
+        1.0
+    }
 }
 
 /// Default publishable estimate implementation.
@@ -77,9 +117,15 @@ pub struct DefaultPublishableEstimate3D {
 }
 
 impl PublishableEstimate3D for DefaultPublishableEstimate3D {
-    fn estimate(&self) -> &GaussianEstimate3D { &self.estimate }
-    fn source_count(&self) -> usize { self.source_count }
-    fn timestamp_us(&self) -> u64 { self.timestamp_us }
+    fn estimate(&self) -> &GaussianEstimate3D {
+        &self.estimate
+    }
+    fn source_count(&self) -> usize {
+        self.source_count
+    }
+    fn timestamp_us(&self) -> u64 {
+        self.timestamp_us
+    }
 }
 
 /// Peer fusion engine using Covariance Intersection.
@@ -89,17 +135,28 @@ pub struct PeerFusion3D {
 }
 
 impl PeerFusion3D {
-    pub fn new(max_peers: usize) -> Self { Self { peers: Vec::new(), max_peers } }
+    pub fn new(max_peers: usize) -> Self {
+        Self {
+            peers: Vec::new(),
+            max_peers,
+        }
+    }
 
     pub fn add_peer(&mut self, peer: PeerEstimate3D) {
-        if self.peers.len() >= self.max_peers { self.peers.remove(0); }
+        if self.peers.len() >= self.max_peers {
+            self.peers.remove(0);
+        }
         self.peers.push(peer);
     }
 
     pub fn fuse(&self) -> Option<GaussianEstimate3D> {
-        if self.peers.is_empty() { return None; }
+        if self.peers.is_empty() {
+            return None;
+        }
         let total_w: f64 = self.peers.iter().map(|p| p.trust_weight).sum();
-        if total_w < 1e-10 { return None; }
+        if total_w < 1e-10 {
+            return None;
+        }
         let mut mean = [0.0; 3];
         let mut cov = [0.0; 3];
         for p in &self.peers {
@@ -109,10 +166,16 @@ impl PeerFusion3D {
                 cov[i] += w * p.estimate.covariance_diag[i];
             }
         }
-        Some(GaussianEstimate3D { mean, covariance_diag: cov, covariance: cov })
+        Some(GaussianEstimate3D {
+            mean,
+            covariance_diag: cov,
+            covariance: cov,
+        })
     }
 
-    pub fn peer_count(&self) -> usize { self.peers.len() }
+    pub fn peer_count(&self) -> usize {
+        self.peers.len()
+    }
 
     pub fn upsert_peer(&mut self, peer: PeerEstimate3D) {
         if let Some(existing) = self.peers.iter_mut().find(|p| p.peer_id == peer.peer_id) {
@@ -122,7 +185,9 @@ impl PeerFusion3D {
         }
     }
 
-    pub fn fused_estimate(&self) -> Option<GaussianEstimate3D> { self.fuse() }
+    pub fn fused_estimate(&self) -> Option<GaussianEstimate3D> {
+        self.fuse()
+    }
 }
 
 /// Covariance Intersection for two 3D Gaussian estimates.
@@ -135,13 +200,29 @@ pub fn covariance_intersection_3d(
     let mut mean = [0.0; 3];
     let mut cov = [0.0; 3];
     for i in 0..3 {
-        let inv_a = if a.covariance_diag[i] > 1e-15 { 1.0 / a.covariance_diag[i] } else { 1e15 };
-        let inv_b = if b.covariance_diag[i] > 1e-15 { 1.0 / b.covariance_diag[i] } else { 1e15 };
+        let inv_a = if a.covariance_diag[i] > 1e-15 {
+            1.0 / a.covariance_diag[i]
+        } else {
+            1e15
+        };
+        let inv_b = if b.covariance_diag[i] > 1e-15 {
+            1.0 / b.covariance_diag[i]
+        } else {
+            1e15
+        };
         let fused_inv = omega * inv_a + (1.0 - omega) * inv_b;
-        cov[i] = if fused_inv > 1e-15 { 1.0 / fused_inv } else { 1e15 };
+        cov[i] = if fused_inv > 1e-15 {
+            1.0 / fused_inv
+        } else {
+            1e15
+        };
         mean[i] = cov[i] * (omega * inv_a * a.mean[i] + (1.0 - omega) * inv_b * b.mean[i]);
     }
-    GaussianEstimate3D { mean, covariance_diag: cov, covariance: cov }
+    GaussianEstimate3D {
+        mean,
+        covariance_diag: cov,
+        covariance: cov,
+    }
 }
 
 #[cfg(test)]

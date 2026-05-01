@@ -43,7 +43,9 @@ use symthaea_core::hdc::ContinuousHV;
 /// the ConjectureEngine is expected to rediscover autonomously.
 fn expr_to_catalog_ast(lhs_name: &str, expr: &Expr) -> EquationNode {
     make_equals(
-        EquationNode::Constant { name: lhs_name.to_string() },
+        EquationNode::Constant {
+            name: lhs_name.to_string(),
+        },
         expr_to_equation_node(expr),
     )
 }

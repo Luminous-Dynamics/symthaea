@@ -1,3 +1,4 @@
+use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -418,6 +419,104 @@ fn ensure_path(path: Path, link_type: LinkTypes) -> ExternResult<EntryHash> {
     let typed = path.clone().typed(link_type)?;
     typed.ensure()?;
     typed.path_entry_hash()
+}
+
+// ============== Liquid Reputation ==============
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GetReputationInput {
+    pub agent: AgentPubKey,
+    pub subject: String,
+}
+
+/// Get the current liquid reputation for an agent in a subject area.
+#[hdk_extern]
+pub fn get_agent_reputation(input: GetReputationInput) -> ExternResult<u64> {
+    let path = Path::from(format!("reputation.{}.{}", input.subject, input.agent));
+    let links = get_links(
+        LinkQuery::try_new(path.path_entry_hash()?, LinkTypes::AgentToReputation)?,
+        GetStrategy::Local,
+    )?;
+
+    if let Some(link) = links.last() {
+        if let Some(record) = get(link.target.clone(), GetOptions::default())? {
+            let rep: Reputation = record.entry().as_option()
+                .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid entry".into())))?
+                .try_into()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("{}", e))))?;
+            return Ok(rep.level_permille);
+        }
+    }
+    Ok(0)
+}
+
+// ============== Reciprocity Economy (NEW) ==============
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ScholarshipPayoutInput {
+    pub pot_hash: ActionHash,
+    pub student: AgentPubKey,
+    pub proof_of_mastery: ActionHash, // ActionHash of the CLR/Endorsement
+}
+
+/// Trigger a TEND payout from a scholarship pot upon capstone validation.
+///
+/// This is the "Smart Bounty" that closes the loop between learning and value.
+#[hdk_extern]
+pub fn trigger_scholarship_payout(input: ScholarshipPayoutInput) -> ExternResult<ActionHash> {
+    let record = get(input.pot_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Scholarship pot not found".into())))?;
+    
+    let mut pot: ScholarshipPot = record.entry().to_app_option::<ScholarshipPot>()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid pot entry".into())))?;
+
+    // Guardrail: Ensure pot has remaining claims and funds
+    if pot.current_claims >= pot.max_claims {
+        return Err(wasm_error!(WasmErrorInner::Guest("Pot maximum claims reached".into())));
+    }
+
+    // Logic: Calculate payout based on pot size and reputation factor
+    let base_payout = pot.total_pledged / pot.max_claims as f64;
+    
+    // Update pot state
+    pot.current_claims += 1;
+    let updated_pot_hash = update_entry(input.pot_hash, &pot)?;
+
+    // Emit a bridge event for the Finance cluster to pick up and process
+    // the actual TEND mutual credit transaction.
+    let event_payload = serde_json::json!({
+        "type": "scholarship_dividend",
+        "recipient": input.student,
+        "amount": base_payout,
+        "pot_id": pot.node_id,
+        "proof": input.proof_of_mastery
+    });
+
+    // We call the bridge to broadcast this economic event
+    let _ = call_remote_bridge("scholarship_payout", event_payload.to_string())?;
+
+    Ok(updated_pot_hash)
+}
+
+/// Calculate the TEND credit limit based on MATL subject reputation.
+///
+/// Higher trust in a subject area = higher credit capacity in related guilds.
+#[hdk_extern]
+pub fn get_credit_capacity(input: GetReputationInput) -> ExternResult<i32> {
+    let rep_permille = get_agent_reputation(input)?;
+    
+    // Formula: Base 40 TEND + (Reputation / 10)
+    // At 0 rep: 40 TEND limit
+    // At 1000 rep: 140 TEND limit (Professional tier)
+    let bonus = (rep_permille / 10) as i32;
+    Ok(40 + bonus)
+}
+
+fn call_remote_bridge(_event_type: &str, _payload: String) -> ExternResult<()> {
+    // In a full implementation, this would use `call` to the praxis-bridge zome
+    // to emit a cross-domain EdunetEventEntry.
+    Ok(())
 }
 
 /// Integer square root for u64 (Newton's method)

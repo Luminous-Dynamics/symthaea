@@ -31,19 +31,19 @@ use std::collections::HashMap;
 pub struct CohortKey {
     pub world_id: u32,
     pub age_band: AgeBand,
-    pub primary_sector: u8,  // 0-7
+    pub primary_sector: u8, // 0-7
     pub health_band: HealthBand,
     pub sex: CohortSex,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AgeBand {
-    Child,      // 0-14
-    Youth,      // 15-24
-    Adult,      // 25-44
-    MidAge,     // 45-64
-    Elder,      // 65-84
-    Ancient,    // 85+
+    Child,   // 0-14
+    Youth,   // 15-24
+    Adult,   // 25-44
+    MidAge,  // 45-64
+    Elder,   // 65-84
+    Ancient, // 85+
 }
 
 impl AgeBand {
@@ -88,10 +88,15 @@ pub enum HealthBand {
 
 impl HealthBand {
     pub fn from_health(h: f64) -> Self {
-        if h >= 0.8 { Self::Excellent }
-        else if h >= 0.5 { Self::Good }
-        else if h >= 0.2 { Self::Poor }
-        else { Self::Critical }
+        if h >= 0.8 {
+            Self::Excellent
+        } else if h >= 0.5 {
+            Self::Good
+        } else if h >= 0.2 {
+            Self::Poor
+        } else {
+            Self::Critical
+        }
     }
 
     pub fn midpoint(&self) -> f64 {
@@ -105,7 +110,10 @@ impl HealthBand {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum CohortSex { Male, Female }
+pub enum CohortSex {
+    Male,
+    Female,
+}
 
 /// A population cohort: statistical aggregate of similar agents.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -168,7 +176,11 @@ impl CohortManager {
     }
 
     /// Build cohorts from a V1 agent list (migration path).
-    pub fn from_v1_agents(agents: &[crate::agent::CivAgent], world_id: u32, current_tick: u32) -> Self {
+    pub fn from_v1_agents(
+        agents: &[crate::agent::CivAgent],
+        world_id: u32,
+        current_tick: u32,
+    ) -> Self {
         let mut manager = Self::new();
         let mut total = 0u32;
 
@@ -199,7 +211,8 @@ impl CohortManager {
             let skill = agent.skills.as_slice()[agent.skills.strongest_index()];
             cohort.mean_skill = (cohort.mean_skill * n + skill) / (n + 1.0);
             cohort.mean_load = (cohort.mean_load * n + agent.needs.allostatic_load) / (n + 1.0);
-            cohort.mean_consciousness = (cohort.mean_consciousness * n + agent.consciousness.phi()) / (n + 1.0);
+            cohort.mean_consciousness =
+                (cohort.mean_consciousness * n + agent.consciousness.phi()) / (n + 1.0);
             cohort.mean_education = (cohort.mean_education * n + agent.education_level) / (n + 1.0);
             if agent.partner_id.is_some() {
                 cohort.paired_fraction = (cohort.paired_fraction * n + 1.0) / (n + 1.0);
@@ -226,7 +239,8 @@ impl CohortManager {
 
     /// Workers (all non-child cohorts).
     pub fn worker_count(&self) -> u32 {
-        self.cohorts.iter()
+        self.cohorts
+            .iter()
             .filter(|(k, _)| k.age_band.can_work())
             .map(|(_, c)| c.count)
             .sum()
@@ -234,7 +248,8 @@ impl CohortManager {
 
     /// Skilled workers in a specific sector.
     pub fn sector_count(&self, sector: u8) -> u32 {
-        self.cohorts.iter()
+        self.cohorts
+            .iter()
             .filter(|(k, _)| k.primary_sector == sector && k.age_band.can_work())
             .map(|(_, c)| c.count)
             .sum()
@@ -242,9 +257,14 @@ impl CohortManager {
 
     /// Mean allostatic load across all cohorts (weighted by count).
     pub fn mean_load(&self) -> f64 {
-        let (sum, count) = self.cohorts.values()
-            .fold((0.0, 0u32), |(s, n), c| (s + c.mean_load * c.count as f64, n + c.count));
-        if count == 0 { 0.0 } else { sum / count as f64 }
+        let (sum, count) = self.cohorts.values().fold((0.0, 0u32), |(s, n), c| {
+            (s + c.mean_load * c.count as f64, n + c.count)
+        });
+        if count == 0 {
+            0.0
+        } else {
+            sum / count as f64
+        }
     }
 }
 
@@ -292,7 +312,9 @@ impl Default for SocialGraph {
 }
 
 impl SocialGraph {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     /// Add a notable agent to the graph.
     pub fn add_notable(&mut self, notable_idx: usize) {
@@ -311,7 +333,8 @@ impl SocialGraph {
     pub fn connections(&self, notable_idx: usize) -> Vec<(usize, &Relationship)> {
         use petgraph::visit::EdgeRef;
         if let Some(&node) = self.node_map.get(&notable_idx) {
-            self.graph.edges(node)
+            self.graph
+                .edges(node)
                 .map(|e| {
                     let other = if e.source() == node {
                         self.graph[e.target()]
@@ -329,7 +352,8 @@ impl SocialGraph {
     /// Propagate grief when a notable dies.
     /// Returns list of (notable_idx, grief_intensity) for affected notables.
     pub fn propagate_grief(&self, dead_idx: usize) -> Vec<(usize, f64)> {
-        self.connections(dead_idx).iter()
+        self.connections(dead_idx)
+            .iter()
             .map(|(idx, rel)| {
                 let intensity = match rel.kind {
                     RelationType::Partner => 0.9,
@@ -379,16 +403,24 @@ mod tests {
         graph.add_notable(1);
         graph.add_notable(2);
 
-        graph.connect(0, 1, Relationship {
-            kind: RelationType::Partner,
-            strength: 0.9,
-            duration: 120,
-        });
-        graph.connect(0, 2, Relationship {
-            kind: RelationType::Friend,
-            strength: 0.6,
-            duration: 60,
-        });
+        graph.connect(
+            0,
+            1,
+            Relationship {
+                kind: RelationType::Partner,
+                strength: 0.9,
+                duration: 120,
+            },
+        );
+        graph.connect(
+            0,
+            2,
+            Relationship {
+                kind: RelationType::Friend,
+                strength: 0.6,
+                duration: 60,
+            },
+        );
 
         assert_eq!(graph.edge_count(), 2);
         let conns = graph.connections(0);
@@ -402,12 +434,24 @@ mod tests {
         graph.add_notable(1); // Partner
         graph.add_notable(2); // Friend
 
-        graph.connect(0, 1, Relationship {
-            kind: RelationType::Partner, strength: 0.95, duration: 240,
-        });
-        graph.connect(0, 2, Relationship {
-            kind: RelationType::Friend, strength: 0.7, duration: 60,
-        });
+        graph.connect(
+            0,
+            1,
+            Relationship {
+                kind: RelationType::Partner,
+                strength: 0.95,
+                duration: 240,
+            },
+        );
+        graph.connect(
+            0,
+            2,
+            Relationship {
+                kind: RelationType::Friend,
+                strength: 0.7,
+                duration: 60,
+            },
+        );
 
         let grief = graph.propagate_grief(0);
         assert_eq!(grief.len(), 2);

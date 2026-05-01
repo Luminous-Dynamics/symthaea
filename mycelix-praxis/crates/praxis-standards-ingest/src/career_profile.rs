@@ -652,7 +652,7 @@ pub fn embedded_emerging_fields() -> Vec<CareerProfile> {
             onet_soc_code: None,
         },
         CareerProfile {
-            field: "Consciousness Computing".into(),
+            field: "Cognitive Computing".into(),
             median_salary_usd: Some(120_000), entry_salary_usd: Some(75_000), senior_salary_usd: Some(200_000),
             employment_thousands: Some(1), growth_rate_pct: Some(100.0), growth_outlook: GrowthOutlook::MuchFaster,
             annual_openings_thousands: Some(1), typical_education: "PhD".into(), years_of_education: Some(22),

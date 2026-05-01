@@ -241,10 +241,7 @@ mod tests {
 
     /// Build a unit map quickly for tests.
     fn units(pairs: &[(&str, DimensionalSignature)]) -> UnitMap {
-        pairs
-            .iter()
-            .map(|(k, v)| (k.to_string(), *v))
-            .collect()
+        pairs.iter().map(|(k, v)| (k.to_string(), *v)).collect()
     }
 
     #[test]
@@ -377,11 +374,7 @@ mod tests {
             Box::new(Expr::Var("v".into())),
             Box::new(Expr::Const(2.0)),
         );
-        let kinetic = Expr::BinOp(
-            BinOp::Mul,
-            Box::new(Expr::Const(0.5)),
-            Box::new(v2),
-        );
+        let kinetic = Expr::BinOp(BinOp::Mul, Box::new(Expr::Const(0.5)), Box::new(v2));
         let potential = Expr::BinOp(
             BinOp::Div,
             Box::new(Expr::Var("mu".into())),
@@ -392,7 +385,10 @@ mod tests {
             ("v", DimensionalSignature::VELOCITY),
             ("r", DimensionalSignature::LENGTH),
             // Standard gravitational parameter: GM has dims L³T⁻²
-            ("mu", DimensionalSignature::from_array([0, 3, -2, 0, 0, 0, 0])),
+            (
+                "mu",
+                DimensionalSignature::from_array([0, 3, -2, 0, 0, 0, 0]),
+            ),
         ]);
         let result = infer_dimensions(&expr, &u);
         // ½v² → L²T⁻²
@@ -437,10 +433,7 @@ mod tests {
     #[test]
     fn test_sqrt_of_area_is_length() {
         // √(area) → length
-        let expr = Expr::Func(
-            UnaryFn::Sqrt,
-            Box::new(Expr::Var("a".into())),
-        );
+        let expr = Expr::Func(UnaryFn::Sqrt, Box::new(Expr::Var("a".into())));
         let u = units(&[("a", DimensionalSignature::AREA)]);
         let result = infer_dimensions(&expr, &u);
         assert_eq!(

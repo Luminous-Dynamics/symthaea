@@ -61,8 +61,12 @@ fn collect_hdc_annotations(
     let mut search_calls = 0;
 
     for sentence in sentences {
-        if sentence.len() < 30 { continue; }
-        if search_calls >= MAX_SEARCH_CALLS || annotations.len() >= MAX_ANNOTATIONS { break; }
+        if sentence.len() < 30 {
+            continue;
+        }
+        if search_calls >= MAX_SEARCH_CALLS || annotations.len() >= MAX_ANNOTATIONS {
+            break;
+        }
 
         search_calls += 1;
         if let Some(top) = engine.search(sentence, 1).into_iter().next() {
@@ -85,7 +89,9 @@ fn render_annotations(
     html.push_str(r#"<h3 class="overlay-title">Epistemic Analysis</h3>"#);
 
     if spore_data.is_some() {
-        html.push_str(r#"<p class="overlay-subtitle">Consciousness-grounded analysis of this page:</p>"#);
+        html.push_str(
+            r#"<p class="overlay-subtitle">Consciousness-grounded analysis of this page:</p>"#,
+        );
     } else {
         html.push_str(r#"<p class="overlay-subtitle">Prism found claims in the knowledge base that relate to this page:</p>"#);
     }
@@ -105,7 +111,11 @@ fn render_annotations(
             EmpiricalLevel::E1 => "E1 Preliminary",
             EmpiricalLevel::E0 => "E0 Unverified",
         };
-        let source = result.sources.first().map(|s| s.as_str()).unwrap_or("\u{2014}");
+        let source = result
+            .sources
+            .first()
+            .map(|s| s.as_str())
+            .unwrap_or("\u{2014}");
         let sim_pct = (result.query_similarity * 100.0) as u32;
 
         // Spore enrichment: show consciousness confidence and surprise
@@ -114,11 +124,20 @@ fn render_annotations(
             .map(|sa| {
                 let conf_pct = (sa.consciousness * 100.0) as u32;
                 if sa.prediction_error > 0.5 {
-                    format!(r#"<span class="overlay-surprise">{}% {} surprising</span>"#, conf_pct, "\u{03A8} \u{00B7}")
+                    format!(
+                        r#"<span class="overlay-surprise">{}% {} surprising</span>"#,
+                        conf_pct, "\u{03A8} \u{00B7}"
+                    )
                 } else if sa.consciousness > 0.4 {
-                    format!(r#"<span class="overlay-confident">{}% {} confident</span>"#, conf_pct, "\u{03A8} \u{00B7}")
+                    format!(
+                        r#"<span class="overlay-confident">{}% {} confident</span>"#,
+                        conf_pct, "\u{03A8} \u{00B7}"
+                    )
                 } else {
-                    format!(r#"<span class="overlay-uncertain">{}% {} uncertain</span>"#, conf_pct, "\u{03A8} \u{00B7}")
+                    format!(
+                        r#"<span class="overlay-uncertain">{}% {} uncertain</span>"#,
+                        conf_pct, "\u{03A8} \u{00B7}"
+                    )
                 }
             })
             .unwrap_or_default();
@@ -155,7 +174,10 @@ fn strip_tags(html: &str) -> String {
     for ch in html.chars() {
         match ch {
             '<' => in_tag = true,
-            '>' => { in_tag = false; result.push(' '); }
+            '>' => {
+                in_tag = false;
+                result.push(' ');
+            }
             _ if !in_tag => result.push(ch),
             _ => {}
         }

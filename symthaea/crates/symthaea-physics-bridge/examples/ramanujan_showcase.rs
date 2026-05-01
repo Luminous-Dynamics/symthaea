@@ -98,14 +98,8 @@ fn kepler_rhs(s: &[f64], _t: f64) -> Vec<f64> {
 fn kepler_dynamics() -> Vec<(&'static str, SymExpr)> {
     let r2 = || {
         SymExpr::Add(
-            Box::new(SymExpr::Pow(
-                Box::new(SymExpr::Var("x".into())),
-                2.0,
-            )),
-            Box::new(SymExpr::Pow(
-                Box::new(SymExpr::Var("y".into())),
-                2.0,
-            )),
+            Box::new(SymExpr::Pow(Box::new(SymExpr::Var("x".into())), 2.0)),
+            Box::new(SymExpr::Pow(Box::new(SymExpr::Var("y".into())), 2.0)),
         )
     };
     vec![
@@ -156,9 +150,15 @@ fn mystery_dynamics() -> Vec<(&'static str, SymExpr)> {
         ("x", var("px")),
         ("y", var("py")),
         // dpx/dt = -2x - y
-        ("px", add(neg(mul(SymExpr::Const(2.0), var("x"))), neg(var("y")))),
+        (
+            "px",
+            add(neg(mul(SymExpr::Const(2.0), var("x"))), neg(var("y"))),
+        ),
         // dpy/dt = -x - 2y
-        ("py", add(neg(var("x")), neg(mul(SymExpr::Const(2.0), var("y"))))),
+        (
+            "py",
+            add(neg(var("x")), neg(mul(SymExpr::Const(2.0), var("y")))),
+        ),
     ]
 }
 
@@ -230,42 +230,27 @@ fn pcr3bp_dynamics() -> Vec<(&'static str, SymExpr)> {
     };
     // dvx/dt = 2·vy + x − (1-μ)(x+μ)/r₁³ − μ(x-1+μ)/r₂³
     let dvx_dt = add(
-        add(
-            mul(SymExpr::Const(2.0), var("vy")),
-            var("x"),
-        ),
+        add(mul(SymExpr::Const(2.0), var("vy")), var("x")),
         add(
             neg(mul(
-                mul(
-                    SymExpr::Const(1.0 - MU),
-                    add(var("x"), SymExpr::Const(MU)),
-                ),
+                mul(SymExpr::Const(1.0 - MU), add(var("x"), SymExpr::Const(MU))),
                 pow(r1_sq(), -1.5),
             )),
             neg(mul(
-                mul(
-                    SymExpr::Const(MU),
-                    add(var("x"), SymExpr::Const(MU - 1.0)),
-                ),
+                mul(SymExpr::Const(MU), add(var("x"), SymExpr::Const(MU - 1.0))),
                 pow(r2_sq(), -1.5),
             )),
         ),
     );
     // dvy/dt = -2·vx + y − (1-μ)·y/r₁³ − μ·y/r₂³
     let dvy_dt = add(
-        add(
-            mul(SymExpr::Const(-2.0), var("vx")),
-            var("y"),
-        ),
+        add(mul(SymExpr::Const(-2.0), var("vx")), var("y")),
         add(
             neg(mul(
                 mul(SymExpr::Const(1.0 - MU), var("y")),
                 pow(r1_sq(), -1.5),
             )),
-            neg(mul(
-                mul(SymExpr::Const(MU), var("y")),
-                pow(r2_sq(), -1.5),
-            )),
+            neg(mul(mul(SymExpr::Const(MU), var("y")), pow(r2_sq(), -1.5))),
         ),
     );
     vec![
@@ -445,9 +430,15 @@ fn emit_combined_latex_table(results: &[DiscoveryResult], catalog_size: usize) -
     out.push_str("% ═════════════════════════════════════════════════════════════════════\n");
     out.push_str("\\begin{table}[htbp]\n");
     out.push_str("\\centering\n");
-    out.push_str("\\caption{Autonomous conservation-law discovery across canonical dynamical systems. ");
-    out.push_str("Each row reports an invariant discovered with zero human guidance from the differential ");
-    out.push_str("equations alone, the trajectory variance of the discovered quantity, the symbolic ");
+    out.push_str(
+        "\\caption{Autonomous conservation-law discovery across canonical dynamical systems. ",
+    );
+    out.push_str(
+        "Each row reports an invariant discovered with zero human guidance from the differential ",
+    );
+    out.push_str(
+        "equations alone, the trajectory variance of the discovered quantity, the symbolic ",
+    );
     out.push_str(&format!(
         "verification status (chain rule + Z3), and the closest match in the {}-equation physics catalog.}}\n",
         catalog_size
@@ -749,7 +740,10 @@ fn main() {
 
     // ─── Sequence-based discovery: Triangular numbers (with Z3 path) ───
     println!("\n╭──────────────────────────────────────────────────────────────────╮");
-    println!("│ {:65}│", "Triangular Numbers (sequence + Z3 formal verification)");
+    println!(
+        "│ {:65}│",
+        "Triangular Numbers (sequence + Z3 formal verification)"
+    );
     println!("╰──────────────────────────────────────────────────────────────────╯");
 
     let mut seq_engine = ConjectureEngine::with_config(RegressorConfig {
@@ -809,9 +803,13 @@ fn main() {
     println!("{}", latex_table);
 
     println!("\n──────────────────────────────────────────────────────────────────────");
-    println!(" SHOWCASE COMPLETE: {} problems, {} catalog matches, all results above.",
+    println!(
+        " SHOWCASE COMPLETE: {} problems, {} catalog matches, all results above.",
         results.len(),
-        results.iter().filter(|r| !r.recognition_headline.contains("NO KNOWN")).count(),
+        results
+            .iter()
+            .filter(|r| !r.recognition_headline.contains("NO KNOWN"))
+            .count(),
     );
     println!("──────────────────────────────────────────────────────────────────────");
 }

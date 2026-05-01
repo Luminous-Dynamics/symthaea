@@ -39,10 +39,10 @@ impl DimensionMode {
     /// 0 = top-down (2D), π/2 = horizontal (3D)
     pub fn camera_pitch(&self) -> f32 {
         match self {
-            Self::D2 => 0.0,                              // straight down
-            Self::D2Half => 0.52,                          // ~30° tilt (isometric)
-            Self::D3 => 1.05,                              // ~60° (3D perspective)
-            Self::D4 => 1.05,                              // same as 3D + W slider
+            Self::D2 => 0.0,      // straight down
+            Self::D2Half => 0.52, // ~30° tilt (isometric)
+            Self::D3 => 1.05,     // ~60° (3D perspective)
+            Self::D4 => 1.05,     // same as 3D + W slider
         }
     }
 
@@ -168,10 +168,7 @@ pub fn dimension_input_system(
 }
 
 /// Advance the dimension transition animation.
-pub fn dimension_transition_system(
-    time: Res<Time>,
-    mut transition: ResMut<DimensionTransition>,
-) {
+pub fn dimension_transition_system(time: Res<Time>, mut transition: ResMut<DimensionTransition>) {
     if transition.progress < 1.0 {
         transition.progress = (transition.progress + time.delta_secs() * transition.speed).min(1.0);
 

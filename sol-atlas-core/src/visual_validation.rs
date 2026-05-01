@@ -24,8 +24,12 @@ pub fn compute_frame_stats(pixels: &[u8], width: u32, height: u32) -> FrameStats
     let total = (width * height) as f64;
     if total == 0.0 || pixels.len() < (total as usize * 4) {
         return FrameStats {
-            width, height,
-            mean_brightness: 0.0, mean_red: 0.0, mean_green: 0.0, mean_blue: 0.0,
+            width,
+            height,
+            mean_brightness: 0.0,
+            mean_red: 0.0,
+            mean_green: 0.0,
+            mean_blue: 0.0,
             non_black_fraction: 0.0,
         };
     }
@@ -123,7 +127,9 @@ impl FrameFingerprint {
         for y in 0..height {
             for x in 0..width {
                 let idx = ((y * width + x) as usize) * 4;
-                if idx + 3 >= pixels.len() { continue; }
+                if idx + 3 >= pixels.len() {
+                    continue;
+                }
                 let r = pixels[idx] as f32 / 255.0;
                 let g = pixels[idx + 1] as f32 / 255.0;
                 let b = pixels[idx + 2] as f32 / 255.0;
@@ -161,7 +167,9 @@ impl FrameFingerprint {
             mag_b += other.bins[i] * other.bins[i];
         }
         let denom = mag_a.sqrt() * mag_b.sqrt();
-        if denom < 1e-10 { return 0.0; }
+        if denom < 1e-10 {
+            return 0.0;
+        }
         dot / denom
     }
 }
@@ -186,7 +194,7 @@ mod tests {
         let mut pixels = vec![0u8; 100 * 100 * 4];
         for i in 0..3000 {
             let idx = i * 4;
-            pixels[idx] = 20;    // R: low
+            pixels[idx] = 20; // R: low
             pixels[idx + 1] = 80; // G: teal
             pixels[idx + 2] = 90; // B: cyan
             pixels[idx + 3] = 255;
@@ -209,24 +217,39 @@ mod tests {
     #[test]
     fn fingerprint_self_similarity() {
         let mut pixels = vec![0u8; 100 * 100 * 4];
-        for i in 0..3000 { pixels[i * 4 + 1] = 80; pixels[i * 4 + 2] = 90; }
+        for i in 0..3000 {
+            pixels[i * 4 + 1] = 80;
+            pixels[i * 4 + 2] = 90;
+        }
         let fp = FrameFingerprint::from_pixels(&pixels, 100, 100);
-        assert!((fp.similarity(&fp) - 1.0).abs() < 0.001, "Self-similarity should be 1.0");
+        assert!(
+            (fp.similarity(&fp) - 1.0).abs() < 0.001,
+            "Self-similarity should be 1.0"
+        );
     }
 
     #[test]
     fn fingerprint_different_frames() {
         // Teal frame
         let mut teal = vec![0u8; 100 * 100 * 4];
-        for i in 0..5000 { teal[i * 4 + 1] = 80; teal[i * 4 + 2] = 90; }
+        for i in 0..5000 {
+            teal[i * 4 + 1] = 80;
+            teal[i * 4 + 2] = 90;
+        }
         // Red frame
         let mut red = vec![0u8; 100 * 100 * 4];
-        for i in 0..5000 { red[i * 4] = 200; }
+        for i in 0..5000 {
+            red[i * 4] = 200;
+        }
 
         let fp_teal = FrameFingerprint::from_pixels(&teal, 100, 100);
         let fp_red = FrameFingerprint::from_pixels(&red, 100, 100);
         let sim = fp_teal.similarity(&fp_red);
-        assert!(sim < 0.8, "Different color frames should have low similarity: {}", sim);
+        assert!(
+            sim < 0.8,
+            "Different color frames should have low similarity: {}",
+            sim
+        );
     }
 
     #[test]
@@ -235,12 +258,18 @@ mod tests {
         let mut frame_a = vec![0u8; 100 * 100 * 4];
         let mut frame_b = vec![0u8; 100 * 100 * 4];
         for i in 0..5000 {
-            frame_a[i * 4 + 1] = 80; frame_a[i * 4 + 2] = 90;
-            frame_b[i * 4 + 1] = 78; frame_b[i * 4 + 2] = 92; // slight variation
+            frame_a[i * 4 + 1] = 80;
+            frame_a[i * 4 + 2] = 90;
+            frame_b[i * 4 + 1] = 78;
+            frame_b[i * 4 + 2] = 92; // slight variation
         }
         let fp_a = FrameFingerprint::from_pixels(&frame_a, 100, 100);
         let fp_b = FrameFingerprint::from_pixels(&frame_b, 100, 100);
         let sim = fp_a.similarity(&fp_b);
-        assert!(sim > 0.95, "Similar frames should have high similarity: {}", sim);
+        assert!(
+            sim > 0.95,
+            "Similar frames should have high similarity: {}",
+            sim
+        );
     }
 }

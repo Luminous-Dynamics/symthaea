@@ -30,34 +30,329 @@ struct JsonClaim {
 const TOPICS: &[(&str, &[&str], &str)] = &[
     // (domain_tag, [article_titles], e_level)
     // Science
-    ("physics", &["Quantum_mechanics", "General_relativity", "Thermodynamics", "Electromagnetism", "Particle_physics", "Nuclear_physics", "Condensed_matter_physics", "Plasma_(physics)", "Optics", "Acoustics", "Fluid_dynamics", "Statistical_mechanics", "Quantum_field_theory", "String_theory", "Cosmology"], "E4"),
-    ("chemistry", &["Chemical_bond", "Organic_chemistry", "Biochemistry", "Electrochemistry", "Photochemistry", "Polymer_chemistry", "Nuclear_chemistry", "Analytical_chemistry", "Physical_chemistry", "Inorganic_chemistry", "Catalysis", "Chemical_reaction", "Stoichiometry", "Thermochemistry"], "E4"),
-    ("biology", &["Cell_(biology)", "DNA", "Evolution", "Ecology", "Genetics", "Microbiology", "Immunology", "Neuroscience", "Botany", "Zoology", "Marine_biology", "Molecular_biology", "Developmental_biology", "Epidemiology", "Virology"], "E4"),
-    ("medicine", &["Vaccine", "Antibiotic", "Cancer", "Diabetes", "Cardiovascular_disease", "Mental_health", "Surgery", "Pharmacology", "Public_health", "Nutrition", "Epidemiology", "Immunotherapy", "Gene_therapy", "Telemedicine"], "E3"),
-    ("astronomy", &["Black_hole", "Neutron_star", "Exoplanet", "Galaxy", "Solar_System", "Big_Bang", "Dark_matter", "Dark_energy", "Supernova", "Pulsar", "Quasar", "Asteroid", "Comet", "Nebula"], "E4"),
-
+    (
+        "physics",
+        &[
+            "Quantum_mechanics",
+            "General_relativity",
+            "Thermodynamics",
+            "Electromagnetism",
+            "Particle_physics",
+            "Nuclear_physics",
+            "Condensed_matter_physics",
+            "Plasma_(physics)",
+            "Optics",
+            "Acoustics",
+            "Fluid_dynamics",
+            "Statistical_mechanics",
+            "Quantum_field_theory",
+            "String_theory",
+            "Cosmology",
+        ],
+        "E4",
+    ),
+    (
+        "chemistry",
+        &[
+            "Chemical_bond",
+            "Organic_chemistry",
+            "Biochemistry",
+            "Electrochemistry",
+            "Photochemistry",
+            "Polymer_chemistry",
+            "Nuclear_chemistry",
+            "Analytical_chemistry",
+            "Physical_chemistry",
+            "Inorganic_chemistry",
+            "Catalysis",
+            "Chemical_reaction",
+            "Stoichiometry",
+            "Thermochemistry",
+        ],
+        "E4",
+    ),
+    (
+        "biology",
+        &[
+            "Cell_(biology)",
+            "DNA",
+            "Evolution",
+            "Ecology",
+            "Genetics",
+            "Microbiology",
+            "Immunology",
+            "Neuroscience",
+            "Botany",
+            "Zoology",
+            "Marine_biology",
+            "Molecular_biology",
+            "Developmental_biology",
+            "Epidemiology",
+            "Virology",
+        ],
+        "E4",
+    ),
+    (
+        "medicine",
+        &[
+            "Vaccine",
+            "Antibiotic",
+            "Cancer",
+            "Diabetes",
+            "Cardiovascular_disease",
+            "Mental_health",
+            "Surgery",
+            "Pharmacology",
+            "Public_health",
+            "Nutrition",
+            "Epidemiology",
+            "Immunotherapy",
+            "Gene_therapy",
+            "Telemedicine",
+        ],
+        "E3",
+    ),
+    (
+        "astronomy",
+        &[
+            "Black_hole",
+            "Neutron_star",
+            "Exoplanet",
+            "Galaxy",
+            "Solar_System",
+            "Big_Bang",
+            "Dark_matter",
+            "Dark_energy",
+            "Supernova",
+            "Pulsar",
+            "Quasar",
+            "Asteroid",
+            "Comet",
+            "Nebula",
+        ],
+        "E4",
+    ),
     // Technology
-    ("computer-science", &["Algorithm", "Data_structure", "Operating_system", "Computer_network", "Database", "Compiler", "Artificial_intelligence", "Machine_learning", "Cryptography", "Computer_security", "Software_engineering", "Distributed_computing", "Computer_graphics", "Natural_language_processing"], "E4"),
-    ("technology", &["Internet", "World_Wide_Web", "Blockchain", "Cloud_computing", "Quantum_computing", "Robotics", "Nanotechnology", "Biotechnology", "Renewable_energy", "Electric_vehicle", "3D_printing", "Virtual_reality", "Augmented_reality", "Internet_of_things"], "E3"),
-
+    (
+        "computer-science",
+        &[
+            "Algorithm",
+            "Data_structure",
+            "Operating_system",
+            "Computer_network",
+            "Database",
+            "Compiler",
+            "Artificial_intelligence",
+            "Machine_learning",
+            "Cryptography",
+            "Computer_security",
+            "Software_engineering",
+            "Distributed_computing",
+            "Computer_graphics",
+            "Natural_language_processing",
+        ],
+        "E4",
+    ),
+    (
+        "technology",
+        &[
+            "Internet",
+            "World_Wide_Web",
+            "Blockchain",
+            "Cloud_computing",
+            "Quantum_computing",
+            "Robotics",
+            "Nanotechnology",
+            "Biotechnology",
+            "Renewable_energy",
+            "Electric_vehicle",
+            "3D_printing",
+            "Virtual_reality",
+            "Augmented_reality",
+            "Internet_of_things",
+        ],
+        "E3",
+    ),
     // Earth Sciences
-    ("climate", &["Climate_change", "Global_warming", "Greenhouse_gas", "Carbon_dioxide", "Sea_level_rise", "Ocean_acidification", "Deforestation", "Renewable_energy", "Paris_Agreement", "Carbon_capture_and_storage"], "E4"),
-    ("geology", &["Plate_tectonics", "Earthquake", "Volcano", "Mineral", "Rock_(geology)", "Fossil", "Geomorphology", "Glaciology", "Hydrology", "Oceanography"], "E4"),
-    ("ecology", &["Ecosystem", "Biodiversity", "Endangered_species", "Conservation_biology", "Deforestation", "Coral_reef", "Wetland", "Rainforest", "Pollination", "Food_web"], "E3"),
-
+    (
+        "climate",
+        &[
+            "Climate_change",
+            "Global_warming",
+            "Greenhouse_gas",
+            "Carbon_dioxide",
+            "Sea_level_rise",
+            "Ocean_acidification",
+            "Deforestation",
+            "Renewable_energy",
+            "Paris_Agreement",
+            "Carbon_capture_and_storage",
+        ],
+        "E4",
+    ),
+    (
+        "geology",
+        &[
+            "Plate_tectonics",
+            "Earthquake",
+            "Volcano",
+            "Mineral",
+            "Rock_(geology)",
+            "Fossil",
+            "Geomorphology",
+            "Glaciology",
+            "Hydrology",
+            "Oceanography",
+        ],
+        "E4",
+    ),
+    (
+        "ecology",
+        &[
+            "Ecosystem",
+            "Biodiversity",
+            "Endangered_species",
+            "Conservation_biology",
+            "Deforestation",
+            "Coral_reef",
+            "Wetland",
+            "Rainforest",
+            "Pollination",
+            "Food_web",
+        ],
+        "E3",
+    ),
     // Social Sciences
-    ("economics", &["Economics", "Gross_domestic_product", "Inflation", "Supply_and_demand", "Market_economy", "Monetary_policy", "Fiscal_policy", "International_trade", "Behavioral_economics", "Development_economics"], "E4"),
-    ("psychology", &["Psychology", "Cognitive_psychology", "Developmental_psychology", "Social_psychology", "Clinical_psychology", "Neuroscience", "Memory", "Emotion", "Intelligence", "Motivation"], "E3"),
-    ("sociology", &["Sociology", "Social_inequality", "Globalization", "Urbanization", "Social_movement", "Culture", "Education", "Poverty", "Migration", "Demographics"], "E3"),
-    ("politics", &["Democracy", "Authoritarianism", "Human_rights", "International_law", "United_Nations", "European_Union", "Constitution", "Civil_liberties", "Rule_of_law", "Election"], "E4"),
-
+    (
+        "economics",
+        &[
+            "Economics",
+            "Gross_domestic_product",
+            "Inflation",
+            "Supply_and_demand",
+            "Market_economy",
+            "Monetary_policy",
+            "Fiscal_policy",
+            "International_trade",
+            "Behavioral_economics",
+            "Development_economics",
+        ],
+        "E4",
+    ),
+    (
+        "psychology",
+        &[
+            "Psychology",
+            "Cognitive_psychology",
+            "Developmental_psychology",
+            "Social_psychology",
+            "Clinical_psychology",
+            "Neuroscience",
+            "Memory",
+            "Emotion",
+            "Intelligence",
+            "Motivation",
+        ],
+        "E3",
+    ),
+    (
+        "sociology",
+        &[
+            "Sociology",
+            "Social_inequality",
+            "Globalization",
+            "Urbanization",
+            "Social_movement",
+            "Culture",
+            "Education",
+            "Poverty",
+            "Migration",
+            "Demographics",
+        ],
+        "E3",
+    ),
+    (
+        "politics",
+        &[
+            "Democracy",
+            "Authoritarianism",
+            "Human_rights",
+            "International_law",
+            "United_Nations",
+            "European_Union",
+            "Constitution",
+            "Civil_liberties",
+            "Rule_of_law",
+            "Election",
+        ],
+        "E4",
+    ),
     // Humanities
-    ("philosophy", &["Philosophy", "Ethics", "Epistemology", "Logic", "Metaphysics", "Aesthetics", "Political_philosophy", "Philosophy_of_mind", "Philosophy_of_science", "Existentialism"], "E4"),
-    ("history", &["Ancient_history", "Middle_Ages", "Renaissance", "Industrial_Revolution", "World_War_I", "World_War_II", "Cold_War", "Colonialism", "Decolonization", "Civil_rights_movement"], "E4"),
-    ("linguistics", &["Linguistics", "Phonetics", "Syntax", "Semantics", "Pragmatics", "Sociolinguistics", "Language_acquisition", "Morphology_(linguistics)", "Writing_system", "Endangered_language"], "E3"),
-
+    (
+        "philosophy",
+        &[
+            "Philosophy",
+            "Ethics",
+            "Epistemology",
+            "Logic",
+            "Metaphysics",
+            "Aesthetics",
+            "Political_philosophy",
+            "Philosophy_of_mind",
+            "Philosophy_of_science",
+            "Existentialism",
+        ],
+        "E4",
+    ),
+    (
+        "history",
+        &[
+            "Ancient_history",
+            "Middle_Ages",
+            "Renaissance",
+            "Industrial_Revolution",
+            "World_War_I",
+            "World_War_II",
+            "Cold_War",
+            "Colonialism",
+            "Decolonization",
+            "Civil_rights_movement",
+        ],
+        "E4",
+    ),
+    (
+        "linguistics",
+        &[
+            "Linguistics",
+            "Phonetics",
+            "Syntax",
+            "Semantics",
+            "Pragmatics",
+            "Sociolinguistics",
+            "Language_acquisition",
+            "Morphology_(linguistics)",
+            "Writing_system",
+            "Endangered_language",
+        ],
+        "E3",
+    ),
     // Mathematics
-    ("mathematics", &["Mathematics", "Calculus", "Linear_algebra", "Number_theory", "Topology", "Graph_theory", "Probability_theory", "Statistics", "Differential_equation", "Group_theory"], "E4"),
+    (
+        "mathematics",
+        &[
+            "Mathematics",
+            "Calculus",
+            "Linear_algebra",
+            "Number_theory",
+            "Topology",
+            "Graph_theory",
+            "Probability_theory",
+            "Statistics",
+            "Differential_equation",
+            "Group_theory",
+        ],
+        "E4",
+    ),
 ];
 
 fn extract_sentences(text: &str) -> Vec<String> {
@@ -98,7 +393,11 @@ fn main() {
     let mut fetched = 0;
     let total_articles: usize = TOPICS.iter().map(|(_, articles, _)| articles.len()).sum();
 
-    println!("Fetching {} Wikipedia articles across {} domains...", total_articles, TOPICS.len());
+    println!(
+        "Fetching {} Wikipedia articles across {} domains...",
+        total_articles,
+        TOPICS.len()
+    );
 
     for (domain, articles, level) in TOPICS {
         for title in *articles {
@@ -116,11 +415,13 @@ fn main() {
                     match resp.json::<WikiSummary>() {
                         Ok(summary) => {
                             let extract = summary.extract.unwrap_or_default();
-                            let article_title = summary.title.unwrap_or_else(|| title.replace('_', " "));
+                            let article_title =
+                                summary.title.unwrap_or_else(|| title.replace('_', " "));
 
                             let sentences = extract_sentences(&extract);
                             for sentence in sentences.iter().take(3) {
-                                let key: String = sentence.chars().take(80).collect::<String>().to_lowercase();
+                                let key: String =
+                                    sentence.chars().take(80).collect::<String>().to_lowercase();
                                 if seen.insert(key) {
                                     all_claims.push(JsonClaim {
                                         claim: sentence.clone(),
@@ -132,7 +433,12 @@ fn main() {
                             }
                             fetched += 1;
                             if fetched % 20 == 0 {
-                                println!("  {} / {} articles fetched ({} claims)", fetched, total_articles, all_claims.len());
+                                println!(
+                                    "  {} / {} articles fetched ({} claims)",
+                                    fetched,
+                                    total_articles,
+                                    all_claims.len()
+                                );
                             }
                         }
                         Err(e) => eprintln!("  SKIP {}: parse error: {}", title, e),
@@ -146,7 +452,11 @@ fn main() {
         }
     }
 
-    println!("\nExtracted {} claims from {} articles", all_claims.len(), fetched);
+    println!(
+        "\nExtracted {} claims from {} articles",
+        all_claims.len(),
+        fetched
+    );
 
     let output_path = "prism-ingest/claims/wikipedia-extracts.json";
     let json = serde_json::to_string_pretty(&all_claims).expect("JSON serialization");

@@ -10,7 +10,7 @@
 //! - datagram fragmentation + reassembly, because the sealed RDP envelope is
 //!   far larger than a single QUIC datagram on realistic paths
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 use bytes::Bytes;
 use quinn::{ClientConfig, Connection, Endpoint, RecvStream, SendStream, ServerConfig};
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};

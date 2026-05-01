@@ -1,0 +1,124 @@
+{
+  "metadata": {
+    "title": "Pragmatic Professional Seed: Ready-to-Work Standards",
+    "framework": "Global Workforce Mesh",
+    "source": "https://mycelix.org/certs-pragmatic",
+    "grade_level": "Professional/Entry",
+    "subject_area": "Multi-Sector",
+    "domain": "Professional Certification",
+    "version": "1.0",
+    "total_standards": 8,
+    "domains": [
+      "Logistics & Safety",
+      "Emergency Health",
+      "Cloud Business",
+      "SME Finance",
+      "Office Productivity"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "High-demand certifications for immediate employment today."
+  },
+  "nodes": [
+    {
+      "id": "CERT-LOG-OSHA",
+      "title": "OSHA Forklift Operator Certification",
+      "description": "Safe operation of powered industrial trucks. Pre-operation inspection, load handling, and maneuverability. Linked to the Warehouse Vector track.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Logistics & Safety",
+      "subdomain": "Certification Bridge",
+      "tags": ["osha", "forklift", "logistics", "safety"],
+      "estimated_hours": 20,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering",
+      "academic_standards": [
+        {
+          "framework": "OSHA",
+          "code": "1910.178",
+          "description": "Powered Industrial Trucks",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "CERT-HLTH-REDCROSS",
+      "title": "Red Cross First Aid/CPR/AED",
+      "description": "Professional emergency response. Recognizing signs of heart attack, stroke, and choking. Performing high-quality CPR and using an AED.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Emergency Health",
+      "subdomain": "Certification Bridge",
+      "tags": ["first-aid", "cpr", "emergency", "standard"],
+      "estimated_hours": 8,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Health Sciences"
+    },
+    {
+      "id": "CERT-DIG-GCP-LEADER",
+      "title": "Google Cloud Digital Leader",
+      "description": "Distinguishing cloud computing from traditional IT. Business value of Google Cloud. Linked to the Architecture of Agency track.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Cloud Business",
+      "subdomain": "Certification Bridge",
+      "tags": ["google", "cloud", "digital-leader", "standard"],
+      "estimated_hours": 30,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Understand",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "CERT-FIN-QUICKBOOKS",
+      "title": "Intuit QuickBooks Certified User",
+      "description": "Professional SME bookkeeping. Invoicing, expenses, payroll, and financial reports. Mapping the TEND economy to standard financial software.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "SME Finance",
+      "subdomain": "Certification Bridge",
+      "tags": ["accounting", "quickbooks", "finance", "standard"],
+      "estimated_hours": 60,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Social Studies"
+    },
+    {
+      "id": "CERT-DIG-MOS-EXCEL",
+      "title": "Microsoft Office Specialist: Excel Associate",
+      "description": "Professional spreadsheet management. Creating formulas, managing data, and visualizing results. Essential for all guild-operations.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Office Productivity",
+      "subdomain": "Certification Bridge",
+      "tags": ["microsoft", "excel", "data", "standard"],
+      "estimated_hours": 40,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science"
+    }
+  ],
+  "edges": [
+    {
+      "from": "VOC-CAP-00",
+      "to": "CERT-LOG-OSHA",
+      "edge_type": "Recommended",
+      "strength_permille": 600,
+      "rationale": "Warehouse stewardship capstone provides the environment-awareness needed for forklift safety."
+    },
+    {
+      "from": "VITA-001",
+      "to": "CERT-HLTH-REDCROSS",
+      "edge_type": "Recommended",
+      "strength_permille": 900,
+      "rationale": "Sovereign emergency care mastery covers 90% of the Red Cross professional certification syllabus."
+    },
+    {
+      "from": "VOC-DT-201",
+      "to": "CERT-FIN-QUICKBOOKS",
+      "edge_type": "Recommended",
+      "strength_permille": 750,
+      "rationale": "Mutual credit bookkeeping training provides the systemic foundation for professional QuickBooks use."
+    }
+  ]
+}

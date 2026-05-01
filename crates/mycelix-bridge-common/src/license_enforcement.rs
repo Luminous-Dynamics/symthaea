@@ -75,7 +75,10 @@ pub enum LicenseCheckResult {
     /// The agent must obtain a license for the given invention.
     RequiresLicense { invention_id: String },
     /// The agent's license has expired.
-    Expired { invention_id: String, expired_at: u64 },
+    Expired {
+        invention_id: String,
+        expired_at: u64,
+    },
     /// The agent's license was revoked.
     Revoked { invention_id: String },
 }

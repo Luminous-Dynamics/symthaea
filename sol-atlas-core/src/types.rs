@@ -34,11 +34,25 @@ pub enum Layer {
 impl Layer {
     pub fn all() -> HashSet<Self> {
         [
-            Self::Energy, Self::Geothermal, Self::Maglev, Self::ResontiaVaults,
-            Self::TerraLumina, Self::Regions, Self::SupplyChain, Self::Climate,
-            Self::Emergency, Self::Health, Self::Robotics, Self::FossilDeposits, Self::Nuclear,
-            Self::Earthquakes, Self::Fires, Self::Storms, Self::Volcanoes,
-            Self::Infrastructure, Self::Chokepoints,
+            Self::Energy,
+            Self::Geothermal,
+            Self::Maglev,
+            Self::ResontiaVaults,
+            Self::TerraLumina,
+            Self::Regions,
+            Self::SupplyChain,
+            Self::Climate,
+            Self::Emergency,
+            Self::Health,
+            Self::Robotics,
+            Self::FossilDeposits,
+            Self::Nuclear,
+            Self::Earthquakes,
+            Self::Fires,
+            Self::Storms,
+            Self::Volcanoes,
+            Self::Infrastructure,
+            Self::Chokepoints,
         ]
         .into_iter()
         .collect()
@@ -184,10 +198,10 @@ pub enum FuelType {
 impl FuelType {
     pub fn rgb(&self) -> [f32; 3] {
         match self {
-            Self::Oil => [0.72, 0.53, 0.04],       // dark goldenrod
-            Self::Gas => [0.50, 0.50, 0.50],        // gray
-            Self::Coal => [0.29, 0.29, 0.29],       // dark gray
-            Self::TarSands => [0.42, 0.26, 0.15],   // dark brown
+            Self::Oil => [0.72, 0.53, 0.04],      // dark goldenrod
+            Self::Gas => [0.50, 0.50, 0.50],      // gray
+            Self::Coal => [0.29, 0.29, 0.29],     // dark gray
+            Self::TarSands => [0.42, 0.26, 0.15], // dark brown
         }
     }
 
@@ -216,17 +230,17 @@ impl FuelType {
 #[serde(rename_all = "UPPERCASE")]
 pub enum ReactorType {
     #[serde(alias = "pwr")]
-    PWR,   // Pressurized Water Reactor
+    PWR, // Pressurized Water Reactor
     #[serde(alias = "bwr")]
-    BWR,   // Boiling Water Reactor
+    BWR, // Boiling Water Reactor
     #[serde(alias = "phwr")]
-    PHWR,  // Pressurized Heavy Water (CANDU)
+    PHWR, // Pressurized Heavy Water (CANDU)
     #[serde(alias = "htgr")]
-    HTGR,  // High Temperature Gas-cooled
+    HTGR, // High Temperature Gas-cooled
     #[serde(alias = "smr")]
-    SMR,   // Small Modular Reactor
+    SMR, // Small Modular Reactor
     #[serde(alias = "fbr")]
-    FBR,   // Fast Breeder Reactor
+    FBR, // Fast Breeder Reactor
     #[serde(alias = "other")]
     Other,
 }
@@ -552,8 +566,12 @@ impl MarkerInstance {
     /// Pack into flat [f32; 8] for GPU buffer upload.
     pub fn as_f32_array(&self) -> [f32; 8] {
         [
-            self.position[0], self.position[1], self.position[2],
-            self.color[0], self.color[1], self.color[2],
+            self.position[0],
+            self.position[1],
+            self.position[2],
+            self.color[0],
+            self.color[1],
+            self.color[2],
             self.size,
             self.marker_type,
         ]

@@ -175,9 +175,7 @@ mod tests {
     fn test_submit_gradient_stored() {
         let mut round = Round::new(1);
         round.start();
-        round
-            .submit_gradient(make_gradient("node-1", 1))
-            .unwrap();
+        round.submit_gradient(make_gradient("node-1", 1)).unwrap();
         assert_eq!(round.gradients.len(), 1);
         assert!(round.submitted_nodes.contains("node-1"));
     }
@@ -194,9 +192,7 @@ mod tests {
     fn test_duplicate_submission_rejected() {
         let mut round = Round::new(1);
         round.start();
-        round
-            .submit_gradient(make_gradient("node-1", 1))
-            .unwrap();
+        round.submit_gradient(make_gradient("node-1", 1)).unwrap();
         let result = round.submit_gradient(make_gradient("node-1", 1));
         assert!(matches!(result, Err(FlError::DuplicateSubmission(_, _))));
     }
@@ -207,17 +203,11 @@ mod tests {
         round.start();
         assert!(!round.has_enough_nodes(3));
 
-        round
-            .submit_gradient(make_gradient("a", 1))
-            .unwrap();
-        round
-            .submit_gradient(make_gradient("b", 1))
-            .unwrap();
+        round.submit_gradient(make_gradient("a", 1)).unwrap();
+        round.submit_gradient(make_gradient("b", 1)).unwrap();
         assert!(!round.has_enough_nodes(3));
 
-        round
-            .submit_gradient(make_gradient("c", 1))
-            .unwrap();
+        round.submit_gradient(make_gradient("c", 1)).unwrap();
         assert!(round.has_enough_nodes(3));
     }
 

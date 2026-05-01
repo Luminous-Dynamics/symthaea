@@ -21,8 +21,8 @@
 //! and order-of-magnitude correctness, not machine precision.
 
 use mycelix_multiworld_sim::config::{
-    BirthPolicy, EpochConfig, PolicyConfig, ProjectStrategy, ResourcePriority,
-    SimulationConfig, WorldSeedConfig,
+    BirthPolicy, EpochConfig, PolicyConfig, ProjectStrategy, ResourcePriority, SimulationConfig,
+    WorldSeedConfig,
 };
 use mycelix_multiworld_sim::MultiWorldSimulator;
 
@@ -113,7 +113,7 @@ fn population_bounded_by_carrying_capacity() {
     // max_population is set by the World struct. Population should not exceed it
     // (births should slow as pop approaches capacity).
     let mut config = minimal_config(1800, 100, 42); // 150 years
-    // Default max_population for Moon is 10_000
+                                                    // Default max_population for Moon is 10_000
     let mut sim = MultiWorldSimulator::new(config);
     let _report = sim.run();
 
@@ -122,7 +122,8 @@ fn population_bounded_by_carrying_capacity() {
     assert!(
         final_pop <= max_pop,
         "Population {} should not exceed carrying capacity {}",
-        final_pop, max_pop
+        final_pop,
+        max_pop
     );
 }
 
@@ -168,8 +169,8 @@ fn energy_depletion_collapses_production() {
     // Engineering output should be near zero (10% of whatever it was)
     let eng_output = sim.worlds[0].economy.sector_output[0]; // engineering
     let agri_output = sim.worlds[0].economy.sector_output[1]; // agriculture
-    // Agriculture should be higher than engineering (exempt from energy penalty)
-    // Both may be zero if population died, so only test if pop survived
+                                                              // Agriculture should be higher than engineering (exempt from energy penalty)
+                                                              // Both may be zero if population died, so only test if pop survived
     if sim.worlds[0].population() > 10 {
         assert!(
             agri_output >= eng_output,
@@ -200,7 +201,8 @@ fn consciousness_develops_with_education() {
     assert!(
         final_phi > initial_phi,
         "Consciousness should develop with education on Earth over 50 years: {:.4} → {:.4}",
-        initial_phi, final_phi
+        initial_phi,
+        final_phi
     );
 }
 
@@ -224,7 +226,10 @@ fn consciousness_higher_with_education() {
 
     // Both should survive on Earth
     assert!(sim_no.worlds[0].population() > 50, "Control should survive");
-    assert!(sim_edu.worlds[0].population() > 50, "Treatment should survive");
+    assert!(
+        sim_edu.worlds[0].population() > 50,
+        "Treatment should survive"
+    );
 
     let phi_no = sim_no.worlds[0].mean_phi();
     let phi_yes = sim_edu.worlds[0].mean_phi();
@@ -234,7 +239,8 @@ fn consciousness_higher_with_education() {
     assert!(
         phi_yes >= phi_no * 0.9, // Allow 10% noise — education shouldn't hurt
         "Education should not reduce Phi: with={:.4} without={:.4}",
-        phi_yes, phi_no
+        phi_yes,
+        phi_no
     );
 }
 
@@ -309,7 +315,8 @@ fn same_seed_same_result() {
     assert!(
         (report1.final_cvs - report2.final_cvs).abs() < 1e-10,
         "Same seed should produce identical CVS: {} vs {}",
-        report1.final_cvs, report2.final_cvs
+        report1.final_cvs,
+        report2.final_cvs
     );
 }
 
@@ -330,6 +337,7 @@ fn different_seed_different_result() {
     assert!(
         pop_diff > 0 || cvs_diff > 0.001,
         "Different seeds should diverge: pop diff={}, cvs diff={}",
-        pop_diff, cvs_diff
+        pop_diff,
+        cvs_diff
     );
 }

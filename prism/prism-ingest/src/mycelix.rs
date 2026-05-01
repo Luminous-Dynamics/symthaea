@@ -4,15 +4,19 @@
 //! Load claims from mycelix-knowledge seed data (embedded at compile time).
 
 use crate::RawClaim;
-use prism_common::{EmpiricalLevel, NormativeLevel, MaterialityLevel};
+use prism_common::{EmpiricalLevel, MaterialityLevel, NormativeLevel};
 use serde::Deserialize;
 
 // Embed JSON files at compile time — no filesystem access needed in WASM
-const ENERGY_JSON: &str = include_str!("../../../mycelix-knowledge/seed-data/claims/energy-facts.json");
-const GEO_JSON: &str = include_str!("../../../mycelix-knowledge/seed-data/claims/geonames-major.json");
+const ENERGY_JSON: &str =
+    include_str!("../../../mycelix-knowledge/seed-data/claims/energy-facts.json");
+const GEO_JSON: &str =
+    include_str!("../../../mycelix-knowledge/seed-data/claims/geonames-major.json");
 const WHO_JSON: &str = include_str!("../../../mycelix-knowledge/seed-data/claims/who-health.json");
-const NOAA_JSON: &str = include_str!("../../../mycelix-knowledge/seed-data/claims/noaa-climate.json");
-const FAO_JSON: &str = include_str!("../../../mycelix-knowledge/seed-data/claims/fao-agriculture.json");
+const NOAA_JSON: &str =
+    include_str!("../../../mycelix-knowledge/seed-data/claims/noaa-climate.json");
+const FAO_JSON: &str =
+    include_str!("../../../mycelix-knowledge/seed-data/claims/fao-agriculture.json");
 
 #[derive(Deserialize)]
 struct MycelixClaim {
@@ -66,7 +70,8 @@ pub fn load_mycelix_claims() -> Vec<RawClaim> {
                 continue;
             }
 
-            let e_val = c.classification
+            let e_val = c
+                .classification
                 .as_ref()
                 .and_then(|cl| cl.empirical)
                 .unwrap_or(0.0);
@@ -82,33 +87,45 @@ pub fn load_mycelix_claims() -> Vec<RawClaim> {
             };
 
             // Simplify source URLs to domain names
-            let sources: Vec<String> = c.sources.unwrap_or_default()
+            let sources: Vec<String> = c
+                .sources
+                .unwrap_or_default()
                 .into_iter()
                 .take(2)
-                .map(|s| {
-                    s.split('/')
-                        .nth(2)
-                        .unwrap_or(&s)
-                        .to_string()
-                })
+                .map(|s| s.split('/').nth(2).unwrap_or(&s).to_string())
                 .collect();
 
-            let tags: Vec<String> = c.tags.unwrap_or_default()
-                .into_iter()
-                .take(3)
-                .collect();
+            let tags: Vec<String> = c.tags.unwrap_or_default().into_iter().take(3).collect();
 
-            let n_val = c.classification.as_ref().and_then(|cl| cl.normative).unwrap_or(0.5);
-            let n_level = if n_val >= 0.75 { NormativeLevel::N3 }
-                else if n_val >= 0.5 { NormativeLevel::N2 }
-                else if n_val >= 0.25 { NormativeLevel::N1 }
-                else { NormativeLevel::N0 };
+            let n_val = c
+                .classification
+                .as_ref()
+                .and_then(|cl| cl.normative)
+                .unwrap_or(0.5);
+            let n_level = if n_val >= 0.75 {
+                NormativeLevel::N3
+            } else if n_val >= 0.5 {
+                NormativeLevel::N2
+            } else if n_val >= 0.25 {
+                NormativeLevel::N1
+            } else {
+                NormativeLevel::N0
+            };
 
-            let m_val = c.classification.as_ref().and_then(|cl| cl.materiality).unwrap_or(0.5);
-            let m_level = if m_val >= 0.75 { MaterialityLevel::M3 }
-                else if m_val >= 0.5 { MaterialityLevel::M2 }
-                else if m_val >= 0.25 { MaterialityLevel::M1 }
-                else { MaterialityLevel::M0 };
+            let m_val = c
+                .classification
+                .as_ref()
+                .and_then(|cl| cl.materiality)
+                .unwrap_or(0.5);
+            let m_level = if m_val >= 0.75 {
+                MaterialityLevel::M3
+            } else if m_val >= 0.5 {
+                MaterialityLevel::M2
+            } else if m_val >= 0.25 {
+                MaterialityLevel::M1
+            } else {
+                MaterialityLevel::M0
+            };
 
             claims.push(RawClaim {
                 content,
@@ -135,8 +152,11 @@ mod tests {
         // Should have filtered out coordinate-only claims
         for c in &claims {
             let low = c.content.to_lowercase();
-            assert!(!(low.contains("latitude") && low.contains("longitude")),
-                "Should filter coordinates: {}", c.content);
+            assert!(
+                !(low.contains("latitude") && low.contains("longitude")),
+                "Should filter coordinates: {}",
+                c.content
+            );
         }
     }
 }

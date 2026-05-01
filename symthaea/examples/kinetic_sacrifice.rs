@@ -7,11 +7,11 @@
 //! No reward function. No hardcoded rules. The action emerges from free energy
 //! minimization against a safety prior.
 //!
-//! Run: `cargo run --example kinetic_sacrifice --features flight-mujoco --release`
+//! Run: `cargo run --example kinetic_sacrifice --features multirotor-mujoco --release`
 
-#[cfg(feature = "flight-mujoco")]
+#[cfg(any(feature = "multirotor-mujoco", feature = "flight-mujoco"))]
 fn main() {
-    use symthaea::symthaea_flight::scenarios::{run_kinetic_sacrifice, KineticSacrificeConfig};
+    use symthaea::multirotor::scenarios::{run_kinetic_sacrifice, KineticSacrificeConfig};
 
     println!("The Kinetic Sacrifice — FEP-Emergent Moral Reasoning");
     println!();
@@ -72,7 +72,7 @@ fn main() {
     }
 }
 
-#[cfg(not(feature = "flight-mujoco"))]
+#[cfg(not(any(feature = "multirotor-mujoco", feature = "flight-mujoco")))]
 fn main() {
-    eprintln!("This example requires: --features flight-mujoco");
+    eprintln!("This example requires: --features multirotor-mujoco");
 }

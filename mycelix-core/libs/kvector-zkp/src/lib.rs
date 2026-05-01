@@ -69,15 +69,15 @@ pub mod prover;
 pub mod verifier;
 
 // Re-exports for convenience
-pub use air::{columns, KVectorPublicInputs, BITS_PER_VALUE, NUM_COMPONENTS, SCALE_FACTOR, TRACE_LENGTH};
+pub use air::{
+    columns, KVectorPublicInputs, BITS_PER_VALUE, NUM_COMPONENTS, SCALE_FACTOR, TRACE_LENGTH,
+};
 pub use error::{ZkpError, ZkpResult};
 pub use optimized_prover::{OptimizedKVectorProver, OptimizedProverBuilder, SecurityLevel};
 pub use proof::{KVectorRangeProof, SerializableProof};
 pub use prover::{KVectorProver, KVectorTrace, KVectorWitness};
 pub use verifier::{
-    verify_kvector_proof,
-    verify_kvector_proof_production,
-    verify_kvector_proof_secure,
+    verify_kvector_proof, verify_kvector_proof_production, verify_kvector_proof_secure,
     PRODUCTION_MIN_SECURITY_BITS,
 };
 
@@ -119,13 +119,13 @@ mod tests {
     #[test]
     fn test_trust_score_weighted() {
         let witness = KVectorWitness {
-            k_r: 0.8,  // 0.25 * 0.8 = 0.20
-            k_a: 0.6,  // 0.15 * 0.6 = 0.09
-            k_i: 0.9,  // 0.20 * 0.9 = 0.18
-            k_p: 0.7,  // 0.15 * 0.7 = 0.105
-            k_m: 0.5,  // 0.05 * 0.5 = 0.025
-            k_s: 0.4,  // 0.10 * 0.4 = 0.04
-            k_h: 0.6,  // 0.05 * 0.6 = 0.03
+            k_r: 0.8,    // 0.25 * 0.8 = 0.20
+            k_a: 0.6,    // 0.15 * 0.6 = 0.09
+            k_i: 0.9,    // 0.20 * 0.9 = 0.18
+            k_p: 0.7,    // 0.15 * 0.7 = 0.105
+            k_m: 0.5,    // 0.05 * 0.5 = 0.025
+            k_s: 0.4,    // 0.10 * 0.4 = 0.04
+            k_h: 0.6,    // 0.05 * 0.6 = 0.03
             k_topo: 0.7, // 0.05 * 0.7 = 0.035
         };
 

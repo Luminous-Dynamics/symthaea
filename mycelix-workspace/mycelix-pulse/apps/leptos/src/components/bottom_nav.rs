@@ -3,8 +3,8 @@
 
 //! Mobile bottom navigation bar with active state highlighting.
 
-use leptos::prelude::*;
 use crate::mail_context::use_mail;
+use leptos::prelude::*;
 
 #[component]
 pub fn BottomNav() -> impl IntoView {

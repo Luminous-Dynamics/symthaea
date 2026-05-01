@@ -114,7 +114,11 @@ impl CivilizationReport {
         ));
         s.push('\n');
 
-        let result_str = if self.survived { "SURVIVED" } else { "COLLAPSED" };
+        let result_str = if self.survived {
+            "SURVIVED"
+        } else {
+            "COLLAPSED"
+        };
         s.push_str(&format!(
             "RESULT: {} (CVS: {:.3})\n",
             result_str, self.final_cvs
@@ -161,7 +165,10 @@ impl CivilizationReport {
                 self.final_harmony_scores[i]
             ));
         }
-        s.push_str(&format!("Love Coherence: {:.3}\n", self.final_love_coherence));
+        s.push_str(&format!(
+            "Love Coherence: {:.3}\n",
+            self.final_love_coherence
+        ));
         s.push('\n');
 
         // Viability components
@@ -174,8 +181,7 @@ impl CivilizationReport {
             "  Economic sustain:   {:.3}\n",
             self.final_economic_sustainability
         ));
-        let harmony_mean: f64 =
-            self.final_harmony_scores.iter().sum::<f64>() / 8.0;
+        let harmony_mean: f64 = self.final_harmony_scores.iter().sum::<f64>() / 8.0;
         s.push_str(&format!("  Harmony mean:       {:.3}\n", harmony_mean));
         s.push_str(&format!(
             "  Oppression (inv):   {:.3}\n",
@@ -216,7 +222,10 @@ impl CivilizationReport {
         ));
         s.push_str(&format!("  Civil wars: {}\n", self.civil_wars));
         s.push_str(&format!("  Secessions: {}\n", self.secessions));
-        s.push_str(&format!("  Turchin transitions: {}\n", self.turchin_transitions));
+        s.push_str(&format!(
+            "  Turchin transitions: {}\n",
+            self.turchin_transitions
+        ));
         s.push_str(&format!("  Epidemics: {}\n", self.epidemics));
         s.push_str(&format!("  Breakthroughs: {}\n", self.breakthroughs));
         s.push_str(&format!("  Worlds founded: {}\n", self.worlds_founded));
@@ -229,29 +238,64 @@ impl CivilizationReport {
     pub fn summary_extended(&self) -> String {
         let mut s = self.summary();
         if self.duration_years >= 300.0 {
-            s.push_str("
+            s.push_str(
+                "
 FACTION ANALYSIS:
-");
-            s.push_str(&format!("  Faction cycles:         {}
-", self.faction_cycles));
-            s.push_str(&format!("  Peak faction count:     {}
-", self.peak_faction_count));
-            s.push_str(&format!("  Max elite persistence:  {:.3}
-", self.max_elite_persistence));
-            s.push_str(&format!("  Max innovation stag:    {:.3}
-", self.max_innovation_stagnation));
-            s.push_str(&format!("  Phi trend at end:       {}
-", self.phi_trend_at_end));
-            s.push_str(&format!("  Max trauma:             {:.3}
-", self.max_trauma));
-            s.push_str(&format!("  Speciation events:      {}
-", self.speciation_events));
-            s.push_str(&format!("  Calcification events:   {}
-", self.constitutional_calcification_events));
+",
+            );
+            s.push_str(&format!(
+                "  Faction cycles:         {}
+",
+                self.faction_cycles
+            ));
+            s.push_str(&format!(
+                "  Peak faction count:     {}
+",
+                self.peak_faction_count
+            ));
+            s.push_str(&format!(
+                "  Max elite persistence:  {:.3}
+",
+                self.max_elite_persistence
+            ));
+            s.push_str(&format!(
+                "  Max innovation stag:    {:.3}
+",
+                self.max_innovation_stagnation
+            ));
+            s.push_str(&format!(
+                "  Phi trend at end:       {}
+",
+                self.phi_trend_at_end
+            ));
+            s.push_str(&format!(
+                "  Max trauma:             {:.3}
+",
+                self.max_trauma
+            ));
+            s.push_str(&format!(
+                "  Speciation events:      {}
+",
+                self.speciation_events
+            ));
+            s.push_str(&format!(
+                "  Calcification events:   {}
+",
+                self.constitutional_calcification_events
+            ));
             s.push_str("\nDISASTER ENGINE:\n");
-            s.push_str(&format!("  Total disasters:        {}\n", self.total_disasters));
-            s.push_str(&format!("  Carrington events:      {}\n", self.carrington_events));
-            s.push_str(&format!("  Tech milestones:        {}\n", self.tech_milestones_achieved));
+            s.push_str(&format!(
+                "  Total disasters:        {}\n",
+                self.total_disasters
+            ));
+            s.push_str(&format!(
+                "  Carrington events:      {}\n",
+                self.carrington_events
+            ));
+            s.push_str(&format!(
+                "  Tech milestones:        {}\n",
+                self.tech_milestones_achieved
+            ));
         }
         s
     }
@@ -358,14 +402,26 @@ FACTION ANALYSIS:
             breakthroughs,
             worlds_founded,
             total_migrants,
-            faction_cycles: events.iter().filter(|e| e.event_type == CivEventType::FactionDissolved).count(),
-            peak_faction_count: events.iter().filter(|e| e.event_type == CivEventType::FactionEmerged).count(),
+            faction_cycles: events
+                .iter()
+                .filter(|e| e.event_type == CivEventType::FactionDissolved)
+                .count(),
+            peak_faction_count: events
+                .iter()
+                .filter(|e| e.event_type == CivEventType::FactionEmerged)
+                .count(),
             max_elite_persistence: 0.0,
             max_innovation_stagnation: 0.0,
             phi_trend_at_end: String::new(),
             max_trauma: 0.0,
-            speciation_events: events.iter().filter(|e| e.event_type == CivEventType::GeneticSpeciation).count(),
-            constitutional_calcification_events: events.iter().filter(|e| e.event_type == CivEventType::ConstitutionalCalcification).count(),
+            speciation_events: events
+                .iter()
+                .filter(|e| e.event_type == CivEventType::GeneticSpeciation)
+                .count(),
+            constitutional_calcification_events: events
+                .iter()
+                .filter(|e| e.event_type == CivEventType::ConstitutionalCalcification)
+                .count(),
             total_disasters: 0,
             carrington_events: 0,
             tech_milestones_achieved: 0,
@@ -469,12 +525,21 @@ mod tests {
         let report = make_test_report(0.65);
         let summary = report.summary();
 
-        assert!(summary.contains("Test Scenario"), "Should contain scenario name");
+        assert!(
+            summary.contains("Test Scenario"),
+            "Should contain scenario name"
+        );
         assert!(summary.contains("seed: 42"), "Should contain seed");
-        assert!(summary.contains("SURVIVED"), "CVS > 0.3 should show SURVIVED");
+        assert!(
+            summary.contains("SURVIVED"),
+            "CVS > 0.3 should show SURVIVED"
+        );
         assert!(summary.contains("50000"), "Should contain population");
         assert!(summary.contains("3 worlds"), "Should contain world count");
-        assert!(summary.contains("1/2 passed"), "Should show checkpoint ratio");
+        assert!(
+            summary.contains("1/2 passed"),
+            "Should show checkpoint ratio"
+        );
         assert!(
             summary.contains("Resonant Coherence"),
             "Should contain harmony names"
@@ -484,7 +549,10 @@ mod tests {
             "Should contain love coherence"
         );
         assert!(summary.contains("CVS"), "Should contain CVS label");
-        assert!(summary.contains("Epidemics: 3"), "Should contain epidemic count");
+        assert!(
+            summary.contains("Epidemics: 3"),
+            "Should contain epidemic count"
+        );
     }
 
     #[test]
@@ -496,7 +564,10 @@ mod tests {
         assert!(!collapsed.survived, "CVS 0.2 should collapse");
 
         let borderline = make_test_report(0.3);
-        assert!(!borderline.survived, "CVS 0.3 exactly should collapse (> not >=)");
+        assert!(
+            !borderline.survived,
+            "CVS 0.3 exactly should collapse (> not >=)"
+        );
 
         let just_above = make_test_report(0.301);
         assert!(just_above.survived, "CVS 0.301 should survive");
@@ -509,7 +580,12 @@ mod tests {
             CivEvent::new(100, Some(0), CivEventType::Birth, "Agent born"),
             CivEvent::new(200, Some(0), CivEventType::EpidemicStart, "Flu outbreak"),
             CivEvent::new(300, None, CivEventType::Migration, "Migration event"),
-            CivEvent::new(400, Some(0), CivEventType::InnovationBreakthrough, "New tech"),
+            CivEvent::new(
+                400,
+                Some(0),
+                CivEventType::InnovationBreakthrough,
+                "New tech",
+            ),
             CivEvent::new(480, Some(1), CivEventType::WorldFounded, "Mars founded"),
         ];
 
@@ -550,7 +626,10 @@ mod tests {
     fn test_summary_shows_collapsed_for_low_cvs() {
         let report = make_test_report(0.1);
         let summary = report.summary();
-        assert!(summary.contains("COLLAPSED"), "Low CVS should show COLLAPSED");
+        assert!(
+            summary.contains("COLLAPSED"),
+            "Low CVS should show COLLAPSED"
+        );
     }
 
     #[test]

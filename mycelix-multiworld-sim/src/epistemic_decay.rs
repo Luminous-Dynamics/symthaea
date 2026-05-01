@@ -77,7 +77,11 @@ impl EpistemicState {
         tech_levels: &[f64; 8],
     ) {
         // 1. Radiation bit-flip decay
-        let ray_mult = if outside_heliosphere { INTERSTELLAR_RAY_MULT } else { 1.0 };
+        let ray_mult = if outside_heliosphere {
+            INTERSTELLAR_RAY_MULT
+        } else {
+            1.0
+        };
         let radiation_decay = RADIATION_DECAY_PER_SV * cosmic_ray_dose_sv * ray_mult;
 
         // 2. Henrich cultural attrition
@@ -172,13 +176,20 @@ mod tests {
         let mut state = EpistemicState::default();
         let tech = [2.0; 8];
         // High radiation, outside heliosphere
-        for _ in 0..120 { // 10 years
+        for _ in 0..120 {
+            // 10 years
             state.tick(500, 3.0, true, 1.0, &tech);
         }
-        assert!(state.mean_integrity() < 1.0,
-            "Radiation should cause decay: {:.3}", state.mean_integrity());
-        assert!(state.mean_integrity() > 0.5,
-            "10 years shouldn't destroy everything: {:.3}", state.mean_integrity());
+        assert!(
+            state.mean_integrity() < 1.0,
+            "Radiation should cause decay: {:.3}",
+            state.mean_integrity()
+        );
+        assert!(
+            state.mean_integrity() > 0.5,
+            "10 years shouldn't destroy everything: {:.3}",
+            state.mean_integrity()
+        );
     }
 
     #[test]
@@ -186,11 +197,15 @@ mod tests {
         let mut state = EpistemicState::default();
         let tech = [1.0; 8];
         // Small population, minimal radiation
-        for _ in 0..120 { // 10 years
+        for _ in 0..120 {
+            // 10 years
             state.tick(50, 0.1, false, 1.0, &tech);
         }
-        assert!(state.mean_integrity() < 1.0,
-            "Small pop should cause knowledge loss: {:.3}", state.mean_integrity());
+        assert!(
+            state.mean_integrity() < 1.0,
+            "Small pop should cause knowledge loss: {:.3}",
+            state.mean_integrity()
+        );
     }
 
     #[test]
@@ -201,8 +216,11 @@ mod tests {
         for _ in 0..12 {
             state.tick(500, 0.0, false, 1.0, &tech);
         }
-        assert!((state.mean_integrity() - 1.0).abs() < 0.01,
-            "No decay expected: {:.3}", state.mean_integrity());
+        assert!(
+            (state.mean_integrity() - 1.0).abs() < 0.01,
+            "No decay expected: {:.3}",
+            state.mean_integrity()
+        );
     }
 
     #[test]
@@ -211,14 +229,18 @@ mod tests {
         let mut state_off = EpistemicState::default();
         let tech = [2.0; 8];
 
-        for _ in 0..60 { // 5 years
-            state_on.tick(500, 2.0, true, 1.0, &tech);  // Correction ON (energy > 0.3)
-            state_off.tick(500, 2.0, true, 0.1, &tech);  // Correction OFF (energy < 0.3)
+        for _ in 0..60 {
+            // 5 years
+            state_on.tick(500, 2.0, true, 1.0, &tech); // Correction ON (energy > 0.3)
+            state_off.tick(500, 2.0, true, 0.1, &tech); // Correction OFF (energy < 0.3)
         }
 
-        assert!(state_off.mean_integrity() < state_on.mean_integrity(),
+        assert!(
+            state_off.mean_integrity() < state_on.mean_integrity(),
             "Correction OFF should decay faster: {:.3} vs {:.3}",
-            state_off.mean_integrity(), state_on.mean_integrity());
+            state_off.mean_integrity(),
+            state_on.mean_integrity()
+        );
     }
 
     #[test]
@@ -233,9 +255,12 @@ mod tests {
             state_high.tick(500, 2.0, true, 1.0, &tech_high);
         }
 
-        assert!(state_high.mean_integrity() < state_low.mean_integrity(),
+        assert!(
+            state_high.mean_integrity() < state_low.mean_integrity(),
             "High tech should be more fragile: {:.3} vs {:.3}",
-            state_high.mean_integrity(), state_low.mean_integrity());
+            state_high.mean_integrity(),
+            state_low.mean_integrity()
+        );
     }
 
     #[test]

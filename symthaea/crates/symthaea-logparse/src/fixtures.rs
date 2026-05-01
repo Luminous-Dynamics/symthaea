@@ -137,25 +137,38 @@ fn base_event(provider: &str, event_id: u32, severity: Severity, host: &str) -> 
 
 fn gen_benign_login(state: &mut u64, _i: usize) -> LogEvent {
     let host = rand_host(state);
-    let mut ev = base_event("Microsoft-Windows-Security-Auditing", 4624, Severity::Info, &host);
+    let mut ev = base_event(
+        "Microsoft-Windows-Security-Auditing",
+        4624,
+        Severity::Info,
+        &host,
+    );
     ev.component = "Security".into();
     ev.fields.insert("LogonType".into(), "2".into()); // interactive
     ev.fields.insert("TargetUserName".into(), rand_user(state));
     ev.fields.insert("IpAddress".into(), "127.0.0.1".into());
-    ev.fields.insert("AuthenticationPackageName".into(), "NTLM".into());
+    ev.fields
+        .insert("AuthenticationPackageName".into(), "NTLM".into());
     ev.label = Some("benign_login".into());
     ev
 }
 
 fn gen_lateral_movement(state: &mut u64, _i: usize) -> LogEvent {
     let host = rand_host(state);
-    let mut ev = base_event("Microsoft-Windows-Security-Auditing", 4624, Severity::Warning, &host);
+    let mut ev = base_event(
+        "Microsoft-Windows-Security-Auditing",
+        4624,
+        Severity::Warning,
+        &host,
+    );
     ev.component = "Security".into();
     ev.fields.insert("LogonType".into(), "3".into()); // network
     ev.fields.insert("TargetUserName".into(), rand_user(state));
     ev.fields.insert("IpAddress".into(), rand_ip(state));
-    ev.fields.insert("AuthenticationPackageName".into(), "Kerberos".into());
-    ev.fields.insert("ImpersonationLevel".into(), "Impersonation".into());
+    ev.fields
+        .insert("AuthenticationPackageName".into(), "Kerberos".into());
+    ev.fields
+        .insert("ImpersonationLevel".into(), "Impersonation".into());
     ev.label = Some("lateral_movement".into());
     ev
 }
@@ -189,8 +202,10 @@ fn gen_ransomware(state: &mut u64, _i: usize) -> LogEvent {
         "TargetFilename".into(),
         format!("C:\\Users\\{}\\Documents\\doc{ext}", rand_user(state)),
     );
-    ev.fields.insert("Image".into(), "C:\\Windows\\Temp\\evil.exe".into());
-    ev.fields.insert("ProcessId".into(), format!("{}", xorshift(state) & 0xFFFF));
+    ev.fields
+        .insert("Image".into(), "C:\\Windows\\Temp\\evil.exe".into());
+    ev.fields
+        .insert("ProcessId".into(), format!("{}", xorshift(state) & 0xFFFF));
     ev.label = Some("ransomware".into());
     ev
 }
@@ -199,9 +214,11 @@ fn gen_network_outage(state: &mut u64, _i: usize) -> LogEvent {
     let host = rand_host(state);
     let mut ev = base_event("NETLOGON", 1014, Severity::Error, &host);
     ev.component = "System".into();
-    ev.fields.insert("DomainController".into(), "DC-01.corp.local".into());
+    ev.fields
+        .insert("DomainController".into(), "DC-01.corp.local".into());
     ev.fields.insert("ErrorCode".into(), "0x5".into());
-    ev.fields.insert("FailureReason".into(), "unreachable".into());
+    ev.fields
+        .insert("FailureReason".into(), "unreachable".into());
     ev.fields.insert("TargetAddress".into(), rand_ip(state));
     ev.label = Some("network_outage".into());
     ev

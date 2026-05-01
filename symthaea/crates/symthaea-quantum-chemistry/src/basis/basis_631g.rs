@@ -48,12 +48,10 @@ fn shells_for_element(z: u8) -> Vec<ShellData631G> {
             ShellData631G {
                 shell_type: ShellType::S,
                 exponents: vec![
-                    3047.524_9, 457.369_51, 103.948_69,
-                    29.210_155, 9.286_663, 3.163_927,
+                    3047.524_9, 457.369_51, 103.948_69, 29.210_155, 9.286_663, 3.163_927,
                 ],
                 coefficients: vec![
-                    0.001_835, 0.014_037, 0.068_843,
-                    0.232_184, 0.467_941, 0.362_312,
+                    0.001_835, 0.014_037, 0.068_843, 0.232_184, 0.467_941, 0.362_312,
                 ],
             },
             // 2s inner: 3 primitives (Hehre 1972 segmented contraction)
@@ -90,12 +88,10 @@ fn shells_for_element(z: u8) -> Vec<ShellData631G> {
             ShellData631G {
                 shell_type: ShellType::S,
                 exponents: vec![
-                    4173.511_5, 627.457_91, 142.902_09,
-                    40.234_330, 12.820_213, 4.390_437,
+                    4173.511_5, 627.457_91, 142.902_09, 40.234_330, 12.820_213, 4.390_437,
                 ],
                 coefficients: vec![
-                    0.001_835, 0.013_995, 0.068_587,
-                    0.232_241, 0.469_070, 0.360_455,
+                    0.001_835, 0.013_995, 0.068_587, 0.232_241, 0.469_070, 0.360_455,
                 ],
             },
             ShellData631G {
@@ -125,12 +121,15 @@ fn shells_for_element(z: u8) -> Vec<ShellData631G> {
             ShellData631G {
                 shell_type: ShellType::S,
                 exponents: vec![
-                    5484.671_7, 825.234_95, 188.046_96,
-                    52.964_500, 16.897_571, 5.799_635_3,
+                    5484.671_7,
+                    825.234_95,
+                    188.046_96,
+                    52.964_500,
+                    16.897_571,
+                    5.799_635_3,
                 ],
                 coefficients: vec![
-                    0.001_831, 0.013_950, 0.068_445,
-                    0.232_714, 0.470_193, 0.358_521,
+                    0.001_831, 0.013_950, 0.068_445, 0.232_714, 0.470_193, 0.358_521,
                 ],
             },
             // 2s inner: 3 primitives (Hehre 1972 segmented contraction)
@@ -181,7 +180,9 @@ impl BasisSetProvider for Basis631G {
                             alpha,
                             coeff,
                             center: atom.position,
-                            l, m, n,
+                            l,
+                            m,
+                            n,
                         })
                         .collect();
 
@@ -224,7 +225,11 @@ mod tests {
         //  = 1 + 1 + 3 + 1 + 3 = 9
         // H: 2 s-functions each × 2 = 4
         // Total = 13
-        assert_eq!(basis.n_basis(), 13, "H2O 6-31G should have 13 basis functions");
+        assert_eq!(
+            basis.n_basis(),
+            13,
+            "H2O 6-31G should have 13 basis functions"
+        );
     }
 
     #[test]
@@ -235,7 +240,8 @@ mod tests {
         assert!(
             b631g.n_basis() > sto3g.n_basis(),
             "6-31G ({}) should be larger than STO-3G ({})",
-            b631g.n_basis(), sto3g.n_basis()
+            b631g.n_basis(),
+            sto3g.n_basis()
         );
     }
 
@@ -256,7 +262,8 @@ mod tests {
         assert!(
             e_631g < e_sto3g,
             "6-31G ({:.4}) should be lower than STO-3G ({:.4})",
-            e_631g, e_sto3g
+            e_631g,
+            e_sto3g
         );
 
         // Reference: HF/6-31G water ≈ -75.585 Ha (vs STO-3G ≈ -74.96)

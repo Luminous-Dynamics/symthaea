@@ -7,7 +7,7 @@
 //! X25519 key agreement in Rust/WASM, HKDF-SHA256 for key derivation, and
 //! AES-256-GCM via Web Crypto for payload encryption.
 
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use ed25519_dalek::Signer;
 use hkdf::Hkdf;
 use sha2::Sha256;
@@ -31,7 +31,10 @@ pub struct MessageCrypto {
 /// Generate cryptographically secure random bytes.
 pub fn generate_nonce(len: usize) -> Vec<u8> {
     let mut buf = vec![0u8; len];
-    let crypto = web_sys::window().unwrap().crypto().expect("crypto API required");
+    let crypto = web_sys::window()
+        .unwrap()
+        .crypto()
+        .expect("crypto API required");
     crypto
         .get_random_values_with_u8_array(&mut buf)
         .expect("RNG failed");
@@ -94,18 +97,30 @@ pub fn sign_message(content: &[u8], nonce: &[u8]) -> Vec<u8> {
 }
 
 fn ensure_signing_keypair() -> Result<(), String> {
-    if load_signing_secret_key().is_some() { return Ok(()); }
+    if load_signing_secret_key().is_some() {
+        return Ok(());
+    }
     let seed_bytes = generate_nonce(32);
-    let seed_array: [u8; 32] = seed_bytes.as_slice().try_into()
+    let seed_array: [u8; 32] = seed_bytes
+        .as_slice()
+        .try_into()
         .map_err(|_| "Could not generate signing seed".to_string())?;
     let signing_key = ed25519_dalek::SigningKey::from_bytes(&seed_array);
     let verifying_key = signing_key.verifying_key();
     let storage = web_sys::window()
         .and_then(|w| w.local_storage().ok().flatten())
         .ok_or_else(|| "localStorage unavailable".to_string())?;
-    storage.set_item(LOCAL_SIGNING_SECRET_KEY, &base64_encode(signing_key.as_bytes()))
+    storage
+        .set_item(
+            LOCAL_SIGNING_SECRET_KEY,
+            &base64_encode(signing_key.as_bytes()),
+        )
         .map_err(|e| format!("{e:?}"))?;
-    storage.set_item(LOCAL_SIGNING_PUBLIC_KEY, &base64_encode(verifying_key.as_bytes()))
+    storage
+        .set_item(
+            LOCAL_SIGNING_PUBLIC_KEY,
+            &base64_encode(verifying_key.as_bytes()),
+        )
         .map_err(|e| format!("{e:?}"))?;
     Ok(())
 }

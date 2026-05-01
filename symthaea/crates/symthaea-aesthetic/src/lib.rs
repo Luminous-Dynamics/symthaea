@@ -352,8 +352,7 @@ impl AestheticTracker {
         let bias_alpha = 0.01_f32;
         for i in 0..8 {
             let target = harmony_activations[i] * score.composite;
-            self.harmony_bias[i] =
-                self.harmony_bias[i] * (1.0 - bias_alpha) + target * bias_alpha;
+            self.harmony_bias[i] = self.harmony_bias[i] * (1.0 - bias_alpha) + target * bias_alpha;
         }
 
         AestheticFeedback {
@@ -453,10 +452,7 @@ impl AestheticTracker {
     /// Batch human feedback: apply multiple ratings at once.
     ///
     /// Useful for catching up on feedback from a listening session.
-    pub fn human_feedback_batch(
-        &mut self,
-        ratings: &[(f32, [f32; 8])],
-    ) -> Vec<AestheticFeedback> {
+    pub fn human_feedback_batch(&mut self, ratings: &[(f32, [f32; 8])]) -> Vec<AestheticFeedback> {
         ratings
             .iter()
             .map(|(rating, harmonies)| self.human_feedback(*rating, harmonies))

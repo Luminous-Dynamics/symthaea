@@ -3,8 +3,8 @@
 
 //! Conversation heatmap — 7x24 day/hour grid showing email activity density.
 
-use leptos::prelude::*;
 use crate::mail_context::use_mail;
+use leptos::prelude::*;
 
 #[component]
 pub fn ConversationHeatmap() -> impl IntoView {

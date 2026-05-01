@@ -182,7 +182,15 @@ impl WorldGovernance {
         rng: &mut StochasticEngine,
         amendment_enabled: bool,
     ) -> Vec<CivEvent> {
-        self.tick_governance_full(world, current_tick, rng, amendment_enabled, false, 0.0, true)
+        self.tick_governance_full(
+            world,
+            current_tick,
+            rng,
+            amendment_enabled,
+            false,
+            0.0,
+            true,
+        )
     }
 
     /// Run one tick of governance with full policy control including hostile guardian mode.
@@ -236,7 +244,9 @@ impl WorldGovernance {
         // MYCEL-blended eligible fraction: soulbound reputation matters too.
         let mycel_eligible = {
             let pop = world.population().max(1) as f64;
-            let mycel_voters = world.agents.iter()
+            let mycel_voters = world
+                .agents
+                .iter()
                 .filter(|a| a.is_alive() && a.mycel_score >= 0.3)
                 .count() as f64;
             mycel_voters / pop
@@ -267,7 +277,8 @@ impl WorldGovernance {
             // Amendment probability: MYCEL-blended eligible fraction × stability × metabolism phase
             // Stillness phase suppresses voting (Metabolism Charter)
             let suppression_factor = 1.0 - voting_suppression.clamp(0.0, 0.95);
-            let amendment_prob = effective_eligible * (1.0 - self.stability_score * 0.5) * suppression_factor;
+            let amendment_prob =
+                effective_eligible * (1.0 - self.stability_score * 0.5) * suppression_factor;
             if rng.bernoulli(amendment_prob.clamp(0.0, 0.8)) {
                 self.amendment_count += 1;
                 self.amendments_this_period += 1;
@@ -352,7 +363,11 @@ impl WorldGovernance {
             let living: Vec<_> = world.agents.iter().filter(|a| a.is_alive()).collect();
             let n = living.len().max(1) as f64;
             let mean_deont: f64 = living.iter().map(|a| a.ethics.deontological).sum::<f64>() / n;
-            let mean_conseq: f64 = living.iter().map(|a| a.ethics.consequentialist).sum::<f64>() / n;
+            let mean_conseq: f64 = living
+                .iter()
+                .map(|a| a.ethics.consequentialist)
+                .sum::<f64>()
+                / n;
             // Net pressure: deontological shortens, consequentialist extends
             // Range: −0.15 (strong deont) to +0.15 (strong conseq)
             let ethics_pressure = (mean_conseq - mean_deont) * 0.15;
@@ -361,8 +376,9 @@ impl WorldGovernance {
 
             if self.emergency_ticks_remaining > 0 {
                 // Deontological populations erode emergency powers faster
-                self.emergency_ticks_remaining =
-                    self.emergency_ticks_remaining.saturating_sub(effective_decay.round() as u32);
+                self.emergency_ticks_remaining = self
+                    .emergency_ticks_remaining
+                    .saturating_sub(effective_decay.round() as u32);
             }
             if self.emergency_ticks_remaining == 0 {
                 self.emergency_powers_active = false;
@@ -668,7 +684,13 @@ mod tests {
                     faction_id: None,
                     generation: 0,
                     trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
+                    cumulative_dose_sv: 0.0,
+                    adversarial: None,
+                    coordination_understanding: 0.0,
+                    mycel_score: 0.1,
+                    sap_balance: 100.0,
+                    is_biological: true,
+                    wounds: Vec::new(),
                     ethics: crate::agent::EthicalOrientation::default(),
                     sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
                     justice: crate::sub_passport::RestorativeJustice::new(),
@@ -697,7 +719,9 @@ mod tests {
             economy: crate::economy::WorldEconomy::new(),
             harmony: crate::harmony::HarmonyTracker::new(),
             governance: crate::governance::WorldGovernance::new(),
-            metabolism_state: crate::metabolism::MetabolismState::default(), currency_state: crate::currency::WorldCurrencyState::default(), policy_state: crate::proposals::PolicyState::default(),
+            metabolism_state: crate::metabolism::MetabolismState::default(),
+            currency_state: crate::currency::WorldCurrencyState::default(),
+            policy_state: crate::proposals::PolicyState::default(),
             power_generation_kw: 0.0,
             power_demand_kw: 0.0,
             narrative_identity: crate::world::NarrativeIdentity::default(),
@@ -812,7 +836,10 @@ mod tests {
         let mut crisis_gov = WorldGovernance::new();
         crisis_gov.constitutional_crisis = true;
         let stability = crisis_gov.compute_stability(0);
-        assert!(stability < 0.7, "Crisis should reduce stability: {stability}");
+        assert!(
+            stability < 0.7,
+            "Crisis should reduce stability: {stability}"
+        );
     }
 
     #[test]
@@ -942,8 +969,7 @@ mod tests {
 
         // Most vetoes should be overridden by the community
         if gov.veto_count > 0 {
-            let override_rate =
-                gov.veto_override_count as f64 / gov.veto_count as f64;
+            let override_rate = gov.veto_override_count as f64 / gov.veto_count as f64;
             assert!(
                 override_rate > 0.5,
                 "Community should override >50% of hostile vetoes: {:.1}% ({} of {})",
@@ -1050,7 +1076,12 @@ mod tests {
                 let _ = gov.tick_governance_full(&world, tick, &mut rng, true, false, 0.0, true);
             }
 
-            results.push((seed, gov.stability_score, gov.veto_count, gov.amendment_count));
+            results.push((
+                seed,
+                gov.stability_score,
+                gov.veto_count,
+                gov.amendment_count,
+            ));
         }
 
         // All seeds should maintain stability > 0.5
@@ -1064,7 +1095,8 @@ mod tests {
             assert!(
                 *vetoes <= 2,
                 "Seed {} had {} vetoes (expected near-zero — deterrence)",
-                seed, vetoes
+                seed,
+                vetoes
             );
             assert!(
                 *amendments > 0,

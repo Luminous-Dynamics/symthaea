@@ -415,7 +415,10 @@ impl RdpSession {
             nonce_bytes[11],
         ]) as u64;
 
-        if !self.replay_window.accept((source_id_u64, payload_type), seq) {
+        if !self
+            .replay_window
+            .accept((source_id_u64, payload_type), seq)
+        {
             // AEAD passed but the message is a replay or too old. Drop.
             return None;
         }

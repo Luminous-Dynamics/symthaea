@@ -26,8 +26,8 @@ impl Default for FrameCaptureConfig {
     fn default() -> Self {
         Self {
             output_dir: "/tmp/terra-atlas-frames".into(),
-            interval_secs: 1.0 / 4.0,  // 4fps — gives async screenshots time to resolve
-            max_frames: 720,           // 90 seconds at 8fps
+            interval_secs: 1.0 / 4.0, // 4fps — gives async screenshots time to resolve
+            max_frames: 720,          // 90 seconds at 8fps
             frame_count: 0,
             accumulator: 0.0,
             active: false,
@@ -56,7 +56,9 @@ pub fn frame_capture_system(
         }
     }
 
-    if !config.active { return; }
+    if !config.active {
+        return;
+    }
 
     if config.max_frames > 0 && config.frame_count >= config.max_frames {
         config.active = false;
@@ -73,9 +75,10 @@ pub fn frame_capture_system(
         let frame_path = format!("{}/frame_{:05}.png", config.output_dir, config.frame_count);
 
         // Capture from the primary window
-        commands.spawn(Screenshot(bevy_camera::RenderTarget::Window(
-            bevy::window::WindowRef::Primary,
-        )))
+        commands
+            .spawn(Screenshot(bevy_camera::RenderTarget::Window(
+                bevy::window::WindowRef::Primary,
+            )))
             .observe(save_to_disk(frame_path));
         config.frame_count += 1;
     }

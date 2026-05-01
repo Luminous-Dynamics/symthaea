@@ -62,7 +62,9 @@ pub use dimensional::DimensionalEncoder;
 pub use dimensional_inference::{infer_dimensions, InferenceResult, UnitMap};
 pub use equation_ast::EquationEncoder;
 pub use query::{PhysicsSearchEngine, SearchWeights};
-pub use recognize::{expr_to_equation_node, recognize_expr, recognize_expr_with_units, RecognitionReport};
+pub use recognize::{
+    expr_to_equation_node, recognize_expr, recognize_expr_with_units, RecognitionReport,
+};
 pub use symmetry::SymmetryEncoder;
 pub use symmetry_inference::infer_symmetry;
 pub use tensor_structure::TensorEncoder;

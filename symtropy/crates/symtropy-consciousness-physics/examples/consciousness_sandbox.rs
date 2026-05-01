@@ -12,10 +12,10 @@
 //! Run: cargo run -p symtropy-consciousness-physics --example consciousness_sandbox
 
 use nalgebra::SVector;
+use symthaea_consciousness_equation::ConsciousnessInputs;
 use symtropy_consciousness_physics::{ConsciousnessField, ThermodynamicConstants};
 use symtropy_math::Point;
 use symtropy_physics::{BodyHandle, PhysicsWorld, RigidBody};
-use symthaea_consciousness_equation::ConsciousnessInputs;
 
 fn main() {
     println!("=== Symtropy Consciousness Sandbox ===\n");
@@ -47,9 +47,11 @@ fn main() {
         // Set harmony activations — alternate between two profiles
         if let Some(entity) = consciousness.entities.get_mut(&h) {
             if i % 2 == 0 {
-                entity.harmony_activations = [0.8, 0.3, 0.1, 0.1, 0.1, 0.1, 0.1, 0.7, 0.5]; // Stillness-heavy
+                entity.harmony_activations = [0.8, 0.3, 0.1, 0.1, 0.1, 0.1, 0.1, 0.7, 0.5];
+            // Stillness-heavy
             } else {
-                entity.harmony_activations = [0.3, 0.1, 0.8, 0.1, 0.1, 0.1, 0.7, 0.3, 0.5]; // Progression-heavy
+                entity.harmony_activations = [0.3, 0.1, 0.8, 0.1, 0.1, 0.1, 0.7, 0.3, 0.5];
+                // Progression-heavy
             }
         }
         handles.push(h);
@@ -92,11 +94,14 @@ fn main() {
         for &h in &handles {
             if let Some(entity) = consciousness.entities.get_mut(&h) {
                 let phi = entity.phi();
-                let cost = consciousness.constants.consciousness_maintenance_per_tick * (1.0 + phi * 0.5);
+                let cost =
+                    consciousness.constants.consciousness_maintenance_per_tick * (1.0 + phi * 0.5);
                 entity.energy.consume(cost);
 
                 // Ambient regen
-                entity.energy.regenerate(consciousness.constants.ambient_regen_rate);
+                entity
+                    .energy
+                    .regenerate(consciousness.constants.ambient_regen_rate);
             }
         }
 
@@ -115,11 +120,14 @@ fn main() {
                     }
                 };
 
-                let resonance = symtropy_consciousness_physics::harmony_field::HarmonyField::<3>::resonance(
-                    &harm_a, &harm_b,
-                );
+                let resonance =
+                    symtropy_consciousness_physics::harmony_field::HarmonyField::<3>::resonance(
+                        &harm_a, &harm_b,
+                    );
                 if resonance > 0.5 {
-                    let regen = consciousness.constants.harmony_resonance_regen_rate * (resonance - 0.5) * 2.0;
+                    let regen = consciousness.constants.harmony_resonance_regen_rate
+                        * (resonance - 0.5)
+                        * 2.0;
                     if let Some(entity) = consciousness.entities.get_mut(&ha) {
                         entity.energy.regenerate(regen);
                     }
@@ -162,12 +170,7 @@ fn main() {
 
             println!(
                 "{:<6} {:<10.3} {:<10} {:<10} {:<10.3} {:<10.1}",
-                tick,
-                consciousness.collective_phi,
-                alive,
-                collapsed,
-                avg_error,
-                avg_energy,
+                tick, consciousness.collective_phi, alive, collapsed, avg_error, avg_energy,
             );
         }
     }

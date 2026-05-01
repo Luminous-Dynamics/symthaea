@@ -20,7 +20,7 @@ use symthaea_core::hdc::ContinuousHV;
 
 use crate::consciousness::code_primitives::{CodeOperation, CodePrimitiveExecutor};
 use crate::hdc::code_encoder::CodeHDEncoder;
-use crate::language::code_parser::{CodeEntity, EntityKind, ParsedCode};
+use crate::language::code_parser::{Entity, EntityKind, ParsedCode};
 
 /// Health score for a single module
 #[derive(Debug, Clone)]
@@ -318,7 +318,7 @@ impl CodeHealthScanner {
     }
 
     /// Compute entity depth (how nested is it)
-    fn entity_depth(&self, entity: &CodeEntity) -> usize {
+    fn entity_depth(&self, entity: &Entity) -> usize {
         if entity.children.is_empty() {
             0
         } else {
@@ -673,12 +673,12 @@ mod tests {
         for f in funcs {
             parsed
                 .entities
-                .push(CodeEntity::new(EntityKind::Function, *f, test_span()));
+                .push(Entity::new(EntityKind::Function, *f, test_span()));
         }
         for t in types {
             parsed
                 .entities
-                .push(CodeEntity::new(EntityKind::Struct, *t, test_span()));
+                .push(Entity::new(EntityKind::Struct, *t, test_span()));
         }
         parsed
     }

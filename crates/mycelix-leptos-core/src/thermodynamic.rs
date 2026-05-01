@@ -13,11 +13,11 @@
 //! vector. It works on Chrome/Android but is disabled in Safari and Firefox.
 //! We catch the Promise rejection gracefully and default to full energy.
 
+use crate::util::set_css_var;
+use gloo_timers::callback::Interval;
 use leptos::prelude::*;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
-use gloo_timers::callback::Interval;
-use crate::util::set_css_var;
 
 /// Torpor threshold: below this battery level (15%), the UI enters torpor.
 const TORPOR_BATTERY_THRESHOLD: f64 = 0.15;
@@ -32,6 +32,8 @@ pub struct ThermodynamicState {
     pub device_energy: ReadSignal<f64>,
     /// Network health 0.0-1.0 (1.0 = healthy, 0.0 = unreachable).
     pub network_health: ReadSignal<f64>,
+    /// Collective Phi (MCE) 0.0-1.0 (global consciousness level).
+    pub collective_phi: ReadSignal<f64>,
     /// Torpor level 0.0-1.0 (0.0 = fully active, 1.0 = deep torpor).
     pub torpor_level: ReadSignal<f64>,
     /// Whether the Battery API is available.
@@ -42,6 +44,7 @@ pub struct ThermodynamicState {
 pub fn provide_thermodynamic_context() -> ThermodynamicState {
     let (device_energy, set_device_energy) = signal(1.0_f64);
     let (network_health, _set_network_health) = signal(1.0_f64);
+    let (collective_phi, _set_collective_phi) = signal(0.5_f64); // Baseline
     let (torpor_level, set_torpor_level) = signal(0.0_f64);
     let (battery_available, set_battery_available) = signal(false);
 
@@ -73,6 +76,7 @@ pub fn provide_thermodynamic_context() -> ThermodynamicState {
     let state = ThermodynamicState {
         device_energy,
         network_health,
+        collective_phi,
         torpor_level,
         battery_available,
     };
@@ -83,6 +87,7 @@ pub fn provide_thermodynamic_context() -> ThermodynamicState {
     Effect::new(move |_| {
         set_css_var("--device-energy", &format!("{:.3}", device_energy.get()));
         set_css_var("--network-health", &format!("{:.3}", network_health.get()));
+        set_css_var("--collective-phi", &format!("{:.3}", collective_phi.get()));
         set_css_var("--torpor-level", &format!("{:.3}", torpor_level.get()));
     });
 

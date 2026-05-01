@@ -3,9 +3,9 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Security badge: safety dot + threat count.
 
+use crate::state::BrowserState;
 use leptos::prelude::*;
 use prism_common::SafetyLevel;
-use crate::state::BrowserState;
 
 #[component]
 pub fn SecurityBadge() -> impl IntoView {

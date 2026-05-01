@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Benchmarks for the Prism epistemic search engine.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use prism_search::binary_hv::BinaryHV;
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 use prism_search::SearchEngine;
+use prism_search::binary_hv::BinaryHV;
 
 fn bench_binary_hv_similarity(c: &mut Criterion) {
     let a = BinaryHV::random(42);

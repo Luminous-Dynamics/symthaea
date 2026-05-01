@@ -65,8 +65,7 @@ impl<const D: usize> SanctuaryZone<D> {
         if should_activate {
             self.active = true;
             // Dampening scales with stillness and phi
-            self.dampening =
-                0.9 * conditions.stillness_activation * conditions.phi.min(1.0);
+            self.dampening = 0.9 * conditions.stillness_activation * conditions.phi.min(1.0);
         } else {
             self.active = false;
             self.dampening = 0.0;
@@ -137,7 +136,10 @@ mod tests {
 
         let mult = zone.impulse_multiplier(&SVector::from([0.0, 0.0, 0.0]));
         // Should be heavily dampened (close to 0)
-        assert!(mult < 0.5, "mult = {mult}, expected strong dampening at center");
+        assert!(
+            mult < 0.5,
+            "mult = {mult}, expected strong dampening at center"
+        );
     }
 
     #[test]
@@ -146,7 +148,10 @@ mod tests {
         zone.update(&active_conditions(), Point::origin());
 
         let mult = zone.impulse_multiplier(&SVector::from([10.0, 0.0, 0.0]));
-        assert!((mult - 1.0).abs() < 0.01, "mult = {mult}, expected ~1.0 at edge");
+        assert!(
+            (mult - 1.0).abs() < 0.01,
+            "mult = {mult}, expected ~1.0 at edge"
+        );
     }
 
     #[test]
@@ -176,7 +181,10 @@ mod tests {
         let m_mid = zone.impulse_multiplier(&SVector::from([5.0, 0.0, 0.0]));
         let m_edge = zone.impulse_multiplier(&SVector::from([10.0, 0.0, 0.0]));
 
-        assert!(m_center <= m_mid, "center ({m_center}) should be ≤ mid ({m_mid})");
+        assert!(
+            m_center <= m_mid,
+            "center ({m_center}) should be ≤ mid ({m_mid})"
+        );
         assert!(m_mid <= m_edge, "mid ({m_mid}) should be ≤ edge ({m_edge})");
     }
 

@@ -78,7 +78,9 @@ fn run_point(seed: u64, ticks: u32, ethics: [f64; 4]) -> (f64, f64, usize) {
     }
 
     let report = sim.run();
-    let phi = sim.worlds.iter()
+    let phi = sim
+        .worlds
+        .iter()
         .map(|w| w.mean_phi() * w.population() as f64)
         .sum::<f64>()
         / report.final_population.max(1) as f64;
@@ -88,15 +90,21 @@ fn run_point(seed: u64, ticks: u32, ethics: [f64; 4]) -> (f64, f64, usize) {
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    let levels: usize = args.iter().position(|a| a == "--levels")
+    let levels: usize = args
+        .iter()
+        .position(|a| a == "--levels")
         .and_then(|i| args.get(i + 1))
         .and_then(|s| s.parse().ok())
         .unwrap_or(3);
-    let n_seeds: usize = args.iter().position(|a| a == "--seeds")
+    let n_seeds: usize = args
+        .iter()
+        .position(|a| a == "--seeds")
         .and_then(|i| args.get(i + 1))
         .and_then(|s| s.parse().ok())
         .unwrap_or(3);
-    let ticks: u32 = args.iter().position(|a| a == "--ticks")
+    let ticks: u32 = args
+        .iter()
+        .position(|a| a == "--ticks")
         .and_then(|i| args.get(i + 1))
         .and_then(|s| s.parse().ok())
         .unwrap_or(1200);
@@ -105,7 +113,10 @@ fn main() {
     let total_runs = total_points * n_seeds;
 
     eprintln!("=== ETHICS LANDSCAPE SEARCH ===");
-    eprintln!("{}^4 = {} grid points x {} seeds = {} total runs", levels, total_points, n_seeds, total_runs);
+    eprintln!(
+        "{}^4 = {} grid points x {} seeds = {} total runs",
+        levels, total_points, n_seeds, total_runs
+    );
     eprintln!("{} ticks ({:.0} years) per run", ticks, ticks as f64 / 12.0);
     eprintln!();
 
@@ -115,7 +126,9 @@ fn main() {
         .collect();
 
     // CSV header
-    println!("deont,conseq,virtue,relat,mean_cvs,std_cvs,mean_phi,std_phi,mean_pop,std_pop,n_seeds");
+    println!(
+        "deont,conseq,virtue,relat,mean_cvs,std_cvs,mean_phi,std_phi,mean_pop,std_pop,n_seeds"
+    );
 
     let seeds: Vec<u64> = (0..n_seeds).map(|i| 42 + i as u64 * 17).collect();
     let mut completed = 0;
@@ -139,18 +152,44 @@ fn main() {
                     let mean_cvs = cvs_vals.iter().sum::<f64>() / n_seeds as f64;
                     let mean_phi = phi_vals.iter().sum::<f64>() / n_seeds as f64;
                     let mean_pop = pop_vals.iter().sum::<f64>() / n_seeds as f64;
-                    let std_cvs = (cvs_vals.iter().map(|x| (x - mean_cvs).powi(2)).sum::<f64>() / n_seeds as f64).sqrt();
-                    let std_phi = (phi_vals.iter().map(|x| (x - mean_phi).powi(2)).sum::<f64>() / n_seeds as f64).sqrt();
-                    let std_pop = (pop_vals.iter().map(|x| (x - mean_pop).powi(2)).sum::<f64>() / n_seeds as f64).sqrt();
+                    let std_cvs = (cvs_vals.iter().map(|x| (x - mean_cvs).powi(2)).sum::<f64>()
+                        / n_seeds as f64)
+                        .sqrt();
+                    let std_phi = (phi_vals.iter().map(|x| (x - mean_phi).powi(2)).sum::<f64>()
+                        / n_seeds as f64)
+                        .sqrt();
+                    let std_pop = (pop_vals.iter().map(|x| (x - mean_pop).powi(2)).sum::<f64>()
+                        / n_seeds as f64)
+                        .sqrt();
 
-                    println!("{:.2},{:.2},{:.2},{:.2},{:.6},{:.6},{:.6},{:.6},{:.0},{:.0},{}",
-                        d, c, v, r, mean_cvs, std_cvs, mean_phi, std_phi, mean_pop, std_pop, n_seeds);
+                    println!(
+                        "{:.2},{:.2},{:.2},{:.2},{:.6},{:.6},{:.6},{:.6},{:.0},{:.0},{}",
+                        d,
+                        c,
+                        v,
+                        r,
+                        mean_cvs,
+                        std_cvs,
+                        mean_phi,
+                        std_phi,
+                        mean_pop,
+                        std_pop,
+                        n_seeds
+                    );
 
                     completed += 1;
                     if completed % 10 == 0 {
-                        eprintln!("  [{}/{}] ({:.1}%) last: [{:.2},{:.2},{:.2},{:.2}] CVS={:.4}",
-                            completed, total_points, completed as f64 / total_points as f64 * 100.0,
-                            d, c, v, r, mean_cvs);
+                        eprintln!(
+                            "  [{}/{}] ({:.1}%) last: [{:.2},{:.2},{:.2},{:.2}] CVS={:.4}",
+                            completed,
+                            total_points,
+                            completed as f64 / total_points as f64 * 100.0,
+                            d,
+                            c,
+                            v,
+                            r,
+                            mean_cvs
+                        );
                     }
                 }
             }

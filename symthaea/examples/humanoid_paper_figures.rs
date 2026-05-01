@@ -9,14 +9,14 @@
 //! 3. Baseline comparison table: HDC-LTC-FEP vs SAC/TD3/D4PG
 //! 4. Perturbation recovery: standing reward under increasing external force
 //!
-//! Run: `cargo run --features flight,humanoid --example humanoid_paper_figures --release`
+//! Run: `cargo run --features multirotor,humanoid --example humanoid_paper_figures --release`
 
-use symthaea::flight::{
-    FlightConfig, FlightController, FlightState, QuadrotorCommand, QuadrotorHdcEncoder,
-};
 use symthaea::humanoid::benchmarks::{BaselineScores, DmcBenchmarkResult};
 use symthaea::humanoid::transfer::{transfer_learning_comparison, MorphologicalTransfer};
 use symthaea::humanoid::{HumanoidConfig, HumanoidTrainer};
+use symthaea::multirotor::{
+    FlightConfig, FlightController, FlightState, QuadrotorCommand, QuadrotorHdcEncoder,
+};
 use symthaea::symthaea_core::genesis::GenesisSeed;
 
 fn main() {
@@ -99,7 +99,7 @@ fn main() {
     println!();
 
     // Train flight controller
-    let flight_genesis = GenesisSeed::from_phrase("symthaea-flight-quadrotor");
+    let flight_genesis = GenesisSeed::from_phrase("symthaea-multirotor-quadrotor");
     let flight_config = FlightConfig::default();
     let mut flight_ctrl = FlightController::new(&flight_genesis, &flight_config);
     let mut flight_encoder = QuadrotorHdcEncoder::new(&flight_genesis, flight_config.num_levels);

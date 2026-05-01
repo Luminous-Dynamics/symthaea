@@ -35,7 +35,7 @@ pub fn RichEditor(
     let on_blockquote = move |_| exec("formatBlock", "blockquote");
     let on_link = move |_| {
         let _ = js_sys::eval(
-            "var u=prompt('Enter URL:');if(u)document.execCommand('createLink',false,u)"
+            "var u=prompt('Enter URL:');if(u)document.execCommand('createLink',false,u)",
         );
     };
     let on_clear = move |_| exec("removeFormat", "");

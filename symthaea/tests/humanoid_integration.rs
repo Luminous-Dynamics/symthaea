@@ -875,7 +875,7 @@ fn test_transfer_creates_valid_controller() {
     use symthaea::symthaea_core::hdc::{HdcLtcUnifiedNetwork, UnifiedConfig, UnifiedNetworkConfig};
 
     // Create a small "trained" flight network
-    let flight_genesis = GenesisSeed::from_phrase("symthaea-flight-quadrotor");
+    let flight_genesis = GenesisSeed::from_phrase("symthaea-multirotor-quadrotor");
     let flight_config = UnifiedNetworkConfig {
         layer_sizes: vec![4; 2], // 2x4 flight config
         neuron_config: UnifiedConfig {
@@ -922,7 +922,7 @@ fn test_transfer_creates_valid_controller() {
 fn test_transfer_differs_from_random_init() {
     use symthaea::symthaea_core::hdc::{HdcLtcUnifiedNetwork, UnifiedConfig, UnifiedNetworkConfig};
 
-    let flight_genesis = GenesisSeed::from_phrase("symthaea-flight-quadrotor");
+    let flight_genesis = GenesisSeed::from_phrase("symthaea-multirotor-quadrotor");
     let flight_config = UnifiedNetworkConfig {
         layer_sizes: vec![4; 2],
         neuron_config: UnifiedConfig {

@@ -34,10 +34,28 @@
 //! use [`anchor_hash_of`] with a caller-provided serializable entry.
 
 use hdk::prelude::*;
+
+// ============================================================================
+// WASM Randomness (getrandom v0.2 custom backend)
+// ============================================================================
+
+/// Register a custom randomness backend for getrandom v0.2 when compiling to WASM.
+/// This routes all requests to the HDK's randomness provider.
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+getrandom::register_custom_getrandom!(my_custom_getrandom);
+
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+pub fn my_custom_getrandom(buf: &mut [u8]) -> Result<(), getrandom::Error> {
+    let bytes = hdk::prelude::random_bytes(buf.len() as u32).map_err(|_| getrandom::Error::UNSUPPORTED)?;
+    buf.copy_from_slice(bytes.as_ref());
+    Ok(())
+}
+
 #[allow(deprecated)] // require_consciousness kept for backward compat
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    sovereign_gate::{CivicRequirement, gate_civic},
+    gate_consciousness,
+    sovereign_gate::{gate_civic, CivicRequirement},
+    GovernanceEligibility, GovernanceRequirement,
 };
 
 // ============================================================================
@@ -100,8 +118,7 @@ pub fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>
             if record_details.updates.is_empty() {
                 Ok(Some(record_details.record))
             } else {
-                let latest_update =
-                    &record_details.updates[record_details.updates.len() - 1];
+                let latest_update = &record_details.updates[record_details.updates.len() - 1];
                 let latest_hash = latest_update.action_address().clone();
                 get_latest_record(latest_hash)
             }
@@ -139,13 +156,12 @@ pub fn records_from_links_strict(links: Vec<Link>) -> ExternResult<Vec<Record>> 
     for link in links {
         let action_hash = ActionHash::try_from(link.target.clone())
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        let record = get_latest_record(action_hash.clone())?
-            .ok_or_else(|| {
-                wasm_error!(WasmErrorInner::Guest(format!(
-                    "Record not found for link target: {:?}",
-                    action_hash
-                )))
-            })?;
+        let record = get_latest_record(action_hash.clone())?.ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Record not found for link target: {:?}",
+                action_hash
+            )))
+        })?;
         records.push(record);
     }
     Ok(records)
@@ -212,14 +228,16 @@ pub fn validate_length_range<T>(
     if data.len() < min {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "{} must have at least {} items, got {}",
-            field_name, min,
+            field_name,
+            min,
             data.len()
         ))));
     }
     if data.len() > max {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "{} must have at most {} items, got {}",
-            field_name, max,
+            field_name,
+            max,
             data.len()
         ))));
     }

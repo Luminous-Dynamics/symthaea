@@ -48,52 +48,74 @@ impl ISRUCapability {
     pub fn for_body(body: PlanetaryBody) -> Self {
         match body {
             PlanetaryBody::Earth => Self {
-                body, water_extraction: 1000.0, oxygen_production: 500.0,
-                metal_extraction: 100.0, hydrocarbon_collection: 0.0,
-                nitrogen_extraction: 100.0, requires_nuclear: false, min_tech_level: 0.0,
+                body,
+                water_extraction: 1000.0,
+                oxygen_production: 500.0,
+                metal_extraction: 100.0,
+                hydrocarbon_collection: 0.0,
+                nitrogen_extraction: 100.0,
+                requires_nuclear: false,
+                min_tech_level: 0.0,
             },
             PlanetaryBody::Moon => Self {
-                body, water_extraction: 5.0, // Polar ice deposits
+                body,
+                water_extraction: 5.0,   // Polar ice deposits
                 oxygen_production: 20.0, // Ilmenite reduction (FeTiO₃ → Fe + TiO₂ + O₂)
                 metal_extraction: 10.0,  // Iron from regolith
-                hydrocarbon_collection: 0.0, nitrogen_extraction: 0.0,
-                requires_nuclear: false, min_tech_level: 1.5,
+                hydrocarbon_collection: 0.0,
+                nitrogen_extraction: 0.0,
+                requires_nuclear: false,
+                min_tech_level: 1.5,
             },
             PlanetaryBody::Mars => Self {
-                body, water_extraction: 15.0, // Subsurface ice
+                body,
+                water_extraction: 15.0,  // Subsurface ice
                 oxygen_production: 30.0, // MOXIE-style CO₂ electrolysis
                 metal_extraction: 15.0,  // Iron oxide regolith
                 hydrocarbon_collection: 0.0,
                 nitrogen_extraction: 2.0, // 2.7% N₂ in atmosphere
-                requires_nuclear: false, min_tech_level: 1.3,
+                requires_nuclear: false,
+                min_tech_level: 1.3,
             },
             PlanetaryBody::Europa => Self {
-                body, water_extraction: 500.0, // Unlimited ice
+                body,
+                water_extraction: 500.0,  // Unlimited ice
                 oxygen_production: 100.0, // Electrolysis
-                metal_extraction: 1.0,   // Extremely limited
+                metal_extraction: 1.0,    // Extremely limited
                 hydrocarbon_collection: 0.0,
                 nitrogen_extraction: 0.0, // No atmospheric N₂
-                requires_nuclear: true, min_tech_level: 2.0,
+                requires_nuclear: true,
+                min_tech_level: 2.0,
             },
             PlanetaryBody::Titan => Self {
-                body, water_extraction: 200.0, // Ice bedrock
-                oxygen_production: 50.0, // Electrolysis
-                metal_extraction: 0.0,   // No accessible metals
+                body,
+                water_extraction: 200.0,        // Ice bedrock
+                oxygen_production: 50.0,        // Electrolysis
+                metal_extraction: 0.0,          // No accessible metals
                 hydrocarbon_collection: 1000.0, // Surface methane lakes
-                nitrogen_extraction: 500.0, // 94% N₂ atmosphere
-                requires_nuclear: true, min_tech_level: 2.0,
+                nitrogen_extraction: 500.0,     // 94% N₂ atmosphere
+                requires_nuclear: true,
+                min_tech_level: 2.0,
             },
             PlanetaryBody::Ceres => Self {
-                body, water_extraction: 100.0, // Ice-rich body
+                body,
+                water_extraction: 100.0, // Ice-rich body
                 oxygen_production: 30.0,
-                metal_extraction: 20.0,  // Carbonaceous chondrite composition
-                hydrocarbon_collection: 0.0, nitrogen_extraction: 0.5,
-                requires_nuclear: false, min_tech_level: 1.8,
+                metal_extraction: 20.0, // Carbonaceous chondrite composition
+                hydrocarbon_collection: 0.0,
+                nitrogen_extraction: 0.5,
+                requires_nuclear: false,
+                min_tech_level: 1.8,
             },
             PlanetaryBody::OrbitalHabitat => Self {
-                body, water_extraction: 0.0, oxygen_production: 0.0,
-                metal_extraction: 0.0, hydrocarbon_collection: 0.0,
-                nitrogen_extraction: 0.0, requires_nuclear: false, min_tech_level: 0.0,
+                body,
+                water_extraction: 0.0,
+                oxygen_production: 0.0,
+                metal_extraction: 0.0,
+                hydrocarbon_collection: 0.0,
+                nitrogen_extraction: 0.0,
+                requires_nuclear: false,
+                min_tech_level: 0.0,
             },
         }
     }

@@ -11,7 +11,9 @@
 
 use bevy::prelude::*;
 
-use crate::components::{ConsciousnessComp, CrewNpc, FactionAffiliation, NoiseEmitter, TendBalance};
+use crate::components::{
+    ConsciousnessComp, CrewNpc, FactionAffiliation, NoiseEmitter, TendBalance,
+};
 use crate::resources::GovernanceLog;
 use symtropy_sim_bridge::{EconomyState, FactionState, GovernanceState};
 
@@ -35,7 +37,12 @@ static NEXT_FACTION_ID: std::sync::atomic::AtomicU32 = std::sync::atomic::Atomic
 
 /// Faction emergence: when inequality or instability is high, NPCs form factions.
 pub fn faction_emergence_system(
-    npcs: Query<(Entity, &ConsciousnessComp, &TendBalance, &FactionAffiliation)>,
+    npcs: Query<(
+        Entity,
+        &ConsciousnessComp,
+        &TendBalance,
+        &FactionAffiliation,
+    )>,
     gov: Res<GovernanceState>,
     mut log: ResMut<GovernanceLog>,
     time: Res<Time>,
@@ -68,7 +75,10 @@ pub fn faction_emergence_system(
 
     if should_emerge {
         // Check if any unaffiliated NPCs exist
-        let unaffiliated_count = npcs.iter().filter(|(_, _, _, fa)| fa.faction_id.is_none()).count();
+        let unaffiliated_count = npcs
+            .iter()
+            .filter(|(_, _, _, fa)| fa.faction_id.is_none())
+            .count();
         if unaffiliated_count < 2 {
             return; // Need at least 2 unaffiliated to form a faction
         }
@@ -164,7 +174,8 @@ pub fn faction_conflict_system(
     *timer = 0.0;
 
     // Group NPCs by faction
-    let mut factions: std::collections::HashMap<u32, Vec<[f64; 4]>> = std::collections::HashMap::new();
+    let mut factions: std::collections::HashMap<u32, Vec<[f64; 4]>> =
+        std::collections::HashMap::new();
     for (fa, cp, _) in &npcs {
         if let Some(fid) = fa.faction_id {
             factions.entry(fid).or_default().push([

@@ -18,9 +18,13 @@ fn find_bin_files(dir: &Path) -> Vec<PathBuf> {
     if let Ok(entries) = std::fs::read_dir(dir) {
         for e in entries.flatten() {
             let p = e.path();
-            if p.is_dir() { out.extend(find_bin_files(&p)); }
-            else if p.extension().and_then(|s| s.to_str()) == Some("bin")
-                && !p.to_string_lossy().ends_with(".pred.bin") { out.push(p); }
+            if p.is_dir() {
+                out.extend(find_bin_files(&p));
+            } else if p.extension().and_then(|s| s.to_str()) == Some("bin")
+                && !p.to_string_lossy().ends_with(".pred.bin")
+            {
+                out.push(p);
+            }
         }
     }
     out.sort();
@@ -35,7 +39,11 @@ fn main() {
     }
     let dir = PathBuf::from(&args[0]);
     let files = find_bin_files(&dir);
-    println!("Scanning {} .pairs.bin files under {}", files.len(), dir.display());
+    println!(
+        "Scanning {} .pairs.bin files under {}",
+        files.len(),
+        dir.display()
+    );
 
     // Two-pass: first file to get dim, then streaming mean/M2 (Welford).
     let (_, probe_mels) = load_pairs(&files[0]).expect("load first");
@@ -75,9 +83,15 @@ fn main() {
     println!("\n═══ Global Mel Statistics ═══");
     println!("  total frames:      {}", count);
     println!("  global mean:       {:.4}", mean_mel);
-    println!("  mean per-bin var:  {:.4}  ← MSE of 'predict global mean' baseline", mean_variance);
+    println!(
+        "  mean per-bin var:  {:.4}  ← MSE of 'predict global mean' baseline",
+        mean_variance
+    );
     println!("  total var (sum):   {:.4}", total_var);
-    println!("\n  Variance explained by a model with val_mse X:  1 − X / {:.4}", mean_variance);
+    println!(
+        "\n  Variance explained by a model with val_mse X:  1 − X / {:.4}",
+        mean_variance
+    );
 
     // Save the global mean so trainers can subtract it from targets
     use std::io::Write;

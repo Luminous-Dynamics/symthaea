@@ -3,11 +3,11 @@
 
 //! Compose page with reply/forward prefill (#3).
 
-use leptos::prelude::*;
-use mail_leptos_types::ComposeMode;
+use crate::components::{FileDropZone, RichEditor};
 use crate::mail_context::use_mail;
 use crate::toasts::use_toasts;
-use crate::components::{RichEditor, FileDropZone};
+use leptos::prelude::*;
+use mail_leptos_types::ComposeMode;
 
 #[component]
 pub fn ComposePage() -> impl IntoView {
@@ -16,20 +16,54 @@ pub fn ComposePage() -> impl IntoView {
 
     // Initialize from compose_mode (reply/forward prefill)
     let mode = mail.compose_mode.get_untracked();
-    let (initial_to, initial_subject, initial_body, mode_label, reply_hash, reply_thread) = match &mode {
-        ComposeMode::New => (String::new(), String::new(), String::new(), "Compose", None, None),
-        ComposeMode::Reply { email_hash, sender, sender_name, subject, body, thread_id } => {
-            let quoted = format!("\n\n--- On previous message, {} wrote ---\n{}", sender_name, body);
-            let subj = if subject.starts_with("Re: ") { subject.clone() } else { format!("Re: {subject}") };
-            (sender.clone(), subj, quoted, "Reply",
-             Some(email_hash.clone()),
-             thread_id.clone().or_else(|| Some(email_hash.clone())))
-        }
-        ComposeMode::Forward { subject, body } => {
-            let quoted = format!("\n\n--- Forwarded message ---\n{}", body);
-            (String::new(), subject.clone(), quoted, "Forward", None, None)
-        }
-    };
+    let (initial_to, initial_subject, initial_body, mode_label, reply_hash, reply_thread) =
+        match &mode {
+            ComposeMode::New => (
+                String::new(),
+                String::new(),
+                String::new(),
+                "Compose",
+                None,
+                None,
+            ),
+            ComposeMode::Reply {
+                email_hash,
+                sender,
+                sender_name,
+                subject,
+                body,
+                thread_id,
+            } => {
+                let quoted = format!(
+                    "\n\n--- On previous message, {} wrote ---\n{}",
+                    sender_name, body
+                );
+                let subj = if subject.starts_with("Re: ") {
+                    subject.clone()
+                } else {
+                    format!("Re: {subject}")
+                };
+                (
+                    sender.clone(),
+                    subj,
+                    quoted,
+                    "Reply",
+                    Some(email_hash.clone()),
+                    thread_id.clone().or_else(|| Some(email_hash.clone())),
+                )
+            }
+            ComposeMode::Forward { subject, body } => {
+                let quoted = format!("\n\n--- Forwarded message ---\n{}", body);
+                (
+                    String::new(),
+                    subject.clone(),
+                    quoted,
+                    "Forward",
+                    None,
+                    None,
+                )
+            }
+        };
     // Reset compose mode after reading
     mail.compose_mode.set(ComposeMode::New);
 
@@ -40,9 +74,19 @@ pub fn ComposePage() -> impl IntoView {
             .and_then(|w| w.local_storage().ok().flatten())
             .and_then(|s| s.get_item(draft_key).ok().flatten())
             .and_then(|json| serde_json::from_str::<(String, String, String)>(&json).ok())
-            .unwrap_or_else(|| (initial_to.clone(), initial_subject.clone(), initial_body.clone()))
+            .unwrap_or_else(|| {
+                (
+                    initial_to.clone(),
+                    initial_subject.clone(),
+                    initial_body.clone(),
+                )
+            })
     } else {
-        (initial_to.clone(), initial_subject.clone(), initial_body.clone())
+        (
+            initial_to.clone(),
+            initial_subject.clone(),
+            initial_body.clone(),
+        )
     };
 
     let to_field = RwSignal::new(draft_to);
@@ -59,7 +103,10 @@ pub fn ComposePage() -> impl IntoView {
             let body = body_field.get();
             if !to.is_empty() || !subj.is_empty() || !body.is_empty() {
                 if let Some(s) = web_sys::window().and_then(|w| w.local_storage().ok().flatten()) {
-                    let _ = s.set_item(dk, &serde_json::to_string(&(to, subj, body)).unwrap_or_default());
+                    let _ = s.set_item(
+                        dk,
+                        &serde_json::to_string(&(to, subj, body)).unwrap_or_default(),
+                    );
                 }
             }
         });
@@ -91,10 +138,10 @@ pub fn ComposePage() -> impl IntoView {
 
         // Duplicate send detection — check if we sent to this person about the same subject recently
         let recent_dup = mail.sent.get_untracked().iter().any(|e| {
-            let same_recipient = e.sender_name.as_deref() == Some(to.trim()) ||
-                                 e.hash.contains(to.trim());
-            let same_subject = e.subject.as_deref().map(|s| s.to_lowercase()) ==
-                               Some(subject.to_lowercase());
+            let same_recipient =
+                e.sender_name.as_deref() == Some(to.trim()) || e.hash.contains(to.trim());
+            let same_subject =
+                e.subject.as_deref().map(|s| s.to_lowercase()) == Some(subject.to_lowercase());
             let now = js_sys::Date::now() as u64 / 1000;
             let recent = now.saturating_sub(e.timestamp) < 3600; // within 1 hour
             same_recipient && same_subject && recent
@@ -106,25 +153,38 @@ pub fn ComposePage() -> impl IntoView {
                     "You sent a similar message to this recipient less than 1 hour ago. Send anyway?"
                 ).ok())
                 .unwrap_or(true);
-            if !confirmed { return; }
+            if !confirmed {
+                return;
+            }
         }
 
         sending.set(true);
         let pqc = use_pqc.get();
-        let crypto_label = if pqc { "PQC (Kyber+Dilithium)" } else { "E2E (X25519+Ed25519)" };
+        let crypto_label = if pqc {
+            "PQC (Kyber+Dilithium)"
+        } else {
+            "E2E (X25519+Ed25519)"
+        };
 
         // Expand template variables
         let now = js_sys::Date::new_0();
-        let today = format!("{}-{:02}-{:02}", now.get_full_year(), now.get_month() + 1, now.get_date());
+        let today = format!(
+            "{}-{:02}-{:02}",
+            now.get_full_year(),
+            now.get_month() + 1,
+            now.get_date()
+        );
         let time_now = format!("{:02}:{:02}", now.get_hours(), now.get_minutes());
-        let body = body.replace("{{name}}", to.trim())
-                       .replace("{{date}}", &today)
-                       .replace("{{time}}", &time_now)
-                       .replace("{{sender}}", "You");
-        let subject = subject.replace("{{name}}", to.trim())
-                             .replace("{{date}}", &today)
-                             .replace("{{time}}", &time_now)
-                             .replace("{{sender}}", "You");
+        let body = body
+            .replace("{{name}}", to.trim())
+            .replace("{{date}}", &today)
+            .replace("{{time}}", &time_now)
+            .replace("{{sender}}", "You");
+        let subject = subject
+            .replace("{{name}}", to.trim())
+            .replace("{{date}}", &today)
+            .replace("{{time}}", &time_now)
+            .replace("{{sender}}", "You");
 
         // Handle scheduled send
         if schedule_send.get() {
@@ -157,7 +217,11 @@ pub fn ComposePage() -> impl IntoView {
         let undo = RwSignal::new(false);
         let toasts_undo = toasts_send.clone();
         toasts_send.push(
-            format!("Sending to {} via {}... (undo available for 5s)", to.trim(), crypto_label),
+            format!(
+                "Sending to {} via {}... (undo available for 5s)",
+                to.trim(),
+                crypto_label
+            ),
             "info",
         );
 
@@ -191,58 +255,70 @@ pub fn ComposePage() -> impl IntoView {
                 // Demo mode: add the email to the local inbox so the demo feels alive
                 let now = (js_sys::Date::now() / 1000.0) as u64;
                 mail.inbox.update(|emails| {
-                    emails.insert(0, mail_leptos_types::EmailListItem {
-                        hash: format!("sent-{now}"),
-                        sender: "uhCAk_self_mock".into(),
-                        sender_name: Some("You".into()),
-                        encrypted_subject: vec![],
-                        subject: Some(send_subject.clone()),
-                        snippet: Some(if send_body.len() > 100 { format!("{}...", &send_body[..100]) } else { send_body.clone() }),
-                        timestamp: now,
-                        priority: mail_leptos_types::EmailPriority::Normal,
-                        is_read: true,
-                        is_starred: false,
-                        star_type: None,
-                        is_pinned: false,
-                        is_muted: false,
-                        is_snoozed: false,
-                        snooze_until: None,
-                        has_attachments: false,
-                        labels: vec![],
-                        thread_id: reply_thread_send.get_untracked(),
-                        crypto_suite: mail_leptos_types::CryptoSuiteView {
-                            key_exchange: if send_pqc { "kyber1024" } else { "x25519" }.into(),
-                            symmetric: "chacha20-poly1305".into(),
-                            signature: if send_pqc { "dilithium3" } else { "ed25519" }.into(),
+                    emails.insert(
+                        0,
+                        mail_leptos_types::EmailListItem {
+                            hash: format!("sent-{now}"),
+                            sender: "uhCAk_self_mock".into(),
+                            sender_name: Some("You".into()),
+                            encrypted_subject: vec![],
+                            subject: Some(send_subject.clone()),
+                            snippet: Some(if send_body.len() > 100 {
+                                format!("{}...", &send_body[..100])
+                            } else {
+                                send_body.clone()
+                            }),
+                            timestamp: now,
+                            priority: mail_leptos_types::EmailPriority::Normal,
+                            is_read: true,
+                            is_starred: false,
+                            star_type: None,
+                            is_pinned: false,
+                            is_muted: false,
+                            is_snoozed: false,
+                            snooze_until: None,
+                            has_attachments: false,
+                            labels: vec![],
+                            thread_id: reply_thread_send.get_untracked(),
+                            crypto_suite: mail_leptos_types::CryptoSuiteView {
+                                key_exchange: if send_pqc { "kyber1024" } else { "x25519" }.into(),
+                                symmetric: "chacha20-poly1305".into(),
+                                signature: if send_pqc { "dilithium3" } else { "ed25519" }.into(),
+                            },
                         },
-                    });
+                    );
                 });
                 toasts_undo.push("Message sent (demo mode — added to inbox)", "success");
                 return;
             }
 
-            let recipient_bundle = match hc.call_zome::<serde_json::Value, serde_json::Value>(
-                "mail_keys", "get_pre_key_bundle", &serde_json::json!(send_to)
-            ).await {
+            let recipient_bundle = match hc
+                .call_zome::<serde_json::Value, serde_json::Value>(
+                    "mail_keys",
+                    "get_pre_key_bundle",
+                    &serde_json::json!(send_to),
+                )
+                .await
+            {
                 Ok(bundle) if !bundle.is_null() => bundle,
                 Ok(_) => {
                     toasts_undo.push("Recipient has no published key bundle yet", "error");
-                    crate::offline::enqueue_action(
-                        mail_leptos_types::OfflineAction::Send {
-                            to: send_to, subject: send_subject,
-                            body: send_body, use_pqc: send_pqc,
-                        }
-                    );
+                    crate::offline::enqueue_action(mail_leptos_types::OfflineAction::Send {
+                        to: send_to,
+                        subject: send_subject,
+                        body: send_body,
+                        use_pqc: send_pqc,
+                    });
                     return;
                 }
                 Err(e) => {
                     toasts_undo.push(format!("Could not fetch recipient keys: {e}"), "error");
-                    crate::offline::enqueue_action(
-                        mail_leptos_types::OfflineAction::Send {
-                            to: send_to, subject: send_subject,
-                            body: send_body, use_pqc: send_pqc,
-                        }
-                    );
+                    crate::offline::enqueue_action(mail_leptos_types::OfflineAction::Send {
+                        to: send_to,
+                        subject: send_subject,
+                        body: send_body,
+                        use_pqc: send_pqc,
+                    });
                     return;
                 }
             };
@@ -274,7 +350,9 @@ pub fn ComposePage() -> impl IntoView {
                 send_subject.as_bytes(),
                 &crypto.subject_key,
                 &crypto.nonce,
-            ).await {
+            )
+            .await
+            {
                 Ok(ct) => ct,
                 Err(e) => {
                     toasts_undo.push(format!("Subject encryption failed: {e}"), "error");
@@ -286,7 +364,9 @@ pub fn ComposePage() -> impl IntoView {
                 send_body.as_bytes(),
                 &crypto.body_key,
                 &crypto.nonce,
-            ).await {
+            )
+            .await
+            {
                 Ok(ct) => ct,
                 Err(e) => {
                     toasts_undo.push(format!("Body encryption failed: {e}"), "error");
@@ -329,23 +409,30 @@ pub fn ComposePage() -> impl IntoView {
                 "expires_at": serde_json::Value::Null
             });
 
-            match hc.call_zome::<serde_json::Value, serde_json::Value>(
-                "mail_messages", "send_email", &payload
-            ).await {
+            match hc
+                .call_zome::<serde_json::Value, serde_json::Value>(
+                    "mail_messages",
+                    "send_email",
+                    &payload,
+                )
+                .await
+            {
                 Ok(response) => {
-                    web_sys::console::log_1(&format!("[Mail] send_email response: {:?}", response).into());
+                    web_sys::console::log_1(
+                        &format!("[Mail] send_email response: {:?}", response).into(),
+                    );
                     toasts_undo.push("Message sent and committed to DHT", "success");
                     mail.versions.inbox.update(|v| *v += 1);
                 }
                 Err(e) => {
                     web_sys::console::warn_1(&format!("[Mail] send_email failed: {e}").into());
                     // Queue for offline retry
-                    crate::offline::enqueue_action(
-                        mail_leptos_types::OfflineAction::Send {
-                            to: send_to, subject: send_subject,
-                            body: send_body, use_pqc: send_pqc,
-                        }
-                    );
+                    crate::offline::enqueue_action(mail_leptos_types::OfflineAction::Send {
+                        to: send_to,
+                        subject: send_subject,
+                        body: send_body,
+                        use_pqc: send_pqc,
+                    });
                     toasts_undo.push(format!("Send failed: {e}. Queued for retry."), "error");
                 }
             }
@@ -365,12 +452,24 @@ pub fn ComposePage() -> impl IntoView {
 
     let contact_suggestions = move || {
         let query = to_field.get().to_lowercase();
-        if query.len() < 2 { return vec![]; }
+        if query.len() < 2 {
+            return vec![];
+        }
         // Local contacts first
-        let mut results: Vec<_> = mail.contacts.get().into_iter().filter(|c| {
-            c.display_name.to_lowercase().contains(&query)
-                || c.email.as_deref().unwrap_or("").to_lowercase().contains(&query)
-        }).take(5).collect();
+        let mut results: Vec<_> = mail
+            .contacts
+            .get()
+            .into_iter()
+            .filter(|c| {
+                c.display_name.to_lowercase().contains(&query)
+                    || c.email
+                        .as_deref()
+                        .unwrap_or("")
+                        .to_lowercase()
+                        .contains(&query)
+            })
+            .take(5)
+            .collect();
 
         // Append DHT search results (deduped by agent key)
         let dht = dht_suggestions.get();
@@ -387,9 +486,14 @@ pub fn ComposePage() -> impl IntoView {
             if !hc.is_mock() {
                 let q = query.clone();
                 wasm_bindgen_futures::spawn_local(async move {
-                    if let Ok(contact) = hc.call_zome::<serde_json::Value, serde_json::Value>(
-                        "mail_contacts", "get_contact_by_email", &serde_json::json!(q)
-                    ).await {
+                    if let Ok(contact) = hc
+                        .call_zome::<serde_json::Value, serde_json::Value>(
+                            "mail_contacts",
+                            "get_contact_by_email",
+                            &serde_json::json!(q),
+                        )
+                        .await
+                    {
                         if let Some(contact) = crate::zome_adapter::adapt_contact_value(contact) {
                             dht_suggestions.set(vec![contact]);
                         }

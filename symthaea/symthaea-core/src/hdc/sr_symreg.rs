@@ -287,10 +287,7 @@ impl Default for SrGpConfig {
 /// Run a single GP search with operator selection perturbed by SR noise
 /// at amplitude `config.sigma`. Returns the best expression found, its
 /// fitness, and the iteration at which it was discovered.
-pub fn run_gp(
-    config: &SrGpConfig,
-    dataset: &[(Vec<f64>, f64)],
-) -> (SrExpr, f64, usize) {
+pub fn run_gp(config: &SrGpConfig, dataset: &[(Vec<f64>, f64)]) -> (SrExpr, f64, usize) {
     let mut state = config.seed;
     let mut best = sample_random(&mut state, config.max_depth, config.n_vars);
     let mut best_mse = mse(&best, dataset);
@@ -488,10 +485,7 @@ mod tests {
 
         let baseline = summary[0];
         // Two "best" notions: by convergence rate, by mean MSE
-        let best_conv = summary
-            .iter()
-            .max_by(|a, b| a.1.cmp(&b.1))
-            .unwrap();
+        let best_conv = summary.iter().max_by(|a, b| a.1.cmp(&b.1)).unwrap();
         let best_mse = summary
             .iter()
             .min_by(|a, b| a.3.partial_cmp(&b.3).unwrap())

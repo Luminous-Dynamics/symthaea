@@ -1,3 +1,4 @@
+use mycelix_zome_helpers as _;
 #![allow(clippy::manual_range_contains)]
 
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics

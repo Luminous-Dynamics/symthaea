@@ -1,5 +1,5 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Island detection: groups connected bodies into independent clusters.
 //!
@@ -10,8 +10,8 @@
 //! Uses Union-Find (disjoint set) for O(n * alpha(n)) grouping, effectively linear.
 
 use crate::body::{BodyHandle, RigidBody};
-use crate::contact::ContactManifold;
 use crate::constraint::Constraint;
+use crate::contact::ContactManifold;
 use std::collections::HashMap;
 
 /// A group of connected bodies that can be solved independently.
@@ -98,10 +98,7 @@ pub fn build_islands<const D: usize>(
     // Union bodies connected by constraints
     for constraint in constraints {
         let (ha, hb) = constraint.bodies();
-        if let (Some(&ia), Some(&ib)) = (
-            handle_to_index.get(&ha),
-            handle_to_index.get(&hb),
-        ) {
+        if let (Some(&ia), Some(&ib)) = (handle_to_index.get(&ha), handle_to_index.get(&hb)) {
             uf.union(ia, ib);
         }
     }
@@ -196,14 +193,18 @@ mod tests {
         let (bodies, map) = make_bodies(4);
         let contacts = vec![
             ContactManifold::single(
-                BodyHandle(0), BodyHandle(1),
+                BodyHandle(0),
+                BodyHandle(1),
                 nalgebra::SVector::from([1.0, 0.0, 0.0]),
-                nalgebra::SVector::zeros(), 0.1,
+                nalgebra::SVector::zeros(),
+                0.1,
             ),
             ContactManifold::single(
-                BodyHandle(1), BodyHandle(2),
+                BodyHandle(1),
+                BodyHandle(2),
                 nalgebra::SVector::from([1.0, 0.0, 0.0]),
-                nalgebra::SVector::zeros(), 0.1,
+                nalgebra::SVector::zeros(),
+                0.1,
             ),
         ];
         let islands = build_islands(&bodies, &contacts, &[], &map);
@@ -225,14 +226,18 @@ mod tests {
 
         let contacts = vec![
             ContactManifold::single(
-                BodyHandle(0), BodyHandle(1),
+                BodyHandle(0),
+                BodyHandle(1),
                 nalgebra::SVector::from([1.0, 0.0, 0.0]),
-                nalgebra::SVector::zeros(), 0.1,
+                nalgebra::SVector::zeros(),
+                0.1,
             ),
             ContactManifold::single(
-                BodyHandle(2), BodyHandle(3),
+                BodyHandle(2),
+                BodyHandle(3),
                 nalgebra::SVector::from([1.0, 0.0, 0.0]),
-                nalgebra::SVector::zeros(), 0.1,
+                nalgebra::SVector::zeros(),
+                0.1,
             ),
         ];
         let islands = build_islands(&bodies, &contacts, &[], &map);
@@ -249,14 +254,12 @@ mod tests {
         use crate::constraint::DistanceConstraint;
 
         let (bodies, map) = make_bodies(3);
-        let constraints: Vec<Box<dyn Constraint<3>>> = vec![
-            Box::new(DistanceConstraint {
-                body_a: BodyHandle(0),
-                body_b: BodyHandle(2),
-                rest_length: 5.0,
-                stiffness: 1.0,
-            }),
-        ];
+        let constraints: Vec<Box<dyn Constraint<3>>> = vec![Box::new(DistanceConstraint {
+            body_a: BodyHandle(0),
+            body_b: BodyHandle(2),
+            rest_length: 5.0,
+            stiffness: 1.0,
+        })];
         let islands = build_islands(&bodies, &[], &constraints, &map);
 
         // Bodies 0,2 connected by constraint; body 1 separate

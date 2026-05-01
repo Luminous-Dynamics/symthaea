@@ -318,3 +318,4 @@ configs/
 /xenia-wire/
 /xenia-server/
 /xenia-peer/
+.aider*

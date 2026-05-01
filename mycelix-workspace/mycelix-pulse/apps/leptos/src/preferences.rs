@@ -5,8 +5,8 @@
 //! Replaces scattered individual preference storage with one coherent struct.
 
 use leptos::prelude::*;
-use serde::{Deserialize, Serialize};
 use mail_leptos_types::*;
+use serde::{Deserialize, Serialize};
 
 const PREFS_KEY: &str = "mycelix_pulse_preferences";
 pub const MIN_FONT_SCALE: u32 = 75;
@@ -69,35 +69,94 @@ pub struct UserPreferences {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ReplyStyle { InlineQuote, TopPost }
-impl Default for ReplyStyle { fn default() -> Self { Self::InlineQuote } }
+pub enum ReplyStyle {
+    InlineQuote,
+    TopPost,
+}
+impl Default for ReplyStyle {
+    fn default() -> Self {
+        Self::InlineQuote
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ReadReceiptPolicy { Always, Ask, Never }
-impl Default for ReadReceiptPolicy { fn default() -> Self { Self::Ask } }
+pub enum ReadReceiptPolicy {
+    Always,
+    Ask,
+    Never,
+}
+impl Default for ReadReceiptPolicy {
+    fn default() -> Self {
+        Self::Ask
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum AvailabilityPolicy { Everyone, ContactsOnly, Nobody }
-impl Default for AvailabilityPolicy { fn default() -> Self { Self::ContactsOnly } }
+pub enum AvailabilityPolicy {
+    Everyone,
+    ContactsOnly,
+    Nobody,
+}
+impl Default for AvailabilityPolicy {
+    fn default() -> Self {
+        Self::ContactsOnly
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum DateFormat { Auto, DmySlash, MdySlash, YmdDash }
+pub enum DateFormat {
+    Auto,
+    DmySlash,
+    MdySlash,
+    YmdDash,
+}
 impl DateFormat {
     pub fn label(&self) -> &'static str {
-        match self { Self::Auto => "Auto (locale)", Self::DmySlash => "DD/MM/YYYY", Self::MdySlash => "MM/DD/YYYY", Self::YmdDash => "YYYY-MM-DD" }
+        match self {
+            Self::Auto => "Auto (locale)",
+            Self::DmySlash => "DD/MM/YYYY",
+            Self::MdySlash => "MM/DD/YYYY",
+            Self::YmdDash => "YYYY-MM-DD",
+        }
     }
 }
-impl Default for DateFormat { fn default() -> Self { Self::Auto } }
+impl Default for DateFormat {
+    fn default() -> Self {
+        Self::Auto
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Language { English, Afrikaans, Zulu, French, Spanish }
+pub enum Language {
+    English,
+    Afrikaans,
+    Zulu,
+    French,
+    Spanish,
+}
 impl Language {
     pub fn label(&self) -> &'static str {
-        match self { Self::English => "English", Self::Afrikaans => "Afrikaans", Self::Zulu => "isiZulu", Self::French => "Fran\u{00E7}ais", Self::Spanish => "Espa\u{00F1}ol" }
+        match self {
+            Self::English => "English",
+            Self::Afrikaans => "Afrikaans",
+            Self::Zulu => "isiZulu",
+            Self::French => "Fran\u{00E7}ais",
+            Self::Spanish => "Espa\u{00F1}ol",
+        }
     }
-    pub const ALL: &[Language] = &[Self::English, Self::Afrikaans, Self::Zulu, Self::French, Self::Spanish];
+    pub const ALL: &[Language] = &[
+        Self::English,
+        Self::Afrikaans,
+        Self::Zulu,
+        Self::French,
+        Self::Spanish,
+    ];
 }
-impl Default for Language { fn default() -> Self { Self::English } }
+impl Default for Language {
+    fn default() -> Self {
+        Self::English
+    }
+}
 
 impl Default for UserPreferences {
     fn default() -> Self {
@@ -188,7 +247,8 @@ pub fn provide_preferences_context() {
 
         // Font scale
         let _ = js_sys::eval(&format!(
-            "document.documentElement.style.fontSize='{}%'", p.font_scale
+            "document.documentElement.style.fontSize='{}%'",
+            p.font_scale
         ));
 
         // High contrast

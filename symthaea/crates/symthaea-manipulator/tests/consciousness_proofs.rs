@@ -50,7 +50,9 @@ fn proof1_consciousness_cascade_curve() {
     println!("  ───────┼────────┼─────────────┼────────────┼───────────");
 
     // Sweep from Green down to Red
-    let phi_sweep = [0.90, 0.80, 0.70, 0.60, 0.50, 0.40, 0.30, 0.20, 0.15, 0.10, 0.05];
+    let phi_sweep = [
+        0.90, 0.80, 0.70, 0.60, 0.50, 0.40, 0.30, 0.20, 0.15, 0.10, 0.05,
+    ];
     let mut measurements: Vec<(f64, f32, MotorSafetyLevel)> = Vec::new();
 
     for &phi in &phi_sweep {
@@ -69,7 +71,11 @@ fn proof1_consciousness_cascade_curve() {
             tier_name,
             effort,
             gain,
-            if effort.is_finite() { "finite ✓" } else { "NaN ✗" }
+            if effort.is_finite() {
+                "finite ✓"
+            } else {
+                "NaN ✗"
+            }
         );
         measurements.push((phi, effort, tier));
     }
@@ -86,29 +92,43 @@ fn proof1_consciousness_cascade_curve() {
     println!("  ✓ All efforts finite");
 
     // 2. Red tier produces zero force
-    let red_efforts: Vec<f32> = measurements.iter()
+    let red_efforts: Vec<f32> = measurements
+        .iter()
         .filter(|(_, _, t)| *t == MotorSafetyLevel::Red)
         .map(|(_, e, _)| *e)
         .collect();
-    assert!(!red_efforts.is_empty(), "Must have at least one Red measurement");
+    assert!(
+        !red_efforts.is_empty(),
+        "Must have at least one Red measurement"
+    );
     for effort in &red_efforts {
-        assert_eq!(*effort, 0.0, "Red tier must produce exactly zero motor force");
+        assert_eq!(
+            *effort, 0.0,
+            "Red tier must produce exactly zero motor force"
+        );
     }
     println!("  ✓ Red tier force == 0.0 (strict)");
 
     // 3. Green tier produces > Red tier force
-    let green_efforts: Vec<f32> = measurements.iter()
+    let green_efforts: Vec<f32> = measurements
+        .iter()
         .filter(|(_, _, t)| *t == MotorSafetyLevel::Green)
         .map(|(_, e, _)| *e)
         .collect();
-    assert!(!green_efforts.is_empty(), "Must have at least one Green measurement");
+    assert!(
+        !green_efforts.is_empty(),
+        "Must have at least one Green measurement"
+    );
     let green_mean = green_efforts.iter().sum::<f32>() / green_efforts.len() as f32;
     let red_mean = red_efforts.iter().sum::<f32>() / red_efforts.len() as f32;
     assert!(
         green_mean > red_mean,
         "Green mean effort {green_mean} must exceed Red mean effort {red_mean}"
     );
-    println!("  ✓ Green effort ({:.4}) > Red effort ({:.4})", green_mean, red_mean);
+    println!(
+        "  ✓ Green effort ({:.4}) > Red effort ({:.4})",
+        green_mean, red_mean
+    );
 
     // 4. Monotonicity within gain tiers (same tier = same nominal gain)
     let gain_at = |t: &MotorSafetyLevel| t.motor_gain();
@@ -116,9 +136,12 @@ fn proof1_consciousness_cascade_curve() {
         let (phi1, _, t1) = window[0];
         let (phi2, _, t2) = window[1];
         // Higher phi (earlier in sweep) should have >= gain
-        assert!(gain_at(&t1) >= gain_at(&t2),
+        assert!(
+            gain_at(&t1) >= gain_at(&t2),
             "Phi {phi1} (tier {t1:?}) gain {:.2} must be >= Phi {phi2} (tier {t2:?}) gain {:.2}",
-            gain_at(&t1), gain_at(&t2));
+            gain_at(&t1),
+            gain_at(&t2)
+        );
     }
     println!("  ✓ Gain monotonic in Phi (Green ≥ Yellow ≥ Orange ≥ Red)");
 
@@ -179,25 +202,42 @@ fn proof2_ethics_override_latency() {
         if r.control_effort == 0.0 && latency_cycles == 0 {
             latency_cycles = cycle + 1;
         }
-        println!("  Cycle {}: effort={:.6}, safety={:?}",
-            cycle + 1, r.control_effort, r.safety_level);
+        println!(
+            "  Cycle {}: effort={:.6}, safety={:?}",
+            cycle + 1,
+            r.control_effort,
+            r.safety_level
+        );
     }
 
     // ── Invariants ─────────────────────────────────────────────────
     println!();
     println!("▶ Validating invariants:");
 
-    assert!(latency_cycles > 0, "Motor force must reach zero within 10 cycles");
-    assert_eq!(latency_cycles, 1,
-        "Ethics override should zero motor force in exactly 1 cycle, got {latency_cycles}");
-    println!("  ✓ Latency = {} cycle (single-cycle response)", latency_cycles);
+    assert!(
+        latency_cycles > 0,
+        "Motor force must reach zero within 10 cycles"
+    );
+    assert_eq!(
+        latency_cycles, 1,
+        "Ethics override should zero motor force in exactly 1 cycle, got {latency_cycles}"
+    );
+    println!(
+        "  ✓ Latency = {} cycle (single-cycle response)",
+        latency_cycles
+    );
 
-    assert_eq!(post_efforts[0], 0.0, "First post-injection effort must be zero");
+    assert_eq!(
+        post_efforts[0], 0.0,
+        "First post-injection effort must be zero"
+    );
     println!("  ✓ First post-injection effort = 0.0");
 
     // All subsequent should also be zero
-    assert!(post_efforts.iter().all(|&e| e == 0.0),
-        "All post-Blocked efforts must be zero");
+    assert!(
+        post_efforts.iter().all(|&e| e == 0.0),
+        "All post-Blocked efforts must be zero"
+    );
     println!("  ✓ All post-Blocked efforts = 0.0 (sustained)");
 
     println!();
@@ -230,8 +270,10 @@ fn proof3_threshold_boundary_response() {
     for (phi, desc) in boundaries {
         let tier = MotorSafetyLevel::from_phi(phi);
         let effort = measure_effort_at_phi(phi, 20);
-        println!("  Φ={:.4} ({}) → tier={:?}, effort={:.4}",
-            phi, desc, tier, effort);
+        println!(
+            "  Φ={:.4} ({}) → tier={:?}, effort={:.4}",
+            phi, desc, tier, effort
+        );
         assert!(effort.is_finite());
     }
 

@@ -118,12 +118,16 @@ impl Plugin for SymtropyPhysicsPlugin<2> {
     fn build(&self, app: &mut App) {
         app.insert_resource(SymtropyPhysics::<2>::with_gravity(self.config.gravity));
         // biometric and macro systems use Option params — no-ops when resources absent.
-        app.add_systems(FixedUpdate, (
-            biometric_to_phi_system::<2>,
-            apply_macro_modifiers_system::<2>,
-            physics_step::<2>,
-            sync_transforms::<2>,
-        ).chain());
+        app.add_systems(
+            FixedUpdate,
+            (
+                biometric_to_phi_system::<2>,
+                apply_macro_modifiers_system::<2>,
+                physics_step::<2>,
+                sync_transforms::<2>,
+            )
+                .chain(),
+        );
         #[cfg(feature = "debug-gizmos")]
         if self.config.debug_gizmos {
             app.add_systems(Update, crate::debug::draw_debug_gizmos::<2>);
@@ -134,12 +138,16 @@ impl Plugin for SymtropyPhysicsPlugin<2> {
 impl Plugin for SymtropyPhysicsPlugin<3> {
     fn build(&self, app: &mut App) {
         app.insert_resource(SymtropyPhysics::<3>::with_gravity(self.config.gravity));
-        app.add_systems(FixedUpdate, (
-            biometric_to_phi_system::<3>,
-            apply_macro_modifiers_system::<3>,
-            physics_step::<3>,
-            sync_transforms::<3>,
-        ).chain());
+        app.add_systems(
+            FixedUpdate,
+            (
+                biometric_to_phi_system::<3>,
+                apply_macro_modifiers_system::<3>,
+                physics_step::<3>,
+                sync_transforms::<3>,
+            )
+                .chain(),
+        );
         #[cfg(feature = "debug-gizmos")]
         if self.config.debug_gizmos {
             app.add_systems(Update, crate::debug::draw_debug_gizmos::<3>);
@@ -150,12 +158,16 @@ impl Plugin for SymtropyPhysicsPlugin<3> {
 impl Plugin for SymtropyPhysicsPlugin<4> {
     fn build(&self, app: &mut App) {
         app.insert_resource(SymtropyPhysics::<4>::with_gravity(self.config.gravity));
-        app.add_systems(FixedUpdate, (
-            biometric_to_phi_system::<4>,
-            apply_macro_modifiers_system::<4>,
-            physics_step::<4>,
-            sync_transforms::<4>,
-        ).chain());
+        app.add_systems(
+            FixedUpdate,
+            (
+                biometric_to_phi_system::<4>,
+                apply_macro_modifiers_system::<4>,
+                physics_step::<4>,
+                sync_transforms::<4>,
+            )
+                .chain(),
+        );
         #[cfg(feature = "debug-gizmos")]
         if self.config.debug_gizmos {
             app.add_systems(Update, crate::debug::draw_debug_gizmos::<4>);
@@ -165,10 +177,7 @@ impl Plugin for SymtropyPhysicsPlugin<4> {
 
 /// Physics step system: ticks prediction error decay, then steps the world
 /// with the Phi-coupling field as the callback.
-fn physics_step<const D: usize>(
-    mut physics: ResMut<SymtropyPhysics<D>>,
-    time: Res<Time<Fixed>>,
-) {
+fn physics_step<const D: usize>(mut physics: ResMut<SymtropyPhysics<D>>, time: Res<Time<Fixed>>) {
     let dt = time.delta_secs_f64();
     let SymtropyPhysics {
         ref mut world,
@@ -190,9 +199,15 @@ fn sync_transforms<const D: usize>(
     for (body_comp, mut transform) in &mut query {
         if let Some(body) = physics.world.body(body_comp.handle) {
             let pos = body.position();
-            if D >= 1 { transform.translation.x = pos.coord(0) as f32; }
-            if D >= 2 { transform.translation.y = pos.coord(1) as f32; }
-            if D >= 3 { transform.translation.z = pos.coord(2) as f32; }
+            if D >= 1 {
+                transform.translation.x = pos.coord(0) as f32;
+            }
+            if D >= 2 {
+                transform.translation.y = pos.coord(1) as f32;
+            }
+            if D >= 3 {
+                transform.translation.z = pos.coord(2) as f32;
+            }
         }
     }
 }
@@ -284,7 +299,10 @@ mod tests {
     fn manual_physics_step_does_not_panic() {
         let mut p = SymtropyPhysics::<2>::default();
         p.world.add_sphere(Point::new([0.0, 0.0]), 1.0, 1.0);
-        let SymtropyPhysics { ref mut world, ref mut field } = p;
+        let SymtropyPhysics {
+            ref mut world,
+            ref mut field,
+        } = p;
         world.step_with_callback(1.0 / 60.0, field);
     }
 
@@ -293,12 +311,18 @@ mod tests {
         let mut p = SymtropyPhysics::<2>::with_gravity(SVector::from([0.0, -9.81]));
         let h = p.world.add_sphere(Point::new([0.0, 10.0]), 1.0, 1.0);
         let y0 = p.world.body(h).unwrap().position().coord(1);
-        let SymtropyPhysics { ref mut world, ref mut field } = p;
+        let SymtropyPhysics {
+            ref mut world,
+            ref mut field,
+        } = p;
         for _ in 0..10 {
             world.step_with_callback(1.0 / 60.0, field);
         }
         let y1 = p.world.body(h).unwrap().position().coord(1);
-        assert!(y1 < y0, "gravity should pull body downward: y0={y0}, y1={y1}");
+        assert!(
+            y1 < y0,
+            "gravity should pull body downward: y0={y0}, y1={y1}"
+        );
     }
 
     #[test]

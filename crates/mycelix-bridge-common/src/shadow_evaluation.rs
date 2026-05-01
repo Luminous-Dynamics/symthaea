@@ -356,7 +356,10 @@ mod tests {
             result_30d.score < result_no_decay.score,
             "30-day decay should reduce score"
         );
-        assert!(result_30d.score > 0.9, "30 days at lambda=0.002 should still be high");
+        assert!(
+            result_30d.score > 0.9,
+            "30 days at lambda=0.002 should still be high"
+        );
     }
 
     #[test]
@@ -450,13 +453,20 @@ mod tests {
 
         let eval = evaluate_all(&active, &[&minimal], &input);
 
-        assert!(eval.active.score >= 0.4, "Active should pass: {}", eval.active.score);
+        assert!(
+            eval.active.score >= 0.4,
+            "Active should pass: {}",
+            eval.active.score
+        );
         assert!(
             eval.shadows[0].score < 0.4,
             "Shadow should fail: {}",
             eval.shadows[0].score
         );
-        assert!(eval.divergence.gate_disagreement, "Gate disagreement should be detected");
+        assert!(
+            eval.divergence.gate_disagreement,
+            "Gate disagreement should be detected"
+        );
     }
 
     #[test]
@@ -519,8 +529,7 @@ mod tests {
 
         // All models should agree on tier for symmetric high input
         assert_eq!(
-            eval.divergence.tier_agreement_count,
-            eval.divergence.total_models,
+            eval.divergence.tier_agreement_count, eval.divergence.total_models,
             "All models should agree on tier for uniform 0.7 input"
         );
     }
@@ -569,10 +578,7 @@ mod tests {
 
         assert_eq!(back.active.model_id, eval.active.model_id);
         assert_eq!(back.shadows.len(), eval.shadows.len());
-        assert_eq!(
-            back.divergence.total_models,
-            eval.divergence.total_models
-        );
+        assert_eq!(back.divergence.total_models, eval.divergence.total_models);
     }
 
     // ---- Descriptor evaluation ----

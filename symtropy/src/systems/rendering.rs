@@ -5,7 +5,9 @@
 use bevy::prelude::*;
 
 use crate::components::*;
-use crate::resources::{BiometricsCtx, GamePhase, GovernanceLog, LeviathanState, PhysicsWorldRes, SleepPhase, TileGrid};
+use crate::resources::{
+    BiometricsCtx, GamePhase, GovernanceLog, LeviathanState, PhysicsWorldRes, SleepPhase, TileGrid,
+};
 // TODO: re-enable when Mycelix integration stabilizes
 // use symtropy_sim_bridge::{ActiveProposal, GovernanceState};
 
@@ -27,19 +29,22 @@ pub struct LeviathanSprite;
 /// Generate full dungeon from seed, optionally modulated by consciousness.
 fn level_dungeon(seed: u64, phi: Option<f64>) -> super::procgen::Dungeon {
     let dungeon = if let Some(phi) = phi {
-        let config = super::phi_pcg::PhiDungeonConfig::from_phi(
-            &super::phi_pcg::PhiPcgParams {
-                phi,
-                ..Default::default()
-            },
+        let config = super::phi_pcg::PhiDungeonConfig::from_phi(&super::phi_pcg::PhiPcgParams {
+            phi,
+            ..Default::default()
+        });
+        eprintln!(
+            "[symtropy] Phi-PCG: phi={phi:.2}, depth={}, rooms_min={}, connections={}",
+            config.bsp_depth, config.min_room_size, config.extra_connections
         );
-        eprintln!("[symtropy] Phi-PCG: phi={phi:.2}, depth={}, rooms_min={}, connections={}",
-            config.bsp_depth, config.min_room_size, config.extra_connections);
         super::procgen::generate_dungeon_phi(MAP_WIDTH as usize, MAP_HEIGHT as usize, seed, &config)
     } else {
         super::procgen::generate_dungeon(MAP_WIDTH as usize, MAP_HEIGHT as usize, seed)
     };
-    eprintln!("[symtropy] Generated dungeon with seed {seed} ({} rooms)", dungeon.room_centers.len());
+    eprintln!(
+        "[symtropy] Generated dungeon with seed {seed} ({} rooms)",
+        dungeon.room_centers.len()
+    );
     dungeon
 }
 
@@ -66,7 +71,11 @@ pub fn setup_world(
     let dungeon = level_dungeon(seed.0, Some(phi));
     let map = &dungeon.tiles;
     let rows = map.len() as i32;
-    let cols = if map.is_empty() { 0 } else { map[0].len() as i32 };
+    let cols = if map.is_empty() {
+        0
+    } else {
+        map[0].len() as i32
+    };
 
     let mut player_pos = Vec2::new(0.0, 0.0);
     let mut core_pos = Vec2::new(0.0, 0.0);
@@ -101,7 +110,9 @@ pub fn setup_world(
             };
 
             // Register in spatial lookup grid
-            tile_grid.cells.insert((col_idx as i32, row_idx as i32), walkable);
+            tile_grid
+                .cells
+                .insert((col_idx as i32, row_idx as i32), walkable);
 
             commands.spawn((
                 Sprite::from_color(color, Vec2::splat(TILE_SIZE - 1.0)),
@@ -129,7 +140,9 @@ pub fn setup_world(
         body.linear_damping = 0.5; // high damping for responsive controls
     }
     // Register player with consciousness field
-    physics_world.consciousness.register(player_physics_handle, 100.0, 50.0);
+    physics_world
+        .consciousness
+        .register(player_physics_handle, 100.0, 50.0);
     commands.spawn((
         Sprite::from_color(Color::srgb(0.2, 0.9, 1.0), Vec2::splat(20.0)),
         Transform::from_xyz(player_pos.x, player_pos.y, 2.0),
@@ -144,9 +157,24 @@ pub fn setup_world(
 
     // Crew NPCs — each a different green shade, spread near player
     let npc_configs = [
-        ("Kael", player_pos.x - 32.0, player_pos.y, Color::srgb(0.3, 0.9, 0.3)),
-        ("Mira", player_pos.x + 32.0, player_pos.y, Color::srgb(0.4, 0.85, 0.5)),
-        ("Soren", player_pos.x, player_pos.y + 32.0, Color::srgb(0.25, 0.8, 0.4)),
+        (
+            "Kael",
+            player_pos.x - 32.0,
+            player_pos.y,
+            Color::srgb(0.3, 0.9, 0.3),
+        ),
+        (
+            "Mira",
+            player_pos.x + 32.0,
+            player_pos.y,
+            Color::srgb(0.4, 0.85, 0.5),
+        ),
+        (
+            "Soren",
+            player_pos.x,
+            player_pos.y + 32.0,
+            Color::srgb(0.25, 0.8, 0.4),
+        ),
     ];
     // NPC consciousness varies — creates natural tier distribution for governance
     let npc_consciousness = [
@@ -170,13 +198,18 @@ pub fn setup_world(
             body.linear_damping = 0.5;
         }
         // Register NPC with consciousness field
-        physics_world.consciousness.register(npc_physics_handle, 80.0, 30.0);
+        physics_world
+            .consciousness
+            .register(npc_physics_handle, 80.0, 30.0);
 
         commands.spawn((
             Sprite::from_color(*color, Vec2::splat(16.0)),
             Transform::from_xyz(*x, *y, 2.0),
             CrewNpc::new(name, i as u64 + 100),
-            MoveTarget { target: None, speed: 60.0 },
+            MoveTarget {
+                target: None,
+                speed: 60.0,
+            },
             NoiseEmitter::default(),
             cp,
             super::consciousness::NpcConsciousness::default(),
@@ -222,16 +255,9 @@ pub fn setup_world(
 
     // Guarantee one well at player spawn — survival lifeline
     commands.spawn((
-        Sprite::from_color(
-            Color::srgba(0.1, 0.8, 0.6, 0.35),
-            Vec2::splat(40.0),
-        ),
+        Sprite::from_color(Color::srgba(0.1, 0.8, 0.6, 0.35), Vec2::splat(40.0)),
         Transform::from_xyz(player_pos.x, player_pos.y, 1.0),
-        crate::resources::EnergyWell::new(
-            well_constants.energy_well_regen_rate,
-            64.0,
-            5000.0,
-        ),
+        crate::resources::EnergyWell::new(well_constants.energy_well_regen_rate, 64.0, 5000.0),
     ));
     well_count += 1;
 
@@ -246,23 +272,16 @@ pub fn setup_world(
         // Skip if too close to player (already have spawn well) or core
         let near_player = (wx - player_pos.x).abs() < TILE_SIZE * 3.0
             && (wy - player_pos.y).abs() < TILE_SIZE * 3.0;
-        let near_core = (wx - core_pos.x).abs() < TILE_SIZE * 2.0
-            && (wy - core_pos.y).abs() < TILE_SIZE * 2.0;
+        let near_core =
+            (wx - core_pos.x).abs() < TILE_SIZE * 2.0 && (wy - core_pos.y).abs() < TILE_SIZE * 2.0;
         if near_player || near_core {
             continue;
         }
 
         commands.spawn((
-            Sprite::from_color(
-                Color::srgba(0.1, 0.8, 0.6, 0.35),
-                Vec2::splat(40.0),
-            ),
+            Sprite::from_color(Color::srgba(0.1, 0.8, 0.6, 0.35), Vec2::splat(40.0)),
             Transform::from_xyz(wx, wy, 1.0),
-            crate::resources::EnergyWell::new(
-                well_constants.energy_well_regen_rate,
-                64.0,
-                5000.0,
-            ),
+            crate::resources::EnergyWell::new(well_constants.energy_well_regen_rate, 64.0, 5000.0),
         ));
         well_count += 1;
     }
@@ -326,7 +345,11 @@ pub fn hud_system(
     timer.0 = 0.0;
 
     let stress = biometrics.encoder.compute_stress_vector();
-    let extraction = cores.iter().next().map(|c| c.extraction_progress).unwrap_or(0.0);
+    let extraction = cores
+        .iter()
+        .next()
+        .map(|c| c.extraction_progress)
+        .unwrap_or(0.0);
     let (player_pos, player_handle) = player
         .iter()
         .next()
@@ -340,11 +363,13 @@ pub fn hud_system(
         SleepPhase::Hunting => ">>> HUNTING <<<",
     };
 
-    let harmony_str = harmony.dominant
-        .map(|h| h.name())
-        .unwrap_or("none");
+    let harmony_str = harmony.dominant.map(|h| h.name()).unwrap_or("none");
 
-    let sanctuary_str = if harmony.is_sanctuary { " [SANCTUARY]" } else { "" };
+    let sanctuary_str = if harmony.is_sanctuary {
+        " [SANCTUARY]"
+    } else {
+        ""
+    };
 
     let consciousness_str = format!(
         "C={:.0}%  bottleneck: {}  stability: {:.0}%",
@@ -359,19 +384,32 @@ pub fn hud_system(
             let e = &entity.energy;
             let frac = e.fraction_remaining();
             let bar_filled = (frac * 15.0) as usize;
-            let bar = format!("[{}{}]", "=".repeat(bar_filled), "-".repeat(15 - bar_filled));
+            let bar = format!(
+                "[{}{}]",
+                "=".repeat(bar_filled),
+                "-".repeat(15 - bar_filled)
+            );
             let net = thermo_hud.regenerated_per_sec - thermo_hud.consumed_per_sec;
-            let net_str = if net >= 0.0 { format!("+{:.1}", net) } else { format!("{:.1}", net) };
+            let net_str = if net >= 0.0 {
+                format!("+{:.1}", net)
+            } else {
+                format!("{:.1}", net)
+            };
             let collapse_str = if e.is_collapsed() {
                 " !! COLLAPSED !!".to_string()
             } else if net < 0.0 && e.available > 0.0 {
-                format!("  collapse in: {:.0}s", e.available / (-net / 64.0).max(0.001))
+                format!(
+                    "  collapse in: {:.0}s",
+                    e.available / (-net / 64.0).max(0.001)
+                )
             } else {
                 String::new()
             };
             (
-                format!("Energy: {:.0}/{:.0} J {} {net_str} J/s{collapse_str}",
-                    e.available, e.max_energy, bar),
+                format!(
+                    "Energy: {:.0}/{:.0} J {} {net_str} J/s{collapse_str}",
+                    e.available, e.max_energy, bar
+                ),
                 frac,
             )
         } else {
@@ -382,7 +420,12 @@ pub fn hud_system(
     };
 
     let dim_str = if dim_state.transitioning() {
-        format!("{} → {} ({:.0}%)", dim_state.current.name(), dim_state.target.name(), dim_state.progress * 100.0)
+        format!(
+            "{} → {} ({:.0}%)",
+            dim_state.current.name(),
+            dim_state.target.name(),
+            dim_state.progress * 100.0
+        )
     } else if dim_state.current == crate::systems::dimension_transition::DimensionMode::D4 {
         format!("4D [F1-F4] W={:.0} [/]", dim_state.w_position)
     } else {
@@ -391,7 +434,10 @@ pub fn hud_system(
 
     // Contextual hint — guide new players based on current state
     let hint = if leviathan.grace_timer > 0.0 {
-        format!(">> Safe for {:.0}s — explore and find energy wells (teal glow)", leviathan.grace_timer)
+        format!(
+            ">> Safe for {:.0}s — explore and find energy wells (teal glow)",
+            leviathan.grace_timer
+        )
     } else if energy_bar < 0.4 {
         ">> LOW ENERGY — find a teal well to restore energy".to_string()
     } else if leviathan.noise_accumulator > 5.0 {

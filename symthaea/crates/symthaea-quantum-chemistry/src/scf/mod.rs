@@ -12,5 +12,7 @@ pub mod fock;
 pub mod generalized_eigen;
 pub mod rhf;
 
-pub use generalized_eigen::{canonical_orthogonalization, solve_generalized_eigen, GeneralizedEigenResult};
+pub use generalized_eigen::{
+    canonical_orthogonalization, solve_generalized_eigen, GeneralizedEigenResult,
+};
 pub use rhf::{restricted_hartree_fock, RhfConfig, RhfResult};

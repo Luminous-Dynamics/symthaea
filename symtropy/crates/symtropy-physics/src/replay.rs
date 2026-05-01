@@ -1,5 +1,5 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Determinism helpers: record/replay command streams and bitwise snapshots.
 //!
@@ -126,8 +126,7 @@ impl<const D: usize> BodySnapshot<D> {
         let translation = std::array::from_fn(|i| body.transform.translation.0[i].to_bits());
 
         let rot = body.transform.rotation.to_matrix();
-        let rotation =
-            std::array::from_fn(|r| std::array::from_fn(|c| rot[(r, c)].to_bits()));
+        let rotation = std::array::from_fn(|r| std::array::from_fn(|c| rot[(r, c)].to_bits()));
 
         let linear_velocity = std::array::from_fn(|i| body.linear_velocity[i].to_bits());
 

@@ -132,23 +132,23 @@ pub fn normalize_all(collected: &CollectedDimensions) -> crate::SovereignProfile
 pub fn default_input(dim: SovereignDimension) -> DimensionInput {
     match dim {
         SovereignDimension::EpistemicIntegrity => DimensionInput {
-            baseline: 50,                  // 50 validated claims for saturation
-            recency_half_life_days: 90.0,  // knowledge contribution decays over 3 months
+            baseline: 50,                 // 50 validated claims for saturation
+            recency_half_life_days: 90.0, // knowledge contribution decays over 3 months
             ..Default::default()
         },
         SovereignDimension::ThermodynamicYield => DimensionInput {
-            baseline: 30,                  // 30 verified energy contributions
-            recency_half_life_days: 30.0,  // energy is real-time, decays fast
+            baseline: 30,                 // 30 verified energy contributions
+            recency_half_life_days: 30.0, // energy is real-time, decays fast
             ..Default::default()
         },
         SovereignDimension::NetworkResilience => DimensionInput {
-            baseline: 720,                 // 720 hours (~30 days) of uptime
-            recency_half_life_days: 14.0,  // infrastructure needs constant maintenance
+            baseline: 720,                // 720 hours (~30 days) of uptime
+            recency_half_life_days: 14.0, // infrastructure needs constant maintenance
             ..Default::default()
         },
         SovereignDimension::EconomicVelocity => DimensionInput {
-            baseline: 50,                  // 50 TEND exchanges
-            recency_half_life_days: 60.0,  // economic activity over 2 months
+            baseline: 50,                 // 50 TEND exchanges
+            recency_half_life_days: 60.0, // economic activity over 2 months
             ..Default::default()
         },
         SovereignDimension::CivicParticipation => DimensionInput {
@@ -157,13 +157,13 @@ pub fn default_input(dim: SovereignDimension) -> DimensionInput {
             ..Default::default()
         },
         SovereignDimension::StewardshipCare => DimensionInput {
-            baseline: 30,                  // 30 care sessions or maintenance tasks
-            recency_half_life_days: 60.0,  // care work over 2 months
+            baseline: 30,                 // 30 care sessions or maintenance tasks
+            recency_half_life_days: 60.0, // care work over 2 months
             ..Default::default()
         },
         SovereignDimension::SemanticResonance => DimensionInput {
-            baseline: 1,                   // 1.0 = full alignment (cosine similarity)
-            recency_half_life_days: 30.0,  // community alignment shifts monthly
+            baseline: 1,                  // 1.0 = full alignment (cosine similarity)
+            recency_half_life_days: 30.0, // community alignment shifts monthly
             ..Default::default()
         },
         SovereignDimension::DomainCompetence => DimensionInput {
@@ -268,7 +268,11 @@ mod tests {
         for dim in SovereignDimension::ALL {
             let def = default_input(dim);
             assert!(def.baseline > 0, "Dimension {:?} has zero baseline", dim);
-            assert!(def.recency_half_life_days > 0.0, "Dimension {:?} has zero half-life", dim);
+            assert!(
+                def.recency_half_life_days > 0.0,
+                "Dimension {:?} has zero half-life",
+                dim
+            );
         }
     }
 
@@ -278,7 +282,12 @@ mod tests {
         let collected = CollectedDimensions::default();
         let profile = normalize_all(&collected);
         for dim in SovereignDimension::ALL {
-            assert_eq!(profile.get(dim), 0.0, "Dimension {:?} should default to 0.0", dim);
+            assert_eq!(
+                profile.get(dim),
+                0.0,
+                "Dimension {:?} should default to 0.0",
+                dim
+            );
         }
     }
 }

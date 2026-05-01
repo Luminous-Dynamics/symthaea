@@ -6,9 +6,9 @@
 //! Launches a passive viewer window showing the quadrotor in real-time
 //! while running the HDC-LTC-FEP control loop.
 //!
-//! Run: `cargo run --example mujoco_flight_viewer --features flight-mujoco --release`
+//! Run: `cargo run --example mujoco_flight_viewer --features multirotor-mujoco --release`
 
-use symthaea::symthaea_flight::{
+use symthaea::multirotor::{
     controller::FlightController,
     encoder::QuadrotorHdcEncoder,
     fep_agent::{ActiveInferenceFlightAgent, FlightFepConfig},

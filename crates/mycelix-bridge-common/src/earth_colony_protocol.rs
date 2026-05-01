@@ -47,11 +47,11 @@ impl PlanetaryBody {
     pub fn solar_flux_fraction(&self) -> f64 {
         match self {
             Self::Earth => 1.0,
-            Self::Moon => 1.0,          // Same distance from Sun
-            Self::Mars => 0.43,         // 1/1.524² AU
-            Self::Europa => 0.037,      // 1/5.2² AU
-            Self::Titan => 0.011,       // 1/9.54² AU
-            Self::Ceres => 0.13,        // 1/2.77² AU
+            Self::Moon => 1.0,     // Same distance from Sun
+            Self::Mars => 0.43,    // 1/1.524² AU
+            Self::Europa => 0.037, // 1/5.2² AU
+            Self::Titan => 0.011,  // 1/9.54² AU
+            Self::Ceres => 0.13,   // 1/2.77² AU
             Self::OrbitalHabitat => 1.0,
         }
     }
@@ -211,46 +211,109 @@ impl ResourceManifest {
     pub fn abundance_profile(body: PlanetaryBody) -> Self {
         match body {
             PlanetaryBody::Earth => Self {
-                food_kg: 1.0, water_kg: 1.0, oxygen_kg: 1.0, nitrogen_kg: 1.0,
-                power_kw: 1.0, energy_stored_kwh: 1.0,
-                iron_kg: 1.0, silicon_kg: 1.0, aluminum_kg: 1.0, carbon_kg: 1.0,
-                rare_earth_kg: 1.0, hydrocarbons_kg: 0.0, regolith_processed_kg: 0.0,
+                food_kg: 1.0,
+                water_kg: 1.0,
+                oxygen_kg: 1.0,
+                nitrogen_kg: 1.0,
+                power_kw: 1.0,
+                energy_stored_kwh: 1.0,
+                iron_kg: 1.0,
+                silicon_kg: 1.0,
+                aluminum_kg: 1.0,
+                carbon_kg: 1.0,
+                rare_earth_kg: 1.0,
+                hydrocarbons_kg: 0.0,
+                regolith_processed_kg: 0.0,
             },
             PlanetaryBody::Moon => Self {
-                food_kg: 0.0, water_kg: 0.1, oxygen_kg: 0.3, nitrogen_kg: 0.0,
-                power_kw: 1.0, energy_stored_kwh: 0.5,
-                iron_kg: 0.4, silicon_kg: 0.6, aluminum_kg: 0.5, carbon_kg: 0.01,
-                rare_earth_kg: 0.2, hydrocarbons_kg: 0.0, regolith_processed_kg: 0.8,
+                food_kg: 0.0,
+                water_kg: 0.1,
+                oxygen_kg: 0.3,
+                nitrogen_kg: 0.0,
+                power_kw: 1.0,
+                energy_stored_kwh: 0.5,
+                iron_kg: 0.4,
+                silicon_kg: 0.6,
+                aluminum_kg: 0.5,
+                carbon_kg: 0.01,
+                rare_earth_kg: 0.2,
+                hydrocarbons_kg: 0.0,
+                regolith_processed_kg: 0.8,
             },
             PlanetaryBody::Mars => Self {
-                food_kg: 0.0, water_kg: 0.3, oxygen_kg: 0.2, nitrogen_kg: 0.05,
-                power_kw: 0.43, energy_stored_kwh: 0.3,
-                iron_kg: 0.7, silicon_kg: 0.5, aluminum_kg: 0.4, carbon_kg: 0.3,
-                rare_earth_kg: 0.3, hydrocarbons_kg: 0.0, regolith_processed_kg: 0.6,
+                food_kg: 0.0,
+                water_kg: 0.3,
+                oxygen_kg: 0.2,
+                nitrogen_kg: 0.05,
+                power_kw: 0.43,
+                energy_stored_kwh: 0.3,
+                iron_kg: 0.7,
+                silicon_kg: 0.5,
+                aluminum_kg: 0.4,
+                carbon_kg: 0.3,
+                rare_earth_kg: 0.3,
+                hydrocarbons_kg: 0.0,
+                regolith_processed_kg: 0.6,
             },
             PlanetaryBody::Europa => Self {
-                food_kg: 0.0, water_kg: 10.0, oxygen_kg: 5.0, nitrogen_kg: 0.0,
-                power_kw: 0.0, energy_stored_kwh: 0.0, // Nuclear only
-                iron_kg: 0.05, silicon_kg: 0.02, aluminum_kg: 0.02, carbon_kg: 0.01,
-                rare_earth_kg: 0.01, hydrocarbons_kg: 0.0, regolith_processed_kg: 0.1,
+                food_kg: 0.0,
+                water_kg: 10.0,
+                oxygen_kg: 5.0,
+                nitrogen_kg: 0.0,
+                power_kw: 0.0,
+                energy_stored_kwh: 0.0, // Nuclear only
+                iron_kg: 0.05,
+                silicon_kg: 0.02,
+                aluminum_kg: 0.02,
+                carbon_kg: 0.01,
+                rare_earth_kg: 0.01,
+                hydrocarbons_kg: 0.0,
+                regolith_processed_kg: 0.1,
             },
             PlanetaryBody::Titan => Self {
-                food_kg: 0.0, water_kg: 5.0, oxygen_kg: 2.0, nitrogen_kg: 10.0,
-                power_kw: 0.0, energy_stored_kwh: 0.0, // Nuclear only
-                iron_kg: 0.0, silicon_kg: 0.0, aluminum_kg: 0.0, carbon_kg: 10.0,
-                rare_earth_kg: 0.0, hydrocarbons_kg: 100.0, regolith_processed_kg: 0.3,
+                food_kg: 0.0,
+                water_kg: 5.0,
+                oxygen_kg: 2.0,
+                nitrogen_kg: 10.0,
+                power_kw: 0.0,
+                energy_stored_kwh: 0.0, // Nuclear only
+                iron_kg: 0.0,
+                silicon_kg: 0.0,
+                aluminum_kg: 0.0,
+                carbon_kg: 10.0,
+                rare_earth_kg: 0.0,
+                hydrocarbons_kg: 100.0,
+                regolith_processed_kg: 0.3,
             },
             PlanetaryBody::Ceres => Self {
-                food_kg: 0.0, water_kg: 3.0, oxygen_kg: 1.0, nitrogen_kg: 0.1,
-                power_kw: 0.13, energy_stored_kwh: 0.1,
-                iron_kg: 0.5, silicon_kg: 0.4, aluminum_kg: 0.3, carbon_kg: 0.5,
-                rare_earth_kg: 0.4, hydrocarbons_kg: 0.0, regolith_processed_kg: 0.7,
+                food_kg: 0.0,
+                water_kg: 3.0,
+                oxygen_kg: 1.0,
+                nitrogen_kg: 0.1,
+                power_kw: 0.13,
+                energy_stored_kwh: 0.1,
+                iron_kg: 0.5,
+                silicon_kg: 0.4,
+                aluminum_kg: 0.3,
+                carbon_kg: 0.5,
+                rare_earth_kg: 0.4,
+                hydrocarbons_kg: 0.0,
+                regolith_processed_kg: 0.7,
             },
             PlanetaryBody::OrbitalHabitat => Self {
-                food_kg: 0.0, water_kg: 0.0, oxygen_kg: 0.0, nitrogen_kg: 0.0,
-                power_kw: 1.0, energy_stored_kwh: 0.5,
-                iron_kg: 0.0, silicon_kg: 0.0, aluminum_kg: 0.0, carbon_kg: 0.0,
-                rare_earth_kg: 0.0, hydrocarbons_kg: 0.0, regolith_processed_kg: 0.0,
+                food_kg: 0.0,
+                water_kg: 0.0,
+                oxygen_kg: 0.0,
+                nitrogen_kg: 0.0,
+                power_kw: 1.0,
+                energy_stored_kwh: 0.5,
+                iron_kg: 0.0,
+                silicon_kg: 0.0,
+                aluminum_kg: 0.0,
+                carbon_kg: 0.0,
+                rare_earth_kg: 0.0,
+                hydrocarbons_kg: 0.0,
+                regolith_processed_kg: 0.0,
             },
         }
     }
@@ -262,7 +325,11 @@ mod tests {
 
     #[test]
     fn test_planetary_body_roundtrip() {
-        for body in [PlanetaryBody::Earth, PlanetaryBody::Europa, PlanetaryBody::Titan] {
+        for body in [
+            PlanetaryBody::Earth,
+            PlanetaryBody::Europa,
+            PlanetaryBody::Titan,
+        ] {
             assert_eq!(PlanetaryBody::from_str(body.as_str()), Some(body));
         }
     }

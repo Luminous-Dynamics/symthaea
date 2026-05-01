@@ -9,7 +9,7 @@
 //! - Recovery dynamics after consciousness disruption
 //! - Multi-body proprioceptive divergence
 //!
-//! Run: `cargo test --features humanoid,helicopter,flight,vehicle --test robotics_scenarios`
+//! Run: `cargo test --features humanoid,helicopter,multirotor,vehicle --test robotics_scenarios`
 
 use symthaea::cognitive_loop::motor_bridge::{EmbodimentPlatform, MotorSafetyLevel};
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};

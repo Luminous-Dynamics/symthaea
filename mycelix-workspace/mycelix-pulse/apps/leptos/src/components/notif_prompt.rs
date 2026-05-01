@@ -17,13 +17,24 @@ pub fn NotificationPrompt() -> impl IntoView {
     let show = RwSignal::new(!already_dismissed);
 
     // Check if already granted
-    let granted = js_sys::eval("typeof Notification !== 'undefined' && Notification.permission === 'granted'")
-        .ok().and_then(|v| v.as_bool()).unwrap_or(false);
-    if granted { show.set(false); }
+    let granted = js_sys::eval(
+        "typeof Notification !== 'undefined' && Notification.permission === 'granted'",
+    )
+    .ok()
+    .and_then(|v| v.as_bool())
+    .unwrap_or(false);
+    if granted {
+        show.set(false);
+    }
 
-    let denied = js_sys::eval("typeof Notification !== 'undefined' && Notification.permission === 'denied'")
-        .ok().and_then(|v| v.as_bool()).unwrap_or(false);
-    if denied { show.set(false); }
+    let denied =
+        js_sys::eval("typeof Notification !== 'undefined' && Notification.permission === 'denied'")
+            .ok()
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+    if denied {
+        show.set(false);
+    }
 
     let dismiss = move || {
         show.set(false);
@@ -36,7 +47,9 @@ pub fn NotificationPrompt() -> impl IntoView {
         crate::notifications::request_notification_permission();
         dismiss();
     };
-    let on_dismiss = move |_| { dismiss(); };
+    let on_dismiss = move |_| {
+        dismiss();
+    };
 
     view! {
         <div class="notif-prompt" style=move || if show.get() { "" } else { "display:none" }>

@@ -171,7 +171,7 @@ Each cluster theme maps its own colors to these semantic tokens; apps using `myc
 
 ### Part 5d — Adoption gap (the work item)
 
-14 of 27 frontends use `mycelix-leptos-core`. **13 don't**. Those 13 either roll their own CSS (symthaea-web, nixforhumanity-web, prism-ui, sol-atlas-leptos, symthaea-sim-ui, portal-shell) — which is fine, they're outside the Mycelix cluster family — or are stub/minimal (e.g., civic which doesn't have a frontend at all).
+14 of 27 frontends use `mycelix-leptos-core`. **13 don't**. Those 13 either roll their own CSS (symthaea-web, nixforhumanity-web, prism-ui, sol-atlas-leptos, symthaea-sim-ui, Sensorium shell) — which is fine, they're outside the Mycelix cluster family — or are stub/minimal (e.g., civic which doesn't have a frontend at all).
 
 The adoption task in Week 3 of the execution path isn't "build the crate" — it was "add the 3 true-gap primitives + semantic-color-token conventions, then drive reference-impl adoption in Praxis first." **The 3 primitives are now shipped** (see Part 5b). Remaining adoption work:
 

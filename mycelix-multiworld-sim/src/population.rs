@@ -39,7 +39,10 @@ pub fn process_death_consequences(agents: &mut [CivAgent], deceased_id: u64) {
     // Small colony (<500): everyone feels the death. 1-tick productivity hit.
     let grief_load = if living_count < 500 { 0.005 } else { 0.001 };
 
-    for agent in agents.iter_mut().filter(|a| a.is_alive() && a.id != deceased_id) {
+    for agent in agents
+        .iter_mut()
+        .filter(|a| a.is_alive() && a.id != deceased_id)
+    {
         if children_ids.contains(&agent.id) {
             // Orphan grief — ACE score (Adverse Childhood Experience)
             agent.trauma_level = (agent.trauma_level + 0.3).min(1.0);
@@ -62,9 +65,9 @@ pub fn process_death_consequences(agents: &mut [CivAgent], deceased_id: u64) {
         deceased.map(|d| d.skills.strongest_index())
     };
     if let Some(sector) = deceased_sector {
-        let remaining_skilled = agents.iter()
-            .filter(|a| a.is_alive() && a.id != deceased_id
-                && a.skills.as_slice()[sector] > 0.3)
+        let remaining_skilled = agents
+            .iter()
+            .filter(|a| a.is_alive() && a.id != deceased_id && a.skills.as_slice()[sector] > 0.3)
             .count();
         if remaining_skilled == 0 && living_count > 10 {
             // SKILL GAP: no one left who can do this job
@@ -107,7 +110,9 @@ impl PopulationEngine {
         }
 
         // Build ID→index map for O(1) lookup (avoids O(N²) scan)
-        let id_to_idx: std::collections::HashMap<u64, usize> = world.agents.iter()
+        let id_to_idx: std::collections::HashMap<u64, usize> = world
+            .agents
+            .iter()
             .enumerate()
             .map(|(i, a)| (a.id, i))
             .collect();
@@ -129,14 +134,24 @@ impl PopulationEngine {
 
             // Find best unpaired male by ethical cosine similarity
             let best_male_slot = if let Some(fe) = &female_ethics {
-                unpaired_males.iter().enumerate()
+                unpaired_males
+                    .iter()
+                    .enumerate()
                     .filter(|(j, _)| !paired_males[*j])
                     .max_by(|(_, &mid_a), (_, &mid_b)| {
-                        let ea = id_to_idx.get(&mid_a).map(|&i| world.agents[i].ethics.as_vec()).unwrap_or([0.4; 4]);
-                        let eb = id_to_idx.get(&mid_b).map(|&i| world.agents[i].ethics.as_vec()).unwrap_or([0.4; 4]);
+                        let ea = id_to_idx
+                            .get(&mid_a)
+                            .map(|&i| world.agents[i].ethics.as_vec())
+                            .unwrap_or([0.4; 4]);
+                        let eb = id_to_idx
+                            .get(&mid_b)
+                            .map(|&i| world.agents[i].ethics.as_vec())
+                            .unwrap_or([0.4; 4]);
                         let sim_a: f64 = fe.iter().zip(ea.iter()).map(|(a, b)| a * b).sum();
                         let sim_b: f64 = fe.iter().zip(eb.iter()).map(|(a, b)| a * b).sum();
-                        sim_a.partial_cmp(&sim_b).unwrap_or(std::cmp::Ordering::Equal)
+                        sim_a
+                            .partial_cmp(&sim_b)
+                            .unwrap_or(std::cmp::Ordering::Equal)
                     })
                     .map(|(j, _)| j)
             } else {
@@ -208,12 +223,10 @@ impl PopulationEngine {
                 // Ref: Holt-Lunstad (2010), Becker (1960), Batson (2008) moral hypocrisy.
                 let revealed = a.ethics.revealed(a.needs.allostatic_load);
                 let ethics_mortality_mod = if a.needs.allostatic_load > 0.5 {
-                    1.0 - revealed.virtue_care * 0.07
-                        - revealed.relational * 0.06
+                    1.0 - revealed.virtue_care * 0.07 - revealed.relational * 0.06
                         + revealed.consequentialist * 0.03
                 } else {
-                    1.0 - revealed.consequentialist * 0.05
-                        - revealed.deontological * 0.04
+                    1.0 - revealed.consequentialist * 0.05 - revealed.deontological * 0.04
                         + revealed.virtue_care * 0.01
                 };
                 rate *= ethics_mortality_mod.clamp(0.7, 1.3);
@@ -237,7 +250,9 @@ impl PopulationEngine {
             .collect();
 
         // Build ID→index map for O(1) death processing
-        let death_map: std::collections::HashMap<u64, usize> = world.agents.iter()
+        let death_map: std::collections::HashMap<u64, usize> = world
+            .agents
+            .iter()
             .enumerate()
             .map(|(i, a)| (a.id, i))
             .collect();
@@ -248,7 +263,11 @@ impl PopulationEngine {
                     current_tick,
                     Some(world.id),
                     CivEventType::Death,
-                    format!("Agent {} died at age {:.1}", id, world.agents[idx].age_years(current_tick)),
+                    format!(
+                        "Agent {} died at age {:.1}",
+                        id,
+                        world.agents[idx].age_years(current_tick)
+                    ),
                 ));
             }
         }
@@ -272,11 +291,7 @@ impl PopulationEngine {
             return events;
         }
         // Collect fertile pairs
-        let living: Vec<&CivAgent> = world
-            .agents
-            .iter()
-            .filter(|a| a.is_alive())
-            .collect();
+        let living: Vec<&CivAgent> = world.agents.iter().filter(|a| a.is_alive()).collect();
 
         let fertile_females: Vec<u64> = living
             .iter()
@@ -308,7 +323,9 @@ impl PopulationEngine {
             let cultural_modifier = 0.8 + 0.4 * world.culture.traditionalism;
 
             // Build ID→index map for O(1) lookup (avoids O(N²) in birth loop)
-            let id_map: std::collections::HashMap<u64, usize> = world.agents.iter()
+            let id_map: std::collections::HashMap<u64, usize> = world
+                .agents
+                .iter()
                 .enumerate()
                 .map(|(i, a)| (a.id, i))
                 .collect();
@@ -337,11 +354,14 @@ impl PopulationEngine {
                     // Relational: community family support networks boost fertility (+9%)
                     // Virtue/care: caregiving orientation supports child-rearing (+6%)
                     // Consequentialist: cost-benefit calculus reduces fertility (-6%)
-                    let ethics_fertility = 1.0
-                        + fem.ethics.relational * 0.09
-                        + fem.ethics.virtue_care * 0.06
-                        - fem.ethics.consequentialist * 0.06;
-                    let p = base_fertility * nutrition_modifier * cultural_modifier * fem.health * ethics_fertility;
+                    let ethics_fertility =
+                        1.0 + fem.ethics.relational * 0.09 + fem.ethics.virtue_care * 0.06
+                            - fem.ethics.consequentialist * 0.06;
+                    let p = base_fertility
+                        * nutrition_modifier
+                        * cultural_modifier
+                        * fem.health
+                        * ethics_fertility;
 
                     if rng.bernoulli(p) {
                         let child_sex = if rng.bernoulli(0.5) {
@@ -355,10 +375,21 @@ impl PopulationEngine {
                         let mother_health = fem.health;
                         // Look up father skills/health/ethics if partner exists
                         let mother_ethics = fem.ethics.clone();
-                        let (father_skills, father_health, father_ethics) = fem.partner_id
+                        let (father_skills, father_health, father_ethics) = fem
+                            .partner_id
                             .and_then(|pid| id_map.get(&pid))
-                            .map(|&fi| (world.agents[fi].skills.as_slice(), world.agents[fi].health, world.agents[fi].ethics.clone()))
-                            .unwrap_or(([0.1; 8], 0.9, crate::agent::EthicalOrientation::default()));
+                            .map(|&fi| {
+                                (
+                                    world.agents[fi].skills.as_slice(),
+                                    world.agents[fi].health,
+                                    world.agents[fi].ethics.clone(),
+                                )
+                            })
+                            .unwrap_or((
+                                [0.1; 8],
+                                0.9,
+                                crate::agent::EthicalOrientation::default(),
+                            ));
 
                         births.push(BirthRecord {
                             child_sex,
@@ -430,13 +461,24 @@ impl PopulationEngine {
                     faction_id: None,
                     generation: birth.generation,
                     trauma_level: birth.trauma,
-                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
+                    cumulative_dose_sv: 0.0,
+                    adversarial: None,
+                    coordination_understanding: 0.0,
+                    mycel_score: 0.1,
+                    sap_balance: 100.0,
+                    is_biological: true,
+                    wounds: Vec::new(),
                     // Phase 3c: children inherit parents' ethical orientation with noise
-                    ethics: crate::agent::EthicalOrientation::inherit(&birth.mother_ethics, &birth.father_ethics, rng),
+                    ethics: crate::agent::EthicalOrientation::inherit(
+                        &birth.mother_ethics,
+                        &birth.father_ethics,
+                        rng,
+                    ),
                     // 8D sovereign profile: sampled at birth from the parents' cultural individualism.
                     // Refreshed from state each governance tick.
                     sovereign_profile: crate::sovereign_profile::SovereignProfile::sample(
-                        world.culture.individualism, rng,
+                        world.culture.individualism,
+                        rng,
                     ),
                     justice: crate::sub_passport::RestorativeJustice::new(),
                 };
@@ -501,9 +543,12 @@ impl PopulationEngine {
     pub fn genetic_viability(world: &World, _current_tick: u32) -> f64 {
         let pop = world.population().max(1) as f64;
         let ne = pop * 0.25; // Conservative Ne/N ratio
-        let immigrant_frac = world.agents.iter()
+        let immigrant_frac = world
+            .agents
+            .iter()
             .filter(|a| a.is_alive() && a.is_immigrant)
-            .count() as f64 / pop;
+            .count() as f64
+            / pop;
 
         // Viability curve: sigmoid centered at Ne=200
         let base = 1.0 / (1.0 + (-0.02 * (ne - 200.0)).exp());
@@ -523,8 +568,7 @@ impl PopulationEngine {
     pub fn genetic_diversity_index(world: &World, current_tick: u32) -> f64 {
         let pop = world.population().max(1);
         let ne = (pop as f64 * 0.7).max(1.0);
-        let generations_elapsed =
-            (current_tick.saturating_sub(world.founded_tick)) as f64 / 300.0;
+        let generations_elapsed = (current_tick.saturating_sub(world.founded_tick)) as f64 / 300.0;
 
         // Count founders: agents whose birth_tick wraps (born "before" simulation start).
         // These have birth_tick > current_tick due to u32 wrapping arithmetic.
@@ -566,10 +610,7 @@ impl PopulationEngine {
         let founder_count = world
             .agents
             .iter()
-            .filter(|a| {
-                a.birth_tick <= world.founded_tick + 1
-                || a.birth_tick > current_tick
-            })
+            .filter(|a| a.birth_tick <= world.founded_tick + 1 || a.birth_tick > current_tick)
             .count()
             .max(1) as f64;
         let h0 = 1.0 - 1.0 / founder_count;
@@ -600,11 +641,7 @@ pub struct SirEpidemic {
 
 impl SirEpidemic {
     /// Advance one tick of the SIR model. Returns (new_infections, new_deaths).
-    pub fn tick(
-        &mut self,
-        population_size: usize,
-        rng: &mut StochasticEngine,
-    ) -> (usize, usize) {
+    pub fn tick(&mut self, population_size: usize, rng: &mut StochasticEngine) -> (usize, usize) {
         if self.infected == 0 || population_size == 0 {
             return (0, 0);
         }
@@ -717,7 +754,9 @@ mod tests {
             economy: crate::economy::WorldEconomy::new(),
             harmony: crate::harmony::HarmonyTracker::new(),
             governance: crate::governance::WorldGovernance::new(),
-            metabolism_state: crate::metabolism::MetabolismState::default(), currency_state: crate::currency::WorldCurrencyState::default(), policy_state: crate::proposals::PolicyState::default(),
+            metabolism_state: crate::metabolism::MetabolismState::default(),
+            currency_state: crate::currency::WorldCurrencyState::default(),
+            policy_state: crate::proposals::PolicyState::default(),
             power_generation_kw: 0.0,
             power_demand_kw: 0.0,
             narrative_identity: crate::world::NarrativeIdentity::default(),
@@ -773,9 +812,16 @@ mod tests {
                 faction_id: None,
                 generation: 0,
                 trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(), ethics: crate::agent::EthicalOrientation::default(),
-                    sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
-                    justice: crate::sub_passport::RestorativeJustice::new(),
+                cumulative_dose_sv: 0.0,
+                adversarial: None,
+                coordination_understanding: 0.0,
+                mycel_score: 0.1,
+                sap_balance: 100.0,
+                is_biological: true,
+                wounds: Vec::new(),
+                ethics: crate::agent::EthicalOrientation::default(),
+                sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
+                justice: crate::sub_passport::RestorativeJustice::new(),
             };
             world.next_agent_id += 1;
             world.agents.push(agent);
@@ -856,7 +902,10 @@ mod tests {
         // At tick 0, agents are age 0 (children), so adults = 0
         assert!(!PopulationEngine::minimum_viable_population(&world, 0));
         // At tick 25*12, agents are 25 (adults)
-        assert!(!PopulationEngine::minimum_viable_population(&world, 25 * 12));
+        assert!(!PopulationEngine::minimum_viable_population(
+            &world,
+            25 * 12
+        ));
         // Need at least 20 adults
         let big = make_test_world(30);
         assert!(PopulationEngine::minimum_viable_population(&big, 25 * 12));
@@ -867,46 +916,122 @@ mod tests {
         // Fix 2: Death Has Consequences
         let mut agents = vec![
             CivAgent {
-                id: 0, birth_tick: 0, death_tick: None, sex: BiologicalSex::Male,
-                world_id: 0, health: 1.0, skills: SkillVector::new(),
-                education_level: 0.0, consciousness: ConsciousnessState::nascent(),
-                partner_id: Some(1), children_ids: vec![2, 3],
-                is_immigrant: false, needs: PsychologicalNeeds::new(),
-                tend_balance: 0.0, parent_ids: None, faction_id: None,
-                generation: 0, trauma_level: 0.0, cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(), ethics: crate::agent::EthicalOrientation::default(),
+                id: 0,
+                birth_tick: 0,
+                death_tick: None,
+                sex: BiologicalSex::Male,
+                world_id: 0,
+                health: 1.0,
+                skills: SkillVector::new(),
+                education_level: 0.0,
+                consciousness: ConsciousnessState::nascent(),
+                partner_id: Some(1),
+                children_ids: vec![2, 3],
+                is_immigrant: false,
+                needs: PsychologicalNeeds::new(),
+                tend_balance: 0.0,
+                parent_ids: None,
+                faction_id: None,
+                generation: 0,
+                trauma_level: 0.0,
+                cumulative_dose_sv: 0.0,
+                adversarial: None,
+                coordination_understanding: 0.0,
+                mycel_score: 0.1,
+                sap_balance: 100.0,
+                is_biological: true,
+                wounds: Vec::new(),
+                ethics: crate::agent::EthicalOrientation::default(),
                 sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
                 justice: crate::sub_passport::RestorativeJustice::new(),
             },
             CivAgent {
-                id: 1, birth_tick: 0, death_tick: None, sex: BiologicalSex::Female,
-                world_id: 0, health: 1.0, skills: SkillVector::new(),
-                education_level: 0.0, consciousness: ConsciousnessState::nascent(),
-                partner_id: Some(0), children_ids: vec![2, 3],
-                is_immigrant: false, needs: PsychologicalNeeds::new(),
-                tend_balance: 0.0, parent_ids: None, faction_id: None,
-                generation: 0, trauma_level: 0.0, cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(), ethics: crate::agent::EthicalOrientation::default(),
+                id: 1,
+                birth_tick: 0,
+                death_tick: None,
+                sex: BiologicalSex::Female,
+                world_id: 0,
+                health: 1.0,
+                skills: SkillVector::new(),
+                education_level: 0.0,
+                consciousness: ConsciousnessState::nascent(),
+                partner_id: Some(0),
+                children_ids: vec![2, 3],
+                is_immigrant: false,
+                needs: PsychologicalNeeds::new(),
+                tend_balance: 0.0,
+                parent_ids: None,
+                faction_id: None,
+                generation: 0,
+                trauma_level: 0.0,
+                cumulative_dose_sv: 0.0,
+                adversarial: None,
+                coordination_understanding: 0.0,
+                mycel_score: 0.1,
+                sap_balance: 100.0,
+                is_biological: true,
+                wounds: Vec::new(),
+                ethics: crate::agent::EthicalOrientation::default(),
                 sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
                 justice: crate::sub_passport::RestorativeJustice::new(),
             },
             CivAgent {
-                id: 2, birth_tick: 100, death_tick: None, sex: BiologicalSex::Male,
-                world_id: 0, health: 1.0, skills: SkillVector::new(),
-                education_level: 0.0, consciousness: ConsciousnessState::nascent(),
-                partner_id: None, children_ids: vec![],
-                is_immigrant: false, needs: PsychologicalNeeds::new(),
-                tend_balance: 0.0, parent_ids: Some((0, 1)), faction_id: None,
-                generation: 1, trauma_level: 0.0, cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(), ethics: crate::agent::EthicalOrientation::default(),
+                id: 2,
+                birth_tick: 100,
+                death_tick: None,
+                sex: BiologicalSex::Male,
+                world_id: 0,
+                health: 1.0,
+                skills: SkillVector::new(),
+                education_level: 0.0,
+                consciousness: ConsciousnessState::nascent(),
+                partner_id: None,
+                children_ids: vec![],
+                is_immigrant: false,
+                needs: PsychologicalNeeds::new(),
+                tend_balance: 0.0,
+                parent_ids: Some((0, 1)),
+                faction_id: None,
+                generation: 1,
+                trauma_level: 0.0,
+                cumulative_dose_sv: 0.0,
+                adversarial: None,
+                coordination_understanding: 0.0,
+                mycel_score: 0.1,
+                sap_balance: 100.0,
+                is_biological: true,
+                wounds: Vec::new(),
+                ethics: crate::agent::EthicalOrientation::default(),
                 sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
                 justice: crate::sub_passport::RestorativeJustice::new(),
             },
             CivAgent {
-                id: 3, birth_tick: 100, death_tick: None, sex: BiologicalSex::Female,
-                world_id: 0, health: 1.0, skills: SkillVector::new(),
-                education_level: 0.0, consciousness: ConsciousnessState::nascent(),
-                partner_id: None, children_ids: vec![],
-                is_immigrant: false, needs: PsychologicalNeeds::new(),
-                tend_balance: 0.0, parent_ids: Some((0, 1)), faction_id: None,
-                generation: 1, trauma_level: 0.0, cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(), ethics: crate::agent::EthicalOrientation::default(),
+                id: 3,
+                birth_tick: 100,
+                death_tick: None,
+                sex: BiologicalSex::Female,
+                world_id: 0,
+                health: 1.0,
+                skills: SkillVector::new(),
+                education_level: 0.0,
+                consciousness: ConsciousnessState::nascent(),
+                partner_id: None,
+                children_ids: vec![],
+                is_immigrant: false,
+                needs: PsychologicalNeeds::new(),
+                tend_balance: 0.0,
+                parent_ids: Some((0, 1)),
+                faction_id: None,
+                generation: 1,
+                trauma_level: 0.0,
+                cumulative_dose_sv: 0.0,
+                adversarial: None,
+                coordination_understanding: 0.0,
+                mycel_score: 0.1,
+                sap_balance: 100.0,
+                is_biological: true,
+                wounds: Vec::new(),
+                ethics: crate::agent::EthicalOrientation::default(),
                 sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
                 justice: crate::sub_passport::RestorativeJustice::new(),
             },
@@ -917,12 +1042,24 @@ mod tests {
         process_death_consequences(&mut agents, 0);
 
         // Partner (agent 1) should have high trauma and cleared partner
-        assert!(agents[1].trauma_level >= 0.39, "Partner grief: {}", agents[1].trauma_level);
+        assert!(
+            agents[1].trauma_level >= 0.39,
+            "Partner grief: {}",
+            agents[1].trauma_level
+        );
         assert_eq!(agents[1].partner_id, None, "Partner bond should be cleared");
 
         // Children (agents 2, 3) should have orphan trauma
-        assert!(agents[2].trauma_level >= 0.29, "Orphan trauma: {}", agents[2].trauma_level);
-        assert!(agents[3].trauma_level >= 0.29, "Orphan trauma: {}", agents[3].trauma_level);
+        assert!(
+            agents[2].trauma_level >= 0.29,
+            "Orphan trauma: {}",
+            agents[2].trauma_level
+        );
+        assert!(
+            agents[3].trauma_level >= 0.29,
+            "Orphan trauma: {}",
+            agents[3].trauma_level
+        );
     }
 
     #[test]
@@ -947,7 +1084,9 @@ mod tests {
 
             // Check newborns — children born at this tick
             for agent in &world.agents {
-                if agent.birth_tick == tick && agent.parent_ids == Some((world.agents[0].id, world.agents[1].id)) {
+                if agent.birth_tick == tick
+                    && agent.parent_ids == Some((world.agents[0].id, world.agents[1].id))
+                {
                     // Child should have engineering skill higher than baseline 0.1
                     let eng = agent.skills.as_slice()[0];
                     assert!(
@@ -967,10 +1106,7 @@ mod tests {
 /// Check genetic diversity across all worlds and emit alerts for critical levels.
 ///
 /// Extracted from `MultiWorldSimulator::tick_genetics()` — pure read of worlds.
-pub fn check_genetic_diversity(
-    worlds: &[World],
-    current_tick: u32,
-) -> Vec<CivEvent> {
+pub fn check_genetic_diversity(worlds: &[World], current_tick: u32) -> Vec<CivEvent> {
     let mut events = Vec::new();
     for world in worlds {
         let div = PopulationEngine::genetic_diversity_index(world, current_tick);

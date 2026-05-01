@@ -224,10 +224,8 @@ impl SybilWeightComputer {
             }
         }
 
-        let scores: Vec<(String, f64)> = node_ids
-            .into_iter()
-            .zip(weights.iter().copied())
-            .collect();
+        let scores: Vec<(String, f64)> =
+            node_ids.into_iter().zip(weights.iter().copied()).collect();
 
         Ok(AggregationResult {
             gradient: agg.iter().map(|&v| v as f32).collect(),
@@ -259,7 +257,11 @@ mod tests {
     use super::*;
 
     fn grad(id: &str, values: Vec<f32>) -> Gradient {
-        Gradient { node_id: id.into(), values, round: 0 }
+        Gradient {
+            node_id: id.into(),
+            values,
+            round: 0,
+        }
     }
 
     #[test]
@@ -312,7 +314,8 @@ mod tests {
         assert!(
             weights[0] > weights[1],
             "good ({:.4}) should have more weight than bad ({:.4})",
-            weights[0], weights[1]
+            weights[0],
+            weights[1]
         );
     }
 
@@ -327,7 +330,10 @@ mod tests {
         let penalty = computer.compute_cluster_penalty(&gradients);
         assert!(penalty[0] < 1.0, "clustered node should be penalized");
         assert!((penalty[0] - penalty[1]).abs() < 1e-6);
-        assert!((penalty[2] - 1.0).abs() < 1e-6, "unique node gets no penalty");
+        assert!(
+            (penalty[2] - 1.0).abs() < 1e-6,
+            "unique node gets no penalty"
+        );
     }
 
     #[test]
@@ -340,10 +346,7 @@ mod tests {
             computer.update_reputation("low", false);
         }
 
-        let gradients = vec![
-            grad("high", vec![1.0, 0.0]),
-            grad("low", vec![0.0, 1.0]),
-        ];
+        let gradients = vec![grad("high", vec![1.0, 0.0]), grad("low", vec![0.0, 1.0])];
         let result = computer.weighted_aggregate(&gradients).unwrap();
         assert!(result.gradient[0] > result.gradient[1]);
     }
@@ -357,9 +360,9 @@ mod tests {
     #[test]
     fn test_quadratic_weighting() {
         let mut computer = SybilWeightComputer::new();
-        computer.update_reputation("a", true);  // score = 1/(1+0+1) = 0.5
+        computer.update_reputation("a", true); // score = 1/(1+0+1) = 0.5
         computer.update_reputation("b", true);
-        computer.update_reputation("b", true);  // score = 2/(2+0+1) = 0.667
+        computer.update_reputation("b", true); // score = 2/(2+0+1) = 0.667
 
         let rep_a = computer.get_reputation("a").unwrap().reputation_score;
         let rep_b = computer.get_reputation("b").unwrap().reputation_score;

@@ -37,7 +37,7 @@ audio → voice-tts + rodio
 | `neural-bridge` | ~2GB model download (BGE-M3 via HF Hub) |
 | `neural-bridge-cuda` | CUDA toolkit |
 | `embeddings-gpu` | WGPU-compatible GPU |
-| `flight-mujoco` | MuJoCo physics engine |
+| `multirotor-mujoco` | MuJoCo physics engine |
 | `humanoid-mujoco` | MuJoCo physics engine |
 | `ssm-power-hal` | Linux I2C (embedded HAL) |
 | `swarm` | Network access (Iroh P2P) |
@@ -71,8 +71,8 @@ embeddings-gpu (WGPU)
 vision-manifold-camera (V4L2)
 foveation-perception (model files)
 neural-bridge-cuda (CUDA)
-flight-mujoco, flight-mujoco-renderer (MuJoCo)
-flight-swarm (MuJoCo + rayon parallel)
+multirotor-mujoco, multirotor-mujoco-renderer (MuJoCo)
+multirotor-swarm (MuJoCo + rayon parallel)
 humanoid-mujoco, humanoid-viewer (MuJoCo)
 hal, ssm-power-hal (I2C hardware)
 ```
@@ -140,10 +140,14 @@ hal, ssm-power-hal (I2C hardware)
 | `nix-mind` | Conscious NixOS | symthaea-nix |
 | `identity` | Ed25519 signing | ed25519-dalek, sha2 |
 | `physics` | Tokamak plasma encoding | symthaea-physics |
-| `flight` | Quadrotor FEP control | symthaea-flight |
-| `flight-mujoco` | + MuJoCo physics | flight |
-| `flight-mujoco-renderer` | + video capture | flight-mujoco |
-| `flight-swarm` | + parallel swarm | flight |
+| `multirotor` | Multirotor FEP control | symthaea-multirotor |
+| `flight` | Backward-compatible alias for `multirotor` | symthaea-multirotor |
+| `multirotor-mujoco` | + MuJoCo physics | multirotor |
+| `multirotor-mujoco-renderer` | + video capture | multirotor-mujoco |
+| `multirotor-swarm` | + parallel swarm | multirotor |
+| `flight-mujoco` | Backward-compatible alias | multirotor-mujoco |
+| `flight-mujoco-renderer` | Backward-compatible alias | multirotor-mujoco-renderer |
+| `flight-swarm` | Backward-compatible alias | multirotor-swarm |
 | `humanoid` | Bipedal DMC benchmark | symthaea-humanoid |
 | `humanoid-mujoco` | + MuJoCo physics | humanoid |
 | `humanoid-viewer` | + MuJoCo viewer | humanoid-mujoco |

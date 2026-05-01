@@ -19,9 +19,8 @@ pub fn CompareView(query: String) -> impl IntoView {
     let search_engine = expect_context::<StoredValue<Option<SearchEngine>>>();
 
     // Prism results (instant, local)
-    let prism_results: Vec<SearchResult> = search_engine.with_value(|e| {
-        e.as_ref().map(|s| s.search(&query, 5)).unwrap_or_default()
-    });
+    let prism_results: Vec<SearchResult> =
+        search_engine.with_value(|e| e.as_ref().map(|s| s.search(&query, 5)).unwrap_or_default());
 
     // External search signals
     let (wiki, set_wiki) = signal(ExternalResult::loading("Wikipedia"));

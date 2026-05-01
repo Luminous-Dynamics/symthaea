@@ -63,7 +63,10 @@ pub enum SimEvent {
     /// An economic crisis occurred.
     EconomicCrisis { severity: f64 },
     /// A faction conflict started.
-    FactionConflict { faction_a: String, faction_b: String },
+    FactionConflict {
+        faction_a: String,
+        faction_b: String,
+    },
     /// A natural disaster or emergency.
     Emergency { description: String, severity: f64 },
     /// Epoch milestone reached.

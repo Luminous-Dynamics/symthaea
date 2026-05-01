@@ -1,0 +1,116 @@
+{
+  "metadata": {
+    "title": "Revenue-Ready Seed: 2026 Economy On-Ramps",
+    "framework": "Global Revenue Mesh",
+    "source": "https://mycelix.org/certs-revenue",
+    "grade_level": "Professional",
+    "subject_area": "Multi-Sector",
+    "domain": "Professional Certification",
+    "version": "1.0",
+    "total_standards": 6,
+    "domains": [
+      "Creator Economy",
+      "Additive Manufacturing",
+      "Decentralized Finance",
+      "Translation Services",
+      "Property Services"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Focused on immediate income-generation in modern and emerging sectors."
+  },
+  "nodes": [
+    {
+      "id": "CERT-CREATOR-STRATEGY",
+      "title": "YouTube & Meta Content Strategy Professional",
+      "description": "Audience growth, algorithmic optimization, and monetization strategy. Mapping linguistic sovereignty and aesthetic resonance to the digital attention economy.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Creator Economy",
+      "subdomain": "Certification Bridge",
+      "tags": ["content", "youtube", "marketing", "digital-economy"],
+      "estimated_hours": 60,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Create",
+      "subject_area": "Arts"
+    },
+    {
+      "id": "CERT-MFG-STRATASYS-3D",
+      "title": "Stratasys Certified 3D Printing Associate",
+      "description": "Additive manufacturing fundamentals, FDM/PolyJet technology, and design for 3D printing. Linking digital fabrication and CNC tracks to industrial standards.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Additive Manufacturing",
+      "subdomain": "Certification Bridge",
+      "tags": ["3d-printing", "mfg", "engineering", "standard"],
+      "estimated_hours": 45,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "CERT-FIN-DEFI-EXPERT",
+      "title": "Certified DeFi Expert (Blockchain Council)",
+      "description": "Lending protocols, yield farming, and decentralized exchange mechanisms. Mapping mutual credit veracity and audit integrity to modern DeFi markets.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Decentralized Finance",
+      "subdomain": "Certification Bridge",
+      "tags": ["defi", "fintech", "blockchain", "standard"],
+      "estimated_hours": 90,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Analyze",
+      "subject_area": "Social Studies"
+    },
+    {
+      "id": "CERT-LANG-ATA-ASSOC",
+      "title": "ATA Associate (Translator/Interpreter Mapping)",
+      "description": "Professional translation ethics, terminology management, and cross-cultural communication. Linking community localization and idiom tracks to professional standards.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Translation Services",
+      "subdomain": "Certification Bridge",
+      "tags": ["translation", "language", "linguistics", "standard"],
+      "estimated_hours": 120,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Analyze",
+      "subject_area": "Humanities"
+    },
+    {
+      "id": "CERT-PROP-RE-ASSOC",
+      "title": "Licensed Real Estate Assistant Foundation",
+      "description": "Contract basics, listing management, and client coordination. Immediate entry standard for property stewardship and real estate operations.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Property Services",
+      "subdomain": "Certification Bridge",
+      "tags": ["real-estate", "property", "business", "standard"],
+      "estimated_hours": 30,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Social Studies"
+    }
+  ],
+  "edges": [
+    {
+      "from": "HUM-LANG-201",
+      "to": "CERT-CREATOR-STRATEGY",
+      "edge_type": "Recommended",
+      "strength_permille": 800,
+      "rationale": "Linguistic sovereignty and narrative mastery are the core foundations for audience engagement."
+    },
+    {
+      "from": "VOC-DT-101",
+      "to": "CERT-MFG-STRATASYS-3D",
+      "edge_type": "Recommended",
+      "strength_permille": 900,
+      "rationale": "Foundational CNC and digital design mastery covers 90% of the Stratasys design requirements."
+    },
+    {
+      "from": "HUM-EPI-201",
+      "to": "CERT-FIN-DEFI-EXPERT",
+      "edge_type": "Recommended",
+      "strength_permille": 750,
+      "rationale": "Epistemic witness and audit-integrity training provide the skepticism needed for DeFi risk assessment."
+    }
+  ]
+}

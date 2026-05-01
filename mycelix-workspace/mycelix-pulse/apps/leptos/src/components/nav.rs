@@ -6,8 +6,8 @@ use leptos_router::components::A;
 
 use crate::holochain::{use_holochain, ConnectionStatus};
 use crate::mail_context::use_mail;
-use crate::theme::use_theme;
 use crate::offline::use_offline;
+use crate::theme::use_theme;
 
 #[component]
 pub fn Nav() -> impl IntoView {
@@ -31,7 +31,11 @@ pub fn Nav() -> impl IntoView {
 
     let unread = move || {
         let count = mail.inbox.get().iter().filter(|e| !e.is_read).count();
-        if count > 0 { format!(" ({count})") } else { String::new() }
+        if count > 0 {
+            format!(" ({count})")
+        } else {
+            String::new()
+        }
     };
 
     let mail_key = mail.clone();
@@ -45,7 +49,11 @@ pub fn Nav() -> impl IntoView {
         show_theme_panel.update(|v| *v = !*v);
     };
     let theme_icon = move || {
-        if theme.current.get() == mail_leptos_types::Theme::Dark { "\u{1F319}" } else { "\u{2600}" }
+        if theme.current.get() == mail_leptos_types::Theme::Dark {
+            "\u{1F319}"
+        } else {
+            "\u{2600}"
+        }
     };
 
     // Offline queue indicator (#4)

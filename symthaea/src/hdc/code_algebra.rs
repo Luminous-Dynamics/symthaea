@@ -274,7 +274,7 @@ impl CodeAlgebra {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::language::code_parser::{CodeEntity, EntityKind, Span};
+    use crate::language::code_parser::{Entity, EntityKind, Span};
 
     fn test_span() -> Span {
         Span {
@@ -327,13 +327,13 @@ mod tests {
 
         let mut old = ParsedCode::new("fn a() {}", "rust");
         old.entities
-            .push(CodeEntity::new(EntityKind::Function, "a", test_span()));
+            .push(Entity::new(EntityKind::Function, "a", test_span()));
 
         let mut new = ParsedCode::new("fn a() {} fn b() {}", "rust");
         new.entities
-            .push(CodeEntity::new(EntityKind::Function, "a", test_span()));
+            .push(Entity::new(EntityKind::Function, "a", test_span()));
         new.entities
-            .push(CodeEntity::new(EntityKind::Function, "b", test_span()));
+            .push(Entity::new(EntityKind::Function, "b", test_span()));
 
         let diff = algebra.semantic_diff(&old, &new);
         // There should be some change

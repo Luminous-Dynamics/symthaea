@@ -15,8 +15,8 @@ use winterfell::{
 };
 
 use crate::air::{
-    columns, decompose_to_bits, scale_value, KVectorPublicInputs, KVectorRangeAir,
-    BITS_PER_VALUE, NUM_COMPONENTS, TRACE_LENGTH,
+    columns, decompose_to_bits, scale_value, KVectorPublicInputs, KVectorRangeAir, BITS_PER_VALUE,
+    NUM_COMPONENTS, TRACE_LENGTH,
 };
 use crate::error::{ZkpError, ZkpResult};
 
@@ -59,7 +59,14 @@ impl KVectorWitness {
     /// Convert to array
     pub fn to_array(&self) -> [f32; 8] {
         [
-            self.k_r, self.k_a, self.k_i, self.k_p, self.k_m, self.k_s, self.k_h, self.k_topo,
+            self.k_r,
+            self.k_a,
+            self.k_i,
+            self.k_p,
+            self.k_m,
+            self.k_s,
+            self.k_h,
+            self.k_topo,
         ]
     }
 
@@ -98,14 +105,16 @@ impl KVectorWitness {
         // NaN/Inf values can bypass constraint validation and create invalid proofs
         for (name, value) in components {
             if value.is_nan() {
-                return Err(ZkpError::DegenerateInput(
-                    format!("component {} is NaN - invalid for ZK proofs", name),
-                ));
+                return Err(ZkpError::DegenerateInput(format!(
+                    "component {} is NaN - invalid for ZK proofs",
+                    name
+                )));
             }
             if value.is_infinite() {
-                return Err(ZkpError::DegenerateInput(
-                    format!("component {} is infinite - invalid for ZK proofs", name),
-                ));
+                return Err(ZkpError::DegenerateInput(format!(
+                    "component {} is infinite - invalid for ZK proofs",
+                    name
+                )));
             }
             if !(0.0..=1.0).contains(&value) {
                 return Err(ZkpError::ValueOutOfRange {
@@ -141,19 +150,16 @@ impl KVectorWitness {
         // M-05: Check for very low variance (near-degenerate case)
         // Low variance means values are clustered, which can reduce constraint effectiveness
         let mean: f32 = values.iter().sum::<f32>() / values.len() as f32;
-        let variance: f32 = values.iter()
-            .map(|&v| (v - mean).powi(2))
-            .sum::<f32>() / values.len() as f32;
+        let variance: f32 =
+            values.iter().map(|&v| (v - mean).powi(2)).sum::<f32>() / values.len() as f32;
 
         // Minimum variance threshold - if all values are within 0.01 of each other
         const MIN_VARIANCE: f32 = 0.0001; // (0.01)^2
         if variance < MIN_VARIANCE && mean > 0.01 {
-            return Err(ZkpError::DegenerateInput(
-                format!(
-                    "K-Vector variance too low ({:.6}) - values are too similar for sound proofs",
-                    variance
-                ),
-            ));
+            return Err(ZkpError::DegenerateInput(format!(
+                "K-Vector variance too low ({:.6}) - values are too similar for sound proofs",
+                variance
+            )));
         }
 
         // M-05: Check for extreme skew (all values near 0 or all near 1)
@@ -246,7 +252,11 @@ impl KVectorTrace {
             }
 
             // Verify accumulated equals target
-            debug_assert_eq!(accumulated, scaled[comp], "Bit reconstruction failed for component {}", comp);
+            debug_assert_eq!(
+                accumulated, scaled[comp],
+                "Bit reconstruction failed for component {}",
+                comp
+            );
         }
 
         // Pad remaining rows to reach TRACE_LENGTH (power of 2)
@@ -335,14 +345,14 @@ impl KVectorProver {
     pub fn new() -> Self {
         Self {
             options: ProofOptions::new(
-                32,                              // number of queries
-                8,                               // blowup factor
-                0,                               // grinding factor
+                32, // number of queries
+                8,  // blowup factor
+                0,  // grinding factor
                 winterfell::FieldExtension::None,
-                8,                               // FRI folding factor
-                31,                              // FRI max remainder polynomial degree
-                BatchingMethod::Linear,          // trace batching
-                BatchingMethod::Linear,          // constraint batching
+                8,                      // FRI folding factor
+                31,                     // FRI max remainder polynomial degree
+                BatchingMethod::Linear, // trace batching
+                BatchingMethod::Linear, // constraint batching
             ),
         }
     }
@@ -428,7 +438,11 @@ impl Prover for KVectorProver {
         aux_rand_elements: Option<winterfell::AuxRandElements<E>>,
         composition_coefficients: winterfell::ConstraintCompositionCoefficients<E>,
     ) -> Self::ConstraintEvaluator<'a, E> {
-        winterfell::DefaultConstraintEvaluator::new(air, aux_rand_elements, composition_coefficients)
+        winterfell::DefaultConstraintEvaluator::new(
+            air,
+            aux_rand_elements,
+            composition_coefficients,
+        )
     }
 }
 
@@ -646,13 +660,25 @@ mod tests {
 
         // Check last computation row (before padding)
         let last_comp = COMPUTATION_STEPS - 1; // Row 111
-        assert_eq!(main.get(columns::STEP, last_comp), BaseElement::from(last_comp as u64));
-        assert_eq!(main.get(columns::COMPONENT, last_comp), BaseElement::from(7u64));
-        assert_eq!(main.get(columns::BIT_INDEX, last_comp), BaseElement::from(13u64));
+        assert_eq!(
+            main.get(columns::STEP, last_comp),
+            BaseElement::from(last_comp as u64)
+        );
+        assert_eq!(
+            main.get(columns::COMPONENT, last_comp),
+            BaseElement::from(7u64)
+        );
+        assert_eq!(
+            main.get(columns::BIT_INDEX, last_comp),
+            BaseElement::from(13u64)
+        );
 
         // Check that padding rows exist and have valid values
         let last_trace = TRACE_LENGTH - 1;
-        assert_eq!(main.get(columns::STEP, last_trace), BaseElement::from(last_trace as u64));
+        assert_eq!(
+            main.get(columns::STEP, last_trace),
+            BaseElement::from(last_trace as u64)
+        );
     }
 
     #[test]

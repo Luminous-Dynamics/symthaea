@@ -1,5 +1,5 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Prismatic joint (slider): constrains motion to a single axis.
 //!
@@ -163,10 +163,18 @@ impl<const D: usize> Constraint<D> for PrismaticJoint<D> {
                 }
                 let correction = rel * self.stiffness * 0.5;
                 if body_a.is_dynamic() {
-                    body_a.angular_velocity.set(i, j, body_a.angular_velocity.get(i, j) + correction);
+                    body_a.angular_velocity.set(
+                        i,
+                        j,
+                        body_a.angular_velocity.get(i, j) + correction,
+                    );
                 }
                 if body_b.is_dynamic() {
-                    body_b.angular_velocity.set(i, j, body_b.angular_velocity.get(i, j) - correction);
+                    body_b.angular_velocity.set(
+                        i,
+                        j,
+                        body_b.angular_velocity.get(i, j) - correction,
+                    );
                 }
             }
         }
@@ -185,12 +193,8 @@ mod tests {
             Point::origin(),
             Box::new(symtropy_math::Sphere::new(Point::origin(), 0.1)),
         );
-        let mut b = RigidBody::<3>::dynamic_sphere(
-            BodyHandle(1),
-            Point::new([2.0, 3.0, 0.0]),
-            0.5,
-            1.0,
-        );
+        let mut b =
+            RigidBody::<3>::dynamic_sphere(BodyHandle(1), Point::new([2.0, 3.0, 0.0]), 0.5, 1.0);
 
         // Prismatic along X — Y should be corrected to 0, X preserved
         let joint = PrismaticJoint::new(BodyHandle(0), BodyHandle(1), 0);
@@ -220,25 +224,17 @@ mod tests {
             Point::origin(),
             Box::new(symtropy_math::Sphere::new(Point::origin(), 0.1)),
         );
-        let mut b = RigidBody::<3>::dynamic_sphere(
-            BodyHandle(1),
-            Point::new([10.0, 0.0, 0.0]),
-            0.5,
-            1.0,
-        );
+        let mut b =
+            RigidBody::<3>::dynamic_sphere(BodyHandle(1), Point::new([10.0, 0.0, 0.0]), 0.5, 1.0);
 
-        let joint = PrismaticJoint::new(BodyHandle(0), BodyHandle(1), 0)
-            .with_limits(-2.0, 5.0);
+        let joint = PrismaticJoint::new(BodyHandle(0), BodyHandle(1), 0).with_limits(-2.0, 5.0);
 
         for _ in 0..30 {
             joint.solve(&mut a, &mut b, 0.016);
         }
 
         let x = b.transform.translation.coord(0);
-        assert!(
-            x <= 5.5,
-            "X should be clamped to max 5.0, got {x}"
-        );
+        assert!(x <= 5.5, "X should be clamped to max 5.0, got {x}");
     }
 
     #[test]
@@ -248,12 +244,7 @@ mod tests {
             Point::origin(),
             Box::new(symtropy_math::Sphere::new(Point::origin(), 0.1)),
         );
-        let mut b = RigidBody::<3>::dynamic_sphere(
-            BodyHandle(1),
-            Point::origin(),
-            0.5,
-            1.0,
-        );
+        let mut b = RigidBody::<3>::dynamic_sphere(BodyHandle(1), Point::origin(), 0.5, 1.0);
         b.linear_velocity = SVector::from([0.0, 10.0, 5.0]); // perpendicular velocity
 
         let joint = PrismaticJoint::new(BodyHandle(0), BodyHandle(1), 0);

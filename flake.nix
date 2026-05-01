@@ -113,6 +113,8 @@
           ] ++ (with pkgs; [
             # Common tools across all projects
             nodejs_20
+            bacon
+            cargo-nextest
 
             # Linker (required by symthaea/.cargo/config.toml: -fuse-ld=mold)
             mold
@@ -128,6 +130,8 @@
             # Nix tooling
             nixfmt
             nil  # Nix LSP
+            deploy-rs
+            colmena
 
             # libclang (needed by sweettest / bindgen for Holochain WASM builds)
             llvmPackages.libclang
@@ -178,6 +182,8 @@
             echo "  lum-start  - Start all services"
             echo "  lum-status - Connect to overmind"
             echo "  lum-stop   - Stop all services"
+            echo "  bacon      - Run repo watch jobs from ./bacon.toml"
+            echo "  cargo nextest run - Faster Rust test runner"
             echo ""
             echo "🌊 We flow with Nix!"
 
@@ -197,6 +203,34 @@
             export PGHOST="localhost"
             export PGUSER="$USER"
             export PGDATABASE="luminous"
+
+            lum_check_sensorium() {
+              cargo check --manifest-path "$LUMINOUS_ROOT/mycelix-sensorium/Cargo.toml" "$@"
+            }
+
+            lum_check_personal() {
+              cargo check --manifest-path "$LUMINOUS_ROOT/mycelix-personal/apps/leptos/Cargo.toml" "$@"
+            }
+
+            lum_check_commons() {
+              cargo check --manifest-path "$LUMINOUS_ROOT/mycelix-commons/apps/leptos/Cargo.toml" "$@"
+            }
+
+            lum_check_health() {
+              cargo check --manifest-path "$LUMINOUS_ROOT/mycelix-health/Cargo.toml" "$@"
+            }
+
+            lum_check_finance() {
+              cargo check --manifest-path "$LUMINOUS_ROOT/mycelix-finance/Cargo.toml" "$@"
+            }
+
+            lum_check_knowledge() {
+              cargo check --manifest-path "$LUMINOUS_ROOT/mycelix-knowledge/Cargo.toml" "$@"
+            }
+
+            lum_check_pulse() {
+              cargo check --manifest-path "$LUMINOUS_ROOT/mycelix-workspace/mycelix-pulse/apps/leptos/Cargo.toml" "$@"
+            }
           '';
         };
 

@@ -1,0 +1,145 @@
+{
+  "metadata": {
+    "title": "Omnibus Professional Seed: High-Demand Gateway Standards",
+    "framework": "Global Omnibus Mesh",
+    "source": "https://mycelix.org/certs-omnibus",
+    "grade_level": "Professional/Entry",
+    "subject_area": "Multi-Sector",
+    "domain": "Professional Certification",
+    "version": "1.0",
+    "total_standards": 10,
+    "domains": [
+      "IT & Networking",
+      "Digital Marketing",
+      "Advanced Safety",
+      "Finance Foundations",
+      "Zero Waste"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "The final omnibus of essential gateway certifications for the modern economy."
+  },
+  "nodes": [
+    {
+      "id": "CERT-IT-COMPTIA-A",
+      "title": "CompTIA A+ (220-1101/1102 Mapping)",
+      "description": "The industry standard for establishing a career in IT. Hardware, networking, mobile devices, operating systems, and security troubleshooting.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "IT & Networking",
+      "subdomain": "Certification Bridge",
+      "tags": ["comptia", "a+", "it-support", "standard"],
+      "estimated_hours": 180,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "CompTIA",
+          "code": "220-1101",
+          "description": "CompTIA A+ Core 1",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "CERT-IT-COMPTIA-NET",
+      "title": "CompTIA Network+ (N10-008 Mapping)",
+      "description": "Essential networking knowledge. Network architecture, operations, security, and troubleshooting on physical and virtual networks.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "IT & Networking",
+      "subdomain": "Certification Bridge",
+      "tags": ["comptia", "network+", "networking", "standard"],
+      "estimated_hours": 120,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "CERT-MKT-HUBSPOT",
+      "title": "HubSpot Content Marketing Certification",
+      "description": "Content creation, promotion, and analysis. Inbound marketing strategy and storytelling for the digital mesh.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Digital Marketing",
+      "subdomain": "Certification Bridge",
+      "tags": ["hubspot", "marketing", "content", "standard"],
+      "estimated_hours": 20,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Social Studies"
+    },
+    {
+      "id": "CERT-OSHA-30",
+      "title": "OSHA 30-Hour General Industry Safety",
+      "description": "Comprehensive safety for supervisors and workers. Hazard recognition, avoidance, and prevention across all industrial sectors.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Advanced Safety",
+      "subdomain": "Certification Bridge",
+      "tags": ["osha", "safety", "industrial", "standard"],
+      "estimated_hours": 30,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Evaluate",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "CERT-FIN-SIE",
+      "title": "FINRA Securities Industry Essentials (SIE)",
+      "description": "Foundational knowledge of the securities industry. Products, risks, and regulatory agencies. Mapping sovereign treasury logic to securities law.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Finance Foundations",
+      "subdomain": "Certification Bridge",
+      "tags": ["finra", "sie", "finance", "standard"],
+      "estimated_hours": 60,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Understand",
+      "subject_area": "Social Studies"
+    },
+    {
+      "id": "CERT-SUST-TRUE",
+      "title": "TRUE Advisor (Zero Waste Professional)",
+      "description": "Standard for resource management and zero waste. Strategies for total material closure and circular economic operations.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Zero Waste",
+      "subdomain": "Certification Bridge",
+      "tags": ["sustainability", "zero-waste", "circular-economy", "standard"],
+      "estimated_hours": 45,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Science"
+    }
+  ],
+  "edges": [
+    {
+      "from": "CERT-IT-GOOGLE-SUPPORT",
+      "to": "CERT-IT-COMPTIA-A",
+      "edge_type": "Recommended",
+      "strength_permille": 950,
+      "rationale": "Google IT Support mastery covers 95% of the CompTIA A+ core domains."
+    },
+    {
+      "from": "CERT-IT-COMPTIA-A",
+      "to": "CERT-IT-COMPTIA-NET",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Network+ assumes mastery of basic hardware and OS troubleshooting found in A+."
+    },
+    {
+      "from": "CERT-OSHA-10",
+      "to": "CERT-OSHA-30",
+      "edge_type": "Requires",
+      "strength_permille": 1000,
+      "rationale": "Advanced OSHA 30 requires the foundational 10-hour outreach as a prerequisite."
+    },
+    {
+      "from": "VOC-MAT-101",
+      "to": "CERT-SUST-TRUE",
+      "edge_type": "Recommended",
+      "strength_permille": 700,
+      "rationale": "Polymer sorting and detritivore feeding provide the practical intuition for zero-waste management."
+    }
+  ]
+}

@@ -100,7 +100,10 @@ pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
 
 /// L2 (Euclidean) norm of a vector.
 pub fn l2_norm(v: &[f32]) -> f64 {
-    v.iter().map(|&x| (x as f64) * (x as f64)).sum::<f64>().sqrt()
+    v.iter()
+        .map(|&x| (x as f64) * (x as f64))
+        .sum::<f64>()
+        .sqrt()
 }
 
 /// L2 (Euclidean) distance between two vectors.

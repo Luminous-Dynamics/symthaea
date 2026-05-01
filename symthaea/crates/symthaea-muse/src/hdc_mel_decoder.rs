@@ -58,15 +58,22 @@ pub struct MelDecoder {
     // Adam state (used iff `use_adam`)
     use_adam: bool,
     t: u64,
-    w1_m: Vec<f32>, w1_v: Vec<f32>,
-    b1_m: Vec<f32>, b1_v: Vec<f32>,
-    w2_m: Vec<f32>, w2_v: Vec<f32>,
-    b2_m: Vec<f32>, b2_v: Vec<f32>,
+    w1_m: Vec<f32>,
+    w1_v: Vec<f32>,
+    b1_m: Vec<f32>,
+    b1_v: Vec<f32>,
+    w2_m: Vec<f32>,
+    w2_v: Vec<f32>,
+    b2_m: Vec<f32>,
+    b2_v: Vec<f32>,
 
     // Persistent gradient buffers (reused across steps to avoid allocation).
-    dw1: Vec<f32>, db1: Vec<f32>,
-    dw2: Vec<f32>, db2: Vec<f32>,
-    da1: Vec<f32>, dz1: Vec<f32>,
+    dw1: Vec<f32>,
+    db1: Vec<f32>,
+    dw2: Vec<f32>,
+    db2: Vec<f32>,
+    da1: Vec<f32>,
+    dz1: Vec<f32>,
 }
 
 impl MelDecoder {
@@ -98,15 +105,34 @@ impl MelDecoder {
         let da1 = vec![0.0; cfg.hidden];
         let dz1 = vec![0.0; cfg.hidden];
         Self {
-            cfg, w1, b1, w2, b2,
-            use_adam: false, t: 0,
-            w1_m, w1_v, b1_m, b1_v, w2_m, w2_v, b2_m, b2_v,
-            dw1, db1, dw2, db2, da1, dz1,
+            cfg,
+            w1,
+            b1,
+            w2,
+            b2,
+            use_adam: false,
+            t: 0,
+            w1_m,
+            w1_v,
+            b1_m,
+            b1_v,
+            w2_m,
+            w2_v,
+            b2_m,
+            b2_v,
+            dw1,
+            db1,
+            dw2,
+            db2,
+            da1,
+            dz1,
         }
     }
 
     /// Switch the optimizer to Adam. Call before `step()`.
-    pub fn enable_adam(&mut self) { self.use_adam = true; }
+    pub fn enable_adam(&mut self) {
+        self.use_adam = true;
+    }
 
     /// Forward pass. Returns (hidden_pre_relu, hidden_post_relu, mel_pred).
     pub fn forward(&self, state: &[f32]) -> (Vec<f32>, Vec<f32>, Vec<f32>) {
@@ -166,7 +192,9 @@ impl MelDecoder {
         loss *= inv_m;
 
         // Gradient buffers live on self and are reused. Clear da1 in place.
-        for i in 0..h { self.da1[i] = 0.0; }
+        for i in 0..h {
+            self.da1[i] = 0.0;
+        }
         for i in 0..h {
             for j in 0..m {
                 let idx = i * m + j;
@@ -194,15 +222,51 @@ impl MelDecoder {
 
         if self.use_adam {
             self.t += 1;
-            adam_update(&mut self.w1, &mut self.w1_m, &mut self.w1_v, &self.dw1, lr, self.t);
-            adam_update(&mut self.b1, &mut self.b1_m, &mut self.b1_v, &self.db1, lr, self.t);
-            adam_update(&mut self.w2, &mut self.w2_m, &mut self.w2_v, &self.dw2, lr, self.t);
-            adam_update(&mut self.b2, &mut self.b2_m, &mut self.b2_v, &self.db2, lr, self.t);
+            adam_update(
+                &mut self.w1,
+                &mut self.w1_m,
+                &mut self.w1_v,
+                &self.dw1,
+                lr,
+                self.t,
+            );
+            adam_update(
+                &mut self.b1,
+                &mut self.b1_m,
+                &mut self.b1_v,
+                &self.db1,
+                lr,
+                self.t,
+            );
+            adam_update(
+                &mut self.w2,
+                &mut self.w2_m,
+                &mut self.w2_v,
+                &self.dw2,
+                lr,
+                self.t,
+            );
+            adam_update(
+                &mut self.b2,
+                &mut self.b2_m,
+                &mut self.b2_v,
+                &self.db2,
+                lr,
+                self.t,
+            );
         } else {
-            for i in 0..self.dw1.len() { self.w1[i] -= lr * self.dw1[i]; }
-            for i in 0..self.db1.len() { self.b1[i] -= lr * self.db1[i]; }
-            for i in 0..self.dw2.len() { self.w2[i] -= lr * self.dw2[i]; }
-            for i in 0..self.db2.len() { self.b2[i] -= lr * self.db2[i]; }
+            for i in 0..self.dw1.len() {
+                self.w1[i] -= lr * self.dw1[i];
+            }
+            for i in 0..self.db1.len() {
+                self.b1[i] -= lr * self.db1[i];
+            }
+            for i in 0..self.dw2.len() {
+                self.w2[i] -= lr * self.dw2[i];
+            }
+            for i in 0..self.db2.len() {
+                self.b2[i] -= lr * self.db2[i];
+            }
         }
 
         loss
@@ -222,7 +286,13 @@ impl MelDecoder {
         ] {
             f.write_all(&v.to_le_bytes())?;
         }
-        for v in self.w1.iter().chain(self.b1.iter()).chain(self.w2.iter()).chain(self.b2.iter()) {
+        for v in self
+            .w1
+            .iter()
+            .chain(self.b1.iter())
+            .chain(self.w2.iter())
+            .chain(self.b2.iter())
+        {
             f.write_all(&v.to_le_bytes())?;
         }
         Ok(())
@@ -237,7 +307,12 @@ impl MelDecoder {
         let state_dim = u32::from_le_bytes(header[0..4].try_into().unwrap()) as usize;
         let hidden = u32::from_le_bytes(header[4..8].try_into().unwrap()) as usize;
         let n_mels = u32::from_le_bytes(header[8..12].try_into().unwrap()) as usize;
-        let cfg = DecoderConfig { state_dim, hidden, n_mels, ..Default::default() };
+        let cfg = DecoderConfig {
+            state_dim,
+            hidden,
+            n_mels,
+            ..Default::default()
+        };
 
         let read_vec = |f: &mut std::fs::File, n: usize| -> std::io::Result<Vec<f32>> {
             let mut buf = vec![0u8; n * 4];
@@ -266,10 +341,27 @@ impl MelDecoder {
         let da1 = vec![0.0; hidden];
         let dz1 = vec![0.0; hidden];
         Ok(Self {
-            cfg, w1, b1, w2, b2,
-            use_adam: false, t: 0,
-            w1_m, w1_v, b1_m, b1_v, w2_m, w2_v, b2_m, b2_v,
-            dw1, db1, dw2, db2, da1, dz1,
+            cfg,
+            w1,
+            b1,
+            w2,
+            b2,
+            use_adam: false,
+            t: 0,
+            w1_m,
+            w1_v,
+            b1_m,
+            b1_v,
+            w2_m,
+            w2_v,
+            b2_m,
+            b2_v,
+            dw1,
+            db1,
+            dw2,
+            db2,
+            da1,
+            dz1,
         })
     }
 }
@@ -315,7 +407,12 @@ mod tests {
 
     #[test]
     fn decoder_shapes_match_config() {
-        let cfg = DecoderConfig { state_dim: 17, hidden: 32, n_mels: 64, ..Default::default() };
+        let cfg = DecoderConfig {
+            state_dim: 17,
+            hidden: 32,
+            n_mels: 64,
+            ..Default::default()
+        };
         let dec = MelDecoder::new(cfg);
         assert_eq!(dec.w1.len(), 17 * 32);
         assert_eq!(dec.b1.len(), 32);
@@ -328,7 +425,13 @@ mod tests {
     #[test]
     fn single_sample_overfits() {
         // A baseline sanity check: can we drive loss to ~0 on one example?
-        let cfg = DecoderConfig { state_dim: 4, hidden: 16, n_mels: 8, lr: 0.1, seed: 1 };
+        let cfg = DecoderConfig {
+            state_dim: 4,
+            hidden: 16,
+            n_mels: 8,
+            lr: 0.1,
+            seed: 1,
+        };
         let mut dec = MelDecoder::new(cfg);
         let state = vec![0.3, -0.1, 0.7, 0.5];
         let target = vec![-2.0, -1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5];
@@ -345,7 +448,13 @@ mod tests {
 
     #[test]
     fn adam_converges_faster_than_sgd_on_single_sample() {
-        let cfg = DecoderConfig { state_dim: 4, hidden: 16, n_mels: 8, lr: 0.01, seed: 1 };
+        let cfg = DecoderConfig {
+            state_dim: 4,
+            hidden: 16,
+            n_mels: 8,
+            lr: 0.01,
+            seed: 1,
+        };
         let mut sgd = MelDecoder::new(cfg.clone());
         let mut adam = MelDecoder::new(cfg);
         adam.enable_adam();
@@ -365,7 +474,12 @@ mod tests {
 
     #[test]
     fn save_load_roundtrip() {
-        let cfg = DecoderConfig { state_dim: 4, hidden: 8, n_mels: 6, ..Default::default() };
+        let cfg = DecoderConfig {
+            state_dim: 4,
+            hidden: 8,
+            n_mels: 6,
+            ..Default::default()
+        };
         let mut dec = MelDecoder::new(cfg);
         // Perturb weights
         for _ in 0..10 {

@@ -23,6 +23,7 @@ const E_CHARGE: f64 = 1.602_176_634e-19;
 /// Electron mass (kg)
 const M_ELECTRON: f64 = 9.109_383_702e-31;
 /// Proton mass (kg)
+#[allow(dead_code)]
 const M_PROTON: f64 = 1.672_621_924e-27;
 
 /// Debye length: λ_D = √(ε₀ k_B T / (n e²))

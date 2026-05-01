@@ -9,7 +9,7 @@
 //! This is the critical gap: individual robotics crates have strong unit tests
 //! (1,366 total) but none verify the full cognitive-embodiment feedback loop.
 //!
-//! Run: `cargo test --features humanoid,helicopter,flight,vehicle --test robotics_integration`
+//! Run: `cargo test --features humanoid,helicopter,multirotor,vehicle --test robotics_integration`
 
 use symthaea::cognitive_loop::motor_bridge::{
     EmbodimentBridge, EmbodimentPlatform, MotorSafetyLevel,
@@ -589,7 +589,7 @@ fn test_cascading_phi_collapse_humanoid() {
 #[cfg(feature = "flight")]
 #[test]
 fn test_cascading_phi_collapse_quadrotor() {
-    use symthaea_flight::embodiment::FlightEmbodiment;
+    use symthaea_multirotor::embodiment::FlightEmbodiment;
 
     let genesis = GenesisSeed::from_phrase("cascade-flight");
     let mut bridge = FlightEmbodiment::new(&genesis);
@@ -758,7 +758,7 @@ fn test_asymmetric_degradation_humanoid_isolated() {
 #[cfg(feature = "flight")]
 #[test]
 fn test_asymmetric_degradation_cross_platform() {
-    use symthaea_flight::embodiment::FlightEmbodiment;
+    use symthaea_multirotor::embodiment::FlightEmbodiment;
 
     let genesis = GenesisSeed::from_phrase("asymmetric-cross");
     let mut humanoid = symthaea::cognitive_loop::motor_bridge::MotorBridge::new(&genesis);
@@ -819,7 +819,7 @@ fn test_rapid_phi_oscillation_humanoid() {
 #[cfg(feature = "flight")]
 #[test]
 fn test_rapid_phi_oscillation_quadrotor() {
-    use symthaea_flight::embodiment::FlightEmbodiment;
+    use symthaea_multirotor::embodiment::FlightEmbodiment;
 
     let genesis = GenesisSeed::from_phrase("oscillation-flight");
     let mut bridge = FlightEmbodiment::new(&genesis);
@@ -915,7 +915,7 @@ fn test_nan_phi_humanoid_bridge_no_panic() {
 #[cfg(feature = "flight")]
 #[test]
 fn test_nan_phi_quadrotor_no_panic() {
-    use symthaea_flight::embodiment::FlightEmbodiment;
+    use symthaea_multirotor::embodiment::FlightEmbodiment;
 
     let genesis = GenesisSeed::from_phrase("nan-flight");
     let mut bridge = FlightEmbodiment::new(&genesis);
@@ -1105,7 +1105,7 @@ fn test_recovery_from_red_humanoid() {
 #[cfg(feature = "flight")]
 #[test]
 fn test_recovery_from_red_quadrotor() {
-    use symthaea_flight::embodiment::FlightEmbodiment;
+    use symthaea_multirotor::embodiment::FlightEmbodiment;
 
     let genesis = GenesisSeed::from_phrase("recovery-flight");
     let mut bridge = FlightEmbodiment::new(&genesis);
@@ -1228,7 +1228,7 @@ fn test_infinity_phi_humanoid_bridge_no_panic() {
 #[cfg(feature = "flight")]
 #[test]
 fn test_infinity_phi_quadrotor_no_panic() {
-    use symthaea_flight::embodiment::FlightEmbodiment;
+    use symthaea_multirotor::embodiment::FlightEmbodiment;
 
     let genesis = GenesisSeed::from_phrase("inf-flight");
     let mut bridge = FlightEmbodiment::new(&genesis);
@@ -1297,9 +1297,9 @@ fn test_all_platforms_same_safety_at_same_phi() {
 ))]
 #[test]
 fn test_six_platforms_same_safety_at_same_phi() {
-    use symthaea_flight::embodiment::FlightEmbodiment;
     use symthaea_helicopter::embodiment::HelicopterEmbodiment;
     use symthaea_manipulator::embodiment::ManipulatorEmbodiment;
+    use symthaea_multirotor::embodiment::FlightEmbodiment;
     use symthaea_vehicle::embodiment::VehicleEmbodiment;
 
     let genesis = GenesisSeed::from_phrase("six-platform-consistency");
@@ -1395,7 +1395,7 @@ fn test_zero_dt_humanoid_no_panic() {
 #[cfg(feature = "flight")]
 #[test]
 fn test_zero_dt_quadrotor_no_panic() {
-    use symthaea_flight::embodiment::FlightEmbodiment;
+    use symthaea_multirotor::embodiment::FlightEmbodiment;
 
     let genesis = GenesisSeed::from_phrase("zero-dt-flight");
     let mut bridge = FlightEmbodiment::new(&genesis);
@@ -1492,7 +1492,7 @@ fn test_large_dt_humanoid_no_overflow() {
 #[cfg(feature = "flight")]
 #[test]
 fn test_large_dt_quadrotor_no_overflow() {
-    use symthaea_flight::embodiment::FlightEmbodiment;
+    use symthaea_multirotor::embodiment::FlightEmbodiment;
 
     let genesis = GenesisSeed::from_phrase("large-dt-flight");
     let mut bridge = FlightEmbodiment::new(&genesis);
@@ -1571,7 +1571,7 @@ fn test_sustained_red_humanoid_1000_cycles() {
 #[cfg(feature = "flight")]
 #[test]
 fn test_sustained_red_quadrotor_1000_cycles() {
-    use symthaea_flight::embodiment::FlightEmbodiment;
+    use symthaea_multirotor::embodiment::FlightEmbodiment;
 
     let genesis = GenesisSeed::from_phrase("sustained-red-flight");
     let mut bridge = FlightEmbodiment::new(&genesis);
@@ -1659,7 +1659,7 @@ fn test_safety_override_does_not_downgrade() {
 #[cfg(feature = "flight")]
 #[test]
 fn test_safety_override_quadrotor() {
-    use symthaea_flight::embodiment::{FlightEmbodiment, MotorSafetyLevel as FlightSafety};
+    use symthaea_multirotor::embodiment::{FlightEmbodiment, MotorSafetyLevel as FlightSafety};
 
     let genesis = GenesisSeed::from_phrase("override-flight");
     let mut bridge = FlightEmbodiment::new(&genesis);
@@ -2229,7 +2229,7 @@ fn test_all_safety_levels_consistent_direct_humanoid() {
 #[cfg(feature = "flight")]
 #[test]
 fn test_all_safety_levels_consistent_direct_flight() {
-    use symthaea_flight::embodiment::FlightEmbodiment;
+    use symthaea_multirotor::embodiment::FlightEmbodiment;
 
     let genesis = GenesisSeed::from_phrase("cross-platform-safety");
     let mut bridge = FlightEmbodiment::new(&genesis);
@@ -2398,7 +2398,7 @@ fn test_safety_override_cross_platform_humanoid() {
 #[cfg(feature = "flight")]
 #[test]
 fn test_safety_override_cross_platform_flight() {
-    use symthaea_flight::embodiment::{FlightEmbodiment, MotorSafetyLevel as FlightSafety};
+    use symthaea_multirotor::embodiment::{FlightEmbodiment, MotorSafetyLevel as FlightSafety};
 
     let genesis = GenesisSeed::from_phrase("override-test");
     let mut bridge = FlightEmbodiment::new(&genesis);
@@ -2568,9 +2568,9 @@ fn test_safety_override_cross_platform_auv() {
 #[test]
 fn test_cross_platform_identical_phi_collapse_direct() {
     use symthaea_auv::embodiment::AuvEmbodiment;
-    use symthaea_flight::embodiment::FlightEmbodiment;
     use symthaea_helicopter::embodiment::HelicopterEmbodiment;
     use symthaea_manipulator::embodiment::ManipulatorEmbodiment;
+    use symthaea_multirotor::embodiment::FlightEmbodiment;
     use symthaea_vehicle::embodiment::VehicleEmbodiment;
 
     let genesis = GenesisSeed::from_phrase("cross-platform-collapse");

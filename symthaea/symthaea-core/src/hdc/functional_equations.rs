@@ -258,8 +258,7 @@ pub fn cauchy_residual(samples: &[(f64, f64)]) -> f64 {
             let (xi, fi) = samples[i];
             let (xj, fj) = samples[j];
             let target = xi + xj;
-            if let Some(&(_, ftarget)) = samples.iter().find(|(x, _)| (x - target).abs() < FE_EPS)
-            {
+            if let Some(&(_, ftarget)) = samples.iter().find(|(x, _)| (x - target).abs() < FE_EPS) {
                 let resid = (ftarget - (fi + fj)).abs();
                 if resid > max_resid {
                     max_resid = resid;
@@ -287,8 +286,7 @@ pub fn multiplicative_residual(samples: &[(f64, f64)]) -> f64 {
                 continue;
             }
             let target = xi * xj;
-            if let Some(&(_, ftarget)) = samples.iter().find(|(x, _)| (x - target).abs() < FE_EPS)
-            {
+            if let Some(&(_, ftarget)) = samples.iter().find(|(x, _)| (x - target).abs() < FE_EPS) {
                 let resid = (ftarget - (fi * fj)).abs();
                 if resid > max_resid {
                     max_resid = resid;
@@ -313,8 +311,7 @@ pub fn exponential_residual(samples: &[(f64, f64)]) -> f64 {
             let (xi, fi) = samples[i];
             let (xj, fj) = samples[j];
             let target = xi + xj;
-            if let Some(&(_, ftarget)) = samples.iter().find(|(x, _)| (x - target).abs() < FE_EPS)
-            {
+            if let Some(&(_, ftarget)) = samples.iter().find(|(x, _)| (x - target).abs() < FE_EPS) {
                 let resid = (ftarget - (fi * fj)).abs();
                 if resid > max_resid {
                     max_resid = resid;
@@ -342,8 +339,7 @@ pub fn logarithmic_residual(samples: &[(f64, f64)]) -> f64 {
                 continue;
             }
             let target = xi * xj;
-            if let Some(&(_, ftarget)) = samples.iter().find(|(x, _)| (x - target).abs() < FE_EPS)
-            {
+            if let Some(&(_, ftarget)) = samples.iter().find(|(x, _)| (x - target).abs() < FE_EPS) {
                 let resid = (ftarget - (fi + fj)).abs();
                 if resid > max_resid {
                     max_resid = resid;
@@ -416,11 +412,7 @@ fn fit_exponential(samples: &[(f64, f64)]) -> Option<(f64, f64)> {
 /// Fit `f(x) = c·log(x)` to positive samples (natural log) by least-squares
 /// through origin in `(log x, f)` space.
 fn fit_logarithmic(samples: &[(f64, f64)]) -> Option<(f64, f64)> {
-    let positive: Vec<(f64, f64)> = samples
-        .iter()
-        .copied()
-        .filter(|(x, _)| *x > 0.0)
-        .collect();
+    let positive: Vec<(f64, f64)> = samples.iter().copied().filter(|(x, _)| *x > 0.0).collect();
     if positive.len() < 2 {
         return None;
     }
@@ -456,7 +448,10 @@ pub fn classify(samples: &[(f64, f64)]) -> Classification {
     let scale = y_scale(samples).max(1.0);
 
     // Constant check: max y minus min y near zero.
-    let y_min = samples.iter().map(|(_, y)| *y).fold(f64::INFINITY, f64::min);
+    let y_min = samples
+        .iter()
+        .map(|(_, y)| *y)
+        .fold(f64::INFINITY, f64::min);
     let y_max = samples
         .iter()
         .map(|(_, y)| *y)
@@ -801,8 +796,14 @@ mod tests {
         // assumption — the witness must reference it explicitly so
         // a downstream proof checker knows what's being assumed.
         let w = EquationKind::CauchyAdditive.uniqueness_witness();
-        assert!(w.contains("continuous"), "Cauchy witness must mention continuity assumption");
-        assert!(w.contains("Hamel"), "Cauchy witness must call out the pathological-solutions caveat");
+        assert!(
+            w.contains("continuous"),
+            "Cauchy witness must mention continuity assumption"
+        );
+        assert!(
+            w.contains("Hamel"),
+            "Cauchy witness must call out the pathological-solutions caveat"
+        );
     }
 
     #[test]
@@ -811,7 +812,10 @@ mod tests {
         // trivial solution; the witness must enumerate this branch
         // before deriving the canonical f(x) = a^x.
         let w = EquationKind::Exponential.uniqueness_witness();
-        assert!(w.contains("f(0) = 0"), "Exponential witness must address the f≡0 branch");
+        assert!(
+            w.contains("f(0) = 0"),
+            "Exponential witness must address the f≡0 branch"
+        );
         assert!(w.contains("a^x") || w.contains("e^"));
     }
 

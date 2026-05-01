@@ -1,5 +1,5 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Broadphase collision detection via LBVH (Linear Bounding Volume Hierarchy).
 //!
@@ -11,8 +11,8 @@
 //! Morton codes use integer quantization, avoiding floating-point heuristics.
 //! Pair list sorted by (BodyHandle, BodyHandle) for identical resolution order.
 
-use nalgebra::SVector;
 use crate::body::{BodyHandle, BodyType, RigidBody};
+use nalgebra::SVector;
 
 /// Pair of body handles that may be colliding.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -27,31 +27,46 @@ pub struct Aabb<const D: usize> {
 
 impl<const D: usize> Aabb<D> {
     pub fn empty() -> Self {
-        Self { min: SVector::from_element(f64::MAX), max: SVector::from_element(f64::MIN) }
+        Self {
+            min: SVector::from_element(f64::MAX),
+            max: SVector::from_element(f64::MIN),
+        }
     }
     pub fn union(&self, other: &Self) -> Self {
-        let mut min = self.min; let mut max = self.max;
+        let mut min = self.min;
+        let mut max = self.max;
         for i in 0..D {
-            if other.min[i] < min[i] { min[i] = other.min[i]; }
-            if other.max[i] > max[i] { max[i] = other.max[i]; }
+            if other.min[i] < min[i] {
+                min[i] = other.min[i];
+            }
+            if other.max[i] > max[i] {
+                max[i] = other.max[i];
+            }
         }
         Self { min, max }
     }
     pub fn overlaps(&self, other: &Self) -> bool {
         for i in 0..D {
-            if self.max[i] < other.min[i] || self.min[i] > other.max[i] { return false; }
+            if self.max[i] < other.min[i] || self.min[i] > other.max[i] {
+                return false;
+            }
         }
         true
     }
     pub fn from_sphere(center: &SVector<f64, D>, radius: f64) -> Self {
-        Self { min: center - SVector::from_element(radius), max: center + SVector::from_element(radius) }
+        Self {
+            min: center - SVector::from_element(radius),
+            max: center + SVector::from_element(radius),
+        }
     }
 }
 
 // Morton codes
 fn quantize(value: f64, world_min: f64, world_max: f64, bits: usize) -> u32 {
     let range = world_max - world_min;
-    if range <= 0.0 { return 0; }
+    if range <= 0.0 {
+        return 0;
+    }
     let max_val = ((1u64 << bits) - 1) as f64;
     let normalized = ((value - world_min) / range).clamp(0.0, 1.0);
     (normalized * max_val) as u32
@@ -59,7 +74,9 @@ fn quantize(value: f64, world_min: f64, world_max: f64, bits: usize) -> u32 {
 
 /// Encode a D-dimensional position into a 64-bit Morton code.
 pub fn morton_encode<const D: usize>(
-    position: &SVector<f64, D>, world_min: &SVector<f64, D>, world_max: &SVector<f64, D>,
+    position: &SVector<f64, D>,
+    world_min: &SVector<f64, D>,
+    world_max: &SVector<f64, D>,
 ) -> u64 {
     let bits = 64 / D;
     let mut code: u64 = 0;
@@ -74,17 +91,29 @@ pub fn morton_encode<const D: usize>(
 
 /// Extract top prefix_bits from a Morton code (for spatial authority zones).
 pub fn morton_prefix(code: u64, prefix_bits: usize) -> u64 {
-    if prefix_bits >= 64 { code } else { code >> (64 - prefix_bits) }
+    if prefix_bits >= 64 {
+        code
+    } else {
+        code >> (64 - prefix_bits)
+    }
 }
 
 // LBVH
 const BRUTE_FORCE_THRESHOLD: usize = 50;
 const LEAF_BIT: u32 = 0x8000_0000;
-fn is_leaf(idx: u32) -> bool { idx & LEAF_BIT != 0 }
-fn leaf_index(idx: u32) -> usize { (idx & !LEAF_BIT) as usize }
+fn is_leaf(idx: u32) -> bool {
+    idx & LEAF_BIT != 0
+}
+fn leaf_index(idx: u32) -> usize {
+    (idx & !LEAF_BIT) as usize
+}
 
 #[derive(Clone, Debug)]
-struct BvhNode<const D: usize> { aabb: Aabb<D>, left: u32, right: u32 }
+struct BvhNode<const D: usize> {
+    aabb: Aabb<D>,
+    left: u32,
+    right: u32,
+}
 
 /// Linear Bounding Volume Hierarchy.
 pub struct Lbvh<const D: usize> {
@@ -104,33 +133,65 @@ impl<const D: usize> Lbvh<D> {
             let c_world = body.transform.transform_point(&c_local).0;
             let aabb = Aabb::from_sphere(&c_world, r);
             for i in 0..D {
-                if aabb.min[i] < world_min[i] { world_min[i] = aabb.min[i]; }
-                if aabb.max[i] > world_max[i] { world_max[i] = aabb.max[i]; }
+                if aabb.min[i] < world_min[i] {
+                    world_min[i] = aabb.min[i];
+                }
+                if aabb.max[i] > world_max[i] {
+                    world_max[i] = aabb.max[i];
+                }
             }
             aabbs.push(aabb);
         }
         for i in 0..D {
-            if world_max[i] - world_min[i] < 1e-6 { world_min[i] -= 1.0; world_max[i] += 1.0; }
+            if world_max[i] - world_min[i] < 1e-6 {
+                world_min[i] -= 1.0;
+                world_max[i] += 1.0;
+            }
         }
-        let morton_codes: Vec<u64> = aabbs.iter()
-            .map(|a| { let c = (a.min + a.max) * 0.5; morton_encode::<D>(&c, &world_min, &world_max) })
+        let morton_codes: Vec<u64> = aabbs
+            .iter()
+            .map(|a| {
+                let c = (a.min + a.max) * 0.5;
+                morton_encode::<D>(&c, &world_min, &world_max)
+            })
             .collect();
         let mut sorted_indices: Vec<usize> = (0..n).collect();
         sorted_indices.sort_by_key(|&i| morton_codes[i]);
         let sorted_aabbs: Vec<Aabb<D>> = sorted_indices.iter().map(|&i| aabbs[i].clone()).collect();
-        let nodes = if n <= 1 { Vec::new() } else { Self::build_nodes(&sorted_indices.iter().map(|&i| morton_codes[i]).collect::<Vec<_>>(), &sorted_aabbs) };
-        Self { sorted_indices, leaf_aabbs: sorted_aabbs, nodes }
+        let nodes = if n <= 1 {
+            Vec::new()
+        } else {
+            Self::build_nodes(
+                &sorted_indices
+                    .iter()
+                    .map(|&i| morton_codes[i])
+                    .collect::<Vec<_>>(),
+                &sorted_aabbs,
+            )
+        };
+        Self {
+            sorted_indices,
+            leaf_aabbs: sorted_aabbs,
+            nodes,
+        }
     }
 
     fn find_split(codes: &[u64], first: usize, last: usize) -> usize {
-        if codes[first] == codes[last] { return (first + last) / 2; }
+        if codes[first] == codes[last] {
+            return (first + last) / 2;
+        }
         let cp = (codes[first] ^ codes[last]).leading_zeros();
-        let mut split = first; let mut step = last - first;
+        let mut split = first;
+        let mut step = last - first;
         loop {
             step = (step + 1) / 2;
             let ns = split + step;
-            if ns < last && (codes[first] ^ codes[ns]).leading_zeros() > cp { split = ns; }
-            if step <= 1 { break; }
+            if ns < last && (codes[first] ^ codes[ns]).leading_zeros() > cp {
+                split = ns;
+            }
+            if step <= 1 {
+                break;
+            }
         }
         split
     }
@@ -141,21 +202,43 @@ impl<const D: usize> Lbvh<D> {
         nodes
     }
 
-    fn build_rec(codes: &[u64], aabbs: &[Aabb<D>], first: usize, last: usize, nodes: &mut Vec<BvhNode<D>>) -> u32 {
-        if first == last { return LEAF_BIT | (first as u32); }
+    fn build_rec(
+        codes: &[u64],
+        aabbs: &[Aabb<D>],
+        first: usize,
+        last: usize,
+        nodes: &mut Vec<BvhNode<D>>,
+    ) -> u32 {
+        if first == last {
+            return LEAF_BIT | (first as u32);
+        }
         let split = Self::find_split(codes, first, last);
         let left = Self::build_rec(codes, aabbs, first, split, nodes);
         let right = Self::build_rec(codes, aabbs, split + 1, last, nodes);
-        let la = if is_leaf(left) { aabbs[leaf_index(left)].clone() } else { nodes[left as usize].aabb.clone() };
-        let ra = if is_leaf(right) { aabbs[leaf_index(right)].clone() } else { nodes[right as usize].aabb.clone() };
+        let la = if is_leaf(left) {
+            aabbs[leaf_index(left)].clone()
+        } else {
+            nodes[left as usize].aabb.clone()
+        };
+        let ra = if is_leaf(right) {
+            aabbs[leaf_index(right)].clone()
+        } else {
+            nodes[right as usize].aabb.clone()
+        };
         let idx = nodes.len() as u32;
-        nodes.push(BvhNode { aabb: la.union(&ra), left, right });
+        nodes.push(BvhNode {
+            aabb: la.union(&ra),
+            left,
+            right,
+        });
         idx
     }
 
     pub fn query_pairs(&self, bodies: &[RigidBody<D>]) -> Vec<BroadphasePair> {
         let n = self.sorted_indices.len();
-        if n <= 1 { return Vec::new(); }
+        if n <= 1 {
+            return Vec::new();
+        }
         let mut pairs = Vec::new();
         let root = (self.nodes.len() - 1) as u32;
         for li in 0..n {
@@ -168,18 +251,34 @@ impl<const D: usize> Lbvh<D> {
                     let oi = leaf_index(ni);
                     if oi > li {
                         let ot = bodies[self.sorted_indices[oi]].body_type;
-                        if lt == BodyType::Static && ot == BodyType::Static { continue; }
-                        if !should_collide(&bodies[self.sorted_indices[li]], &bodies[self.sorted_indices[oi]]) { continue; }
+                        if lt == BodyType::Static && ot == BodyType::Static {
+                            continue;
+                        }
+                        if !should_collide(
+                            &bodies[self.sorted_indices[li]],
+                            &bodies[self.sorted_indices[oi]],
+                        ) {
+                            continue;
+                        }
                         if la.overlaps(&self.leaf_aabbs[oi]) {
-                            let (ha, hb) = (bodies[self.sorted_indices[li]].handle, bodies[self.sorted_indices[oi]].handle);
-                            if ha < hb { pairs.push(BroadphasePair(ha, hb)); }
-                            else { pairs.push(BroadphasePair(hb, ha)); }
+                            let (ha, hb) = (
+                                bodies[self.sorted_indices[li]].handle,
+                                bodies[self.sorted_indices[oi]].handle,
+                            );
+                            if ha < hb {
+                                pairs.push(BroadphasePair(ha, hb));
+                            } else {
+                                pairs.push(BroadphasePair(hb, ha));
+                            }
                         }
                     }
                     continue;
                 }
                 let node = &self.nodes[ni as usize];
-                if la.overlaps(&node.aabb) { stack.push(node.left); stack.push(node.right); }
+                if la.overlaps(&node.aabb) {
+                    stack.push(node.left);
+                    stack.push(node.right);
+                }
             }
         }
         pairs.sort_unstable_by_key(|p| (p.0, p.1));
@@ -197,8 +296,11 @@ fn should_collide<const D: usize>(a: &RigidBody<D>, b: &RigidBody<D>) -> bool {
 
 /// Find all potentially colliding pairs. Uses LBVH for ≥50 bodies, brute-force otherwise.
 pub fn find_pairs<const D: usize>(bodies: &[RigidBody<D>]) -> Vec<BroadphasePair> {
-    if bodies.len() < BRUTE_FORCE_THRESHOLD { find_pairs_brute(bodies) }
-    else { Lbvh::build(bodies).query_pairs(bodies) }
+    if bodies.len() < BRUTE_FORCE_THRESHOLD {
+        find_pairs_brute(bodies)
+    } else {
+        Lbvh::build(bodies).query_pairs(bodies)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -253,7 +355,9 @@ pub struct StaticBroadphase<const D: usize> {
 
 impl<const D: usize> StaticBroadphase<D> {
     pub fn new() -> Self {
-        Self { entries: Vec::new() }
+        Self {
+            entries: Vec::new(),
+        }
     }
 
     /// Rebuild the cache from all bodies in the world.
@@ -383,9 +487,13 @@ fn find_pairs_brute<const D: usize>(bodies: &[RigidBody<D>]) -> Vec<BroadphasePa
     let mut pairs = Vec::new();
     for i in 0..bodies.len() {
         let ti = bodies[i].body_type;
-        for j in (i+1)..bodies.len() {
-            if ti == BodyType::Static && bodies[j].body_type == BodyType::Static { continue; }
-            if !should_collide(&bodies[i], &bodies[j]) { continue; }
+        for j in (i + 1)..bodies.len() {
+            if ti == BodyType::Static && bodies[j].body_type == BodyType::Static {
+                continue;
+            }
+            if !should_collide(&bodies[i], &bodies[j]) {
+                continue;
+            }
             let (ci, ri) = bodies[i].collider.bounding_sphere();
             let (cj, rj) = bodies[j].collider.bounding_sphere();
             let wi = bodies[i].transform.transform_point(&ci);
@@ -426,7 +534,11 @@ mod tests {
     fn static_static_ignored() {
         let bodies = vec![
             RigidBody::<3>::static_body(BodyHandle(0), Point::origin(), Box::new(Sphere::unit())),
-            RigidBody::<3>::static_body(BodyHandle(1), Point::new([0.5, 0.0, 0.0]), Box::new(Sphere::unit())),
+            RigidBody::<3>::static_body(
+                BodyHandle(1),
+                Point::new([0.5, 0.0, 0.0]),
+                Box::new(Sphere::unit()),
+            ),
         ];
         assert!(find_pairs(&bodies).is_empty());
     }
@@ -474,7 +586,12 @@ mod tests {
         let mut bodies = Vec::new();
         for i in 0..(BRUTE_FORCE_THRESHOLD + 10) {
             let x = (i as f64) * 0.5;
-            bodies.push(RigidBody::<2>::dynamic_sphere(BodyHandle(i), Point::new([x, 0.0]), 1.0, 1.0));
+            bodies.push(RigidBody::<2>::dynamic_sphere(
+                BodyHandle(i),
+                Point::new([x, 0.0]),
+                1.0,
+                1.0,
+            ));
         }
         let mut brute = find_pairs_brute(&bodies);
         brute.sort_by_key(|p| (p.0, p.1));
@@ -496,9 +613,18 @@ mod tests {
 
     #[test]
     fn aabb_overlap() {
-        let a = Aabb::<2> { min: SVector::from([0.0, 0.0]), max: SVector::from([2.0, 2.0]) };
-        let b = Aabb::<2> { min: SVector::from([1.0, 1.0]), max: SVector::from([3.0, 3.0]) };
-        let c = Aabb::<2> { min: SVector::from([5.0, 5.0]), max: SVector::from([6.0, 6.0]) };
+        let a = Aabb::<2> {
+            min: SVector::from([0.0, 0.0]),
+            max: SVector::from([2.0, 2.0]),
+        };
+        let b = Aabb::<2> {
+            min: SVector::from([1.0, 1.0]),
+            max: SVector::from([3.0, 3.0]),
+        };
+        let c = Aabb::<2> {
+            min: SVector::from([5.0, 5.0]),
+            max: SVector::from([6.0, 6.0]),
+        };
         assert!(a.overlaps(&b));
         assert!(!a.overlaps(&c));
     }
@@ -517,15 +643,21 @@ mod tests {
         let pairs = super::find_pairs_incremental(&bodies, &static_bp);
         assert_eq!(pairs.len(), 1);
         let p = pairs[0];
-        assert!((p.0 == BodyHandle(0) && p.1 == BodyHandle(1))
-            || (p.0 == BodyHandle(1) && p.1 == BodyHandle(0)));
+        assert!(
+            (p.0 == BodyHandle(0) && p.1 == BodyHandle(1))
+                || (p.0 == BodyHandle(1) && p.1 == BodyHandle(0))
+        );
     }
 
     #[test]
     fn incremental_static_static_not_produced() {
         let bodies = vec![
             RigidBody::<3>::static_body(BodyHandle(0), Point::origin(), Box::new(Sphere::unit())),
-            RigidBody::<3>::static_body(BodyHandle(1), Point::new([0.5, 0.0, 0.0]), Box::new(Sphere::unit())),
+            RigidBody::<3>::static_body(
+                BodyHandle(1),
+                Point::new([0.5, 0.0, 0.0]),
+                Box::new(Sphere::unit()),
+            ),
         ];
         let mut static_bp = super::StaticBroadphase::new();
         static_bp.rebuild(&bodies);
@@ -537,7 +669,11 @@ mod tests {
     #[test]
     fn incremental_matches_standard_find_pairs() {
         let bodies = vec![
-            RigidBody::<3>::static_body(BodyHandle(0), Point::new([0.0, 0.0, 0.0]), Box::new(Sphere::unit())),
+            RigidBody::<3>::static_body(
+                BodyHandle(0),
+                Point::new([0.0, 0.0, 0.0]),
+                Box::new(Sphere::unit()),
+            ),
             RigidBody::<3>::dynamic_sphere(BodyHandle(1), Point::new([1.5, 0.0, 0.0]), 1.0, 1.0),
             RigidBody::<3>::dynamic_sphere(BodyHandle(2), Point::new([0.0, 1.5, 0.0]), 1.0, 1.0),
             RigidBody::<3>::dynamic_sphere(BodyHandle(3), Point::new([10.0, 0.0, 0.0]), 1.0, 1.0),
@@ -549,7 +685,10 @@ mod tests {
         let mut standard = find_pairs(&bodies);
         incremental.sort_by_key(|p| (p.0, p.1));
         standard.sort_by_key(|p| (p.0, p.1));
-        assert_eq!(incremental, standard, "incremental must match standard broadphase");
+        assert_eq!(
+            incremental, standard,
+            "incremental must match standard broadphase"
+        );
     }
 
     #[test]

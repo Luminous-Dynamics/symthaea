@@ -147,15 +147,10 @@ where
         match req.uri().path() {
             "/mycelix.fl.FederatedLearning/RegisterNode" => {
                 struct Svc<T: FederatedLearning>(Arc<T>);
-                impl<T: FederatedLearning>
-                    tonic::server::UnaryService<RegisterNodeRequest> for Svc<T>
-                {
+                impl<T: FederatedLearning> tonic::server::UnaryService<RegisterNodeRequest> for Svc<T> {
                     type Response = RegisterNodeResponse;
                     type Future = BoxFuture<Response<Self::Response>, Status>;
-                    fn call(
-                        &mut self,
-                        request: Request<RegisterNodeRequest>,
-                    ) -> Self::Future {
+                    fn call(&mut self, request: Request<RegisterNodeRequest>) -> Self::Future {
                         let inner = Arc::clone(&self.0);
                         Box::pin(async move { inner.register_node(request).await })
                     }
@@ -172,15 +167,10 @@ where
 
             "/mycelix.fl.FederatedLearning/SubmitGradient" => {
                 struct Svc<T: FederatedLearning>(Arc<T>);
-                impl<T: FederatedLearning>
-                    tonic::server::UnaryService<SubmitGradientRequest> for Svc<T>
-                {
+                impl<T: FederatedLearning> tonic::server::UnaryService<SubmitGradientRequest> for Svc<T> {
                     type Response = SubmitGradientResponse;
                     type Future = BoxFuture<Response<Self::Response>, Status>;
-                    fn call(
-                        &mut self,
-                        request: Request<SubmitGradientRequest>,
-                    ) -> Self::Future {
+                    fn call(&mut self, request: Request<SubmitGradientRequest>) -> Self::Future {
                         let inner = Arc::clone(&self.0);
                         Box::pin(async move { inner.submit_gradient(request).await })
                     }
@@ -197,15 +187,10 @@ where
 
             "/mycelix.fl.FederatedLearning/GetRoundStatus" => {
                 struct Svc<T: FederatedLearning>(Arc<T>);
-                impl<T: FederatedLearning>
-                    tonic::server::UnaryService<GetRoundStatusRequest> for Svc<T>
-                {
+                impl<T: FederatedLearning> tonic::server::UnaryService<GetRoundStatusRequest> for Svc<T> {
                     type Response = GetRoundStatusResponse;
                     type Future = BoxFuture<Response<Self::Response>, Status>;
-                    fn call(
-                        &mut self,
-                        request: Request<GetRoundStatusRequest>,
-                    ) -> Self::Future {
+                    fn call(&mut self, request: Request<GetRoundStatusRequest>) -> Self::Future {
                         let inner = Arc::clone(&self.0);
                         Box::pin(async move { inner.get_round_status(request).await })
                     }
@@ -222,15 +207,10 @@ where
 
             "/mycelix.fl.FederatedLearning/GetRoundResult" => {
                 struct Svc<T: FederatedLearning>(Arc<T>);
-                impl<T: FederatedLearning>
-                    tonic::server::UnaryService<GetRoundResultRequest> for Svc<T>
-                {
+                impl<T: FederatedLearning> tonic::server::UnaryService<GetRoundResultRequest> for Svc<T> {
                     type Response = GetRoundResultResponse;
                     type Future = BoxFuture<Response<Self::Response>, Status>;
-                    fn call(
-                        &mut self,
-                        request: Request<GetRoundResultRequest>,
-                    ) -> Self::Future {
+                    fn call(&mut self, request: Request<GetRoundResultRequest>) -> Self::Future {
                         let inner = Arc::clone(&self.0);
                         Box::pin(async move { inner.get_round_result(request).await })
                     }
@@ -248,8 +228,7 @@ where
             "/mycelix.fl.FederatedLearning/StreamGradients" => {
                 struct Svc<T: FederatedLearning>(Arc<T>);
                 impl<T: FederatedLearning>
-                    tonic::server::ClientStreamingService<SubmitGradientRequest>
-                    for Svc<T>
+                    tonic::server::ClientStreamingService<SubmitGradientRequest> for Svc<T>
                 {
                     type Response = GetRoundResultResponse;
                     type Future = BoxFuture<Response<Self::Response>, Status>;
@@ -273,15 +252,10 @@ where
 
             "/mycelix.fl.FederatedLearning/HealthCheck" => {
                 struct Svc<T: FederatedLearning>(Arc<T>);
-                impl<T: FederatedLearning>
-                    tonic::server::UnaryService<HealthCheckRequest> for Svc<T>
-                {
+                impl<T: FederatedLearning> tonic::server::UnaryService<HealthCheckRequest> for Svc<T> {
                     type Response = HealthCheckResponse;
                     type Future = BoxFuture<Response<Self::Response>, Status>;
-                    fn call(
-                        &mut self,
-                        request: Request<HealthCheckRequest>,
-                    ) -> Self::Future {
+                    fn call(&mut self, request: Request<HealthCheckRequest>) -> Self::Future {
                         let inner = Arc::clone(&self.0);
                         Box::pin(async move { inner.health_check(request).await })
                     }

@@ -21,8 +21,8 @@
 //! a dimension-specific basis vector and weighted-bundled with community
 //! `DimensionWeights` to produce the final profile HV.
 
-use crate::{CivicTier, SovereignDimension, SovereignProfile};
 use crate::weights::DimensionWeights;
+use crate::{CivicTier, SovereignDimension, SovereignProfile};
 
 // ============================================================================
 // Constants
@@ -60,8 +60,7 @@ const TIER_SEED_BASE: u64 = 0x5449_4552_0000_0000; // "TIER\0\0\0\0"
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[repr(align(32))]
 pub struct BinaryHV(
-    #[cfg_attr(feature = "serde", serde(with = "serde_bytes_2048"))]
-    pub [u8; HDC_BYTES],
+    #[cfg_attr(feature = "serde", serde(with = "serde_bytes_2048"))] pub [u8; HDC_BYTES],
 );
 
 impl BinaryHV {
@@ -164,7 +163,10 @@ impl BinaryHV {
     /// Hamming similarity [0.0, 1.0].
     #[inline]
     pub fn similarity(&self, other: &Self) -> f32 {
-        let matching: u32 = self.0.iter().zip(other.0.iter())
+        let matching: u32 = self
+            .0
+            .iter()
+            .zip(other.0.iter())
             .map(|(a, b)| (!(a ^ b)).count_ones())
             .sum();
         matching as f32 / Self::DIM as f32
@@ -185,7 +187,12 @@ impl BinaryHV {
 
 impl std::fmt::Debug for BinaryHV {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "BinaryHV(density={:.3}, pop={})", self.density(), self.popcount())
+        write!(
+            f,
+            "BinaryHV(density={:.3}, pop={})",
+            self.density(),
+            self.popcount()
+        )
     }
 }
 
@@ -222,7 +229,11 @@ pub fn encode_profile(profile: &SovereignProfile, weights: &DimensionWeights) ->
     let mut bit_offset = 0;
 
     for (i, (&value, &weight)) in dims.iter().zip(weights.weights.iter()).enumerate() {
-        let value = if value.is_finite() { value.clamp(0.0, 1.0) } else { 0.0 };
+        let value = if value.is_finite() {
+            value.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
         let dim_bits = (weight * total_bits as f64).round() as usize;
         let active_bits = (value * dim_bits as f64).round() as usize;
 
@@ -406,7 +417,10 @@ mod tests {
     fn binary_hv_random_balanced_density() {
         let v = BinaryHV::random(42);
         let d = v.density();
-        assert!(d > 0.45 && d < 0.55, "Random density should be ~0.5, got {d}");
+        assert!(
+            d > 0.45 && d < 0.55,
+            "Random density should be ~0.5, got {d}"
+        );
     }
 
     #[test]
@@ -420,7 +434,10 @@ mod tests {
         let a = BinaryHV::random(1);
         let b = BinaryHV::random(2);
         let sim = a.similarity(&b);
-        assert!((sim - 0.5).abs() < 0.05, "Random similarity should be ~0.5, got {sim}");
+        assert!(
+            (sim - 0.5).abs() < 0.05,
+            "Random similarity should be ~0.5, got {sim}"
+        );
     }
 
     #[test]
@@ -430,7 +447,10 @@ mod tests {
         let inter = a.intersection(&b);
         // ~25% of bits should be 1 (both random ~50%)
         let density = inter.density();
-        assert!(density > 0.2 && density < 0.3, "AND density should be ~0.25, got {density}");
+        assert!(
+            density > 0.2 && density < 0.3,
+            "AND density should be ~0.25, got {density}"
+        );
     }
 
     #[test]
@@ -439,8 +459,14 @@ mod tests {
         let b = BinaryHV::random(2);
         // Weight a at 0.9, b at 0.1 — result should be very similar to a
         let result = BinaryHV::weighted_bundle(&[a, b], &[0.9, 0.1]);
-        assert!(result.similarity(&a) > 0.8, "Heavily weighted vector should dominate");
-        assert!(result.similarity(&b) < 0.6, "Lightly weighted vector should not dominate");
+        assert!(
+            result.similarity(&a) > 0.8,
+            "Heavily weighted vector should dominate"
+        );
+        assert!(
+            result.similarity(&b) < 0.6,
+            "Lightly weighted vector should not dominate"
+        );
     }
 
     // --- Profile encoding ---
@@ -459,9 +485,17 @@ mod tests {
         let profile = SovereignProfile::from_array([1.0; 8]);
         let weights = DimensionWeights::equal();
         let hv = encode_profile(&profile, &weights);
-        assert!(hv.popcount() > 0, "Full profile should have nonzero popcount, got {}", hv.popcount());
+        assert!(
+            hv.popcount() > 0,
+            "Full profile should have nonzero popcount, got {}",
+            hv.popcount()
+        );
         // Weighted bundle of 8 equally-weighted dimensions → density ~0.5
-        assert!(hv.density() > 0.1, "Full profile density should be > 0.1, got {}", hv.density());
+        assert!(
+            hv.density() > 0.1,
+            "Full profile density should be > 0.1, got {}",
+            hv.density()
+        );
     }
 
     #[test]
@@ -481,7 +515,10 @@ mod tests {
         let hv1 = encode_profile(&p1, &weights);
         let hv2 = encode_profile(&p2, &weights);
         let sim = hv1.similarity(&hv2);
-        assert!(sim > 0.6, "Similar profiles should have high similarity, got {sim}");
+        assert!(
+            sim > 0.6,
+            "Similar profiles should have high similarity, got {sim}"
+        );
     }
 
     #[test]
@@ -492,7 +529,10 @@ mod tests {
         let hv1 = encode_profile(&p1, &weights);
         let hv2 = encode_profile(&p2, &weights);
         let sim = hv1.similarity(&hv2);
-        assert!(sim < 0.7, "Different profiles should have lower similarity, got {sim}");
+        assert!(
+            sim < 0.7,
+            "Different profiles should have lower similarity, got {sim}"
+        );
     }
 
     // --- Tier from popcount ---
@@ -512,7 +552,12 @@ mod tests {
         let profile = SovereignProfile::from_array([1.0; 8]);
         let hv = encode_profile(&profile, &weights);
         let tier = tier_from_popcount(&hv, &thresholds);
-        assert_eq!(tier, CivicTier::Guardian, "Full profile should be Guardian, popcount={}", hv.popcount());
+        assert_eq!(
+            tier,
+            CivicTier::Guardian,
+            "Full profile should be Guardian, popcount={}",
+            hv.popcount()
+        );
     }
 
     #[test]
@@ -551,7 +596,10 @@ mod tests {
             assert!(
                 thresholds.min_popcount[i] >= thresholds.min_popcount[i - 1],
                 "Tier thresholds should be non-decreasing: [{}]={} < [{}]={}",
-                i - 1, thresholds.min_popcount[i - 1], i, thresholds.min_popcount[i]
+                i - 1,
+                thresholds.min_popcount[i - 1],
+                i,
+                thresholds.min_popcount[i]
             );
         }
     }
@@ -562,9 +610,17 @@ mod tests {
         let low = encode_profile(&SovereignProfile::from_array([0.2; 8]), &weights);
         let mid = encode_profile(&SovereignProfile::from_array([0.5; 8]), &weights);
         let high = encode_profile(&SovereignProfile::from_array([0.9; 8]), &weights);
-        assert!(mid.popcount() > low.popcount(),
-            "Mid popcount {} should exceed low {}", mid.popcount(), low.popcount());
-        assert!(high.popcount() > mid.popcount(),
-            "High popcount {} should exceed mid {}", high.popcount(), mid.popcount());
+        assert!(
+            mid.popcount() > low.popcount(),
+            "Mid popcount {} should exceed low {}",
+            mid.popcount(),
+            low.popcount()
+        );
+        assert!(
+            high.popcount() > mid.popcount(),
+            "High popcount {} should exceed mid {}",
+            high.popcount(),
+            mid.popcount()
+        );
     }
 }

@@ -167,6 +167,61 @@ impl Default for VotingMode {
 pub enum EntryTypes {
     Proposal(Proposal),
     Vote(Vote),
+    Reputation(Reputation),
+}
+
+/// Liquid reputation for an agent in a specific subject area
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct Reputation {
+    /// Agent holding the reputation
+    pub agent: AgentPubKey,
+    /// Subject area (e.g., "Mathematics", "Rust")
+    pub subject: String,
+    /// Reputation level as permille (0-1000 representing 0.0-1.0)
+    pub level_permille: u64,
+    /// Last updated timestamp
+    pub updated_at: i64,
+    /// Proof of work/endorsement source (serialized action hash)
+    pub source: ActionHash,
+}
+
+/// The 16 Moral Obligations (8 Perfect + 8 Imperfect)
+/// Used to bound the system against extractive or harmful dynamics.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct AlignmentVector {
+    // --- Perfect Obligations (Strictly required) ---
+    pub ahimsa: u16,
+    pub reversibility: u16,
+    pub truthfulness: u16,
+    pub sovereignty_respect: u16,
+    pub reciprocity: u16,
+    pub thermodynamic_efficiency: u16,
+    pub accountability: u16,
+    pub proportionality: u16,
+
+    // --- Imperfect Obligations (Aspirational goals) ---
+    pub ecological_stewardship: u16,
+    pub collective_flourishing: u16,
+    pub knowledge_commoning: u16,
+    pub mentorship: u16,
+    pub aesthetic_harmony: u16,
+    pub civic_participation: u16,
+    pub innovation_for_good: u16,
+    pub resilience: u16,
+}
+
+impl AlignmentVector {
+    pub fn aggregate_score(&self) -> u16 {
+        let sum: u32 = 
+            self.ahimsa as u32 + self.reversibility as u32 + self.truthfulness as u32 + 
+            self.sovereignty_respect as u32 + self.reciprocity as u32 + self.thermodynamic_efficiency as u32 + 
+            self.accountability as u32 + self.proportionality as u32 + self.ecological_stewardship as u32 + 
+            self.collective_flourishing as u32 + self.knowledge_commoning as u32 + self.mentorship as u32 + 
+            self.aesthetic_harmony as u32 + self.civic_participation as u32 + self.innovation_for_good as u32 + 
+            self.resilience as u32;
+        (sum / 16) as u16
+    }
 }
 
 // ============================================================================
@@ -185,6 +240,8 @@ pub enum LinkTypes {
     CategoryToProposals,
     /// All proposals (for listing)
     AllProposals,
+    /// Agent to subject reputation
+    AgentToReputation,
 }
 
 // ============================================================================

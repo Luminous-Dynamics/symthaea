@@ -1,11 +1,28 @@
-# Build WASM zomes
-build:
-    cargo build --workspace --target wasm32-unknown-unknown --release
+# Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+# Mycelix Praxis — One-Click Quickening Orchestrator
 
-# Run tests
-test:
-    cargo test --workspace
+# Default: Build everything
+default: build
 
-# Check (fast)
-check:
-    cargo check --workspace
+# 1. Environment Liberation: Ensure linker and PWA tools are ready
+check-env:
+    @echo "\u{1F512} Hardening Build Environment..."
+    nix develop --command bash -c "rustc --version"
+
+# 2. Substrate Generation: Build the PWA and WASM artifacts
+build: check-env
+    @echo "\u{1F980} Bundling PWA Substrate (WASM)..."
+    nix develop --command trunk build --release
+
+# 3. The Quickening: Initialize Node Zero and the Genesis Epoch
+quicken: build
+    @echo "\u{1F331} Executing Node Zero Bootstrap Ritual..."
+    bash scripts/bootstrap_node_zero.sh
+
+# 4. Live Sync: Run the Holochain Conductor (Simulation)
+run-node:
+    @echo "\u{1F310} Node Zero is ONLINE. Mirroring to local mesh..."
+    nix develop --command hc run -p 8888
+
+# 5. Full Deployment: The Asymptote
+deploy: quicken run-node

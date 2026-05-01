@@ -58,7 +58,7 @@ pub enum ConductorState {
     Error(String),
 }
 
-/// Consciousness state from Soma sensors (or simulation).
+/// Cognitive state from Soma sensors (or simulation).
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ConsciousnessState {
     /// Integrated Information (Phi proxy, 0.0-1.0)
@@ -241,7 +241,7 @@ fn validate_bkt_state(claimed: f32, attempts: u32, correct: u32, tolerance: f32)
 
 // ============== Consciousness Commands ==============
 
-/// Get current consciousness state (from Soma or simulation).
+/// Get current cognitive state (from Soma or simulation).
 #[tauri::command]
 fn get_consciousness(state: tauri::State<AppState>) -> ConsciousnessState {
     state.consciousness.lock().unwrap().clone()

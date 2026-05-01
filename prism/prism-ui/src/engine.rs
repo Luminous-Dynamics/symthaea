@@ -10,7 +10,7 @@ use prism_reflex::ReflexArc;
 use prism_search::SearchEngine;
 
 use crate::state::{BrowserState, PageView, SearchMode};
-use prism_common::{EmpiricalLevel, NormativeLevel, MaterialityLevel, SearchResult};
+use prism_common::{EmpiricalLevel, MaterialityLevel, NormativeLevel, SearchResult};
 
 /// Re-navigate to a URL from history (back/forward). Calls process_input
 /// without pushing to the history stack (the navigating_history flag handles this).
@@ -54,15 +54,67 @@ fn sanitize_html(html: &str, base_url: Option<&url::Url>) -> String {
 
     builder
         .add_tags(&[
-            "h1", "h2", "h3", "h4", "h5", "h6",
-            "p", "br", "hr", "div", "span", "section", "article", "main",
-            "ul", "ol", "li", "dl", "dt", "dd",
-            "strong", "em", "b", "i", "u", "s", "mark", "small", "sub", "sup",
-            "a", "blockquote", "pre", "code", "kbd", "var", "samp",
-            "table", "thead", "tbody", "tfoot", "tr", "th", "td", "caption", "col", "colgroup",
-            "img", "figure", "figcaption", "picture", "source",
-            "details", "summary", "time", "abbr", "cite",
-            "nav", "header", "footer", "aside",
+            "h1",
+            "h2",
+            "h3",
+            "h4",
+            "h5",
+            "h6",
+            "p",
+            "br",
+            "hr",
+            "div",
+            "span",
+            "section",
+            "article",
+            "main",
+            "ul",
+            "ol",
+            "li",
+            "dl",
+            "dt",
+            "dd",
+            "strong",
+            "em",
+            "b",
+            "i",
+            "u",
+            "s",
+            "mark",
+            "small",
+            "sub",
+            "sup",
+            "a",
+            "blockquote",
+            "pre",
+            "code",
+            "kbd",
+            "var",
+            "samp",
+            "table",
+            "thead",
+            "tbody",
+            "tfoot",
+            "tr",
+            "th",
+            "td",
+            "caption",
+            "col",
+            "colgroup",
+            "img",
+            "figure",
+            "figcaption",
+            "picture",
+            "source",
+            "details",
+            "summary",
+            "time",
+            "abbr",
+            "cite",
+            "nav",
+            "header",
+            "footer",
+            "aside",
             "style",
         ])
         .add_generic_attributes(generic_attrs)
@@ -150,7 +202,10 @@ pub fn is_url(input: &str) -> bool {
 /// Normalize a bare domain into a full URL.
 fn normalize_url(input: &str) -> String {
     let input = input.trim();
-    if input.starts_with("http://") || input.starts_with("https://") || input.starts_with("prism://") {
+    if input.starts_with("http://")
+        || input.starts_with("https://")
+        || input.starts_with("prism://")
+    {
         input.to_string()
     } else {
         format!("https://{}", input)
@@ -270,16 +325,21 @@ fn search_query(query: &str, state: &BrowserState, engine: &SearchEngine) {
         // Yield one frame so the search results render before Spore blocks
         gloo_timers::future::TimeoutFuture::new(0).await;
 
-        let spore = expect_context::<StoredValue<
-            Option<symthaea_spore::engine::SporeEngine>,
-            leptos::prelude::LocalStorage,
-        >>();
+        let spore = expect_context::<
+            StoredValue<Option<symthaea_spore::engine::SporeEngine>, leptos::prelude::LocalStorage>,
+        >();
         spore.update_value(|opt: &mut Option<symthaea_spore::engine::SporeEngine>| {
             if let Some(spore_engine) = opt {
                 let result = spore_engine.cycle(&query_for_spore);
-                state_spore.set_consciousness.set(result.consciousness_level);
-                state_spore.set_epistemic_confidence.set(result.epistemic_status.honest_confidence);
-                state_spore.set_prediction_error.set(result.prediction_error);
+                state_spore
+                    .set_consciousness
+                    .set(result.consciousness_level);
+                state_spore
+                    .set_epistemic_confidence
+                    .set(result.epistemic_status.honest_confidence);
+                state_spore
+                    .set_prediction_error
+                    .set(result.prediction_error);
 
                 let generated = spore_engine.generate_text_with_input(&query_for_spore, 40);
                 if !generated.text.is_empty() {
@@ -315,7 +375,11 @@ fn search_query(query: &str, state: &BrowserState, engine: &SearchEngine) {
             failed_sources.push("Wikipedia".into());
         }
         for hit in wiki.hits {
-            merged.push(external_hit_to_result(&hit, "Wikipedia", EmpiricalLevel::E3));
+            merged.push(external_hit_to_result(
+                &hit,
+                "Wikipedia",
+                EmpiricalLevel::E3,
+            ));
         }
 
         // DuckDuckGo (via proxy)
@@ -324,7 +388,11 @@ fn search_query(query: &str, state: &BrowserState, engine: &SearchEngine) {
             failed_sources.push("DuckDuckGo".into());
         }
         for hit in ddg.hits {
-            merged.push(external_hit_to_result(&hit, "DuckDuckGo", EmpiricalLevel::E2));
+            merged.push(external_hit_to_result(
+                &hit,
+                "DuckDuckGo",
+                EmpiricalLevel::E2,
+            ));
         }
 
         // Paradigm mode: also try Knowledge DHT + Ollama
@@ -333,7 +401,10 @@ fn search_query(query: &str, state: &BrowserState, engine: &SearchEngine) {
             merged.extend(dht);
 
             let ollama = crate::external_search::query_ollama(&query_owned).await;
-            if matches!(ollama.status, crate::external_search::SearchStatus::Error(_)) {
+            if matches!(
+                ollama.status,
+                crate::external_search::SearchStatus::Error(_)
+            ) {
                 failed_sources.push("Ollama".into());
             }
             for hit in ollama.hits {
@@ -348,19 +419,31 @@ fn search_query(query: &str, state: &BrowserState, engine: &SearchEngine) {
         // Deduplicate by content prefix
         let mut seen = std::collections::HashSet::new();
         merged.retain(|r| {
-            let key: String = r.content.chars().take(60).collect::<String>().to_lowercase();
+            let key: String = r
+                .content
+                .chars()
+                .take(60)
+                .collect::<String>()
+                .to_lowercase();
             seen.insert(key)
         });
 
         // Re-rank by composite score
-        merged.sort_by(|a, b| b.rank_score().partial_cmp(&a.rank_score()).unwrap_or(std::cmp::Ordering::Equal));
+        merged.sort_by(|a, b| {
+            b.rank_score()
+                .partial_cmp(&a.rank_score())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // Limit to top 20
         merged.truncate(20);
 
         // Discard stale results if a newer search was started
         if search_gen.get_untracked() != this_generation {
-            log::info!("Discarding stale search results (generation {})", this_generation);
+            log::info!(
+                "Discarding stale search results (generation {})",
+                this_generation
+            );
             return;
         }
 
@@ -430,22 +513,29 @@ fn navigate_fullpage(url_str: &str, state: &BrowserState, reflex: &ReflexArc) {
     let state_spore = state.clone();
     wasm_bindgen_futures::spawn_local(async move {
         gloo_timers::future::TimeoutFuture::new(0).await;
-        let spore = expect_context::<StoredValue<
-            Option<symthaea_spore::engine::SporeEngine>,
-            leptos::prelude::LocalStorage,
-        >>();
+        let spore = expect_context::<
+            StoredValue<Option<symthaea_spore::engine::SporeEngine>, leptos::prelude::LocalStorage>,
+        >();
         spore.update_value(|opt: &mut Option<symthaea_spore::engine::SporeEngine>| {
             if let Some(spore_engine) = opt {
                 let result = spore_engine.cycle(&url_for_spore);
-                state_spore.set_consciousness.set(result.consciousness_level);
-                state_spore.set_epistemic_confidence.set(result.epistemic_status.honest_confidence);
-                state_spore.set_prediction_error.set(result.prediction_error);
+                state_spore
+                    .set_consciousness
+                    .set(result.consciousness_level);
+                state_spore
+                    .set_epistemic_confidence
+                    .set(result.epistemic_status.honest_confidence);
+                state_spore
+                    .set_prediction_error
+                    .set(result.prediction_error);
             }
         });
     });
 
     let host = url.host_str().unwrap_or("").to_string();
-    let view = PageView::FullPageIframe { url: url_str.to_string() };
+    let view = PageView::FullPageIframe {
+        url: url_str.to_string(),
+    };
     state.set_current_url.set(url_str.to_string());
     state.set_page_title.set(host);
     state.set_zone.set(ContentZone::Public);
@@ -471,16 +561,21 @@ fn navigate_url(url_str: &str, state: &BrowserState, reflex: &ReflexArc) {
     let state_spore = state.clone();
     wasm_bindgen_futures::spawn_local(async move {
         gloo_timers::future::TimeoutFuture::new(0).await;
-        let spore = expect_context::<StoredValue<
-            Option<symthaea_spore::engine::SporeEngine>,
-            leptos::prelude::LocalStorage,
-        >>();
+        let spore = expect_context::<
+            StoredValue<Option<symthaea_spore::engine::SporeEngine>, leptos::prelude::LocalStorage>,
+        >();
         spore.update_value(|opt: &mut Option<symthaea_spore::engine::SporeEngine>| {
             if let Some(spore_engine) = opt {
                 let result = spore_engine.cycle(&url_for_spore);
-                state_spore.set_consciousness.set(result.consciousness_level);
-                state_spore.set_epistemic_confidence.set(result.epistemic_status.honest_confidence);
-                state_spore.set_prediction_error.set(result.prediction_error);
+                state_spore
+                    .set_consciousness
+                    .set(result.consciousness_level);
+                state_spore
+                    .set_epistemic_confidence
+                    .set(result.epistemic_status.honest_confidence);
+                state_spore
+                    .set_prediction_error
+                    .set(result.prediction_error);
             }
         });
     });
@@ -523,7 +618,8 @@ fn navigate_url(url_str: &str, state: &BrowserState, reflex: &ReflexArc) {
                             return;
                         }
                         let parsed_url = url::Url::parse(&url_string).ok();
-                        let source_host = parsed_url.as_ref()
+                        let source_host = parsed_url
+                            .as_ref()
                             .and_then(|u| u.host_str().map(|s| s.to_string()))
                             .unwrap_or_default();
                         let clean = sanitize_html(&html, parsed_url.as_ref());
@@ -532,10 +628,7 @@ fn navigate_url(url_str: &str, state: &BrowserState, reflex: &ReflexArc) {
                         let reflex = ReflexArc::new();
                         let post = reflex.post_parse(&dom, &pre);
                         let consent = ConsentStore::new();
-                        let zone = consent.resolve_zone(
-                            post.zone,
-                            &source_host,
-                        );
+                        let zone = consent.resolve_zone(post.zone, &source_host);
                         let title = dom.title().unwrap_or_else(|| "Untitled".to_string());
 
                         let view = PageView::Page { html: clean };
@@ -557,16 +650,18 @@ fn navigate_url(url_str: &str, state: &BrowserState, reflex: &ReflexArc) {
             }
             Err(e) => {
                 let err_str = format!("{}", e);
-                let message = if err_str.contains("Failed to fetch") || err_str.contains("NetworkError") {
-                    format!(
-                        "Could not load this page. The CORS proxy may not be running.\n\n\
+                let message =
+                    if err_str.contains("Failed to fetch") || err_str.contains("NetworkError") {
+                        format!(
+                            "Could not load this page. The CORS proxy may not be running.\n\n\
                          Start the proxy: cargo run -p prism-proxy\n\n\
                          Or use the Tauri desktop app for unrestricted browsing.\n\n\
-                         Technical: {}", e
-                    )
-                } else {
-                    format!("Fetch failed: {}", e)
-                };
+                         Technical: {}",
+                            e
+                        )
+                    } else {
+                        format!("Fetch failed: {}", e)
+                    };
                 state_clone.set_view.set(PageView::Error { message });
                 state_clone.set_loading.set(false);
             }

@@ -41,7 +41,10 @@ impl ValenceArousal {
 
     /// Neutral state: slightly positive, moderate arousal.
     pub fn neutral() -> Self {
-        Self { valence: 0.1, arousal: 0.5 }
+        Self {
+            valence: 0.1,
+            arousal: 0.5,
+        }
     }
 
     /// The Russell circumplex quadrant (1–4).
@@ -156,13 +159,11 @@ pub fn from_core_affect(
     // Serotonin shifts valence positive (contentment); high noradrenaline stress shifts negative.
     let stress = (noradrenaline - 0.5).max(0.0) * 0.3;
     let wellbeing = (serotonin - 0.4).max(0.0) * 0.3;
-    let va_valence = (valence * 0.6 + wellbeing - stress + dopamine * 0.1 - 0.05)
-        .clamp(-1.0, 1.0);
+    let va_valence = (valence * 0.6 + wellbeing - stress + dopamine * 0.1 - 0.05).clamp(-1.0, 1.0);
 
     // Arousal: CoreAffect arousal + noradrenaline activation.
     // Dopamine adds gentle arousal (reward anticipation energizes).
-    let va_arousal = (arousal * 0.65 + noradrenaline * 0.25 + dopamine * 0.10)
-        .clamp(0.0, 1.0);
+    let va_arousal = (arousal * 0.65 + noradrenaline * 0.25 + dopamine * 0.10).clamp(0.0, 1.0);
 
     ValenceArousal::new(va_valence, va_arousal)
 }

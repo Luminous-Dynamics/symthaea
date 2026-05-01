@@ -305,27 +305,17 @@ pub struct GetRecognitionsInput {
 
 /// A member's MYCEL state -- soulbound, non-transferable reputation.
 ///
-/// MYCEL score is 0.0-1.0, computed from 4 weighted components:
-/// - Participation (40%): tx activity, governance voting, commons engagement
-/// - Recognition (20%): weighted recognition events from other members
-/// - Validation (20%): quality of work as validator/contributor
-/// - Longevity (20%): time active, capped at 24 months
+/// Upgraded to 8D Sovereign Profile mapping:
+/// - Participation (D4, D5, D6)
+/// - Recognition (D6, D7)
+/// - Validation (D0)
+/// - Longevity (D2)
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MemberMycelState {
     /// DID of the member
     pub member_did: String,
-    /// Composite MYCEL score (0.0 - 1.0)
-    pub mycel_score: f64,
-    /// Participation component (0.0 - 1.0)
-    pub participation: f64,
-    /// Recognition component (0.0 - 1.0)
-    pub recognition: f64,
-    /// Validation component (0.0 - 1.0)
-    pub validation: f64,
-    /// Longevity component (0.0 - 1.0)
-    pub longevity: f64,
-    /// Active months count (for longevity calculation)
-    pub active_months: u32,
+    /// 8D Sovereign Profile (replaces legacy composite 1D mycel_score)
+    pub sovereign_profile: SovereignProfile,
     /// Whether this member is in apprentice mode
     pub is_apprentice: bool,
     /// DID of the vouching mentor (if apprentice)
@@ -508,12 +498,12 @@ pub struct UpdateCollateralHealthInput {
     pub obligation_amount: u64,
 }
 
-/// Member fee-tier lookup response (derived from MYCEL recognition score).
+/// Member fee-tier lookup response (derived from 8D Sovereign Profile).
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FeeTierResponse {
     pub member_did: String,
-    /// MYCEL recognition score; f64 to match the oracle return type.
-    pub mycel_score: f64,
+    /// 8D Sovereign Profile (replaces legacy composite 1D mycel_score).
+    pub sovereign_profile: SovereignProfile,
     /// Human-readable tier name (Bronze/Silver/Gold/...).
     pub tier_name: String,
     /// Fee rate applied to this tier, as a fraction (0.0–1.0).

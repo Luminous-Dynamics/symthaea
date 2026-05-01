@@ -14,13 +14,13 @@
 //! Output: CSV to stdout, summary to stderr
 
 use nalgebra::SVector;
+use symthaea_consciousness_equation::ConsciousnessInputs;
 use symtropy_consciousness_physics::convergence::ConvergenceDetector;
 use symtropy_consciousness_physics::fep_gradient;
 use symtropy_consciousness_physics::harmony_field::HarmonyField;
 use symtropy_consciousness_physics::{ConsciousnessField, ThermodynamicConstants};
 use symtropy_math::Point;
 use symtropy_physics::PhysicsWorld;
-use symthaea_consciousness_equation::ConsciousnessInputs;
 
 const AGENTS: usize = 12;
 const MAX_TICKS: usize = 10_000;
@@ -30,15 +30,29 @@ const CONVERGENCE_WINDOW: usize = 200;
 const CONVERGENCE_THRESHOLD: f64 = 1e-3;
 
 #[derive(Clone, Copy)]
-enum Condition { Full, EnergyOnly, Free }
+enum Condition {
+    Full,
+    EnergyOnly,
+    Free,
+}
 
 impl Condition {
     fn name(&self) -> &'static str {
-        match self { Condition::Full => "FULL", Condition::EnergyOnly => "ENERGY_ONLY", Condition::Free => "FREE" }
+        match self {
+            Condition::Full => "FULL",
+            Condition::EnergyOnly => "ENERGY_ONLY",
+            Condition::Free => "FREE",
+        }
     }
-    fn enforce_thermo(&self) -> bool { !matches!(self, Condition::Free) }
-    fn use_gradient(&self) -> bool { matches!(self, Condition::Full) }
-    fn use_offloading(&self) -> bool { matches!(self, Condition::Full) }
+    fn enforce_thermo(&self) -> bool {
+        !matches!(self, Condition::Free)
+    }
+    fn use_gradient(&self) -> bool {
+        matches!(self, Condition::Full)
+    }
+    fn use_offloading(&self) -> bool {
+        matches!(self, Condition::Full)
+    }
 }
 
 struct RunResult {
@@ -64,10 +78,7 @@ fn run_experiment(condition: Condition, seed: u64) -> RunResult {
         consciousness.constants.collision_energy_drain = 0.0;
     }
 
-    let well_positions = vec![
-        SVector::from([25.0, 25.0]),
-        SVector::from([-25.0, -25.0]),
-    ];
+    let well_positions = vec![SVector::from([25.0, 25.0]), SVector::from([-25.0, -25.0])];
     // Well depletion: each well has finite capacity (Joules).
     // Forces migration when wells run dry, breaking equilibrium flatline.
     let mut well_remaining = vec![3000.0f64; well_positions.len()];
@@ -82,7 +93,11 @@ fn run_experiment(condition: Condition, seed: u64) -> RunResult {
         if let Some(body) = world.body_mut(h) {
             body.linear_damping = 0.05; // LTC: tau = 20s, gentle air resistance
         }
-        consciousness.register(h, consciousness.constants.initial_energy, consciousness.constants.harmony_range);
+        consciousness.register(
+            h,
+            consciousness.constants.initial_energy,
+            consciousness.constants.harmony_range,
+        );
 
         if let Some(entity) = consciousness.entities.get_mut(&h) {
             match i % 4 {
@@ -114,14 +129,34 @@ fn run_experiment(condition: Condition, seed: u64) -> RunResult {
             // Count nearby agents for this entity
             let nearby = if let Some(body) = world.body(h) {
                 let pos = body.position().0;
-                handles.iter().filter(|&&oh| {
-                    oh != h && world.body(oh).map(|ob| (ob.position().0 - pos).norm() < consciousness.constants.harmony_range).unwrap_or(false)
-                }).count()
-            } else { 0 };
+                handles
+                    .iter()
+                    .filter(|&&oh| {
+                        oh != h
+                            && world
+                                .body(oh)
+                                .map(|ob| {
+                                    (ob.position().0 - pos).norm()
+                                        < consciousness.constants.harmony_range
+                                })
+                                .unwrap_or(false)
+                    })
+                    .count()
+            } else {
+                0
+            };
 
             let inputs = if collapsed {
-                ConsciousnessInputs { phi: 0.0, broadcast: 0.0, working_memory: 0.0,
-                    attention: 0.0, recurrence: 0.0, embodiment: 0.0, knowledge: 0.0, synchrony: 0.0 }
+                ConsciousnessInputs {
+                    phi: 0.0,
+                    broadcast: 0.0,
+                    working_memory: 0.0,
+                    attention: 0.0,
+                    recurrence: 0.0,
+                    embodiment: 0.0,
+                    knowledge: 0.0,
+                    synchrony: 0.0,
+                }
             } else {
                 ConsciousnessInputs {
                     phi: energy_frac,
@@ -134,39 +169,60 @@ fn run_experiment(condition: Condition, seed: u64) -> RunResult {
                     synchrony: consciousness.collective_phi.max(0.5), // Floor at 0.5 — agents in a simulation ARE synchronized
                 }
             };
-            let old_phi = consciousness.entities.get(&h).map(|e| e.phi()).unwrap_or(0.0);
+            let old_phi = consciousness
+                .entities
+                .get(&h)
+                .map(|e| e.phi())
+                .unwrap_or(0.0);
             consciousness.update_entity(h, &inputs, Point::origin());
-            let new_phi = consciousness.entities.get(&h).map(|e| e.phi()).unwrap_or(0.0);
+            let new_phi = consciousness
+                .entities
+                .get(&h)
+                .map(|e| e.phi())
+                .unwrap_or(0.0);
             consciousness.ledger.record_phi_change(new_phi - old_phi);
         }
 
         // 2. FEP gradient movement (if condition uses it)
         if condition.use_gradient() {
-            let agent_data: Vec<(SVector<f64, 2>, [f64; 9])> = handles.iter()
+            let agent_data: Vec<(SVector<f64, 2>, [f64; 9])> = handles
+                .iter()
                 .filter_map(|&h| {
                     let body = world.body(h)?;
                     let entity = consciousness.entities.get(&h)?;
                     Some((body.position().0, entity.harmony_activations))
-                }).collect();
+                })
+                .collect();
 
             // Well data includes remaining fraction (depleted wells are less attractive)
-            let well_data: Vec<(SVector<f64, 2>, f64)> = well_positions.iter().zip(well_remaining.iter())
+            let well_data: Vec<(SVector<f64, 2>, f64)> = well_positions
+                .iter()
+                .zip(well_remaining.iter())
                 .filter(|(_, &rem)| rem > 0.0)
                 .map(|(&p, &rem)| (p, (rem / 3000.0).min(1.0)))
                 .collect();
 
             for &h in &handles {
                 let Some(body) = world.body(h) else { continue };
-                let Some(entity) = consciousness.entities.get(&h) else { continue };
-                if entity.energy.is_collapsed() { continue; }
+                let Some(entity) = consciousness.entities.get(&h) else {
+                    continue;
+                };
+                if entity.energy.is_collapsed() {
+                    continue;
+                }
 
                 let pos = body.position().0;
                 let ef = entity.energy.fraction_remaining();
                 let harmony = entity.harmony_activations;
-                let nearby: Vec<_> = agent_data.iter()
-                    .filter(|(p, _)| (p - pos).norm() > 2.0).cloned().collect();
+                let nearby: Vec<_> = agent_data
+                    .iter()
+                    .filter(|(p, _)| (p - pos).norm() > 2.0)
+                    .cloned()
+                    .collect();
 
-                let dir = fep_gradient::free_energy_gradient(&pos, ef, &harmony, &nearby, &well_data, None, 0.0);
+                let dir = fep_gradient::free_energy_gradient(
+                    &pos, ef, &harmony, &nearby, &well_data, None, 0.0,
+                );
                 if let Some(body) = world.body_mut(h) {
                     body.linear_velocity = dir * 25.0;
                 }
@@ -180,14 +236,19 @@ fn run_experiment(condition: Condition, seed: u64) -> RunResult {
         let well_rate = consciousness.constants.energy_well_regen_rate;
 
         // Collect which well (if any) each agent is near, with depletion check
-        let agent_well_idx: Vec<Option<usize>> = handles.iter().map(|&h| {
-            world.body(h).and_then(|body| {
-                let pos = body.position().0;
-                well_positions.iter().enumerate()
-                    .find(|(i, &wp)| (pos - wp).norm() < 35.0 && well_remaining[*i] > 0.0)
-                    .map(|(i, _)| i)
+        let agent_well_idx: Vec<Option<usize>> = handles
+            .iter()
+            .map(|&h| {
+                world.body(h).and_then(|body| {
+                    let pos = body.position().0;
+                    well_positions
+                        .iter()
+                        .enumerate()
+                        .find(|(i, &wp)| (pos - wp).norm() < 35.0 && well_remaining[*i] > 0.0)
+                        .map(|(i, _)| i)
+                })
             })
-        }).collect();
+            .collect();
 
         for (idx, &h) in handles.iter().enumerate() {
             // Energy tick reset
@@ -216,7 +277,7 @@ fn run_experiment(condition: Condition, seed: u64) -> RunResult {
         // 4. Harmony resonance + offloading
         if condition.use_offloading() {
             for i in 0..handles.len() {
-                for j in (i+1)..handles.len() {
+                for j in (i + 1)..handles.len() {
                     let (ha, hb) = (handles[i], handles[j]);
                     let (harm_a, harm_b) = {
                         let ea = consciousness.entities.get(&ha);
@@ -228,9 +289,15 @@ fn run_experiment(condition: Condition, seed: u64) -> RunResult {
                     };
                     let resonance = HarmonyField::<2>::resonance(&harm_a, &harm_b);
                     if resonance > 0.5 {
-                        let regen = consciousness.constants.harmony_resonance_regen_rate * (resonance - 0.5) * 2.0;
-                        if let Some(e) = consciousness.entities.get_mut(&ha) { e.energy.regenerate(regen); }
-                        if let Some(e) = consciousness.entities.get_mut(&hb) { e.energy.regenerate(regen); }
+                        let regen = consciousness.constants.harmony_resonance_regen_rate
+                            * (resonance - 0.5)
+                            * 2.0;
+                        if let Some(e) = consciousness.entities.get_mut(&ha) {
+                            e.energy.regenerate(regen);
+                        }
+                        if let Some(e) = consciousness.entities.get_mut(&hb) {
+                            e.energy.regenerate(regen);
+                        }
                         cooperation_events += 1;
                     }
                 }
@@ -244,9 +311,17 @@ fn run_experiment(condition: Condition, seed: u64) -> RunResult {
 
         // 6. Track convergence (normalized J/Phi per agent per second)
         if let Some(jphi) = balance.joules_per_phi {
-            let alive_count = handles.iter()
-                .filter(|h| consciousness.entities.get(h).map(|e| !e.energy.is_collapsed()).unwrap_or(false))
-                .count().max(1) as f64;
+            let alive_count = handles
+                .iter()
+                .filter(|h| {
+                    consciousness
+                        .entities
+                        .get(h)
+                        .map(|e| !e.energy.is_collapsed())
+                        .unwrap_or(false)
+                })
+                .count()
+                .max(1) as f64;
             let jphi_normalized = jphi / alive_count / (1.0 / DT); // per agent per second
             if jphi_normalized.is_finite() && jphi_detector.push(jphi_normalized) && !converged {
                 converged = true;
@@ -257,20 +332,43 @@ fn run_experiment(condition: Condition, seed: u64) -> RunResult {
 
         // CSV output every 100 ticks
         if tick % 100 == 0 {
-            let alive = handles.iter()
-                .filter(|h| consciousness.entities.get(h).map(|e| !e.energy.is_collapsed()).unwrap_or(false))
+            let alive = handles
+                .iter()
+                .filter(|h| {
+                    consciousness
+                        .entities
+                        .get(h)
+                        .map(|e| !e.energy.is_collapsed())
+                        .unwrap_or(false)
+                })
                 .count();
             let clustering = avg_nearest_neighbor(&world, &handles);
-            let jphi_str = balance.joules_per_phi.map(|j| format!("{j:.6}")).unwrap_or("N/A".into());
-            println!("{},{seed},{tick},{:.4},{jphi_str},{alive},{:.2},{clustering:.2}",
-                condition.name(), consciousness.collective_phi,
-                handles.iter().filter_map(|h| consciousness.entities.get(h).map(|e| e.energy.available)).sum::<f64>() / AGENTS as f64,
+            let jphi_str = balance
+                .joules_per_phi
+                .map(|j| format!("{j:.6}"))
+                .unwrap_or("N/A".into());
+            println!(
+                "{},{seed},{tick},{:.4},{jphi_str},{alive},{:.2},{clustering:.2}",
+                condition.name(),
+                consciousness.collective_phi,
+                handles
+                    .iter()
+                    .filter_map(|h| consciousness.entities.get(h).map(|e| e.energy.available))
+                    .sum::<f64>()
+                    / AGENTS as f64,
             );
         }
     }
 
-    let alive = handles.iter()
-        .filter(|h| consciousness.entities.get(h).map(|e| !e.energy.is_collapsed()).unwrap_or(false))
+    let alive = handles
+        .iter()
+        .filter(|h| {
+            consciousness
+                .entities
+                .get(h)
+                .map(|e| !e.energy.is_collapsed())
+                .unwrap_or(false)
+        })
         .count();
 
     RunResult {
@@ -307,8 +405,15 @@ fn main() {
         let n = results.len() as f64;
         let converged_count = results.iter().filter(|r| r.converged).count();
         let mean_tick = if converged_count > 0 {
-            results.iter().filter(|r| r.converged).map(|r| r.convergence_tick as f64).sum::<f64>() / converged_count as f64
-        } else { f64::NAN };
+            results
+                .iter()
+                .filter(|r| r.converged)
+                .map(|r| r.convergence_tick as f64)
+                .sum::<f64>()
+                / converged_count as f64
+        } else {
+            f64::NAN
+        };
         let mean_jphi = results.iter().map(|r| r.final_jphi).sum::<f64>() / n;
         let mean_phi = results.iter().map(|r| r.final_phi).sum::<f64>() / n;
         let mean_alive = results.iter().map(|r| r.alive as f64).sum::<f64>() / n;
@@ -318,9 +423,17 @@ fn main() {
         let jphi_std = std_dev(&jphi_vals);
         let jphi_ci = 1.96 * jphi_std / n.sqrt();
 
-        eprintln!("\n── {} ({}/{} converged) ──", condition.name(), converged_count, NUM_SEEDS);
+        eprintln!(
+            "\n── {} ({}/{} converged) ──",
+            condition.name(),
+            converged_count,
+            NUM_SEEDS
+        );
         eprintln!("  Convergence tick:  {:.0} (mean of converged)", mean_tick);
-        eprintln!("  J/Φ:              {:.6} ± {:.6} (95% CI)", mean_jphi, jphi_ci);
+        eprintln!(
+            "  J/Φ:              {:.6} ± {:.6} (95% CI)",
+            mean_jphi, jphi_ci
+        );
         eprintln!("  Final Φ:          {:.4}", mean_phi);
         eprintln!("  Alive:            {:.1}/{AGENTS}", mean_alive);
         eprintln!("  Clustering:       {:.2}", mean_cluster);
@@ -344,41 +457,65 @@ fn main() {
         energy_cluster.push(r_energy.final_clustering);
     }
 
-    use symtropy_consciousness_physics::convergence::{mann_whitney_u, cohens_d};
+    use symtropy_consciousness_physics::convergence::{cohens_d, mann_whitney_u};
 
     let (u, z, p) = mann_whitney_u(&full_cluster, &free_cluster);
     let d = cohens_d(&full_cluster, &free_cluster);
     eprintln!("  FULL vs FREE clustering:");
     eprintln!("    Mann-Whitney U={:.1}, z={:.3}, p={:.4}", u, z, p);
     eprintln!("    Cohen's d={:.3} ({})", d, effect_label(d));
-    eprintln!("    {} at α=0.05", if p < 0.05 { "SIGNIFICANT" } else { "not significant" });
+    eprintln!(
+        "    {} at α=0.05",
+        if p < 0.05 {
+            "SIGNIFICANT"
+        } else {
+            "not significant"
+        }
+    );
 
     let (u2, z2, p2) = mann_whitney_u(&full_cluster, &energy_cluster);
     let d2 = cohens_d(&full_cluster, &energy_cluster);
     eprintln!("  FULL vs ENERGY_ONLY clustering:");
     eprintln!("    Mann-Whitney U={:.1}, z={:.3}, p={:.4}", u2, z2, p2);
     eprintln!("    Cohen's d={:.3} ({})", d2, effect_label(d2));
-    eprintln!("    {} at α=0.05", if p2 < 0.05 { "SIGNIFICANT" } else { "not significant" });
+    eprintln!(
+        "    {} at α=0.05",
+        if p2 < 0.05 {
+            "SIGNIFICANT"
+        } else {
+            "not significant"
+        }
+    );
 
     eprintln!("\n=== Experiment Complete ===");
 }
 
 fn effect_label(d: f64) -> &'static str {
     let d = d.abs();
-    if d < 0.2 { "negligible" }
-    else if d < 0.5 { "small" }
-    else if d < 0.8 { "medium" }
-    else { "large" }
+    if d < 0.2 {
+        "negligible"
+    } else if d < 0.5 {
+        "small"
+    } else if d < 0.8 {
+        "medium"
+    } else {
+        "large"
+    }
 }
 
 fn avg_nearest_neighbor(world: &PhysicsWorld<2>, handles: &[symtropy_physics::BodyHandle]) -> f64 {
-    let positions: Vec<SVector<f64, 2>> = handles.iter()
+    let positions: Vec<SVector<f64, 2>> = handles
+        .iter()
         .filter_map(|h| world.body(*h).map(|b| b.position().0))
         .collect();
-    if positions.len() < 2 { return f64::MAX; }
+    if positions.len() < 2 {
+        return f64::MAX;
+    }
     let mut total = 0.0;
     for (i, p) in positions.iter().enumerate() {
-        let nearest = positions.iter().enumerate()
+        let nearest = positions
+            .iter()
+            .enumerate()
             .filter(|(j, _)| *j != i)
             .map(|(_, q)| (p - q).norm())
             .fold(f64::MAX, f64::min);
@@ -389,12 +526,16 @@ fn avg_nearest_neighbor(world: &PhysicsWorld<2>, handles: &[symtropy_physics::Bo
 
 fn std_dev(vals: &[f64]) -> f64 {
     let n = vals.len() as f64;
-    if n < 2.0 { return 0.0; }
+    if n < 2.0 {
+        return 0.0;
+    }
     let mean = vals.iter().sum::<f64>() / n;
     (vals.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n - 1.0)).sqrt()
 }
 
 fn rng_f64(state: &mut u64) -> f64 {
-    *state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+    *state = state
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
     (*state >> 11) as f64 / (1u64 << 53) as f64
 }

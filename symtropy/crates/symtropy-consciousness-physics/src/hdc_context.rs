@@ -28,10 +28,10 @@
 //! carries an optional `HdcConsciousnessContext`. When present, `phi()`
 //! returns the HDC-derived value instead of the scalar equation.
 
-use symthaea_core::hdc::unified_hv::ContinuousHV;
 use symthaea_core::hdc::hdc_ltc_unified::{
     HdcLtcUnifiedNetwork, UnifiedConfig, UnifiedNetworkConfig,
 };
+use symthaea_core::hdc::unified_hv::ContinuousHV;
 
 /// Number of consciousness components (phi, broadcast, working_memory,
 /// attention, recurrence, embodiment, knowledge).
@@ -80,7 +80,8 @@ impl HdcConsciousnessContext {
         let harmony_basis: Vec<ContinuousHV> = (0..NUM_HARMONIES)
             .map(|i| {
                 let base = &consciousness_basis[i % NUM_COMPONENTS];
-                let noise = ContinuousHV::random(HDC_DIM, seed.wrapping_add(1000 + i as u64 * 6271));
+                let noise =
+                    ContinuousHV::random(HDC_DIM, seed.wrapping_add(1000 + i as u64 * 6271));
                 // 70% correlated with consciousness basis, 30% unique noise
                 base.scale(0.7).add(&noise.scale(0.3)).normalize()
             })
@@ -90,8 +91,8 @@ impl HdcConsciousnessContext {
         let config = UnifiedNetworkConfig {
             neuron_config: UnifiedConfig {
                 dimension: HDC_DIM,
-                tau_base: 0.1,       // 100ms time constant
-                backbone_tau: 0.5,   // state-dependent scaling
+                tau_base: 0.1,     // 100ms time constant
+                backbone_tau: 0.5, // state-dependent scaling
                 ..UnifiedConfig::default()
             },
             layer_sizes: vec![7, 8, 4],
@@ -113,7 +114,12 @@ impl HdcConsciousnessContext {
     /// `inputs`: 7 scalar consciousness components [phi, broadcast, wm, attention, recurrence, embodiment, knowledge]
     /// `harmony`: 8 harmony activations [0, 1]
     /// `dt`: time delta in seconds
-    pub fn step(&mut self, inputs: &[f64; NUM_COMPONENTS], harmony: &[f64; NUM_HARMONIES], dt: f32) {
+    pub fn step(
+        &mut self,
+        inputs: &[f64; NUM_COMPONENTS],
+        harmony: &[f64; NUM_HARMONIES],
+        dt: f32,
+    ) {
         // Encode scalar inputs as weighted basis HVs bundled together.
         let scaled: Vec<ContinuousHV> = self
             .consciousness_basis
@@ -190,13 +196,13 @@ pub fn inputs_from_state(
     collective_phi: f64,
 ) -> [f64; NUM_COMPONENTS] {
     [
-        energy_frac.clamp(0.0, 1.0),                          // phi ← energy = integration capacity
-        (nearby_count as f64 / 5.0).min(1.0),                 // broadcast ← social = workspace
-        (1.0 - prediction_error).clamp(0.0, 1.0),             // working_memory ← surprise load
-        if danger > 0.3 { 0.8 } else { 0.5 },                 // attention ← threat presence
-        motor_precision.clamp(0.0, 1.0),                       // recurrence ← action feedback
-        (1.0 - energy_frac * 0.3).clamp(0.0, 1.0),            // embodiment ← physical cost
-        (harmony_total / 8.0).clamp(0.0, 1.0),                // knowledge ← harmony integration
+        energy_frac.clamp(0.0, 1.0), // phi ← energy = integration capacity
+        (nearby_count as f64 / 5.0).min(1.0), // broadcast ← social = workspace
+        (1.0 - prediction_error).clamp(0.0, 1.0), // working_memory ← surprise load
+        if danger > 0.3 { 0.8 } else { 0.5 }, // attention ← threat presence
+        motor_precision.clamp(0.0, 1.0), // recurrence ← action feedback
+        (1.0 - energy_frac * 0.3).clamp(0.0, 1.0), // embodiment ← physical cost
+        (harmony_total / 8.0).clamp(0.0, 1.0), // knowledge ← harmony integration
     ]
 }
 
@@ -204,10 +210,7 @@ pub fn inputs_from_state(
 ///
 /// Returns cosine similarity between two state vectors.
 /// Complements scalar harmony resonance with high-dimensional state alignment.
-pub fn thought_resonance(
-    thought_a: &ContinuousHV,
-    thought_b: &ContinuousHV,
-) -> f64 {
+pub fn thought_resonance(thought_a: &ContinuousHV, thought_b: &ContinuousHV) -> f64 {
     thought_a.similarity(thought_b) as f64
 }
 
@@ -332,7 +335,10 @@ mod tests {
         }
 
         let phi = ctx.phi_from_thought(&harmony);
-        eprintln!("  HDC Phi after 50 ticks: {phi:.6}, norm: {:.4}", ctx.thought_hv().norm());
+        eprintln!(
+            "  HDC Phi after 50 ticks: {phi:.6}, norm: {:.4}",
+            ctx.thought_hv().norm()
+        );
         assert!(phi > 0.001, "Phi should be nonzero after stepping: {phi}");
     }
 
@@ -355,8 +361,10 @@ mod tests {
 
         eprintln!("  phi_high={phi_high:.6}, phi_low={phi_low:.6}");
         // They should be different (consciousness responds to input changes)
-        assert!((phi_high - phi_low).abs() > 0.001,
-            "Phi should respond to input changes: high={phi_high}, low={phi_low}");
+        assert!(
+            (phi_high - phi_low).abs() > 0.001,
+            "Phi should respond to input changes: high={phi_high}, low={phi_low}"
+        );
     }
 
     #[test]
@@ -371,6 +379,9 @@ mod tests {
             ctx2.step(&inputs, &harmony, 0.016);
         }
         let res = thought_resonance(ctx2.thought_hv(), ctx2.thought_hv());
-        assert!((res - 1.0).abs() < 0.01, "Self-resonance should be ~1.0: {res}");
+        assert!(
+            (res - 1.0).abs() < 0.01,
+            "Self-resonance should be ~1.0: {res}"
+        );
     }
 }

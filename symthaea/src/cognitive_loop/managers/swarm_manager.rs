@@ -773,7 +773,8 @@ impl SwarmManager {
     pub fn effective_phi(&self, individual_phi: f64) -> f64 {
         if self.swarm_consciousness.delegation.in_conscious_collective {
             let alpha = 0.3;
-            let blended = alpha * self.swarm_consciousness.phi_swarm + (1.0 - alpha) * individual_phi;
+            let blended =
+                alpha * self.swarm_consciousness.phi_swarm + (1.0 - alpha) * individual_phi;
             blended.max(individual_phi)
         } else {
             individual_phi

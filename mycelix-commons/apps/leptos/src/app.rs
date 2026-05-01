@@ -60,8 +60,13 @@ fn AppInner() -> impl IntoView {
                     <Route path=path!("/property") view=PropertyPage />
                     <Route path=path!("/housing") view=HousingPage />
                     <Route path=path!("/care") view=CarePage />
+                    <Route path=path!("/mutual-aid") view=MutualAidPage />
+                    <Route path=path!("/food") view=FoodPage />
+                    <Route path=path!("/water") view=WaterPage />
+                    <Route path=path!("/tools") view=ToolsPage />
                     <Route path=path!("/resources") view=ResourcesPage />
                     <Route path=path!("/transport") view=TransportPage />
+                    <Route path=path!("/calendar") view=CalendarPage />
                 </Routes>
             </main>
             <footer class="footer">

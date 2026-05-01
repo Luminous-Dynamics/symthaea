@@ -1,0 +1,126 @@
+{
+  "metadata": {
+    "title": "The Mycelial Soul: Sovereign Jurisprudence & Collective Psychology",
+    "framework": "Mycelix Psychology",
+    "source": "https://mycelix.org",
+    "grade_level": "Lifelong/Universal",
+    "subject_area": "Humanities",
+    "domain": "Humanities",
+    "version": "1.0",
+    "total_standards": 5,
+    "domains": [
+      "Jurisprudence",
+      "Psychology",
+      "Economic Anthropology"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "The internal and legal shift required for a sovereign, decentralized society."
+  },
+  "nodes": [
+    {
+      "id": "HUM-LAW-101",
+      "title": "Poly-Centric Law & Boundary Contracts",
+      "description": "Moving from top-down legislation to community-authored boundary contracts. Understanding how to manage overlapping jurisdictions in a global mesh network.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Jurisprudence",
+      "subdomain": "Mycelial Soul",
+      "tags": ["law", "sovereignty", "governance", "contracts"],
+      "estimated_hours": 60,
+      "grade_levels": ["Graduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Humanities"
+    },
+    {
+      "id": "HUM-PSY-101",
+      "title": "Psychology of Sovereignty",
+      "description": "Deconstructing the 'Consumer' identity. Building the mental resilience and epistemic humility required to act as a primary steward of a civilizational node.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Psychology",
+      "subdomain": "Mycelial Soul",
+      "tags": ["psychology", "mindset", "sovereignty", "resilience"],
+      "estimated_hours": 45,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Understand",
+      "subject_area": "Humanities"
+    },
+    {
+      "id": "HUM-KULA-201",
+      "title": "Risk Commoning & Mutual Aid",
+      "description": "The math of the Kula ring. Designing decentralized insurance pools where the community backs individual risk through shared TEND reserves and social proof.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Economic Anthropology",
+      "subdomain": "Mycelial Soul",
+      "tags": ["kula", "mutual-aid", "insurance", "reciprocity"],
+      "estimated_hours": 60,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Apply",
+      "subject_area": "Humanities"
+    },
+    {
+      "id": "HUM-DIP-301",
+      "title": "Interspecies Diplomacy",
+      "description": "Representing the non-human. Techniques for integrating biosignals into civic quorums. How to act as a legal proxy for a local river or mycelial network.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Jurisprudence",
+      "subdomain": "Mycelial Soul",
+      "tags": ["diplomacy", "ecology", "dao", "rights-of-nature"],
+      "estimated_hours": 90,
+      "grade_levels": ["Graduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Humanities"
+    },
+    {
+      "id": "HUM-CAP-04",
+      "title": "The Mycelial Soul Capstone",
+      "description": "Draft a full 'Social Charter' for a new local guild or Learning Pod, including its legal boundaries, risk-sharing model, and interspecies proxies.",
+      "node_type": "Capstone",
+      "difficulty": "Expert",
+      "domain": "Universal",
+      "subdomain": "Mycelial Soul",
+      "tags": ["capstone", "charter", "founding", "jurisprudence"],
+      "estimated_hours": 180,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Create",
+      "subject_area": "Humanities",
+      "holonic_capstone": {
+        "required_node_ids": ["HUM-LAW-101", "HUM-PSY-101", "HUM-KULA-201"],
+        "deliverable": "A cryptographically signed Guild Charter and a verified initial risk-pool commitment.",
+        "min_peer_endorsements": 10
+      },
+      "alignment_vector": {
+        "ahimsa": 990,
+        "sovereignty_respect": 990,
+        "reciprocity": 980,
+        "collective_flourishing": 950,
+        "epistemic_humility": 920
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "HUM-LAW-101",
+      "to": "HUM-CAP-04",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "A social charter requires mastery of poly-centric legal principles."
+    },
+    {
+      "from": "HUM-KULA-201",
+      "to": "HUM-CAP-04",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "The charter must include a sustainable economic risk model."
+    },
+    {
+      "from": "HUM-PSY-101",
+      "to": "HUM-CAP-04",
+      "edge_type": "Recommended",
+      "strength_permille": 600,
+      "rationale": "Sovereign psychology is the invisible glue of a community charter."
+    }
+  ]
+}

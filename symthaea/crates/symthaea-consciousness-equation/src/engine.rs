@@ -213,7 +213,11 @@ impl MasterConsciousnessEquation {
         let softmin = if weight_sum > epsilon {
             let raw = weighted_sum / weight_sum;
             // Fall back to hard-min if val*weight overflowed
-            if raw.is_finite() { raw } else { min_val }
+            if raw.is_finite() {
+                raw
+            } else {
+                min_val
+            }
         } else {
             min_val
         };
@@ -770,20 +774,22 @@ mod tests {
     fn test_softmin_extreme_values_no_nan() {
         let eq = MasterConsciousnessEquation::default();
         // Very large positive values — softmin exponent would overflow without clamping
-        let factors = vec![
-            ("A", 1e300_f64),
-            ("B", 1e300_f64),
-        ];
+        let factors = vec![("A", 1e300_f64), ("B", 1e300_f64)];
         let (result, _) = eq.softmin_with_name(&factors);
-        assert!(result.is_finite(), "softmin with extreme positive inputs should be finite, got {}", result);
+        assert!(
+            result.is_finite(),
+            "softmin with extreme positive inputs should be finite, got {}",
+            result
+        );
 
         // Very large negative values
-        let factors_neg = vec![
-            ("A", -1e300_f64),
-            ("B", -1e300_f64),
-        ];
+        let factors_neg = vec![("A", -1e300_f64), ("B", -1e300_f64)];
         let (result_neg, _) = eq.softmin_with_name(&factors_neg);
-        assert!(result_neg.is_finite(), "softmin with extreme negative inputs should be finite, got {}", result_neg);
+        assert!(
+            result_neg.is_finite(),
+            "softmin with extreme negative inputs should be finite, got {}",
+            result_neg
+        );
 
         // Tiny tau with moderate values
         let mut eq_tiny = MasterConsciousnessEquation::default();
@@ -794,7 +800,11 @@ mod tests {
         });
         let factors_mod = vec![("A", 0.5), ("B", 0.8)];
         let (result_tiny, _) = eq_tiny.softmin_with_name(&factors_mod);
-        assert!(result_tiny.is_finite(), "softmin with tiny tau should be finite, got {}", result_tiny);
+        assert!(
+            result_tiny.is_finite(),
+            "softmin with tiny tau should be finite, got {}",
+            result_tiny
+        );
     }
 
     #[test]
@@ -802,18 +812,31 @@ mod tests {
         let eq = MasterConsciousnessEquation::default();
         // Large positive — should saturate to 1.0
         let s_pos = eq.sigmoid(200.0);
-        assert!((s_pos - 1.0).abs() < 1e-10, "sigmoid(200) should be ~1.0, got {}", s_pos);
+        assert!(
+            (s_pos - 1.0).abs() < 1e-10,
+            "sigmoid(200) should be ~1.0, got {}",
+            s_pos
+        );
         assert!(s_pos.is_finite());
 
         // Large negative — should saturate to 0.0
         let s_neg = eq.sigmoid(-200.0);
-        assert!(s_neg.abs() < 1e-10, "sigmoid(-200) should be ~0.0, got {}", s_neg);
+        assert!(
+            s_neg.abs() < 1e-10,
+            "sigmoid(-200) should be ~0.0, got {}",
+            s_neg
+        );
         assert!(s_neg.is_finite());
 
         // Normal value — should match original formula
         let s_mid = eq.sigmoid(0.5);
         let expected = 1.0 / (1.0 + (-2.5_f64).exp());
-        assert!((s_mid - expected).abs() < 1e-10, "sigmoid(0.5) should be {}, got {}", expected, s_mid);
+        assert!(
+            (s_mid - expected).abs() < 1e-10,
+            "sigmoid(0.5) should be {}, got {}",
+            expected,
+            s_mid
+        );
     }
 
     /// Weight sensitivity analysis: sweep each weight ±50% and measure impact.
@@ -840,9 +863,16 @@ mod tests {
 
         // Weight names and their default values for sweeping
         let weight_names = [
-            "phi", "broadcast", "working_memory", "attention",
-            "recurrence", "embodiment", "knowledge",
-            "embodiment_factor", "narrative", "social",
+            "phi",
+            "broadcast",
+            "working_memory",
+            "attention",
+            "recurrence",
+            "embodiment",
+            "knowledge",
+            "embodiment_factor",
+            "narrative",
+            "social",
         ];
         let default_weights = [0.15, 0.10, 0.10, 0.12, 0.10, 0.10, 0.08, 0.10, 0.08, 0.07];
 
@@ -898,8 +928,14 @@ mod tests {
         // Verify all results are finite and consciousness stays in [0, 1]
         for (name, sens, c_dn, _c0, c_up) in &sensitivities {
             assert!(sens.is_finite(), "Sensitivity for {name} is non-finite");
-            assert!(*c_dn >= 0.0 && *c_dn <= 1.0, "{name} c_dn out of range: {c_dn}");
-            assert!(*c_up >= 0.0 && *c_up <= 1.0, "{name} c_up out of range: {c_up}");
+            assert!(
+                *c_dn >= 0.0 && *c_dn <= 1.0,
+                "{name} c_dn out of range: {c_dn}"
+            );
+            assert!(
+                *c_up >= 0.0 && *c_up <= 1.0,
+                "{name} c_up out of range: {c_up}"
+            );
         }
 
         // The equation should respond to weight changes (not be constant)

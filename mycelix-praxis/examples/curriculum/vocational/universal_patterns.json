@@ -1,0 +1,100 @@
+{
+  "metadata": {
+    "title": "Universal Patterns & Systems Dynamics",
+    "framework": "Mycelix Systems Thinking",
+    "source": "https://mycelix.org",
+    "grade_level": "Secondary/Undergraduate",
+    "subject_area": "Systems Science",
+    "domain": "Systems",
+    "version": "1.0",
+    "total_standards": 4,
+    "domains": [
+      "Mathematics",
+      "Complexity Science",
+      "Ecology"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Foundational 'Grammar of Nature' for all disciplines."
+  },
+  "nodes": [
+    {
+      "id": "MATH-UNI-101",
+      "title": "The Math of Growth: Fractals & Power Laws",
+      "description": "Understanding how nature builds. Fractals, Fibonacci sequences, and power-law distributions in living systems, cities, and mesh networks. Why scale matters.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Mathematics",
+      "subdomain": "Universal Patterns",
+      "tags": ["math", "fractals", "growth", "patterns"],
+      "estimated_hours": 45,
+      "grade_levels": ["Grade10", "Grade11", "Grade12", "Undergraduate"],
+      "bloom_level": "Understand",
+      "subject_area": "Mathematics"
+    },
+    {
+      "id": "SCI-UNI-101",
+      "title": "Systems Dynamics & Feedback Loops",
+      "description": "Thinking in loops. Positive and negative feedback, delayed signals, and the unintended consequences of centralized interventions. Modeling ecological and economic balance.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Complexity Science",
+      "subdomain": "Universal Patterns",
+      "tags": ["systems", "logic", "ecology", "causality"],
+      "estimated_hours": 45,
+      "grade_levels": ["Grade11", "Grade12", "Undergraduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Science"
+    },
+    {
+      "id": "SCI-UNI-201",
+      "title": "The Physics of Phase Transitions",
+      "description": "Why things suddenly change. From individual agents to collective swarms. Understanding critical points, tipping points, and emergent order in decentralized systems.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Complexity Science",
+      "subdomain": "Universal Patterns",
+      "tags": ["physics", "emergence", "collective-intelligence", "tipping-points"],
+      "estimated_hours": 60,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Science"
+    },
+    {
+      "id": "SCI-BIO-201-F",
+      "title": "Biological Homeostasis & Social Ubuntu",
+      "description": "The parallel between the body's internal balance and the community's social health. How individual 'errors' are corrected by the collective substrate to maintain the whole.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Ecology",
+      "subdomain": "Universal Patterns",
+      "tags": ["biology", "ubuntu", "homeostasis", "sociology"],
+      "estimated_hours": 45,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Science"
+    }
+  ],
+  "edges": [
+    {
+      "from": "MATH-UNI-101",
+      "to": "SCI-UNI-201",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Understanding power-law distributions is required for modeling critical points in phase transitions."
+    },
+    {
+      "from": "SCI-UNI-101",
+      "to": "CIV-501",
+      "edge_type": "Recommended",
+      "strength_permille": 700,
+      "rationale": "Systems dynamics provide the causal intuition for thermodynamic governance."
+    },
+    {
+      "from": "SCI-BIO-201-F",
+      "to": "HUM-CAP-01",
+      "edge_type": "Recommended",
+      "strength_permille": 600,
+      "rationale": "Biological homeostasis is the spiritual model for Ubuntu stewardship."
+    }
+  ]
+}

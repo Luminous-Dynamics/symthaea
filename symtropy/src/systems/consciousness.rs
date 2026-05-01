@@ -10,9 +10,7 @@
 //! The player can see and act on these bottlenecks.
 
 use bevy::prelude::*;
-use symthaea_consciousness_equation::{
-    ConsciousnessInputs, MasterConsciousnessEquation,
-};
+use symthaea_consciousness_equation::{ConsciousnessInputs, MasterConsciousnessEquation};
 
 use crate::components::{CrewNpc, Player};
 use crate::resources::{BiometricsCtx, LeviathanState, SleepPhase};
@@ -80,14 +78,18 @@ pub fn player_consciousness_system(
     };
 
     let inputs = ConsciousnessInputs {
-        phi: (1.0 - load as f64) * 0.8 + 0.2,  // integration degrades with stress
+        phi: (1.0 - load as f64) * 0.8 + 0.2, // integration degrades with stress
         broadcast: (1.0 - stress.arousal as f64 * 0.5).max(0.1), // panic narrows broadcast
         working_memory: (1.0 - load as f64 * 0.6).max(0.1),
         attention: (stress.arousal as f64 * 0.3 + 0.5).min(1.0), // some arousal helps
         recurrence: (harmony.total_energy as f64 / 8.0).min(1.0),
         embodiment: (1.0_f64 - danger as f64 * 0.3).max(0.2),
         knowledge: (harmony.activations.iter().filter(|&&a| a > 0.3).count() as f64 / 8.0).min(1.0),
-        synchrony: if harmony.is_sanctuary { 0.9 } else { 0.4 + harmony.total_energy as f64 * 0.05 },
+        synchrony: if harmony.is_sanctuary {
+            0.9
+        } else {
+            0.4 + harmony.total_energy as f64 * 0.05
+        },
     };
 
     let result = player_c.equation.compute(&inputs);
@@ -99,7 +101,11 @@ pub fn player_consciousness_system(
 /// Update NPC consciousness from game state.
 /// Burnout ceiling: allostatic_load > 0.8 caps Phi (ported from multiworld sim).
 pub fn npc_consciousness_system(
-    mut npcs: Query<(&CrewNpc, &mut NpcConsciousness, Option<&crate::systems::psychology::PsychologicalNeeds>)>,
+    mut npcs: Query<(
+        &CrewNpc,
+        &mut NpcConsciousness,
+        Option<&crate::systems::psychology::PsychologicalNeeds>,
+    )>,
     leviathan: Res<LeviathanState>,
     harmony: Res<crate::systems::harmonies::LocalHarmonyState>,
 ) {
@@ -129,7 +135,11 @@ pub fn npc_consciousness_system(
             recurrence: (harmony.total_energy as f64 / 8.0).min(1.0),
             embodiment: (1.0_f64 - danger * 0.5).max(0.2),
             knowledge: 0.5,
-            synchrony: if harmony.is_sanctuary { 0.8 } else { 0.3 + harmony.total_energy as f64 * 0.04 },
+            synchrony: if harmony.is_sanctuary {
+                0.8
+            } else {
+                0.3 + harmony.total_energy as f64 * 0.04
+            },
         };
 
         let result = consciousness.equation.compute(&inputs);

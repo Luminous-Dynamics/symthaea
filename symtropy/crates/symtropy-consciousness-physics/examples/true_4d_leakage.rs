@@ -13,15 +13,15 @@
 //! our 3D universe is a slice of a 4D bulk, and energy can leak out.
 
 use nalgebra::SVector;
+use symthaea_consciousness_equation::ConsciousnessInputs;
 use symtropy_consciousness_physics::fep_gradient;
 use symtropy_consciousness_physics::harmony_field::HarmonyField;
 use symtropy_consciousness_physics::{ConsciousnessField, ThermodynamicConstants};
 use symtropy_math::Point;
 use symtropy_physics::PhysicsWorld;
-use symthaea_consciousness_equation::ConsciousnessInputs;
 
 const AGENTS: usize = 12;
-const DRIFTERS: usize = 4;  // objects that drift along W axis
+const DRIFTERS: usize = 4; // objects that drift along W axis
 const TICKS: usize = 3000;
 const SEEDS: usize = 10;
 
@@ -35,7 +35,7 @@ fn distance_3d(a: &SVector<f64, 4>, b: &SVector<f64, 4>) -> f64 {
     let dx = a[0] - b[0];
     let dy = a[1] - b[1];
     let dz = a[2] - b[2];
-    (dx*dx + dy*dy + dz*dz).sqrt()
+    (dx * dx + dy * dy + dz * dz).sqrt()
 }
 
 /// Whether an object is "visible" to 3D agents (w close to 0).
@@ -47,11 +47,11 @@ struct Result {
     avg_pred_error: f64,
     alive: usize,
     avg_energy: f64,
-    objects_visible: f64,       // fraction of drifters visible at end
-    total_3d_energy: f64,       // total energy in 3D-visible objects
-    total_4d_energy: f64,       // total energy including W-displaced objects
-    apparent_violation: f64,    // difference = "dark energy"
-    max_pred_error_spike: f64,  // peak prediction error during the run
+    objects_visible: f64,      // fraction of drifters visible at end
+    total_3d_energy: f64,      // total energy in 3D-visible objects
+    total_4d_energy: f64,      // total energy including W-displaced objects
+    apparent_violation: f64,   // difference = "dark energy"
+    max_pred_error_spike: f64, // peak prediction error during the run
 }
 
 fn run(with_drift: bool, seed: u64) -> Result {
@@ -59,11 +59,16 @@ fn run(with_drift: bool, seed: u64) -> Result {
     let mut world = PhysicsWorld::<4>::new(SVector::from([0.0, 0.0, 0.0, 0.0]));
     let mut consciousness = ConsciousnessField::<4>::new();
     consciousness.constants = ThermodynamicConstants {
-        initial_energy: 500.0, max_energy: 500.0,
-        consciousness_maintenance_per_tick: 0.10, movement_cost_per_unit: 0.006,
-        sprint_cost_multiplier: 2.5, collision_energy_drain: 0.05,
-        harmony_resonance_regen_rate: 0.12, energy_well_regen_rate: 0.25,
-        ambient_regen_rate: 0.03, collapse_recovery_harmony_threshold: 0.5,
+        initial_energy: 500.0,
+        max_energy: 500.0,
+        consciousness_maintenance_per_tick: 0.10,
+        movement_cost_per_unit: 0.006,
+        sprint_cost_multiplier: 2.5,
+        collision_energy_drain: 0.05,
+        harmony_resonance_regen_rate: 0.12,
+        energy_well_regen_rate: 0.25,
+        ambient_regen_rate: 0.03,
+        collapse_recovery_harmony_threshold: 0.5,
         harmony_range: 40.0,
     };
 
@@ -79,16 +84,19 @@ fn run(with_drift: bool, seed: u64) -> Result {
         if let Some(b) = world.body_mut(h) {
             b.linear_damping = 0.3;
             b.linear_velocity = SVector::from([
-                (nr(&mut rng)-0.5)*8.0, (nr(&mut rng)-0.5)*8.0, 0.0, 0.0
+                (nr(&mut rng) - 0.5) * 8.0,
+                (nr(&mut rng) - 0.5) * 8.0,
+                0.0,
+                0.0,
             ]);
         }
         consciousness.register(h, 500.0, 20.0);
         if let Some(e) = consciousness.entities.get_mut(&h) {
             match i % 4 {
-                0 => e.harmony_activations = [0.9,0.1,0.1,0.1,0.1,0.1,0.1,0.8,0.5],
-                1 => e.harmony_activations = [0.1,0.9,0.1,0.1,0.1,0.1,0.8,0.1,0.5],
-                2 => e.harmony_activations = [0.1,0.1,0.9,0.1,0.1,0.8,0.1,0.1,0.5],
-                _ => e.harmony_activations = [0.4;9],
+                0 => e.harmony_activations = [0.9, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.8, 0.5],
+                1 => e.harmony_activations = [0.1, 0.9, 0.1, 0.1, 0.1, 0.1, 0.8, 0.1, 0.5],
+                2 => e.harmony_activations = [0.1, 0.1, 0.9, 0.1, 0.1, 0.8, 0.1, 0.1, 0.5],
+                _ => e.harmony_activations = [0.4; 9],
             }
         }
         agent_handles.push(h);
@@ -120,30 +128,63 @@ fn run(with_drift: bool, seed: u64) -> Result {
     for tick in 0..TICKS {
         // Consciousness update for agents
         for &h in &agent_handles {
-            let ef = consciousness.entities.get(&h).map(|e| e.energy.fraction_remaining()).unwrap_or(0.0);
-            let inputs = ConsciousnessInputs { phi: if ef > 0.0 { 0.5 } else { 0.0 },
-                broadcast: 0.6, working_memory: 0.5, attention: 0.5,
-                recurrence: 0.4, embodiment: 0.6, knowledge: 0.4, synchrony: 0.5 };
+            let ef = consciousness
+                .entities
+                .get(&h)
+                .map(|e| e.energy.fraction_remaining())
+                .unwrap_or(0.0);
+            let inputs = ConsciousnessInputs {
+                phi: if ef > 0.0 { 0.5 } else { 0.0 },
+                broadcast: 0.6,
+                working_memory: 0.5,
+                attention: 0.5,
+                recurrence: 0.4,
+                embodiment: 0.6,
+                knowledge: 0.4,
+                synchrony: 0.5,
+            };
             consciousness.update_entity(h, &inputs, Point::origin());
         }
 
         // FEP gradient — agents sense in 3D only
         // Build "nearby agents" list using 3D projected positions
-        let agent_data_3d: Vec<(SVector<f64, 4>, [f64; 9])> = agent_handles.iter()
+        let agent_data_3d: Vec<(SVector<f64, 4>, [f64; 9])> = agent_handles
+            .iter()
             .filter_map(|&h| {
                 let body = world.body(h)?;
                 let entity = consciousness.entities.get(&h)?;
                 Some((body.position().0, entity.harmony_activations))
-            }).collect();
+            })
+            .collect();
 
         for (idx, &h) in agent_handles.iter().enumerate() {
-            if consciousness.entities.get(&h).map(|e| e.energy.is_collapsed()).unwrap_or(true) { continue; }
-            let pos = match world.body(h) { Some(b) => b.position().0, None => continue };
-            let ef = consciousness.entities.get(&h).map(|e| e.energy.fraction_remaining()).unwrap_or(0.0);
-            let harm = consciousness.entities.get(&h).map(|e| e.harmony_activations).unwrap_or([0.5;9]);
+            if consciousness
+                .entities
+                .get(&h)
+                .map(|e| e.energy.is_collapsed())
+                .unwrap_or(true)
+            {
+                continue;
+            }
+            let pos = match world.body(h) {
+                Some(b) => b.position().0,
+                None => continue,
+            };
+            let ef = consciousness
+                .entities
+                .get(&h)
+                .map(|e| e.energy.fraction_remaining())
+                .unwrap_or(0.0);
+            let harm = consciousness
+                .entities
+                .get(&h)
+                .map(|e| e.harmony_activations)
+                .unwrap_or([0.5; 9]);
 
             // 3D-BLIND: agent can only see other agents' xyz, not w
-            let nearby: Vec<_> = agent_data_3d.iter().enumerate()
+            let nearby: Vec<_> = agent_data_3d
+                .iter()
+                .enumerate()
                 .filter(|(i, _)| *i != idx)
                 .map(|(_, (p, h))| (*p, *h)) // passes 4D but gradient only uses first dims
                 .collect();
@@ -164,8 +205,11 @@ fn run(with_drift: bool, seed: u64) -> Result {
             if let Some(e) = consciousness.entities.get_mut(&h) {
                 e.energy.tick_reset();
                 let phi = e.phi();
-                e.energy.consume(consciousness.constants.consciousness_maintenance_per_tick * (1.0 + phi * 0.5));
-                e.energy.regenerate(consciousness.constants.ambient_regen_rate * rm);
+                e.energy.consume(
+                    consciousness.constants.consciousness_maintenance_per_tick * (1.0 + phi * 0.5),
+                );
+                e.energy
+                    .regenerate(consciousness.constants.ambient_regen_rate * rm);
             }
         }
 
@@ -212,43 +256,79 @@ fn run(with_drift: bool, seed: u64) -> Result {
 
         // Offloading (same as before)
         for i in 0..agent_handles.len() {
-            for j in (i+1)..agent_handles.len() {
-                let (ha,hb) = (agent_handles[i],agent_handles[j]);
-                let dist = match (world.body(ha),world.body(hb)) {
-                    (Some(a),Some(b)) => distance_3d(&a.position().0, &b.position().0),
-                    _ => continue
+            for j in (i + 1)..agent_handles.len() {
+                let (ha, hb) = (agent_handles[i], agent_handles[j]);
+                let dist = match (world.body(ha), world.body(hb)) {
+                    (Some(a), Some(b)) => distance_3d(&a.position().0, &b.position().0),
+                    _ => continue,
                 };
-                if dist > consciousness.constants.harmony_range { continue; }
-                let (hah,hbh) = match (consciousness.entities.get(&ha), consciousness.entities.get(&hb)) {
-                    (Some(a),Some(b)) => (a.harmony_activations, b.harmony_activations), _ => continue };
+                if dist > consciousness.constants.harmony_range {
+                    continue;
+                }
+                let (hah, hbh) = match (
+                    consciousness.entities.get(&ha),
+                    consciousness.entities.get(&hb),
+                ) {
+                    (Some(a), Some(b)) => (a.harmony_activations, b.harmony_activations),
+                    _ => continue,
+                };
                 let res = HarmonyField::<4>::resonance(&hah, &hbh);
                 if res > 0.5 {
-                    let off = (res-0.5)*2.0;
+                    let off = (res - 0.5) * 2.0;
                     if let Some(e) = consciousness.entities.get_mut(&ha) {
-                        e.prediction_error *= 1.0-off*0.1; e.motor_precision = 1.0/(1.0+e.prediction_error);
-                        e.energy.regenerate(consciousness.constants.consciousness_maintenance_per_tick * off * 0.5);
+                        e.prediction_error *= 1.0 - off * 0.1;
+                        e.motor_precision = 1.0 / (1.0 + e.prediction_error);
+                        e.energy.regenerate(
+                            consciousness.constants.consciousness_maintenance_per_tick * off * 0.5,
+                        );
                     }
                     if let Some(e) = consciousness.entities.get_mut(&hb) {
-                        e.prediction_error *= 1.0-off*0.1; e.motor_precision = 1.0/(1.0+e.prediction_error);
-                        e.energy.regenerate(consciousness.constants.consciousness_maintenance_per_tick * off * 0.5);
+                        e.prediction_error *= 1.0 - off * 0.1;
+                        e.motor_precision = 1.0 / (1.0 + e.prediction_error);
+                        e.energy.regenerate(
+                            consciousness.constants.consciousness_maintenance_per_tick * off * 0.5,
+                        );
                     }
                 }
             }
         }
 
         consciousness.tick_prediction_errors();
-        world.step_with_callback(1.0/64.0, &mut consciousness);
+        world.step_with_callback(1.0 / 64.0, &mut consciousness);
         consciousness.tick_thermodynamics();
     }
 
     // Final measurements
-    let alive = agent_handles.iter().filter(|h| consciousness.entities.get(h).map(|e| !e.energy.is_collapsed()).unwrap_or(false)).count();
-    let ae = agent_handles.iter().filter_map(|h| consciousness.entities.get(h).map(|e| e.energy.available)).sum::<f64>() / AGENTS as f64;
-    let avg_pe = agent_handles.iter().filter_map(|h| consciousness.entities.get(h).map(|e| e.prediction_error)).sum::<f64>() / AGENTS as f64;
+    let alive = agent_handles
+        .iter()
+        .filter(|h| {
+            consciousness
+                .entities
+                .get(h)
+                .map(|e| !e.energy.is_collapsed())
+                .unwrap_or(false)
+        })
+        .count();
+    let ae = agent_handles
+        .iter()
+        .filter_map(|h| consciousness.entities.get(h).map(|e| e.energy.available))
+        .sum::<f64>()
+        / AGENTS as f64;
+    let avg_pe = agent_handles
+        .iter()
+        .filter_map(|h| consciousness.entities.get(h).map(|e| e.prediction_error))
+        .sum::<f64>()
+        / AGENTS as f64;
 
-    let visible_drifters = drifter_handles.iter().filter(|&&h| {
-        world.body(h).map(|b| visible_in_3d(&b.position().0, w_visibility)).unwrap_or(false)
-    }).count();
+    let visible_drifters = drifter_handles
+        .iter()
+        .filter(|&&h| {
+            world
+                .body(h)
+                .map(|b| visible_in_3d(&b.position().0, w_visibility))
+                .unwrap_or(false)
+        })
+        .count();
 
     let mut total_3d = 0.0f64;
     let mut total_4d = 0.0f64;
@@ -279,34 +359,51 @@ fn main() {
     println!("║  Objects drift along W axis. Agents can't see W.              ║");
     println!("║  Energy that moves in W vanishes from agents' reality.         ║");
     println!("╚═════════════════════════════════════════════════════════════════╝\n");
-    println!("{} agents + {} drifters in PhysicsWorld<4>, {} ticks, {} seeds\n",
-        AGENTS, DRIFTERS, TICKS, SEEDS);
+    println!(
+        "{} agents + {} drifters in PhysicsWorld<4>, {} ticks, {} seeds\n",
+        AGENTS, DRIFTERS, TICKS, SEEDS
+    );
 
-    println!("{:<10} {:<8} {:<8} {:<8} {:<10} {:<10} {:<10} {:<10} {:<10}",
-        "Cond", "PredErr", "MaxPE", "Alive", "Energy", "Visible", "3D_E", "4D_E", "DarkE");
+    println!(
+        "{:<10} {:<8} {:<8} {:<8} {:<10} {:<10} {:<10} {:<10} {:<10}",
+        "Cond", "PredErr", "MaxPE", "Alive", "Energy", "Visible", "3D_E", "4D_E", "DarkE"
+    );
     println!("{}", "─".repeat(84));
 
     for (name, drift) in &[("STATIC", false), ("DRIFTING", true)] {
-        let mut pe=Vec::new(); let mut mp=Vec::new(); let mut al=Vec::new();
-        let mut en=Vec::new(); let mut vi=Vec::new(); let mut e3=Vec::new();
-        let mut e4=Vec::new(); let mut de=Vec::new();
+        let mut pe = Vec::new();
+        let mut mp = Vec::new();
+        let mut al = Vec::new();
+        let mut en = Vec::new();
+        let mut vi = Vec::new();
+        let mut e3 = Vec::new();
+        let mut e4 = Vec::new();
+        let mut de = Vec::new();
 
         for s in 0..SEEDS {
             let r = run(*drift, 42 + s as u64 * 997);
-            pe.push(r.avg_pred_error); mp.push(r.max_pred_error_spike);
-            al.push(r.alive as f64); en.push(r.avg_energy);
-            vi.push(r.objects_visible); e3.push(r.total_3d_energy);
-            e4.push(r.total_4d_energy); de.push(r.apparent_violation);
+            pe.push(r.avg_pred_error);
+            mp.push(r.max_pred_error_spike);
+            al.push(r.alive as f64);
+            en.push(r.avg_energy);
+            vi.push(r.objects_visible);
+            e3.push(r.total_3d_energy);
+            e4.push(r.total_4d_energy);
+            de.push(r.apparent_violation);
         }
 
         let n = SEEDS as f64;
-        println!("{:<10} {:<8.4} {:<8.3} {:<8.1} {:<10.1} {:<10.1}% {:<10.2} {:<10.2} {:<10.2}",
+        println!(
+            "{:<10} {:<8.4} {:<8.3} {:<8.1} {:<10.1} {:<10.1}% {:<10.2} {:<10.2} {:<10.2}",
             name,
-            pe.iter().sum::<f64>()/n, mp.iter().sum::<f64>()/n,
-            al.iter().sum::<f64>()/n, en.iter().sum::<f64>()/n,
-            vi.iter().sum::<f64>()/n * 100.0,
-            e3.iter().sum::<f64>()/n, e4.iter().sum::<f64>()/n,
-            de.iter().sum::<f64>()/n,
+            pe.iter().sum::<f64>() / n,
+            mp.iter().sum::<f64>() / n,
+            al.iter().sum::<f64>() / n,
+            en.iter().sum::<f64>() / n,
+            vi.iter().sum::<f64>() / n * 100.0,
+            e3.iter().sum::<f64>() / n,
+            e4.iter().sum::<f64>() / n,
+            de.iter().sum::<f64>() / n,
         );
     }
 
@@ -319,4 +416,9 @@ fn main() {
     println!("═══════════════════════════════════════════════════════════════");
 }
 
-fn nr(s: &mut u64) -> f64 { *s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407); (*s >> 11) as f64 / (1u64 << 53) as f64 }
+fn nr(s: &mut u64) -> f64 {
+    *s = s
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
+    (*s >> 11) as f64 / (1u64 << 53) as f64
+}

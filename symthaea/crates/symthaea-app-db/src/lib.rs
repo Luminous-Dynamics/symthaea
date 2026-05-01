@@ -375,10 +375,8 @@ impl AppDatabase {
         // Detect format
         if raw_text.contains("---APPS---") || raw_text.contains("---BREW---") {
             // macOS companion script format
-            let mut section = "";
             for line in &lines {
                 if line.starts_with("---") {
-                    section = line.trim_matches('-');
                     continue;
                 }
                 let name = line.trim();

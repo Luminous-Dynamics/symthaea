@@ -3,12 +3,12 @@
 //! Consciousness-coupled surgical robot — sub-mm RCM-constrained precision.
 //! Safety: Green=5N/50mm/s, Yellow=2N/20mm/s, Orange=freeze, Red=retract.
 #![deny(unsafe_code)]
-pub mod types;
-pub mod encoder;
 pub mod controller;
-pub mod simulator;
 pub mod embodiment;
+pub mod encoder;
 pub mod fep_agent;
 pub mod perturbations;
-pub mod training;
 pub mod plugin;
+pub mod simulator;
+pub mod training;
+pub mod types;

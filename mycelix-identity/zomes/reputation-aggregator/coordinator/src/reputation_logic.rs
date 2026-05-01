@@ -32,11 +32,12 @@ pub fn calculate_recursive_reputation(agent_b64: String) -> ExternResult<f64> {
         did,
     ) {
         Ok(ZomeCallResponse::Ok(extern_io)) => {
-            let score: f64 = extern_io
-                .decode()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(
-                    format!("Failed to decode reputation score: {}", e)
-                )))?;
+            let score: f64 = extern_io.decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "Failed to decode reputation score: {}",
+                    e
+                )))
+            })?;
             Ok(score.clamp(0.0, 1.0))
         }
         Ok(_) | Err(_) => {

@@ -8,7 +8,7 @@
 
 use super::nix_parser::{ErrorSeverity, NixConfig, NixParser, NixValue};
 use crate::traits::{
-    CodeDiagnostic, CodeEntity, CodeParser, DiagnosticSeverity, EntityKind, ParsedCode, Span,
+    CodeDiagnostic, CodeParser, DiagnosticSeverity, Entity, EntityKind, ParsedCode, Span,
 };
 
 /// Adapter that makes NixParser implement CodeParser
@@ -24,8 +24,8 @@ impl NixCodeParser {
         }
     }
 
-    /// Convert NixConfig entities to CodeEntity format
-    fn convert_entities(&self, config: &NixConfig) -> Vec<CodeEntity> {
+    /// Convert NixConfig entities to Entity format
+    fn convert_entities(&self, config: &NixConfig) -> Vec<Entity> {
         let mut entities = Vec::new();
 
         // Convert module args to parameters
@@ -39,8 +39,7 @@ impl NixCodeParser {
                 end_col: 0,
             };
             entities.push(
-                CodeEntity::new(EntityKind::Variable, arg, span)
-                    .with_annotation("kind", "module_arg"),
+                Entity::new(EntityKind::Variable, arg, span).with_annotation("kind", "module_arg"),
             );
         }
 
@@ -54,7 +53,7 @@ impl NixCodeParser {
                 end_line: 0,
                 end_col: 0,
             };
-            entities.push(CodeEntity::new(EntityKind::Import, import, span));
+            entities.push(Entity::new(EntityKind::Import, import, span));
         }
 
         // Convert options to bindings
@@ -69,7 +68,7 @@ impl NixCodeParser {
             };
 
             let kind = self.classify_nix_option(&option.path, &option.value);
-            let mut entity = CodeEntity::new(kind, &option.path, span)
+            let mut entity = Entity::new(kind, &option.path, span)
                 .with_source(option.raw_value.clone())
                 .with_annotation(
                     "value_type",
@@ -78,12 +77,12 @@ impl NixCodeParser {
 
             // Detect flake-specific patterns
             if option.path.starts_with("inputs.") {
-                entity = CodeEntity {
+                entity = Entity {
                     kind: EntityKind::FlakeInput,
                     ..entity
                 };
             } else if option.path.starts_with("outputs") {
-                entity = CodeEntity {
+                entity = Entity {
                     kind: EntityKind::FlakeOutput,
                     ..entity
                 };
@@ -103,7 +102,7 @@ impl NixCodeParser {
                 end_col: 0,
             };
             entities.push(
-                CodeEntity::new(EntityKind::Module, "flake", span).with_annotation("type", "flake"),
+                Entity::new(EntityKind::Module, "flake", span).with_annotation("type", "flake"),
             );
         }
 
@@ -191,7 +190,7 @@ impl CodeParser for NixCodeParser {
         Ok(parsed)
     }
 
-    fn extract_entities(&self, parsed: &ParsedCode) -> Vec<CodeEntity> {
+    fn extract_entities(&self, parsed: &ParsedCode) -> Vec<Entity> {
         parsed.entities.clone()
     }
 

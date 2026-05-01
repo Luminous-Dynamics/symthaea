@@ -6,8 +6,8 @@
 //! Each experience (game, tool, visualization) registers itself with a
 //! descriptor. The Nexus launcher reads the registry to build the menu.
 
-use bevy::prelude::*;
 use crate::resources::GamePhase;
+use bevy::prelude::*;
 
 /// Describes a launchable experience.
 #[derive(Debug, Clone)]
@@ -29,16 +29,14 @@ pub struct ExperienceRegistry {
 
 impl Default for ExperienceRegistry {
     fn default() -> Self {
-        let mut experiences = vec![
-            ExperienceDescriptor {
-                id: "the-room",
-                name: "The Room That Remembers You",
-                subtitle: "Consciousness survival horror",
-                icon_color: [0.3, 0.9, 0.8],  // Symtropy cyan
-                phase: GamePhase::Loading,
-                available: true,
-            },
-        ];
+        let mut experiences = vec![ExperienceDescriptor {
+            id: "the-room",
+            name: "The Room That Remembers You",
+            subtitle: "Consciousness survival horror",
+            icon_color: [0.3, 0.9, 0.8], // Symtropy cyan
+            phase: GamePhase::Loading,
+            available: true,
+        }];
 
         // Sol Atlas (feature-gated)
         #[cfg(feature = "atlas")]
@@ -46,12 +44,15 @@ impl Default for ExperienceRegistry {
             id: "sol-atlas",
             name: "Sol Atlas",
             subtitle: "Civilizational planetary instrument",
-            icon_color: [0.2, 0.6, 1.0],  // Deep blue
+            icon_color: [0.2, 0.6, 1.0], // Deep blue
             phase: GamePhase::GlobeView,
             available: true,
         });
 
-        Self { experiences, selected: 0 }
+        Self {
+            experiences,
+            selected: 0,
+        }
     }
 }
 

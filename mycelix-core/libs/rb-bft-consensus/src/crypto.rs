@@ -7,12 +7,12 @@
 //! All signing keys are zeroized on drop to prevent memory leaks.
 
 use ed25519_dalek::{
-    Signature, Signer, SigningKey, Verifier, VerifyingKey,
-    SECRET_KEY_LENGTH, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH,
+    Signature, Signer, SigningKey, Verifier, VerifyingKey, PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH,
+    SIGNATURE_LENGTH,
 };
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 use zeroize::ZeroizeOnDrop;
 
 use crate::error::{ConsensusError, ConsensusResult};
@@ -136,28 +136,31 @@ impl ConsensusSignature {
             });
         }
 
-        let pubkey_bytes: [u8; PUBLIC_KEY_LENGTH] = self.signer_pubkey
-            .as_slice()
-            .try_into()
-            .map_err(|_| ConsensusError::InvalidSignature {
-                reason: "invalid public key length".to_string(),
+        let pubkey_bytes: [u8; PUBLIC_KEY_LENGTH] =
+            self.signer_pubkey.as_slice().try_into().map_err(|_| {
+                ConsensusError::InvalidSignature {
+                    reason: "invalid public key length".to_string(),
+                }
             })?;
 
-        let sig_bytes: [u8; SIGNATURE_LENGTH] = self.signature
-            .as_slice()
-            .try_into()
-            .map_err(|_| ConsensusError::InvalidSignature {
-                reason: "invalid signature length".to_string(),
-            })?;
+        let sig_bytes: [u8; SIGNATURE_LENGTH] =
+            self.signature
+                .as_slice()
+                .try_into()
+                .map_err(|_| ConsensusError::InvalidSignature {
+                    reason: "invalid signature length".to_string(),
+                })?;
 
-        let verifying_key = VerifyingKey::from_bytes(&pubkey_bytes)
-            .map_err(|e| ConsensusError::InvalidSignature {
+        let verifying_key = VerifyingKey::from_bytes(&pubkey_bytes).map_err(|e| {
+            ConsensusError::InvalidSignature {
                 reason: format!("invalid public key: {}", e),
-            })?;
+            }
+        })?;
 
         let signature = Signature::from_bytes(&sig_bytes);
 
-        verifying_key.verify(message, &signature)
+        verifying_key
+            .verify(message, &signature)
             .map_err(|e| ConsensusError::InvalidSignature {
                 reason: format!("signature verification failed: {}", e),
             })

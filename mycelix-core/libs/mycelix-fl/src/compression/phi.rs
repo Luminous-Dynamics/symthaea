@@ -76,10 +76,7 @@ impl PhiApproximator {
     /// (e.g., 1.1 = 10%), that gradient is likely Byzantine.
     ///
     /// Returns a list of node IDs flagged as Byzantine and the system Phi.
-    pub fn detect_byzantine(
-        gradients: &[Gradient],
-        threshold_ratio: f64,
-    ) -> (Vec<String>, f64) {
+    pub fn detect_byzantine(gradients: &[Gradient], threshold_ratio: f64) -> (Vec<String>, f64) {
         let system_phi = Self::approximate_phi(gradients);
         if system_phi <= 0.0 || gradients.len() <= 2 {
             return (Vec::new(), system_phi);

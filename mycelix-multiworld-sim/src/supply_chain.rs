@@ -39,14 +39,14 @@ use std::collections::HashMap;
 pub enum SupplyNode {
     // === Earth regions ===
     NorthAmerica,
-    SouthAmerica,    // Ecuador Spaceport
+    SouthAmerica, // Ecuador Spaceport
     WesternEurope,
     EasternEurope,
     NorthAfrica,
     SubSaharanAfrica,
     MiddleEast,
     SouthAsia,
-    EastAsia,        // Semiconductor hub
+    EastAsia, // Semiconductor hub
     SoutheastAsia,
     Oceania,
     CentralAsia,
@@ -59,15 +59,26 @@ pub enum SupplyNode {
 
 impl SupplyNode {
     pub fn is_earth(&self) -> bool {
-        !matches!(self, Self::LunarColony | Self::MarsColony | Self::EuropaStation | Self::TitanOutpost)
+        !matches!(
+            self,
+            Self::LunarColony | Self::MarsColony | Self::EuropaStation | Self::TitanOutpost
+        )
     }
 
     pub fn all_earth() -> Vec<Self> {
         vec![
-            Self::NorthAmerica, Self::SouthAmerica, Self::WesternEurope,
-            Self::EasternEurope, Self::NorthAfrica, Self::SubSaharanAfrica,
-            Self::MiddleEast, Self::SouthAsia, Self::EastAsia,
-            Self::SoutheastAsia, Self::Oceania, Self::CentralAsia,
+            Self::NorthAmerica,
+            Self::SouthAmerica,
+            Self::WesternEurope,
+            Self::EasternEurope,
+            Self::NorthAfrica,
+            Self::SubSaharanAfrica,
+            Self::MiddleEast,
+            Self::SouthAsia,
+            Self::EastAsia,
+            Self::SoutheastAsia,
+            Self::Oceania,
+            Self::CentralAsia,
         ]
     }
 
@@ -179,14 +190,22 @@ impl SupplyChainGraph {
 
         // Add all nodes
         let all_nodes = [
-            SupplyNode::NorthAmerica, SupplyNode::SouthAmerica,
-            SupplyNode::WesternEurope, SupplyNode::EasternEurope,
-            SupplyNode::NorthAfrica, SupplyNode::SubSaharanAfrica,
-            SupplyNode::MiddleEast, SupplyNode::SouthAsia,
-            SupplyNode::EastAsia, SupplyNode::SoutheastAsia,
-            SupplyNode::Oceania, SupplyNode::CentralAsia,
-            SupplyNode::LunarColony, SupplyNode::MarsColony,
-            SupplyNode::EuropaStation, SupplyNode::TitanOutpost,
+            SupplyNode::NorthAmerica,
+            SupplyNode::SouthAmerica,
+            SupplyNode::WesternEurope,
+            SupplyNode::EasternEurope,
+            SupplyNode::NorthAfrica,
+            SupplyNode::SubSaharanAfrica,
+            SupplyNode::MiddleEast,
+            SupplyNode::SouthAsia,
+            SupplyNode::EastAsia,
+            SupplyNode::SoutheastAsia,
+            SupplyNode::Oceania,
+            SupplyNode::CentralAsia,
+            SupplyNode::LunarColony,
+            SupplyNode::MarsColony,
+            SupplyNode::EuropaStation,
+            SupplyNode::TitanOutpost,
         ];
         for &node in &all_nodes {
             let idx = graph.add_node(node);
@@ -196,86 +215,203 @@ impl SupplyChainGraph {
 
         // Add key supply routes (Earth internal)
         let mut g = Self {
-            graph, node_indices, node_health,
+            graph,
+            node_indices,
+            node_health,
             disruptions: Vec::new(),
             global_health: 1.0,
         };
 
         // === Critical Earth supply chains ===
         // Semiconductors: East Asia → everywhere
-        g.add_route(SupplyNode::EastAsia, SupplyNode::NorthAmerica,
-            TransportMode::Maritime, 0.9, 0.15, vec!["semiconductors", "electronics"]);
-        g.add_route(SupplyNode::EastAsia, SupplyNode::WesternEurope,
-            TransportMode::Maritime, 0.8, 0.15, vec!["semiconductors", "electronics"]);
+        g.add_route(
+            SupplyNode::EastAsia,
+            SupplyNode::NorthAmerica,
+            TransportMode::Maritime,
+            0.9,
+            0.15,
+            vec!["semiconductors", "electronics"],
+        );
+        g.add_route(
+            SupplyNode::EastAsia,
+            SupplyNode::WesternEurope,
+            TransportMode::Maritime,
+            0.8,
+            0.15,
+            vec!["semiconductors", "electronics"],
+        );
 
         // Rare earths: Sub-Saharan Africa + Central Asia → manufacturing
-        g.add_route(SupplyNode::SubSaharanAfrica, SupplyNode::EastAsia,
-            TransportMode::Maritime, 0.7, 0.2, vec!["rare_earths", "cobalt"]);
-        g.add_route(SupplyNode::CentralAsia, SupplyNode::EastAsia,
-            TransportMode::Land, 0.5, 0.15, vec!["rare_earths"]);
+        g.add_route(
+            SupplyNode::SubSaharanAfrica,
+            SupplyNode::EastAsia,
+            TransportMode::Maritime,
+            0.7,
+            0.2,
+            vec!["rare_earths", "cobalt"],
+        );
+        g.add_route(
+            SupplyNode::CentralAsia,
+            SupplyNode::EastAsia,
+            TransportMode::Land,
+            0.5,
+            0.15,
+            vec!["rare_earths"],
+        );
 
         // Energy: Middle East → global
-        g.add_route(SupplyNode::MiddleEast, SupplyNode::SouthAsia,
-            TransportMode::Maritime, 0.8, 0.1, vec!["energy"]);
-        g.add_route(SupplyNode::MiddleEast, SupplyNode::EastAsia,
-            TransportMode::Maritime, 0.9, 0.15, vec!["energy"]);
+        g.add_route(
+            SupplyNode::MiddleEast,
+            SupplyNode::SouthAsia,
+            TransportMode::Maritime,
+            0.8,
+            0.1,
+            vec!["energy"],
+        );
+        g.add_route(
+            SupplyNode::MiddleEast,
+            SupplyNode::EastAsia,
+            TransportMode::Maritime,
+            0.9,
+            0.15,
+            vec!["energy"],
+        );
 
         // Aerospace: North America → South America (launch)
-        g.add_route(SupplyNode::NorthAmerica, SupplyNode::SouthAmerica,
-            TransportMode::Land, 0.8, 0.1, vec!["aerospace", "software"]);
+        g.add_route(
+            SupplyNode::NorthAmerica,
+            SupplyNode::SouthAmerica,
+            TransportMode::Land,
+            0.8,
+            0.1,
+            vec!["aerospace", "software"],
+        );
 
         // Launch corridor: South America → Lunar Colony
-        g.add_route(SupplyNode::SouthAmerica, SupplyNode::LunarColony,
-            TransportMode::LaunchCorridor, 0.6, 0.3, vec!["crew", "equipment"]);
+        g.add_route(
+            SupplyNode::SouthAmerica,
+            SupplyNode::LunarColony,
+            TransportMode::LaunchCorridor,
+            0.6,
+            0.3,
+            vec!["crew", "equipment"],
+        );
 
         // Nuclear: Western Europe + Oceania → space program
-        g.add_route(SupplyNode::WesternEurope, SupplyNode::NorthAmerica,
-            TransportMode::Maritime, 0.7, 0.1, vec!["precision_optics", "nuclear"]);
-        g.add_route(SupplyNode::Oceania, SupplyNode::SouthAmerica,
-            TransportMode::Maritime, 0.5, 0.2, vec!["uranium"]);
+        g.add_route(
+            SupplyNode::WesternEurope,
+            SupplyNode::NorthAmerica,
+            TransportMode::Maritime,
+            0.7,
+            0.1,
+            vec!["precision_optics", "nuclear"],
+        );
+        g.add_route(
+            SupplyNode::Oceania,
+            SupplyNode::SouthAmerica,
+            TransportMode::Maritime,
+            0.5,
+            0.2,
+            vec!["uranium"],
+        );
 
         // Pharmaceuticals: South Asia + Western Europe → colonies
-        g.add_route(SupplyNode::SouthAsia, SupplyNode::NorthAmerica,
-            TransportMode::Air, 0.6, 0.1, vec!["pharmaceuticals"]);
+        g.add_route(
+            SupplyNode::SouthAsia,
+            SupplyNode::NorthAmerica,
+            TransportMode::Air,
+            0.6,
+            0.1,
+            vec!["pharmaceuticals"],
+        );
 
         // === Interplanetary routes ===
-        g.add_route(SupplyNode::LunarColony, SupplyNode::MarsColony,
-            TransportMode::Interplanetary, 0.3, 0.4, vec!["equipment", "crew"]);
-        g.add_route(SupplyNode::LunarColony, SupplyNode::EuropaStation,
-            TransportMode::Interplanetary, 0.1, 0.5, vec!["equipment"]);
-        g.add_route(SupplyNode::MarsColony, SupplyNode::TitanOutpost,
-            TransportMode::Interplanetary, 0.05, 0.6, vec!["equipment"]);
+        g.add_route(
+            SupplyNode::LunarColony,
+            SupplyNode::MarsColony,
+            TransportMode::Interplanetary,
+            0.3,
+            0.4,
+            vec!["equipment", "crew"],
+        );
+        g.add_route(
+            SupplyNode::LunarColony,
+            SupplyNode::EuropaStation,
+            TransportMode::Interplanetary,
+            0.1,
+            0.5,
+            vec!["equipment"],
+        );
+        g.add_route(
+            SupplyNode::MarsColony,
+            SupplyNode::TitanOutpost,
+            TransportMode::Interplanetary,
+            0.05,
+            0.6,
+            vec!["equipment"],
+        );
 
         // Titan exports hydrocarbons back
-        g.add_route(SupplyNode::TitanOutpost, SupplyNode::MarsColony,
-            TransportMode::Interplanetary, 0.1, 0.5, vec!["hydrocarbons", "nitrogen"]);
-        g.add_route(SupplyNode::EuropaStation, SupplyNode::MarsColony,
-            TransportMode::Interplanetary, 0.1, 0.4, vec!["water", "oxygen"]);
+        g.add_route(
+            SupplyNode::TitanOutpost,
+            SupplyNode::MarsColony,
+            TransportMode::Interplanetary,
+            0.1,
+            0.5,
+            vec!["hydrocarbons", "nitrogen"],
+        );
+        g.add_route(
+            SupplyNode::EuropaStation,
+            SupplyNode::MarsColony,
+            TransportMode::Interplanetary,
+            0.1,
+            0.4,
+            vec!["water", "oxygen"],
+        );
 
         g
     }
 
-    fn add_route(&mut self, from: SupplyNode, to: SupplyNode,
-                 mode: TransportMode, capacity: f64, vulnerability: f64,
-                 goods: Vec<&str>) {
+    fn add_route(
+        &mut self,
+        from: SupplyNode,
+        to: SupplyNode,
+        mode: TransportMode,
+        capacity: f64,
+        vulnerability: f64,
+        goods: Vec<&str>,
+    ) {
         let from_idx = self.node_indices[&from];
         let to_idx = self.node_indices[&to];
-        self.graph.add_edge(from_idx, to_idx, SupplyRoute {
-            capacity,
-            utilization: capacity * 0.5,
-            vulnerability,
-            mode,
-            goods: goods.iter().map(|s| s.to_string()).collect(),
-        });
+        self.graph.add_edge(
+            from_idx,
+            to_idx,
+            SupplyRoute {
+                capacity,
+                utilization: capacity * 0.5,
+                vulnerability,
+                mode,
+                goods: goods.iter().map(|s| s.to_string()).collect(),
+            },
+        );
     }
 
     /// Apply a disruption to a node (from disaster, conflict, etc.).
-    pub fn disrupt_node(&mut self, node: SupplyNode, severity: f64, description: String, duration: u32) {
+    pub fn disrupt_node(
+        &mut self,
+        node: SupplyNode,
+        severity: f64,
+        description: String,
+        duration: u32,
+    ) {
         if let Some(health) = self.node_health.get_mut(&node) {
             *health = (*health - severity).max(0.0);
         }
         self.disruptions.push(SupplyDisruption {
-            node, severity, description, remaining_ticks: duration,
+            node,
+            severity,
+            description,
+            remaining_ticks: duration,
         });
     }
 
@@ -296,8 +432,12 @@ impl SupplyChainGraph {
 
         // Compute effective throughput for each colony
         let mut colony_supply: HashMap<SupplyNode, f64> = HashMap::new();
-        let colonies = [SupplyNode::LunarColony, SupplyNode::MarsColony,
-                       SupplyNode::EuropaStation, SupplyNode::TitanOutpost];
+        let colonies = [
+            SupplyNode::LunarColony,
+            SupplyNode::MarsColony,
+            SupplyNode::EuropaStation,
+            SupplyNode::TitanOutpost,
+        ];
 
         for &colony in &colonies {
             let colony_idx = self.node_indices[&colony];

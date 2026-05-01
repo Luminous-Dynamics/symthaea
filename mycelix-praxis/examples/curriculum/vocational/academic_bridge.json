@@ -1,0 +1,122 @@
+{
+  "metadata": {
+    "title": "Academic Bridge: Foundations for Sovereignty",
+    "framework": "Mycelix Academic",
+    "source": "https://mycelix.org",
+    "grade_level": "Undergraduate/Advanced",
+    "subject_area": "Multi-Subject",
+    "domain": "Academic Bridge",
+    "version": "1.0",
+    "total_standards": 5,
+    "domains": [
+      "Mathematics",
+      "Science",
+      "Linguistics",
+      "History"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Bridging the gap between K-12 and Type 1 Civilization technical tracks."
+  },
+  "nodes": [
+    {
+      "id": "MATH-ADV-301",
+      "title": "Mathematics of the Mesh",
+      "description": "Linear Algebra and Graph Theory applied to decentralized networks. Understanding eigenvalues in trust-propagation and the geometry of high-dimensional semantic spaces (HDC).",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Academic Bridge",
+      "tags": ["math", "linear-algebra", "graph-theory", "topology"],
+      "estimated_hours": 90,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics"
+    },
+    {
+      "id": "SCI-CHEM-201",
+      "title": "Electrochemistry & Energy Storage",
+      "description": "The molecular basis of energy. Oxidation-reduction reactions, electrolyte chemistry, and the thermodynamics of phase-transition in solid-state batteries.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Science",
+      "subdomain": "Academic Bridge",
+      "tags": ["chemistry", "battery", "energy", "thermodynamics"],
+      "estimated_hours": 60,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Apply",
+      "subject_area": "Science"
+    },
+    {
+      "id": "ELA-ADV-401",
+      "title": "Sovereign Rhetoric & Formal Logic",
+      "description": "Critical analysis for a decentralized world. Formal logic, identifying sophistry/propaganda, and the linguistic precision required to draft auditable social contracts.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Linguistics",
+      "subdomain": "Academic Bridge",
+      "tags": ["logic", "rhetoric", "writing", "contracts"],
+      "estimated_hours": 60,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Evaluate",
+      "subject_area": "EnglishLanguageArts"
+    },
+    {
+      "id": "SOC-HIST-301",
+      "title": "History of Global Commoning",
+      "description": "Case studies in long-term stable cooperation. The Althing, the Haudenosaunee Great Law of Peace, and the Ejidos of Mexico. Patterns of successful decentralized law.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "History",
+      "subdomain": "Academic Bridge",
+      "tags": ["history", "commons", "law", "governance"],
+      "estimated_hours": 60,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Social Studies"
+    },
+    {
+      "id": "MATH-GAME-401",
+      "title": "Game Theory for Cooperators",
+      "description": "Moving from zero-sum to win-win dynamics. Nash equilibria in peer-to-peer networks, Tit-for-Tat strategies, and the math of 'Sacred Reciprocity'.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Mathematics",
+      "subdomain": "Academic Bridge",
+      "tags": ["game-theory", "economics", "cooperation", "math"],
+      "estimated_hours": 90,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics"
+    }
+  ],
+  "edges": [
+    {
+      "from": "MATH-ADV-301",
+      "to": "SCI-INFO-401",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Information theory in the mesh requires foundational graph theory and linear algebra."
+    },
+    {
+      "from": "SCI-CHEM-201",
+      "to": "VOC-RE-201",
+      "edge_type": "Recommended",
+      "strength_permille": 700,
+      "rationale": "Understanding electrolyte chemistry helps troubleshoot advanced battery management systems."
+    },
+    {
+      "from": "ELA-ADV-401",
+      "to": "HUM-LAW-101",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Drafting boundary contracts requires formal logic and rhetorical precision."
+    },
+    {
+      "from": "MATH-GAME-401",
+      "to": "CIV-501",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Thermodynamic governance is an application of multi-agent cooperative game theory."
+    }
+  ]
+}

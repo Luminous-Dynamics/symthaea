@@ -11,7 +11,9 @@
 
 use leptos::prelude::*;
 use crate::contexts::governance_context::use_governance;
-use mycelix_leptos_core::use_consciousness;
+use mycelix_leptos_core::{
+    AvailabilityState, AvailabilityStateKind, FreshnessBadge, FreshnessLevel, use_consciousness,
+};
 use crate::components::ProposalCard;
 use governance_leptos_types::*;
 
@@ -19,6 +21,7 @@ use governance_leptos_types::*;
 pub fn HomePage() -> impl IntoView {
     let gov = use_governance();
     let consciousness = use_consciousness();
+    let hc = mycelix_leptos_core::holochain_provider::use_holochain();
 
     let active_proposals = Memo::new(move |_| {
         gov.proposals.get()
@@ -43,6 +46,38 @@ pub fn HomePage() -> impl IntoView {
 
     view! {
         <div class="home-page">
+            <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-bottom: 1rem;">
+                {move || {
+                    gov.charter.get().map(|charter| {
+                        view! { <FreshnessBadge level=freshness_from_millis(charter.adopted) detail=format!("Charter {}", format_relative_millis(charter.adopted)) /> }
+                    }).unwrap_or_else(|| view! { <FreshnessBadge level=FreshnessLevel::Unknown detail="No charter timestamp yet" /> })
+                }}
+            </div>
+
+            {move || {
+                if hc.is_mock() {
+                    view! {
+                        <AvailabilityState
+                            kind=AvailabilityStateKind::Mock
+                            title="Mock Civic Posture"
+                            description="Governance is showing simulated proposals and constitutional state while live conductor-backed civic data continues wiring in."
+                            action={None}
+                        />
+                    }.into_any()
+                } else if gov.proposals.get().is_empty() && gov.charter.get().is_none() {
+                    view! {
+                        <AvailabilityState
+                            kind=AvailabilityStateKind::Empty
+                            title="Civic Surface Empty"
+                            description="Connected, but governance has not returned proposals or charter posture yet."
+                            action={None}
+                        />
+                    }.into_any()
+                } else {
+                    view! { <></> }.into_any()
+                }
+            }}
+
             <section class="civic-breath" aria-label="commons health">
                 <div class="breath-state">
                     {move || {
@@ -117,4 +152,23 @@ pub fn HomePage() -> impl IntoView {
             }}
         </div>
     }
+}
+
+fn freshness_from_millis(timestamp_millis: i64) -> FreshnessLevel {
+    let now_millis = js_sys::Date::now() as i64;
+    let age_minutes = now_millis.saturating_sub(timestamp_millis) / 60_000;
+    if age_minutes <= 5 {
+        FreshnessLevel::Fresh
+    } else if age_minutes <= 60 {
+        FreshnessLevel::Aging
+    } else {
+        FreshnessLevel::Stale
+    }
+}
+
+fn format_relative_millis(timestamp_millis: i64) -> String {
+    let date = js_sys::Date::new(&wasm_bindgen::JsValue::from_f64(timestamp_millis as f64));
+    date.to_locale_string("en-US", &wasm_bindgen::JsValue::UNDEFINED)
+        .as_string()
+        .unwrap_or_else(|| "recently".into())
 }

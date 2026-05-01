@@ -51,13 +51,23 @@ impl NetworkTopology {
         // Clustering decreases with population (more diverse connections)
         let clustering = (0.6 - 0.2 * (pop.ln() / 20.0).min(1.0)).max(0.1);
         // Average path length: small-world ln(N)/ln(k)
-        let avg_path = if mean_degree > 1.0 { pop.ln() / mean_degree.ln() } else { pop };
+        let avg_path = if mean_degree > 1.0 {
+            pop.ln() / mean_degree.ln()
+        } else {
+            pop
+        };
         // Hub fraction: scale-free networks have ~1-5% hubs
         let hub_fraction = 0.02 + 0.03 * urbanization;
         // Fragmentation: higher in rural, lower in urban
         let fragmentation = (0.4 - 0.3 * urbanization).max(0.05);
 
-        Self { mean_degree, clustering, avg_path_length: avg_path, hub_fraction, fragmentation }
+        Self {
+            mean_degree,
+            clustering,
+            avg_path_length: avg_path,
+            hub_fraction,
+            fragmentation,
+        }
     }
 
     /// Innovation diffusion rate: how fast new ideas spread.
@@ -152,8 +162,8 @@ pub fn earth_resources() -> Vec<DepletableResource> {
             name: "Oil".into(),
             total_reserve: 4000.0, // billion barrels (conventional + unconventional + undiscovered)
             cumulative_extracted: 400.0, // ~400Gb extracted by 1970 (10% of total)
-            peak_rate: 3.0,  // ~36Gb/year at peak ÷ 12 months
-            depletion_tau: 900.0, // broad peak
+            peak_rate: 3.0,        // ~36Gb/year at peak ÷ 12 months
+            depletion_tau: 900.0,  // broad peak
             current_rate: 0.0,
             eroi_at_full: 30.0,
             eroi_at_half: 12.0,
@@ -172,7 +182,7 @@ pub fn earth_resources() -> Vec<DepletableResource> {
         },
         DepletableResource {
             name: "Phosphorus".into(), // critical for agriculture
-            total_reserve: 70000.0, // million tonnes (USGS)
+            total_reserve: 70000.0,    // million tonnes (USGS)
             cumulative_extracted: 5000.0,
             peak_rate: 20.0,
             depletion_tau: 1200.0, // 100 years
@@ -281,8 +291,8 @@ pub struct EcosystemHealth {
 impl EcosystemHealth {
     pub fn earth_1970() -> Self {
         Self {
-            biodiversity: 0.95,  // ~5% loss by 1970
-            forest_cover: 0.85,  // pre-major deforestation
+            biodiversity: 0.95, // ~5% loss by 1970
+            forest_cover: 0.85, // pre-major deforestation
             soil_health: 0.80,
             ocean_health: 0.90,
             freshwater: 0.90,
@@ -321,9 +331,21 @@ impl EcosystemHealth {
     /// Agriculture productivity modifier from ecosystem services.
     /// Below tipping points, food production collapses nonlinearly.
     pub fn agriculture_modifier(&self) -> f64 {
-        let soil_factor = if self.soil_health > 0.5 { 1.0 } else { self.soil_health * 2.0 };
-        let water_factor = if self.freshwater > 0.3 { 1.0 } else { self.freshwater * 3.3 };
-        let pollination = if self.biodiversity > 0.4 { 1.0 } else { self.biodiversity * 2.5 };
+        let soil_factor = if self.soil_health > 0.5 {
+            1.0
+        } else {
+            self.soil_health * 2.0
+        };
+        let water_factor = if self.freshwater > 0.3 {
+            1.0
+        } else {
+            self.freshwater * 3.3
+        };
+        let pollination = if self.biodiversity > 0.4 {
+            1.0
+        } else {
+            self.biodiversity * 2.5
+        };
         (soil_factor * water_factor * pollination).clamp(0.1, 1.0)
     }
 
@@ -375,8 +397,8 @@ impl AsymmetricTrust {
     pub fn new() -> Self {
         Self {
             level: 0.5,
-            build_rate: 0.005,    // slow build
-            destroy_rate: 0.025,  // 5× faster destruction
+            build_rate: 0.005,   // slow build
+            destroy_rate: 0.025, // 5× faster destruction
             recovery_streak: 0,
             betrayal_count: 0,
         }
@@ -548,7 +570,8 @@ impl CivilizationalPrimitives {
 
         // 4. Tick ecosystem
         let pop_b = pop_millions / 1000.0;
-        self.ecosystem.tick(pop_b, gdp_per_capita, policy_protection);
+        self.ecosystem
+            .tick(pop_b, gdp_per_capita, policy_protection);
 
         // 5. Knowledge network with network diffusion
         let diffusion = self.network.innovation_diffusion_rate();
@@ -568,10 +591,18 @@ mod tests {
     fn test_network_scales_with_urbanization() {
         let rural = NetworkTopology::from_population(100.0, 0.2);
         let urban = NetworkTopology::from_population(100.0, 0.8);
-        assert!(urban.mean_degree > rural.mean_degree,
-            "Urban networks denser: {} vs {}", urban.mean_degree, rural.mean_degree);
-        assert!(urban.fragmentation < rural.fragmentation,
-            "Urban less fragmented: {} vs {}", urban.fragmentation, rural.fragmentation);
+        assert!(
+            urban.mean_degree > rural.mean_degree,
+            "Urban networks denser: {} vs {}",
+            urban.mean_degree,
+            rural.mean_degree
+        );
+        assert!(
+            urban.fragmentation < rural.fragmentation,
+            "Urban less fragmented: {} vs {}",
+            urban.fragmentation,
+            rural.fragmentation
+        );
     }
 
     #[test]
@@ -584,18 +615,32 @@ mod tests {
     #[test]
     fn test_hubbert_curve_peaks_and_declines() {
         let mut resource = DepletableResource {
-            name: "test".into(), total_reserve: 100.0, cumulative_extracted: 0.0,
-            peak_rate: 1.0, depletion_tau: 100.0, current_rate: 0.0,
-            eroi_at_full: 30.0, eroi_at_half: 15.0, eroi_at_depleted: 5.0,
+            name: "test".into(),
+            total_reserve: 100.0,
+            cumulative_extracted: 0.0,
+            peak_rate: 1.0,
+            depletion_tau: 100.0,
+            current_rate: 0.0,
+            eroi_at_full: 30.0,
+            eroi_at_half: 15.0,
+            eroi_at_depleted: 5.0,
         };
         // Run enough ticks to fully deplete
-        for _ in 0..500 { resource.tick(); }
+        for _ in 0..500 {
+            resource.tick();
+        }
         // Resource should be substantially depleted
-        assert!(resource.fraction_remaining() < 0.1,
-            "Should be mostly depleted: {:.1}% remaining", resource.fraction_remaining() * 100.0);
+        assert!(
+            resource.fraction_remaining() < 0.1,
+            "Should be mostly depleted: {:.1}% remaining",
+            resource.fraction_remaining() * 100.0
+        );
         // Current rate should be near zero at end (post-peak decline)
-        assert!(resource.current_rate < resource.peak_rate * 0.5,
-            "Post-depletion rate should be low: {}", resource.current_rate);
+        assert!(
+            resource.current_rate < resource.peak_rate * 0.5,
+            "Post-depletion rate should be low: {}",
+            resource.current_rate
+        );
     }
 
     #[test]
@@ -604,18 +649,28 @@ mod tests {
         let eroi_early = resource.current_eroi();
         resource.cumulative_extracted = resource.total_reserve * 0.8;
         let eroi_late = resource.current_eroi();
-        assert!(eroi_late < eroi_early,
-            "EROI should degrade: {} vs {}", eroi_late, eroi_early);
+        assert!(
+            eroi_late < eroi_early,
+            "EROI should degrade: {} vs {}",
+            eroi_late,
+            eroi_early
+        );
     }
 
     #[test]
     fn test_institutional_switching_cost_increases() {
         let mut inst = InstitutionalInertia::new("democracy");
         let cost_early = inst.switching_cost();
-        for _ in 0..120 { inst.tick(0.1); }
+        for _ in 0..120 {
+            inst.tick(0.1);
+        }
         let cost_late = inst.switching_cost();
-        assert!(cost_late > cost_early,
-            "Lock-in should increase: {} vs {}", cost_late, cost_early);
+        assert!(
+            cost_late > cost_early,
+            "Lock-in should increase: {} vs {}",
+            cost_late,
+            cost_early
+        );
     }
 
     #[test]
@@ -639,8 +694,10 @@ mod tests {
         // One bad should undo more than one good
         let good_delta = after_good - initial;
         let bad_delta = after_good - after_bad;
-        assert!(bad_delta > good_delta * 3.0,
-            "Destruction should be >3× faster: bad={bad_delta}, good={good_delta}");
+        assert!(
+            bad_delta > good_delta * 3.0,
+            "Destruction should be >3× faster: bad={bad_delta}, good={good_delta}"
+        );
     }
 
     #[test]
@@ -652,16 +709,25 @@ mod tests {
         k.discover();
         let adj_13 = k.adjacent_possible;
         // Adjacent possible should grow faster than linear
-        assert!(adj_13 > adj_10 + 10,
-            "Combinatorial growth: {} vs {}", adj_13, adj_10);
+        assert!(
+            adj_13 > adj_10 + 10,
+            "Combinatorial growth: {} vs {}",
+            adj_13,
+            adj_10
+        );
     }
 
     #[test]
     fn test_knowledge_paradigm_shift() {
         let mut k = KnowledgeNetwork::new(10);
         assert_eq!(k.paradigm_shifts, 0);
-        for _ in 0..20 { k.discover(); }
-        assert!(k.paradigm_shifts >= 1, "Should have paradigm shift after 20 discoveries");
+        for _ in 0..20 {
+            k.discover();
+        }
+        assert!(
+            k.paradigm_shifts >= 1,
+            "Should have paradigm shift after 20 discoveries"
+        );
     }
 
     #[test]

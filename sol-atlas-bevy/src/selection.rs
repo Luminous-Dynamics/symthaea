@@ -5,9 +5,9 @@
 //! Uses Camera::viewport_to_world for ray creation, then tests against
 //! marker sphere positions.
 
-use bevy::prelude::*;
-use crate::markers::DataMarker;
 use crate::camera::OrbitalCamera;
+use crate::markers::DataMarker;
+use bevy::prelude::*;
 
 /// Currently selected marker.
 #[derive(Resource, Default)]
@@ -68,11 +68,17 @@ pub fn click_select_system(
     }
 
     let Ok(window) = windows.single() else { return };
-    let Some(cursor_pos) = window.cursor_position() else { return };
-    let Ok((camera, camera_tf)) = camera_q.single() else { return };
+    let Some(cursor_pos) = window.cursor_position() else {
+        return;
+    };
+    let Ok((camera, camera_tf)) = camera_q.single() else {
+        return;
+    };
 
     // Create ray from camera through cursor
-    let Ok(ray) = camera.viewport_to_world(camera_tf, cursor_pos) else { return };
+    let Ok(ray) = camera.viewport_to_world(camera_tf, cursor_pos) else {
+        return;
+    };
 
     // Find nearest marker hit (within threshold)
     let mut best: Option<(Entity, f32, DataMarker)> = None;
@@ -83,7 +89,9 @@ pub fn click_select_system(
         // Distance from ray to point (perpendicular distance)
         let to_marker = marker_pos - ray.origin;
         let along_ray = to_marker.dot(*ray.direction);
-        if along_ray < 0.0 { continue; } // behind camera
+        if along_ray < 0.0 {
+            continue;
+        } // behind camera
         let closest_on_ray = ray.origin + *ray.direction * along_ray;
         let dist = (marker_pos - closest_on_ray).length();
 

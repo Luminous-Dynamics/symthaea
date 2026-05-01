@@ -1,5 +1,5 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Hinge joint (revolute): constrains rotation to a single plane.
 //!
@@ -195,13 +195,15 @@ impl<const D: usize> Constraint<D> for HingeJoint<D> {
                 let correction = rel_component * self.stiffness * 0.5;
                 if body_a.is_dynamic() {
                     body_a.angular_velocity.set(
-                        i, j,
+                        i,
+                        j,
                         body_a.angular_velocity.get(i, j) + correction,
                     );
                 }
                 if body_b.is_dynamic() {
                     body_b.angular_velocity.set(
-                        i, j,
+                        i,
+                        j,
                         body_b.angular_velocity.get(i, j) - correction,
                     );
                 }
@@ -210,16 +212,25 @@ impl<const D: usize> Constraint<D> for HingeJoint<D> {
 
         // Motor drive on the hinge rotation axis
         if let Some(ref motor) = self.motor {
-            let current_angular = body_b.angular_velocity.get(pa, pb) - body_a.angular_velocity.get(pa, pb);
+            let current_angular =
+                body_b.angular_velocity.get(pa, pb) - body_a.angular_velocity.get(pa, pb);
             let error = motor.target - current_angular;
             let torque = (error * motor.max_force - current_angular * motor.damping)
                 .clamp(-motor.max_force, motor.max_force);
             let impulse = torque * _dt;
             if body_a.is_dynamic() {
-                body_a.angular_velocity.set(pa, pb, body_a.angular_velocity.get(pa, pb) - impulse * 0.5);
+                body_a.angular_velocity.set(
+                    pa,
+                    pb,
+                    body_a.angular_velocity.get(pa, pb) - impulse * 0.5,
+                );
             }
             if body_b.is_dynamic() {
-                body_b.angular_velocity.set(pa, pb, body_b.angular_velocity.get(pa, pb) + impulse * 0.5);
+                body_b.angular_velocity.set(
+                    pa,
+                    pb,
+                    body_b.angular_velocity.get(pa, pb) + impulse * 0.5,
+                );
             }
         }
     }
@@ -237,12 +248,8 @@ mod tests {
             Point::origin(),
             Box::new(symtropy_math::Sphere::new(Point::origin(), 0.1)),
         );
-        let mut b = RigidBody::<3>::dynamic_sphere(
-            BodyHandle(1),
-            Point::new([3.0, 0.0, 0.0]),
-            0.5,
-            1.0,
-        );
+        let mut b =
+            RigidBody::<3>::dynamic_sphere(BodyHandle(1), Point::new([3.0, 0.0, 0.0]), 0.5, 1.0);
 
         // Hinge in XY plane (rotation around Z)
         let joint = HingeJoint::new(BodyHandle(0), BodyHandle(1), 0, 1);
@@ -262,12 +269,7 @@ mod tests {
             Point::origin(),
             Box::new(symtropy_math::Sphere::new(Point::origin(), 0.1)),
         );
-        let mut b = RigidBody::<3>::dynamic_sphere(
-            BodyHandle(1),
-            Point::origin(),
-            0.5,
-            1.0,
-        );
+        let mut b = RigidBody::<3>::dynamic_sphere(BodyHandle(1), Point::origin(), 0.5, 1.0);
 
         // Give body B angular velocity in the allowed XY plane (around Z)
         b.angular_velocity.set(0, 1, 5.0);
@@ -318,12 +320,7 @@ mod tests {
         // In 2D, there's only one rotation plane (0,1). A hinge in that plane
         // is equivalent to a ball joint — all rotation is allowed.
         let mut a = RigidBody::<2>::dynamic_sphere(BodyHandle(0), Point::origin(), 0.5, 1.0);
-        let mut b = RigidBody::<2>::dynamic_sphere(
-            BodyHandle(1),
-            Point::new([2.0, 0.0]),
-            0.5,
-            1.0,
-        );
+        let mut b = RigidBody::<2>::dynamic_sphere(BodyHandle(1), Point::new([2.0, 0.0]), 0.5, 1.0);
         b.angular_velocity.set(0, 1, 3.0);
 
         let joint = HingeJoint::new(BodyHandle(0), BodyHandle(1), 0, 1);
@@ -331,6 +328,9 @@ mod tests {
 
         // In 2D, no angular constraint is applied (only 1 plane)
         // The angular velocity should be modified only by the relative constraint
-        assert!(b.angular_velocity.get(0, 1).abs() > 0.0, "2D hinge should allow rotation");
+        assert!(
+            b.angular_velocity.get(0, 1).abs() > 0.0,
+            "2D hinge should allow rotation"
+        );
     }
 }

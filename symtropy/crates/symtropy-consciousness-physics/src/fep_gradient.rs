@@ -17,8 +17,8 @@
 //! move in the direction that reduces it most. Pure gradient descent
 //! on the variational free energy landscape.
 
-use nalgebra::SVector;
 use crate::harmony_field::{HarmonyField, NUM_HARMONIES};
+use nalgebra::SVector;
 
 /// Compute the preferred movement direction for an agent to minimize free energy.
 ///
@@ -41,7 +41,16 @@ pub fn free_energy_gradient<const D: usize>(
     danger_source: Option<&SVector<f64, D>>,
     danger_level: f64,
 ) -> SVector<f64, D> {
-    free_energy_gradient_phi(position, energy_fraction, None, harmony, nearby_agents, energy_wells, danger_source, danger_level)
+    free_energy_gradient_phi(
+        position,
+        energy_fraction,
+        None,
+        harmony,
+        nearby_agents,
+        energy_wells,
+        danger_source,
+        danger_level,
+    )
 }
 
 /// Extended version with Φ as an explicit parameter.
@@ -75,7 +84,9 @@ pub fn free_energy_gradient_phi<const D: usize>(
     for (agent_pos, agent_harmony) in nearby_agents {
         let delta = agent_pos - position;
         let dist = delta.norm();
-        if dist < 1.0 || dist > 100.0 { continue; }
+        if dist < 1.0 || dist > 100.0 {
+            continue;
+        }
 
         let resonance = HarmonyField::<D>::resonance(harmony, agent_harmony);
         // Φ-coupled resonance gating: need resonance × phi_val > 0.15 to feel attraction
@@ -98,10 +109,14 @@ pub fn free_energy_gradient_phi<const D: usize>(
     };
 
     for (well_pos, well_remaining) in energy_wells {
-        if *well_remaining < 0.01 { continue; } // depleted well
+        if *well_remaining < 0.01 {
+            continue;
+        } // depleted well
         let delta = well_pos - position;
         let dist = delta.norm();
-        if dist < 1.0 || dist > 200.0 { continue; }
+        if dist < 1.0 || dist > 200.0 {
+            continue;
+        }
 
         let attraction = energy_urgency * well_remaining;
         gradient += delta / dist * attraction;
@@ -130,7 +145,9 @@ pub fn free_energy_gradient_phi<const D: usize>(
         let phase = position[0] * 0.1 + position[1 % D] * 0.07;
         let mut explore = SVector::zeros();
         explore[0] = phase.sin() * 0.3;
-        if D > 1 { explore[1] = phase.cos() * 0.3; }
+        if D > 1 {
+            explore[1] = phase.cos() * 0.3;
+        }
         gradient += explore;
     }
 
@@ -196,11 +213,13 @@ impl LearnedFepWeights {
         let reward = current_energy - self.prev_energy;
         self.prev_energy = current_energy;
 
-        if reward.abs() < 1e-6 { return; } // no signal
+        if reward.abs() < 1e-6 {
+            return;
+        } // no signal
 
         let lr = self.learning_rate;
         let beta = 0.9; // momentum coefficient
-        // Update each weight with reward-modulated plasticity
+                        // Update each weight with reward-modulated plasticity
         let grads: [f64; 4] = std::array::from_fn(|i| {
             let grad = reward * contributions[i];
             self.momentum[i] = beta * self.momentum[i] + (1.0 - beta) * grad;
@@ -218,7 +237,9 @@ impl LearnedFepWeights {
     /// providing a much stronger gradient signal than per-tick deltas.
     /// This is the recommended update method for experiments with memory.
     pub fn update_windowed(&mut self, windowed_reward: f64, contributions: [f64; 4]) {
-        if windowed_reward.abs() < 1e-4 { return; } // no signal
+        if windowed_reward.abs() < 1e-4 {
+            return;
+        } // no signal
 
         let lr = self.learning_rate * 5.0; // stronger signal = can use higher LR
         let beta = 0.9;
@@ -269,7 +290,9 @@ pub fn free_energy_gradient_learned<const D: usize>(
     for (agent_pos, agent_harmony) in nearby_agents {
         let delta = agent_pos - position;
         let dist = delta.norm();
-        if dist < 1.0 || dist > 100.0 { continue; }
+        if dist < 1.0 || dist > 100.0 {
+            continue;
+        }
         let resonance = HarmonyField::<D>::resonance(harmony, agent_harmony);
         let effective_resonance = resonance * (0.3 + phi_val * 0.7);
         if effective_resonance > 0.15 {
@@ -283,13 +306,19 @@ pub fn free_energy_gradient_learned<const D: usize>(
     // === 2. Seek energy wells ===
     let energy_urgency = if energy_fraction < 0.5 {
         (0.5 - energy_fraction) * 4.0
-    } else { 0.0 };
+    } else {
+        0.0
+    };
     let mut well_grad: SVector<f64, D> = SVector::zeros();
     for (well_pos, well_remaining) in energy_wells {
-        if *well_remaining < 0.01 { continue; }
+        if *well_remaining < 0.01 {
+            continue;
+        }
         let delta = well_pos - position;
         let dist = delta.norm();
-        if dist < 1.0 || dist > 200.0 { continue; }
+        if dist < 1.0 || dist > 200.0 {
+            continue;
+        }
         well_grad += delta / dist * (energy_urgency * *well_remaining);
     }
     contributions[1] = well_grad.norm();
@@ -315,14 +344,20 @@ pub fn free_energy_gradient_learned<const D: usize>(
     if energy_fraction > 0.7 && gradient.norm() < 0.5 {
         let phase = position[0] * 0.1 + position[1 % D] * 0.07;
         explore_grad[0] = phase.sin();
-        if D > 1 { explore_grad[1] = phase.cos(); }
+        if D > 1 {
+            explore_grad[1] = phase.cos();
+        }
     }
     contributions[3] = explore_grad.norm();
     gradient += explore_grad * weights.exploration;
 
     // Normalize
     let norm = gradient.norm();
-    let dir = if norm > 1e-6 { gradient / norm } else { SVector::zeros() };
+    let dir = if norm > 1e-6 {
+        gradient / norm
+    } else {
+        SVector::zeros()
+    };
     (dir, contributions)
 }
 
@@ -364,7 +399,7 @@ pub fn phi_gravity<const D: usize>(
     position: &SVector<f64, D>,
     self_phi: f64,
     nearby_agents: &[(SVector<f64, D>, f64)], // (position, phi)
-    gravitational_constant: f64,               // coupling strength (default ~0.5)
+    gravitational_constant: f64,              // coupling strength (default ~0.5)
 ) -> SVector<f64, D> {
     let mut accel = SVector::zeros();
     let softening = 1.0; // Plummer softening to prevent singularity
@@ -374,7 +409,9 @@ pub fn phi_gravity<const D: usize>(
         let dist_sq = delta.norm_squared() + softening * softening;
         let dist = dist_sq.sqrt();
 
-        if dist < 1e-6 { continue; }
+        if dist < 1e-6 {
+            continue;
+        }
 
         // F = G × Φ₁ × Φ₂ / r² (Plummer-softened)
         let force_mag = gravitational_constant * self_phi * other_phi / dist_sq;
@@ -403,28 +440,29 @@ mod tests {
             (SVector::from([50.0, 0.0]), 1.0), // well to the right
         ];
 
-        let dir = free_energy_gradient(
-            &pos, 0.1, &harmony, &[], &wells, None, 0.0,
-        );
+        let dir = free_energy_gradient(&pos, 0.1, &harmony, &[], &wells, None, 0.0);
 
         // Should move toward the well (positive x)
-        assert!(dir[0] > 0.0, "should seek well when low energy, got x={}", dir[0]);
+        assert!(
+            dir[0] > 0.0,
+            "should seek well when low energy, got x={}",
+            dir[0]
+        );
     }
 
     #[test]
     fn full_energy_ignores_wells() {
         let pos = SVector::from([0.0, 0.0]);
         let harmony = [0.5; NUM_HARMONIES];
-        let wells = vec![
-            (SVector::from([50.0, 0.0]), 1.0),
-        ];
+        let wells = vec![(SVector::from([50.0, 0.0]), 1.0)];
 
-        let dir = free_energy_gradient(
-            &pos, 0.9, &harmony, &[], &wells, None, 0.0,
-        );
+        let dir = free_energy_gradient(&pos, 0.9, &harmony, &[], &wells, None, 0.0);
 
         // Should not strongly seek well when energy is high
-        assert!(dir[0].abs() < 0.5, "should not urgently seek well at 90% energy");
+        assert!(
+            dir[0].abs() < 0.5,
+            "should not urgently seek well at 90% energy"
+        );
     }
 
     #[test]
@@ -433,9 +471,7 @@ mod tests {
         let harmony = [0.5; NUM_HARMONIES];
         let danger = SVector::from([50.0, 0.0]); // danger to the right
 
-        let dir = free_energy_gradient(
-            &pos, 0.5, &harmony, &[], &[], Some(&danger), 0.8,
-        );
+        let dir = free_energy_gradient(&pos, 0.5, &harmony, &[], &[], Some(&danger), 0.8);
 
         // Should flee (negative x)
         assert!(dir[0] < 0.0, "should flee from danger, got x={}", dir[0]);
@@ -446,13 +482,9 @@ mod tests {
         let pos = SVector::from([0.0, 0.0]);
         let harmony = [0.8, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.8, 0.0];
         let partner_harmony = [0.8, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.8, 0.0]; // same = high resonance
-        let agents = vec![
-            (SVector::from([30.0, 0.0]), partner_harmony),
-        ];
+        let agents = vec![(SVector::from([30.0, 0.0]), partner_harmony)];
 
-        let dir = free_energy_gradient(
-            &pos, 0.2, &harmony, &agents, &[], None, 0.0,
-        );
+        let dir = free_energy_gradient(&pos, 0.2, &harmony, &agents, &[], None, 0.0);
 
         assert!(dir[0] > 0.0, "should seek resonant partner when low energy");
     }
@@ -462,13 +494,9 @@ mod tests {
         let pos = SVector::from([0.0, 0.0]);
         let harmony = [0.9, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
         let other_harmony = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.9, 0.0]; // orthogonal
-        let agents = vec![
-            (SVector::from([30.0, 0.0]), other_harmony),
-        ];
+        let agents = vec![(SVector::from([30.0, 0.0]), other_harmony)];
 
-        let dir = free_energy_gradient(
-            &pos, 0.2, &harmony, &agents, &[], None, 0.0,
-        );
+        let dir = free_energy_gradient(&pos, 0.2, &harmony, &agents, &[], None, 0.0);
 
         // Orthogonal harmonies = resonance ~0 = no attraction
         assert!(dir[0].abs() < 0.3, "should not seek dissonant agent");
@@ -494,9 +522,7 @@ mod tests {
         let harmony = [0.5; NUM_HARMONIES];
         let wells = vec![(SVector::from([50.0, 30.0]), 1.0)];
 
-        let dir = free_energy_gradient(
-            &pos, 0.2, &harmony, &[], &wells, None, 0.0,
-        );
+        let dir = free_energy_gradient(&pos, 0.2, &harmony, &[], &wells, None, 0.0);
         let norm = dir.norm();
         assert!(norm < 1.01, "gradient should be unit length, got {}", norm);
     }

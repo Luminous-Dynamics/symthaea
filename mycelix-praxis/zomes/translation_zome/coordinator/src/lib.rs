@@ -1,3 +1,4 @@
+use mycelix_zome_helpers as _;
 #![deny(unsafe_code)]
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
@@ -66,7 +67,7 @@ pub struct VoteOnTranslationInput {
     pub proposal_hash: ActionHash,
     pub approved: bool,
     pub native_speaker_attestation: bool,
-    /// Voter's consciousness permille (from frontend consciousness provider).
+    /// Voter's consciousness permille (from frontend cognitive provider).
     /// Determines vote weight. Higher consciousness = more influence.
     pub voter_consciousness_permille: Option<u16>,
 }
@@ -123,7 +124,7 @@ pub fn vote_on_translation(input: VoteOnTranslationInput) -> ExternResult<Action
 
     // Voter's consciousness tier — gate voting to at least Participant tier.
     // Full consciousness-weighted voting uses the voter_consciousness_permille
-    // field on the input (set by the frontend from the consciousness provider).
+    // field on the input (set by the frontend from the cognitive provider).
     let voter_consciousness = input.voter_consciousness_permille.unwrap_or(500);
 
     let vote = TranslationVote {

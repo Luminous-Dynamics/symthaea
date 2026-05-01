@@ -38,6 +38,7 @@ impl HV {
     }
 
     /// XOR bind (associative memory)
+    #[allow(dead_code)]
     fn bind(&self, other: &HV) -> HV {
         let bits: Vec<u8> = self
             .bits

@@ -1,0 +1,132 @@
+{
+  "metadata": {
+    "title": "Type 1 Civilization Studies: Planetary Metabolism",
+    "framework": "Mycelix Type 1 Foundation",
+    "source": "https://mycelix.org",
+    "grade_level": "Graduate/Doctoral",
+    "subject_area": "Civilizational Engineering",
+    "domain": "Civilizational Engineering",
+    "version": "1.0",
+    "total_standards": 8,
+    "domains": [
+      "Thermodynamic Governance",
+      "Interplanetary Logistics",
+      "Metabolic Infrastructure"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Advanced studies for the stewards of a Type 1 Civilization. Linked directly to Symtropy platforms."
+  },
+  "nodes": [
+    {
+      "id": "CIV-501",
+      "title": "Thermodynamics of Governance",
+      "description": "Applying the J/Φ metric and thermodynamic ledgers to civic decision-making. Modeling social coherence as a phase transition and using Active Inference to minimize 'Surprise' in resource allocation.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Thermodynamic Governance",
+      "subdomain": "Type 1 Studies",
+      "tags": ["governance", "thermodynamics", "phi", "entropy"],
+      "estimated_hours": 90,
+      "grade_levels": ["Graduate"],
+      "bloom_level": "Evaluate",
+      "subject_area": "Humanities",
+      "alignment_vector": {
+        "ahimsa": 900,
+        "reciprocity": 950,
+        "thermodynamic_efficiency": 990,
+        "truthfulness": 920
+      }
+    },
+    {
+      "id": "CIV-RE-601",
+      "title": "Keplerian FEP & Orbital Logistics",
+      "description": "Active Inference applied to orbital mechanics. Optimizing low-thrust Hall-effect trajectories and Oberth-maneuver timing for high-efficiency cislunar transport (ref. symthaea-cycler).",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Interplanetary Logistics",
+      "subdomain": "Type 1 Studies",
+      "tags": ["orbital-mechanics", "fep", "kepler", "space-logistics"],
+      "estimated_hours": 135,
+      "grade_levels": ["Doctoral"],
+      "bloom_level": "Analyze",
+      "subject_area": "Science"
+    },
+    {
+      "id": "CIV-MET-501",
+      "title": "Closed-Loop Bioreactor Design",
+      "description": "Closing the P/N cycle. Engineering localized human-waste-to-nutrient conversion systems to feed the agribot layer and maintain bio-regional homeostasis.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Metabolic Infrastructure",
+      "subdomain": "Type 1 Studies",
+      "tags": ["bioreactor", "closed-loop", "sanitation", "agribot"],
+      "estimated_hours": 90,
+      "grade_levels": ["Graduate"],
+      "bloom_level": "Create",
+      "subject_area": "Science"
+    },
+    {
+      "id": "CIV-INF-601",
+      "title": "Arterial Transit Dynamics",
+      "description": "Modeling urban movement as a circulatory wave. Virtual magnetic tethers and swarm fluid dynamics for zero-wait urban transit (ref. symthaea-flux).",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Metabolic Infrastructure",
+      "subdomain": "Type 1 Studies",
+      "tags": ["transit", "maglev", "fluid-dynamics", "urban-planning"],
+      "estimated_hours": 90,
+      "grade_levels": ["Doctoral"],
+      "bloom_level": "Evaluate",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "CIV-CAP-PLANET",
+      "title": "Planetary Stewardship Masterpiece",
+      "description": "Design a 50-year metabolic integration plan for a bio-region. Must synchronize local energy (helios), food (agribot), and waste (bioreactor) using the Mycelix DHT.",
+      "node_type": "Capstone",
+      "difficulty": "Expert",
+      "domain": "Universal",
+      "subdomain": "Type 1 Studies",
+      "tags": ["capstone", "stewardship", "planetary-health"],
+      "estimated_hours": 360,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Create",
+      "subject_area": "Humanities",
+      "holonic_capstone": {
+        "required_node_ids": ["CIV-501", "CIV-MET-501", "HUM-CAP-02"],
+        "deliverable": "A mathematically verified civilizational audit report that passes the Symthaea Supreme Court with a structural integrity score > 950.",
+        "min_peer_endorsements": 10
+      },
+      "alignment_vector": {
+        "ahimsa": 990,
+        "reciprocity": 990,
+        "ecological_stewardship": 990,
+        "deep_time": 980,
+        "thermodynamic_efficiency": 950
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "HUM-TIME-601",
+      "to": "CIV-CAP-PLANET",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Planetary stewardship is impossible without the foundation of Deep Time Ethics."
+    },
+    {
+      "from": "CIV-501",
+      "to": "CIV-CAP-PLANET",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Governance must be grounded in thermodynamic reality before scaling to a planet."
+    },
+    {
+      "from": "CIV-MET-501",
+      "to": "CIV-CAP-PLANET",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Closed-loop biological systems are the 'gut' of a planetary metabolism."
+    }
+  ]
+}

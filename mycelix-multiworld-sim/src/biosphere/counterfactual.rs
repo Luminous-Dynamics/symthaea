@@ -18,9 +18,7 @@
 
 use super::bridge::biosphere_energy_adjustment;
 use super::deep_time_data::DeepTimeData;
-use super::dimensions::{
-    compute_bt, compute_raw_dimensions, BiosphereMaxima,
-};
+use super::dimensions::{compute_bt, compute_raw_dimensions, BiosphereMaxima};
 use super::mass_extinctions::{
     canonical_mass_extinctions, extinction_multiplier, MassExtinctionEvent,
 };
@@ -172,7 +170,9 @@ fn compute_regime_curve(
         })
     });
 
-    let cap_values = ceiling.as_ref().map(|c| (c.complexity, c.energy, c.information));
+    let cap_values = ceiling
+        .as_ref()
+        .map(|c| (c.complexity, c.energy, c.information));
 
     let filtered: Vec<MassExtinctionEvent> = all_extinctions
         .iter()
@@ -203,9 +203,12 @@ fn compute_regime_curve(
                             // Cap grows slowly: cap(t) = ceil + leakage × (empirical - ceil) × time
                             // This lets the suppressed branch slowly approach empirical values
                             let leak_factor = (leakage_rate * time_since / 100.0).min(1.0);
-                            let eff_cap_c = ceil.complexity + leak_factor * (norm.values[1] - ceil.complexity).max(0.0);
-                            let eff_cap_e = ceil.energy + leak_factor * (norm.values[4] - ceil.energy).max(0.0);
-                            let eff_cap_i = ceil.information + leak_factor * (norm.values[5] - ceil.information).max(0.0);
+                            let eff_cap_c = ceil.complexity
+                                + leak_factor * (norm.values[1] - ceil.complexity).max(0.0);
+                            let eff_cap_e =
+                                ceil.energy + leak_factor * (norm.values[4] - ceil.energy).max(0.0);
+                            let eff_cap_i = ceil.information
+                                + leak_factor * (norm.values[5] - ceil.information).max(0.0);
                             norm.values[1] = norm.values[1].min(eff_cap_c);
                             norm.values[4] = norm.values[4].min(eff_cap_e);
                             norm.values[5] = norm.values[5].min(eff_cap_i);
@@ -301,8 +304,11 @@ pub fn run_counterfactual_with_regime(regime: &CapRegime) -> CounterfactualCompa
 
     for branch in &branches {
         let delta = baseline.terminal_bt - branch.terminal_bt;
-        if delta > 0.001 { helped += 1; }
-        else if delta < -0.001 { hurt += 1; }
+        if delta > 0.001 {
+            helped += 1;
+        } else if delta < -0.001 {
+            hurt += 1;
+        }
         if delta.abs() > most_impactful_delta.abs() {
             most_impactful_delta = delta;
             most_impactful = branch.suppressed_event.clone().unwrap_or_default();
@@ -367,24 +373,43 @@ pub fn run_multi_regime_kpg() -> Vec<MultiRegimeResult> {
 impl CounterfactualComparison {
     pub fn to_markdown(&self) -> String {
         let mut md = String::new();
-        let regime = self.branches.first().map(|b| b.regime.as_str()).unwrap_or("?");
+        let regime = self
+            .branches
+            .first()
+            .map(|b| b.regime.as_str())
+            .unwrap_or("?");
         md.push_str(&format!("# Counterfactual Analysis ({})\n\n", regime));
         md.push_str("| Event | Terminal B(t) | Δ | Crossover | Cap (C/E/I) |\n");
         md.push_str("|---|---|---|---|---|\n");
-        md.push_str(&format!("| **Baseline** | **{:.4}** | — | — | — |\n", self.baseline.terminal_bt));
+        md.push_str(&format!(
+            "| **Baseline** | **{:.4}** | — | — | — |\n",
+            self.baseline.terminal_bt
+        ));
         for branch in &self.branches {
             let delta = branch.terminal_bt - self.baseline.terminal_bt;
             let sign = if delta > 0.0 { "+" } else { "" };
-            let cap_str = branch.cap_values
+            let cap_str = branch
+                .cap_values
                 .map(|(c, e, i)| format!("{:.2}/{:.2}/{:.2}", c, e, i))
                 .unwrap_or_else(|| "—".into());
-            let cross_str = branch.crossover_age_ma
-                .map(|a| if a >= 1000.0 { format!("{:.1} Ga", a / 1000.0) } else { format!("{:.0} Ma", a) })
+            let cross_str = branch
+                .crossover_age_ma
+                .map(|a| {
+                    if a >= 1000.0 {
+                        format!("{:.1} Ga", a / 1000.0)
+                    } else {
+                        format!("{:.0} Ma", a)
+                    }
+                })
                 .unwrap_or_else(|| "never".into());
             md.push_str(&format!(
                 "| {} | {:.4} | {}{:.4} | {} | {} |\n",
                 branch.suppressed_event.as_deref().unwrap_or("?"),
-                branch.terminal_bt, sign, delta, cross_str, cap_str,
+                branch.terminal_bt,
+                sign,
+                delta,
+                cross_str,
+                cap_str,
             ));
         }
         md.push_str(&format!(
@@ -407,9 +432,12 @@ pub fn multi_regime_markdown(results: &[MultiRegimeResult]) -> String {
     for r in results {
         md.push_str(&format!(
             "| {} | {:.4} | {:.4} | {:.4} | {:.4} | {:.4} | {}/4 |\n",
-            r.event_name, r.baseline_terminal,
-            r.hard_cap_terminal, r.soft_cap_terminal,
-            r.delayed_escape_terminal, r.no_cap_terminal,
+            r.event_name,
+            r.baseline_terminal,
+            r.hard_cap_terminal,
+            r.soft_cap_terminal,
+            r.delayed_escape_terminal,
+            r.no_cap_terminal,
             r.regimes_supporting_generative,
         ));
     }
@@ -441,7 +469,8 @@ mod tests {
 
     #[test]
     fn delayed_escape_runs() {
-        let comparison = run_counterfactual_with_regime(&CapRegime::DelayedEscape { hold_ma: 30.0 });
+        let comparison =
+            run_counterfactual_with_regime(&CapRegime::DelayedEscape { hold_ma: 30.0 });
         assert_eq!(comparison.branches.len(), 6);
     }
 
@@ -461,7 +490,8 @@ mod tests {
                 s.terminal_bt >= h.terminal_bt - 0.001,
                 "{}: soft ({:.4}) should >= hard ({:.4})",
                 h.suppressed_event.as_deref().unwrap_or("?"),
-                s.terminal_bt, h.terminal_bt,
+                s.terminal_bt,
+                h.terminal_bt,
             );
         }
     }
@@ -475,7 +505,8 @@ mod tests {
                 n.terminal_bt >= h.terminal_bt - 0.001,
                 "{}: no-cap ({:.4}) should >= hard ({:.4})",
                 h.suppressed_event.as_deref().unwrap_or("?"),
-                n.terminal_bt, h.terminal_bt,
+                n.terminal_bt,
+                h.terminal_bt,
             );
         }
     }
@@ -497,12 +528,16 @@ mod tests {
             assert!(
                 r.hard_cap_terminal <= r.soft_cap_terminal + 0.01,
                 "{}: hard ({:.4}) > soft ({:.4})",
-                r.event_name, r.hard_cap_terminal, r.soft_cap_terminal,
+                r.event_name,
+                r.hard_cap_terminal,
+                r.soft_cap_terminal,
             );
             assert!(
                 r.soft_cap_terminal <= r.no_cap_terminal + 0.01,
                 "{}: soft ({:.4}) > no-cap ({:.4})",
-                r.event_name, r.soft_cap_terminal, r.no_cap_terminal,
+                r.event_name,
+                r.soft_cap_terminal,
+                r.no_cap_terminal,
             );
         }
     }

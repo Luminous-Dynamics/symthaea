@@ -3,7 +3,7 @@
 //! Ranging integrity zome: validates range measurements between nodes.
 
 use hdi::prelude::*;
-use mycelix_position_shared::{RangeMeasurement, validate_range, validate_node_id};
+use mycelix_position_shared::{validate_node_id, validate_range, RangeMeasurement};
 
 #[hdk_entry_types]
 #[unit_enum(UnitEntryTypes)]

@@ -1,3 +1,4 @@
+use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -8,6 +9,7 @@
 
 use hdk::prelude::*;
 use proposals_integrity::*;
+use mycelix_bridge_proc::{mycelix_zome_fn, sovereign_gated};
 
 // ============================================================================
 // REAL-TIME SIGNALS
@@ -52,6 +54,8 @@ pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
 
 /// Create a new proposal
 #[hdk_extern]
+#[mycelix_zome_fn]
+#[sovereign_gated(proposal)]
 pub fn create_proposal(proposal: Proposal) -> ExternResult<Record> {
     // Input validation
     if proposal.title.is_empty() || proposal.title.len() > 256 {
@@ -144,6 +148,7 @@ pub fn create_proposal(proposal: Proposal) -> ExternResult<Record> {
 
 /// Get a proposal by ID (O(1) link-based lookup with chain scan fallback)
 #[hdk_extern]
+#[mycelix_zome_fn]
 pub fn get_proposal(proposal_id: String) -> ExternResult<Option<Record>> {
     // Try link-based lookup first (O(1))
     let pid_anchor = format!("pid:{}", proposal_id);
@@ -190,6 +195,7 @@ pub fn get_proposal(proposal_id: String) -> ExternResult<Option<Record>> {
 
 /// Get active proposals
 #[hdk_extern]
+#[mycelix_zome_fn]
 pub fn get_active_proposals(_: ()) -> ExternResult<Vec<Record>> {
     let links = get_links(
         LinkQuery::try_new(anchor_hash("active_proposals")?, LinkTypes::ActiveProposals)?,
@@ -210,6 +216,7 @@ pub fn get_active_proposals(_: ()) -> ExternResult<Vec<Record>> {
 
 /// Get proposals by author
 #[hdk_extern]
+#[mycelix_zome_fn]
 pub fn get_proposals_by_author(author_did: String) -> ExternResult<Vec<Record>> {
     let links = get_links(
         LinkQuery::try_new(
@@ -239,6 +246,7 @@ pub fn get_proposals_by_author(author_did: String) -> ExternResult<Vec<Record>> 
 ///   Approved→Signed, Signed→Executed, any→Failed
 /// - Unauthorized transitions are rejected
 #[hdk_extern]
+#[mycelix_zome_fn]
 pub fn update_proposal_status(input: UpdateStatusInput) -> ExternResult<Record> {
     if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -495,6 +503,8 @@ use std::collections::{HashMap, HashSet};
 
 /// Add a contribution to a proposal's discussion
 #[hdk_extern]
+#[mycelix_zome_fn]
+#[sovereign_gated(basic)]
 pub fn add_contribution(input: AddContributionInput) -> ExternResult<Record> {
     // Input validation
     if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
@@ -663,6 +673,8 @@ pub fn get_replies(contribution_id: String) -> ExternResult<Vec<Record>> {
 ///
 /// This mirrors how the conversation looks - not whether it's "good" or "bad"
 #[hdk_extern]
+#[mycelix_zome_fn]
+#[sovereign_gated(proposal)]
 pub fn reflect_on_discussion(proposal_id: String) -> ExternResult<Record> {
     let now = sys_time()?;
 

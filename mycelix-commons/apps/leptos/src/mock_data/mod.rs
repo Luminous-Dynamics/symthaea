@@ -66,6 +66,49 @@ pub fn mock_tools() -> Vec<ToolView> {
     ]
 }
 
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct CompostBatchView {
+    pub hash: String,
+    pub name: String,
+    pub method: String,
+    pub status: String,
+    pub temperature_c: f64,
+    pub ph: f64,
+    pub started_at: i64,
+    pub carbon_seq_est: f64, // kg CO2e
+    pub reward_tend: f64,
+    pub can_claim: bool,
+}
+
+pub fn mock_compost_batches() -> Vec<CompostBatchView> {
+    vec![
+        CompostBatchView {
+            hash: "compost_001".into(),
+            name: "Main Community Biochar Pile".into(),
+            method: "Terra Preta (Charged Biochar)".into(),
+            status: "Charging".into(),
+            temperature_c: 42.5,
+            ph: 7.2,
+            started_at: days_ago(14),
+            carbon_seq_est: 250.0,
+            reward_tend: 12.5,
+            can_claim: false,
+        },
+        CompostBatchView {
+            hash: "compost_002".into(),
+            name: "Bokashi Bin - Hub B".into(),
+            method: "Bokashi (Anaerobic)".into(),
+            status: "Mature".into(),
+            temperature_c: 24.0,
+            ph: 4.1,
+            started_at: days_ago(21),
+            carbon_seq_est: 15.0,
+            reward_tend: 5.0,
+            can_claim: true,
+        },
+    ]
+}
+
 pub fn mock_events() -> Vec<EventView> {
     vec![
         EventView { hash: "event_001".into(), title: "Community garden planting day".into(), description: "Spring planting — bring gloves and seeds if you have them.".into(), category: "Garden".into(), organizer_did: "did:mycelix:river".into(), start_time: days_from_now(3), end_time: days_from_now(3) + 14_400_000_000, max_attendees: 30, rsvp_count: 12 },

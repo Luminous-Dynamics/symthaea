@@ -1,0 +1,40 @@
+[package]
+name = "mycelix-sensorium-shell"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Mycelix Sensorium shell — unified interface for all Mycelix clusters"
+
+[dependencies]
+leptos = { version = "0.8", features = ["csr"] }
+# No router — the orb doesn't navigate, it zooms
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = [
+    "console", "Window", "Document", "HtmlCanvasElement", "HtmlInputElement",
+    "WebGl2RenderingContext", "WebGlProgram", "WebGlShader", "WebGlBuffer",
+    "WebGlUniformLocation", "EventTarget", "Navigator", "Storage", "Location",
+    "Performance", "Crypto",
+] }
+console_error_panic_hook = "0.1"
+gloo-timers = { version = "0.3", features = ["futures"] }
+sha2 = "0.10"
+hmac = "0.12"
+
+# Domain trait
+sensorium-domain-trait = { path = "../sensorium-domain-trait" }
+
+# Domain modules (feature-gated)
+domain-health = { path = "../domain-health", optional = true }
+
+[features]
+default = ["health"]
+health = ["dep:domain-health"]
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1

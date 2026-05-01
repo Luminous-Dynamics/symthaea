@@ -1,0 +1,13 @@
+[package]
+name = "domain-health"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Health domain module for Mycelix Sensorium"
+
+[dependencies]
+sensorium-domain-trait = { path = "../sensorium-domain-trait" }
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+rmp-serde = "1"

@@ -25,8 +25,8 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 
 const SAMPLE_RATE: u32 = 44100;
-const HOP_LEN: usize = 512;   // matches MelConfig default
-const N_FFT: usize = 2048;    // matches MelConfig default
+const HOP_LEN: usize = 512; // matches MelConfig default
+const N_FFT: usize = 2048; // matches MelConfig default
 const F_MIN: f32 = 20.0;
 const F_MAX: f32 = 16000.0;
 
@@ -109,7 +109,11 @@ fn main() {
     println!("Input:   {}", in_path.display());
     println!("Frames:  {}", frames.len());
     println!("Mel dim: {}", n_mels);
-    println!("Center freqs: {:.1}..{:.1} Hz", centers.first().unwrap(), centers.last().unwrap());
+    println!(
+        "Center freqs: {:.1}..{:.1} Hz",
+        centers.first().unwrap(),
+        centers.last().unwrap()
+    );
 
     // Additive synthesis: one oscillator per mel bin.
     // Amplitude = exp(log_mel) clipped to a reasonable range.
@@ -164,13 +168,13 @@ fn main() {
     // fmt chunk
     f.write_all(b"fmt ").unwrap();
     f.write_all(&16u32.to_le_bytes()).unwrap();
-    f.write_all(&1u16.to_le_bytes()).unwrap();              // PCM
-    f.write_all(&1u16.to_le_bytes()).unwrap();              // mono
+    f.write_all(&1u16.to_le_bytes()).unwrap(); // PCM
+    f.write_all(&1u16.to_le_bytes()).unwrap(); // mono
     f.write_all(&SAMPLE_RATE.to_le_bytes()).unwrap();
     f.write_all(&(SAMPLE_RATE * 2).to_le_bytes()).unwrap(); // byte rate
-    f.write_all(&2u16.to_le_bytes()).unwrap();              // block align
-    f.write_all(&16u16.to_le_bytes()).unwrap();             // bits per sample
-    // data chunk
+    f.write_all(&2u16.to_le_bytes()).unwrap(); // block align
+    f.write_all(&16u16.to_le_bytes()).unwrap(); // bits per sample
+                                                // data chunk
     f.write_all(b"data").unwrap();
     f.write_all(&(data_bytes as u32).to_le_bytes()).unwrap();
     for &s in &out {

@@ -18,18 +18,18 @@
 //! 7. **Coarse Graining** — Molecular → continuum property extraction
 //! 8. **Open Quantum Systems** — Lindblad master equation, decoherence
 
-pub mod maxwell;
-pub mod navier_stokes;
-pub mod nonlinear_waves;
-pub mod continuum_em;
 pub mod acoustics;
-pub mod plasma_mhd;
 pub mod coarse_graining;
 pub mod consciousness_scaling;
+pub mod continuum_em;
 pub mod id_tradeoff;
-pub mod nonhomogeneous_consciousness;
+pub mod maxwell;
+pub mod navier_stokes;
 pub mod neural_validation;
+pub mod nonhomogeneous_consciousness;
+pub mod nonlinear_waves;
 pub mod open_quantum;
+pub mod plasma_mhd;
 pub mod predictive_consciousness;
 pub mod self_tuning_consciousness;
 pub mod topology_consciousness;

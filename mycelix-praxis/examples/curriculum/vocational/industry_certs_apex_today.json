@@ -1,0 +1,116 @@
+{
+  "metadata": {
+    "title": "Apex Today: Immediate Professional Impact",
+    "framework": "Global Apex Today Mesh",
+    "source": "https://mycelix.org/certs-apex-today",
+    "grade_level": "Professional/Entry",
+    "subject_area": "Multi-Sector",
+    "domain": "Professional Certification",
+    "version": "1.0",
+    "total_standards": 6,
+    "domains": [
+      "AI Foundations",
+      "Green Building",
+      "Human Resources",
+      "Data Visualization",
+      "Digital Productivity"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Essential, high-impact certifications for the current 2026 global market."
+  },
+  "nodes": [
+    {
+      "id": "CERT-AI-GOOGLE-GENAI",
+      "title": "Google Cloud: Introduction to Generative AI",
+      "description": "Foundational knowledge of Generative AI: what it is, how it is used, and how it differs from traditional machine learning. Linked to the Active Inference and HDC tracks.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "AI Foundations",
+      "subdomain": "Certification Bridge",
+      "tags": ["ai", "genai", "google", "standard"],
+      "estimated_hours": 10,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Understand",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "CERT-GREEN-LEED-GA",
+      "title": "LEED Green Associate",
+      "description": "Foundational knowledge of green building principles and practices. Sustainable sites, water efficiency, energy and atmosphere, and indoor environmental quality. Linked to Habitat Engineering.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Green Building",
+      "subdomain": "Certification Bridge",
+      "tags": ["leed", "sustainability", "green-building", "standard"],
+      "estimated_hours": 60,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "CERT-HR-SHRM-CP",
+      "title": "SHRM Certified Professional (SHRM-CP) Mapping",
+      "description": "Competency-based HR certification. Leadership, ethics, business acumen, and relationship management. Mapping Ubuntu pod-cooperation to professional HR standards.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Human Resources",
+      "subdomain": "Certification Bridge",
+      "tags": ["hr", "management", "leadership", "shrm", "standard"],
+      "estimated_hours": 180,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Social Studies"
+    },
+    {
+      "id": "CERT-DATA-TABLEAU-SPEC",
+      "title": "Tableau Desktop Specialist",
+      "description": "Foundational knowledge of Tableau Desktop. Connecting to and preparing data; exploring and analyzing data; and sharing insights. Linked to Value Topology.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Data Visualization",
+      "subdomain": "Certification Bridge",
+      "tags": ["tableau", "data-viz", "analytics", "standard"],
+      "estimated_hours": 40,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "CERT-PROD-ASANA",
+      "title": "Asana Project Management Certificate",
+      "description": "Project management fundamentals using Asana. Managing tasks, timelines, and team collaboration. Mapping mesh-based coordination to enterprise productivity tools.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Digital Productivity",
+      "subdomain": "Certification Bridge",
+      "tags": ["asana", "pm", "productivity", "standard"],
+      "estimated_hours": 20,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Social Studies"
+    }
+  ],
+  "edges": [
+    {
+      "from": "SYM-101",
+      "to": "CERT-AI-GOOGLE-GENAI",
+      "edge_type": "Recommended",
+      "strength_permille": 750,
+      "rationale": "Foundational active inference theory provides the necessary context for generative AI architectures."
+    },
+    {
+      "from": "HAB-VOC-101",
+      "to": "CERT-GREEN-LEED-GA",
+      "edge_type": "Recommended",
+      "strength_permille": 900,
+      "rationale": "Eco-stewardship habitat design covers 90% of the LEED green building knowledge domains."
+    },
+    {
+      "from": "CIV-GEN-050",
+      "to": "CERT-HR-SHRM-CP",
+      "edge_type": "Recommended",
+      "strength_permille": 700,
+      "rationale": "Collective decision-making and Ubuntu leadership are the practical basis for modern HR management."
+    }
+  ]
+}

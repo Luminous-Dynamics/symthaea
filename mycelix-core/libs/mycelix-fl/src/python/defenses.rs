@@ -10,9 +10,9 @@
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
-use crate::defenses::{CoordinateMedian, Defense, FedAvg, Rfa, TrimmedMean};
 use crate::defenses::fltrust::FLTrust;
 use crate::defenses::krum::{Bulyan, Krum, MultiKrum};
+use crate::defenses::{CoordinateMedian, Defense, FedAvg, Rfa, TrimmedMean};
 use crate::types::DefenseConfig;
 
 use super::types::{convert_gradients, PyAggregationResult, PyGradient};
@@ -184,10 +184,7 @@ fn rfa(
 /// Returns:
 ///     AggregationResult weighted by directional trust scores.
 #[pyfunction]
-fn fltrust(
-    gradients: Vec<PyGradient>,
-    server_gradient: Vec<f32>,
-) -> PyResult<PyAggregationResult> {
+fn fltrust(gradients: Vec<PyGradient>, server_gradient: Vec<f32>) -> PyResult<PyAggregationResult> {
     let grads = convert_gradients(&gradients);
     FLTrust::aggregate(&grads, &server_gradient)
         .map(PyAggregationResult::from)

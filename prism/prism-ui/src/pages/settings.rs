@@ -4,18 +4,58 @@
 //! Settings page for Prism.
 
 use leptos::prelude::*;
-use wasm_bindgen::JsCast;
 use prism_search::SearchEngine;
+use wasm_bindgen::JsCast;
 
 const THEMES: &[(&str, &str, &str, &str)] = &[
-    ("abyss",     "Abyssal Bioluminescence", "#4aecd8", "Deep ocean, life in darkness"),
-    ("parchment", "Mycelial Parchment",      "#8fbc8f", "Living manuscript, organic warmth"),
-    ("prism",     "Hyperdimensional Prism",   "#a78bfa", "Crystalline, scientific precision"),
-    ("solar",     "Solar Resonance",          "#f59e0b", "Warm ember, sunset glow"),
-    ("verdant",   "Verdant Canopy",           "#22c55e", "Forest canopy, growth"),
-    ("arctic",    "Arctic Aurora",            "#38bdf8", "Ice blue, aurora shimmer"),
-    ("obsidian",  "Obsidian Forge",           "#ef4444", "Volcanic, industrial power"),
-    ("lavender",  "Lavender Twilight",        "#c084fc", "Dusk, contemplative softness"),
+    (
+        "abyss",
+        "Abyssal Bioluminescence",
+        "#4aecd8",
+        "Deep ocean, life in darkness",
+    ),
+    (
+        "parchment",
+        "Mycelial Parchment",
+        "#8fbc8f",
+        "Living manuscript, organic warmth",
+    ),
+    (
+        "prism",
+        "Hyperdimensional Prism",
+        "#a78bfa",
+        "Crystalline, scientific precision",
+    ),
+    (
+        "solar",
+        "Solar Resonance",
+        "#f59e0b",
+        "Warm ember, sunset glow",
+    ),
+    (
+        "verdant",
+        "Verdant Canopy",
+        "#22c55e",
+        "Forest canopy, growth",
+    ),
+    (
+        "arctic",
+        "Arctic Aurora",
+        "#38bdf8",
+        "Ice blue, aurora shimmer",
+    ),
+    (
+        "obsidian",
+        "Obsidian Forge",
+        "#ef4444",
+        "Volcanic, industrial power",
+    ),
+    (
+        "lavender",
+        "Lavender Twilight",
+        "#c084fc",
+        "Dusk, contemplative softness",
+    ),
 ];
 
 #[component]
@@ -24,35 +64,28 @@ pub fn SettingsPage() -> impl IntoView {
     let claim_count = engine.with_value(|e| e.as_ref().map(|s| s.claim_count()).unwrap_or(0));
 
     // Current theme
-    let (current_theme, set_current_theme) = signal(
-        crate::persistence::load::<String>("theme").unwrap_or_else(|| "abyss".to_string())
-    );
+    let (current_theme, set_current_theme) =
+        signal(crate::persistence::load::<String>("theme").unwrap_or_else(|| "abyss".to_string()));
 
     // Font size
-    let (font_size, set_font_size) = signal(
-        crate::persistence::load::<f64>("font-size").unwrap_or(17.0)
-    );
+    let (font_size, set_font_size) =
+        signal(crate::persistence::load::<f64>("font-size").unwrap_or(17.0));
 
     // Line height
-    let (line_height, set_line_height) = signal(
-        crate::persistence::load::<f64>("line-height").unwrap_or(1.7)
-    );
+    let (line_height, set_line_height) =
+        signal(crate::persistence::load::<f64>("line-height").unwrap_or(1.7));
 
     // Content width
-    let (content_width, set_content_width) = signal(
-        crate::persistence::load::<f64>("content-width").unwrap_or(680.0)
-    );
+    let (content_width, set_content_width) =
+        signal(crate::persistence::load::<f64>("content-width").unwrap_or(680.0));
 
     // Toggle settings
-    let (show_vector_viz, set_show_vector_viz) = signal(
-        crate::persistence::load::<bool>("vector-viz").unwrap_or(true)
-    );
-    let (show_overlay, set_show_overlay) = signal(
-        crate::persistence::load::<bool>("overlay").unwrap_or(true)
-    );
-    let (show_scores, set_show_scores) = signal(
-        crate::persistence::load::<bool>("show-scores").unwrap_or(true)
-    );
+    let (show_vector_viz, set_show_vector_viz) =
+        signal(crate::persistence::load::<bool>("vector-viz").unwrap_or(true));
+    let (show_overlay, set_show_overlay) =
+        signal(crate::persistence::load::<bool>("overlay").unwrap_or(true));
+    let (show_scores, set_show_scores) =
+        signal(crate::persistence::load::<bool>("show-scores").unwrap_or(true));
 
     // Apply font size to CSS
     Effect::new(move |_| {

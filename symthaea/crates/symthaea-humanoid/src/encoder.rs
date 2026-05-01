@@ -3,7 +3,7 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Humanoid HDC encoder: sensor state → ContinuousHV (16,384D).
 //!
-//! Follows the `QuadrotorHdcEncoder` pattern from `symthaea-flight/src/encoder.rs`.
+//! Follows the `QuadrotorHdcEncoder` pattern from `symthaea-multirotor/src/encoder.rs`.
 //! Each of 72 sensor channels gets a genesis-seeded base vector. Values are level-encoded
 //! (thermometer coding) then bound with the base vector. Channels are organized in semantic
 //! groups with balance-critical channels weighted higher.
@@ -369,6 +369,7 @@ impl ChannelLayout {
 /// | Torso vertical  | [54..57]    | 3     | 1.5    | Uprightness                |
 /// | Extremities     | [57..69]    | 12    | 0.5    | Less critical initially    |
 /// | COM velocity    | [69..72]    | 3     | 1.0    | Locomotion target          |
+#[allow(dead_code)]
 const DMC21_CHANNEL_GROUPS: [ChannelGroup; 10] = [
     ChannelGroup {
         start: 0,
@@ -423,9 +424,11 @@ const DMC21_CHANNEL_GROUPS: [ChannelGroup; 10] = [
 ];
 
 /// Total number of channels for DMC21 (backward-compat constant).
+#[allow(dead_code)]
 const DMC21_NUM_CHANNELS: usize = 72;
 
 /// Channel normalization ranges for DMC21 [min, max].
+#[allow(dead_code)]
 const DMC21_CHANNEL_RANGES: [[f32; 2]; DMC21_NUM_CHANNELS] = [
     // Root height (1)
     [0.0, 2.0],
@@ -526,6 +529,7 @@ pub struct HumanoidHdcEncoder {
     /// Base vectors for each channel.
     base_vectors: Vec<ContinuousHV>,
     /// Level codebook (num_levels entries).
+    #[allow(dead_code)]
     level_vectors: Vec<ContinuousHV>,
     /// Base vectors for derivative channels.
     deriv_base_vectors: Vec<ContinuousHV>,
@@ -621,6 +625,7 @@ impl HumanoidHdcEncoder {
 
     /// Level-encode a normalized [0,1] value using thermometer coding.
     /// Returns a new HV (allocates). Use `encode_level_into` for zero-alloc path.
+    #[allow(dead_code)]
     fn encode_level(&self, normalized: f32) -> ContinuousHV {
         let k = ((normalized * self.num_levels as f32) as usize).min(self.num_levels - 1);
         if k == 0 {
@@ -633,6 +638,7 @@ impl HumanoidHdcEncoder {
 
     /// Level-encode into a pre-allocated buffer (zero allocation).
     /// Accumulates level vectors 0..=k directly into `buf`.
+    #[allow(dead_code)]
     fn encode_level_into(&self, normalized: f32, buf: &mut [f32]) {
         let k = ((normalized * self.num_levels as f32) as usize).min(self.num_levels - 1);
         let dim = buf.len();

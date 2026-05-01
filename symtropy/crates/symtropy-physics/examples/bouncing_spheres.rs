@@ -1,5 +1,5 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //! Bouncing spheres: minimal physics demo.
 //!
 //! 20 spheres fall under gravity, bounce off the floor and each other.
@@ -25,7 +25,10 @@ fn main() {
 
     // Simulate 5 seconds at 64Hz
     println!("Simulating 20 spheres for 5 seconds...");
-    println!("{:<8} {:<12} {:<12} {:<8}", "Time", "KE (J)", "Sleeping", "Contacts");
+    println!(
+        "{:<8} {:<12} {:<12} {:<8}",
+        "Time", "KE (J)", "Sleeping", "Contacts"
+    );
     println!("{}", "-".repeat(44));
 
     for step in 0..(5 * 64) {
@@ -36,7 +39,10 @@ fn main() {
             let ke = world.total_kinetic_energy();
             let sleeping = world.sleeping_count();
             let contacts = world.contacts.len();
-            println!("{:<8.1} {:<12.3} {:<12} {:<8}", time, ke, sleeping, contacts);
+            println!(
+                "{:<8.1} {:<12.3} {:<12} {:<8}",
+                time, ke, sleeping, contacts
+            );
         }
     }
 

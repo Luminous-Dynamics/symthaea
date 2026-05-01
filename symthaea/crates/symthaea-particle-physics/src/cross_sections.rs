@@ -84,7 +84,8 @@ pub fn sigma_ee_to_mumu_with_z(s: f64) -> f64 {
     let chi_im = -kappa * s * denom_im / denom_sq;
 
     // |1 + χ|² for vector coupling (approximate, ignoring axial-vector)
-    let factor = (1.0 + chi_re * (gv * gv + ga * ga)).powi(2) + (chi_im * (gv * gv + ga * ga)).powi(2);
+    let factor =
+        (1.0 + chi_re * (gv * gv + ga * ga)).powi(2) + (chi_im * (gv * gv + ga * ga)).powi(2);
 
     sigma_qed * factor
 }
@@ -111,8 +112,8 @@ pub fn sigma_compton(omega: f64) -> f64 {
     // Klein-Nishina formula
     let r_e_sq = ALPHA_EM * ALPHA_EM / (M_ELECTRON * M_ELECTRON);
 
-    let term1 = (1.0 + x) / (x * x * x)
-        * (2.0 * x * (1.0 + x) / (1.0 + 2.0 * x) - (1.0 + 2.0 * x).ln());
+    let term1 =
+        (1.0 + x) / (x * x * x) * (2.0 * x * (1.0 + x) / (1.0 + 2.0 * x) - (1.0 + 2.0 * x).ln());
     let term2 = (1.0 + 2.0 * x).ln() / (2.0 * x);
     let term3 = -(1.0 + 3.0 * x) / (1.0 + 2.0 * x).powi(2);
 
@@ -232,12 +233,24 @@ pub fn alpha_em_running(q2: f64) -> f64 {
 /// Count active quark flavors at energy scale Q (GeV).
 fn count_active_flavors(q: f64) -> u8 {
     let mut nf = 0u8;
-    if q > M_UP { nf += 1; }
-    if q > M_DOWN { nf += 1; }
-    if q > M_STRANGE { nf += 1; }
-    if q > M_CHARM { nf += 1; }
-    if q > M_BOTTOM { nf += 1; }
-    if q > M_TOP { nf += 1; }
+    if q > M_UP {
+        nf += 1;
+    }
+    if q > M_DOWN {
+        nf += 1;
+    }
+    if q > M_STRANGE {
+        nf += 1;
+    }
+    if q > M_CHARM {
+        nf += 1;
+    }
+    if q > M_BOTTOM {
+        nf += 1;
+    }
+    if q > M_TOP {
+        nf += 1;
+    }
     nf
 }
 
@@ -287,7 +300,7 @@ mod tests {
     fn test_r_ratio_below_charm() {
         // Below charm threshold: R = N_c × (Q_u² + Q_d² + Q_s²) = 3×(4/9+1/9+1/9) = 2
         let r = r_ratio(1.5); // √s = 1.5 GeV (below charm)
-        // R₀ = 2.0 × (1 + α_s/π) ≈ 2.0 × 1.1 = 2.2 with QCD correction
+                              // R₀ = 2.0 × (1 + α_s/π) ≈ 2.0 × 1.1 = 2.2 with QCD correction
         assert!(
             (r - 2.0).abs() < 0.4,
             "R below charm = {:.3}, expected ≈ 2.0-2.2 (with QCD correction)",

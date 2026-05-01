@@ -241,24 +241,24 @@ const FUSION_GRID_EARLIEST: u32 = 300;
 const FUSION_GRID_LATEST: u32 = 600;
 
 // Extended tech tree milestones (1000-year arc)
-const RADIATION_HARDENING_EARLIEST: u32 = 120;  // Year 10
-const RADIATION_HARDENING_LATEST: u32 = 600;    // Year 50
-const CRYO_MATERIALS_EARLIEST: u32 = 240;       // Year 20
-const CRYO_MATERIALS_LATEST: u32 = 960;         // Year 80
-const CLOSED_LOOP_ECLSS_EARLIEST: u32 = 360;    // Year 30
-const CLOSED_LOOP_ECLSS_LATEST: u32 = 1200;     // Year 100
-const ADR_CAPABILITY_EARLIEST: u32 = 600;        // Year 50
-const ADR_CAPABILITY_LATEST: u32 = 2400;         // Year 200
-const BIOREGENERATIVE_AG_EARLIEST: u32 = 480;    // Year 40
-const BIOREGENERATIVE_AG_LATEST: u32 = 1800;     // Year 150
-const FUSION_DRIVE_EARLIEST: u32 = 1200;         // Year 100
-const FUSION_DRIVE_LATEST: u32 = 4800;           // Year 400
-const QUANTUM_COMMS_EARLIEST: u32 = 2400;        // Year 200
-const QUANTUM_COMMS_LATEST: u32 = 7200;          // Year 600
+const RADIATION_HARDENING_EARLIEST: u32 = 120; // Year 10
+const RADIATION_HARDENING_LATEST: u32 = 600; // Year 50
+const CRYO_MATERIALS_EARLIEST: u32 = 240; // Year 20
+const CRYO_MATERIALS_LATEST: u32 = 960; // Year 80
+const CLOSED_LOOP_ECLSS_EARLIEST: u32 = 360; // Year 30
+const CLOSED_LOOP_ECLSS_LATEST: u32 = 1200; // Year 100
+const ADR_CAPABILITY_EARLIEST: u32 = 600; // Year 50
+const ADR_CAPABILITY_LATEST: u32 = 2400; // Year 200
+const BIOREGENERATIVE_AG_EARLIEST: u32 = 480; // Year 40
+const BIOREGENERATIVE_AG_LATEST: u32 = 1800; // Year 150
+const FUSION_DRIVE_EARLIEST: u32 = 1200; // Year 100
+const FUSION_DRIVE_LATEST: u32 = 4800; // Year 400
+const QUANTUM_COMMS_EARLIEST: u32 = 2400; // Year 200
+const QUANTUM_COMMS_LATEST: u32 = 7200; // Year 600
 const TERRAFORMING_PRECURSOR_EARLIEST: u32 = 3600; // Year 300
-const TERRAFORMING_PRECURSOR_LATEST: u32 = 9600;   // Year 800
-const INTERSTELLAR_PROBE_EARLIEST: u32 = 6000;     // Year 500
-const INTERSTELLAR_PROBE_LATEST: u32 = 12000;      // Year 1000
+const TERRAFORMING_PRECURSOR_LATEST: u32 = 9600; // Year 800
+const INTERSTELLAR_PROBE_EARLIEST: u32 = 6000; // Year 500
+const INTERSTELLAR_PROBE_LATEST: u32 = 12000; // Year 1000
 
 // ---------------------------------------------------------------------------
 // Event kinds
@@ -513,14 +513,11 @@ impl DisasterEffects {
             (self.infrastructure_damage + other.infrastructure_damage).min(1.0);
         self.resource_production_penalty =
             (self.resource_production_penalty + other.resource_production_penalty).min(1.0);
-        self.solar_power_penalty =
-            (self.solar_power_penalty + other.solar_power_penalty).min(1.0);
-        self.consciousness_shock =
-            (self.consciousness_shock + other.consciousness_shock).min(1.0);
+        self.solar_power_penalty = (self.solar_power_penalty + other.solar_power_penalty).min(1.0);
+        self.consciousness_shock = (self.consciousness_shock + other.consciousness_shock).min(1.0);
         self.allostatic_load_increase =
             (self.allostatic_load_increase + other.allostatic_load_increase).min(1.0);
-        self.electronics_damage =
-            (self.electronics_damage + other.electronics_damage).min(1.0);
+        self.electronics_damage = (self.electronics_damage + other.electronics_damage).min(1.0);
         self.morale_impact = (self.morale_impact + other.morale_impact).clamp(-1.0, 1.0);
     }
 }
@@ -812,8 +809,8 @@ impl TechTree {
                 // Rejuvenate Bio (2024): 109% lifespan increase in mice with OSK.
                 TechMilestone {
                     name: "Genetic Engineering".into(),
-                    earliest_tick: CRYO_MATERIALS_EARLIEST,   // Year 20
-                    latest_tick: FUSION_DRIVE_LATEST,          // Year 400
+                    earliest_tick: CRYO_MATERIALS_EARLIEST, // Year 20
+                    latest_tick: FUSION_DRIVE_LATEST,       // Year 400
                     base_probability: 0.004,
                     prerequisites: vec![(4, 2.5), (2, 2.0)], // science + medicine
                     prerequisite_milestones: vec![],
@@ -832,7 +829,10 @@ impl TechTree {
                     latest_tick: TERRAFORMING_PRECURSOR_LATEST,
                     base_probability: 0.001,
                     prerequisites: vec![(0, 4.0), (1, 3.0), (4, 4.0)],
-                    prerequisite_milestones: vec!["Bioregenerative Agriculture".into(), "Fusion Grid Scale".into()],
+                    prerequisite_milestones: vec![
+                        "Bioregenerative Agriculture".into(),
+                        "Fusion Grid Scale".into(),
+                    ],
                     effects: TechEffects {
                         tech_level_boost: vec![(0, 1.5), (1, 1.5), (4, 1.0)],
                         power_multiplier: 1.0,
@@ -848,7 +848,10 @@ impl TechTree {
                     latest_tick: INTERSTELLAR_PROBE_LATEST,
                     base_probability: 0.0002,
                     prerequisites: vec![(0, 5.0), (4, 5.0), (7, 3.0)],
-                    prerequisite_milestones: vec!["Fusion Drive".into(), "Quantum Communications".into()],
+                    prerequisite_milestones: vec![
+                        "Fusion Drive".into(),
+                        "Quantum Communications".into(),
+                    ],
                     effects: TechEffects {
                         tech_level_boost: vec![(0, 2.0), (4, 2.0), (6, 1.0)],
                         power_multiplier: 1.0,
@@ -864,9 +867,7 @@ impl TechTree {
 
     /// Check whether a named milestone has been achieved.
     pub fn is_achieved(&self, name: &str) -> bool {
-        self.milestones
-            .iter()
-            .any(|m| m.name == name && m.achieved)
+        self.milestones.iter().any(|m| m.name == name && m.achieved)
     }
 }
 
@@ -1122,7 +1123,8 @@ impl DisasterEngine {
             .map(|w| w.governance.stability_score)
             .unwrap_or(1.0);
         let has_manufacturing = self.tech_tree.is_achieved("Manufacturing Breakthrough");
-        self.orbital_debris.tick(earth_gov_stability, has_manufacturing, current_tick, rng);
+        self.orbital_debris
+            .tick(earth_gov_stability, has_manufacturing, current_tick, rng);
 
         // Kessler cascade event generation
         if self.orbital_debris.cascade_active
@@ -1169,7 +1171,11 @@ impl DisasterEngine {
             }
         }
         // Also count global disasters (world_id == None) toward all worlds
-        let global_count = self.active_disasters.iter().filter(|d| d.world_id.is_none()).count() as u32;
+        let global_count = self
+            .active_disasters
+            .iter()
+            .filter(|d| d.world_id.is_none())
+            .count() as u32;
         for world in worlds {
             let entry = self.active_per_world.entry(world.id).or_insert(0);
             *entry += global_count;
@@ -1183,7 +1189,8 @@ impl DisasterEngine {
         // Cap new disasters per world per tick to prevent unrealistic stacking.
         // Count how many results target each world and drop excess.
         {
-            let mut per_world_count: std::collections::HashMap<u32, usize> = std::collections::HashMap::new();
+            let mut per_world_count: std::collections::HashMap<u32, usize> =
+                std::collections::HashMap::new();
             results.retain(|(_, world_id, _)| {
                 if let Some(wid) = world_id {
                     let count = per_world_count.entry(*wid).or_insert(0);
@@ -1269,8 +1276,12 @@ impl DisasterEngine {
             results.push((
                 effects,
                 None,
-                CivEvent::new(tick, None, CivEventType::EmergencyDeclared,
-                    "M-class solar flare: 10x SEU rate, minor communications disruption"),
+                CivEvent::new(
+                    tick,
+                    None,
+                    CivEventType::EmergencyDeclared,
+                    "M-class solar flare: 10x SEU rate, minor communications disruption",
+                ),
             ));
             self.total_disasters += 1;
         }
@@ -1286,9 +1297,8 @@ impl DisasterEngine {
             if self.tech_tree.is_achieved("Manufacturing Breakthrough") {
                 xclass_severity *= 0.8; // additional 20% reduction
             }
-            xclass_severity *= self.inoculation_factor(
-                DisasterKind::Solar(SolarEventKind::XClassFlare),
-            );
+            xclass_severity *=
+                self.inoculation_factor(DisasterKind::Solar(SolarEventKind::XClassFlare));
             let effects = DisasterEffects {
                 solar_power_penalty: 0.15 * xclass_severity,
                 electronics_damage: 0.05 * xclass_severity,
@@ -1330,9 +1340,8 @@ impl DisasterEngine {
                 carrington_severity *= 0.7; // additional 30% reduction
             }
             // Mechanism 5 — Collective Memory Inoculation
-            carrington_severity *= self.inoculation_factor(
-                DisasterKind::Solar(SolarEventKind::CarringtonEvent),
-            );
+            carrington_severity *=
+                self.inoculation_factor(DisasterKind::Solar(SolarEventKind::CarringtonEvent));
             let effects = DisasterEffects {
                 solar_power_penalty: 0.9 * carrington_severity,
                 electronics_damage: 0.6 * carrington_severity,
@@ -1353,9 +1362,15 @@ impl DisasterEngine {
             results.push((
                 effects,
                 None,
-                CivEvent::new(tick, None, CivEventType::EmergencyDeclared,
-                    format!("CARRINGTON-CLASS EVENT: catastrophic electronics damage (severity {:.0}%)",
-                        carrington_severity * 100.0)),
+                CivEvent::new(
+                    tick,
+                    None,
+                    CivEventType::EmergencyDeclared,
+                    format!(
+                        "CARRINGTON-CLASS EVENT: catastrophic electronics damage (severity {:.0}%)",
+                        carrington_severity * 100.0
+                    ),
+                ),
             ));
             self.total_disasters += 1;
             self.carrington_events += 1;
@@ -1371,9 +1386,8 @@ impl DisasterEngine {
             if self.tech_tree.is_achieved("Manufacturing Breakthrough") {
                 spe_severity *= 0.8; // additional 20% reduction
             }
-            spe_severity *= self.inoculation_factor(
-                DisasterKind::Solar(SolarEventKind::SolarProtonEvent),
-            );
+            spe_severity *=
+                self.inoculation_factor(DisasterKind::Solar(SolarEventKind::SolarProtonEvent));
             let effects = DisasterEffects {
                 population_loss_fraction: 0.01 * spe_severity,
                 allostatic_load_increase: 0.15 * spe_severity,
@@ -1391,9 +1405,15 @@ impl DisasterEngine {
             results.push((
                 effects,
                 None,
-                CivEvent::new(tick, None, CivEventType::EmergencyDeclared,
-                    format!("Major solar proton event: acute radiation hazard (severity {:.0}%)",
-                        spe_severity * 100.0)),
+                CivEvent::new(
+                    tick,
+                    None,
+                    CivEventType::EmergencyDeclared,
+                    format!(
+                        "Major solar proton event: acute radiation hazard (severity {:.0}%)",
+                        spe_severity * 100.0
+                    ),
+                ),
             ));
             self.total_disasters += 1;
         }
@@ -1406,8 +1426,12 @@ impl DisasterEngine {
                     ..Default::default()
                 },
                 None,
-                CivEvent::new(tick, None, CivEventType::EmergencyDeclared,
-                    "Solar minimum onset: GCR flux elevated 15% for ~5 years"),
+                CivEvent::new(
+                    tick,
+                    None,
+                    CivEventType::EmergencyDeclared,
+                    "Solar minimum onset: GCR flux elevated 15% for ~5 years",
+                ),
             ));
         }
     }
@@ -1444,8 +1468,12 @@ impl DisasterEngine {
                 results.push((
                     effects,
                     Some(world.id),
-                    CivEvent::new(tick, Some(world.id), CivEventType::EmergencyDeclared,
-                        format!("{}: small meteorite impact — hull breach risk", world.name)),
+                    CivEvent::new(
+                        tick,
+                        Some(world.id),
+                        CivEventType::EmergencyDeclared,
+                        format!("{}: small meteorite impact — hull breach risk", world.name),
+                    ),
                 ));
                 self.total_disasters += 1;
             }
@@ -1464,8 +1492,15 @@ impl DisasterEngine {
                 results.push((
                     effects,
                     Some(world.id),
-                    CivEvent::new(tick, Some(world.id), CivEventType::EmergencyDeclared,
-                        format!("{}: LARGE METEORITE IMPACT — catastrophic structural damage", world.name)),
+                    CivEvent::new(
+                        tick,
+                        Some(world.id),
+                        CivEventType::EmergencyDeclared,
+                        format!(
+                            "{}: LARGE METEORITE IMPACT — catastrophic structural damage",
+                            world.name
+                        ),
+                    ),
                 ));
                 self.total_disasters += 1;
             }
@@ -1523,8 +1558,15 @@ impl DisasterEngine {
                         results.push((
                             effects,
                             Some(world.id),
-                            CivEvent::new(tick, Some(world.id), CivEventType::EmergencyDeclared,
-                                format!("{}: regional dust storm — solar output reduced 50%", world.name)),
+                            CivEvent::new(
+                                tick,
+                                Some(world.id),
+                                CivEventType::EmergencyDeclared,
+                                format!(
+                                    "{}: regional dust storm — solar output reduced 50%",
+                                    world.name
+                                ),
+                            ),
                         ));
                         self.total_disasters += 1;
                     }
@@ -1541,8 +1583,15 @@ impl DisasterEngine {
                         results.push((
                             effects,
                             Some(world.id),
-                            CivEvent::new(tick, Some(world.id), CivEventType::EmergencyDeclared,
-                                format!("{}: shallow moonquake — structural inspection required", world.name)),
+                            CivEvent::new(
+                                tick,
+                                Some(world.id),
+                                CivEventType::EmergencyDeclared,
+                                format!(
+                                    "{}: shallow moonquake — structural inspection required",
+                                    world.name
+                                ),
+                            ),
                         ));
                         self.total_disasters += 1;
                     }
@@ -1557,8 +1606,15 @@ impl DisasterEngine {
                         results.push((
                             effects,
                             Some(world.id),
-                            CivEvent::new(tick, Some(world.id), CivEventType::EmergencyDeclared,
-                                format!("{}: charged lunar dust event — equipment fouling", world.name)),
+                            CivEvent::new(
+                                tick,
+                                Some(world.id),
+                                CivEventType::EmergencyDeclared,
+                                format!(
+                                    "{}: charged lunar dust event — equipment fouling",
+                                    world.name
+                                ),
+                            ),
                         ));
                     }
                 }
@@ -1566,7 +1622,11 @@ impl DisasterEngine {
                     // Jupiter radiation surge — magnetosphere compression event
                     if rng.bernoulli(P_EUROPA_RADIATION_SURGE) {
                         // Subterranean colonies (infrastructure > 0.3 implies buried) get 90% reduction
-                        let mut shielding = if world.infrastructure_level > 0.3 { 0.1 } else { 1.0 };
+                        let mut shielding = if world.infrastructure_level > 0.3 {
+                            0.1
+                        } else {
+                            1.0
+                        };
                         // Radiation Hardening tech: additional 60% reduction
                         if self.tech_tree.is_achieved("Radiation Hardening") {
                             shielding *= 0.4;
@@ -1592,7 +1652,7 @@ impl DisasterEngine {
                     // Tidal quake (30m peak-to-peak flexing, 3.55-day cycle)
                     if rng.bernoulli(P_EUROPA_TIDAL_QUAKE) {
                         let damage = 0.01 + rng.next_f64() * 0.02; // 0.01-0.03
-                        // Better infrastructure flexes with the ice
+                                                                   // Better infrastructure flexes with the ice
                         let flex_factor = 1.0 - world.infrastructure_level * 0.5;
                         let effects = DisasterEffects {
                             infrastructure_damage: damage * flex_factor,
@@ -1602,9 +1662,16 @@ impl DisasterEngine {
                         results.push((
                             effects,
                             Some(world.id),
-                            CivEvent::new(tick, Some(world.id), CivEventType::EmergencyDeclared,
-                                format!("{}: tidal flexing quake — structural stress ({:.1}% damage)",
-                                    world.name, damage * flex_factor * 100.0)),
+                            CivEvent::new(
+                                tick,
+                                Some(world.id),
+                                CivEventType::EmergencyDeclared,
+                                format!(
+                                    "{}: tidal flexing quake — structural stress ({:.1}% damage)",
+                                    world.name,
+                                    damage * flex_factor * 100.0
+                                ),
+                            ),
                         ));
                         self.total_disasters += 1;
                     }
@@ -1621,7 +1688,9 @@ impl DisasterEngine {
                             ..Default::default()
                         };
                         self.active_disasters.push(ActiveDisaster {
-                            kind: DisasterKind::Planetary(PlanetaryEventKind::EuropaIceShellInstability),
+                            kind: DisasterKind::Planetary(
+                                PlanetaryEventKind::EuropaIceShellInstability,
+                            ),
                             severity,
                             remaining_ticks: 2,
                             world_id: Some(world.id),
@@ -1689,15 +1758,24 @@ impl DisasterEngine {
                             ..Default::default()
                         };
                         // Accelerate seal degradation for Titan
-                        self.seal_degradation =
-                            (self.seal_degradation + SEAL_DEGRADATION_PER_TICK * seal_accel).min(1.0);
-                        if rng.bernoulli(0.1) { // Log occasionally, not every tick
+                        self.seal_degradation = (self.seal_degradation
+                            + SEAL_DEGRADATION_PER_TICK * seal_accel)
+                            .min(1.0);
+                        if rng.bernoulli(0.1) {
+                            // Log occasionally, not every tick
                             results.push((
                                 effects,
                                 Some(world.id),
-                                CivEvent::new(tick, Some(world.id), CivEventType::EmergencyDeclared,
-                                    format!("{}: cryogenic embrittlement — seal degradation at {:.1}%",
-                                        world.name, self.seal_degradation * 100.0)),
+                                CivEvent::new(
+                                    tick,
+                                    Some(world.id),
+                                    CivEventType::EmergencyDeclared,
+                                    format!(
+                                        "{}: cryogenic embrittlement — seal degradation at {:.1}%",
+                                        world.name,
+                                        self.seal_degradation * 100.0
+                                    ),
+                                ),
                             ));
                         }
                     }
@@ -1722,9 +1800,15 @@ impl DisasterEngine {
                         results.push((
                             effects,
                             Some(world.id),
-                            CivEvent::new(tick, Some(world.id), CivEventType::EmergencyDeclared,
-                                format!("{}: major methane rainstorm — flooding, {} months duration",
-                                    world.name, duration)),
+                            CivEvent::new(
+                                tick,
+                                Some(world.id),
+                                CivEventType::EmergencyDeclared,
+                                format!(
+                                    "{}: major methane rainstorm — flooding, {} months duration",
+                                    world.name, duration
+                                ),
+                            ),
                         ));
                         self.total_disasters += 1;
                     }
@@ -1732,11 +1816,12 @@ impl DisasterEngine {
                     // Low-gravity chronic health degradation (deterministic, every tick)
                     let low_g_load = TITAN_LOW_G_LOAD_PER_TICK;
                     // Tech milestones reduce the health impact (centrifuge quarters, pharma)
-                    let low_g_mitigation = if self.tech_tree.is_achieved("Manufacturing Breakthrough") {
-                        0.5
-                    } else {
-                        1.0
-                    };
+                    let low_g_mitigation =
+                        if self.tech_tree.is_achieved("Manufacturing Breakthrough") {
+                            0.5
+                        } else {
+                            1.0
+                        };
                     results.push((
                         DisasterEffects {
                             allostatic_load_increase: low_g_load * low_g_mitigation,
@@ -1768,9 +1853,16 @@ impl DisasterEngine {
                         results.push((
                             effects.clone(),
                             Some(world.id),
-                            CivEvent::new(tick, Some(world.id), CivEventType::EmergencyDeclared,
-                                format!("{}: MEGA-QUAKE M9.0+ — infrastructure damage {:.1}%",
-                                    world.name, severity * 100.0)),
+                            CivEvent::new(
+                                tick,
+                                Some(world.id),
+                                CivEventType::EmergencyDeclared,
+                                format!(
+                                    "{}: MEGA-QUAKE M9.0+ — infrastructure damage {:.1}%",
+                                    world.name,
+                                    severity * 100.0
+                                ),
+                            ),
                         ));
                         self.total_disasters += 1;
 
@@ -1787,8 +1879,12 @@ impl DisasterEngine {
                             results.push((
                                 effects,
                                 Some(world.id),
-                                CivEvent::new(tick, Some(world.id), CivEventType::EmergencyDeclared,
-                                    format!("{}: MEGA-TSUNAMI triggered by quake", world.name)),
+                                CivEvent::new(
+                                    tick,
+                                    Some(world.id),
+                                    CivEventType::EmergencyDeclared,
+                                    format!("{}: MEGA-TSUNAMI triggered by quake", world.name),
+                                ),
                             ));
                             self.total_disasters += 1;
                         }
@@ -1805,7 +1901,9 @@ impl DisasterEngine {
                         };
                         // Volcanic winter: 24 ticks (2 years) of reduced food production
                         self.active_disasters.push(ActiveDisaster {
-                            kind: DisasterKind::Planetary(PlanetaryEventKind::EarthSupervolcanicEruption),
+                            kind: DisasterKind::Planetary(
+                                PlanetaryEventKind::EarthSupervolcanicEruption,
+                            ),
                             severity: 0.9,
                             remaining_ticks: 24,
                             world_id: None, // Global: affects all worlds' solar/food
@@ -1879,14 +1977,18 @@ impl DisasterEngine {
             // extends mean time between failures, and mature colonies (infra > 0.7)
             // get an additional 50% MTBF bonus from built-in redundancy.
             let tech_multiplier = 1.0 + world.knowledge.mean_tech_level() * 2.0;
-            let infra_redundancy = if world.infrastructure_level > 0.7 { 1.5 } else { 1.0 };
+            let infra_redundancy = if world.infrastructure_level > 0.7 {
+                1.5
+            } else {
+                1.0
+            };
             let effective_mtbf_scale = tech_multiplier * infra_redundancy;
             // Scale failure probability by inverse of infrastructure level
             // Better infrastructure = more redundancy (original factor)
             let infra_factor = 1.0 / (0.5 + world.infrastructure_level);
             // Combined: divide base probability by MTBF scale, amplified by disaster interactions
-            let mtbf_factor = (infra_factor / effective_mtbf_scale)
-                * interaction_amplifier * damage_amplifier;
+            let mtbf_factor =
+                (infra_factor / effective_mtbf_scale) * interaction_amplifier * damage_amplifier;
 
             let eclss_failures: &[(f64, InfrastructureFailureKind, &str, DisasterEffects)] = &[
                 (
@@ -2046,8 +2148,12 @@ impl DisasterEngine {
                 results.push((
                     effects,
                     Some(world.id),
-                    CivEvent::new(tick, Some(world.id), CivEventType::FactionConflict,
-                        format!("{}: interpersonal conflict — productivity loss", world.name)),
+                    CivEvent::new(
+                        tick,
+                        Some(world.id),
+                        CivEventType::FactionConflict,
+                        format!("{}: interpersonal conflict — productivity loss", world.name),
+                    ),
                 ));
                 self.total_disasters += 1;
             }
@@ -2063,8 +2169,15 @@ impl DisasterEngine {
                 results.push((
                     effects,
                     Some(world.id),
-                    CivEvent::new(tick, Some(world.id), CivEventType::EmergencyDeclared,
-                        format!("{}: cognitive impairment episode — decision quality degraded", world.name)),
+                    CivEvent::new(
+                        tick,
+                        Some(world.id),
+                        CivEventType::EmergencyDeclared,
+                        format!(
+                            "{}: cognitive impairment episode — decision quality degraded",
+                            world.name
+                        ),
+                    ),
                 ));
                 self.total_disasters += 1;
             }
@@ -2081,8 +2194,15 @@ impl DisasterEngine {
                 results.push((
                     effects,
                     Some(world.id),
-                    CivEvent::new(tick, Some(world.id), CivEventType::FactionEmerged,
-                        format!("{}: social cohesion collapse — faction emergence likely", world.name)),
+                    CivEvent::new(
+                        tick,
+                        Some(world.id),
+                        CivEventType::FactionEmerged,
+                        format!(
+                            "{}: social cohesion collapse — faction emergence likely",
+                            world.name
+                        ),
+                    ),
                 ));
                 self.total_disasters += 1;
                 self.faction_crises += 1;
@@ -2098,8 +2218,15 @@ impl DisasterEngine {
                 results.push((
                     effects,
                     Some(world.id),
-                    CivEvent::new(tick, Some(world.id), CivEventType::EmergencyDeclared,
-                        format!("{}: individual psychotic break — medical emergency", world.name)),
+                    CivEvent::new(
+                        tick,
+                        Some(world.id),
+                        CivEventType::EmergencyDeclared,
+                        format!(
+                            "{}: individual psychotic break — medical emergency",
+                            world.name
+                        ),
+                    ),
                 ));
                 self.total_disasters += 1;
             }
@@ -2116,8 +2243,12 @@ impl DisasterEngine {
                 results.push((
                     effects,
                     Some(world.id),
-                    CivEvent::new(tick, Some(world.id), CivEventType::GovernanceTransition,
-                        format!("{}: authority challenge — leadership crisis", world.name)),
+                    CivEvent::new(
+                        tick,
+                        Some(world.id),
+                        CivEventType::GovernanceTransition,
+                        format!("{}: authority challenge — leadership crisis", world.name),
+                    ),
                 ));
                 self.total_disasters += 1;
             }
@@ -2155,8 +2286,12 @@ impl DisasterEngine {
             results.push((
                 effects,
                 None,
-                CivEvent::new(tick, None, CivEventType::InnovationStagnation,
-                    "Technology regression: researchers below critical mass — knowledge loss"),
+                CivEvent::new(
+                    tick,
+                    None,
+                    CivEventType::InnovationStagnation,
+                    "Technology regression: researchers below critical mass — knowledge loss",
+                ),
             ));
             self.total_disasters += 1;
         }
@@ -2195,8 +2330,12 @@ impl DisasterEngine {
                 results.push((
                     effects,
                     None,
-                    CivEvent::new(tick, None, CivEventType::InnovationBreakthrough,
-                        format!("TECH MILESTONE: {} achieved", milestone.name)),
+                    CivEvent::new(
+                        tick,
+                        None,
+                        CivEventType::InnovationBreakthrough,
+                        format!("TECH MILESTONE: {} achieved", milestone.name),
+                    ),
                 ));
             }
         }
@@ -2220,8 +2359,7 @@ impl DisasterEngine {
                     milestone.achieved_tick = None;
                     // Remove the result we just pushed
                     results.retain(|(_e, _w, ev)| {
-                        !(ev.tick == tick
-                            && ev.description.contains(&milestone.name))
+                        !(ev.tick == tick && ev.description.contains(&milestone.name))
                     });
                 }
             }
@@ -2276,7 +2414,7 @@ impl DisasterEngine {
             // --- Elite Overproduction (Turchin 2003) ---
             let tier_dist = world.tier_distribution();
             let guardian_frac = tier_dist[4]; // tier 4 = Guardian
-            // Use world-level Gini as proxy (computed externally, use tier skew)
+                                              // Use world-level Gini as proxy (computed externally, use tier skew)
             let phi_values: Vec<f64> = world
                 .agents
                 .iter()
@@ -2320,8 +2458,12 @@ impl DisasterEngine {
                     results.push((
                         effects,
                         Some(world.id),
-                        CivEvent::new(tick, Some(world.id), CivEventType::ResourceCrisis,
-                            format!("{}: resource depletion crisis compounding", world.name)),
+                        CivEvent::new(
+                            tick,
+                            Some(world.id),
+                            CivEventType::ResourceCrisis,
+                            format!("{}: resource depletion crisis compounding", world.name),
+                        ),
                     ));
                     self.total_disasters += 1;
                 }
@@ -2340,9 +2482,16 @@ impl DisasterEngine {
                     results.push((
                         effects,
                         Some(world.id),
-                        CivEvent::new(tick, Some(world.id), CivEventType::ConstitutionalCalcification,
-                            format!("{}: institutional sclerosis — governance rigidity at {:.0}%",
-                                world.name, calcification * 100.0)),
+                        CivEvent::new(
+                            tick,
+                            Some(world.id),
+                            CivEventType::ConstitutionalCalcification,
+                            format!(
+                                "{}: institutional sclerosis — governance rigidity at {:.0}%",
+                                world.name,
+                                calcification * 100.0
+                            ),
+                        ),
                     ));
                     self.total_disasters += 1;
                 }
@@ -2361,9 +2510,15 @@ impl DisasterEngine {
                 results.push((
                     effects,
                     Some(world.id),
-                    CivEvent::new(tick, Some(world.id), CivEventType::EmergencyDeclared,
-                        format!("{}: SYSTEMIC CASCADE FAILURE — {} infrastructure failures in {} ticks",
-                            world.name, self.cascade_failure_count, CASCADE_WINDOW_TICKS)),
+                    CivEvent::new(
+                        tick,
+                        Some(world.id),
+                        CivEventType::EmergencyDeclared,
+                        format!(
+                            "{}: SYSTEMIC CASCADE FAILURE — {} infrastructure failures in {} ticks",
+                            world.name, self.cascade_failure_count, CASCADE_WINDOW_TICKS
+                        ),
+                    ),
                 ));
                 self.total_disasters += 1;
                 // Reset to avoid firing every tick
@@ -2381,7 +2536,11 @@ impl DisasterEngine {
                 / pop as f64;
 
             // Track sustained high load per world
-            if let Some(entry) = self.high_load_ticks.iter_mut().find(|(id, _)| *id == world.id) {
+            if let Some(entry) = self
+                .high_load_ticks
+                .iter_mut()
+                .find(|(id, _)| *id == world.id)
+            {
                 if mean_load > COHESION_CRISIS_LOAD {
                     entry.1 += 1;
                 } else {
@@ -2390,7 +2549,11 @@ impl DisasterEngine {
             } else {
                 self.high_load_ticks.push((
                     world.id,
-                    if mean_load > COHESION_CRISIS_LOAD { 1 } else { 0 },
+                    if mean_load > COHESION_CRISIS_LOAD {
+                        1
+                    } else {
+                        0
+                    },
                 ));
             }
 
@@ -2419,7 +2582,11 @@ impl DisasterEngine {
                 ));
                 self.total_disasters += 1;
                 // Reset counter
-                if let Some(entry) = self.high_load_ticks.iter_mut().find(|(id, _)| *id == world.id) {
+                if let Some(entry) = self
+                    .high_load_ticks
+                    .iter_mut()
+                    .find(|(id, _)| *id == world.id)
+                {
                     entry.1 = 0;
                 }
             }
@@ -2454,7 +2621,10 @@ impl DisasterEngine {
     /// Apply collective memory inoculation: reduce severity by 30% if the
     /// civilization has survived this disaster kind before (Mechanism 5).
     fn inoculation_factor(&self, kind: DisasterKind) -> f64 {
-        if self.survived_disaster_types.contains(&Self::disaster_kind_key(kind)) {
+        if self
+            .survived_disaster_types
+            .contains(&Self::disaster_kind_key(kind))
+        {
             0.7
         } else {
             1.0
@@ -2525,10 +2695,16 @@ mod tests {
                 faction_id: None,
                 generation: 0,
                 trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
-                    ethics: crate::agent::EthicalOrientation::default(),
-                    sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
-                    justice: crate::sub_passport::RestorativeJustice::new(),
+                cumulative_dose_sv: 0.0,
+                adversarial: None,
+                coordination_understanding: 0.0,
+                mycel_score: 0.1,
+                sap_balance: 100.0,
+                is_biological: true,
+                wounds: Vec::new(),
+                ethics: crate::agent::EthicalOrientation::default(),
+                sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
+                justice: crate::sub_passport::RestorativeJustice::new(),
             });
         }
         World {
@@ -2549,7 +2725,10 @@ mod tests {
             knowledge: WorldKnowledge::new(),
             economy: WorldEconomy::new(),
             harmony: HarmonyTracker::new(),
-            governance: WorldGovernance::new(), metabolism_state: crate::metabolism::MetabolismState::default(), currency_state: crate::currency::WorldCurrencyState::default(), policy_state: crate::proposals::PolicyState::default(),
+            governance: WorldGovernance::new(),
+            metabolism_state: crate::metabolism::MetabolismState::default(),
+            currency_state: crate::currency::WorldCurrencyState::default(),
+            policy_state: crate::proposals::PolicyState::default(),
             power_generation_kw: 0.0,
             power_demand_kw: 0.0,
             narrative_identity: crate::world::NarrativeIdentity::default(),
@@ -2752,7 +2931,10 @@ mod tests {
                 break;
             }
         }
-        assert!(triggered, "Tainter diminishing returns should trigger eventually");
+        assert!(
+            triggered,
+            "Tainter diminishing returns should trigger eventually"
+        );
     }
 
     #[test]
@@ -2994,12 +3176,14 @@ mod tests {
         assert!(
             day_effects.electronics_damage > night_effects.electronics_damage,
             "Day-side solar should do more electronics damage: {} vs {}",
-            day_effects.electronics_damage, night_effects.electronics_damage
+            day_effects.electronics_damage,
+            night_effects.electronics_damage
         );
         assert!(
             day_effects.population_loss_fraction > night_effects.population_loss_fraction,
             "Day-side solar should cause more casualties: {} vs {}",
-            day_effects.population_loss_fraction, night_effects.population_loss_fraction
+            day_effects.population_loss_fraction,
+            night_effects.population_loss_fraction
         );
     }
 
@@ -3023,7 +3207,8 @@ mod tests {
         assert!(
             effects.infrastructure_damage > base_infra,
             "Night shift should amplify infra damage: {} vs {}",
-            effects.infrastructure_damage, base_infra
+            effects.infrastructure_damage,
+            base_infra
         );
     }
 }

@@ -219,6 +219,68 @@ pub struct ConsentGrantView {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConsentGrantInputView {
+    pub grantee: String,
+    pub record_types: Vec<String>,
+    pub expires_at: Option<i64>,
+    pub active: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DataSharingPreferenceView {
+    pub source_cluster: String,
+    pub target_cluster: String,
+    pub allowed: bool,
+    pub blocked_zomes: Vec<String>,
+    pub reason: String,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PreferenceChangeLogView {
+    pub source_cluster: String,
+    pub target_cluster: String,
+    pub was_allowed: bool,
+    pub now_allowed: bool,
+    pub changed_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BridgeQueryView {
+    pub hash: String,
+    pub domain: String,
+    pub query_type: String,
+    pub requester: String,
+    pub params: String,
+    pub result: Option<String>,
+    pub created_at: i64,
+    pub resolved_at: Option<i64>,
+    pub success: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BridgeEventView {
+    pub hash: String,
+    pub domain: String,
+    pub event_type: String,
+    pub source_agent: String,
+    pub payload: String,
+    pub created_at: i64,
+    pub related_hashes: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActivityItemView {
+    pub id: String,
+    pub kind: String,
+    pub domain: String,
+    pub title: String,
+    pub detail: String,
+    pub created_at: i64,
+    pub success: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoredCredentialView {
     pub hash: String,
     pub credential_type: CredentialType,

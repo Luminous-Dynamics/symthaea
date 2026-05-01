@@ -99,9 +99,7 @@ impl FLCoordinator {
     pub fn start_round(&mut self) -> Result<u64, FlError> {
         // Check no round is currently in progress
         if let Some(ref round) = self.current_round {
-            if round.status == RoundStatus::Collecting
-                || round.status == RoundStatus::Aggregating
-            {
+            if round.status == RoundStatus::Collecting || round.status == RoundStatus::Aggregating {
                 return Err(FlError::InvalidRoundState {
                     expected: "no active round".into(),
                     got: round.status.to_string(),
@@ -155,10 +153,7 @@ impl FLCoordinator {
         }
 
         // 5. Submit to current round
-        let round = self
-            .current_round
-            .as_mut()
-            .ok_or(FlError::NoActiveRound)?;
+        let round = self.current_round.as_mut().ok_or(FlError::NoActiveRound)?;
 
         round.submit_gradient(gradient)?;
 
@@ -175,10 +170,7 @@ impl FLCoordinator {
     /// Returns [`FlError::NoActiveRound`] if no round is in progress.
     /// Returns [`FlError::InsufficientGradients`] if fewer than `min_nodes` submitted.
     pub fn complete_round(&mut self) -> Result<AggregationResult, FlError> {
-        let round = self
-            .current_round
-            .as_mut()
-            .ok_or(FlError::NoActiveRound)?;
+        let round = self.current_round.as_mut().ok_or(FlError::NoActiveRound)?;
 
         if !round.has_enough_nodes(self.config.min_nodes) {
             let got = round.gradients.len();
@@ -372,9 +364,7 @@ mod tests {
         assert_eq!(round_num, 1);
 
         for &node in &nodes {
-            coord
-                .submit_gradient(honest_gradient(node, 1, 50))
-                .unwrap();
+            coord.submit_gradient(honest_gradient(node, 1, 50)).unwrap();
         }
 
         let result = coord.complete_round().unwrap();
@@ -458,10 +448,7 @@ mod tests {
         let mut coord = default_coordinator();
         register_nodes(&mut coord, &["a"]); // Only 1, need 3
         let result = coord.start_round();
-        assert!(matches!(
-            result,
-            Err(FlError::InsufficientGradients { .. })
-        ));
+        assert!(matches!(result, Err(FlError::InsufficientGradients { .. })));
     }
 
     #[test]
@@ -471,15 +458,10 @@ mod tests {
         coord.start_round().unwrap();
 
         // Only submit 1 gradient (need 3)
-        coord
-            .submit_gradient(honest_gradient("a", 1, 10))
-            .unwrap();
+        coord.submit_gradient(honest_gradient("a", 1, 10)).unwrap();
 
         let result = coord.complete_round();
-        assert!(matches!(
-            result,
-            Err(FlError::InsufficientGradients { .. })
-        ));
+        assert!(matches!(result, Err(FlError::InsufficientGradients { .. })));
 
         // Should be recorded as failed in history
         assert_eq!(coord.round_history().len(), 1);
@@ -590,9 +572,7 @@ mod tests {
         register_nodes(&mut coord, &["a", "b", "c"]);
         coord.start_round().unwrap();
 
-        coord
-            .submit_gradient(honest_gradient("a", 1, 10))
-            .unwrap();
+        coord.submit_gradient(honest_gradient("a", 1, 10)).unwrap();
 
         // The per-round rate limit (1) will reject the second submission
         let result = coord.submit_gradient(honest_gradient("a", 1, 10));

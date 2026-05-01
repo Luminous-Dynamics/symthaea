@@ -41,28 +41,28 @@ const NARRATION: &[(f32, f32, &str)] = &[
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CinematicPhase {
     // Act 1: The Room (0-22s)
-    FadeIn,         // 0-2s
-    Explore,        // 2-10s
-    Leviathan,      // 10-14s
-    Dimension,      // 14-20s
-    Calm,           // 20-22s
+    FadeIn,    // 0-2s
+    Explore,   // 2-10s
+    Leviathan, // 10-14s
+    Dimension, // 14-20s
+    Calm,      // 20-22s
     // Act 2: The Planet (22-52s)
-    FadeToGlobe,    // 22-24s
-    GlobeHolo,      // 24-32s
-    SplitScreen,    // 32-36s
-    Timeline,       // 36-42s
-    Satellites,     // 42-48s
-    Night,          // 48-52s
+    FadeToGlobe, // 22-24s
+    GlobeHolo,   // 24-32s
+    SplitScreen, // 32-36s
+    Timeline,    // 36-42s
+    Satellites,  // 42-48s
+    Night,       // 48-52s
     // Act 3: The Solar System (52-78s)
-    PullOut,        // 52-56s
-    FlyToMars,      // 56-62s
-    FlyToJupiter,   // 62-68s
-    SaturnRings,    // 68-74s
-    ReturnEarth,    // 74-78s
+    PullOut,      // 52-56s
+    FlyToMars,    // 56-62s
+    FlyToJupiter, // 62-68s
+    SaturnRings,  // 68-74s
+    ReturnEarth,  // 74-78s
     // Act 4: Closing (78-90s)
-    FadeToRoom,     // 78-80s
-    Dungeon3D,      // 80-86s
-    FinalFade,      // 86-90s
+    FadeToRoom, // 78-80s
+    Dungeon3D,  // 80-86s
+    FinalFade,  // 86-90s
     Done,
 }
 
@@ -119,11 +119,18 @@ impl CinematicPhase {
 
     /// Is this phase in the globe view?
     pub fn is_globe(&self) -> bool {
-        matches!(self,
-            Self::GlobeHolo | Self::SplitScreen | Self::Timeline |
-            Self::Satellites | Self::Night | Self::PullOut |
-            Self::FlyToMars | Self::FlyToJupiter | Self::SaturnRings |
-            Self::ReturnEarth
+        matches!(
+            self,
+            Self::GlobeHolo
+                | Self::SplitScreen
+                | Self::Timeline
+                | Self::Satellites
+                | Self::Night
+                | Self::PullOut
+                | Self::FlyToMars
+                | Self::FlyToJupiter
+                | Self::SaturnRings
+                | Self::ReturnEarth
         )
     }
 }
@@ -165,7 +172,7 @@ pub struct ScreenFade {
 impl Default for ScreenFade {
     fn default() -> Self {
         Self {
-            alpha: 1.0,  // start black
+            alpha: 1.0, // start black
             target: 0.0,
             speed: 1.0,
         }
@@ -266,7 +273,9 @@ pub fn narration_system(
     mut narration: ResMut<NarrationState>,
     mut texts: Query<(&mut Text, &mut TextColor), With<NarrationText>>,
 ) {
-    if !director.enabled { return; }
+    if !director.enabled {
+        return;
+    }
 
     let t = director.total_time;
     let mut active_text = "";
@@ -309,11 +318,10 @@ pub fn narration_system(
 /// Voice narration trigger — logs when each narration line starts.
 /// When audio is enabled (live-audio feature), this will trigger playback.
 /// Pre-render narration WAVs with: symthaea-voice --formant --text "..."
-pub fn voice_narration_system(
-    director: Res<CinematicDirector>,
-    mut voice: ResMut<VoiceNarration>,
-) {
-    if !director.enabled { return; }
+pub fn voice_narration_system(director: Res<CinematicDirector>, mut voice: ResMut<VoiceNarration>) {
+    if !director.enabled {
+        return;
+    }
 
     let t = director.total_time;
 
@@ -332,7 +340,11 @@ pub fn voice_narration_system(
 
 /// Cubic ease-in-out.
 fn ease(t: f32) -> f32 {
-    if t < 0.5 { 4.0 * t * t * t } else { 1.0 - (-2.0 * t + 2.0).powi(3) / 2.0 }
+    if t < 0.5 {
+        4.0 * t * t * t
+    } else {
+        1.0 - (-2.0 * t + 2.0).powi(3) / 2.0
+    }
 }
 
 pub fn cinematic_director_system(
@@ -504,40 +516,52 @@ pub fn cinematic_director_system(
         CinematicPhase::FlyToMars => {
             // Fly toward Mars position
             if let Some(mut cam) = camera_config {
-                let mars = sol_atlas_core::solar_system::solar_system_bodies()
-                    .into_iter().find(|b| b.name == "Mars").unwrap();
-                let pos = sol_atlas_core::solar_system::body_position(&mars, director.total_time);
-                // Interpolate camera toward Mars
-                let target_theta = pos[2].atan2(pos[0]);
-                let target_dist = (pos[0] * pos[0] + pos[2] * pos[2]).sqrt() - 0.5;
-                cam.theta += (target_theta - cam.theta) * 0.03;
-                cam.distance += (target_dist - cam.distance) * 0.03;
-                cam.phi += (pos[1].atan2(target_dist) - cam.phi) * 0.02;
+                if let Some(mars) = sol_atlas_core::solar_system::solar_system_bodies()
+                    .into_iter()
+                    .find(|b| b.name == "Mars")
+                {
+                    let pos =
+                        sol_atlas_core::solar_system::body_position(&mars, director.total_time);
+                    // Interpolate camera toward Mars
+                    let target_theta = pos[2].atan2(pos[0]);
+                    let target_dist = (pos[0] * pos[0] + pos[2] * pos[2]).sqrt() - 0.5;
+                    cam.theta += (target_theta - cam.theta) * 0.03;
+                    cam.distance += (target_dist - cam.distance) * 0.03;
+                    cam.phi += (pos[1].atan2(target_dist) - cam.phi) * 0.02;
+                }
             }
         }
 
         CinematicPhase::FlyToJupiter => {
             if let Some(mut cam) = camera_config {
-                let jupiter = sol_atlas_core::solar_system::solar_system_bodies()
-                    .into_iter().find(|b| b.name == "Jupiter").unwrap();
-                let pos = sol_atlas_core::solar_system::body_position(&jupiter, director.total_time);
-                let target_theta = pos[2].atan2(pos[0]);
-                let target_dist = (pos[0] * pos[0] + pos[2] * pos[2]).sqrt() - 1.0;
-                cam.theta += (target_theta - cam.theta) * 0.03;
-                cam.distance += (target_dist - cam.distance) * 0.03;
-                cam.phi += (0.0 - cam.phi) * 0.02;
+                if let Some(jupiter) = sol_atlas_core::solar_system::solar_system_bodies()
+                    .into_iter()
+                    .find(|b| b.name == "Jupiter")
+                {
+                    let pos =
+                        sol_atlas_core::solar_system::body_position(&jupiter, director.total_time);
+                    let target_theta = pos[2].atan2(pos[0]);
+                    let target_dist = (pos[0] * pos[0] + pos[2] * pos[2]).sqrt() - 1.0;
+                    cam.theta += (target_theta - cam.theta) * 0.03;
+                    cam.distance += (target_dist - cam.distance) * 0.03;
+                    cam.phi += (0.0 - cam.phi) * 0.02;
+                }
             }
         }
 
         CinematicPhase::SaturnRings => {
             if let Some(mut cam) = camera_config {
-                let saturn = sol_atlas_core::solar_system::solar_system_bodies()
-                    .into_iter().find(|b| b.name == "Saturn").unwrap();
-                let pos = sol_atlas_core::solar_system::body_position(&saturn, director.total_time);
-                let target_theta = pos[2].atan2(pos[0]);
-                let target_dist = (pos[0] * pos[0] + pos[2] * pos[2]).sqrt() - 1.0;
-                cam.theta += (target_theta - cam.theta) * 0.03;
-                cam.distance += (target_dist - cam.distance) * 0.03;
+                if let Some(saturn) = sol_atlas_core::solar_system::solar_system_bodies()
+                    .into_iter()
+                    .find(|b| b.name == "Saturn")
+                {
+                    let pos =
+                        sol_atlas_core::solar_system::body_position(&saturn, director.total_time);
+                    let target_theta = pos[2].atan2(pos[0]);
+                    let target_dist = (pos[0] * pos[0] + pos[2] * pos[2]).sqrt() - 1.0;
+                    cam.theta += (target_theta - cam.theta) * 0.03;
+                    cam.distance += (target_dist - cam.distance) * 0.03;
+                }
             }
         }
 
@@ -602,7 +626,10 @@ pub fn cinematic_director_system(
         director.phase = director.phase.next();
         director.phase_timer = 0.0;
         if director.phase != CinematicPhase::Done {
-            info!("[cinematic] {:?} → {:?} (t={:.1}s)", old, director.phase, director.total_time);
+            info!(
+                "[cinematic] {:?} → {:?} (t={:.1}s)",
+                old, director.phase, director.total_time
+            );
         } else {
             info!("[cinematic] Complete! {:.1}s total. Stitch: ffmpeg -framerate 8 -i /tmp/symtropy-cinematic-frames/frame_%05d.png -c:v libx264 cinematic.mp4", director.total_time);
         }
@@ -618,9 +645,14 @@ pub fn orbital_tracks_system(
     time: Res<Time>,
     director: Res<CinematicDirector>,
 ) {
-    if !director.enabled { return; }
+    if !director.enabled {
+        return;
+    }
     // Only draw during Satellites phase (and Night for persistence)
-    if !matches!(director.phase, CinematicPhase::Satellites | CinematicPhase::Night) {
+    if !matches!(
+        director.phase,
+        CinematicPhase::Satellites | CinematicPhase::Night
+    ) {
         return;
     }
 
@@ -636,7 +668,11 @@ pub fn orbital_tracks_system(
     let geo_r = 1.6f32; // compressed
     let geo_color = Color::linear_rgba(1.0, 0.7, 0.2, 0.08);
 
-    let shells = [(leo_r, leo_color, 48, 8), (meo_r, meo_color, 36, 4), (geo_r, geo_color, 24, 2)];
+    let shells = [
+        (leo_r, leo_color, 48, 8),
+        (meo_r, meo_color, 36, 4),
+        (geo_r, geo_color, 24, 2),
+    ];
 
     for (radius, color, segments, sat_count) in shells {
         // Draw orbital ring

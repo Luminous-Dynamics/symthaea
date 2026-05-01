@@ -42,6 +42,9 @@ pub use phase_tracker::*;
 mod snapshot;
 pub use snapshot::*;
 
+pub mod substance_profiles;
+pub use substance_profiles::*;
+
 // Research directions
 pub mod pgx_health_equity;
 pub mod pharmacogenomics;

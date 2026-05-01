@@ -25,9 +25,9 @@
 //! at 30 fps. HEVC HW gives ~50% better compression than H.264 — close
 //! enough to AV1's 30-40% that the USB 2.0 budget relief survives.
 
-pub mod wire;
 pub mod decoder;
 pub mod stream;
+pub mod wire;
 
 use std::io;
 use std::path::{Path, PathBuf};
@@ -177,7 +177,9 @@ pub enum ScrcpyError {
 impl std::fmt::Display for ScrcpyError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ScrcpyError::JarMissing(p) => write!(f, "scrcpy-server JAR not found at {}", p.display()),
+            ScrcpyError::JarMissing(p) => {
+                write!(f, "scrcpy-server JAR not found at {}", p.display())
+            }
             ScrcpyError::JarShaMismatch { expected, actual } => write!(
                 f,
                 "scrcpy-server JAR SHA256 mismatch: expected {expected}, got {actual}"
@@ -551,10 +553,9 @@ mod tests {
     #[test]
     fn extra_args_are_appended_verbatim() {
         let mut opts = ScrcpyOptions::cybernetic_defaults("s", 8400);
-        opts.extra_args.push("video_codec_options=profile=1".to_string());
+        opts.extra_args
+            .push("video_codec_options=profile=1".to_string());
         let args = opts.to_server_args();
-        assert!(args
-            .iter()
-            .any(|a| a == "video_codec_options=profile=1"));
+        assert!(args.iter().any(|a| a == "video_codec_options=profile=1"));
     }
 }

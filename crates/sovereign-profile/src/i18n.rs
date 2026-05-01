@@ -78,7 +78,7 @@ pub fn dimension_label(dim: SovereignDimension) -> &'static DimensionLabel {
 }
 
 /// Tier labels with i18n keys.
-pub const TIER_LABELS: [(& str, &str); 5] = [
+pub const TIER_LABELS: [(&str, &str); 5] = [
     ("observer", "Observer"),
     ("participant", "Participant"),
     ("citizen", "Citizen"),

@@ -19,7 +19,17 @@ rmp-serde = "1"
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 js-sys = "0.3"
-web-sys = { version = "0.3", features = ["console", "HtmlSelectElement", "HtmlInputElement", "HtmlTextAreaElement", "EventTarget", "Window", "Navigator", "Clipboard", "Location", "Storage", "MediaQueryList", "Blob", "BlobPropertyBag", "Url", "HtmlElement", "Document", "Element", "FileReader", "File", "FileList", "HtmlAnchorElement", "Worker", "MessageEvent", "ErrorEvent", "IdbFactory", "IdbDatabase", "IdbObjectStore", "IdbObjectStoreParameters", "IdbRequest", "IdbTransaction", "IdbTransactionMode", "IdbOpenDbRequest", "DomStringList"] }
+web-sys = { version = "0.3", features = [
+    "console", "HtmlSelectElement", "HtmlInputElement", "HtmlTextAreaElement", 
+    "EventTarget", "Window", "Navigator", "Clipboard", "Location", "Storage", 
+    "MediaQueryList", "Blob", "BlobPropertyBag", "Url", "HtmlElement", "Document", 
+    "Element", "FileReader", "File", "FileList", "HtmlAnchorElement", "Worker", 
+    "MessageEvent", "ErrorEvent", "IdbFactory", "IdbDatabase", "IdbObjectStore", 
+    "IdbObjectStoreParameters", "IdbRequest", "IdbTransaction", "IdbTransactionMode", 
+    "IdbOpenDbRequest", "DomStringList", "HtmlCanvasElement", "WebGl2RenderingContext",
+    "WebGlProgram", "WebGlShader", "WebGlBuffer", "WebGlUniformLocation", 
+    "WebGlVertexArrayObject", "WebGlTexture"
+] }
 console_error_panic_hook = "0.1"
 gloo-timers = { version = "0.3", features = ["futures"] }
 

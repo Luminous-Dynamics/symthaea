@@ -36,13 +36,26 @@ pub struct MatlProfile {
 impl MatlProfile {
     /// All 6 values as an array (for iteration).
     pub fn values(&self) -> [f64; 6] {
-        [self.assurance, self.network, self.epistemics,
-         self.vitality, self.reciprocity, self.thermodynamics]
+        [
+            self.assurance,
+            self.network,
+            self.epistemics,
+            self.vitality,
+            self.reciprocity,
+            self.thermodynamics,
+        ]
     }
 
     /// Axis labels.
     pub fn labels() -> [&'static str; 6] {
-        ["Assurance", "Network", "Epistemics", "Vitality", "Reciprocity", "Thermo"]
+        [
+            "Assurance",
+            "Network",
+            "Epistemics",
+            "Vitality",
+            "Reciprocity",
+            "Thermo",
+        ]
     }
 
     /// Short labels for compact display.
@@ -82,11 +95,15 @@ impl MatlProfile {
 
     /// Compute hexagon vertex coordinates for a given center and radius.
     fn vertices(center: f64, radius: f64, values: &[f64; 6]) -> Vec<(f64, f64)> {
-        values.iter().enumerate().map(|(i, &v)| {
-            let angle = std::f64::consts::PI / 2.0 + (i as f64) * std::f64::consts::PI / 3.0;
-            let r = v * radius;
-            (center + r * angle.cos(), center - r * angle.sin())
-        }).collect()
+        values
+            .iter()
+            .enumerate()
+            .map(|(i, &v)| {
+                let angle = std::f64::consts::PI / 2.0 + (i as f64) * std::f64::consts::PI / 3.0;
+                let r = v * radius;
+                (center + r * angle.cos(), center - r * angle.sin())
+            })
+            .collect()
     }
 }
 
@@ -94,8 +111,7 @@ impl MatlProfile {
 #[component]
 pub fn MatlDiamond(
     #[prop(into)] profile: MatlProfile,
-    #[prop(default = 140)]
-    size: u32,
+    #[prop(default = 140)] size: u32,
 ) -> impl IntoView {
     let s = size as f64;
     let center = s / 2.0;
@@ -105,23 +121,34 @@ pub fn MatlDiamond(
 
     // Profile shape vertices
     let verts = MatlProfile::vertices(center, radius, &vals);
-    let shape: String = verts.iter()
+    let shape: String = verts
+        .iter()
         .map(|(x, y)| format!("{x:.1},{y:.1}"))
         .collect::<Vec<_>>()
         .join(" ");
 
     // Grid hexagons at 0.25, 0.5, 0.75, 1.0
-    let grids: Vec<String> = [0.25, 0.5, 0.75, 1.0].iter().map(|&level| {
-        let full = [level; 6];
-        let gv = MatlProfile::vertices(center, radius, &full);
-        gv.iter().map(|(x, y)| format!("{x:.1},{y:.1}")).collect::<Vec<_>>().join(" ")
-    }).collect();
+    let grids: Vec<String> = [0.25, 0.5, 0.75, 1.0]
+        .iter()
+        .map(|&level| {
+            let full = [level; 6];
+            let gv = MatlProfile::vertices(center, radius, &full);
+            gv.iter()
+                .map(|(x, y)| format!("{x:.1},{y:.1}"))
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
+        .collect();
 
     // Label positions (slightly outside the outer hexagon)
     let label_verts = MatlProfile::vertices(center, radius + 14.0, &[1.0; 6]);
 
     let suspicious = profile.is_suspicious();
-    let fill = if suspicious { "rgba(239,68,68,0.12)" } else { "rgba(6,214,200,0.12)" };
+    let fill = if suspicious {
+        "rgba(239,68,68,0.12)"
+    } else {
+        "rgba(6,214,200,0.12)"
+    };
     let stroke = if suspicious { "#ef4444" } else { "#06D6C8" };
 
     view! {
@@ -169,29 +196,42 @@ pub fn MatlDiamond(
 #[component]
 pub fn MatlGlyph(
     #[prop(into)] profile: MatlProfile,
-    #[prop(default = 20)]
-    size: u32,
+    #[prop(default = 20)] size: u32,
 ) -> impl IntoView {
     let s = size as f64;
     let c = s / 2.0;
     let r = c - 1.0;
     let vals = profile.values();
     let verts = MatlProfile::vertices(c, r, &vals);
-    let shape: String = verts.iter()
+    let shape: String = verts
+        .iter()
         .map(|(x, y)| format!("{x:.1},{y:.1}"))
         .collect::<Vec<_>>()
         .join(" ");
 
     let suspicious = profile.is_suspicious();
-    let fill = if suspicious { "rgba(239,68,68,0.3)" } else { "rgba(6,214,200,0.3)" };
+    let fill = if suspicious {
+        "rgba(239,68,68,0.3)"
+    } else {
+        "rgba(6,214,200,0.3)"
+    };
     let stroke = if suspicious { "#ef4444" } else { "#06D6C8" };
 
     let labels = MatlProfile::short_labels();
     let title = format!(
         "{}:{:.0}% {}:{:.0}% {}:{:.0}% {}:{:.0}% {}:{:.0}% {}:{:.0}%",
-        labels[0], vals[0]*100.0, labels[1], vals[1]*100.0,
-        labels[2], vals[2]*100.0, labels[3], vals[3]*100.0,
-        labels[4], vals[4]*100.0, labels[5], vals[5]*100.0,
+        labels[0],
+        vals[0] * 100.0,
+        labels[1],
+        vals[1] * 100.0,
+        labels[2],
+        vals[2] * 100.0,
+        labels[3],
+        vals[3] * 100.0,
+        labels[4],
+        vals[4] * 100.0,
+        labels[5],
+        vals[5] * 100.0,
     );
 
     view! {

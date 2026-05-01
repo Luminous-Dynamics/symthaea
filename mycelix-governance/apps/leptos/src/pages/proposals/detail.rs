@@ -7,6 +7,7 @@ use leptos::prelude::*;
 use leptos_router::hooks::use_params_map;
 use crate::contexts::governance_context::use_governance;
 use crate::contexts::civic_actions;
+use mycelix_leptos_core::consciousness::combined_score;
 use mycelix_leptos_core::use_consciousness;
 use governance_leptos_types::*;
 
@@ -42,7 +43,7 @@ pub fn ProposalDetailPage() -> impl IntoView {
                         let phase = p.status.phase();
                         let can_vote = p.status == ProposalStatus::Active;
                         let thresholds = gov.thresholds.get();
-                        let score = consciousness.profile.get().combined_score();
+                        let score = combined_score(&consciousness.profile.get());
                         let meets_voting_gate = score >= thresholds.voting;
                         let proposal_id = p.id.clone();
 

@@ -85,9 +85,7 @@ mod tests {
     #[test]
     fn test_single_gradient() {
         let g = grad(vec![5.0, 10.0], "x");
-        let result = FedAvg
-            .aggregate(&[g], &DefenseConfig::default())
-            .unwrap();
+        let result = FedAvg.aggregate(&[g], &DefenseConfig::default()).unwrap();
         assert!((result.gradient[0] - 5.0).abs() < 1e-6);
         assert!((result.gradient[1] - 10.0).abs() < 1e-6);
     }

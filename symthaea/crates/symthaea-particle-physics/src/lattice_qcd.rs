@@ -12,7 +12,6 @@
 //! - Rothe, H. J. (2012). *Lattice Gauge Theories*. World Scientific.
 
 use crate::constants::*;
-use std::f64::consts::PI;
 
 /// Strong coupling string tension σ in GeV² (from lattice calculations).
 /// σ ≈ (440 MeV)² ≈ 0.194 GeV²
@@ -113,7 +112,11 @@ mod tests {
     fn test_cornell_potential_coulomb_short() {
         // At very short r, should be negative (attractive Coulomb)
         let v_short = cornell_potential(0.1);
-        assert!(v_short < 0.0, "Short-range: V(0.1fm) = {:.3} should be negative", v_short);
+        assert!(
+            v_short < 0.0,
+            "Short-range: V(0.1fm) = {:.3} should be negative",
+            v_short
+        );
     }
 
     #[test]

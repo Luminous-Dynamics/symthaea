@@ -1,5 +1,5 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 use crate::bivector::Bivector;
 use crate::point::Point;
@@ -42,9 +42,8 @@ impl<const D: usize> Rotor<D> {
         }
 
         let b_hat = plane.to_matrix() / norm;
-        let b_hat_sq = &b_hat * &b_hat;
-        let mat =
-            SMatrix::identity() - &b_hat * angle.sin() + b_hat_sq * (1.0 - angle.cos());
+        let b_hat_sq = b_hat * b_hat;
+        let mat = SMatrix::identity() - b_hat * angle.sin() + b_hat_sq * (1.0 - angle.cos());
 
         Self { mat }
     }

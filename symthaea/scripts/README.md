@@ -27,8 +27,11 @@ Python and Shell scripts for development, analysis, and benchmarking.
 ### Utilities
 - `aggregate_metrics.py` - Metrics aggregation
 - `check_regressions.py` - Regression checking
+- `ci_check_lanes.sh` - Run the focused `core`, `gpu`, `python-research`, and `coding-validation` validation lanes
+- `run_coding_validation.sh` - Run code-generation honesty tests and the verified HumanEval-style smoke benchmark
 - `format_summary.py` - Summary formatting
 - `generate_benchmark_report.py` - Report generation
+- `gpu_smoke.sh` - NVIDIA/CUDA environment preflight and optional Broca CUDA smoke test
 - `post_to_dashboard.py` - Dashboard posting
 - `precompute_ethics_embeddings.py` - Ethics embeddings
 - `pyphi_comparison.py` - PyPhi comparison
@@ -47,12 +50,23 @@ Python and Shell scripts for development, analysis, and benchmarking.
 ## Usage
 
 ```bash
-# Enter nix shell first
-nix develop
+# Enter a focused shell first
+nix develop .#python-research
 
-# Run Python scripts
+# Run package-backed Python scripts
+python scripts/analyze_nixos_config.py
 python scripts/benchmark_causal_consciousness.py
+
+# Run Python smoke checks
+uv run --no-sync pytest tests/python -q
+uv run --no-sync ruff check python/symthaea_research scripts/analyze_nixos_config.py tests/python
+
+# Run lane checks
+./scripts/ci_check_lanes.sh core
+./scripts/ci_check_lanes.sh python-research
+./scripts/ci_check_lanes.sh coding-validation
 
 # Run shell scripts
 ./scripts/benchmark-consciousness.sh
+./scripts/gpu_smoke.sh
 ```

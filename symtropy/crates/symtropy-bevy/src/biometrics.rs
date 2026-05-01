@@ -40,8 +40,8 @@
 
 use bevy::prelude::*;
 use symtropy_consciousness_physics::biometrics::{BiometricHistory, BiometricSample};
-use symtropy_physics::body::BodyHandle;
 use symtropy_math::Point;
+use symtropy_physics::body::BodyHandle;
 
 use crate::plugin::SymtropyPhysics;
 
@@ -112,8 +112,12 @@ pub fn biometric_to_phi_system<const D: usize>(
     bio: Option<ResMut<PlayerBiometrics>>,
     mut physics: ResMut<SymtropyPhysics<D>>,
 ) {
-    let Some(mut bio) = bio else { return; };
-    if !bio.active { return; }
+    let Some(mut bio) = bio else {
+        return;
+    };
+    if !bio.active {
+        return;
+    }
 
     let inputs = bio.history.to_consciousness_inputs();
     let handle = bio.handle;
@@ -142,9 +146,9 @@ pub fn biometric_to_phi_system<const D: usize>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use symtropy_physics::PhysicsWorld;
-    use symtropy_consciousness_physics::coupling::ConsciousnessField;
     use nalgebra::SVector;
+    use symtropy_consciousness_physics::coupling::ConsciousnessField;
+    use symtropy_physics::PhysicsWorld;
 
     fn make_physics() -> SymtropyPhysics<2> {
         SymtropyPhysics {
@@ -154,10 +158,9 @@ mod tests {
     }
 
     fn add_player(p: &mut SymtropyPhysics<2>) -> BodyHandle {
-        let h = p.world.add_sphere(
-            symtropy_math::Point::new([0.0, 0.0]),
-            1.0, 1.0,
-        );
+        let h = p
+            .world
+            .add_sphere(symtropy_math::Point::new([0.0, 0.0]), 1.0, 1.0);
         p.field.register(h, 100.0, 5.0);
         h
     }
@@ -177,11 +180,17 @@ mod tests {
         // Verify it doesn't panic and can accept samples up to window
         let mut bio = bio;
         for _ in 0..60 {
-            bio.push(BiometricSample { hrv_rmssd: Some(50.0), ..Default::default() });
+            bio.push(BiometricSample {
+                hrv_rmssd: Some(50.0),
+                ..Default::default()
+            });
         }
         assert_eq!(bio.sample_count(), 60);
         // Next push should evict oldest
-        bio.push(BiometricSample { hrv_rmssd: Some(50.0), ..Default::default() });
+        bio.push(BiometricSample {
+            hrv_rmssd: Some(50.0),
+            ..Default::default()
+        });
         assert_eq!(bio.sample_count(), 60);
     }
 
@@ -214,7 +223,8 @@ mod tests {
 
         // Manually run what the system does (without a full Bevy App)
         let inputs = bio.history.to_consciousness_inputs();
-        p.field.update_entity(h, &inputs, symtropy_math::Point::origin());
+        p.field
+            .update_entity(h, &inputs, symtropy_math::Point::origin());
 
         let phi_after = p.field.entities.get(&h).unwrap().phi();
         assert!(
@@ -240,9 +250,13 @@ mod tests {
         // No samples → history.to_consciousness_inputs() returns 0.5 on all channels
         let inputs = bio.history.to_consciousness_inputs();
         // phi=0.5, which should produce a non-zero consciousness level
-        p.field.update_entity(h, &inputs, symtropy_math::Point::origin());
+        p.field
+            .update_entity(h, &inputs, symtropy_math::Point::origin());
         let phi = p.field.entities.get(&h).unwrap().phi();
-        assert!(phi > 0.0, "neutral inputs (0.5) should produce non-zero Phi");
+        assert!(
+            phi > 0.0,
+            "neutral inputs (0.5) should produce non-zero Phi"
+        );
     }
 
     #[test]
@@ -256,7 +270,8 @@ mod tests {
             ..Default::default()
         });
         let inputs = bio.history.to_consciousness_inputs();
-        p.field.update_entity(h, &inputs, symtropy_math::Point::origin());
+        p.field
+            .update_entity(h, &inputs, symtropy_math::Point::origin());
         assert!(p.field.entities.get(&h).is_some());
     }
 }

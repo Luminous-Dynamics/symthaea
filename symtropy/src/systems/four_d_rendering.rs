@@ -48,9 +48,9 @@ impl Default for FourDProjector {
     fn default() -> Self {
         Self {
             projector: Projector4D::new(
-                0.0,   // w_slice: start at origin
-                20.0,  // slice_thickness: entities within 20 units of the slice are visible
-                1.0,   // scale_factor
+                0.0,  // w_slice: start at origin
+                20.0, // slice_thickness: entities within 20 units of the slice are visible
+                1.0,  // scale_factor
             ),
         }
     }
@@ -77,8 +77,8 @@ pub fn four_d_visibility_system(
     projector: Res<FourDProjector>,
     mut query: Query<(&FourDBody, &mut Sprite, Option<&FourDOnly>)>,
 ) {
-    let in_4d = dim.target == DimensionMode::D4 && dim.progress >= 0.5
-        || dim.current == DimensionMode::D4;
+    let in_4d =
+        dim.target == DimensionMode::D4 && dim.progress >= 0.5 || dim.current == DimensionMode::D4;
 
     for (body_4d, mut sprite, is_4d_only) in &mut query {
         if in_4d {
@@ -107,13 +107,12 @@ pub fn four_d_visibility_system(
 ///
 /// Called from the Loading phase. Places secret items at various W positions
 /// that players can only discover by entering 4D mode and sliding the W axis.
-pub fn spawn_four_d_secrets(
-    mut commands: Commands,
-    seed: Res<crate::resources::DungeonSeed>,
-) {
+pub fn spawn_four_d_secrets(mut commands: Commands, seed: Res<crate::resources::DungeonSeed>) {
     // Deterministic jitter from seed — no rand needed for fixed placements
     let jitter = |seed_val: u64, i: usize| -> (f32, f32) {
-        let h = seed_val.wrapping_mul(2654435761).wrapping_add(i as u64 * 131);
+        let h = seed_val
+            .wrapping_mul(2654435761)
+            .wrapping_add(i as u64 * 131);
         let jx = ((h % 3200) as f32 / 100.0) - 16.0;
         let jy = (((h >> 16) % 3200) as f32 / 100.0) - 16.0;
         (jx, jy)
@@ -151,7 +150,9 @@ pub fn assign_player_four_d(
     players: Query<(Entity, &Sprite), (With<crate::components::Player>, Without<FourDBody>)>,
 ) {
     for (entity, sprite) in &players {
-        commands.entity(entity).insert(FourDBody::new(0.0, sprite.color));
+        commands
+            .entity(entity)
+            .insert(FourDBody::new(0.0, sprite.color));
     }
 }
 
@@ -177,7 +178,10 @@ mod tests {
         let proj = FourDProjector::default();
         let point = symtropy_math::Point::new([0.0, 0.0, 0.0, 0.0]);
         let alpha = proj.projector.alpha(&point);
-        assert!((alpha - 1.0).abs() < 1e-5, "Entity at w=0 should be fully visible at default slice");
+        assert!(
+            (alpha - 1.0).abs() < 1e-5,
+            "Entity at w=0 should be fully visible at default slice"
+        );
     }
 
     #[test]
@@ -185,7 +189,10 @@ mod tests {
         let proj = FourDProjector::default();
         let point = symtropy_math::Point::new([0.0, 0.0, 0.0, 30.0]);
         let alpha = proj.projector.alpha(&point);
-        assert!((alpha - 0.0).abs() < 1e-5, "Entity at w=30 should be invisible (thickness=20)");
+        assert!(
+            (alpha - 0.0).abs() < 1e-5,
+            "Entity at w=30 should be invisible (thickness=20)"
+        );
     }
 
     #[test]
@@ -193,6 +200,9 @@ mod tests {
         let proj = FourDProjector::default();
         let point = symtropy_math::Point::new([0.0, 0.0, 0.0, 10.0]);
         let alpha = proj.projector.alpha(&point);
-        assert!((alpha - 0.5).abs() < 1e-5, "Entity at w=10 should be half-visible (thickness=20)");
+        assert!(
+            (alpha - 0.5).abs() < 1e-5,
+            "Entity at w=10 should be half-visible (thickness=20)"
+        );
     }
 }

@@ -4,29 +4,29 @@
 
 pub mod ai_player;
 pub mod audio;
+pub mod consciousness;
 pub mod consciousness_aura;
+pub mod dialogue;
 pub mod dimension_transition;
 pub mod dimensional_leakage;
-pub mod four_d_rendering;
-pub mod consciousness;
 pub mod engine_physics;
-pub mod phi_pcg;
-pub mod living_dungeon;
-pub mod thermodynamic;
-pub mod dialogue;
-pub mod room_memory;
 pub mod fep_behavior;
+pub mod four_d_rendering;
 pub mod harmonies;
 pub mod input;
 pub mod leviathan;
+pub mod living_dungeon;
 pub mod menu;
 pub mod minimap;
+pub mod phi_pcg;
 pub mod player;
 pub mod postprocess;
 pub mod procgen;
 pub mod psychology;
 pub mod rendering;
+pub mod room_memory;
 pub mod scavenge;
+pub mod thermodynamic;
 
 // Sol Atlas globe view — planetary coordination layer.
 // Enabled via `cargo build --features atlas`.
@@ -53,6 +53,6 @@ pub mod faction;
 #[cfg(feature = "mycelix")]
 pub mod fl_simulation;
 #[cfg(feature = "mycelix")]
-pub mod medical_commons;
-#[cfg(feature = "mycelix")]
 pub mod governance;
+#[cfg(feature = "mycelix")]
+pub mod medical_commons;

@@ -19,10 +19,10 @@
 //!
 //! This prevents grinding attacks where validators try to manipulate leader selection.
 
-use ed25519_dalek::{Signer, SigningKey, VerifyingKey, Signature, Verifier};
+use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 
 use crate::error::{ConsensusError, ConsensusResult};
 
@@ -40,14 +40,20 @@ impl VrfKeypair {
     pub fn generate() -> Self {
         let signing_key = SigningKey::generate(&mut OsRng);
         let verifying_key = signing_key.verifying_key();
-        Self { signing_key, verifying_key }
+        Self {
+            signing_key,
+            verifying_key,
+        }
     }
 
     /// Create from existing ed25519 signing key bytes
     pub fn from_bytes(bytes: &[u8; 32]) -> ConsensusResult<Self> {
         let signing_key = SigningKey::from_bytes(bytes);
         let verifying_key = signing_key.verifying_key();
-        Ok(Self { signing_key, verifying_key })
+        Ok(Self {
+            signing_key,
+            verifying_key,
+        })
     }
 
     /// Get the public key
@@ -155,7 +161,8 @@ impl<'de> Deserialize<'de> for VrfProof {
     {
         let s = String::deserialize(deserializer)?;
         let bytes = hex::decode(&s).map_err(serde::de::Error::custom)?;
-        let arr: [u8; 64] = bytes.try_into()
+        let arr: [u8; 64] = bytes
+            .try_into()
             .map_err(|_| serde::de::Error::custom("VrfProof must be exactly 64 bytes"))?;
         Ok(VrfProof(arr))
     }
@@ -185,12 +192,20 @@ impl VrfOutput {
 
     /// Get the output as a u128 for comparison (lower = higher priority)
     pub fn output_as_u128(&self) -> u128 {
-        u128::from_le_bytes(self.output[..16].try_into().expect("16-byte slice always fits u128"))
+        u128::from_le_bytes(
+            self.output[..16]
+                .try_into()
+                .expect("16-byte slice always fits u128"),
+        )
     }
 
     /// Get the output as a u64 for simpler comparison
     pub fn output_as_u64(&self) -> u64 {
-        u64::from_le_bytes(self.output[..8].try_into().expect("8-byte slice always fits u64"))
+        u64::from_le_bytes(
+            self.output[..8]
+                .try_into()
+                .expect("8-byte slice always fits u64"),
+        )
     }
 
     /// Convert output to a normalized f64 in [0, 1)
@@ -212,14 +227,15 @@ pub fn verify_vrf(
     message.extend_from_slice(input);
 
     // Verify the signature (proof)
-    let verifying_key = VerifyingKey::from_bytes(&public_key.0)
-        .map_err(|e| ConsensusError::InvalidSignature {
+    let verifying_key =
+        VerifyingKey::from_bytes(&public_key.0).map_err(|e| ConsensusError::InvalidSignature {
             reason: format!("invalid VRF public key: {}", e),
         })?;
 
     let signature = Signature::from_bytes(&proof.0);
 
-    verifying_key.verify(&message, &signature)
+    verifying_key
+        .verify(&message, &signature)
         .map_err(|e| ConsensusError::InvalidSignature {
             reason: format!("VRF proof verification failed: {}", e),
         })?;
@@ -274,7 +290,8 @@ impl LeaderElection {
 
 /// Select a leader from VRF outputs (lowest output wins)
 pub fn select_leader(outputs: &[(VrfPublicKey, VrfOutput)]) -> Option<(VrfPublicKey, VrfOutput)> {
-    outputs.iter()
+    outputs
+        .iter()
         .min_by_key(|(_, output)| output.output_as_u128())
         .cloned()
 }
@@ -286,14 +303,17 @@ pub fn select_leader(outputs: &[(VrfPublicKey, VrfOutput)]) -> Option<(VrfPublic
 pub fn select_leader_weighted(
     outputs: &[(VrfPublicKey, VrfOutput, f64)], // (pubkey, vrf_output, reputation)
 ) -> Option<(VrfPublicKey, VrfOutput)> {
-    outputs.iter()
+    outputs
+        .iter()
         .filter(|(_, _, rep)| *rep > 0.0)
         .min_by(|(_, a, rep_a), (_, b, rep_b)| {
             // Effective priority: lower is better
             // priority = vrf_output / reputation²
             let priority_a = a.output_as_f64() / (rep_a * rep_a);
             let priority_b = b.output_as_f64() / (rep_b * rep_b);
-            priority_a.partial_cmp(&priority_b).unwrap_or(std::cmp::Ordering::Equal)
+            priority_a
+                .partial_cmp(&priority_b)
+                .unwrap_or(std::cmp::Ordering::Equal)
         })
         .map(|(pk, output, _)| (pk.clone(), output.clone()))
 }
@@ -357,7 +377,8 @@ mod tests {
         let keypairs: Vec<VrfKeypair> = (0..5).map(|_| VrfKeypair::generate()).collect();
         let round = 42u64;
 
-        let outputs: Vec<(VrfPublicKey, VrfOutput)> = keypairs.iter()
+        let outputs: Vec<(VrfPublicKey, VrfOutput)> = keypairs
+            .iter()
             .map(|kp| (kp.public_key(), kp.evaluate_round(round)))
             .collect();
 
@@ -382,7 +403,8 @@ mod tests {
         // Give different reputations
         let reputations = [0.9, 0.7, 0.5, 0.3, 0.1];
 
-        let outputs: Vec<(VrfPublicKey, VrfOutput, f64)> = keypairs.iter()
+        let outputs: Vec<(VrfPublicKey, VrfOutput, f64)> = keypairs
+            .iter()
             .zip(reputations.iter())
             .map(|(kp, &rep)| (kp.public_key(), kp.evaluate_round(round), rep))
             .collect();
@@ -407,7 +429,11 @@ mod tests {
 
         // Check distribution is roughly uniform
         let mean: f64 = outputs.iter().sum::<f64>() / outputs.len() as f64;
-        assert!((mean - 0.5).abs() < 0.1, "Mean should be close to 0.5, got {}", mean);
+        assert!(
+            (mean - 0.5).abs() < 0.1,
+            "Mean should be close to 0.5, got {}",
+            mean
+        );
     }
 
     #[test]

@@ -29,8 +29,8 @@ pub mod trimmed_mean;
 
 pub mod boba;
 pub mod cbf;
-pub mod foolsgold;
 pub mod fltrust;
+pub mod foolsgold;
 pub mod krum;
 pub mod sybil_weights;
 

@@ -8,7 +8,10 @@ use mail_leptos_types::*;
 
 /// Time grid for day/week views — shows hourly slots with positioned events.
 #[component]
-pub fn TimeGrid(events: Vec<CalendarEventView>, #[prop(default = 1)] columns: usize) -> impl IntoView {
+pub fn TimeGrid(
+    events: Vec<CalendarEventView>,
+    #[prop(default = 1)] columns: usize,
+) -> impl IntoView {
     let hours: Vec<u8> = (0..24).collect();
 
     view! {
@@ -173,12 +176,32 @@ pub fn MiniCalendar() -> impl IntoView {
     let month = RwSignal::new(now.get_month() as u32 + 1);
 
     let month_label = move || {
-        let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        let months = [
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+        ];
         format!("{} {}", months[(month.get() - 1) as usize], year.get())
     };
 
-    let on_prev = move |_| month.update(|m| { if *m == 1 { *m = 12; year.update(|y| *y -= 1); } else { *m -= 1; } });
-    let on_next = move |_| month.update(|m| { if *m == 12 { *m = 1; year.update(|y| *y += 1); } else { *m += 1; } });
+    let on_prev = move |_| {
+        month.update(|m| {
+            if *m == 1 {
+                *m = 12;
+                year.update(|y| *y -= 1);
+            } else {
+                *m -= 1;
+            }
+        })
+    };
+    let on_next = move |_| {
+        month.update(|m| {
+            if *m == 12 {
+                *m = 1;
+                year.update(|y| *y += 1);
+            } else {
+                *m += 1;
+            }
+        })
+    };
 
     view! {
         <div class="mini-calendar">
@@ -197,8 +220,13 @@ fn format_grid_time(ts: u64) -> String {
     d.set_time((ts as f64) * 1000.0);
     let h = d.get_hours();
     let m = d.get_minutes();
-    if h == 0 { format!("12:{m:02} AM") }
-    else if h < 12 { format!("{h}:{m:02} AM") }
-    else if h == 12 { format!("12:{m:02} PM") }
-    else { format!("{}:{m:02} PM", h - 12) }
+    if h == 0 {
+        format!("12:{m:02} AM")
+    } else if h < 12 {
+        format!("{h}:{m:02} AM")
+    } else if h == 12 {
+        format!("12:{m:02} PM")
+    } else {
+        format!("{}:{m:02} PM", h - 12)
+    }
 }

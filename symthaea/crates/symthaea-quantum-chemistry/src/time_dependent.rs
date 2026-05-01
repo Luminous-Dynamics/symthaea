@@ -43,7 +43,6 @@ pub struct CisExcitation {
 pub fn cis_excitations(rhf: &RhfResult, n_excitations: usize) -> Vec<CisExcitation> {
     let n_occ = rhf.n_occupied;
     let n_mo = rhf.n_independent;
-    let n_vir = n_mo - n_occ;
     let eps = &rhf.orbital_energies;
 
     // Simplified CIS: excitation energies = ε_a - ε_i (Koopman's theorem)
@@ -226,7 +225,11 @@ mod tests {
 
         let (re_t, im_t) = time_evolve_eigenstate(&re, &im, &energies, 10.0);
 
-        let norm: f64 = re_t.iter().zip(im_t.iter()).map(|(r, i)| r * r + i * i).sum();
+        let norm: f64 = re_t
+            .iter()
+            .zip(im_t.iter())
+            .map(|(r, i)| r * r + i * i)
+            .sum();
         assert!(
             (norm - 1.0).abs() < 1e-10,
             "Norm should be preserved: {}",

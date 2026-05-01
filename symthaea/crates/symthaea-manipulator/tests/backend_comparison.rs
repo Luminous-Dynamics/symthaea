@@ -14,10 +14,10 @@
 
 #![cfg(feature = "symtropy")]
 
-use symtropy_physics as _; // ensure dep active
 use symthaea_manipulator::simulator::{ManipulatorPhysicsSimulator, SimpleManipulatorSimulator};
 use symthaea_manipulator::symtropy_sim::SymtropyManipulatorSimulator;
 use symthaea_manipulator::types::{ManipulatorCommand, NUM_JOINTS};
+use symtropy_physics as _; // ensure dep active
 
 // ═══════════════════════════════════════════════════════════════════════
 // Comparison 1: Both backends handle zero-command gracefully
@@ -34,8 +34,14 @@ fn both_backends_stable_under_zero_command() {
         symtropy.step(&cmd, 0.002);
     }
 
-    assert!(simple.state().is_finite(), "Simple backend should remain finite");
-    assert!(symtropy.state().is_finite(), "Symtropy backend should remain finite");
+    assert!(
+        simple.state().is_finite(),
+        "Simple backend should remain finite"
+    );
+    assert!(
+        symtropy.state().is_finite(),
+        "Symtropy backend should remain finite"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -60,10 +66,12 @@ fn both_backends_respond_to_torque() {
     }
 
     // Both should have moved from initial position
-    let simple_moved = simple_initial.iter()
+    let simple_moved = simple_initial
+        .iter()
         .zip(simple.state().joint_angles.iter())
         .any(|(a, b)| (a - b).abs() > 0.001);
-    let symtropy_moved = symtropy_initial.iter()
+    let symtropy_moved = symtropy_initial
+        .iter()
         .zip(symtropy.state().joint_angles.iter())
         .any(|(a, b)| (a - b).abs() > 0.001);
 
@@ -125,11 +133,16 @@ fn backends_trajectory_divergence_bounded() {
         symtropy.step(&cmd, 0.005);
 
         // Compute per-joint divergence
-        let div: f64 = simple.state().joint_angles.iter()
+        let div: f64 = simple
+            .state()
+            .joint_angles
+            .iter()
             .zip(symtropy.state().joint_angles.iter())
             .map(|(a, b)| (a - b).abs())
             .sum();
-        if div > max_divergence { max_divergence = div; }
+        if div > max_divergence {
+            max_divergence = div;
+        }
     }
 
     // Both backends should remain bounded (not diverging to infinity)

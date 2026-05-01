@@ -37,8 +37,8 @@
 //! - Norris, J.R. (1997). Markov Chains. Cambridge UP.
 
 use serde::{Deserialize, Serialize};
-use std::collections::BinaryHeap;
 use std::cmp::Ordering;
+use std::collections::BinaryHeap;
 
 // ============================================================================
 // Event Types
@@ -63,24 +63,43 @@ pub enum EventType {
     Supervolcano,
 
     // === ECLSS / Infrastructure ===
-    EclssFailure { world_id: u32 },
-    SealBreach { world_id: u32 },
-    PowerSystemFailure { world_id: u32 },
+    EclssFailure {
+        world_id: u32,
+    },
+    SealBreach {
+        world_id: u32,
+    },
+    PowerSystemFailure {
+        world_id: u32,
+    },
 
     // === Technology milestones ===
-    TechMilestone { index: usize },
+    TechMilestone {
+        index: usize,
+    },
 
     // === Demographics (cohort-level) ===
-    CohortBirth { world_id: u32 },
-    CohortDeath { world_id: u32 },
+    CohortBirth {
+        world_id: u32,
+    },
+    CohortDeath {
+        world_id: u32,
+    },
 
     // === Social / Political ===
-    FactionFormation { world_id: u32 },
-    IndependenceMovement { world_id: u32 },
+    FactionFormation {
+        world_id: u32,
+    },
+    IndependenceMovement {
+        world_id: u32,
+    },
     DiplomaticShift,
 
     // === Project completion ===
-    ProjectComplete { world_id: u32, project_index: usize },
+    ProjectComplete {
+        world_id: u32,
+        project_index: usize,
+    },
 
     // === Periodic state updates (still needed for continuous dynamics) ===
     /// Monthly aggregate update for demographics, economy, knowledge.
@@ -127,7 +146,9 @@ impl PartialOrd for ScheduledEvent {
 impl Ord for ScheduledEvent {
     fn cmp(&self, other: &Self) -> Ordering {
         // Reverse: smallest tick = highest priority (min-heap via BinaryHeap)
-        other.tick.cmp(&self.tick)
+        other
+            .tick
+            .cmp(&self.tick)
             .then_with(|| other.priority.cmp(&self.priority))
     }
 }
@@ -181,7 +202,9 @@ impl EventQueue {
 
         // Δt = -ln(U) / λ — exponential inter-arrival time
         let u: f64 = rng.uniform_f64(); // U ~ Uniform(0,1)
-        if u <= 0.0 { return; } // Guard against ln(0)
+        if u <= 0.0 {
+            return;
+        } // Guard against ln(0)
 
         let delta_t = (-u.ln() / lambda).ceil() as u32;
         let fire_tick = current_tick.saturating_add(delta_t.max(1));
@@ -233,7 +256,9 @@ impl EventQueue {
 
     /// Skip rate: fraction of ticks with no events.
     pub fn skip_rate(&self, total_ticks: u32) -> f64 {
-        if total_ticks == 0 { return 0.0; }
+        if total_ticks == 0 {
+            return 0.0;
+        }
         1.0 - (self.total_resolved as f64 / total_ticks as f64)
     }
 }
@@ -267,7 +292,7 @@ pub fn v1_disaster_table() -> Vec<PoissonProcess> {
         PoissonProcess {
             name: "M-class solar flare".into(),
             event_type: EventType::MClassFlare,
-            per_tick_probability: 0.05,     // P_M_CLASS_FLARE
+            per_tick_probability: 0.05, // P_M_CLASS_FLARE
             priority: 10,
             earliest_tick: 0,
             latest_tick: None,
@@ -275,7 +300,7 @@ pub fn v1_disaster_table() -> Vec<PoissonProcess> {
         PoissonProcess {
             name: "X-class solar flare".into(),
             event_type: EventType::XClassFlare,
-            per_tick_probability: 0.01,     // P_X_CLASS_FLARE
+            per_tick_probability: 0.01, // P_X_CLASS_FLARE
             priority: 5,
             earliest_tick: 0,
             latest_tick: None,
@@ -283,7 +308,7 @@ pub fn v1_disaster_table() -> Vec<PoissonProcess> {
         PoissonProcess {
             name: "Major SPE".into(),
             event_type: EventType::MajorSPE,
-            per_tick_probability: 0.0035,   // P_MAJOR_SPE
+            per_tick_probability: 0.0035, // P_MAJOR_SPE
             priority: 3,
             earliest_tick: 0,
             latest_tick: None,
@@ -296,12 +321,11 @@ pub fn v1_disaster_table() -> Vec<PoissonProcess> {
             earliest_tick: 0,
             latest_tick: None,
         },
-
         // Planetary events
         PoissonProcess {
             name: "Europa tidal quake".into(),
             event_type: EventType::EuropaTidalQuake,
-            per_tick_probability: 0.03,     // P_EUROPA_TIDAL_QUAKE
+            per_tick_probability: 0.03, // P_EUROPA_TIDAL_QUAKE
             priority: 10,
             earliest_tick: 0,
             latest_tick: None,
@@ -309,7 +333,7 @@ pub fn v1_disaster_table() -> Vec<PoissonProcess> {
         PoissonProcess {
             name: "Mega-quake (M7+)".into(),
             event_type: EventType::MegaQuake,
-            per_tick_probability: 0.001,    // P_MEGA_QUAKE
+            per_tick_probability: 0.001, // P_MEGA_QUAKE
             priority: 2,
             earliest_tick: 0,
             latest_tick: None,
@@ -377,7 +401,8 @@ pub fn run_event_loop(
 ) -> EventLoopResult {
     #[allow(unused_assignments)]
     let mut current_tick: u32 = 0;
-    let mut events_by_type: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
+    let mut events_by_type: std::collections::HashMap<String, u32> =
+        std::collections::HashMap::new();
     let mut ticks_visited: std::collections::HashSet<u32> = std::collections::HashSet::new();
 
     while let Some(event) = queue.pop() {
@@ -401,7 +426,9 @@ pub fn run_event_loop(
 
                 // Reschedule the next occurrence of this process
                 for process in processes {
-                    if std::mem::discriminant(&process.event_type) == std::mem::discriminant(&event.event_type) {
+                    if std::mem::discriminant(&process.event_type)
+                        == std::mem::discriminant(&event.event_type)
+                    {
                         queue.schedule_poisson(
                             current_tick + 1, // Earliest: next tick
                             process.per_tick_probability,
@@ -447,8 +474,10 @@ pub fn validate_v1_v2_equivalence(
     num_trials: u32,
 ) -> ValidationResult {
     let processes = v1_disaster_table();
-    let mut v1_counts: std::collections::HashMap<String, Vec<u32>> = std::collections::HashMap::new();
-    let mut v2_counts: std::collections::HashMap<String, Vec<u32>> = std::collections::HashMap::new();
+    let mut v1_counts: std::collections::HashMap<String, Vec<u32>> =
+        std::collections::HashMap::new();
+    let mut v2_counts: std::collections::HashMap<String, Vec<u32>> =
+        std::collections::HashMap::new();
 
     for trial in 0..num_trials {
         let trial_seed = seed + trial as u64 * 1000;
@@ -456,7 +485,8 @@ pub fn validate_v1_v2_equivalence(
         // V1: bernoulli rolls every tick
         {
             let mut rng = crate::stochastic::StochasticEngine::new(trial_seed);
-            let mut counts: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
+            let mut counts: std::collections::HashMap<String, u32> =
+                std::collections::HashMap::new();
             for _tick in 0..total_ticks {
                 for process in &processes {
                     if rng.bernoulli(process.per_tick_probability) {
@@ -465,7 +495,9 @@ pub fn validate_v1_v2_equivalence(
                 }
             }
             for process in &processes {
-                v1_counts.entry(process.name.clone()).or_default()
+                v1_counts
+                    .entry(process.name.clone())
+                    .or_default()
                     .push(*counts.get(&process.name).unwrap_or(&0));
             }
         }
@@ -475,25 +507,42 @@ pub fn validate_v1_v2_equivalence(
             let mut rng = crate::stochastic::StochasticEngine::new(trial_seed + 1);
             let mut queue = EventQueue::new();
             for process in &processes {
-                queue.schedule_poisson(0, process.per_tick_probability,
-                    process.event_type.clone(), process.priority, &mut rng);
+                queue.schedule_poisson(
+                    0,
+                    process.per_tick_probability,
+                    process.event_type.clone(),
+                    process.priority,
+                    &mut rng,
+                );
             }
-            let mut counts: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
+            let mut counts: std::collections::HashMap<String, u32> =
+                std::collections::HashMap::new();
             while let Some(event) = queue.pop() {
-                if event.tick > total_ticks { break; }
+                if event.tick > total_ticks {
+                    break;
+                }
                 let _type_name = format!("{:?}", event.event_type);
                 // Find process name from event type
                 for process in &processes {
-                    if std::mem::discriminant(&process.event_type) == std::mem::discriminant(&event.event_type) {
+                    if std::mem::discriminant(&process.event_type)
+                        == std::mem::discriminant(&event.event_type)
+                    {
                         *counts.entry(process.name.clone()).or_insert(0) += 1;
-                        queue.schedule_poisson(event.tick + 1, process.per_tick_probability,
-                            process.event_type.clone(), process.priority, &mut rng);
+                        queue.schedule_poisson(
+                            event.tick + 1,
+                            process.per_tick_probability,
+                            process.event_type.clone(),
+                            process.priority,
+                            &mut rng,
+                        );
                         break;
                     }
                 }
             }
             for process in &processes {
-                v2_counts.entry(process.name.clone()).or_default()
+                v2_counts
+                    .entry(process.name.clone())
+                    .or_default()
                     .push(*counts.get(&process.name).unwrap_or(&0));
             }
         }
@@ -541,18 +590,34 @@ pub struct ProcessComparison {
 
 impl ValidationResult {
     pub fn print_report(&self) {
-        println!("=== V1 vs V2 Statistical Validation ({} trials × {} ticks) ===\n",
-            self.num_trials, self.total_ticks);
-        println!("{:<30} {:>10} {:>10} {:>10} {:>10}",
-            "Event Type", "V1 Mean", "V2 Mean", "Expected", "Rel.Error");
+        println!(
+            "=== V1 vs V2 Statistical Validation ({} trials × {} ticks) ===\n",
+            self.num_trials, self.total_ticks
+        );
+        println!(
+            "{:<30} {:>10} {:>10} {:>10} {:>10}",
+            "Event Type", "V1 Mean", "V2 Mean", "Expected", "Rel.Error"
+        );
         println!("{}", "-".repeat(72));
         for c in &self.comparisons {
-            let status = if c.relative_error < 0.15 { "OK" } else { "WARN" };
-            println!("{:<30} {:>10.2} {:>10.2} {:>10.2} {:>9.1}% {}",
-                c.name, c.v1_mean, c.v2_mean, c.expected,
-                c.relative_error * 100.0, status);
+            let status = if c.relative_error < 0.15 {
+                "OK"
+            } else {
+                "WARN"
+            };
+            println!(
+                "{:<30} {:>10.2} {:>10.2} {:>10.2} {:>9.1}% {}",
+                c.name,
+                c.v1_mean,
+                c.v2_mean,
+                c.expected,
+                c.relative_error * 100.0,
+                status
+            );
         }
-        let max_error = self.comparisons.iter()
+        let max_error = self
+            .comparisons
+            .iter()
             .map(|c| c.relative_error)
             .fold(0.0_f64, f64::max);
         println!("\nMax relative error: {:.1}%", max_error * 100.0);
@@ -576,16 +641,22 @@ mod tests {
     fn test_event_queue_ordering() {
         let mut queue = EventQueue::new();
         queue.schedule(ScheduledEvent {
-            tick: 100, event_type: EventType::MegaQuake,
-            priority: 1, magnitude: 0.5,
+            tick: 100,
+            event_type: EventType::MegaQuake,
+            priority: 1,
+            magnitude: 0.5,
         });
         queue.schedule(ScheduledEvent {
-            tick: 50, event_type: EventType::MClassFlare,
-            priority: 10, magnitude: 0.3,
+            tick: 50,
+            event_type: EventType::MClassFlare,
+            priority: 10,
+            magnitude: 0.3,
         });
         queue.schedule(ScheduledEvent {
-            tick: 200, event_type: EventType::Supervolcano,
-            priority: 1, magnitude: 0.9,
+            tick: 200,
+            event_type: EventType::Supervolcano,
+            priority: 1,
+            magnitude: 0.9,
         });
 
         // Should come out in tick order: 50, 100, 200
@@ -604,7 +675,11 @@ mod tests {
 
         let event = queue.pop().unwrap();
         assert!(event.tick > 0);
-        assert!(event.tick < 200, "Expected within 200 ticks for p=0.05, got {}", event.tick);
+        assert!(
+            event.tick < 200,
+            "Expected within 200 ticks for p=0.05, got {}",
+            event.tick
+        );
     }
 
     #[test]
@@ -624,7 +699,9 @@ mod tests {
 
             let mut count = 0;
             while let Some(event) = queue.pop() {
-                if event.tick > ticks { break; }
+                if event.tick > ticks {
+                    break;
+                }
                 count += 1;
                 queue.schedule_poisson(event.tick + 1, p, EventType::XClassFlare, 5, &mut rng);
             }
@@ -633,9 +710,13 @@ mod tests {
 
         let mean = total_events as f64 / trials as f64;
         let relative_error = ((mean - expected) / expected).abs();
-        assert!(relative_error < 0.15,
+        assert!(
+            relative_error < 0.15,
             "Poisson mean {:.1} vs expected {:.1}, error {:.1}%",
-            mean, expected, relative_error * 100.0);
+            mean,
+            expected,
+            relative_error * 100.0
+        );
     }
 
     #[test]
@@ -646,13 +727,20 @@ mod tests {
         // Schedule only 120 heartbeats (10 years) + disaster processes
         let mut queue = EventQueue::new();
         for process in &processes {
-            queue.schedule_poisson(0, process.per_tick_probability,
-                process.event_type.clone(), process.priority, &mut rng);
+            queue.schedule_poisson(
+                0,
+                process.per_tick_probability,
+                process.event_type.clone(),
+                process.priority,
+                &mut rng,
+            );
         }
         for tick in 0..120 {
             queue.schedule(ScheduledEvent {
-                tick, event_type: EventType::MonthlyHeartbeat,
-                priority: 100, magnitude: 0.0,
+                tick,
+                event_type: EventType::MonthlyHeartbeat,
+                priority: 100,
+                magnitude: 0.0,
             });
         }
 
@@ -660,28 +748,37 @@ mod tests {
 
         let heartbeats = *result.events_by_type.get("heartbeat").unwrap_or(&0);
         assert_eq!(heartbeats, 120);
-        assert!(result.events_processed > 120, "Should have disasters + heartbeats");
+        assert!(
+            result.events_processed > 120,
+            "Should have disasters + heartbeats"
+        );
     }
 
     #[test]
     fn test_drain_until() {
         let mut queue = EventQueue::new();
         queue.schedule(ScheduledEvent {
-            tick: 10, event_type: EventType::MClassFlare,
-            priority: 10, magnitude: 0.3,
+            tick: 10,
+            event_type: EventType::MClassFlare,
+            priority: 10,
+            magnitude: 0.3,
         });
         queue.schedule(ScheduledEvent {
-            tick: 20, event_type: EventType::XClassFlare,
-            priority: 5, magnitude: 0.5,
+            tick: 20,
+            event_type: EventType::XClassFlare,
+            priority: 5,
+            magnitude: 0.5,
         });
         queue.schedule(ScheduledEvent {
-            tick: 30, event_type: EventType::MegaQuake,
-            priority: 1, magnitude: 0.8,
+            tick: 30,
+            event_type: EventType::MegaQuake,
+            priority: 1,
+            magnitude: 0.8,
         });
 
         let events = queue.drain_until(25);
         assert_eq!(events.len(), 2); // tick 10 and 20
-        assert_eq!(queue.len(), 1);  // tick 30 remains
+        assert_eq!(queue.len(), 1); // tick 30 remains
     }
 
     #[test]
@@ -694,17 +791,30 @@ mod tests {
         for c in &result.comparisons {
             // Both V1 and V2 should converge to the expected value.
             // Skip extremely rare events (expected < 0.1) — not enough signal.
-            if c.expected < 0.1 { continue; }
+            if c.expected < 0.1 {
+                continue;
+            }
             let v1_err = ((c.v1_mean - c.expected) / c.expected).abs();
             let v2_err = ((c.v2_mean - c.expected) / c.expected).abs();
-            assert!(v1_err < 0.30,
+            assert!(
+                v1_err < 0.30,
                 "V1 {}: mean={:.1} expected={:.1} error={:.1}%",
-                c.name, c.v1_mean, c.expected, v1_err * 100.0);
+                c.name,
+                c.v1_mean,
+                c.expected,
+                v1_err * 100.0
+            );
             // Rare events (expected < 2) have huge Poisson variance — allow 60%
             let threshold = if c.expected < 2.0 { 0.60 } else { 0.30 };
-            assert!(v2_err < threshold,
+            assert!(
+                v2_err < threshold,
                 "V2 {}: mean={:.1} expected={:.1} error={:.1}% (threshold {:.0}%)",
-                c.name, c.v2_mean, c.expected, v2_err * 100.0, threshold * 100.0);
+                c.name,
+                c.v2_mean,
+                c.expected,
+                v2_err * 100.0,
+                threshold * 100.0
+            );
         }
     }
 }

@@ -57,8 +57,8 @@ impl ExtinctionSelectivity {
     pub fn lag_phase_ma(self) -> f64 {
         match self {
             Self::ApexPredator => 3.0,   // End-Permian "languishing" ~3-5 Ma
-            Self::Specialist => 1.0,      // Faster recovery from generalist survivors
-            Self::Indiscriminate => 2.0,  // Intermediate
+            Self::Specialist => 1.0,     // Faster recovery from generalist survivors
+            Self::Indiscriminate => 2.0, // Intermediate
         }
     }
 
@@ -66,9 +66,9 @@ impl ExtinctionSelectivity {
     /// Apex removal opens more niche space → higher overshoot.
     pub fn overshoot_modifier(self) -> f64 {
         match self {
-            Self::ApexPredator => 1.2,    // Clearing apex taxa opens big niches
-            Self::Specialist => 0.8,      // Less niche space freed
-            Self::Indiscriminate => 1.0,  // Neutral
+            Self::ApexPredator => 1.2,   // Clearing apex taxa opens big niches
+            Self::Specialist => 0.8,     // Less niche space freed
+            Self::Indiscriminate => 1.0, // Neutral
         }
     }
 }
@@ -281,7 +281,9 @@ pub fn canonical_mass_extinctions() -> Vec<MassExtinctionEvent> {
             genus_extinction_fraction: 0.40,
             recovery_time_ma: 7.0,
             complexity_increase: true,
-            cause: ExtinctionCause::Impact { crater_diameter_km: 180.0 },
+            cause: ExtinctionCause::Impact {
+                crater_diameter_km: 180.0,
+            },
             selectivity: ExtinctionSelectivity::ApexPredator, // Non-avian dinosaurs removed
         },
         MassExtinctionEvent {
@@ -442,10 +444,7 @@ mod tests {
         // Recovery should accelerate then decelerate (S-shaped)
         let early_rate = mid - early;
         let late_rate = late - mid;
-        assert!(
-            early_rate > 0.0,
-            "Early recovery should be positive"
-        );
+        assert!(early_rate > 0.0, "Early recovery should be positive");
         // Late rate should be smaller (approaching carrying capacity)
         // This is inherent in the logistic model
         assert!(
@@ -459,7 +458,11 @@ mod tests {
         let events = canonical_mass_extinctions();
         // At the End-Permian nadir (252 Ma)
         let mult = extinction_multiplier(251.5, &events);
-        assert!(mult < 0.6, "End-Permian should severely depress B(t), got {}", mult);
+        assert!(
+            mult < 0.6,
+            "End-Permian should severely depress B(t), got {}",
+            mult
+        );
 
         // Well after all Phanerozoic extinctions (10 Ma)
         let mult_recovered = extinction_multiplier(10.0, &events);
@@ -473,7 +476,13 @@ mod tests {
     #[test]
     fn post_extinction_exceeds_pre_for_big_five() {
         let events = canonical_mass_extinctions();
-        let big_five = ["End-Ordovician", "Late Devonian", "End-Permian", "End-Triassic", "End-Cretaceous"];
+        let big_five = [
+            "End-Ordovician",
+            "Late Devonian",
+            "End-Permian",
+            "End-Triassic",
+            "End-Cretaceous",
+        ];
         let mut overshoot_count = 0;
         for name in &big_five {
             let event = events.iter().find(|e| e.name.contains(name)).unwrap();

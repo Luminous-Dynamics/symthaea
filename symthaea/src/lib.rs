@@ -482,9 +482,9 @@ pub use symthaea_physics as physics;
 #[cfg(feature = "cell-foundry")]
 pub use symthaea_cell_foundry;
 
-// Flight: HDC-LTC + FEP Active Inference quadrotor flight control
-#[cfg(feature = "flight")]
-pub use symthaea_flight as flight;
+// Multirotor: HDC-LTC + FEP Active Inference hover/quadrotor flight control
+#[cfg(any(feature = "multirotor", feature = "flight"))]
+pub use symthaea_multirotor as multirotor;
 
 // Humanoid: HDC-LTC + FEP Active Inference bipedal humanoid control (DMC benchmark)
 #[cfg(feature = "humanoid")]
@@ -521,6 +521,14 @@ pub use symthaea_quadruped as quadruped;
 // Orbital: spacecraft with NASA-standard safe-mode fallback
 #[cfg(feature = "orbital")]
 pub use symthaea_orbital as orbital;
+
+// Biota: interspecies bridge for sanctuary, right-of-way, and welfare signaling
+#[cfg(feature = "biota")]
+pub use symthaea_biota as biota;
+
+// Clime: habitat homeostasis for air quality, thermal comfort, and circadian support
+#[cfg(feature = "clime")]
+pub use symthaea_clime as clime;
 
 // Meta: Self-analysis, code quality metrics, active inference exploration, dream synthesis
 #[cfg(feature = "code_generation")]

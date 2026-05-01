@@ -80,10 +80,12 @@ impl NodeStats {
 
         // Trim to max history
         if self.score_history.len() > max_history {
-            self.score_history.drain(..self.score_history.len() - max_history);
+            self.score_history
+                .drain(..self.score_history.len() - max_history);
         }
         if self.norm_history.len() > max_history {
-            self.norm_history.drain(..self.norm_history.len() - max_history);
+            self.norm_history
+                .drain(..self.norm_history.len() - max_history);
         }
 
         self.count += 1;
@@ -246,10 +248,7 @@ impl AdaptivePoGQ {
     /// # Errors
     ///
     /// Returns errors from the inner PoGQ evaluation.
-    pub fn evaluate_round(
-        &mut self,
-        gradients: &[Gradient],
-    ) -> Result<PoGQRoundResult, FlError> {
+    pub fn evaluate_round(&mut self, gradients: &[Gradient]) -> Result<PoGQRoundResult, FlError> {
         // Delegate to inner PoGQ for base scoring
         let mut result = self.inner.evaluate_round(gradients)?;
 
@@ -301,10 +300,7 @@ impl AdaptivePoGQ {
     ///
     /// Runs [`evaluate_round`](Self::evaluate_round) and then averages the
     /// gradients of non-quarantined nodes.
-    pub fn aggregate(
-        &mut self,
-        gradients: &[Gradient],
-    ) -> Result<AggregationResult, FlError> {
+    pub fn aggregate(&mut self, gradients: &[Gradient]) -> Result<AggregationResult, FlError> {
         let round_result = self.evaluate_round(gradients)?;
 
         let mut included_refs: Vec<&[f32]> = Vec::new();
@@ -439,13 +435,8 @@ mod tests {
 
         // slow-node should NOT be quarantined — its adaptive threshold
         // should accommodate its consistently lower scores
-        let slow_quarantined = pogq
-            .inner()
-            .is_quarantined("slow-node")
-            || pogq
-                .node_stats()
-                .get("slow-node")
-                .map_or(false, |_| false);
+        let slow_quarantined = pogq.inner().is_quarantined("slow-node")
+            || pogq.node_stats().get("slow-node").map_or(false, |_| false);
 
         // Check the evaluate_round result directly
         let mut grads = honest_gradients(4, dim);
@@ -462,7 +453,8 @@ mod tests {
         assert!(
             !slow.quarantined || !slow_quarantined,
             "Non-IID slow node should not be quarantined: quarantined={}, ema={}",
-            slow.quarantined, slow.ema_score
+            slow.quarantined,
+            slow.ema_score
         );
     }
 

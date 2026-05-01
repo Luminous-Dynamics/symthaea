@@ -103,6 +103,8 @@ impl IntegrationOracle {
             window_size: config.window_size,
             min_samples: 3.min(config.window_size),
             regularization: config.regularization,
+            normalize_variance: true,
+            temporal_decorrelation: true,
         };
         let mip_finder = SpectralMIPFinder::new(mip_config);
 

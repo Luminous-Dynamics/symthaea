@@ -1,0 +1,116 @@
+{
+  "metadata": {
+    "title": "Tactical Professional Seed: High-Demand Gateway Standards",
+    "framework": "Global Tactical Mesh",
+    "source": "https://mycelix.org/certs-tactical",
+    "grade_level": "Professional/Entry",
+    "subject_area": "Multi-Sector",
+    "domain": "Professional Certification",
+    "version": "1.0",
+    "total_standards": 6,
+    "domains": [
+      "Aerospace Ops",
+      "Cybersecurity",
+      "Cloud Foundations",
+      "Supply Chain",
+      "Clinical Support"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Essential gateway certifications for immediate job-readiness."
+  },
+  "nodes": [
+    {
+      "id": "CERT-AERO-FAA-107",
+      "title": "FAA Part 107 (Remote Pilot Certificate)",
+      "description": "Rules and regulations for operating small Unmanned Aircraft Systems (sUAS). Weather, loading, and performance. Linked to the Manipulator and Terra tracks.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Aerospace Ops",
+      "subdomain": "Certification Bridge",
+      "tags": ["drone", "uas", "faa", "aviation", "standard"],
+      "estimated_hours": 30,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "CERT-SEC-SECURITY-PLUS",
+      "title": "CompTIA Security+ (SY0-701 Mapping)",
+      "description": "The global standard for foundational cybersecurity skills. Threats, attacks, vulnerabilities, architecture, and design. Mapping mesh immunity to Security+ domains.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Cybersecurity",
+      "subdomain": "Certification Bridge",
+      "tags": ["comptia", "security+", "cybersecurity", "standard"],
+      "estimated_hours": 150,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "CERT-CLOUD-AWS-CP",
+      "title": "AWS Certified Cloud Practitioner",
+      "description": "Foundational understanding of the AWS Cloud platform. Basic global infrastructure, security, and compliance. Essential on-ramp for all cloud roles.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Cloud Foundations",
+      "subdomain": "Certification Bridge",
+      "tags": ["aws", "cloud", "practitioner", "standard"],
+      "estimated_hours": 40,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Understand",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "CERT-LOG-CSCP",
+      "title": "ASCM Certified Supply Chain Professional (CSCP)",
+      "description": "End-to-end supply chain management. Design, planning, execution, control, and monitoring. Linking the Mycelial Oracle to professional supply chain standards.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Supply Chain",
+      "subdomain": "Certification Bridge",
+      "tags": ["logistics", "supply-chain", "ascm", "standard"],
+      "estimated_hours": 150,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Analyze",
+      "subject_area": "Social Studies"
+    },
+    {
+      "id": "CERT-HLTH-NHA-CPT",
+      "title": "NHA Certified Phlebotomy Technician (CPT)",
+      "description": "Blood collection procedures, safety, and patient interaction. Mapping physiological integrity and mk0-vita standards to professional phlebotomy.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Clinical Support",
+      "subdomain": "Certification Bridge",
+      "tags": ["healthcare", "medical", "phlebotomy", "standard"],
+      "estimated_hours": 120,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Health Sciences"
+    }
+  ],
+  "edges": [
+    {
+      "from": "ROB-101",
+      "to": "CERT-AERO-FAA-107",
+      "edge_type": "Recommended",
+      "strength_permille": 700,
+      "rationale": "Robotics platforms provide the mechanical and control intuition for sUAS operation."
+    },
+    {
+      "from": "IT-SEC-101",
+      "to": "CERT-SEC-SECURITY-PLUS",
+      "edge_type": "Requires",
+      "strength_permille": 950,
+      "rationale": "Basic mesh security and encryption mastery are the prerequisites for Security+ certification."
+    },
+    {
+      "from": "CIV-GEN-050",
+      "to": "CERT-LOG-CSCP",
+      "edge_type": "Recommended",
+      "strength_permille": 600,
+      "rationale": "Foundational collective decision-making is the basis for professional supply chain design."
+    }
+  ]
+}

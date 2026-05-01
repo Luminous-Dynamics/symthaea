@@ -90,10 +90,7 @@ fn kepler_priors() -> Vec<Expr> {
     let r2 = || add(pow(x(), 2.0), pow(y(), 2.0));
     let v2 = || add(pow(vx(), 2.0), pow(vy(), 2.0));
     let ang_mom = sub(mul(x(), vy()), mul(y(), vx()));
-    let inv_r = div(
-        Expr::Const(1.0),
-        Expr::Func(UnaryFn::Sqrt, Box::new(r2())),
-    );
+    let inv_r = div(Expr::Const(1.0), Expr::Func(UnaryFn::Sqrt, Box::new(r2())));
     vec![ang_mom, r2(), v2(), inv_r]
 }
 
@@ -244,9 +241,11 @@ struct SeedResult {
 }
 
 fn summarize(label: &str, seed: u64, results: &[AutonomousInvariant]) -> SeedResult {
-    let best = results
-        .iter()
-        .min_by(|a, b| a.variance.partial_cmp(&b.variance).unwrap_or(std::cmp::Ordering::Equal));
+    let best = results.iter().min_by(|a, b| {
+        a.variance
+            .partial_cmp(&b.variance)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     let count_nontrivial = results
         .iter()
         .filter(|inv| inv.variance.is_finite() && inv.variance < 1e-2 && inv.complexity >= 3)
@@ -365,9 +364,7 @@ fn main() {
         .collect();
     aggregate("cheat + diverse-5", &cheat_div);
 
-    println!(
-        "\n━━━ Jacobi cheat + no-trig + diverse-5 + HIGH BUDGET (Session 23) ━━━"
-    );
+    println!("\n━━━ Jacobi cheat + no-trig + diverse-5 + HIGH BUDGET (Session 23) ━━━");
     println!("  pop=300 gen=100 max_depth=6 max_complexity=24, depth+reach boosted");
     let cheat_hb: Vec<SeedResult> = SEEDS
         .iter()
@@ -381,9 +378,7 @@ fn main() {
         .collect();
     aggregate("cheat + high-bud", &cheat_hb);
 
-    println!(
-        "\n━━━ Jacobi cheat + high-budget + prior-composition-0.15 (Session 24) ━━━"
-    );
+    println!("\n━━━ Jacobi cheat + high-budget + prior-composition-0.15 (Session 24) ━━━");
     println!("  15% of new children = op(prior_A, prior_B) for random distinct pinned priors");
     let cheat_comp: Vec<SeedResult> = SEEDS
         .iter()
@@ -397,9 +392,7 @@ fn main() {
         .collect();
     aggregate("cheat + composit", &cheat_comp);
 
-    println!(
-        "\n━━━ Jacobi cheat + composition-0.15 + fragment-bonus-0.5 (Session 25) ━━━"
-    );
+    println!("\n━━━ Jacobi cheat + composition-0.15 + fragment-bonus-0.5 (Session 25) ━━━");
     println!("  each pinned prior matched as subtree halves fitness → composites reliably win");
     let cheat_frag: Vec<SeedResult> = SEEDS
         .iter()
@@ -416,32 +409,22 @@ fn main() {
     println!("\n━━━ Head-to-head per seed (primed vs cold, trig allowed) ━━━");
     head_to_head("cold vs primed", &cold, &primed);
 
-    println!(
-        "\n━━━ Head-to-head per seed (primed vs cold, trig DISABLED — Session 19) ━━━"
-    );
+    println!("\n━━━ Head-to-head per seed (primed vs cold, trig DISABLED — Session 19) ━━━");
     head_to_head("cold-NT vs primed-NT", &cold_notrig, &primed_notrig);
 
     println!("\n━━━ Head-to-head per seed (cheat vs cold, trig DISABLED — Session 20) ━━━");
     head_to_head("cold-NT vs cheat-NT", &cold_notrig, &cheat_notrig);
 
-    println!(
-        "\n━━━ Head-to-head per seed (cheat vs cold, DIVERSE fitness — Session 21) ━━━"
-    );
+    println!("\n━━━ Head-to-head per seed (cheat vs cold, DIVERSE fitness — Session 21) ━━━");
     head_to_head("cold-D vs cheat-D", &cold_div, &cheat_div);
 
-    println!(
-        "\n━━━ Head-to-head per seed (cheat-HB vs cheat-D — Session 23 budget ablation) ━━━"
-    );
+    println!("\n━━━ Head-to-head per seed (cheat-HB vs cheat-D — Session 23 budget ablation) ━━━");
     head_to_head("cheat-D vs cheat-HB", &cheat_div, &cheat_hb);
 
-    println!(
-        "\n━━━ Head-to-head per seed (cheat-C vs cheat-HB — Session 24 composition) ━━━"
-    );
+    println!("\n━━━ Head-to-head per seed (cheat-C vs cheat-HB — Session 24 composition) ━━━");
     head_to_head("cheat-HB vs cheat-C", &cheat_hb, &cheat_comp);
 
-    println!(
-        "\n━━━ Head-to-head per seed (cheat-F vs cheat-C — Session 25 fragment bonus) ━━━"
-    );
+    println!("\n━━━ Head-to-head per seed (cheat-F vs cheat-C — Session 25 fragment bonus) ━━━");
     head_to_head("cheat-C vs cheat-F", &cheat_comp, &cheat_frag);
 
     println!("\n━━━ Degeneracy accounting: formulas containing cos/sin ━━━");

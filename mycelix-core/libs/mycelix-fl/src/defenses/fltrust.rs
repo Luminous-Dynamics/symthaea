@@ -31,7 +31,10 @@ use crate::types::{AggregationResult, Gradient};
 
 /// L2 norm of an `f32` slice, computed in `f64` for precision.
 fn l2_norm(v: &[f32]) -> f64 {
-    v.iter().map(|&x| (x as f64) * (x as f64)).sum::<f64>().sqrt()
+    v.iter()
+        .map(|&x| (x as f64) * (x as f64))
+        .sum::<f64>()
+        .sqrt()
 }
 
 /// Dot product of two `f32` slices, accumulated in `f64`.
@@ -126,8 +129,7 @@ impl FLTrust {
         // If all clients are adversarial (all trust scores zero), fall back to
         // the server gradient itself.
         if total_trust < 1e-12 {
-            let excluded_nodes: Vec<String> =
-                gradients.iter().map(|g| g.node_id.clone()).collect();
+            let excluded_nodes: Vec<String> = gradients.iter().map(|g| g.node_id.clone()).collect();
             let score_pairs: Vec<(String, f64)> = gradients
                 .iter()
                 .zip(trust_scores.iter())
@@ -253,9 +255,9 @@ mod tests {
         // Server points in +x direction. Byzantine points in -x.
         let server = vec![1.0, 0.0, 0.0];
         let gradients = vec![
-            grad(&[1.0, 0.1, 0.0]),    // honest, aligned
-            grad(&[0.9, -0.1, 0.0]),   // honest, aligned
-            grad(&[-10.0, 0.0, 0.0]),  // Byzantine: opposite direction
+            grad(&[1.0, 0.1, 0.0]),   // honest, aligned
+            grad(&[0.9, -0.1, 0.0]),  // honest, aligned
+            grad(&[-10.0, 0.0, 0.0]), // Byzantine: opposite direction
         ];
 
         let result = FLTrust::aggregate(&gradients, &server).unwrap();
@@ -286,7 +288,10 @@ mod tests {
         let result = FLTrust::aggregate(&gradients, &server).unwrap();
 
         // All trust scores zero => fallback to server gradient.
-        assert!(result.included_nodes.is_empty(), "all nodes should be excluded");
+        assert!(
+            result.included_nodes.is_empty(),
+            "all nodes should be excluded"
+        );
         assert_eq!(result.gradient, vec![1.0, 0.0]);
     }
 
@@ -324,9 +329,9 @@ mod tests {
         // Regardless of client magnitudes, result should have server's norm.
         let server = vec![3.0, 4.0]; // norm = 5
         let gradients = vec![
-            grad(&[30.0, 40.0]),   // 10x magnitude
-            grad(&[0.3, 0.4]),     // 0.1x magnitude
-            grad(&[6.0, 8.0]),     // 2x magnitude
+            grad(&[30.0, 40.0]), // 10x magnitude
+            grad(&[0.3, 0.4]),   // 0.1x magnitude
+            grad(&[6.0, 8.0]),   // 2x magnitude
         ];
 
         let result = FLTrust::aggregate(&gradients, &server).unwrap();

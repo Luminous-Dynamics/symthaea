@@ -106,9 +106,8 @@ pub struct FusionCore {
 // --- With real Mycelix types (feature = "mycelix") ---
 #[cfg(feature = "mycelix")]
 pub use mycelix_bridge_common::{
+    consciousness_thresholds::ConsciousnessThresholds, CivicTier as MycelixTier,
     ConsciousnessProfile as MycelixConsciousnessProfile,
-    CivicTier as MycelixTier,
-    consciousness_thresholds::ConsciousnessThresholds,
 };
 #[cfg(feature = "mycelix")]
 pub use mycelix_core_types::epistemic::EmpiricalLevel;
@@ -126,8 +125,10 @@ pub struct MycelixConsciousnessProfile {
 #[cfg(not(feature = "mycelix"))]
 impl MycelixConsciousnessProfile {
     pub fn combined_score(&self) -> f64 {
-        (self.identity * 0.25 + self.reputation * 0.25
-            + self.community * 0.30 + self.engagement * 0.20)
+        (self.identity * 0.25
+            + self.reputation * 0.25
+            + self.community * 0.30
+            + self.engagement * 0.20)
             .clamp(0.0, 1.0)
     }
 }
@@ -166,7 +167,17 @@ impl ConsciousnessComp {
     /// Governance tier (canonical: 0.3/0.4/0.6/0.8).
     pub fn tier(&self) -> u8 {
         let s = self.combined_score();
-        if s >= 0.8 { 4 } else if s >= 0.6 { 3 } else if s >= 0.4 { 2 } else if s >= 0.3 { 1 } else { 0 }
+        if s >= 0.8 {
+            4
+        } else if s >= 0.6 {
+            3
+        } else if s >= 0.4 {
+            2
+        } else if s >= 0.3 {
+            1
+        } else {
+            0
+        }
     }
 
     /// Phi from 6D simulation dimensions (multiworld-sim formula).
@@ -252,9 +263,17 @@ impl EpistemicTag {
         }
     }
 
-    pub fn level(&self) -> u8 { self.0 }
+    pub fn level(&self) -> u8 {
+        self.0
+    }
 
-    pub fn degrade(&mut self) { self.0 = self.0.saturating_sub(1); }
+    pub fn degrade(&mut self) {
+        self.0 = self.0.saturating_sub(1);
+    }
 
-    pub fn advance(&mut self) { if self.0 < 4 { self.0 += 1; } }
+    pub fn advance(&mut self) {
+        if self.0 < 4 {
+            self.0 += 1;
+        }
+    }
 }

@@ -75,7 +75,8 @@ pub fn living_dungeon_system(
     };
 
     breath.breath_count += 1;
-    let mut rng = rand::rngs::StdRng::seed_from_u64(breath.seed.wrapping_add(breath.breath_count as u64));
+    let mut rng =
+        rand::rngs::StdRng::seed_from_u64(breath.seed.wrapping_add(breath.breath_count as u64));
 
     let collective_phi = physics.consciousness.collective_phi;
 
@@ -115,7 +116,8 @@ pub fn living_dungeon_system(
             .collect();
 
         // Open a few walls proportional to collective Φ
-        let num_to_open = ((collective_phi - PHI_OPEN_THRESHOLD) * 10.0).min(MAX_TILES_PER_BREATH as f64) as usize;
+        let num_to_open = ((collective_phi - PHI_OPEN_THRESHOLD) * 10.0)
+            .min(MAX_TILES_PER_BREATH as f64) as usize;
         for _ in 0..num_to_open.min(wall_candidates.len()) {
             if wall_candidates.is_empty() {
                 break;
@@ -152,7 +154,8 @@ pub fn living_dungeon_system(
             })
             .collect();
 
-        let num_to_close = ((PHI_CLOSE_THRESHOLD - collective_phi) * 10.0).min(MAX_TILES_PER_BREATH as f64) as usize;
+        let num_to_close = ((PHI_CLOSE_THRESHOLD - collective_phi) * 10.0)
+            .min(MAX_TILES_PER_BREATH as f64) as usize;
         for _ in 0..num_to_close.min(floor_candidates.len()) {
             if floor_candidates.is_empty() {
                 break;
@@ -209,7 +212,11 @@ pub fn living_dungeon_system(
     // Sync tile sprites to match grid state (make breathing VISIBLE)
     if changes > 0 {
         for (tile, mut sprite) in &mut tile_sprites {
-            let walkable = grid.cells.get(&(tile.grid_x, tile.grid_y)).copied().unwrap_or(false);
+            let walkable = grid
+                .cells
+                .get(&(tile.grid_x, tile.grid_y))
+                .copied()
+                .unwrap_or(false);
             let expected_color = if walkable {
                 Color::srgb(0.22, 0.22, 0.30) // floor — dark blue-gray
             } else {

@@ -84,7 +84,7 @@
     },
     {
       "id": "RUST-301",
-      "title": "Rust for Consciousness Computing",
+      "title": "Rust for Cognitive Computing",
       "description": "Building HDC systems in Rust. SIMD-optimized hypervector operations. Rayon parallelism. serde serialization for neural state. candle GPU compute. WASM compilation targets. The symthaea-core architecture as a case study.",
       "node_type": "Course",
       "difficulty": "Advanced",
@@ -109,7 +109,7 @@
         {
           "framework": "Luminous Dynamics",
           "code": "RUST-301",
-          "description": "Rust for Consciousness Computing",
+          "description": "Rust for Cognitive Computing",
           "grade_level": "Undergraduate"
         }
       ],
@@ -357,7 +357,7 @@
       "to": "RUST-301",
       "edge_type": "Requires",
       "strength_permille": 900,
-      "rationale": "Rust for Consciousness Computing requires RUST-201"
+      "rationale": "Rust for Cognitive Computing requires RUST-201"
     },
     {
       "from": "NIX-101",

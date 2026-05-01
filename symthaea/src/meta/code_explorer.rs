@@ -194,7 +194,7 @@ mod tests {
     use super::*;
     use crate::hdc::code_encoder::CodeHDEncoder;
     use crate::hdc::code_memory::CodebaseMemory;
-    use crate::language::code_parser::{CodeEntity, EntityKind, ParsedCode, Span};
+    use crate::language::code_parser::{Entity, EntityKind, ParsedCode, Span};
 
     fn test_span() -> Span {
         Span {
@@ -257,15 +257,12 @@ mod tests {
         // Index diverse files
         let mut p1 = ParsedCode::new("", "rust");
         p1.entities
-            .push(CodeEntity::new(EntityKind::Function, "sort", test_span()));
+            .push(Entity::new(EntityKind::Function, "sort", test_span()));
         memory.index_file(Path::new("sort.rs"), &p1);
 
         let mut p2 = ParsedCode::new("", "rust");
-        p2.entities.push(CodeEntity::new(
-            EntityKind::Function,
-            "connect",
-            test_span(),
-        ));
+        p2.entities
+            .push(Entity::new(EntityKind::Function, "connect", test_span()));
         memory.index_file(Path::new("network.rs"), &p2);
 
         let mut explorer = ActiveCodeExplorer::new(512);

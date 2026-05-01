@@ -684,6 +684,16 @@ pub const CIRCADIAN_STILLNESS_DAWN: f32 = 0.05;
 /// Science: Friston (2010) — surprise signals exceeding 3× baseline threshold.
 pub const SURPRISE_PE_MULTIPLIER: f32 = 3.0;
 
+/// Visual surprise threshold for phasic NE burst.
+/// Science: Aston-Jones & Cohen (2005) — LC-NE reactivity to unexpected visual events.
+pub const VISION_SURPRISE_THRESHOLD: f32 = 0.4;
+
+/// Visual surprise to NE production scaling factor.
+pub const VISION_SURPRISE_NE_SCALE: f32 = 0.2;
+
+/// Cross-manifold prediction error to NE production scaling factor.
+pub const VISION_CROSS_MANIFOLD_NE_SCALE: f32 = 0.15;
+
 /// Default coherence when not yet cached from prior cycles.
 pub const COHERENCE_DEFAULT: f32 = 0.5;
 

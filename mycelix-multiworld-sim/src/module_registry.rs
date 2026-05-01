@@ -88,7 +88,8 @@ impl ModuleRegistry {
 
     /// Collect report sections from all modules.
     pub fn collect_reports(&self) -> Vec<ReportSection> {
-        self.modules.iter()
+        self.modules
+            .iter()
             .filter_map(|m| m.report_section())
             .collect()
     }
@@ -96,7 +97,8 @@ impl ModuleRegistry {
     /// List registered modules with their phases (sorts if needed).
     pub fn list_modules(&mut self) -> Vec<(ModuleId, &str, TickPhase)> {
         self.ensure_sorted();
-        self.modules.iter()
+        self.modules
+            .iter()
             .map(|m| (m.id(), m.name(), m.phase()))
             .collect()
     }
@@ -131,15 +133,29 @@ mod tests {
     }
 
     impl SimulationModule for CounterModule {
-        fn id(&self) -> ModuleId { "counter" }
-        fn name(&self) -> &str { "Counter Module" }
-        fn phase(&self) -> TickPhase { self.phase }
+        fn id(&self) -> ModuleId {
+            "counter"
+        }
+        fn name(&self) -> &str {
+            "Counter Module"
+        }
+        fn phase(&self) -> TickPhase {
+            self.phase
+        }
 
-        fn tick(&mut self, _tick: u32, _feedback: &HashMap<String, f64>) -> Result<ModuleOutputs, String> {
+        fn tick(
+            &mut self,
+            _tick: u32,
+            _feedback: &HashMap<String, f64>,
+        ) -> Result<ModuleOutputs, String> {
             self.count += 1;
             let mut outputs = ModuleOutputs::default();
-            outputs.feedback_signals.insert("counter_value".into(), self.count as f64);
-            outputs.metrics.push(("ticks_counted".into(), self.count as f64));
+            outputs
+                .feedback_signals
+                .insert("counter_value".into(), self.count as f64);
+            outputs
+                .metrics
+                .push(("ticks_counted".into(), self.count as f64));
             Ok(outputs)
         }
 
@@ -168,11 +184,21 @@ mod tests {
     }
 
     impl SimulationModule for ReaderModule {
-        fn id(&self) -> ModuleId { "reader" }
-        fn name(&self) -> &str { "Reader Module" }
-        fn phase(&self) -> TickPhase { TickPhase::Economy } // Later phase
+        fn id(&self) -> ModuleId {
+            "reader"
+        }
+        fn name(&self) -> &str {
+            "Reader Module"
+        }
+        fn phase(&self) -> TickPhase {
+            TickPhase::Economy
+        } // Later phase
 
-        fn tick(&mut self, _tick: u32, feedback: &HashMap<String, f64>) -> Result<ModuleOutputs, String> {
+        fn tick(
+            &mut self,
+            _tick: u32,
+            feedback: &HashMap<String, f64>,
+        ) -> Result<ModuleOutputs, String> {
             self.last_counter = feedback.get("counter_value").copied().unwrap_or(0.0);
             Ok(ModuleOutputs::default())
         }
@@ -252,7 +278,10 @@ mod tests {
         }
 
         let reports = registry.collect_reports();
-        assert!((reports[0].metrics[0].1 - 10.0).abs() < 0.001,
-            "Should count 10 ticks: {:?}", reports[0].metrics);
+        assert!(
+            (reports[0].metrics[0].1 - 10.0).abs() < 0.001,
+            "Should count 10 ticks: {:?}",
+            reports[0].metrics
+        );
     }
 }

@@ -315,7 +315,11 @@ mod tests {
         let t = ModelTransition::new("old".into(), "new".into(), 30, 0).unwrap();
         let midpoint = t.completes_at / 2;
         let p = t.progress(midpoint);
-        assert!((p - 0.5).abs() < 0.01, "Midpoint progress should be ~0.5, got {}", p);
+        assert!(
+            (p - 0.5).abs() < 0.01,
+            "Midpoint progress should be ~0.5, got {}",
+            p
+        );
     }
 
     #[test]
@@ -342,7 +346,11 @@ mod tests {
     #[test]
     fn blended_score_at_half_progress() {
         let b = blended_score(0.8, 0.4, 0.5);
-        assert!((b - 0.6).abs() < 1e-10, "Half blend of 0.8 and 0.4 should be 0.6, got {}", b);
+        assert!(
+            (b - 0.6).abs() < 1e-10,
+            "Half blend of 0.8 and 0.4 should be 0.6, got {}",
+            b
+        );
     }
 
     #[test]

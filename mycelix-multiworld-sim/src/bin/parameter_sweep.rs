@@ -18,7 +18,10 @@ fn main() {
         "founding_pop" => sweep_founding_population(seeds_per_point),
         "mars_pop" => sweep_mars_population(seeds_per_point),
         _ => {
-            eprintln!("Unknown parameter: {}. Options: founding_pop, mars_pop", parameter);
+            eprintln!(
+                "Unknown parameter: {}. Options: founding_pop, mars_pop",
+                parameter
+            );
             std::process::exit(1);
         }
     }
@@ -31,12 +34,18 @@ fn sweep_founding_population(seeds_per_point: usize) {
 
     println!("╔══════════════════════════════════════════════════════════╗");
     println!("║  PARAMETER SWEEP: Earth Founding Population             ║");
-    println!("║  {} seeds per point × {} ticks ({} years)              ║",
-        seeds_per_point, ticks, ticks / 12);
+    println!(
+        "║  {} seeds per point × {} ticks ({} years)              ║",
+        seeds_per_point,
+        ticks,
+        ticks / 12
+    );
     println!("╚══════════════════════════════════════════════════════════╝\n");
 
-    println!("{:<10} {:>8} {:>8} {:>8} {:>8} {:>10} {:>8}",
-        "Pop", "Survive", "CVS", "FinalPop", "Milestn", "Mars Pop", "Off-Earth");
+    println!(
+        "{:<10} {:>8} {:>8} {:>8} {:>8} {:>10} {:>8}",
+        "Pop", "Survive", "CVS", "FinalPop", "Milestn", "Mars Pop", "Off-Earth"
+    );
     println!("{}", "-".repeat(72));
 
     for &founding_pop in &populations {
@@ -53,7 +62,9 @@ fn sweep_founding_population(seeds_per_point: usize) {
             config.total_ticks = ticks;
             config.seed = seed;
             // Override Earth founding population
-            if let Some(earth) = config.initial_worlds.iter_mut()
+            if let Some(earth) = config
+                .initial_worlds
+                .iter_mut()
                 .find(|w| w.location == "Earth")
             {
                 earth.initial_population = founding_pop;
@@ -62,24 +73,33 @@ fn sweep_founding_population(seeds_per_point: usize) {
             let mut sim = MultiWorldSimulator::new(config);
             let report = sim.run();
 
-            if report.survived { survived += 1; }
+            if report.survived {
+                survived += 1;
+            }
             total_cvs += report.final_cvs;
             total_pop += report.final_population as u64;
             total_milestones += report.tech_milestones_achieved as u32;
 
-            let mars_pop: usize = sim.worlds.iter()
+            let mars_pop: usize = sim
+                .worlds
+                .iter()
                 .filter(|w| w.location == "Mars")
-                .map(|w| w.population()).sum();
-            let offearth: usize = sim.worlds.iter()
+                .map(|w| w.population())
+                .sum();
+            let offearth: usize = sim
+                .worlds
+                .iter()
                 .filter(|w| w.location != "Earth")
-                .map(|w| w.population()).sum();
+                .map(|w| w.population())
+                .sum();
             total_mars += mars_pop as u64;
             total_offearth += offearth as u64;
         }
 
         let n = seeds_per_point as f64;
         let survival_rate = survived as f64 / n;
-        println!("{:<10} {:>7.0}% {:>8.3} {:>8.0} {:>8.1} {:>10.0} {:>8.0}",
+        println!(
+            "{:<10} {:>7.0}% {:>8.3} {:>8.0} {:>8.1} {:>10.0} {:>8.0}",
             founding_pop,
             survival_rate * 100.0,
             total_cvs / n,
@@ -98,12 +118,18 @@ fn sweep_mars_population(seeds_per_point: usize) {
 
     println!("╔══════════════════════════════════════════════════════════╗");
     println!("║  PARAMETER SWEEP: Mars Founding Population              ║");
-    println!("║  {} seeds per point × {} ticks ({} years)              ║",
-        seeds_per_point, ticks, ticks / 12);
+    println!(
+        "║  {} seeds per point × {} ticks ({} years)              ║",
+        seeds_per_point,
+        ticks,
+        ticks / 12
+    );
     println!("╚══════════════════════════════════════════════════════════╝\n");
 
-    println!("{:<10} {:>8} {:>8} {:>10} {:>8} {:>10}",
-        "MarsPop", "Survive", "CVS", "Mars500yr", "SS", "Milestn");
+    println!(
+        "{:<10} {:>8} {:>8} {:>10} {:>8} {:>10}",
+        "MarsPop", "Survive", "CVS", "Mars500yr", "SS", "Milestn"
+    );
     println!("{}", "-".repeat(60));
 
     for &mars_pop in &mars_pops {
@@ -118,7 +144,9 @@ fn sweep_mars_population(seeds_per_point: usize) {
             let mut config = SimulationConfig::default_300_year();
             config.total_ticks = ticks;
             config.seed = seed;
-            if let Some(mars) = config.initial_worlds.iter_mut()
+            if let Some(mars) = config
+                .initial_worlds
+                .iter_mut()
                 .find(|w| w.location == "Mars")
             {
                 mars.initial_population = mars_pop;
@@ -127,23 +155,32 @@ fn sweep_mars_population(seeds_per_point: usize) {
             let mut sim = MultiWorldSimulator::new(config);
             let report = sim.run();
 
-            if report.survived { survived += 1; }
+            if report.survived {
+                survived += 1;
+            }
             total_cvs += report.final_cvs;
             total_milestones += report.tech_milestones_achieved as u32;
 
-            let mars_final: usize = sim.worlds.iter()
+            let mars_final: usize = sim
+                .worlds
+                .iter()
                 .filter(|w| w.location == "Mars")
-                .map(|w| w.population()).sum();
-            let mars_ss: f64 = sim.worlds.iter()
+                .map(|w| w.population())
+                .sum();
+            let mars_ss: f64 = sim
+                .worlds
+                .iter()
                 .filter(|w| w.location == "Mars")
                 .map(|w| w.resources.self_sufficiency())
-                .next().unwrap_or(0.0);
+                .next()
+                .unwrap_or(0.0);
             total_mars_final += mars_final as u64;
             total_ss += mars_ss;
         }
 
         let n = seeds_per_point as f64;
-        println!("{:<10} {:>7.0}% {:>8.3} {:>10.0} {:>7.0}% {:>10.1}",
+        println!(
+            "{:<10} {:>7.0}% {:>8.3} {:>10.0} {:>7.0}% {:>10.1}",
             mars_pop,
             survived as f64 / n * 100.0,
             total_cvs / n,

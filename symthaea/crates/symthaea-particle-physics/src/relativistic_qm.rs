@@ -14,7 +14,6 @@
 //! - Bjorken & Drell (1964). *Relativistic Quantum Mechanics*. McGraw-Hill.
 
 use crate::constants::*;
-use std::f64::consts::PI;
 
 /// Dirac gamma matrices (4×4) in the Dirac representation.
 /// γ⁰ = diag(I, -I), γⁱ = [[0, σⁱ], [-σⁱ, 0]]
@@ -25,7 +24,11 @@ pub fn gamma_matrix(mu: usize, i: usize, j: usize) -> (f64, f64) {
         0 => {
             // γ⁰ = diag(1, 1, -1, -1)
             if i == j {
-                if i < 2 { (1.0, 0.0) } else { (-1.0, 0.0) }
+                if i < 2 {
+                    (1.0, 0.0)
+                } else {
+                    (-1.0, 0.0)
+                }
             } else {
                 (0.0, 0.0)
             }
@@ -83,8 +86,8 @@ pub fn dirac_hydrogen_energy(n: u32, j: f64, z: u32) -> f64 {
 
 /// Non-relativistic hydrogen energy (for comparison): E_n = -Z²α²m_e/(2n²)
 pub fn hydrogen_energy_nr(n: u32, z: u32) -> f64 {
-    let za = z as f64 * ALPHA_EM;
-    -za * za / (2.0 * (n * n) as f64)
+    let _za = z as f64 * ALPHA_EM;
+    -_za * _za / (2.0 * (n * n) as f64)
 }
 
 /// Fine structure splitting: ΔE between j=l+1/2 and j=l-1/2 states.
@@ -95,7 +98,6 @@ pub fn fine_structure_splitting(n: u32, l: u32, z: u32) -> f64 {
     if l == 0 {
         return 0.0; // No splitting for s-states
     }
-    let za = z as f64 * ALPHA_EM;
     let j_plus = l as f64 + 0.5;
     let j_minus = l as f64 - 0.5;
 
@@ -174,7 +176,11 @@ mod tests {
         let split = fine_structure_splitting(2, 1, 1);
         assert!(split > 0.0, "Fine structure should exist: {:.2e}", split);
         // Should be of order α⁴ ≈ 3e-9
-        assert!(split < 1e-4, "Fine structure should be small: {:.2e}", split);
+        assert!(
+            split < 1e-4,
+            "Fine structure should be small: {:.2e}",
+            split
+        );
     }
 
     #[test]

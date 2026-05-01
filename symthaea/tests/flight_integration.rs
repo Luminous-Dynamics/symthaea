@@ -1,22 +1,22 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Integration test for the `flight` feature gate.
+//! Integration test for the `multirotor` feature gate.
 //!
-//! Validates that the flight crate is properly re-exported and usable
+//! Validates that the multirotor crate is properly re-exported and usable
 //! from the main symthaea crate.
 //!
-//! Run: `cargo test --features flight --test flight_integration`
+//! Run: `cargo test --features multirotor --test flight_integration`
 
-use symthaea::flight::formation::{FormationController, FormationShape};
-use symthaea::flight::{
+use symthaea::multirotor::formation::{FormationController, FormationShape};
+use symthaea::multirotor::{
     FlightConfig, FlightController, FlightTrainer, PhysicsSimulator, QuadrotorHdcEncoder,
     SimplePhysicsSimulator,
 };
 use symthaea::symthaea_core::genesis::GenesisSeed;
 
 #[test]
-fn test_flight_feature_reexports() {
+fn test_multirotor_feature_reexports() {
     // Verify all key types are accessible through the main crate
     let config = FlightConfig::default();
     assert!(config.motor_hz > 0.0);
@@ -25,7 +25,7 @@ fn test_flight_feature_reexports() {
 }
 
 #[test]
-fn test_flight_basic_training() {
+fn test_multirotor_basic_training() {
     let config = FlightConfig {
         num_episodes: 3,
         steps_per_episode: 100,

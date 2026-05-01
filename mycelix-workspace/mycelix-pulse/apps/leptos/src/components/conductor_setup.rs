@@ -9,9 +9,9 @@
 //! 3. If not found: offers one-click install instructions via platform detection
 //! 4. Continuously polls for conductor availability
 
+use crate::holochain::{use_holochain, ConnectionStatus};
 use leptos::prelude::*;
 use wasm_bindgen_futures::spawn_local;
-use crate::holochain::{use_holochain, ConnectionStatus};
 
 #[derive(Clone, PartialEq)]
 enum SetupState {
@@ -102,10 +102,12 @@ pub fn ConductorSetup() -> impl IntoView {
     // Check if the JS bridge already connected (works on both local and remote)
     spawn_local(async move {
         // First check: did the JS bootstrap in index.html already connect?
-        let js_connected = js_sys::eval("window.__HC_STATUS === 'connected' && typeof window.__HC_CALL_ZOME === 'function'")
-            .ok()
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
+        let js_connected = js_sys::eval(
+            "window.__HC_STATUS === 'connected' && typeof window.__HC_CALL_ZOME === 'function'",
+        )
+        .ok()
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
 
         if js_connected {
             web_sys::console::log_1(&"[Setup] JS bridge already connected".into());
@@ -133,7 +135,9 @@ pub fn ConductorSetup() -> impl IntoView {
         for _ in 0..20 {
             gloo_timers::future::sleep(std::time::Duration::from_millis(500)).await;
             let connected = js_sys::eval("window.__HC_STATUS === 'connected'")
-                .ok().and_then(|v| v.as_bool()).unwrap_or(false);
+                .ok()
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
             if connected || hc.status.get_untracked() == ConnectionStatus::Connected {
                 state.set(SetupState::Connected);
                 return;

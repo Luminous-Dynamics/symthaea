@@ -11,14 +11,14 @@
 //!
 //! Returns the same `GovernanceEligibility` for backward compatibility.
 
+pub use sovereign_profile::compat::{LegacyProfile, LegacyTier};
+pub use sovereign_profile::i18n;
+pub use sovereign_profile::weights::DimensionWeights;
 pub use sovereign_profile::{
     civic_requirement_basic, civic_requirement_constitutional, civic_requirement_guardian,
     civic_requirement_proposal, civic_requirement_voting, CivicRequirement, CivicTier,
     SovereignCredential, SovereignDimension, SovereignProfile,
 };
-pub use sovereign_profile::compat::{LegacyProfile, LegacyTier};
-pub use sovereign_profile::weights::DimensionWeights;
-pub use sovereign_profile::i18n;
 
 #[allow(deprecated)] // Needed for backward-compatible fallback path
 use crate::consciousness_profile::{
@@ -336,7 +336,11 @@ mod tests {
         let cred = steward_credential();
         let req = civic_requirement_constitutional();
         let result = evaluate_sovereign(&cred, &req, 1000);
-        assert!(result.eligible, "Steward should pass constitutional: {:?}", result.reasons);
+        assert!(
+            result.eligible,
+            "Steward should pass constitutional: {:?}",
+            result.reasons
+        );
     }
 
     #[test]
@@ -369,7 +373,10 @@ mod tests {
         };
         let result = evaluate_sovereign(&cred, &req, 1000);
         assert!(!result.eligible);
-        assert!(result.reasons.iter().any(|r| r.contains("EpistemicIntegrity")));
+        assert!(result
+            .reasons
+            .iter()
+            .any(|r| r.contains("EpistemicIntegrity")));
     }
 
     #[test]
@@ -459,9 +466,12 @@ mod tests {
         let req = civic_requirement_basic();
         let low_result = evaluate_sovereign(&low, &req, 1000);
         let high_result = evaluate_sovereign(&high, &req, 1000);
-        assert!(high_result.weight_bp >= low_result.weight_bp,
+        assert!(
+            high_result.weight_bp >= low_result.weight_bp,
             "Steward weight {} should >= Participant weight {}",
-            high_result.weight_bp, low_result.weight_bp);
+            high_result.weight_bp,
+            low_result.weight_bp
+        );
     }
 
     #[test]
@@ -473,7 +483,10 @@ mod tests {
             (civic_requirement_basic(), requirement_for_basic()),
             (civic_requirement_proposal(), requirement_for_proposal()),
             (civic_requirement_voting(), requirement_for_voting()),
-            (civic_requirement_constitutional(), requirement_for_constitutional()),
+            (
+                civic_requirement_constitutional(),
+                requirement_for_constitutional(),
+            ),
             (civic_requirement_guardian(), requirement_for_guardian()),
         ];
 
@@ -481,15 +494,18 @@ mod tests {
             let converted = governance_requirement_from_civic(&civic);
             assert_eq!(
                 converted.min_tier, expected.min_tier,
-                "Tier mismatch for {:?}", civic.min_tier
+                "Tier mismatch for {:?}",
+                civic.min_tier
             );
             assert_eq!(
                 converted.min_identity, expected.min_identity,
-                "Identity minimum mismatch for {:?}", civic.min_tier
+                "Identity minimum mismatch for {:?}",
+                civic.min_tier
             );
             assert_eq!(
                 converted.min_community, expected.min_community,
-                "Community minimum mismatch for {:?}", civic.min_tier
+                "Community minimum mismatch for {:?}",
+                civic.min_tier
             );
         }
     }

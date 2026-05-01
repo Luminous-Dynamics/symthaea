@@ -8,9 +8,11 @@
 //! which gets converted into the existing config types. Backward-compatible:
 //! the existing scenario TOML files also parse correctly.
 
-use luminous_sim_core::UnifiedConfig;
-use crate::config::{SimulationConfig, PolicyConfig, BirthPolicy, ProjectStrategy, ResourcePriority};
+use crate::config::{
+    BirthPolicy, PolicyConfig, ProjectStrategy, ResourcePriority, SimulationConfig,
+};
 use crate::constants::SimulationParams;
+use luminous_sim_core::UnifiedConfig;
 
 /// Convert a `UnifiedConfig` into the simulator's existing config types.
 ///
@@ -27,31 +29,73 @@ pub fn apply_unified_config(
     sim_config.total_ticks = unified.simulation.years * 12;
 
     // --- Policy section ---
-    if let Some(v) = unified.policy.trust_weighted_governance { policy.trust_weighted_governance = v; }
-    if let Some(v) = unified.policy.turchin_cycles_enabled { policy.turchin_cycles_enabled = v; }
-    if let Some(v) = unified.policy.fep_immiseration_enabled { policy.fep_immiseration_enabled = v; }
-    if let Some(v) = unified.policy.sacred_stillness_enabled { policy.sacred_stillness_enabled = v; }
-    if let Some(v) = unified.policy.disasters_enabled { policy.disasters_enabled = v; }
-    if let Some(v) = unified.policy.faction_enabled { policy.faction_enabled = v; }
-    if let Some(v) = unified.policy.education_enabled { policy.education_enabled = v; }
-    if let Some(v) = unified.policy.migration_enabled { policy.migration_enabled = v; }
-    if let Some(v) = unified.policy.hybrid_earth { policy.hybrid_earth = v; }
+    if let Some(v) = unified.policy.trust_weighted_governance {
+        policy.trust_weighted_governance = v;
+    }
+    if let Some(v) = unified.policy.turchin_cycles_enabled {
+        policy.turchin_cycles_enabled = v;
+    }
+    if let Some(v) = unified.policy.fep_immiseration_enabled {
+        policy.fep_immiseration_enabled = v;
+    }
+    if let Some(v) = unified.policy.sacred_stillness_enabled {
+        policy.sacred_stillness_enabled = v;
+    }
+    if let Some(v) = unified.policy.disasters_enabled {
+        policy.disasters_enabled = v;
+    }
+    if let Some(v) = unified.policy.faction_enabled {
+        policy.faction_enabled = v;
+    }
+    if let Some(v) = unified.policy.education_enabled {
+        policy.education_enabled = v;
+    }
+    if let Some(v) = unified.policy.migration_enabled {
+        policy.migration_enabled = v;
+    }
+    if let Some(v) = unified.policy.hybrid_earth {
+        policy.hybrid_earth = v;
+    }
 
     // Disaster sub-toggles
-    if let Some(v) = unified.policy.disasters_solar_enabled { policy.disasters_solar_enabled = v; }
-    if let Some(v) = unified.policy.disasters_impact_enabled { policy.disasters_impact_enabled = v; }
-    if let Some(v) = unified.policy.disasters_planetary_enabled { policy.disasters_planetary_enabled = v; }
-    if let Some(v) = unified.policy.disasters_eclss_enabled { policy.disasters_eclss_enabled = v; }
-    if let Some(v) = unified.policy.disasters_psychological_enabled { policy.disasters_psychological_enabled = v; }
-    if let Some(v) = unified.policy.disasters_technology_enabled { policy.disasters_technology_enabled = v; }
-    if let Some(v) = unified.policy.disasters_civilization_enabled { policy.disasters_civilization_enabled = v; }
+    if let Some(v) = unified.policy.disasters_solar_enabled {
+        policy.disasters_solar_enabled = v;
+    }
+    if let Some(v) = unified.policy.disasters_impact_enabled {
+        policy.disasters_impact_enabled = v;
+    }
+    if let Some(v) = unified.policy.disasters_planetary_enabled {
+        policy.disasters_planetary_enabled = v;
+    }
+    if let Some(v) = unified.policy.disasters_eclss_enabled {
+        policy.disasters_eclss_enabled = v;
+    }
+    if let Some(v) = unified.policy.disasters_psychological_enabled {
+        policy.disasters_psychological_enabled = v;
+    }
+    if let Some(v) = unified.policy.disasters_technology_enabled {
+        policy.disasters_technology_enabled = v;
+    }
+    if let Some(v) = unified.policy.disasters_civilization_enabled {
+        policy.disasters_civilization_enabled = v;
+    }
 
     // Numeric knobs
-    if let Some(v) = unified.policy.pair_bond_rate { policy.pair_bond_rate = v; }
-    if let Some(v) = unified.policy.care_effectiveness { policy.care_effectiveness = v; }
-    if let Some(v) = unified.policy.trade_openness { policy.trade_openness = v; }
-    if let Some(v) = unified.policy.defense_spending { policy.defense_spending = v; }
-    if let Some(v) = unified.policy.exploration_investment { policy.exploration_investment = v; }
+    if let Some(v) = unified.policy.pair_bond_rate {
+        policy.pair_bond_rate = v;
+    }
+    if let Some(v) = unified.policy.care_effectiveness {
+        policy.care_effectiveness = v;
+    }
+    if let Some(v) = unified.policy.trade_openness {
+        policy.trade_openness = v;
+    }
+    if let Some(v) = unified.policy.defense_spending {
+        policy.defense_spending = v;
+    }
+    if let Some(v) = unified.policy.exploration_investment {
+        policy.exploration_investment = v;
+    }
 
     // Enums
     if let Some(ref s) = unified.policy.birth_policy {
@@ -81,25 +125,53 @@ pub fn apply_unified_config(
     }
 
     // --- Params section ---
-    if let Some(v) = unified.params.stress_baseline { params.stress_baseline = v; }
-    if let Some(v) = unified.params.stress_isolation { params.stress_isolation = v; }
-    if let Some(v) = unified.params.stress_overwork { params.stress_overwork = v; }
-    if let Some(v) = unified.params.stress_decay { params.stress_decay = v; }
-    if let Some(v) = unified.params.burnout_threshold { params.burnout_threshold = v; }
-    if let Some(v) = unified.params.trauma_decay_base { params.trauma_decay_base = v; }
-    if let Some(v) = unified.params.trauma_disaster_scale { params.trauma_disaster_scale = v; }
-    if let Some(v) = unified.params.radiation_mars_sv_month { params.radiation_mars_sv_month = v; }
-    if let Some(v) = unified.params.radiation_moon_sv_month { params.radiation_moon_sv_month = v; }
-    if let Some(v) = unified.params.radiation_career_limit_sv { params.radiation_career_limit_sv = v; }
-    if let Some(v) = unified.params.spoilage_food { params.spoilage_food = v; }
-    if let Some(v) = unified.params.spoilage_energy { params.spoilage_energy = v; }
-    if let Some(v) = unified.params.spoilage_water { params.spoilage_water = v; }
+    if let Some(v) = unified.params.stress_baseline {
+        params.stress_baseline = v;
+    }
+    if let Some(v) = unified.params.stress_isolation {
+        params.stress_isolation = v;
+    }
+    if let Some(v) = unified.params.stress_overwork {
+        params.stress_overwork = v;
+    }
+    if let Some(v) = unified.params.stress_decay {
+        params.stress_decay = v;
+    }
+    if let Some(v) = unified.params.burnout_threshold {
+        params.burnout_threshold = v;
+    }
+    if let Some(v) = unified.params.trauma_decay_base {
+        params.trauma_decay_base = v;
+    }
+    if let Some(v) = unified.params.trauma_disaster_scale {
+        params.trauma_disaster_scale = v;
+    }
+    if let Some(v) = unified.params.radiation_mars_sv_month {
+        params.radiation_mars_sv_month = v;
+    }
+    if let Some(v) = unified.params.radiation_moon_sv_month {
+        params.radiation_moon_sv_month = v;
+    }
+    if let Some(v) = unified.params.radiation_career_limit_sv {
+        params.radiation_career_limit_sv = v;
+    }
+    if let Some(v) = unified.params.spoilage_food {
+        params.spoilage_food = v;
+    }
+    if let Some(v) = unified.params.spoilage_energy {
+        params.spoilage_energy = v;
+    }
+    if let Some(v) = unified.params.spoilage_water {
+        params.spoilage_water = v;
+    }
 }
 
 /// Create a `SimulationConfig` from a unified TOML string.
 ///
 /// Parses the TOML, creates default configs, then applies overrides.
-pub fn from_unified_toml(toml_str: &str) -> Result<(SimulationConfig, PolicyConfig, SimulationParams), String> {
+pub fn from_unified_toml(
+    toml_str: &str,
+) -> Result<(SimulationConfig, PolicyConfig, SimulationParams), String> {
     let unified = UnifiedConfig::from_toml(toml_str)
         .map_err(|e| format!("Failed to parse unified config: {e}"))?;
 
@@ -161,11 +233,14 @@ stress_baseline = 0.01
 
     #[test]
     fn test_feedback_loops_available() {
-        let unified = UnifiedConfig::from_toml(r#"
+        let unified = UnifiedConfig::from_toml(
+            r#"
 [feedback_loops]
 disaster_trauma = true
 harmony_policy = false
-"#).unwrap();
+"#,
+        )
+        .unwrap();
         assert!(unified.feedback_loops.disaster_trauma);
         assert!(!unified.feedback_loops.harmony_policy);
     }

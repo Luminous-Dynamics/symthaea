@@ -6,8 +6,11 @@ use hdk::prelude::*;
 use grid_integrity::*;
 use mycelix_energy_shared::batch::{links_to_records, filter_records_by};
 use mycelix_energy_shared::anchors::anchor_hash;
+use mycelix_bridge_proc::{mycelix_zome_fn, sovereign_gated};
 
 #[hdk_extern]
+#[mycelix_zome_fn]
+#[sovereign_gated(basic)]
 pub fn record_production(input: RecordProductionInput) -> ExternResult<Record> {
     let now = sys_time()?;
     let production = EnergyProduction {

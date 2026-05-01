@@ -16,15 +16,15 @@
 
 pub mod constitutional_envelope;
 // ── Model governance extensions (feature-gated) ──────────────────────────
-#[cfg(feature = "model-governance")]
-pub mod scoring_model;
-#[cfg(feature = "model-governance")]
-pub mod model_governance;
-#[cfg(feature = "model-governance")]
-pub mod shadow_evaluation;
 pub mod consciousness_thresholds;
 pub mod consciousness_zkp;
 pub mod membership_zkp;
+#[cfg(feature = "model-governance")]
+pub mod model_governance;
+#[cfg(feature = "model-governance")]
+pub mod scoring_model;
+#[cfg(feature = "model-governance")]
+pub mod shadow_evaluation;
 /// Backward-compatible module alias — allows `mycelix_bridge_common::phi_thresholds::*` paths.
 pub use consciousness_thresholds as phi_thresholds;
 pub use consciousness_thresholds::{ConsciousnessThresholds, PhiThresholds};
@@ -47,19 +47,21 @@ pub use consciousness_profile::gate_consciousness;
 
 // 8D Sovereign Profile — anti-tyranny civic identity (replacing 4D ConsciousnessProfile)
 pub mod sovereign_gate;
-pub use sovereign_profile::{
-    CivicRequirement, CivicTier, SovereignCredential, SovereignDimension, SovereignProfile,
-    civic_requirement_basic, civic_requirement_constitutional, civic_requirement_guardian,
-    civic_requirement_proposal, civic_requirement_voting,
-};
-pub use sovereign_profile::weights::DimensionWeights;
 #[cfg(feature = "hdk")]
 pub use sovereign_gate::gate_civic;
+pub use sovereign_profile::weights::DimensionWeights;
+pub use sovereign_profile::{
+    civic_requirement_basic, civic_requirement_constitutional, civic_requirement_guardian,
+    civic_requirement_proposal, civic_requirement_voting, CivicRequirement, CivicTier,
+    SovereignCredential, SovereignDimension, SovereignProfile,
+};
 
 pub mod offline_credential;
 pub mod sub_passport;
 
 // ── Interplanetary extensions (feature-gated) ────────────────────────────
+#[cfg(feature = "interplanetary")]
+pub mod cross_planetary_fl;
 #[cfg(feature = "interplanetary")]
 pub mod earth_colony_protocol;
 #[cfg(feature = "interplanetary")]
@@ -68,16 +70,14 @@ pub mod interplanetary_bridge;
 pub mod mars_isru;
 #[cfg(feature = "interplanetary")]
 pub mod planetary_governance;
-#[cfg(feature = "interplanetary")]
-pub mod cross_planetary_fl;
 
 // ── Federated learning extensions (feature-gated) ────────────────────────
 #[cfg(feature = "federated")]
 pub mod terrain_fl;
-#[cfg(feature = "federated")]
-pub mod consciousness_sync;
-#[cfg(feature = "federated")]
-pub mod federated_genomics;
+// #[cfg(feature = "federated")]
+// pub mod consciousness_sync;
+// #[cfg(feature = "federated")]
+// pub mod federated_genomics;
 
 #[cfg(feature = "hdk")]
 pub mod validation;
@@ -101,10 +101,10 @@ pub mod metrics;
 
 // ── Infrastructure extensions (feature-gated) ────────────────────────────
 #[cfg(feature = "infrastructure")]
-pub mod saga;
-#[cfg(feature = "infrastructure")]
 pub mod migration;
-pub mod notifications; // Notifications are core — used by all clusters
+pub mod notifications;
+#[cfg(feature = "infrastructure")]
+pub mod saga; // Notifications are core — used by all clusters
 
 #[cfg(feature = "infrastructure")]
 pub mod license_enforcement;
@@ -272,11 +272,7 @@ pub const MAX_DISPATCH_PAYLOAD_BYTES: usize = 1_048_576;
 pub const MAX_DISPATCH_IDENTIFIER_BYTES: usize = 256;
 
 /// Validate dispatch input field sizes.
-fn validate_dispatch_sizes(
-    zome: &str,
-    fn_name: &str,
-    payload: &[u8],
-) -> Result<(), String> {
+fn validate_dispatch_sizes(zome: &str, fn_name: &str, payload: &[u8]) -> Result<(), String> {
     if zome.len() > MAX_DISPATCH_IDENTIFIER_BYTES {
         return Err(format!(
             "Zome name too long ({} bytes, max {})",
@@ -320,14 +316,25 @@ pub fn dispatch_call_checked(
     allowed_zomes: &[&str],
 ) -> ExternResult<DispatchResult> {
     if let Err(msg) = validate_dispatch_sizes(&input.zome, &input.fn_name, &input.payload) {
-        metrics::record_error(&input.zome, &input.fn_name, BridgeErrorCode::ValidationFailed.as_str());
+        metrics::record_error(
+            &input.zome,
+            &input.fn_name,
+            BridgeErrorCode::ValidationFailed.as_str(),
+        );
         return Ok(DispatchResult::err(BridgeErrorCode::ValidationFailed, msg));
     }
     if !allowed_zomes.contains(&input.zome.as_str()) {
-        metrics::record_error(&input.zome, &input.fn_name, BridgeErrorCode::AllowlistRejected.as_str());
+        metrics::record_error(
+            &input.zome,
+            &input.fn_name,
+            BridgeErrorCode::AllowlistRejected.as_str(),
+        );
         return Ok(DispatchResult::err(
             BridgeErrorCode::AllowlistRejected,
-            format!("Zome '{}' is not in the allowed dispatch list. Valid zomes: {:?}", input.zome, allowed_zomes),
+            format!(
+                "Zome '{}' is not in the allowed dispatch list. Valid zomes: {:?}",
+                input.zome, allowed_zomes
+            ),
         ));
     }
 
@@ -345,7 +352,9 @@ pub fn dispatch_call_checked(
     });
 
     let elapsed_us = start_us.and_then(|start| {
-        sys_time().ok().map(|end| (end.as_micros() as u64).saturating_sub(start))
+        sys_time()
+            .ok()
+            .map(|end| (end.as_micros() as u64).saturating_sub(start))
     });
 
     match result {
@@ -364,12 +373,18 @@ pub fn dispatch_call_checked(
             Some(other) => {
                 let code = BridgeErrorCode::LocalCallRejected;
                 metrics::record_error(&input.zome, &input.fn_name, code.as_str());
-                Ok(DispatchResult::err(code, format!("Zome call rejected: {:?}", other)))
+                Ok(DispatchResult::err(
+                    code,
+                    format!("Zome call rejected: {:?}", other),
+                ))
             }
             None => {
                 let code = BridgeErrorCode::LocalNoResponse;
                 metrics::record_error(&input.zome, &input.fn_name, code.as_str());
-                Ok(DispatchResult::err(code, "No response from zome call".into()))
+                Ok(DispatchResult::err(
+                    code,
+                    "No response from zome call".into(),
+                ))
             }
         },
         Err(e) => {
@@ -432,21 +447,40 @@ pub fn dispatch_call_cross_cluster(
     allowed_zomes: &[&str],
 ) -> ExternResult<DispatchResult> {
     if let Err(msg) = validate_dispatch_sizes(&input.zome, &input.fn_name, &input.payload) {
-        metrics::record_error(&input.zome, &input.fn_name, BridgeErrorCode::ValidationFailed.as_str());
+        metrics::record_error(
+            &input.zome,
+            &input.fn_name,
+            BridgeErrorCode::ValidationFailed.as_str(),
+        );
         return Ok(DispatchResult::err(BridgeErrorCode::ValidationFailed, msg));
     }
     if input.role.len() > MAX_DISPATCH_IDENTIFIER_BYTES {
-        metrics::record_error(&input.zome, &input.fn_name, BridgeErrorCode::ValidationFailed.as_str());
+        metrics::record_error(
+            &input.zome,
+            &input.fn_name,
+            BridgeErrorCode::ValidationFailed.as_str(),
+        );
         return Ok(DispatchResult::err(
             BridgeErrorCode::ValidationFailed,
-            format!("Role name too long ({} bytes, max {})", input.role.len(), MAX_DISPATCH_IDENTIFIER_BYTES),
+            format!(
+                "Role name too long ({} bytes, max {})",
+                input.role.len(),
+                MAX_DISPATCH_IDENTIFIER_BYTES
+            ),
         ));
     }
     if !allowed_zomes.contains(&input.zome.as_str()) {
-        metrics::record_error(&input.zome, &input.fn_name, BridgeErrorCode::AllowlistRejected.as_str());
+        metrics::record_error(
+            &input.zome,
+            &input.fn_name,
+            BridgeErrorCode::AllowlistRejected.as_str(),
+        );
         return Ok(DispatchResult::err(
             BridgeErrorCode::AllowlistRejected,
-            format!("Zome '{}' is not in the allowed cross-cluster dispatch list. Valid zomes: {:?}", input.zome, allowed_zomes),
+            format!(
+                "Zome '{}' is not in the allowed cross-cluster dispatch list. Valid zomes: {:?}",
+                input.zome, allowed_zomes
+            ),
         ));
     }
 
@@ -466,7 +500,9 @@ pub fn dispatch_call_cross_cluster(
     });
 
     let elapsed_us = start_us.and_then(|start| {
-        sys_time().ok().map(|end| (end.as_micros() as u64).saturating_sub(start))
+        sys_time()
+            .ok()
+            .map(|end| (end.as_micros() as u64).saturating_sub(start))
     });
 
     match result {
@@ -480,23 +516,35 @@ pub fn dispatch_call_cross_cluster(
             Some(ZomeCallResponse::NetworkError(err)) => {
                 let code = BridgeErrorCode::CrossClusterNetworkError;
                 metrics::record_error(&call_key, &input.fn_name, code.as_str());
-                Ok(DispatchResult::err(code, format!("Cross-cluster network error: {}", err)))
+                Ok(DispatchResult::err(
+                    code,
+                    format!("Cross-cluster network error: {}", err),
+                ))
             }
             Some(other) => {
                 let code = BridgeErrorCode::CrossClusterCallRejected;
                 metrics::record_error(&call_key, &input.fn_name, code.as_str());
-                Ok(DispatchResult::err(code, format!("Cross-cluster call rejected: {:?}", other)))
+                Ok(DispatchResult::err(
+                    code,
+                    format!("Cross-cluster call rejected: {:?}", other),
+                ))
             }
             None => {
                 let code = BridgeErrorCode::CrossClusterNoResponse;
                 metrics::record_error(&call_key, &input.fn_name, code.as_str());
-                Ok(DispatchResult::err(code, "No response from cross-cluster call".into()))
+                Ok(DispatchResult::err(
+                    code,
+                    "No response from cross-cluster call".into(),
+                ))
             }
         },
         Err(e) => {
             let code = BridgeErrorCode::CrossClusterCallFailed;
             metrics::record_error(&call_key, &input.fn_name, code.as_str());
-            Ok(DispatchResult::err(code, format!("Cross-cluster call failed: {:?}", e)))
+            Ok(DispatchResult::err(
+                code,
+                format!("Cross-cluster call failed: {:?}", e),
+            ))
         }
     }
 }
@@ -1092,10 +1140,8 @@ mod tests {
 
     #[test]
     fn dispatch_result_error_serde_roundtrip() {
-        let result = DispatchResult::err(
-            BridgeErrorCode::LocalCallFailed,
-            "something failed".into(),
-        );
+        let result =
+            DispatchResult::err(BridgeErrorCode::LocalCallFailed, "something failed".into());
         let json = serde_json::to_string(&result).unwrap();
         assert!(json.contains("error_code")); // error code field present
         let r2: DispatchResult = serde_json::from_str(&json).unwrap();

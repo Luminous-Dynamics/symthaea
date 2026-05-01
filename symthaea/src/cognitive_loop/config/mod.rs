@@ -698,7 +698,25 @@ pub struct CognitiveLoopConfig {
 
     /// Which embodiment platform to use for proprioceptive loop closure.
     /// Default: `None` (disembodied cognitive loop).
-    #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))]
+    #[cfg(any(
+        feature = "humanoid",
+        feature = "helicopter",
+        feature = "flight",
+        feature = "vehicle",
+        feature = "auv",
+        feature = "manipulator",
+        feature = "exoskeleton",
+        feature = "surgical",
+        feature = "orbital",
+        feature = "quadruped",
+        feature = "subterranean",
+        feature = "infrastructure",
+        feature = "scavenger",
+        feature = "agribot",
+        feature = "biota",
+        feature = "clime",
+        feature = "phone"
+    ))]
     #[serde(default)]
     pub embodiment_platform: super::motor_bridge::EmbodimentPlatform,
 
@@ -708,22 +726,94 @@ pub struct CognitiveLoopConfig {
     /// weight=0.1 → Phi=0.757, weight=0.2 → ~0.62, weight=0.3 → ~0.44.
     /// Light proprioceptive feedback grounds consciousness; heavy feedback
     /// floods the CfC with prediction errors that reduce Phi.
-    #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))]
+    #[cfg(any(
+        feature = "humanoid",
+        feature = "helicopter",
+        feature = "flight",
+        feature = "vehicle",
+        feature = "auv",
+        feature = "manipulator",
+        feature = "exoskeleton",
+        feature = "surgical",
+        feature = "orbital",
+        feature = "quadruped",
+        feature = "subterranean",
+        feature = "infrastructure",
+        feature = "scavenger",
+        feature = "agribot",
+        feature = "biota",
+        feature = "clime",
+        feature = "phone"
+    ))]
     #[serde(default = "default_embodiment_blend")]
     pub embodiment_blend_weight: f32,
 
     /// Embodiment step interval in cognitive cycles. Default: 1.
-    #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))]
+    #[cfg(any(
+        feature = "humanoid",
+        feature = "helicopter",
+        feature = "flight",
+        feature = "vehicle",
+        feature = "auv",
+        feature = "manipulator",
+        feature = "exoskeleton",
+        feature = "surgical",
+        feature = "orbital",
+        feature = "quadruped",
+        feature = "subterranean",
+        feature = "infrastructure",
+        feature = "scavenger",
+        feature = "agribot",
+        feature = "biota",
+        feature = "clime",
+        feature = "phone"
+    ))]
     #[serde(default = "default_embodiment_interval")]
     pub embodiment_step_interval: usize,
 }
 
-#[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))]
+#[cfg(any(
+    feature = "humanoid",
+    feature = "helicopter",
+    feature = "flight",
+    feature = "vehicle",
+    feature = "auv",
+    feature = "manipulator",
+    feature = "exoskeleton",
+    feature = "surgical",
+    feature = "orbital",
+    feature = "quadruped",
+    feature = "subterranean",
+    feature = "infrastructure",
+    feature = "scavenger",
+    feature = "agribot",
+    feature = "biota",
+    feature = "clime",
+    feature = "phone"
+))]
 fn default_embodiment_blend() -> f32 {
     0.1 // Optimized via weight sweep: 0.1 → Phi=0.757 (was 0.2 → ~0.62)
 }
 
-#[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))]
+#[cfg(any(
+    feature = "humanoid",
+    feature = "helicopter",
+    feature = "flight",
+    feature = "vehicle",
+    feature = "auv",
+    feature = "manipulator",
+    feature = "exoskeleton",
+    feature = "surgical",
+    feature = "orbital",
+    feature = "quadruped",
+    feature = "subterranean",
+    feature = "infrastructure",
+    feature = "scavenger",
+    feature = "agribot",
+    feature = "biota",
+    feature = "clime",
+    feature = "phone"
+))]
 fn default_embodiment_interval() -> usize {
     1
 }
@@ -885,11 +975,65 @@ impl Default for CognitiveLoopConfig {
             #[cfg(feature = "fhe-wisdom")]
             fhe_aggregation_interval: 100,
             attention_budget_override_us: None,
-            #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))]
+            #[cfg(any(
+                feature = "humanoid",
+                feature = "helicopter",
+                feature = "flight",
+                feature = "vehicle",
+                feature = "auv",
+                feature = "manipulator",
+                feature = "exoskeleton",
+                feature = "surgical",
+                feature = "orbital",
+                feature = "quadruped",
+                feature = "subterranean",
+                feature = "infrastructure",
+                feature = "scavenger",
+                feature = "agribot",
+                feature = "biota",
+                feature = "clime",
+                feature = "phone"
+            ))]
             embodiment_platform: super::motor_bridge::EmbodimentPlatform::None,
-            #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))]
+            #[cfg(any(
+                feature = "humanoid",
+                feature = "helicopter",
+                feature = "flight",
+                feature = "vehicle",
+                feature = "auv",
+                feature = "manipulator",
+                feature = "exoskeleton",
+                feature = "surgical",
+                feature = "orbital",
+                feature = "quadruped",
+                feature = "subterranean",
+                feature = "infrastructure",
+                feature = "scavenger",
+                feature = "agribot",
+                feature = "biota",
+                feature = "clime",
+                feature = "phone"
+            ))]
             embodiment_blend_weight: 0.1,
-            #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))]
+            #[cfg(any(
+                feature = "humanoid",
+                feature = "helicopter",
+                feature = "flight",
+                feature = "vehicle",
+                feature = "auv",
+                feature = "manipulator",
+                feature = "exoskeleton",
+                feature = "surgical",
+                feature = "orbital",
+                feature = "quadruped",
+                feature = "subterranean",
+                feature = "infrastructure",
+                feature = "scavenger",
+                feature = "agribot",
+                feature = "biota",
+                feature = "clime",
+                feature = "phone"
+            ))]
             embodiment_step_interval: 1,
         }
     }
@@ -965,7 +1109,25 @@ impl CognitiveLoopConfig {
             domain_profile: capability.preferred_domain_profile(),
             ..Default::default()
         };
-        #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))]
+        #[cfg(any(
+            feature = "humanoid",
+            feature = "helicopter",
+            feature = "flight",
+            feature = "vehicle",
+            feature = "auv",
+            feature = "manipulator",
+            feature = "exoskeleton",
+            feature = "surgical",
+            feature = "orbital",
+            feature = "quadruped",
+            feature = "subterranean",
+            feature = "infrastructure",
+            feature = "scavenger",
+            feature = "agribot",
+            feature = "biota",
+            feature = "clime",
+            feature = "phone"
+        ))]
         {
             config.embodiment_platform = platform;
         }
@@ -989,7 +1151,25 @@ impl CognitiveLoopConfig {
             domain_profile: resolved_domain,
             ..Default::default()
         };
-        #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))]
+        #[cfg(any(
+            feature = "humanoid",
+            feature = "helicopter",
+            feature = "flight",
+            feature = "vehicle",
+            feature = "auv",
+            feature = "manipulator",
+            feature = "exoskeleton",
+            feature = "surgical",
+            feature = "orbital",
+            feature = "quadruped",
+            feature = "subterranean",
+            feature = "infrastructure",
+            feature = "scavenger",
+            feature = "agribot",
+            feature = "biota",
+            feature = "clime",
+            feature = "phone"
+        ))]
         {
             config.embodiment_platform = platform;
         }
@@ -1454,7 +1634,19 @@ mod tests {
     fn config_for_platform_uses_platform_preferred_domain() {
         let c = CognitiveLoopConfig::for_platform(EmbodimentPlatform::Auv);
         assert_eq!(c.domain_profile.kind, "underwater");
-        #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))]
+        #[cfg(any(
+            feature = "humanoid",
+            feature = "helicopter",
+            feature = "flight",
+            feature = "vehicle",
+            feature = "auv",
+            feature = "manipulator",
+            feature = "exoskeleton",
+            feature = "surgical",
+            feature = "orbital",
+            feature = "quadruped",
+            feature = "phone"
+        ))]
         assert_eq!(c.embodiment_platform, EmbodimentPlatform::Auv);
     }
 

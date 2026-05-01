@@ -56,12 +56,18 @@ fn validate_proxy_url(raw: &str) -> Result<url::Url, &'static str> {
             let seg = ip.segments();
 
             // IPv4-mapped IPv6 (::ffff:x.x.x.x)
-            if seg[0] == 0 && seg[1] == 0 && seg[2] == 0 && seg[3] == 0
-                && seg[4] == 0 && seg[5] == 0xffff
+            if seg[0] == 0
+                && seg[1] == 0
+                && seg[2] == 0
+                && seg[3] == 0
+                && seg[4] == 0
+                && seg[5] == 0xffff
             {
                 let mapped = std::net::Ipv4Addr::new(
-                    (seg[6] >> 8) as u8, seg[6] as u8,
-                    (seg[7] >> 8) as u8, seg[7] as u8,
+                    (seg[6] >> 8) as u8,
+                    seg[6] as u8,
+                    (seg[7] >> 8) as u8,
+                    seg[7] as u8,
                 );
                 if is_private_ipv4(&mapped) {
                     return Err("Access to private/reserved IP addresses is forbidden");
@@ -99,7 +105,10 @@ fn internal_error_response() -> axum::response::Response<axum::body::Body> {
     resp
 }
 
-fn json_response(status: u16, body: axum::body::Bytes) -> axum::response::Response<axum::body::Body> {
+fn json_response(
+    status: u16,
+    body: axum::body::Bytes,
+) -> axum::response::Response<axum::body::Body> {
     axum::response::Response::builder()
         .status(status)
         .header("content-type", "application/json")
@@ -309,9 +318,7 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind(addr)
         .await
         .expect("Failed to bind port 8131");
-    axum::serve(listener, app)
-        .await
-        .expect("Server error");
+    axum::serve(listener, app).await.expect("Server error");
 }
 
 #[cfg(test)]

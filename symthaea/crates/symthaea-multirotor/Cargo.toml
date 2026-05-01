@@ -1,0 +1,63 @@
+[package]
+name = "symthaea-multirotor"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Unified HDC-LTC + FEP Active Inference multirotor flight control via MuJoCo"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["multirotor", "flight-control", "active-inference", "hdc", "mujoco"]
+categories = ["science", "algorithms", "simulation"]
+
+[lib]
+name = "symthaea_multirotor"
+
+[dependencies]
+positioning = { path = "../../../mycelix-position/lib/positioning" }
+symthaea-core = { path = "../../symthaea-core" }
+symthaea-fep = { path = "../symthaea-fep" }
+symthaea-hal = { path = "../symthaea-hal", default-features = false }
+serde = { workspace = true }
+rand = { workspace = true }
+anyhow = { workspace = true }
+
+# MuJoCo bindings (optional, behind `mujoco` feature)
+mujoco-rs = { version = "2.3", optional = true, default-features = false }
+
+# Parallel swarm training (optional, behind `swarm` feature)
+rayon = { version = "1.10", optional = true }
+parking_lot = { version = "0.12", optional = true }
+
+# Deterministic RNG for sensory filter
+rand_chacha = { version = "0.3", optional = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+proptest = "1"
+
+[features]
+default = []
+mujoco = ["dep:mujoco-rs", "dep:rand_chacha"]
+mujoco-viewer = ["mujoco", "mujoco-rs/viewer"]
+mujoco-renderer = ["mujoco", "mujoco-rs/renderer"]
+swarm = ["mujoco", "dep:rayon", "dep:parking_lot"]
+
+[[example]]
+name = "mujoco_survival_reflex"
+required-features = ["mujoco"]
+
+[[example]]
+name = "mujoco_kinetic_sacrifice"
+required-features = ["mujoco"]
+
+[[example]]
+name = "mujoco_swarm_validation"
+required-features = ["swarm"]
+
+[[example]]
+name = "efe_ablation"
+
+[[example]]
+name = "multi_scenario"

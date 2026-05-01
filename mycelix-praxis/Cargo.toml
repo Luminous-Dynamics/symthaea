@@ -33,7 +33,7 @@ members = [
   # Mentorship Matching (mentor/mentee pairing + session tracking)
   "zomes/mentorship_zome/integrity",
   "zomes/mentorship_zome/coordinator",
-  # Trust Tier Bridge (cross-domain dispatch + consciousness gating)
+  # Trust Tier Bridge (cross-domain dispatch + epistemic gating)
   "zomes/praxis-bridge/integrity",
   "zomes/praxis-bridge/coordinator",
   # Community Translation (multilingual content with trust-weighted verification)

@@ -3,8 +3,8 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Validator types and management for RB-BFT consensus
 
-use serde::{Deserialize, Serialize};
 use mycelix_core_types::{KVector, TrustScore};
+use serde::{Deserialize, Serialize};
 
 use crate::error::{ConsensusError, ConsensusResult};
 use crate::MIN_PARTICIPATION_REPUTATION;
@@ -162,7 +162,8 @@ impl ValidatorSet {
 
     /// Create from a list of validators
     pub fn from_validators(validators: Vec<ValidatorNode>) -> Self {
-        let total_weight = validators.iter()
+        let total_weight = validators
+            .iter()
             .filter(|v| v.active && v.reputation() >= MIN_PARTICIPATION_REPUTATION)
             .map(|v| v.voting_weight())
             .sum();
@@ -193,7 +194,8 @@ impl ValidatorSet {
 
     /// Get all active validators
     pub fn active_validators(&self) -> Vec<&ValidatorNode> {
-        self.validators.iter()
+        self.validators
+            .iter()
             .filter(|v| v.active && v.reputation() >= MIN_PARTICIPATION_REPUTATION)
             .collect()
     }
@@ -210,7 +212,9 @@ impl ValidatorSet {
 
     /// Recalculate total weight (call after modifying validators)
     pub fn recalculate_weight(&mut self) {
-        self.total_weight = self.validators.iter()
+        self.total_weight = self
+            .validators
+            .iter()
             .filter(|v| v.active && v.reputation() >= MIN_PARTICIPATION_REPUTATION)
             .map(|v| v.voting_weight())
             .sum();
@@ -329,7 +333,7 @@ mod tests {
         let mut set = ValidatorSet::new();
         set.add(create_test_validator("a", 0.8)); // weight = 0.64
         set.add(create_test_validator("b", 0.6)); // weight = 0.36
-        // Total = 1.0
+                                                  // Total = 1.0
 
         assert!((set.total_weight() - 1.0).abs() < 0.01);
     }

@@ -22,6 +22,7 @@
 //! | MYCEL Score | 0.25 | Ecosystem participation |
 //! | Domain Average | 0.40 | Cross-cluster activity |
 
+use mycelix_zome_helpers as _;
 use hdk::prelude::*;
 use reputation_aggregator_integrity::*;
 use serde::{Deserialize, Serialize};
@@ -88,10 +89,10 @@ fn ensure_anchor(name: &str) -> ExternResult<EntryHash> {
 pub fn get_composite_reputation(agent_b64: String) -> ExternResult<AggregatedReputation> {
     // 1. Calculate recursive score
     let raw_score = calculate_recursive_reputation(agent_b64.clone())?;
-    
+
     // 2. Normalize using Sigmoid
     let _normalized_score = apply_sigmoid_normalization(raw_score);
-    
+
     // Existing static implementation (for transition):
     let agent_anchor = ensure_anchor(&format!("agent_rep:{}", agent_b64))?;
     let links = get_links(
@@ -111,7 +112,7 @@ pub fn get_composite_reputation(agent_b64: String) -> ExternResult<AggregatedRep
             return Ok(rep);
         }
     }
-    
+
     // No cached reputation — compute fresh
     refresh_reputation(agent_b64)
 }

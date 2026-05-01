@@ -12,9 +12,9 @@
 //! Run: cargo run --example curvature_selforg --release --features consciousness-curvature
 
 use nalgebra::SVector;
+use symtropy_consciousness_physics::convergence::{cohens_d, mann_whitney_u};
 use symtropy_consciousness_physics::curvature::ConformalMetric;
 use symtropy_consciousness_physics::harmony_field::{HarmonyField, HarmonySource};
-use symtropy_consciousness_physics::convergence::{mann_whitney_u, cohens_d};
 use symtropy_math::Point;
 use symtropy_physics::PhysicsWorld;
 
@@ -26,11 +26,11 @@ const NUM_SEEDS: usize = 10;
 struct OrgResult {
     scale: f64,
     seed: u64,
-    initial_spread: f64,    // mean distance from origin at t=0
-    final_spread: f64,      // mean distance from origin at t=end
-    final_clustering: f64,  // mean nearest-neighbor distance
-    min_distance: f64,      // closest any agent got to origin
-    orbiting_count: usize,  // agents within [10, 40] units of origin (ring)
+    initial_spread: f64,   // mean distance from origin at t=0
+    final_spread: f64,     // mean distance from origin at t=end
+    final_clustering: f64, // mean nearest-neighbor distance
+    min_distance: f64,     // closest any agent got to origin
+    orbiting_count: usize, // agents within [10, 40] units of origin (ring)
 }
 
 fn run_experiment(curvature_scale: f64, seed: u64) -> OrgResult {
@@ -61,7 +61,7 @@ fn run_experiment(curvature_scale: f64, seed: u64) -> OrgResult {
         let h = world.add_sphere(Point::new([x, y]), 1.0, 1.0);
         if let Some(body) = world.body_mut(h) {
             body.linear_damping = 0.02; // Very light damping for orbital dynamics
-            // Tangential velocity (perpendicular to radial direction)
+                                        // Tangential velocity (perpendicular to radial direction)
             let speed = 5.0 + rng_f64(&mut rng) * 3.0;
             body.linear_velocity = SVector::from([-angle.sin() * speed, angle.cos() * speed]);
         }
@@ -96,22 +96,37 @@ fn run_experiment(curvature_scale: f64, seed: u64) -> OrgResult {
         for &h in &handles {
             if let Some(body) = world.body(h) {
                 let dist = body.position().0.norm();
-                if dist < min_distance { min_distance = dist; }
+                if dist < min_distance {
+                    min_distance = dist;
+                }
             }
         }
     }
 
     let final_spread = mean_dist_from_origin(&world, &handles);
     let final_clustering = avg_nn(&world, &handles);
-    let orbiting_count = handles.iter().filter(|&&h| {
-        world.body(h).map(|b| {
-            let d = b.position().0.norm();
-            d > 10.0 && d < 40.0
-        }).unwrap_or(false)
-    }).count();
+    let orbiting_count = handles
+        .iter()
+        .filter(|&&h| {
+            world
+                .body(h)
+                .map(|b| {
+                    let d = b.position().0.norm();
+                    d > 10.0 && d < 40.0
+                })
+                .unwrap_or(false)
+        })
+        .count();
 
-    OrgResult { scale: curvature_scale, seed, initial_spread, final_spread,
-        final_clustering, min_distance, orbiting_count }
+    OrgResult {
+        scale: curvature_scale,
+        seed,
+        initial_spread,
+        final_spread,
+        final_clustering,
+        min_distance,
+        orbiting_count,
+    }
 }
 
 fn main() {
@@ -128,9 +143,16 @@ fn main() {
         for s in 0..NUM_SEEDS {
             let seed = 42 + s as u64 * 137;
             let r = run_experiment(scale, seed);
-            println!("{},{},{:.2},{:.2},{:.2},{:.2}{}",
-                r.scale, r.seed, r.initial_spread, r.final_spread,
-                r.final_clustering, r.min_distance, r.orbiting_count);
+            println!(
+                "{},{},{:.2},{:.2},{:.2},{:.2}{}",
+                r.scale,
+                r.seed,
+                r.initial_spread,
+                r.final_spread,
+                r.final_clustering,
+                r.min_distance,
+                r.orbiting_count
+            );
             results.push(r);
         }
 
@@ -140,8 +162,10 @@ fn main() {
         let mean_orbit = results.iter().map(|r| r.orbiting_count as f64).sum::<f64>() / n;
         let mean_min = results.iter().map(|r| r.min_distance).sum::<f64>() / n;
 
-        eprintln!("\n  κ={:.2}: spread={:.1}, cluster={:.1}, orbiting={:.1}/{AGENTS}, min_dist={:.1}",
-            scale, mean_spread, mean_cluster, mean_orbit, mean_min);
+        eprintln!(
+            "\n  κ={:.2}: spread={:.1}, cluster={:.1}, orbiting={:.1}/{AGENTS}, min_dist={:.1}",
+            scale, mean_spread, mean_cluster, mean_orbit, mean_min
+        );
 
         all_results.push(results);
     }
@@ -149,39 +173,80 @@ fn main() {
     // Statistical comparison: flat (κ=0) vs strong curvature (κ=0.05)
     if all_results.len() >= 2 {
         let flat_spread: Vec<f64> = all_results[0].iter().map(|r| r.final_spread).collect();
-        let curved_spread: Vec<f64> = all_results.last().unwrap().iter().map(|r| r.final_spread).collect();
+        let curved_spread: Vec<f64> = all_results
+            .last()
+            .unwrap()
+            .iter()
+            .map(|r| r.final_spread)
+            .collect();
 
         let (u, z, p) = mann_whitney_u(&flat_spread, &curved_spread);
         let d = cohens_d(&flat_spread, &curved_spread);
 
-        eprintln!("\n── κ=0 vs κ={:.2} (spread from origin) ──", scales.last().unwrap());
+        eprintln!(
+            "\n── κ=0 vs κ={:.2} (spread from origin) ──",
+            scales.last().unwrap()
+        );
         eprintln!("  Mann-Whitney U={:.1}, z={:.3}, p={:.4}", u, z, p);
-        eprintln!("  Cohen's d={:.3} ({})", d, if d.abs() > 0.8 { "large" } else if d.abs() > 0.5 { "medium" } else { "small" });
-        eprintln!("  {}", if p < 0.05 { "SIGNIFICANT" } else { "not significant" });
+        eprintln!(
+            "  Cohen's d={:.3} ({})",
+            d,
+            if d.abs() > 0.8 {
+                "large"
+            } else if d.abs() > 0.5 {
+                "medium"
+            } else {
+                "small"
+            }
+        );
+        eprintln!(
+            "  {}",
+            if p < 0.05 {
+                "SIGNIFICANT"
+            } else {
+                "not significant"
+            }
+        );
     }
 
     eprintln!("\n=== Complete ===");
 }
 
 fn mean_dist_from_origin(world: &PhysicsWorld<2>, handles: &[symtropy_physics::BodyHandle]) -> f64 {
-    let dists: Vec<f64> = handles.iter()
+    let dists: Vec<f64> = handles
+        .iter()
         .filter_map(|h| world.body(*h).map(|b| b.position().0.norm()))
         .collect();
-    if dists.is_empty() { return 0.0; }
+    if dists.is_empty() {
+        return 0.0;
+    }
     dists.iter().sum::<f64>() / dists.len() as f64
 }
 
 fn avg_nn(world: &PhysicsWorld<2>, handles: &[symtropy_physics::BodyHandle]) -> f64 {
-    let pos: Vec<SVector<f64, 2>> = handles.iter()
-        .filter_map(|h| world.body(*h).map(|b| b.position().0)).collect();
-    if pos.len() < 2 { return f64::MAX; }
-    pos.iter().enumerate().map(|(i, p)| {
-        pos.iter().enumerate().filter(|(j,_)| *j != i)
-            .map(|(_,q)| (p-q).norm()).fold(f64::MAX, f64::min)
-    }).sum::<f64>() / pos.len() as f64
+    let pos: Vec<SVector<f64, 2>> = handles
+        .iter()
+        .filter_map(|h| world.body(*h).map(|b| b.position().0))
+        .collect();
+    if pos.len() < 2 {
+        return f64::MAX;
+    }
+    pos.iter()
+        .enumerate()
+        .map(|(i, p)| {
+            pos.iter()
+                .enumerate()
+                .filter(|(j, _)| *j != i)
+                .map(|(_, q)| (p - q).norm())
+                .fold(f64::MAX, f64::min)
+        })
+        .sum::<f64>()
+        / pos.len() as f64
 }
 
 fn rng_f64(s: &mut u64) -> f64 {
-    *s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+    *s = s
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
     (*s >> 11) as f64 / (1u64 << 53) as f64
 }

@@ -266,10 +266,7 @@ impl SpaceClient {
     pub fn get_votes_for_proposal_request(
         proposal_hash: &str,
     ) -> (&'static str, serde_json::Value) {
-        (
-            "get_votes_for_proposal",
-            serde_json::json!(proposal_hash),
-        )
+        ("get_votes_for_proposal", serde_json::json!(proposal_hash))
     }
 }
 
@@ -309,10 +306,7 @@ impl SpaceClient {
     ///
     /// Zome function: `fuse_observations_for_object`
     pub fn fuse_observations_request(norad_id: u32) -> (&'static str, serde_json::Value) {
-        (
-            "fuse_observations_for_object",
-            serde_json::json!(norad_id),
-        )
+        ("fuse_observations_for_object", serde_json::json!(norad_id))
     }
 }
 

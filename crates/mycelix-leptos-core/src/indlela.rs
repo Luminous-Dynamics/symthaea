@@ -28,10 +28,15 @@ pub enum GrowthStage {
 impl GrowthStage {
     /// Determine growth stage from progress (0.0-1.0).
     pub fn from_progress(progress: f64) -> Self {
-        if progress < 0.1 { Self::Seed }
-        else if progress < 0.4 { Self::Sprout }
-        else if progress < 0.75 { Self::Sapling }
-        else { Self::Tree }
+        if progress < 0.1 {
+            Self::Seed
+        } else if progress < 0.4 {
+            Self::Sprout
+        } else if progress < 0.75 {
+            Self::Sapling
+        } else {
+            Self::Tree
+        }
     }
 
     /// CSS class for styling.
@@ -87,7 +92,9 @@ pub fn community_warmth(id: &str, peer_count: Option<u32>) -> f64 {
         1.0 / (1.0 + (-0.1 * (x - 10.0)).exp())
     } else {
         // Mock: deterministic hash for stable visual warmth
-        let hash = id.bytes().fold(0u32, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u32));
+        let hash = id
+            .bytes()
+            .fold(0u32, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u32));
         (hash % 100) as f64 / 100.0
     }
 }
@@ -100,7 +107,9 @@ pub fn knowledge_freshness(last_reviewed_ms: Option<f64>, now_ms: f64) -> f64 {
     match last_reviewed_ms {
         Some(reviewed) => {
             let days_since = (now_ms - reviewed) / 86_400_000.0;
-            if days_since <= 0.0 { return 0.0; }
+            if days_since <= 0.0 {
+                return 0.0;
+            }
             // Ebbinghaus: retention = e^(-t/S), where S=10 days for 50% at 7 days
             let decay = 1.0 - (-days_since / 10.0_f64).exp();
             decay.clamp(0.0, 1.0)

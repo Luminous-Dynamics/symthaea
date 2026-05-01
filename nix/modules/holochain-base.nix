@@ -28,10 +28,13 @@ let
   commonBuildInputs = with pkgs; [
     # Rust toolchain
     rustToolchain
+    bacon
     cargo-watch
     cargo-edit
     cargo-expand
     cargo-nextest
+    deploy-rs
+    colmena
 
     # Build essentials
     pkg-config
@@ -174,6 +177,7 @@ let
     echo "  - LIBCLANG_PATH for bindgen"
     echo "  - System includes for C/C++ deps"
     echo "  - OpenSSL paths"
+    echo "  - bacon / cargo-nextest / deploy-rs / Colmena"
     echo ""
   '';
 

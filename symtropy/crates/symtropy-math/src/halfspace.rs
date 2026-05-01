@@ -1,5 +1,5 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! D-dimensional half-space (infinite plane with one solid side).
 //!
@@ -180,7 +180,9 @@ impl<const D: usize> Shape<D> for HalfSpace<D> {
         (Point::origin(), HALFSPACE_EXTENT)
     }
 
-    fn as_any(&self) -> &dyn std::any::Any { self }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 #[cfg(test)]
@@ -217,7 +219,11 @@ mod tests {
         let center = SVector::from([0.0, 0.5, 0.0]); // half-embedded
         let (contact, depth) = plane.contact_sphere(&center, 1.0).unwrap();
         assert!((depth - 0.5).abs() < 1e-12, "depth = {depth}");
-        assert!((contact[1] - 0.0).abs() < 1e-12, "contact Y = {}", contact[1]);
+        assert!(
+            (contact[1] - 0.0).abs() < 1e-12,
+            "contact Y = {}",
+            contact[1]
+        );
     }
 
     #[test]
@@ -252,10 +258,7 @@ mod tests {
         // Bottom 4 vertices (Y = 0.5-1.0 = -0.5) penetrate by 0.5
         assert_eq!(contacts.len(), 4, "expected 4 bottom vertices to penetrate");
         for (_, depth) in &contacts {
-            assert!(
-                (depth - 0.5).abs() < 1e-10,
-                "box vertex depth = {depth}"
-            );
+            assert!((depth - 0.5).abs() < 1e-10, "box vertex depth = {depth}");
         }
     }
 

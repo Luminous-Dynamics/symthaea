@@ -115,10 +115,7 @@ impl MetaHDC {
     pub fn new() -> Self {
         let mut domain_hvs = HashMap::new();
         for domain in ALL_DOMAINS {
-            domain_hvs.insert(
-                *domain,
-                BinaryHV::random(super::domain_seed(*domain)),
-            );
+            domain_hvs.insert(*domain, BinaryHV::random(super::domain_seed(*domain)));
         }
 
         let mut status_hvs = HashMap::new();
@@ -190,12 +187,8 @@ impl MetaHDC {
         let bound_status = self.roles.status.bind(&status_hv);
         let bound_structure = self.roles.structure.bind(&structural_hv);
 
-        let encoding = BinaryHV::bundle(&[
-            bound_formula,
-            bound_domain,
-            bound_status,
-            bound_structure,
-        ]);
+        let encoding =
+            BinaryHV::bundle(&[bound_formula, bound_domain, bound_status, bound_structure]);
 
         ConceptVector {
             encoding,
@@ -282,10 +275,8 @@ impl MetaHDC {
             }
 
             // Count domain diversity using the MathDomain enum directly
-            let domains: HashSet<MathDomain> = members
-                .iter()
-                .map(|&i| self.concepts[i].domain)
-                .collect();
+            let domains: HashSet<MathDomain> =
+                members.iter().map(|&i| self.concepts[i].domain).collect();
 
             self.clusters.push(ConceptCluster {
                 id: j,
@@ -326,7 +317,11 @@ impl MetaHDC {
                     continue;
                 }
                 let formula = &engine.conjectures[conj_idx].formula;
-                let subtrees = extract_subtrees(formula, crate::hdc::abstract_thought::SUBTREE_MIN_COMPLEXITY, crate::hdc::abstract_thought::SUBTREE_MAX_COMPLEXITY);
+                let subtrees = extract_subtrees(
+                    formula,
+                    crate::hdc::abstract_thought::SUBTREE_MIN_COMPLEXITY,
+                    crate::hdc::abstract_thought::SUBTREE_MAX_COMPLEXITY,
+                );
 
                 // Track unique patterns per conjecture (count once per conjecture)
                 let mut seen_in_this_conj = HashSet::new();
@@ -375,7 +370,11 @@ impl MetaHDC {
                 continue;
             }
             let formula = &engine.conjectures[concept.conjecture_idx].formula;
-            let subtrees = extract_subtrees(formula, crate::hdc::abstract_thought::SUBTREE_MIN_COMPLEXITY, crate::hdc::abstract_thought::SUBTREE_MAX_COMPLEXITY);
+            let subtrees = extract_subtrees(
+                formula,
+                crate::hdc::abstract_thought::SUBTREE_MIN_COMPLEXITY,
+                crate::hdc::abstract_thought::SUBTREE_MAX_COMPLEXITY,
+            );
 
             // Count each unique pattern once per conjecture
             let mut seen_in_this_conj = HashSet::new();
@@ -395,9 +394,7 @@ impl MetaHDC {
         pattern_occurrences
             .into_iter()
             .filter(|(_, ids)| ids.len() >= min_occurrences)
-            .filter_map(|(canonical, ids)| {
-                pattern_exprs.remove(&canonical).map(|expr| (expr, ids))
-            })
+            .filter_map(|(canonical, ids)| pattern_exprs.remove(&canonical).map(|expr| (expr, ids)))
             .collect()
     }
 
@@ -414,10 +411,7 @@ impl MetaHDC {
     ///
     /// Returns (normalized subtree, single-element conjecture ID vector)
     /// so the result is directly compatible with `observe_subtree`.
-    pub fn verified_subtrees(
-        &self,
-        engine: &ConjectureEngine,
-    ) -> Vec<(Expr, Vec<usize>)> {
+    pub fn verified_subtrees(&self, engine: &ConjectureEngine) -> Vec<(Expr, Vec<usize>)> {
         use crate::hdc::conjecture_engine::ConjectureStatus;
         let mut results = Vec::new();
 
@@ -451,8 +445,7 @@ impl MetaHDC {
             let mut seen_canonical = HashSet::new();
             for st in subtrees {
                 let normalized = crate::hdc::abstract_thought::normalize_expr(&st);
-                let canonical =
-                    crate::hdc::abstract_thought::expr_canonical_string(&normalized);
+                let canonical = crate::hdc::abstract_thought::expr_canonical_string(&normalized);
                 if seen_canonical.insert(canonical) {
                     results.push((normalized, vec![conj_idx]));
                 }
@@ -524,6 +517,14 @@ mod tests {
             status: ConjectureStatus::FormallyVerified { proof_steps: 5 },
             confidence: 0.95,
             macro_promotion_tier: crate::hdc::conjecture_engine::MacroPromotionTier::Formal,
+            eml_compiled: None,
+            eml_metrics: None,
+            eml_verified_real: None,
+            eml_real_domain: None,
+            eml_verified_complex: None,
+            eml_constructive_compiled: None,
+            eml_constructive_metrics: None,
+            eml_verified_constructive_real: None,
         }
     }
 

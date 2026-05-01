@@ -5,9 +5,9 @@
 //!
 //! Demonstrates that HDC's noise resilience carries over to high-fidelity physics.
 //!
-//! Run: `cargo run --example mujoco_vs_simple_benchmark --features flight-mujoco --release`
+//! Run: `cargo run --example mujoco_vs_simple_benchmark --features multirotor-mujoco --release`
 
-use symthaea::symthaea_flight::{
+use symthaea::multirotor::{
     benchmarks::{
         run_wind_benchmark, run_wind_benchmark_mujoco, run_wind_benchmark_mujoco_noisy,
         WindBenchmarkConfig, WindGust,

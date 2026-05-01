@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     # Shared crates
+    "crates/commons-leptos-types",
     "crates/commons-types",
     "crates/mutualaid-common",
 
@@ -160,6 +161,7 @@ thiserror = "1.0"
 derive_more = "0.99"
 
 # WASM compatibility - getrandom 0.3 with custom backend
+getrandom = { version = "0.2", features = ["custom"] }
 getrandom_03 = { package = "getrandom", version = "0.3" }
 
 # Internal shared crates

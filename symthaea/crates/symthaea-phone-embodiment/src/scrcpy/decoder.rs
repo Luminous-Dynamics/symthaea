@@ -194,9 +194,7 @@ impl HevcDecoder {
                 }
                 // EAGAIN means "no more frames right now, send another packet"
                 // EOF means "all frames drained after send_eof"
-                Err(ffmpeg::Error::Other { errno })
-                    if errno == ffmpeg::util::error::EAGAIN =>
-                {
+                Err(ffmpeg::Error::Other { errno }) if errno == ffmpeg::util::error::EAGAIN => {
                     break;
                 }
                 Err(ffmpeg::Error::Eof) => break,
@@ -236,10 +234,7 @@ impl HevcDecoder {
             });
         }
 
-        let scaler = self
-            .scaler
-            .as_mut()
-            .expect("scaler set above");
+        let scaler = self.scaler.as_mut().expect("scaler set above");
 
         let mut rgba_frame = ffmpeg::frame::Video::empty();
         scaler.ctx.run(yuv, &mut rgba_frame)?;
@@ -320,8 +315,7 @@ mod tests {
     fn end_to_end_decode_recorded_wire_asset() {
         use crate::scrcpy::wire;
 
-        const ASSET: &[u8] =
-            include_bytes!("../../tests/data/sample.hevc.wire");
+        const ASSET: &[u8] = include_bytes!("../../tests/data/sample.hevc.wire");
 
         let mut dec = HevcDecoder::new().expect("HevcDecoder::new");
         let mut cursor = 0usize;
@@ -331,8 +325,8 @@ mod tests {
         let mut keyframe_count = 0;
 
         while cursor + wire::FRAME_HEADER_LEN <= ASSET.len() {
-            let header = wire::parse_frame_header(&ASSET[cursor..])
-                .expect("parse_frame_header on asset");
+            let header =
+                wire::parse_frame_header(&ASSET[cursor..]).expect("parse_frame_header on asset");
             cursor += wire::FRAME_HEADER_LEN;
             let payload_end = cursor + header.packet_size as usize;
             assert!(

@@ -28,31 +28,42 @@ impl Plugin for ManipulatorDemoPlugin {
             .insert_resource(SharedHuman {
                 obstacle: HumanObstacle::new(12345),
             })
-            .insert_resource(AdaptiveGraspObject { object: GraspObject::at_pick() })
-            .insert_resource(IsoGraspObject { object: GraspObject::at_pick() })
+            .insert_resource(AdaptiveGraspObject {
+                object: GraspObject::at_pick(),
+            })
+            .insert_resource(IsoGraspObject {
+                object: GraspObject::at_pick(),
+            })
             .insert_resource(SimTime::default())
             .insert_resource(ThroughputMetrics::default())
             // Startup systems
-            .add_systems(Startup, (
-                camera::setup_camera,
-                visualization::setup_scene,
-                hud::setup_hud,
-            ))
+            .add_systems(
+                Startup,
+                (
+                    camera::setup_camera,
+                    visualization::setup_scene,
+                    hud::setup_hud,
+                ),
+            )
             // Per-frame update systems (ordered)
-            .add_systems(Update, (
-                update_sim_time,
-                update_human,
-                step_phi_arm,
-                step_iso_arm,
-                update_throughput_metrics,
-                visualization::update_human_visual,
-                visualization::update_iso_arm_visual,
-                visualization::update_workspace_envelope,
-                hud::update_phi_hud,
-                hud::update_iso_hud,
-                hud::update_throughput_hud,
-                print_status,
-            ).chain());
+            .add_systems(
+                Update,
+                (
+                    update_sim_time,
+                    update_human,
+                    step_phi_arm,
+                    step_iso_arm,
+                    update_throughput_metrics,
+                    visualization::update_human_visual,
+                    visualization::update_iso_arm_visual,
+                    visualization::update_workspace_envelope,
+                    hud::update_phi_hud,
+                    hud::update_iso_hud,
+                    hud::update_throughput_hud,
+                    print_status,
+                )
+                    .chain(),
+            );
     }
 }
 
@@ -94,10 +105,7 @@ fn step_phi_arm(
 
     // === Step 1: Compute external forces ===
     // Human proximity repulsive force
-    let human_forces = prediction_bridge::compute_human_interaction_forces(
-        &human.obstacle,
-        &state,
-    );
+    let human_forces = prediction_bridge::compute_human_interaction_forces(&human.obstacle, &state);
     // Object gravity load (changes arm dynamics when holding object)
     let gravity_load = grasp_obj.object.gravity_load();
 
@@ -121,17 +129,16 @@ fn step_phi_arm(
 
     // === Step 3: Run full consciousness pipeline ===
     let last_pe = phi_arm.last_prediction_error;
-    let (phi, safety_tier, _motor_gain) = consciousness_bridge::consciousness_tick(
-        &mut phi_arm.robot_agent,
-        last_pe,
-        danger,
-    );
+    let (phi, safety_tier, _motor_gain) =
+        consciousness_bridge::consciousness_tick(&mut phi_arm.robot_agent, last_pe, danger);
     phi_arm.current_phi = phi;
     phi_arm.current_safety = safety_tier;
 
     // === Step 4: Update admittance stiffness from Phi ===
     phi_arm.stiffness = phi.clamp(0.1, 1.0);
-    let mut admittance = AdmittanceController { stiffness: phi_arm.stiffness };
+    let mut admittance = AdmittanceController {
+        stiffness: phi_arm.stiffness,
+    };
 
     // === Step 5: Determine if task should pause ===
     // Orange/Red → pause task (arm retreats or holds)
@@ -140,13 +147,11 @@ fn step_phi_arm(
 
     // === Step 6: Compute IK torques toward assembly target ===
     let target = phi_arm.task.current_target();
-    let ik_torques = if let Some(q_target) = phi_arm.kinematics.ik_dls(
-        &target,
-        &state.joint_angles,
-        0.1,
-        50,
-        0.01,
-    ) {
+    let ik_torques = if let Some(q_target) =
+        phi_arm
+            .kinematics
+            .ik_dls(&target, &state.joint_angles, 0.1, 50, 0.01)
+    {
         let mut torques = [0.0f32; NUM_JOINTS];
         for i in 0..NUM_JOINTS {
             let error = q_target[i] - state.joint_angles[i];
@@ -240,13 +245,10 @@ fn step_iso_arm(
 
     if !iso.is_stopped {
         let target = iso.task.current_target();
-        if let Some(q_target) = iso.kinematics.ik_dls(
-            &target,
-            &state.joint_angles,
-            0.1,
-            50,
-            0.01,
-        ) {
+        if let Some(q_target) = iso
+            .kinematics
+            .ik_dls(&target, &state.joint_angles, 0.1, 50, 0.01)
+        {
             let mut cmd = symthaea_manipulator::ManipulatorCommand::zero();
             for i in 0..NUM_JOINTS {
                 let error = q_target[i] - state.joint_angles[i];

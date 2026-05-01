@@ -1,0 +1,108 @@
+{
+  "metadata": {
+    "title": "Global Fruits: Multi-Sector Industry Standards",
+    "framework": "Global Career Mesh",
+    "source": "https://mycelix.org/careers",
+    "grade_level": "Professional",
+    "subject_area": "Multi-Sector",
+    "domain": "Professional Certification",
+    "version": "1.0",
+    "total_standards": 8,
+    "domains": [
+      "Health & Safety",
+      "Energy & Solar",
+      "Sustainable Agriculture",
+      "Accounting & Finance"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Expanded mapping of global professional standards across all metabolic sectors."
+  },
+  "nodes": [
+    {
+      "id": "CERT-HEALTH-BLS",
+      "title": "Basic Life Support (AHA Mapping)",
+      "description": "Fundamental life-saving skills for healthcare providers. CPR, AED usage, and airway obstruction relief. Linked to the First-Line Emergency Care track.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Health & Safety",
+      "subdomain": "Certification Bridge",
+      "tags": ["healthcare", "cpr", "emergency", "standard"],
+      "estimated_hours": 20,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Health Sciences"
+    },
+    {
+      "id": "CERT-SOLAR-NABCEP",
+      "title": "NABCEP PV Installation Professional",
+      "description": "The gold standard for solar energy. Code-compliant system design, installation, and commissioning. Mapping Mycelix mini-grid capstones to global code standards.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Energy & Solar",
+      "subdomain": "Certification Bridge",
+      "tags": ["solar", "pv", "engineering", "standard"],
+      "estimated_hours": 180,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Analyze",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "CERT-AG-GLOBALGAP",
+      "title": "Global G.A.P. Standards",
+      "description": "International standard for farm production. Food safety, sustainability, and worker welfare. Mapping regenerative agriculture to global market requirements.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Sustainable Agriculture",
+      "subdomain": "Certification Bridge",
+      "tags": ["agriculture", "food-safety", "sustainability", "standard"],
+      "estimated_hours": 60,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Science"
+    },
+    {
+      "id": "CERT-FIN-CPA",
+      "title": "CPA Financial Accounting Basics",
+      "description": "Core principles of financial accounting. Auditing, taxation, and regulatory reporting. Mapping the TEND ledger to standard GAAP principles.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Accounting & Finance",
+      "subdomain": "Certification Bridge",
+      "tags": ["accounting", "finance", "audit", "standard"],
+      "estimated_hours": 120,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Analyze",
+      "subject_area": "Social Studies"
+    }
+  ],
+  "edges": [
+    {
+      "from": "VITA-001",
+      "to": "CERT-HEALTH-BLS",
+      "edge_type": "Recommended",
+      "strength_permille": 850,
+      "rationale": "Sovereign emergency care provides 85% of the AHA BLS requirement."
+    },
+    {
+      "from": "VOC-RE-CAP",
+      "to": "CERT-SOLAR-NABCEP",
+      "edge_type": "Recommended",
+      "strength_permille": 900,
+      "rationale": "Completing the mini-grid capstone covers the majority of NABCEP field-work requirements."
+    },
+    {
+      "from": "VOC-AG-CAP",
+      "to": "CERT-AG-GLOBALGAP",
+      "edge_type": "Recommended",
+      "strength_permille": 750,
+      "rationale": "Regenerative plot stewardship is the perfect foundation for global GAP certification."
+    },
+    {
+      "from": "VOC-DT-201",
+      "to": "CERT-FIN-CPA",
+      "edge_type": "Recommended",
+      "strength_permille": 600,
+      "rationale": "Mutual credit bookkeeping provides the systemic intuition for professional accounting."
+    }
+  ]
+}

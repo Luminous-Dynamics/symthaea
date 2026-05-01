@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Lightweight waypoint PID controller for the demo.
 //!
-//! We deliberately do NOT use `symthaea_flight::FlightController` here — that one
+//! We deliberately do NOT use `symthaea_multirotor::FlightController` here — that one
 //! wraps the full 16,384-D HDC-LTC network + learned output head and needs training
 //! to converge. For an easy-to-run demo a classical cascade controller is clearer:
 //! it reliably hovers and tracks waypoints so the consciousness side-channel's
 //! effect (motor-gain modulation under gusts) is legible.
 
-use symthaea_flight::types::{FlightState, QuadrotorCommand};
+use symthaea_multirotor::types::{FlightState, QuadrotorCommand};
 
 /// Cascade PID: outer-loop position → target attitude; inner-loop attitude → moments.
 pub struct WaypointController {

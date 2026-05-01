@@ -9,11 +9,8 @@ use leptos_router::{
     path,
 };
 
-use crate::adaptivity_provider::AdaptivityProvider;
-use crate::consciousness::ConsciousnessProvider;
 use crate::curriculum::provide_curriculum_context;
 use crate::holochain::{HolochainProvider, ConnectionBadge};
-use crate::learning_engine::LearningEngineProvider;
 use crate::pages::*;
 use crate::role::{provide_role_context, UserRole};
 use crate::student_profile::provide_profile_context;
@@ -23,13 +20,9 @@ use crate::theme::{provide_theme_context, use_theme, use_set_theme};
 pub fn App() -> impl IntoView {
     view! {
         <HolochainProvider>
-            <ConsciousnessProvider>
-            <LearningEngineProvider>
-            <AdaptivityProvider>
+            <crate::theme::SomaticThemeHandler>
                 <AppInner />
-            </AdaptivityProvider>
-            </LearningEngineProvider>
-            </ConsciousnessProvider>
+            </crate::theme::SomaticThemeHandler>
         </HolochainProvider>
     }
 }
@@ -40,11 +33,13 @@ fn AppInner() -> impl IntoView {
     let (_theme, _set_theme) = provide_theme_context();
     let (_profile, _set_profile) = provide_profile_context();
     provide_curriculum_context();
+    crate::location::provide_biome_context();
+    crate::persistence::provide_mutation_queue();
+    crate::mesh::provide_mesh_context();
+    crate::craft::provide_craft_context();
+    crate::tutor::provide_tutor_context();
     crate::study_tracker::provide_study_tracker();
     crate::i18n::provide_i18n();
-
-    // Wire consciousness signals to CSS custom properties
-    crate::consciousness_ui::init_consciousness_ui();
 
     view! {
         <Router>
@@ -52,14 +47,17 @@ fn AppInner() -> impl IntoView {
                 <a href="/" class="logo">"Praxis"</a>
                 <div class="nav-links">
                     <RoleNav role=role />
+                    <crate::components::sync_hud::SyncStatusHud />
                 </div>
                 <crate::search::SearchBar />
                 <div class="nav-actions">
+                    <crate::mesh::MeshStatusBadge />
                     <crate::i18n::LanguagePicker />
                     <ThemeToggle />
                     <ConnectionBadge />
                 </div>
             </nav>
+            <crate::tutor::ResonantWhisper />
             <CelebrationOverlay />
             <main>
                 <Routes fallback=|| view! { <p>"Page not found"</p> }>
@@ -67,6 +65,10 @@ fn AppInner() -> impl IntoView {
                     <Route path=path!("/courses") view=CoursesPage />
                     <Route path=path!("/review") view=ReviewPage />
                     <Route path=path!("/dashboard") view=DashboardPage />
+                    <Route path=path!("/employer") view=EmployerPortal />
+                    <Route path=path!("/careers") view=CareerPathPage />
+                    <Route path=path!("/verify") view=crate::pages::verify::VerificationPage />
+                    <Route path=path!("/metabolism") view=crate::pages::metabolism::MetabolismPage />
                     <Route path=path!("/skill-map") view=SkillMapPage />
                     <Route path=path!("/study/:id") view=StudyPageWrapper />
                     <Route path=path!("/exam-prep") view=ExamPrepPage />
@@ -75,6 +77,7 @@ fn AppInner() -> impl IntoView {
                     <Route path=path!("/teacher") view=TeacherDashboardPage />
                     <Route path=path!("/governance") view=GovernancePage />
                     <Route path=path!("/credentials") view=CredentialsPage />
+                    <Route path=path!("/verify/:id") view=VerificationPortal />
                 </Routes>
             </main>
             <MobileBottomNav />

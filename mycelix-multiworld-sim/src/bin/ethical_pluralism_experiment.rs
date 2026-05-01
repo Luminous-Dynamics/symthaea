@@ -57,13 +57,47 @@ struct Condition {
 
 fn conditions() -> Vec<Condition> {
     vec![
-        Condition { name: "A: homo+equal",   trust_weighted: false, ethics_profile: EthicsProfile::Homogeneous },
-        Condition { name: "B: homo+gated",   trust_weighted: true,  ethics_profile: EthicsProfile::Homogeneous },
-        Condition { name: "C: plural+equal", trust_weighted: false, ethics_profile: EthicsProfile::Pluralistic },
-        Condition { name: "D: plural+gated", trust_weighted: true,  ethics_profile: EthicsProfile::Pluralistic },
-        Condition { name: "E: deont+gated",  trust_weighted: true,  ethics_profile: EthicsProfile::Dominated { dominant: DEONTOLOGICAL } },
-        Condition { name: "F: conseq+gated", trust_weighted: true,  ethics_profile: EthicsProfile::Dominated { dominant: CONSEQUENTIALIST } },
-        Condition { name: "G: relat+gated",  trust_weighted: true,  ethics_profile: EthicsProfile::Dominated { dominant: RELATIONAL } },
+        Condition {
+            name: "A: homo+equal",
+            trust_weighted: false,
+            ethics_profile: EthicsProfile::Homogeneous,
+        },
+        Condition {
+            name: "B: homo+gated",
+            trust_weighted: true,
+            ethics_profile: EthicsProfile::Homogeneous,
+        },
+        Condition {
+            name: "C: plural+equal",
+            trust_weighted: false,
+            ethics_profile: EthicsProfile::Pluralistic,
+        },
+        Condition {
+            name: "D: plural+gated",
+            trust_weighted: true,
+            ethics_profile: EthicsProfile::Pluralistic,
+        },
+        Condition {
+            name: "E: deont+gated",
+            trust_weighted: true,
+            ethics_profile: EthicsProfile::Dominated {
+                dominant: DEONTOLOGICAL,
+            },
+        },
+        Condition {
+            name: "F: conseq+gated",
+            trust_weighted: true,
+            ethics_profile: EthicsProfile::Dominated {
+                dominant: CONSEQUENTIALIST,
+            },
+        },
+        Condition {
+            name: "G: relat+gated",
+            trust_weighted: true,
+            ethics_profile: EthicsProfile::Dominated {
+                dominant: RELATIONAL,
+            },
+        },
     ]
 }
 
@@ -113,7 +147,9 @@ fn apply_ethics(sim: &mut MultiWorldSimulator, profile: &EthicsProfile) {
     for wi in 0..sim.worlds.len() {
         let n = sim.worlds[wi].agents.len().max(1);
         for i in 0..sim.worlds[wi].agents.len() {
-            if !sim.worlds[wi].agents[i].is_alive() { continue; }
+            if !sim.worlds[wi].agents[i].is_alive() {
+                continue;
+            }
             match profile {
                 EthicsProfile::Homogeneous => {
                     sim.worlds[wi].agents[i].ethics = EthicalOrientation::default();
@@ -131,10 +167,14 @@ fn apply_ethics(sim: &mut MultiWorldSimulator, profile: &EthicsProfile) {
                 EthicsProfile::Dominated { dominant } => {
                     if (i as f64 / n as f64) < 0.8 {
                         sim.worlds[wi].agents[i].ethics = EthicalOrientation {
-                            deontological: (dominant[0] + sim.rng.next_gaussian(0.0, 0.05)).clamp(0.05, 1.0),
-                            consequentialist: (dominant[1] + sim.rng.next_gaussian(0.0, 0.05)).clamp(0.05, 1.0),
-                            virtue_care: (dominant[2] + sim.rng.next_gaussian(0.0, 0.05)).clamp(0.05, 1.0),
-                            relational: (dominant[3] + sim.rng.next_gaussian(0.0, 0.05)).clamp(0.05, 1.0),
+                            deontological: (dominant[0] + sim.rng.next_gaussian(0.0, 0.05))
+                                .clamp(0.05, 1.0),
+                            consequentialist: (dominant[1] + sim.rng.next_gaussian(0.0, 0.05))
+                                .clamp(0.05, 1.0),
+                            virtue_care: (dominant[2] + sim.rng.next_gaussian(0.0, 0.05))
+                                .clamp(0.05, 1.0),
+                            relational: (dominant[3] + sim.rng.next_gaussian(0.0, 0.05))
+                                .clamp(0.05, 1.0),
                         };
                     } else {
                         sim.worlds[wi].agents[i].ethics = EthicalOrientation {
@@ -164,7 +204,9 @@ fn run_condition(seed: u64, ticks: u32, cond: &Condition) -> RunResult {
     sim.run_initialization();
     apply_ethics(&mut sim, &cond.ethics_profile);
     let report = sim.run();
-    let phi = sim.worlds.iter()
+    let phi = sim
+        .worlds
+        .iter()
         .map(|w| w.mean_phi() * w.population() as f64)
         .sum::<f64>()
         / report.final_population.max(1) as f64;
@@ -176,17 +218,23 @@ fn run_condition(seed: u64, ticks: u32, cond: &Condition) -> RunResult {
 }
 
 fn mean(v: &[f64]) -> f64 {
-    if v.is_empty() { return 0.0; }
+    if v.is_empty() {
+        return 0.0;
+    }
     v.iter().sum::<f64>() / v.len() as f64
 }
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    let n_seeds: usize = args.iter().position(|a| a == "--seeds")
+    let n_seeds: usize = args
+        .iter()
+        .position(|a| a == "--seeds")
         .and_then(|i| args.get(i + 1))
         .and_then(|s| s.parse().ok())
         .unwrap_or(20);
-    let ticks: u32 = args.iter().position(|a| a == "--ticks")
+    let ticks: u32 = args
+        .iter()
+        .position(|a| a == "--ticks")
         .and_then(|i| args.get(i + 1))
         .and_then(|s| s.parse().ok())
         .unwrap_or(1800);
@@ -196,8 +244,13 @@ fn main() {
 
     eprintln!("╔══════════════════════════════════════════════════════════════╗");
     eprintln!("║  ETHICAL PLURALISM EXPERIMENT                               ║");
-    eprintln!("║  {} conditions × {} seeds × {} ticks ({:.0} years)           ║",
-        conds.len(), n_seeds, ticks, ticks as f64 / 12.0);
+    eprintln!(
+        "║  {} conditions × {} seeds × {} ticks ({:.0} years)           ║",
+        conds.len(),
+        n_seeds,
+        ticks,
+        ticks as f64 / 12.0
+    );
     eprintln!("╚══════════════════════════════════════════════════════════════╝\n");
 
     let mut all_cvs: Vec<Vec<f64>> = vec![Vec::new(); conds.len()];
@@ -213,8 +266,12 @@ fn main() {
             all_phi[ci].push(result.phi);
             all_pop[ci].push(result.population as f64);
         }
-        eprintln!(" CVS={:.4} Phi={:.4} Pop={:.0}",
-            mean(&all_cvs[ci]), mean(&all_phi[ci]), mean(&all_pop[ci]));
+        eprintln!(
+            " CVS={:.4} Phi={:.4} Pop={:.0}",
+            mean(&all_cvs[ci]),
+            mean(&all_phi[ci]),
+            mean(&all_pop[ci])
+        );
     }
 
     let mut rng = StochasticEngine::new(12345);
@@ -223,13 +280,16 @@ fn main() {
     println!("║  RESULTS                                                                 ║");
     println!("╚══════════════════════════════════════════════════════════════════════════╝\n");
 
-    println!("{:<20} {:>8} {:>14} {:>8} {:>8}",
-        "Condition", "CVS", "CVS 95% CI", "Phi", "Pop");
+    println!(
+        "{:<20} {:>8} {:>14} {:>8} {:>8}",
+        "Condition", "CVS", "CVS 95% CI", "Phi", "Pop"
+    );
     println!("{}", "-".repeat(62));
 
     for (ci, cond) in conds.iter().enumerate() {
         let ci_result = bootstrap_ci(&all_cvs[ci], 0.95, 2000, &mut rng);
-        println!("{:<20} {:>8.4} [{:>5.4}, {:>5.4}] {:>8.4} {:>8.0}",
+        println!(
+            "{:<20} {:>8.4} [{:>5.4}, {:>5.4}] {:>8.4} {:>8.0}",
             cond.name,
             mean(&all_cvs[ci]),
             ci_result.as_ref().map(|c| c.lower).unwrap_or(0.0),
@@ -243,31 +303,44 @@ fn main() {
     println!("PAIRWISE COMPARISONS (Cohen's d, paired t-test p-value)\n");
 
     let comparisons: &[(&str, usize, usize)] = &[
-        ("B vs A (gating effect, homo)",  1, 0),
+        ("B vs A (gating effect, homo)", 1, 0),
         ("D vs C (gating effect, plural)", 3, 2),
-        ("C vs A (pluralism, ungated)",   2, 0),
-        ("D vs B (pluralism, gated)",     3, 1),
-        ("E vs D (deont vs plural)",      4, 3),
-        ("F vs D (conseq vs plural)",     5, 3),
-        ("G vs D (relat vs plural)",      6, 3),
-        ("E vs F (deont vs conseq)",      4, 5),
-        ("E vs G (deont vs relat)",       4, 6),
-        ("F vs G (conseq vs relat)",      5, 6),
+        ("C vs A (pluralism, ungated)", 2, 0),
+        ("D vs B (pluralism, gated)", 3, 1),
+        ("E vs D (deont vs plural)", 4, 3),
+        ("F vs D (conseq vs plural)", 5, 3),
+        ("G vs D (relat vs plural)", 6, 3),
+        ("E vs F (deont vs conseq)", 4, 5),
+        ("E vs G (deont vs relat)", 4, 6),
+        ("F vs G (conseq vs relat)", 5, 6),
     ];
 
-    println!("{:<35} {:>8} {:>8} {:>8} {:>10}",
-        "Comparison", "ΔCVS", "d", "p", "Sig?");
+    println!(
+        "{:<35} {:>8} {:>8} {:>8} {:>10}",
+        "Comparison", "ΔCVS", "d", "p", "Sig?"
+    );
     println!("{}", "-".repeat(73));
 
     for &(label, better_idx, worse_idx) in comparisons {
         let delta = mean(&all_cvs[better_idx]) - mean(&all_cvs[worse_idx]);
         let d = cohens_d(&all_cvs[better_idx], &all_cvs[worse_idx]).unwrap_or(0.0);
         let p = paired_t_test(&all_cvs[better_idx], &all_cvs[worse_idx])
-            .map(|t| t.p_value).unwrap_or(1.0);
-        let sig = if p < 0.001 { "***" } else if p < 0.01 { "**" } else if p < 0.05 { "*" } else { "ns" };
+            .map(|t| t.p_value)
+            .unwrap_or(1.0);
+        let sig = if p < 0.001 {
+            "***"
+        } else if p < 0.01 {
+            "**"
+        } else if p < 0.05 {
+            "*"
+        } else {
+            "ns"
+        };
 
-        println!("{:<35} {:>+8.4} {:>8.3} {:>8.4} {:>10}",
-            label, delta, d, p, sig);
+        println!(
+            "{:<35} {:>+8.4} {:>8.3} {:>8.4} {:>10}",
+            label, delta, d, p, sig
+        );
     }
 
     println!("\n{}", "=".repeat(62));
@@ -275,16 +348,26 @@ fn main() {
 
     let gating_homo = mean(&all_cvs[1]) - mean(&all_cvs[0]);
     let gating_plural = mean(&all_cvs[3]) - mean(&all_cvs[2]);
-    let p_homo = paired_t_test(&all_cvs[1], &all_cvs[0]).map(|t| t.p_value).unwrap_or(1.0);
-    let p_plural = paired_t_test(&all_cvs[3], &all_cvs[2]).map(|t| t.p_value).unwrap_or(1.0);
+    let p_homo = paired_t_test(&all_cvs[1], &all_cvs[0])
+        .map(|t| t.p_value)
+        .unwrap_or(1.0);
+    let p_plural = paired_t_test(&all_cvs[3], &all_cvs[2])
+        .map(|t| t.p_value)
+        .unwrap_or(1.0);
 
     println!("1. CONSCIOUSNESS-GATING ROBUSTNESS:");
     if gating_homo > 0.0 && gating_plural > 0.0 && p_homo < 0.05 && p_plural < 0.05 {
         println!("   CONFIRMED: Consciousness-gated governance improves CVS");
-        println!("   REGARDLESS of ethical composition (homo: +{:.4}, plural: +{:.4}).", gating_homo, gating_plural);
+        println!(
+            "   REGARDLESS of ethical composition (homo: +{:.4}, plural: +{:.4}).",
+            gating_homo, gating_plural
+        );
     } else if gating_homo > 0.0 || gating_plural > 0.0 {
         println!("   PARTIAL: Gating helps in some conditions but not all.");
-        println!("   Homo: {:+.4} (p={:.4}), Plural: {:+.4} (p={:.4}).", gating_homo, p_homo, gating_plural, p_plural);
+        println!(
+            "   Homo: {:+.4} (p={:.4}), Plural: {:+.4} (p={:.4}).",
+            gating_homo, p_homo, gating_plural, p_plural
+        );
     } else {
         println!("   NOT CONFIRMED: Gating does not reliably improve outcomes.");
     }
@@ -292,27 +375,46 @@ fn main() {
     let plural_effect = mean(&all_cvs[3]) - mean(&all_cvs[1]);
     println!("\n2. ETHICAL DIVERSITY EFFECT:");
     if plural_effect > 0.01 {
-        println!("   Pluralistic ethics OUTPERFORM homogeneous by {:.4} CVS.", plural_effect);
+        println!(
+            "   Pluralistic ethics OUTPERFORM homogeneous by {:.4} CVS.",
+            plural_effect
+        );
     } else if plural_effect < -0.01 {
-        println!("   Homogeneous ethics outperform pluralistic by {:.4} CVS.", -plural_effect);
+        println!(
+            "   Homogeneous ethics outperform pluralistic by {:.4} CVS.",
+            -plural_effect
+        );
     } else {
         println!("   No significant difference between pluralistic and homogeneous ethics.");
     }
 
-    let best_gated = (4..7).max_by(|&a, &b|
-        mean(&all_cvs[a]).partial_cmp(&mean(&all_cvs[b])).unwrap_or(std::cmp::Ordering::Equal)
-    ).unwrap_or(4);
+    let best_gated = (4..7)
+        .max_by(|&a, &b| {
+            mean(&all_cvs[a])
+                .partial_cmp(&mean(&all_cvs[b]))
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .unwrap_or(4);
     let best_name = conds[best_gated].name;
     println!("\n3. OPTIMAL ETHICAL COMPOSITION (under gating):");
-    println!("   Best: {} (CVS={:.4})", best_name, mean(&all_cvs[best_gated]));
-    println!("   vs Pluralistic D: {:+.4} CVS", mean(&all_cvs[best_gated]) - mean(&all_cvs[3]));
+    println!(
+        "   Best: {} (CVS={:.4})",
+        best_name,
+        mean(&all_cvs[best_gated])
+    );
+    println!(
+        "   vs Pluralistic D: {:+.4} CVS",
+        mean(&all_cvs[best_gated]) - mean(&all_cvs[3])
+    );
 
     println!("\n--- CSV ---");
     println!("condition,seed,cvs,phi,population");
     for (ci, cond) in conds.iter().enumerate() {
         for (si, &seed) in seeds.iter().enumerate() {
-            println!("{},{},{:.6},{:.6},{:.0}",
-                cond.name, seed, all_cvs[ci][si], all_phi[ci][si], all_pop[ci][si]);
+            println!(
+                "{},{},{:.6},{:.6},{:.0}",
+                cond.name, seed, all_cvs[ci][si], all_phi[ci][si], all_pop[ci][si]
+            );
         }
     }
 }

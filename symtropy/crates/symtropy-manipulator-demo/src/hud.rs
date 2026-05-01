@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Real-time HUD overlay showing Phi metrics, ISO metrics, and throughput comparison.
 
-use bevy::prelude::*;
 use crate::resources::*;
+use bevy::prelude::*;
 use symthaea_manipulator::simulator::ManipulatorPhysicsSimulator;
 use symtropy_consciousness_physics::safety::SafetyTier;
 
@@ -87,10 +87,7 @@ pub fn setup_hud(mut commands: Commands) {
 }
 
 /// Update Phi arm HUD text.
-pub fn update_phi_hud(
-    phi_arm: Res<PhiArmState>,
-    mut query: Query<&mut Text, With<PhiHudText>>,
-) {
+pub fn update_phi_hud(phi_arm: Res<PhiArmState>, mut query: Query<&mut Text, With<PhiHudText>>) {
     for mut text in &mut query {
         let tier_name = match phi_arm.current_safety {
             SafetyTier::Green => "GREEN",
@@ -122,12 +119,13 @@ pub fn update_phi_hud(
 }
 
 /// Update ISO arm HUD text.
-pub fn update_iso_hud(
-    iso: Res<IsoArmState>,
-    mut query: Query<&mut Text, With<IsoHudText>>,
-) {
+pub fn update_iso_hud(iso: Res<IsoArmState>, mut query: Query<&mut Text, With<IsoHudText>>) {
     for mut text in &mut query {
-        let status = if iso.is_stopped { "STOPPED ■" } else { "RUNNING ▶" };
+        let status = if iso.is_stopped {
+            "STOPPED ■"
+        } else {
+            "RUNNING ▶"
+        };
 
         **text = format!(
             "ISO/TS 15066 SSM\n\
@@ -153,18 +151,19 @@ pub fn update_throughput_hud(
 
     for mut text in &mut query {
         if both_have_cycles {
-            let sign = if metrics.advantage_percent >= 0.0 { "+" } else { "" };
+            let sign = if metrics.advantage_percent >= 0.0 {
+                "+"
+            } else {
+                ""
+            };
             **text = format!(
                 "THROUGHPUT ADVANTAGE: {sign}{:.1}%  (Adaptive: {} cycles | ISO: {} cycles)",
-                metrics.advantage_percent,
-                phi_arm.cycles_completed,
-                iso.cycles_completed,
+                metrics.advantage_percent, phi_arm.cycles_completed, iso.cycles_completed,
             );
         } else {
             **text = format!(
                 "THROUGHPUT ADVANTAGE: measuring... (Adaptive: {} | ISO: {} cycles)",
-                phi_arm.cycles_completed,
-                iso.cycles_completed,
+                phi_arm.cycles_completed, iso.cycles_completed,
             );
         }
     }

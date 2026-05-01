@@ -1,0 +1,94 @@
+{
+  "metadata": {
+    "title": "Market Ready Seed: Immediate Entry Standards",
+    "framework": "Global Market Mesh",
+    "source": "https://mycelix.org/certs-market",
+    "grade_level": "Professional/Entry",
+    "subject_area": "Multi-Sector",
+    "domain": "Professional Certification",
+    "version": "1.0",
+    "total_standards": 6,
+    "domains": [
+      "Business Quality",
+      "Digital Fundamentals",
+      "Retail & Sales",
+      "Guest Service"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Foundational certifications for immediate entry-level work in the current global economy."
+  },
+  "nodes": [
+    {
+      "id": "CERT-QUAL-SIXSIGMA-YELLOW",
+      "title": "Six Sigma Yellow Belt",
+      "description": "Foundational process improvement. Understanding DMAIC methodology and participating in quality improvement projects. Mapping systems dynamics to business quality.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Business Quality",
+      "subdomain": "Certification Bridge",
+      "tags": ["quality", "six-sigma", "process", "standard"],
+      "estimated_hours": 40,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics"
+    },
+    {
+      "id": "CERT-DIG-GOOGLE-GARAGE",
+      "title": "Google Digital Garage: Digital Marketing",
+      "description": "The fundamentals of digital marketing. Online presence, search, social media, and e-commerce basics.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Digital Fundamentals",
+      "subdomain": "Certification Bridge",
+      "tags": ["google", "marketing", "digital-garage", "standard"],
+      "estimated_hours": 40,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Understand",
+      "subject_area": "Social Studies"
+    },
+    {
+      "id": "CERT-RETAIL-NRF",
+      "title": "NRF: Customer Service & Sales",
+      "description": "Professional retail skills. Product knowledge, customer engagement, and sales techniques. Mapping collective psychology to retail excellence.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Retail & Sales",
+      "subdomain": "Certification Bridge",
+      "tags": ["retail", "sales", "customer-service", "standard"],
+      "estimated_hours": 30,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Social Studies"
+    },
+    {
+      "id": "CERT-HOSP-CGSP",
+      "title": "AHLEI Certified Guest Service Professional",
+      "description": "Professional hospitality standards. The seven golden rules of guest service. Linked to the Ubuntu Stewardship track.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Guest Service",
+      "subdomain": "Certification Bridge",
+      "tags": ["hospitality", "guest-service", "service", "standard"],
+      "estimated_hours": 15,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Arts"
+    }
+  ],
+  "edges": [
+    {
+      "from": "SCI-UNI-101",
+      "to": "CERT-QUAL-SIXSIGMA-YELLOW",
+      "edge_type": "Recommended",
+      "strength_permille": 800,
+      "rationale": "Foundational systems dynamics provide the intuition for six sigma process improvement."
+    },
+    {
+      "from": "HUM-PSY-101",
+      "to": "CERT-HOSP-CGSP",
+      "edge_type": "Recommended",
+      "strength_permille": 700,
+      "rationale": "Sovereign psychology training provides the empathy foundation for elite guest service."
+    }
+  ]
+}

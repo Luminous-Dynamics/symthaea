@@ -83,7 +83,10 @@ pub enum ProblemKind {
     /// Solve x² − D·y² = 1 for the given D.
     PellEquation { d: i64 },
     /// Verify that the given CRT system is consistent and find the solution.
-    CrtSystem { residues: Vec<(i64, i64)>, expected: i64 },
+    CrtSystem {
+        residues: Vec<(i64, i64)>,
+        expected: i64,
+    },
     /// Verify that (a/p) has the expected sign (+1 / −1).
     LegendreSymbol { a: i64, p: i64, expected: i32 },
     /// Verify AM ≥ GM on the given non-negative slice.
@@ -165,11 +168,7 @@ impl CurriculumProblem {
                     _ => false,
                 }
             }
-            ProblemKind::BezoutIdentity {
-                a,
-                b,
-                expected_gcd,
-            } => {
+            ProblemKind::BezoutIdentity { a, b, expected_gcd } => {
                 let engine = NumberTheoryEngine::new();
                 let (g, x, y) = engine.extended_gcd(*a, *b);
                 g == *expected_gcd && a * x + b * y == g
@@ -316,9 +315,9 @@ pub fn gen_legendre(difficulty: Difficulty, state: &mut u64) -> Option<Curriculu
     let engine = NumberTheoryEngine::new();
     let primes = small_primes();
     let (lo_idx, hi_idx) = match difficulty {
-        Difficulty::Easy => (1, 15),   // skip 2, use 3..47
+        Difficulty::Easy => (1, 15),    // skip 2, use 3..47
         Difficulty::Medium => (15, 30), // 47..113
-        Difficulty::Hard => (30, 54),  // 113..251
+        Difficulty::Hard => (30, 54),   // 113..251
     };
     // Pick an odd prime p from the range
     let p_idx = lo_idx + (xorshift64(state) as usize) % (hi_idx - lo_idx);
@@ -401,10 +400,7 @@ pub fn gen_pigeonhole(difficulty: Difficulty, state: &mut u64) -> CurriculumProb
 
 /// Generate a full curriculum of `n_per_template_per_tier` problems for
 /// every (template × difficulty) combination. Reproducible via `seed`.
-pub fn generate_curriculum(
-    n_per_template_per_tier: usize,
-    seed: u64,
-) -> Vec<CurriculumProblem> {
+pub fn generate_curriculum(n_per_template_per_tier: usize, seed: u64) -> Vec<CurriculumProblem> {
     let mut state = seed;
     let mut out = Vec::new();
     for &diff in &[Difficulty::Easy, Difficulty::Medium, Difficulty::Hard] {

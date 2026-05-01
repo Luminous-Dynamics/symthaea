@@ -29,7 +29,13 @@ pub fn xyz_to_lat_lon(pos: [f32; 3], _radius: f64) -> (f64, f64) {
     let lat = 90.0 - (y / r).acos() * (180.0 / PI);
     let lon = z.atan2(-x) * (180.0 / PI) - 180.0;
     // Normalize longitude to [-180, 180]
-    let lon = if lon < -180.0 { lon + 360.0 } else if lon > 180.0 { lon - 360.0 } else { lon };
+    let lon = if lon < -180.0 {
+        lon + 360.0
+    } else if lon > 180.0 {
+        lon - 360.0
+    } else {
+        lon
+    };
     (lat, lon)
 }
 
@@ -58,7 +64,10 @@ pub fn haversine_km(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
 
 /// Carbon emission halo radius from annual production and fuel type.
 /// Log-scaled, clamped. Returns a globe-relative radius for the translucent red sphere.
-pub fn emission_halo_radius(annual_production_mboe: f64, fuel_type: &crate::types::FuelType) -> f32 {
+pub fn emission_halo_radius(
+    annual_production_mboe: f64,
+    fuel_type: &crate::types::FuelType,
+) -> f32 {
     let co2_mt = annual_production_mboe * crate::economics::emission_factor(fuel_type);
     let radius = (co2_mt + 1.0).ln() as f32 * 0.015;
     radius.clamp(0.02, 0.12)
@@ -98,10 +107,10 @@ mod tests {
         let cases = [
             (0.0, 0.0),
             (45.0, 90.0),
-            (-33.9, 18.4),   // Cape Town
-            (40.7, -74.0),   // NYC
-            (90.0, 0.0),     // North pole
-            (-90.0, 0.0),    // South pole
+            (-33.9, 18.4), // Cape Town
+            (40.7, -74.0), // NYC
+            (90.0, 0.0),   // North pole
+            (-90.0, 0.0),  // South pole
         ];
         for (lat, lon) in cases {
             let pos = lat_lon_to_xyz(lat, lon, 1.0);
@@ -197,14 +206,18 @@ mod arc_tests {
     fn arc_peak_bounded() {
         // Even max distance shouldn't go crazy
         let max = arc_peak_height(40000.0);
-        assert!(max < 0.5, "Arc peak {} shouldn't exceed 50% of globe radius", max);
+        assert!(
+            max < 0.5,
+            "Arc peak {} shouldn't exceed 50% of globe radius",
+            max
+        );
     }
 
     #[test]
     fn lat_lon_to_xyz_radius() {
         // Equator at radius 1.0
         let pos = lat_lon_to_xyz(0.0, 0.0, 1.0);
-        let r = (pos[0]*pos[0] + pos[1]*pos[1] + pos[2]*pos[2]).sqrt();
+        let r = (pos[0] * pos[0] + pos[1] * pos[1] + pos[2] * pos[2]).sqrt();
         assert!((r - 1.0).abs() < 0.01, "Radius should be ~1.0, got {}", r);
     }
 
@@ -212,10 +225,18 @@ mod arc_tests {
     fn lat_lon_to_xyz_poles() {
         // North pole
         let north = lat_lon_to_xyz(90.0, 0.0, 1.0);
-        assert!(north[1] > 0.99, "North pole Y should be ~1.0, got {}", north[1]);
+        assert!(
+            north[1] > 0.99,
+            "North pole Y should be ~1.0, got {}",
+            north[1]
+        );
         // South pole
         let south = lat_lon_to_xyz(-90.0, 0.0, 1.0);
-        assert!(south[1] < -0.99, "South pole Y should be ~-1.0, got {}", south[1]);
+        assert!(
+            south[1] < -0.99,
+            "South pole Y should be ~-1.0, got {}",
+            south[1]
+        );
     }
 
     #[test]

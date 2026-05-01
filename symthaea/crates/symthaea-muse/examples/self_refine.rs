@@ -9,11 +9,11 @@
 //! cargo run --release -p symthaea-muse --example self_refine
 //! ```
 
+use symthaea_aesthetic::ValenceArousal;
 use symthaea_muse::creative_bench::{
     AudioQualityScore, CreativeQualityScore, HarmonicProgressionScore, TheoryValidation,
 };
 use symthaea_muse::{compose, export, pitch, MuseConfig, MusicalState};
-use symthaea_aesthetic::ValenceArousal;
 
 const CANDIDATES_PER_ROUND: usize = 6;
 const REFINEMENT_ROUNDS: usize = 4;
@@ -35,26 +35,62 @@ fn main() {
     };
 
     let scenarios: Vec<(&str, &str, MusicalState)> = vec![
-        ("Joyful", "refined_joyful.wav", MusicalState {
-            valence: 0.7, arousal: 0.7, dopamine: 0.8, serotonin: 0.5,
-            noradrenaline: 0.3, consciousness_level: 0.7, prediction_error: 0.2,
-            harmony_activations: [0.6, 0.7, 0.7, 0.3, 0.5, 0.4, 0.6, 0.1],
-        }),
-        ("Serene", "refined_serene.wav", MusicalState {
-            valence: 0.5, arousal: 0.15, dopamine: 0.2, serotonin: 0.8,
-            noradrenaline: 0.05, consciousness_level: 0.6, prediction_error: 0.05,
-            harmony_activations: [0.5, 0.4, 0.5, 0.1, 0.3, 0.3, 0.1, 0.7],
-        }),
-        ("Melancholy", "refined_melancholy.wav", MusicalState {
-            valence: -0.6, arousal: 0.2, dopamine: 0.1, serotonin: 0.3,
-            noradrenaline: 0.15, consciousness_level: 0.5, prediction_error: 0.1,
-            harmony_activations: [0.3, 0.2, 0.3, 0.3, 0.2, 0.2, 0.1, 0.5],
-        }),
-        ("Intense", "refined_intense.wav", MusicalState {
-            valence: -0.3, arousal: 0.85, dopamine: 0.5, serotonin: 0.2,
-            noradrenaline: 0.7, consciousness_level: 0.6, prediction_error: 0.5,
-            harmony_activations: [0.3, 0.4, 0.3, 0.7, 0.4, 0.3, 0.7, 0.0],
-        }),
+        (
+            "Joyful",
+            "refined_joyful.wav",
+            MusicalState {
+                valence: 0.7,
+                arousal: 0.7,
+                dopamine: 0.8,
+                serotonin: 0.5,
+                noradrenaline: 0.3,
+                consciousness_level: 0.7,
+                prediction_error: 0.2,
+                harmony_activations: [0.6, 0.7, 0.7, 0.3, 0.5, 0.4, 0.6, 0.1],
+            },
+        ),
+        (
+            "Serene",
+            "refined_serene.wav",
+            MusicalState {
+                valence: 0.5,
+                arousal: 0.15,
+                dopamine: 0.2,
+                serotonin: 0.8,
+                noradrenaline: 0.05,
+                consciousness_level: 0.6,
+                prediction_error: 0.05,
+                harmony_activations: [0.5, 0.4, 0.5, 0.1, 0.3, 0.3, 0.1, 0.7],
+            },
+        ),
+        (
+            "Melancholy",
+            "refined_melancholy.wav",
+            MusicalState {
+                valence: -0.6,
+                arousal: 0.2,
+                dopamine: 0.1,
+                serotonin: 0.3,
+                noradrenaline: 0.15,
+                consciousness_level: 0.5,
+                prediction_error: 0.1,
+                harmony_activations: [0.3, 0.2, 0.3, 0.3, 0.2, 0.2, 0.1, 0.5],
+            },
+        ),
+        (
+            "Intense",
+            "refined_intense.wav",
+            MusicalState {
+                valence: -0.3,
+                arousal: 0.85,
+                dopamine: 0.5,
+                serotonin: 0.2,
+                noradrenaline: 0.7,
+                consciousness_level: 0.6,
+                prediction_error: 0.5,
+                harmony_activations: [0.3, 0.4, 0.3, 0.7, 0.4, 0.3, 0.7, 0.0],
+            },
+        ),
     ];
 
     for (name, filename, state) in &scenarios {
@@ -136,13 +172,19 @@ fn main() {
                 }
             }
             if rejected > 0 {
-                println!("  Round {}: rejected {} noisy candidates (flat > 0.4)",
-                    round + 1, rejected);
+                println!(
+                    "  Round {}: rejected {} noisy candidates (flat > 0.4)",
+                    round + 1,
+                    rejected
+                );
             }
 
             println!(
                 "  Round {}: best seed={}, score={:.3} (overall best={:.3})",
-                round + 1, round_best_seed, round_best_score, best_score
+                round + 1,
+                round_best_seed,
+                round_best_score,
+                best_score
             );
         }
 
@@ -156,7 +198,10 @@ fn main() {
                         .unwrap_or(0);
                     println!(
                         "  Winner: seed={}, score={:.3}, {} notes, {} KB\n",
-                        best_seed, best_score, comp.notes.len(), size_kb
+                        best_seed,
+                        best_score,
+                        comp.notes.len(),
+                        size_kb
                     );
                 }
                 Err(e) => println!("  ERROR: {}\n", e),
@@ -166,6 +211,9 @@ fn main() {
 
     println!("═══ Self-Refinement Complete ═══");
     println!("  Best compositions saved to {}/", out_dir);
-    println!("  Each is the winner of {} candidates across {} rounds.",
-        CANDIDATES_PER_ROUND * REFINEMENT_ROUNDS, REFINEMENT_ROUNDS);
+    println!(
+        "  Each is the winner of {} candidates across {} rounds.",
+        CANDIDATES_PER_ROUND * REFINEMENT_ROUNDS,
+        REFINEMENT_ROUNDS
+    );
 }

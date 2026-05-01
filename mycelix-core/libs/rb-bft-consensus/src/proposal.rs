@@ -3,9 +3,9 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Proposal types for RB-BFT consensus
 
-use serde::{Deserialize, Serialize};
-use crate::crypto::{ConsensusSignature, ValidatorKeypair, domains, create_signable_bytes};
+use crate::crypto::{create_signable_bytes, domains, ConsensusSignature, ValidatorKeypair};
 use crate::error::ConsensusResult;
+use serde::{Deserialize, Serialize};
 
 /// A proposal submitted by a leader for consensus
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -54,7 +54,7 @@ impl Proposal {
 
     /// Compute proposal ID from components using SHA256
     fn compute_id(round: u64, proposer: &str, content_hash: &str) -> String {
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
         hasher.update(round.to_le_bytes());
         hasher.update(proposer.as_bytes());

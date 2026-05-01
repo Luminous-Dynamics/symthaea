@@ -286,7 +286,11 @@ mod tests {
     fn test_all_bands_have_distinct_seed_offsets() {
         let offsets: std::collections::HashSet<u64> =
             SpectrumBand::ALL.iter().map(|b| b.seed_offset()).collect();
-        assert_eq!(offsets.len(), 5, "All bands must have distinct seed offsets");
+        assert_eq!(
+            offsets.len(),
+            5,
+            "All bands must have distinct seed offsets"
+        );
     }
 
     #[test]
@@ -349,7 +353,10 @@ mod tests {
         };
         let hv = enc.encode(&frame);
         let norm: f32 = hv.as_slice().iter().map(|x| x * x).sum::<f32>().sqrt();
-        assert!(norm < 1e-6, "Empty frame should produce near-zero HV, norm={norm}");
+        assert!(
+            norm < 1e-6,
+            "Empty frame should produce near-zero HV, norm={norm}"
+        );
     }
 
     #[test]
@@ -444,7 +451,11 @@ mod tests {
         for band in SpectrumBand::ALL {
             let hv = enc.band_id_hv(band);
             let norm: f32 = hv.as_slice().iter().map(|x| x * x).sum::<f32>().sqrt();
-            assert!(norm > 0.1, "Band HV for {:?} should be non-zero, norm={norm}", band);
+            assert!(
+                norm > 0.1,
+                "Band HV for {:?} should be non-zero, norm={norm}",
+                band
+            );
         }
     }
 

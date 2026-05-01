@@ -46,28 +46,33 @@
 pub mod connection_status;
 pub mod holochain_provider;
 pub mod provider;
+pub mod bridge_finance;
 
 // --- UI components ---
 pub mod app_shell;
-pub mod badge;
+pub mod availability_state;
+pub mod activity_feed;
+pub use mycelix_leptos_ui::badge;
 pub mod cluster_launcher;
-pub mod data_table;
-pub mod empty_state;
+pub use mycelix_leptos_ui::data_table;
+pub use mycelix_leptos_ui::empty_state;
 pub mod error_boundary;
+pub mod freshness;
 pub mod flow_indicator;
 pub mod forms;
 pub mod graph_node;
 pub mod indlela;
-pub mod loading;
+pub use mycelix_leptos_ui::loading;
 pub mod local_identity;
 pub mod modal;
-pub mod progress_bar;
+pub use mycelix_leptos_ui::progress_bar;
 pub mod search_bar;
 pub mod showcase;
-pub mod sovereign_radar;
+pub use mycelix_leptos_ui::sovereign_radar;
 pub mod spore_bridge;
-pub mod stat_card;
-pub mod tabs;
+pub use mycelix_leptos_ui::stat_card;
+pub mod summary_card;
+pub use mycelix_leptos_ui::tabs;
 pub mod telemetry_line;
 pub mod tier_gate;
 pub mod trust_badge;
@@ -79,7 +84,7 @@ pub mod consciousness_ui;
 pub mod homeostasis;
 pub mod theme;
 pub mod thermodynamic;
-pub mod toasts;
+pub use mycelix_leptos_ui::toasts;
 
 // --- Utilities ---
 pub mod util;
@@ -120,11 +125,14 @@ pub use toasts::{provide_toast_context, use_toasts, Toast, ToastContainer, Toast
 
 // Re-exports — new components
 pub use app_shell::{AppNav, AppShell, MobileBottomNav, NavLink, NavTab};
+pub use availability_state::{AvailabilityState, AvailabilityStateKind};
+pub use activity_feed::{ActivityFeed, ActivityFeedItem};
 pub use badge::{Badge, BadgeVariant, StatusDot};
 pub use cluster_launcher::{default_clusters, ClusterLauncher, ClusterLink};
 pub use data_table::{Column, DataTable, Pagination};
 pub use empty_state::EmptyState;
 pub use flow_indicator::FlowIndicator;
+pub use freshness::{FreshnessBadge, FreshnessLevel};
 pub use forms::{Checkbox, FormField, Select, SelectOption, TextArea, TextInput};
 pub use graph_node::{GraphEdge, GraphNode, NodeEmphasis};
 pub use indlela::{community_warmth, knowledge_freshness, GrowthStage};
@@ -137,6 +145,9 @@ pub use showcase::Showcase;
 pub use sovereign_radar::{SovereignRadar, SovereignRadarSize};
 pub use spore_bridge::{provide_spore_bridge, use_spore, SporeState};
 pub use tabs::{TabPanel, Tabs};
+pub use summary_card::{
+    SummaryActionItem, SummaryAttentionItem, SummaryCard, SummaryMetricItem, SummaryStatusBadge,
+};
 
 // Re-exports — utilities
 pub use util::{set_css_var, set_root_attribute};

@@ -15,8 +15,8 @@
 //! 5. Convert tier to voting weight [0.0, 1.0]
 
 use mycelix_bridge_common::constitutional_envelope::apply_decay;
-use mycelix_bridge_common::sovereign_gate::CivicTier;
 use mycelix_bridge_common::scoring_model::ModelDescriptor;
+use mycelix_bridge_common::sovereign_gate::CivicTier;
 
 use crate::agent::CivAgent;
 use crate::civic_dimensions::CivicDimensions;
@@ -66,12 +66,7 @@ impl ScoringModelGovernance {
     /// `elapsed_days`: days since the agent's last verified civic interaction.
     /// For simplicity in simulation, this defaults to 0 (no decay per tick)
     /// or can be set per-tick to simulate credential expiry.
-    pub fn voting_weight(
-        &self,
-        agent: &CivAgent,
-        current_tick: u32,
-        elapsed_days: f64,
-    ) -> f64 {
+    pub fn voting_weight(&self, agent: &CivAgent, current_tick: u32, elapsed_days: f64) -> f64 {
         // Must be alive and adult (>= 15 years)
         if !agent.is_alive() || agent.age_years(current_tick) < 15.0 {
             return 0.0;
@@ -162,9 +157,7 @@ pub struct AgentScoringResult {
 /// - Citizen: 0.6
 /// - Steward: 0.85
 /// - Guardian: 1.0
-fn tier_to_vote_weight(
-    tier: mycelix_bridge_common::sovereign_gate::CivicTier,
-) -> f64 {
+fn tier_to_vote_weight(tier: mycelix_bridge_common::sovereign_gate::CivicTier) -> f64 {
     use mycelix_bridge_common::sovereign_gate::CivicTier;
     match tier {
         CivicTier::Observer => 0.0,
@@ -190,11 +183,7 @@ pub fn builtin_scoring_models() -> Vec<ScoringModelGovernance> {
     models
         .iter()
         .map(|m| {
-            let desc = ModelDescriptor::from_model(
-                m.as_ref(),
-                0,
-                "simulation-harness".into(),
-            );
+            let desc = ModelDescriptor::from_model(m.as_ref(), 0, "simulation-harness".into());
             ScoringModelGovernance::new(desc)
         })
         .collect()
@@ -209,10 +198,10 @@ mod tests {
     use super::*;
     use crate::agent::{BiologicalSex, ConsciousnessState, SkillVector};
     use crate::needs::PsychologicalNeeds;
-    use mycelix_bridge_common::sovereign_gate::CivicTier;
     use mycelix_bridge_common::scoring_model::{
         Canonical4D, MinimalCivic, ScoringModel, Sovereign8D,
     };
+    use mycelix_bridge_common::sovereign_gate::CivicTier;
 
     fn sample_agent() -> CivAgent {
         CivAgent {
@@ -252,7 +241,11 @@ mod tests {
             trauma_level: 0.1,
             cumulative_dose_sv: 0.01,
             adversarial: None,
-            coordination_understanding: 0.5, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
+            coordination_understanding: 0.5,
+            mycel_score: 0.1,
+            sap_balance: 100.0,
+            is_biological: true,
+            wounds: Vec::new(),
             ethics: crate::agent::EthicalOrientation::default(),
             sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
             justice: crate::sub_passport::RestorativeJustice::new(),
@@ -383,8 +376,14 @@ mod tests {
         agent.consciousness.harmonic_alignment = 0.95;
         agent.consciousness.coherence = 0.95;
         agent.skills = SkillVector {
-            engineering: 0.9, agriculture: 0.9, medicine: 0.9, governance: 0.9,
-            science: 0.9, education: 0.9, art_culture: 0.9, logistics: 0.9,
+            engineering: 0.9,
+            agriculture: 0.9,
+            medicine: 0.9,
+            governance: 0.9,
+            science: 0.9,
+            education: 0.9,
+            art_culture: 0.9,
+            logistics: 0.9,
         };
         agent.education_level = 0.95;
         agent.needs.engagement = 0.95;
@@ -407,7 +406,7 @@ mod tests {
         let w3 = make_3d_bridge().voting_weight(&agent, 360, 0.0);
         // They don't have to diverge, but it's useful to see the values
         let _ = (w4, w8, w3); // suppress unused warnings
-        // At minimum, all should be valid
+                              // At minimum, all should be valid
         assert!(w4 >= 0.0 && w4 <= 1.0);
         assert!(w8 >= 0.0 && w8 <= 1.0);
         assert!(w3 >= 0.0 && w3 <= 1.0);

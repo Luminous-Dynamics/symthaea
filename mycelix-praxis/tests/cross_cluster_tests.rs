@@ -4,7 +4,7 @@
 //! # Cross-Cluster Dispatch Integration Tests
 //!
 //! Tests verifying that the EduNet bridge zome correctly dispatches calls
-//! across internal domains and validates consciousness gating.
+//! across internal domains and validates epistemic gating.
 //!
 //! These tests require a running Holochain conductor with the EduNet DNA.
 //! Run with: `cargo test --test cross_cluster_tests -- --ignored`

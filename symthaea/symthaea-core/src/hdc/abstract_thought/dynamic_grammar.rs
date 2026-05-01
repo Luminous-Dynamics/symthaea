@@ -33,9 +33,11 @@ use std::collections::{HashMap, HashSet};
 
 use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::conjecture_engine::{
-    BinOp, ConjectureEngine, ConjectureStatus, Expr, MacroPromotionTier,
+    conjecture_has_verified_eml_backend, BinOp, Conjecture, ConjectureEngine, ConjectureStatus,
+    Expr, MacroPromotionTier, PreferredEmlBackend,
 };
 use crate::hdc::deterministic_seeds::seed_from_name;
+use crate::hdc::eml;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -210,7 +212,7 @@ impl DynamicGrammar {
             return;
         }
 
-        let canonical = crate::hdc::abstract_thought::expr_canonical_string(&canon_expr);
+        let canonical = subtree_candidate_identity(&canon_expr);
         let vars_used = crate::hdc::abstract_thought::expr_variables(&canon_expr);
         let var_count = vars_used.len();
         let signature = crate::hdc::abstract_thought::expr_signature(&canon_expr);
@@ -228,7 +230,9 @@ impl DynamicGrammar {
                     if id < engine.conjectures.len() {
                         let conj = &engine.conjectures[id];
                         existing.sources.insert(conj.source.clone());
-                        existing.parent_formulas.insert(conj.formula_str.clone());
+                        existing
+                            .parent_formulas
+                            .insert(conjecture_parent_formula_identity(conj));
                         if conj.macro_promotion_tier.allows_recurrent_promotion()
                             && is_verified(&conj.status)
                         {
@@ -237,8 +241,8 @@ impl DynamicGrammar {
                                 .promotion_tier
                                 .max(MacroPromotionTier::RecurrentNumerical);
                         }
-                        if conj.macro_promotion_tier.allows_fast_track()
-                            && is_strongly_verified(&conj.status)
+                        if conj.macro_promotion_tier.allows_recurrent_promotion()
+                            && conjecture_supports_fast_track(conj)
                             && subtree_admits_fast_track(&canon_expr)
                         {
                             existing.strongly_verified_count += 1;
@@ -265,15 +269,15 @@ impl DynamicGrammar {
             if id < engine.conjectures.len() {
                 let conj = &engine.conjectures[id];
                 sources.insert(conj.source.clone());
-                parent_formulas.insert(conj.formula_str.clone());
+                parent_formulas.insert(conjecture_parent_formula_identity(conj));
                 if conj.macro_promotion_tier.allows_recurrent_promotion()
                     && is_verified(&conj.status)
                 {
                     verified_count += 1;
                     promotion_tier = promotion_tier.max(MacroPromotionTier::RecurrentNumerical);
                 }
-                if conj.macro_promotion_tier.allows_fast_track()
-                    && is_strongly_verified(&conj.status)
+                if conj.macro_promotion_tier.allows_recurrent_promotion()
+                    && conjecture_supports_fast_track(conj)
                     && subtree_admits_fast_track(&canon_expr)
                 {
                     strongly_verified_count += 1;
@@ -313,11 +317,11 @@ impl DynamicGrammar {
     ///    single discovery.
     pub fn promote_eligible(&mut self, engine: &ConjectureEngine) {
         let _ = engine; // engine reserved for future cross-checks
-        let mut promoted_indices = Vec::new();
+        let mut eligible: Vec<(usize, bool)> = Vec::new();
 
         for (i, candidate) in self.candidates.iter().enumerate() {
-            if self.operators.len() >= self.max_operators {
-                break;
+            if self.operators.len() + eligible.len() >= self.max_operators {
+                // Still scan all candidates so ordering is decided by quality, not insertion order.
             }
 
             let standard_promote = candidate.occurrences.len() >= self.min_occurrences
@@ -331,43 +335,69 @@ impl DynamicGrammar {
                 candidate.strongly_verified_count >= 1 && !candidate.occurrences.is_empty();
 
             if standard_promote || fast_track_promote {
-                let arity = count_constants(&candidate.pattern);
-                let name = format!(
-                    "MACRO_{}_{:.20}",
-                    self.next_id,
-                    candidate.canonical.replace(' ', "_")
-                );
-                let promotion_tier = if fast_track_promote {
-                    MacroPromotionTier::Formal
-                } else {
-                    MacroPromotionTier::RecurrentNumerical
-                };
-                let mut parent_formulas: Vec<String> =
-                    candidate.parent_formulas.iter().cloned().collect();
-                parent_formulas.sort();
-
-                self.operators.push(MacroOperator {
-                    name,
-                    template: candidate.pattern.clone(),
-                    canonical: candidate.canonical.clone(),
-                    arity,
-                    promotion_tier,
-                    source_conjectures: candidate.occurrences.clone(),
-                    parent_formulas,
-                    vars_used: candidate.vars_used.clone(),
-                    var_count: candidate.var_count,
-                    signature: candidate.signature.clone(),
-                    source_count: candidate.sources.len(),
-                    usage_count: 0,
-                    created_at: self.cycle,
-                });
-                self.next_id += 1;
-                self.total_promoted += 1;
-                promoted_indices.push(i);
+                eligible.push((i, fast_track_promote));
             }
         }
 
-        // Remove promoted candidates (iterate in reverse to preserve indices)
+        eligible.sort_by(|(a_idx, a_fast), (b_idx, b_fast)| {
+            let a = &self.candidates[*a_idx];
+            let b = &self.candidates[*b_idx];
+            b_fast
+                .cmp(a_fast)
+                .then_with(|| {
+                    candidate_fast_track_rank(a, engine).cmp(&candidate_fast_track_rank(b, engine))
+                })
+                .then_with(|| candidate_eml_rank(a).cmp(&candidate_eml_rank(b)))
+                .then_with(|| b.strongly_verified_count.cmp(&a.strongly_verified_count))
+                .then_with(|| b.verified_count.cmp(&a.verified_count))
+                .then_with(|| b.sources.len().cmp(&a.sources.len()))
+                .then_with(|| b.occurrences.len().cmp(&a.occurrences.len()))
+                .then_with(|| a.canonical.cmp(&b.canonical))
+        });
+
+        let remaining_slots = self.max_operators.saturating_sub(self.operators.len());
+        let mut promoted_indices = Vec::new();
+
+        for (i, fast_track_promote) in eligible.into_iter().take(remaining_slots) {
+            let candidate = &self.candidates[i];
+            let arity = count_constants(&candidate.pattern);
+            let name = format!(
+                "MACRO_{}_{:.20}",
+                self.next_id,
+                candidate.canonical.replace(' ', "_")
+            );
+            let promotion_tier = if fast_track_promote {
+                MacroPromotionTier::Formal
+            } else {
+                MacroPromotionTier::RecurrentNumerical
+            };
+            let mut parent_formulas: Vec<String> =
+                candidate.parent_formulas.iter().cloned().collect();
+            parent_formulas.sort();
+
+            self.operators.push(MacroOperator {
+                name,
+                template: candidate.pattern.clone(),
+                canonical: candidate.canonical.clone(),
+                arity,
+                promotion_tier,
+                source_conjectures: candidate.occurrences.clone(),
+                parent_formulas,
+                vars_used: candidate.vars_used.clone(),
+                var_count: candidate.var_count,
+                signature: candidate.signature.clone(),
+                source_count: candidate.sources.len(),
+                usage_count: 0,
+                created_at: self.cycle,
+            });
+            self.next_id += 1;
+            self.total_promoted += 1;
+            promoted_indices.push(i);
+        }
+
+        // Remove promoted candidates in descending index order so swap_remove
+        // never invalidates a later removal target.
+        promoted_indices.sort_unstable();
         for i in promoted_indices.into_iter().rev() {
             self.candidates.swap_remove(i);
         }
@@ -611,6 +641,81 @@ fn is_strongly_verified(status: &ConjectureStatus) -> bool {
     }
 }
 
+fn conjecture_supports_fast_track(conjecture: &crate::hdc::conjecture_engine::Conjecture) -> bool {
+    is_strongly_verified(&conjecture.status) || conjecture_has_verified_eml_backend(conjecture)
+}
+
+fn conjecture_parent_formula_identity(
+    conjecture: &crate::hdc::conjecture_engine::Conjecture,
+) -> String {
+    conjecture
+        .preferred_eml_canonical_form()
+        .unwrap_or_else(|| conjecture.formula_str.clone())
+}
+
+fn subtree_candidate_identity(expr: &Expr) -> String {
+    if let Ok(compiled) = eml::compile_expr(expr) {
+        format!("eml:strict:{}", compiled)
+    } else if let Ok(compiled) = eml::compile_expr_constructive(expr) {
+        format!("eml:constructive:{}", compiled)
+    } else {
+        crate::hdc::abstract_thought::expr_canonical_string(expr)
+    }
+}
+
+fn candidate_eml_rank(candidate: &SubtreeCandidate) -> u8 {
+    if candidate.canonical.starts_with("eml:strict:") {
+        0
+    } else if candidate.canonical.starts_with("eml:constructive:") {
+        1
+    } else {
+        2
+    }
+}
+
+fn candidate_fast_track_rank(candidate: &SubtreeCandidate, engine: &ConjectureEngine) -> u8 {
+    candidate
+        .occurrences
+        .iter()
+        .filter_map(|&id| engine.conjectures.get(id))
+        .filter(|conj| conjecture_supports_fast_track(conj))
+        .map(conjecture_fast_track_rank)
+        .min()
+        .unwrap_or(u8::MAX)
+}
+
+fn conjecture_fast_track_rank(conjecture: &Conjecture) -> u8 {
+    if is_strongly_verified(&conjecture.status) {
+        return 0;
+    }
+
+    match conjecture.preferred_eml_backend() {
+        Some(PreferredEmlBackend::StrictRealAndComplex) => {
+            if conjecture
+                .eml_real_domain
+                .is_some_and(|d| d.is_unconstrained())
+            {
+                1
+            } else {
+                2
+            }
+        }
+        Some(PreferredEmlBackend::StrictReal) => {
+            if conjecture
+                .eml_real_domain
+                .is_some_and(|d| d.is_unconstrained())
+            {
+                3
+            } else {
+                4
+            }
+        }
+        Some(PreferredEmlBackend::StrictComplex) => 5,
+        Some(PreferredEmlBackend::ConstructiveReal) => 6,
+        Some(PreferredEmlBackend::StrictUnverified) | None => 7,
+    }
+}
+
 fn subtree_admits_fast_track(expr: &Expr) -> bool {
     !(contains_unary_fn(expr)
         && crate::hdc::abstract_thought::expr_variables(expr).len() <= 1
@@ -677,7 +782,10 @@ fn lcg_step(state: u64) -> u64 {
 mod tests {
     use super::*;
     use crate::hdc::abstract_thought::normalize_expr;
-    use crate::hdc::conjecture_engine::{BinOp, Conjecture, MathDomain, UnaryFn};
+    use crate::hdc::conjecture_engine::{
+        attach_eml_metadata, BinOp, Conjecture, MathDomain, UnaryFn,
+    };
+    use crate::hdc::eml::{EmlExpr, EmlRealDomainAssumption};
 
     fn make_conjecture(
         formula: Expr,
@@ -698,6 +806,14 @@ mod tests {
             status,
             confidence: 0.95,
             macro_promotion_tier: MacroPromotionTier::Formal,
+            eml_compiled: None,
+            eml_metrics: None,
+            eml_verified_real: None,
+            eml_real_domain: None,
+            eml_verified_complex: None,
+            eml_constructive_compiled: None,
+            eml_constructive_metrics: None,
+            eml_verified_constructive_real: None,
         }
     }
 
@@ -742,6 +858,55 @@ mod tests {
 
         assert_eq!(grammar.candidates.len(), 1);
         assert_eq!(grammar.candidates[0].occurrences.len(), 1);
+    }
+
+    #[test]
+    fn test_observe_subtree_uses_eml_candidate_identity() {
+        let mut grammar = DynamicGrammar::new();
+        let mut engine = ConjectureEngine::new();
+
+        let c0 = make_conjecture(
+            Expr::BinOp(
+                BinOp::Mul,
+                Box::new(Expr::Var("n".to_string())),
+                Box::new(Expr::Var("n".to_string())),
+            ),
+            MathDomain::NumberTheory,
+            "seq_mul",
+            ConjectureStatus::Proposed,
+        );
+        let c1 = make_conjecture(
+            Expr::BinOp(
+                BinOp::Pow,
+                Box::new(Expr::Var("n".to_string())),
+                Box::new(Expr::Const(2.0)),
+            ),
+            MathDomain::Physics,
+            "seq_pow",
+            ConjectureStatus::Proposed,
+        );
+        engine.conjectures.push(c0);
+        engine.conjectures.push(c1);
+
+        let mul_subtree = normalize_expr(&Expr::BinOp(
+            BinOp::Mul,
+            Box::new(Expr::Var("n".to_string())),
+            Box::new(Expr::Var("n".to_string())),
+        ));
+        let pow_subtree = normalize_expr(&Expr::BinOp(
+            BinOp::Pow,
+            Box::new(Expr::Var("n".to_string())),
+            Box::new(Expr::Const(2.0)),
+        ));
+
+        grammar.observe_subtree(mul_subtree, &[0], &engine);
+        grammar.observe_subtree(pow_subtree, &[1], &engine);
+
+        assert_eq!(grammar.candidates.len(), 1);
+        assert_eq!(grammar.candidates[0].occurrences.len(), 2);
+        assert!(grammar.candidates[0]
+            .canonical
+            .starts_with("eml:constructive:"));
     }
 
     #[test]
@@ -884,6 +1049,105 @@ mod tests {
     }
 
     #[test]
+    fn test_fast_track_promotes_single_verified_eml_backend() {
+        let mut grammar = DynamicGrammar::new();
+        let mut engine = ConjectureEngine::new();
+
+        let mut c = make_conjecture(
+            n_squared_plus_c(1.0),
+            MathDomain::NumberTheory,
+            "unique_seq",
+            ConjectureStatus::Proposed,
+        );
+        c.macro_promotion_tier = MacroPromotionTier::RecurrentNumerical;
+        attach_eml_metadata(&mut c);
+        assert!(
+            c.eml_constructive_compiled.is_some(),
+            "test setup requires constructive EML backend"
+        );
+        engine.conjectures.push(c);
+
+        let subtree = normalize_expr(&n_squared_plus_c(1.0));
+        grammar.observe_subtree(subtree, &[0], &engine);
+        grammar.promote_eligible(&engine);
+
+        assert_eq!(
+            grammar.operators.len(),
+            1,
+            "Single verified EML-backed conjecture should fast-track promote"
+        );
+    }
+
+    #[test]
+    fn test_parent_formula_identity_prefers_eml_canonical_form() {
+        let mut grammar = DynamicGrammar::new();
+        let mut engine = ConjectureEngine::new();
+
+        let mut c1 = make_conjecture(
+            Expr::Func(UnaryFn::Exp, Box::new(Expr::Var("x".to_string()))),
+            MathDomain::NumberTheory,
+            "seq_a",
+            ConjectureStatus::Proposed,
+        );
+        c1.formula_str = "exp_alias_a".to_string();
+        attach_eml_metadata(&mut c1);
+
+        let mut c2 = make_conjecture(
+            Expr::Func(UnaryFn::Exp, Box::new(Expr::Var("x".to_string()))),
+            MathDomain::Physics,
+            "seq_b",
+            ConjectureStatus::Proposed,
+        );
+        c2.formula_str = "exp_alias_b".to_string();
+        attach_eml_metadata(&mut c2);
+
+        engine.conjectures.push(c1);
+        engine.conjectures.push(c2);
+
+        let subtree = normalize_expr(&Expr::Func(
+            UnaryFn::Exp,
+            Box::new(Expr::Var("x".to_string())),
+        ));
+        grammar.observe_subtree(subtree, &[0, 1], &engine);
+
+        assert_eq!(grammar.candidates.len(), 1);
+        let candidate = &grammar.candidates[0];
+        assert_eq!(candidate.parent_formulas.len(), 1);
+        assert!(candidate.parent_formulas.contains("eml(x,1)"));
+    }
+
+    #[test]
+    fn test_simple_unary_strict_eml_does_not_fast_track() {
+        let mut grammar = DynamicGrammar::new();
+        let mut engine = ConjectureEngine::new();
+
+        let mut c = make_conjecture(
+            Expr::Func(UnaryFn::Exp, Box::new(Expr::Var("x".to_string()))),
+            MathDomain::NumberTheory,
+            "simple_unary_strict",
+            ConjectureStatus::Proposed,
+        );
+        attach_eml_metadata(&mut c);
+        assert!(
+            c.eml_compiled.is_some(),
+            "test setup requires strict EML compilation"
+        );
+        engine.conjectures.push(c);
+
+        let subtree = normalize_expr(&Expr::Func(
+            UnaryFn::Exp,
+            Box::new(Expr::Var("x".to_string())),
+        ));
+        grammar.observe_subtree(subtree, &[0], &engine);
+
+        assert_eq!(grammar.candidates.len(), 1);
+        assert_eq!(
+            grammar.candidates[0].strongly_verified_count, 0,
+            "simple unary strict forms should stay off the fast-track path"
+        );
+    }
+
+    #[test]
     fn test_fast_track_does_not_trigger_on_poor_mse() {
         // NumericallyTested with test_mse = 0.5 (poor fit) should NOT
         // trigger fast-track. The threshold is 1e-2 which catches reasonable
@@ -969,6 +1233,260 @@ mod tests {
             grammar.operators.len() <= 2,
             "Should cap at max_operators: got {}",
             grammar.operators.len()
+        );
+    }
+
+    #[test]
+    fn test_max_operators_prefers_strict_eml_candidate() {
+        let mut grammar = DynamicGrammar::new();
+        grammar.max_operators = 1;
+
+        let mut engine = ConjectureEngine::new();
+        for i in 0..3 {
+            let mut strict = make_conjecture(
+                Expr::BinOp(
+                    BinOp::Div,
+                    Box::new(Expr::Func(
+                        UnaryFn::Exp,
+                        Box::new(Expr::Var("x".to_string())),
+                    )),
+                    Box::new(Expr::Var("y".to_string())),
+                ),
+                MathDomain::NumberTheory,
+                &format!("strict_seq_{i}"),
+                ConjectureStatus::Proposed,
+            );
+            attach_eml_metadata(&mut strict);
+            engine.conjectures.push(strict);
+        }
+        for i in 0..3 {
+            let mut constructive = make_conjecture(
+                Expr::BinOp(
+                    BinOp::Add,
+                    Box::new(Expr::Var("x".to_string())),
+                    Box::new(Expr::Var("y".to_string())),
+                ),
+                MathDomain::Physics,
+                &format!("constructive_seq_{i}"),
+                ConjectureStatus::Proposed,
+            );
+            attach_eml_metadata(&mut constructive);
+            engine.conjectures.push(constructive);
+        }
+
+        let strict_subtree = normalize_expr(&Expr::Func(
+            UnaryFn::Exp,
+            Box::new(Expr::Var("x".to_string())),
+        ));
+        let strict_subtree = normalize_expr(&Expr::BinOp(
+            BinOp::Div,
+            Box::new(strict_subtree),
+            Box::new(Expr::Var("y".to_string())),
+        ));
+        let constructive_subtree = normalize_expr(&Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::Var("x".to_string())),
+            Box::new(Expr::Var("y".to_string())),
+        ));
+        grammar.observe_subtree(strict_subtree, &[0, 1, 2], &engine);
+        grammar.observe_subtree(constructive_subtree, &[3, 4, 5], &engine);
+
+        grammar.promote_eligible(&engine);
+
+        assert_eq!(grammar.operators.len(), 1);
+        assert!(
+            grammar.operators[0].canonical.starts_with("eml:strict:"),
+            "strict EML candidate should win the cap, got {}",
+            grammar.operators[0].canonical
+        );
+    }
+
+    #[test]
+    fn test_max_operators_prefers_unconstrained_strict_over_constrained_strict() {
+        let mut grammar = DynamicGrammar::new();
+        grammar.max_operators = 1;
+
+        let mut engine = ConjectureEngine::new();
+        for i in 0..3 {
+            let mut unconstrained = make_conjecture(
+                Expr::BinOp(
+                    BinOp::Div,
+                    Box::new(Expr::Var("x".to_string())),
+                    Box::new(Expr::Var("y".to_string())),
+                ),
+                MathDomain::NumberTheory,
+                &format!("unconstrained_seq_{i}"),
+                ConjectureStatus::Proposed,
+            );
+            unconstrained.eml_compiled = Some(EmlExpr::terminal_var("strict_unconstrained"));
+            unconstrained.eml_metrics = unconstrained.eml_compiled.as_ref().map(EmlExpr::metrics);
+            unconstrained.eml_verified_real = Some(true);
+            unconstrained.eml_real_domain = Some(EmlRealDomainAssumption::AnyFinite);
+            unconstrained.eml_verified_complex = Some(true);
+            assert_eq!(
+                unconstrained.preferred_eml_backend(),
+                Some(PreferredEmlBackend::StrictRealAndComplex)
+            );
+            assert!(unconstrained
+                .eml_real_domain
+                .is_some_and(|d| d.is_unconstrained()));
+            engine.conjectures.push(unconstrained);
+        }
+        for i in 0..3 {
+            let mut constrained = make_conjecture(
+                Expr::BinOp(
+                    BinOp::Div,
+                    Box::new(Expr::Var("x".to_string())),
+                    Box::new(Expr::Var("z".to_string())),
+                ),
+                MathDomain::Physics,
+                &format!("constrained_seq_{i}"),
+                ConjectureStatus::Proposed,
+            );
+            constrained.eml_compiled = Some(EmlExpr::terminal_var("strict_constrained"));
+            constrained.eml_metrics = constrained.eml_compiled.as_ref().map(EmlExpr::metrics);
+            constrained.eml_verified_real = Some(true);
+            constrained.eml_real_domain = Some(EmlRealDomainAssumption::GreaterThanOne);
+            constrained.eml_verified_complex = Some(true);
+            assert_eq!(
+                constrained.preferred_eml_backend(),
+                Some(PreferredEmlBackend::StrictRealAndComplex)
+            );
+            assert!(constrained
+                .eml_real_domain
+                .is_some_and(|d| !d.is_unconstrained()));
+            engine.conjectures.push(constrained);
+        }
+
+        let unconstrained_subtree = normalize_expr(&Expr::BinOp(
+            BinOp::Div,
+            Box::new(Expr::Var("x".to_string())),
+            Box::new(Expr::Var("y".to_string())),
+        ));
+        let constrained_subtree = normalize_expr(&Expr::BinOp(
+            BinOp::Div,
+            Box::new(Expr::Var("x".to_string())),
+            Box::new(Expr::Var("z".to_string())),
+        ));
+        grammar.observe_subtree(unconstrained_subtree, &[0, 1, 2], &engine);
+        grammar.observe_subtree(constrained_subtree, &[3, 4, 5], &engine);
+
+        assert_eq!(grammar.candidates.len(), 2);
+        let unconstrained_candidate = grammar
+            .candidates
+            .iter()
+            .find(|candidate| candidate.canonical.contains("y"))
+            .expect("unconstrained strict candidate missing");
+        let constrained_candidate = grammar
+            .candidates
+            .iter()
+            .find(|candidate| candidate.canonical.contains("z"))
+            .expect("constrained strict candidate missing");
+        assert_eq!(
+            candidate_fast_track_rank(unconstrained_candidate, &engine),
+            1
+        );
+        assert_eq!(candidate_fast_track_rank(constrained_candidate, &engine), 2);
+
+        grammar.promote_eligible(&engine);
+
+        assert_eq!(grammar.operators.len(), 1);
+        assert!(
+            grammar.operators[0].canonical.contains("y"),
+            "expected unconstrained strict candidate to win the cap, got {}",
+            grammar.operators[0].canonical
+        );
+    }
+
+    #[test]
+    fn test_promote_eligible_removes_multiple_candidates_without_index_panic() {
+        let mut grammar = DynamicGrammar::new();
+        grammar.max_operators = 3;
+
+        let mut engine = ConjectureEngine::new();
+        for i in 0..3 {
+            let mut strict = make_conjecture(
+                Expr::BinOp(
+                    BinOp::Div,
+                    Box::new(Expr::Func(
+                        UnaryFn::Exp,
+                        Box::new(Expr::Var("x".to_string())),
+                    )),
+                    Box::new(Expr::Var("y".to_string())),
+                ),
+                MathDomain::NumberTheory,
+                &format!("strict_seq_{i}"),
+                ConjectureStatus::Proposed,
+            );
+            attach_eml_metadata(&mut strict);
+            engine.conjectures.push(strict);
+        }
+        for i in 0..3 {
+            let mut constructive = make_conjecture(
+                Expr::BinOp(
+                    BinOp::Add,
+                    Box::new(Expr::Var("x".to_string())),
+                    Box::new(Expr::Var("y".to_string())),
+                ),
+                MathDomain::Physics,
+                &format!("constructive_seq_{i}"),
+                ConjectureStatus::Proposed,
+            );
+            attach_eml_metadata(&mut constructive);
+            engine.conjectures.push(constructive);
+        }
+        for i in 0..3 {
+            let mut recurrent = make_conjecture(
+                Expr::BinOp(
+                    BinOp::Mul,
+                    Box::new(Expr::Var("a".to_string())),
+                    Box::new(Expr::Var("b".to_string())),
+                ),
+                MathDomain::Chemistry,
+                &format!("recurrent_seq_{i}"),
+                ConjectureStatus::FormallyVerified { proof_steps: 5 },
+            );
+            attach_eml_metadata(&mut recurrent);
+            engine.conjectures.push(recurrent);
+        }
+
+        grammar.observe_subtree(
+            normalize_expr(&Expr::BinOp(
+                BinOp::Add,
+                Box::new(Expr::Var("x".to_string())),
+                Box::new(Expr::Var("y".to_string())),
+            )),
+            &[3, 4, 5],
+            &engine,
+        );
+        grammar.observe_subtree(
+            normalize_expr(&Expr::BinOp(
+                BinOp::Div,
+                Box::new(Expr::Func(
+                    UnaryFn::Exp,
+                    Box::new(Expr::Var("x".to_string())),
+                )),
+                Box::new(Expr::Var("y".to_string())),
+            )),
+            &[0, 1, 2],
+            &engine,
+        );
+        grammar.observe_subtree(
+            normalize_expr(&Expr::BinOp(
+                BinOp::Mul,
+                Box::new(Expr::Var("a".to_string())),
+                Box::new(Expr::Var("b".to_string())),
+            )),
+            &[6, 7, 8],
+            &engine,
+        );
+
+        grammar.promote_eligible(&engine);
+
+        assert_eq!(grammar.operators.len(), 3);
+        assert!(
+            grammar.candidates.is_empty(),
+            "all promoted candidates should be removed cleanly"
         );
     }
 

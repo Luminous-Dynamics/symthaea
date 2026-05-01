@@ -16,9 +16,9 @@
 //! Attackers are injected identically in both conditions. Only the
 //! DEFENSE differs.
 
-use mycelix_multiworld_sim::MultiWorldSimulator;
 use mycelix_multiworld_sim::config::{PolicyConfig, SimulationConfig};
 use mycelix_multiworld_sim::red_team::AdversarialStrategy;
+use mycelix_multiworld_sim::MultiWorldSimulator;
 
 fn run_condition(seed: u64, years: u32, phase2: bool) -> (bool, f64, usize) {
     let mut config = SimulationConfig::default_150_year();

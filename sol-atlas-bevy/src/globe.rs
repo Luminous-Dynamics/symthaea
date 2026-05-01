@@ -80,11 +80,6 @@ pub fn spawn_globe(
             shadows_enabled: true,
             ..default()
         },
-        Transform::from_rotation(Quat::from_euler(
-            EulerRot::XYZ,
-            -0.4,
-            0.6,
-            0.0,
-        )),
+        Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, -0.4, 0.6, 0.0)),
     ));
 }

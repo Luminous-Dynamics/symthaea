@@ -15,7 +15,8 @@ const GEOCARB_CSV: &str = include_str!("../../data/biosphere/geocarb_o2_co2.csv"
 const IMPACT_CSV: &str = include_str!("../../data/biosphere/impact_events.csv");
 const LIP_CSV: &str = include_str!("../../data/biosphere/lip_events.csv");
 const D13C_CSV: &str = include_str!("../../data/biosphere/d13c_proxy.csv");
-const BACKGROUND_EXT_CSV: &str = include_str!("../../data/biosphere/background_extinction_rate.csv");
+const BACKGROUND_EXT_CSV: &str =
+    include_str!("../../data/biosphere/background_extinction_rate.csv");
 const EPSILON_P_CSV: &str = include_str!("../../data/biosphere/epsilon_p.csv");
 const FUNCTIONAL_GROUPS_CSV: &str = include_str!("../../data/biosphere/functional_groups.csv");
 
@@ -71,13 +72,13 @@ impl TaphonomicRegime {
     /// Determine regime for a given age.
     pub fn for_age(age_ma: MaAge) -> Self {
         if age_ma > 2500.0 {
-            Self::VeryPoor  // Archean
+            Self::VeryPoor // Archean
         } else if age_ma > 635.0 {
-            Self::Poor  // Proterozoic (pre-Ediacaran)
+            Self::Poor // Proterozoic (pre-Ediacaran)
         } else if age_ma > 541.0 {
-            Self::Moderate  // Ediacaran (some soft-body preservation)
+            Self::Moderate // Ediacaran (some soft-body preservation)
         } else {
-            Self::Good  // Phanerozoic (shelly fauna, good record)
+            Self::Good // Phanerozoic (shelly fauna, good record)
         }
     }
 }
@@ -318,7 +319,10 @@ impl DeepTimeData {
         let proxy: Vec<ProxyPoint> = self
             .atmosphere
             .iter()
-            .map(|a| ProxyPoint { age_ma: a.age_ma, value: a.o2_fraction })
+            .map(|a| ProxyPoint {
+                age_ma: a.age_ma,
+                value: a.o2_fraction,
+            })
             .collect();
         Self::interpolate_proxy(&proxy, age_ma)
     }
@@ -328,7 +332,10 @@ impl DeepTimeData {
         let proxy: Vec<ProxyPoint> = self
             .atmosphere
             .iter()
-            .map(|a| ProxyPoint { age_ma: a.age_ma, value: a.co2_ppm })
+            .map(|a| ProxyPoint {
+                age_ma: a.age_ma,
+                value: a.co2_ppm,
+            })
             .collect();
         Self::interpolate_proxy(&proxy, age_ma)
     }
@@ -355,7 +362,10 @@ impl DeepTimeData {
         let proxy: Vec<ProxyPoint> = self
             .extinction_rates
             .iter()
-            .map(|e| ProxyPoint { age_ma: e.age_ma, value: e.extinction_rate })
+            .map(|e| ProxyPoint {
+                age_ma: e.age_ma,
+                value: e.extinction_rate,
+            })
             .collect();
         Self::interpolate_proxy(&proxy, age_ma)
     }
@@ -366,7 +376,10 @@ impl DeepTimeData {
         let proxy: Vec<ProxyPoint> = self
             .d13c
             .iter()
-            .map(|d| ProxyPoint { age_ma: d.age_ma, value: d.excursion_abs })
+            .map(|d| ProxyPoint {
+                age_ma: d.age_ma,
+                value: d.excursion_abs,
+            })
             .collect();
         Self::interpolate_proxy(&proxy, age_ma)
     }
@@ -398,7 +411,11 @@ mod tests {
         let data = DeepTimeData::load();
         for pt in &data.genus_diversity {
             assert!(pt.value >= 0.0, "Genus count must be non-negative");
-            assert!(pt.value < 50000.0, "Genus count unreasonably high: {}", pt.value);
+            assert!(
+                pt.value < 50000.0,
+                "Genus count unreasonably high: {}",
+                pt.value
+            );
         }
     }
 
@@ -410,7 +427,10 @@ mod tests {
 
         let val_252 = DeepTimeData::interpolate_proxy(&data.genus_diversity, 252.0);
         let val_260 = DeepTimeData::interpolate_proxy(&data.genus_diversity, 260.0);
-        assert!(val_252 < val_260, "End-Permian (252 Ma) should be lower than pre-Permian (260 Ma)");
+        assert!(
+            val_252 < val_260,
+            "End-Permian (252 Ma) should be lower than pre-Permian (260 Ma)"
+        );
     }
 
     #[test]
@@ -429,9 +449,17 @@ mod tests {
     fn o2_fraction_reasonable() {
         let data = DeepTimeData::load();
         let o2_now = data.interpolate_o2(0.01);
-        assert!((o2_now - 0.21).abs() < 0.02, "Modern O2 should be ~21%, got {}", o2_now);
+        assert!(
+            (o2_now - 0.21).abs() < 0.02,
+            "Modern O2 should be ~21%, got {}",
+            o2_now
+        );
 
         let o2_archean = data.interpolate_o2(3000.0);
-        assert!(o2_archean < 0.01, "Archean O2 should be <1%, got {}", o2_archean);
+        assert!(
+            o2_archean < 0.01,
+            "Archean O2 should be <1%, got {}",
+            o2_archean
+        );
     }
 }

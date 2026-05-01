@@ -481,8 +481,8 @@ fn template_pigeonhole(text: &str) -> Option<CurriculumProblem> {
 /// Pell: "Show x² − D·y² = 1 has a positive integer solution" → extract D.
 fn template_pell(text: &str) -> Option<CurriculumProblem> {
     // Look for "D = N" or "- N·y²" pattern
-    if let Some(d) = extract_labeled_integer(text, "D =")
-        .or_else(|| extract_labeled_integer(text, "D="))
+    if let Some(d) =
+        extract_labeled_integer(text, "D =").or_else(|| extract_labeled_integer(text, "D="))
     {
         if d >= 2 && d <= 150 {
             return Some(CurriculumProblem {
@@ -517,8 +517,7 @@ fn template_crt(text: &str) -> Option<CurriculumProblem> {
     if ints.len() < 4 || ints.len() % 2 != 0 {
         return None;
     }
-    let residues: Vec<(i64, i64)> =
-        ints.chunks(2).map(|c| (c[0], c[1])).collect();
+    let residues: Vec<(i64, i64)> = ints.chunks(2).map(|c| (c[0], c[1])).collect();
     // Sanity: moduli must be ≥ 2
     if !residues.iter().all(|(_, m)| *m >= 2) {
         return None;
@@ -708,11 +707,7 @@ fn template_bezout(text: &str) -> Option<CurriculumProblem> {
         name: format!("Bezout gcd({}, {})={}", a, b, expected_gcd),
         difficulty: Difficulty::Easy,
         domain: Domain::NumberTheory,
-        kind: ProblemKind::BezoutIdentity {
-            a,
-            b,
-            expected_gcd,
-        },
+        kind: ProblemKind::BezoutIdentity { a, b, expected_gcd },
     })
 }
 
@@ -1199,9 +1194,7 @@ impl ImoNlParser {
             "ONNX-fallback"
         };
         entries.push(EncoderEntry::build(
-            onnx,
-            &corpus,
-            0.50, // ONNX scores higher; raise threshold accordingly
+            onnx, &corpus, 0.50, // ONNX scores higher; raise threshold accordingly
             onnx_label,
         ));
 
@@ -1396,7 +1389,12 @@ mod tests {
         let q = "Color the vertices of a regular pentagon with 3 colors";
         let scores = keyword_scores_for_query(q);
         for (cat, s) in &scores {
-            assert!(*s < 0.3, "category {} false-matched out-of-scope at {}", cat, s);
+            assert!(
+                *s < 0.3,
+                "category {} false-matched out-of-scope at {}",
+                cat,
+                s
+            );
         }
     }
 
@@ -1508,7 +1506,8 @@ mod tests {
     fn test_parse_canonical_pigeonhole() {
         let p = ImoNlParser::new();
         // Exact canonical text — should match with high similarity
-        let result = p.parse("Among any 7 integers, some two have the same remainder when divided by 6.");
+        let result =
+            p.parse("Among any 7 integers, some two have the same remainder when divided by 6.");
         let parsed = result.expect("should parse canonical pigeonhole");
         eprintln!("Match similarity: {:.3}", parsed.similarity);
         match parsed.problem.kind {
@@ -1525,7 +1524,8 @@ mod tests {
     fn test_parse_rephrased_pigeonhole() {
         let p = ImoNlParser::new();
         // Paraphrased — different words, same structure
-        let result = p.parse("If you put 15 objects into 4 bins, prove one bin has at least 4 objects.");
+        let result =
+            p.parse("If you put 15 objects into 4 bins, prove one bin has at least 4 objects.");
         match result {
             Some(parsed) => {
                 eprintln!(
@@ -1536,7 +1536,9 @@ mod tests {
             }
             None => {
                 // Acceptable failure — paraphrase may not hit the threshold
-                eprintln!("Rephrased pigeonhole did not match any reference — expected for weak encoder");
+                eprintln!(
+                    "Rephrased pigeonhole did not match any reference — expected for weak encoder"
+                );
             }
         }
     }
@@ -1544,7 +1546,8 @@ mod tests {
     #[test]
     fn test_parse_canonical_pell() {
         let p = ImoNlParser::new();
-        let result = p.parse("Show that the Pell equation x² − 13y² = 1 has a positive integer solution.");
+        let result =
+            p.parse("Show that the Pell equation x² − 13y² = 1 has a positive integer solution.");
         let parsed = result.expect("should parse canonical Pell");
         match parsed.problem.kind {
             ProblemKind::PellEquation { d } => {
@@ -1603,7 +1606,8 @@ mod tests {
     #[test]
     fn test_parse_canonical_cauchy_schwarz() {
         let p = ImoNlParser::new();
-        let result = p.parse("Verify the Cauchy-Schwarz inequality for the vectors 1, 2, 3 and 4, 5, 6.");
+        let result =
+            p.parse("Verify the Cauchy-Schwarz inequality for the vectors 1, 2, 3 and 4, 5, 6.");
         let parsed = result.expect("should parse canonical Cauchy-Schwarz");
         match &parsed.problem.kind {
             ProblemKind::CauchySchwarz { a, b } => {
@@ -1662,11 +1666,15 @@ mod tests {
 
         let mut parse_successes = 0usize;
         let mut solve_successes = 0usize;
-        let mut by_domain: std::collections::HashMap<&'static str, (usize, usize)> = std::collections::HashMap::new();
+        let mut by_domain: std::collections::HashMap<&'static str, (usize, usize)> =
+            std::collections::HashMap::new();
 
         eprintln!("\n════════════════════════════════════════════════════════════");
         eprintln!("  IMO NL PARSER — EXPANDED REAL-IMO BATCH TEST");
-        eprintln!("  {} problems, 30 reference patterns, 11 templates", problems.len());
+        eprintln!(
+            "  {} problems, 30 reference patterns, 11 templates",
+            problems.len()
+        );
         eprintln!("────────────────────────────────────────────────────────────");
 
         for (text, label) in &problems {
@@ -1803,10 +1811,9 @@ mod tests {
     fn test_template_functional_equation_exponential_priority() {
         // Exponential law f(x+y) = f(x)f(y) — the detector must pick
         // Exponential, not CauchyAdditive, because the RHS is a product.
-        let p = template_functional_equation(
-            "Determine all functions f satisfying f(x+y) = f(x)f(y).",
-        )
-        .expect("exp-form text should produce a problem");
+        let p =
+            template_functional_equation("Determine all functions f satisfying f(x+y) = f(x)f(y).")
+                .expect("exp-form text should produce a problem");
         use crate::hdc::functional_equations::EquationKind;
         assert!(matches!(
             p.kind,
@@ -1851,10 +1858,8 @@ mod tests {
 
     #[test]
     fn test_template_functional_equation_involution() {
-        let p = template_functional_equation(
-            "Find all f: R → R with f(f(x)) = x for all real x.",
-        )
-        .expect("involution-form text should produce a problem");
+        let p = template_functional_equation("Find all f: R → R with f(f(x)) = x for all real x.")
+            .expect("involution-form text should produce a problem");
         use crate::hdc::functional_equations::EquationKind;
         assert!(matches!(
             p.kind,
@@ -2029,7 +2034,11 @@ mod tests {
         .expect("Cauchy form should match");
         assert!(parsed.solve());
         let answer = parsed.canonical_answer().expect("canonical answer present");
-        assert!(answer.contains("c"), "answer should mention constant c, got: {}", answer);
+        assert!(
+            answer.contains("c"),
+            "answer should mention constant c, got: {}",
+            answer
+        );
         // A non-functional-equation problem returns None
         let pell = template_pell("Show that x² − 13y² = 1 has a solution.")
             .expect("Pell template should match");
@@ -2146,9 +2155,8 @@ mod tests {
         // After the cascade refactor, the default parser must still
         // solve the canonical problems via its single entry.
         let parser = ImoNlParser::new();
-        let result = parser.parse(
-            "Show that the Pell equation x² − 13y² = 1 has a positive integer solution.",
-        );
+        let result = parser
+            .parse("Show that the Pell equation x² − 13y² = 1 has a positive integer solution.");
         let parsed = result.expect("default cascade parser should solve canonical Pell");
         match parsed.problem.kind {
             ProblemKind::PellEquation { d } => assert_eq!(d, 13),
@@ -2213,7 +2221,10 @@ mod tests {
             ("For non-negative reals 2, 5, 7 verify Schur's inequality at exponent 1.", "Schur"),
             ("Find integers x, y satisfying 18 x + 12 y = gcd(18, 12).", "Bezout"),
         ];
-        let in_scope_count = standard_problems.iter().filter(|(_, l)| *l != "out-of-scope").count()
+        let in_scope_count = standard_problems
+            .iter()
+            .filter(|(_, l)| *l != "out-of-scope")
+            .count()
             + hard_problems.len();
         let total = standard_problems.len() + hard_problems.len();
 
@@ -2250,7 +2261,11 @@ mod tests {
         // Replace the default entry with an ONNX-only entry
         let corpus = reference_corpus();
         let onnx_encoder = create_encoder(EncoderType::OnnxSemantic);
-        let onnx_label = if onnx_encoder.name() == "OnnxSemantic" { "ONNX" } else { "ONNX-fallback" };
+        let onnx_label = if onnx_encoder.name() == "OnnxSemantic" {
+            "ONNX"
+        } else {
+            "ONNX-fallback"
+        };
         onnx_parser.entries = vec![EncoderEntry::build(onnx_encoder, &corpus, 0.50, onnx_label)];
         let t0 = Instant::now();
         let mut onnx_solved = 0;

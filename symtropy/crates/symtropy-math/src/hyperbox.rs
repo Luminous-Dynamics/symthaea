@@ -1,5 +1,5 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! D-dimensional axis-aligned box (hyperbox / tesseract).
 //!
@@ -60,16 +60,13 @@ impl<const D: usize> Shape<D> for HyperBox<D> {
     }
 
     fn bounding_sphere(&self) -> (Point<D>, f64) {
-        let radius = self
-            .half_extents
-            .iter()
-            .map(|h| h * h)
-            .sum::<f64>()
-            .sqrt();
+        let radius = self.half_extents.iter().map(|h| h * h).sum::<f64>().sqrt();
         (Point::origin(), radius)
     }
 
-    fn as_any(&self) -> &dyn std::any::Any { self }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 #[cfg(test)]

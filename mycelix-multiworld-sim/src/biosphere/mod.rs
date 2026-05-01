@@ -37,9 +37,9 @@ pub mod dimensions;
 pub mod ensemble;
 pub mod kt_engine;
 pub mod mass_extinctions;
+pub mod sensitivity;
 pub mod temporal_bins;
 pub mod uncertainty;
-pub mod sensitivity;
 pub mod unified_curve;
 pub mod validation;
 
@@ -50,7 +50,9 @@ use luminous_sim_core::module_trait::{
     TickPhase,
 };
 
-use bridge::{biosphere_energy_adjustment, bt_to_ecosystem_health, CoherencePoint, CoherenceSource};
+use bridge::{
+    biosphere_energy_adjustment, bt_to_ecosystem_health, CoherencePoint, CoherenceSource,
+};
 use deep_time_data::DeepTimeData;
 use dimensions::{compute_bt, compute_bt_ci, compute_raw_dimensions, BiosphereMaxima};
 use mass_extinctions::{canonical_mass_extinctions, extinction_multiplier, MassExtinctionEvent};
@@ -232,29 +234,54 @@ impl SimulationModule for BiosphereCoherenceEngine {
             let terminal = self.terminal_bt();
             let health = bt_to_ecosystem_health(terminal, terminal);
 
-            outputs.feedback_signals.insert("bt_biodiversity".into(), health.biodiversity);
-            outputs.feedback_signals.insert("bt_forest_cover".into(), health.forest_cover);
-            outputs.feedback_signals.insert("bt_soil_health".into(), health.soil_health);
-            outputs.feedback_signals.insert("bt_ocean_health".into(), health.ocean_health);
-            outputs.feedback_signals.insert("bt_freshwater".into(), health.freshwater);
-            outputs.feedback_signals.insert("bt_terminal_value".into(), terminal);
+            outputs
+                .feedback_signals
+                .insert("bt_biodiversity".into(), health.biodiversity);
+            outputs
+                .feedback_signals
+                .insert("bt_forest_cover".into(), health.forest_cover);
+            outputs
+                .feedback_signals
+                .insert("bt_soil_health".into(), health.soil_health);
+            outputs
+                .feedback_signals
+                .insert("bt_ocean_health".into(), health.ocean_health);
+            outputs
+                .feedback_signals
+                .insert("bt_freshwater".into(), health.freshwater);
+            outputs
+                .feedback_signals
+                .insert("bt_terminal_value".into(), terminal);
 
             // Shock-recovery baseline (mean recovery time across all events)
-            let mean_recovery = self.extinctions.iter()
+            let mean_recovery = self
+                .extinctions
+                .iter()
                 .map(|e| e.recovery_time_ma)
                 .sum::<f64>()
                 / self.extinctions.len().max(1) as f64;
-            outputs.feedback_signals.insert("bt_mean_recovery_ma".into(), mean_recovery);
+            outputs
+                .feedback_signals
+                .insert("bt_mean_recovery_ma".into(), mean_recovery);
 
             // Report
             outputs.metrics.push(("bt_terminal".into(), terminal));
-            outputs.metrics.push(("bt_bins".into(), self.bins.len() as f64));
-            outputs.metrics.push(("bt_extinctions".into(), self.extinctions.len() as f64));
+            outputs
+                .metrics
+                .push(("bt_bins".into(), self.bins.len() as f64));
+            outputs
+                .metrics
+                .push(("bt_extinctions".into(), self.extinctions.len() as f64));
         }
 
         // Every tick: emit planetary context signal
-        let eco_feedback = feedback.get("ecosystem_service_index").copied().unwrap_or(0.8);
-        outputs.feedback_signals.insert("biosphere_coherence".into(), eco_feedback);
+        let eco_feedback = feedback
+            .get("ecosystem_service_index")
+            .copied()
+            .unwrap_or(0.8);
+        outputs
+            .feedback_signals
+            .insert("biosphere_coherence".into(), eco_feedback);
 
         Ok(outputs)
     }
@@ -286,7 +313,8 @@ impl SimulationModule for BiosphereCoherenceEngine {
             ],
             warnings: vec![
                 "Precambrian CIs are wide (±0.3-0.4) — honest epistemic uncertainty".into(),
-                "Network integration and information capacity use metabolic scaling estimates".into(),
+                "Network integration and information capacity use metabolic scaling estimates"
+                    .into(),
             ],
         })
     }
@@ -449,10 +477,22 @@ mod tests {
         assert!(assessment.limitations.len() >= 5);
         // Should mention all 5 upgraded limitations
         let text = assessment.limitations.join(" ");
-        assert!(text.contains("taphonomic"), "Should mention taphonomic correction");
-        assert!(text.contains("HANPP") || text.contains("thermodynamic"), "Should mention energy bridge");
-        assert!(text.contains("Lotka-Volterra") || text.contains("niche"), "Should mention logistic recovery");
+        assert!(
+            text.contains("taphonomic"),
+            "Should mention taphonomic correction"
+        );
+        assert!(
+            text.contains("HANPP") || text.contains("thermodynamic"),
+            "Should mention energy bridge"
+        );
+        assert!(
+            text.contains("Lotka-Volterra") || text.contains("niche"),
+            "Should mention logistic recovery"
+        );
         assert!(text.contains("Kleiber"), "Should mention metabolic scaling");
-        assert!(text.contains("δ¹³C") || text.contains("Geochemical"), "Should mention geochemical bounding");
+        assert!(
+            text.contains("δ¹³C") || text.contains("Geochemical"),
+            "Should mention geochemical bounding"
+        );
     }
 }

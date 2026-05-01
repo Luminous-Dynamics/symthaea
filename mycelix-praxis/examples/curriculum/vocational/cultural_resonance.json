@@ -1,0 +1,126 @@
+{
+  "metadata": {
+    "title": "Cultural Resonance & Aesthetic Sovereignty",
+    "framework": "Mycelix Aesthetics",
+    "source": "https://mycelix.org",
+    "grade_level": "Lifelong/Universal",
+    "subject_area": "Arts & Humanities",
+    "domain": "Culture",
+    "version": "1.0",
+    "total_standards": 5,
+    "domains": [
+      "Acoustic Coherence",
+      "Linguistic Sovereignty",
+      "Spatial Narrative"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Using art and language to maintain social network coherence."
+  },
+  "nodes": [
+    {
+      "id": "ART-SON-101",
+      "title": "Sonic Mesh-Weaving",
+      "description": "The physics of collective rhythm. Synchronizing high-frequency signals across a decentralized network. Using the mesh for collaborative acoustic resonance and 'Mesh-Music'.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Acoustic Coherence",
+      "subdomain": "Cultural Resonance",
+      "tags": ["music", "coherence", "mesh", "physics"],
+      "estimated_hours": 45,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Apply",
+      "subject_area": "Arts"
+    },
+    {
+      "id": "HUM-LANG-201",
+      "title": "Linguistic Resurrection & Semantic Mapping",
+      "description": "Preserving world-views. Mapping endangered and local idioms into the HDC semantic mesh. Understanding why linguistic diversity is a prerequisite for collective intelligence.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Linguistic Sovereignty",
+      "subdomain": "Cultural Resonance",
+      "tags": ["language", "sovereignty", "hdc", "anthropology"],
+      "estimated_hours": 60,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Humanities"
+    },
+    {
+      "id": "ART-VIS-101",
+      "title": "Muralism & The Memory of the Commons",
+      "description": "Visualizing the ledger. Techniques for large-scale spatial storytelling and public art that anchors a community's historical lineage and moral obligations.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Spatial Narrative",
+      "subdomain": "Cultural Resonance",
+      "tags": ["art", "mural", "history", "commons"],
+      "estimated_hours": 45,
+      "grade_levels": ["Vocational"],
+      "bloom_level": "Apply",
+      "subject_area": "Arts"
+    },
+    {
+      "id": "HUM-PSY-301",
+      "title": "The Psychology of Resonance",
+      "description": "Flow states and collective effervescence. The neuro-biology of belonging and the role of shared aesthetic experience in preventing network-scale 'Burnout'.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Psychology",
+      "subdomain": "Cultural Resonance",
+      "tags": ["psychology", "belonging", "neuro-science", "resonance"],
+      "estimated_hours": 60,
+      "grade_levels": ["Graduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Humanities"
+    },
+    {
+      "id": "ART-CAP-01",
+      "title": "The Resonance Capstone",
+      "description": "Organize a 'Convergence Event' (ritual, performance, or council) that effectively binds a multi-pod cluster together, as verified by increased social-endorsement velocity.",
+      "node_type": "Capstone",
+      "difficulty": "Advanced",
+      "domain": "Universal",
+      "subdomain": "Cultural Resonance",
+      "tags": ["capstone", "ritual", "leadership", "aesthetics"],
+      "estimated_hours": 120,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Create",
+      "subject_area": "Arts",
+      "holonic_capstone": {
+        "required_node_ids": ["ART-SON-101", "HUM-LANG-201", "HUM-PSY-301"],
+        "deliverable": "A verified 'Artifact of Coherence' (recording, mural, or transcript) and a documented increase in peer-trust markers post-event.",
+        "min_peer_endorsements": 15
+      },
+      "alignment_vector": {
+        "ahimsa": 900,
+        "reciprocity": 950,
+        "aesthetic_harmony": 1000,
+        "collective_flourishing": 990,
+        "mentorship": 920
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "HUM-ART-301",
+      "to": "ART-SON-101",
+      "edge_type": "Recommended",
+      "strength_permille": 600,
+      "rationale": "Collective aesthetics provide the theoretical foundation for sonic mesh-weaving."
+    },
+    {
+      "from": "HUM-LANG-201",
+      "to": "ART-CAP-01",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "True resonance requires the inclusion of diverse linguistic world-views."
+    },
+    {
+      "from": "HUM-PSY-301",
+      "to": "ART-CAP-01",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Leading a convergence requires deep understanding of the psychology of belonging."
+    }
+  ]
+}

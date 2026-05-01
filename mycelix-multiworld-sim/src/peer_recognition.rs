@@ -170,7 +170,11 @@ mod tests {
         let agents = vec![make_agent(1, 0.5, 0.8)];
         let mut rng = StochasticEngine::new(42);
         let result = tick_recognition(&agents, &mut rng);
-        assert_eq!(result.score_for(0), 0.0, "Single agent can't recognize self");
+        assert_eq!(
+            result.score_for(0),
+            0.0,
+            "Single agent can't recognize self"
+        );
     }
 
     #[test]
@@ -208,19 +212,12 @@ mod tests {
 
     #[test]
     fn recognition_scores_bounded() {
-        let agents: Vec<CivAgent> = (0..20)
-            .map(|i| make_agent(i, 0.6, 0.7))
-            .collect();
+        let agents: Vec<CivAgent> = (0..20).map(|i| make_agent(i, 0.6, 0.7)).collect();
         let mut rng = StochasticEngine::new(42);
         let result = tick_recognition(&agents, &mut rng);
 
         for (i, &s) in result.scores.iter().enumerate() {
-            assert!(
-                s >= 0.0 && s <= 1.0,
-                "Agent {} score {} out of [0,1]",
-                i,
-                s
-            );
+            assert!(s >= 0.0 && s <= 1.0, "Agent {} score {} out of [0,1]", i, s);
         }
     }
 }

@@ -10,7 +10,7 @@
 //! # Architecture
 //!
 //! ```text
-//! CodeEntity (AST)
+//! Entity (AST)
 //!     ↓ encode_entity()
 //! bind(role_hv, name_hv, position_hv)
 //!     ↓
@@ -27,7 +27,7 @@ use std::collections::HashMap;
 
 use symthaea_core::hdc::ContinuousHV;
 
-use crate::language::code_parser::{CodeEntity, CodeRelation, EntityKind, ParsedCode, Relation};
+use crate::language::code_parser::{Entity, EntityKind, EntityRelation, ParsedCode, Relation};
 
 /// Encoder that converts AST structure into hypervectors
 pub struct CodeHDEncoder {
@@ -218,7 +218,7 @@ impl CodeHDEncoder {
     // ========================================================================
 
     /// Encode a single code entity: bind(role, name, position)
-    pub fn encode_entity(&self, entity: &CodeEntity) -> ContinuousHV {
+    pub fn encode_entity(&self, entity: &Entity) -> ContinuousHV {
         let role_hv = self
             .role_vectors
             .get(&entity.kind)
@@ -263,7 +263,7 @@ impl CodeHDEncoder {
 
     /// Encode a function entity with full semantic structure:
     /// bind(FUNCTION, name) ⊕ bundle([param_hvs]) ⊕ bind(RETURNS, return_type)
-    pub fn encode_function(&self, entity: &CodeEntity) -> ContinuousHV {
+    pub fn encode_function(&self, entity: &Entity) -> ContinuousHV {
         let base = self.encode_entity(entity);
 
         // Encode return type if present
@@ -329,7 +329,7 @@ impl CodeHDEncoder {
     }
 
     /// Encode a set of relationships
-    pub fn encode_relations(&self, relations: &[CodeRelation]) -> ContinuousHV {
+    pub fn encode_relations(&self, relations: &[EntityRelation]) -> ContinuousHV {
         if relations.is_empty() {
             return ContinuousHV::zero(self.dim);
         }
@@ -404,8 +404,8 @@ impl CodeHDEncoder {
             // Hierarchical: bind coarse and fine position vectors
             let coarse_idx = (index / self.max_positions) % self.max_positions;
             let fine_idx = index % self.max_positions;
-            let composed = self.coarse_position_vectors[coarse_idx]
-                .bind(&self.position_vectors[fine_idx]);
+            let composed =
+                self.coarse_position_vectors[coarse_idx].bind(&self.position_vectors[fine_idx]);
             std::borrow::Cow::Owned(composed)
         }
     }
@@ -473,7 +473,7 @@ mod tests {
     #[test]
     fn test_encode_entity() {
         let encoder = CodeHDEncoder::new(512);
-        let entity = CodeEntity::new(EntityKind::Function, "my_func", test_span())
+        let entity = Entity::new(EntityKind::Function, "my_func", test_span())
             .with_annotation("visibility", "pub");
 
         let hv = encoder.encode_entity(&entity);
@@ -487,7 +487,7 @@ mod tests {
     #[test]
     fn test_encode_function_with_return_type() {
         let encoder = CodeHDEncoder::new(512);
-        let entity = CodeEntity::new(EntityKind::Function, "calculate", test_span())
+        let entity = Entity::new(EntityKind::Function, "calculate", test_span())
             .with_annotation("parameters", "(x: f64, y: f64)")
             .with_annotation("return_type", "f64");
 
@@ -499,15 +499,15 @@ mod tests {
     fn test_similar_functions_similar_hvs() {
         let encoder = CodeHDEncoder::new(512);
 
-        let func1 = CodeEntity::new(EntityKind::Function, "add", test_span())
+        let func1 = Entity::new(EntityKind::Function, "add", test_span())
             .with_annotation("parameters", "(a: i32, b: i32)")
             .with_annotation("return_type", "i32");
 
-        let func2 = CodeEntity::new(EntityKind::Function, "sum", test_span())
+        let func2 = Entity::new(EntityKind::Function, "sum", test_span())
             .with_annotation("parameters", "(a: i32, b: i32)")
             .with_annotation("return_type", "i32");
 
-        let func3 = CodeEntity::new(EntityKind::Struct, "Config", test_span());
+        let func3 = Entity::new(EntityKind::Struct, "Config", test_span());
 
         let hv1 = encoder.encode_function(&func1);
         let hv2 = encoder.encode_function(&func2);
@@ -531,10 +531,10 @@ mod tests {
         let mut parsed = ParsedCode::new("fn a() {} fn b() {}", "rust");
         parsed
             .entities
-            .push(CodeEntity::new(EntityKind::Function, "a", test_span()));
+            .push(Entity::new(EntityKind::Function, "a", test_span()));
         parsed
             .entities
-            .push(CodeEntity::new(EntityKind::Function, "b", test_span()));
+            .push(Entity::new(EntityKind::Function, "b", test_span()));
 
         let module_hv = encoder.encode_module(&parsed);
         assert_eq!(module_hv.values.len(), 512);
@@ -566,13 +566,13 @@ mod tests {
 
         let mut old = ParsedCode::new("fn a() {}", "rust");
         old.entities
-            .push(CodeEntity::new(EntityKind::Function, "a", test_span()));
+            .push(Entity::new(EntityKind::Function, "a", test_span()));
 
         let mut new = ParsedCode::new("fn a() {} fn b() {}", "rust");
         new.entities
-            .push(CodeEntity::new(EntityKind::Function, "a", test_span()));
+            .push(Entity::new(EntityKind::Function, "a", test_span()));
         new.entities
-            .push(CodeEntity::new(EntityKind::Function, "b", test_span()));
+            .push(Entity::new(EntityKind::Function, "b", test_span()));
 
         let diff_hv = encoder.encode_diff(&old, &new);
         assert_eq!(diff_hv.values.len(), 512);
@@ -617,7 +617,9 @@ mod tests {
         let encoder = CodeHDEncoder::new(512);
 
         // Verify positions across a 500-entity module remain distinguishable
-        let positions: Vec<_> = (0..500).map(|i| encoder.position_vector(i).into_owned()).collect();
+        let positions: Vec<_> = (0..500)
+            .map(|i| encoder.position_vector(i).into_owned())
+            .collect();
 
         // Sample pairs should have low similarity (high-D random vectors are quasi-orthogonal)
         let sim_0_300 = positions[0].similarity(&positions[300]);

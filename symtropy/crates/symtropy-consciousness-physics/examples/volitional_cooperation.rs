@@ -19,13 +19,13 @@
 //! Run: cargo run --example volitional_cooperation --release
 
 use nalgebra::SVector;
-use symtropy_consciousness_physics::convergence::{mann_whitney_u, cohens_d, holm_bonferroni};
+use symthaea_consciousness_equation::ConsciousnessInputs;
+use symtropy_consciousness_physics::convergence::{cohens_d, holm_bonferroni, mann_whitney_u};
 use symtropy_consciousness_physics::fep_gradient;
 use symtropy_consciousness_physics::harmony_field::HarmonyField;
 use symtropy_consciousness_physics::{ConsciousnessField, ThermodynamicConstants};
 use symtropy_math::Point;
 use symtropy_physics::PhysicsWorld;
-use symthaea_consciousness_equation::ConsciousnessInputs;
 
 const AGENTS: usize = 20;
 const TICKS: usize = 8_000;
@@ -52,11 +52,19 @@ struct VolitionResult {
 
 fn gini(values: &[f64]) -> f64 {
     let n = values.len();
-    if n < 2 { return 0.0; }
+    if n < 2 {
+        return 0.0;
+    }
     let mean = values.iter().sum::<f64>() / n as f64;
-    if mean < 1e-10 { return 0.0; }
+    if mean < 1e-10 {
+        return 0.0;
+    }
     let mut sum = 0.0;
-    for i in 0..n { for j in 0..n { sum += (values[i] - values[j]).abs(); } }
+    for i in 0..n {
+        for j in 0..n {
+            sum += (values[i] - values[j]).abs();
+        }
+    }
     sum / (2.0 * n as f64 * n as f64 * mean)
 }
 
@@ -75,8 +83,14 @@ fn run_experiment(willingness: f64, seed: u64) -> VolitionResult {
         let x = (rng_f64(&mut rng) - 0.5) * 100.0;
         let y = (rng_f64(&mut rng) - 0.5) * 100.0;
         let h = world.add_sphere(Point::new([x, y]), 1.0, 1.0);
-        if let Some(b) = world.body_mut(h) { b.linear_damping = 0.05; }
-        consciousness.register(h, consciousness.constants.initial_energy, consciousness.constants.harmony_range);
+        if let Some(b) = world.body_mut(h) {
+            b.linear_damping = 0.05;
+        }
+        consciousness.register(
+            h,
+            consciousness.constants.initial_energy,
+            consciousness.constants.harmony_range,
+        );
         if let Some(e) = consciousness.entities.get_mut(&h) {
             e.harmony_activations = HARMONY_PROFILES[i % 4];
         }
@@ -93,44 +107,85 @@ fn run_experiment(willingness: f64, seed: u64) -> VolitionResult {
             let ht = e.map(|e| e.total_harmony_energy()).unwrap_or(0.0);
             let collapsed = e.map(|e| e.energy.is_collapsed()).unwrap_or(true);
             let inputs = if collapsed {
-                ConsciousnessInputs { phi: 0.0, broadcast: 0.0, working_memory: 0.0,
-                    attention: 0.0, recurrence: 0.0, embodiment: 0.0, knowledge: 0.0, synchrony: 0.0 }
+                ConsciousnessInputs {
+                    phi: 0.0,
+                    broadcast: 0.0,
+                    working_memory: 0.0,
+                    attention: 0.0,
+                    recurrence: 0.0,
+                    embodiment: 0.0,
+                    knowledge: 0.0,
+                    synchrony: 0.0,
+                }
             } else {
                 ConsciousnessInputs {
-                    phi: ef, broadcast: 0.5, working_memory: (1.0 - pe).max(0.0),
-                    attention: 0.5, recurrence: 1.0, embodiment: 0.7,
-                    knowledge: (ht / 8.0).min(1.0), synchrony: consciousness.collective_phi.max(0.5),
+                    phi: ef,
+                    broadcast: 0.5,
+                    working_memory: (1.0 - pe).max(0.0),
+                    attention: 0.5,
+                    recurrence: 1.0,
+                    embodiment: 0.7,
+                    knowledge: (ht / 8.0).min(1.0),
+                    synchrony: consciousness.collective_phi.max(0.5),
                 }
             };
             consciousness.update_entity(h, &inputs, Point::origin());
         }
 
-        let adata: Vec<_> = handles.iter().filter_map(|&h| {
-            Some((world.body(h)?.position().0, consciousness.entities.get(&h)?.harmony_activations))
-        }).collect();
-        let wdata: Vec<_> = wells.iter().zip(well_remaining.iter())
-            .filter(|(_, &r)| r > 0.0).map(|(&p, &r)| (p, (r / 2500.0).min(1.0))).collect();
+        let adata: Vec<_> = handles
+            .iter()
+            .filter_map(|&h| {
+                Some((
+                    world.body(h)?.position().0,
+                    consciousness.entities.get(&h)?.harmony_activations,
+                ))
+            })
+            .collect();
+        let wdata: Vec<_> = wells
+            .iter()
+            .zip(well_remaining.iter())
+            .filter(|(_, &r)| r > 0.0)
+            .map(|(&p, &r)| (p, (r / 2500.0).min(1.0)))
+            .collect();
 
         for &h in &handles {
             let Some(b) = world.body(h) else { continue };
-            let Some(e) = consciousness.entities.get(&h) else { continue };
-            if e.energy.is_collapsed() { continue; }
+            let Some(e) = consciousness.entities.get(&h) else {
+                continue;
+            };
+            if e.energy.is_collapsed() {
+                continue;
+            }
             let pos = b.position().0;
 
             // VOLITION: each tick, roll whether to include social gradient
             let include_social = rng_f64(&mut rng) < willingness;
 
             let near: Vec<_> = if include_social {
-                adata.iter().filter(|(p, _)| {
-                    let d = (p - pos).norm(); d > 2.0 && d < consciousness.constants.harmony_range
-                }).cloned().collect()
+                adata
+                    .iter()
+                    .filter(|(p, _)| {
+                        let d = (p - pos).norm();
+                        d > 2.0 && d < consciousness.constants.harmony_range
+                    })
+                    .cloned()
+                    .collect()
             } else {
                 vec![] // ignore other agents entirely
             };
 
-            let dir = fep_gradient::free_energy_gradient(&pos, e.energy.fraction_remaining(),
-                &e.harmony_activations, &near, &wdata, None, 0.0);
-            if let Some(b) = world.body_mut(h) { b.linear_velocity = dir * 20.0; }
+            let dir = fep_gradient::free_energy_gradient(
+                &pos,
+                e.energy.fraction_remaining(),
+                &e.harmony_activations,
+                &near,
+                &wdata,
+                None,
+                0.0,
+            );
+            if let Some(b) = world.body_mut(h) {
+                b.linear_velocity = dir * 20.0;
+            }
         }
 
         let rm = consciousness.resource_regeneration_multiplier();
@@ -138,7 +193,9 @@ fn run_experiment(willingness: f64, seed: u64) -> VolitionResult {
         let ar = consciousness.constants.ambient_regen_rate;
         let wr = consciousness.constants.energy_well_regen_rate;
         for &h in handles.iter() {
-            if let Some(e) = consciousness.entities.get_mut(&h) { e.energy.tick_reset(); }
+            if let Some(e) = consciousness.entities.get_mut(&h) {
+                e.energy.tick_reset();
+            }
             consciousness.consume_energy(h, mr * (1.0 + consciousness.phi(h) * 0.5));
             if let Some(e) = consciousness.entities.get_mut(&h) {
                 e.energy.regenerate(ar * rm);
@@ -159,21 +216,34 @@ fn run_experiment(willingness: f64, seed: u64) -> VolitionResult {
         // Cooperation still happens when agents are near (resonance is passive)
         // But willingness affects whether agents SEEK each other
         for i in 0..handles.len() {
-            for j in (i+1)..handles.len() {
+            for j in (i + 1)..handles.len() {
                 let (ha, hb) = (handles[i], handles[j]);
                 let in_range = match (world.body(ha), world.body(hb)) {
-                    (Some(a), Some(b)) => a.position().distance(b.position()) < consciousness.constants.harmony_range,
+                    (Some(a), Some(b)) => {
+                        a.position().distance(b.position()) < consciousness.constants.harmony_range
+                    }
                     _ => false,
                 };
-                if !in_range { continue; }
-                let (a, b) = match (consciousness.entities.get(&ha), consciousness.entities.get(&hb)) {
-                    (Some(a), Some(b)) => (a.harmony_activations, b.harmony_activations), _ => continue,
+                if !in_range {
+                    continue;
+                }
+                let (a, b) = match (
+                    consciousness.entities.get(&ha),
+                    consciousness.entities.get(&hb),
+                ) {
+                    (Some(a), Some(b)) => (a.harmony_activations, b.harmony_activations),
+                    _ => continue,
                 };
                 let res = HarmonyField::<2>::resonance(&a, &b);
                 if res > 0.5 {
-                    let rg = consciousness.constants.harmony_resonance_regen_rate * (res - 0.5) * 2.0;
-                    if let Some(e) = consciousness.entities.get_mut(&ha) { e.energy.regenerate(rg); }
-                    if let Some(e) = consciousness.entities.get_mut(&hb) { e.energy.regenerate(rg); }
+                    let rg =
+                        consciousness.constants.harmony_resonance_regen_rate * (res - 0.5) * 2.0;
+                    if let Some(e) = consciousness.entities.get_mut(&ha) {
+                        e.energy.regenerate(rg);
+                    }
+                    if let Some(e) = consciousness.entities.get_mut(&hb) {
+                        e.energy.regenerate(rg);
+                    }
                     coop += 1;
                 }
             }
@@ -184,17 +254,60 @@ fn run_experiment(willingness: f64, seed: u64) -> VolitionResult {
         consciousness.tick_thermodynamics();
     }
 
-    let alive = handles.iter().filter(|h| consciousness.entities.get(h).map(|e| !e.energy.is_collapsed()).unwrap_or(false)).count() as f64;
-    let energy = handles.iter().filter_map(|h| consciousness.entities.get(h).map(|e| e.energy.available)).sum::<f64>() / AGENTS as f64;
-    let energies: Vec<f64> = handles.iter().map(|h| consciousness.entities.get(h).map(|e| e.energy.available).unwrap_or(0.0)).collect();
-    let pos: Vec<SVector<f64, 2>> = handles.iter().filter_map(|h| world.body(*h).map(|b| b.position().0)).collect();
+    let alive = handles
+        .iter()
+        .filter(|h| {
+            consciousness
+                .entities
+                .get(h)
+                .map(|e| !e.energy.is_collapsed())
+                .unwrap_or(false)
+        })
+        .count() as f64;
+    let energy = handles
+        .iter()
+        .filter_map(|h| consciousness.entities.get(h).map(|e| e.energy.available))
+        .sum::<f64>()
+        / AGENTS as f64;
+    let energies: Vec<f64> = handles
+        .iter()
+        .map(|h| {
+            consciousness
+                .entities
+                .get(h)
+                .map(|e| e.energy.available)
+                .unwrap_or(0.0)
+        })
+        .collect();
+    let pos: Vec<SVector<f64, 2>> = handles
+        .iter()
+        .filter_map(|h| world.body(*h).map(|b| b.position().0))
+        .collect();
     let clustering = if pos.len() >= 2 {
-        pos.iter().enumerate().map(|(i, p)| pos.iter().enumerate().filter(|(j,_)| *j!=i).map(|(_,q)| (p-q).norm()).fold(f64::MAX, f64::min)).sum::<f64>() / pos.len() as f64
-    } else { f64::MAX };
+        pos.iter()
+            .enumerate()
+            .map(|(i, p)| {
+                pos.iter()
+                    .enumerate()
+                    .filter(|(j, _)| *j != i)
+                    .map(|(_, q)| (p - q).norm())
+                    .fold(f64::MAX, f64::min)
+            })
+            .sum::<f64>()
+            / pos.len() as f64
+    } else {
+        f64::MAX
+    };
 
     VolitionResult {
-        willingness, alive, energy,
-        clustering: if clustering.is_finite() { clustering } else { 0.0 },
+        willingness,
+        alive,
+        energy,
+        clustering: if clustering.is_finite() {
+            clustering
+        } else {
+            0.0
+        },
         cooperation: coop as f64,
         gini: gini(&energies),
     }
@@ -216,15 +329,19 @@ fn main() {
             let seed = 42 + s as u64 * 997;
             eprintln!("  w={w:.1} seed={seed}...");
             let r = run_experiment(w, seed);
-            println!("{w:.1},{seed},{:.1},{:.1},{:.2},{:.0},{:.4}",
-                r.alive, r.energy, r.clustering, r.cooperation, r.gini);
+            println!(
+                "{w:.1},{seed},{:.1},{:.1},{:.2},{:.0},{:.4}",
+                r.alive, r.energy, r.clustering, r.cooperation, r.gini
+            );
             results.push(r);
         }
         let n = results.len() as f64;
-        eprintln!("  → w={w:.1}: alive={:.1}, coop={:.0}, gini={:.3}",
+        eprintln!(
+            "  → w={w:.1}: alive={:.1}, coop={:.0}, gini={:.3}",
             results.iter().map(|r| r.alive).sum::<f64>() / n,
             results.iter().map(|r| r.cooperation).sum::<f64>() / n,
-            results.iter().map(|r| r.gini).sum::<f64>() / n);
+            results.iter().map(|r| r.gini).sum::<f64>() / n
+        );
         all.push((w, results));
     }
 
@@ -241,13 +358,21 @@ fn main() {
         let marker = if survival_rate < 0.5 && critical_w.is_none() {
             critical_w = Some(*w);
             " ← CRITICAL"
-        } else { "" };
-        eprintln!("  {w:.1}    {:5.1}  {:9.0}   {:6.2}   {:.3}{marker}", alive, coop, clust, gi);
+        } else {
+            ""
+        };
+        eprintln!(
+            "  {w:.1}    {:5.1}  {:9.0}   {:6.2}   {:.3}{marker}",
+            alive, coop, clust, gi
+        );
     }
 
     // Putnam analysis: compare w=1.0 (full cooperation) vs w=0.2 (low willingness)
-    let full = &all[0].1;  // w=1.0
-    let low_idx = WILLINGNESS_LEVELS.iter().position(|&w| w == 0.2).unwrap_or(4);
+    let full = &all[0].1; // w=1.0
+    let low_idx = WILLINGNESS_LEVELS
+        .iter()
+        .position(|&w| w == 0.2)
+        .unwrap_or(4);
     let low = &all[low_idx].1; // w=0.2
 
     let f_alive: Vec<f64> = full.iter().map(|r| r.alive).collect();
@@ -258,9 +383,18 @@ fn main() {
     let l_gini: Vec<f64> = low.iter().map(|r| r.gini).collect();
 
     let tests = vec![
-        ("survival", { let (_, _, p) = mann_whitney_u(&f_alive, &l_alive); p }),
-        ("cooperation", { let (_, _, p) = mann_whitney_u(&f_coop, &l_coop); p }),
-        ("inequality", { let (_, _, p) = mann_whitney_u(&f_gini, &l_gini); p }),
+        ("survival", {
+            let (_, _, p) = mann_whitney_u(&f_alive, &l_alive);
+            p
+        }),
+        ("cooperation", {
+            let (_, _, p) = mann_whitney_u(&f_coop, &l_coop);
+            p
+        }),
+        ("inequality", {
+            let (_, _, p) = mann_whitney_u(&f_gini, &l_gini);
+            p
+        }),
     ];
     let effects = [
         cohens_d(&f_alive, &l_alive),
@@ -272,8 +406,17 @@ fn main() {
     eprintln!("\n── w=1.0 vs w=0.2 (Holm-Bonferroni, k=3) ──");
     for (i, &(label, adj_p, sig)) in corrected.iter().enumerate() {
         let d = effects[i];
-        let size = if d.abs() > 0.8 { "LARGE" } else if d.abs() > 0.5 { "medium" } else { "small" };
-        eprintln!("  {label:12}: p_adj={adj_p:.4}, d={d:.3} ({size}) {}", if sig { "← SIG" } else { "" });
+        let size = if d.abs() > 0.8 {
+            "LARGE"
+        } else if d.abs() > 0.5 {
+            "medium"
+        } else {
+            "small"
+        };
+        eprintln!(
+            "  {label:12}: p_adj={adj_p:.4}, d={d:.3} ({size}) {}",
+            if sig { "← SIG" } else { "" }
+        );
     }
 
     // Putnam check: does low willingness produce all 4 trends?
@@ -285,15 +428,27 @@ fn main() {
     let low_gini_mean = l_gini.iter().sum::<f64>() / l_gini.len() as f64;
 
     let mut putnam = 0;
-    if low_coop_mean < base_coop * 0.7 { putnam += 1; eprintln!("\n  ✓ Declining cooperation"); }
-    if low_alive_mean > base_alive * 0.5 { putnam += 1; eprintln!("  ✓ Persistent survival"); }
-    if low_gini_mean > base_gini_mean + 0.03 { putnam += 1; eprintln!("  ✓ Rising inequality"); }
+    if low_coop_mean < base_coop * 0.7 {
+        putnam += 1;
+        eprintln!("\n  ✓ Declining cooperation");
+    }
+    if low_alive_mean > base_alive * 0.5 {
+        putnam += 1;
+        eprintln!("  ✓ Persistent survival");
+    }
+    if low_gini_mean > base_gini_mean + 0.03 {
+        putnam += 1;
+        eprintln!("  ✓ Rising inequality");
+    }
     // Isolation measured by clustering loosening
     let f_clust: Vec<f64> = full.iter().map(|r| r.clustering).collect();
     let l_clust: Vec<f64> = low.iter().map(|r| r.clustering).collect();
     let f_clust_mean = f_clust.iter().sum::<f64>() / f_clust.len() as f64;
     let l_clust_mean = l_clust.iter().sum::<f64>() / l_clust.len() as f64;
-    if l_clust_mean > f_clust_mean * 1.2 { putnam += 1; eprintln!("  ✓ Increasing isolation"); }
+    if l_clust_mean > f_clust_mean * 1.2 {
+        putnam += 1;
+        eprintln!("  ✓ Increasing isolation");
+    }
 
     eprintln!("\n  Putnam score: {putnam}/4");
     if putnam >= 3 {
@@ -309,4 +464,9 @@ fn main() {
     eprintln!("\n=== Complete ===");
 }
 
-fn rng_f64(s: &mut u64) -> f64 { *s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407); (*s >> 11) as f64 / (1u64 << 53) as f64 }
+fn rng_f64(s: &mut u64) -> f64 {
+    *s = s
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
+    (*s >> 11) as f64 / (1u64 << 53) as f64
+}

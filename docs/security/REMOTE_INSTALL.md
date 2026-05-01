@@ -4,7 +4,7 @@ This repo is security-hardened to avoid the historical pattern of "installer run
 The intended remote install flow is now:
 
 - Target machine: runs the installer ISO, exposes **SSH only**.
-- Operator machine: runs the **SSH relay locally** (localhost-only + token auth) and drives install from the portal UI.
+- Operator machine: runs the **SSH relay locally** (localhost-only + token auth) and drives install from the Sensorium UI.
 
 ## What Changed (Security Posture)
 
@@ -44,11 +44,11 @@ cd symthaea
 RUSTC_WRAPPER= cargo run -p symthaea-spore --features server --bin ssh-relay
 ```
 
-6) Open the portal UI on the operator machine and paste the relay token when prompted.
+6) Open the Sensorium UI on the operator machine and paste the relay token when prompted.
 
 Notes:
-- The relay listens on `127.0.0.1`, so the portal must run on the same machine as the relay, or you must port-forward.
-- If you need to access the portal/relay from a second machine, prefer SSH port-forwarding rather than exposing services:
+- The relay listens on `127.0.0.1`, so the Sensorium must run on the same machine as the relay, or you must port-forward.
+- If you need to access the Sensorium/relay from a second machine, prefer SSH port-forwarding rather than exposing services:
 
 ```bash
 # Example: forward relay from operator to your laptop

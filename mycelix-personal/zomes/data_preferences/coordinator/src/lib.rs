@@ -8,15 +8,25 @@
 //! cross-cluster calls. If a user has blocked a flow, the bridge returns
 //! BRG-011 (UserBlocked) instead of executing the call.
 
-use hdk::prelude::*;
 use data_preferences_integrity::*;
+use hdk::prelude::*;
+
+getrandom::register_custom_getrandom!(my_custom_getrandom);
+
+pub fn my_custom_getrandom(buf: &mut [u8]) -> Result<(), getrandom::Error> {
+    let bytes = random_bytes(buf.len() as u32).map_err(|_| getrandom::Error::UNSUPPORTED)?;
+    buf.copy_from_slice(bytes.as_ref());
+    Ok(())
+}
+
+use personal_leptos_types::{DataSharingPreferenceView, PreferenceChangeLogView};
 
 /// Set a data sharing preference for a cluster pair.
 ///
 /// Creates or updates the preference. Logs the change for audit.
 #[hdk_extern]
 pub fn set_preference(pref: DataSharingPreference) -> ExternResult<ActionHash> {
-    let agent = agent_info()?.agent_latest_pubkey;
+    let agent = agent_info()?.agent_initial_pubkey;
 
     // Check if a preference already exists for this pair
     let existing = get_preference_for_pair(&pref.source_cluster, &pref.target_cluster)?;
@@ -48,27 +58,60 @@ pub fn set_preference(pref: DataSharingPreference) -> ExternResult<ActionHash> {
     Ok(action_hash)
 }
 
+#[hdk_extern]
+pub fn set_preference_view(pref: DataSharingPreferenceView) -> ExternResult<ActionHash> {
+    set_preference(DataSharingPreference {
+        source_cluster: pref.source_cluster,
+        target_cluster: pref.target_cluster,
+        allowed: pref.allowed,
+        blocked_zomes: pref.blocked_zomes,
+        reason: pref.reason,
+        updated_at: sys_time()?,
+    })
+}
+
 /// Get all data sharing preferences for the current agent.
 #[hdk_extern]
 pub fn get_my_preferences(_: ()) -> ExternResult<Vec<DataSharingPreference>> {
-    let agent = agent_info()?.agent_latest_pubkey;
+    let agent = agent_info()?.agent_initial_pubkey;
     let links = get_links(
-        GetLinksInputBuilder::try_new(agent, LinkTypes::AgentToPreferences)?.build(),
+        LinkQuery::new(agent, LinkTypes::AgentToPreferences.try_into_filter()?),
+        GetStrategy::Network,
     )?;
 
     let mut prefs = Vec::new();
     for link in links {
-        let hash: ActionHash = link.target.into_action_hash()
+        let hash: ActionHash = link
+            .target
+            .into_action_hash()
             .ok_or(wasm_error!("Invalid link target"))?;
         if let Some(record) = get(hash, GetOptions::default())? {
-            if let Some(p) = record.entry().to_app_option::<DataSharingPreference>()
-                .map_err(|e| wasm_error!("Deserialize: {}", e))? {
+            if let Some(p) = record
+                .entry()
+                .to_app_option::<DataSharingPreference>()
+                .map_err(|e| wasm_error!("Deserialize: {}", e))?
+            {
                 prefs.push(p);
             }
         }
     }
 
     Ok(prefs)
+}
+
+#[hdk_extern]
+pub fn get_my_preferences_view(_: ()) -> ExternResult<Vec<DataSharingPreferenceView>> {
+    Ok(get_my_preferences(())?
+        .into_iter()
+        .map(|pref| DataSharingPreferenceView {
+            source_cluster: pref.source_cluster,
+            target_cluster: pref.target_cluster,
+            allowed: pref.allowed,
+            blocked_zomes: pref.blocked_zomes,
+            reason: pref.reason,
+            updated_at: pref.updated_at.as_micros(),
+        })
+        .collect())
 }
 
 /// Check if a specific flow is allowed for the current agent.
@@ -96,24 +139,44 @@ pub fn is_flow_allowed(input: FlowCheckInput) -> ExternResult<bool> {
 /// Get the preference change log for the current agent.
 #[hdk_extern]
 pub fn get_change_log(_: ()) -> ExternResult<Vec<PreferenceChangeLog>> {
-    let agent = agent_info()?.agent_latest_pubkey;
+    let agent = agent_info()?.agent_initial_pubkey;
     let links = get_links(
-        GetLinksInputBuilder::try_new(agent, LinkTypes::AgentToChangeLog)?.build(),
+        LinkQuery::new(agent, LinkTypes::AgentToChangeLog.try_into_filter()?),
+        GetStrategy::Network,
     )?;
 
     let mut logs = Vec::new();
     for link in links {
-        let hash: ActionHash = link.target.into_action_hash()
+        let hash: ActionHash = link
+            .target
+            .into_action_hash()
             .ok_or(wasm_error!("Invalid link target"))?;
         if let Some(record) = get(hash, GetOptions::default())? {
-            if let Some(log) = record.entry().to_app_option::<PreferenceChangeLog>()
-                .map_err(|e| wasm_error!("Deserialize: {}", e))? {
+            if let Some(log) = record
+                .entry()
+                .to_app_option::<PreferenceChangeLog>()
+                .map_err(|e| wasm_error!("Deserialize: {}", e))?
+            {
                 logs.push(log);
             }
         }
     }
 
     Ok(logs)
+}
+
+#[hdk_extern]
+pub fn get_change_log_view(_: ()) -> ExternResult<Vec<PreferenceChangeLogView>> {
+    Ok(get_change_log(())?
+        .into_iter()
+        .map(|log| PreferenceChangeLogView {
+            source_cluster: log.source_cluster,
+            target_cluster: log.target_cluster,
+            was_allowed: log.was_allowed,
+            now_allowed: log.now_allowed,
+            changed_at: log.changed_at.as_micros(),
+        })
+        .collect())
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -124,21 +187,28 @@ pub struct FlowCheckInput {
 }
 
 /// Internal: find existing preference for a cluster pair.
-fn get_preference_for_pair(source: &str, target: &str) -> ExternResult<Option<DataSharingPreference>> {
-    let agent = agent_info()?.agent_latest_pubkey;
+fn get_preference_for_pair(
+    source: &str,
+    target: &str,
+) -> ExternResult<Option<DataSharingPreference>> {
+    let agent = agent_info()?.agent_initial_pubkey;
     let tag = LinkTag::new(format!("{source}→{target}"));
     let links = get_links(
-        GetLinksInputBuilder::try_new(agent, LinkTypes::AgentToPreferences)?
-            .tag_prefix(tag)
-            .build(),
+        LinkQuery::new(agent, LinkTypes::AgentToPreferences.try_into_filter()?).tag_prefix(tag),
+        GetStrategy::Network,
     )?;
 
     // Return the most recent preference (last link)
     if let Some(link) = links.last() {
-        let hash: ActionHash = link.target.clone().into_action_hash()
+        let hash: ActionHash = link
+            .target
+            .clone()
+            .into_action_hash()
             .ok_or(wasm_error!("Invalid link target"))?;
         if let Some(record) = get(hash, GetOptions::default())? {
-            return record.entry().to_app_option::<DataSharingPreference>()
+            return record
+                .entry()
+                .to_app_option::<DataSharingPreference>()
                 .map_err(|e| wasm_error!("Deserialize: {}", e));
         }
     }

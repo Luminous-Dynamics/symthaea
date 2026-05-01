@@ -21,7 +21,12 @@ fn main() {
     let seed: u64 = args.get(1).and_then(|s| s.parse().ok()).unwrap_or(42);
     let ticks: u32 = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(1800);
 
-    eprintln!("=== ETHICS STORY — seed {} × {} ticks ({:.0} years) ===\n", seed, ticks, ticks as f64 / 12.0);
+    eprintln!(
+        "=== ETHICS STORY — seed {} × {} ticks ({:.0} years) ===\n",
+        seed,
+        ticks,
+        ticks as f64 / 12.0
+    );
 
     let mut policy = PolicyConfig::default();
     policy.trust_weighted_governance = true;
@@ -61,7 +66,10 @@ fn main() {
 
     // === 1. Narrative Chronicle ===
     println!("╔══════════════════════════════════════════════════════╗");
-    println!("║  THE MORAL STORY OF SEED {}                         ║", seed);
+    println!(
+        "║  THE MORAL STORY OF SEED {}                         ║",
+        seed
+    );
     println!("╚══════════════════════════════════════════════════════╝\n");
 
     if !sim.narrative_engine.events.is_empty() {
@@ -77,15 +85,21 @@ fn main() {
 
     println!("snapshot,pop,deont,conseq,virtue,relat,dominant,diversity");
     for snap in &report.epoch_snapshots {
-        println!("yr{:.0},{},{:.3},{:.3},{:.3},{:.3},{},{:.3}",
+        println!(
+            "yr{:.0},{},{:.3},{:.3},{:.3},{:.3},{},{:.3}",
             snap.tick as f64 / 12.0,
             snap.total_population,
-            snap.ethics_mean[0], snap.ethics_mean[1],
-            snap.ethics_mean[2], snap.ethics_mean[3],
-            ["deont", "conseq", "virtue", "relat"][snap.ethics_mean.iter()
+            snap.ethics_mean[0],
+            snap.ethics_mean[1],
+            snap.ethics_mean[2],
+            snap.ethics_mean[3],
+            ["deont", "conseq", "virtue", "relat"][snap
+                .ethics_mean
+                .iter()
                 .enumerate()
                 .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
-                .map(|(i, _)| i).unwrap_or(0)],
+                .map(|(i, _)| i)
+                .unwrap_or(0)],
             snap.ethics_diversity,
         );
     }
@@ -105,8 +119,14 @@ fn main() {
         let mean_load: f64 = living.iter().map(|a| a.needs.allostatic_load).sum::<f64>() / n;
         let mean_trauma: f64 = living.iter().map(|a| a.trauma_level).sum::<f64>() / n;
 
-        let max_guilt = living.iter().map(|a| a.needs.affect.guilt).fold(0.0f64, f64::max);
-        let max_harm = living.iter().map(|a| a.needs.affect.harm).fold(0.0f64, f64::max);
+        let max_guilt = living
+            .iter()
+            .map(|a| a.needs.affect.guilt)
+            .fold(0.0f64, f64::max);
+        let max_harm = living
+            .iter()
+            .map(|a| a.needs.affect.harm)
+            .fold(0.0f64, f64::max);
 
         let guilt_saturated = living.iter().filter(|a| a.needs.affect.guilt > 0.8).count();
         let harm_saturated = living.iter().filter(|a| a.needs.affect.harm > 0.8).count();
@@ -116,37 +136,64 @@ fn main() {
         let inst = &world.institutional_ethics;
 
         println!("World: {} (pop: {})", world.name, living.len());
-        println!("  Ethics mean:        [{:.3}, {:.3}, {:.3}, {:.3}] ({})",
-            mean_ethics.deontological, mean_ethics.consequentialist,
-            mean_ethics.virtue_care, mean_ethics.relational,
-            mean_ethics.dominant());
-        println!("  Institutional:      [{:.3}, {:.3}, {:.3}, {:.3}] ({})",
-            inst.deontological, inst.consequentialist,
-            inst.virtue_care, inst.relational,
-            inst.dominant());
-        println!("  Moral memories:     {} active", world.moral_memories.len());
+        println!(
+            "  Ethics mean:        [{:.3}, {:.3}, {:.3}, {:.3}] ({})",
+            mean_ethics.deontological,
+            mean_ethics.consequentialist,
+            mean_ethics.virtue_care,
+            mean_ethics.relational,
+            mean_ethics.dominant()
+        );
+        println!(
+            "  Institutional:      [{:.3}, {:.3}, {:.3}, {:.3}] ({})",
+            inst.deontological,
+            inst.consequentialist,
+            inst.virtue_care,
+            inst.relational,
+            inst.dominant()
+        );
+        println!(
+            "  Moral memories:     {} active",
+            world.moral_memories.len()
+        );
         for mem in &world.moral_memories {
-            let dim_names = ["deontological", "consequentialist", "virtue_care", "relational"];
-            println!("    yr {:.0}: lesson={}, strength={:.2}",
+            let dim_names = [
+                "deontological",
+                "consequentialist",
+                "virtue_care",
+                "relational",
+            ];
+            println!(
+                "    yr {:.0}: lesson={}, strength={:.2}",
                 mem.tick as f64 / 12.0,
                 dim_names[mem.lesson_dimension],
-                mem.strength(report.total_ticks));
+                mem.strength(report.total_ticks)
+            );
         }
         println!("  Affect diagnostics:");
-        println!("    mean guilt:       {:.4} (max: {:.4}, saturated: {})", mean_guilt, max_guilt, guilt_saturated);
-        println!("    mean harm:        {:.4} (max: {:.4}, saturated: {})", mean_harm, max_harm, harm_saturated);
+        println!(
+            "    mean guilt:       {:.4} (max: {:.4}, saturated: {})",
+            mean_guilt, max_guilt, guilt_saturated
+        );
+        println!(
+            "    mean harm:        {:.4} (max: {:.4}, saturated: {})",
+            mean_harm, max_harm, harm_saturated
+        );
         println!("    mean outrage:     {:.4}", mean_outrage);
-        println!("    morally injured:  {}/{} agents ({:.1}%)", morally_injured, living.len(),
-            morally_injured as f64 / n * 100.0);
+        println!(
+            "    morally injured:  {}/{} agents ({:.1}%)",
+            morally_injured,
+            living.len(),
+            morally_injured as f64 / n * 100.0
+        );
         println!("    mean load:        {:.4}", mean_load);
         println!("    mean trauma:      {:.4}", mean_trauma);
         println!();
     }
 
     // === Summary ===
-    println!("Final CVS: {:.4}, Phi: {:.4}, Pop: {}, Survived: {}",
-        report.final_cvs,
-        report.final_collective_phi,
-        report.final_population,
-        report.survived);
+    println!(
+        "Final CVS: {:.4}, Phi: {:.4}, Pop: {}, Survived: {}",
+        report.final_cvs, report.final_collective_phi, report.final_population, report.survived
+    );
 }

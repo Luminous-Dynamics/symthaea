@@ -42,11 +42,15 @@ impl AggregationStrategy {
     pub fn for_latency(one_way_delay_secs: f64) -> Self {
         if one_way_delay_secs < 10.0 {
             Self::Synchronous
-        } else if one_way_delay_secs < 1800.0 { // <30 min
+        } else if one_way_delay_secs < 1800.0 {
+            // <30 min
             Self::AsyncWeighted
-        } else if one_way_delay_secs < 5400.0 { // <90 min
+        } else if one_way_delay_secs < 5400.0 {
+            // <90 min
             // Sync every 12 ticks (1 year) for deep space
-            Self::EpochBased { ticks_per_epoch: 12 }
+            Self::EpochBased {
+                ticks_per_epoch: 12,
+            }
         } else {
             Self::Autonomous
         }
@@ -83,14 +87,20 @@ impl LatencyWeighting {
         // Tau scales with distance: nearby colonies are penalized more for staleness
         // because we expect fresher updates. Distant colonies get more slack.
         let tau = match source {
-            PlanetaryBody::Moon => 1.0,    // Expect fresh updates
-            PlanetaryBody::Mars => 3.0,    // 26-month windows
-            PlanetaryBody::Europa => 6.0,  // Deeply async
-            PlanetaryBody::Titan => 12.0,  // Near-autonomous
+            PlanetaryBody::Moon => 1.0,   // Expect fresh updates
+            PlanetaryBody::Mars => 3.0,   // 26-month windows
+            PlanetaryBody::Europa => 6.0, // Deeply async
+            PlanetaryBody::Titan => 12.0, // Near-autonomous
             _ => 2.0,
         };
         let effective_weight = base_weight * (-1.0 * staleness_ticks as f64 / tau).exp();
-        Self { source, base_weight, staleness_ticks, tau, effective_weight }
+        Self {
+            source,
+            base_weight,
+            staleness_ticks,
+            tau,
+            effective_weight,
+        }
     }
 }
 
@@ -123,13 +133,23 @@ mod tests {
 
     #[test]
     fn test_aggregation_strategy_selection() {
-        assert_eq!(AggregationStrategy::for_body(PlanetaryBody::Moon), AggregationStrategy::Synchronous);
-        assert_eq!(AggregationStrategy::for_body(PlanetaryBody::Mars), AggregationStrategy::AsyncWeighted);
-        assert!(matches!(AggregationStrategy::for_body(PlanetaryBody::Europa),
-            AggregationStrategy::EpochBased { .. }));
+        assert_eq!(
+            AggregationStrategy::for_body(PlanetaryBody::Moon),
+            AggregationStrategy::Synchronous
+        );
+        assert_eq!(
+            AggregationStrategy::for_body(PlanetaryBody::Mars),
+            AggregationStrategy::AsyncWeighted
+        );
+        assert!(matches!(
+            AggregationStrategy::for_body(PlanetaryBody::Europa),
+            AggregationStrategy::EpochBased { .. }
+        ));
         // Titan at 4758s mean delay is in EpochBased range (<5400s threshold)
-        assert!(matches!(AggregationStrategy::for_body(PlanetaryBody::Titan),
-            AggregationStrategy::EpochBased { .. }));
+        assert!(matches!(
+            AggregationStrategy::for_body(PlanetaryBody::Titan),
+            AggregationStrategy::EpochBased { .. }
+        ));
     }
 
     #[test]

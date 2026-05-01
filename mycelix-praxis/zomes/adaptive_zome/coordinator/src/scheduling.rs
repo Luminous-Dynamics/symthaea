@@ -638,7 +638,7 @@ pub fn should_suggest_session(
     profile: &SchedulingProfile,
     current_hour: u8,
     current_day: u8,
-    consciousness_level_permille: u16,
+    cognitive_readiness_permille: u16,
     dopamine_permille: u16,
     cortisol_permille: u16,
     sessions_today: u32,
@@ -710,9 +710,9 @@ pub fn should_suggest_session(
 
     // --- 5. Determine urgency and content ---
     let (flow_min, flow_max) = profile.consciousness_gates.flow_state_range;
-    let in_flow = consciousness_level_permille >= flow_min
-        && consciousness_level_permille <= flow_max;
-    let above_new_material = consciousness_level_permille
+    let in_flow = cognitive_readiness_permille >= flow_min
+        && cognitive_readiness_permille <= flow_max;
+    let above_new_material = cognitive_readiness_permille
         >= profile.consciousness_gates.min_phi_new_material;
 
     let (urgency, focus_area, reason) = if in_flow

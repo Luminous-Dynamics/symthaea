@@ -8,9 +8,9 @@
 // adversaries don't procreate attackers, so general population outgrows the
 // one-shot attack over generations.
 
-use mycelix_multiworld_sim::MultiWorldSimulator;
 use mycelix_multiworld_sim::config::{PolicyConfig, SimulationConfig};
 use mycelix_multiworld_sim::red_team::AdversarialStrategy;
+use mycelix_multiworld_sim::MultiWorldSimulator;
 
 fn main() {
     let mut config = SimulationConfig::default_150_year();
@@ -72,7 +72,9 @@ fn main() {
         let other_mean = other_sap_sum / other_count as f64;
         println!(
             "tier_buyer:     mean_sap={:.2} vs baseline_mean={:.2} delta={:+.2}",
-            buyer_mean, other_mean, buyer_mean - other_mean,
+            buyer_mean,
+            other_mean,
+            buyer_mean - other_mean,
         );
     }
 }

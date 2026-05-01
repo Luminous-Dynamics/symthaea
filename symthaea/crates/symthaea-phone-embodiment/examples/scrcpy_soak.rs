@@ -76,21 +76,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .get(1)
         .cloned()
         .unwrap_or_else(|| "41201FDJG000UM".to_string());
-    let duration_secs: u64 = args
-        .get(2)
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(60);
-    let max_size: u32 = args
-        .get(3)
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(720);
-    let report_interval: u64 = args
-        .get(4)
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(10);
+    let duration_secs: u64 = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(60);
+    let max_size: u32 = args.get(3).and_then(|s| s.parse().ok()).unwrap_or(720);
+    let report_interval: u64 = args.get(4).and_then(|s| s.parse().ok()).unwrap_or(10);
 
     let crate_dir = env!("CARGO_MANIFEST_DIR");
-    let jar = PathBuf::from(crate_dir).join("vendor").join(VENDORED_JAR_NAME);
+    let jar = PathBuf::from(crate_dir)
+        .join("vendor")
+        .join(VENDORED_JAR_NAME);
 
     println!("=== Phase I.B.6 sustain/soak harness ===");
     println!("device serial   : {serial}");
@@ -99,7 +92,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("report interval : {report_interval} s");
     println!("vendored JAR    : {}", jar.display());
     println!("target fps      : {TARGET_FPS}");
-    println!("sustain pass at : {} fps ({}% of target)", TARGET_FPS * SUSTAIN_PASS_FRACTION, (SUSTAIN_PASS_FRACTION * 100.0) as u32);
+    println!(
+        "sustain pass at : {} fps ({}% of target)",
+        TARGET_FPS * SUSTAIN_PASS_FRACTION,
+        (SUSTAIN_PASS_FRACTION * 100.0) as u32
+    );
     println!();
 
     let mut opts = ScrcpyOptions::cybernetic_defaults(serial.clone(), 8401);
@@ -116,10 +113,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Launching scrcpy capture stream...");
     let mut stream = ScrcpyCaptureStream::launch(&jar, &opts)?;
-    println!(
-        "  device       : {}",
-        stream.device_meta().name
-    );
+    println!("  device       : {}", stream.device_meta().name);
     println!(
         "  encoder size : {}x{} ({:?})",
         stream.video_header().width,
@@ -252,18 +246,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!();
     println!("=== Phase I.B.6 final summary ===");
-    println!("duration             : {:.2} s", total_elapsed.as_secs_f64());
+    println!(
+        "duration             : {:.2} s",
+        total_elapsed.as_secs_f64()
+    );
     println!("decoded frames       : {total_frames}");
     println!("mean fps             : {mean_fps:.2}");
     println!("target fps           : {TARGET_FPS:.0}");
-    println!("sustain threshold    : {sustain_threshold:.1} fps ({}% of target)", (SUSTAIN_PASS_FRACTION * 100.0) as u32);
+    println!(
+        "sustain threshold    : {sustain_threshold:.1} fps ({}% of target)",
+        (SUSTAIN_PASS_FRACTION * 100.0) as u32
+    );
     println!("sustain verdict      : {sustain_verdict}");
     println!();
     println!("wire packets read    : {total_wire_packets}");
-    println!("wire (HEVC) bytes    : {total_wire_bytes} ({} KB)", total_wire_bytes / 1024);
-    println!("mean wire throughput : {:.1} KB/s", mean_bytes_per_sec / 1024.0);
+    println!(
+        "wire (HEVC) bytes    : {total_wire_bytes} ({} KB)",
+        total_wire_bytes / 1024
+    );
+    println!(
+        "mean wire throughput : {:.1} KB/s",
+        mean_bytes_per_sec / 1024.0
+    );
     println!("peak wire pkt bytes  : {peak_wire_packet}");
-    println!("min wire pkt bytes   : {}", if min_wire_packet == u64::MAX { 0 } else { min_wire_packet });
+    println!(
+        "min wire pkt bytes   : {}",
+        if min_wire_packet == u64::MAX {
+            0
+        } else {
+            min_wire_packet
+        }
+    );
     println!();
     println!("decode p50           : {global_p50} us");
     println!("decode p95           : {global_p95} us");

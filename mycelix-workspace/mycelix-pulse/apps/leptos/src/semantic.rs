@@ -15,14 +15,39 @@ const DIM: usize = 1024;
 
 /// Sentiment/ethical words for basic content analysis.
 const HARM_WORDS: &[&str] = &[
-    "urgent", "immediately", "threat", "demand", "require", "force",
-    "without consent", "unauthorized", "breach", "violat", "attack",
-    "compromis", "exploit", "manipulat", "deceiv", "coerce",
+    "urgent",
+    "immediately",
+    "threat",
+    "demand",
+    "require",
+    "force",
+    "without consent",
+    "unauthorized",
+    "breach",
+    "violat",
+    "attack",
+    "compromis",
+    "exploit",
+    "manipulat",
+    "deceiv",
+    "coerce",
 ];
 const TRUST_WORDS: &[&str] = &[
-    "please", "thank", "appreciate", "collaborate", "together",
-    "consent", "agree", "proposal", "discuss", "consider",
-    "respect", "support", "community", "shared", "mutual",
+    "please",
+    "thank",
+    "appreciate",
+    "collaborate",
+    "together",
+    "consent",
+    "agree",
+    "proposal",
+    "discuss",
+    "consider",
+    "respect",
+    "support",
+    "community",
+    "shared",
+    "mutual",
 ];
 
 /// A compact hypervector for semantic representation.
@@ -33,7 +58,9 @@ pub struct HyperVector {
 
 impl HyperVector {
     pub fn zero() -> Self {
-        Self { bits: vec![0i8; DIM] }
+        Self {
+            bits: vec![0i8; DIM],
+        }
     }
 
     /// Generate a deterministic random HV from a seed string.
@@ -45,7 +72,9 @@ impl HyperVector {
         }
         for i in 0..DIM {
             // LCG-based deterministic bit generation
-            hash = hash.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            hash = hash
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             bits[i] = if (hash >> 33) & 1 == 0 { -1 } else { 1 };
         }
         Self { bits }
@@ -62,7 +91,10 @@ impl HyperVector {
 
     /// Element-wise multiply (binding operation).
     fn bind(&self, other: &Self) -> Self {
-        let bits = self.bits.iter().zip(other.bits.iter())
+        let bits = self
+            .bits
+            .iter()
+            .zip(other.bits.iter())
             .map(|(a, b)| a * b)
             .collect();
         Self { bits }
@@ -70,7 +102,10 @@ impl HyperVector {
 
     /// Cosine similarity between two HVs. Returns [-1.0, 1.0].
     pub fn similarity(&self, other: &Self) -> f32 {
-        let dot: i32 = self.bits.iter().zip(other.bits.iter())
+        let dot: i32 = self
+            .bits
+            .iter()
+            .zip(other.bits.iter())
             .map(|(a, b)| (*a as i32) * (*b as i32))
             .sum();
         dot as f32 / DIM as f32
@@ -83,7 +118,11 @@ struct Accumulator {
 }
 
 impl Accumulator {
-    fn new() -> Self { Self { sums: vec![0i32; DIM] } }
+    fn new() -> Self {
+        Self {
+            sums: vec![0i32; DIM],
+        }
+    }
 
     fn add(&mut self, hv: &HyperVector) {
         for (s, b) in self.sums.iter_mut().zip(hv.bits.iter()) {
@@ -93,7 +132,11 @@ impl Accumulator {
 
     fn to_hv(&self) -> HyperVector {
         HyperVector {
-            bits: self.sums.iter().map(|s| if *s >= 0 { 1 } else { -1 }).collect()
+            bits: self
+                .sums
+                .iter()
+                .map(|s| if *s >= 0 { 1 } else { -1 })
+                .collect(),
         }
     }
 }
@@ -107,7 +150,8 @@ impl Accumulator {
 /// 4. Bind each word HV with a position HV
 /// 5. Bundle all position-bound word HVs → sentence HV
 pub fn encode_text(text: &str) -> HyperVector {
-    let words: Vec<&str> = text.split_whitespace()
+    let words: Vec<&str> = text
+        .split_whitespace()
         .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()))
         .filter(|w| !w.is_empty())
         .collect();
@@ -142,7 +186,7 @@ fn encode_word(word: &str) -> HyperVector {
 
     let mut acc = Accumulator::new();
     for i in 0..chars.len().saturating_sub(2) {
-        let trigram: String = chars[i..i+3].iter().collect();
+        let trigram: String = chars[i..i + 3].iter().collect();
         let tri_hv = HyperVector::from_seed(&trigram);
         // Shift by position within word for order sensitivity
         let shifted = tri_hv.permute(i % DIM);
@@ -164,7 +208,7 @@ pub struct SemanticResult {
 /// Positive = collaborative/consensual. Negative = coercive/harmful.
 #[derive(Clone, Debug)]
 pub struct ContentScore {
-    pub trust_harm_score: f32,  // [-1.0 harm, +1.0 trust]
+    pub trust_harm_score: f32, // [-1.0 harm, +1.0 trust]
     pub flags: Vec<&'static str>,
     pub confidence: f32,
 }
@@ -208,7 +252,8 @@ pub fn semantic_search(
     email_hvs: &[HyperVector],
     threshold: f32,
 ) -> Vec<SemanticResult> {
-    let mut results: Vec<SemanticResult> = email_hvs.iter()
+    let mut results: Vec<SemanticResult> = email_hvs
+        .iter()
         .enumerate()
         .map(|(i, hv)| SemanticResult {
             index: i,
@@ -217,6 +262,10 @@ pub fn semantic_search(
         .filter(|r| r.similarity >= threshold)
         .collect();
 
-    results.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
+    results.sort_by(|a, b| {
+        b.similarity
+            .partial_cmp(&a.similarity)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     results
 }

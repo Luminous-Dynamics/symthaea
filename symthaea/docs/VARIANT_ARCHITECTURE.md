@@ -362,9 +362,9 @@ Property, housing, care, mutual aid, water, food, transport, mesh-time, resource
 
 Standalone crates that use the Spore/Holon consciousness pipeline for physical control.
 
-### symthaea-flight (Quadrotor)
+### symthaea-multirotor (Quadrotor / Multirotor)
 
-**Crate**: `symthaea/crates/symthaea-flight/`
+**Crate**: `symthaea/crates/symthaea-multirotor/`
 **LOC**: 9,637 | **Tests**: 184
 
 | Component | Status | Notes |

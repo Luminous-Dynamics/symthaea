@@ -17,10 +17,10 @@
 //! not just a UI decoration.
 
 use nalgebra::SVector;
+use symthaea_consciousness_equation::ConsciousnessInputs;
 use symtropy_consciousness_physics::{ConsciousnessField, SafetyTier};
 use symtropy_math::{Point, Sphere};
 use symtropy_physics::{BodyHandle, PhysicsWorld, RigidBody};
-use symthaea_consciousness_equation::ConsciousnessInputs;
 
 /// Helper: create a physics world with a dynamic sphere and a static wall.
 fn setup_collision_scenario() -> (PhysicsWorld<3>, BodyHandle, BodyHandle) {
@@ -91,7 +91,10 @@ fn consciousness_modulates_impulse_via_callback() {
     // Agent should still bounce (consciousness doesn't prevent physics)
     let body = world.body(agent).unwrap();
     let vx = body.linear_velocity[0];
-    assert!(vx < 5.0, "agent should have bounced with consciousness, vx = {vx}");
+    assert!(
+        vx < 5.0,
+        "agent should have bounced with consciousness, vx = {vx}"
+    );
 }
 
 #[test]

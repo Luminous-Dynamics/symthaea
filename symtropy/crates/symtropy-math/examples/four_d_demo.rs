@@ -1,5 +1,5 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //! 4D geometry demo: demonstrates N-dimensional math.
 //!
 //! Creates a tesseract (4D hypercube), rotates it in the XW plane,
@@ -20,7 +20,10 @@ fn main() {
     // Show all vertices
     println!("Vertices:");
     for (i, v) in tesseract.vertices.iter().enumerate() {
-        println!("  V{:02}: ({:+.0}, {:+.0}, {:+.0}, {:+.0})", i, v[0], v[1], v[2], v[3]);
+        println!(
+            "  V{:02}: ({:+.0}, {:+.0}, {:+.0}, {:+.0})",
+            i, v[0], v[1], v[2], v[3]
+        );
     }
 
     // Rotate in the XW plane (a rotation that only exists in 4D!)
@@ -47,10 +50,7 @@ fn main() {
     println!("(Like shining a flashlight through a 4D object)\n");
 
     for w_slice in [-1.0, -0.5, 0.0, 0.5, 1.0] {
-        let plane = Hyperplane::<4>::new(
-            nalgebra::SVector::from([0.0, 0.0, 0.0, 1.0]),
-            w_slice,
-        );
+        let plane = Hyperplane::<4>::new(nalgebra::SVector::from([0.0, 0.0, 0.0, 1.0]), w_slice);
 
         // Count how many vertices are on each side
         let mut front = 0;
@@ -72,9 +72,7 @@ fn main() {
             _ => "intermediate",
         };
 
-        println!(
-            "  W={w_slice:+.1}: {front} front, {back} back, {on} on plane -> {section_type}",
-        );
+        println!("  W={w_slice:+.1}: {front} front, {back} back, {on} on plane -> {section_type}",);
     }
 
     // Demonstrate 4D rotation preserves distances
@@ -100,7 +98,13 @@ fn main() {
 
     let p = Point::new([1.0, 0.0, 1.0, 0.0]);
     let rotated = double_rot.rotate_point(&p);
-    println!("  Original: ({:.3}, {:.3}, {:.3}, {:.3})", p.coord(0), p.coord(1), p.coord(2), p.coord(3));
+    println!(
+        "  Original: ({:.3}, {:.3}, {:.3}, {:.3})",
+        p.coord(0),
+        p.coord(1),
+        p.coord(2),
+        p.coord(3)
+    );
     println!(
         "  Rotated:  ({:.3}, {:.3}, {:.3}, {:.3})",
         rotated.coord(0),
@@ -109,6 +113,9 @@ fn main() {
         rotated.coord(3)
     );
     println!("  (Both XY and ZW planes rotated simultaneously!)");
-    println!("  Norm preserved: {}", (p.0.norm() - rotated.0.norm()).abs() < 1e-10);
+    println!(
+        "  Norm preserved: {}",
+        (p.0.norm() - rotated.0.norm()).abs() < 1e-10
+    );
     println!("  (Norm: {:.6} → {:.6})", p.0.norm(), rotated.0.norm());
 }

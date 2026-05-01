@@ -104,12 +104,8 @@ impl TacticId {
             CRTSolve | LegendreCheck | LTEBound | LinearDiophantine | PellDescent => {
                 Domain::NumberTheory
             }
-            AngleChase | PowerOfPoint | SimilarTrianglesSSS | BarycentricCoerce => {
-                Domain::Geometry
-            }
-            AMGM | CauchySchwarz | PowerMean | Jensen | SchurT1 | SchurT2 => {
-                Domain::Inequality
-            }
+            AngleChase | PowerOfPoint | SimilarTrianglesSSS | BarycentricCoerce => Domain::Geometry,
+            AMGM | CauchySchwarz | PowerMean | Jensen | SchurT1 | SchurT2 => Domain::Inequality,
         }
     }
 }
@@ -516,11 +512,7 @@ impl AdaptiveSrSelector {
     }
 
     /// Cascade solver using the **weak** heuristic. Same budget logic.
-    pub fn solve_adaptive_weak(
-        &mut self,
-        problem: &Problem,
-        tactics: &[TacticId],
-    ) -> usize {
+    pub fn solve_adaptive_weak(&mut self, problem: &Problem, tactics: &[TacticId]) -> usize {
         let mut inner = SrTacticSelector::new(0.0, self.rng_state);
         if let Some(n) = inner.solve_weak_with_budget(problem, tactics, self.easy_budget) {
             self.rng_state = inner.rng_state;
@@ -560,22 +552,14 @@ impl Default for AdaptiveSrSelector {
 /// phase ≈ 2 + 5 + 15 = 22, much larger than tactics.len() / 2 = 7).
 /// The headline metric is whether the problem was **eventually** solved
 /// at all — not whether it was solved within the cascade's first phase.
-pub fn adaptive_sweep(
-    problems: &[Problem],
-    trials: usize,
-    base_seed: u64,
-) -> SweepPoint {
+pub fn adaptive_sweep(problems: &[Problem], trials: usize, base_seed: u64) -> SweepPoint {
     adaptive_sweep_with(problems, trials, base_seed, |s, p, t| {
         s.solve_adaptive(p, t)
     })
 }
 
 /// Adaptive cascade sweep using the weak heuristic.
-pub fn adaptive_sweep_weak(
-    problems: &[Problem],
-    trials: usize,
-    base_seed: u64,
-) -> SweepPoint {
+pub fn adaptive_sweep_weak(problems: &[Problem], trials: usize, base_seed: u64) -> SweepPoint {
     adaptive_sweep_with(problems, trials, base_seed, |s, p, t| {
         s.solve_adaptive_weak(p, t)
     })
@@ -607,7 +591,10 @@ where
     // cascade's cumulative-attempt worst case (easy_budget +
     // medium_budget + full σ=0.40 run = 2 + 5 + 15 = 22, less than 30).
     let threshold = 2 * tactics.len();
-    let good = all_attempts.iter().filter(|&&n| n <= threshold as f32).count();
+    let good = all_attempts
+        .iter()
+        .filter(|&&n| n <= threshold as f32)
+        .count();
     let solve_rate = good as f32 / all_attempts.len() as f32;
     SweepPoint {
         sigma: -1.0, // sentinel — adaptive σ is per-problem
@@ -661,7 +648,10 @@ where
         let mean = all_attempts.iter().sum::<f32>() / all_attempts.len() as f32;
         let median = all_attempts[all_attempts.len() / 2];
         let threshold = tactics.len() / 2;
-        let good = all_attempts.iter().filter(|&&n| n <= threshold as f32).count();
+        let good = all_attempts
+            .iter()
+            .filter(|&&n| n <= threshold as f32)
+            .count();
         let solve_rate = good as f32 / all_attempts.len() as f32;
         points.push(SweepPoint {
             sigma,
@@ -711,11 +701,7 @@ pub fn random_corpus(n: usize, seed: u64) -> Vec<Problem> {
     for i in 0..n {
         let r = xorshift64(&mut state);
         let t = tactics[(r % tactics.len() as u64) as usize];
-        out.push(Problem::new(
-            &format!("random_{}", i),
-            t.native_domain(),
-            t,
-        ));
+        out.push(Problem::new(&format!("random_{}", i), t.native_domain(), t));
     }
     out
 }
@@ -791,10 +777,7 @@ pub fn adversarial_hard_corpus(n: usize, seed: u64) -> Vec<Problem> {
 /// filtering by baseline-attempts-needed. Returns a HashMap from
 /// difficulty to problem list. Uses the strong heuristic at σ=0 as the
 /// baseline difficulty classifier.
-pub fn stratified_corpus(
-    n_per_tier: usize,
-    seed: u64,
-) -> HashMap<ProblemDifficulty, Vec<Problem>> {
+pub fn stratified_corpus(n_per_tier: usize, seed: u64) -> HashMap<ProblemDifficulty, Vec<Problem>> {
     let tactics = TacticId::all();
     let mut easy: Vec<Problem> = Vec::new();
     let mut medium: Vec<Problem> = Vec::new();
@@ -811,11 +794,7 @@ pub fn stratified_corpus(
         // filter).
         let r = xorshift64(&mut state);
         let t = tactics[(r % tactics.len() as u64) as usize];
-        let p = Problem::new(
-            &format!("strat_{}", generated),
-            t.native_domain(),
-            t,
-        );
+        let p = Problem::new(&format!("strat_{}", generated), t.native_domain(), t);
         // Classify: how many attempts does the strong-heuristic baseline
         // need to solve this problem? Use solve_scaled at strength=1.0.
         let attempts = baseline.solve_scaled(&p, &tactics, 1.0);
@@ -1105,13 +1084,9 @@ mod tests {
                 "  Δ from σ=0: {:.1}% fewer attempts at σ={:.3}",
                 improvement, best.sigma
             );
-            eprintln!(
-                "  → Preliminary evidence that SR transfers to tactic selection."
-            );
+            eprintln!("  → Preliminary evidence that SR transfers to tactic selection.");
         } else {
-            eprintln!(
-                "  → σ=0 is the best: SR does NOT improve selection on this corpus."
-            );
+            eprintln!("  → σ=0 is the best: SR does NOT improve selection on this corpus.");
             eprintln!("    This is a valid negative result — heuristic is already optimal.");
         }
     }
@@ -1188,12 +1163,20 @@ mod tests {
             .max_by(|a, b| a.solve_rate.partial_cmp(&b.solve_rate).unwrap())
             .unwrap();
 
-        eprintln!("\n  BASELINE (σ=0): mean={:.3}, solve-rate={:.2}%",
-                  pt0.mean_attempts, pt0.solve_rate * 100.0);
-        eprintln!("  BEST BY MEAN ATTEMPTS: σ={:.3}, mean={:.3}",
-                  best_mean.sigma, best_mean.mean_attempts);
-        eprintln!("  BEST BY SOLVE RATE:    σ={:.3}, rate={:.2}%",
-                  best_rate.sigma, best_rate.solve_rate * 100.0);
+        eprintln!(
+            "\n  BASELINE (σ=0): mean={:.3}, solve-rate={:.2}%",
+            pt0.mean_attempts,
+            pt0.solve_rate * 100.0
+        );
+        eprintln!(
+            "  BEST BY MEAN ATTEMPTS: σ={:.3}, mean={:.3}",
+            best_mean.sigma, best_mean.mean_attempts
+        );
+        eprintln!(
+            "  BEST BY SOLVE RATE:    σ={:.3}, rate={:.2}%",
+            best_rate.sigma,
+            best_rate.solve_rate * 100.0
+        );
 
         // The scientifically meaningful signal is solve rate.
         if best_rate.sigma > 0.0 && best_rate.solve_rate > pt0.solve_rate + 0.01 {
@@ -1203,9 +1186,7 @@ mod tests {
                 "\n  ✓ SR TRANSFERS: solve rate +{:.1}pp (+{:.1}% relative) at σ={:.3}",
                 pp_gain, rel_gain, best_rate.sigma
             );
-            eprintln!(
-                "    Consistent with inverted-U prediction from stochastic_resonance.tex"
-            );
+            eprintln!("    Consistent with inverted-U prediction from stochastic_resonance.tex");
             eprintln!(
                 "    ({} percentage points, p ≈ binomial test on 3000 trials)",
                 pp_gain.round() as i32
@@ -1462,10 +1443,7 @@ mod tests {
                 delta_pp,
                 problems.len(),
             ));
-            eprintln!(
-                "    → best σ={:.2}, Δ = {:+.2}pp",
-                best.sigma, delta_pp
-            );
+            eprintln!("    → best σ={:.2}, Δ = {:+.2}pp", best.sigma, delta_pp);
         }
 
         eprintln!("\n════════════════════════════════════════════════════════════");
@@ -1562,22 +1540,27 @@ mod tests {
         let delta_pp = (best.solve_rate - baseline.solve_rate) * 100.0;
 
         // Two-proportion z-test best vs baseline
-        let base_succ =
-            (baseline.solve_rate * baseline.trials as f32).round() as usize;
+        let base_succ = (baseline.solve_rate * baseline.trials as f32).round() as usize;
         let best_succ = (best.solve_rate * best.trials as f32).round() as usize;
         let z = two_proportion_z(best_succ, best.trials, base_succ, baseline.trials);
 
         // Theoretical random-selection ceiling: threshold / |tactics|
         let random_ceiling = 7.0 / 15.0 * 100.0;
 
-        eprintln!("\n  BASELINE (σ=0): solve rate = {:.2}%", baseline.solve_rate * 100.0);
+        eprintln!(
+            "\n  BASELINE (σ=0): solve rate = {:.2}%",
+            baseline.solve_rate * 100.0
+        );
         eprintln!(
             "  BEST σ = {:.2} (solve rate {:.2}%)",
             best.sigma,
             best.solve_rate * 100.0
         );
         eprintln!("  Δ = {:+.2}pp    z = {:.2}", delta_pp, z);
-        eprintln!("  Theoretical random-selection ceiling: {:.2}%", random_ceiling);
+        eprintln!(
+            "  Theoretical random-selection ceiling: {:.2}%",
+            random_ceiling
+        );
         if z.abs() > 2.58 {
             eprintln!("  p < 0.01 ✓");
         } else if z.abs() > 1.96 {
@@ -1615,9 +1598,16 @@ mod tests {
             eprintln!("     Noise is nullifying the adversarial heuristic, not amplifying signal.");
             eprintln!("     Both mechanisms fall under SR theory but have distinct signatures.");
         } else {
-            eprintln!("\n  ◇ MECHANISM: CURVE STILL RISING at σ={:.2} — test higher σ", best.sigma);
-            eprintln!("     Current: {:.2}%, random ceiling: {:.2}%, gap: {:+.2}pp",
-                      best.solve_rate * 100.0, random_ceiling, saturation_gap * 100.0);
+            eprintln!(
+                "\n  ◇ MECHANISM: CURVE STILL RISING at σ={:.2} — test higher σ",
+                best.sigma
+            );
+            eprintln!(
+                "     Current: {:.2}%, random ceiling: {:.2}%, gap: {:+.2}pp",
+                best.solve_rate * 100.0,
+                random_ceiling,
+                saturation_gap * 100.0
+            );
         }
 
         assert_eq!(points.len(), sigmas.len());
@@ -1641,7 +1631,11 @@ mod tests {
         for (name, n) in &mismatches {
             eprintln!("  {}: {} attempts", name, n);
         }
-        eprintln!("  total: {}/{} problems where baseline ≠ first pick", mismatches.len(), corpus.len());
+        eprintln!(
+            "  total: {}/{} problems where baseline ≠ first pick",
+            mismatches.len(),
+            corpus.len()
+        );
         // If ALL problems are first-pick correct, the experiment has no
         // headroom. We expect at least some mismatches.
         assert!(
@@ -1660,7 +1654,10 @@ mod tests {
         let tactics = TacticId::all();
         let regime = detect_regime(Domain::Inequality, &tactics);
         // Whatever it classifies as, it should be one of the three
-        assert!(matches!(regime, Regime::Easy | Regime::Medium | Regime::Hard));
+        assert!(matches!(
+            regime,
+            Regime::Easy | Regime::Medium | Regime::Hard
+        ));
     }
 
     #[test]
@@ -1697,8 +1694,14 @@ mod tests {
         let fair_threshold = tactics.len(); // 15: generous for both
 
         eprintln!("\n════════════════════════════════════════════════════════════");
-        eprintln!("  PHASE A — FAIR METRIC (solve within {} tactics)", fair_threshold);
-        eprintln!("  30 problems per tier, {} trials per configuration", trials);
+        eprintln!(
+            "  PHASE A — FAIR METRIC (solve within {} tactics)",
+            fair_threshold
+        );
+        eprintln!(
+            "  30 problems per tier, {} trials per configuration",
+            trials
+        );
         eprintln!("────────────────────────────────────────────────────────────");
 
         for tier in [
@@ -1726,8 +1729,7 @@ mod tests {
                     fixed_zero_total += 1;
                 }
             }
-            let fixed_zero_rate =
-                fixed_zero_wins as f32 / fixed_zero_total as f32;
+            let fixed_zero_rate = fixed_zero_wins as f32 / fixed_zero_total as f32;
 
             // Cascade weak — measure same metric
             let mut cascade_wins = 0usize;
@@ -1746,10 +1748,7 @@ mod tests {
             let cascade_rate = cascade_wins as f32 / cascade_total as f32;
 
             let delta = (cascade_rate - fixed_zero_rate) * 100.0;
-            eprintln!(
-                "    fixed σ=0 weak:  {:.2}%",
-                fixed_zero_rate * 100.0
-            );
+            eprintln!("    fixed σ=0 weak:  {:.2}%", fixed_zero_rate * 100.0);
             eprintln!(
                 "    cascade weak:    {:.2}%    Δ = {:+.2}pp",
                 cascade_rate * 100.0,
@@ -1783,7 +1782,10 @@ mod tests {
 
         eprintln!("\n════════════════════════════════════════════════════════════");
         eprintln!("  PHASE A — CASCADE ADAPTIVE σ vs FIXED σ");
-        eprintln!("  30 problems per tier, {} trials per configuration", trials);
+        eprintln!(
+            "  30 problems per tier, {} trials per configuration",
+            trials
+        );
         eprintln!("────────────────────────────────────────────────────────────");
 
         let mut tier_count = 0usize;
@@ -1804,12 +1806,7 @@ mod tests {
             eprintln!("\n  {:?} tier ({} problems)", tier, problems.len());
 
             // STRONG heuristic comparison
-            let fixed_strong = sigma_sweep(
-                problems,
-                &[0.00, 0.10, 0.20, 0.30, 0.40],
-                trials,
-                42,
-            );
+            let fixed_strong = sigma_sweep(problems, &[0.00, 0.10, 0.20, 0.30, 0.40], trials, 42);
             let best_strong = fixed_strong
                 .iter()
                 .max_by(|a, b| a.solve_rate.partial_cmp(&b.solve_rate).unwrap())
@@ -1834,12 +1831,8 @@ mod tests {
             );
 
             // WEAK heuristic comparison
-            let fixed_weak = sigma_sweep_weak(
-                problems,
-                &[0.00, 0.10, 0.20, 0.30, 0.40],
-                trials,
-                42,
-            );
+            let fixed_weak =
+                sigma_sweep_weak(problems, &[0.00, 0.10, 0.20, 0.30, 0.40], trials, 42);
             let best_weak = fixed_weak
                 .iter()
                 .max_by(|a, b| a.solve_rate.partial_cmp(&b.solve_rate).unwrap())
@@ -1865,17 +1858,12 @@ mod tests {
         }
 
         if tier_count > 0 {
-            eprintln!(
-                "\n  AVG Δ (cascade − best_fixed) across tiers:"
-            );
+            eprintln!("\n  AVG Δ (cascade − best_fixed) across tiers:");
             eprintln!(
                 "    STRONG:  {:+.2}pp",
                 sum_strong_delta / tier_count as f32
             );
-            eprintln!(
-                "    WEAK:    {:+.2}pp",
-                sum_weak_delta / tier_count as f32
-            );
+            eprintln!("    WEAK:    {:+.2}pp", sum_weak_delta / tier_count as f32);
         }
         eprintln!("════════════════════════════════════════════════════════════");
 

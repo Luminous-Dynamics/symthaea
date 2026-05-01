@@ -60,7 +60,9 @@ impl MotorRenderingManager {
             #[cfg(feature = "canvas")]
             last_canvas_svg: None,
             #[cfg(feature = "creative")]
-            creative_manager: Some(super::creative_bridge::CreativeManager::new_with_path(aesthetic_path)),
+            creative_manager: Some(super::creative_bridge::CreativeManager::new_with_path(
+                aesthetic_path,
+            )),
         }
     }
 }

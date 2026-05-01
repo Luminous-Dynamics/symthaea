@@ -741,8 +741,7 @@ fn encode_observation(obs: &SpectrumObservation) -> symthaea_core::hdc::BinaryHV
     let freq_pair = BinaryHV::random(SPECTRUM_ROLE_FREQ).bind(&BinaryHV::random(freq_bucket));
     let noise_pair = BinaryHV::random(SPECTRUM_ROLE_NOISE).bind(&BinaryHV::random(noise_bucket));
     let snr_pair = BinaryHV::random(SPECTRUM_ROLE_SNR).bind(&BinaryHV::random(snr_bucket));
-    let jammed_pair =
-        BinaryHV::random(SPECTRUM_ROLE_JAMMED).bind(&BinaryHV::random(jammed_bit));
+    let jammed_pair = BinaryHV::random(SPECTRUM_ROLE_JAMMED).bind(&BinaryHV::random(jammed_bit));
 
     BinaryHV::bundle(&[freq_pair, noise_pair, snr_pair, jammed_pair])
 }

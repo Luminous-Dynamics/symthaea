@@ -97,14 +97,8 @@ pub fn reconstruct_state_at(notes: &[Note], t: f32, window_secs: f32) -> Musical
     let valence = (major_count as f32 - minor_count as f32) / total as f32;
 
     // Pitch range → consciousness coherence (tighter = higher phi)
-    let min_freq = active
-        .iter()
-        .map(|n| n.frequency)
-        .fold(f32::MAX, f32::min);
-    let max_freq = active
-        .iter()
-        .map(|n| n.frequency)
-        .fold(f32::MIN, f32::max);
+    let min_freq = active.iter().map(|n| n.frequency).fold(f32::MAX, f32::min);
+    let max_freq = active.iter().map(|n| n.frequency).fold(f32::MIN, f32::max);
     let range_octaves = if min_freq > 0.0 {
         (max_freq / min_freq).log2()
     } else {
@@ -169,11 +163,7 @@ pub fn reconstruct_state_at(notes: &[Note], t: f32, window_secs: f32) -> Musical
 ///
 /// `notes` should come from midi_loader::load_midi.
 /// `samples` should be mono f32 at `config.mel.sample_rate`.
-pub fn build_pairs(
-    notes: &[Note],
-    samples: &[f32],
-    config: &PairConfig,
-) -> Vec<TrainingPair> {
+pub fn build_pairs(notes: &[Note], samples: &[f32], config: &PairConfig) -> Vec<TrainingPair> {
     if notes.is_empty() || samples.is_empty() {
         return Vec::new();
     }
@@ -259,9 +249,7 @@ pub fn save_pairs(pairs: &[TrainingPair], path: &std::path::Path) -> std::io::Re
 ///
 /// This flat form avoids reconstructing `MusicalState` structs and is the
 /// shape training code actually consumes (state vector → mel vector regression).
-pub fn load_pairs(
-    path: &std::path::Path,
-) -> std::io::Result<(Vec<[f32; 17]>, Vec<Vec<f32>>)> {
+pub fn load_pairs(path: &std::path::Path) -> std::io::Result<(Vec<[f32; 17]>, Vec<Vec<f32>>)> {
     use std::io::Read;
     let mut file = std::fs::File::open(path)?;
     let mut header = [0u8; 8];
@@ -296,9 +284,24 @@ mod tests {
 
     fn make_test_notes() -> Vec<Note> {
         vec![
-            Note { frequency: 261.63, start_time: 0.0, duration: 0.5, velocity: 0.7 }, // C4
-            Note { frequency: 329.63, start_time: 0.5, duration: 0.5, velocity: 0.8 }, // E4
-            Note { frequency: 392.00, start_time: 1.0, duration: 0.5, velocity: 0.75 }, // G4
+            Note {
+                frequency: 261.63,
+                start_time: 0.0,
+                duration: 0.5,
+                velocity: 0.7,
+            }, // C4
+            Note {
+                frequency: 329.63,
+                start_time: 0.5,
+                duration: 0.5,
+                velocity: 0.8,
+            }, // E4
+            Note {
+                frequency: 392.00,
+                start_time: 1.0,
+                duration: 0.5,
+                velocity: 0.75,
+            }, // G4
         ]
     }
 
@@ -315,9 +318,24 @@ mod tests {
     fn reconstruct_state_major_intervals_positive_valence() {
         // C-E-G arpeggio played close together so the window catches all 3
         let notes = vec![
-            Note { frequency: 261.63, start_time: 0.0, duration: 2.0, velocity: 0.7 }, // C4
-            Note { frequency: 329.63, start_time: 0.05, duration: 2.0, velocity: 0.8 }, // E4
-            Note { frequency: 392.00, start_time: 0.1, duration: 2.0, velocity: 0.75 }, // G4
+            Note {
+                frequency: 261.63,
+                start_time: 0.0,
+                duration: 2.0,
+                velocity: 0.7,
+            }, // C4
+            Note {
+                frequency: 329.63,
+                start_time: 0.05,
+                duration: 2.0,
+                velocity: 0.8,
+            }, // E4
+            Note {
+                frequency: 392.00,
+                start_time: 0.1,
+                duration: 2.0,
+                velocity: 0.75,
+            }, // G4
         ];
         // At t=1.0 with 1s window, all 3 notes are active simultaneously
         let state = reconstruct_state_at(&notes, 1.0, 1.0);

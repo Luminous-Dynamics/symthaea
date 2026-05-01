@@ -28,8 +28,8 @@ fn build_context_input(states: &[[f32; 17]], t: usize, ctx: usize) -> Vec<f32> {
     let window = 2 * ctx + 1;
     let mut out = Vec::with_capacity(window * 17);
     for k in 0..window {
-        let idx = (t as isize + k as isize - ctx as isize)
-            .clamp(0, states.len() as isize - 1) as usize;
+        let idx =
+            (t as isize + k as isize - ctx as isize).clamp(0, states.len() as isize - 1) as usize;
         out.extend_from_slice(&normalize_state(&states[idx]));
     }
     out
@@ -53,7 +53,10 @@ fn main() {
     // Infer the context half-window from state_dim / 17.
     let ctx = (decoder.cfg.state_dim / 17).saturating_sub(1) / 2;
     println!("Checkpoint: {}", ckpt_path.display());
-    println!("  state_dim: {}  (ctx half-window = {})", decoder.cfg.state_dim, ctx);
+    println!(
+        "  state_dim: {}  (ctx half-window = {})",
+        decoder.cfg.state_dim, ctx
+    );
     println!("  hidden:    {}", decoder.cfg.hidden);
     println!("  n_mels:    {}", decoder.cfg.n_mels);
 

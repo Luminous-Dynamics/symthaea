@@ -17,16 +17,88 @@ use crate::persistence;
 // Embedded curriculum data
 // ============================================================
 
-const CAPS_JSON: &str = include_str!("../../../examples/curriculum/caps/caps-unified-matric.json");
+const UNIFIED_JSON: &str = include_str!("../../../examples/curriculum/unified_k_to_phd.json");
 
-static CAPS_GRAPH: OnceLock<CurriculumGraph> = OnceLock::new();
+static UNIFIED_GRAPH: OnceLock<CurriculumGraph> = OnceLock::new();
 
-/// Get the parsed CAPS graph (lazily initialized).
+/// Get the parsed unified graph (lazily initialized and merged with seeds).
 pub fn curriculum_graph() -> &'static CurriculumGraph {
-    CAPS_GRAPH.get_or_init(|| {
-        let raw: RawCurriculumDocument = serde_json::from_str(CAPS_JSON)
-            .expect("embedded CAPS JSON must be valid");
-        CurriculumGraph::from_raw(raw)
+    UNIFIED_GRAPH.get_or_init(|| {
+        let mut base_raw: RawCurriculumDocument = serde_json::from_str(UNIFIED_JSON)
+            .expect("base unified JSON must be valid");
+        
+        // Systematic merge of all vocational and professional seeds
+        let seeds = vec![
+            include_str!("../../../examples/curriculum/vocational/applied_resilience.json"),
+            include_str!("../../../examples/curriculum/vocational/mycelial_humanities.json"),
+            include_str!("../../../examples/curriculum/vocational/collective_flourishing.json"),
+            include_str!("../../../examples/curriculum/vocational/epistemic_sovereignty.json"),
+            include_str!("../../../examples/curriculum/vocational/type1_studies.json"),
+            include_str!("../../../examples/curriculum/vocational/mycelial_soul.json"),
+            include_str!("../../../examples/curriculum/vocational/bioregional_vitality.json"),
+            include_str!("../../../examples/curriculum/vocational/robotics_platforms.json"),
+            include_str!("../../../examples/curriculum/vocational/habitat_engineering.json"),
+            include_str!("../../../examples/curriculum/vocational/warehouse_stewardship.json"),
+            include_str!("../../../examples/curriculum/vocational/civilizational_synthesis.json"),
+            include_str!("../../../examples/curriculum/vocational/foundational_sovereignty.json"),
+            include_str!("../../../examples/curriculum/vocational/substrate_science.json"),
+            include_str!("../../../examples/curriculum/vocational/academic_bridge.json"),
+            include_str!("../../../examples/curriculum/vocational/sovereign_lineage.json"),
+            include_str!("../../../examples/curriculum/vocational/sovereign_it_cyber.json"),
+            include_str!("../../../examples/curriculum/vocational/planetary_repair.json"),
+            include_str!("../../../examples/curriculum/vocational/cultural_resonance.json"),
+            include_str!("../../../examples/curriculum/vocational/computational_cognition.json"),
+            include_str!("../../../examples/curriculum/vocational/universal_patterns.json"),
+            include_str!("../../../examples/curriculum/vocational/ecosystem_expansion.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs.json"),
+            include_str!("../../../examples/curriculum/vocational/global_fruits.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_expanded.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_final.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_master.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_ultimate.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_supreme.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_zenith.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_apex.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_empyrean.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_pragmatic.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_utility.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_everyday.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_essentials.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_omnibus.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_resilient.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_elite.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_trades.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_comprehensive.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_catalyst.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_market.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_momentum.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_momentum_v2.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_revenue.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_frontline_trades.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_specialty.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_tactical.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_vanguard.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_summit.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_ascendant.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_legacy_bridge.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_nexus.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_apex_today.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_practical_prosperity.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_global_citizen.json"),
+            include_str!("../../../examples/curriculum/vocational/industry_certs_horizon.json"),
+            include_str!("../../../examples/curriculum/vocational/universal_wisdom.json"),
+            include_str!("../../../examples/curriculum/vocational/living_tradition.json"),
+            include_str!("../../../examples/curriculum/vocational/mk0_bootstrapper.json"),
+        ];
+
+        for seed_json in seeds {
+            let seed_raw: RawCurriculumDocument = serde_json::from_str(seed_json)
+                .expect("all curriculum seeds must be valid JSON");
+            base_raw.nodes.extend(seed_raw.nodes);
+            base_raw.edges.extend(seed_raw.edges);
+        }
+
+        CurriculumGraph::from_raw(base_raw)
     })
 }
 
@@ -65,6 +137,134 @@ pub struct CurriculumNode {
     pub supplementary_resources: Vec<SupplementaryResource>,
     #[serde(default)]
     pub exam_weight: Option<ExamWeight>,
+    #[serde(default)]
+    pub academic_standards: Vec<AcademicStandard>,
+    #[serde(default)]
+    pub industry_mappings: Vec<IndustryMapping>,
+    #[serde(default)]
+    pub holonic_capstone: Option<HolonicCapstone>,
+    #[serde(default)]
+    pub alignment_vector: Option<AlignmentVector>,
+    #[serde(default)]
+    pub wisdom_bridge: Option<WisdomBridge>,
+    #[serde(default)]
+    pub economic_signals: Option<EconomicSignals>,
+    #[serde(default)]
+    pub biome_parameters: Option<BiomeParameters>,
+    #[serde(default)]
+    pub abstract_resources: Vec<ResourceProfile>,
+    #[serde(default)]
+    pub hdc_anchor: Option<HdcAnchor>,
+    #[serde(default)]
+    pub lineage_anchor: Option<LineageAnchor>,
+    #[serde(default)]
+    pub gaia_target: Option<GaiaSignal>,
+    #[serde(default)]
+    pub apoptosis: Option<ApoptosisState>,
+    }
+
+    #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+    pub struct ApoptosisState {
+    pub last_accessed: u64,
+    pub usage_velocity: f32,
+    pub semantic_weight: u16,
+    }
+
+    #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+    pub struct LineageAnchor {    pub creator_did: String,
+    pub mentor_dids: Vec<String>,
+    pub generation: u32,
+    }
+
+    #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+    pub struct GaiaSignal {
+    pub metric_type: String,
+    pub target_delta: f32,
+    }
+
+    #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+    pub struct WisdomBridge {
+    pub hardiness_zones: Vec<u8>,
+    pub min_annual_rainfall_mm: Option<u32>,
+    pub terrain_types: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ResourceProfile {
+    pub class: String, // e.g. "DC_Storage_Cell"
+    pub min_capacity_mah: Option<u32>,
+    pub thermodynamic_threshold: Option<f32>,
+    pub common_scraps: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HdcAnchor {
+    pub vector_hash: String, // SHA-256 of the 16k-dimensional vector
+    pub semantic_tag: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct EconomicSignals {
+    pub average_starting_salary: u32,
+    pub market_demand: String, // e.g. "Extreme", "High", "Steady"
+    pub growth_rate_percent: u8,
+    #[serde(default = "default_multiplier")]
+    pub local_demand_multiplier: f32, // Controlled by Isibaya Governance
+}
+
+fn default_multiplier() -> f32 { 1.0 }
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WisdomBridge {
+    pub pattern_name: String,
+    pub tradition: String,
+    pub description: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct AlignmentVector {
+    pub ahimsa: u16,
+    pub reversibility: u16,
+    pub truthfulness: u16,
+    pub sovereignty_respect: u16,
+    pub reciprocity: u16,
+    pub thermodynamic_efficiency: u16,
+    pub accountability: u16,
+    pub proportionality: u16,
+    pub ecological_stewardship: u16,
+    pub collective_flourishing: u16,
+    pub knowledge_commoning: u16,
+    pub mentorship: u16,
+    pub aesthetic_harmony: u16,
+    pub civic_participation: u16,
+    pub innovation_for_good: u16,
+    pub resilience: u16,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HolonicCapstone {
+    /// Required nodes for this capstone
+    pub required_node_ids: Vec<String>,
+    /// Deliverable description
+    pub deliverable: String,
+    /// Minimum peer endorsements required
+    pub min_peer_endorsements: u8,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct IndustryMapping {
+    pub framework: String,
+    pub version: String,
+    pub code: String,
+    pub label: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AcademicStandard {
+    pub framework: String,
+    pub code: String,
+    pub description: String,
+    pub grade_level: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -243,6 +443,17 @@ impl CurriculumGraph {
         None
     }
 
+    /// Get all unmastered nodes whose prerequisites are all met (the Zone of Proximal Development).
+    pub fn zpd_nodes(&self, mastered_ids: &std::collections::HashSet<String>) -> Vec<&CurriculumNode> {
+        self.nodes.iter()
+            .filter(|n| !mastered_ids.contains(&n.id))
+            .filter(|n| {
+                let prereqs = self.prereqs_for(&n.id);
+                prereqs.is_empty() || prereqs.iter().all(|p| mastered_ids.contains(*p))
+            })
+            .collect()
+    }
+
     /// All unique subjects.
     pub fn subjects(&self) -> Vec<&str> {
         let mut subjects: Vec<&str> = self.nodes.iter().map(|n| n.subject_area.as_str()).collect();
@@ -397,6 +608,13 @@ impl ProgressStore {
         if nodes.is_empty() { return 0; }
         let total: u32 = nodes.iter().map(|n| self.get(&n.id).mastery_permille as u32).sum();
         (total / nodes.len() as u32) as u16
+    }
+
+    pub fn mastered_ids(&self) -> std::collections::HashSet<String> {
+        self.nodes.iter()
+            .filter(|(_, p)| p.status == ProgressStatus::Mastered)
+            .map(|(id, _)| id.clone())
+            .collect()
     }
 }
 

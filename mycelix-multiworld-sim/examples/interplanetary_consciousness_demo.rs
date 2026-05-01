@@ -43,9 +43,7 @@ fn main() {
             sim.inject_intervention(1, Intervention::Education { boost: 3.0 });
         }
         if tick == 80 {
-            println!(
-                "  >>> Tick 80: Injecting Mentorship intervention on Europa (pairs=50)"
-            );
+            println!("  >>> Tick 80: Injecting Mentorship intervention on Europa (pairs=50)");
             sim.inject_intervention(2, Intervention::Mentorship { pairs: 50 });
         }
 
@@ -57,9 +55,7 @@ fn main() {
                 InterplanetaryEvent::BlackoutStarted { world_a, world_b } => {
                     blackout_count += 1;
                     if tick % REPORT_INTERVAL == 0 || tick <= 5 {
-                        println!(
-                            "  [!] Blackout: {world_a} <-> {world_b} (tick {tick})"
-                        );
+                        println!("  [!] Blackout: {world_a} <-> {world_b} (tick {tick})");
                     }
                 }
                 InterplanetaryEvent::BlackoutEnded {
@@ -83,12 +79,13 @@ fn main() {
                     }
                 }
                 InterplanetaryEvent::ConsciousnessSync {
-                    from, to, psi_delta, ..
+                    from,
+                    to,
+                    psi_delta,
+                    ..
                 } => {
                     if tick % (REPORT_INTERVAL * 5) == 0 {
-                        println!(
-                            "  [~] Sync: {from} -> {to} (psi delta: {psi_delta:.6})"
-                        );
+                        println!("  [~] Sync: {from} -> {to} (psi delta: {psi_delta:.6})");
                     }
                 }
                 _ => {}
@@ -176,10 +173,16 @@ fn main() {
     println!();
 
     // --- Consciousness gap over time summary ---
-    println!("  Consciousness gap trajectory (sampled every {} ticks):", REPORT_INTERVAL);
+    println!(
+        "  Consciousness gap trajectory (sampled every {} ticks):",
+        REPORT_INTERVAL
+    );
     println!("  Final gap: {:.4}", report.max_consciousness_gap);
     println!();
-    println!("  Demo complete. {} ticks simulated across 3 worlds.", TOTAL_TICKS);
+    println!(
+        "  Demo complete. {} ticks simulated across 3 worlds.",
+        TOTAL_TICKS
+    );
 }
 
 fn print_banner() {

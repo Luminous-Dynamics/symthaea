@@ -40,7 +40,13 @@ impl Aesthetic {
     }
 
     pub fn all() -> &'static [Self] {
-        &[Self::Holographic, Self::Satellite, Self::Procedural, Self::Minimal, Self::Night]
+        &[
+            Self::Holographic,
+            Self::Satellite,
+            Self::Procedural,
+            Self::Minimal,
+            Self::Night,
+        ]
     }
 }
 
@@ -247,7 +253,11 @@ mod tests {
     fn test_all_aesthetics_have_configs() {
         for aesthetic in Aesthetic::all() {
             let config = config_for(*aesthetic);
-            assert!(config.globe.base_color[3] > 0.0, "{:?} has zero alpha", aesthetic);
+            assert!(
+                config.globe.base_color[3] > 0.0,
+                "{:?} has zero alpha",
+                aesthetic
+            );
         }
     }
 

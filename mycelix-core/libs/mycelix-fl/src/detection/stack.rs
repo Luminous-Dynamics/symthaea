@@ -104,9 +104,7 @@ impl DetectionStack {
     /// Create a detection stack from configuration.
     pub fn new(config: DetectionConfig) -> Self {
         let pogq = if config.enable_pogq {
-            Some(PoGQv41Enhanced::new(
-                config.pogq_config.unwrap_or_default(),
-            ))
+            Some(PoGQv41Enhanced::new(config.pogq_config.unwrap_or_default()))
         } else {
             None
         };
@@ -120,9 +118,7 @@ impl DetectionStack {
         };
 
         let healer = if config.enable_healing {
-            Some(SelfHealer::new(
-                config.healing_config.unwrap_or_default(),
-            ))
+            Some(SelfHealer::new(config.healing_config.unwrap_or_default()))
         } else {
             None
         };
@@ -153,10 +149,7 @@ impl DetectionStack {
     /// # Errors
     ///
     /// Returns [`FlError::EmptyGradients`] if the input is empty.
-    pub fn detect_and_filter(
-        &mut self,
-        gradients: &[Gradient],
-    ) -> Result<StackResult, FlError> {
+    pub fn detect_and_filter(&mut self, gradients: &[Gradient]) -> Result<StackResult, FlError> {
         if gradients.is_empty() {
             return Err(FlError::EmptyGradients);
         }
@@ -323,10 +316,7 @@ mod tests {
 
         // Clean gradients should not contain the Byzantine.
         assert!(
-            !result
-                .clean_gradients
-                .iter()
-                .any(|g| g.node_id == "byz"),
+            !result.clean_gradients.iter().any(|g| g.node_id == "byz"),
             "Clean set should not contain Byzantine"
         );
     }

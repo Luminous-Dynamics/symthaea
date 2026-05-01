@@ -20,6 +20,16 @@ use mycelix_bridge_common::{
     ResolveQueryInput, RATE_LIMIT_WINDOW_SECS,
 };
 use personal_bridge_integrity::*;
+
+getrandom::register_custom_getrandom!(my_custom_getrandom);
+
+pub fn my_custom_getrandom(buf: &mut [u8]) -> Result<(), getrandom::Error> {
+    let bytes = hdk::prelude::random_bytes(buf.len() as u32).map_err(|_| getrandom::Error::UNSUPPORTED)?;
+    buf.copy_from_slice(bytes.as_ref());
+    Ok(())
+}
+
+use personal_leptos_types::{ActivityItemView, BridgeEventView, BridgeQueryView};
 #[cfg(test)]
 use personal_types::PresentationRequest;
 use personal_types::{CredentialPresentation, CredentialType, DisclosureScope};
@@ -56,6 +66,48 @@ fn ensure_anchor(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
     create_entry(&EntryTypes::Anchor(anchor))?;
     anchor_hash(anchor_str)
+}
+
+fn query_view_from_record(record: Record) -> ExternResult<Option<BridgeQueryView>> {
+    if let Some(query) = record
+        .entry()
+        .to_app_option::<PersonalQueryEntry>()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+    {
+        Ok(Some(BridgeQueryView {
+            hash: record.action_address().to_string(),
+            domain: query.domain,
+            query_type: query.query_type,
+            requester: query.requester.to_string(),
+            params: query.params,
+            result: query.result,
+            created_at: query.created_at.as_micros(),
+            resolved_at: query.resolved_at.map(|ts| ts.as_micros()),
+            success: query.success,
+        }))
+    } else {
+        Ok(None)
+    }
+}
+
+fn event_view_from_record(record: Record) -> ExternResult<Option<BridgeEventView>> {
+    if let Some(event) = record
+        .entry()
+        .to_app_option::<PersonalEventEntry>()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+    {
+        Ok(Some(BridgeEventView {
+            hash: record.action_address().to_string(),
+            domain: event.domain,
+            event_type: event.event_type,
+            source_agent: event.source_agent.to_string(),
+            payload: event.payload,
+            created_at: event.created_at.as_micros(),
+            related_hashes: event.related_hashes,
+        }))
+    } else {
+        Ok(None)
+    }
 }
 
 // ============================================================================
@@ -280,6 +332,20 @@ pub fn get_all_events(_: ()) -> ExternResult<Vec<Record>> {
 }
 
 #[hdk_extern]
+pub fn get_all_events_view(_: ()) -> ExternResult<Vec<BridgeEventView>> {
+    let records = get_all_events(())?;
+    let mut events = Vec::new();
+    for record in records {
+        if let Some(view) = event_view_from_record(record)? {
+            events.push(view);
+        }
+    }
+    events.sort_by_key(|item| item.created_at);
+    events.reverse();
+    Ok(events)
+}
+
+#[hdk_extern]
 pub fn get_events_by_type(query: EventTypeQuery) -> ExternResult<Vec<Record>> {
     let type_anchor = anchor_hash(&format!("event_type:{}:{}", query.domain, query.event_type))?;
     let links = get_links(
@@ -298,6 +364,53 @@ pub fn get_my_queries(_: ()) -> ExternResult<Vec<Record>> {
         GetStrategy::default(),
     )?;
     bridge::records_from_links(links)
+}
+
+#[hdk_extern]
+pub fn get_my_queries_view(_: ()) -> ExternResult<Vec<BridgeQueryView>> {
+    let records = get_my_queries(())?;
+    let mut queries = Vec::new();
+    for record in records {
+        if let Some(view) = query_view_from_record(record)? {
+            queries.push(view);
+        }
+    }
+    queries.sort_by_key(|item| item.created_at);
+    queries.reverse();
+    Ok(queries)
+}
+
+#[hdk_extern]
+pub fn get_recent_activity_view(_: ()) -> ExternResult<Vec<ActivityItemView>> {
+    let mut items = Vec::new();
+
+    for query in get_my_queries_view(())? {
+        items.push(ActivityItemView {
+            id: format!("query:{}", query.hash),
+            kind: "query".to_string(),
+            domain: query.domain.clone(),
+            title: format!("{} query", query.query_type),
+            detail: query.result.clone().unwrap_or_else(|| query.params.clone()),
+            created_at: query.created_at,
+            success: query.success,
+        });
+    }
+
+    for event in get_all_events_view(())? {
+        items.push(ActivityItemView {
+            id: format!("event:{}", event.hash),
+            kind: "event".to_string(),
+            domain: event.domain.clone(),
+            title: format!("{} event", event.event_type),
+            detail: event.payload.clone(),
+            created_at: event.created_at,
+            success: None,
+        });
+    }
+
+    items.sort_by_key(|item| item.created_at);
+    items.reverse();
+    Ok(items)
 }
 
 // ============================================================================

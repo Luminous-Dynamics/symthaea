@@ -181,10 +181,7 @@ pub fn start_emergency(
 }
 
 /// Tick the emergency session state. Call every tick.
-pub fn tick_emergency(
-    state: &mut GovernanceHardeningState,
-    config: &GovernanceHardeningConfig,
-) {
+pub fn tick_emergency(state: &mut GovernanceHardeningState, config: &GovernanceHardeningConfig) {
     if state.emergency_ticks_remaining > 0 {
         state.emergency_ticks_remaining -= 1;
         if state.emergency_ticks_remaining == 0 {
@@ -203,11 +200,7 @@ pub fn tick_emergency(
 /// Compute effective governance tier for an agent, respecting AI ceiling.
 ///
 /// Non-biological agents are capped at `config.ai_max_tier` (Steward = 3).
-pub fn effective_tier(
-    raw_tier: u8,
-    is_biological: bool,
-    config: &GovernanceHardeningConfig,
-) -> u8 {
+pub fn effective_tier(raw_tier: u8, is_biological: bool, config: &GovernanceHardeningConfig) -> u8 {
     if !is_biological && raw_tier > config.ai_max_tier {
         config.ai_max_tier
     } else {
@@ -266,7 +259,10 @@ mod tests {
         record_veto(&mut state, 1, 0);
         record_veto(&mut state, 1, 4);
         record_veto(&mut state, 1, 8);
-        assert!(!can_veto(&state, &config, 1, 10), "4th veto within 12 ticks should be blocked");
+        assert!(
+            !can_veto(&state, &config, 1, 10),
+            "4th veto within 12 ticks should be blocked"
+        );
     }
 
     #[test]
@@ -311,7 +307,10 @@ mod tests {
     fn quorum_triggers_expert_after_three_failures() {
         let mut state = default_state();
         state.consecutive_quorum_failures = 3;
-        assert_eq!(effective_quorum(&state, &default_config()), Err("expert_adjudication"));
+        assert_eq!(
+            effective_quorum(&state, &default_config()),
+            Err("expert_adjudication")
+        );
     }
 
     // ---- Emergency sessions ----
@@ -344,7 +343,10 @@ mod tests {
         assert_eq!(state.emergency_ticks_remaining, 1);
 
         tick_emergency(&mut state, &config);
-        assert_eq!(state.emergency_ticks_remaining, 0, "Session should expire after 1 tick");
+        assert_eq!(
+            state.emergency_ticks_remaining, 0,
+            "Session should expire after 1 tick"
+        );
     }
 
     #[test]
@@ -358,11 +360,20 @@ mod tests {
             tick_emergency(&mut state, &config);
         }
 
-        assert_eq!(state.emergency_cooldown_remaining, 1, "Cooldown should activate");
-        assert!(!can_start_emergency(&state, &config), "Should be blocked during cooldown");
+        assert_eq!(
+            state.emergency_cooldown_remaining, 1,
+            "Cooldown should activate"
+        );
+        assert!(
+            !can_start_emergency(&state, &config),
+            "Should be blocked during cooldown"
+        );
 
         tick_emergency(&mut state, &config);
-        assert_eq!(state.emergency_cooldown_remaining, 0, "Cooldown should expire");
+        assert_eq!(
+            state.emergency_cooldown_remaining, 0,
+            "Cooldown should expire"
+        );
     }
 
     // ---- AI ceiling ----
@@ -409,7 +420,10 @@ mod tests {
     #[test]
     fn config_matches_constitution() {
         let config = default_config();
-        assert!((config.veto_override_threshold - 0.67).abs() < 0.01, "⅔ majority");
+        assert!(
+            (config.veto_override_threshold - 0.67).abs() < 0.01,
+            "⅔ majority"
+        );
         assert_eq!(config.veto_yearly_limit, 3, "3 vetoes per year");
         assert!((config.quorum_primary - 0.40).abs() < 0.01, "40% quorum");
         assert!((config.quorum_fallback - 0.30).abs() < 0.01, "30% fallback");
@@ -417,7 +431,10 @@ mod tests {
         assert_eq!(config.emergency_max_ticks, 1, "1 month emergency max");
         assert_eq!(config.emergency_max_consecutive, 3, "3 consecutive max");
         assert_eq!(config.ai_max_tier, 3, "Steward ceiling for AI");
-        assert!((config.unsigned_phi_cap - 0.6).abs() < 0.01, "0.6 self-report cap");
+        assert!(
+            (config.unsigned_phi_cap - 0.6).abs() < 0.01,
+            "0.6 self-report cap"
+        );
         assert_eq!(config.term_limit_ticks, 12, "12-month terms");
     }
 }

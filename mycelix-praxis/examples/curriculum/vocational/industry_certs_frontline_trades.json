@@ -1,0 +1,116 @@
+{
+  "metadata": {
+    "title": "Frontline Trades: High-Volume Entry Standards",
+    "framework": "Global Frontline Mesh",
+    "source": "https://mycelix.org/certs-frontline",
+    "grade_level": "Entry/Professional",
+    "subject_area": "Multi-Sector",
+    "domain": "Professional Certification",
+    "version": "1.0",
+    "total_standards": 6,
+    "domains": [
+      "Industrial Safety",
+      "HVAC & Cooling",
+      "Local Logistics",
+      "Culinary Leadership",
+      "Automotive Tech"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Focused on high-volume certifications for immediate workforce entry."
+  },
+  "nodes": [
+    {
+      "id": "CERT-SAFE-OSHA10",
+      "title": "OSHA 10-Hour (General Industry)",
+      "description": "Foundational health and safety awareness for industrial workers. Hazard recognition and avoidance. The universal requirement for warehouse and factory roles.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Industrial Safety",
+      "subdomain": "Certification Bridge",
+      "tags": ["osha", "safety", "industrial", "standard"],
+      "estimated_hours": 10,
+      "grade_levels": ["Adult"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "CERT-HVAC-EPA608-UNI",
+      "title": "EPA Section 608 Universal Certification",
+      "description": "Legal requirement for anyone maintaining, servicing, repairing, or disposing of appliances that contain refrigerants. Essential for climate control trades.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "HVAC & Cooling",
+      "subdomain": "Certification Bridge",
+      "tags": ["epa", "hvac", "cooling", "standard"],
+      "estimated_hours": 30,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "CERT-LOG-CDL-B",
+      "title": "CDL Class B: Theory & Skills",
+      "description": "Operating vehicles over 26,001 lbs that do not tow trailers. Essential for local delivery, buses, and service trucks.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Local Logistics",
+      "subdomain": "Certification Bridge",
+      "tags": ["cdl", "trucking", "logistics", "standard"],
+      "estimated_hours": 60,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "CERT-CUL-SERV-MGR",
+      "title": "ServSafe Food Protection Manager",
+      "description": "High-tier food safety certification for kitchen leaders. Managing time, temperature, and contamination risks. Mapping regenerative nutrition to food safety.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Culinary Leadership",
+      "subdomain": "Certification Bridge",
+      "tags": ["culinary", "food-safety", "management", "standard"],
+      "estimated_hours": 40,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Health Sciences"
+    },
+    {
+      "id": "CERT-AUTO-ASE-ENTRY",
+      "title": "ASE Entry-Level (Automobile) Mapping",
+      "description": "Foundational knowledge for auto technicians. Engine repair, brakes, electrical systems, and maintenance. Linked to Scrap-stack Mechanics.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Automotive Tech",
+      "subdomain": "Certification Bridge",
+      "tags": ["auto", "mechanic", "ase", "standard"],
+      "estimated_hours": 80,
+      "grade_levels": ["Entry"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering"
+    }
+  ],
+  "edges": [
+    {
+      "from": "VOC-KINETIC-101",
+      "to": "CERT-SAFE-OSHA10",
+      "edge_type": "Recommended",
+      "strength_permille": 900,
+      "rationale": "Kinetic safety and tool mastery are the direct prerequisites for professional OSHA standards."
+    },
+    {
+      "from": "VOC-H2O-101",
+      "to": "CERT-HVAC-EPA608-UNI",
+      "edge_type": "Recommended",
+      "strength_permille": 600,
+      "rationale": "Water stewardship and plumbing intuition provide the context for closed-loop refrigerant systems."
+    },
+    {
+      "from": "VOC-AG-101",
+      "to": "CERT-CUL-SERV-MGR",
+      "edge_type": "Recommended",
+      "strength_permille": 750,
+      "rationale": "Understanding the source-chain of soil health is the prerequisite for safe food management."
+    }
+  ]
+}

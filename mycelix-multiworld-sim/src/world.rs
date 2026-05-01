@@ -185,7 +185,7 @@ impl WorldResources {
             ResourceStock {
                 current: 1000.0,
                 capacity: 2000.0,
-                production_rate: 45.0,   // Hydroponics + imported supplements
+                production_rate: 45.0, // Hydroponics + imported supplements
                 consumption_rate: 40.0,
                 critical_threshold: 0.1,
             },
@@ -240,41 +240,56 @@ impl WorldResources {
     /// Paranicas et al. (2009); Anderson et al. (1998) for ocean/ice data.
     pub fn europa_default() -> Self {
         let mut r = Self::new();
-        r.set("food", ResourceStock {
-            current: 500.0,
-            capacity: 1500.0,
-            production_rate: 30.0,    // Hydroponics under ice (energy-limited)
-            consumption_rate: 40.0,
-            critical_threshold: 0.15,
-        });
-        r.set("water", ResourceStock {
-            current: 5000.0,
-            capacity: 20000.0,
-            production_rate: 500.0,   // 10× lunar — unlimited ice
-            consumption_rate: 45.0,
-            critical_threshold: 0.05,
-        });
-        r.set("energy", ResourceStock {
-            current: 500.0,           // Bootstrapped from lander reactors
-            capacity: 3000.0,
-            production_rate: 0.0,     // ZERO until fission/fusion achieved
-            consumption_rate: 100.0,  // Higher than lunar — radiation shielding + ice processing
-            critical_threshold: 0.15,
-        });
-        r.set("materials", ResourceStock {
-            current: 200.0,
-            capacity: 800.0,
-            production_rate: 3.0,     // 0.3× lunar — limited metals, must import
-            consumption_rate: 15.0,
-            critical_threshold: 0.25,
-        });
-        r.set("oxygen", ResourceStock {
-            current: 900.0,
-            capacity: 2000.0,
-            production_rate: 60.0,    // Electrolysis from ice (if energy available)
-            consumption_rate: 50.0,
-            critical_threshold: 0.2,
-        });
+        r.set(
+            "food",
+            ResourceStock {
+                current: 500.0,
+                capacity: 1500.0,
+                production_rate: 30.0, // Hydroponics under ice (energy-limited)
+                consumption_rate: 40.0,
+                critical_threshold: 0.15,
+            },
+        );
+        r.set(
+            "water",
+            ResourceStock {
+                current: 5000.0,
+                capacity: 20000.0,
+                production_rate: 500.0, // 10× lunar — unlimited ice
+                consumption_rate: 45.0,
+                critical_threshold: 0.05,
+            },
+        );
+        r.set(
+            "energy",
+            ResourceStock {
+                current: 500.0, // Bootstrapped from lander reactors
+                capacity: 3000.0,
+                production_rate: 0.0,    // ZERO until fission/fusion achieved
+                consumption_rate: 100.0, // Higher than lunar — radiation shielding + ice processing
+                critical_threshold: 0.15,
+            },
+        );
+        r.set(
+            "materials",
+            ResourceStock {
+                current: 200.0,
+                capacity: 800.0,
+                production_rate: 3.0, // 0.3× lunar — limited metals, must import
+                consumption_rate: 15.0,
+                critical_threshold: 0.25,
+            },
+        );
+        r.set(
+            "oxygen",
+            ResourceStock {
+                current: 900.0,
+                capacity: 2000.0,
+                production_rate: 60.0, // Electrolysis from ice (if energy available)
+                consumption_rate: 50.0,
+                critical_threshold: 0.2,
+            },
+        );
         r
     }
 
@@ -285,52 +300,70 @@ impl WorldResources {
     /// Fulchignoni et al. (2005); Niemann et al. (2010); Mastrogiuseppe et al. (2019).
     pub fn titan_default() -> Self {
         let mut r = Self::new();
-        r.set("food", ResourceStock {
-            current: 300.0,
-            capacity: 1000.0,
-            production_rate: 22.0,    // 0.5× lunar — all lighting artificial, energy-expensive
-            consumption_rate: 40.0,
-            critical_threshold: 0.15,
-        });
-        r.set("water", ResourceStock {
-            current: 3000.0,
-            capacity: 15000.0,
-            production_rate: 250.0,   // 5× lunar — ice bedrock, but must melt (energy cost)
-            consumption_rate: 45.0,
-            critical_threshold: 0.1,
-        });
-        r.set("energy", ResourceStock {
-            current: 300.0,           // Bootstrapped from lander reactors
-            capacity: 2000.0,
-            production_rate: 0.0,     // ZERO until fission/fusion achieved
-            consumption_rate: 120.0,  // Higher than Europa — heating load is relentless (199K ΔT)
-            critical_threshold: 0.2,
-        });
-        r.set("materials", ResourceStock {
-            current: 400.0,
-            capacity: 1500.0,
-            production_rate: 20.0,    // 2× lunar — hydrocarbon polymers, ice pykrete construction
-            consumption_rate: 15.0,
-            critical_threshold: 0.15,
-        });
-        r.set("oxygen", ResourceStock {
-            current: 600.0,
-            capacity: 1500.0,
-            production_rate: 40.0,    // Electrolysis from ice (if energy available)
-            consumption_rate: 50.0,
-            critical_threshold: 0.2,
-        });
+        r.set(
+            "food",
+            ResourceStock {
+                current: 300.0,
+                capacity: 1000.0,
+                production_rate: 22.0, // 0.5× lunar — all lighting artificial, energy-expensive
+                consumption_rate: 40.0,
+                critical_threshold: 0.15,
+            },
+        );
+        r.set(
+            "water",
+            ResourceStock {
+                current: 3000.0,
+                capacity: 15000.0,
+                production_rate: 250.0, // 5× lunar — ice bedrock, but must melt (energy cost)
+                consumption_rate: 45.0,
+                critical_threshold: 0.1,
+            },
+        );
+        r.set(
+            "energy",
+            ResourceStock {
+                current: 300.0, // Bootstrapped from lander reactors
+                capacity: 2000.0,
+                production_rate: 0.0,    // ZERO until fission/fusion achieved
+                consumption_rate: 120.0, // Higher than Europa — heating load is relentless (199K ΔT)
+                critical_threshold: 0.2,
+            },
+        );
+        r.set(
+            "materials",
+            ResourceStock {
+                current: 400.0,
+                capacity: 1500.0,
+                production_rate: 20.0, // 2× lunar — hydrocarbon polymers, ice pykrete construction
+                consumption_rate: 15.0,
+                critical_threshold: 0.15,
+            },
+        );
+        r.set(
+            "oxygen",
+            ResourceStock {
+                current: 600.0,
+                capacity: 1500.0,
+                production_rate: 40.0, // Electrolysis from ice (if energy available)
+                consumption_rate: 50.0,
+                critical_threshold: 0.2,
+            },
+        );
         // Titan-exclusive: hydrocarbon resource (methane/ethane from lakes).
         // Kraken Mare alone holds ~20,000 km³. Effectively unlimited for colony scale.
         // Used for materials ISRU (polymers, pykrete), rocket fuel (CH4/LOX), and
         // chemical energy storage. Mastrogiuseppe et al. (2019), Nature Astronomy.
-        r.set("hydrocarbons", ResourceStock {
-            current: 50000.0,
-            capacity: 100000.0,
-            production_rate: 500.0,   // Surface collection from methane lakes
-            consumption_rate: 50.0,   // Materials + fuel synthesis
-            critical_threshold: 0.05, // Very hard to run out
-        });
+        r.set(
+            "hydrocarbons",
+            ResourceStock {
+                current: 50000.0,
+                capacity: 100000.0,
+                production_rate: 500.0, // Surface collection from methane lakes
+                consumption_rate: 50.0, // Materials + fuel synthesis
+                critical_threshold: 0.05, // Very hard to run out
+            },
+        );
         r
     }
 
@@ -389,20 +422,60 @@ impl WorldZone {
     /// Default zone for a generation ship section.
     pub fn generation_ship_zones() -> Vec<WorldZone> {
         vec![
-            WorldZone { name: "Bridge & Command".into(), radiation_multiplier: 0.5, resource_access: 1.0, social_density: 0.8 },
-            WorldZone { name: "Habitation Ring".into(), radiation_multiplier: 0.7, resource_access: 0.9, social_density: 1.0 },
-            WorldZone { name: "Hydroponic Bay".into(), radiation_multiplier: 1.0, resource_access: 1.2, social_density: 0.5 },
-            WorldZone { name: "Engineering Deck".into(), radiation_multiplier: 1.5, resource_access: 0.8, social_density: 0.4 },
-            WorldZone { name: "Cargo Hold".into(), radiation_multiplier: 2.0, resource_access: 0.6, social_density: 0.2 },
+            WorldZone {
+                name: "Bridge & Command".into(),
+                radiation_multiplier: 0.5,
+                resource_access: 1.0,
+                social_density: 0.8,
+            },
+            WorldZone {
+                name: "Habitation Ring".into(),
+                radiation_multiplier: 0.7,
+                resource_access: 0.9,
+                social_density: 1.0,
+            },
+            WorldZone {
+                name: "Hydroponic Bay".into(),
+                radiation_multiplier: 1.0,
+                resource_access: 1.2,
+                social_density: 0.5,
+            },
+            WorldZone {
+                name: "Engineering Deck".into(),
+                radiation_multiplier: 1.5,
+                resource_access: 0.8,
+                social_density: 0.4,
+            },
+            WorldZone {
+                name: "Cargo Hold".into(),
+                radiation_multiplier: 2.0,
+                resource_access: 0.6,
+                social_density: 0.2,
+            },
         ]
     }
 
     /// Default zones for a lunar base.
     pub fn lunar_zones() -> Vec<WorldZone> {
         vec![
-            WorldZone { name: "Central Dome".into(), radiation_multiplier: 0.8, resource_access: 1.0, social_density: 1.0 },
-            WorldZone { name: "Regolith-Shielded Lab".into(), radiation_multiplier: 0.3, resource_access: 0.9, social_density: 0.6 },
-            WorldZone { name: "Surface Operations".into(), radiation_multiplier: 2.5, resource_access: 0.7, social_density: 0.3 },
+            WorldZone {
+                name: "Central Dome".into(),
+                radiation_multiplier: 0.8,
+                resource_access: 1.0,
+                social_density: 1.0,
+            },
+            WorldZone {
+                name: "Regolith-Shielded Lab".into(),
+                radiation_multiplier: 0.3,
+                resource_access: 0.9,
+                social_density: 0.6,
+            },
+            WorldZone {
+                name: "Surface Operations".into(),
+                radiation_multiplier: 2.5,
+                resource_access: 0.7,
+                social_density: 0.3,
+            },
         ]
     }
 }
@@ -439,11 +512,7 @@ pub struct CulturalProfile {
 
 impl CulturalProfile {
     /// Fix 9: Tick cultural evolution — language divergence and ritual emergence.
-    pub fn tick_culture_evolution(
-        &mut self,
-        current_tick: u32,
-        contact_frequency: f64,
-    ) {
+    pub fn tick_culture_evolution(&mut self, current_tick: u32, contact_frequency: f64) {
         // Language diverges when isolated
         let isolation = 1.0 - contact_frequency;
         self.language_divergence = (self.language_divergence + 0.001 * isolation).min(1.0);
@@ -456,12 +525,7 @@ impl CulturalProfile {
 
     /// Brownian cultural drift: magnitude proportional to 1/sqrt(pop) * (1 - contact_frequency).
     /// Small populations drift faster; high inter-group contact slows drift.
-    pub fn drift(
-        &mut self,
-        rng: &mut StochasticEngine,
-        population: usize,
-        contact_frequency: f64,
-    ) {
+    pub fn drift(&mut self, rng: &mut StochasticEngine, population: usize, contact_frequency: f64) {
         let magnitude = 0.01 / (population as f64).sqrt().max(1.0) * (1.0 - contact_frequency);
 
         for w in &mut self.harmony_weights {
@@ -480,8 +544,7 @@ impl CulturalProfile {
             (self.individualism + rng.next_gaussian(0.0, magnitude)).clamp(0.0, 1.0);
         self.risk_tolerance =
             (self.risk_tolerance + rng.next_gaussian(0.0, magnitude)).clamp(0.0, 1.0);
-        self.xenophilia =
-            (self.xenophilia + rng.next_gaussian(0.0, magnitude)).clamp(0.0, 1.0);
+        self.xenophilia = (self.xenophilia + rng.next_gaussian(0.0, magnitude)).clamp(0.0, 1.0);
         self.traditionalism =
             (self.traditionalism + rng.next_gaussian(0.0, magnitude)).clamp(0.0, 1.0);
     }
@@ -494,7 +557,12 @@ impl CulturalProfile {
             .zip(other.harmony_weights.iter())
             .map(|(a, b)| a * b)
             .sum();
-        let mag_a: f64 = self.harmony_weights.iter().map(|x| x * x).sum::<f64>().sqrt();
+        let mag_a: f64 = self
+            .harmony_weights
+            .iter()
+            .map(|x| x * x)
+            .sum::<f64>()
+            .sqrt();
         let mag_b: f64 = other
             .harmony_weights
             .iter()
@@ -518,7 +586,8 @@ impl CulturalProfile {
             traditionalism: 0.5,
             language_divergence: 0.0,
             ritual_count: 100, // Earth has many existing rituals
-            founding_mythology: "Cradle of humanity — the blue marble from which all journeys begin".into(),
+            founding_mythology:
+                "Cradle of humanity — the blue marble from which all journeys begin".into(),
         }
     }
 
@@ -532,7 +601,8 @@ impl CulturalProfile {
             traditionalism: 0.3,
             language_divergence: 0.0,
             ritual_count: 3, // Pioneers start with few rituals
-            founding_mythology: "We left everything behind to build something new among the stars".into(),
+            founding_mythology: "We left everything behind to build something new among the stars"
+                .into(),
         }
     }
 }
@@ -597,7 +667,6 @@ pub struct World {
     // =================================================================
     // Structural realism systems (Top 10 from exhaustive audit)
     // =================================================================
-
     /// #1: Power flow budget (watts). Total generation vs total demand.
     /// When demand > generation, load shedding begins.
     #[serde(default)]
@@ -692,10 +761,18 @@ pub struct World {
     pub zones: Vec<WorldZone>,
 }
 
-fn default_trust() -> f64 { 0.7 }
-fn default_funding() -> f64 { 1.0 }
-fn default_one() -> f64 { 1.0 }
-fn default_true() -> bool { true }
+fn default_trust() -> f64 {
+    0.7
+}
+fn default_funding() -> f64 {
+    1.0
+}
+fn default_one() -> f64 {
+    1.0
+}
+fn default_true() -> bool {
+    true
+}
 
 /// Parameters for creating a new colony world.
 /// Captures the fields that vary between `initialize_worlds()` and `found_colony()`.
@@ -737,7 +814,10 @@ impl World {
             knowledge: WorldKnowledge::new(),
             economy: WorldEconomy::new(),
             harmony: HarmonyTracker::new(),
-            governance: WorldGovernance::new(), metabolism_state: crate::metabolism::MetabolismState::default(), currency_state: crate::currency::WorldCurrencyState::default(), policy_state: crate::proposals::PolicyState::default(),
+            governance: WorldGovernance::new(),
+            metabolism_state: crate::metabolism::MetabolismState::default(),
+            currency_state: crate::currency::WorldCurrencyState::default(),
+            policy_state: crate::proposals::PolicyState::default(),
             power_generation_kw: 0.0,
             power_demand_kw: 0.0,
             narrative_identity: NarrativeIdentity::default(),
@@ -809,11 +889,11 @@ impl NarrativeArchetype {
     pub fn disaster_resilience(&self) -> f64 {
         match self {
             Self::Pioneers => 0.6,   // Built for hardship
-            Self::Scientists => 0.8,  // Curious but not tough
-            Self::Refugees => 0.5,    // Survived worse
-            Self::Utopians => 1.0,    // Shattered by reality
-            Self::Workers => 0.9,     // Didn't sign up for this
-            Self::Settlers => 0.7,    // Stubborn endurance
+            Self::Scientists => 0.8, // Curious but not tough
+            Self::Refugees => 0.5,   // Survived worse
+            Self::Utopians => 1.0,   // Shattered by reality
+            Self::Workers => 0.9,    // Didn't sign up for this
+            Self::Settlers => 0.7,   // Stubborn endurance
         }
     }
 
@@ -822,11 +902,11 @@ impl NarrativeArchetype {
     pub fn adaptation_capacity(&self) -> f64 {
         match self {
             Self::Pioneers => 0.7,
-            Self::Scientists => 0.9,   // Hypothesis-driven, will try new things
-            Self::Refugees => 0.6,     // Cautious, stick to what works
-            Self::Utopians => 0.5,     // Ideology constrains adaptation
-            Self::Workers => 0.8,      // Pragmatic
-            Self::Settlers => 0.3,     // "This is how we've always done it"
+            Self::Scientists => 0.9, // Hypothesis-driven, will try new things
+            Self::Refugees => 0.6,   // Cautious, stick to what works
+            Self::Utopians => 0.5,   // Ideology constrains adaptation
+            Self::Workers => 0.8,    // Pragmatic
+            Self::Settlers => 0.3,   // "This is how we've always done it"
         }
     }
 }
@@ -853,11 +933,7 @@ impl World {
         self.agents
             .iter()
             .filter(|a| {
-                a.is_alive()
-                    && matches!(
-                        a.life_stage(tick),
-                        LifeStage::Adult | LifeStage::Elder
-                    )
+                a.is_alive() && matches!(a.life_stage(tick), LifeStage::Adult | LifeStage::Elder)
             })
             .count()
     }
@@ -911,7 +987,9 @@ impl World {
     /// - Infrastructure quality (enables coordination)
     pub fn collective_phi(&self) -> f64 {
         let base = self.mean_phi();
-        if base <= 0.0 { return 0.0; }
+        if base <= 0.0 {
+            return 0.0;
+        }
 
         let pop = self.population().max(1) as f64;
         // Scale bonus: log2(pop/100) — a colony of 10,000 gets +3.3 bonus
@@ -919,9 +997,8 @@ impl World {
         let scale_bonus = (pop / 100.0).max(1.0).log2().min(5.0);
 
         // Organizational quality: governance × trust × infrastructure
-        let org_quality = self.governance.stability_score
-            * self.trust_level
-            * self.infrastructure_level;
+        let org_quality =
+            self.governance.stability_score * self.trust_level * self.infrastructure_level;
 
         // Collective Phi = base × (1 + scale_bonus × org_quality)
         // At pop=100, org=1.0: multiplier = 1.0 (no bonus)
@@ -1006,36 +1083,40 @@ impl World {
         requirement: &crate::sovereign_profile::CivicRequirement,
         weights: &crate::sovereign_profile::DimensionWeights,
     ) -> f64 {
-        let (eligible, total) = self
-            .agents
-            .iter()
-            .filter(|a| a.is_alive())
-            .fold((0usize, 0usize), |(e, t), a| {
-                let raw = a.sovereign_profile.tier(weights);
-                let effective = a.justice.effective_tier(raw);
-                // Tier check: use effective tier (degraded).
-                let tier_ok = effective >= requirement.min_tier;
-                // Per-dimension minimums: CrossClusterAmplifier routes the
-                // check through a lenient cluster gate, reducing each floor.
-                let bypass = match a.adversarial {
-                    Some(crate::red_team::AdversarialStrategy::CrossClusterAmplifier) => {
-                        let m = crate::red_team::AdversarialModifier::for_strategy(
-                            crate::red_team::AdversarialStrategy::CrossClusterAmplifier,
-                            0.01,
-                        );
-                        m.cross_cluster_bypass.clamp(0.0, 1.0)
-                    }
-                    _ => 0.0,
-                };
-                let dim_ok = requirement.min_dimensions.iter().all(|&(dim, min)| {
-                    let v = a.sovereign_profile.get(dim);
-                    let sanitized = if v.is_finite() { v.clamp(0.0, 1.0) } else { 0.0 };
-                    let effective_min = min * (1.0 - bypass);
-                    sanitized >= effective_min
+        let (eligible, total) =
+            self.agents
+                .iter()
+                .filter(|a| a.is_alive())
+                .fold((0usize, 0usize), |(e, t), a| {
+                    let raw = a.sovereign_profile.tier(weights);
+                    let effective = a.justice.effective_tier(raw);
+                    // Tier check: use effective tier (degraded).
+                    let tier_ok = effective >= requirement.min_tier;
+                    // Per-dimension minimums: CrossClusterAmplifier routes the
+                    // check through a lenient cluster gate, reducing each floor.
+                    let bypass = match a.adversarial {
+                        Some(crate::red_team::AdversarialStrategy::CrossClusterAmplifier) => {
+                            let m = crate::red_team::AdversarialModifier::for_strategy(
+                                crate::red_team::AdversarialStrategy::CrossClusterAmplifier,
+                                0.01,
+                            );
+                            m.cross_cluster_bypass.clamp(0.0, 1.0)
+                        }
+                        _ => 0.0,
+                    };
+                    let dim_ok = requirement.min_dimensions.iter().all(|&(dim, min)| {
+                        let v = a.sovereign_profile.get(dim);
+                        let sanitized = if v.is_finite() {
+                            v.clamp(0.0, 1.0)
+                        } else {
+                            0.0
+                        };
+                        let effective_min = min * (1.0 - bypass);
+                        sanitized >= effective_min
+                    });
+                    let e = e + (tier_ok && dim_ok) as usize;
+                    (e, t + 1)
                 });
-                let e = e + (tier_ok && dim_ok) as usize;
-                (e, t + 1)
-            });
         if total == 0 {
             0.0
         } else {
@@ -1092,7 +1173,10 @@ mod tests {
             knowledge: WorldKnowledge::new(),
             economy: WorldEconomy::new(),
             harmony: HarmonyTracker::new(),
-            governance: WorldGovernance::new(), metabolism_state: crate::metabolism::MetabolismState::default(), currency_state: crate::currency::WorldCurrencyState::default(), policy_state: crate::proposals::PolicyState::default(),
+            governance: WorldGovernance::new(),
+            metabolism_state: crate::metabolism::MetabolismState::default(),
+            currency_state: crate::currency::WorldCurrencyState::default(),
+            policy_state: crate::proposals::PolicyState::default(),
             power_generation_kw: 0.0,
             power_demand_kw: 0.0,
             narrative_identity: crate::world::NarrativeIdentity::default(),
@@ -1144,10 +1228,16 @@ mod tests {
                 faction_id: None,
                 generation: 0,
                 trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
-                    ethics: crate::agent::EthicalOrientation::default(),
-                    sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
-                    justice: crate::sub_passport::RestorativeJustice::new(),
+                cumulative_dose_sv: 0.0,
+                adversarial: None,
+                coordination_understanding: 0.0,
+                mycel_score: 0.1,
+                sap_balance: 100.0,
+                is_biological: true,
+                wounds: Vec::new(),
+                ethics: crate::agent::EthicalOrientation::default(),
+                sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
+                justice: crate::sub_passport::RestorativeJustice::new(),
             };
             world.agents.push(agent);
         }

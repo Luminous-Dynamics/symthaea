@@ -10,6 +10,7 @@ crate-type = ["cdylib", "rlib"]
 name = "identity_bridge"
 
 [dependencies]
+mycelix-zome-helpers = { workspace = true }
 hdk = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

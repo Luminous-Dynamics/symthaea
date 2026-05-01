@@ -1,5 +1,5 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! GJK (Gilbert–Johnson–Keerthi) intersection test generalized to N dimensions.
 //!
@@ -120,10 +120,7 @@ fn minkowski_support<const D: usize>(
 ///
 /// This is the dimension-agnostic simplex handler. For D dimensions,
 /// we need at most D+1 points to enclose the origin.
-fn do_simplex<const D: usize>(
-    simplex: &mut Simplex<D>,
-    direction: &mut SVector<f64, D>,
-) -> bool {
+fn do_simplex<const D: usize>(simplex: &mut Simplex<D>, direction: &mut SVector<f64, D>) -> bool {
     match simplex.len() {
         2 => do_simplex_line(simplex, direction),
         3 => do_simplex_triangle(simplex, direction),
@@ -238,8 +235,8 @@ fn do_simplex_triangle<const D: usize>(
     // Project AO onto the triangle plane, then subtract to get normal component
     let ao_e1 = ao.dot(&ab);
     let ao_e2 = ao.dot(&ac);
-    let proj = &ab * ((ao_e1 * e2e2 - ao_e2 * e1e2) / det)
-             + &ac * ((ao_e2 * e1e1 - ao_e1 * e1e2) / det);
+    let proj =
+        &ab * ((ao_e1 * e2e2 - ao_e2 * e1e2) / det) + &ac * ((ao_e2 * e1e1 - ao_e1 * e1e2) / det);
     let face_normal = &ao - &proj;
 
     if face_normal.norm_squared() < 1e-20 {
@@ -333,7 +330,7 @@ fn face_normal<const D: usize>(
 
     // Projection of opposite onto the plane
     let proj = edge1 * ((opp_e1 * e2_norm - opp_e2 * e1_e2) / denom)
-             + edge2 * ((opp_e2 * e1_norm - opp_e1 * e1_e2) / denom);
+        + edge2 * ((opp_e2 * e1_norm - opp_e1 * e1_e2) / denom);
 
     // Normal component (perpendicular to face, in direction of opposite vertex)
     let normal_toward_opp = opposite - proj;
@@ -403,7 +400,6 @@ fn triple_cross_product<const D: usize>(
 ) -> SVector<f64, D> {
     b * a.dot(c) - a * b.dot(c)
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -502,7 +498,10 @@ mod tests {
         let pc = SVector::from([3.0, 0.0, 0.0]);
         let result = intersects(&sphere, &ps, &cube, &pc);
         // sphere(r=1) at 0 + cube(half=1) at 3: gap = 3 - 1 - 1 = 1
-        assert!(!result.intersecting, "sphere+box should be separated at dist 3");
+        assert!(
+            !result.intersecting,
+            "sphere+box should be separated at dist 3"
+        );
     }
 
     #[test]
@@ -521,7 +520,11 @@ mod tests {
         let pb = SVector::from([0.5, 0.3, 0.1]);
         let result = intersects(&a, &pa, &b, &pb);
         // Sphere r=1 at origin + cube half=1 at (0.5,0.3,0.1): clearly overlapping
-        assert!(result.intersecting, "sphere+cube should intersect, iters={}", result.iterations);
+        assert!(
+            result.intersecting,
+            "sphere+cube should intersect, iters={}",
+            result.iterations
+        );
     }
 }
 

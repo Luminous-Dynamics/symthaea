@@ -1,3 +1,4 @@
+use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -15,6 +16,7 @@
 use hdk::prelude::*;
 use credential_integrity::{
     VerifiableCredential, CredentialStatus,
+    CredentialDisclosure, ComprehensiveLearnerRecord, DisclosureAudience,
     EntryTypes, LinkTypes
 };
 use praxis_core::CourseId;
@@ -689,6 +691,256 @@ pub enum SignalPayload {
         reason: String,
         timestamp: String,
     },
+}
+
+// ============== CLR 2.0 & Selective Disclosure ==============
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CreateDisclosureInput {
+    pub private_credential_hash: ActionHash,
+    pub visible_fields: Vec<String>,
+    pub audience: DisclosureAudience,
+}
+
+#[hdk_extern]
+pub fn create_credential_disclosure(input: CreateDisclosureInput) -> ExternResult<ActionHash> {
+    let now = sys_time()?.as_micros();
+    
+    // Generate a random salt for blinding
+    let mut salt = [0u8; 16];
+    let seed = now.to_le_bytes();
+    for i in 0..8 {
+        salt[i] = seed[i];
+        salt[i+8] = seed[i] ^ 0xFF;
+    }
+
+    let disclosure = CredentialDisclosure {
+        private_credential_hash: input.private_credential_hash.clone(),
+        visible_fields: input.visible_fields,
+        audience: input.audience,
+        salt,
+        created_at: now as i64,
+    };
+
+    let action_hash = create_entry(EntryTypes::CredentialDisclosure(disclosure))?;
+    
+    // Link from private credential to its disclosures
+    create_link(input.private_credential_hash, action_hash.clone(), LinkTypes::PrivateToDisclosure, ())?;
+    
+    Ok(action_hash)
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CreateClrInput {
+    pub title: String,
+    pub description: String,
+    pub disclosures: Vec<ActionHash>,
+    pub targeted_industries: Vec<credential_integrity::IndustryMapping>,
+}
+
+#[hdk_extern]
+pub fn create_clr(input: CreateClrInput) -> ExternResult<ActionHash> {
+    let now = sys_time()?.as_micros();
+    let agent = agent_info()?.agent_initial_pubkey;
+
+    // Calculate MATL trust score (Mock for now, weighting PoL by reputation)
+    let aggregate_trust_score = calculate_matl_trust_score(&input.disclosures)?;
+
+    let clr = ComprehensiveLearnerRecord {
+        title: input.title,
+        description: input.description,
+        disclosures: input.disclosures.clone(),
+        aggregate_trust_score,
+        targeted_industries: input.targeted_industries.clone(),
+        created_at: now as i64,
+        expires_at: None,
+    };
+
+    let action_hash = create_entry(EntryTypes::ComprehensiveLearnerRecord(clr))?;
+
+    // Link from learner to CLR
+    create_link(agent, action_hash.clone(), LinkTypes::LearnerToClrs, ())?;
+
+    // Link CLR to its disclosures
+    for disc_hash in input.disclosures {
+        create_link(action_hash.clone(), disc_hash, LinkTypes::ClrToDisclosures, ())?;
+    }
+
+    // Index by ESCO/Industry codes for employer search
+    for mapping in input.targeted_industries {
+        let path = Path::from(format!("esco.{}.{}", mapping.framework, mapping.code));
+        let path_hash = ensure_path(path, LinkTypes::EscoToDisclosures)?;
+        create_link(path_hash, action_hash.clone(), LinkTypes::EscoToDisclosures, ())?;
+    }
+
+    Ok(action_hash)
+}
+
+// ============== Employer Search & ZK-Proofs ==============
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct EscoSearchInput {
+    pub framework: String,
+    pub code: String,
+}
+
+/// Search for CLR records matching a specific ESCO code
+#[hdk_extern]
+pub fn search_credentials_by_esco(input: EscoSearchInput) -> ExternResult<Vec<Record>> {
+    let path = Path::from(format!("esco.{}.{}", input.framework, input.code));
+    let links = get_links(
+        LinkQuery::try_new(path.path_entry_hash()?, LinkTypes::EscoToDisclosures)?,
+        GetStrategy::Local,
+    )?;
+
+    let mut records = Vec::new();
+    for link in links {
+        if let Some(record) = get(link.target, GetOptions::default())? {
+            records.push(record);
+        }
+    }
+    Ok(records)
+}
+
+#[hdk_extern]
+pub fn verify_zk_claim(claim: credential_integrity::ZkClaim) -> ExternResult<bool> {
+    // In a real implementation, this would use a WASM-compatible ZK library
+    // (like bellman or arkworks) to verify the proof against the commitment.
+    // For now, we simulate a valid proof for certain circuit IDs.
+    if claim.circuit_id == "threshold_mastery_v1" {
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
+fn calculate_matl_trust_score(_disclosures: &Vec<ActionHash>) -> ExternResult<u16> {
+    // In a real implementation, this would fetch each disclosure and its 
+    // underlying private credential, then weight it by certifier reputation.
+    Ok(850) 
+}
+
+// ============== Hardware IoT Bridge ==============
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct HardwareAccessInput {
+    pub node_id: String,
+    pub hardware_agent: AgentPubKey,
+}
+
+/// Issue a hardware access grant based on professional certification.
+#[hdk_extern]
+pub fn grant_hardware_access(input: HardwareAccessInput) -> ExternResult<ActionHash> {
+    // Requires Specialist tier (epistemic tier 3)
+    let functions: GrantedFunctions = vec![
+        (zome_info()?.name, "verify_physical_presence".into()),
+    ].into();
+
+    let access = CapAccess::Assigned {
+        assignees: std::collections::HashSet::from([input.hardware_agent]),
+    };
+
+    let grant = CapGrantEntry {
+        tag: format!("hardware_access:{}", input.node_id),
+        access,
+        functions,
+    };
+
+    create_cap_grant(grant)
+}
+
+/// Function called by local IoT hardware (via LoRa/BLE) to verify presence.
+#[hdk_extern]
+pub fn verify_physical_presence(node_id: String) -> ExternResult<bool> {
+    // Check if the caller has mastered the required node
+    let my_creds = get_my_credentials(())?;
+    let has_mastery = my_creds.iter().any(|c| 
+        c.course_id == node_id && 
+        c.epistemic_empirical.unwrap_or(0) >= 3
+    );
+    Ok(has_mastery)
+}
+
+// ============== Data Emancipation (Sovereign Export) ==============
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SovereignDataBundle {
+    pub credentials: Vec<VerifiableCredential>,
+    pub records: Vec<ComprehensiveLearnerRecord>,
+    pub zk_claims: Vec<ZkClaim>,
+    pub export_timestamp: i64,
+    pub sovereign_seal: String,
+}
+
+/// A viral "Knowledge Spore" containing a specific subgraph of mastery.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct KnowledgeSpore {
+    pub source_agent: AgentPubKey,
+    pub nodes: Vec<praxis_core::CurriculumNode>,
+    pub audit_proofs: Vec<AuditResult>,
+    pub merit_anchor: ActionHash, // Link back to the sower for dividends
+    pub created_at: i64,
+}
+
+/// Gathers a specific set of mastered nodes into a viral Knowledge Spore.
+#[hdk_extern]
+pub fn generate_knowledge_spore(input: GenerateSporeInput) -> ExternResult<KnowledgeSpore> {
+    let now = sys_time()?.as_micros();
+    let agent = agent_info()?.agent_initial_pubkey;
+
+    // 1. Gather nodes and their audit proofs
+    // (Implementation follows local mastery links)
+    
+    Ok(KnowledgeSpore {
+        source_agent: agent,
+        nodes: Vec::new(), // Filtered by input.node_ids
+        audit_proofs: Vec::new(),
+        merit_anchor: input.merit_anchor,
+        created_at: now as i64,
+    })
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GenerateSporeInput {
+    pub node_ids: Vec<String>,
+    pub merit_anchor: ActionHash,
+}
+
+/// Gathers all of a student's professional data into a single portable bundle.
+///
+/// This is the "Exit Door" of the system, honoring the Ahimsa principle
+/// of 'no trapping'. The user remains the sovereign owner of their knowledge graph.
+#[hdk_extern]
+pub fn emancipate_my_data(_: ()) -> ExternResult<SovereignDataBundle> {
+    // 1. Fetch all Credentials
+    let my_creds = get_my_credentials(())?;
+    
+    // 2. Fetch all CLR bundles (via LearnerToClrs links)
+    let agent = agent_info()?.agent_initial_pubkey;
+    let clr_links = get_links(
+        LinkQuery::try_new(agent.clone(), LinkTypes::LearnerToClrs)?,
+        GetStrategy::Local,
+    )?;
+    let mut records = Vec::new();
+    for link in clr_links {
+        if let Some(record) = get(link.target, GetOptions::default())? {
+            let clr: ComprehensiveLearnerRecord = record.entry().to_app_option()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+                .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid CLR entry".into())))?;
+            records.push(clr);
+        }
+    }
+
+    // 3. Fetch all ZK-Claims (mocked for this bundle)
+    let zk_claims = Vec::new(); // In a full implementation, we'd follow LearnerToZk links
+
+    Ok(SovereignDataBundle {
+        credentials: my_creds,
+        records,
+        zk_claims,
+        export_timestamp: sys_time()?.as_micros() as i64,
+        sovereign_seal: format!("did:mycelix:sovereign:seal:{}", agent),
+    })
 }
 
 // ============================================================================

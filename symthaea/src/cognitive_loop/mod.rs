@@ -265,6 +265,12 @@ pub mod nurture_bridge;
     feature = "surgical",
     feature = "orbital",
     feature = "quadruped",
+    feature = "subterranean",
+    feature = "infrastructure",
+    feature = "scavenger",
+    feature = "agribot",
+    feature = "biota",
+    feature = "clime",
     feature = "phone"
 ))]
 pub mod motor_bridge;

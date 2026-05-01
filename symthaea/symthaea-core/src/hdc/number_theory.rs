@@ -258,9 +258,15 @@ impl NumberTheoryEngine {
     /// - n < 3,215,031,751: witnesses {2, 3, 5, 7}
     /// - n < 3,317,044,064,679,887,385,961,981: witnesses {2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37}
     pub fn miller_rabin(&self, n: u64) -> bool {
-        if n < 2 { return false; }
-        if n == 2 || n == 3 { return true; }
-        if n % 2 == 0 { return false; }
+        if n < 2 {
+            return false;
+        }
+        if n == 2 || n == 3 {
+            return true;
+        }
+        if n % 2 == 0 {
+            return false;
+        }
 
         // Write n-1 = 2^r * d where d is odd
         let mut d = n - 1;
@@ -285,7 +291,9 @@ impl NumberTheoryEngine {
         let ring = ModularRing::new(n);
 
         'witness: for &a in witnesses {
-            if a >= n { continue; }
+            if a >= n {
+                continue;
+            }
 
             // Compute a^d mod n
             let mut x = ring.power(a, d);
@@ -697,7 +705,10 @@ mod tests {
     #[test]
     fn test_miller_rabin_small_primes() {
         let engine = NumberTheoryEngine::new();
-        let primes = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97];
+        let primes = [
+            2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83,
+            89, 97,
+        ];
         for &p in &primes {
             assert!(engine.miller_rabin(p), "{} should be prime", p);
         }
@@ -720,8 +731,11 @@ mod tests {
         // First 10 Carmichael numbers
         let carmichael = [561, 1105, 1729, 2465, 2821, 6601, 8911, 10585, 15841, 29341];
         for &c in &carmichael {
-            assert!(!engine.miller_rabin(c),
-                "Carmichael number {} should be rejected by Miller-Rabin", c);
+            assert!(
+                !engine.miller_rabin(c),
+                "Carmichael number {} should be rejected by Miller-Rabin",
+                c
+            );
         }
 
         // Verify that Fermat INCORRECTLY accepts some Carmichael numbers
@@ -729,16 +743,22 @@ mod tests {
         let fermat_561 = engine.fermat_test(561, &[2]);
         // Note: 561 actually DOES pass Fermat with witness 2
         // because 2^560 mod 561 = 1 (this is why Carmichael numbers are dangerous)
-        eprintln!("Fermat(561, [2]) = {} (Carmichael — Fermat may be fooled)", fermat_561);
-        eprintln!("Miller-Rabin(561) = {} (correctly rejects)", engine.miller_rabin(561));
+        eprintln!(
+            "Fermat(561, [2]) = {} (Carmichael — Fermat may be fooled)",
+            fermat_561
+        );
+        eprintln!(
+            "Miller-Rabin(561) = {} (correctly rejects)",
+            engine.miller_rabin(561)
+        );
     }
 
     #[test]
     fn test_miller_rabin_large_primes() {
         let engine = NumberTheoryEngine::new();
         // Large known primes
-        assert!(engine.miller_rabin(104729));     // 10000th prime
-        assert!(engine.miller_rabin(1_000_003));  // prime just above 1M
+        assert!(engine.miller_rabin(104729)); // 10000th prime
+        assert!(engine.miller_rabin(1_000_003)); // prime just above 1M
         assert!(engine.miller_rabin(15_485_863)); // 1 millionth prime
         assert!(!engine.miller_rabin(15_485_864)); // not prime
     }

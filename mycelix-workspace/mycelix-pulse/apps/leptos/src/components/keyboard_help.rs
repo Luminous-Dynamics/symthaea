@@ -12,24 +12,27 @@ pub fn KeyboardHelp() -> impl IntoView {
     let show = RwSignal::new(false);
 
     // Listen for ? key
-    let closure = Closure::<dyn Fn(web_sys::KeyboardEvent)>::new(move |ev: web_sys::KeyboardEvent| {
-        if let Some(target) = ev.target() {
-            if let Ok(el) = target.dyn_into::<web_sys::HtmlElement>() {
-                let tag = el.tag_name().to_lowercase();
-                if tag == "input" || tag == "textarea" { return; }
+    let closure =
+        Closure::<dyn Fn(web_sys::KeyboardEvent)>::new(move |ev: web_sys::KeyboardEvent| {
+            if let Some(target) = ev.target() {
+                if let Ok(el) = target.dyn_into::<web_sys::HtmlElement>() {
+                    let tag = el.tag_name().to_lowercase();
+                    if tag == "input" || tag == "textarea" {
+                        return;
+                    }
+                }
             }
-        }
-        if ev.key() == "?" {
-            show.update(|v| *v = !*v);
-        }
-        if ev.key() == "Escape" && show.get_untracked() {
-            show.set(false);
-        }
-    });
+            if ev.key() == "?" {
+                show.update(|v| *v = !*v);
+            }
+            if ev.key() == "Escape" && show.get_untracked() {
+                show.set(false);
+            }
+        });
     let window = web_sys::window().unwrap();
-    window.add_event_listener_with_callback(
-        "keydown", closure.as_ref().unchecked_ref()
-    ).unwrap();
+    window
+        .add_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref())
+        .unwrap();
     closure.forget();
 
     view! {

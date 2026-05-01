@@ -11,6 +11,7 @@ crate-type = ["cdylib", "rlib"]
 name = "dao_coordinator"
 
 [dependencies]
+mycelix-zome-helpers = { workspace = true }
 # Holochain Development (HDK) for business logic
 hdk.workspace = true
 
@@ -30,5 +31,5 @@ chrono.workspace = true
 # Crypto
 blake3.workspace = true
 
-# Cross-cluster bridge (consciousness gating)
+# Cross-cluster bridge (epistemic gating)
 mycelix-bridge-common = { path = "../../../../crates/mycelix-bridge-common" }

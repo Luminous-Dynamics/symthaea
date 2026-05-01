@@ -50,8 +50,8 @@ struct StoredContactMetadata {
 /// Wire type matching the zome's EmailListItem exactly.
 #[derive(serde::Deserialize, Debug, Clone)]
 pub struct WireEmailListItem {
-    pub hash: serde_json::Value,     // ActionHash (base64 or bytes)
-    pub sender: serde_json::Value,   // AgentPubKey
+    pub hash: serde_json::Value,   // ActionHash (base64 or bytes)
+    pub sender: serde_json::Value, // AgentPubKey
     pub encrypted_subject: Vec<u8>,
     pub timestamp: serde_json::Value, // Timestamp (i64 microseconds or [seconds, nanos])
     pub priority: String,
@@ -112,7 +112,10 @@ pub fn json_hash_to_string(val: &serde_json::Value) -> String {
         serde_json::Value::String(s) => s.clone(),
         serde_json::Value::Array(arr) => {
             // Byte array → base64url
-            let bytes: Vec<u8> = arr.iter().filter_map(|v| v.as_u64().map(|n| n as u8)).collect();
+            let bytes: Vec<u8> = arr
+                .iter()
+                .filter_map(|v| v.as_u64().map(|n| n as u8))
+                .collect();
             base64_encode(&bytes)
         }
         _ => format!("{val}"),
@@ -149,8 +152,12 @@ fn base64_encode(bytes: &[u8]) -> String {
         let n = (b0 << 16) | (b1 << 8) | b2;
         result.push(CHARS[((n >> 18) & 0x3F) as usize] as char);
         result.push(CHARS[((n >> 12) & 0x3F) as usize] as char);
-        if chunk.len() > 1 { result.push(CHARS[((n >> 6) & 0x3F) as usize] as char); }
-        if chunk.len() > 2 { result.push(CHARS[(n & 0x3F) as usize] as char); }
+        if chunk.len() > 1 {
+            result.push(CHARS[((n >> 6) & 0x3F) as usize] as char);
+        }
+        if chunk.len() > 2 {
+            result.push(CHARS[(n & 0x3F) as usize] as char);
+        }
     }
     result
 }
@@ -163,56 +170,62 @@ pub fn adapt_inbox(
     wire: Vec<WireEmailListItem>,
     contacts: &[ContactView],
 ) -> Vec<mail_leptos_types::EmailListItem> {
-    wire.into_iter().map(|w| {
-        let sender_key = json_hash_to_string(&w.sender);
-        let sender_name = contacts.iter()
-            .find(|c| c.agent_pub_key.as_deref() == Some(&sender_key))
-            .map(|c| c.display_name.clone());
+    wire.into_iter()
+        .map(|w| {
+            let sender_key = json_hash_to_string(&w.sender);
+            let sender_name = contacts
+                .iter()
+                .find(|c| c.agent_pub_key.as_deref() == Some(&sender_key))
+                .map(|c| c.display_name.clone());
 
-        let crypto = w.crypto_suite.map(|cs| CryptoSuiteView {
-            key_exchange: cs.key_exchange,
-            symmetric: cs.symmetric,
-            signature: cs.signature,
-        }).unwrap_or_else(|| CryptoSuiteView {
-            key_exchange: "unknown".into(),
-            symmetric: "unknown".into(),
-            signature: "unknown".into(),
-        });
+            let crypto = w
+                .crypto_suite
+                .map(|cs| CryptoSuiteView {
+                    key_exchange: cs.key_exchange,
+                    symmetric: cs.symmetric,
+                    signature: cs.signature,
+                })
+                .unwrap_or_else(|| CryptoSuiteView {
+                    key_exchange: "unknown".into(),
+                    symmetric: "unknown".into(),
+                    signature: "unknown".into(),
+                });
 
-        mail_leptos_types::EmailListItem {
-            hash: json_hash_to_string(&w.hash),
-            sender: sender_key,
-            sender_name,
-            encrypted_subject: w.encrypted_subject.clone(),
-            subject: crate::crypto::decode_transport_text(&w.encrypted_subject)
-                .or_else(|| Some("Encrypted message".into())),
-            snippet: None,
-            timestamp: wire_timestamp_to_u64(&w.timestamp),
-            priority: match w.priority.as_str() {
-                "Urgent" => EmailPriority::Urgent,
-                "High" => EmailPriority::High,
-                "Low" => EmailPriority::Low,
-                _ => EmailPriority::Normal,
-            },
-            is_read: w.is_read,
-            is_starred: w.is_starred,
-            star_type: None,
-            is_pinned: false,
-            is_muted: false,
-            is_snoozed: false,
-            snooze_until: None,
-            has_attachments: w.has_attachments,
-            labels: vec![],
-            thread_id: w.thread_id,
-            crypto_suite: crypto,
-        }
-    }).collect()
+            mail_leptos_types::EmailListItem {
+                hash: json_hash_to_string(&w.hash),
+                sender: sender_key,
+                sender_name,
+                encrypted_subject: w.encrypted_subject.clone(),
+                subject: crate::crypto::decode_transport_text(&w.encrypted_subject)
+                    .or_else(|| Some("Encrypted message".into())),
+                snippet: None,
+                timestamp: wire_timestamp_to_u64(&w.timestamp),
+                priority: match w.priority.as_str() {
+                    "Urgent" => EmailPriority::Urgent,
+                    "High" => EmailPriority::High,
+                    "Low" => EmailPriority::Low,
+                    _ => EmailPriority::Normal,
+                },
+                is_read: w.is_read,
+                is_starred: w.is_starred,
+                star_type: None,
+                is_pinned: false,
+                is_muted: false,
+                is_snoozed: false,
+                snooze_until: None,
+                has_attachments: w.has_attachments,
+                labels: vec![],
+                thread_id: w.thread_id,
+                crypto_suite: crypto,
+            }
+        })
+        .collect()
 }
 
 /// Adapt wire folders to frontend FolderView vec.
 pub fn adapt_folders(wire: Vec<WireFolder>) -> Vec<FolderView> {
-    wire.into_iter().map(|w| {
-        FolderView {
+    wire.into_iter()
+        .map(|w| FolderView {
             hash: json_hash_to_string(&w.hash),
             name: if let Some(enc) = &w.encrypted_name {
                 String::from_utf8_lossy(enc).to_string()
@@ -222,14 +235,14 @@ pub fn adapt_folders(wire: Vec<WireFolder>) -> Vec<FolderView> {
             is_system: w.is_system,
             sort_order: w.sort_order as i32,
             unread_count: w.unread_count,
-        }
-    }).collect()
+        })
+        .collect()
 }
 
 /// Adapt wire contacts to frontend ContactView vec.
 pub fn adapt_contacts(wire: Vec<WireContact>) -> Vec<ContactView> {
-    wire.into_iter().map(|w| {
-        ContactView {
+    wire.into_iter()
+        .map(|w| ContactView {
             hash: json_hash_to_string(&w.hash),
             id: w.display_name.to_lowercase().replace(' ', "-"),
             display_name: w.display_name,
@@ -243,8 +256,8 @@ pub fn adapt_contacts(wire: Vec<WireContact>) -> Vec<ContactView> {
             is_blocked: false,
             email_count: 0,
             trust_score: w.trust_score,
-        }
-    }).collect()
+        })
+        .collect()
 }
 
 fn adapt_stored_contact(contact: StoredContact) -> ContactView {
@@ -267,7 +280,10 @@ fn adapt_stored_contact(contact: StoredContact) -> ContactView {
         groups: contact.groups,
         is_favorite: contact.is_favorite,
         is_blocked: contact.is_blocked,
-        email_count: contact.metadata.map(|metadata| metadata.email_count).unwrap_or(0),
+        email_count: contact
+            .metadata
+            .map(|metadata| metadata.email_count)
+            .unwrap_or(0),
         trust_score: None,
     }
 }
@@ -275,8 +291,16 @@ fn adapt_stored_contact(contact: StoredContact) -> ContactView {
 pub fn adapt_contact_value(value: serde_json::Value) -> Option<ContactView> {
     serde_json::from_value::<ContactView>(value.clone())
         .ok()
-        .or_else(|| serde_json::from_value::<WireContact>(value.clone()).ok().map(|wire| adapt_contacts(vec![wire]).remove(0)))
-        .or_else(|| serde_json::from_value::<StoredContact>(value).ok().map(adapt_stored_contact))
+        .or_else(|| {
+            serde_json::from_value::<WireContact>(value.clone())
+                .ok()
+                .map(|wire| adapt_contacts(vec![wire]).remove(0))
+        })
+        .or_else(|| {
+            serde_json::from_value::<StoredContact>(value)
+                .ok()
+                .map(adapt_stored_contact)
+        })
 }
 
 pub fn adapt_contact_values(values: Vec<serde_json::Value>) -> Vec<ContactView> {

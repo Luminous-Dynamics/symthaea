@@ -10,18 +10,18 @@
 //!
 //! Run with:
 //! ```
-//! cargo run --release --example flight_integration --features flight
+//! cargo run --release --example flight_integration --features multirotor
 //! ```
 
-#![cfg(feature = "flight")]
+#![cfg(any(feature = "multirotor", feature = "flight"))]
 
 use std::time::Instant;
 
-use symthaea_flight::controller::FlightController;
-use symthaea_flight::encoder::QuadrotorHdcEncoder;
-use symthaea_flight::simulator::{PhysicsSimulator, SimplePhysicsSimulator};
-use symthaea_flight::types::{FlightConfig, QuadrotorCommand};
 use symthaea_core::genesis::GenesisSeed;
+use symthaea_multirotor::controller::FlightController;
+use symthaea_multirotor::encoder::QuadrotorHdcEncoder;
+use symthaea_multirotor::simulator::{PhysicsSimulator, SimplePhysicsSimulator};
+use symthaea_multirotor::types::{FlightConfig, QuadrotorCommand};
 
 fn main() {
     println!();
@@ -76,8 +76,12 @@ fn main() {
         total_effort += cmd.thrust.abs();
 
         let alt = simulator.state().altitude();
-        if alt > max_altitude { max_altitude = alt; }
-        if alt < min_altitude { min_altitude = alt; }
+        if alt > max_altitude {
+            max_altitude = alt;
+        }
+        if alt < min_altitude {
+            min_altitude = alt;
+        }
         steps += 1;
 
         if !simulator.state().is_finite() {
@@ -95,10 +99,19 @@ fn main() {
     println!("📊 Results:");
     println!("  Steps executed:    {}", steps);
     println!("  Elapsed:           {:.2}ms", elapsed_ms);
-    println!("  Throughput:        {:.0} steps/sec", steps as f64 / (elapsed_ms / 1000.0));
+    println!(
+        "  Throughput:        {:.0} steps/sec",
+        steps as f64 / (elapsed_ms / 1000.0)
+    );
     println!("  Mean control effort: {:.4}", total_effort / steps as f32);
-    println!("  Altitude range:    [{:.2}, {:.2}] m", min_altitude, max_altitude);
-    println!("  Altitude stability: {:.4} m", (max_altitude - min_altitude).abs());
+    println!(
+        "  Altitude range:    [{:.2}, {:.2}] m",
+        min_altitude, max_altitude
+    );
+    println!(
+        "  Altitude stability: {:.4} m",
+        (max_altitude - min_altitude).abs()
+    );
     println!("  Final state finite: {}", simulator.state().is_finite());
     println!();
 

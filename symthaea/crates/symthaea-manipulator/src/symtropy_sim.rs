@@ -80,13 +80,70 @@ impl SymtropyManipulatorSimulator {
 
         // Build 7-DOF articulated arm
         let panda_links = [
-            LinkSpec { mass: 4.0, length: 0.333, radius: 0.06, plane_a: 0, plane_b: 2, motor_max_force: Some(87.0), ..Default::default() },
-            LinkSpec { mass: 4.0, length: 0.316, radius: 0.06, plane_a: 0, plane_b: 1, motor_max_force: Some(87.0), ..Default::default() },
-            LinkSpec { mass: 3.0, length: 0.384, radius: 0.05, plane_a: 0, plane_b: 2, motor_max_force: Some(87.0), ..Default::default() },
-            LinkSpec { mass: 3.0, length: 0.088, radius: 0.05, plane_a: 0, plane_b: 1, angle_limits: Some((-3.07, -0.07)), motor_max_force: Some(87.0), ..Default::default() },
-            LinkSpec { mass: 2.0, length: 0.107, radius: 0.04, plane_a: 0, plane_b: 2, motor_max_force: Some(12.0), ..Default::default() },
-            LinkSpec { mass: 1.5, length: 0.100, radius: 0.04, plane_a: 0, plane_b: 1, motor_max_force: Some(12.0), ..Default::default() },
-            LinkSpec { mass: 0.5, length: 0.088, radius: 0.03, plane_a: 0, plane_b: 2, motor_max_force: Some(12.0), ..Default::default() },
+            LinkSpec {
+                mass: 4.0,
+                length: 0.333,
+                radius: 0.06,
+                plane_a: 0,
+                plane_b: 2,
+                motor_max_force: Some(87.0),
+                ..Default::default()
+            },
+            LinkSpec {
+                mass: 4.0,
+                length: 0.316,
+                radius: 0.06,
+                plane_a: 0,
+                plane_b: 1,
+                motor_max_force: Some(87.0),
+                ..Default::default()
+            },
+            LinkSpec {
+                mass: 3.0,
+                length: 0.384,
+                radius: 0.05,
+                plane_a: 0,
+                plane_b: 2,
+                motor_max_force: Some(87.0),
+                ..Default::default()
+            },
+            LinkSpec {
+                mass: 3.0,
+                length: 0.088,
+                radius: 0.05,
+                plane_a: 0,
+                plane_b: 1,
+                angle_limits: Some((-3.07, -0.07)),
+                motor_max_force: Some(87.0),
+                ..Default::default()
+            },
+            LinkSpec {
+                mass: 2.0,
+                length: 0.107,
+                radius: 0.04,
+                plane_a: 0,
+                plane_b: 2,
+                motor_max_force: Some(12.0),
+                ..Default::default()
+            },
+            LinkSpec {
+                mass: 1.5,
+                length: 0.100,
+                radius: 0.04,
+                plane_a: 0,
+                plane_b: 1,
+                motor_max_force: Some(12.0),
+                ..Default::default()
+            },
+            LinkSpec {
+                mass: 0.5,
+                length: 0.088,
+                radius: 0.03,
+                plane_a: 0,
+                plane_b: 2,
+                motor_max_force: Some(12.0),
+                ..Default::default()
+            },
         ];
 
         let mut builder = ChainBuilder::new().base_position(Point::new([0.0, 0.0, 1.0]));
@@ -154,12 +211,18 @@ impl ManipulatorPhysicsSimulator for SymtropyManipulatorSimulator {
             // Convert torque command to angular velocity target
             // (simplified: torque ∝ target angular velocity for PD motor)
             let target = torque as f64 * gain * 5.0; // Scale factor
-            // Update motor target via constraint system
-            // Note: direct constraint access not available — use body forces instead
-            if let Some(body) = self.world.body_mut(self.chain.links[i.min(self.chain.links.len() - 1)]) {
+                                                     // Update motor target via constraint system
+                                                     // Note: direct constraint access not available — use body forces instead
+            if let Some(body) = self
+                .world
+                .body_mut(self.chain.links[i.min(self.chain.links.len() - 1)])
+            {
                 let plane_idx = if i % 2 == 0 { (0, 2) } else { (0, 1) };
-                body.angular_velocity.set(plane_idx.0, plane_idx.1,
-                    body.angular_velocity.get(plane_idx.0, plane_idx.1) + target * dt);
+                body.angular_velocity.set(
+                    plane_idx.0,
+                    plane_idx.1,
+                    body.angular_velocity.get(plane_idx.0, plane_idx.1) + target * dt,
+                );
             }
         }
 
@@ -200,7 +263,10 @@ mod tests {
         for _ in 0..200 {
             sim.step(&cmd, 0.002);
         }
-        assert!(sim.state().is_finite(), "State should remain finite after 200 steps");
+        assert!(
+            sim.state().is_finite(),
+            "State should remain finite after 200 steps"
+        );
     }
 
     #[test]
@@ -214,7 +280,10 @@ mod tests {
         }
         let after = &sim.state().joint_angles;
         // At least one angle should have changed
-        let changed = before.iter().zip(after.iter()).any(|(a, b)| (a - b).abs() > 0.001);
+        let changed = before
+            .iter()
+            .zip(after.iter())
+            .any(|(a, b)| (a - b).abs() > 0.001);
         assert!(changed, "Torque should produce motion");
     }
 
@@ -254,7 +323,9 @@ mod tests {
         let mut sim = SymtropyManipulatorSimulator::new();
         let mut cmd = ManipulatorCommand::zero();
         cmd.joint_torques[0] = 1.0;
-        for _ in 0..100 { sim.step(&cmd, 0.005); }
+        for _ in 0..100 {
+            sim.step(&cmd, 0.005);
+        }
         sim.reset();
         assert_eq!(sim.chain.num_joints, 7);
         assert!(sim.state().is_finite());

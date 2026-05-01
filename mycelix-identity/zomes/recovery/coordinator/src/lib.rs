@@ -11,6 +11,7 @@
 //! - Enrolls SocialRecovery factor when setting up recovery
 //! - Updates MFA state when recovery is executed
 
+use mycelix_zome_helpers as _;
 use hdk::prelude::*;
 use recovery_integrity::*;
 use subtle::ConstantTimeEq;
@@ -1129,10 +1130,9 @@ pub fn create_self_recovery(input: CreateSelfRecoveryInput) -> ExternResult<Reco
         LinkTag::new("self_recovery"),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Failed to get created self-recovery config".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to get created self-recovery config".into()
+    )))
 }
 
 /// Input for adding a verification anchor.
@@ -1163,10 +1163,9 @@ pub fn add_verification_anchor(input: AddVerificationAnchorInput) -> ExternResul
     let original_hash = ActionHash::try_from(link.target.clone())
         .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
 
-    let record = get(original_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Self-recovery config record not found".into()
-        )))?;
+    let record = get(original_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Self-recovery config record not found".into())
+    ))?;
 
     let mut config: SelfRecoveryConfig = record
         .entry()
@@ -1190,20 +1189,19 @@ pub fn add_verification_anchor(input: AddVerificationAnchorInput) -> ExternResul
 
     // Adjust time lock based on anchor count (more anchors = shorter lock)
     config.time_lock = match config.anchors.len() {
-        0 => SELF_RECOVERY_DEFAULT_TIME_LOCK,        // 7 days (shouldn't reach here)
-        1 => 14 * 24 * 3600,                          // 14 days
-        2 => SELF_RECOVERY_DEFAULT_TIME_LOCK,         // 7 days
-        _ => SELF_RECOVERY_MIN_TIME_LOCK,             // 72 hours
+        0 => SELF_RECOVERY_DEFAULT_TIME_LOCK, // 7 days (shouldn't reach here)
+        1 => 14 * 24 * 3600,                  // 14 days
+        2 => SELF_RECOVERY_DEFAULT_TIME_LOCK, // 7 days
+        _ => SELF_RECOVERY_MIN_TIME_LOCK,     // 72 hours
     };
 
     // Adjust threshold: require majority of anchors
     config.anchor_threshold = ((config.anchors.len() as f64 * 0.5).ceil() as u32).max(1);
 
     let new_hash = update_entry(original_hash, &config)?;
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Failed to get updated self-recovery config".into()
-        )))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to get updated self-recovery config".into()
+    )))
 }
 
 /// Get self-recovery config for a DID.
@@ -1276,10 +1274,9 @@ pub struct InitiateSelfRecoveryInput {
 #[hdk_extern]
 pub fn initiate_self_recovery(input: InitiateSelfRecoveryInput) -> ExternResult<Record> {
     // Fetch self-recovery config
-    let config_record = get_self_recovery_config(input.did.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "No self-recovery config found".into()
-        )))?;
+    let config_record = get_self_recovery_config(input.did.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("No self-recovery config found".into())
+    ))?;
 
     let config: SelfRecoveryConfig = config_record
         .entry()
@@ -1335,10 +1332,9 @@ pub fn initiate_self_recovery(input: InitiateSelfRecoveryInput) -> ExternResult<
         LinkTag::new("self_recovery_request"),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Failed to get created self-recovery request".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to get created self-recovery request".into()
+    )))
 }
 
 /// Input for verifying an additional anchor during self-recovery.
@@ -1353,13 +1349,11 @@ pub struct VerifySelfRecoveryAnchorInput {
 /// When the anchor threshold is met, the request transitions to Approved
 /// and the time lock countdown begins.
 #[hdk_extern]
-pub fn verify_self_recovery_anchor(
-    input: VerifySelfRecoveryAnchorInput,
-) -> ExternResult<Record> {
-    let record = get(input.request_action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Self-recovery request not found".into()
-        )))?;
+pub fn verify_self_recovery_anchor(input: VerifySelfRecoveryAnchorInput) -> ExternResult<Record> {
+    let record =
+        get(input.request_action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+            WasmErrorInner::Guest("Self-recovery request not found".into())
+        ))?;
 
     let mut request: SelfRecoveryRequest = record
         .entry()
@@ -1376,10 +1370,9 @@ pub fn verify_self_recovery_anchor(
     }
 
     // Get the config to check threshold
-    let config_record = get_self_recovery_config(request.did.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Self-recovery config not found".into()
-        )))?;
+    let config_record = get_self_recovery_config(request.did.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Self-recovery config not found".into())
+    ))?;
     let config: SelfRecoveryConfig = config_record
         .entry()
         .to_app_option()
@@ -1404,17 +1397,15 @@ pub fn verify_self_recovery_anchor(
     if request.verified_anchors.len() as u32 >= config.anchor_threshold {
         request.status = RecoveryStatus::Approved;
         let now = sys_time()?;
-        let expires = Timestamp::from_micros(
-            now.as_micros() + (config.time_lock as i64 * 1_000_000),
-        );
+        let expires =
+            Timestamp::from_micros(now.as_micros() + (config.time_lock as i64 * 1_000_000));
         request.time_lock_expires = Some(expires);
     }
 
     let new_hash = update_entry(input.request_action_hash, &request)?;
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Failed to get updated request".into()
-        )))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to get updated request".into()
+    )))
 }
 
 /// Execute a self-recovery request after time lock expires.
@@ -1422,10 +1413,9 @@ pub fn verify_self_recovery_anchor(
 /// Completes the identity rotation — same effect as social recovery execution.
 #[hdk_extern]
 pub fn execute_self_recovery(request_action_hash: ActionHash) -> ExternResult<Record> {
-    let record = get(request_action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Self-recovery request not found".into()
-        )))?;
+    let record = get(request_action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Self-recovery request not found".into())
+    ))?;
 
     let mut request: SelfRecoveryRequest = record
         .entry()
@@ -1445,9 +1435,11 @@ pub fn execute_self_recovery(request_action_hash: ActionHash) -> ExternResult<Re
 
     // Check time lock has expired
     let now = sys_time()?;
-    let expires = request.time_lock_expires.ok_or(wasm_error!(
-        WasmErrorInner::Guest("No time lock expiry set".into())
-    ))?;
+    let expires = request
+        .time_lock_expires
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "No time lock expiry set".into()
+        )))?;
     if now < expires {
         let remaining_secs = (expires.as_micros() - now.as_micros()) / 1_000_000;
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
@@ -1469,8 +1461,7 @@ pub fn execute_self_recovery(request_action_hash: ActionHash) -> ExternResult<Re
         request.did.clone(),
     );
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Failed to get completed request".into()
-        )))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to get completed request".into()
+    )))
 }

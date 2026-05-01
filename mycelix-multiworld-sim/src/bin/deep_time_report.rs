@@ -7,16 +7,16 @@
 
 use mycelix_multiworld_sim::biosphere::{
     consciousness_emergence::{compute_emergence_curve, emergence_report},
-    counterfactual::{run_counterfactual, run_multi_regime_kpg, multi_regime_markdown},
+    counterfactual::{multi_regime_markdown, run_counterfactual, run_multi_regime_kpg},
     counterfactual_consciousness::run_counterfactual_consciousness,
-    sensitivity::run_sensitivity,
-    validation::validate_against_sepkoski,
     deep_time_data::DeepTimeData,
     dimensions::{compute_raw_dimensions, BiosphereMaxima, DIMENSION_NAMES},
     ensemble::run_ensemble,
     mass_extinctions::canonical_mass_extinctions,
+    sensitivity::run_sensitivity,
     temporal_bins::build_deep_time_bins,
     unified_curve::{build_unified_curve, unified_summary},
+    validation::validate_against_sepkoski,
     BiosphereCoherenceEngine,
 };
 
@@ -45,11 +45,17 @@ fn main() {
         (66.0, "End-Cretaceous (K-Pg)"),
         (0.01, "Neolithic (K(t) handoff)"),
     ];
-    println!("{:<12} {:<32} {:>8} {:>10} {:>10}", "Age (Ma)", "Event", "B(t)", "CI Low", "CI High");
+    println!(
+        "{:<12} {:<32} {:>8} {:>10} {:>10}",
+        "Age (Ma)", "Event", "B(t)", "CI Low", "CI High"
+    );
     println!("{}", "-".repeat(75));
     for &(age, name) in &calibration_ages {
         let (val, lo, hi) = engine.bt_at(age);
-        println!("{:<12.1} {:<32} {:>8.4} {:>10.4} {:>10.4}", age, name, val, lo, hi);
+        println!(
+            "{:<12.1} {:<32} {:>8.4} {:>10.4} {:>10.4}",
+            age, name, val, lo, hi
+        );
     }
     println!();
 
@@ -83,14 +89,20 @@ fn main() {
     // ── 4. Monte Carlo ensemble ──
     println!("── Monte Carlo Ensemble (50 members, seed=42) ──");
     let ensemble = run_ensemble(50, 42);
-    println!("{:<12} {:>8} {:>8} {:>8} {:>8} {:>8}", "Age (Ma)", "Median", "Mean", "P5", "P25-P75", "P95");
+    println!(
+        "{:<12} {:>8} {:>8} {:>8} {:>8} {:>8}",
+        "Age (Ma)", "Median", "Mean", "P5", "P25-P75", "P95"
+    );
     println!("{}", "-".repeat(62));
     // Sample key ages
     let sample_indices: Vec<usize> = (0..ensemble.ages.len())
         .filter(|&i| {
             let a = ensemble.ages[i];
-            a > 3000.0 || a > 2000.0 && a < 2500.0 || a > 500.0 && a < 600.0
-                || a > 250.0 && a < 260.0 || a > 60.0 && a < 70.0
+            a > 3000.0
+                || a > 2000.0 && a < 2500.0
+                || a > 500.0 && a < 600.0
+                || a > 250.0 && a < 260.0
+                || a > 60.0 && a < 70.0
                 || a < 1.0
         })
         .collect();
@@ -127,7 +139,9 @@ fn main() {
     for dim_idx in 0..6 {
         print!("{:<16}", DIMENSION_NAMES[dim_idx]);
         for &(age, _) in &key_epochs {
-            let bin = bins.iter().find(|b| age >= b.end_ma && age <= b.start_ma)
+            let bin = bins
+                .iter()
+                .find(|b| age >= b.end_ma && age <= b.start_ma)
                 .unwrap_or(bins.last().unwrap());
             let raw = compute_raw_dimensions(bin, &data, &extinctions);
             let d13c = Some(data.interpolate_d13c_excursion(age));
@@ -144,15 +158,33 @@ fn main() {
     println!();
 
     // Show key points across the full range
-    println!("{:<16} {:>10} {:>10} {:>10}", "Year", "Value", "CI Low", "Source");
+    println!(
+        "{:<16} {:>10} {:>10} {:>10}",
+        "Year", "Value", "CI Low", "Source"
+    );
     println!("{}", "-".repeat(50));
     let sample_years: Vec<f64> = vec![
-        -3_800_000_000.0, -2_400_000_000.0, -541_000_000.0, -252_000_000.0,
-        -66_000_000.0, -10_000.0, -3000.0, 0.0, 1000.0, 1810.0, 1900.0, 1970.0, 2000.0, 2020.0,
+        -3_800_000_000.0,
+        -2_400_000_000.0,
+        -541_000_000.0,
+        -252_000_000.0,
+        -66_000_000.0,
+        -10_000.0,
+        -3000.0,
+        0.0,
+        1000.0,
+        1810.0,
+        1900.0,
+        1970.0,
+        2000.0,
+        2020.0,
     ];
     for &target_year in &sample_years {
         if let Some(pt) = unified.iter().min_by(|a, b| {
-            (a.year_ce - target_year).abs().partial_cmp(&(b.year_ce - target_year).abs()).unwrap()
+            (a.year_ce - target_year)
+                .abs()
+                .partial_cmp(&(b.year_ce - target_year).abs())
+                .unwrap()
         }) {
             let year_str = if pt.year_ce.abs() > 1_000_000.0 {
                 format!("{:.1} Ga", pt.year_ce / -1_000_000_000.0)
@@ -191,8 +223,14 @@ fn main() {
     print!("{}", cc_result.to_markdown());
 
     println!("\n══════════════════════════════════════════════════════════════");
-    println!("  Unified curve: 3.8 Ga → 2020 CE ({} points)", unified.len());
-    println!("  {} mass extinction events with Lotka-Volterra recovery", engine.extinction_count());
+    println!(
+        "  Unified curve: 3.8 Ga → 2020 CE ({} points)",
+        unified.len()
+    );
+    println!(
+        "  {} mass extinction events with Lotka-Volterra recovery",
+        engine.extinction_count()
+    );
     println!("  Counterfactual crossover proves catastrophe is generative");
     println!("  Consciousness emergence: 406 Ma → 28 Ma (workspace bottleneck)");
     println!("══════════════════════════════════════════════════════════════");

@@ -138,11 +138,7 @@ impl DreamableAction for MotorTrajectory {
         } else {
             (self.phi_trace.iter().sum::<f64>() / self.phi_trace.len() as f64) as f32
         };
-        let min_phi = self
-            .phi_trace
-            .iter()
-            .copied()
-            .fold(f64::MAX, f64::min) as f32;
+        let min_phi = self.phi_trace.iter().copied().fold(f64::MAX, f64::min) as f32;
         let len = self.len() as f32;
 
         vec![mean_pe, max_pe, safety_event, mean_phi, min_phi, len]

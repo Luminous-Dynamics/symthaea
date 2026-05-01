@@ -122,7 +122,7 @@ pub fn analyze(doc: &CurriculumDocument) -> GraphStats {
         "Education", "Arts & Humanities", "Social Sciences", "Business & Law",
         "Natural Sciences & Mathematics", "Information & Communication Technologies",
         "Engineering & Manufacturing", "Agriculture & Environment", "Health & Welfare",
-        "Services & Recreation", "Meta-Learning (Consciousness Computing)",
+        "Services & Recreation", "Meta-Learning (Cognitive Computing)",
     ];
     let present_fields: HashSet<String> = field_counts.keys().cloned().collect();
     let missing_fields: Vec<String> = all_fields

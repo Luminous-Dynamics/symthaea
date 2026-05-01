@@ -330,7 +330,8 @@ fn test_blacklisted_agent_blocked_from_governance() {
     );
 
     // Basic participation should be blocked
-    let basic_result = evaluate_governance_with_reputation(&cred, &requirement_for_basic(), &rep, now);
+    let basic_result =
+        evaluate_governance_with_reputation(&cred, &requirement_for_basic(), &rep, now);
     assert!(
         !basic_result.eligible,
         "Blacklisted agent must be blocked from basic governance"
@@ -364,7 +365,10 @@ fn test_max_slashes_saturates() {
 
     // This must not panic
     let score = rep.slash(BASE_US + 1000);
-    assert!(score.is_finite(), "Score must remain finite after overflow-safe slash");
+    assert!(
+        score.is_finite(),
+        "Score must remain finite after overflow-safe slash"
+    );
     assert_eq!(
         rep.total_slashes,
         u32::MAX,

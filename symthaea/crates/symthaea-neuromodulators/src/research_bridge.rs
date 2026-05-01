@@ -20,7 +20,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::pharmacogenomics::{ConsciousnessSensitivity, DrugClass, PgxProfile, PharmaResponse};
-use crate::pni_coupling::{NeuromodDeltas as PniDeltas, PniCoupling};
+use crate::pni_coupling::PniCoupling;
 
 // ── Named constants ──────────────────────────────────────────────────────
 

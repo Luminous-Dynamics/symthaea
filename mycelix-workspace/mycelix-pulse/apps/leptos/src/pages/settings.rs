@@ -3,13 +3,13 @@
 
 //! Settings page with sidebar navigation — 14 sections, all persisted.
 
-use leptos::prelude::*;
-use wasm_bindgen::JsCast;
-use mail_leptos_types::*;
-use crate::mail_context::use_mail;
 use crate::holochain::ConnectionStatus;
+use crate::mail_context::use_mail;
 use crate::preferences::*;
 use crate::toasts::use_toasts;
+use leptos::prelude::*;
+use mail_leptos_types::*;
+use wasm_bindgen::JsCast;
 
 #[derive(Clone, Default)]
 struct LiveSliceReport {
@@ -39,20 +39,65 @@ pub fn SettingsPage() -> impl IntoView {
     let toasts_export = toasts.clone();
 
     let nav_items: &[(&str, &str, &str, &str)] = &[
-        ("profile","\u{1F464}","Profile","name bio avatar dsid identity"),
-        ("security","\u{1F6E1}","Security","dsid mfa factor assurance verification sybil"),
-        ("appearance","\u{1F3A8}","Appearance","theme density font contrast color accent"),
-        ("layout","\u{1F4BB}","Layout","reading pane split"),
-        ("compose","\u{270F}","Compose","encryption reply undo send delay pqc"),
-        ("privacy","\u{1F512}","Privacy","read receipts typing indicators availability"),
-        ("notifications","\u{1F514}","Notifications","desktop sound alert"),
-        ("keyboard","\u{2328}","Keyboard","shortcuts hotkeys keys"),
-        ("attention","\u{1F9E0}","Attention","budget focus time"),
-        ("data","\u{1F4BE}","Data","backup restore reset export import"),
-        ("locale","\u{1F310}","Locale","language date format region"),
-        ("signatures","\u{270D}","Signatures","signature email"),
-        ("labels","\u{1F3F7}","Labels","label tag color"),
-        ("encryption","\u{1F512}","Encryption","key status connection test pqc aes"),
+        (
+            "profile",
+            "\u{1F464}",
+            "Profile",
+            "name bio avatar dsid identity",
+        ),
+        (
+            "security",
+            "\u{1F6E1}",
+            "Security",
+            "dsid mfa factor assurance verification sybil",
+        ),
+        (
+            "appearance",
+            "\u{1F3A8}",
+            "Appearance",
+            "theme density font contrast color accent",
+        ),
+        ("layout", "\u{1F4BB}", "Layout", "reading pane split"),
+        (
+            "compose",
+            "\u{270F}",
+            "Compose",
+            "encryption reply undo send delay pqc",
+        ),
+        (
+            "privacy",
+            "\u{1F512}",
+            "Privacy",
+            "read receipts typing indicators availability",
+        ),
+        (
+            "notifications",
+            "\u{1F514}",
+            "Notifications",
+            "desktop sound alert",
+        ),
+        ("keyboard", "\u{2328}", "Keyboard", "shortcuts hotkeys keys"),
+        ("attention", "\u{1F9E0}", "Attention", "budget focus time"),
+        (
+            "data",
+            "\u{1F4BE}",
+            "Data",
+            "backup restore reset export import",
+        ),
+        (
+            "locale",
+            "\u{1F310}",
+            "Locale",
+            "language date format region",
+        ),
+        ("signatures", "\u{270D}", "Signatures", "signature email"),
+        ("labels", "\u{1F3F7}", "Labels", "label tag color"),
+        (
+            "encryption",
+            "\u{1F512}",
+            "Encryption",
+            "key status connection test pqc aes",
+        ),
     ];
 
     view! {
@@ -753,22 +798,28 @@ fn ProfileSection() -> impl IntoView {
         let hc = hc.clone();
         wasm_bindgen_futures::spawn_local(async move {
             // Get agent key from JS bridge
-            if let Some(info) = web_sys::window()
-                .and_then(|w| js_sys::Reflect::get(&w, &wasm_bindgen::JsValue::from_str("__HC_APP_INFO")).ok())
-            {
-                if let Ok(key_val) = js_sys::Reflect::get(&info, &wasm_bindgen::JsValue::from_str("installed_app_id")) {
+            if let Some(info) = web_sys::window().and_then(|w| {
+                js_sys::Reflect::get(&w, &wasm_bindgen::JsValue::from_str("__HC_APP_INFO")).ok()
+            }) {
+                if let Ok(key_val) = js_sys::Reflect::get(
+                    &info,
+                    &wasm_bindgen::JsValue::from_str("installed_app_id"),
+                ) {
                     let _ = key_val; // just checking it exists
                 }
-                if let Ok(agent) = js_sys::Reflect::get(&info, &wasm_bindgen::JsValue::from_str("agent_pub_key")) {
+                if let Ok(agent) =
+                    js_sys::Reflect::get(&info, &wasm_bindgen::JsValue::from_str("agent_pub_key"))
+                {
                     if let Some(s) = agent.as_string() {
                         agent_key.set(s);
                     }
                 }
             }
 
-            match hc.call_zome::<(), Option<serde_json::Value>>(
-                "mail_profiles", "get_my_profile", &()
-            ).await {
+            match hc
+                .call_zome::<(), Option<serde_json::Value>>("mail_profiles", "get_my_profile", &())
+                .await
+            {
                 Ok(Some(profile)) => {
                     if let Some(name) = profile.get("name").and_then(|v| v.as_str()) {
                         profile_name.set(name.to_string());
@@ -785,9 +836,15 @@ fn ProfileSection() -> impl IntoView {
                 }
             }
             // Also load DID from identity DNA
-            match hc.call_zome_on_role::<(), serde_json::Value>(
-                "identity", "did_registry", "get_did_document", &()
-            ).await {
+            match hc
+                .call_zome_on_role::<(), serde_json::Value>(
+                    "identity",
+                    "did_registry",
+                    "get_did_document",
+                    &(),
+                )
+                .await
+            {
                 Ok(val) if !val.is_null() => {
                     if let Some(id) = val.get("id").and_then(|v| v.as_str()) {
                         did_id.set(id.to_string());
@@ -809,7 +866,9 @@ fn ProfileSection() -> impl IntoView {
             if prev.is_some() && current > 0 {
                 let name = profile_name.get_untracked();
                 let bio = profile_bio.get_untracked();
-                if name.trim().is_empty() { return current; }
+                if name.trim().is_empty() {
+                    return current;
+                }
                 saving.set(true);
 
                 let hc = hc.clone();
@@ -821,9 +880,14 @@ fn ProfileSection() -> impl IntoView {
                         "avatar_url": "",
                         "bio": bio.trim(),
                     });
-                    match hc.call_zome::<serde_json::Value, serde_json::Value>(
-                        "mail_profiles", "set_profile", &profile
-                    ).await {
+                    match hc
+                        .call_zome::<serde_json::Value, serde_json::Value>(
+                            "mail_profiles",
+                            "set_profile",
+                            &profile,
+                        )
+                        .await
+                    {
                         Ok(_) => {
                             toasts.push("Profile updated!", "success");
                             edit_mode.set(false);
@@ -940,9 +1004,15 @@ fn SecuritySection() -> impl IntoView {
         let hc = hc.clone();
         wasm_bindgen_futures::spawn_local(async move {
             // Get DSID first
-            match hc.call_zome_on_role::<(), serde_json::Value>(
-                "identity", "did_registry", "get_did_document", &()
-            ).await {
+            match hc
+                .call_zome_on_role::<(), serde_json::Value>(
+                    "identity",
+                    "did_registry",
+                    "get_did_document",
+                    &(),
+                )
+                .await
+            {
                 Ok(val) if !val.is_null() => {
                     if let Some(id) = val.get("id").and_then(|v| v.as_str()) {
                         dsid.set(crate::dsid::display_dsid(id));
@@ -954,13 +1024,21 @@ fn SecuritySection() -> impl IntoView {
             // Get MFA state
             let did_wire = crate::dsid::wire_dsid(&dsid.get_untracked());
             if !did_wire.is_empty() {
-                match hc.call_zome_on_role::<serde_json::Value, serde_json::Value>(
-                    "identity", "mfa", "get_mfa_state", &serde_json::json!(did_wire)
-                ).await {
+                match hc
+                    .call_zome_on_role::<serde_json::Value, serde_json::Value>(
+                        "identity",
+                        "mfa",
+                        "get_mfa_state",
+                        &serde_json::json!(did_wire),
+                    )
+                    .await
+                {
                     Ok(val) if !val.is_null() => {
                         // Parse assurance level
                         if let Some(state) = val.get("state").or(Some(&val)) {
-                            if let Some(level) = state.get("assurance_level").and_then(|v| v.as_str()) {
+                            if let Some(level) =
+                                state.get("assurance_level").and_then(|v| v.as_str())
+                            {
                                 let l = match level {
                                     "ConstitutionallyCritical" => 4,
                                     "HighlyAssured" => 3,
@@ -972,12 +1050,25 @@ fn SecuritySection() -> impl IntoView {
                             }
                             if let Some(fs) = state.get("factors").and_then(|v| v.as_array()) {
                                 factor_count.set(fs.len() as u32);
-                                let parsed: Vec<_> = fs.iter().filter_map(|f| {
-                                    let ft = f.get("factor_type").and_then(|v| v.as_str()).unwrap_or("Unknown");
-                                    let fid = f.get("factor_id").and_then(|v| v.as_str()).unwrap_or("");
-                                    let status = if f.get("last_verified").is_some() { "Active" } else { "Pending" };
-                                    Some((ft.to_string(), fid.to_string(), status.to_string()))
-                                }).collect();
+                                let parsed: Vec<_> = fs
+                                    .iter()
+                                    .filter_map(|f| {
+                                        let ft = f
+                                            .get("factor_type")
+                                            .and_then(|v| v.as_str())
+                                            .unwrap_or("Unknown");
+                                        let fid = f
+                                            .get("factor_id")
+                                            .and_then(|v| v.as_str())
+                                            .unwrap_or("");
+                                        let status = if f.get("last_verified").is_some() {
+                                            "Active"
+                                        } else {
+                                            "Pending"
+                                        };
+                                        Some((ft.to_string(), fid.to_string(), status.to_string()))
+                                    })
+                                    .collect();
                                 factors.set(parsed);
                             }
                         }
@@ -1127,7 +1218,9 @@ fn MfaEnrollment(dsid: RwSignal<String>) -> impl IntoView {
             if prev.is_some() && current > 0 {
                 let factor_type = enrolling.get_untracked().unwrap_or_default();
                 let did_wire = crate::dsid::wire_dsid(&dsid.get_untracked());
-                if did_wire.is_empty() { return current; }
+                if did_wire.is_empty() {
+                    return current;
+                }
 
                 status.set("Enrolling...".into());
                 let hc = hc.clone();
@@ -1138,10 +1231,18 @@ fn MfaEnrollment(dsid: RwSignal<String>) -> impl IntoView {
                     "RecoveryPhrase" => {
                         let phrase = phrase_input.get_untracked();
                         let hash = format!("{:x}", md5_simple(phrase.as_bytes()));
-                        (format!("recovery-{}", &hash[..8]), serde_json::json!({"hash": hash}).to_string())
+                        (
+                            format!("recovery-{}", &hash[..8]),
+                            serde_json::json!({"hash": hash}).to_string(),
+                        )
                     }
                     "SecurityQuestions" => {
-                        let answers = format!("{}|{}|{}", a1.get_untracked(), a2.get_untracked(), a3.get_untracked());
+                        let answers = format!(
+                            "{}|{}|{}",
+                            a1.get_untracked(),
+                            a2.get_untracked(),
+                            a3.get_untracked()
+                        );
                         let hash = format!("{:x}", md5_simple(answers.as_bytes()));
                         let qs = serde_json::json!({
                             "questions": [q1.get_untracked(), q2.get_untracked(), q3.get_untracked()],
@@ -1149,7 +1250,9 @@ fn MfaEnrollment(dsid: RwSignal<String>) -> impl IntoView {
                         });
                         (format!("secq-{}", &hash[..8]), qs.to_string())
                     }
-                    _ => { return current; }
+                    _ => {
+                        return current;
+                    }
                 };
 
                 wasm_bindgen_futures::spawn_local(async move {
@@ -1160,9 +1263,15 @@ fn MfaEnrollment(dsid: RwSignal<String>) -> impl IntoView {
                         "metadata": metadata,
                         "reason": "User enrollment",
                     });
-                    match hc.call_zome_on_role::<serde_json::Value, serde_json::Value>(
-                        "identity", "mfa", "enroll_factor", &input
-                    ).await {
+                    match hc
+                        .call_zome_on_role::<serde_json::Value, serde_json::Value>(
+                            "identity",
+                            "mfa",
+                            "enroll_factor",
+                            &input,
+                        )
+                        .await
+                    {
                         Ok(_) => {
                             toasts.push(format!("{factor_type} enrolled!"), "success");
                             enrolling.set(None);

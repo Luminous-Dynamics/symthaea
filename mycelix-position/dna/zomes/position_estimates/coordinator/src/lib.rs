@@ -6,10 +6,8 @@
 //! from range measurements and anchor locations stored in sibling zomes.
 
 use hdk::prelude::*;
+use mycelix_position_shared::{PositionEstimateEntry, PositionQuality, PositionTimestamp};
 use position_estimates_integrity::*;
-use mycelix_position_shared::{
-    PositionEstimateEntry, PositionTimestamp, PositionQuality,
-};
 
 fn anchor_for_node(node_id: &str) -> ExternResult<AnyLinkableHash> {
     let path = Path::from(format!("estimates.node.{}", node_id));
@@ -40,19 +38,32 @@ pub fn get_latest_position(node_id: String) -> ExternResult<Option<PositionEstim
     let node_anchor = anchor_for_node(&node_id)?;
     let links = get_links(
         LinkQuery::try_new(node_anchor, LinkTypes::EstimatesByNode)?,
-            GetStrategy::Network,
+        GetStrategy::Network,
     )?;
 
     let mut latest: Option<(PositionEstimateEntry, Timestamp)> = None;
 
     for link in links {
-        let Some(target) = link.target.into_action_hash() else { continue };
-        let Some(record) = get(target, GetOptions::default())? else { continue };
+        let Some(target) = link.target.into_action_hash() else {
+            continue;
+        };
+        let Some(record) = get(target, GetOptions::default())? else {
+            continue;
+        };
         let timestamp = record.action().timestamp();
-        if let Some(est) = record.entry().to_app_option::<PositionEstimateEntry>().ok().flatten() {
+        if let Some(est) = record
+            .entry()
+            .to_app_option::<PositionEstimateEntry>()
+            .ok()
+            .flatten()
+        {
             match &latest {
-                Some((_, t)) if timestamp > *t => { latest = Some((est, timestamp)); }
-                None => { latest = Some((est, timestamp)); }
+                Some((_, t)) if timestamp > *t => {
+                    latest = Some((est, timestamp));
+                }
+                None => {
+                    latest = Some((est, timestamp));
+                }
                 _ => {}
             }
         }
@@ -67,14 +78,23 @@ pub fn get_position_history(node_id: String) -> ExternResult<Vec<PositionEstimat
     let node_anchor = anchor_for_node(&node_id)?;
     let links = get_links(
         LinkQuery::try_new(node_anchor, LinkTypes::EstimatesByNode)?,
-            GetStrategy::Network,
+        GetStrategy::Network,
     )?;
 
     let mut results = Vec::new();
     for link in links {
-        let Some(target) = link.target.into_action_hash() else { continue };
-        let Some(record) = get(target, GetOptions::default())? else { continue };
-        if let Some(est) = record.entry().to_app_option::<PositionEstimateEntry>().ok().flatten() {
+        let Some(target) = link.target.into_action_hash() else {
+            continue;
+        };
+        let Some(record) = get(target, GetOptions::default())? else {
+            continue;
+        };
+        if let Some(est) = record
+            .entry()
+            .to_app_option::<PositionEstimateEntry>()
+            .ok()
+            .flatten()
+        {
             results.push(est);
         }
     }

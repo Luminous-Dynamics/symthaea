@@ -176,14 +176,14 @@
     },
     {
       "id": "MYC-501",
-      "title": "Consciousness Gating",
-      "description": "4D consciousness profile (identity/reputation/community/engagement). 5 trust tiers (Observer → Guardian). Configurable vote weights for default, constitutional, budget, and emergency contexts. Phi-coupled governance: how consciousness scores affect civic participation rights.",
+      "title": "Epistemic Gating",
+      "description": "4D cognitive profile (identity/reputation/community/engagement). 5 trust tiers (Observer → Guardian). Configurable vote weights for default, constitutional, budget, and emergency contexts. Trust-coupled governance: how trust scores affect civic participation rights.",
       "node_type": "Course",
       "difficulty": "Expert",
       "domain": "Decentralized Systems",
       "subdomain": "Mycelix",
       "tags": [
-        "consciousness-gating",
+        "epistemic-gating",
         "trust-tiers",
         "phi",
         "vote-weights"
@@ -198,7 +198,7 @@
         {
           "framework": "Luminous Dynamics",
           "code": "MYC-501",
-          "description": "Consciousness Gating",
+          "description": "Epistemic Gating",
           "grade_level": "Graduate"
         }
       ],
@@ -272,14 +272,14 @@
       "to": "MYC-501",
       "edge_type": "Requires",
       "strength_permille": 900,
-      "rationale": "Consciousness Gating requires MYC-301"
+      "rationale": "Epistemic Gating requires MYC-301"
     },
     {
       "from": "MYC-302",
       "to": "MYC-501",
       "edge_type": "Requires",
       "strength_permille": 900,
-      "rationale": "Consciousness Gating requires MYC-302"
+      "rationale": "Epistemic Gating requires MYC-302"
     },
     {
       "from": "MYC-202",

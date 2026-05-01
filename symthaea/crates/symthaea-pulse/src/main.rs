@@ -28,7 +28,7 @@ use symthaea::cognitive_loop::{
 
 use symthaea_psych_bench::benchmarks::{
     attention::VisualSearchBenchmark,
-    butlin::ButlinIndicatorSuite,
+    butlin::{ButlinIndicatorReport, ButlinIndicatorSuite},
     executive::{FlankerBenchmark, StroopBenchmark},
     inhibition::StopSignalBenchmark,
     metacognition::MetacognitiveCalibrationBenchmark,

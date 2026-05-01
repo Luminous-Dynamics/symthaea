@@ -276,10 +276,19 @@ impl CognitiveLoopService {
         // Science: Lakoff & Johnson (1999) embodied cognition, Varela (1991) enactivism
         // Platform-agnostic: works for all 10 robotics platforms via EmbodimentBridge trait.
         // ═══════════════════════════════════════════════════════════════════
-        #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight",
-                  feature = "vehicle", feature = "auv", feature = "manipulator",
-                  feature = "exoskeleton", feature = "surgical", feature = "orbital",
-                  feature = "quadruped", feature = "phone"))]
+        #[cfg(any(
+            feature = "humanoid",
+            feature = "helicopter",
+            feature = "flight",
+            feature = "vehicle",
+            feature = "auv",
+            feature = "manipulator",
+            feature = "exoskeleton",
+            feature = "surgical",
+            feature = "orbital",
+            feature = "quadruped",
+            feature = "phone"
+        ))]
         {
             let cycle_num = self.stats.total_cycles as usize;
             let interval = self.config.embodiment_step_interval.max(1);
@@ -456,10 +465,19 @@ impl CognitiveLoopService {
 
             // ── Gate 5: Embodiment motor halt carry-forward ──────────────
             // Platform-agnostic: applies to all 10 robotics platforms.
-            #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight",
-                      feature = "vehicle", feature = "auv", feature = "manipulator",
-                      feature = "exoskeleton", feature = "surgical", feature = "orbital",
-                      feature = "quadruped", feature = "phone"))]
+            #[cfg(any(
+                feature = "humanoid",
+                feature = "helicopter",
+                feature = "flight",
+                feature = "vehicle",
+                feature = "auv",
+                feature = "manipulator",
+                feature = "exoskeleton",
+                feature = "surgical",
+                feature = "orbital",
+                feature = "quadruped",
+                feature = "phone"
+            ))]
             if let Some(ref mut bridge) = self.sensorimotor.embodiment_bridge {
                 use crate::cognitive_loop::motor_bridge::MotorSafetyLevel;
                 if safety_result.motor_halt {
@@ -703,10 +721,8 @@ impl CognitiveLoopService {
             // input is relative to the system's internal model.
             let pe = dynamics.core.prediction_error as f64;
             let phi = feedback.consciousness.consciousness_level;
-            self.scientific_method_engine.observe(
-                vec![pe, phi],
-                "prediction_error_and_consciousness",
-            );
+            self.scientific_method_engine
+                .observe(vec![pe, phi], "prediction_error_and_consciousness");
 
             // Predict what the standing hypothesis (id 0) expects.
             let predicted = self.scientific_method_engine.predict(0);
@@ -716,7 +732,8 @@ impl CognitiveLoopService {
             let observed_coherence = (1.0 - pe).clamp(0.0, 1.0);
 
             // Test and update Bayesian posterior.
-            self.scientific_method_engine.test_hypothesis(0, observed_coherence, predicted);
+            self.scientific_method_engine
+                .test_hypothesis(0, observed_coherence, predicted);
 
             // Batch-recompute lifecycle status for all hypotheses.
             self.scientific_method_engine.update_beliefs();

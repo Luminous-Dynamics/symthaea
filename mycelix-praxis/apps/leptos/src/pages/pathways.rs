@@ -26,7 +26,7 @@ const PATHWAYS: &[(&str, &str, &str)] = &[
     ("Statistics", "Statistics & Data", "Probability, inference, bias, and visualisation"),
     ("Civic Literacy", "Civic Literacy", "Government, rights, voting, and engagement"),
     ("Philosophy", "Philosophy", "Logic, ethics, epistemology, and metaphysics"),
-    ("Consciousness Computing", "Consciousness Computing", "HDC, IIT, active inference, and embodiment"),
+    ("Cognitive Computing", "Cognitive Computing", "HDC, IIT, active inference, and embodiment"),
     ("Decentralized Systems", "Decentralized Systems", "Holochain, Mycelix governance, and identity"),
     ("Economics", "Economics", "Micro, macro, behavioral, and policy"),
     ("Mathematics", "University Mathematics", "Calculus, linear algebra, differential equations, and beyond"),
@@ -47,7 +47,7 @@ const PATHWAYS: &[(&str, &str, &str)] = &[
 /// Returns a CSS class suffix for the pathway category based on subject name.
 fn pathway_category_class(subject: &str) -> &'static str {
     match subject {
-        "Cybersecurity" | "Computer Science" | "Consciousness Computing"
+        "Cybersecurity" | "Computer Science" | "Cognitive Computing"
         | "Decentralized Systems" | "IT Support" => "pathway-card-tech",
 
         "Critical Thinking" | "Philosophy" | "Learning Science" | "Statistics"

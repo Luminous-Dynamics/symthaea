@@ -130,12 +130,18 @@ mod tests {
 
     #[test]
     fn gate_local_allows_local_only() {
-        assert_eq!(encoding_gate(ContentZone::Local), EncodingDecision::LocalOnly);
+        assert_eq!(
+            encoding_gate(ContentZone::Local),
+            EncodingDecision::LocalOnly
+        );
     }
 
     #[test]
     fn gate_public_allows_share() {
-        assert_eq!(encoding_gate(ContentZone::Public), EncodingDecision::EncodeAndShare);
+        assert_eq!(
+            encoding_gate(ContentZone::Public),
+            EncodingDecision::EncodeAndShare
+        );
     }
 
     #[test]

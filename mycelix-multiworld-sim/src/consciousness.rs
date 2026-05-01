@@ -91,19 +91,29 @@ impl ConsciousnessEngine {
         let community_mean_trauma: f64 = {
             let living: Vec<_> = agents.iter().filter(|a| a.is_alive()).collect();
             let n = living.len().max(1) as f64;
-            if living.is_empty() { 0.0 }
-            else { living.iter().map(|a| a.trauma_level).sum::<f64>() / n }
+            if living.is_empty() {
+                0.0
+            } else {
+                living.iter().map(|a| a.trauma_level).sum::<f64>() / n
+            }
         };
         let community_mean_ethics: [f64; 4] = {
             let living: Vec<_> = agents.iter().filter(|a| a.is_alive()).collect();
             let n = living.len().max(1) as f64;
-            if living.is_empty() { [0.5; 4] }
-            else { [
-                living.iter().map(|a| a.ethics.deontological).sum::<f64>() / n,
-                living.iter().map(|a| a.ethics.consequentialist).sum::<f64>() / n,
-                living.iter().map(|a| a.ethics.virtue_care).sum::<f64>() / n,
-                living.iter().map(|a| a.ethics.relational).sum::<f64>() / n,
-            ]}
+            if living.is_empty() {
+                [0.5; 4]
+            } else {
+                [
+                    living.iter().map(|a| a.ethics.deontological).sum::<f64>() / n,
+                    living
+                        .iter()
+                        .map(|a| a.ethics.consequentialist)
+                        .sum::<f64>()
+                        / n,
+                    living.iter().map(|a| a.ethics.virtue_care).sum::<f64>() / n,
+                    living.iter().map(|a| a.ethics.relational).sum::<f64>() / n,
+                ]
+            }
         };
 
         // --- Individual evolution ---
@@ -115,8 +125,7 @@ impl ConsciousnessEngine {
             agent.consciousness.level = (agent.consciousness.level - DECAY_RATE).max(0.0);
             agent.consciousness.meta_awareness =
                 (agent.consciousness.meta_awareness - DECAY_RATE).max(0.0);
-            agent.consciousness.coherence =
-                (agent.consciousness.coherence - DECAY_RATE).max(0.0);
+            agent.consciousness.coherence = (agent.consciousness.coherence - DECAY_RATE).max(0.0);
             agent.consciousness.care_activation =
                 (agent.consciousness.care_activation - DECAY_RATE).max(0.0);
             agent.consciousness.harmonic_alignment =
@@ -163,12 +172,11 @@ impl ConsciousnessEngine {
             let trauma_factor = 1.0 - agent.trauma_level;
             let experience_factor = (agent.age_years(current_tick) / 80.0).min(1.0);
             let cultural_factor = culture.harmony_weights[strongest_idx].min(1.0);
-            agent.consciousness.coherence = (
-                edu_factor * 0.4
+            agent.consciousness.coherence = (edu_factor * 0.4
                 + trauma_factor * 0.2
                 + experience_factor * 0.2
-                + cultural_factor * 0.2
-            ).clamp(0.0, 1.0);
+                + cultural_factor * 0.2)
+                .clamp(0.0, 1.0);
 
             // Care activation: grows if agent has children or works in medicine/education
             if !agent.children_ids.is_empty() {
@@ -183,12 +191,13 @@ impl ConsciousnessEngine {
 
             // Harmonic alignment: cosine similarity between skill vector and cultural weights
             agent.consciousness.harmonic_alignment =
-                cosine_similarity_8(&skill_slice, &culture.harmony_weights).max(0.0).min(1.0);
+                cosine_similarity_8(&skill_slice, &culture.harmony_weights)
+                    .max(0.0)
+                    .min(1.0);
 
             // Epistemic confidence: grows with education
             agent.consciousness.epistemic_confidence =
-                (agent.consciousness.epistemic_confidence + agent.education_level * 0.001)
-                    .min(1.0);
+                (agent.consciousness.epistemic_confidence + agent.education_level * 0.001).min(1.0);
 
             // Ethics-consciousness coupling: each ethical orientation accelerates
             // growth in a DIFFERENT consciousness dimension. This creates distinct
@@ -201,12 +210,14 @@ impl ConsciousnessEngine {
             // Consequentialist → epistemic_confidence (evidence-based → calibrated belief)
             agent.consciousness.care_activation =
                 (agent.consciousness.care_activation + agent.ethics.virtue_care * 0.0007).min(1.0);
-            agent.consciousness.harmonic_alignment =
-                (agent.consciousness.harmonic_alignment + agent.ethics.relational * 0.0007).min(1.0);
+            agent.consciousness.harmonic_alignment = (agent.consciousness.harmonic_alignment
+                + agent.ethics.relational * 0.0007)
+                .min(1.0);
             agent.consciousness.coherence =
                 (agent.consciousness.coherence + agent.ethics.deontological * 0.0005).min(1.0);
-            agent.consciousness.epistemic_confidence =
-                (agent.consciousness.epistemic_confidence + agent.ethics.consequentialist * 0.0005).min(1.0);
+            agent.consciousness.epistemic_confidence = (agent.consciousness.epistemic_confidence
+                + agent.ethics.consequentialist * 0.0005)
+                .min(1.0);
 
             // Ethics-needs coupling (Maslow-inspired):
             // Psychological state shapes ethical orientation over time.
@@ -216,13 +227,29 @@ impl ConsciousnessEngine {
             // Disengaged people optimize selfishly → consequentialist drift.
             // Rate: 0.0003/tick ≈ 0.036/year — slow but persistent.
             let nd = 0.00015;
-            let stress_d = if agent.needs.allostatic_load > 0.5 { nd } else { -nd * 0.5 };
+            let stress_d = if agent.needs.allostatic_load > 0.5 {
+                nd
+            } else {
+                -nd * 0.5
+            };
             agent.ethics.modify_with_sacred_resistance(0, stress_d);
-            let social_d = if agent.needs.social_satiation > 0.6 { nd } else { -nd * 0.5 };
+            let social_d = if agent.needs.social_satiation > 0.6 {
+                nd
+            } else {
+                -nd * 0.5
+            };
             agent.ethics.modify_with_sacred_resistance(3, social_d);
-            let engage_d = if agent.needs.engagement > 0.6 { nd } else { -nd * 0.5 };
+            let engage_d = if agent.needs.engagement > 0.6 {
+                nd
+            } else {
+                -nd * 0.5
+            };
             agent.ethics.modify_with_sacred_resistance(2, engage_d);
-            let disengage_d = if agent.needs.engagement < 0.4 { nd } else { -nd * 0.3 };
+            let disengage_d = if agent.needs.engagement < 0.4 {
+                nd
+            } else {
+                -nd * 0.3
+            };
             agent.ethics.modify_with_sacred_resistance(1, disengage_d);
 
             // Ethical switching cost (cognitive dissonance):
@@ -230,7 +257,9 @@ impl ConsciousnessEngine {
             // When ethics shift by > 0.05 in a single tick, allostatic load increases.
             // Ref: Festinger (1957) cognitive dissonance theory.
             let ethics_after = agent.ethics.as_vec();
-            let ethics_delta: f64 = ethics_before.iter().zip(ethics_after.iter())
+            let ethics_delta: f64 = ethics_before
+                .iter()
+                .zip(ethics_after.iter())
                 .map(|(a, b)| (a - b).abs())
                 .sum::<f64>();
             if ethics_delta > 0.05 {
@@ -243,8 +272,10 @@ impl ConsciousnessEngine {
             // Prevents runaway growth where all 4 dims inflate simultaneously.
             // Berlin (1969) value pluralism: genuine ethical tensions mean you can't
             // be maximally committed to ALL frameworks. Trade-offs are irreducible.
-            let eth_sum = agent.ethics.deontological + agent.ethics.consequentialist
-                + agent.ethics.virtue_care + agent.ethics.relational;
+            let eth_sum = agent.ethics.deontological
+                + agent.ethics.consequentialist
+                + agent.ethics.virtue_care
+                + agent.ethics.relational;
             if eth_sum > 2.05 {
                 let scale = 2.0 / eth_sum;
                 agent.ethics.deontological = (agent.ethics.deontological * scale).max(0.05);
@@ -265,21 +296,25 @@ impl ConsciousnessEngine {
             // Source 2: Hypocrisy gap — stress-driven pragmatism diverges from stated values.
             // Only significant at allostatic_load > 0.5 (severe stress = survival mode).
             let revealed = agent.ethics.revealed(agent.needs.allostatic_load);
-            let hypocrisy_gap: f64 = agent.ethics.as_vec().iter()
+            let hypocrisy_gap: f64 = agent
+                .ethics
+                .as_vec()
+                .iter()
                 .zip(revealed.as_vec().iter())
                 .map(|(s, r)| (s - r).abs())
                 .sum::<f64>();
             let hypocrisy_guilt = hypocrisy_gap * 0.15;
 
             // Combined: slow decay (0.98 ≈ 4-year half-life at monthly resolution)
-            agent.needs.affect.guilt = (agent.needs.affect.guilt * 0.98
-                + survivor_guilt + hypocrisy_guilt).min(1.0);
+            agent.needs.affect.guilt =
+                (agent.needs.affect.guilt * 0.98 + survivor_guilt + hypocrisy_guilt).min(1.0);
 
             // Guilt → consequentialist self-correction: feeling guilty about pragmatic
             // compromises triggers moral self-regulation (Tangney 2002).
             if agent.needs.affect.guilt > 0.2 {
                 let correction = agent.needs.affect.guilt * 0.0008;
-                agent.ethics.consequentialist = (agent.ethics.consequentialist - correction).max(0.05);
+                agent.ethics.consequentialist =
+                    (agent.ethics.consequentialist - correction).max(0.05);
             }
 
             // ── Moral injury (harm) ────────────────────────────────────────────
@@ -290,7 +325,8 @@ impl ConsciousnessEngine {
                 agent.needs.affect.harm = (agent.needs.affect.harm + 0.001).min(1.0);
                 if agent.needs.affect.harm > 0.5 {
                     agent.trauma_level = (agent.trauma_level + 0.0005).min(1.0);
-                    agent.consciousness.coherence = (agent.consciousness.coherence - 0.0003).max(0.0);
+                    agent.consciousness.coherence =
+                        (agent.consciousness.coherence - 0.0003).max(0.0);
                 }
             } else {
                 agent.needs.affect.harm = (agent.needs.affect.harm - 0.005).max(0.0);
@@ -322,22 +358,33 @@ impl ConsciousnessEngine {
         // transmission through community interaction.
         // Rate: ~10% of agents per tick contact a neighbor, blend at 0.005 rate.
         {
-            let living_indices: Vec<usize> = agents.iter().enumerate()
+            let living_indices: Vec<usize> = agents
+                .iter()
+                .enumerate()
                 .filter(|(_, a)| a.is_alive())
                 .map(|(i, _)| i)
                 .collect();
             let n_contacts = (living_indices.len() as f64 * 0.10).ceil() as usize;
             for _ in 0..n_contacts {
-                if living_indices.len() < 2 { break; }
+                if living_indices.len() < 2 {
+                    break;
+                }
                 let ai = living_indices[(rng.next_u64() as usize) % living_indices.len()];
                 let bi = living_indices[(rng.next_u64() as usize) % living_indices.len()];
-                if ai == bi { continue; }
+                if ai == bi {
+                    continue;
+                }
                 // Moral leadership: high-consciousness agents are ethical beacons.
                 // Guardian (tier 4) transmits at 5x, Steward (tier 3) at 2x.
                 // This models Gandhi/Tutu/King — moral leaders who shift populations.
                 // Receivers absorb faster with high coordination_understanding.
                 let tier_mult = |tier: u8| -> f64 {
-                    match tier { 4 => 5.0, 3 => 2.0, 2 => 1.0, _ => 0.3 }
+                    match tier {
+                        4 => 5.0,
+                        3 => 2.0,
+                        2 => 1.0,
+                        _ => 0.3,
+                    }
                 };
                 let transmit_a = tier_mult(agents[ai].consciousness.tier());
                 let transmit_b = tier_mult(agents[bi].consciousness.tier());
@@ -386,8 +433,8 @@ impl ConsciousnessEngine {
         let sampled: Vec<&CivAgent> = living.iter().step_by(stride).copied().collect();
 
         // Mean Phi from sampled agents
-        self.mean_phi = sampled.iter().map(|a| a.consciousness.phi()).sum::<f64>()
-            / sampled.len() as f64;
+        self.mean_phi =
+            sampled.iter().map(|a| a.consciousness.phi()).sum::<f64>() / sampled.len() as f64;
 
         // Inter-agent coherence: pairwise cosine similarity of 6D consciousness vectors
         if sampled.len() >= 2 {
@@ -400,8 +447,10 @@ impl ConsciousnessEngine {
                 if j == i {
                     j = (i + 1) % sampled.len();
                 }
-                coherence_sum +=
-                    consciousness_cosine_similarity(&sampled[i].consciousness, &sampled[j].consciousness);
+                coherence_sum += consciousness_cosine_similarity(
+                    &sampled[i].consciousness,
+                    &sampled[j].consciousness,
+                );
                 pair_count += 1;
             }
             self.inter_agent_coherence = if pair_count > 0 {
@@ -497,12 +546,20 @@ impl Default for ConsciousnessEngine {
 /// dynamic skill theory.
 pub fn tick_consciousness_development(agent: &mut CivAgent, has_mentor: bool) {
     let _age = if agent.birth_tick == 0 { 30.0 } else { 0.0 }; // approximate; caller should pass tick
-    // We use consciousness.level as a proxy for development stage
+                                                               // We use consciousness.level as a proxy for development stage
 
     let base_rate = 0.001;
-    let education_bonus = if agent.education_level > 0.3 { 0.002 } else { 0.0 };
+    let education_bonus = if agent.education_level > 0.3 {
+        0.002
+    } else {
+        0.0
+    };
     let mentor_bonus = if has_mentor { 0.003 } else { 0.0 };
-    let trauma_penalty = if agent.trauma_level > 0.3 { -0.005 * agent.trauma_level } else { 0.0 };
+    let trauma_penalty = if agent.trauma_level > 0.3 {
+        -0.005 * agent.trauma_level
+    } else {
+        0.0
+    };
 
     let raw_rate = base_rate + education_bonus + mentor_bonus + trauma_penalty;
     if raw_rate <= 0.0 {
@@ -529,9 +586,17 @@ pub fn tick_consciousness_development_with_age(
     }
 
     let base_rate = 0.001;
-    let education_bonus = if agent.education_level > 0.3 { 0.002 } else { 0.0 };
+    let education_bonus = if agent.education_level > 0.3 {
+        0.002
+    } else {
+        0.0
+    };
     let mentor_bonus = if has_mentor { 0.003 } else { 0.0 };
-    let trauma_penalty = if agent.trauma_level > 0.3 { -0.005 * agent.trauma_level } else { 0.0 };
+    let trauma_penalty = if agent.trauma_level > 0.3 {
+        -0.005 * agent.trauma_level
+    } else {
+        0.0
+    };
 
     let raw_rate = base_rate + education_bonus + mentor_bonus + trauma_penalty;
     if raw_rate <= 0.0 {
@@ -630,16 +695,23 @@ pub fn tick_consciousness_all_worlds(
         let has_adversaries = world.agents.iter().any(|a| a.adversarial.is_some());
         if has_adversaries {
             let living = world.agents.iter().filter(|a| a.is_alive()).count();
-            let adv_count = world.agents.iter()
-                .filter(|a| a.is_alive() && a.adversarial.is_some()).count();
+            let adv_count = world
+                .agents
+                .iter()
+                .filter(|a| a.is_alive() && a.adversarial.is_some())
+                .count();
             let target = (living as f64 * 0.05).ceil() as usize;
             if adv_count < target {
                 let deficit = target - adv_count;
                 let mut recruited = 0;
-                for agent in world.agents.iter_mut()
+                for agent in world
+                    .agents
+                    .iter_mut()
                     .filter(|a| a.is_alive() && a.adversarial.is_none())
                 {
-                    if recruited >= deficit { break; }
+                    if recruited >= deficit {
+                        break;
+                    }
                     agent.adversarial = Some(red_team::AdversarialStrategy::ProfileMaximizer);
                     recruited += 1;
                 }
@@ -650,12 +722,17 @@ pub fn tick_consciousness_all_worlds(
     // Phase 7: Gradual consciousness growth for agents.
     for world in worlds.iter_mut() {
         let mean_edu: f64 = {
-            let living: Vec<f64> = world.agents.iter()
+            let living: Vec<f64> = world
+                .agents
+                .iter()
                 .filter(|a| a.is_alive())
                 .map(|a| a.education_level)
                 .collect();
-            if living.is_empty() { 0.0 }
-            else { living.iter().sum::<f64>() / living.len() as f64 }
+            if living.is_empty() {
+                0.0
+            } else {
+                living.iter().sum::<f64>() / living.len() as f64
+            }
         };
 
         for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
@@ -667,7 +744,8 @@ pub fn tick_consciousness_all_worlds(
                 agent::LifeStage::Elder => 0.001,
             };
 
-            let base_decay = if stage == agent::LifeStage::Adult || stage == agent::LifeStage::Elder {
+            let base_decay = if stage == agent::LifeStage::Adult || stage == agent::LifeStage::Elder
+            {
                 0.0015
             } else {
                 0.0
@@ -681,7 +759,11 @@ pub fn tick_consciousness_all_worlds(
             c.harmonic_alignment = (c.harmonic_alignment - decay).max(0.0);
             c.epistemic_confidence = (c.epistemic_confidence - decay).max(0.0);
 
-            let pharma = if world.infrastructure_level > 0.3 { pharma_boost } else { 0.0 };
+            let pharma = if world.infrastructure_level > 0.3 {
+                pharma_boost
+            } else {
+                0.0
+            };
             let gating_factor = if trust_weighted_governance {
                 let phi = c.phi();
                 let bonus = 0.5 / (1.0 + (-10.0 * (phi - 0.3)).exp());
@@ -709,9 +791,11 @@ pub fn tick_consciousness_all_worlds(
                 rate * amplifier * headroom
             };
             c.level = (c.level + dr(c.level, growth_rate)).min(cap);
-            c.meta_awareness = (c.meta_awareness + dr(c.meta_awareness, growth_rate * 0.8)).min(cap);
+            c.meta_awareness =
+                (c.meta_awareness + dr(c.meta_awareness, growth_rate * 0.8)).min(cap);
             c.coherence = (c.coherence + dr(c.coherence, growth_rate * 0.6)).min(cap);
-            c.care_activation = (c.care_activation + dr(c.care_activation, growth_rate * 0.7)).min(cap);
+            c.care_activation =
+                (c.care_activation + dr(c.care_activation, growth_rate * 0.7)).min(cap);
             c.harmonic_alignment =
                 (c.harmonic_alignment + dr(c.harmonic_alignment, growth_rate * 0.5)).min(cap);
             c.epistemic_confidence =
@@ -738,26 +822,38 @@ pub fn tick_consciousness_all_worlds(
         let community_mean_trauma: f64 = {
             let living: Vec<_> = world.agents.iter().filter(|a| a.is_alive()).collect();
             let n = living.len().max(1) as f64;
-            if living.is_empty() { 0.0 }
-            else { living.iter().map(|a| a.trauma_level).sum::<f64>() / n }
+            if living.is_empty() {
+                0.0
+            } else {
+                living.iter().map(|a| a.trauma_level).sum::<f64>() / n
+            }
         };
         let community_mean_ethics: [f64; 4] = {
             let living: Vec<_> = world.agents.iter().filter(|a| a.is_alive()).collect();
             let n = living.len().max(1) as f64;
-            if living.is_empty() { [0.5; 4] }
-            else { [
-                living.iter().map(|a| a.ethics.deontological).sum::<f64>() / n,
-                living.iter().map(|a| a.ethics.consequentialist).sum::<f64>() / n,
-                living.iter().map(|a| a.ethics.virtue_care).sum::<f64>() / n,
-                living.iter().map(|a| a.ethics.relational).sum::<f64>() / n,
-            ]}
+            if living.is_empty() {
+                [0.5; 4]
+            } else {
+                [
+                    living.iter().map(|a| a.ethics.deontological).sum::<f64>() / n,
+                    living
+                        .iter()
+                        .map(|a| a.ethics.consequentialist)
+                        .sum::<f64>()
+                        / n,
+                    living.iter().map(|a| a.ethics.virtue_care).sum::<f64>() / n,
+                    living.iter().map(|a| a.ethics.relational).sum::<f64>() / n,
+                ]
+            }
         };
 
         for agent in world.agents.iter_mut().filter(|a| a.is_alive()) {
             // Age drift: elders develop virtue/care and relational wisdom (Tornstam 1989).
             let age_in_years = if current_tick > agent.birth_tick {
                 (current_tick - agent.birth_tick) as f64 / 12.0
-            } else { 0.0 };
+            } else {
+                0.0
+            };
             if age_in_years > 50.0 {
                 agent.ethics.virtue_care = (agent.ethics.virtue_care + 0.0001).min(1.0);
                 agent.ethics.relational = (agent.ethics.relational + 0.0001).min(1.0);
@@ -766,12 +862,14 @@ pub fn tick_consciousness_all_worlds(
             // Ethics-consciousness coupling: each framework builds a different dimension.
             agent.consciousness.care_activation =
                 (agent.consciousness.care_activation + agent.ethics.virtue_care * 0.0007).min(1.0);
-            agent.consciousness.harmonic_alignment =
-                (agent.consciousness.harmonic_alignment + agent.ethics.relational * 0.0007).min(1.0);
+            agent.consciousness.harmonic_alignment = (agent.consciousness.harmonic_alignment
+                + agent.ethics.relational * 0.0007)
+                .min(1.0);
             agent.consciousness.coherence =
                 (agent.consciousness.coherence + agent.ethics.deontological * 0.0005).min(1.0);
-            agent.consciousness.epistemic_confidence =
-                (agent.consciousness.epistemic_confidence + agent.ethics.consequentialist * 0.0005).min(1.0);
+            agent.consciousness.epistemic_confidence = (agent.consciousness.epistemic_confidence
+                + agent.ethics.consequentialist * 0.0005)
+                .min(1.0);
 
             // Ethics-needs coupling: symmetric dead-zone coupling prevents one-directional
             // drift in moderate conditions. Each variable has a HIGH trigger (dim rises),
@@ -779,29 +877,39 @@ pub fn tick_consciousness_all_worlds(
             // Berlin (1969) value pluralism: stability in moderate conditions is natural.
             let nd = 0.00015;
             // Stress: high → deontological (need rules); low → virtue (safety enables care)
-            let stress_d = if agent.needs.allostatic_load > 0.6 { nd }
-                else if agent.needs.allostatic_load < 0.2 { -nd * 0.3 }
-                else { 0.0 };
+            let stress_d = if agent.needs.allostatic_load > 0.6 {
+                nd
+            } else if agent.needs.allostatic_load < 0.2 {
+                -nd * 0.3
+            } else {
+                0.0
+            };
             agent.ethics.modify_with_sacred_resistance(0, stress_d); // deontological
-            // Social: high satiation → relational; isolated → relational falls
-            let social_d = if agent.needs.social_satiation > 0.7 { nd }
-                else if agent.needs.social_satiation < 0.3 { -nd * 0.5 }
-                else { 0.0 };
+                                                                     // Social: high satiation → relational; isolated → relational falls
+            let social_d = if agent.needs.social_satiation > 0.7 {
+                nd
+            } else if agent.needs.social_satiation < 0.3 {
+                -nd * 0.5
+            } else {
+                0.0
+            };
             agent.ethics.modify_with_sacred_resistance(3, social_d); // relational
-            // Engagement: zero-sum — high → virtue up + conseq down; low → conseq up + virtue down
+                                                                     // Engagement: zero-sum — high → virtue up + conseq down; low → conseq up + virtue down
             if agent.needs.engagement > 0.7 {
-                agent.ethics.modify_with_sacred_resistance(2, nd);        // virtue up
+                agent.ethics.modify_with_sacred_resistance(2, nd); // virtue up
                 agent.ethics.modify_with_sacred_resistance(1, -nd * 0.4); // conseq slightly down
             } else if agent.needs.engagement < 0.3 {
-                agent.ethics.modify_with_sacred_resistance(1, nd);        // conseq up
+                agent.ethics.modify_with_sacred_resistance(1, nd); // conseq up
                 agent.ethics.modify_with_sacred_resistance(2, -nd * 0.4); // virtue slightly down
             }
             // Neutral zone [0.3, 0.7]: no engagement-driven pressure
 
             // Ethics normalization: prevent all-dimensions inflation.
             // Berlin (1969): genuine ethical tensions make maximal commitment impossible.
-            let eth_sum = agent.ethics.deontological + agent.ethics.consequentialist
-                + agent.ethics.virtue_care + agent.ethics.relational;
+            let eth_sum = agent.ethics.deontological
+                + agent.ethics.consequentialist
+                + agent.ethics.virtue_care
+                + agent.ethics.relational;
             if eth_sum > 2.05 {
                 let scale = 2.0 / eth_sum;
                 agent.ethics.deontological = (agent.ethics.deontological * scale).max(0.05);
@@ -815,16 +923,20 @@ pub fn tick_consciousness_all_worlds(
             let survivor_guilt = agent.ethics.virtue_care * community_mean_trauma * 0.005;
             // Hypocrisy gap: stress-driven pragmatism vs stated values.
             let revealed = agent.ethics.revealed(agent.needs.allostatic_load);
-            let hypocrisy_gap: f64 = agent.ethics.as_vec().iter()
+            let hypocrisy_gap: f64 = agent
+                .ethics
+                .as_vec()
+                .iter()
                 .zip(revealed.as_vec().iter())
                 .map(|(s, r)| (s - r).abs())
                 .sum::<f64>();
-            agent.needs.affect.guilt = (agent.needs.affect.guilt * 0.98
-                + survivor_guilt + hypocrisy_gap * 0.15).min(1.0);
+            agent.needs.affect.guilt =
+                (agent.needs.affect.guilt * 0.98 + survivor_guilt + hypocrisy_gap * 0.15).min(1.0);
             // Guilt self-corrects consequentialist drift.
             if agent.needs.affect.guilt > 0.2 {
                 let correction = agent.needs.affect.guilt * 0.0008;
-                agent.ethics.consequentialist = (agent.ethics.consequentialist - correction).max(0.05);
+                agent.ethics.consequentialist =
+                    (agent.ethics.consequentialist - correction).max(0.05);
             }
 
             // ── Moral injury (harm) ──────────────────────────────────────────
@@ -858,18 +970,30 @@ pub fn tick_consciousness_all_worlds(
         // 10% of agents per tick contact a random neighbor and blend ethics.
         // Rate 0.005 (was 0.02) to preserve diversity in large populations.
         {
-            let living_indices: Vec<usize> = world.agents.iter().enumerate()
+            let living_indices: Vec<usize> = world
+                .agents
+                .iter()
+                .enumerate()
                 .filter(|(_, a)| a.is_alive())
                 .map(|(i, _)| i)
                 .collect();
             let n_contacts = (living_indices.len() as f64 * 0.10).ceil() as usize;
             for _ in 0..n_contacts {
-                if living_indices.len() < 2 { break; }
+                if living_indices.len() < 2 {
+                    break;
+                }
                 let ai = living_indices[(rng.next_u64() as usize) % living_indices.len()];
                 let bi = living_indices[(rng.next_u64() as usize) % living_indices.len()];
-                if ai == bi { continue; }
+                if ai == bi {
+                    continue;
+                }
                 let tier_mult = |tier: u8| -> f64 {
-                    match tier { 4 => 5.0, 3 => 2.0, 2 => 1.0, _ => 0.3 }
+                    match tier {
+                        4 => 5.0,
+                        3 => 2.0,
+                        2 => 1.0,
+                        _ => 0.3,
+                    }
                 };
                 let transmit_a = tier_mult(world.agents[ai].consciousness.tier());
                 let transmit_b = tier_mult(world.agents[bi].consciousness.tier());
@@ -915,14 +1039,20 @@ mod tests {
             is_immigrant: false,
             needs: crate::needs::PsychologicalNeeds::new(),
             tend_balance: 0.0,
-                    parent_ids: None,
-                    faction_id: None,
-                    generation: 0,
-                    trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
-                    ethics: crate::agent::EthicalOrientation::default(),
-                    sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
-                    justice: crate::sub_passport::RestorativeJustice::new(),
+            parent_ids: None,
+            faction_id: None,
+            generation: 0,
+            trauma_level: 0.0,
+            cumulative_dose_sv: 0.0,
+            adversarial: None,
+            coordination_understanding: 0.0,
+            mycel_score: 0.1,
+            sap_balance: 100.0,
+            is_biological: true,
+            wounds: Vec::new(),
+            ethics: crate::agent::EthicalOrientation::default(),
+            sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
+            justice: crate::sub_passport::RestorativeJustice::new(),
         }
     }
 
@@ -954,21 +1084,26 @@ mod tests {
         let culture = CulturalProfile::earth_default();
 
         // Create agents with elevated consciousness
-        let mut agents: Vec<CivAgent> = (0..20).map(|i| {
-            let mut a = make_agent(i, 0);
-            a.consciousness.level = 0.7;
-            a.consciousness.meta_awareness = 0.6;
-            a.consciousness.coherence = 0.5;
-            a.consciousness.care_activation = 0.5;
-            a.consciousness.harmonic_alignment = 0.5;
-            a.consciousness.epistemic_confidence = 0.5;
-            a
-        }).collect();
+        let mut agents: Vec<CivAgent> = (0..20)
+            .map(|i| {
+                let mut a = make_agent(i, 0);
+                a.consciousness.level = 0.7;
+                a.consciousness.meta_awareness = 0.6;
+                a.consciousness.coherence = 0.5;
+                a.consciousness.care_activation = 0.5;
+                a.consciousness.harmonic_alignment = 0.5;
+                a.consciousness.epistemic_confidence = 0.5;
+                a
+            })
+            .collect();
 
         engine.tick_consciousness(&mut agents, &culture, 1, &mut rng);
 
         assert!(engine.mean_phi > 0.0, "mean_phi should be positive");
-        assert!(engine.collective_phi > 0.0, "collective_phi should be positive");
+        assert!(
+            engine.collective_phi > 0.0,
+            "collective_phi should be positive"
+        );
         assert!(
             engine.inter_agent_coherence > 0.0,
             "coherence should be positive for similar agents"
@@ -999,12 +1134,14 @@ mod tests {
 
         // All agents at tier 0 (nascent) with low phi — classic fragile consensus.
         // Low education ensures emergent coherence stays low (phi < 0.3).
-        let mut agents: Vec<CivAgent> = (0..30).map(|i| {
-            let mut a = make_agent(i, 0);
-            a.consciousness = ConsciousnessState::nascent();
-            a.education_level = 0.05;
-            a
-        }).collect();
+        let mut agents: Vec<CivAgent> = (0..30)
+            .map(|i| {
+                let mut a = make_agent(i, 0);
+                a.consciousness = ConsciousnessState::nascent();
+                a.education_level = 0.05;
+                a
+            })
+            .collect();
 
         engine.tick_consciousness(&mut agents, &culture, 1, &mut rng);
 
@@ -1083,7 +1220,8 @@ mod tests {
         assert!(
             agent.consciousness.level > initial_level,
             "Consciousness should grow: {} vs {}",
-            agent.consciousness.level, initial_level
+            agent.consciousness.level,
+            initial_level
         );
     }
 

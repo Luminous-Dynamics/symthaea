@@ -610,10 +610,7 @@ impl CSPSolver {
 /// with the smallest domain size.
 ///
 /// Breaks ties by degree (most constraints with unassigned variables).
-pub fn mrv_select_variable(
-    domains: &[Vec<usize>],
-    assigned: &[Option<usize>],
-) -> Option<usize> {
+pub fn mrv_select_variable(domains: &[Vec<usize>], assigned: &[Option<usize>]) -> Option<usize> {
     let mut best_idx = None;
     let mut best_size = usize::MAX;
 
@@ -698,7 +695,9 @@ fn count_eliminations(
         }
         for &other_val in domain {
             // Check if assigning var_idx=val would eliminate other_val from domain[other]
-            let violates = constraints.iter().any(|c| !c(var_idx, val, other, other_val));
+            let violates = constraints
+                .iter()
+                .any(|c| !c(var_idx, val, other, other_val));
             if violates {
                 eliminated += 1;
             }
@@ -729,14 +728,17 @@ pub fn backtrack_mrv_lcv(
     };
 
     // LCV: order values to try
-    let ordered_values = lcv_order_values(var, &domains[var].clone(), domains, assigned, constraints);
+    let ordered_values =
+        lcv_order_values(var, &domains[var].clone(), domains, assigned, constraints);
 
     for val in ordered_values {
         // Check consistency: does assigning var=val violate any constraint
         // with already-assigned variables?
         let consistent = assigned.iter().enumerate().all(|(other, other_val)| {
             if let Some(ov) = other_val {
-                constraints.iter().all(|c| c(var, val, other, *ov) && c(other, *ov, var, val))
+                constraints
+                    .iter()
+                    .all(|c| c(var, val, other, *ov) && c(other, *ov, var, val))
             } else {
                 true
             }
@@ -760,7 +762,9 @@ pub fn backtrack_mrv_lcv(
                 .iter()
                 .copied()
                 .filter(|&ov| {
-                    constraints.iter().all(|c| c(var, val, other, ov) && c(other, ov, var, val))
+                    constraints
+                        .iter()
+                        .all(|c| c(var, val, other, ov) && c(other, ov, var, val))
                 })
                 .collect();
 
@@ -1107,7 +1111,11 @@ mod tests {
         let domains = vec![vec![1, 2, 3], vec![1], vec![1, 2]];
         let assigned = vec![None, None, None];
         let selected = mrv_select_variable(&domains, &assigned);
-        assert_eq!(selected, Some(1), "MRV should select var1 with domain size 1");
+        assert_eq!(
+            selected,
+            Some(1),
+            "MRV should select var1 with domain size 1"
+        );
     }
 
     #[test]
@@ -1208,8 +1216,8 @@ mod tests {
         }
 
         // Build AllDifferent-style constraints for rows, columns, and 2x2 boxes
-        let constraints: Vec<Box<dyn Fn(usize, usize, usize, usize) -> bool>> = vec![
-            Box::new(move |v1, val1, v2, val2| {
+        let constraints: Vec<Box<dyn Fn(usize, usize, usize, usize) -> bool>> =
+            vec![Box::new(move |v1, val1, v2, val2| {
                 if v1 == v2 {
                     return true;
                 }
@@ -1224,8 +1232,7 @@ mod tests {
                 } else {
                     true
                 }
-            }),
-        ];
+            })];
 
         let mut backtracks = 0;
         let solved = backtrack_mrv_lcv(&mut domains, &mut assigned, &constraints, &mut backtracks);
@@ -1233,9 +1240,7 @@ mod tests {
 
         // Verify row uniqueness
         for row in 0..n {
-            let vals: Vec<usize> = (0..n)
-                .map(|col| assigned[row * n + col].unwrap())
-                .collect();
+            let vals: Vec<usize> = (0..n).map(|col| assigned[row * n + col].unwrap()).collect();
             let unique: std::collections::HashSet<_> = vals.iter().collect();
             assert_eq!(unique.len(), n, "Row {} has duplicates", row);
         }

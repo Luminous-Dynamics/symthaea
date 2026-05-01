@@ -70,9 +70,7 @@ impl DomTree {
     /// Remove `child` from its parent's children list.
     pub fn detach(&mut self, child: NodeId) {
         if let Some(parent_id) = self.nodes[child.0].parent {
-            self.nodes[parent_id.0]
-                .children
-                .retain(|&id| id != child);
+            self.nodes[parent_id.0].children.retain(|&id| id != child);
             self.nodes[child.0].parent = None;
         }
     }
@@ -143,9 +141,10 @@ impl DomTree {
     fn find_by_tag_recursive(&self, node_id: NodeId, tag: &str, results: &mut Vec<NodeId>) {
         let node = &self.nodes[node_id.0];
         if let NodeData::Element(el) = &node.data
-            && el.tag == tag {
-                results.push(node_id);
-            }
+            && el.tag == tag
+        {
+            results.push(node_id);
+        }
         for &child_id in &node.children {
             self.find_by_tag_recursive(child_id, tag, results);
         }
@@ -185,9 +184,9 @@ impl DomTree {
         let titles = self.find_by_tag("title");
         titles.first().and_then(|&id| {
             let node = self.get(id)?;
-            node.children.first().and_then(|&child_id| {
-                self.get(child_id)?.as_text().map(|t| t.trim().to_string())
-            })
+            node.children
+                .first()
+                .and_then(|&child_id| self.get(child_id)?.as_text().map(|t| t.trim().to_string()))
         })
     }
 }
@@ -202,7 +201,7 @@ impl Default for DomTree {
 mod tests {
     use super::*;
     use crate::node::ElementData;
-    use html5ever::{namespace_url, ns, QualName};
+    use html5ever::{QualName, namespace_url, ns};
     use std::collections::HashMap;
 
     fn make_element(tree: &mut DomTree, tag: &str) -> NodeId {

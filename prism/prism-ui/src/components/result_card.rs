@@ -3,9 +3,9 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Search result card with epistemic overlay and claim actions.
 
+use crate::components::claim_actions::ClaimActions;
 use leptos::prelude::*;
 use prism_common::{EmpiricalLevel, SearchResult};
-use crate::components::claim_actions::ClaimActions;
 
 #[component]
 pub fn ResultCard(result: SearchResult, rank: usize) -> impl IntoView {
@@ -18,7 +18,11 @@ pub fn ResultCard(result: SearchResult, rank: usize) -> impl IntoView {
     };
 
     let score_pct = (result.rank_score() * 100.0) as u32;
-    let source = result.sources.first().cloned().unwrap_or_else(|| "\u{2014}".to_string());
+    let source = result
+        .sources
+        .first()
+        .cloned()
+        .unwrap_or_else(|| "\u{2014}".to_string());
     let source_is_url = source.starts_with("http://") || source.starts_with("https://");
     let source_nav = source.clone();
     let source_display = source.clone();

@@ -6,9 +6,9 @@
 //! Supports Gmail, Outlook, Yahoo, iCloud, ProtonMail Bridge, Fastmail,
 //! AOL, Zoho, GMX, Mail.de, and custom IMAP/SMTP servers.
 
+use crate::toasts::use_toasts;
 use leptos::prelude::*;
 use wasm_bindgen::JsCast;
-use crate::toasts::use_toasts;
 
 const STORAGE_KEY: &str = "mycelix_mail_external_accounts";
 
@@ -49,9 +49,17 @@ pub enum Provider {
 
 impl Provider {
     pub const ALL: &[Provider] = &[
-        Self::Gmail, Self::Outlook, Self::Yahoo, Self::ICloud,
-        Self::ProtonMail, Self::Fastmail, Self::Aol, Self::Zoho,
-        Self::Gmx, Self::MailDe, Self::Custom,
+        Self::Gmail,
+        Self::Outlook,
+        Self::Yahoo,
+        Self::ICloud,
+        Self::ProtonMail,
+        Self::Fastmail,
+        Self::Aol,
+        Self::Zoho,
+        Self::Gmx,
+        Self::MailDe,
+        Self::Custom,
     ];
 
     pub fn label(&self) -> &'static str {
@@ -195,18 +203,34 @@ pub fn AccountsPage() -> impl IntoView {
         if let Some(search) = web_sys::window().and_then(|w| w.location().search().ok()) {
             if search.contains("code=") {
                 // Extract authorization code
-                let code = search.split("code=").nth(1)
+                let code = search
+                    .split("code=")
+                    .nth(1)
                     .and_then(|s| s.split('&').next())
                     .unwrap_or("");
                 if !code.is_empty() {
-                    web_sys::console::log_1(&format!("[OAuth] Received auth code: {}...", &code[..code.len().min(10)]).into());
-                    toasts_oauth_cb.push("OAuth authorization received! Token exchange would happen here.", "success");
+                    web_sys::console::log_1(
+                        &format!(
+                            "[OAuth] Received auth code: {}...",
+                            &code[..code.len().min(10)]
+                        )
+                        .into(),
+                    );
+                    toasts_oauth_cb.push(
+                        "OAuth authorization received! Token exchange would happen here.",
+                        "success",
+                    );
                     // In production: exchange code for access_token via token endpoint
                     // Then save the token in the account config
                     // Clear the URL params
                     let _ = web_sys::window().and_then(|w| {
                         w.history().ok().and_then(|h| {
-                            h.replace_state_with_url(&wasm_bindgen::JsValue::NULL, "", Some("/accounts")).ok()
+                            h.replace_state_with_url(
+                                &wasm_bindgen::JsValue::NULL,
+                                "",
+                                Some("/accounts"),
+                            )
+                            .ok()
                         })
                     });
                 }
@@ -252,10 +276,18 @@ pub fn AccountsPage() -> impl IntoView {
             label: p.label().to_string(),
             email: e.clone(),
             provider: p,
-            imap_host: if imap_host.get_untracked().is_empty() { defaults.imap_host.to_string() } else { imap_host.get_untracked() },
+            imap_host: if imap_host.get_untracked().is_empty() {
+                defaults.imap_host.to_string()
+            } else {
+                imap_host.get_untracked()
+            },
             imap_port: imap_port.get_untracked(),
             imap_tls: defaults.imap_tls,
-            smtp_host: if smtp_host.get_untracked().is_empty() { defaults.smtp_host.to_string() } else { smtp_host.get_untracked() },
+            smtp_host: if smtp_host.get_untracked().is_empty() {
+                defaults.smtp_host.to_string()
+            } else {
+                smtp_host.get_untracked()
+            },
             smtp_port: smtp_port.get_untracked(),
             smtp_tls: defaults.smtp_tls,
             username: if u.is_empty() { e.clone() } else { u },

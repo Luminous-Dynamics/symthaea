@@ -13,16 +13,28 @@ If a feature helps both tracks, it's a core priority. If it helps only B at the 
 
 ## Current State (honest, 2026-04)
 
-- 61K LOC Rust · 677 tests · 23 crates · 8 published on crates.io
+- 29 crate manifests in this workspace · 734 Rust test/proptest/bench markers counted locally · 8 published on crates.io
 - Rigid-body ND physics real and benchmarked
 - Φ coupling load-bearing (5 channels, ThermodynamicLedger, J/Φ ledger)
 - Mycelix headless governance harness production-ready (11 scenarios)
 - Robotics bridge is a skeleton (platform types + FEP; no joint fidelity)
 - Symthaea integration: FEP + Consciousness Equation wired; full CognitiveLoopService not yet stepped inside entities
 - 3D rendering pipeline missing (2D sprite projection only today)
-- Licensed AGPL-3.0-or-later across all crates (adoption blocker for general use)
+- License split is in progress: core crates are Apache-2.0 OR MIT; research/game/integration crates remain AGPL-3.0-or-later
 
 ---
+
+## Phase 0.1 — Correctness & Claim Reconciliation (immediate, 1-2 weeks)
+
+Before adoption work, make the code, docs, licensing metadata, and tests agree. This is not feature work; it protects the central claims.
+
+- **PhysicsCallback contract:** `step_with_callback` must exercise all documented channels. Channel 1 (`Metric/Φ -> Force`) is covered by a regression test that verifies zero-gain callbacks block intended motor force while unit-gain callbacks preserve it.
+- **Coupling accounting:** callback implementations must not duplicate or bypass their accounting-aware inherent methods. Sanctuary impulse absorption should reach `ThermodynamicLedger` on the same path used by `PhysicsWorld`.
+- **License scanner clean:** Cargo license fields, SPDX headers, README, Book, and `LICENSING.md` must tell the same story. Permissive crates cannot contain AGPL SPDX headers; permissive meta-crates cannot require AGPL dependencies by default.
+- **Docs state sync:** crate counts, test counts, published versions, and roadmap completion markers should be generated or periodically checked, not hand-maintained in multiple places.
+- **Verification surface:** add one canonical `just verify-core` command for fmt, clippy/check, core tests, replay determinism, and license/doc checks.
+
+**Gate to Phase 0.5:** central claims in README/Book/ROADMAP are mechanically backed by code or explicitly scoped as planned.
 
 ## Phase 0 — Stabilize & Unblock Adoption (4–6 weeks)
 
@@ -48,7 +60,75 @@ Also queued: refactor existing `symtropy-bevy` (AGPL) to re-export `symtropy-bev
 - **Determinism contract** — document the *actual* guarantee (same-CPU float, Morton integer broadphase, BTreeMap iteration). Add regression tests that lock down invariants across Rust versions.
 - **Wayland re-enabled** on Linux; verified Windows launch; verified macOS launch.
 
+### Phase 0.6 — Demo & Visibility (2-4 weeks)
+
+Give external users one obvious path from curiosity to success.
+
+- **Hero demo:** one polished replayable 4D/state-coupled scene with visible Φ/metric controls, contact/energy overlays, and screenshot capture.
+- **Starter template:** `cargo generate` or `symtropy new` flow for a small Bevy app using `symtropy-bevy-core` by default, with AGPL Φ/Mycelix sections as explicit opt-ins.
+- **Recipe docs:** short guides for character controllers, input mapping, pathfinding, save/load, VFX, profiling, and Mycelix cloud-save/identity opt-in. These should live under `docs/recipes/` and reflect `docs/GAME_ENGINE_COMPONENTS.md`.
+- **Comparative benchmarks:** one public Criterion report comparing native Symtropy, Rapier3D bridge targets, and Bevy ecosystem physics on a few representative workloads.
+- **README adoption story:** surface why Symtropy + Symthaea + Mycelix is more than a physics crate without forcing that stack on permissive-core users.
+
+### Phase 0.7 — Mk0 Bootstrapper Protocol (immediate operational path)
+
+The North Star city stack should not be mistaken for the first deployable slice. The immediate executable path is a **Mk0 bootstrapper loop** built from off-the-shelf hardware plus Symtropy/Symthaea/Mycelix software. This is the minimum viable metabolism that can fabricate, assemble, move, and coordinate its own next increment.
+
+**Why this matters**
+- It turns the roadmap from "future city taxonomy" into a testable warehouse-scale protocol.
+- It provides a practical local starting point: one room, one energy loop, one material loop, one compute cluster, one logistics rover.
+- It creates the seed conditions for producing the more specialized Phase 1 and Phase 2 platforms rather than waiting for them fully formed.
+
+**Mk0 bootstrapper roster**
+
+| Mk0 role | Hardware posture | Symthaea / Symtropy mapping | Immediate purpose |
+|---|---|---|---|
+| `mk0-seed-node` | rack server / SBC / workstation mesh | Mycelix DHT + Symtropy runtime + scenario orchestration; conceptually the precursor to `symthaea-archive` rather than a new `cortex` crate | local compute, coordination, replay, policy distribution |
+| `mk0-helios` | solar + LiFePO4 + smart inverter microgrid | precursor to `symthaea-infrastructure` / `symthaea-plexus` | autonomous power for compute and fabrication |
+| `mk0-detritivore` | plastic shredder + filament extruder | early material-recovery profile of `symthaea-scavenger`, not a separate top-level crate yet | close the minimum plastic loop for local fabrication |
+| `mk0-fabricator` | FDM print farm + light CNC | precursor to `symthaea-fabricator` | print structural parts, fixtures, chassis, adapters |
+| `mk0-manipulator` | bench arm / cobot | `symthaea-manipulator` | insert fasteners, assemble joints, tend printers/workcells |
+| `mk0-vector` | warehouse rover | `symthaea-vehicle` or future `vector` logistics profile | move stock, parts, tools, and finished modules between cells |
+
+**Phase 0 success condition**
+- One-room bootstrapper can recycle feedstock, print useful parts, assemble at least one repeatable subassembly, move materials autonomously, and remain energy-aware under local microgrid constraints.
+
+**Strategic note**
+- The Mk0 bootstrapper is an **operational phase**, not a permanent parallel naming universe. Where possible, Mk0 work should feed the real platform crates above rather than create duplicate crate taxonomies.
+
 **Gate to Phase 1:** crates.io downloads > 100/mo on a core crate; one external user opens a non-trivial issue or PR.
+
+---
+
+## Phase 0.8 — The Mk0 Scrap-Stack Expansion (immediate)
+
+Beyond the basic stations, the Mk0 environment needs "Scrap-Stack" utilities that leverage existing debris and cheap electronics to establish the facility's sensory and metabolic perimeter.
+
+### 1. Logistics & Movement
+- **`mk0-gantry` (Sky-Hook):** Ceiling-mounted pulley grid for 2D coordinate movement of 1–5kg loads (spools, tools).
+- **`mk0-scout` (Cable-Crawler):** Sky-wire camera carriage for top-down God-view mapping and human activity heatmaps.
+
+### 2. Primary Energy & Thermal
+- **`mk0-thermal` (Bio-Furnace):** Captures heat from composting organic waste via liquid-loop exchangers.
+- **`mk0-chimney` (Solar Draft):** Passive cooling via solar-heated updraft pipes with FEP-controlled butterfly valves.
+- **`mk0-aeolus` (Wind Harvester):** Salvaged alternators with 3D-printed blades for atmospheric kinetic capture.
+- **`mk0-kinetic` (Gravity Engine):** Weight-drop battery using scrap-filled crates to store surplus solar energy for night use.
+- **`mk0-geothermal` (Earth-Heat Tap):** Passive cooling loops inserted into basement crawl spaces or local mine shafts.
+
+### 3. Sub-Surface & Sensing
+- **`mk0-augur` (Soil-Probe):** Automated drill for mapping soil density and identifying bioremediation injection sites.
+- **`mk0-signal` (Semaphore Relay):** Visual gossip system (servos + flags) for safety overrides during total data blackouts.
+
+---
+
+## Phase 0.9 — The Mk0.5 Tooling & Bootstrap Gap (Q2 2026)
+
+The chasm between Mk0 (scrap) and Mk1 (precision) is a manufacturing gap. Mk0.5 is the **Tooling Phase**: using the scrap-stack to build the machines that build the high-fidelity city.
+
+- **`mk0.5-mill` (The Precision Escalator):** A sloppy, 3D-printed CNC router that uses FEP software to compensate for backlash/slop, eventually milling the high-precision aluminum parts for its own successor.
+- **`mk0.5-loom` (The Motor Winder):** Automated jig for winding copper wire into custom, high-efficiency BLDC motor stators.
+- **`mk0.5-spark` (The PCB Assembler):** Gantry-based pick-and-place machine and reflow hotplate for local circuit board assembly.
+- **`mk0.5-forge` (The Scrap-to-Filament Loop):** Extrusion line that turns `mk0-detritivore` shred into high-tolerance 1.75mm filament.
 
 ---
 
@@ -163,6 +243,159 @@ Previously "Will NOT Do" — reframed as welcomed contributions outside the core
 
 ---
 
+## Platform Expansion Program (Regime-Based)
+
+The platform roster is organized by **Physics & Metabolic Regimes**. Each regime introduces distinct physical laws, networking constraints, and civilizational roles.
+
+### 1. Terrestrial Regime (Ground & Low-Atmosphere)
+*The foundation: mobility, stewardship, and local assembly.*
+
+| Platform | Why it matters | Physics challenge |
+|---|---|---|
+| `symthaea-subterranean` | Subsurface autonomy | Dense friction, spoil, heat, occlusion, pressure |
+| `symthaea-infrastructure` | Buildings as agents | Thermal balancing, stationary actuation |
+| `symthaea-scavenger` | Material recycling | Fracture, stress, teardown, sorting |
+| `symthaea-agribot` | Living soil stewardship | Soil/water/light feedback, seasonal budgets |
+| `symthaea-terra` | Land remediation | Toxic dust, heavy-metal injection |
+
+### 2. Oceanic Regime (Buoyancy & Macro-Inertia)
+*The global bloodstream: moving mass with minimum energy.*
+
+| Platform | Role | Physics / Systems challenge |
+|---|---|---|
+| `symthaea-leviathan` | Intercontinental cargo | Extreme macro-inertia, hull resistance, weather routing |
+| `symthaea-pilot` | Harbor precision tug | Swarm coordination, fluid coupling, multi-agent docking |
+| `symthaea-stevedore` | Port gantry transfer | Pendulum dynamics, wind shear compensation, heavy-cable tension |
+| `symthaea-abyssal` | Deep-ocean stewardship | Extreme pressure, low-visibility sensing, high-latency comms |
+
+### 3. Arterial Regime (Macro-Throughput & Transit)
+*The city's circulatory system: continuous flow and orthogonal separation.*
+
+| Platform | Role | Physics / Systems challenge |
+|---|---|---|
+| `symthaea-meridian` | Continental spine (Maglev) | Virtual magnetic tethers, electrodynamic suspension, aerodynamic slipstreaming |
+| `symthaea-flux` | Urban pod swarm | Swarm fluid dynamics, bumper-to-bumper laminar flow, zero-wait merging |
+| `symthaea-stratum` | Adaptive transit surface | Load-aware damping, induction transfer, right-of-way signaling |
+
+### 4. Vacuum Regime (Orbital & Lunar Metabolism)
+*Expansion beyond the gravity well: assembly and primary extraction.*
+
+| Platform | Role | Physics / Systems challenge |
+|---|---|---|
+| `symthaea-cycler` | Orbital tug | Keplerian mechanics, low-thrust Hall-effect trajectories, Oberth effect |
+| `symthaea-spindle` | Zero-G assembler | Inertial homeostasis, 300°C thermal swings, vacuum welding prevention |
+| `symthaea-regolith` | Lunar mining | Electrostatic dust management, microwave sintering, 1/6th gravity excavation |
+| `symthaea-astrolabe` | Optical comms mesh | Point-to-point laser links, orbital debris avoidance, planetary relay continuity |
+
+### 5. Interplanetary Regime (Deep Space Expansion)
+*A multi-planetary species: autonomy under extreme latency.*
+
+| Platform | Role | Physics / Systems challenge |
+|---|---|---|
+| `symthaea-beacon` | Deep space relay | Epoch-batching, high-latency HDC gossip, optical transceivers |
+| `symthaea-vault` | Lava-tube steward | Subterranean sealing, geopolymer extrusion, atmospheric bleed prevention |
+| `symthaea-isotope` | Fission power heart | Neutronic homeostasis, Stirling-engine heat balancing, radiation shielding |
+| `symthaea-torch` | Interplanetary hauler | Nuclear electric propulsion, skeletal macro-logistics, deep-space thermal |
+
+---
+
+## Type 1 Civilization Metabolism (Foundational Loops)
+
+A Type 1 Civilization requires absolute mastery of a planet's energy and chemical cycles. These foundational requirements are integrated into the **Metabolic Infrastructure** and **Civic** platforms.
+
+- **Nitrogen/Phosphorus Cycle (Sanitation):** Localized bioreactor systems that break down biological waste into usable nutrients for the `agribot` layer. No ocean dumping.
+- **Grid-Scale Energy Storage:** Beyond chemical batteries; requires macro-storage platforms (phase-change thermal, pumped hydro, or compressed air).
+- **Caloric Decoupling:** Shifting from land-use agriculture to precision fermentation and automated bio-reactors for dense calorie production.
+- **Atmospheric Engineering:** Localized carbon capture and chemical scrubbing to produce bioplastics and structural materials from airborne carbon.
+
+---
+
+### Metabolic infrastructure layer — the city's body
+
+These are not just "more robots." They are stationary or semi-stationary platforms that make the city itself an embodied system: transit surfaces, utility routing, material refinement, assembly, and shared semantic memory.
+
+| Platform | Role | Why it matters | Physics / systems challenge | Networking / civic challenge |
+|---|---|---|---|---|
+| `symthaea-stratum` | adaptive transit surface | makes roads/floors active participants in traction, charging, and safety | load-aware damping, induction transfer, fall-softening, traffic-aware surface control | right-of-way signaling, flow prediction, public-safety coordination |
+| `symthaea-plexus` | utility manifold for water/power/data | turns passive pipes/cables into self-healing civic metabolism | pressure equilibrium, voltage stability, rerouting, leak isolation, thermal load | utility prioritization, fault isolation, neighborhood resilience |
+| `symthaea-foundry` | material synthesis / metallurgy | provides the raw-to-component refinement layer without overloading general robotics crates | thermal induction, phase-transition control, quality sensing, cooling curves | production scheduling, energy budgeting, resource allocation |
+| `symthaea-fabricator` | component and robot assembly | bridges refined material into finished parts, modules, and civic hardware | assembly sequencing, tolerance management, fixture coordination, QA gates | workcell dispatch, recipe/version propagation, supply-chain handoff |
+| `symthaea-archive` | semantic city memory / knowledge mining | allows the city to learn from its own operations and propagate improvements across platforms | telemetry ingestion, retrieval, semantic clustering, replay/benchmark indexing | fleet-wide update gossip, knowledge retention, governance over learned policies |
+
+**Naming hygiene**
+- `symthaea-foundry` is preferred over `symthaea-crucible` because `symthaea-crucible` already exists in-tree as an ethics/stress-testing crate.
+- `symthaea-archive` is preferred over `symthaea-cortex` because `cortex` is already heavily overloaded across the Symthaea codebase.
+
+### Civic / habitat platforms — the city's soul
+
+These platforms govern co-habitation rather than raw throughput. They are where the roadmap stops being "automation" and starts being a plausible lived environment for humans, animals, and shared civic life.
+
+| Platform | Role | Why it matters | Physics / systems challenge | Ethical / civic constraint |
+|---|---|---|---|---|
+| `symthaea-clime` | atmosphere, HVAC, air quality, circadian lighting | makes indoor life healthy and comfortable instead of merely habitable | thermal control, humidity, air-quality sensing, lighting schedules, occupancy response | comfort must not override safety or public-health constraints |
+| `symthaea-biota` | interspecies bridge for pets and wildlife | makes animal welfare and right-of-way first-class in the simulation | low-speed mobile or embedded sensing, stress inference, sanctuary-zone signaling | animal movement and distress should be treated as protected civic signals |
+| `symthaea-hearth` | adaptive architecture and shared living space | turns homes and communal space into responsive habitat rather than static shell | occupancy-aware reconfiguration, furniture transforms, acoustic/privacy control | must preserve human dignity, consent, accessibility, and predictability |
+| `symthaea-vita` | preventive biosensing and advisory care | introduces biological homeostasis as part of city operations | non-invasive sensing, health-vector tracking, early-warning inference, triage handoff | advisory/monitoring first; no autonomous diagnosis or treatment claims without strict validation and governance |
+
+### Aerial platform clarification
+
+The current `symthaea-multirotor` crate is the **multirotor** platform line, not the whole aerial stack. It already covers quadrotor-style hover, swarm, and scenario work well, but it does **not** constitute fixed-wing or passenger-aircraft support.
+
+**Recommended aerial taxonomy**
+
+| Platform | Role | Why it should exist separately | Near-term status |
+|---|---|---|---|
+| `symthaea-multirotor` | hover, inspection, local logistics, SAR, swarm interception | rotor thrust allocation, hover control, aggressive close-quarters maneuvering | exists today |
+| `symthaea-evtol` | urban air mobility, air taxi, lift+cruise, vertiport operations | transition flight, battery reserve logic, passenger safety envelopes, fleet dispatch economics | missing |
+| `symthaea-fixedwing` | long-range mapping, cargo relay, endurance cruise, passenger-aircraft foundations | lift/drag curves, stall envelopes, runway or catapult constraints, efficient cruise autonomy | missing |
+| `symthaea-aerostat` | persistent relay / observation / mesh anchor | buoyancy and passive station-keeping are a different regime from powered flight | planned in Phase 2 |
+
+**Naming recommendation**
+- Package rename is now in place as `symthaea-multirotor`.
+- Rust imports should use `symthaea_multirotor`.
+- Add `symthaea-evtol` and `symthaea-fixedwing` as separate future crates rather than overloading the multirotor stack.
+
+**Passenger-plane verdict**
+- There is no real passenger-plane platform in-tree today.
+- Passenger aircraft should not be modeled as a variant of the current quadrotor stack.
+- The right path is either:
+  1. `symthaea-fixedwing` first, then a passenger-aircraft configuration on top of it, or
+  2. `symthaea-evtol` first if the near-term goal is decentralized urban air mobility rather than conventional airline simulation.
+
+### Phase 3 additions — research / prestige platforms
+
+These remain valuable, but they should not outrank the infrastructure/stewardship platforms above.
+
+| Platform | Why it matters | Physics challenge | Networking challenge | Demo value |
+|---|---|---|---|---|
+| `symthaea-astrolabe` | Practical orbital backbone for relay, debris awareness, and LEO logistics | orbital mechanics, tethered maneuvering, power budgeting, debris interception envelopes | planetary relay continuity, sparse-asset coordination, solar-weather / hazard broadcast | very high |
+| `symthaea-softbot` | New morphology/control research line | compliance, deformation, contact-rich locomotion | distributed control across many soft DOF | high |
+| `symthaea-abyssal` | Deep-ocean stewardship and resilience | pressure, buoyancy extremes, low-visibility sensing | extreme latency/isolation, sparse relays | high |
+| `symthaea-tesseract` | ND/4D prestige probe for the research story | 4D navigation and visualization | nonstandard spatial coordination semantics | very high |
+
+**Orbital note**
+- Existing orbital experimentation should converge toward `symthaea-astrolabe` if the goal is an operational platform rather than a prestige stub.
+
+### Recommended platform sequence
+
+1. Finish the current Phase 1 roster properly: manipulator, quadruped, humanoid, flight, vehicle.
+2. Add `symthaea-subterranean` next; it is the single best new regime opener.
+3. Add `symthaea-infrastructure` and `symthaea-scavenger` before more prestige mobility platforms.
+4. Add `symthaea-agribot`, then `symthaea-terra`, to prove the stack can both steward living systems and repair damaged land.
+5. Treat `symthaea-multirotor` as the hover/rotorcraft foundation, then add `symthaea-evtol` or `symthaea-fixedwing` when the aerial roadmap needs true passenger/cargo coverage.
+6. Add the metabolic infrastructure layer next: `symthaea-stratum`, `symthaea-plexus`, `symthaea-foundry`, `symthaea-fabricator`, `symthaea-archive`.
+7. Add the first civic/habitat platforms after that: `symthaea-clime` and `symthaea-biota`, then `symthaea-hearth`.
+8. Keep `symthaea-vita` behind a stricter ethical and validation gate than other civic platforms.
+9. Only then prioritize aerostat / weaver / brachiator as differentiators, with `weaver` carrying the macro-construction story.
+10. Introduce `symthaea-astrolabe` once the ground, atmosphere, and civic stack are credible enough that an orbital backbone has something meaningful to serve.
+11. Keep softbot / abyssal / tesseract as research heroes, not near-term schedule drivers.
+
+**Near-term flagship thesis:** once subterranean + infrastructure + scavenger + agribot exist, the platform roster stops feeling like a robotics catalog and starts feeling like a civilization stack.
+
+**Extended flagship thesis:** once the metabolic infrastructure and civic/habitat layers exist, and terra/remediation work closes the damaged-land loop, the stack stops feeling like an industrial robotics program and starts feeling like a plausible city substrate.
+
+---
+
 ## Continuing Physics Work (preserved from original roadmap, re-prioritized)
 
 ### High priority (unchanged)
@@ -263,7 +496,7 @@ Each phase should move these. "Now" figures are 2026-04.
 | Non-research games shipped on Symtropy | 0 | 1 | 5 |
 | Academic citations | 0 | 3 | 15 |
 | Symthaea + Mycelix CI coverage | ~0 % | 40 % | 80 % |
-| Robot platforms running in-engine | 0 | 3 | 6 |
+| Robot platforms running in-engine | 0 | 3 | 10 |
 | CI matrix (OS × arch × toolchain) | 1 × 1 × 1 | 6+ | 12+ |
 
 ---
@@ -302,3 +535,5 @@ These remain outside the core engine's scope. Reframed from "never" to "not here
 5. **Rapier3D** — Phase 1 as `symtropy-rapier3d-bridge` (opt-in), for high-fidelity 3D robotics; native ND solver remains research path. Backend chosen at spawn time; `PhysicsCallback` works identically on both.
 6. **Terrain + Soft-body** — Phase 5 ecosystem crates, not core engine builds.
 7. **Mycelix-in-Bevy** — three tracks across phases, *preferred architectural path is Track B*. Track A (WASM + CSS-3D iframe) covers browser-only hero demo. Track C (native Bevy UI screens) covers desktop-native player interaction. Track B (direct Holochain client as Bevy Resource) is the architectural foundation all three share. WebView-embed of real Leptos apps on native desktop is **not pursued** due to wry offscreen-rendering limitations.
+
+

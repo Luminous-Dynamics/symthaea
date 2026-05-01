@@ -1,3 +1,6 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 // Regression tests protecting load-bearing empirical constants in
 // `examples/pendulum_swarm.md`. Each test guards one physics primitive
 // the demo depends on. If an upstream change breaks one of these, the

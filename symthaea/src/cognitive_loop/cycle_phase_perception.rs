@@ -398,6 +398,23 @@ impl CognitiveLoopService {
                 symthaea_core::hdc::ContinuousHV::weighted_bundle(&hvs, &weights);
         }
 
+        // ── Vision → Neuromodulation Feedback ──
+        // Inject visual surprise and cross-manifold prediction error into NE bath.
+        // Science: Aston-Jones & Cohen (2005) — LC-NE reactivity to multimodal surprise.
+        #[cfg(feature = "vision-manifold")]
+        {
+            if vision_mean_surprise > super::thresholds::VISION_SURPRISE_THRESHOLD {
+                let amount = (vision_mean_surprise - super::thresholds::VISION_SURPRISE_THRESHOLD)
+                    * super::thresholds::VISION_SURPRISE_NE_SCALE;
+                self.neuromod.bath.noradrenaline.produce(amount);
+            }
+            if cross_manifold_prediction_error > 0.1 {
+                let amount = cross_manifold_prediction_error
+                    * super::thresholds::VISION_CROSS_MANIFOLD_NE_SCALE;
+                self.neuromod.bath.noradrenaline.produce(amount);
+            }
+        }
+
         #[cfg(feature = "foveation")]
         let foveation_recognition_count = fov_results.len();
         #[cfg(feature = "foveation")]

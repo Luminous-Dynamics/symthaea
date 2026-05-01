@@ -36,18 +36,22 @@ fn compute_id_at_coupling(
     let measure = 5000;
 
     let mut net = OscillatorNetwork {
-        oscillators: (0..n).map(|i| {
-            let mut osc = crate::nonlinear_waves::FitzHughNagumo::new();
-            // Heterogeneous: different natural frequencies
-            osc.i_ext = 0.4 + 0.4 * (i as f64 / n as f64 - 0.5);
-            osc.v = -1.0 + 0.2 * (i as f64 / n as f64);
-            osc
-        }).collect(),
+        oscillators: (0..n)
+            .map(|i| {
+                let mut osc = crate::nonlinear_waves::FitzHughNagumo::new();
+                // Heterogeneous: different natural frequencies
+                osc.i_ext = 0.4 + 0.4 * (i as f64 / n as f64 - 0.5);
+                osc.v = -1.0 + 0.2 * (i as f64 / n as f64);
+                osc
+            })
+            .collect(),
         coupling: build_coupling(n, coupling),
         n,
     };
 
-    for _ in 0..warmup { net.step(dt); }
+    for _ in 0..warmup {
+        net.step(dt);
+    }
 
     let mut traces: Vec<Vec<f64>> = vec![Vec::with_capacity(measure); n];
     let mut sync_trace = Vec::with_capacity(measure);
@@ -72,21 +76,29 @@ fn compute_id_at_coupling(
     integration /= n_pairs.max(1) as f64;
 
     // Differentiation: variance of firing rates
-    let rates: Vec<f64> = traces.iter().map(|tr| {
-        tr.windows(2).filter(|w| w[0] < 0.0 && w[1] >= 0.0).count() as f64 / (measure as f64 * dt)
-    }).collect();
+    let rates: Vec<f64> = traces
+        .iter()
+        .map(|tr| {
+            tr.windows(2).filter(|w| w[0] < 0.0 && w[1] >= 0.0).count() as f64
+                / (measure as f64 * dt)
+        })
+        .collect();
     let rate_mean = rates.iter().sum::<f64>() / n as f64;
     let differentiation = if n > 1 {
         let var = rates.iter().map(|r| (r - rate_mean).powi(2)).sum::<f64>() / n as f64;
         // Normalize: max differentiation when rates span full range
         (var * 100.0).min(1.0)
-    } else { 0.0 };
+    } else {
+        0.0
+    };
 
     let synchrony = sync_trace.iter().sum::<f64>() / sync_trace.len() as f64;
     let sync_mean = synchrony;
-    let metastability = sync_trace.iter()
+    let metastability = sync_trace
+        .iter()
         .map(|s| (s - sync_mean).powi(2))
-        .sum::<f64>() / sync_trace.len() as f64;
+        .sum::<f64>()
+        / sync_trace.len() as f64;
 
     TradeoffPoint {
         coupling,
@@ -104,7 +116,9 @@ fn all_to_all_coupling(n: usize, g: f64) -> Vec<f64> {
     let w = g / (n - 1).max(1) as f64;
     for i in 0..n {
         for j in 0..n {
-            if i != j { c[i * n + j] = w; }
+            if i != j {
+                c[i * n + j] = w;
+            }
         }
     }
     c
@@ -118,7 +132,9 @@ fn modular_coupling(n: usize, g: f64) -> Vec<f64> {
     for i in 0..n {
         let mi = i / module_size.max(1);
         for j in 0..n {
-            if i == j { continue; }
+            if i == j {
+                continue;
+            }
             let mj = j / module_size.max(1);
             c[i * n + j] = if mi == mj {
                 g / module_size.max(1) as f64
@@ -149,7 +165,9 @@ fn hierarchical_coupling(n: usize, g: f64) -> Vec<f64> {
         let qi = i / quarter;
         let hi = i / (n / 2).max(1);
         for j in 0..n {
-            if i == j { continue; }
+            if i == j {
+                continue;
+            }
             let qj = j / quarter;
             let hj = j / (n / 2).max(1);
             c[i * n + j] = if qi == qj {
@@ -168,20 +186,23 @@ fn hierarchical_coupling(n: usize, g: f64) -> Vec<f64> {
 pub fn coupling_sweep(
     n: usize,
     n_points: usize,
-    topology_name: &str,
+    _topology_name: &str,
     build_fn: &dyn Fn(usize, f64) -> Vec<f64>,
 ) -> Vec<TradeoffPoint> {
     // Logarithmic sweep from 0.001 to 2.0
-    (0..n_points).map(|i| {
-        let frac = i as f64 / (n_points - 1) as f64;
-        let g = 0.001 * (2000.0_f64).powf(frac); // 0.001 to 2.0
-        compute_id_at_coupling(n, g, build_fn)
-    }).collect()
+    (0..n_points)
+        .map(|i| {
+            let frac = i as f64 / (n_points - 1) as f64;
+            let g = 0.001 * (2000.0_f64).powf(frac); // 0.001 to 2.0
+            compute_id_at_coupling(n, g, build_fn)
+        })
+        .collect()
 }
 
 /// Find the optimal coupling g* that maximizes I×D.
 pub fn find_optimal_coupling(points: &[TradeoffPoint]) -> (f64, f64) {
-    points.iter()
+    points
+        .iter()
         .max_by(|a, b| a.id_product.partial_cmp(&b.id_product).unwrap())
         .map(|p| (p.coupling, p.id_product))
         .unwrap_or((0.0, 0.0))
@@ -209,7 +230,10 @@ pub fn check_monotonicity(points: &[TradeoffPoint]) -> (bool, bool, usize, usize
 }
 
 /// Full tradeoff analysis across 4 topologies.
-pub fn full_tradeoff_analysis(n: usize, n_points: usize) -> Vec<(&'static str, Vec<TradeoffPoint>, f64, f64)> {
+pub fn full_tradeoff_analysis(
+    n: usize,
+    n_points: usize,
+) -> Vec<(&'static str, Vec<TradeoffPoint>, f64, f64)> {
     let topologies: Vec<(&str, Box<dyn Fn(usize, f64) -> Vec<f64>>)> = vec![
         ("All-to-All", Box::new(all_to_all_coupling)),
         ("Ring", Box::new(ring_coupling)),
@@ -217,24 +241,33 @@ pub fn full_tradeoff_analysis(n: usize, n_points: usize) -> Vec<(&'static str, V
         ("Hierarchical", Box::new(hierarchical_coupling)),
     ];
 
-    topologies.into_iter().map(|(name, build_fn)| {
-        let points = coupling_sweep(n, n_points, name, &*build_fn);
-        let (g_star, id_max) = find_optimal_coupling(&points);
-        (name, points, g_star, id_max)
-    }).collect()
+    topologies
+        .into_iter()
+        .map(|(name, build_fn)| {
+            let points = coupling_sweep(n, n_points, name, &*build_fn);
+            let (g_star, id_max) = find_optimal_coupling(&points);
+            (name, points, g_star, id_max)
+        })
+        .collect()
 }
 
 fn pearson_abs(x: &[f64], y: &[f64]) -> f64 {
     let n = x.len().min(y.len()) as f64;
-    if n < 3.0 { return 0.0; }
+    if n < 3.0 {
+        return 0.0;
+    }
     let mx = x.iter().sum::<f64>() / n;
     let my = y.iter().sum::<f64>() / n;
     let (mut cov, mut vx, mut vy) = (0.0, 0.0, 0.0);
     for (xi, yi) in x.iter().zip(y.iter()) {
         let (dx, dy) = (xi - mx, yi - my);
-        cov += dx * dy; vx += dx * dx; vy += dy * dy;
+        cov += dx * dy;
+        vx += dx * dx;
+        vy += dy * dy;
     }
-    if vx < 1e-15 || vy < 1e-15 { return 0.0; }
+    if vx < 1e-15 || vy < 1e-15 {
+        return 0.0;
+    }
     (cov / (vx * vy).sqrt()).abs().min(1.0)
 }
 
@@ -254,7 +287,11 @@ mod tests {
     fn test_optimal_coupling_exists() {
         let points = coupling_sweep(10, 8, "test", &all_to_all_coupling);
         let (g_star, id_max) = find_optimal_coupling(&points);
-        assert!(g_star > 0.0, "Optimal coupling should exist: g*={:.4}", g_star);
+        assert!(
+            g_star > 0.0,
+            "Optimal coupling should exist: g*={:.4}",
+            g_star
+        );
         assert!(id_max > 0.0, "I×D max should be positive: {:.4}", id_max);
     }
 }

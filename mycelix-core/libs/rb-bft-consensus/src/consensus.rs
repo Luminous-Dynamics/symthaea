@@ -158,17 +158,22 @@ impl RbBftConsensus {
         ))?;
 
         // Get parent hash first (immutable borrow)
-        let parent_hash = self.rounds.history()
+        let parent_hash = self
+            .rounds
+            .history()
             .last()
             .and_then(|r| r.result_hash.clone())
             .unwrap_or_else(|| "genesis".to_string());
 
         let threshold = self.validators.consensus_threshold();
 
-        let round = self.rounds.active_round_mut().ok_or(ConsensusError::InvalidRoundState {
-            expected: "active round".to_string(),
-            actual: "no active round".to_string(),
-        })?;
+        let round = self
+            .rounds
+            .active_round_mut()
+            .ok_or(ConsensusError::InvalidRoundState {
+                expected: "active round".to_string(),
+                actual: "no active round".to_string(),
+            })?;
 
         if round.leader != our_id {
             return Err(ConsensusError::NotLeader {
@@ -177,13 +182,7 @@ impl RbBftConsensus {
             });
         }
 
-        let proposal = Proposal::new(
-            round.number,
-            our_id,
-            content,
-            content_hash,
-            parent_hash,
-        );
+        let proposal = Proposal::new(round.number, our_id, content, content_hash, parent_hash);
 
         // Note: In production deployments, call sign_proposal() separately
         // or use propose_signed() which takes a keypair
@@ -207,10 +206,13 @@ impl RbBftConsensus {
         let our_id = keypair.public_key_hex();
 
         // Verify we're the expected leader
-        let round = self.rounds.active_round().ok_or(ConsensusError::InvalidRoundState {
-            expected: "active round".to_string(),
-            actual: "no active round".to_string(),
-        })?;
+        let round = self
+            .rounds
+            .active_round()
+            .ok_or(ConsensusError::InvalidRoundState {
+                expected: "active round".to_string(),
+                actual: "no active round".to_string(),
+            })?;
 
         if round.state != RoundState::WaitingForProposal {
             return Err(ConsensusError::InvalidRoundState {
@@ -223,24 +225,23 @@ impl RbBftConsensus {
         if leader.map(|l| &l.id) != Some(&our_id) {
             return Err(ConsensusError::NotLeader {
                 round: round.number,
-                leader: leader.map(|l| l.id.clone()).unwrap_or_else(|| "none".to_string()),
+                leader: leader
+                    .map(|l| l.id.clone())
+                    .unwrap_or_else(|| "none".to_string()),
             });
         }
 
         let threshold = self.validators.consensus_threshold();
 
-        let round = self.rounds.active_round_mut().ok_or(ConsensusError::InvalidRoundState {
-            expected: "active round".to_string(),
-            actual: "no active round".to_string(),
-        })?;
+        let round = self
+            .rounds
+            .active_round_mut()
+            .ok_or(ConsensusError::InvalidRoundState {
+                expected: "active round".to_string(),
+                actual: "no active round".to_string(),
+            })?;
 
-        let mut proposal = Proposal::new(
-            round.number,
-            our_id,
-            content,
-            content_hash,
-            parent_hash,
-        );
+        let mut proposal = Proposal::new(round.number, our_id, content, content_hash, parent_hash);
 
         // Sign with real ed25519 signature
         proposal.sign(keypair)?;
@@ -252,31 +253,44 @@ impl RbBftConsensus {
 
     /// Submit a proposal from an external source (for non-leader nodes)
     pub fn receive_proposal(&mut self, proposal: Proposal) -> ConsensusResult<()> {
-        let round = self.rounds.active_round_mut().ok_or(ConsensusError::InvalidRoundState {
-            expected: "active round".to_string(),
-            actual: "no active round".to_string(),
-        })?;
+        let round = self
+            .rounds
+            .active_round_mut()
+            .ok_or(ConsensusError::InvalidRoundState {
+                expected: "active round".to_string(),
+                actual: "no active round".to_string(),
+            })?;
 
         let threshold = self.validators.consensus_threshold();
         round.submit_proposal(proposal, threshold)
     }
 
     /// Cast a vote on the current proposal
-    pub fn vote(&mut self, decision: VoteDecision, reason: Option<String>) -> ConsensusResult<Vote> {
+    pub fn vote(
+        &mut self,
+        decision: VoteDecision,
+        reason: Option<String>,
+    ) -> ConsensusResult<Vote> {
         let our_id = self.our_id.clone().ok_or(ConsensusError::Internal(
             "Our validator ID not set".to_string(),
         ))?;
 
-        let validator = self.validators.get(&our_id).ok_or(ConsensusError::ValidatorNotFound {
-            validator_id: our_id.clone(),
-        })?;
+        let validator = self
+            .validators
+            .get(&our_id)
+            .ok_or(ConsensusError::ValidatorNotFound {
+                validator_id: our_id.clone(),
+            })?;
 
         validator.can_participate()?;
 
-        let round = self.rounds.active_round_mut().ok_or(ConsensusError::InvalidRoundState {
-            expected: "active round".to_string(),
-            actual: "no active round".to_string(),
-        })?;
+        let round = self
+            .rounds
+            .active_round_mut()
+            .ok_or(ConsensusError::InvalidRoundState {
+                expected: "active round".to_string(),
+                actual: "no active round".to_string(),
+            })?;
 
         if round.state != RoundState::Voting {
             return Err(ConsensusError::InvalidRoundState {
@@ -285,10 +299,13 @@ impl RbBftConsensus {
             });
         }
 
-        let proposal = round.proposal.as_ref().ok_or(ConsensusError::InvalidRoundState {
-            expected: "proposal exists".to_string(),
-            actual: "no proposal".to_string(),
-        })?;
+        let proposal = round
+            .proposal
+            .as_ref()
+            .ok_or(ConsensusError::InvalidRoundState {
+                expected: "proposal exists".to_string(),
+                actual: "no proposal".to_string(),
+            })?;
 
         // Check for duplicate vote
         if round.votes.has_voted(&our_id) {
@@ -345,16 +362,22 @@ impl RbBftConsensus {
     ) -> ConsensusResult<Vote> {
         let our_id = keypair.public_key_hex();
 
-        let validator = self.validators.get(&our_id).ok_or(ConsensusError::ValidatorNotFound {
-            validator_id: our_id.clone(),
-        })?;
+        let validator = self
+            .validators
+            .get(&our_id)
+            .ok_or(ConsensusError::ValidatorNotFound {
+                validator_id: our_id.clone(),
+            })?;
 
         validator.can_participate()?;
 
-        let round = self.rounds.active_round_mut().ok_or(ConsensusError::InvalidRoundState {
-            expected: "active round".to_string(),
-            actual: "no active round".to_string(),
-        })?;
+        let round = self
+            .rounds
+            .active_round_mut()
+            .ok_or(ConsensusError::InvalidRoundState {
+                expected: "active round".to_string(),
+                actual: "no active round".to_string(),
+            })?;
 
         if round.state != RoundState::Voting {
             return Err(ConsensusError::InvalidRoundState {
@@ -363,10 +386,13 @@ impl RbBftConsensus {
             });
         }
 
-        let proposal = round.proposal.as_ref().ok_or(ConsensusError::InvalidRoundState {
-            expected: "proposal exists".to_string(),
-            actual: "no proposal".to_string(),
-        })?;
+        let proposal = round
+            .proposal
+            .as_ref()
+            .ok_or(ConsensusError::InvalidRoundState {
+                expected: "proposal exists".to_string(),
+                actual: "no proposal".to_string(),
+            })?;
 
         // Check for duplicate vote
         if round.votes.has_voted(&our_id) {
@@ -425,9 +451,12 @@ impl RbBftConsensus {
         }
 
         // Check validator exists
-        let validator = self.validators.get(&vote.voter).ok_or(ConsensusError::ValidatorNotFound {
-            validator_id: vote.voter.clone(),
-        })?;
+        let validator =
+            self.validators
+                .get(&vote.voter)
+                .ok_or(ConsensusError::ValidatorNotFound {
+                    validator_id: vote.voter.clone(),
+                })?;
 
         // Verify reputation matches (tight tolerance to prevent vote weight manipulation)
         // H-04: Tightened from 0.01 to 0.001 to prevent Byzantine vote weight gaming
@@ -437,15 +466,20 @@ impl RbBftConsensus {
                 validator: vote.voter.clone(),
                 reason: format!(
                     "Reputation mismatch: vote={:.4}, validator={:.4}, tolerance={:.4}",
-                    vote.reputation, validator.reputation(), REPUTATION_TOLERANCE
+                    vote.reputation,
+                    validator.reputation(),
+                    REPUTATION_TOLERANCE
                 ),
             });
         }
 
-        let round = self.rounds.active_round_mut().ok_or(ConsensusError::InvalidRoundState {
-            expected: "active round".to_string(),
-            actual: "no active round".to_string(),
-        })?;
+        let round = self
+            .rounds
+            .active_round_mut()
+            .ok_or(ConsensusError::InvalidRoundState {
+                expected: "active round".to_string(),
+                actual: "no active round".to_string(),
+            })?;
 
         if vote.round != round.number {
             return Err(ConsensusError::InvalidVote {
@@ -461,10 +495,8 @@ impl RbBftConsensus {
             if let Some(existing_vote) = existing {
                 if existing_vote.decision != vote.decision {
                     // Double vote detected!
-                    let evidence = crate::vote::DoubleVoteEvidence::new(
-                        existing_vote.clone(),
-                        vote.clone(),
-                    );
+                    let evidence =
+                        crate::vote::DoubleVoteEvidence::new(existing_vote.clone(), vote.clone());
                     if let Some(e) = evidence {
                         let offense = SlashableOffense::DoubleVoting(Box::new(e));
                         self.slashing.report_offense(
@@ -501,11 +533,14 @@ impl RbBftConsensus {
             return Ok(BatchVoteResult::default());
         }
 
-        let round_num = self.rounds.active_round()
+        let round_num = self
+            .rounds
+            .active_round()
             .ok_or(ConsensusError::InvalidRoundState {
                 expected: "active round".to_string(),
                 actual: "no active round".to_string(),
-            })?.number;
+            })?
+            .number;
 
         // Pre-validate votes before batch signature verification
         let mut valid_votes: Vec<Vote> = Vec::new();
@@ -540,7 +575,10 @@ impl RbBftConsensus {
             }
 
             // Check for double voting (check against existing votes)
-            let round = self.rounds.active_round().expect("active round exists during vote processing");
+            let round = self
+                .rounds
+                .active_round()
+                .expect("active round exists during vote processing");
             if round.votes.has_voted(&vote.voter) {
                 rejected.push((vote.voter.clone(), "Already voted".to_string()));
                 continue;
@@ -551,15 +589,17 @@ impl RbBftConsensus {
 
         // Now batch verify signatures of valid votes
         if !valid_votes.is_empty() {
-            let messages: Vec<Vec<u8>> = valid_votes.iter()
-                .map(|v| v.signable_bytes())
-                .collect();
+            let messages: Vec<Vec<u8>> = valid_votes.iter().map(|v| v.signable_bytes()).collect();
 
-            let batch_result = crate::crypto_ops::batch_verify_vote_signatures(&valid_votes, &messages)?;
+            let batch_result =
+                crate::crypto_ops::batch_verify_vote_signatures(&valid_votes, &messages)?;
 
             // Process verification results
             let mut accepted_count = 0;
-            let round = self.rounds.active_round_mut().expect("active round exists during vote processing");
+            let round = self
+                .rounds
+                .active_round_mut()
+                .expect("active round exists during vote processing");
 
             for (i, vote) in valid_votes.into_iter().enumerate() {
                 if batch_result.is_valid_by_index(i) {
@@ -569,7 +609,8 @@ impl RbBftConsensus {
                         accepted_count += 1;
                     }
                 } else {
-                    let reason = batch_result.get_error_by_index(i)
+                    let reason = batch_result
+                        .get_error_by_index(i)
                         .unwrap_or_else(|| "Signature verification failed".to_string());
                     rejected.push((vote.voter, reason));
                 }
@@ -601,10 +642,13 @@ impl RbBftConsensus {
         let threshold = self.validators.consensus_threshold();
         let total_weight = self.validators.total_weight();
 
-        let round = self.rounds.active_round_mut().ok_or(ConsensusError::InvalidRoundState {
-            expected: "active round".to_string(),
-            actual: "no active round".to_string(),
-        })?;
+        let round = self
+            .rounds
+            .active_round_mut()
+            .ok_or(ConsensusError::InvalidRoundState {
+                expected: "active round".to_string(),
+                actual: "no active round".to_string(),
+            })?;
 
         // Check timeout
         if round.is_timed_out() {
@@ -620,10 +664,13 @@ impl RbBftConsensus {
 
         // Check if consensus reached
         if round.votes.consensus_reached(threshold) {
-            let proposal = round.proposal.as_ref().ok_or(ConsensusError::InvalidRoundState {
-                expected: "proposal exists for consensus".to_string(),
-                actual: "no proposal in round".to_string(),
-            })?;
+            let proposal = round
+                .proposal
+                .as_ref()
+                .ok_or(ConsensusError::InvalidRoundState {
+                    expected: "proposal exists for consensus".to_string(),
+                    actual: "no proposal in round".to_string(),
+                })?;
             let result_hash = proposal.content_hash.clone();
             let proposal_id = proposal.id.clone();
             let round_num = round.number;
@@ -631,7 +678,9 @@ impl RbBftConsensus {
             round.commit(result_hash.clone());
 
             // Collect vote info for reputation updates
-            let vote_outcomes: Vec<(String, bool)> = round.votes.votes()
+            let vote_outcomes: Vec<(String, bool)> = round
+                .votes
+                .votes()
                 .iter()
                 .map(|v| (v.voter.clone(), v.decision.is_approval()))
                 .collect();
@@ -652,10 +701,13 @@ impl RbBftConsensus {
 
         // Check if consensus is impossible
         if round.votes.consensus_impossible(total_weight, threshold) {
-            let proposal = round.proposal.as_ref().ok_or(ConsensusError::InvalidRoundState {
-                expected: "proposal exists for rejection".to_string(),
-                actual: "no proposal in round".to_string(),
-            })?;
+            let proposal = round
+                .proposal
+                .as_ref()
+                .ok_or(ConsensusError::InvalidRoundState {
+                    expected: "proposal exists for rejection".to_string(),
+                    actual: "no proposal in round".to_string(),
+                })?;
             let proposal_id = proposal.id.clone();
             let round_num = round.number;
             round.fail("consensus impossible");
@@ -759,7 +811,8 @@ mod tests {
         let round = consensus.rounds.active_round().unwrap();
         let leader_id = round.leader.clone();
 
-        let leader_keypair = keypairs.iter()
+        let leader_keypair = keypairs
+            .iter()
             .find(|kp| kp.public_key_hex() == leader_id)
             .expect("Leader keypair should exist");
 
@@ -792,10 +845,7 @@ mod tests {
         };
         consensus.set_our_id(non_leader.to_string());
 
-        let result = consensus.propose(
-            vec![1, 2, 3],
-            "content-hash-123".to_string(),
-        );
+        let result = consensus.propose(vec![1, 2, 3], "content-hash-123".to_string());
         assert!(matches!(result, Err(ConsensusError::NotLeader { .. })));
     }
 
@@ -817,29 +867,33 @@ mod tests {
         let round = consensus.rounds.active_round().unwrap();
         let leader_id = round.leader.clone();
 
-        let leader_keypair = keypairs.iter()
+        let leader_keypair = keypairs
+            .iter()
             .find(|kp| kp.public_key_hex() == leader_id)
             .expect("Leader keypair should exist");
 
         // Create and submit proposal
-        consensus.propose_signed(
-            vec![1, 2, 3],
-            "content-hash-123".to_string(),
-            "parent-hash-000".to_string(),
-            leader_keypair,
-        ).unwrap();
+        consensus
+            .propose_signed(
+                vec![1, 2, 3],
+                "content-hash-123".to_string(),
+                "parent-hash-000".to_string(),
+                leader_keypair,
+            )
+            .unwrap();
 
         // Get non-leader validators and create signed votes
         let mut votes = Vec::new();
         for kp in keypairs.iter() {
             if kp.public_key_hex() != leader_id {
-                let proposal = consensus.rounds.active_round().unwrap().proposal.as_ref().unwrap();
-                let mut vote = Vote::approve(
-                    proposal.id.clone(),
-                    1,
-                    kp.public_key_hex(),
-                    0.8,
-                );
+                let proposal = consensus
+                    .rounds
+                    .active_round()
+                    .unwrap()
+                    .proposal
+                    .as_ref()
+                    .unwrap();
+                let mut vote = Vote::approve(proposal.id.clone(), 1, kp.public_key_hex(), 0.8);
                 vote.sign(kp).unwrap();
                 votes.push(vote);
             }

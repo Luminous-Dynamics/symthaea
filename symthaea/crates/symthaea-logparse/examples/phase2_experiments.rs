@@ -43,12 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Load sbousseaden (per-file cap 50, but no global total cap now)
     // ----------------------------------------------------------------
     println!("[load] sbousseaden corpus from {evtx_dir}");
-    let sbou_events = load_evtx_corpus(
-        &PathBuf::from(&evtx_dir),
-        50,
-        None,
-        &shared_labels,
-    )?;
+    let sbou_events = load_evtx_corpus(&PathBuf::from(&evtx_dir), 50, None, &shared_labels)?;
     let sbou_labels: Vec<String> = sbou_events
         .iter()
         .map(|e| e.label.clone().unwrap())
@@ -82,7 +77,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n=== Experiment 1: scale-up (sbousseaden full corpus, 80/20 split) ===");
     let (tr_hv, tr_y, te_hv, te_y) =
         symthaea_logparse::probe::stratified_split(&sbou_hvs, &sbou_labels, 0.8, 0xFACADE);
-    println!("  train={}, test={}, classes={}", tr_hv.len(), te_hv.len(), shared_labels.len());
+    println!(
+        "  train={}, test={}, classes={}",
+        tr_hv.len(),
+        te_hv.len(),
+        shared_labels.len()
+    );
     let probe1 = LogisticProbe::train(&tr_hv, &tr_y, cfg);
     let train_acc = probe1.accuracy(&tr_hv, &tr_y);
     let test_acc = probe1.accuracy(&te_hv, &te_y);
@@ -96,17 +96,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n=== Experiment 2: 5-fold stratified CV on sbousseaden ===");
     let fold_accs = run_kfold(&sbou_hvs, &sbou_labels, 5, cfg);
     let mean = fold_accs.iter().sum::<f32>() / fold_accs.len() as f32;
-    let var = fold_accs
-        .iter()
-        .map(|a| (a - mean).powi(2))
-        .sum::<f32>()
-        / fold_accs.len() as f32;
+    let var = fold_accs.iter().map(|a| (a - mean).powi(2)).sum::<f32>() / fold_accs.len() as f32;
     let std = var.sqrt();
     println!("  per-fold test accuracy: {:?}", fold_accs);
     println!("  mean ± std: {mean:.3} ± {std:.3}");
-    println!("  min/max:    {:.3} / {:.3}",
+    println!(
+        "  min/max:    {:.3} / {:.3}",
         fold_accs.iter().cloned().fold(f32::INFINITY, f32::min),
-        fold_accs.iter().cloned().fold(f32::NEG_INFINITY, f32::max));
+        fold_accs.iter().cloned().fold(f32::NEG_INFINITY, f32::max)
+    );
 
     // ----------------------------------------------------------------
     // Experiment 3: Cross-corpus OOD — train on sbousseaden, test on OTRF
@@ -158,7 +156,11 @@ fn print_distribution(name: &str, labels: &[String]) {
     for l in labels {
         *dist.entry(l.as_str()).or_insert(0) += 1;
     }
-    println!("[dist] {name}: {} events across {} classes", labels.len(), dist.len());
+    println!(
+        "[dist] {name}: {} events across {} classes",
+        labels.len(),
+        dist.len()
+    );
     for (k, n) in dist {
         println!("  {k:<22} {n}");
     }
@@ -200,7 +202,11 @@ fn load_evtx_corpus(
             parsed
         } else {
             let stride = parsed.len() / max_per_file;
-            parsed.into_iter().step_by(stride.max(1)).take(max_per_file).collect()
+            parsed
+                .into_iter()
+                .step_by(stride.max(1))
+                .take(max_per_file)
+                .collect()
         };
         let bucket = by_label.entry(label.clone()).or_default();
         for mut ev in capped {
@@ -259,7 +265,11 @@ fn load_otrf_corpus(
             parsed
         } else {
             let stride = parsed.len() / max_per_dir;
-            parsed.into_iter().step_by(stride.max(1)).take(max_per_dir).collect()
+            parsed
+                .into_iter()
+                .step_by(stride.max(1))
+                .take(max_per_dir)
+                .collect()
         };
         for mut ev in capped {
             ev.label = Some(label.clone());

@@ -1,0 +1,9 @@
+[package]
+name = "domain-personal"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Personal domain module for the Mycelix Sensorium"
+
+[dependencies]
+sensorium-domain-trait = { path = "../sensorium-domain-trait" }

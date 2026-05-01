@@ -19,7 +19,12 @@ pub struct SpaceNavigationEstimate {
 
 impl SpaceNavigationEstimate {
     pub fn from_state(pos: [f64; 3], vel: [f64; 3], sigma: f64, epoch: f64) -> Self {
-        Self { position_eci_km: pos, velocity_eci_km_s: vel, position_sigma_km: sigma, epoch_jd: epoch }
+        Self {
+            position_eci_km: pos,
+            velocity_eci_km_s: vel,
+            position_sigma_km: sigma,
+            epoch_jd: epoch,
+        }
     }
     pub fn altitude_km(&self) -> f64 {
         let r = (self.position_eci_km.iter().map(|p| p * p).sum::<f64>()).sqrt();
@@ -37,15 +42,28 @@ impl SpaceNavigationEstimator {
     /// Create for Earth orbit.
     pub fn earth_orbit() -> Self {
         Self {
-            state: SpaceNavigationEstimate::from_state([6771.0, 0.0, 0.0], [0.0, 7.67, 0.0], 1.0, 0.0),
+            state: SpaceNavigationEstimate::from_state(
+                [6771.0, 0.0, 0.0],
+                [0.0, 7.67, 0.0],
+                1.0,
+                0.0,
+            ),
             mu: 398600.4418,
         }
     }
 
     /// Propagate state forward by dt seconds using two-body dynamics.
     pub fn propagate(&mut self, dt_s: f64) {
-        let r = (self.state.position_eci_km.iter().map(|p| p * p).sum::<f64>()).sqrt();
-        if r < 1.0 { return; } // Prevent singularity
+        let r = (self
+            .state
+            .position_eci_km
+            .iter()
+            .map(|p| p * p)
+            .sum::<f64>())
+        .sqrt();
+        if r < 1.0 {
+            return;
+        } // Prevent singularity
         let a = -self.mu / (r * r * r);
         for i in 0..3 {
             self.state.velocity_eci_km_s[i] += a * self.state.position_eci_km[i] * dt_s;
@@ -55,10 +73,14 @@ impl SpaceNavigationEstimator {
     }
 
     /// Get current estimate.
-    pub fn estimate(&self) -> &SpaceNavigationEstimate { &self.state }
+    pub fn estimate(&self) -> &SpaceNavigationEstimate {
+        &self.state
+    }
 
     /// Reset to default LEO orbit.
-    pub fn reset(&mut self) { *self = Self::earth_orbit(); }
+    pub fn reset(&mut self) {
+        *self = Self::earth_orbit();
+    }
 }
 
 #[cfg(test)]
@@ -67,9 +89,14 @@ mod tests {
     #[test]
     fn test_propagate_stays_finite() {
         let mut nav = SpaceNavigationEstimator::earth_orbit();
-        for _ in 0..1000 { nav.propagate(1.0); }
+        for _ in 0..1000 {
+            nav.propagate(1.0);
+        }
         let alt = nav.estimate().altitude_km();
         assert!(alt.is_finite(), "Altitude diverged: {alt}");
-        assert!(alt > 100.0 && alt < 2000.0, "LEO orbit should stay in range: {alt}");
+        assert!(
+            alt > 100.0 && alt < 2000.0,
+            "LEO orbit should stay in range: {alt}"
+        );
     }
 }

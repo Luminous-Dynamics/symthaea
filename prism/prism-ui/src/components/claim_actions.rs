@@ -7,9 +7,9 @@
 //! Mycelix knowledge DHT via Holochain. This is when Prism stops being
 //! a local tool and becomes a network instrument.
 
+use crate::holochain::DhtClaim;
 use leptos::prelude::*;
 use prism_common::SearchResult;
-use crate::holochain::DhtClaim;
 
 #[component]
 pub fn ClaimActions(result: SearchResult) -> impl IntoView {
@@ -28,7 +28,10 @@ pub fn ClaimActions(result: SearchResult) -> impl IntoView {
         // Personal verification: the user confirms they consider this claim accurate.
         // This is a local endorsement — in future, verified claims will carry
         // higher trust weight in the epistemic ranking.
-        log::info!("Claim personally verified: {}", &content[..content.len().min(50)]);
+        log::info!(
+            "Claim personally verified: {}",
+            &content[..content.len().min(50)]
+        );
     };
 
     let content_share = result.content.clone();

@@ -21,11 +21,11 @@ pub enum LodLevel {
 impl LodLevel {
     pub fn from_camera_distance(distance: f32) -> Self {
         if distance > 3.8 {
-            Self::Orbit      // far zoom — heat blobs only
+            Self::Orbit // far zoom — heat blobs only
         } else if distance > 2.8 {
-            Self::Atmosphere  // mid — nothing (clean transition gap)
+            Self::Atmosphere // mid — nothing (clean transition gap)
         } else {
-            Self::Surface     // close — individual markers only
+            Self::Surface // close — individual markers only
         }
     }
 }
@@ -55,8 +55,7 @@ pub fn cluster_markers(
     let lat_step = 180.0 / lat_cells as f64;
     let lon_step = 360.0 / lon_cells as f64;
 
-    let mut cells: Vec<Vec<(f64, f64, f64, [f32; 3])>> =
-        vec![Vec::new(); lat_cells * lon_cells];
+    let mut cells: Vec<Vec<(f64, f64, f64, [f32; 3])>> = vec![Vec::new(); lat_cells * lon_cells];
 
     for &(lat, lon, importance, color) in markers {
         let lat_idx = ((lat + 90.0) / lat_step).floor() as usize;
@@ -114,9 +113,9 @@ mod tests {
     #[test]
     fn test_cluster_basic() {
         let markers = vec![
-            (51.5, -0.1, 100.0, [1.0, 0.0, 0.0]),  // London
-            (48.9, 2.3, 200.0, [0.0, 1.0, 0.0]),    // Paris
-            (-33.9, 18.4, 50.0, [0.0, 0.0, 1.0]),   // Cape Town
+            (51.5, -0.1, 100.0, [1.0, 0.0, 0.0]), // London
+            (48.9, 2.3, 200.0, [0.0, 1.0, 0.0]),  // Paris
+            (-33.9, 18.4, 50.0, [0.0, 0.0, 1.0]), // Cape Town
         ];
         let cells = cluster_markers(&markers, 6, 12);
         // London and Paris should be in the same cell (close together in a coarse grid)

@@ -3,13 +3,17 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Individual search engine result card for the comparison view.
 
-use leptos::prelude::*;
 use crate::external_search::{ExternalResult, SearchStatus};
+use leptos::prelude::*;
 
 #[component]
 pub fn EngineCard(result: ExternalResult, is_prism: bool) -> impl IntoView {
     let engine = result.engine.clone();
-    let card_class = if is_prism { "engine-card prism" } else { "engine-card" };
+    let card_class = if is_prism {
+        "engine-card prism"
+    } else {
+        "engine-card"
+    };
 
     let label_class = match engine.as_str() {
         "Prism" => "engine-label prism-label",

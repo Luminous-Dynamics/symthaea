@@ -217,7 +217,11 @@ mod tests {
             trauma_level: 0.1,
             cumulative_dose_sv: 0.01,
             adversarial: None,
-            coordination_understanding: 0.5, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
+            coordination_understanding: 0.5,
+            mycel_score: 0.1,
+            sap_balance: 100.0,
+            is_biological: true,
+            wounds: Vec::new(),
             ethics: crate::agent::EthicalOrientation::default(),
             sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
             justice: crate::sub_passport::RestorativeJustice::new(),
@@ -309,8 +313,8 @@ mod tests {
     #[test]
     fn experienced_agent_has_higher_network_resilience() {
         let agent = sample_agent();
-        let young = CivicDimensions::from_agent(&agent, 60);  // 5 years
-        let old = CivicDimensions::from_agent(&agent, 360);   // 30 years
+        let young = CivicDimensions::from_agent(&agent, 60); // 5 years
+        let old = CivicDimensions::from_agent(&agent, 360); // 30 years
 
         assert!(
             old.network_resilience >= young.network_resilience,

@@ -172,7 +172,11 @@ pub fn apply_macro_modifiers<const D: usize>(
 
     // 2. Per-entity oppression stress + emergency spike
     let oppression_err = modifiers.oppression_error_per_tick();
-    let emergency_err = if modifiers.emergency_active { EMERGENCY_ERROR_SPIKE } else { 0.0 };
+    let emergency_err = if modifiers.emergency_active {
+        EMERGENCY_ERROR_SPIKE
+    } else {
+        0.0
+    };
     let total_err_delta = oppression_err + emergency_err;
 
     if total_err_delta > 1e-10 {
@@ -208,26 +212,38 @@ mod tests {
 
     #[test]
     fn high_stability_increases_gravity() {
-        let mods = MacroWorldModifiers { stability: 1.0, ..Default::default() };
+        let mods = MacroWorldModifiers {
+            stability: 1.0,
+            ..Default::default()
+        };
         assert!(mods.phi_gravity_delta() > 0.0);
         assert!(mods.phi_gravity_delta() <= MAX_STABILITY_GRAVITY_BOOST);
     }
 
     #[test]
     fn low_stability_decreases_gravity() {
-        let mods = MacroWorldModifiers { stability: 0.0, ..Default::default() };
+        let mods = MacroWorldModifiers {
+            stability: 0.0,
+            ..Default::default()
+        };
         assert!(mods.phi_gravity_delta() < 0.0);
     }
 
     #[test]
     fn high_production_boosts_regen() {
-        let mods = MacroWorldModifiers { production_norm: 1.0, ..Default::default() };
+        let mods = MacroWorldModifiers {
+            production_norm: 1.0,
+            ..Default::default()
+        };
         assert!(mods.energy_regen_multiplier() > 1.0);
     }
 
     #[test]
     fn low_production_reduces_regen() {
-        let mods = MacroWorldModifiers { production_norm: 0.0, ..Default::default() };
+        let mods = MacroWorldModifiers {
+            production_norm: 0.0,
+            ..Default::default()
+        };
         assert!(mods.energy_regen_multiplier() < 1.0);
         // Must be positive (economy can't drive regen below 0)
         assert!(mods.energy_regen_multiplier() >= 1.0 - MAX_PRODUCTION_REGEN_BOOST);
@@ -235,13 +251,19 @@ mod tests {
 
     #[test]
     fn oppression_error_zero_when_no_oppression() {
-        let mods = MacroWorldModifiers { oppression: 0.0, ..Default::default() };
+        let mods = MacroWorldModifiers {
+            oppression: 0.0,
+            ..Default::default()
+        };
         assert!((mods.oppression_error_per_tick()).abs() < 1e-15);
     }
 
     #[test]
     fn max_oppression_error_bounded() {
-        let mods = MacroWorldModifiers { oppression: 1.0, ..Default::default() };
+        let mods = MacroWorldModifiers {
+            oppression: 1.0,
+            ..Default::default()
+        };
         assert!((mods.oppression_error_per_tick() - MAX_OPPRESSION_ERROR).abs() < 1e-9);
     }
 
@@ -249,10 +271,16 @@ mod tests {
     fn apply_oppression_increases_entity_prediction_error() {
         let (mut field, h) = make_field_with_entity();
         let err_before = field.entities[&h].prediction_error;
-        let mods = MacroWorldModifiers { oppression: 1.0, ..Default::default() };
+        let mods = MacroWorldModifiers {
+            oppression: 1.0,
+            ..Default::default()
+        };
         apply_macro_modifiers(&mut field, &mods, 0.0);
         let err_after = field.entities[&h].prediction_error;
-        assert!(err_after > err_before, "oppression should increase prediction error");
+        assert!(
+            err_after > err_before,
+            "oppression should increase prediction error"
+        );
     }
 
     #[test]
@@ -276,7 +304,10 @@ mod tests {
     #[test]
     fn apply_stability_sets_phi_gravity() {
         let (mut field, _h) = make_field_with_entity();
-        let mods = MacroWorldModifiers { stability: 1.0, ..Default::default() };
+        let mods = MacroWorldModifiers {
+            stability: 1.0,
+            ..Default::default()
+        };
         apply_macro_modifiers(&mut field, &mods, 0.1);
         let expected = 0.1 + mods.phi_gravity_delta();
         assert!(
@@ -288,7 +319,10 @@ mod tests {
     #[test]
     fn phi_gravity_never_goes_negative() {
         let (mut field, _h) = make_field_with_entity();
-        let mods = MacroWorldModifiers { stability: 0.0, ..Default::default() };
+        let mods = MacroWorldModifiers {
+            stability: 0.0,
+            ..Default::default()
+        };
         apply_macro_modifiers(&mut field, &mods, 0.0);
         assert!(field.phi_gravity_strength >= 0.0);
     }

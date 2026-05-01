@@ -157,8 +157,7 @@ pub fn verify_sovereign_tier(
     lambda: f64,
     elapsed_days: f64,
 ) -> Result<(), String> {
-    let threshold_scaled =
-        (required_threshold.clamp(0.0, 1.0) * SCORE_SCALE as f64).round() as u64;
+    let threshold_scaled = (required_threshold.clamp(0.0, 1.0) * SCORE_SCALE as f64).round() as u64;
     let lambda_scaled = (lambda * 1_000_000.0).round() as u64;
     let elapsed_scaled = (elapsed_days * 1000.0).round() as u64;
 
@@ -168,7 +167,12 @@ pub fn verify_sovereign_tier(
     let proof = winterfell::Proof::from_bytes(&result.proof_bytes)
         .map_err(|e| format!("Failed to deserialize proof: {:?}", e))?;
 
-    range_proof::verify_range(proof, threshold_scaled, SCORE_SCALE, result.score_commitment)
+    range_proof::verify_range(
+        proof,
+        threshold_scaled,
+        SCORE_SCALE,
+        result.score_commitment,
+    )
 }
 
 /// Map a CivicTier to its minimum score threshold (for ZKP).
@@ -316,13 +320,7 @@ mod tests {
 
             // Verify
             let start = std::time::Instant::now();
-            verify_sovereign_tier(
-                &result,
-                &request.agent_did,
-                *threshold,
-                0.002,
-                30.0,
-            ).unwrap();
+            verify_sovereign_tier(&result, &request.agent_did, *threshold, 0.002, 30.0).unwrap();
             let verify_ms = start.elapsed().as_secs_f64() * 1000.0;
 
             println!(

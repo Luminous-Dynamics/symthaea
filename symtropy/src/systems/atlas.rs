@@ -72,7 +72,9 @@ pub enum DataView {
 }
 
 impl Default for DataView {
-    fn default() -> Self { Self::All }
+    fn default() -> Self {
+        Self::All
+    }
 }
 
 impl DataView {
@@ -103,19 +105,27 @@ impl DataView {
         match self {
             Self::All => Layer::all().into_iter().collect(),
             Self::Energy => vec![
-                Layer::Energy, Layer::FossilDeposits, Layer::Nuclear,
-                Layer::Geothermal, Layer::TerraLumina,
+                Layer::Energy,
+                Layer::FossilDeposits,
+                Layer::Nuclear,
+                Layer::Geothermal,
+                Layer::TerraLumina,
             ],
             Self::Climate => vec![
-                Layer::Earthquakes, Layer::Fires, Layer::Storms, Layer::Volcanoes,
+                Layer::Earthquakes,
+                Layer::Fires,
+                Layer::Storms,
+                Layer::Volcanoes,
                 Layer::Climate,
             ],
-            Self::Civilization => vec![
-                Layer::Regions, Layer::Health, Layer::Emergency,
-            ],
+            Self::Civilization => vec![Layer::Regions, Layer::Health, Layer::Emergency],
             Self::Infrastructure => vec![
-                Layer::Maglev, Layer::SupplyChain, Layer::ResontiaVaults,
-                Layer::Robotics, Layer::Infrastructure, Layer::Chokepoints,
+                Layer::Maglev,
+                Layer::SupplyChain,
+                Layer::ResontiaVaults,
+                Layer::Robotics,
+                Layer::Infrastructure,
+                Layer::Chokepoints,
             ],
             Self::Interplanetary => vec![], // planets + colonies only (no Earth markers)
         }
@@ -131,10 +141,10 @@ pub struct ViewHud;
 pub struct OverlayManager {
     pub show_controls: bool,
     pub show_metrics: bool,
-    pub show_labels: bool,      // SOL ATLAS + year + view labels
+    pub show_labels: bool, // SOL ATLAS + year + view labels
     pub show_timeline_bar: bool,
-    pub show_grid: bool,        // gravity well grid
-    pub show_orbits: bool,      // orbital rings around planets
+    pub show_grid: bool,   // gravity well grid
+    pub show_orbits: bool, // orbital rings around planets
 }
 
 impl Default for OverlayManager {
@@ -187,10 +197,18 @@ pub fn overlay_toggle_system(
         } else {
             Visibility::Hidden
         };
-        for mut vis in panels.iter_mut() { *vis = panel_vis; }
+        for mut vis in panels.iter_mut() {
+            *vis = panel_vis;
+        }
 
-        let scrub_vis = if overlays.show_timeline_bar { Visibility::Visible } else { Visibility::Hidden };
-        for mut vis in scrubbers.iter_mut() { *vis = scrub_vis; }
+        let scrub_vis = if overlays.show_timeline_bar {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
+        for mut vis in scrubbers.iter_mut() {
+            *vis = scrub_vis;
+        }
     }
 }
 
@@ -234,10 +252,7 @@ pub struct AtlasData {
 }
 
 /// Toggle to globe view when M is pressed during gameplay.
-pub fn atlas_toggle_system(
-    kb: Res<ButtonInput<KeyCode>>,
-    mut next: ResMut<NextState<GamePhase>>,
-) {
+pub fn atlas_toggle_system(kb: Res<ButtonInput<KeyCode>>, mut next: ResMut<NextState<GamePhase>>) {
     if kb.just_pressed(KeyCode::KeyM) {
         next.set(GamePhase::GlobeView);
     }
@@ -281,26 +296,27 @@ pub fn setup_globe_view(
     let earth_mesh = meshes.add(Sphere::new(1.0).mesh().uv(64, 64));
     let earth_texture: Handle<Image> = asset_server.load(sol_atlas_bevy::globe::EARTH_TEXTURE_PATH);
     let night_texture: Handle<Image> = asset_server.load("textures/earth-night-8k.jpg");
-    let holo_globe = holo_materials.add(sol_atlas_bevy::holographic_material::HolographicMaterial {
-        base: StandardMaterial {
-            base_color: Color::linear_rgba(0.15, 0.22, 0.28, 0.5),
-            base_color_texture: Some(earth_texture),
-            emissive: LinearRgba::new(4.0, 3.0, 1.5, 1.0), // strong glow — city lights visible through hologram
-            emissive_texture: Some(night_texture), // city lights glow through holographic transparency
-            alpha_mode: AlphaMode::Blend,
-            double_sided: true,
-            cull_mode: None,
-            ..default()
-        },
-        extension: sol_atlas_bevy::holographic_material::HolographicExtension {
-            fresnel_color: LinearRgba::new(0.0, 0.87, 1.0, 1.0),
-            fresnel_power: 3.0,
-            scanline_speed: 0.5,
-            scanline_density: 20.0,
-            hologram_alpha: 0.55,
-            ..default()
-        },
-    });
+    let holo_globe =
+        holo_materials.add(sol_atlas_bevy::holographic_material::HolographicMaterial {
+            base: StandardMaterial {
+                base_color: Color::linear_rgba(0.15, 0.22, 0.28, 0.5),
+                base_color_texture: Some(earth_texture),
+                emissive: LinearRgba::new(4.0, 3.0, 1.5, 1.0), // strong glow — city lights visible through hologram
+                emissive_texture: Some(night_texture), // city lights glow through holographic transparency
+                alpha_mode: AlphaMode::Blend,
+                double_sided: true,
+                cull_mode: None,
+                ..default()
+            },
+            extension: sol_atlas_bevy::holographic_material::HolographicExtension {
+                fresnel_color: LinearRgba::new(0.0, 0.87, 1.0, 1.0),
+                fresnel_power: 3.0,
+                scanline_speed: 0.5,
+                scanline_density: 20.0,
+                hologram_alpha: 0.55,
+                ..default()
+            },
+        });
     commands.spawn((
         Mesh3d(earth_mesh),
         MeshMaterial3d(holo_globe),
@@ -334,7 +350,7 @@ pub fn setup_globe_view(
     let grid_mesh = meshes.add(Sphere::new(0.97).mesh().uv(24, 24)); // low-poly = visible edges
     let grid_material = materials.add(StandardMaterial {
         base_color: Color::linear_rgba(0.0, 0.6, 0.8, 0.02), // barely visible — data is the hero
-        emissive: LinearRgba::new(0.0, 0.08, 0.1, 1.0), // very dim grid
+        emissive: LinearRgba::new(0.0, 0.08, 0.1, 1.0),      // very dim grid
         alpha_mode: AlphaMode::Blend,
         unlit: true,
         double_sided: true,
@@ -391,8 +407,8 @@ pub fn setup_globe_view(
         base_color: Color::linear_rgba(0.01, 0.02, 0.03, 0.3),
         emissive: LinearRgba::new(0.0, 0.01, 0.015, 1.0),
         perceptual_roughness: 0.95, // matte — won't reflect sun bloom
-        metallic: 0.0, // non-metallic — no mirror reflections
-        unlit: true, // bypass PBR entirely — just a dark platform
+        metallic: 0.0,              // non-metallic — no mirror reflections
+        unlit: true,                // bypass PBR entirely — just a dark platform
         alpha_mode: AlphaMode::Blend,
         double_sided: true,
         ..default()
@@ -428,14 +444,14 @@ pub fn setup_globe_view(
         },
         // [3] Chromatic aberration — holographic projection artifact
         bevy::post_process::effect_stack::ChromaticAberration {
-            intensity: 0.002,  // minimal — preserves text clarity
+            intensity: 0.002, // minimal — preserves text clarity
             max_samples: 8,
             ..default()
         },
         // [7] Depth of field — cinematic lens, background blurs
         bevy::post_process::dof::DepthOfField {
             mode: bevy::post_process::dof::DepthOfFieldMode::Bokeh,
-            focal_distance: 4.2,  // focus on globe surface
+            focal_distance: 4.2,    // focus on globe surface
             sensor_height: 0.01866, // Super 35 cinema format
             max_circle_of_confusion_diameter: 40.0,
             max_depth: 50.0,
@@ -449,7 +465,10 @@ pub fn setup_globe_view(
     // ─── Globe Label HUD ─────────────────────────────────────────
     commands.spawn((
         Text::new("SOL ATLAS"),
-        TextFont { font_size: 16.0, ..default() },
+        TextFont {
+            font_size: 16.0,
+            ..default()
+        },
         TextColor(Color::srgba(0.4, 0.7, 0.8, 0.65)),
         Node {
             position_type: PositionType::Absolute,
@@ -463,7 +482,10 @@ pub fn setup_globe_view(
     // Data view indicator HUD (top-right)
     commands.spawn((
         Text::new("ALL DATA"),
-        TextFont { font_size: 13.0, ..default() },
+        TextFont {
+            font_size: 13.0,
+            ..default()
+        },
         TextColor(Color::srgba(0.5, 0.7, 0.8, 0.55)),
         Node {
             position_type: PositionType::Absolute,
@@ -478,7 +500,10 @@ pub fn setup_globe_view(
     // Timeline year + Turchin cycle phase HUD
     commands.spawn((
         Text::new("Year 0 | Growth"),
-        TextFont { font_size: 13.0, ..default() },
+        TextFont {
+            font_size: 13.0,
+            ..default()
+        },
         TextColor(Color::srgba(0.4, 0.7, 0.5, 0.5)),
         Node {
             position_type: PositionType::Absolute,
@@ -497,7 +522,8 @@ pub fn setup_globe_view(
     for chunk in star_data.chunks_exact(7) {
         let brightness = chunk[6];
         // Only spawn the brighter stars as entities (top ~30%)
-        if brightness < 0.55 { // only brightest stars — prevents edge strays
+        if brightness < 0.55 {
+            // only brightest stars — prevents edge strays
             continue;
         }
         let size = 0.06 + brightness * 0.12; // smaller — stars shouldn't be diamonds
@@ -513,8 +539,7 @@ pub fn setup_globe_view(
         commands.spawn((
             Mesh3d(star_mesh.clone()),
             MeshMaterial3d(mat),
-            Transform::from_xyz(chunk[0], chunk[1], chunk[2])
-                .with_scale(Vec3::splat(size)),
+            Transform::from_xyz(chunk[0], chunk[1], chunk[2]).with_scale(Vec3::splat(size)),
             AtlasEntity,
         ));
     }
@@ -541,9 +566,17 @@ pub fn setup_globe_view(
             Mesh3d(marker_mesh.clone()),
             MeshMaterial3d(mat),
             Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(size)),
-            DataMarker { layer: Layer::Energy, name: site.name.clone() },
+            DataMarker {
+                layer: Layer::Energy,
+                name: site.name.clone(),
+            },
             TemporalW { year: 2010.0 },
-            MarkerPulse { speed: 1.0, amplitude: 0.15, phase: site.lat as f32 * 0.1, base_scale: size },
+            MarkerPulse {
+                speed: 1.0,
+                amplitude: 0.15,
+                phase: site.lat as f32 * 0.1,
+                base_scale: size,
+            },
             SurfaceLod,
             TimelineLayer::Renewable,
             AtlasEntity,
@@ -557,31 +590,53 @@ pub fn setup_globe_view(
         // Energy
         for s in &data.sites {
             let c = s.energy_type.rgb();
-            all_markers.push((s.lat, s.lon, s.capacity_mw, [c[0] * 0.5, c[1] * 0.5, c[2] * 0.5]));
+            all_markers.push((
+                s.lat,
+                s.lon,
+                s.capacity_mw,
+                [c[0] * 0.5, c[1] * 0.5, c[2] * 0.5],
+            ));
         }
         // Geothermal
         let gc = Layer::Geothermal.rgb();
         for n in &data.geothermal_nodes {
-            all_markers.push((n.lat, n.lon, n.capacity_mw, [gc[0] * 0.5, gc[1] * 0.5, gc[2] * 0.5]));
+            all_markers.push((
+                n.lat,
+                n.lon,
+                n.capacity_mw,
+                [gc[0] * 0.5, gc[1] * 0.5, gc[2] * 0.5],
+            ));
         }
         // Fossil
         for d in &data.fossil_deposits {
             let eroi = sol_atlas_core::economics::compute_eroi(d).unwrap_or(5.0);
             let c = sol_atlas_core::economics::eroi_color(eroi);
-            all_markers.push((d.lat, d.lon, d.proven_reserves_mboe * 0.01, [c[0] * 0.5, c[1] * 0.5, c[2] * 0.5]));
+            all_markers.push((
+                d.lat,
+                d.lon,
+                d.proven_reserves_mboe * 0.01,
+                [c[0] * 0.5, c[1] * 0.5, c[2] * 0.5],
+            ));
         }
         // Nuclear
         let nc = Layer::Nuclear.rgb();
         for s in &data.nuclear_sites {
-            all_markers.push((s.lat, s.lon, s.capacity_mw, [nc[0] * 0.5, nc[1] * 0.5, nc[2] * 0.5]));
+            all_markers.push((
+                s.lat,
+                s.lon,
+                s.capacity_mw,
+                [nc[0] * 0.5, nc[1] * 0.5, nc[2] * 0.5],
+            ));
         }
 
         let clusters = sol_atlas_core::lod::cluster_markers(&all_markers, 4, 8); // coarser = fewer blobs
-        // Heat blobs disabled — city indicators + event markers provide better data.
+                                                                                 // Heat blobs disabled — city indicators + event markers provide better data.
         let blob_mesh = meshes.add(Sphere::new(1.0).mesh().uv(10, 10));
         let _spawn_blobs = false;
         for cell in &clusters {
-            if !_spawn_blobs { continue; }
+            if !_spawn_blobs {
+                continue;
+            }
             let pos = geo::lat_lon_to_xyz(cell.center_lat, cell.center_lon, 1.04);
             let size = sol_atlas_core::lod::heat_blob_size(cell.count);
             let c = cell.avg_color;
@@ -618,7 +673,10 @@ pub fn setup_globe_view(
             Mesh3d(marker_mesh.clone()),
             MeshMaterial3d(mat),
             Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(size)),
-            DataMarker { layer: Layer::Geothermal, name: node.name.clone() },
+            DataMarker {
+                layer: Layer::Geothermal,
+                name: node.name.clone(),
+            },
             SurfaceLod,
             TimelineLayer::Renewable,
             AtlasEntity,
@@ -640,7 +698,10 @@ pub fn setup_globe_view(
             Mesh3d(marker_mesh.clone()),
             MeshMaterial3d(mat),
             Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(0.014)),
-            DataMarker { layer: Layer::TerraLumina, name: site.name.clone() },
+            DataMarker {
+                layer: Layer::TerraLumina,
+                name: site.name.clone(),
+            },
             SurfaceLod,
             TimelineLayer::Renewable,
             AtlasEntity,
@@ -662,7 +723,10 @@ pub fn setup_globe_view(
             Mesh3d(marker_mesh.clone()),
             MeshMaterial3d(mat),
             Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(0.010)),
-            DataMarker { layer: Layer::ResontiaVaults, name: vault.name.clone() },
+            DataMarker {
+                layer: Layer::ResontiaVaults,
+                name: vault.name.clone(),
+            },
             SurfaceLod,
             TimelineLayer::Vault(i),
             AtlasEntity,
@@ -688,8 +752,13 @@ pub fn setup_globe_view(
             Mesh3d(marker_mesh.clone()),
             MeshMaterial3d(mat),
             Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(size)),
-            DataMarker { layer: Layer::FossilDeposits, name: deposit.name.clone() },
-            TemporalW { year: deposit.discovery_year as f64 },
+            DataMarker {
+                layer: Layer::FossilDeposits,
+                name: deposit.name.clone(),
+            },
+            TemporalW {
+                year: deposit.discovery_year as f64,
+            },
             SurfaceLod,
             TimelineLayer::Fossil,
             AtlasEntity,
@@ -697,10 +766,8 @@ pub fn setup_globe_view(
 
         // Carbon emission halo — translucent red, sized by CO2 output
         if deposit.annual_production_mboe > 0.0 {
-            let halo_radius = geo::emission_halo_radius(
-                deposit.annual_production_mboe,
-                &deposit.fuel_type,
-            );
+            let halo_radius =
+                geo::emission_halo_radius(deposit.annual_production_mboe, &deposit.fuel_type);
             let halo_mat = materials.add(StandardMaterial {
                 base_color: Color::linear_rgba(1.0, 0.15, 0.05, 0.10),
                 alpha_mode: AlphaMode::Blend,
@@ -712,9 +779,11 @@ pub fn setup_globe_view(
             commands.spawn((
                 Mesh3d(halo_mesh.clone()),
                 MeshMaterial3d(halo_mat),
-                Transform::from_xyz(pos[0], pos[1], pos[2])
-                    .with_scale(Vec3::splat(halo_radius)),
-                DataMarker { layer: Layer::FossilDeposits, name: format!("{} CO2 halo", deposit.name) },
+                Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(halo_radius)),
+                DataMarker {
+                    layer: Layer::FossilDeposits,
+                    name: format!("{} CO2 halo", deposit.name),
+                },
                 SurfaceLod,
                 TimelineLayer::Fossil,
                 AtlasEntity,
@@ -731,7 +800,11 @@ pub fn setup_globe_view(
         let size = geo::marker_size_from_capacity(site.capacity_mw);
         let brightness = if site.reactor_type.is_smr() { 1.4 } else { 1.0 };
         let mat = materials.add(StandardMaterial {
-            base_color: Color::linear_rgb(nc[0] * brightness, nc[1] * brightness, nc[2] * brightness),
+            base_color: Color::linear_rgb(
+                nc[0] * brightness,
+                nc[1] * brightness,
+                nc[2] * brightness,
+            ),
             emissive: LinearRgba::new(nc[0] * 0.4, nc[1] * 0.4, nc[2] * 0.4, 1.0),
             unlit: true,
             ..default()
@@ -740,8 +813,13 @@ pub fn setup_globe_view(
             Mesh3d(marker_mesh.clone()),
             MeshMaterial3d(mat),
             Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(size)),
-            DataMarker { layer: Layer::Nuclear, name: site.name.clone() },
-            TemporalW { year: site.commission_year as f64 },
+            DataMarker {
+                layer: Layer::Nuclear,
+                name: site.name.clone(),
+            },
+            TemporalW {
+                year: site.commission_year as f64,
+            },
             SurfaceLod,
             TimelineLayer::Nuclear,
             AtlasEntity,
@@ -779,14 +857,24 @@ pub fn setup_globe_view(
             Mesh3d(city_mesh.clone()),
             MeshMaterial3d(mat),
             Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(size)),
-            CityIndicator { name: stress.name.clone(), load: stress.allostatic_load },
+            CityIndicator {
+                name: stress.name.clone(),
+                load: stress.allostatic_load,
+            },
             MarkerPulse {
                 speed: 1.5 + stress.allostatic_load * 2.0, // stressed cities pulse faster
                 amplitude: 0.1 + stress.allostatic_load * 0.15,
                 phase: stress.lat as f32 * 0.2,
                 base_scale: size,
             },
-            DataMarker { layer: Layer::Energy, name: format!("{} (load={:.0}%)", stress.name, stress.allostatic_load * 100.0) },
+            DataMarker {
+                layer: Layer::Energy,
+                name: format!(
+                    "{} (load={:.0}%)",
+                    stress.name,
+                    stress.allostatic_load * 100.0
+                ),
+            },
             // NO SurfaceLod — always visible at orbit!
             AtlasEntity,
         ));
@@ -801,9 +889,9 @@ pub fn setup_globe_view(
         // NOT red — red is reserved for emergencies/earthquakes
         let v = region.climate_vulnerability as f32;
         let c = [
-            0.2 + v * 0.4,      // R: slight increase
-            0.3 * (1.0 - v),    // G: decreases
-            0.6 + v * 0.3,      // B: stays high (blue→purple)
+            0.2 + v * 0.4,   // R: slight increase
+            0.3 * (1.0 - v), // G: decreases
+            0.6 + v * 0.3,   // B: stays high (blue→purple)
         ];
         let size = 0.006 + (region.population_m as f32 / 3000.0).min(1.0) * 0.006;
         let mat = materials.add(StandardMaterial {
@@ -817,7 +905,15 @@ pub fn setup_globe_view(
             Mesh3d(region_mesh.clone()),
             MeshMaterial3d(mat),
             Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(size)),
-            DataMarker { layer: Layer::Regions, name: format!("{} (pop={}M, vuln={:.0}%)", region.name, region.population_m as u32, v * 100.0) },
+            DataMarker {
+                layer: Layer::Regions,
+                name: format!(
+                    "{} (pop={}M, vuln={:.0}%)",
+                    region.name,
+                    region.population_m as u32,
+                    v * 100.0
+                ),
+            },
             // NO LOD tag — always visible at orbit
             AtlasEntity,
         ));
@@ -844,11 +940,17 @@ pub fn setup_globe_view(
             Mesh3d(city_dot_mesh.clone()),
             MeshMaterial3d(mat),
             Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(size)),
-            DataMarker { layer: Layer::Regions, name: format!("{} ({}M)", city.name, city.population / 1_000_000) },
+            DataMarker {
+                layer: Layer::Regions,
+                name: format!("{} ({}M)", city.name, city.population / 1_000_000),
+            },
             AtlasEntity,
         ));
     }
-    info!("[atlas] {} major cities loaded (pop >= 1M)", data.major_cities.len());
+    info!(
+        "[atlas] {} major cities loaded (pop >= 1M)",
+        data.major_cities.len()
+    );
 
     // ─── Natural Events (ALWAYS VISIBLE) ──────────────────────────
     // Earthquakes, fires, storms, volcanoes from USGS/NASA/NOAA.
@@ -857,7 +959,9 @@ pub fn setup_globe_view(
         // Filter: only show significant events (M4+ quakes, high-confidence fires)
         // Strict filter — only major events to avoid visual noise
         match event.event_type {
-            sol_atlas_core::types::NaturalEventType::Earthquake if event.magnitude < 5.5 => continue,
+            sol_atlas_core::types::NaturalEventType::Earthquake if event.magnitude < 5.5 => {
+                continue
+            }
             sol_atlas_core::types::NaturalEventType::Fire => continue, // fires disabled — too many, too noisy
             sol_atlas_core::types::NaturalEventType::Storm if event.magnitude < 30.0 => continue, // only major storms
             _ => {}
@@ -895,12 +999,18 @@ pub fn setup_globe_view(
                 phase: event.lat as f32 * 0.3,
                 base_scale: size,
             },
-            DataMarker { layer, name: event.name.clone() },
+            DataMarker {
+                layer,
+                name: event.name.clone(),
+            },
             // NO LOD tag — always visible
             AtlasEntity,
         ));
     }
-    info!("[atlas] {} natural events loaded (earthquakes + fires + storms + volcanoes)", data.natural_events.len());
+    info!(
+        "[atlas] {} natural events loaded (earthquakes + fires + storms + volcanoes)",
+        data.natural_events.len()
+    );
 
     // ─── Maritime Chokepoints (ALWAYS VISIBLE) ──────────────────
     // 8 critical bottlenecks in global trade — diamond-shaped, warning color.
@@ -919,8 +1029,16 @@ pub fn setup_globe_view(
             Mesh3d(choke_mesh.clone()),
             MeshMaterial3d(mat),
             Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(size)),
-            MarkerPulse { speed: 0.8, amplitude: 0.2, phase: choke.lat as f32, base_scale: size },
-            DataMarker { layer: Layer::Chokepoints, name: format!("{} ({}M bbl/day)", choke.name, choke.daily_barrels_m) },
+            MarkerPulse {
+                speed: 0.8,
+                amplitude: 0.2,
+                phase: choke.lat as f32,
+                base_scale: size,
+            },
+            DataMarker {
+                layer: Layer::Chokepoints,
+                name: format!("{} ({}M bbl/day)", choke.name, choke.daily_barrels_m),
+            },
             AtlasEntity,
         ));
     }
@@ -951,8 +1069,19 @@ pub fn setup_globe_view(
             Mesh3d(crit_mesh.clone()),
             MeshMaterial3d(mat),
             Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(size)),
-            MarkerPulse { speed: 1.2, amplitude: 0.15, phase: infra.lon as f32 * 0.1, base_scale: size },
-            DataMarker { layer: Layer::Infrastructure, name: format!("{} ({}, risk: {})", infra.name, infra.infra_type, infra.risk) },
+            MarkerPulse {
+                speed: 1.2,
+                amplitude: 0.15,
+                phase: infra.lon as f32 * 0.1,
+                base_scale: size,
+            },
+            DataMarker {
+                layer: Layer::Infrastructure,
+                name: format!(
+                    "{} ({}, risk: {})",
+                    infra.name, infra.infra_type, infra.risk
+                ),
+            },
             AtlasEntity,
         ));
     }
@@ -979,7 +1108,10 @@ pub fn setup_globe_view(
                 MeshMaterial3d(corona),
                 Transform::from_xyz(pos[0], pos[1], pos[2])
                     .with_scale(Vec3::splat(body.visual_radius * 1.4)), // tight corona — no overlap
-                CelestialBodyMesh { body_index: body_idx, is_corona: true },
+                CelestialBodyMesh {
+                    body_index: body_idx,
+                    is_corona: true,
+                },
                 AtlasEntity,
             ));
             // The sun itself — white-hot, extreme HDR emissive
@@ -1005,9 +1137,11 @@ pub fn setup_globe_view(
         commands.spawn((
             Mesh3d(body_mesh.clone()),
             MeshMaterial3d(mat),
-            Transform::from_xyz(pos[0], pos[1], pos[2])
-                .with_scale(Vec3::splat(body.visual_radius)),
-            CelestialBodyMesh { body_index: body_idx, is_corona: false },
+            Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(body.visual_radius)),
+            CelestialBodyMesh {
+                body_index: body_idx,
+                is_corona: false,
+            },
             AtlasEntity,
         ));
     }
@@ -1028,93 +1162,125 @@ pub fn setup_globe_view(
             Mesh3d(gov_mesh.clone()),
             MeshMaterial3d(mat),
             Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(size)),
-            DataMarker { layer: Layer::Regions, name: format!("{} ({}% participation)", pulse.name, (pulse.participation * 100.0) as u32) },
+            DataMarker {
+                layer: Layer::Regions,
+                name: format!(
+                    "{} ({}% participation)",
+                    pulse.name,
+                    (pulse.participation * 100.0) as u32
+                ),
+            },
             SurfaceLod,
             AtlasEntity,
         ));
     }
 
     // ─── Side Panel UI ───────────────────────────────────────────
-    commands.spawn((
-        Node {
-            position_type: PositionType::Absolute,
-            left: Val::Px(0.0),
-            top: Val::Px(80.0),
-            width: Val::Px(200.0),
-            height: Val::Auto,
-            flex_direction: FlexDirection::Column,
-            padding: UiRect::all(Val::Px(12.0)),
-            ..default()
-        },
-        BackgroundColor(Color::srgba(0.02, 0.03, 0.05, 0.6)),
-        SidePanel,
-        AtlasEntity,
-    )).with_children(|parent| {
-        // Section: Controls
-        parent.spawn((
-            Text::new("-- Controls --"),
-            TextFont { font_size: 11.0, ..default() },
-            TextColor(Color::srgba(0.5, 0.7, 0.8, 0.7)),
-            Node { margin: UiRect::bottom(Val::Px(6.0)), ..default() },
-        ));
-        for line in [
-            "Tab    Data View",
-            "1-5    Aesthetic",
-            "←/→    Timeline",
-            "Scroll Zoom",
-            "Drag   Rotate",
-            "F1-F6  Planets",
-            "F7     Earth",
-            "H      Toggle HUD",
-            "Space  Play/Pause",
-            "F9     Record",
-        ] {
-            parent.spawn((
-                Text::new(line),
-                TextFont { font_size: 10.0, ..default() },
-                TextColor(Color::srgba(0.4, 0.55, 0.5, 0.5)),
-                Node { margin: UiRect::bottom(Val::Px(2.0)), ..default() },
-            ));
-        }
-
-        // Section: Metrics
-        parent.spawn((
-            Text::new("-- Metrics --"),
-            TextFont { font_size: 11.0, ..default() },
-            TextColor(Color::srgba(0.5, 0.7, 0.8, 0.7)),
-            Node { margin: UiRect::top(Val::Px(10.0)).with_bottom(Val::Px(6.0)), ..default() },
-        ));
-        parent.spawn((
-            Text::new("Loading..."),
-            TextFont { font_size: 10.0, ..default() },
-            TextColor(Color::srgba(0.4, 0.6, 0.5, 0.6)),
-            PanelMetrics,
-        ));
-    });
-
-    // ─── Timeline Scrubber Bar (bottom of screen) ─────────────
-    commands.spawn((
-        Node {
-            width: Val::Percent(100.0),
-            height: Val::Px(6.0),
-            position_type: PositionType::Absolute,
-            bottom: Val::Px(0.0),
-            ..default()
-        },
-        BackgroundColor(Color::srgba(0.05, 0.08, 0.1, 0.6)),
-        TimelineScrubber,
-        AtlasEntity,
-    )).with_children(|bar| {
-        bar.spawn((
+    commands
+        .spawn((
             Node {
-                width: Val::Percent(0.0), // updated each frame
-                height: Val::Percent(100.0),
+                position_type: PositionType::Absolute,
+                left: Val::Px(0.0),
+                top: Val::Px(80.0),
+                width: Val::Px(200.0),
+                height: Val::Auto,
+                flex_direction: FlexDirection::Column,
+                padding: UiRect::all(Val::Px(12.0)),
                 ..default()
             },
-            BackgroundColor(Color::srgb(0.0, 0.7, 0.6)), // teal fill
-            TimelineFill,
-        ));
-    });
+            BackgroundColor(Color::srgba(0.02, 0.03, 0.05, 0.6)),
+            SidePanel,
+            AtlasEntity,
+        ))
+        .with_children(|parent| {
+            // Section: Controls
+            parent.spawn((
+                Text::new("-- Controls --"),
+                TextFont {
+                    font_size: 11.0,
+                    ..default()
+                },
+                TextColor(Color::srgba(0.5, 0.7, 0.8, 0.7)),
+                Node {
+                    margin: UiRect::bottom(Val::Px(6.0)),
+                    ..default()
+                },
+            ));
+            for line in [
+                "Tab    Data View",
+                "1-5    Aesthetic",
+                "←/→    Timeline",
+                "Scroll Zoom",
+                "Drag   Rotate",
+                "F1-F6  Planets",
+                "F7     Earth",
+                "H      Toggle HUD",
+                "Space  Play/Pause",
+                "F9     Record",
+            ] {
+                parent.spawn((
+                    Text::new(line),
+                    TextFont {
+                        font_size: 10.0,
+                        ..default()
+                    },
+                    TextColor(Color::srgba(0.4, 0.55, 0.5, 0.5)),
+                    Node {
+                        margin: UiRect::bottom(Val::Px(2.0)),
+                        ..default()
+                    },
+                ));
+            }
+
+            // Section: Metrics
+            parent.spawn((
+                Text::new("-- Metrics --"),
+                TextFont {
+                    font_size: 11.0,
+                    ..default()
+                },
+                TextColor(Color::srgba(0.5, 0.7, 0.8, 0.7)),
+                Node {
+                    margin: UiRect::top(Val::Px(10.0)).with_bottom(Val::Px(6.0)),
+                    ..default()
+                },
+            ));
+            parent.spawn((
+                Text::new("Loading..."),
+                TextFont {
+                    font_size: 10.0,
+                    ..default()
+                },
+                TextColor(Color::srgba(0.4, 0.6, 0.5, 0.6)),
+                PanelMetrics,
+            ));
+        });
+
+    // ─── Timeline Scrubber Bar (bottom of screen) ─────────────
+    commands
+        .spawn((
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Px(6.0),
+                position_type: PositionType::Absolute,
+                bottom: Val::Px(0.0),
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.05, 0.08, 0.1, 0.6)),
+            TimelineScrubber,
+            AtlasEntity,
+        ))
+        .with_children(|bar| {
+            bar.spawn((
+                Node {
+                    width: Val::Percent(0.0), // updated each frame
+                    height: Val::Percent(100.0),
+                    ..default()
+                },
+                BackgroundColor(Color::srgb(0.0, 0.7, 0.6)), // teal fill
+                TimelineFill,
+            ));
+        });
 
     // Store data for arc rendering (gizmos are immediate-mode)
     commands.insert_resource(AtlasData { data });
@@ -1124,16 +1290,15 @@ pub fn setup_globe_view(
 }
 
 /// Draw maglev corridor arcs using gizmos (immediate-mode, redrawn each frame).
-pub fn draw_arcs_system(
-    atlas_data: Option<Res<AtlasData>>,
-    mut gizmos: Gizmos,
-    time: Res<Time>,
-) {
+pub fn draw_arcs_system(atlas_data: Option<Res<AtlasData>>, mut gizmos: Gizmos, time: Res<Time>) {
     let Some(atlas_data) = atlas_data else { return };
     let t = time.elapsed_secs();
 
     // P2P energy trades — green animated arcs between renewable sites
-    let trade_sites: Vec<(f64, f64, f64)> = atlas_data.data.sites.iter()
+    let trade_sites: Vec<(f64, f64, f64)> = atlas_data
+        .data
+        .sites
+        .iter()
         .take(8) // top 8 sites — fewer arcs = less pole convergence
         .map(|s| (s.lat, s.lon, s.capacity_mw))
         .collect();
@@ -1143,8 +1308,10 @@ pub fn draw_arcs_system(
         let from = geo::lat_lon_to_xyz(trade.seller_lat, trade.seller_lon, 1.04);
         let to = geo::lat_lon_to_xyz(trade.buyer_lat, trade.buyer_lon, 1.04);
         let dist = sol_atlas_core::geo::haversine_km(
-            trade.seller_lat, trade.seller_lon,
-            trade.buyer_lat, trade.buyer_lon,
+            trade.seller_lat,
+            trade.seller_lon,
+            trade.buyer_lat,
+            trade.buyer_lon,
         );
         let peak = geo::arc_peak_height(dist);
         let segments = 12u32;
@@ -1161,7 +1328,12 @@ pub fn draw_arcs_system(
     for (fi, flow) in tend_flows.iter().enumerate() {
         let from = geo::lat_lon_to_xyz(flow.from_lat, flow.from_lon, 1.04);
         let to = geo::lat_lon_to_xyz(flow.to_lat, flow.to_lon, 1.04);
-        let dist = sol_atlas_core::geo::haversine_km(flow.from_lat, flow.from_lon, flow.to_lat, flow.to_lon);
+        let dist = sol_atlas_core::geo::haversine_km(
+            flow.from_lat,
+            flow.from_lon,
+            flow.to_lat,
+            flow.to_lon,
+        );
         let peak = geo::arc_peak_height(dist) * 1.5;
         let segments = 16u32;
         let arc = sol_atlas_core::geometry::generate_arc(from, to, peak, segments);
@@ -1172,7 +1344,16 @@ pub fn draw_arcs_system(
             let b = Vec3::new(arc[(i + 1) * 3], arc[(i + 1) * 3 + 1], arc[(i + 1) * 3 + 2]);
             let dist_to_packet = (i as f32 - packet_seg as f32).abs() / segments as f32;
             let brightness = 0.3 + 0.7 * (-dist_to_packet * 6.0).exp();
-            gizmos.line(a, b, Color::linear_rgba(0.486 * brightness, 0.988 * brightness, 0.0, brightness * 0.7));
+            gizmos.line(
+                a,
+                b,
+                Color::linear_rgba(
+                    0.486 * brightness,
+                    0.988 * brightness,
+                    0.0,
+                    brightness * 0.7,
+                ),
+            );
         }
     }
 
@@ -1193,8 +1374,18 @@ pub fn draw_arcs_system(
             let b = Vec3::new(arc[(i + 1) * 3], arc[(i + 1) * 3 + 1], arc[(i + 1) * 3 + 2]);
             let dist_to_packet = (i as f32 - packet_seg as f32).abs() / segments as f32;
             let brightness = 0.4 + 0.6 * (-dist_to_packet * 8.0).exp();
-            let color = Color::linear_rgba(1.0 * brightness, 0.8 * brightness, 0.1 * brightness, brightness);
-            let glow = Color::linear_rgba(1.0 * brightness * 0.3, 0.8 * brightness * 0.3, 0.1 * brightness * 0.3, brightness * 0.3);
+            let color = Color::linear_rgba(
+                1.0 * brightness,
+                0.8 * brightness,
+                0.1 * brightness,
+                brightness,
+            );
+            let glow = Color::linear_rgba(
+                1.0 * brightness * 0.3,
+                0.8 * brightness * 0.3,
+                0.1 * brightness * 0.3,
+                brightness * 0.3,
+            );
             // Center line + 2 glow flanks
             gizmos.line(a, b, color);
             let normal = (b - a).cross(Vec3::Y).normalize_or_zero() * 0.004;
@@ -1204,19 +1395,26 @@ pub fn draw_arcs_system(
             // Data pulse sphere at packet position
             if dist_to_packet < 0.05 {
                 let pulse_pos = a.lerp(b, 0.5);
-                gizmos.sphere(Isometry3d::from_translation(pulse_pos), 0.008, Color::linear_rgba(1.0, 0.95, 0.7, 0.9));
+                gizmos.sphere(
+                    Isometry3d::from_translation(pulse_pos),
+                    0.008,
+                    Color::linear_rgba(1.0, 0.95, 0.7, 0.9),
+                );
             }
         }
     }
 
     // Supply routes — cyan arcs, dimmer
     let supply_color = Color::linear_rgba(0.0, 0.5, 0.8, 0.3); // cyan, dimmer — background layer
-    for route in atlas_data.data.supply_routes.iter().take(5) { // limit to 5 routes
+    for route in atlas_data.data.supply_routes.iter().take(5) {
+        // limit to 5 routes
         let from = geo::lat_lon_to_xyz(route.from_lat, route.from_lon, 1.04);
         let to = geo::lat_lon_to_xyz(route.to_lat, route.to_lon, 1.04);
         let dist = sol_atlas_core::geo::haversine_km(
-            route.from_lat, route.from_lon,
-            route.to_lat, route.to_lon,
+            route.from_lat,
+            route.from_lon,
+            route.to_lat,
+            route.to_lon,
         );
         let peak = geo::arc_peak_height(dist);
 
@@ -1309,10 +1507,18 @@ pub fn timeline_visibility_system(
             TimelineLayer::Renewable => sol_atlas_core::timeline::renewable_opacity(year),
             TimelineLayer::Nuclear => sol_atlas_core::timeline::nuclear_opacity(year),
             TimelineLayer::Vault(i) => {
-                if sol_atlas_core::timeline::vault_visible(*i, year) { 1.0 } else { 0.0 }
+                if sol_atlas_core::timeline::vault_visible(*i, year) {
+                    1.0
+                } else {
+                    0.0
+                }
             }
             TimelineLayer::Corridor(i) => {
-                if sol_atlas_core::timeline::corridor_visible(*i, year) { 1.0 } else { 0.0 }
+                if sol_atlas_core::timeline::corridor_visible(*i, year) {
+                    1.0
+                } else {
+                    0.0
+                }
             }
             TimelineLayer::Star => 1.0,
         };
@@ -1440,7 +1646,10 @@ pub fn planet_focus_system(
             camera.distance = (pos[0] * pos[0] + pos[1] * pos[1] + pos[2] * pos[2]).sqrt()
                 - body.visual_radius * 2.0;
             camera.auto_rotate = false;
-            info!("[atlas] Camera → {} (distance {:.1})", name, camera.distance);
+            info!(
+                "[atlas] Camera → {} (distance {:.1})",
+                name, camera.distance
+            );
         }
     }
 }
@@ -1475,16 +1684,32 @@ pub fn data_view_switch_system(
 /// Runs every frame (not just on change) because LOD also sets Visibility.
 pub fn data_view_filter_system(
     view: Res<DataView>,
-    mut markers: Query<(&DataMarker, &mut Visibility), (Without<CityIndicator>, Without<SurfaceLod>, Without<OrbitLod>)>,
-    mut surface_markers: Query<(&DataMarker, &mut Visibility), (With<SurfaceLod>, Without<OrbitLod>, Without<CityIndicator>)>,
-    mut orbit_markers: Query<(&DataMarker, &mut Visibility), (With<OrbitLod>, Without<SurfaceLod>, Without<CityIndicator>)>,
+    mut markers: Query<
+        (&DataMarker, &mut Visibility),
+        (
+            Without<CityIndicator>,
+            Without<SurfaceLod>,
+            Without<OrbitLod>,
+        ),
+    >,
+    mut surface_markers: Query<
+        (&DataMarker, &mut Visibility),
+        (With<SurfaceLod>, Without<OrbitLod>, Without<CityIndicator>),
+    >,
+    mut orbit_markers: Query<
+        (&DataMarker, &mut Visibility),
+        (With<OrbitLod>, Without<SurfaceLod>, Without<CityIndicator>),
+    >,
     camera: Query<&Transform, With<OrbitalCamera>>,
 ) {
     let visible_layers = view.visible_layers();
     let show_all = *view == DataView::All;
 
     // Get LOD state
-    let distance = camera.single().map(|t| t.translation.length()).unwrap_or(4.2);
+    let distance = camera
+        .single()
+        .map(|t| t.translation.length())
+        .unwrap_or(4.2);
     let lod = LodLevel::from_camera_distance(distance);
     let show_surface = matches!(lod, LodLevel::Surface);
     let show_orbit = matches!(lod, LodLevel::Orbit);
@@ -1562,18 +1787,28 @@ pub fn aesthetic_switch_system(
     mut current: ResMut<CurrentAesthetic>,
 ) {
     use sol_atlas_core::aesthetics::Aesthetic;
-    let new = if kb.just_pressed(KeyCode::Digit1) { Some(Aesthetic::Holographic) }
-        else if kb.just_pressed(KeyCode::Digit2) { Some(Aesthetic::Satellite) }
-        else if kb.just_pressed(KeyCode::Digit3) { Some(Aesthetic::Procedural) }
-        else if kb.just_pressed(KeyCode::Digit4) { Some(Aesthetic::Minimal) }
-        else if kb.just_pressed(KeyCode::Digit5) { Some(Aesthetic::Night) }
-        else { None };
+    let new = if kb.just_pressed(KeyCode::Digit1) {
+        Some(Aesthetic::Holographic)
+    } else if kb.just_pressed(KeyCode::Digit2) {
+        Some(Aesthetic::Satellite)
+    } else if kb.just_pressed(KeyCode::Digit3) {
+        Some(Aesthetic::Procedural)
+    } else if kb.just_pressed(KeyCode::Digit4) {
+        Some(Aesthetic::Minimal)
+    } else if kb.just_pressed(KeyCode::Digit5) {
+        Some(Aesthetic::Night)
+    } else {
+        None
+    };
 
     if let Some(aesthetic) = new {
         if aesthetic != current.aesthetic {
             current.aesthetic = aesthetic;
             current.changed = true;
-            info!("[atlas] Aesthetic: {} (press 1-5 to switch)", aesthetic.label());
+            info!(
+                "[atlas] Aesthetic: {} (press 1-5 to switch)",
+                aesthetic.label()
+            );
         }
     }
 }
@@ -1586,7 +1821,9 @@ pub fn aesthetic_apply_system(
     atmo_q: Query<&MeshMaterial3d<StandardMaterial>, With<Atmosphere>>,
     mut cloud_vis: Query<&mut Visibility, With<CloudLayer>>,
 ) {
-    if !current.changed { return; }
+    if !current.changed {
+        return;
+    }
     current.changed = false;
 
     let config = sol_atlas_core::aesthetics::config_for(current.aesthetic);
@@ -1650,17 +1887,23 @@ pub fn aesthetic_apply_system(
         if let Some(mat) = materials.get_mut(&mat_handle.0) {
             let f = &config.fresnel;
             mat.base_color = Color::linear_rgba(f.color[0], f.color[1], f.color[2], f.color[3]);
-            mat.emissive = LinearRgba::new(f.emissive[0], f.emissive[1], f.emissive[2], f.emissive[3]);
+            mat.emissive =
+                LinearRgba::new(f.emissive[0], f.emissive[1], f.emissive[2], f.emissive[3]);
         }
     }
 
     // Toggle cloud layer visibility per aesthetic
-    let show_clouds = matches!(current.aesthetic,
-        sol_atlas_core::aesthetics::Aesthetic::Satellite |
-        sol_atlas_core::aesthetics::Aesthetic::Procedural
+    let show_clouds = matches!(
+        current.aesthetic,
+        sol_atlas_core::aesthetics::Aesthetic::Satellite
+            | sol_atlas_core::aesthetics::Aesthetic::Procedural
     );
     for mut vis in cloud_vis.iter_mut() {
-        *vis = if show_clouds { Visibility::Visible } else { Visibility::Hidden };
+        *vis = if show_clouds {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
     }
 
     info!("[aesthetic] Switched to {:?}", current.aesthetic);
@@ -1682,10 +1925,18 @@ pub fn lod_visibility_system(
     // Atmosphere = clean gap — only arcs + globe visible
 
     for mut vis in surface_markers.iter_mut() {
-        *vis = if show_surface { Visibility::Visible } else { Visibility::Hidden };
+        *vis = if show_surface {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
     }
     for mut vis in orbit_blobs.iter_mut() {
-        *vis = if show_orbit { Visibility::Visible } else { Visibility::Hidden };
+        *vis = if show_orbit {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
     }
 }
 
@@ -1701,16 +1952,13 @@ pub fn holographic_pulse_system(
 
     for mut tf in atmospheres.iter_mut() {
         let base = tf.scale.x.max(0.5); // avoid zero scale
-        // Apply breathing to atmosphere shells (they started at ~1.03-1.05 scale)
+                                        // Apply breathing to atmosphere shells (they started at ~1.03-1.05 scale)
         tf.scale = Vec3::splat(base.signum() * breath * 1.04);
     }
 }
 
 /// Cloud layer independent rotation — creates parallax depth against the globe surface.
-pub fn cloud_rotation_system(
-    time: Res<Time>,
-    mut clouds: Query<&mut Transform, With<CloudLayer>>,
-) {
+pub fn cloud_rotation_system(time: Res<Time>, mut clouds: Query<&mut Transform, With<CloudLayer>>) {
     let dt = time.delta_secs();
     for mut tf in clouds.iter_mut() {
         tf.rotate_y(0.002 * dt); // slow independent rotation
@@ -1719,13 +1967,11 @@ pub fn cloud_rotation_system(
 }
 
 /// Marker pulse — data markers breathe with sinusoidal scale modulation.
-pub fn marker_pulse_system(
-    time: Res<Time>,
-    mut markers: Query<(&MarkerPulse, &mut Transform)>,
-) {
+pub fn marker_pulse_system(time: Res<Time>, mut markers: Query<(&MarkerPulse, &mut Transform)>) {
     let t = time.elapsed_secs();
     for (pulse, mut tf) in markers.iter_mut() {
-        let scale = pulse.base_scale * (1.0 + pulse.amplitude * (t * pulse.speed + pulse.phase).sin());
+        let scale =
+            pulse.base_scale * (1.0 + pulse.amplitude * (t * pulse.speed + pulse.phase).sin());
         tf.scale = Vec3::splat(scale);
     }
 }
@@ -1741,19 +1987,15 @@ pub fn consciousness_shader_system(
     for (_, mat) in materials.iter_mut() {
         // Higher phi = tighter fresnel (more integrated, coherent light)
         mat.extension.fresnel_power = 2.0 + phi * 3.0; // 2.0 → 5.0
-        // Higher phi = slower scanlines (serene vs anxious)
+                                                       // Higher phi = slower scanlines (serene vs anxious)
         mat.extension.scanline_speed = 1.3 - phi * 1.0; // 1.3 → 0.3
-        // Higher phi = more opaque (clearer perception)
+                                                        // Higher phi = more opaque (clearer perception)
         mat.extension.hologram_alpha = 0.40 + phi * 0.40; // 0.40 → 0.80
     }
 }
 
 /// Animate celestial bodies along their orbits (drawn as gizmo orbit rings).
-pub fn celestial_orbit_system(
-    mut gizmos: Gizmos,
-    time: Res<Time>,
-    timeline: Res<TimelineState>,
-) {
+pub fn celestial_orbit_system(mut gizmos: Gizmos, time: Res<Time>, timeline: Res<TimelineState>) {
     let t = time.elapsed_secs();
     let bodies = sol_atlas_core::solar_system::solar_system_bodies();
 
@@ -1797,8 +2039,16 @@ pub fn celestial_orbit_system(
             let a0 = i as f32 / ring_segs as f32 * std::f32::consts::TAU;
             let a1 = (i + 1) as f32 / ring_segs as f32 * std::f32::consts::TAU;
             gizmos.line(
-                Vec3::new(pos[0] + ring_r * a0.cos(), pos[1], pos[2] + ring_r * a0.sin()),
-                Vec3::new(pos[0] + ring_r * a1.cos(), pos[1], pos[2] + ring_r * a1.sin()),
+                Vec3::new(
+                    pos[0] + ring_r * a0.cos(),
+                    pos[1],
+                    pos[2] + ring_r * a0.sin(),
+                ),
+                Vec3::new(
+                    pos[0] + ring_r * a1.cos(),
+                    pos[1],
+                    pos[2] + ring_r * a1.sin(),
+                ),
                 ring_color,
             );
         }
@@ -1847,7 +2097,9 @@ pub fn celestial_body_update_system(
     let bodies = sol_atlas_core::solar_system::solar_system_bodies();
 
     for (body_marker, mut transform) in &mut query {
-        if body_marker.body_index >= bodies.len() { continue; }
+        if body_marker.body_index >= bodies.len() {
+            continue;
+        }
         let body = &bodies[body_marker.body_index];
         let pos = sol_atlas_core::solar_system::body_position(body, t);
 
@@ -1857,10 +2109,7 @@ pub fn celestial_body_update_system(
 }
 
 /// Return to gameplay when Escape is pressed in globe view.
-pub fn globe_input_system(
-    kb: Res<ButtonInput<KeyCode>>,
-    mut next: ResMut<NextState<GamePhase>>,
-) {
+pub fn globe_input_system(kb: Res<ButtonInput<KeyCode>>, mut next: ResMut<NextState<GamePhase>>) {
     if kb.just_pressed(KeyCode::Escape) {
         next.set(GamePhase::Playing);
     }

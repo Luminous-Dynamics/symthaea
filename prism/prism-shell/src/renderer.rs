@@ -11,19 +11,23 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use vello::kurbo::{Affine, Line, Rect, RoundedRect, RoundedRectRadii};
 use vello::kurbo::Stroke;
+use vello::kurbo::{Affine, Line, Rect, RoundedRect, RoundedRectRadii};
 use vello::peniko::{Blob, Color, Fill, FontData};
 use vello::util::{RenderContext, RenderSurface};
 use vello::wgpu;
-use vello::{AaConfig, Glyph, Renderer, RendererOptions, RenderParams, Scene};
+use vello::{AaConfig, Glyph, RenderParams, Renderer, RendererOptions, Scene};
 use winit::window::Window;
 
 use prism_common::{ContentZone, SafetyLevel};
 use prism_layout::{PaintContent, PaintRect};
 
-const FONT_REGULAR: &[u8] = include_bytes!("/nix/store/9v9i2f647ihw56z8cr5p5x7sf9adrrak-dejavu-fonts-2.37/share/fonts/truetype/DejaVuSans.ttf");
-const FONT_BOLD: &[u8] = include_bytes!("/nix/store/9v9i2f647ihw56z8cr5p5x7sf9adrrak-dejavu-fonts-2.37/share/fonts/truetype/DejaVuSans-Bold.ttf");
+const FONT_REGULAR: &[u8] = include_bytes!(
+    "/nix/store/9v9i2f647ihw56z8cr5p5x7sf9adrrak-dejavu-fonts-2.37/share/fonts/truetype/DejaVuSans.ttf"
+);
+const FONT_BOLD: &[u8] = include_bytes!(
+    "/nix/store/9v9i2f647ihw56z8cr5p5x7sf9adrrak-dejavu-fonts-2.37/share/fonts/truetype/DejaVuSans-Bold.ttf"
+);
 
 /// Chrome bar height in pixels.
 const CHROME_HEIGHT: f64 = 48.0;
@@ -147,14 +151,19 @@ impl PrismRenderer {
             )?;
 
         let surface_texture = surface.surface.get_current_texture()?;
-        let mut encoder = device_handle.device.create_command_encoder(
-            &wgpu::CommandEncoderDescriptor { label: Some("Prism Blit") },
-        );
+        let mut encoder =
+            device_handle
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Prism Blit"),
+                });
         surface.blitter.copy(
             &device_handle.device,
             &mut encoder,
             &surface.target_view,
-            &surface_texture.texture.create_view(&wgpu::TextureViewDescriptor::default()),
+            &surface_texture
+                .texture
+                .create_view(&wgpu::TextureViewDescriptor::default()),
         );
         device_handle.queue.submit([encoder.finish()]);
         surface_texture.present();
@@ -168,9 +177,11 @@ impl PrismRenderer {
     fn draw_chrome(&mut self, w: f64, _h: f64, security: &SecurityState) {
         // Top bar background
         self.scene.fill(
-            Fill::NonZero, Affine::IDENTITY,
+            Fill::NonZero,
+            Affine::IDENTITY,
             Color::new([0.08, 0.14, 0.20, 1.0]),
-            None, &Rect::new(0.0, 0.0, w, CHROME_HEIGHT),
+            None,
+            &Rect::new(0.0, 0.0, w, CHROME_HEIGHT),
         );
 
         // Brand
@@ -193,9 +204,11 @@ impl PrismRenderer {
         };
         let dot_x = w - 80.0;
         self.scene.fill(
-            Fill::NonZero, Affine::IDENTITY,
+            Fill::NonZero,
+            Affine::IDENTITY,
             Color::new(safety_color),
-            None, &vello::kurbo::Circle::new((dot_x, 24.0), 5.0),
+            None,
+            &vello::kurbo::Circle::new((dot_x, 24.0), 5.0),
         );
         self.draw_text(safety_label, dot_x + 10.0, 28.0, 11.0, false, safety_color);
 
@@ -203,22 +216,30 @@ impl PrismRenderer {
         if security.threat_count > 0 {
             let badge_x = dot_x - 50.0;
             self.scene.fill(
-                Fill::NonZero, Affine::IDENTITY,
+                Fill::NonZero,
+                Affine::IDENTITY,
                 Color::new([0.8, 0.15, 0.15, 1.0]),
-                None, &RoundedRect::new(badge_x, 14.0, badge_x + 36.0, 34.0, 10.0),
+                None,
+                &RoundedRect::new(badge_x, 14.0, badge_x + 36.0, 34.0, 10.0),
             );
             self.draw_text(
                 &format!("{}", security.threat_count),
-                badge_x + 12.0, 29.0, 12.0, true, [1.0, 1.0, 1.0, 1.0],
+                badge_x + 12.0,
+                29.0,
+                12.0,
+                true,
+                [1.0, 1.0, 1.0, 1.0],
             );
         }
 
         // Address bar area
         let bar_y = CHROME_HEIGHT;
         self.scene.fill(
-            Fill::NonZero, Affine::IDENTITY,
+            Fill::NonZero,
+            Affine::IDENTITY,
             Color::new([0.12, 0.18, 0.24, 1.0]),
-            None, &Rect::new(0.0, bar_y, w, bar_y + ADDRESS_BAR_HEIGHT),
+            None,
+            &Rect::new(0.0, bar_y, w, bar_y + ADDRESS_BAR_HEIGHT),
         );
 
         // Zone badge (left of address bar)
@@ -229,11 +250,20 @@ impl PrismRenderer {
         };
         let badge_y = bar_y + 4.0;
         self.scene.fill(
-            Fill::NonZero, Affine::IDENTITY,
+            Fill::NonZero,
+            Affine::IDENTITY,
             Color::new(zone_color),
-            None, &RoundedRect::new(10.0, badge_y, 80.0, badge_y + 24.0, 4.0),
+            None,
+            &RoundedRect::new(10.0, badge_y, 80.0, badge_y + 24.0, 4.0),
         );
-        self.draw_text(zone_label, 16.0, badge_y + 17.0, 10.0, true, [1.0, 1.0, 1.0, 1.0]);
+        self.draw_text(
+            zone_label,
+            16.0,
+            badge_y + 17.0,
+            10.0,
+            true,
+            [1.0, 1.0, 1.0, 1.0],
+        );
 
         // Address bar
         let url_x = 90.0;
@@ -243,11 +273,16 @@ impl PrismRenderer {
             [0.18, 0.24, 0.30, 1.0]
         };
         self.scene.fill(
-            Fill::NonZero, Affine::IDENTITY,
+            Fill::NonZero,
+            Affine::IDENTITY,
             Color::new(bar_bg),
-            None, &RoundedRect::new(url_x, badge_y, w - 10.0, badge_y + 24.0, 4.0),
+            None,
+            &RoundedRect::new(url_x, badge_y, w - 10.0, badge_y + 24.0, 4.0),
         );
-        let display_text = security.address_bar_text.as_deref().unwrap_or(&security.url);
+        let display_text = security
+            .address_bar_text
+            .as_deref()
+            .unwrap_or(&security.url);
         let display_text = if display_text.len() > 80 {
             &display_text[..80]
         } else {
@@ -258,14 +293,23 @@ impl PrismRenderer {
         } else {
             [0.7, 0.75, 0.8, 1.0]
         };
-        self.draw_text(display_text, url_x + 8.0, badge_y + 17.0, 12.0, false, text_color);
+        self.draw_text(
+            display_text,
+            url_x + 8.0,
+            badge_y + 17.0,
+            12.0,
+            false,
+            text_color,
+        );
 
         // Blinking cursor when focused
         if security.address_bar_focused {
             let cursor_x = url_x + 8.0 + display_text.len() as f64 * 12.0 * 0.52;
             self.scene.stroke(
-                &Stroke::new(1.5), Affine::IDENTITY,
-                Color::new([0.4, 0.85, 0.8, 1.0]), None,
+                &Stroke::new(1.5),
+                Affine::IDENTITY,
+                Color::new([0.4, 0.85, 0.8, 1.0]),
+                None,
                 &Line::new((cursor_x, badge_y + 4.0), (cursor_x, badge_y + 20.0)),
             );
         }
@@ -273,9 +317,11 @@ impl PrismRenderer {
         // Separator line
         let sep_y = bar_y + ADDRESS_BAR_HEIGHT;
         self.scene.stroke(
-            &Stroke::new(1.0), Affine::IDENTITY,
+            &Stroke::new(1.0),
+            Affine::IDENTITY,
             Color::new([0.2, 0.26, 0.32, 1.0]),
-            None, &Line::new((0.0, sep_y), (w, sep_y)),
+            None,
+            &Line::new((0.0, sep_y), (w, sep_y)),
         );
     }
 
@@ -294,7 +340,13 @@ impl PrismRenderer {
 
             match &rect.content {
                 PaintContent::Text {
-                    text, font_size, bold, italic: _, color, is_link, ..
+                    text,
+                    font_size,
+                    bold,
+                    italic: _,
+                    color,
+                    is_link,
+                    ..
                 } => {
                     self.draw_text(
                         text,
@@ -310,8 +362,10 @@ impl PrismRenderer {
                         let uw = text.len() as f64 * *font_size as f64 * 0.52;
                         let uy = y as f64 + *font_size as f64 + 2.0;
                         self.scene.stroke(
-                            &Stroke::new(1.0), Affine::IDENTITY,
-                            Color::new(*color), None,
+                            &Stroke::new(1.0),
+                            Affine::IDENTITY,
+                            Color::new(*color),
+                            None,
                             &Line::new((rect.x as f64, uy), (rect.x as f64 + uw, uy)),
                         );
                     }
@@ -322,16 +376,29 @@ impl PrismRenderer {
                         Affine::IDENTITY,
                         Color::new(*color),
                         None,
-                        &Line::new((rect.x as f64, y as f64), (rect.x as f64 + rect.width as f64, y as f64)),
+                        &Line::new(
+                            (rect.x as f64, y as f64),
+                            (rect.x as f64 + rect.width as f64, y as f64),
+                        ),
                     );
                 }
-                PaintContent::Fill { color, corner_radius } => {
+                PaintContent::Fill {
+                    color,
+                    corner_radius,
+                } => {
                     let r = *corner_radius as f64;
                     self.scene.fill(
-                        Fill::NonZero, Affine::IDENTITY,
-                        Color::new(*color), None,
+                        Fill::NonZero,
+                        Affine::IDENTITY,
+                        Color::new(*color),
+                        None,
                         &RoundedRect::from_rect(
-                            Rect::new(rect.x as f64, y as f64, (rect.x + rect.width) as f64, (y + rect.height) as f64),
+                            Rect::new(
+                                rect.x as f64,
+                                y as f64,
+                                (rect.x + rect.width) as f64,
+                                (y + rect.height) as f64,
+                            ),
                             RoundedRectRadii::from_single_radius(r),
                         ),
                     );
@@ -351,7 +418,11 @@ impl PrismRenderer {
         bold: bool,
         color: [f32; 4],
     ) {
-        let font = if bold { &self.font_bold } else { &self.font_regular };
+        let font = if bold {
+            &self.font_bold
+        } else {
+            &self.font_regular
+        };
         let vello_color = Color::new(color);
 
         let font_ref = match skrifa::raw::FontRef::from_index(font.data.as_ref(), 0) {
@@ -362,7 +433,9 @@ impl PrismRenderer {
         let charmap = skrifa::MetadataProvider::charmap(&font_ref);
         let sz = skrifa::instance::Size::new(font_size);
         let glyph_metrics = skrifa::MetadataProvider::glyph_metrics(
-            &font_ref, sz, skrifa::instance::LocationRef::default(),
+            &font_ref,
+            sz,
+            skrifa::instance::LocationRef::default(),
         );
 
         let mut pen_x = 0.0_f32;
@@ -373,7 +446,11 @@ impl PrismRenderer {
                 let advance = glyph_metrics.advance_width(gid).unwrap_or(font_size * 0.5);
                 let gx = pen_x;
                 pen_x += advance;
-                Some(Glyph { id: gid.to_u32(), x: gx, y: 0.0 })
+                Some(Glyph {
+                    id: gid.to_u32(),
+                    x: gx,
+                    y: 0.0,
+                })
             })
             .collect();
 

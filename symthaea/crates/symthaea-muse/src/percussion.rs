@@ -468,29 +468,56 @@ mod tests {
     #[test]
     fn velocity_shapes_kick_duration() {
         let soft = render_drum_colored(
-            &DrumHit { drum: DrumType::Kick, time: 0.0, velocity: 0.2 },
-            44100, &DrumColor::default(),
+            &DrumHit {
+                drum: DrumType::Kick,
+                time: 0.0,
+                velocity: 0.2,
+            },
+            44100,
+            &DrumColor::default(),
         );
         let loud = render_drum_colored(
-            &DrumHit { drum: DrumType::Kick, time: 0.0, velocity: 0.9 },
-            44100, &DrumColor::default(),
+            &DrumHit {
+                drum: DrumType::Kick,
+                time: 0.0,
+                velocity: 0.9,
+            },
+            44100,
+            &DrumColor::default(),
         );
         assert!(
             loud.len() > soft.len(),
             "loud kick should be longer: loud={}, soft={}",
-            loud.len(), soft.len()
+            loud.len(),
+            soft.len()
         );
     }
 
     #[test]
     fn tightness_shortens_decay() {
         let loose = render_drum_colored(
-            &DrumHit { drum: DrumType::Snare, time: 0.0, velocity: 0.7 },
-            44100, &DrumColor { tightness: 0.0, ..Default::default() },
+            &DrumHit {
+                drum: DrumType::Snare,
+                time: 0.0,
+                velocity: 0.7,
+            },
+            44100,
+            &DrumColor {
+                tightness: 0.0,
+                ..Default::default()
+            },
         );
         let tight = render_drum_colored(
-            &DrumHit { drum: DrumType::Snare, time: 0.0, velocity: 0.7 },
-            44100, &DrumColor { tightness: 1.0, ..Default::default() },
+            &DrumHit {
+                drum: DrumType::Snare,
+                time: 0.0,
+                velocity: 0.7,
+            },
+            44100,
+            &DrumColor {
+                tightness: 1.0,
+                ..Default::default()
+            },
         );
         // Tight snare should have less energy in the tail
         let loose_tail: f32 = loose[loose.len() / 2..].iter().map(|s| s * s).sum::<f32>();
@@ -508,7 +535,9 @@ mod tests {
         humanize_hits(&mut hits, 0.5, 42);
         let jittered_times: Vec<f32> = hits.iter().map(|h| h.time).collect();
         // At least some times should differ (all except beat 0)
-        let diffs: usize = original_times.iter().zip(&jittered_times)
+        let diffs: usize = original_times
+            .iter()
+            .zip(&jittered_times)
             .filter(|(&a, &b)| (a - b).abs() > 0.0001)
             .count();
         assert!(diffs > 0, "humanize should jitter at least some hit times");
@@ -517,9 +546,13 @@ mod tests {
     #[test]
     fn ghost_notes_at_high_consciousness() {
         let pattern = generate_pattern_full(120.0, 0.8, 0.6, 0.5, 0.0);
-        let ghost_snares: Vec<_> = pattern.iter()
+        let ghost_snares: Vec<_> = pattern
+            .iter()
             .filter(|h| h.drum == DrumType::Snare && h.velocity < 0.4)
             .collect();
-        assert!(!ghost_snares.is_empty(), "high consciousness should produce ghost notes");
+        assert!(
+            !ghost_snares.is_empty(),
+            "high consciousness should produce ghost notes"
+        );
     }
 }

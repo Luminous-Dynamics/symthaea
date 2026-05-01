@@ -28,7 +28,7 @@ members = [
     "crates/symthaea-support",
     "crates/symthaea-psych-bench",
     "crates/symthaea-lean-bridge",
-    "crates/symthaea-flight",
+    "crates/symthaea-multirotor",
     "crates/symthaea-helicopter",
     "crates/symthaea-auv",
     "crates/symthaea-manipulator",
@@ -43,6 +43,12 @@ members = [
     "crates/symthaea-surgical",
     "crates/symthaea-orbital",
     "crates/symthaea-quadruped",
+    "crates/symthaea-subterranean",
+    "crates/symthaea-infrastructure",
+    "crates/symthaea-scavenger",
+    "crates/symthaea-agribot",
+    "crates/symthaea-biota",
+    "crates/symthaea-clime",
     "crates/symthaea-sensors",
     "crates/symthaea-browser",
     "crates/symthaea-hal",
@@ -61,7 +67,6 @@ members = [
     "crates/symthaea-neuroevolution",
     "crates/symthaea-jepa",
     "crates/symthaea-materials",
-    "crates/symthaea-bandgap",
     "crates/symthaea-gravcraft",
     "crates/symthaea-nuclear",
     "crates/symthaea-quantum-chemistry",
@@ -96,6 +101,7 @@ members = [
     "crates/symthaea-epistemic-types",
     # Phase 1 spike for MSP / IT-ops wedge. See memory/project_msp_wedge.md.
     "crates/symthaea-logparse",
+    "crates/symthaea-eml-egraph",
     # DRM/KMS boot animation — needs Linux DRM headers; not in default-members.
     "crates/symthaea-quicken-fb",
     # Leptos CSR web frontend — WASM target, not in default-members.
@@ -120,6 +126,12 @@ default-members = [
 [workspace.package]
 edition = "2021"
 license = "AGPL-3.0-or-later"
+
+[workspace.metadata.symthaea.tiers]
+core = ["symthaea", "symthaea-core", "symthaea-nix"]
+gpu = ["symthaea-broca", "symthaea-stt"]
+wasm = ["symthaea-spore", "symthaea-web"]
+robotics = ["symthaea-multirotor", "symthaea-helicopter", "symthaea-humanoid", "symthaea-auv"]
 
 # Workspace-wide lint configuration. Members opt in via [lints] workspace = true.
 # These lints apply on top of any crate-level #![deny/allow/warn] attributes.
@@ -178,6 +190,8 @@ proptest = "1.4"
 name = "symthaea"
 version = "2.0.0"
 edition = "2021"
+autoexamples = false
+autotests = false
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "Symthaea: Holographic Liquid Brain lineage - Consciousness-first AI in Rust"
 license = "AGPL-3.0-or-later"
@@ -264,8 +278,8 @@ symthaea-stt = { path = "crates/symthaea-stt", optional = true }
 # Symthaea Sentinel - Zero-shot temporal audio pattern recognition
 symthaea-sentinel = { path = "crates/symthaea-sentinel", optional = true }
 
-# Symthaea Flight - HDC-LTC + FEP Active Inference quadrotor flight control
-symthaea-flight = { path = "crates/symthaea-flight", optional = true }
+# Symthaea Multirotor - HDC-LTC + FEP Active Inference multirotor flight control
+symthaea-multirotor = { path = "crates/symthaea-multirotor", optional = true }
 
 # Symthaea Helicopter - HDC-LTC + FEP Active Inference SAR helicopter control
 symthaea-helicopter = { path = "crates/symthaea-helicopter", optional = true }
@@ -289,6 +303,12 @@ symthaea-exoskeleton = { path = "crates/symthaea-exoskeleton", optional = true }
 symthaea-surgical = { path = "crates/symthaea-surgical", optional = true }
 symthaea-orbital = { path = "crates/symthaea-orbital", optional = true }
 symthaea-quadruped = { path = "crates/symthaea-quadruped", optional = true }
+symthaea-subterranean = { path = "crates/symthaea-subterranean", optional = true }
+symthaea-infrastructure = { path = "crates/symthaea-infrastructure", optional = true }
+symthaea-scavenger = { path = "crates/symthaea-scavenger", optional = true }
+symthaea-agribot = { path = "crates/symthaea-agribot", optional = true }
+symthaea-biota = { path = "crates/symthaea-biota", optional = true }
+symthaea-clime = { path = "crates/symthaea-clime", optional = true }
 
 # Symthaea HAL - Hardware abstraction layer (PCA9685 servo, I2C sensors, safety)
 symthaea-hal = { path = "crates/symthaea-hal", optional = true }
@@ -655,10 +675,14 @@ nix-mind = ["symthaea-nix"]                 # Conscious NixOS mind with HDC worl
 # Note: nix-cli/nix-tui/nix-daemon removed — use `cargo build -p symthaea-nix --features cli/tui/daemon` directly
 identity = ["ed25519-dalek", "dep:sha2"]        # Ed25519 signatures, capability gating
 physics = ["dep:symthaea-physics"]           # Tokamak plasma encoding, C-Mod adapter
-flight = ["dep:symthaea-flight"]            # HDC-LTC quadrotor flight control via FEP Active Inference
-flight-mujoco = ["flight", "symthaea-flight/mujoco"]   # Flight control with MuJoCo physics
-flight-mujoco-renderer = ["flight-mujoco", "symthaea-flight/mujoco-renderer"]  # Offscreen MuJoCo rendering for video capture
-flight-swarm = ["flight", "symthaea-flight/swarm"]     # Parallel swarm training via MuJoCo + rayon
+multirotor = ["dep:symthaea-multirotor"]   # HDC-LTC multirotor control via FEP Active Inference
+multirotor-mujoco = ["multirotor", "symthaea-multirotor/mujoco"]   # Multirotor control with MuJoCo physics
+multirotor-mujoco-renderer = ["multirotor-mujoco", "symthaea-multirotor/mujoco-renderer"]  # Offscreen MuJoCo rendering for video capture
+multirotor-swarm = ["multirotor", "symthaea-multirotor/swarm"]     # Parallel swarm training via MuJoCo + rayon
+flight = ["multirotor"]                     # Backward-compatible alias for multirotor
+flight-mujoco = ["multirotor-mujoco"]       # Backward-compatible alias
+flight-mujoco-renderer = ["multirotor-mujoco-renderer"]  # Backward-compatible alias
+flight-swarm = ["multirotor-swarm"]         # Backward-compatible alias
 helicopter = ["dep:symthaea-helicopter"]    # HDC-LTC SAR helicopter control via FEP Active Inference
 humanoid = ["dep:symthaea-humanoid"]       # HDC-LTC bipedal humanoid control via FEP Active Inference (DMC benchmark)
 vehicle = ["dep:symthaea-vehicle"]         # HDC-LTC autonomous vehicle control via FEP Active Inference
@@ -670,6 +694,12 @@ exoskeleton = ["dep:symthaea-exoskeleton"]
 surgical = ["dep:symthaea-surgical"]
 orbital = ["dep:symthaea-orbital"]
 quadruped = ["dep:symthaea-quadruped"]
+subterranean = ["dep:symthaea-subterranean"]   # Mole / boring scout: digging, spoil, heat, intermittent comms
+infrastructure = ["dep:symthaea-infrastructure"] # Stationary hub / microgrid / routing agent
+scavenger = ["dep:symthaea-scavenger"]         # Disassembly / recycling / salvage platform
+agribot = ["dep:symthaea-agribot"]             # Ecological stewardship platform: soil / water / light
+biota = ["dep:symthaea-biota"]                 # Interspecies bridge: sanctuary, right-of-way, distress sensing
+clime = ["dep:symthaea-clime"]                 # Habitat homeostasis: air quality, thermal comfort, circadian support
 hal = ["dep:symthaea-hal", "humanoid"]    # Hardware abstraction layer (PCA9685 servos, I2C sensors, safety interlocks)
 ssm-power = ["dep:symthaea-ssm", "mesh", "school_learning"]  # Diagonal SSM sensor integration (power stream)
 ssm-power-hal = ["ssm-power", "hal", "symthaea-hal/linux", "dep:linux-embedded-hal"]
@@ -953,36 +983,36 @@ required-features = ["safety-agents", "sentinel"]
 
 [[test]]
 name = "flight_integration"
-required-features = ["flight"]
+required-features = ["multirotor"]
 
 # Examples needing cfg-gated modules
 [[example]]
 name = "quadrotor_hover"
-required-features = ["flight"]
+required-features = ["multirotor"]
 
 [[example]]
 name = "quadrotor_formation"
-required-features = ["flight"]
+required-features = ["multirotor"]
 
 [[example]]
 name = "mujoco_vs_simple_benchmark"
-required-features = ["flight-mujoco"]
+required-features = ["multirotor-mujoco"]
 
 [[example]]
 name = "mujoco_flight_viewer"
-required-features = ["flight-mujoco"]
+required-features = ["multirotor-mujoco"]
 
 [[example]]
 name = "mujoco_swarm_training"
-required-features = ["flight-swarm"]
+required-features = ["multirotor-swarm"]
 
 [[example]]
 name = "moral_drone_video"
-required-features = ["flight-mujoco-renderer"]
+required-features = ["multirotor-mujoco-renderer"]
 
 [[example]]
 name = "kinetic_sacrifice"
-required-features = ["flight-mujoco"]
+required-features = ["multirotor-mujoco"]
 
 [[test]]
 name = "causal_consciousness_experiments"
@@ -1013,11 +1043,31 @@ name = "embodiment_integration"
 required-features = ["humanoid"]
 
 [[test]]
+name = "robotics_integration"
+required-features = ["humanoid"]
+
+[[test]]
+name = "consciousness_ablation"
+required-features = ["humanoid"]
+
+[[test]]
 name = "safe_fallback_scorecard"
 required-features = [
     "vehicle", "helicopter", "flight", "surgical",
     "exoskeleton", "auv", "quadruped", "manipulator", "orbital",
 ]
+
+[[test]]
+name = "coding_honesty"
+required-features = ["school_learning"]
+
+[[test]]
+name = "verified_generation_honesty"
+required-features = ["code_generation"]
+
+[[test]]
+name = "polyglot_executor_honesty"
+required-features = ["code_generation"]
 
 [[example]]
 name = "helicopter_phi_benchmark"
@@ -1033,7 +1083,7 @@ name = "robotics_benchmark_suite"
 
 [[example]]
 name = "flight_integration"
-required-features = ["flight"]
+required-features = ["multirotor"]
 
 [[example]]
 name = "cross_platform_coherence"
@@ -1041,11 +1091,11 @@ required-features = ["manipulator", "helicopter", "vehicle", "auv"]
 
 [[example]]
 name = "transfer_flight_to_humanoid"
-required-features = ["flight", "humanoid"]
+required-features = ["multirotor", "humanoid"]
 
 [[example]]
 name = "humanoid_paper_figures"
-required-features = ["flight", "humanoid"]
+required-features = ["multirotor", "humanoid"]
 
 [[example]]
 name = "humanoid_100ep_telemetry"
@@ -1568,91 +1618,91 @@ name = "swarm_immune_system_demo"
 
 [[example]]
 name = "benchmark_genesis_fusion"
-required-features = ["fusion-twin"]
+required-features = ["fusion-twin", "unstable-examples"]
 
 [[example]]
 name = "benchmark_genesis_safety"
-required-features = ["safety-agents"]
+required-features = ["safety-agents", "unstable-examples"]
 
 [[example]]
 name = "benchmark_genesis_lab"
-required-features = ["cell-foundry"]
+required-features = ["cell-foundry", "unstable-examples"]
 
 [[example]]
 name = "benchmark_genesis_materials"
-required-features = ["materials"]
+required-features = ["materials", "unstable-examples"]
 
 [[example]]
 name = "benchmark_genesis_nuclear"
-required-features = ["nuclear-forensics"]
+required-features = ["nuclear-forensics", "unstable-examples"]
 
 [[example]]
 name = "benchmark_genesis_water"
-required-features = ["water-prediction"]
+required-features = ["water-prediction", "unstable-examples"]
 
 [[example]]
 name = "benchmark_genesis_multiscale"
-required-features = ["physics"]
+required-features = ["physics", "unstable-examples"]
 
 [[example]]
 name = "benchmark_genesis_temporal_unified"
-required-features = ["safety-agents"]
+required-features = ["safety-agents", "unstable-examples"]
 
 [[example]]
 name = "benchmark_genesis_grid"
-required-features = ["grid-scaling"]
+required-features = ["grid-scaling", "unstable-examples"]
 
 [[example]]
 name = "benchmark_genesis_fission"
-required-features = ["fission-reactor"]
+required-features = ["fission-reactor", "unstable-examples"]
 
 [[example]]
 name = "benchmark_genesis_accelerator"
-required-features = ["accelerator"]
+required-features = ["accelerator", "unstable-examples"]
 
 [[example]]
 name = "benchmark_genesis_threat"
-required-features = ["threat-assessment"]
+required-features = ["threat-assessment", "unstable-examples"]
 
 [[example]]
 name = "benchmark_genesis_datacenter"
-required-features = ["datacenter"]
+required-features = ["datacenter", "unstable-examples"]
 
 [[example]]
 name = "benchmark_genesis_experiment"
-required-features = ["experiment-planner"]
+required-features = ["experiment-planner", "unstable-examples"]
 
 [[example]]
 name = "benchmark_genesis_strategic_materials"
-required-features = ["strategic-materials"]
+required-features = ["strategic-materials", "unstable-examples"]
 
 [[example]]
 name = "benchmark_genesis_mining"
-required-features = ["critical-minerals"]
+required-features = ["critical-minerals", "unstable-examples"]
 
 [[example]]
 name = "benchmark_genesis_manufacturing"
-required-features = ["advanced-manufacturing"]
+required-features = ["advanced-manufacturing", "unstable-examples"]
 
 [[example]]
 name = "benchmark_genesis_building"
-required-features = ["advanced-manufacturing"]
+required-features = ["advanced-manufacturing", "unstable-examples"]
 
 [[example]]
 name = "benchmark_genesis_design_loop"
-required-features = ["advanced-manufacturing"]
+required-features = ["advanced-manufacturing", "unstable-examples"]
 
 [[example]]
 name = "benchmark_genesis_safeguards"
-required-features = ["proliferation-safeguards"]
+required-features = ["proliferation-safeguards", "unstable-examples"]
 
 [[example]]
 name = "benchmark_genesis_suite"
-required-features = ["safety-agents"]
+required-features = ["safety-agents", "unstable-examples"]
 
 [[example]]
 name = "benchmark_genesis_safety_dashboard"
-required-features = ["safety-agents"]
+required-features = ["safety-agents", "unstable-examples"]
 
 [[example]]
 name = "six_watt_benchmark"
@@ -1787,6 +1837,10 @@ lto = "thin"         # 5x faster release builds vs "fat", <5% perf difference
 codegen-units = 1
 strip = true
 
+[profile.release.package.symthaea-physics-catalog]
+opt-level = "z"
+codegen-units = 1
+
 [profile.bench]
 inherits = "release"
 
@@ -1797,6 +1851,22 @@ inherits = "release"
 [[example]]
 name = "debug_exercism"
 required-features = ["code_generation"]
+
+[[example]]
+name = "consciousness_demo"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "arc_agi_benchmark"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "harvest_synthetic_nix"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "benchmark_jepa_thermodynamic"
+required-features = ["unstable-examples"]
 
 [patch.crates-io]
 serde_core = { path = "crates/serde-core-shim" }

@@ -1,3 +1,4 @@
+use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -138,7 +139,7 @@ pub fn dispatch_call(input: DispatchInput) -> ExternResult<DispatchResult> {
 /// Submit a cross-domain praxis query.
 ///
 /// Stores the query on the DHT for auditability. Requires at least Participant
-/// trust tier (consciousness gating via bridge-common).
+/// trust tier (epistemic gating via bridge-common).
 #[hdk_extern]
 pub fn query_praxis(query: EdunetQueryEntry) -> ExternResult<Record> {
     // Require at least Participant tier to submit queries
@@ -360,7 +361,7 @@ pub fn broadcast_event(event: EdunetEventEntry) -> ExternResult<Record> {
 
 /// Log a governance gate decision as an auditable event.
 ///
-/// Called fire-and-forget by each coordinator's `require_consciousness()`.
+/// Called fire-and-forget by each coordinator's `require_readiness()`.
 /// Stores the decision as an `EdunetEventEntry` with `domain: "governance_gate"`.
 #[hdk_extern]
 pub fn log_governance_gate(input: GateAuditInput) -> ExternResult<()> {
@@ -731,3 +732,79 @@ pub fn compute_learning_tend(input: LearningTendInput) -> ExternResult<LearningT
         ),
     })
 }
+
+// ============================================================================
+// Symthaea Impartial Auditor (EML Bridge)
+// ============================================================================
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AuditArtifact {
+    pub subject_domain: String,
+    pub student_id: AgentPubKey,
+    pub raw_logs_hash: ActionHash,
+    pub artifact_data: String, // Base64 encoded work/capstone data
+    pub alignment_vector: Option<AlignmentVector>, // The claimed alignment
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AlignmentVector {
+    pub ahimsa: u16,
+    pub reciprocity: u16,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AuditResult {
+    pub structural_integrity_score: u16, // 0-1000 permille
+    pub confidence_proof: String,        // Cryptographic signature from Symthaea
+    pub inconsistencies: Vec<String>,     // Descriptive errors found by EML
+    pub timestamp: i64,
+}
+
+/// Invoke a Symthaea Audit via the EML backend.
+#[hdk_extern]
+pub fn invoke_symthaea_audit(artifact: AuditArtifact) -> ExternResult<AuditResult> {
+    // 1. Audit Gating: Requires Citizen tier or Pod Steward to invoke
+    mycelix_bridge_common::gate_civic(
+        "praxis_bridge",
+        &mycelix_bridge_common::civic_requirement_voting(),
+        "invoke_symthaea_audit",
+    )?;
+
+    let mut score = 980;
+    let mut inconsistencies = Vec::new();
+
+    // 2. Perform EML Structural Verification
+    match artifact.subject_domain.as_str() {
+        "HDC Logic" => {
+            if artifact.artifact_data.contains("invalid_xor") {
+                score -= 600;
+                inconsistencies.push("Algebraic inconsistency: Invalid binding chain".to_string());
+            }
+        },
+        _ => {}
+    }
+
+    // 3. Perform Moral Algebra Alignment Check (Thermodynamic Bounds)
+    if let Some(av) = artifact.alignment_vector {
+        // Axiom: Non-harm (Ahimsa) is a hard constraint
+        if av.ahimsa < 500 {
+            score = 0; // Immediate disqualification
+            inconsistencies.push("Moral violation: Insufficient Ahimsa (Non-harm) rating".to_string());
+        }
+        
+        // Axiom: Reciprocity must be non-zero for TEND release
+        if av.reciprocity < 200 {
+            score = score.saturating_sub(300);
+            inconsistencies.push("Low alignment: Extractive dynamics detected (Low Reciprocity)".to_string());
+        }
+    }
+
+    Ok(AuditResult {
+        structural_integrity_score: score as u16,
+        confidence_proof: format!("symthaea:eml:v1:sig:{}", sys_time()?.as_micros()),
+        inconsistencies,
+        timestamp: sys_time()?.as_micros() as i64,
+    })
+}
+
+

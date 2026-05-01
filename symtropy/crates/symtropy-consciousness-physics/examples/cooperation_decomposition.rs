@@ -22,13 +22,13 @@
 //! Run: cargo run --example cooperation_decomposition --release
 
 use nalgebra::SVector;
-use symtropy_consciousness_physics::convergence::{mann_whitney_u, cohens_d, holm_bonferroni};
+use symthaea_consciousness_equation::ConsciousnessInputs;
+use symtropy_consciousness_physics::convergence::{cohens_d, holm_bonferroni, mann_whitney_u};
 use symtropy_consciousness_physics::fep_gradient;
 use symtropy_consciousness_physics::harmony_field::HarmonyField;
 use symtropy_consciousness_physics::{ConsciousnessField, ThermodynamicConstants};
 use symtropy_math::Point;
 use symtropy_physics::PhysicsWorld;
-use symthaea_consciousness_equation::ConsciousnessInputs;
 
 const AGENTS: usize = 20;
 const TICKS: usize = 8_000;
@@ -43,9 +43,16 @@ const HARMONY_PROFILES: [[f64; 9]; 4] = [
 ];
 
 #[derive(Clone, Copy)]
-enum Controller { Fep, WellOnly, Greedy }
+enum Controller {
+    Fep,
+    WellOnly,
+    Greedy,
+}
 #[derive(Clone, Copy)]
-enum RegenMode { WithRegen, NoRegen }
+enum RegenMode {
+    WithRegen,
+    NoRegen,
+}
 
 struct DecompResult {
     condition: String,
@@ -71,16 +78,29 @@ fn run_experiment(ctrl: Controller, regen: RegenMode, seed: u64) -> DecompResult
         let x = (rng_f64(&mut rng) - 0.5) * 100.0;
         let y = (rng_f64(&mut rng) - 0.5) * 100.0;
         let h = world.add_sphere(Point::new([x, y]), 1.0, 1.0);
-        if let Some(b) = world.body_mut(h) { b.linear_damping = 0.05; }
-        consciousness.register(h, consciousness.constants.initial_energy, consciousness.constants.harmony_range);
+        if let Some(b) = world.body_mut(h) {
+            b.linear_damping = 0.05;
+        }
+        consciousness.register(
+            h,
+            consciousness.constants.initial_energy,
+            consciousness.constants.harmony_range,
+        );
         if let Some(e) = consciousness.entities.get_mut(&h) {
             e.harmony_activations = HARMONY_PROFILES[i % 4];
         }
         handles.push(h);
     }
 
-    let ctrl_name = match ctrl { Controller::Fep => "FEP", Controller::WellOnly => "WELL", Controller::Greedy => "GREEDY" };
-    let regen_name = match regen { RegenMode::WithRegen => "REGEN", RegenMode::NoRegen => "NO_REGEN" };
+    let ctrl_name = match ctrl {
+        Controller::Fep => "FEP",
+        Controller::WellOnly => "WELL",
+        Controller::Greedy => "GREEDY",
+    };
+    let regen_name = match regen {
+        RegenMode::WithRegen => "REGEN",
+        RegenMode::NoRegen => "NO_REGEN",
+    };
     let condition = format!("{}+{}", ctrl_name, regen_name);
 
     let mut coop = 0u64;
@@ -95,49 +115,93 @@ fn run_experiment(ctrl: Controller, regen: RegenMode, seed: u64) -> DecompResult
             let ht = e.map(|e| e.total_harmony_energy()).unwrap_or(0.0);
             let collapsed = e.map(|e| e.energy.is_collapsed()).unwrap_or(true);
             let inputs = if collapsed {
-                ConsciousnessInputs { phi: 0.0, broadcast: 0.0, working_memory: 0.0,
-                    attention: 0.0, recurrence: 0.0, embodiment: 0.0, knowledge: 0.0, synchrony: 0.0 }
+                ConsciousnessInputs {
+                    phi: 0.0,
+                    broadcast: 0.0,
+                    working_memory: 0.0,
+                    attention: 0.0,
+                    recurrence: 0.0,
+                    embodiment: 0.0,
+                    knowledge: 0.0,
+                    synchrony: 0.0,
+                }
             } else {
                 ConsciousnessInputs {
-                    phi: ef, broadcast: 0.5, working_memory: (1.0 - pe).max(0.0),
-                    attention: 0.5, recurrence: 1.0, embodiment: 0.7,
-                    knowledge: (ht / 8.0).min(1.0), synchrony: consciousness.collective_phi.max(0.5),
+                    phi: ef,
+                    broadcast: 0.5,
+                    working_memory: (1.0 - pe).max(0.0),
+                    attention: 0.5,
+                    recurrence: 1.0,
+                    embodiment: 0.7,
+                    knowledge: (ht / 8.0).min(1.0),
+                    synchrony: consciousness.collective_phi.max(0.5),
                 }
             };
             consciousness.update_entity(h, &inputs, Point::origin());
         }
 
-        let adata: Vec<_> = handles.iter().filter_map(|&h| {
-            Some((world.body(h)?.position().0, consciousness.entities.get(&h)?.harmony_activations))
-        }).collect();
-        let wdata: Vec<_> = wells.iter().zip(well_remaining.iter())
-            .filter(|(_, &r)| r > 0.0).map(|(&p, &r)| (p, (r / 2500.0).min(1.0))).collect();
+        let adata: Vec<_> = handles
+            .iter()
+            .filter_map(|&h| {
+                Some((
+                    world.body(h)?.position().0,
+                    consciousness.entities.get(&h)?.harmony_activations,
+                ))
+            })
+            .collect();
+        let wdata: Vec<_> = wells
+            .iter()
+            .zip(well_remaining.iter())
+            .filter(|(_, &r)| r > 0.0)
+            .map(|(&p, &r)| (p, (r / 2500.0).min(1.0)))
+            .collect();
 
         for (idx, &h) in handles.iter().enumerate() {
             let Some(b) = world.body(h) else { continue };
-            let Some(e) = consciousness.entities.get(&h) else { continue };
-            if e.energy.is_collapsed() { continue; }
+            let Some(e) = consciousness.entities.get(&h) else {
+                continue;
+            };
+            if e.energy.is_collapsed() {
+                continue;
+            }
             let pos = b.position().0;
 
             let vel: SVector<f64, 2> = match ctrl {
                 Controller::Fep => {
-                    let near: Vec<_> = adata.iter().filter(|(p, _)| {
-                        let d = (p - pos).norm(); d > 2.0 && d < consciousness.constants.harmony_range
-                    }).cloned().collect();
-                    fep_gradient::free_energy_gradient(&pos, e.energy.fraction_remaining(),
-                        &e.harmony_activations, &near, &wdata, None, 0.0) * 20.0
-                },
+                    let near: Vec<_> = adata
+                        .iter()
+                        .filter(|(p, _)| {
+                            let d = (p - pos).norm();
+                            d > 2.0 && d < consciousness.constants.harmony_range
+                        })
+                        .cloned()
+                        .collect();
+                    fep_gradient::free_energy_gradient(
+                        &pos,
+                        e.energy.fraction_remaining(),
+                        &e.harmony_activations,
+                        &near,
+                        &wdata,
+                        None,
+                        0.0,
+                    ) * 20.0
+                }
                 Controller::WellOnly => {
                     let mut best_dir = SVector::zeros();
                     let mut best_dist = f64::MAX;
                     for (wp, wr) in &wdata {
-                        if *wr < 0.01 { continue; }
+                        if *wr < 0.01 {
+                            continue;
+                        }
                         let delta = wp - pos;
                         let d = delta.norm();
-                        if d < best_dist && d > 1.0 { best_dist = d; best_dir = delta / d; }
+                        if d < best_dist && d > 1.0 {
+                            best_dist = d;
+                            best_dir = delta / d;
+                        }
                     }
                     best_dir * 20.0
-                },
+                }
                 Controller::Greedy => {
                     let mut best_dir = SVector::zeros();
                     let mut best_gain = f64::NEG_INFINITY;
@@ -147,23 +211,38 @@ fn run_experiment(ctrl: Controller, regen: RegenMode, seed: u64) -> DecompResult
                         let tp = pos + td * 5.0;
                         let mut gain = 0.0;
                         for (wp, wr) in &wdata {
-                            if *wr < 0.01 { continue; }
-                            if (tp - wp).norm() < 35.0 { gain += consciousness.constants.energy_well_regen_rate * wr; }
+                            if *wr < 0.01 {
+                                continue;
+                            }
+                            if (tp - wp).norm() < 35.0 {
+                                gain += consciousness.constants.energy_well_regen_rate * wr;
+                            }
                         }
                         if use_regen {
                             for (ap, ah) in &adata {
                                 let d = (tp - ap).norm();
-                                if d < 2.0 || d > consciousness.constants.harmony_range { continue; }
+                                if d < 2.0 || d > consciousness.constants.harmony_range {
+                                    continue;
+                                }
                                 let res = HarmonyField::<2>::resonance(&e.harmony_activations, ah);
-                                if res > 0.5 { gain += consciousness.constants.harmony_resonance_regen_rate * (res - 0.5) * 2.0; }
+                                if res > 0.5 {
+                                    gain += consciousness.constants.harmony_resonance_regen_rate
+                                        * (res - 0.5)
+                                        * 2.0;
+                                }
                             }
                         }
-                        if gain > best_gain { best_gain = gain; best_dir = td; }
+                        if gain > best_gain {
+                            best_gain = gain;
+                            best_dir = td;
+                        }
                     }
                     best_dir * 20.0
-                },
+                }
             };
-            if let Some(b) = world.body_mut(h) { b.linear_velocity = vel; }
+            if let Some(b) = world.body_mut(h) {
+                b.linear_velocity = vel;
+            }
         }
 
         // Maintenance + well regen (always on)
@@ -172,7 +251,9 @@ fn run_experiment(ctrl: Controller, regen: RegenMode, seed: u64) -> DecompResult
         let ar = consciousness.constants.ambient_regen_rate;
         let wr = consciousness.constants.energy_well_regen_rate;
         for &h in handles.iter() {
-            if let Some(e) = consciousness.entities.get_mut(&h) { e.energy.tick_reset(); }
+            if let Some(e) = consciousness.entities.get_mut(&h) {
+                e.energy.tick_reset();
+            }
             consciousness.consume_energy(h, mr * (1.0 + consciousness.phi(h) * 0.5));
             if let Some(e) = consciousness.entities.get_mut(&h) {
                 e.energy.regenerate(ar * rm);
@@ -193,23 +274,37 @@ fn run_experiment(ctrl: Controller, regen: RegenMode, seed: u64) -> DecompResult
 
         // Resonance regeneration (only if use_regen)
         for i in 0..handles.len() {
-            for j in (i+1)..handles.len() {
+            for j in (i + 1)..handles.len() {
                 let (ha, hb) = (handles[i], handles[j]);
                 let in_range = match (world.body(ha), world.body(hb)) {
-                    (Some(a), Some(b)) => a.position().distance(b.position()) < consciousness.constants.harmony_range,
+                    (Some(a), Some(b)) => {
+                        a.position().distance(b.position()) < consciousness.constants.harmony_range
+                    }
                     _ => false,
                 };
-                if !in_range { continue; }
-                let (a, b) = match (consciousness.entities.get(&ha), consciousness.entities.get(&hb)) {
-                    (Some(a), Some(b)) => (a.harmony_activations, b.harmony_activations), _ => continue,
+                if !in_range {
+                    continue;
+                }
+                let (a, b) = match (
+                    consciousness.entities.get(&ha),
+                    consciousness.entities.get(&hb),
+                ) {
+                    (Some(a), Some(b)) => (a.harmony_activations, b.harmony_activations),
+                    _ => continue,
                 };
                 let res = HarmonyField::<2>::resonance(&a, &b);
                 if res > 0.5 {
                     coop += 1;
                     if use_regen {
-                        let rg = consciousness.constants.harmony_resonance_regen_rate * (res - 0.5) * 2.0;
-                        if let Some(e) = consciousness.entities.get_mut(&ha) { e.energy.regenerate(rg); }
-                        if let Some(e) = consciousness.entities.get_mut(&hb) { e.energy.regenerate(rg); }
+                        let rg = consciousness.constants.harmony_resonance_regen_rate
+                            * (res - 0.5)
+                            * 2.0;
+                        if let Some(e) = consciousness.entities.get_mut(&ha) {
+                            e.energy.regenerate(rg);
+                        }
+                        if let Some(e) = consciousness.entities.get_mut(&hb) {
+                            e.energy.regenerate(rg);
+                        }
                         total_res_energy += rg * 2.0;
                     }
                 }
@@ -221,10 +316,30 @@ fn run_experiment(ctrl: Controller, regen: RegenMode, seed: u64) -> DecompResult
         consciousness.tick_thermodynamics();
     }
 
-    let alive = handles.iter().filter(|h| consciousness.entities.get(h).map(|e| !e.energy.is_collapsed()).unwrap_or(false)).count() as f64;
-    let energy = handles.iter().filter_map(|h| consciousness.entities.get(h).map(|e| e.energy.available)).sum::<f64>() / AGENTS as f64;
+    let alive = handles
+        .iter()
+        .filter(|h| {
+            consciousness
+                .entities
+                .get(h)
+                .map(|e| !e.energy.is_collapsed())
+                .unwrap_or(false)
+        })
+        .count() as f64;
+    let energy = handles
+        .iter()
+        .filter_map(|h| consciousness.entities.get(h).map(|e| e.energy.available))
+        .sum::<f64>()
+        / AGENTS as f64;
 
-    DecompResult { condition, alive, energy, cooperation: coop as f64, well_energy_gained: total_well_energy, resonance_energy_gained: total_res_energy }
+    DecompResult {
+        condition,
+        alive,
+        energy,
+        cooperation: coop as f64,
+        well_energy_gained: total_well_energy,
+        resonance_energy_gained: total_res_energy,
+    }
 }
 
 fn main() {
@@ -250,15 +365,28 @@ fn main() {
             let seed = 42 + s as u64 * 997;
             eprintln!("  {name} seed={seed}...");
             let r = run_experiment(ctrl, regen, seed);
-            println!("{},{seed},{:.1},{:.1},{:.0},{:.0},{:.0}",
-                r.condition, r.alive, r.energy, r.cooperation, r.well_energy_gained, r.resonance_energy_gained);
+            println!(
+                "{},{seed},{:.1},{:.1},{:.0},{:.0},{:.0}",
+                r.condition,
+                r.alive,
+                r.energy,
+                r.cooperation,
+                r.well_energy_gained,
+                r.resonance_energy_gained
+            );
             results.push(r);
         }
         let n = results.len() as f64;
-        eprintln!("  → {name}: alive={:.1}, well_E={:.0}J, res_E={:.0}J",
+        eprintln!(
+            "  → {name}: alive={:.1}, well_E={:.0}J, res_E={:.0}J",
             results.iter().map(|r| r.alive).sum::<f64>() / n,
             results.iter().map(|r| r.well_energy_gained).sum::<f64>() / n,
-            results.iter().map(|r| r.resonance_energy_gained).sum::<f64>() / n);
+            results
+                .iter()
+                .map(|r| r.resonance_energy_gained)
+                .sum::<f64>()
+                / n
+        );
         all.push((name, results));
     }
 
@@ -266,13 +394,19 @@ fn main() {
     eprintln!("  Condition          Alive  Energy  Coop     Well_E    Res_E");
     for (name, results) in &all {
         let n = results.len() as f64;
-        eprintln!("  {:18} {:5.1}  {:5.1}J  {:8.0}  {:7.0}J  {:7.0}J",
+        eprintln!(
+            "  {:18} {:5.1}  {:5.1}J  {:8.0}  {:7.0}J  {:7.0}J",
             name,
             results.iter().map(|r| r.alive).sum::<f64>() / n,
             results.iter().map(|r| r.energy).sum::<f64>() / n,
             results.iter().map(|r| r.cooperation).sum::<f64>() / n,
             results.iter().map(|r| r.well_energy_gained).sum::<f64>() / n,
-            results.iter().map(|r| r.resonance_energy_gained).sum::<f64>() / n);
+            results
+                .iter()
+                .map(|r| r.resonance_energy_gained)
+                .sum::<f64>()
+                / n
+        );
     }
 
     // THE KEY TEST: WELL+REGEN vs WELL+NO_REGEN
@@ -292,13 +426,17 @@ fn main() {
     if (wr_mean - wnr_mean).abs() < 2.0 && p > 0.05 {
         eprintln!("\n  THESIS A: Cooperation is EPIPHENOMENAL.");
         eprintln!("  Wells alone sustain agents. Passive resonance is noise.");
-        eprintln!("  WELL+REGEN={wr_mean:.1}, WELL+NO_REGEN={wnr_mean:.1} (no significant difference)");
+        eprintln!(
+            "  WELL+REGEN={wr_mean:.1}, WELL+NO_REGEN={wnr_mean:.1} (no significant difference)"
+        );
     } else if wr_mean > wnr_mean + 2.0 {
         eprintln!("\n  THESIS B: Passive cooperation is LOAD-BEARING.");
         eprintln!("  Agents co-located at wells benefit measurably from resonance.");
         eprintln!("  WELL+REGEN={wr_mean:.1} > WELL+NO_REGEN={wnr_mean:.1}");
     } else {
-        eprintln!("\n  INCONCLUSIVE: WELL+REGEN={wr_mean:.1}, WELL+NO_REGEN={wnr_mean:.1}, p={p:.4}");
+        eprintln!(
+            "\n  INCONCLUSIVE: WELL+REGEN={wr_mean:.1}, WELL+NO_REGEN={wnr_mean:.1}, p={p:.4}"
+        );
     }
 
     // Energy source decomposition
@@ -306,14 +444,34 @@ fn main() {
     for (name, results) in &all {
         let n = results.len() as f64;
         let well = results.iter().map(|r| r.well_energy_gained).sum::<f64>() / n;
-        let res = results.iter().map(|r| r.resonance_energy_gained).sum::<f64>() / n;
+        let res = results
+            .iter()
+            .map(|r| r.resonance_energy_gained)
+            .sum::<f64>()
+            / n;
         let total = well + res;
-        let pct_well = if total > 0.0 { well / total * 100.0 } else { 0.0 };
-        let pct_res = if total > 0.0 { res / total * 100.0 } else { 0.0 };
-        eprintln!("  {:18}: {pct_well:5.1}% wells, {pct_res:5.1}% resonance", name);
+        let pct_well = if total > 0.0 {
+            well / total * 100.0
+        } else {
+            0.0
+        };
+        let pct_res = if total > 0.0 {
+            res / total * 100.0
+        } else {
+            0.0
+        };
+        eprintln!(
+            "  {:18}: {pct_well:5.1}% wells, {pct_res:5.1}% resonance",
+            name
+        );
     }
 
     eprintln!("\n=== Complete ===");
 }
 
-fn rng_f64(s: &mut u64) -> f64 { *s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407); (*s >> 11) as f64 / (1u64 << 53) as f64 }
+fn rng_f64(s: &mut u64) -> f64 {
+    *s = s
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
+    (*s >> 11) as f64 / (1u64 << 53) as f64
+}

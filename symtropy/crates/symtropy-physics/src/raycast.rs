@@ -1,5 +1,5 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Ray casting: find the first intersection of a ray with physics bodies.
 //!
@@ -123,7 +123,11 @@ pub fn raycast_all<const D: usize>(
         }
     }
 
-    hits.sort_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap_or(std::cmp::Ordering::Equal));
+    hits.sort_by(|a, b| {
+        a.distance
+            .partial_cmp(&b.distance)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     hits
 }
 
@@ -133,12 +137,12 @@ pub fn raycast_all<const D: usize>(
 /// Uses the standard quadratic formula: solve `|origin + t*dir - center|² = radius²`.
 fn ray_sphere_intersection<const D: usize>(
     origin: &SVector<f64, D>,
-    dir: &SVector<f64, D>,    // must be unit length
+    dir: &SVector<f64, D>, // must be unit length
     center: &SVector<f64, D>,
     radius: f64,
 ) -> Option<f64> {
     let oc = origin - center;
-    let a = dir.dot(dir);           // Should be ~1.0 for unit dir
+    let a = dir.dot(dir); // Should be ~1.0 for unit dir
     let b = 2.0 * oc.dot(dir);
     let c = oc.dot(&oc) - radius * radius;
 
@@ -233,7 +237,10 @@ mod tests {
 
         let hits = raycast_all(&world, &origin, &dir, 100.0);
         assert_eq!(hits.len(), 2);
-        assert!(hits[0].distance < hits[1].distance, "hits should be sorted by distance");
+        assert!(
+            hits[0].distance < hits[1].distance,
+            "hits should be sorted by distance"
+        );
     }
 
     #[test]

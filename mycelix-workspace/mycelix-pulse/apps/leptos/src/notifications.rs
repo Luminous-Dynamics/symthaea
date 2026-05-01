@@ -3,10 +3,10 @@
 
 //! Notification sounds + favicon badge (#5).
 
+use crate::mail_context::use_mail;
 use leptos::prelude::*;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
-use crate::mail_context::use_mail;
 
 #[derive(Clone, Copy)]
 pub struct NotificationState {
@@ -32,10 +32,8 @@ pub fn provide_notification_context() {
         visible.set(!hidden);
     });
     let doc = web_sys::window().unwrap().document().unwrap();
-    let _ = doc.add_event_listener_with_callback(
-        "visibilitychange",
-        closure.as_ref().unchecked_ref(),
-    );
+    let _ =
+        doc.add_event_listener_with_callback("visibilitychange", closure.as_ref().unchecked_ref());
     closure.forget();
 
     // Reactive title update based on unread count
@@ -76,8 +74,12 @@ pub fn show_desktop_notification(sender: &str, subject: &str) {
 /// Play a short notification beep using Web Audio API.
 pub fn play_notification_sound() {
     let state = use_notifications();
-    if !state.sound_enabled.get_untracked() { return; }
-    if state.tab_visible.get_untracked() { return; }
+    if !state.sound_enabled.get_untracked() {
+        return;
+    }
+    if state.tab_visible.get_untracked() {
+        return;
+    }
 
     // Use eval for simple Web Audio beep
     let _ = js_sys::eval(

@@ -19,14 +19,14 @@
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use nalgebra::SVector;
+use symthaea_consciousness_equation::ConsciousnessInputs;
 use symtropy_consciousness_physics::{
     biometrics::{BiometricHistory, BiometricSample},
     coupling::ConsciousnessField,
     macro_bridge::{apply_macro_modifiers, MacroWorldModifiers},
-    phase_transition::{BifurcationConfig, run_bifurcation_sweep},
+    phase_transition::{run_bifurcation_sweep, BifurcationConfig},
     proc_gen::PhiEnvironmentCoupler,
 };
-use symthaea_consciousness_equation::ConsciousnessInputs;
 use symtropy_math::Point;
 use symtropy_physics::{BodyHandle, PhysicsWorld};
 
@@ -42,10 +42,7 @@ fn make_field_n<const D: usize>(n: usize) -> (ConsciousnessField<D>, Vec<BodyHan
         let h = {
             let mut coords = [0.0f64; D];
             coords[0] = i as f64 * 3.0;
-            world.add_sphere(
-                Point::new(coords),
-                1.0, 1.0,
-            )
+            world.add_sphere(Point::new(coords), 1.0, 1.0)
         };
         field.register(h, 100.0, 2.0);
         handles.push(h);
@@ -139,14 +136,21 @@ fn bench_spread_contagion(c: &mut Criterion) {
         }
         // Set positions in ring
         let r = 10.0f64;
-        let entity_positions: Vec<(BodyHandle, Point<2>)> = handles.iter().enumerate().map(|(i, &h)| {
-            let angle = 2.0 * std::f64::consts::PI * i as f64 / handles.len() as f64;
-            (h, Point::new([r * angle.cos(), r * angle.sin()]))
-        }).collect();
+        let entity_positions: Vec<(BodyHandle, Point<2>)> = handles
+            .iter()
+            .enumerate()
+            .map(|(i, &h)| {
+                let angle = 2.0 * std::f64::consts::PI * i as f64 / handles.len() as f64;
+                (h, Point::new([r * angle.cos(), r * angle.sin()]))
+            })
+            .collect();
 
         group.bench_with_input(BenchmarkId::from_parameter(n), n, |b, _| {
             b.iter(|| {
-                field.spread_emotional_contagion(black_box(&entity_positions), black_box(1.0 / 60.0));
+                field.spread_emotional_contagion(
+                    black_box(&entity_positions),
+                    black_box(1.0 / 60.0),
+                );
             });
         });
     }
@@ -221,10 +225,7 @@ fn bench_full_step_with_coupling(c: &mut Criterion) {
         // Re-add spheres to the world (make_field_n creates its own world)
         let mut field2 = ConsciousnessField::<2>::new();
         for i in 0..*n {
-            let h = world.add_sphere(
-                Point::new([i as f64 * 3.0, 0.0]),
-                1.0, 1.0,
-            );
+            let h = world.add_sphere(Point::new([i as f64 * 3.0, 0.0]), 1.0, 1.0);
             field2.register(h, 100.0, 2.0);
         }
         let inputs = test_inputs(0.8);
@@ -259,8 +260,14 @@ fn bench_bifurcation_sweep_tiny(c: &mut Criterion) {
         measure_ticks: 5,
         dt: 1.0 / 60.0,
         agent_inputs: ConsciousnessInputs {
-            phi: 0.5, broadcast: 0.5, working_memory: 0.5, attention: 0.5,
-            recurrence: 0.5, embodiment: 0.5, knowledge: 0.5, synchrony: 0.5,
+            phi: 0.5,
+            broadcast: 0.5,
+            working_memory: 0.5,
+            attention: 0.5,
+            recurrence: 0.5,
+            embodiment: 0.5,
+            knowledge: 0.5,
+            synchrony: 0.5,
         },
     };
 

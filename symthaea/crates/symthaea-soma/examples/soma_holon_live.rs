@@ -82,6 +82,14 @@ impl DesktopHolon {
                     let result = format!("Processed {task_type}: {payload} -> done");
                     self.responses.push(result);
                 }
+                HolonOutbound::SearchRequest { query, max_results } => {
+                    println!(
+                        "  [Holon] Search request: query=\"{query}\", max_results={max_results}"
+                    );
+                    self.responses.push(format!(
+                        "Search queued: {query} (max_results={max_results})"
+                    ));
+                }
                 HolonOutbound::KnowledgeOffer { topic, embedding } => {
                     println!(
                         "  [Holon] Knowledge offer: topic=\"{topic}\", dims={}",

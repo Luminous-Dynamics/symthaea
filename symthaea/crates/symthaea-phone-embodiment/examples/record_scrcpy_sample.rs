@@ -32,13 +32,13 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use symthaea_phone_embodiment::scrcpy::{
-    accept_from_server, bind_host_listener, start_scrcpy, ScrcpyOptions, DEVICE_JAR_PATH,
-    VENDORED_JAR_NAME,
-};
 use symthaea_phone_embodiment::scrcpy::wire::{
     parse_device_meta, parse_frame_header, parse_video_header, DEVICE_NAME_LEN, FRAME_HEADER_LEN,
     VIDEO_HEADER_LEN,
+};
+use symthaea_phone_embodiment::scrcpy::{
+    accept_from_server, bind_host_listener, start_scrcpy, ScrcpyOptions, DEVICE_JAR_PATH,
+    VENDORED_JAR_NAME,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -47,13 +47,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .get(1)
         .cloned()
         .unwrap_or_else(|| "41201FDJG000UM".to_string());
-    let frame_count: usize = args
-        .get(2)
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(10);
+    let frame_count: usize = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(10);
 
     let crate_dir = env!("CARGO_MANIFEST_DIR");
-    let jar = PathBuf::from(crate_dir).join("vendor").join(VENDORED_JAR_NAME);
+    let jar = PathBuf::from(crate_dir)
+        .join("vendor")
+        .join(VENDORED_JAR_NAME);
     let out_path = PathBuf::from(crate_dir)
         .join("tests")
         .join("data")
@@ -73,7 +72,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut opts = ScrcpyOptions::cybernetic_defaults(serial.clone(), 8401);
     opts.extra_args.push("max_size=720".to_string());
 
-    println!("Binding host listener on 127.0.0.1:{} BEFORE server spawn...", opts.tcp_port);
+    println!(
+        "Binding host listener on 127.0.0.1:{} BEFORE server spawn...",
+        opts.tcp_port
+    );
     let listener = bind_host_listener(opts.tcp_port)?;
     println!("Host listener ready.\n");
 
@@ -155,7 +157,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let elapsed = started_at.elapsed();
     println!();
-    println!("Captured {} packets in {:.3}s", frame_count, elapsed.as_secs_f32());
+    println!(
+        "Captured {} packets in {:.3}s",
+        frame_count,
+        elapsed.as_secs_f32()
+    );
     println!("Total wire bytes  : {bytes_written}");
     println!("Saw config packet : {config_seen}");
     println!("Saw key frame     : {keyframe_seen}");

@@ -26,7 +26,7 @@ use std::path::{Path, PathBuf};
 
 use symthaea_core::hdc::ContinuousHV;
 
-use super::code_parser::{CodeEntity, EntityKind, ParsedCode};
+use super::code_parser::{Entity, EntityKind, ParsedCode};
 use crate::hdc::code_encoder::CodeHDEncoder;
 
 /// A pattern extracted from real source code.
@@ -144,10 +144,9 @@ impl PatternBootstrap {
                     result.files_processed += 1;
                 }
                 Err(e) => {
-                    result.parse_errors.push((
-                        file_path.to_string_lossy().to_string(),
-                        e.to_string(),
-                    ));
+                    result
+                        .parse_errors
+                        .push((file_path.to_string_lossy().to_string(), e.to_string()));
                 }
             }
         }
@@ -174,9 +173,7 @@ impl PatternBootstrap {
         // Encode parsed entities
         for entity in parsed.all_entities() {
             let hv = match entity.kind {
-                EntityKind::Function | EntityKind::Method => {
-                    self.encoder.encode_function(entity)
-                }
+                EntityKind::Function | EntityKind::Method => self.encoder.encode_function(entity),
                 _ => self.encoder.encode_entity(entity),
             };
 
@@ -195,7 +192,10 @@ impl PatternBootstrap {
 
         // Add simple-extracted entities if they're not duplicates
         for entity in entities {
-            if !patterns.iter().any(|p| p.name == entity.name && p.kind == entity.kind) {
+            if !patterns
+                .iter()
+                .any(|p| p.name == entity.name && p.kind == entity.kind)
+            {
                 let hv = self.encoder.encode_entity(&entity);
                 patterns.push(ExtractedPattern {
                     name: entity.name.clone(),
@@ -205,7 +205,7 @@ impl PatternBootstrap {
                     annotations: entity
                         .annotations
                         .iter()
-                        .map(|(k, v)| (k.clone(), v.clone()))
+                        .map(|(k, v): (&String, &String)| (k.clone(), v.clone()))
                         .collect(),
                 });
             }
@@ -219,7 +219,7 @@ impl PatternBootstrap {
     /// Extracts function, struct, trait, enum, and impl declarations
     /// without requiring tree-sitter. This provides a baseline pattern
     /// library even when the full parser isn't available.
-    fn extract_entities_simple(source: &str) -> Vec<CodeEntity> {
+    fn extract_entities_simple(source: &str) -> Vec<Entity> {
         let mut entities = Vec::new();
         let span = super::code_parser::Span {
             start_byte: 0,
@@ -248,7 +248,7 @@ impl PatternBootstrap {
                 && trimmed.contains('(')
             {
                 if let Some(name) = Self::extract_fn_name(trimmed) {
-                    let mut entity = CodeEntity::new(EntityKind::Function, &name, span.clone());
+                    let mut entity = Entity::new(EntityKind::Function, &name, span.clone());
 
                     // Extract visibility
                     if trimmed.starts_with("pub ") {
@@ -270,16 +270,17 @@ impl PatternBootstrap {
             }
             // Struct declarations
             else if (trimmed.starts_with("pub struct ") || trimmed.starts_with("struct "))
-                && !trimmed.contains(';') // Skip unit structs for now
+                && !trimmed.contains(';')
+            // Skip unit structs for now
             {
                 if let Some(name) = Self::extract_type_name(trimmed, "struct") {
-                    entities.push(CodeEntity::new(EntityKind::Struct, &name, span.clone()));
+                    entities.push(Entity::new(EntityKind::Struct, &name, span.clone()));
                 }
             }
             // Enum declarations
             else if trimmed.starts_with("pub enum ") || trimmed.starts_with("enum ") {
                 if let Some(name) = Self::extract_type_name(trimmed, "enum") {
-                    entities.push(CodeEntity::new(EntityKind::Enum, &name, span.clone()));
+                    entities.push(Entity::new(EntityKind::Enum, &name, span.clone()));
                 }
             }
             // Trait declarations
@@ -287,13 +288,13 @@ impl PatternBootstrap {
                 && !trimmed.contains("trait_impl")
             {
                 if let Some(name) = Self::extract_type_name(trimmed, "trait") {
-                    entities.push(CodeEntity::new(EntityKind::Trait, &name, span.clone()));
+                    entities.push(Entity::new(EntityKind::Trait, &name, span.clone()));
                 }
             }
             // Impl blocks
             else if trimmed.starts_with("impl ") || trimmed.starts_with("impl<") {
                 if let Some(name) = Self::extract_impl_name(trimmed) {
-                    entities.push(CodeEntity::new(EntityKind::TraitImpl, &name, span.clone()));
+                    entities.push(Entity::new(EntityKind::TraitImpl, &name, span.clone()));
                 }
             }
         }
@@ -499,10 +500,7 @@ mod tests {
             PatternBootstrap::extract_return_type("fn run() -> Result<(), Error> {"),
             Some("Result<(), Error>".to_string())
         );
-        assert_eq!(
-            PatternBootstrap::extract_return_type("fn noop() {"),
-            None
-        );
+        assert_eq!(PatternBootstrap::extract_return_type("fn noop() {"), None);
     }
 
     #[test]
@@ -540,11 +538,26 @@ mod tests {
         let entities = PatternBootstrap::extract_entities_simple(source);
 
         let names: Vec<&str> = entities.iter().map(|e| e.name.as_str()).collect();
-        assert!(names.contains(&"Config"), "Should find struct Config: {names:?}");
-        assert!(names.contains(&"Color"), "Should find enum Color: {names:?}");
-        assert!(names.contains(&"Drawable"), "Should find trait Drawable: {names:?}");
-        assert!(names.contains(&"hello_world"), "Should find fn hello_world: {names:?}");
-        assert!(names.contains(&"private_helper"), "Should find fn private_helper: {names:?}");
+        assert!(
+            names.contains(&"Config"),
+            "Should find struct Config: {names:?}"
+        );
+        assert!(
+            names.contains(&"Color"),
+            "Should find enum Color: {names:?}"
+        );
+        assert!(
+            names.contains(&"Drawable"),
+            "Should find trait Drawable: {names:?}"
+        );
+        assert!(
+            names.contains(&"hello_world"),
+            "Should find fn hello_world: {names:?}"
+        );
+        assert!(
+            names.contains(&"private_helper"),
+            "Should find fn private_helper: {names:?}"
+        );
     }
 
     #[test]

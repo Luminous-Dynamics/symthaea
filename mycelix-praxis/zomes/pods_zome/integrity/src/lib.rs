@@ -324,6 +324,44 @@ pub enum EntryTypes {
     PodChallenge(PodChallenge),
     #[entry_type(required_validations = 1, visibility = "public")]
     PeerTutoringSession(PeerTutoringSession),
+    #[entry_type(required_validations = 2, visibility = "public")]
+    Endorsement(Endorsement),
+    #[entry_type(required_validations = 2, visibility = "public")]
+    ScholarshipPot(ScholarshipPot),
+}
+
+/// A peer endorsement of mastery
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq, Eq)]
+pub struct Endorsement {
+    /// The agent giving the endorsement
+    pub endorser: AgentPubKey,
+    /// The agent receiving the endorsement
+    pub endorsee: AgentPubKey,
+    /// The topic/node ID being endorsed
+    pub node_id: String,
+    /// Optional rationale or link to evidence
+    pub rationale: String,
+    /// Timestamp of endorsement
+    pub created_at: i64,
+}
+
+/// A scholarship pot to incentivize learning a specific topic
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq, Eq)]
+pub struct ScholarshipPot {
+    /// The topic/node ID being incentivized
+    pub node_id: String,
+    /// Total TEND pledged to this pot
+    pub total_pledged: f64,
+    /// Number of contributors
+    pub contributor_count: u32,
+    /// Minimum mastery level required to claim (permille)
+    pub min_mastery_required: u16,
+    /// Maximum claims allowed
+    pub max_claims: u32,
+    /// Current number of claims
+    pub current_claims: u32,
 }
 
 #[hdk_link_types]
@@ -352,6 +390,10 @@ pub enum LinkTypes {
     AgentToTuteeSessions,
     /// Topic-sharded anchor -> tutoring sessions (e.g., "tutoring.calculus.week_14")
     TopicToTutoringSessions,
+    /// Agent -> Endorsements they've received
+    AgentToEndorsements,
+    /// NodeID -> Endorsements for that topic
+    NodeToEndorsements,
 }
 
 // ============== Validation Functions ==============

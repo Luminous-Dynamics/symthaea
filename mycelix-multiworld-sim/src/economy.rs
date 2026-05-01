@@ -171,8 +171,7 @@ impl WorldEconomy {
                         let switch_prob = cu * 0.15;
                         // Deterministic approximation: switch if cu high enough
                         // and this sector is overstaffed (> 150% of average)
-                        if self.sector_workers[natural] > avg_workers * 3 / 2
-                            && switch_prob > 0.05
+                        if self.sector_workers[natural] > avg_workers * 3 / 2 && switch_prob > 0.05
                         {
                             self.sector_workers[natural] -= 1;
                             self.sector_workers[min_sector] += 1;
@@ -244,7 +243,11 @@ impl WorldEconomy {
 
         // Choose exponents based on whether energy is modeled
         let (alpha, beta, gamma) = if energy_available.is_some() {
-            (LABOR_EXPONENT_WITH_ENERGY, CAPITAL_EXPONENT_WITH_ENERGY, ENERGY_EXPONENT)
+            (
+                LABOR_EXPONENT_WITH_ENERGY,
+                CAPITAL_EXPONENT_WITH_ENERGY,
+                ENERGY_EXPONENT,
+            )
         } else {
             (LABOR_EXPONENT, CAPITAL_EXPONENT, 0.0)
         };
@@ -290,9 +293,7 @@ impl WorldEconomy {
     /// Consequentialist societies extract efficiently but create waste externalities.
     /// Deontological societies add bureaucratic overhead but ensure fair distribution.
     pub fn apply_ethics_efficiency(&mut self, mean_ethics: &crate::agent::EthicalOrientation) {
-        let modifier = 1.0
-            + mean_ethics.relational * 0.05
-            + mean_ethics.virtue_care * 0.03
+        let modifier = 1.0 + mean_ethics.relational * 0.05 + mean_ethics.virtue_care * 0.03
             - mean_ethics.consequentialist * 0.025
             - mean_ethics.deontological * 0.02;
         let modifier = modifier.clamp(0.85, 1.15);
@@ -321,7 +322,8 @@ impl WorldEconomy {
         // Inflation = mean price change
         let price_change: f64 = (0..NUM_SECTORS)
             .map(|i| self.prices[i] - old_prices[i])
-            .sum::<f64>() / NUM_SECTORS as f64;
+            .sum::<f64>()
+            / NUM_SECTORS as f64;
         self.inflation_rate = price_change;
     }
 
@@ -345,9 +347,8 @@ impl WorldEconomy {
             .filter(|a| a.is_alive())
             .map(|a| {
                 let skills = a.skills.as_slice();
-                let price_weighted: f64 = skills.iter().enumerate()
-                    .map(|(i, &s)| s * prices[i])
-                    .sum();
+                let price_weighted: f64 =
+                    skills.iter().enumerate().map(|(i, &s)| s * prices[i]).sum();
                 // Blend TEND balance with price-weighted skills
                 price_weighted + a.tend_balance.abs()
             })
@@ -453,14 +454,20 @@ mod tests {
             is_immigrant: false,
             needs: crate::needs::PsychologicalNeeds::new(),
             tend_balance: 0.0,
-                    parent_ids: None,
-                    faction_id: None,
-                    generation: 0,
-                    trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
-                    ethics: crate::agent::EthicalOrientation::default(),
-                    sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
-                    justice: crate::sub_passport::RestorativeJustice::new(),
+            parent_ids: None,
+            faction_id: None,
+            generation: 0,
+            trauma_level: 0.0,
+            cumulative_dose_sv: 0.0,
+            adversarial: None,
+            coordination_understanding: 0.0,
+            mycel_score: 0.1,
+            sap_balance: 100.0,
+            is_biological: true,
+            wounds: Vec::new(),
+            ethics: crate::agent::EthicalOrientation::default(),
+            sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
+            justice: crate::sub_passport::RestorativeJustice::new(),
         }
     }
 
@@ -562,15 +569,21 @@ mod tests {
                 children_ids: vec![],
                 is_immigrant: false,
                 needs: crate::needs::PsychologicalNeeds::new(),
-            tend_balance: 0.0,
-                    parent_ids: None,
-                    faction_id: None,
-                    generation: 0,
-                    trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
-                    ethics: crate::agent::EthicalOrientation::default(),
-                    sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
-                    justice: crate::sub_passport::RestorativeJustice::new(),
+                tend_balance: 0.0,
+                parent_ids: None,
+                faction_id: None,
+                generation: 0,
+                trauma_level: 0.0,
+                cumulative_dose_sv: 0.0,
+                adversarial: None,
+                coordination_understanding: 0.0,
+                mycel_score: 0.1,
+                sap_balance: 100.0,
+                is_biological: true,
+                wounds: Vec::new(),
+                ethics: crate::agent::EthicalOrientation::default(),
+                sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
+                justice: crate::sub_passport::RestorativeJustice::new(),
             };
             diverse_agents.push(a);
         }
@@ -734,11 +747,16 @@ mod tests {
         econ.tick_production_extended(Some(&scaling_10k), None);
         let scaled = econ.total_production;
 
-        assert!(scaled > baseline,
-            "Superlinear scaling should boost production: {scaled} vs {baseline}");
+        assert!(
+            scaled > baseline,
+            "Superlinear scaling should boost production: {scaled} vs {baseline}"
+        );
         // 10k pop at ref 1k => ratio 10, innovation mult = 10^(1/6) ≈ 1.468
-        assert!(scaled > baseline * 1.3,
-            "Should be at least 1.3x boost: {scaled} vs {} (baseline*1.3)", baseline * 1.3);
+        assert!(
+            scaled > baseline * 1.3,
+            "Should be at least 1.3x boost: {scaled} vs {} (baseline*1.3)",
+            baseline * 1.3
+        );
     }
 
     #[test]
@@ -754,8 +772,10 @@ mod tests {
         econ.tick_production_extended(None, Some(10.0));
         let scarce = econ.total_production;
 
-        assert!(abundant > scarce,
-            "More energy should produce more: {abundant} vs {scarce}");
+        assert!(
+            abundant > scarce,
+            "More energy should produce more: {abundant} vs {scarce}"
+        );
     }
 
     #[test]
@@ -770,8 +790,11 @@ mod tests {
         // Extended path with None (should be identical)
         econ2.tick_production_extended(None, None);
 
-        assert!((econ1.total_production - econ2.total_production).abs() < 0.001,
+        assert!(
+            (econ1.total_production - econ2.total_production).abs() < 0.001,
             "Legacy and extended(None,None) should be identical: {} vs {}",
-            econ1.total_production, econ2.total_production);
+            econ1.total_production,
+            econ2.total_production
+        );
     }
 }

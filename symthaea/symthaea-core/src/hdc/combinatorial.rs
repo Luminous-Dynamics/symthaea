@@ -52,11 +52,7 @@ pub fn pigeonhole_min_max_bucket(items: usize, boxes: usize) -> usize {
 /// compute the size of the largest bucket. Return `Some(max_bucket)` if
 /// it is ≥ `min_collision` (pigeonhole forced a collision), otherwise
 /// `None`.
-pub fn pigeonhole_apply<T, K, F>(
-    items: &[T],
-    partition: F,
-    min_collision: usize,
-) -> Option<usize>
+pub fn pigeonhole_apply<T, K, F>(items: &[T], partition: F, min_collision: usize) -> Option<usize>
 where
     K: Hash + Eq,
     F: Fn(&T) -> K,
@@ -84,7 +80,10 @@ where
 {
     let mut buckets: HashMap<K, Vec<usize>> = HashMap::new();
     for (i, it) in items.iter().enumerate() {
-        buckets.entry(partition(it)).or_insert_with(Vec::new).push(i);
+        buckets
+            .entry(partition(it))
+            .or_insert_with(Vec::new)
+            .push(i);
     }
     buckets
         .into_iter()
@@ -199,10 +198,7 @@ pub fn find_linear_invariant(trajectory: &[Vec<f64>]) -> Option<(Vec<f64>, f64)>
 /// This catches all obvious monovariants without a full LP solve. A more
 /// sophisticated search would use linear programming to find any feasible
 /// monovariant; that's deferred.
-pub fn find_linear_monovariant(
-    trajectory: &[Vec<f64>],
-    seek_decreasing: bool,
-) -> Option<Vec<f64>> {
+pub fn find_linear_monovariant(trajectory: &[Vec<f64>], seek_decreasing: bool) -> Option<Vec<f64>> {
     if trajectory.len() < 2 {
         return None;
     }
@@ -306,11 +302,7 @@ mod tests {
         // 14 people, 12 months → pigeonhole forces some month ≥ 2.
         let people: Vec<usize> = (0..14).collect();
         let months = [1, 4, 7, 2, 8, 12, 3, 5, 11, 6, 9, 10, 4, 7]; // birthdays
-        let result = pigeonhole_apply(
-            &people,
-            |&i| months[i],
-            2,
-        );
+        let result = pigeonhole_apply(&people, |&i| months[i], 2);
         assert!(result.is_some());
     }
 
@@ -359,7 +351,11 @@ mod tests {
             vec![8.0, 3.0],
         ];
         let result = find_linear_invariant(&trajectory);
-        assert!(result.is_none(), "should find no invariant, got {:?}", result);
+        assert!(
+            result.is_none(),
+            "should find no invariant, got {:?}",
+            result
+        );
     }
 
     #[test]
@@ -416,11 +412,7 @@ mod tests {
     #[test]
     fn test_monovariant_strictly_increasing_2d() {
         // (a, b) → (a+1, b+1): sum strictly increases.
-        let trajectory = vec![
-            vec![0.0, 0.0],
-            vec![1.0, 1.0],
-            vec![2.0, 2.0],
-        ];
+        let trajectory = vec![vec![0.0, 0.0], vec![1.0, 1.0], vec![2.0, 2.0]];
         let c = find_linear_monovariant(&trajectory, false).expect("sum increases");
         assert!(c.iter().any(|v| *v > 0.0));
     }

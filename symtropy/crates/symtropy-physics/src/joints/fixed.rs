@@ -1,5 +1,5 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Fixed joint: rigidly attaches two bodies (zero degrees of freedom).
 //!
@@ -63,8 +63,10 @@ impl<const D: usize> Constraint<D> for FixedJoint<D> {
 
     fn solve(&self, body_a: &mut RigidBody<D>, body_b: &mut RigidBody<D>, _dt: f64) {
         // Compute world-space anchor positions
-        let world_a = body_a.transform.translation.0 + body_a.transform.rotation.rotate_vector(&self.anchor_a);
-        let world_b = body_b.transform.translation.0 + body_b.transform.rotation.rotate_vector(&self.anchor_b);
+        let world_a = body_a.transform.translation.0
+            + body_a.transform.rotation.rotate_vector(&self.anchor_a);
+        let world_b = body_b.transform.translation.0
+            + body_b.transform.rotation.rotate_vector(&self.anchor_b);
 
         // Positional error: the two anchors should coincide
         let error = world_b - world_a;
@@ -121,8 +123,10 @@ mod tests {
 
     #[test]
     fn fixed_joint_holds_position() {
-        let mut a = RigidBody::<3>::dynamic_sphere(BodyHandle(0), Point::new([0.0, 0.0, 0.0]), 0.5, 1.0);
-        let mut b = RigidBody::<3>::dynamic_sphere(BodyHandle(1), Point::new([3.0, 0.0, 0.0]), 0.5, 1.0);
+        let mut a =
+            RigidBody::<3>::dynamic_sphere(BodyHandle(0), Point::new([0.0, 0.0, 0.0]), 0.5, 1.0);
+        let mut b =
+            RigidBody::<3>::dynamic_sphere(BodyHandle(1), Point::new([3.0, 0.0, 0.0]), 0.5, 1.0);
 
         let joint = FixedJoint::new(BodyHandle(0), BodyHandle(1));
 
@@ -140,8 +144,10 @@ mod tests {
 
     #[test]
     fn fixed_joint_with_anchors() {
-        let mut a = RigidBody::<3>::dynamic_sphere(BodyHandle(0), Point::new([0.0, 0.0, 0.0]), 0.5, 1.0);
-        let mut b = RigidBody::<3>::dynamic_sphere(BodyHandle(1), Point::new([5.0, 0.0, 0.0]), 0.5, 1.0);
+        let mut a =
+            RigidBody::<3>::dynamic_sphere(BodyHandle(0), Point::new([0.0, 0.0, 0.0]), 0.5, 1.0);
+        let mut b =
+            RigidBody::<3>::dynamic_sphere(BodyHandle(1), Point::new([5.0, 0.0, 0.0]), 0.5, 1.0);
 
         // Anchor at (+1,0,0) on A should meet anchor at (-1,0,0) on B
         // So bodies should end up 2 apart (not 0)

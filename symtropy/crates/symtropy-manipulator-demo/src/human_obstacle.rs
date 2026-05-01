@@ -57,7 +57,9 @@ impl HumanObstacle {
             position: [0.0, -1.2, 0.5],
             reach_radius: 0.7,
             capsule_half_height: 0.4,
-            phase: HumanPhase::Idle { remaining: idle_time },
+            phase: HumanPhase::Idle {
+                remaining: idle_time,
+            },
             rng,
             home_position: [0.0, -1.2, 0.5],
             elapsed: 0.0,
@@ -145,10 +147,7 @@ impl HumanObstacle {
                         };
                     }
                 } else {
-                    self.phase = HumanPhase::ReachingIn {
-                        target,
-                        remaining,
-                    };
+                    self.phase = HumanPhase::ReachingIn { target, remaining };
                 }
             }
             HumanPhase::LateralDrift {
@@ -190,7 +189,9 @@ impl HumanObstacle {
                 let arrived = self.move_toward(&target, speed, dt);
                 if arrived {
                     let idle_time = self.rng.gen_range(3.0..8.0);
-                    self.phase = HumanPhase::Idle { remaining: idle_time };
+                    self.phase = HumanPhase::Idle {
+                        remaining: idle_time,
+                    };
                 }
             }
         }

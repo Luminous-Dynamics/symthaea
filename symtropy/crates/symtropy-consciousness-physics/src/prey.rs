@@ -7,8 +7,8 @@
 //! by-product mutualism cannot solve it because different agent types
 //! must arrive at the same place at the same time.
 
-use nalgebra::SVector;
 use crate::harmony_field::{HarmonyField, NUM_HARMONIES};
+use nalgebra::SVector;
 
 /// A prey entity that requires complementary agents to capture.
 #[derive(Debug, Clone)]
@@ -36,8 +36,19 @@ pub struct HuntResult {
 
 impl<const D: usize> Prey<D> {
     /// Create a new active prey.
-    pub fn new(position: SVector<f64, D>, energy_value: f64, radius: f64, respawn_delay: usize) -> Self {
-        Self { position, energy_value, radius, respawn_countdown: 0, respawn_delay }
+    pub fn new(
+        position: SVector<f64, D>,
+        energy_value: f64,
+        radius: f64,
+        respawn_delay: usize,
+    ) -> Self {
+        Self {
+            position,
+            energy_value,
+            radius,
+            respawn_countdown: 0,
+            respawn_delay,
+        }
     }
 
     /// Whether the prey is available for capture.
@@ -74,11 +85,13 @@ pub fn check_complementary_hunt(
     max_resonance: f64, // must be BELOW this to count as complementary
 ) -> Option<(usize, usize)> {
     // Find all drivers and ambushers
-    let drivers: Vec<usize> = agents_at_prey.iter()
+    let drivers: Vec<usize> = agents_at_prey
+        .iter()
         .filter(|(_, h)| h[driver_channel] > capability_threshold)
         .map(|(idx, _)| *idx)
         .collect();
-    let ambushers: Vec<usize> = agents_at_prey.iter()
+    let ambushers: Vec<usize> = agents_at_prey
+        .iter()
         .filter(|(_, h)| h[ambusher_channel] > capability_threshold)
         .map(|(idx, _)| *idx)
         .collect();
@@ -87,7 +100,9 @@ pub fn check_complementary_hunt(
     for &d in &drivers {
         let d_harm = &agents_at_prey.iter().find(|(i, _)| *i == d).unwrap().1;
         for &a in &ambushers {
-            if a == d { continue; } // can't be both
+            if a == d {
+                continue;
+            } // can't be both
             let a_harm = &agents_at_prey.iter().find(|(i, _)| *i == a).unwrap().1;
             let res = HarmonyField::<2>::resonance(d_harm, a_harm);
             if res < max_resonance {
@@ -108,7 +123,9 @@ mod tests {
         assert!(prey.is_active());
         prey.capture();
         assert!(!prey.is_active());
-        for _ in 0..99 { prey.tick(); }
+        for _ in 0..99 {
+            prey.tick();
+        }
         assert!(!prey.is_active());
         prey.tick();
         assert!(prey.is_active());
@@ -145,6 +162,9 @@ mod tests {
         ];
         // Both have high harmony[0] AND harmony[2], but resonance is high
         let result = check_complementary_hunt(&agents, 0, 2, 0.6, 0.3);
-        assert!(result.is_none(), "Similar agents should not form complementary pair");
+        assert!(
+            result.is_none(),
+            "Similar agents should not form complementary pair"
+        );
     }
 }

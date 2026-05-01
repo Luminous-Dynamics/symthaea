@@ -9,18 +9,18 @@ use finance_wire_types::FinanceRuntimeDiscovery;
 #[derive(Debug, Clone)]
 pub struct FinanceRuntimeConfig {
     pub member_did: String,
-    pub dao_did: String,
-    pub treasury_id: String,
-    pub commons_pool_id: String,
+    pub dao_did: Option<String>,
+    pub treasury_id: Option<String>,
+    pub commons_pool_id: Option<String>,
 }
 
 impl Default for FinanceRuntimeConfig {
     fn default() -> Self {
         Self {
             member_did: String::new(),
-            dao_did: "dao:default".into(),
-            treasury_id: "treasury:default".into(),
-            commons_pool_id: "pool:default".into(),
+            dao_did: None,
+            treasury_id: None,
+            commons_pool_id: None,
         }
     }
 }
@@ -28,13 +28,26 @@ impl Default for FinanceRuntimeConfig {
 /// Merge runtime discovery from conductor with local config.
 pub fn merge_runtime_discovery(
     discovery: &FinanceRuntimeDiscovery,
-    _local: &FinanceRuntimeConfig,
+    local: &FinanceRuntimeConfig,
 ) -> FinanceRuntimeConfig {
     FinanceRuntimeConfig {
-        member_did: discovery.member_did.clone(),
-        dao_did: discovery.dao_did.clone(),
-        treasury_id: discovery.treasury_id.clone(),
-        commons_pool_id: discovery.commons_pool_id.clone(),
+        member_did: if discovery.member_did.is_empty() {
+            local.member_did.clone()
+        } else {
+            discovery.member_did.clone()
+        },
+        dao_did: discovery
+            .default_dao_did
+            .clone()
+            .or_else(|| local.dao_did.clone()),
+        treasury_id: discovery
+            .treasury_id
+            .clone()
+            .or_else(|| local.treasury_id.clone()),
+        commons_pool_id: discovery
+            .commons_pool_id
+            .clone()
+            .or_else(|| local.commons_pool_id.clone()),
     }
 }
 

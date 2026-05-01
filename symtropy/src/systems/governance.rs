@@ -67,7 +67,9 @@ pub fn governance_proposal_system(
         }
     }
 
-    let Some((name, surprise, phi)) = best_proposer else { return };
+    let Some((name, surprise, phi)) = best_proposer else {
+        return;
+    };
 
     // Only propose if surprise is high enough (FEP-driven governance need)
     if surprise < 0.4 {
@@ -133,7 +135,7 @@ pub fn governance_voting_system(
         // Vote decision: NPCs with high care_activation approve pro-social proposals
         let care = consciousness.sim_dimensions[3]; // care_activation
         let coherence = consciousness.sim_dimensions[2]; // coherence
-        // High-care NPCs approve; low-coherence NPCs abstain (don't vote)
+                                                         // High-care NPCs approve; low-coherence NPCs abstain (don't vote)
         if coherence < 0.3 {
             continue; // Too confused to vote
         }
@@ -155,11 +157,17 @@ pub fn governance_voting_system(
     if expired {
         let passed = proposal.passed();
         let msg = if passed {
-            format!("Proposal PASSED: \"{}\" (approval={:.0}%)",
-                proposal.description, proposal.approval_ratio() * 100.0)
+            format!(
+                "Proposal PASSED: \"{}\" (approval={:.0}%)",
+                proposal.description,
+                proposal.approval_ratio() * 100.0
+            )
         } else {
-            format!("Proposal FAILED: \"{}\" (approval={:.0}%)",
-                proposal.description, proposal.approval_ratio() * 100.0)
+            format!(
+                "Proposal FAILED: \"{}\" (approval={:.0}%)",
+                proposal.description,
+                proposal.approval_ratio() * 100.0
+            )
         };
         eprintln!("[governance] {}", msg);
         log.push(time.elapsed_secs(), msg, if passed { 0 } else { 1 });
@@ -179,7 +187,11 @@ pub fn veto_override_system(
         // If already vetoed, check for override votes
         if proposal.vetoed && proposal.active {
             for (npc, consciousness) in &npcs {
-                if proposal.override_votes.iter().any(|(n, _, _)| n == &npc.name) {
+                if proposal
+                    .override_votes
+                    .iter()
+                    .any(|(n, _, _)| n == &npc.name)
+                {
                     continue;
                 }
                 // Most NPCs support override (democracy)
@@ -208,7 +220,11 @@ pub fn veto_override_system(
         let harmony = consciousness.sim_dimensions[4];
         if care < 0.3 && harmony < 0.4 {
             if proposal.veto(&npc.name, consciousness.combined_score()) {
-                let msg = format!("{} VETOES proposal (Guardian, phi={:.2})", npc.name, consciousness.combined_score());
+                let msg = format!(
+                    "{} VETOES proposal (Guardian, phi={:.2})",
+                    npc.name,
+                    consciousness.combined_score()
+                );
                 eprintln!("[governance] {}", msg);
                 log.push(time.elapsed_secs(), msg, 2);
                 gov.governance.veto_count += 1;
@@ -277,7 +293,9 @@ pub fn oppression_detection_system(
 
     // Constitutional crisis at sustained high oppression (12 ticks = 60 seconds)
     if *consecutive_ticks >= 12 {
-        let msg = "CONSTITUTIONAL CRISIS: Sustained oppression detected! Gating thresholds lowered.".to_string();
+        let msg =
+            "CONSTITUTIONAL CRISIS: Sustained oppression detected! Gating thresholds lowered."
+                .to_string();
         eprintln!("[governance] {}", msg);
         log.push(time.elapsed_secs(), msg, 2);
 

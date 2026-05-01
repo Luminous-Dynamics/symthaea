@@ -1,5 +1,5 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Multi-point contact manifold generation via contact clustering.
 //!
@@ -90,7 +90,12 @@ pub fn generate_contact_manifold<const D: usize>(
 
     let max_pts = MAX_CONTACTS.min(4);
     let points = best_n(&candidates, max_pts);
-    ContactManifold { body_a, body_b, normal, points }
+    ContactManifold {
+        body_a,
+        body_b,
+        normal,
+        points,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -100,9 +105,7 @@ pub fn generate_contact_manifold<const D: usize>(
 /// Build D−1 orthonormal vectors perpendicular to `n` via Gram-Schmidt.
 ///
 /// Returns up to 3 tangent vectors (sufficient for D ≤ 4).
-fn orthonormal_complement<const D: usize>(
-    n: &SVector<f64, D>,
-) -> ArrayVec<SVector<f64, D>, 3> {
+fn orthonormal_complement<const D: usize>(n: &SVector<f64, D>) -> ArrayVec<SVector<f64, D>, 3> {
     let mut tangents: ArrayVec<SVector<f64, D>, 3> = ArrayVec::new();
     let needed = D.saturating_sub(1).min(3);
 
@@ -243,8 +246,12 @@ fn best_n<const D: usize>(
     let i2 = (0..candidates.len())
         .filter(|&i| i != i0 && i != i1)
         .max_by(|&a, &b| {
-            perp_dist_sq(&candidates[a].0, &p0, &edge, edge_len_sq)
-                .total_cmp(&perp_dist_sq(&candidates[b].0, &p0, &edge, edge_len_sq))
+            perp_dist_sq(&candidates[a].0, &p0, &edge, edge_len_sq).total_cmp(&perp_dist_sq(
+                &candidates[b].0,
+                &p0,
+                &edge,
+                edge_len_sq,
+            ))
         })
         .unwrap();
     push_cand!(i2);
@@ -313,8 +320,14 @@ mod tests {
         let depth = 0.2;
 
         let m = generate_contact_manifold(
-            &sa, &pos_a, &sb, &pos_b, normal, depth,
-            BodyHandle(0), BodyHandle(1),
+            &sa,
+            &pos_a,
+            &sb,
+            &pos_b,
+            normal,
+            depth,
+            BodyHandle(0),
+            BodyHandle(1),
         );
         // Sphere support is continuous — perturbed queries converge to same point
         // We expect at least 1 contact
@@ -335,12 +348,21 @@ mod tests {
         let depth = 0.1;
 
         let m = generate_contact_manifold(
-            &box_a, &pos_a, &box_b, &pos_b, normal, depth,
-            BodyHandle(0), BodyHandle(1),
+            &box_a,
+            &pos_a,
+            &box_b,
+            &pos_b,
+            normal,
+            depth,
+            BodyHandle(0),
+            BodyHandle(1),
         );
         // Flat box-box contact should have more than 1 contact point
-        assert!(m.points.len() >= 2,
-            "expected ≥2 contact points for flat face, got {}", m.points.len());
+        assert!(
+            m.points.len() >= 2,
+            "expected ≥2 contact points for flat face, got {}",
+            m.points.len()
+        );
     }
 
     #[test]
@@ -353,11 +375,20 @@ mod tests {
         let depth = 0.1;
 
         let m = generate_contact_manifold(
-            &box_a, &pos_a, &box_b, &pos_b, normal, depth,
-            BodyHandle(0), BodyHandle(1),
+            &box_a,
+            &pos_a,
+            &box_b,
+            &pos_b,
+            normal,
+            depth,
+            BodyHandle(0),
+            BodyHandle(1),
         );
         for pt in &m.points {
-            assert!(pt.depth > 0.0, "all contact points must have positive depth");
+            assert!(
+                pt.depth > 0.0,
+                "all contact points must have positive depth"
+            );
         }
     }
 
@@ -371,8 +402,14 @@ mod tests {
         let depth = 0.1;
 
         let m = generate_contact_manifold(
-            &box_a, &pos_a, &box_b, &pos_b, normal, depth,
-            BodyHandle(0), BodyHandle(1),
+            &box_a,
+            &pos_a,
+            &box_b,
+            &pos_b,
+            normal,
+            depth,
+            BodyHandle(0),
+            BodyHandle(1),
         );
         assert!(m.points.len() <= 4, "at most 4 contact points");
     }
@@ -387,8 +424,14 @@ mod tests {
         let depth = 0.2;
 
         let m = generate_contact_manifold(
-            &sa, &pos_a, &sb, &pos_b, normal, depth,
-            BodyHandle(0), BodyHandle(1),
+            &sa,
+            &pos_a,
+            &sb,
+            &pos_b,
+            normal,
+            depth,
+            BodyHandle(0),
+            BodyHandle(1),
         );
         // Normal is passed through unchanged
         assert!((m.normal - normal).norm() < 1e-10);
@@ -401,9 +444,15 @@ mod tests {
         assert_eq!(ts.len(), 2);
         for t in &ts {
             assert!(n.dot(t).abs() < 1e-10, "tangent must be perpendicular to n");
-            assert!((t.norm() - 1.0).abs() < 1e-10, "tangent must be unit length");
+            assert!(
+                (t.norm() - 1.0).abs() < 1e-10,
+                "tangent must be unit length"
+            );
         }
-        assert!(ts[0].dot(&ts[1]).abs() < 1e-10, "tangents must be orthogonal");
+        assert!(
+            ts[0].dot(&ts[1]).abs() < 1e-10,
+            "tangents must be orthogonal"
+        );
     }
 
     #[test]
@@ -440,11 +489,14 @@ mod tests {
     fn best_n_returns_deepest_first() {
         let pts: Vec<(SVector<f64, 3>, f64)> = vec![
             (vec3(0.0, 0.0, 0.0), 0.05),
-            (vec3(1.0, 0.0, 0.0), 0.2),   // deepest
+            (vec3(1.0, 0.0, 0.0), 0.2), // deepest
             (vec3(0.0, 0.0, 1.0), 0.1),
         ];
         let result = best_n(&pts, 4);
-        assert!((result[0].depth - 0.2).abs() < 1e-12, "first result must be deepest");
+        assert!(
+            (result[0].depth - 0.2).abs() < 1e-12,
+            "first result must be deepest"
+        );
     }
 
     #[test]
@@ -457,8 +509,14 @@ mod tests {
         let depth = 0.1;
 
         let m = generate_contact_manifold(
-            &box_a, &pos_a, &box_b, &pos_b, normal, depth,
-            BodyHandle(0), BodyHandle(1),
+            &box_a,
+            &pos_a,
+            &box_b,
+            &pos_b,
+            normal,
+            depth,
+            BodyHandle(0),
+            BodyHandle(1),
         );
         for pt in &m.points {
             assert_eq!(pt.lambda, 0.0, "lambda must start at zero");

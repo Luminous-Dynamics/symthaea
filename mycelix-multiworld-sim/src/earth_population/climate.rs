@@ -53,18 +53,18 @@ const BASELINE_CUMULATIVE_GT: f64 = 200.0;
 /// CITATION: IPCC AR6 WG1 Ch4: Arctic amplification 2-3×, tropics ~0.8×.
 /// Indexed by region order from build_earth_regions().
 const REGIONAL_AMPLIFICATION: [f64; 12] = [
-    1.0,  // East Asia
-    0.9,  // South Asia (tropical)
-    0.8,  // Southeast Asia (tropical)
-    1.5,  // Central Asia (continental)
-    1.0,  // Middle East & N Africa
-    0.8,  // Sub-Saharan Africa (tropical)
-    1.0,  // Europe
-    1.2,  // North America (mid-latitude)
-    0.8,  // Latin America (tropical)
-    0.8,  // Oceania
-    2.5,  // Russia/N Asia (Arctic amplification)
-    1.0,  // Other/Small states
+    1.0, // East Asia
+    0.9, // South Asia (tropical)
+    0.8, // Southeast Asia (tropical)
+    1.5, // Central Asia (continental)
+    1.0, // Middle East & N Africa
+    0.8, // Sub-Saharan Africa (tropical)
+    1.0, // Europe
+    1.2, // North America (mid-latitude)
+    0.8, // Latin America (tropical)
+    0.8, // Oceania
+    2.5, // Russia/N Asia (Arctic amplification)
+    1.0, // Other/Small states
 ];
 
 /// Global climate state tracking.
@@ -116,17 +116,18 @@ impl ClimateModel {
         // CITATION: IEA World Energy Outlook 2023, IRENA Renewable Power Costs 2023.
         // Acceleration starts later (year 40 = 2010, year 50 = 2020)
         let effective_rate = if self.years_elapsed < 40.0 {
-            DECARBONIZATION_RATE  // 1.5% baseline (1970-2010)
+            DECARBONIZATION_RATE // 1.5% baseline (1970-2010)
         } else if self.years_elapsed < 50.0 {
             DECARBONIZATION_RATE + 0.003 // 1.8% (2010-2020, early renewables)
         } else {
             DECARBONIZATION_RATE + 0.008 // 2.3% (2020+, Paris Agreement effect)
         };
-        self.carbon_intensity = INITIAL_CARBON_INTENSITY
-            * (1.0 - effective_rate).powf(self.years_elapsed);
+        self.carbon_intensity =
+            INITIAL_CARBON_INTENSITY * (1.0 - effective_rate).powf(self.years_elapsed);
 
         // 2. Global GDP (sum of region GDP × population in millions × 1M)
-        let global_gdp: f64 = regions.iter()
+        let global_gdp: f64 = regions
+            .iter()
             .map(|r| r.gdp_per_capita * r.population * 1_000_000.0)
             .sum();
 
@@ -150,7 +151,9 @@ impl ClimateModel {
 
         // 6. Per-region damage (DICE quadratic)
         for (i, region) in regions.iter().enumerate() {
-            if i >= self.regional_damage.len() { break; }
+            if i >= self.regional_damage.len() {
+                break;
+            }
 
             let amp = if i < REGIONAL_AMPLIFICATION.len() {
                 REGIONAL_AMPLIFICATION[i]
@@ -178,7 +181,10 @@ impl ClimateModel {
 
     /// Get temperature anomaly for a region.
     pub fn temp_anomaly(&self, region_idx: usize) -> f64 {
-        self.regional_temp.get(region_idx).copied().unwrap_or(self.global_temp_anomaly)
+        self.regional_temp
+            .get(region_idx)
+            .copied()
+            .unwrap_or(self.global_temp_anomaly)
     }
 }
 
@@ -198,8 +204,12 @@ mod tests {
             climate.tick(&regions);
         }
 
-        assert!(climate.global_temp_anomaly > initial_temp,
-            "Temperature should increase: {} vs {}", climate.global_temp_anomaly, initial_temp);
+        assert!(
+            climate.global_temp_anomaly > initial_temp,
+            "Temperature should increase: {} vs {}",
+            climate.global_temp_anomaly,
+            initial_temp
+        );
     }
 
     #[test]
@@ -208,13 +218,19 @@ mod tests {
         let mut climate = ClimateModel::new(regions.len());
 
         // Tick to accumulate warming
-        for _ in 0..240 { // 20 years
+        for _ in 0..240 {
+            // 20 years
             climate.tick(&regions);
         }
 
         // All regions should have positive damage
         for (i, &damage) in climate.regional_damage.iter().enumerate() {
-            assert!(damage > 0.0, "Region {} should have positive damage: {}", i, damage);
+            assert!(
+                damage > 0.0,
+                "Region {} should have positive damage: {}",
+                i,
+                damage
+            );
         }
     }
 
@@ -231,10 +247,18 @@ mod tests {
         let arctic_temp = climate.regional_temp[10]; // Russia, amp 2.5
         let tropical_temp = climate.regional_temp[2]; // SE Asia, amp 0.8
 
-        assert!(arctic_temp > tropical_temp,
-            "Arctic should warm more: {} vs {}", arctic_temp, tropical_temp);
-        assert!(arctic_temp > tropical_temp * 2.0,
-            "Arctic amplification should be >2x: {} vs {}", arctic_temp, tropical_temp);
+        assert!(
+            arctic_temp > tropical_temp,
+            "Arctic should warm more: {} vs {}",
+            arctic_temp,
+            tropical_temp
+        );
+        assert!(
+            arctic_temp > tropical_temp * 2.0,
+            "Arctic amplification should be >2x: {} vs {}",
+            arctic_temp,
+            tropical_temp
+        );
     }
 
     #[test]
@@ -243,15 +267,23 @@ mod tests {
         let mut climate = ClimateModel::new(regions.len());
         let initial_ci = climate.carbon_intensity;
 
-        for _ in 0..120 { // 10 years
+        for _ in 0..120 {
+            // 10 years
             climate.tick(&regions);
         }
 
-        assert!(climate.carbon_intensity < initial_ci,
-            "Carbon intensity should decrease: {} vs {}", climate.carbon_intensity, initial_ci);
+        assert!(
+            climate.carbon_intensity < initial_ci,
+            "Carbon intensity should decrease: {} vs {}",
+            climate.carbon_intensity,
+            initial_ci
+        );
         // After 10 years at 1.5%/year: 0.55 × 0.985^10 ≈ 0.473
-        assert!(climate.carbon_intensity > 0.45 && climate.carbon_intensity < 0.50,
-            "Expected ~0.47, got {}", climate.carbon_intensity);
+        assert!(
+            climate.carbon_intensity > 0.45 && climate.carbon_intensity < 0.50,
+            "Expected ~0.47, got {}",
+            climate.carbon_intensity
+        );
     }
 
     #[test]
@@ -260,10 +292,16 @@ mod tests {
         let mut climate = ClimateModel::new(regions.len());
         climate.tick(&regions);
 
-        assert!(climate.annual_emissions > 0.0,
-            "Annual emissions should be positive: {}", climate.annual_emissions);
+        assert!(
+            climate.annual_emissions > 0.0,
+            "Annual emissions should be positive: {}",
+            climate.annual_emissions
+        );
         // Global GDP ~$100T × 0.26 kg/$ / 1e12 ≈ ~26 GtCO₂/year (roughly matches reality ~37 Gt)
-        assert!(climate.annual_emissions > 10.0 && climate.annual_emissions < 100.0,
-            "Emissions should be in plausible range: {}", climate.annual_emissions);
+        assert!(
+            climate.annual_emissions > 10.0 && climate.annual_emissions < 100.0,
+            "Emissions should be in plausible range: {}",
+            climate.annual_emissions
+        );
     }
 }

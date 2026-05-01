@@ -290,8 +290,10 @@ fn manufacturing_to_supplychain_allows_inventory() {
 
 #[test]
 fn manufacturing_to_supplychain_has_3_zomes() {
-    let zomes =
-        get_allowed_zomes(CrossClusterRole::Manufacturing, CrossClusterRole::Supplychain);
+    let zomes = get_allowed_zomes(
+        CrossClusterRole::Manufacturing,
+        CrossClusterRole::Supplychain,
+    );
     assert_eq!(zomes.len(), 3);
 }
 
@@ -741,10 +743,7 @@ fn total_registered_routes_is_36() {
             }
         }
     }
-    assert_eq!(
-        count, 53,
-        "Expected 53 registered routes, found {count}"
-    );
+    assert_eq!(count, 53, "Expected 53 registered routes, found {count}");
 }
 
 /// Every registered route has at least 1 allowed zome.
@@ -834,10 +833,7 @@ fn local_zome_lists_are_nonempty() {
 #[test]
 fn legacy_to_music_not_registered() {
     let zomes = get_allowed_zomes(CrossClusterRole::Legacy, CrossClusterRole::Music);
-    assert!(
-        zomes.is_empty(),
-        "Legacy -> Music should not have a route"
-    );
+    assert!(zomes.is_empty(), "Legacy -> Music should not have a route");
 }
 
 #[test]
@@ -879,26 +875,27 @@ fn knowledge_to_personal_not_registered() {
 #[test]
 fn legacy_to_energy_not_registered() {
     let zomes = get_allowed_zomes(CrossClusterRole::Legacy, CrossClusterRole::Energy);
-    assert!(
-        zomes.is_empty(),
-        "Legacy -> Energy should not have a route"
-    );
+    assert!(zomes.is_empty(), "Legacy -> Energy should not have a route");
 }
 
 #[test]
 fn praxis_to_finance_allows_tend() {
     let zomes = get_allowed_zomes(CrossClusterRole::Praxis, CrossClusterRole::Finance);
-    assert_eq!(zomes.len(), 2, "Praxis -> Finance should have 2 zomes (finance_bridge, tend)");
-    assert!(zomes.contains(&"tend"), "Praxis -> Finance should allow TEND learning credits");
+    assert_eq!(
+        zomes.len(),
+        2,
+        "Praxis -> Finance should have 2 zomes (finance_bridge, tend)"
+    );
+    assert!(
+        zomes.contains(&"tend"),
+        "Praxis -> Finance should allow TEND learning credits"
+    );
 }
 
 #[test]
 fn music_to_climate_not_registered() {
     let zomes = get_allowed_zomes(CrossClusterRole::Music, CrossClusterRole::Climate);
-    assert!(
-        zomes.is_empty(),
-        "Music -> Climate should not have a route"
-    );
+    assert!(zomes.is_empty(), "Music -> Climate should not have a route");
 }
 
 // ============================================================================

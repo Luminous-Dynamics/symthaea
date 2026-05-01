@@ -27,7 +27,8 @@ enum AgentAction {
     Click(String),        // Click element by text
     Type(String, String), // Type text into field (placeholder, value)
     Navigate(String),     // Go to URL
-    Wait,                 // Do nothing this cycle
+    #[allow(dead_code)]
+    Wait, // Do nothing this cycle
     Done,                 // Mission complete
 }
 

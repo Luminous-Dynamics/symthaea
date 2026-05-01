@@ -44,14 +44,21 @@ pub struct CategoryConfig {
 
 impl Default for CategoryConfig {
     fn default() -> Self {
-        Self { enabled: true, events: HashMap::new() }
+        Self {
+            enabled: true,
+            events: HashMap::new(),
+        }
     }
 }
 
 /// Extract a probability from the TOML event config, or return the default.
 pub fn event_probability(config: &CategoryConfig, event_name: &str, default: f64) -> f64 {
-    if !config.enabled { return 0.0; }
-    config.events.get(event_name)
+    if !config.enabled {
+        return 0.0;
+    }
+    config
+        .events
+        .get(event_name)
         .and_then(|v| v.as_table())
         .and_then(|t| t.get("probability"))
         .and_then(|p| p.as_float())
@@ -94,20 +101,21 @@ pub struct MilestoneConfig {
 /// Load disaster config from TOML file. Falls back to empty (all defaults) on error.
 pub fn load_disaster_config(path: &Path) -> DisasterConfig {
     match std::fs::read_to_string(path) {
-        Ok(content) => {
-            match toml::from_str(&content) {
-                Ok(config) => {
-                    tracing::info!("Loaded disaster config from {}", path.display());
-                    config
-                }
-                Err(e) => {
-                    tracing::warn!("Failed to parse {}: {}. Using defaults.", path.display(), e);
-                    DisasterConfig::default()
-                }
+        Ok(content) => match toml::from_str(&content) {
+            Ok(config) => {
+                tracing::info!("Loaded disaster config from {}", path.display());
+                config
             }
-        }
+            Err(e) => {
+                tracing::warn!("Failed to parse {}: {}. Using defaults.", path.display(), e);
+                DisasterConfig::default()
+            }
+        },
         Err(_) => {
-            tracing::info!("No disaster config at {}. Using hardcoded defaults.", path.display());
+            tracing::info!(
+                "No disaster config at {}. Using hardcoded defaults.",
+                path.display()
+            );
             DisasterConfig::default()
         }
     }
@@ -116,21 +124,26 @@ pub fn load_disaster_config(path: &Path) -> DisasterConfig {
 /// Load tech tree config from TOML file. Falls back to empty on error.
 pub fn load_tech_tree_config(path: &Path) -> TechTreeConfig {
     match std::fs::read_to_string(path) {
-        Ok(content) => {
-            match toml::from_str(&content) {
-                Ok(config) => {
-                    tracing::info!("Loaded tech tree from {}", path.display());
-                    config
-                }
-                Err(e) => {
-                    tracing::warn!("Failed to parse {}: {}. Using defaults.", path.display(), e);
-                    TechTreeConfig { milestones: HashMap::new() }
+        Ok(content) => match toml::from_str(&content) {
+            Ok(config) => {
+                tracing::info!("Loaded tech tree from {}", path.display());
+                config
+            }
+            Err(e) => {
+                tracing::warn!("Failed to parse {}: {}. Using defaults.", path.display(), e);
+                TechTreeConfig {
+                    milestones: HashMap::new(),
                 }
             }
-        }
+        },
         Err(_) => {
-            tracing::info!("No tech tree config at {}. Using hardcoded defaults.", path.display());
-            TechTreeConfig { milestones: HashMap::new() }
+            tracing::info!(
+                "No tech tree config at {}. Using hardcoded defaults.",
+                path.display()
+            );
+            TechTreeConfig {
+                milestones: HashMap::new(),
+            }
         }
     }
 }
@@ -149,7 +162,9 @@ impl Default for DisasterConfig {
     }
 }
 
-fn default_true() -> bool { true }
+fn default_true() -> bool {
+    true
+}
 
 // ============================================================================
 // TESTS
@@ -201,7 +216,10 @@ enabled = false
 
     #[test]
     fn event_probability_zero_when_disabled() {
-        let config = CategoryConfig { enabled: false, events: HashMap::new() };
+        let config = CategoryConfig {
+            enabled: false,
+            events: HashMap::new(),
+        };
         let p = event_probability(&config, "anything", 0.99);
         assert_eq!(p, 0.0);
     }

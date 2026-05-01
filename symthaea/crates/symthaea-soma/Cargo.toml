@@ -29,6 +29,9 @@ prism-search = { path = "../../../prism/prism-search", optional = true }
 tracing = { workspace = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
+[dev-dependencies]
+proptest = { workspace = true }
+
 [features]
 default = []
 # Native mobile FFI: C-compatible extern functions for iOS (staticlib) and Android (cdylib/JNI).
@@ -47,6 +50,8 @@ prism-search = ["dep:prism-common", "dep:prism-search"]
 fusion = ["litert", "broca-full"]
 # Decentralized cooperative positioning (GPS-independent).
 positioning = ["dep:positioning"]
+# Property/invariant tests that target unstable or evolving APIs.
+prop-tests = []
 
 [[bin]]
 name = "soma_bench"
@@ -56,3 +61,7 @@ path = "src/bin/soma_bench.rs"
 name = "train_soma_broca"
 path = "src/bin/train_soma_broca.rs"
 required-features = ["broca-full"]
+
+[[test]]
+name = "proptest_soma"
+required-features = ["prop-tests"]

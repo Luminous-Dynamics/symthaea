@@ -10,11 +10,11 @@
 //! Run: cargo run --example dunbar_number -p symtropy-consciousness-physics --release
 
 use nalgebra::SVector;
+use symthaea_consciousness_equation::ConsciousnessInputs;
 use symtropy_consciousness_physics::coupling::ConsciousnessField;
 use symtropy_consciousness_physics::ThermodynamicConstants;
 use symtropy_math::Point;
 use symtropy_physics::{BodyHandle, PhysicsWorld};
-use symthaea_consciousness_equation::ConsciousnessInputs;
 
 const TICKS: u64 = 5000;
 const DT: f64 = 1.0 / 60.0;
@@ -38,23 +38,24 @@ fn run_trial(num_agents: usize, seed: u64) -> TrialResult {
     let mut handles = Vec::new();
     for i in 0..num_agents {
         let angle = std::f64::consts::TAU * (i as f64 + seed as f64 * 0.37) / num_agents as f64;
-        let h = world.add_sphere(
-            Point::new([r * angle.cos(), r * angle.sin()]),
-            1.0, 1.0,
-        );
+        let h = world.add_sphere(Point::new([r * angle.cos(), r * angle.sin()]), 1.0, 1.0);
         field.register(h, 200.0, 3.0);
         handles.push(h);
     }
 
     // Place 2 energy wells (fixed positions, scale with arena)
-    let well_positions: Vec<Point<2>> = vec![
-        Point::new([r * 0.5, 0.0]),
-        Point::new([-r * 0.5, 0.0]),
-    ];
+    let well_positions: Vec<Point<2>> =
+        vec![Point::new([r * 0.5, 0.0]), Point::new([-r * 0.5, 0.0])];
 
     let inputs = ConsciousnessInputs {
-        phi: 0.5, broadcast: 0.5, working_memory: 0.5, attention: 0.5,
-        recurrence: 0.5, embodiment: 0.5, knowledge: 0.5, synchrony: 0.5,
+        phi: 0.5,
+        broadcast: 0.5,
+        working_memory: 0.5,
+        attention: 0.5,
+        recurrence: 0.5,
+        embodiment: 0.5,
+        knowledge: 0.5,
+        synchrony: 0.5,
     };
 
     let mut last_all_alive_tick: u64 = 0;
@@ -62,8 +63,12 @@ fn run_trial(num_agents: usize, seed: u64) -> TrialResult {
     for tick in 0..TICKS {
         // Update consciousness
         for &h in &handles {
-            let pos = world.body(h)
-                .map(|b| { let p = b.position(); Point::new([p.coord(0), p.coord(1)]) })
+            let pos = world
+                .body(h)
+                .map(|b| {
+                    let p = b.position();
+                    Point::new([p.coord(0), p.coord(1)])
+                })
                 .unwrap_or_else(Point::origin);
             field.update_entity(h, &inputs, pos);
         }
@@ -71,15 +76,20 @@ fn run_trial(num_agents: usize, seed: u64) -> TrialResult {
         // Simulate energy well regeneration for agents near wells
         for &h in &handles {
             if let Some(entity) = field.entities.get_mut(&h) {
-                let agent_pos = world.body(h)
-                    .map(|b| { let p = b.position(); [p.coord(0), p.coord(1)] })
+                let agent_pos = world
+                    .body(h)
+                    .map(|b| {
+                        let p = b.position();
+                        [p.coord(0), p.coord(1)]
+                    })
                     .unwrap_or([0.0, 0.0]);
 
                 for well in &well_positions {
                     let dx = agent_pos[0] - well.coord(0);
                     let dy = agent_pos[1] - well.coord(1);
-                    let dist = (dx*dx + dy*dy).sqrt();
-                    if dist < 15.0 { // well radius
+                    let dist = (dx * dx + dy * dy).sqrt();
+                    if dist < 15.0 {
+                        // well radius
                         entity.energy.available = (entity.energy.available
                             + field.constants.energy_well_regen_rate)
                             .min(entity.energy.max_energy);
@@ -96,18 +106,32 @@ fn run_trial(num_agents: usize, seed: u64) -> TrialResult {
         field.tick_prediction_errors();
 
         // Emotional contagion
-        let positions: Vec<(BodyHandle, Point<2>)> = handles.iter().map(|&h| {
-            let pos = world.body(h)
-                .map(|b| { let p = b.position(); Point::new([p.coord(0), p.coord(1)]) })
-                .unwrap_or_else(Point::origin);
-            (h, pos)
-        }).collect();
+        let positions: Vec<(BodyHandle, Point<2>)> = handles
+            .iter()
+            .map(|&h| {
+                let pos = world
+                    .body(h)
+                    .map(|b| {
+                        let p = b.position();
+                        Point::new([p.coord(0), p.coord(1)])
+                    })
+                    .unwrap_or_else(Point::origin);
+                (h, pos)
+            })
+            .collect();
         field.spread_emotional_contagion(&positions, DT);
 
         world.step_with_callback(DT, &mut field);
 
-        let alive_now = handles.iter()
-            .filter(|&&h| field.entities.get(&h).map(|e| e.energy.available > 0.0).unwrap_or(false))
+        let alive_now = handles
+            .iter()
+            .filter(|&&h| {
+                field
+                    .entities
+                    .get(&h)
+                    .map(|e| e.energy.available > 0.0)
+                    .unwrap_or(false)
+            })
             .count();
         if alive_now == num_agents {
             last_all_alive_tick = tick;
@@ -115,10 +139,18 @@ fn run_trial(num_agents: usize, seed: u64) -> TrialResult {
     }
 
     // Final metrics
-    let alive = handles.iter()
-        .filter(|&&h| field.entities.get(&h).map(|e| e.energy.available > 0.0).unwrap_or(false))
+    let alive = handles
+        .iter()
+        .filter(|&&h| {
+            field
+                .entities
+                .get(&h)
+                .map(|e| e.energy.available > 0.0)
+                .unwrap_or(false)
+        })
         .count();
-    let total_energy: f64 = handles.iter()
+    let total_energy: f64 = handles
+        .iter()
         .filter_map(|h| field.entities.get(h).map(|e| e.energy.available))
         .sum();
 
@@ -126,20 +158,31 @@ fn run_trial(num_agents: usize, seed: u64) -> TrialResult {
     let n = handles.len();
     let mut total_dist = 0.0;
     let mut pairs = 0u64;
-    let pos_vec: Vec<[f64; 2]> = handles.iter().map(|&h| {
-        world.body(h)
-            .map(|b| { let p = b.position(); [p.coord(0), p.coord(1)] })
-            .unwrap_or([0.0, 0.0])
-    }).collect();
+    let pos_vec: Vec<[f64; 2]> = handles
+        .iter()
+        .map(|&h| {
+            world
+                .body(h)
+                .map(|b| {
+                    let p = b.position();
+                    [p.coord(0), p.coord(1)]
+                })
+                .unwrap_or([0.0, 0.0])
+        })
+        .collect();
     for i in 0..n {
-        for j in (i+1)..n {
+        for j in (i + 1)..n {
             let dx = pos_vec[i][0] - pos_vec[j][0];
             let dy = pos_vec[i][1] - pos_vec[j][1];
-            total_dist += (dx*dx + dy*dy).sqrt();
+            total_dist += (dx * dx + dy * dy).sqrt();
             pairs += 1;
         }
     }
-    let clustering = if pairs > 0 { total_dist / pairs as f64 } else { 0.0 };
+    let clustering = if pairs > 0 {
+        total_dist / pairs as f64
+    } else {
+        0.0
+    };
 
     TrialResult {
         clustering,
@@ -151,8 +194,12 @@ fn run_trial(num_agents: usize, seed: u64) -> TrialResult {
 
 fn main() {
     eprintln!("Dunbar Number Experiment (thermodynamic enforcement)\n");
-    eprintln!("  {} ticks, {} seeds per group size, {} J/tick maintenance\n",
-        TICKS, SEEDS, ThermodynamicConstants::research().consciousness_maintenance_per_tick);
+    eprintln!(
+        "  {} ticks, {} seeds per group size, {} J/tick maintenance\n",
+        TICKS,
+        SEEDS,
+        ThermodynamicConstants::research().consciousness_maintenance_per_tick
+    );
 
     let group_sizes = [2, 4, 6, 8, 12, 16, 24, 32, 48, 64];
 
@@ -165,9 +212,17 @@ fn main() {
         }
 
         let c_mean = results.iter().map(|r| r.clustering).sum::<f64>() / SEEDS as f64;
-        let c_std = (results.iter().map(|r| (r.clustering - c_mean).powi(2)).sum::<f64>()
-            / (SEEDS.max(2) - 1) as f64).sqrt();
-        let alive_pct = results.iter().map(|r| r.alive as f64 / n as f64 * 100.0).sum::<f64>() / SEEDS as f64;
+        let c_std = (results
+            .iter()
+            .map(|r| (r.clustering - c_mean).powi(2))
+            .sum::<f64>()
+            / (SEEDS.max(2) - 1) as f64)
+            .sqrt();
+        let alive_pct = results
+            .iter()
+            .map(|r| r.alive as f64 / n as f64 * 100.0)
+            .sum::<f64>()
+            / SEEDS as f64;
         let e_mean = results.iter().map(|r| r.per_capita_energy).sum::<f64>() / SEEDS as f64;
         let surv_mean = results.iter().map(|r| r.survival_ticks as f64).sum::<f64>() / SEEDS as f64;
 

@@ -419,9 +419,7 @@ impl CodingAgent {
         }
 
         // Code Quality Gate
-        let is_rust = self.target_language() == "rust";
-        if is_rust
-            && (self.phase == TaskPhase::Generating || self.phase == TaskPhase::Fixing)
+        if (self.phase == TaskPhase::Generating || self.phase == TaskPhase::Fixing)
             && self.generated_code.is_some()
         {
             if let Some(ref code) = self.generated_code {

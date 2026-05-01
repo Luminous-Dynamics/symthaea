@@ -9,15 +9,15 @@
 //! Run: cargo run --example full_pipeline -p symtropy-consciousness-physics
 
 use nalgebra::SVector;
+use symthaea_consciousness_equation::ConsciousnessInputs;
 use symtropy_consciousness_physics::{
     biometrics::{BiometricHistory, BiometricSample},
     coupling::ConsciousnessField,
     macro_bridge::{apply_macro_modifiers, MacroWorldModifiers},
-    proc_gen::{PhiEnvironmentCoupler, EnvironmentEvent},
+    proc_gen::{EnvironmentEvent, PhiEnvironmentCoupler},
 };
 use symtropy_math::Point;
 use symtropy_physics::PhysicsWorld;
-use symthaea_consciousness_equation::ConsciousnessInputs;
 
 const NUM_AGENTS: usize = 8;
 const TICKS: usize = 600; // 10 seconds at 60Hz
@@ -59,7 +59,12 @@ fn main() {
     );
 
     // ── 3. Simulation loop ───────────────────────────────────────────
-    eprintln!("Running {} ticks ({:.1}s at {:.0} Hz)...\n", TICKS, TICKS as f64 * DT, 1.0/DT);
+    eprintln!(
+        "Running {} ticks ({:.1}s at {:.0} Hz)...\n",
+        TICKS,
+        TICKS as f64 * DT,
+        1.0 / DT
+    );
 
     let mut total_events = 0usize;
     let mut regime_transitions = 0usize;
@@ -90,13 +95,24 @@ fn main() {
         // ── Phase C: Update all agents' consciousness ────────────────
         // Player (agent 0) gets biometric inputs; others get default
         let default_inputs = ConsciousnessInputs {
-            phi: 0.5, broadcast: 0.5, working_memory: 0.5, attention: 0.5,
-            recurrence: 0.5, embodiment: 0.5, knowledge: 0.5, synchrony: 0.5,
+            phi: 0.5,
+            broadcast: 0.5,
+            working_memory: 0.5,
+            attention: 0.5,
+            recurrence: 0.5,
+            embodiment: 0.5,
+            knowledge: 0.5,
+            synchrony: 0.5,
         };
 
         for (i, &h) in handles.iter().enumerate() {
-            let inputs = if i == 0 { &player_inputs } else { &default_inputs };
-            let pos = world.body(h)
+            let inputs = if i == 0 {
+                &player_inputs
+            } else {
+                &default_inputs
+            };
+            let pos = world
+                .body(h)
                 .map(|b| {
                     let p = b.position();
                     Point::new([p.coord(0), p.coord(1)])
@@ -108,7 +124,10 @@ fn main() {
         // ── Phase D: Macro bridge — civilization modifiers → physics ─
         // Simulate governance destabilization over time
         if tick == TICKS / 2 {
-            eprintln!("  [tick {}] Emergency declared! Governance destabilizing.", tick);
+            eprintln!(
+                "  [tick {}] Emergency declared! Governance destabilizing.",
+                tick
+            );
             macro_mods = MacroWorldModifiers::from_sim(
                 0.3,  // stability drops
                 0.4,  // oppression rises
@@ -122,16 +141,24 @@ fn main() {
         apply_macro_modifiers(&mut field, &macro_mods, 0.1);
 
         // ── Phase E: Proc-gen — collective Φ reshapes environment ────
-        let collective_phi: f64 = handles.iter()
+        let collective_phi: f64 = handles
+            .iter()
             .filter_map(|h| field.entities.get(h).map(|e| e.phi()))
-            .sum::<f64>() / NUM_AGENTS as f64;
+            .sum::<f64>()
+            / NUM_AGENTS as f64;
 
         env_coupler.tick(collective_phi);
         let events = env_coupler.drain_events();
         for event in &events {
             match event {
                 EnvironmentEvent::RegimeTransition { from, to, phi } => {
-                    eprintln!("  [tick {}] Regime: {} → {} (Φ={:.3})", tick, from.name(), to.name(), phi);
+                    eprintln!(
+                        "  [tick {}] Regime: {} → {} (Φ={:.3})",
+                        tick,
+                        from.name(),
+                        to.name(),
+                        phi
+                    );
                     regime_transitions += 1;
                 }
                 EnvironmentEvent::PortalActivated { phi } => {
@@ -152,8 +179,15 @@ fn main() {
         // ── Telemetry (every 60 ticks = ~1s) ─────────────────────────
         if tick % 60 == 0 {
             let profile = env_coupler.current_profile();
-            let alive = handles.iter()
-                .filter(|h| field.entities.get(h).map(|e| e.phi() > 0.0).unwrap_or(false))
+            let alive = handles
+                .iter()
+                .filter(|h| {
+                    field
+                        .entities
+                        .get(h)
+                        .map(|e| e.phi() > 0.0)
+                        .unwrap_or(false)
+                })
                 .count();
 
             eprintln!(
@@ -169,9 +203,11 @@ fn main() {
     }
 
     // ── Results ──────────────────────────────────────────────────────
-    let final_phi: f64 = handles.iter()
+    let final_phi: f64 = handles
+        .iter()
         .filter_map(|h| field.entities.get(h).map(|e| e.phi()))
-        .sum::<f64>() / NUM_AGENTS as f64;
+        .sum::<f64>()
+        / NUM_AGENTS as f64;
     let final_profile = env_coupler.current_profile();
 
     eprintln!("\n═══════════════════════════════════════════════════════════");
@@ -181,13 +217,26 @@ fn main() {
     eprintln!("  Environment events:    {}", total_events);
     eprintln!("  Regime transitions:    {}", regime_transitions);
     eprintln!("  Portal active:         {}", final_profile.portal_active);
-    eprintln!("  Obstacle density:      {:.2}", final_profile.obstacle_density);
-    eprintln!("  Energy wells:          {}", final_profile.energy_well_count);
-    eprintln!("  Darkness level:        {:.2}", final_profile.darkness_level);
+    eprintln!(
+        "  Obstacle density:      {:.2}",
+        final_profile.obstacle_density
+    );
+    eprintln!(
+        "  Energy wells:          {}",
+        final_profile.energy_well_count
+    );
+    eprintln!(
+        "  Darkness level:        {:.2}",
+        final_profile.darkness_level
+    );
     eprintln!("═══════════════════════════════════════════════════════════");
 
     // Sanity assertions
-    assert!(final_phi >= 0.0 && final_phi <= 1.0, "Φ out of range: {}", final_phi);
+    assert!(
+        final_phi >= 0.0 && final_phi <= 1.0,
+        "Φ out of range: {}",
+        final_phi
+    );
     assert!(final_profile.obstacle_density >= 0.0 && final_profile.obstacle_density <= 1.0);
     eprintln!("\n  ✓ All pipeline stages executed successfully.");
 }

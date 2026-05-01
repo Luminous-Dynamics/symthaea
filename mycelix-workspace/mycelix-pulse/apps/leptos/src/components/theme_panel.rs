@@ -4,10 +4,10 @@
 //! Theme customization panel — named themes, accent color picker, density slider, custom CSS.
 //! Reuses Hearth's 10 named themes adapted for the Pulse workspace.
 
+use crate::preferences::{clamp_font_scale, use_preferences, MAX_FONT_SCALE, MIN_FONT_SCALE};
+use crate::theme::use_theme;
 use leptos::prelude::*;
 use wasm_bindgen::JsCast;
-use crate::theme::use_theme;
-use crate::preferences::{clamp_font_scale, use_preferences, MAX_FONT_SCALE, MIN_FONT_SCALE};
 
 const ACCENT_COLORS: &[(&str, &str)] = &[
     ("Cyan", "#06D6C8"),
@@ -191,19 +191,22 @@ pub fn ThemePanel(show: RwSignal<bool>) -> impl IntoView {
 }
 
 fn load_custom_css() -> String {
-    web_sys::window().and_then(|w| w.local_storage().ok().flatten())
+    web_sys::window()
+        .and_then(|w| w.local_storage().ok().flatten())
         .and_then(|s| s.get_item(CUSTOM_CSS_KEY).ok().flatten())
         .unwrap_or_default()
 }
 
 fn load_accent() -> String {
-    web_sys::window().and_then(|w| w.local_storage().ok().flatten())
+    web_sys::window()
+        .and_then(|w| w.local_storage().ok().flatten())
         .and_then(|s| s.get_item(ACCENT_KEY).ok().flatten())
         .unwrap_or_else(|| "#06D6C8".into())
 }
 
 fn load_theme_name() -> String {
-    web_sys::window().and_then(|w| w.local_storage().ok().flatten())
+    web_sys::window()
+        .and_then(|w| w.local_storage().ok().flatten())
         .and_then(|s| s.get_item(THEME_NAME_KEY).ok().flatten())
         .unwrap_or_else(|| "Circuit".into())
 }

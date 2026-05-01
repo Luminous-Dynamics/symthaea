@@ -1,0 +1,131 @@
+{
+  "metadata": {
+    "title": "Resilient Professional Seed: Infrastructure Readiness",
+    "framework": "Global Resilience Mesh",
+    "source": "https://mycelix.org/certs-resilient",
+    "grade_level": "Professional/Vocational",
+    "subject_area": "Multi-Sector",
+    "domain": "Professional Certification",
+    "version": "1.0",
+    "total_standards": 8,
+    "domains": [
+      "Water Treatment",
+      "Solar Commerce",
+      "Community Health",
+      "Small Business Admin",
+      "IT Operations"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Closing the gap for the stewards of essential community infrastructure."
+  },
+  "nodes": [
+    {
+      "id": "CERT-WATER-ABC-L1",
+      "title": "ABC Water Treatment Operator Level 1",
+      "description": "Foundational knowledge for drinking water treatment. Source water protection, treatment processes, and water quality testing. Linked to Greywater Loop track.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Water Treatment",
+      "subdomain": "Certification Bridge",
+      "tags": ["water", "infrastructure", "safety", "standard"],
+      "estimated_hours": 90,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering",
+      "academic_standards": [
+        {
+          "framework": "ABC",
+          "code": "WTO-L1",
+          "description": "Water Treatment Operator Class 1",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "CERT-SOLAR-SALES",
+      "title": "NABCEP PV Technical Sales Professional",
+      "description": "Analyzing customer needs, site assessment, and economic performance of PV systems. Bridging technical solar knowledge to community procurement.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Solar Commerce",
+      "subdomain": "Certification Bridge",
+      "tags": ["solar", "sales", "business", "standard"],
+      "estimated_hours": 60,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Analyze",
+      "subject_area": "Social Studies"
+    },
+    {
+      "id": "CERT-HLTH-CHW",
+      "title": "Community Health Worker (CHW) Standard",
+      "description": "Advocacy, outreach, and social support. Navigating healthcare systems and promoting community wellness. Linked to Bioregional Vitality.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Community Health",
+      "subdomain": "Certification Bridge",
+      "tags": ["healthcare", "outreach", "wellness", "standard"],
+      "estimated_hours": 80,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Health Sciences"
+    },
+    {
+      "id": "CERT-BIZ-SBA-MGMT",
+      "title": "SBA Small Business Management",
+      "description": "Strategic planning, marketing, and financial management for small enterprises. Mapping the TEND economy to standard SBA business models.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Small Business Admin",
+      "subdomain": "Certification Bridge",
+      "tags": ["business", "management", "sba", "standard"],
+      "estimated_hours": 45,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Social Studies"
+    },
+    {
+      "id": "CERT-IT-CIOS",
+      "title": "CompTIA IT Operations Specialist (CIOS)",
+      "description": "Combined mastery of A+ and Network+. The professional standard for end-to-end IT infrastructure operations.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "IT Operations",
+      "subdomain": "Certification Bridge",
+      "tags": ["comptia", "it-ops", "infrastructure", "standard"],
+      "estimated_hours": 300,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science"
+    }
+  ],
+  "edges": [
+    {
+      "from": "VOC-H2O-101",
+      "to": "CERT-WATER-ABC-L1",
+      "edge_type": "Recommended",
+      "strength_permille": 850,
+      "rationale": "Sovereign water catchment provides the practical foundation for municipal water treatment standards."
+    },
+    {
+      "from": "VOC-RE-101",
+      "to": "CERT-SOLAR-SALES",
+      "edge_type": "Recommended",
+      "strength_permille": 750,
+      "rationale": "PV fundamentals are the technical prerequisite for professional solar sales."
+    },
+    {
+      "from": "VITA-001",
+      "to": "CERT-HLTH-CHW",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "First-line emergency care is a core competency requirement for community health workers."
+    },
+    {
+      "from": "VOC-DT-201",
+      "to": "CERT-BIZ-SBA-MGMT",
+      "edge_type": "Recommended",
+      "strength_permille": 700,
+      "rationale": "Mutual credit bookkeeping training provides the systemic foundation for SBA financial management."
+    }
+  ]
+}

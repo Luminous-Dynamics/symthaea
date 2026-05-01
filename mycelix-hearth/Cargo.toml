@@ -72,6 +72,7 @@ thiserror = "1.0"
 derive_more = "0.99"
 
 # WASM compatibility
+getrandom = { version = "0.2", features = ["custom"] }
 getrandom_03 = { package = "getrandom", version = "0.3" }
 
 # Internal shared crates

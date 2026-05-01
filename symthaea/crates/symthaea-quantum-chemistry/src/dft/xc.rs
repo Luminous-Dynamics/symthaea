@@ -107,7 +107,7 @@ pub fn kohn_sham_dft(molecule: &Molecule, basis: &BasisSet, config: &DftConfig) 
     let mut energy_old = 0.0;
     let mut converged = false;
     let mut n_iterations = 0;
-    let mut xc_energy = 0.0;
+    let mut xc_energy: f64;
 
     let mut diis = if config.use_diis {
         Some(Diis::new(n))
@@ -123,7 +123,7 @@ pub fn kohn_sham_dft(molecule: &Molecule, basis: &BasisSet, config: &DftConfig) 
 
         // Compute XC energy and potential on grid
         // E_xc = Σ_g w_g × ε_xc(ρ_g) × ρ_g
-        let (e_xc_unweighted, v_xc) = lda_exchange_correlation(&rho);
+        let (_e_xc_unweighted, v_xc) = lda_exchange_correlation(&rho);
         // Weight the XC energy by grid weights
         xc_energy = 0.0;
         for (g, pt) in grid.points.iter().enumerate() {
@@ -221,9 +221,8 @@ fn evaluate_basis_on_grid(basis: &[ContractedGaussian], grid: &DftGrid) -> Vec<f
                 let dz = pt.z - prim.center[2];
                 let r2 = dx * dx + dy * dy + dz * dz;
 
-                let angular = dx.powi(prim.l as i32)
-                    * dy.powi(prim.m as i32)
-                    * dz.powi(prim.n as i32);
+                let angular =
+                    dx.powi(prim.l as i32) * dy.powi(prim.m as i32) * dz.powi(prim.n as i32);
 
                 val += prim.coeff * prim.normalization() * angular * (-prim.alpha * r2).exp();
             }
@@ -282,12 +281,7 @@ fn build_coulomb_matrix(density: &[f64], eri: &[f64], n: usize) -> Vec<f64> {
 }
 
 /// Build the XC potential matrix: V_xc_μν = Σ_g w_g × v_xc(r_g) × φ_μ(r_g) × φ_ν(r_g)
-fn build_xc_matrix(
-    v_xc: &[f64],
-    basis_at_grid: &[f64],
-    grid: &DftGrid,
-    n: usize,
-) -> Vec<f64> {
+fn build_xc_matrix(v_xc: &[f64], basis_at_grid: &[f64], grid: &DftGrid, n: usize) -> Vec<f64> {
     let mut mat = vec![0.0; n * n];
 
     for (g, pt) in grid.points.iter().enumerate() {

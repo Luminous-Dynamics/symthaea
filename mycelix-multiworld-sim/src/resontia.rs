@@ -66,13 +66,13 @@ impl EvacuationTrigger {
     /// Typical warning time in hours for this threat class.
     pub fn warning_hours(&self) -> f64 {
         match self {
-            EvacuationTrigger::CarringtonEvent => 18.0,       // NOAA 15-30 min to hours; assume 18h from CME detection
-            EvacuationTrigger::MegaTsunami => 12.0,           // Seismic detection gives 6-24h for distant events
-            EvacuationTrigger::AsteroidImpact => 720.0,       // Weeks to months from survey detection
-            EvacuationTrigger::SupervolcanoEruption => 168.0,  // Days to weeks from seismic/deformation monitoring
-            EvacuationTrigger::KesslerSyndrome => 48.0,       // Tracked debris, hours to days warning
+            EvacuationTrigger::CarringtonEvent => 18.0, // NOAA 15-30 min to hours; assume 18h from CME detection
+            EvacuationTrigger::MegaTsunami => 12.0, // Seismic detection gives 6-24h for distant events
+            EvacuationTrigger::AsteroidImpact => 720.0, // Weeks to months from survey detection
+            EvacuationTrigger::SupervolcanoEruption => 168.0, // Days to weeks from seismic/deformation monitoring
+            EvacuationTrigger::KesslerSyndrome => 48.0, // Tracked debris, hours to days warning
             EvacuationTrigger::MagnetosphereExcursion => 720.0, // Geomagnetic drift monitored over months
-            EvacuationTrigger::NuclearWinter => 4.0,          // Minutes to hours (ICBM flight time)
+            EvacuationTrigger::NuclearWinter => 4.0, // Minutes to hours (ICBM flight time)
         }
     }
 
@@ -191,8 +191,7 @@ impl ResontiaInfrastructure {
             self.vault_capacity += 50_000;
             self.heat_rejection_mw += 10.0;
             self.maglev_blast_doors += 8; // 8 blast doors per vault
-            self.vault_infrastructure =
-                (self.vault_infrastructure + 0.08).min(1.0);
+            self.vault_infrastructure = (self.vault_infrastructure + 0.08).min(1.0);
             events.push(CivEvent::new(
                 tick,
                 None,
@@ -307,8 +306,8 @@ impl Default for ResontiaConfig {
             enabled: false,
             construction_start_year: 50.0, // Year 2076 (Epoch 3)
             vault_construction_time_years: 10.0,
-            max_vault_nodes: 12, // 12 vault cities worldwide
-            maglev_construction_rate: 2.0, // 2 corridors per decade
+            max_vault_nodes: 12,               // 12 vault cities worldwide
+            maglev_construction_rate: 2.0,     // 2 corridors per decade
             dormant_vault_cost_fraction: 0.05, // 5% of active maintenance cost
         }
     }
@@ -346,9 +345,7 @@ pub fn compute_evacuation_success(
     let effective_evacuated = max_evacuated * orderly_factor;
 
     // Can't evacuate more than vault capacity or heat-limited capacity
-    let capacity_limit = infra
-        .vault_capacity
-        .min(infra.heat_limited_capacity()) as f64;
+    let capacity_limit = infra.vault_capacity.min(infra.heat_limited_capacity()) as f64;
     let capped_evacuated = effective_evacuated.min(capacity_limit);
 
     (capped_evacuated / population as f64).min(1.0)
@@ -402,16 +399,12 @@ pub fn tick_resontia(
     let current_year = current_tick as f64 / TICKS_PER_YEAR as f64;
 
     // --- Phase 1: Start construction if time has come ---
-    let construction_ticks =
-        (config.vault_construction_time_years * TICKS_PER_YEAR as f64) as u32;
+    let construction_ticks = (config.vault_construction_time_years * TICKS_PER_YEAR as f64) as u32;
 
     if current_year >= config.construction_start_year {
         // Start a new vault every construction_time_years if below max
-        let total_planned = infra.vault_count
-            + infra.vaults_under_construction.len();
-        if total_planned < config.max_vault_nodes
-            && infra.vaults_under_construction.is_empty()
-        {
+        let total_planned = infra.vault_count + infra.vaults_under_construction.len();
+        if total_planned < config.max_vault_nodes && infra.vaults_under_construction.is_empty() {
             infra.start_vault_construction(construction_ticks);
             events.push(CivEvent::new(
                 current_tick,
@@ -426,8 +419,7 @@ pub fn tick_resontia(
         }
 
         // Start maglev corridors: one per (120 / construction_rate) ticks
-        let corridor_interval =
-            (120.0 / config.maglev_construction_rate) as u32; // ticks between corridor starts
+        let corridor_interval = (120.0 / config.maglev_construction_rate) as u32; // ticks between corridor starts
         let corridor_construction_ticks = corridor_interval / 2; // corridors build faster than vaults
         if current_tick % corridor_interval == 0
             && infra.corridors_under_construction.is_empty()
@@ -447,12 +439,8 @@ pub fn tick_resontia(
             let warning = trigger.warning_hours();
             let stillness = earth_world.harmony.current_scores[SACRED_STILLNESS_INDEX];
 
-            let success_rate = compute_evacuation_success(
-                infra,
-                disaster_population_loss,
-                warning,
-                stillness,
-            );
+            let success_rate =
+                compute_evacuation_success(infra, disaster_population_loss, warning, stillness);
 
             let evacuated = (disaster_population_loss as f64 * success_rate) as usize;
             mitigated = evacuated;
@@ -568,7 +556,13 @@ mod tests {
                 faction_id: None,
                 generation: 0,
                 trauma_level: 0.0,
-                cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
+                cumulative_dose_sv: 0.0,
+                adversarial: None,
+                coordination_understanding: 0.0,
+                mycel_score: 0.1,
+                sap_balance: 100.0,
+                is_biological: true,
+                wounds: Vec::new(),
                 ethics: crate::agent::EthicalOrientation::default(),
                 sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
                 justice: crate::sub_passport::RestorativeJustice::new(),
@@ -596,7 +590,9 @@ mod tests {
             economy: crate::economy::WorldEconomy::new(),
             harmony,
             governance: crate::governance::WorldGovernance::new(),
-            metabolism_state: crate::metabolism::MetabolismState::default(), currency_state: crate::currency::WorldCurrencyState::default(), policy_state: crate::proposals::PolicyState::default(),
+            metabolism_state: crate::metabolism::MetabolismState::default(),
+            currency_state: crate::currency::WorldCurrencyState::default(),
+            policy_state: crate::proposals::PolicyState::default(),
             power_generation_kw: 0.0,
             power_demand_kw: 0.0,
             narrative_identity: crate::world::NarrativeIdentity::default(),
@@ -663,7 +659,10 @@ mod tests {
         for tick in 0..119 {
             infra.tick_construction(tick);
         }
-        assert_eq!(infra.vault_count, 0, "Vault should not complete before 120 ticks");
+        assert_eq!(
+            infra.vault_count, 0,
+            "Vault should not complete before 120 ticks"
+        );
 
         // Tick 120 — completes
         let events = infra.tick_construction(119);
@@ -707,7 +706,10 @@ mod tests {
             large_rate > small_rate,
             "More infrastructure should yield higher evacuation rate: {large_rate} vs {small_rate}"
         );
-        assert!(small_rate > 0.0, "Even small infra should evacuate some people");
+        assert!(
+            small_rate > 0.0,
+            "Even small infra should evacuate some people"
+        );
         assert!(large_rate <= 1.0, "Rate should be capped at 1.0");
     }
 
@@ -724,20 +726,23 @@ mod tests {
 
         // Exceed it
         infra.vault_occupancy = 150_000;
-        let config = ResontiaConfig { enabled: true, ..Default::default() };
+        let config = ResontiaConfig {
+            enabled: true,
+            ..Default::default()
+        };
         let earth = make_earth(500, 0.5);
         let mut rng = StochasticEngine::new(42);
 
-        let (events, _) = tick_resontia(
-            &mut infra, &config, &earth, 1000, 0, None, &mut rng,
-        );
+        let (events, _) = tick_resontia(&mut infra, &config, &earth, 1000, 0, None, &mut rng);
 
         assert_eq!(
             infra.vault_occupancy, heat_cap,
             "Occupancy should be clamped to heat-limited capacity"
         );
         assert!(
-            events.iter().any(|e| e.description.contains("heat rejection")),
+            events
+                .iter()
+                .any(|e| e.description.contains("heat rejection")),
             "Should generate heat rejection event"
         );
     }
@@ -845,12 +850,11 @@ mod tests {
             mitigated_full > mitigated_none,
             "Resontia should mitigate casualties: {mitigated_full} vs {mitigated_none}"
         );
+        assert!(!events.is_empty(), "Should generate evacuation events");
         assert!(
-            !events.is_empty(),
-            "Should generate evacuation events"
-        );
-        assert!(
-            events.iter().any(|e| e.description.contains("Resontia evacuation")),
+            events
+                .iter()
+                .any(|e| e.description.contains("Resontia evacuation")),
             "Should contain Resontia evacuation event description"
         );
         assert!(

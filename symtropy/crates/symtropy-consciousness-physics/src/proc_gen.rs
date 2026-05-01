@@ -76,18 +76,23 @@ pub enum ConsciousnessRegime {
 impl ConsciousnessRegime {
     /// Compute regime from a collective Φ value.
     pub fn from_phi(phi: f64) -> Self {
-        if phi >= PHI_THRESHOLD_TRANSCENDENT { Self::Transcendent }
-        else if phi >= PHI_THRESHOLD_INTEGRATED { Self::Integrated }
-        else if phi >= PHI_THRESHOLD_EMERGING  { Self::Emerging }
-        else { Self::Fragmented }
+        if phi >= PHI_THRESHOLD_TRANSCENDENT {
+            Self::Transcendent
+        } else if phi >= PHI_THRESHOLD_INTEGRATED {
+            Self::Integrated
+        } else if phi >= PHI_THRESHOLD_EMERGING {
+            Self::Emerging
+        } else {
+            Self::Fragmented
+        }
     }
 
     /// Human-readable regime name.
     pub fn name(&self) -> &'static str {
         match self {
-            Self::Fragmented   => "Fragmented",
-            Self::Emerging     => "Emerging",
-            Self::Integrated   => "Integrated",
+            Self::Fragmented => "Fragmented",
+            Self::Emerging => "Emerging",
+            Self::Integrated => "Integrated",
             Self::Transcendent => "Transcendent",
         }
     }
@@ -150,13 +155,14 @@ impl RoomProfile {
         // Resonance seed: stable within a regime, changes on transition.
         // Uses a simple mixing of the regime ordinal and the quantized Φ.
         let regime_ord = match regime {
-            ConsciousnessRegime::Fragmented   => 0u64,
-            ConsciousnessRegime::Emerging     => 1u64,
-            ConsciousnessRegime::Integrated   => 2u64,
+            ConsciousnessRegime::Fragmented => 0u64,
+            ConsciousnessRegime::Emerging => 1u64,
+            ConsciousnessRegime::Integrated => 2u64,
             ConsciousnessRegime::Transcendent => 3u64,
         };
         let phi_quantized = (phi * 1000.0) as u64;
-        let resonance_seed = regime_ord.wrapping_mul(0xDEAD_BEEF_CAFE_BABE)
+        let resonance_seed = regime_ord
+            .wrapping_mul(0xDEAD_BEEF_CAFE_BABE)
             .wrapping_add(phi_quantized.wrapping_mul(0x9E37_79B9_7F4A_7C15));
 
         Self {
@@ -193,7 +199,11 @@ pub enum EnvironmentEvent {
         phi: f64,
     },
     /// Energy well count changed (spawn or despawn signal).
-    WellCountChanged { previous: u32, current: u32, phi: f64 },
+    WellCountChanged {
+        previous: u32,
+        current: u32,
+        phi: f64,
+    },
     /// Higher-D portal just activated (Φ crossed PORTAL_THRESHOLD upward).
     PortalActivated { phi: f64 },
     /// Portal deactivated (Φ dropped below PORTAL_THRESHOLD).
@@ -308,8 +318,12 @@ impl PhiEnvironmentCoupler {
 
         // Emit portal activation / deactivation
         match (self.prev_portal_active, new_profile.portal_active) {
-            (false, true)  => self.events.push(EnvironmentEvent::PortalActivated { phi: self.smoothed_phi }),
-            (true,  false) => self.events.push(EnvironmentEvent::PortalDeactivated { phi: self.smoothed_phi }),
+            (false, true) => self.events.push(EnvironmentEvent::PortalActivated {
+                phi: self.smoothed_phi,
+            }),
+            (true, false) => self.events.push(EnvironmentEvent::PortalDeactivated {
+                phi: self.smoothed_phi,
+            }),
             _ => {}
         }
         self.prev_portal_active = new_profile.portal_active;
@@ -414,13 +428,19 @@ mod tests {
         // Push Φ just below threshold — no activation
         coupler.tick(PHI_THRESHOLD_TRANSCENDENT - 0.01);
         let events = coupler.drain_events();
-        assert!(!events.iter().any(|e| matches!(e, EnvironmentEvent::PortalActivated { .. })));
+        assert!(!events
+            .iter()
+            .any(|e| matches!(e, EnvironmentEvent::PortalActivated { .. })));
 
         // Push Φ above threshold — portal activates
         coupler.tick(PHI_THRESHOLD_TRANSCENDENT + 0.01);
         let events = coupler.drain_events();
-        assert!(events.iter().any(|e| matches!(e, EnvironmentEvent::PortalActivated { .. })),
-                "crossing portal threshold should emit PortalActivated");
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, EnvironmentEvent::PortalActivated { .. })),
+            "crossing portal threshold should emit PortalActivated"
+        );
     }
 
     #[test]
@@ -430,7 +450,9 @@ mod tests {
         coupler.drain_events();
         coupler.tick(0.5); // deactivate
         let events = coupler.drain_events();
-        assert!(events.iter().any(|e| matches!(e, EnvironmentEvent::PortalDeactivated { .. })));
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, EnvironmentEvent::PortalDeactivated { .. })));
     }
 
     #[test]
@@ -440,8 +462,13 @@ mod tests {
         coupler.drain_events();
         coupler.tick(0.5); // Emerging
         let events = coupler.drain_events();
-        let transition = events.iter().find(|e| matches!(e, EnvironmentEvent::RegimeTransition { .. }));
-        assert!(transition.is_some(), "crossing regime threshold should emit RegimeTransition");
+        let transition = events
+            .iter()
+            .find(|e| matches!(e, EnvironmentEvent::RegimeTransition { .. }));
+        assert!(
+            transition.is_some(),
+            "crossing regime threshold should emit RegimeTransition"
+        );
         if let Some(EnvironmentEvent::RegimeTransition { from, to, .. }) = transition {
             assert_eq!(*from, ConsciousnessRegime::Fragmented);
             assert_eq!(*to, ConsciousnessRegime::Emerging);
@@ -460,7 +487,9 @@ mod tests {
         // What matters is the event was emitted if the count changed
         let new_wells = profile.energy_well_count;
         if new_wells > 0 {
-            assert!(events.iter().any(|e| matches!(e, EnvironmentEvent::WellCountChanged { .. })));
+            assert!(events
+                .iter()
+                .any(|e| matches!(e, EnvironmentEvent::WellCountChanged { .. })));
         }
     }
 
@@ -472,8 +501,10 @@ mod tests {
             coupler.tick(if i % 2 == 0 { 0.0 } else { 1.0 });
         }
         let smoothed = coupler.smoothed_phi();
-        assert!((smoothed - 0.5).abs() < 0.15,
-                "alternating 0/1 should smooth to ~0.5, got {smoothed}");
+        assert!(
+            (smoothed - 0.5).abs() < 0.15,
+            "alternating 0/1 should smooth to ~0.5, got {smoothed}"
+        );
     }
 
     #[test]
@@ -484,18 +515,26 @@ mod tests {
         let first_drain = coupler.drain_events();
         assert!(!first_drain.is_empty());
         let second_drain = coupler.drain_events();
-        assert!(second_drain.is_empty(), "events should be cleared after drain");
+        assert!(
+            second_drain.is_empty(),
+            "events should be cleared after drain"
+        );
     }
 
     #[test]
     fn reset_clears_all_state() {
         let mut coupler = PhiEnvironmentCoupler::new(5);
-        for _ in 0..5 { coupler.tick(0.9); }
+        for _ in 0..5 {
+            coupler.tick(0.9);
+        }
         coupler.reset();
         assert_eq!(coupler.smoothed_phi(), 0.0);
         assert_eq!(coupler.window_len(), 0);
         assert!(coupler.pending_events().is_empty());
-        assert_eq!(coupler.current_profile().regime, ConsciousnessRegime::Fragmented);
+        assert_eq!(
+            coupler.current_profile().regime,
+            ConsciousnessRegime::Fragmented
+        );
     }
 
     #[test]
@@ -521,8 +560,11 @@ mod tests {
 
     #[test]
     fn spawn_multiplier_decreases_with_phi() {
-        let low  = RoomProfile::from_phi(0.1).spawn_multiplier;
+        let low = RoomProfile::from_phi(0.1).spawn_multiplier;
         let high = RoomProfile::from_phi(0.9).spawn_multiplier;
-        assert!(high < low, "higher Φ should reduce spawn multiplier: {low} vs {high}");
+        assert!(
+            high < low,
+            "higher Φ should reduce spawn multiplier: {low} vs {high}"
+        );
     }
 }

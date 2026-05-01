@@ -9,9 +9,9 @@
 // actually improve outcomes vs. the older baseline under the same
 // adversarial pressure?
 
-use mycelix_multiworld_sim::MultiWorldSimulator;
 use mycelix_multiworld_sim::config::{PolicyConfig, SimulationConfig};
 use mycelix_multiworld_sim::red_team::AdversarialStrategy;
+use mycelix_multiworld_sim::MultiWorldSimulator;
 
 #[derive(Debug, Clone, Copy)]
 struct PairResult {
@@ -46,7 +46,12 @@ fn run_condition(seed: u64, years: u32, phase2: bool) -> (f64, f64, usize, f64) 
         .as_ref()
         .map(|r| r.mean())
         .unwrap_or(f64::NAN);
-    (report.final_cvs, report.final_cvs_geometric, report.final_population, res)
+    (
+        report.final_cvs,
+        report.final_cvs_geometric,
+        report.final_population,
+        res,
+    )
 }
 
 fn main() {
@@ -61,15 +66,7 @@ fn main() {
     println!();
     println!(
         "{:>6} {:>7} {:>7} {:>+8} {:>7} {:>7} {:>+8} {:>7} {:>7}",
-        "seed",
-        "cvs_on",
-        "cvs_off",
-        "d_arith",
-        "geo_on",
-        "geo_off",
-        "d_geo",
-        "res_on",
-        "res_off",
+        "seed", "cvs_on", "cvs_off", "d_arith", "geo_on", "geo_off", "d_geo", "res_on", "res_off",
     );
     println!("{}", "-".repeat(79));
 

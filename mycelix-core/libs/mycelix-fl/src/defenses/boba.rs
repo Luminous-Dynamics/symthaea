@@ -86,7 +86,11 @@ impl Boba {
         let mut weights = vec![0.0_f64; n];
         for i in 0..n {
             let avg: f64 = sim_matrix[i * n..(i + 1) * n].iter().sum::<f64>() / n as f64;
-            weights[i] = if avg >= self.similarity_threshold { avg } else { 0.0 };
+            weights[i] = if avg >= self.similarity_threshold {
+                avg
+            } else {
+                0.0
+            };
         }
 
         // If all rejected, fall back to simple mean.
@@ -221,14 +225,21 @@ mod tests {
     use super::*;
 
     fn grad(id: &str, values: Vec<f32>) -> Gradient {
-        Gradient { node_id: id.into(), values, round: 0 }
+        Gradient {
+            node_id: id.into(),
+            values,
+            round: 0,
+        }
     }
 
     #[test]
     fn test_jsd_identical_distributions() {
         let p = vec![0.25, 0.25, 0.25, 0.25];
         let jsd = jensen_shannon_divergence(&p, &p);
-        assert!(jsd.abs() < 1e-10, "JSD of identical distributions should be 0");
+        assert!(
+            jsd.abs() < 1e-10,
+            "JSD of identical distributions should be 0"
+        );
     }
 
     #[test]
@@ -246,7 +257,9 @@ mod tests {
     fn test_jsd_symmetry() {
         let p = vec![0.7, 0.2, 0.1];
         let q = vec![0.1, 0.3, 0.6];
-        assert!((jensen_shannon_divergence(&p, &q) - jensen_shannon_divergence(&q, &p)).abs() < 1e-10);
+        assert!(
+            (jensen_shannon_divergence(&p, &q) - jensen_shannon_divergence(&q, &p)).abs() < 1e-10
+        );
     }
 
     #[test]
@@ -275,16 +288,25 @@ mod tests {
             grad("b", vec![1.1, 1.9]),
             grad("outlier", vec![5.0, -5.0]),
         ];
-        let histograms = vec![
-            vec![0.5, 0.5],
-            vec![0.45, 0.55],
-            vec![1.0, 0.0],
-        ];
+        let histograms = vec![vec![0.5, 0.5], vec![0.45, 0.55], vec![1.0, 0.0]];
         let result = boba.aggregate(&gradients, Some(&histograms)).unwrap();
 
-        let outlier_score = result.scores.iter().find(|(id, _)| id == "outlier").map(|(_, w)| *w).unwrap_or(1.0);
-        let a_score = result.scores.iter().find(|(id, _)| id == "a").map(|(_, w)| *w).unwrap_or(0.0);
-        assert!(outlier_score <= a_score, "outlier should have <= weight than similar node");
+        let outlier_score = result
+            .scores
+            .iter()
+            .find(|(id, _)| id == "outlier")
+            .map(|(_, w)| *w)
+            .unwrap_or(1.0);
+        let a_score = result
+            .scores
+            .iter()
+            .find(|(id, _)| id == "a")
+            .map(|(_, w)| *w)
+            .unwrap_or(0.0);
+        assert!(
+            outlier_score <= a_score,
+            "outlier should have <= weight than similar node"
+        );
     }
 
     #[test]

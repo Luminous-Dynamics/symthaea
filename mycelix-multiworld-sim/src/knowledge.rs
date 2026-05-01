@@ -142,12 +142,14 @@ pub struct CriticalSystemCoverage {
 impl CriticalSystemCoverage {
     /// Compute coverage from agent skills.
     pub fn compute(agents: &[crate::agent::CivAgent], current_tick: u32) -> Self {
-        let living: Vec<_> = agents.iter()
+        let living: Vec<_> = agents
+            .iter()
             .filter(|a| a.is_alive() && a.life_stage(current_tick).can_work())
             .collect();
 
         let count_skilled = |sector: usize, min_skill: f64| -> u32 {
-            living.iter()
+            living
+                .iter()
                 .filter(|a| a.skills.as_slice()[sector] > min_skill)
                 .count() as u32
         };
@@ -161,7 +163,16 @@ impl CriticalSystemCoverage {
         let education = count_skilled(5, 0.3);
         let governance = count_skilled(3, 0.3);
 
-        let systems = [eclss, power, agriculture, medical, comms, fabrication, education, governance];
+        let systems = [
+            eclss,
+            power,
+            agriculture,
+            medical,
+            comms,
+            fabrication,
+            education,
+            governance,
+        ];
         let at_risk = systems.iter().filter(|&&s| s <= 1).count() as u32;
         let failing = systems.iter().filter(|&&s| s == 0).count() as u32;
 
@@ -259,7 +270,13 @@ impl WorldKnowledge {
             .agents
             .iter()
             .filter(|a| a.is_alive() && a.life_stage(current_tick).can_work())
-            .map(|a| if a.skills.strongest() == "science" { 1.0 } else { 0.2 })
+            .map(|a| {
+                if a.skills.strongest() == "science" {
+                    1.0
+                } else {
+                    0.2
+                }
+            })
             .sum();
         self.active_researchers = researcher_equivalent.ceil() as usize;
 
@@ -301,10 +318,7 @@ impl WorldKnowledge {
                 CivEventType::InnovationBreakthrough,
                 format!(
                     "{}: innovation in {} (+{:.3}), tech level now {:.3}",
-                    world.name,
-                    SECTOR_NAMES[sector],
-                    increment,
-                    self.technology_levels[sector],
+                    world.name, SECTOR_NAMES[sector], increment, self.technology_levels[sector],
                 ),
             ));
         }
@@ -332,10 +346,7 @@ impl WorldKnowledge {
                 CivEventType::InnovationBreakthrough,
                 format!(
                     "{}: BREAKTHROUGH in {} (+{:.3})! Tech level: {:.3}",
-                    world.name,
-                    SECTOR_NAMES[sector],
-                    magnitude,
-                    self.technology_levels[sector],
+                    world.name, SECTOR_NAMES[sector], magnitude, self.technology_levels[sector],
                 ),
             ));
             self.breakthroughs.push(bt);
@@ -361,9 +372,7 @@ impl WorldKnowledge {
                 CivEventType::InnovationBreakthrough,
                 format!(
                     "{}: LCF ENERGY BREAKTHROUGH (+{:.2})! Engineering tech: {:.3}",
-                    world.name,
-                    magnitude,
-                    self.technology_levels[ENERGY_SECTOR],
+                    world.name, magnitude, self.technology_levels[ENERGY_SECTOR],
                 ),
             ));
             self.breakthroughs.push(bt);
@@ -374,7 +383,8 @@ impl WorldKnowledge {
 
         // --- Sample tech history every 12 ticks ---
         if current_tick % 12 == 0 {
-            self.tech_history.push((current_tick, self.mean_tech_level()));
+            self.tech_history
+                .push((current_tick, self.mean_tech_level()));
         }
 
         // --- Detect stagnation ---
@@ -556,10 +566,16 @@ mod tests {
                 faction_id: None,
                 generation: 0,
                 trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
-                    ethics: crate::agent::EthicalOrientation::default(),
-                    sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
-                    justice: crate::sub_passport::RestorativeJustice::new(),
+                cumulative_dose_sv: 0.0,
+                adversarial: None,
+                coordination_understanding: 0.0,
+                mycel_score: 0.1,
+                sap_balance: 100.0,
+                is_biological: true,
+                wounds: Vec::new(),
+                ethics: crate::agent::EthicalOrientation::default(),
+                sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
+                justice: crate::sub_passport::RestorativeJustice::new(),
             });
             id += 1;
         }
@@ -587,10 +603,16 @@ mod tests {
                 faction_id: None,
                 generation: 0,
                 trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
-                    ethics: crate::agent::EthicalOrientation::default(),
-                    sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
-                    justice: crate::sub_passport::RestorativeJustice::new(),
+                cumulative_dose_sv: 0.0,
+                adversarial: None,
+                coordination_understanding: 0.0,
+                mycel_score: 0.1,
+                sap_balance: 100.0,
+                is_biological: true,
+                wounds: Vec::new(),
+                ethics: crate::agent::EthicalOrientation::default(),
+                sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
+                justice: crate::sub_passport::RestorativeJustice::new(),
             });
             id += 1;
         }
@@ -614,7 +636,9 @@ mod tests {
             economy: crate::economy::WorldEconomy::new(),
             harmony: crate::harmony::HarmonyTracker::new(),
             governance: crate::governance::WorldGovernance::new(),
-            metabolism_state: crate::metabolism::MetabolismState::default(), currency_state: crate::currency::WorldCurrencyState::default(), policy_state: crate::proposals::PolicyState::default(),
+            metabolism_state: crate::metabolism::MetabolismState::default(),
+            currency_state: crate::currency::WorldCurrencyState::default(),
+            policy_state: crate::proposals::PolicyState::default(),
             power_generation_kw: 0.0,
             power_demand_kw: 0.0,
             narrative_identity: crate::world::NarrativeIdentity::default(),

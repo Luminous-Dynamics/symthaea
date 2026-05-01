@@ -1,0 +1,83 @@
+# Mycelix Sensorium — development commands
+# Usage: just <recipe>
+
+# Default target dir (avoids lock contention with other sessions)
+export CARGO_TARGET_DIR := "target"
+
+# ── Build ──
+
+# Build Sensorium WASM (debug)
+build:
+    cargo build --target wasm32-unknown-unknown -j2
+
+# Build Sensorium WASM (release, optimized for size)
+build-release:
+    cargo build --target wasm32-unknown-unknown --release -j2
+
+# Build with trunk (for serving)
+trunk-build:
+    ~/.cargo/bin/trunk build
+
+# ── Serve ──
+
+# Serve the Sensorium at localhost:8095
+serve:
+    ~/.cargo/bin/trunk serve --port 8095
+
+# ── Test ──
+
+# Run all 41 Sensorium tests (native Rust, no WASM/browser/conductor)
+test:
+    @echo "=== Sensorium Test Suite (41 tests) ==="
+    @echo "--- Inference (11 tests) ---"
+    cargo test -p sensorium-inference --no-default-features
+    @echo "--- Governance types (10 tests) ---"
+    cargo test -p domain-governance
+    @echo "--- Conductor integration (5 tests) ---"
+    cargo test --test conductor_integration
+    @echo "--- Force graph physics (4 tests) ---"
+    cargo test -p sensorium-viz --lib
+    @echo "--- Games progress + social proof (4 tests) ---"
+    cargo test -p sensorium-games --lib -- social_proof progress
+    @echo "--- Domain roundtrips (7 tests) ---"
+    cargo test -p domain-health -p domain-commons -p domain-finance -p domain-hearth -p domain-knowledge -p domain-lucid -p domain-mail
+    @echo "=== All 41 tests passed! ==="
+
+# Run just the wire protocol tests
+test-wire:
+    cargo test -p mycelix-leptos-client --manifest-path ../crates/mycelix-leptos-client/Cargo.toml
+
+# Run just the domain type tests
+test-types:
+    cargo test -p domain-governance --no-default-features
+
+# ── Check ──
+
+# Check all crates compile for WASM target
+check:
+    cargo check --target wasm32-unknown-unknown
+
+# Check workspace (all crates)
+check-all:
+    cargo check --workspace --target wasm32-unknown-unknown
+
+# ── Release ──
+
+# Full production build with optimization
+release:
+    cargo build --target wasm32-unknown-unknown --release -j2
+    @echo "Release WASM at target/wasm32-unknown-unknown/release/mycelix-sensorium.wasm"
+    @ls -lh target/wasm32-unknown-unknown/release/mycelix-sensorium.wasm
+
+# Optimize WASM with wasm-opt
+optimize: release
+    wasm-opt -Oz target/wasm32-unknown-unknown/release/mycelix-sensorium.wasm -o dist/mycelix-sensorium.wasm
+    @echo "Optimized:"
+    @ls -lh dist/mycelix-sensorium.wasm
+
+# ── Clean ──
+
+# Remove build artifacts
+clean:
+    cargo clean
+    rm -rf dist/

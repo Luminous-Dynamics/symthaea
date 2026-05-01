@@ -1,0 +1,148 @@
+{
+  "metadata": {
+    "title": "Universal Wisdom: Ancient Teachings & Modern Standards",
+    "framework": "Global Wisdom Mesh",
+    "source": "https://mycelix.org/wisdom",
+    "grade_level": "Lifelong/Universal",
+    "subject_area": "Multi-Subject",
+    "domain": "Wisdom & Mastery",
+    "version": "1.0",
+    "total_standards": 10,
+    "domains": [
+      "Ancient Philosophy",
+      "Indigenous Science",
+      "Modern Leadership",
+      "Holistic Health"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Bridging ancient human wisdom with modern professional standards."
+  },
+  "nodes": [
+    {
+      "id": "CERT-MGT-GOOGLE-PM",
+      "title": "Google Project Management Certificate",
+      "description": "Foundations of project management: initiating, planning, and executing projects. Agile, Waterfall, and Lean methodologies. Practical skills for guild leaders.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Modern Leadership",
+      "subdomain": "Wisdom Bridge",
+      "tags": ["google", "management", "project", "standard"],
+      "estimated_hours": 120,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Social Studies"
+    },
+    {
+      "id": "ANC-STO-101",
+      "title": "Stoic Logic & The Inner Citadel",
+      "description": "Ancient techniques for emotional resilience and epistemic humility. Marcus Aurelius and Epictetus. Managing the 'internal substrate' during systemic crisis.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Ancient Philosophy",
+      "subdomain": "Wisdom Bridge",
+      "tags": ["stoicism", "philosophy", "resilience", "ethics"],
+      "estimated_hours": 45,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Humanities"
+    },
+    {
+      "id": "ANC-YOGA-101",
+      "title": "Yoga Sutras & Biological Homeostasis",
+      "description": "Patanjali's logic of the mind-body substrate. The science of breath (Pranayama) as a thermodynamic regulator. Linked to the Bioregional Vitality track.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Holistic Health",
+      "subdomain": "Wisdom Bridge",
+      "tags": ["yoga", "homeostasis", "health", "philosophy"],
+      "estimated_hours": 60,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Apply",
+      "subject_area": "Health Sciences"
+    },
+    {
+      "id": "ANC-SONG-201",
+      "title": "Indigenous Mnemonics & Songlines",
+      "description": "Advanced oral knowledge systems. Using spatial narrative to store 16k-dimensional environmental data. The origin of the Mycelix semantic mesh.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Indigenous Science",
+      "subdomain": "Wisdom Bridge",
+      "tags": ["iks", "memory", "navigation", "mapping"],
+      "estimated_hours": 90,
+      "grade_levels": ["Graduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Humanities"
+    },
+    {
+      "id": "ANC-TAO-101",
+      "title": "Taoist Flow & Substrate Efficiency",
+      "description": "Lao Tzu and the logic of 'Wei Wu Wei' (effortless action). The physics of flow states and their role in high-velocity cooperative networks.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Ancient Philosophy",
+      "subdomain": "Wisdom Bridge",
+      "tags": ["taoism", "flow", "physics", "cooperation"],
+      "estimated_hours": 45,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Humanities"
+    },
+    {
+      "id": "ANC-CAP-WISDOM",
+      "title": "The Universal Sage Capstone",
+      "description": "Synthesize a modern technical challenge (e.g. Solar installation or Mesh security) with an ancient wisdom framework. Prove that the solution is both technically sound and morally aligned.",
+      "node_type": "Capstone",
+      "difficulty": "Expert",
+      "domain": "Universal",
+      "subdomain": "Wisdom Bridge",
+      "tags": ["capstone", "wisdom", "synthesis", "ethics"],
+      "estimated_hours": 180,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Create",
+      "subject_area": "Synthesis",
+      "holonic_capstone": {
+        "required_node_ids": ["ANC-STO-101", "ANC-TAO-101", "HUM-HIST-CAP"],
+        "deliverable": "A 'Wisdom Charter' for a local guild, verified by the Symthaea Auditor and a consensus of 3+ elders.",
+        "min_peer_endorsements": 5
+      },
+      "alignment_vector": {
+        "ahimsa": 999,
+        "truthfulness": 999,
+        "epistemic_humility": 995,
+        "collective_flourishing": 990,
+        "aesthetic_harmony": 950
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "ANC-STO-101",
+      "to": "CERT-MGT-GOOGLE-PM",
+      "edge_type": "Recommended",
+      "strength_permille": 700,
+      "rationale": "Stoic resilience provides the emotional foundation required for high-stakes project leadership."
+    },
+    {
+      "from": "ANC-YOGA-101",
+      "to": "VITA-201",
+      "edge_type": "Recommended",
+      "strength_permille": 800,
+      "rationale": "Ayurvedic homeostasis provides the systemic context for soil-to-body nutrition."
+    },
+    {
+      "from": "ANC-SONG-201",
+      "to": "SYM-201",
+      "edge_type": "Recommended",
+      "strength_permille": 850,
+      "rationale": "Songline mnemonics provide the prehistoric intuition for high-dimensional semantic mapping."
+    },
+    {
+      "from": "ANC-TAO-101",
+      "to": "MATH-GAME-401",
+      "edge_type": "Recommended",
+      "strength_permille": 600,
+      "rationale": "Taoist non-action is the philosophical counterpart to optimal win-win game theory."
+    }
+  ]
+}

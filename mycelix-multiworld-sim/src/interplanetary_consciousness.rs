@@ -159,8 +159,7 @@ impl PlanetaryWorld {
         population: usize,
         seed: u64,
     ) -> Self {
-        let epidemic =
-            ConsciousnessEpidemic::new(population, seed, TransmissionModel::default());
+        let epidemic = ConsciousnessEpidemic::new(population, seed, TransmissionModel::default());
         let collective_psi = epidemic.mean_phi();
         Self {
             name: name.into(),
@@ -197,10 +196,7 @@ pub enum InterplanetaryEvent {
         new_tier_counts: [usize; NUM_TIERS],
     },
     /// Solar conjunction started: communication blacked out between two worlds.
-    BlackoutStarted {
-        world_a: String,
-        world_b: String,
-    },
+    BlackoutStarted { world_a: String, world_b: String },
     /// Solar conjunction ended: communication restored.
     BlackoutEnded {
         world_a: String,
@@ -215,10 +211,7 @@ pub enum InterplanetaryEvent {
         psi_delta: f64,
     },
     /// Divergence alert: consciousness gap between two worlds exceeds threshold.
-    DivergenceAlert {
-        worlds: (String, String),
-        gap: f64,
-    },
+    DivergenceAlert { worlds: (String, String), gap: f64 },
 }
 
 // ============================================================================
@@ -380,7 +373,10 @@ impl InterplanetaryConsciousness {
         let sync_quality = if self.worlds.is_empty() {
             0.0
         } else {
-            self.worlds.iter().map(|w| w.cultural_coherence).sum::<f64>()
+            self.worlds
+                .iter()
+                .map(|w| w.cultural_coherence)
+                .sum::<f64>()
                 / self.worlds.len() as f64
         };
 
@@ -424,8 +420,8 @@ impl InterplanetaryConsciousness {
 
                 // A pair is blacked out if either body is in conjunction
                 // (conjunction is always relative to Earth/Sun alignment)
-                let blacked_out = body_i.is_in_conjunction(self.tick)
-                    || body_j.is_in_conjunction(self.tick);
+                let blacked_out =
+                    body_i.is_in_conjunction(self.tick) || body_j.is_in_conjunction(self.tick);
 
                 if blacked_out {
                     new_blackouts.push((i, j));
@@ -472,7 +468,8 @@ impl InterplanetaryConsciousness {
                 self.worlds[j].isolation_ticks = 0;
 
                 // Remove snapshot for this pair
-                self.blackout_psi_snapshots.retain(|(a, b, _, _)| !(*a == i && *b == j));
+                self.blackout_psi_snapshots
+                    .retain(|(a, b, _, _)| !(*a == i && *b == j));
             }
         }
 
@@ -536,14 +533,10 @@ impl InterplanetaryConsciousness {
         let n = self.worlds.len();
         for i in 0..n {
             for j in (i + 1)..n {
-                let gap =
-                    (self.worlds[i].collective_psi - self.worlds[j].collective_psi).abs();
+                let gap = (self.worlds[i].collective_psi - self.worlds[j].collective_psi).abs();
                 if gap > DIVERGENCE_ALERT_THRESHOLD {
                     events.push(InterplanetaryEvent::DivergenceAlert {
-                        worlds: (
-                            self.worlds[i].name.clone(),
-                            self.worlds[j].name.clone(),
-                        ),
+                        worlds: (self.worlds[i].name.clone(), self.worlds[j].name.clone()),
                         gap,
                     });
                 }
@@ -621,7 +614,10 @@ mod tests {
                 }
             }
         }
-        assert!(saw_blackout, "Expected Mars conjunction blackout within 30 ticks");
+        assert!(
+            saw_blackout,
+            "Expected Mars conjunction blackout within 30 ticks"
+        );
     }
 
     #[test]

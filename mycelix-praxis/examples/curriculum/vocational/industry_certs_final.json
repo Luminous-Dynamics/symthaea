@@ -1,0 +1,122 @@
+{
+  "metadata": {
+    "title": "Advanced Professional Mosaic: Expert Industry Standards",
+    "framework": "Global Expert Mesh",
+    "source": "https://mycelix.org/certs-final",
+    "grade_level": "Professional/Expert",
+    "subject_area": "Multi-Sector",
+    "domain": "Professional Certification",
+    "version": "1.0",
+    "total_standards": 10,
+    "domains": [
+      "Sustainable Architecture",
+      "Environmental Management",
+      "Enterprise IT Defense",
+      "Global Supply Chain"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Expert-level mapping of global professional standards for civilizational infrastructure."
+  },
+  "nodes": [
+    {
+      "id": "CERT-ARCH-LEED",
+      "title": "LEED Green Associate",
+      "description": "The standard for green building. Sustainable sites, water efficiency, energy and atmosphere, materials and resources, and indoor environmental quality. Linked to the Regenerative Habitat track.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Sustainable Architecture",
+      "subdomain": "Certification Bridge",
+      "tags": ["leed", "green-building", "sustainability", "standard"],
+      "estimated_hours": 90,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "CERT-ENV-HAZWOPER",
+      "title": "OSHA 40-Hour HAZWOPER",
+      "description": "Hazardous Waste Operations and Emergency Response. Safety training for cleaning up hazardous waste sites. Linked to the Planetary Repair track.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Environmental Management",
+      "subdomain": "Certification Bridge",
+      "tags": ["osha", "hazardous-waste", "safety", "standard"],
+      "estimated_hours": 40,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Science"
+    },
+    {
+      "id": "CERT-IT-RHCSA",
+      "title": "Red Hat Certified System Administrator (RHCSA)",
+      "description": "Professional Linux systems administration. Command line, local storage, file systems, and security. Directly linked to the NixOS and Sovereign IT tracks.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Enterprise IT Defense",
+      "subdomain": "Certification Bridge",
+      "tags": ["linux", "redhat", "sysadmin", "standard"],
+      "estimated_hours": 150,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "CERT-IT-CISSP",
+      "title": "Certified Information Systems Security Professional",
+      "description": "The elite cybersecurity standard. Risk management, asset security, identity and access management, and network security. Mapping MATL math to CISSP domains.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Enterprise IT Defense",
+      "subdomain": "Certification Bridge",
+      "tags": ["cissp", "cybersecurity", "expert", "standard"],
+      "estimated_hours": 300,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Evaluate",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "CERT-LOG-CSCP",
+      "title": "APICS Certified Supply Chain Professional (CSCP)",
+      "description": "End-to-end supply chain management. Sourcing, procurement, and fulfillment. Mapping the Mycelial Oracle logic to global logistics standards.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Global Supply Chain",
+      "subdomain": "Certification Bridge",
+      "tags": ["supply-chain", "logistics", "management", "standard"],
+      "estimated_hours": 120,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Analyze",
+      "subject_area": "Social Studies"
+    }
+  ],
+  "edges": [
+    {
+      "from": "CON-VOC-101",
+      "to": "CERT-ARCH-LEED",
+      "edge_type": "Recommended",
+      "strength_permille": 800,
+      "rationale": "Bio-material mastery covers 80% of the LEED Materials & Resources credit requirements."
+    },
+    {
+      "from": "REPAIR-SCI-101",
+      "to": "CERT-ENV-HAZWOPER",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Active carbon scrubbing and remediation requires OSHA hazardous waste safety training."
+    },
+    {
+      "from": "IT-SEC-101",
+      "to": "CERT-IT-RHCSA",
+      "edge_type": "Recommended",
+      "strength_permille": 700,
+      "rationale": "Sovereign hardware security provides the root-of-trust needed for Linux sysadmin."
+    },
+    {
+      "from": "CIV-701",
+      "to": "CERT-LOG-CSCP",
+      "edge_type": "Recommended",
+      "strength_permille": 600,
+      "rationale": "Global mesh governance provides the systemic intuition for global supply chain management."
+    }
+  ]
+}

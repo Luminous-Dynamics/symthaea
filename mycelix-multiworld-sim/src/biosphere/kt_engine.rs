@@ -98,7 +98,11 @@ impl FeatureSeries {
             }
             NormStrategy::MinmaxGlobal => {
                 let (lo, hi) = min_max(&self.values);
-                let range = if (hi - lo).abs() < 1e-15 { 1.0 } else { hi - lo };
+                let range = if (hi - lo).abs() < 1e-15 {
+                    1.0
+                } else {
+                    hi - lo
+                };
                 for v in &mut self.values {
                     *v = (*v - lo) / range;
                 }
@@ -115,7 +119,11 @@ impl FeatureSeries {
             NormStrategy::MinmaxByCentury => {
                 self.grouped_transform(|vals| {
                     let (lo, hi) = min_max(vals);
-                    let range = if (hi - lo).abs() < 1e-15 { 1.0 } else { hi - lo };
+                    let range = if (hi - lo).abs() < 1e-15 {
+                        1.0
+                    } else {
+                        hi - lo
+                    };
                     for v in vals {
                         *v = (*v - lo) / range;
                     }
@@ -258,12 +266,16 @@ impl KtEngine {
 
         // Normalize weights
         let w: Vec<f64> = if let Some(wt) = weights {
-            let mut wvec: Vec<f64> = self.harmony_names.iter().map(|name| {
-                *wt.get(name).unwrap_or(&(1.0 / h as f64))
-            }).collect();
+            let mut wvec: Vec<f64> = self
+                .harmony_names
+                .iter()
+                .map(|name| *wt.get(name).unwrap_or(&(1.0 / h as f64)))
+                .collect();
             let wsum: f64 = wvec.iter().sum();
             if wsum > 0.0 {
-                for v in &mut wvec { *v /= wsum; }
+                for v in &mut wvec {
+                    *v /= wsum;
+                }
             }
             wvec
         } else {
@@ -282,9 +294,7 @@ impl KtEngine {
                     log_sum.exp()
                 }
                 AggregationMethod::Arithmetic => {
-                    (0..h)
-                        .map(|j| w[j] * self.harmony_columns[j][i])
-                        .sum()
+                    (0..h).map(|j| w[j] * self.harmony_columns[j][i]).sum()
                 }
             };
             k_values.push(val);
@@ -294,9 +304,19 @@ impl KtEngine {
     }
 
     /// Bootstrap mean CI (scalar bounds on overall mean K).
-    pub fn bootstrap_mean_ci(&self, k_values: &[f64], n_samples: usize, ci: f64, seed: u64) -> (f64, f64) {
+    pub fn bootstrap_mean_ci(
+        &self,
+        k_values: &[f64],
+        n_samples: usize,
+        ci: f64,
+        seed: u64,
+    ) -> (f64, f64) {
         if n_samples == 0 || k_values.is_empty() {
-            let mean = if k_values.is_empty() { 0.0 } else { k_values.iter().sum::<f64>() / k_values.len() as f64 };
+            let mean = if k_values.is_empty() {
+                0.0
+            } else {
+                k_values.iter().sum::<f64>() / k_values.len() as f64
+            };
             return (mean, mean);
         }
 
@@ -325,7 +345,9 @@ impl KtEngine {
 
 /// Simple LCG for deterministic bootstrap (no external RNG dependency).
 fn lcg_next(state: u64) -> u64 {
-    state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407)
+    state
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407)
 }
 
 #[cfg(test)]
@@ -354,7 +376,11 @@ mod tests {
         };
         series.normalize(NormStrategy::ZscoreGlobal);
         let sum: f64 = series.values.iter().sum();
-        assert!((sum).abs() < 1e-10, "Z-score mean should be ~0, got {}", sum);
+        assert!(
+            (sum).abs() < 1e-10,
+            "Z-score mean should be ~0, got {}",
+            sum
+        );
     }
 
     #[test]
@@ -363,11 +389,17 @@ mod tests {
         let mut harmonies = HashMap::new();
         harmonies.insert(
             "h1".to_string(),
-            vec![FeatureSeries { years: years.clone(), values: vec![0.5, 0.6, 0.7] }],
+            vec![FeatureSeries {
+                years: years.clone(),
+                values: vec![0.5, 0.6, 0.7],
+            }],
         );
         harmonies.insert(
             "h2".to_string(),
-            vec![FeatureSeries { years: years.clone(), values: vec![0.3, 0.8, 0.9] }],
+            vec![FeatureSeries {
+                years: years.clone(),
+                values: vec![0.3, 0.8, 0.9],
+            }],
         );
 
         let engine = KtEngine::from_harmony_features(&years, &harmonies);
@@ -378,7 +410,9 @@ mod tests {
             assert!(
                 geo[i] <= arith[i] + 1e-8,
                 "Geometric ({}) should be <= arithmetic ({}) at year {}",
-                geo[i], arith[i], years[i]
+                geo[i],
+                arith[i],
+                years[i]
             );
         }
     }
@@ -387,7 +421,11 @@ mod tests {
     fn bootstrap_ci_contains_mean() {
         let k_values = vec![0.3, 0.5, 0.7, 0.4, 0.6];
         let years = vec![2000, 2010, 2020, 2030, 2040];
-        let engine = KtEngine { years, harmony_columns: vec![], harmony_names: vec![] };
+        let engine = KtEngine {
+            years,
+            harmony_columns: vec![],
+            harmony_names: vec![],
+        };
         let (lo, hi) = engine.bootstrap_mean_ci(&k_values, 1000, 0.95, 42);
         let mean: f64 = k_values.iter().sum::<f64>() / k_values.len() as f64;
         assert!(lo <= mean, "CI lower ({}) should be <= mean ({})", lo, mean);

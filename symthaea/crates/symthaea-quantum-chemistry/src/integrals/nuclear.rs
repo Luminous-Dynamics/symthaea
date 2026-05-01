@@ -47,8 +47,7 @@ fn nuclear_primitive(
             }
 
             for v in 0..=(na + nb) {
-                let ez =
-                    hermite_coefficient(na, nb, v, alpha_a, alpha_b, center_a[2], center_b[2]);
+                let ez = hermite_coefficient(na, nb, v, alpha_a, alpha_b, center_a[2], center_b[2]);
                 if ez.abs() < 1e-15 {
                     continue;
                 }

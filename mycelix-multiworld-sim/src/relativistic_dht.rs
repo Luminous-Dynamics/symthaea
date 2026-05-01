@@ -34,8 +34,12 @@ use serde::{Deserialize, Serialize};
 /// # Arguments
 /// - `velocity_c`: Velocity as fraction of speed of light (0.0 to < 1.0)
 pub fn lorentz_gamma(velocity_c: f64) -> f64 {
-    if velocity_c <= 0.0 { return 1.0; }
-    if velocity_c >= 1.0 { return f64::INFINITY; }
+    if velocity_c <= 0.0 {
+        return 1.0;
+    }
+    if velocity_c >= 1.0 {
+        return f64::INFINITY;
+    }
     1.0 / (1.0 - velocity_c * velocity_c).sqrt()
 }
 
@@ -124,8 +128,10 @@ impl RelativisticReconciliation {
     pub fn summary(&self) -> String {
         format!(
             "γ={:.6} | Drift: {:.2} days | Offset: {:.0}s | Gossip sent: {}",
-            self.gamma, self.clock_drift_days,
-            self.timestamp_offset_seconds, self.gossip_payloads_sent,
+            self.gamma,
+            self.clock_drift_days,
+            self.timestamp_offset_seconds,
+            self.gossip_payloads_sent,
         )
     }
 }
@@ -164,8 +170,11 @@ mod tests {
     fn drift_at_005c_85_years() {
         let drift = clock_drift_days(85.0, 0.05);
         // At 0.05c, γ=1.00125. Over 85yr: drift = 85 × (1 - 1/γ) × 365.25 ≈ 38.8 days
-        assert!(drift > 35.0 && drift < 42.0,
-            "85yr drift at 0.05c: {:.1} days", drift);
+        assert!(
+            drift > 35.0 && drift < 42.0,
+            "85yr drift at 0.05c: {:.1} days",
+            drift
+        );
     }
 
     #[test]
@@ -184,8 +193,13 @@ mod tests {
         let ship_ts = 1000000.0; // Arbitrary ship timestamp
         let earth_ts = recon.ship_to_earth_timestamp(ship_ts);
         let back = recon.earth_to_ship_timestamp(earth_ts);
-        assert!((back - ship_ts).abs() < 0.01,
-            "Roundtrip should be identity: {} → {} → {}", ship_ts, earth_ts, back);
+        assert!(
+            (back - ship_ts).abs() < 0.01,
+            "Roundtrip should be identity: {} → {} → {}",
+            ship_ts,
+            earth_ts,
+            back
+        );
     }
 
     #[test]

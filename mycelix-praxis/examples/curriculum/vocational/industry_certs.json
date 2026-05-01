@@ -1,0 +1,130 @@
+{
+  "metadata": {
+    "title": "Industry Certification Bridge: Professional Standards",
+    "framework": "Global IT Standards",
+    "source": "https://mycelix.org/certs",
+    "grade_level": "Professional",
+    "subject_area": "IT & Cybersecurity",
+    "domain": "Professional Certification",
+    "version": "1.0",
+    "total_standards": 6,
+    "domains": [
+      "Cybersecurity",
+      "Networking",
+      "Cloud Infrastructure"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Mapping legacy global industry certifications to the Mycelix knowledge mesh."
+  },
+  "nodes": [
+    {
+      "id": "CERT-COMP-SEC",
+      "title": "CompTIA Security+ (SY0-701 Mapping)",
+      "description": "Core cybersecurity skills. Threats, attacks, and vulnerabilities; Architecture and design; Implementation; Operations and incident response; Governance, risk, and compliance.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Cybersecurity",
+      "subdomain": "Certification Bridge",
+      "tags": ["comptia", "security+", "cybersecurity", "standard"],
+      "estimated_hours": 120,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "CompTIA",
+          "code": "SY0-701",
+          "description": "CompTIA Security+ Certification Exam",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "CERT-CISCO-NA",
+      "title": "Cisco Certified Network Associate (CCNA Mapping)",
+      "description": "Network fundamentals, IP connectivity, IP services, security fundamentals, and automation/programmability. Standard routing and switching protocols.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Networking",
+      "subdomain": "Certification Bridge",
+      "tags": ["cisco", "ccna", "networking", "standard"],
+      "estimated_hours": 150,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "academic_standards": [
+        {
+          "framework": "Cisco",
+          "code": "200-301",
+          "description": "Implementing and Administering Cisco Solutions",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "CERT-AWS-ARCH",
+      "title": "AWS Certified Solutions Architect (Associate Mapping)",
+      "description": "Designing resilient, high-performing, secure, and cost-optimized architectures. Mapping cloud primitives to decentralized infrastructure needs.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Cloud Infrastructure",
+      "subdomain": "Certification Bridge",
+      "tags": ["aws", "cloud", "architecture", "standard"],
+      "estimated_hours": 120,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "CERT-GOOGLE-DA",
+      "title": "Google Data Analytics Certificate Mapping",
+      "description": "Data cleaning, analysis, and visualization. Using SQL, R, and Tableau to extract insights. Mapping legacy data-pipelines to the Mycelial Oracle logic.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Data Science",
+      "subdomain": "Certification Bridge",
+      "tags": ["google", "data-analytics", "sql", "visualization"],
+      "estimated_hours": 180,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "CERT-MS-AZURE",
+      "title": "Microsoft Azure Fundamentals (AZ-900 Mapping)",
+      "description": "Cloud concepts, Azure services, workloads, security, privacy, and support. Bridging enterprise cloud to sovereign node management.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Cloud Infrastructure",
+      "subdomain": "Certification Bridge",
+      "tags": ["microsoft", "azure", "cloud", "standard"],
+      "estimated_hours": 45,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Understand",
+      "subject_area": "Computer Science"
+    }
+  ],
+  "edges": [
+    {
+      "from": "IT-SEC-201",
+      "to": "CERT-COMP-SEC",
+      "edge_type": "Recommended",
+      "strength_permille": 800,
+      "rationale": "Mesh immunity training provides the practical foundation for Security+ threat domains."
+    },
+    {
+      "from": "DIG-ADV-301",
+      "to": "CERT-CISCO-NA",
+      "edge_type": "Recommended",
+      "strength_permille": 700,
+      "rationale": "Understanding P2P network topology helps in mastering standard IP connectivity."
+    },
+    {
+      "from": "IT-SEC-101",
+      "to": "CERT-COMP-SEC",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Hardware security is a core domain of the CompTIA Security+ standard."
+    }
+  ]
+}

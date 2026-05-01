@@ -1,0 +1,116 @@
+{
+  "metadata": {
+    "title": "Market Momentum: Gig & Trade Readiness",
+    "framework": "Global Market Mesh v2",
+    "source": "https://mycelix.org/certs-momentum-v2",
+    "grade_level": "Professional",
+    "subject_area": "Multi-Sector",
+    "domain": "Professional Certification",
+    "version": "1.0",
+    "total_standards": 6,
+    "domains": [
+      "E-commerce Ops",
+      "Environmental Safety",
+      "Aerospace Mapping",
+      "Physical Security",
+      "Marketing Ops"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Focused on immediate revenue-generating skills for the modern agent."
+  },
+  "nodes": [
+    {
+      "id": "CERT-BIZ-SHOPIFY-DEV",
+      "title": "Shopify Partner: Theme Development",
+      "description": "Mastery of Liquid, Shopify CLI, and store configuration. Building and optimizing e-commerce storefronts for local guilds. Linked to Frontend Engineering.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "E-commerce Ops",
+      "subdomain": "Certification Bridge",
+      "tags": ["shopify", "e-commerce", "liquid", "web-dev", "standard"],
+      "estimated_hours": 60,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Create",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "CERT-ENV-PEST-CORE",
+      "title": "EPA Core Pesticide Applicator Standard",
+      "description": "Safe use and handling of pesticides. Environmental protection, pest identification, and regulation compliance. Linked to Bioregional Vitality.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Environmental Safety",
+      "subdomain": "Certification Bridge",
+      "tags": ["epa", "safety", "agriculture", "pest-control", "standard"],
+      "estimated_hours": 30,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Science"
+    },
+    {
+      "id": "CERT-AERO-DRONE-MAPPING",
+      "title": "Drone Mapping & Photogrammetry Specialist",
+      "description": "Creating 2D maps and 3D models using sUAS data. Volumetric analysis and multispectral mapping for agriculture. Linked to FAA Part 107.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Aerospace Mapping",
+      "subdomain": "Certification Bridge",
+      "tags": ["drone", "mapping", "photogrammetry", "gis", "standard"],
+      "estimated_hours": 80,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Analyze",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "CERT-SEC-ALOA-LOCK",
+      "title": "ALOA Locksmithing Fundamentals",
+      "description": "Physical security, key duplication, and lock servicing. Principles of master keying and bypass techniques. Linked to Habitat Engineering.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Physical Security",
+      "subdomain": "Certification Bridge",
+      "tags": ["locksmith", "security", "trades", "safety", "standard"],
+      "estimated_hours": 120,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "CERT-MKT-META-LEADS",
+      "title": "Meta Certified Lead Generation Professional",
+      "description": "Building and optimizing lead generation campaigns on Facebook and Instagram. Managing CRM integrations and privacy compliance.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Marketing Ops",
+      "subdomain": "Certification Bridge",
+      "tags": ["meta", "marketing", "leads", "sales", "standard"],
+      "estimated_hours": 40,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Social Studies"
+    }
+  ],
+  "edges": [
+    {
+      "from": "CERT-WEB-META-FRONTEND",
+      "to": "CERT-BIZ-SHOPIFY-DEV",
+      "edge_type": "Recommended",
+      "strength_permille": 850,
+      "rationale": "General frontend mastery provides the HTML/CSS/JS foundation for Shopify Liquid development."
+    },
+    {
+      "from": "CERT-AERO-FAA-107",
+      "to": "CERT-AERO-DRONE-MAPPING",
+      "edge_type": "Requires",
+      "strength_permille": 1000,
+      "rationale": "Advanced mapping requires the foundational safety and regulation mastery of Part 107."
+    },
+    {
+      "from": "VOC-AG-101",
+      "to": "CERT-ENV-PEST-CORE",
+      "edge_type": "Recommended",
+      "strength_permille": 700,
+      "rationale": "Regenerative agriculture principles provide the ecological context for safe pest management."
+    }
+  ]
+}

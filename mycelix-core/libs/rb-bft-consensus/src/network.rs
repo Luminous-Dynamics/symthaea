@@ -39,8 +39,8 @@ use std::fmt::Debug;
 use std::future::Future;
 use std::pin::Pin;
 
-use crate::error::{ConsensusError, ConsensusResult};
 use crate::crypto::ConsensusSignature;
+use crate::error::{ConsensusError, ConsensusResult};
 use crate::proposal::Proposal;
 
 /// Peer identifier (32-byte public key)
@@ -289,13 +289,24 @@ pub trait NetworkService: Send + Sync {
     fn local_peer_id(&self) -> PeerId;
 
     /// Broadcast a message to all connected peers
-    fn broadcast(&self, message: ConsensusMessage) -> Pin<Box<dyn Future<Output = ConsensusResult<()>> + Send + '_>>;
+    fn broadcast(
+        &self,
+        message: ConsensusMessage,
+    ) -> Pin<Box<dyn Future<Output = ConsensusResult<()>> + Send + '_>>;
 
     /// Send a message to a specific peer
-    fn send(&self, peer: &PeerId, message: ConsensusMessage) -> Pin<Box<dyn Future<Output = ConsensusResult<()>> + Send + '_>>;
+    fn send(
+        &self,
+        peer: &PeerId,
+        message: ConsensusMessage,
+    ) -> Pin<Box<dyn Future<Output = ConsensusResult<()>> + Send + '_>>;
 
     /// Send to multiple specific peers
-    fn send_many(&self, peers: &[PeerId], message: ConsensusMessage) -> Pin<Box<dyn Future<Output = ConsensusResult<()>> + Send + '_>>;
+    fn send_many(
+        &self,
+        peers: &[PeerId],
+        message: ConsensusMessage,
+    ) -> Pin<Box<dyn Future<Output = ConsensusResult<()>> + Send + '_>>;
 
     /// Get list of connected peers
     fn connected_peers(&self) -> Pin<Box<dyn Future<Output = Vec<PeerId>> + Send + '_>>;
@@ -487,7 +498,10 @@ mod tests {
             vote_weight: 1.0,
         });
 
-        assert!(matches!(validate_message(&msg, current_round), ValidationResult::Valid));
+        assert!(matches!(
+            validate_message(&msg, current_round),
+            ValidationResult::Valid
+        ));
 
         // Old message
         let old_msg = ConsensusMessage::Vote(VoteMessage {
@@ -501,7 +515,10 @@ mod tests {
             vote_weight: 1.0,
         });
 
-        assert!(matches!(validate_message(&old_msg, current_round), ValidationResult::Invalid(_)));
+        assert!(matches!(
+            validate_message(&old_msg, current_round),
+            ValidationResult::Invalid(_)
+        ));
 
         // Future message
         let future_msg = ConsensusMessage::Vote(VoteMessage {
@@ -515,7 +532,10 @@ mod tests {
             vote_weight: 1.0,
         });
 
-        assert!(matches!(validate_message(&future_msg, current_round), ValidationResult::Pending(_)));
+        assert!(matches!(
+            validate_message(&future_msg, current_round),
+            ValidationResult::Pending(_)
+        ));
     }
 
     #[test]

@@ -6,22 +6,56 @@
 use leptos::prelude::*;
 
 const FORMAL_WORDS: &[&str] = &[
-    "pursuant", "hereby", "sincerely", "regarding", "enclosed", "accordingly",
-    "furthermore", "henceforth", "respectfully", "acknowledge", "correspond",
-    "commence", "inquire", "notify", "request", "submit", "advise",
+    "pursuant",
+    "hereby",
+    "sincerely",
+    "regarding",
+    "enclosed",
+    "accordingly",
+    "furthermore",
+    "henceforth",
+    "respectfully",
+    "acknowledge",
+    "correspond",
+    "commence",
+    "inquire",
+    "notify",
+    "request",
+    "submit",
+    "advise",
 ];
 const CASUAL_WORDS: &[&str] = &[
-    "hey", "hi", "lol", "btw", "gonna", "wanna", "cool", "awesome", "yeah",
-    "nah", "tbh", "imo", "fyi", "np", "thx", "sup", "dude", "yo",
+    "hey", "hi", "lol", "btw", "gonna", "wanna", "cool", "awesome", "yeah", "nah", "tbh", "imo",
+    "fyi", "np", "thx", "sup", "dude", "yo",
 ];
 const URGENT_WORDS: &[&str] = &[
-    "asap", "urgent", "critical", "deadline", "immediately", "emergency",
-    "priority", "crucial", "time-sensitive", "overdue", "escalate",
+    "asap",
+    "urgent",
+    "critical",
+    "deadline",
+    "immediately",
+    "emergency",
+    "priority",
+    "crucial",
+    "time-sensitive",
+    "overdue",
+    "escalate",
 ];
 const FRIENDLY_WORDS: &[&str] = &[
-    "wonderful", "happy", "glad", "lovely", "delighted", "appreciate",
-    "great to hear", "looking forward", "hope you're well", "take care",
-    "warmly", "cheers", "best wishes", "kind regards",
+    "wonderful",
+    "happy",
+    "glad",
+    "lovely",
+    "delighted",
+    "appreciate",
+    "great to hear",
+    "looking forward",
+    "hope you're well",
+    "take care",
+    "warmly",
+    "cheers",
+    "best wishes",
+    "kind regards",
 ];
 
 #[derive(Clone, Debug, PartialEq)]
@@ -66,11 +100,11 @@ impl Tone {
 pub fn analyze_tone(text: &str) -> (Tone, f32) {
     let lower = text.to_lowercase();
     let words: Vec<&str> = lower.split_whitespace().collect();
-    if words.len() < 3 { return (Tone::Neutral, 0.0); }
+    if words.len() < 3 {
+        return (Tone::Neutral, 0.0);
+    }
 
-    let count = |list: &[&str]| -> usize {
-        list.iter().filter(|w| lower.contains(**w)).count()
-    };
+    let count = |list: &[&str]| -> usize { list.iter().filter(|w| lower.contains(**w)).count() };
 
     let formal = count(FORMAL_WORDS);
     let casual = count(CASUAL_WORDS);
@@ -78,14 +112,21 @@ pub fn analyze_tone(text: &str) -> (Tone, f32) {
     let friendly = count(FRIENDLY_WORDS);
 
     let max = formal.max(casual).max(urgent).max(friendly);
-    if max == 0 { return (Tone::Neutral, 0.3); }
+    if max == 0 {
+        return (Tone::Neutral, 0.3);
+    }
 
     let confidence = (max as f32 / words.len().max(1) as f32 * 10.0).min(1.0);
 
-    let tone = if formal == max { Tone::Formal }
-    else if casual == max { Tone::Casual }
-    else if urgent == max { Tone::Urgent }
-    else { Tone::Friendly };
+    let tone = if formal == max {
+        Tone::Formal
+    } else if casual == max {
+        Tone::Casual
+    } else if urgent == max {
+        Tone::Urgent
+    } else {
+        Tone::Friendly
+    };
 
     (tone, confidence)
 }
@@ -94,9 +135,13 @@ pub fn analyze_tone(text: &str) -> (Tone, f32) {
 pub fn ToneIndicator(text: RwSignal<String>) -> impl IntoView {
     let analysis = move || {
         let t = text.get();
-        if t.len() < 10 { return None; }
+        if t.len() < 10 {
+            return None;
+        }
         let (tone, confidence) = analyze_tone(&t);
-        if confidence < 0.1 { return None; }
+        if confidence < 0.1 {
+            return None;
+        }
         Some((tone, confidence))
     };
 

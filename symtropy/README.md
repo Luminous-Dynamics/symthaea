@@ -157,6 +157,7 @@ cargo run --example hdc_cooperation --features consciousness-hdc
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Crate dependency graph, key types, extension guide |
 | [FORMAL_SPECIFICATION.md](FORMAL_SPECIFICATION.md) | Mathematical specification of all 5 coupling channels |
 | [ROADMAP.md](ROADMAP.md) | Completed features, current priorities, future plans |
+| [docs/MK0_BOOTSTRAPPER_PROTOCOL.md](docs/MK0_BOOTSTRAPPER_PROTOCOL.md) | One-room bootstrapper protocol for the immediate deployable starting loop |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute (determinism is a hard requirement) |
 
 ## Building

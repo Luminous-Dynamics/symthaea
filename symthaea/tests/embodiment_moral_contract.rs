@@ -95,7 +95,7 @@ fn moral_contract_humanoid() {
 #[cfg(feature = "flight")]
 #[test]
 fn moral_contract_flight() {
-    let bridge = symthaea_flight::embodiment::FlightEmbodiment::new(&GenesisSeed::from_phrase(
+    let bridge = symthaea_multirotor::embodiment::FlightEmbodiment::new(&GenesisSeed::from_phrase(
         "contract-flight",
     ));
     assert_moral_contract(bridge, "flight", 0.002);

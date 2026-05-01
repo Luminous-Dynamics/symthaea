@@ -119,8 +119,8 @@ impl CivilizationFusionState {
         };
 
         // Q factor: fusion power / input power (rough estimate)
-        let fusion_power = reaction_rate_density * self.research_volume_cm3
-            * DD_Q_AVERAGE * 1.602e-13; // MeV to J
+        let fusion_power =
+            reaction_rate_density * self.research_volume_cm3 * DD_Q_AVERAGE * 1.602e-13; // MeV to J
         let input_power = 1.0; // 1 watt input (conservative)
         self.q_factor = fusion_power / input_power;
         self.breakeven_achieved = self.q_factor > 1.0;
@@ -142,11 +142,19 @@ impl CivilizationFusionState {
     /// Generate a narrative description of the current fusion research state.
     pub fn narrative(&self) -> Option<String> {
         if self.rate_gap_log10 < 10.0 && self.rate_gap_log10 > 5.0 {
-            Some("Anomalous fusion rates approaching reproducibility — the rate gap narrows".to_string())
+            Some(
+                "Anomalous fusion rates approaching reproducibility — the rate gap narrows"
+                    .to_string(),
+            )
         } else if self.rate_gap_log10 <= 5.0 && !self.breakeven_achieved {
-            Some("Fusion researchers report consistent neutron excess — breakthrough imminent".to_string())
+            Some(
+                "Fusion researchers report consistent neutron excess — breakthrough imminent"
+                    .to_string(),
+            )
         } else if self.breakeven_achieved {
-            Some("FUSION BREAKEVEN ACHIEVED — Q > 1, civilization enters the fusion age".to_string())
+            Some(
+                "FUSION BREAKEVEN ACHIEVED — Q > 1, civilization enters the fusion age".to_string(),
+            )
         } else {
             None
         }
@@ -165,7 +173,9 @@ impl CivilizationFusionState {
 /// suitable for the civilization sim's monthly tick rate.
 fn simplified_gamow_dd(t_k: f64, screening_ev: f64, phonon_modes: u32) -> f64 {
     let kt_kev = t_k * 8.617e-8; // kT in keV
-    if kt_kev < 1e-15 { return 0.0; }
+    if kt_kev < 1e-15 {
+        return 0.0;
+    }
 
     // Gamow peak energy
     let e_g = DD_GAMOW_CONSTANT; // keV^0.5
@@ -196,8 +206,12 @@ fn simplified_gamow_dd(t_k: f64, screening_ev: f64, phonon_modes: u32) -> f64 {
 
     // Net exponent: tunneling (very negative at low T) + capped enhancements
     let net_exp = tunneling_exp + capped_screening + capped_phonon;
-    if net_exp < -500.0 { return 0.0; }
-    if net_exp > 100.0 { return 1e30; } // cap
+    if net_exp < -500.0 {
+        return 0.0;
+    }
+    if net_exp > 100.0 {
+        return 1e30;
+    } // cap
 
     // Astrophysical S-factor for D-D
     let s_factor = 52.0; // keV·barn
@@ -230,17 +244,23 @@ mod tests {
     fn baseline_tech_low_probability() {
         let mut state = CivilizationFusionState::default();
         state.update_from_tech(1.0, 1.0); // Baseline tech
-        // At baseline, probability is at the sigmoid floor — capped at 5%
-        assert!(state.lcf_probability <= 0.05,
-            "Baseline tech probability should be <= 5%: {}", state.lcf_probability);
+                                          // At baseline, probability is at the sigmoid floor — capped at 5%
+        assert!(
+            state.lcf_probability <= 0.05,
+            "Baseline tech probability should be <= 5%: {}",
+            state.lcf_probability
+        );
     }
 
     #[test]
     fn high_tech_meaningful_probability() {
         let mut state = CivilizationFusionState::default();
         state.update_from_tech(5.0, 5.0); // Advanced tech
-        assert!(state.lcf_probability > state.q_factor.min(0.001) || state.effective_temperature_k > 100_000.0,
-            "High tech should improve fusion parameters");
+        assert!(
+            state.lcf_probability > state.q_factor.min(0.001)
+                || state.effective_temperature_k > 100_000.0,
+            "High tech should improve fusion parameters"
+        );
         assert!(state.effective_temperature_k > 300_000.0);
         assert!(state.phonon_modes >= 3);
     }
@@ -257,15 +277,25 @@ mod tests {
         }
         // Temperature should increase monotonically
         for i in 1..temps.len() {
-            assert!(temps[i] >= temps[i-1],
+            assert!(
+                temps[i] >= temps[i - 1],
                 "Tech {} temp {} should be >= tech {} temp {}",
-                i+1, temps[i], i, temps[i-1]);
+                i + 1,
+                temps[i],
+                i,
+                temps[i - 1]
+            );
         }
         // Screening should increase monotonically
         for i in 1..screens.len() {
-            assert!(screens[i] >= screens[i-1],
+            assert!(
+                screens[i] >= screens[i - 1],
                 "Tech {} screening {} should be >= tech {} screening {}",
-                i+1, screens[i], i, screens[i-1]);
+                i + 1,
+                screens[i],
+                i,
+                screens[i - 1]
+            );
         }
     }
 
@@ -273,8 +303,11 @@ mod tests {
     fn probability_capped_at_5_percent() {
         let mut state = CivilizationFusionState::default();
         state.update_from_tech(10.0, 10.0); // Max tech
-        assert!(state.lcf_probability <= 0.05,
-            "Probability should cap at 5%: {}", state.lcf_probability);
+        assert!(
+            state.lcf_probability <= 0.05,
+            "Probability should cap at 5%: {}",
+            state.lcf_probability
+        );
     }
 
     #[test]
@@ -313,8 +346,12 @@ mod tests {
         let mut high = CivilizationFusionState::default();
         low.update_from_tech(3.0, 1.0);
         high.update_from_tech(3.0, 5.0);
-        assert!(high.screening_ev > low.screening_ev,
-            "Higher science should improve screening: {} vs {}", high.screening_ev, low.screening_ev);
+        assert!(
+            high.screening_ev > low.screening_ev,
+            "Higher science should improve screening: {} vs {}",
+            high.screening_ev,
+            low.screening_ev
+        );
     }
 
     #[test]
@@ -324,10 +361,16 @@ mod tests {
         assert_eq!(state.phonon_modes, 0, "Low eng should have 0 phonon modes");
 
         state.update_from_tech(3.5, 1.0);
-        assert!(state.phonon_modes >= 1, "Eng 3.5 should have 1+ phonon modes");
+        assert!(
+            state.phonon_modes >= 1,
+            "Eng 3.5 should have 1+ phonon modes"
+        );
 
         state.update_from_tech(7.0, 1.0);
-        assert_eq!(state.phonon_modes, 5, "Eng 7+ should have max 5 phonon modes");
+        assert_eq!(
+            state.phonon_modes, 5,
+            "Eng 7+ should have max 5 phonon modes"
+        );
     }
 
     #[test]

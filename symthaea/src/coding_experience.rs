@@ -26,6 +26,7 @@ use crate::databases::{
 };
 use std::sync::atomic::{AtomicU64, Ordering};
 use symthaea_core::hdc::binary_hv::BinaryHV;
+use symthaea_core::hdc::unified_hv::ContinuousHV;
 
 /// Monotonic counter to ensure unique IDs even within the same millisecond.
 static EXPERIENCE_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -43,6 +44,8 @@ pub struct CodingExperience {
     pub tier: String,
     /// Fix hint: what worked to resolve the error (for failures that were later fixed).
     pub fix_hint: Option<String>,
+    /// Optional HDC diagnostic geometry of the failure.
+    pub diagnostic_hv: Option<ContinuousHV>,
 }
 
 /// Persistent coding experience store backed by ConsciousnessDatabase.
@@ -206,7 +209,14 @@ impl CodingExperienceStore {
     pub async fn store(&mut self, experience: CodingExperience) {
         // Flush any queued records first
         self.flush().await;
-        let encoding = Self::encode_text(&experience.task);
+
+        // PRIORITIZE: If we have a diagnostic HV, use it for the memory encoding.
+        // This closes the loop: failure geometry → memory store → future recall.
+        let encoding = if let Some(diag_hv) = &experience.diagnostic_hv {
+            BinaryHV::from_continuous(diag_hv)
+        } else {
+            Self::encode_text(&experience.task)
+        };
 
         let now_ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -282,6 +292,45 @@ impl CodingExperienceStore {
             .search_similar(&query_hv, top_k)
             .await
             .unwrap_or_default()
+    }
+
+    /// Query for similar coding experiences by diagnostic geometry.
+    ///
+    /// This allows the agent to "remember" how it fixed a similar-looking
+    /// compiler error in the past by comparing the failure geometries.
+    pub async fn query_by_diagnostic(
+        &self,
+        diagnostic: &ContinuousHV,
+        top_k: usize,
+    ) -> Vec<SearchResult> {
+        // Convert ContinuousHV to BinaryHV for the database search
+        let query_hv = BinaryHV::from_continuous(diagnostic);
+        self.db
+            .search_similar(&query_hv, top_k)
+            .await
+            .unwrap_or_default()
+    }
+
+    /// Look up a learned code template by failure diagnostic.
+    ///
+    /// If we have a failure geometry, we can check if we've seen and fixed
+    /// a similar failure before.
+    pub async fn learned_template_for_diagnostic(
+        &self,
+        diagnostic: &ContinuousHV,
+    ) -> Option<String> {
+        let results = self.query_by_diagnostic(diagnostic, 3).await;
+        for result in results {
+            // If it's a positive valence record (success) that matched our failure geometry,
+            // it likely contains the template that fixed it.
+            if result.record.valence > 0.0 && result.similarity > 0.6 {
+                // Return the task/template name or the first topic if it's a template
+                if result.record.content.starts_with("template:") {
+                    return result.record.topics.get(1).cloned();
+                }
+            }
+        }
+        None
     }
 
     /// Get error hints relevant to a task, from both cache and similarity search.
@@ -389,7 +438,12 @@ impl CodingExperienceStore {
     /// WHAT was done (e.g., "add Clone derive", "insert .clone()").
     ///
     /// Persists to the database so fix strategies survive across sessions.
-    pub fn store_fix_strategy(&mut self, error_signature: &str, fix_strategy: &str) {
+    pub fn store_fix_strategy(
+        &mut self,
+        error_signature: &str,
+        fix_strategy: &str,
+        diagnostic_hv: Option<&ContinuousHV>,
+    ) {
         // Store in error_hints_cache with a "fix:" prefix to distinguish from generic hints
         let key = format!("fix:{}", error_signature);
         // Avoid duplicates: if we already have this exact fix, skip
@@ -403,7 +457,11 @@ impl CodingExperienceStore {
         }
 
         // Persist to DB so fix strategies survive across sessions
-        let encoding = Self::encode_text(error_signature);
+        let encoding = if let Some(diag_hv) = diagnostic_hv {
+            BinaryHV::from_continuous(diag_hv)
+        } else {
+            Self::encode_text(error_signature)
+        };
         let now_ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_millis() as u64)
@@ -464,7 +522,12 @@ impl CodingExperienceStore {
     /// so future similar tasks can use it natively without LLM escalation.
     ///
     /// Persists to the database so learned templates survive across sessions.
-    pub fn store_learned_template(&mut self, task: &str, code: &str) {
+    pub fn store_learned_template(
+        &mut self,
+        task: &str,
+        code: &str,
+        diagnostic_hv: Option<&ContinuousHV>,
+    ) {
         let key = format!("template:{}", task.to_lowercase());
         let code_summary: String = code.chars().take(2000).collect();
         // Replace if exists, otherwise push
@@ -478,7 +541,11 @@ impl CodingExperienceStore {
         }
 
         // Persist to DB so templates survive across sessions
-        let encoding = Self::encode_text(task);
+        let encoding = if let Some(diag_hv) = diagnostic_hv {
+            BinaryHV::from_continuous(diag_hv)
+        } else {
+            Self::encode_text(task)
+        };
         let now_ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_millis() as u64)
@@ -774,6 +841,7 @@ mod tests {
         store.store_fix_strategy(
             "error[E0308]: mismatched types expected `u32` found `i32`",
             "add explicit cast: `as u32`",
+            None,
         );
 
         let fix = store.lookup_fix_strategy("error[E0308]: different types");
@@ -792,8 +860,8 @@ mod tests {
     async fn test_fix_strategy_deduplication() {
         let mut store = CodingExperienceStore::new().await.unwrap();
 
-        store.store_fix_strategy("error[E0308]: mismatched types", "cast fix");
-        store.store_fix_strategy("error[E0308]: mismatched types", "cast fix v2");
+        store.store_fix_strategy("error[E0308]: mismatched types", "cast fix", None);
+        store.store_fix_strategy("error[E0308]: mismatched types", "cast fix v2", None);
 
         let fix_count = store
             .cached_error_hints()
@@ -812,6 +880,7 @@ mod tests {
         store.store_learned_template(
             "implement binary heap data structure",
             "pub struct BinaryHeap<T> { data: Vec<T> }\nimpl<T: Ord> BinaryHeap<T> {\n    pub fn new() -> Self { Self { data: Vec::new() } }\n}\n",
+            None,
         );
 
         let template = store.lookup_learned_template("implement binary heap data structure");
@@ -823,8 +892,8 @@ mod tests {
     async fn test_learned_template_overwrites_on_same_task() {
         let mut store = CodingExperienceStore::new().await.unwrap();
 
-        store.store_learned_template("add sort function", "pub fn sort_v1() {}");
-        store.store_learned_template("add sort function", "pub fn sort_v2() {}");
+        store.store_learned_template("add sort function", "pub fn sort_v1() {}", None);
+        store.store_learned_template("add sort function", "pub fn sort_v2() {}", None);
 
         let template = store.lookup_learned_template("add sort function");
         assert!(template.is_some());
@@ -849,6 +918,7 @@ mod tests {
         store.store_learned_template(
             "implement a redis client connection pool",
             "pub struct RedisPool { /* ... */ }",
+            None,
         );
 
         // Completely unrelated task should not match
@@ -872,7 +942,7 @@ mod tests {
             let mut store = CodingExperienceStore::persistent(&db_path.to_string_lossy())
                 .await
                 .unwrap();
-            store.store_fix_strategy("error[E0308]: mismatched types", "cast with `as u32`");
+            store.store_fix_strategy("error[E0308]: mismatched types", "cast with `as u32`", None);
             store.flush().await; // Persist queued writes to DB
             assert_eq!(
                 store
@@ -910,6 +980,7 @@ mod tests {
             store.store_learned_template(
                 "implement binary search",
                 "pub fn binary_search(arr: &[i32], target: i32) -> Option<usize> { todo!() }",
+                None,
             );
             store.flush().await; // Persist queued writes to DB
         }

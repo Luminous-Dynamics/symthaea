@@ -7,9 +7,7 @@
 //! 3. Adversarial robustness (5 red team agents per world)
 
 use mycelix_multiworld_sim::{
-    MultiWorldSimulator,
-    config::SimulationConfig,
-    red_team::AdversarialStrategy,
+    config::SimulationConfig, red_team::AdversarialStrategy, MultiWorldSimulator,
 };
 
 struct ArmResult {
@@ -32,8 +30,10 @@ fn run_cell_d(seed: u64, harsh: bool) -> ArmResult {
     let mut sim = MultiWorldSimulator::new(config);
     let report = sim.run();
     ArmResult {
-        cvs: report.final_cvs, phi: report.final_collective_phi,
-        population: report.final_population, civil_wars: report.civil_wars,
+        cvs: report.final_cvs,
+        phi: report.final_collective_phi,
+        population: report.final_population,
+        civil_wars: report.civil_wars,
         survived: report.survived,
     }
 }
@@ -50,8 +50,10 @@ fn run_baseline(seed: u64, harsh: bool) -> ArmResult {
     let mut sim = MultiWorldSimulator::new(config);
     let report = sim.run();
     ArmResult {
-        cvs: report.final_cvs, phi: report.final_collective_phi,
-        population: report.final_population, civil_wars: report.civil_wars,
+        cvs: report.final_cvs,
+        phi: report.final_collective_phi,
+        population: report.final_population,
+        civil_wars: report.civil_wars,
         survived: report.survived,
     }
 }
@@ -68,14 +70,20 @@ fn run_adversarial(seed: u64, with_coordination: bool) -> ArmResult {
     sim.inject_adversaries(AdversarialStrategy::ProfileMaximizer, 5);
     let report = sim.run();
     ArmResult {
-        cvs: report.final_cvs, phi: report.final_collective_phi,
-        population: report.final_population, civil_wars: report.civil_wars,
+        cvs: report.final_cvs,
+        phi: report.final_collective_phi,
+        population: report.final_population,
+        civil_wars: report.civil_wars,
         survived: report.survived,
     }
 }
 
 fn mean(v: &[f64]) -> f64 {
-    if v.is_empty() { 0.0 } else { v.iter().sum::<f64>() / v.len() as f64 }
+    if v.is_empty() {
+        0.0
+    } else {
+        v.iter().sum::<f64>() / v.len() as f64
+    }
 }
 
 fn print_summary(name: &str, results: &[ArmResult]) {
@@ -85,9 +93,17 @@ fn print_summary(name: &str, results: &[ArmResult]) {
     let phi: Vec<f64> = results.iter().map(|r| r.phi).collect();
     let zero_war_runs = results.iter().filter(|r| r.civil_wars == 0).count();
     let collapsed = results.iter().filter(|r| !r.survived).count();
-    println!("  {:<30} CVS={:.4} Phi={:.4} Pop={:>7.0} Wars={:.2} ZeroWar={}/{} Collapsed={}",
-        name, mean(&cvs), mean(&phi), mean(&pop), mean(&wars),
-        zero_war_runs, results.len(), collapsed);
+    println!(
+        "  {:<30} CVS={:.4} Phi={:.4} Pop={:>7.0} Wars={:.2} ZeroWar={}/{} Collapsed={}",
+        name,
+        mean(&cvs),
+        mean(&phi),
+        mean(&pop),
+        mean(&wars),
+        zero_war_runs,
+        results.len(),
+        collapsed
+    );
 }
 
 fn main() {
@@ -115,13 +131,29 @@ fn main() {
     print_summary("Baseline (50 seeds)", &baseline_50);
     print_summary("Cell D: C+CU (50 seeds)", &cell_d_50);
 
-    let baseline_war_rate = mean(&baseline_50.iter().map(|r| r.civil_wars as f64).collect::<Vec<_>>());
-    let cell_d_war_rate = mean(&cell_d_50.iter().map(|r| r.civil_wars as f64).collect::<Vec<_>>());
+    let baseline_war_rate = mean(
+        &baseline_50
+            .iter()
+            .map(|r| r.civil_wars as f64)
+            .collect::<Vec<_>>(),
+    );
+    let cell_d_war_rate = mean(
+        &cell_d_50
+            .iter()
+            .map(|r| r.civil_wars as f64)
+            .collect::<Vec<_>>(),
+    );
     let baseline_zero = baseline_50.iter().filter(|r| r.civil_wars == 0).count();
     let cell_d_zero = cell_d_50.iter().filter(|r| r.civil_wars == 0).count();
 
-    println!("\n  War rate: Baseline {:.2}/run vs Cell D {:.2}/run", baseline_war_rate, cell_d_war_rate);
-    println!("  Zero-war runs: Baseline {}/50 vs Cell D {}/50", baseline_zero, cell_d_zero);
+    println!(
+        "\n  War rate: Baseline {:.2}/run vs Cell D {:.2}/run",
+        baseline_war_rate, cell_d_war_rate
+    );
+    println!(
+        "  Zero-war runs: Baseline {}/50 vs Cell D {}/50",
+        baseline_zero, cell_d_zero
+    );
 
     if cell_d_war_rate < baseline_war_rate * 0.5 {
         println!("  CONFIRMED: Cell D war rate < 50% of baseline");
@@ -144,9 +176,22 @@ fn main() {
     print_summary("Baseline (harsh, 20 seeds)", &baseline_harsh);
     print_summary("Cell D (harsh, 20 seeds)", &cell_d_harsh);
 
-    let harsh_baseline_wars = mean(&baseline_harsh.iter().map(|r| r.civil_wars as f64).collect::<Vec<_>>());
-    let harsh_cell_d_wars = mean(&cell_d_harsh.iter().map(|r| r.civil_wars as f64).collect::<Vec<_>>());
-    println!("\n  Harsh war rate: Baseline {:.2}/run vs Cell D {:.2}/run", harsh_baseline_wars, harsh_cell_d_wars);
+    let harsh_baseline_wars = mean(
+        &baseline_harsh
+            .iter()
+            .map(|r| r.civil_wars as f64)
+            .collect::<Vec<_>>(),
+    );
+    let harsh_cell_d_wars = mean(
+        &cell_d_harsh
+            .iter()
+            .map(|r| r.civil_wars as f64)
+            .collect::<Vec<_>>(),
+    );
+    println!(
+        "\n  Harsh war rate: Baseline {:.2}/run vs Cell D {:.2}/run",
+        harsh_baseline_wars, harsh_cell_d_wars
+    );
 
     if harsh_cell_d_wars < harsh_baseline_wars * 0.5 {
         println!("  ROBUST: Zero-wars finding SURVIVES harsh conditions");
@@ -168,13 +213,30 @@ fn main() {
     print_summary("Baseline + adversaries (20)", &baseline_adv);
     print_summary("Cell D + adversaries (20)", &cell_d_adv);
 
-    let adv_baseline_wars = mean(&baseline_adv.iter().map(|r| r.civil_wars as f64).collect::<Vec<_>>());
-    let adv_cell_d_wars = mean(&cell_d_adv.iter().map(|r| r.civil_wars as f64).collect::<Vec<_>>());
+    let adv_baseline_wars = mean(
+        &baseline_adv
+            .iter()
+            .map(|r| r.civil_wars as f64)
+            .collect::<Vec<_>>(),
+    );
+    let adv_cell_d_wars = mean(
+        &cell_d_adv
+            .iter()
+            .map(|r| r.civil_wars as f64)
+            .collect::<Vec<_>>(),
+    );
     let adv_baseline_cvs = mean(&baseline_adv.iter().map(|r| r.cvs).collect::<Vec<_>>());
     let adv_cell_d_cvs = mean(&cell_d_adv.iter().map(|r| r.cvs).collect::<Vec<_>>());
-    println!("\n  Adversarial wars: Baseline {:.2} vs Cell D {:.2}", adv_baseline_wars, adv_cell_d_wars);
-    println!("  Adversarial CVS:  Baseline {:.4} vs Cell D {:.4} (Δ={:+.4})",
-        adv_baseline_cvs, adv_cell_d_cvs, adv_cell_d_cvs - adv_baseline_cvs);
+    println!(
+        "\n  Adversarial wars: Baseline {:.2} vs Cell D {:.2}",
+        adv_baseline_wars, adv_cell_d_wars
+    );
+    println!(
+        "  Adversarial CVS:  Baseline {:.4} vs Cell D {:.4} (Δ={:+.4})",
+        adv_baseline_cvs,
+        adv_cell_d_cvs,
+        adv_cell_d_cvs - adv_baseline_cvs
+    );
 
     // ── Final verdict ──
     println!("\n══════════════════════════════════════════════════════════════");
@@ -186,11 +248,30 @@ fn main() {
     let adversarial_holds = adv_cell_d_wars < adv_baseline_wars * 0.75;
 
     let tests_passed = [replication_holds, harsh_holds, adversarial_holds]
-        .iter().filter(|&&x| x).count();
+        .iter()
+        .filter(|&&x| x)
+        .count();
 
-    println!("  Replication (50 seeds):  {}", if replication_holds { "PASSED" } else { "FAILED" });
-    println!("  Harsh conditions:       {}", if harsh_holds { "PASSED" } else { "FAILED" });
-    println!("  Adversarial robustness: {}", if adversarial_holds { "PASSED" } else { "FAILED" });
+    println!(
+        "  Replication (50 seeds):  {}",
+        if replication_holds {
+            "PASSED"
+        } else {
+            "FAILED"
+        }
+    );
+    println!(
+        "  Harsh conditions:       {}",
+        if harsh_holds { "PASSED" } else { "FAILED" }
+    );
+    println!(
+        "  Adversarial robustness: {}",
+        if adversarial_holds {
+            "PASSED"
+        } else {
+            "FAILED"
+        }
+    );
     println!("  Overall: {}/3 stress tests passed", tests_passed);
 
     if tests_passed == 3 {

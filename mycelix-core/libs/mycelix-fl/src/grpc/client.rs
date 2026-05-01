@@ -41,9 +41,7 @@ impl FlClient {
     ///
     /// `addr` should be a full URI, e.g. `"http://[::1]:50051"`.
     pub async fn connect(addr: &str, node_id: String) -> Result<Self, Box<dyn std::error::Error>> {
-        let channel = Channel::from_shared(addr.to_string())?
-            .connect()
-            .await?;
+        let channel = Channel::from_shared(addr.to_string())?.connect().await?;
         Ok(Self { channel, node_id })
     }
 
@@ -63,15 +61,14 @@ impl FlClient {
             did: did.unwrap_or_default(),
         });
 
-        let path = http::uri::PathAndQuery::from_static(
-            "/mycelix.fl.FederatedLearning/RegisterNode",
-        );
+        let path =
+            http::uri::PathAndQuery::from_static("/mycelix.fl.FederatedLearning/RegisterNode");
         let codec: ProstCodec<RegisterNodeRequest, RegisterNodeResponse> = ProstCodec::default();
 
         let mut grpc = Grpc::new(self.channel.clone());
-        grpc.ready().await.map_err(|e| {
-            tonic::Status::unavailable(format!("channel not ready: {}", e))
-        })?;
+        grpc.ready()
+            .await
+            .map_err(|e| tonic::Status::unavailable(format!("channel not ready: {}", e)))?;
 
         let response = grpc.unary(request, path, codec).await?;
         Ok(response.into_inner())
@@ -89,60 +86,51 @@ impl FlClient {
             round,
         });
 
-        let path = http::uri::PathAndQuery::from_static(
-            "/mycelix.fl.FederatedLearning/SubmitGradient",
-        );
+        let path =
+            http::uri::PathAndQuery::from_static("/mycelix.fl.FederatedLearning/SubmitGradient");
         let codec: ProstCodec<SubmitGradientRequest, SubmitGradientResponse> =
             ProstCodec::default();
 
         let mut grpc = Grpc::new(self.channel.clone());
-        grpc.ready().await.map_err(|e| {
-            tonic::Status::unavailable(format!("channel not ready: {}", e))
-        })?;
+        grpc.ready()
+            .await
+            .map_err(|e| tonic::Status::unavailable(format!("channel not ready: {}", e)))?;
 
         let response = grpc.unary(request, path, codec).await?;
         Ok(response.into_inner())
     }
 
     /// Query the status of a round. Pass `0` for the current round.
-    pub async fn round_status(
-        &self,
-        round: u64,
-    ) -> Result<GetRoundStatusResponse, tonic::Status> {
+    pub async fn round_status(&self, round: u64) -> Result<GetRoundStatusResponse, tonic::Status> {
         let request = tonic::Request::new(GetRoundStatusRequest { round });
 
-        let path = http::uri::PathAndQuery::from_static(
-            "/mycelix.fl.FederatedLearning/GetRoundStatus",
-        );
+        let path =
+            http::uri::PathAndQuery::from_static("/mycelix.fl.FederatedLearning/GetRoundStatus");
         let codec: ProstCodec<GetRoundStatusRequest, GetRoundStatusResponse> =
             ProstCodec::default();
 
         let mut grpc = Grpc::new(self.channel.clone());
-        grpc.ready().await.map_err(|e| {
-            tonic::Status::unavailable(format!("channel not ready: {}", e))
-        })?;
+        grpc.ready()
+            .await
+            .map_err(|e| tonic::Status::unavailable(format!("channel not ready: {}", e)))?;
 
         let response = grpc.unary(request, path, codec).await?;
         Ok(response.into_inner())
     }
 
     /// Get the aggregation result for a completed round.
-    pub async fn round_result(
-        &self,
-        round: u64,
-    ) -> Result<GetRoundResultResponse, tonic::Status> {
+    pub async fn round_result(&self, round: u64) -> Result<GetRoundResultResponse, tonic::Status> {
         let request = tonic::Request::new(GetRoundResultRequest { round });
 
-        let path = http::uri::PathAndQuery::from_static(
-            "/mycelix.fl.FederatedLearning/GetRoundResult",
-        );
+        let path =
+            http::uri::PathAndQuery::from_static("/mycelix.fl.FederatedLearning/GetRoundResult");
         let codec: ProstCodec<GetRoundResultRequest, GetRoundResultResponse> =
             ProstCodec::default();
 
         let mut grpc = Grpc::new(self.channel.clone());
-        grpc.ready().await.map_err(|e| {
-            tonic::Status::unavailable(format!("channel not ready: {}", e))
-        })?;
+        grpc.ready()
+            .await
+            .map_err(|e| tonic::Status::unavailable(format!("channel not ready: {}", e)))?;
 
         let response = grpc.unary(request, path, codec).await?;
         Ok(response.into_inner())
@@ -152,15 +140,14 @@ impl FlClient {
     pub async fn health_check(&self) -> Result<HealthCheckResponse, tonic::Status> {
         let request = tonic::Request::new(HealthCheckRequest {});
 
-        let path = http::uri::PathAndQuery::from_static(
-            "/mycelix.fl.FederatedLearning/HealthCheck",
-        );
+        let path =
+            http::uri::PathAndQuery::from_static("/mycelix.fl.FederatedLearning/HealthCheck");
         let codec: ProstCodec<HealthCheckRequest, HealthCheckResponse> = ProstCodec::default();
 
         let mut grpc = Grpc::new(self.channel.clone());
-        grpc.ready().await.map_err(|e| {
-            tonic::Status::unavailable(format!("channel not ready: {}", e))
-        })?;
+        grpc.ready()
+            .await
+            .map_err(|e| tonic::Status::unavailable(format!("channel not ready: {}", e)))?;
 
         let response = grpc.unary(request, path, codec).await?;
         Ok(response.into_inner())

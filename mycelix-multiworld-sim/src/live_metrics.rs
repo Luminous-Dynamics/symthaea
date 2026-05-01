@@ -18,9 +18,9 @@ pub struct LiveMetrics {
 
     // === Turchin secular cycle state ===
     pub secular_phase: String,
-    pub psi: f64,                 // Elite overproduction [0, 5]
-    pub immiseration: f64,        // W [0, 1]
-    pub state_stability: f64,     // S [0, 1]
+    pub psi: f64,             // Elite overproduction [0, 5]
+    pub immiseration: f64,    // W [0, 1]
+    pub state_stability: f64, // S [0, 1]
 
     // === Dynamic probabilities (per tick) ===
     pub p_civil_war: f64,
@@ -81,47 +81,99 @@ impl LiveMetrics {
                 } else {
                     0.0
                 }
-            } else { 0.0 }
-        } else { 0.0 };
+            } else {
+                0.0
+            }
+        } else {
+            0.0
+        };
 
         let p_secession = if policy.turchin_cycles_enabled {
             if let Some(s) = secular {
-                if s.psi > 0.8 && s.state_stability < 0.4 { 0.01 } else { 0.0 }
-            } else { 0.0 }
-        } else { 0.0 };
+                if s.psi > 0.8 && s.state_stability < 0.4 {
+                    0.01
+                } else {
+                    0.0
+                }
+            } else {
+                0.0
+            }
+        } else {
+            0.0
+        };
 
         let p_carrington = if policy.disasters_enabled && policy.disasters_solar_enabled {
-            if solar_cycle_max { 0.002 } else { 0.0005 }
-        } else { 0.0 };
+            if solar_cycle_max {
+                0.002
+            } else {
+                0.0005
+            }
+        } else {
+            0.0
+        };
 
         let p_eclss_failure = if policy.disasters_enabled && policy.disasters_eclss_enabled {
             let base = 0.01; // ~1% base per tick
             let infra_factor = 1.0 + (1.0 - infrastructure_mean).max(0.0) * 2.0;
             base * infra_factor
-        } else { 0.0 };
+        } else {
+            0.0
+        };
 
         let p_kessler = if policy.disasters_enabled && policy.disasters_civilization_enabled {
             0.001 * (kessler_density / 1.0).max(1.0).ln().max(0.0)
-        } else { 0.0 };
+        } else {
+            0.0
+        };
 
         let p_epidemic = if policy.disasters_enabled && policy.disasters_psychological_enabled {
-            if total_population > 100 { 0.005 } else { 0.001 }
-        } else { 0.0 };
+            if total_population > 100 {
+                0.005
+            } else {
+                0.001
+            }
+        } else {
+            0.0
+        };
 
         // Collect active toggles
         let mut active = Vec::new();
-        if policy.trust_weighted_governance { active.push("trust_weighting".to_string()); }
-        if policy.turchin_cycles_enabled { active.push("turchin_cycles".to_string()); }
-        if policy.fep_immiseration_enabled { active.push("fep_immiseration".to_string()); }
-        if policy.sacred_stillness_enabled { active.push("sacred_stillness".to_string()); }
-        if policy.disasters_enabled { active.push("disasters".to_string()); }
-        if policy.faction_enabled { active.push("factions".to_string()); }
-        if policy.education_enabled { active.push("education".to_string()); }
-        if policy.migration_enabled { active.push("migration".to_string()); }
-        if policy.amendment_enabled { active.push("amendments".to_string()); }
-        if policy.stoichiometry_enabled { active.push("stoichiometry".to_string()); }
-        if policy.epistemic_decay_enabled { active.push("epistemic_decay".to_string()); }
-        if policy.age_demographics_enabled { active.push("age_demographics".to_string()); }
+        if policy.trust_weighted_governance {
+            active.push("trust_weighting".to_string());
+        }
+        if policy.turchin_cycles_enabled {
+            active.push("turchin_cycles".to_string());
+        }
+        if policy.fep_immiseration_enabled {
+            active.push("fep_immiseration".to_string());
+        }
+        if policy.sacred_stillness_enabled {
+            active.push("sacred_stillness".to_string());
+        }
+        if policy.disasters_enabled {
+            active.push("disasters".to_string());
+        }
+        if policy.faction_enabled {
+            active.push("factions".to_string());
+        }
+        if policy.education_enabled {
+            active.push("education".to_string());
+        }
+        if policy.migration_enabled {
+            active.push("migration".to_string());
+        }
+        if policy.amendment_enabled {
+            active.push("amendments".to_string());
+        }
+        if policy.stoichiometry_enabled {
+            active.push("stoichiometry".to_string());
+        }
+        if policy.epistemic_decay_enabled {
+            active.push("epistemic_decay".to_string());
+        }
+        if policy.age_demographics_enabled {
+            active.push("age_demographics".to_string());
+        }
         let toggle_count = active.len();
 
         Self {
@@ -179,9 +231,17 @@ impl LiveMetrics {
     /// Risk level: 0=green, 1=yellow, 2=red based on aggregate threat.
     pub fn risk_level(&self) -> u8 {
         let total_risk = self.p_civil_war + self.p_secession + self.p_carrington + self.p_kessler;
-        if total_risk > 0.05 { 2 } // Red
-        else if total_risk > 0.01 { 1 } // Yellow
-        else { 0 } // Green
+        if total_risk > 0.05 {
+            2
+        }
+        // Red
+        else if total_risk > 0.01 {
+            1
+        }
+        // Yellow
+        else {
+            0
+        } // Green
     }
 }
 
@@ -211,9 +271,23 @@ mod tests {
         secular.immiseration = 0.7;
 
         let metrics = LiveMetrics::compute(
-            600, &policy, Some(&secular), 0.5, 5000, 0.2, 0.5, 0.6, 0.5, false, 1.0,
+            600,
+            &policy,
+            Some(&secular),
+            0.5,
+            5000,
+            0.2,
+            0.5,
+            0.6,
+            0.5,
+            false,
+            1.0,
         );
-        assert!(metrics.p_civil_war > 0.04, "Crisis should show war prob: {}", metrics.p_civil_war);
+        assert!(
+            metrics.p_civil_war > 0.04,
+            "Crisis should show war prob: {}",
+            metrics.p_civil_war
+        );
         assert_eq!(metrics.risk_level(), 2); // Red
     }
 
@@ -228,8 +302,12 @@ mod tests {
         let m_default = LiveMetrics::compute(
             100, &default, None, 0.5, 1000, 0.2, 0.3, 0.2, 0.7, false, 1.0,
         );
-        assert!(m_legacy.toggle_count < m_default.toggle_count,
-            "Legacy should have fewer toggles: {} vs {}", m_legacy.toggle_count, m_default.toggle_count);
+        assert!(
+            m_legacy.toggle_count < m_default.toggle_count,
+            "Legacy should have fewer toggles: {} vs {}",
+            m_legacy.toggle_count,
+            m_default.toggle_count
+        );
     }
 
     #[test]
@@ -264,8 +342,17 @@ mod tests {
         // Write 3 ticks
         for tick in 0..3 {
             let m = LiveMetrics::compute(
-                tick * 12, &policy, None, 0.7, 1000 + tick as usize * 10,
-                0.3, 0.25, 0.15, 0.8, false, 1.0,
+                tick * 12,
+                &policy,
+                None,
+                0.7,
+                1000 + tick as usize * 10,
+                0.3,
+                0.25,
+                0.15,
+                0.8,
+                false,
+                1.0,
             );
             m.append_jsonl(path).expect("Should write JSONL");
         }
@@ -275,8 +362,8 @@ mod tests {
         let lines: Vec<&str> = content.trim().split('\n').collect();
         assert_eq!(lines.len(), 3, "Should have 3 lines");
         for line in &lines {
-            let _: serde_json::Value = serde_json::from_str(line)
-                .expect("Each line should be valid JSON");
+            let _: serde_json::Value =
+                serde_json::from_str(line).expect("Each line should be valid JSON");
         }
 
         // Verify first line has expected fields

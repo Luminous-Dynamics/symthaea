@@ -91,9 +91,8 @@ impl PrimitiveGaussian {
 
         let prefactor = (2.0 * self.alpha / PI_CONST).powf(0.75);
         let angular = (4.0 * self.alpha).powi(ltot) as f64;
-        let denom = double_factorial(2 * l - 1)
-            * double_factorial(2 * m - 1)
-            * double_factorial(2 * n - 1);
+        let denom =
+            double_factorial(2 * l - 1) * double_factorial(2 * m - 1) * double_factorial(2 * n - 1);
 
         prefactor * (angular / denom).sqrt()
     }
@@ -127,11 +126,32 @@ impl ContractedGaussian {
                 // Overlap of two s-type primitives at the same center
                 // For general angular momentum, use the full overlap formula
                 let ex = crate::integrals::hermite::hermite_coefficient(
-                    pa.l as i32, pb.l as i32, 0, pa.alpha, pb.alpha, pa.center[0], pb.center[0]);
+                    pa.l as i32,
+                    pb.l as i32,
+                    0,
+                    pa.alpha,
+                    pb.alpha,
+                    pa.center[0],
+                    pb.center[0],
+                );
                 let ey = crate::integrals::hermite::hermite_coefficient(
-                    pa.m as i32, pb.m as i32, 0, pa.alpha, pb.alpha, pa.center[1], pb.center[1]);
+                    pa.m as i32,
+                    pb.m as i32,
+                    0,
+                    pa.alpha,
+                    pb.alpha,
+                    pa.center[1],
+                    pb.center[1],
+                );
                 let ez = crate::integrals::hermite::hermite_coefficient(
-                    pa.n as i32, pb.n as i32, 0, pa.alpha, pb.alpha, pa.center[2], pb.center[2]);
+                    pa.n as i32,
+                    pb.n as i32,
+                    0,
+                    pa.alpha,
+                    pb.alpha,
+                    pa.center[2],
+                    pb.center[2],
+                );
                 let s = ex * ey * ez * (PI_CONST / p).powf(1.5);
                 result += pa.coeff * pb.coeff * na * nb * s;
             }
@@ -202,6 +222,11 @@ mod tests {
         };
         let n = g.normalization();
         let expected = (2.0 / PI_CONST).powf(0.75);
-        assert!((n - expected).abs() < 1e-12, "N={}, expected={}", n, expected);
+        assert!(
+            (n - expected).abs() < 1e-12,
+            "N={}, expected={}",
+            n,
+            expected
+        );
     }
 }

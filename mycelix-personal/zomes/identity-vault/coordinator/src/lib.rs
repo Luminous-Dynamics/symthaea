@@ -9,6 +9,16 @@
 use hdk::prelude::*;
 use identity_vault_integrity::*;
 
+getrandom::register_custom_getrandom!(my_custom_getrandom);
+
+pub fn my_custom_getrandom(buf: &mut [u8]) -> Result<(), getrandom::Error> {
+    let bytes = random_bytes(buf.len() as u32).map_err(|_| getrandom::Error::UNSUPPORTED)?;
+    buf.copy_from_slice(bytes.as_ref());
+    Ok(())
+}
+
+use personal_leptos_types::{MasterKeyView, ProfileView};
+
 /// Create or update the agent's profile.
 ///
 /// Stores the profile on the source chain and creates a link from the
@@ -21,6 +31,17 @@ pub fn set_profile(profile: Profile) -> ExternResult<Record> {
     get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve created profile".into()
     )))
+}
+
+#[hdk_extern]
+pub fn set_profile_view(profile: ProfileView) -> ExternResult<Record> {
+    set_profile(Profile {
+        display_name: profile.display_name,
+        avatar: profile.avatar,
+        bio: profile.bio,
+        metadata: profile.metadata,
+        updated_at: sys_time()?,
+    })
 }
 
 /// Get the agent's current profile.
@@ -41,6 +62,31 @@ pub fn get_my_profile(_: ()) -> ExternResult<Option<Record>> {
         get(target, GetOptions::default())
     } else {
         Ok(None)
+    }
+}
+
+#[hdk_extern]
+pub fn get_my_profile_view(_: ()) -> ExternResult<Option<ProfileView>> {
+    let profile_record = get_my_profile(())?;
+    match profile_record {
+        Some(record) => {
+            let profile: Profile = record
+                .entry()
+                .to_app_option()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "Invalid profile entry".into()
+                )))?;
+
+            Ok(Some(ProfileView {
+                display_name: profile.display_name,
+                avatar: profile.avatar,
+                bio: profile.bio,
+                metadata: profile.metadata,
+                updated_at: profile.updated_at.as_micros(),
+            }))
+        }
+        None => Ok(None),
     }
 }
 
@@ -76,6 +122,28 @@ pub fn get_my_keys(_: ()) -> ExternResult<Vec<Record>> {
         }
     }
     Ok(records)
+}
+
+#[hdk_extern]
+pub fn get_my_keys_view(_: ()) -> ExternResult<Vec<MasterKeyView>> {
+    let records = get_my_keys(())?;
+    let mut keys = Vec::new();
+    for record in records {
+        if let Some(key) = record
+            .entry()
+            .to_app_option::<MasterKey>()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        {
+            keys.push(MasterKeyView {
+                label: key.label,
+                purpose: key.purpose,
+                public_key_hex: key.public_key_hex,
+                active: key.active,
+                created_at: key.created_at.as_micros(),
+            });
+        }
+    }
+    Ok(keys)
 }
 
 /// Selective disclosure: return profile fields filtered by requested scope.

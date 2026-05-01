@@ -97,7 +97,7 @@ path = "src/bin/gen_speech_training.rs"
 required-features = ["speech-data"]
 
 [features]
-default = ["simd", "parallel", "gpu"]
+default = ["simd", "parallel"]
 # GPU tensor acceleration via candle CUDA (auto-detects at runtime)
 gpu = ["candle-core/cuda", "dep:candle-nn", "candle-nn/cuda"]
 parallel = ["dep:rayon"]

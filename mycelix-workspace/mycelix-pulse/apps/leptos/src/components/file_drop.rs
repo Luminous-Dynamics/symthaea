@@ -17,9 +17,13 @@ pub struct Attachment {
 
 impl Attachment {
     pub fn size_display(&self) -> String {
-        if self.size < 1024 { format!("{} B", self.size) }
-        else if self.size < 1024 * 1024 { format!("{:.1} KB", self.size as f64 / 1024.0) }
-        else { format!("{:.1} MB", self.size as f64 / (1024.0 * 1024.0)) }
+        if self.size < 1024 {
+            format!("{} B", self.size)
+        } else if self.size < 1024 * 1024 {
+            format!("{:.1} KB", self.size as f64 / 1024.0)
+        } else {
+            format!("{:.1} MB", self.size as f64 / (1024.0 * 1024.0))
+        }
     }
 }
 
@@ -32,7 +36,9 @@ pub fn FileDropZone(attachments: RwSignal<Vec<Attachment>>) -> impl IntoView {
         ev.prevent_default();
         is_drag_over.set(true);
     };
-    let on_dragleave = move |_: web_sys::DragEvent| { is_drag_over.set(false); };
+    let on_dragleave = move |_: web_sys::DragEvent| {
+        is_drag_over.set(false);
+    };
 
     let on_drop = move |ev: web_sys::DragEvent| {
         ev.prevent_default();
@@ -55,7 +61,9 @@ pub fn FileDropZone(attachments: RwSignal<Vec<Attachment>>) -> impl IntoView {
     };
 
     let on_file_input = move |ev: leptos::ev::Event| {
-        let input = ev.target().and_then(|t| t.dyn_into::<web_sys::HtmlInputElement>().ok());
+        let input = ev
+            .target()
+            .and_then(|t| t.dyn_into::<web_sys::HtmlInputElement>().ok());
         if let Some(input) = input {
             if let Some(files) = input.files() {
                 for i in 0..files.length() {

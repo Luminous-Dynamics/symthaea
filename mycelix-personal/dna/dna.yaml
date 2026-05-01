@@ -1,7 +1,7 @@
 ---
 # Mycelix Personal DNA
 # Sovereign Agent Data Vault: identity + health + credentials + bridge
-# 4 domain zomes + 1 unified bridge = 5 zome pairs (10 WASM crates)
+# 5 domain zomes + 1 unified bridge = 6 zome pairs (12 WASM crates)
 
 manifest_version: "0"
 name: mycelix_personal
@@ -26,6 +26,10 @@ integrity:
     - name: credential_wallet_integrity
       path: ../target/wasm32-unknown-unknown/release/credential_wallet_integrity.wasm
 
+    # Data preferences
+    - name: data_preferences_integrity
+      path: ../target/wasm32-unknown-unknown/release/data_preferences_integrity.wasm
+
     # Unified bridge
     - name: personal_bridge_integrity
       path: ../target/wasm32-unknown-unknown/release/personal_bridge_integrity.wasm
@@ -49,6 +53,12 @@ coordinator:
       path: ../target/wasm32-unknown-unknown/release/credential_wallet.wasm
       dependencies:
         - name: credential_wallet_integrity
+
+    # Data preferences
+    - name: data_preferences
+      path: ../target/wasm32-unknown-unknown/release/data_preferences.wasm
+      dependencies:
+        - name: data_preferences_integrity
 
     # Unified bridge
     - name: personal_bridge

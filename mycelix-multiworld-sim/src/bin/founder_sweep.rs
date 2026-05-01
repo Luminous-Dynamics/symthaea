@@ -23,7 +23,11 @@ fn main() {
         config.seed = SEED;
 
         // Override the Moon colony's initial population
-        if let Some(moon) = config.initial_worlds.iter_mut().find(|w| w.location == "Moon") {
+        if let Some(moon) = config
+            .initial_worlds
+            .iter_mut()
+            .find(|w| w.location == "Moon")
+        {
             moon.initial_population = founders;
         }
 
@@ -37,7 +41,9 @@ fn main() {
             .map(|w| w.population())
             .sum();
 
-        let tech = report.epoch_snapshots.last()
+        let tech = report
+            .epoch_snapshots
+            .last()
             .map(|s| s.mean_tech_level)
             .unwrap_or(0.0);
 
@@ -62,7 +68,10 @@ fn main() {
             if report.survived { "YES" } else { "NO" },
         );
 
-        eprintln!(" done (CVS: {:.3}, pop: {})", report.final_cvs, report.final_population);
+        eprintln!(
+            " done (CVS: {:.3}, pop: {})",
+            report.final_cvs, report.final_population
+        );
     }
 
     println!("\n=== CSV DATA ===");

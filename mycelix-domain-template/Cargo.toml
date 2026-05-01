@@ -1,16 +1,16 @@
 # Mycelix Domain Module Template
 #
-# Use this template to create a new domain module for the Mycelix Portal.
+# Use this template to create a new domain module for Mycelix Sensorium.
 #
 # Steps:
-# 1. Copy this directory to mycelix-portal/crates/domain-yourdomain/
+# 1. Copy this directory to mycelix-sensorium/crates/domain-yourdomain/
 # 2. Rename the package and struct below
 # 3. Implement the DomainModule trait methods
-# 4. Add as a feature flag to mycelix-portal/Cargo.toml
-# 5. Add a `mod` + match arm in portal-shell pages/mod.rs (optional — for inline UI)
+# 4. Add as a feature flag to mycelix-sensorium/Cargo.toml
+# 5. Add a `mod` + match arm in sensorium-shell pages/mod.rs (optional — for inline UI)
 #
 # For external frontends (community extensions), you don't need to compile
-# into the portal. Instead, create an extensions.json manifest and build
+# into the Sensorium. Instead, create an extensions.json manifest and build
 # your frontend as a standalone web app using @mycelix/sdk or mycelix-leptos-client.
 
 [package]
@@ -21,4 +21,4 @@ license = "AGPL-3.0-or-later"
 description = "Template for creating a Mycelix domain module"
 
 [dependencies]
-portal-domain-trait = { path = "../mycelix-portal/crates/portal-domain-trait" }
+sensorium-domain-trait = { path = "../mycelix-sensorium/crates/sensorium-domain-trait" }

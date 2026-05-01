@@ -15,10 +15,9 @@ use mycelix_fl::grpc::client::FlClient;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let coordinator_addr = std::env::var("COORDINATOR_URL")
-        .unwrap_or_else(|_| "http://[::1]:50051".to_string());
-    let node_id =
-        std::env::var("NODE_ID").unwrap_or_else(|_| "node-default".to_string());
+    let coordinator_addr =
+        std::env::var("COORDINATOR_URL").unwrap_or_else(|_| "http://[::1]:50051".to_string());
+    let node_id = std::env::var("NODE_ID").unwrap_or_else(|_| "node-default".to_string());
     let did = std::env::var("NODE_DID").ok();
 
     println!("=====================================================");

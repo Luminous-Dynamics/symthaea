@@ -25,88 +25,197 @@ pub struct ScavengeItem {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum NsmPrimitive {
     // Substantives
-    I, You, Someone, Something, People, Body,
+    I,
+    You,
+    Someone,
+    Something,
+    People,
+    Body,
     // Determiners
-    This, Same, Other,
+    This,
+    Same,
+    Other,
     // Quantifiers
-    One, Two, Some, All, Much,
+    One,
+    Two,
+    Some,
+    All,
+    Much,
     // Evaluators
-    Good, Bad, Big, Small,
+    Good,
+    Bad,
+    Big,
+    Small,
     // Descriptors
-    Think, Know, Want, Feel, See, Hear,
+    Think,
+    Know,
+    Want,
+    Feel,
+    See,
+    Hear,
     // Speech
-    Say, Words, True,
+    Say,
+    Words,
+    True,
     // Actions & Events
-    Do, Happen, Move,
+    Do,
+    Happen,
+    Move,
     // Existence & Possession
-    There, Be, Have,
+    There,
+    Be,
+    Have,
     // Life & Death
-    Live, Die,
+    Live,
+    Die,
     // Time
-    When, Now, Before, After, Long, Short,
+    When,
+    Now,
+    Before,
+    After,
+    Long,
+    Short,
     // Space
-    Where, Here, Above, Below, Far, Near, Side, Inside,
+    Where,
+    Here,
+    Above,
+    Below,
+    Far,
+    Near,
+    Side,
+    Inside,
     // Logical
-    Not, Maybe, Can, Because, If,
+    Not,
+    Maybe,
+    Can,
+    Because,
+    If,
 }
 
 impl NsmPrimitive {
     /// Which Harmony this primitive contributes to when verified.
     pub fn harmony_index(&self) -> usize {
         match self {
-            Self::I | Self::Body | Self::Be | Self::Live =>
-                0, // ResonantCoherence (self-unity)
-            Self::Someone | Self::People | Self::Feel | Self::Good =>
-                1, // PanSentientFlourishing (care)
-            Self::Know | Self::Think | Self::True | Self::Because =>
-                2, // IntegralWisdom (understanding)
-            Self::Do | Self::Happen | Self::Move | Self::Can =>
-                3, // InfinitePlay (creative tension)
-            Self::You | Self::Other | Self::Same | Self::Here =>
-                4, // UniversalInterconnectedness
-            Self::Have | Self::Some | Self::One | Self::Two =>
-                5, // SacredReciprocity
-            Self::Before | Self::After | Self::Long | Self::Big =>
-                6, // EvolutionaryProgression
-            _ =>
-                7, // SacredStillness (everything else → contemplation)
+            Self::I | Self::Body | Self::Be | Self::Live => 0, // ResonantCoherence (self-unity)
+            Self::Someone | Self::People | Self::Feel | Self::Good => 1, // PanSentientFlourishing (care)
+            Self::Know | Self::Think | Self::True | Self::Because => 2, // IntegralWisdom (understanding)
+            Self::Do | Self::Happen | Self::Move | Self::Can => 3, // InfinitePlay (creative tension)
+            Self::You | Self::Other | Self::Same | Self::Here => 4, // UniversalInterconnectedness
+            Self::Have | Self::Some | Self::One | Self::Two => 5,  // SacredReciprocity
+            Self::Before | Self::After | Self::Long | Self::Big => 6, // EvolutionaryProgression
+            _ => 7, // SacredStillness (everything else → contemplation)
         }
     }
 
     pub fn name(&self) -> &'static str {
         match self {
-            Self::I => "I", Self::You => "YOU", Self::Someone => "SOMEONE",
-            Self::Something => "SOMETHING", Self::People => "PEOPLE",
-            Self::Body => "BODY", Self::This => "THIS", Self::Same => "SAME",
-            Self::Other => "OTHER", Self::One => "ONE", Self::Two => "TWO",
-            Self::Some => "SOME", Self::All => "ALL", Self::Much => "MUCH",
-            Self::Good => "GOOD", Self::Bad => "BAD", Self::Big => "BIG",
-            Self::Small => "SMALL", Self::Think => "THINK", Self::Know => "KNOW",
-            Self::Want => "WANT", Self::Feel => "FEEL", Self::See => "SEE",
-            Self::Hear => "HEAR", Self::Say => "SAY", Self::Words => "WORDS",
-            Self::True => "TRUE", Self::Do => "DO", Self::Happen => "HAPPEN",
-            Self::Move => "MOVE", Self::There => "THERE", Self::Be => "BE",
-            Self::Have => "HAVE", Self::Live => "LIVE", Self::Die => "DIE",
-            Self::When => "WHEN", Self::Now => "NOW", Self::Before => "BEFORE",
-            Self::After => "AFTER", Self::Long => "LONG", Self::Short => "SHORT",
-            Self::Where => "WHERE", Self::Here => "HERE", Self::Above => "ABOVE",
-            Self::Below => "BELOW", Self::Far => "FAR", Self::Near => "NEAR",
-            Self::Side => "SIDE", Self::Inside => "INSIDE", Self::Not => "NOT",
-            Self::Maybe => "MAYBE", Self::Can => "CAN", Self::Because => "BECAUSE",
+            Self::I => "I",
+            Self::You => "YOU",
+            Self::Someone => "SOMEONE",
+            Self::Something => "SOMETHING",
+            Self::People => "PEOPLE",
+            Self::Body => "BODY",
+            Self::This => "THIS",
+            Self::Same => "SAME",
+            Self::Other => "OTHER",
+            Self::One => "ONE",
+            Self::Two => "TWO",
+            Self::Some => "SOME",
+            Self::All => "ALL",
+            Self::Much => "MUCH",
+            Self::Good => "GOOD",
+            Self::Bad => "BAD",
+            Self::Big => "BIG",
+            Self::Small => "SMALL",
+            Self::Think => "THINK",
+            Self::Know => "KNOW",
+            Self::Want => "WANT",
+            Self::Feel => "FEEL",
+            Self::See => "SEE",
+            Self::Hear => "HEAR",
+            Self::Say => "SAY",
+            Self::Words => "WORDS",
+            Self::True => "TRUE",
+            Self::Do => "DO",
+            Self::Happen => "HAPPEN",
+            Self::Move => "MOVE",
+            Self::There => "THERE",
+            Self::Be => "BE",
+            Self::Have => "HAVE",
+            Self::Live => "LIVE",
+            Self::Die => "DIE",
+            Self::When => "WHEN",
+            Self::Now => "NOW",
+            Self::Before => "BEFORE",
+            Self::After => "AFTER",
+            Self::Long => "LONG",
+            Self::Short => "SHORT",
+            Self::Where => "WHERE",
+            Self::Here => "HERE",
+            Self::Above => "ABOVE",
+            Self::Below => "BELOW",
+            Self::Far => "FAR",
+            Self::Near => "NEAR",
+            Self::Side => "SIDE",
+            Self::Inside => "INSIDE",
+            Self::Not => "NOT",
+            Self::Maybe => "MAYBE",
+            Self::Can => "CAN",
+            Self::Because => "BECAUSE",
             Self::If => "IF",
         }
     }
 
     /// All 48 primitives.
     pub const ALL: [NsmPrimitive; 48] = [
-        Self::I, Self::You, Self::Someone, Self::Something, Self::People, Self::Body,
-        Self::This, Self::Same, Self::Other, Self::One, Self::Two, Self::Some,
-        Self::All, Self::Much, Self::Good, Self::Bad, Self::Big, Self::Small,
-        Self::Think, Self::Know, Self::Want, Self::Feel, Self::See, Self::Hear,
-        Self::Say, Self::Words, Self::True, Self::Do, Self::Happen, Self::Move,
-        Self::There, Self::Be, Self::Have, Self::Live, Self::Die, Self::When,
-        Self::Now, Self::Before, Self::After, Self::Long, Self::Short, Self::Where,
-        Self::Here, Self::Above, Self::Below, Self::Far, Self::Near, Self::Side,
+        Self::I,
+        Self::You,
+        Self::Someone,
+        Self::Something,
+        Self::People,
+        Self::Body,
+        Self::This,
+        Self::Same,
+        Self::Other,
+        Self::One,
+        Self::Two,
+        Self::Some,
+        Self::All,
+        Self::Much,
+        Self::Good,
+        Self::Bad,
+        Self::Big,
+        Self::Small,
+        Self::Think,
+        Self::Know,
+        Self::Want,
+        Self::Feel,
+        Self::See,
+        Self::Hear,
+        Self::Say,
+        Self::Words,
+        Self::True,
+        Self::Do,
+        Self::Happen,
+        Self::Move,
+        Self::There,
+        Self::Be,
+        Self::Have,
+        Self::Live,
+        Self::Die,
+        Self::When,
+        Self::Now,
+        Self::Before,
+        Self::After,
+        Self::Long,
+        Self::Short,
+        Self::Where,
+        Self::Here,
+        Self::Above,
+        Self::Below,
+        Self::Far,
+        Self::Near,
+        Self::Side,
     ];
 }
 
@@ -142,12 +251,15 @@ pub fn spawn_scavenge_items(
     tiles: Query<(&Transform, &crate::components::Tile)>,
 ) {
     let mut rng = rand::thread_rng();
-    let walkable_positions: Vec<Vec2> = tiles.iter()
+    let walkable_positions: Vec<Vec2> = tiles
+        .iter()
         .filter(|(_, t)| t.walkable)
         .map(|(tf, _)| tf.translation.truncate())
         .collect();
 
-    if walkable_positions.is_empty() { return; }
+    if walkable_positions.is_empty() {
+        return;
+    }
 
     // Place 8-12 items randomly
     let count = rng.gen_range(8..=12).min(walkable_positions.len());
@@ -185,11 +297,15 @@ pub fn scavenge_pickup_system(
     mut collected: ResMut<CollectedPrimitives>,
     mut harmony: ResMut<super::harmonies::LocalHarmonyState>,
 ) {
-    let Ok(player_tf) = player.single() else { return };
+    let Ok(player_tf) = player.single() else {
+        return;
+    };
     let player_pos = player_tf.translation.truncate();
 
     for (item_tf, mut item, mut sprite) in &mut items {
-        if item.collected { continue; }
+        if item.collected {
+            continue;
+        }
 
         let dist = player_pos.distance(item_tf.translation.truncate());
         if dist < 30.0 {

@@ -11,7 +11,9 @@
 
 use bevy::prelude::*;
 
-use symtropy_sim_bridge::{FlDefense as Defense, TrimmedMean, FlDefenseConfig as DefenseConfig, FlGradient as Gradient};
+use symtropy_sim_bridge::{
+    FlDefense as Defense, FlDefenseConfig as DefenseConfig, FlGradient as Gradient, TrimmedMean,
+};
 
 use crate::components::{ConsciousnessComp, CrewNpc, NoiseEmitter};
 use crate::resources::{GovernanceLog, LeviathanState, SleepPhase};
@@ -187,10 +189,7 @@ pub fn fl_aggregation_system(
 }
 
 /// Byzantine Leviathan effect: when FL defense fails, room systems degrade.
-pub fn byzantine_effect_system(
-    pool: Res<FlPool>,
-    mut noise_sources: Query<&mut NoiseEmitter>,
-) {
+pub fn byzantine_effect_system(pool: Res<FlPool>, mut noise_sources: Query<&mut NoiseEmitter>) {
     if !pool.bft_exceeded {
         return;
     }

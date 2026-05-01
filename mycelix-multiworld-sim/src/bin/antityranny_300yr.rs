@@ -9,7 +9,7 @@
 //! Key hypothesis: The mere EXISTENCE of the 80% override should deter most
 //! Guardian vetoes, meaning veto_count << veto_deterred_count.
 
-use mycelix_multiworld_sim::{MultiWorldSimulator, config::SimulationConfig};
+use mycelix_multiworld_sim::{config::SimulationConfig, MultiWorldSimulator};
 
 fn main() {
     let seeds: Vec<u64> = std::env::args()
@@ -18,7 +18,10 @@ fn main() {
         .unwrap_or_else(|| vec![42, 123, 789, 1337, 2718]);
 
     println!("=== 300-YEAR ANTI-TYRANNY PILOT RUN ===");
-    println!("Testing governance invariants across {} seeds\n", seeds.len());
+    println!(
+        "Testing governance invariants across {} seeds\n",
+        seeds.len()
+    );
     println!(
         "{:<6} {:>5} {:>5} {:>7} {:>7} {:>7} {:>7} {:>8} {:>6} {:>6}",
         "Seed", "CVS", "Alive", "Vetoes", "Overrd", "Deter", "Crises", "Amend", "Pop", "Phi"
@@ -54,8 +57,16 @@ fn main() {
             }
         }
 
-        let final_pop = report.epoch_snapshots.last().map(|s| s.total_population).unwrap_or(0);
-        let final_phi = report.epoch_snapshots.last().map(|s| s.mean_phi).unwrap_or(0.0);
+        let final_pop = report
+            .epoch_snapshots
+            .last()
+            .map(|s| s.total_population)
+            .unwrap_or(0);
+        let final_phi = report
+            .epoch_snapshots
+            .last()
+            .map(|s| s.mean_phi)
+            .unwrap_or(0.0);
 
         println!(
             "{:<6} {:>5.3} {:>5} {:>7} {:>7} {:>7} {:>7} {:>8} {:>6} {:>6.3}",
@@ -109,7 +120,11 @@ fn main() {
 
     println!(
         "\nSurvival: {} / {} seeds survived 300 years",
-        seeds.iter().filter(|_| all_survived).count().max(if all_survived { seeds.len() } else { 0 }),
+        seeds
+            .iter()
+            .filter(|_| all_survived)
+            .count()
+            .max(if all_survived { seeds.len() } else { 0 }),
         seeds.len()
     );
 

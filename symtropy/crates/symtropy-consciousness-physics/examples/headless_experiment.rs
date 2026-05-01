@@ -12,11 +12,11 @@
 //!   cooperation_events, joules_per_phi, conservation_error
 
 use nalgebra::SVector;
+use symthaea_consciousness_equation::ConsciousnessInputs;
 use symtropy_consciousness_physics::harmony_field::HarmonyField;
 use symtropy_consciousness_physics::{ConsciousnessField, ThermodynamicConstants};
 use symtropy_math::Point;
 use symtropy_physics::PhysicsWorld;
-use symthaea_consciousness_equation::ConsciousnessInputs;
 
 const NUM_AGENTS: usize = 20;
 const TICKS: usize = 2000;
@@ -79,16 +79,16 @@ fn main() {
         if let Some(entity) = consciousness.entities.get_mut(&h) {
             match i % 3 {
                 0 => {
-                    entity.harmony_activations =
-                        [0.9, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.8, 0.5]; // Stillness group
+                    entity.harmony_activations = [0.9, 0.2, 0.1, 0.1, 0.1, 0.1, 0.1, 0.8, 0.5];
+                    // Stillness group
                 }
                 1 => {
-                    entity.harmony_activations =
-                        [0.2, 0.1, 0.9, 0.1, 0.1, 0.1, 0.8, 0.2, 0.5]; // Progression group
+                    entity.harmony_activations = [0.2, 0.1, 0.9, 0.1, 0.1, 0.1, 0.8, 0.2, 0.5];
+                    // Progression group
                 }
                 _ => {
-                    entity.harmony_activations =
-                        [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]; // Balanced (resonates with all)
+                    entity.harmony_activations = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5];
+                    // Balanced (resonates with all)
                 }
             }
         }
@@ -129,9 +129,12 @@ fn main() {
             if let Some(entity) = consciousness.entities.get_mut(&h) {
                 entity.energy.tick_reset();
                 let phi = entity.phi();
-                let maintenance = consciousness.constants.consciousness_maintenance_per_tick * (1.0 + phi * 0.5);
+                let maintenance =
+                    consciousness.constants.consciousness_maintenance_per_tick * (1.0 + phi * 0.5);
                 entity.energy.consume(maintenance);
-                entity.energy.regenerate(consciousness.constants.ambient_regen_rate * regen_mult);
+                entity
+                    .energy
+                    .regenerate(consciousness.constants.ambient_regen_rate * regen_mult);
             }
         }
 
@@ -163,12 +166,22 @@ fn main() {
 
                     // Collapse recovery
                     if resonance > consciousness.constants.collapse_recovery_harmony_threshold {
-                        if consciousness.entities.get(&ha).map(|e| e.energy.is_collapsed()).unwrap_or(false) {
+                        if consciousness
+                            .entities
+                            .get(&ha)
+                            .map(|e| e.energy.is_collapsed())
+                            .unwrap_or(false)
+                        {
                             if let Some(e) = consciousness.entities.get_mut(&ha) {
                                 e.energy.regenerate(50.0);
                             }
                         }
-                        if consciousness.entities.get(&hb).map(|e| e.energy.is_collapsed()).unwrap_or(false) {
+                        if consciousness
+                            .entities
+                            .get(&hb)
+                            .map(|e| e.energy.is_collapsed())
+                            .unwrap_or(false)
+                        {
                             if let Some(e) = consciousness.entities.get_mut(&hb) {
                                 e.energy.regenerate(50.0);
                             }
@@ -192,7 +205,11 @@ fn main() {
             let alive = handles
                 .iter()
                 .filter(|h| {
-                    consciousness.entities.get(h).map(|e| !e.energy.is_collapsed()).unwrap_or(false)
+                    consciousness
+                        .entities
+                        .get(h)
+                        .map(|e| !e.energy.is_collapsed())
+                        .unwrap_or(false)
                 })
                 .count();
             let collapsed = NUM_AGENTS - alive;
@@ -230,7 +247,11 @@ fn main() {
     let final_alive = handles
         .iter()
         .filter(|h| {
-            consciousness.entities.get(h).map(|e| !e.energy.is_collapsed()).unwrap_or(false)
+            consciousness
+                .entities
+                .get(h)
+                .map(|e| !e.energy.is_collapsed())
+                .unwrap_or(false)
         })
         .count();
 
@@ -257,7 +278,8 @@ fn main() {
 
 // Simple deterministic RNG (no external deps)
 fn simple_rng(seed: u64) -> u64 {
-    seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407)
+    seed.wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407)
 }
 fn rng_f64(state: &mut u64) -> f64 {
     *state = simple_rng(*state);

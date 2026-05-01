@@ -9,9 +9,9 @@
 //!
 //! Run: cargo run --release --bin interstellar_integrated
 
-use mycelix_multiworld_sim::MultiWorldSimulator;
 use mycelix_multiworld_sim::config::SimulationConfig;
 use mycelix_multiworld_sim::generation_ship::ShipPhase;
+use mycelix_multiworld_sim::MultiWorldSimulator;
 
 fn main() {
     let seed = std::env::args()
@@ -19,7 +19,10 @@ fn main() {
         .and_then(|s| s.parse::<u64>().ok())
         .unwrap_or(42);
 
-    println!("=== INTEGRATED INTERSTELLAR SIMULATION (seed: {}) ===", seed);
+    println!(
+        "=== INTEGRATED INTERSTELLAR SIMULATION (seed: {}) ===",
+        seed
+    );
     println!("1000-year civilization + generation ship to Proxima Centauri\n");
 
     // Use the standard 1000-year config
@@ -36,8 +39,20 @@ fn main() {
 
     // Print civilization results
     println!("=== CIVILIZATION RESULTS ===");
-    println!("Duration: {:.0} years ({} ticks)", report.total_ticks as f64 / 12.0, report.total_ticks);
-    println!("RESULT: {} (CVS: {:.3})", if report.survived { "SURVIVED" } else { "COLLAPSED" }, report.final_cvs);
+    println!(
+        "Duration: {:.0} years ({} ticks)",
+        report.total_ticks as f64 / 12.0,
+        report.total_ticks
+    );
+    println!(
+        "RESULT: {} (CVS: {:.3})",
+        if report.survived {
+            "SURVIVED"
+        } else {
+            "COLLAPSED"
+        },
+        report.final_cvs
+    );
     println!("Population: {}", report.final_population);
     println!("Breakthroughs: {}", report.breakthroughs);
     println!();
@@ -45,14 +60,28 @@ fn main() {
     // Print generation ship results
     if let Some(ref ship) = sim.generation_ship {
         println!("=== GENERATION SHIP RESULTS ===");
-        println!("Destination: {} ({:.2} ly)", ship.destination.name(), ship.distance_ly);
+        println!(
+            "Destination: {} ({:.2} ly)",
+            ship.destination.name(),
+            ship.distance_ly
+        );
         println!("Phase: {:?}", ship.phase);
         println!("Transit progress: {:.1}%", ship.transit_progress() * 100.0);
         println!("Hull integrity: {:.1}%", ship.hull_integrity * 100.0);
         println!("Fuel remaining: {:.1}%", ship.fuel_fraction * 100.0);
         println!("Cosmic ray dose: {:.3} Sv", ship.cosmic_ray_dose);
-        println!("Comms delay: {:.1} years (round trip)", ship.comms_roundtrip_years());
-        println!("Cultural speciation: {}", if ship.culturally_speciated { "YES" } else { "No" });
+        println!(
+            "Comms delay: {:.1} years (round trip)",
+            ship.comms_roundtrip_years()
+        );
+        println!(
+            "Cultural speciation: {}",
+            if ship.culturally_speciated {
+                "YES"
+            } else {
+                "No"
+            }
+        );
         println!("Interstellar disasters: {}", ship.disasters_survived.len());
 
         if ship.phase == ShipPhase::Arrived {
@@ -63,9 +92,15 @@ fn main() {
         } else {
             let years_remaining = ship.years_remaining();
             let arrival_year = 500.0 + (ship.elapsed_ticks as f64 / 12.0) + years_remaining;
-            println!("\nShip in transit — arrives at year {:.0} ({:.1} years remaining)", arrival_year, years_remaining);
+            println!(
+                "\nShip in transit — arrives at year {:.0} ({:.1} years remaining)",
+                arrival_year, years_remaining
+            );
         }
     } else {
-        println!("No generation ship was launched (launch tick {} not reached?)", sim.generation_ship_launch_tick);
+        println!(
+            "No generation ship was launched (launch tick {} not reached?)",
+            sim.generation_ship_launch_tick
+        );
     }
 }

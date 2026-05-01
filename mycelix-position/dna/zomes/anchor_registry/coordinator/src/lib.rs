@@ -5,11 +5,11 @@
 //! Anchors are nodes with surveyed or GPS-determined positions that
 //! serve as reference points for cooperative trilateration.
 
-use hdk::prelude::*;
 use anchor_registry_integrity::*;
+use hdk::prelude::*;
 use mycelix_position_shared::{
-    AnchorNode, AnchorCertification, SurveyMethod,
-    PositionTimestamp, PositionError, PositionErrorCode,
+    AnchorCertification, AnchorNode, PositionError, PositionErrorCode, PositionTimestamp,
+    SurveyMethod,
 };
 
 // ============================================================================
@@ -145,13 +145,17 @@ pub fn get_anchors_in_region(input: RegionQueryInput) -> ExternResult<Vec<Anchor
 
     let links = get_links(
         LinkQuery::try_new(region_anchor, LinkTypes::AnchorsByRegion)?,
-            GetStrategy::Network,
+        GetStrategy::Network,
     )?;
 
     let mut results = Vec::new();
     for link in links {
-        let Some(target) = link.target.into_action_hash() else { continue };
-        let Some(record) = get(target, GetOptions::default())? else { continue };
+        let Some(target) = link.target.into_action_hash() else {
+            continue;
+        };
+        let Some(record) = get(target, GetOptions::default())? else {
+            continue;
+        };
         if let Some(node) = record.entry().to_app_option::<AnchorNode>().ok().flatten() {
             results.push(node);
         }
@@ -165,13 +169,17 @@ pub fn get_all_anchors(_: ()) -> ExternResult<Vec<AnchorNode>> {
     let all_anchor = anchor_all()?;
     let links = get_links(
         LinkQuery::try_new(all_anchor, LinkTypes::AllAnchors)?,
-            GetStrategy::Network,
+        GetStrategy::Network,
     )?;
 
     let mut results = Vec::new();
     for link in links {
-        let Some(target) = link.target.into_action_hash() else { continue };
-        let Some(record) = get(target, GetOptions::default())? else { continue };
+        let Some(target) = link.target.into_action_hash() else {
+            continue;
+        };
+        let Some(record) = get(target, GetOptions::default())? else {
+            continue;
+        };
         if let Some(node) = record.entry().to_app_option::<AnchorNode>().ok().flatten() {
             results.push(node);
         }

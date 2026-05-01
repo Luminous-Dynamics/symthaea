@@ -371,7 +371,138 @@ fn TeacherActions() -> impl IntoView {
                 <a href="#" class="btn-primary">"Create Assessment"</a>
                 <a href="#" class="btn-secondary">"Assign Curriculum"</a>
                 <a href="#" class="btn-secondary">"Generate Report Cards"</a>
-                <a href="#" class="btn-secondary">"View Attendance"</a>
+            </div>
+        </div>
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Curriculum Lab — Sovereign Standard Authoring
+// ---------------------------------------------------------------------------
+
+#[component]
+fn CurriculumLab() -> impl IntoView {
+    let (show_editor, set_show_editor) = signal(false);
+
+    view! {
+        <div class="dash-section curriculum-lab">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem">
+                <div>
+                    <h3>"Curriculum Lab"</h3>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary)">"Author sovereign standards and bind them to the semantic mesh."</p>
+                </div>
+                <button class="btn-primary" on:click=move |_| set_show_editor.set(true)>
+                    "\u{002B} Create Sovereign Standard"
+                </button>
+            </div>
+
+            {move || if show_editor.get() {
+                view! { <SovereignStandardEditor on_close=move || set_show_editor.set(false) /> }.into_any()
+            } else {
+                view! {
+                    <div class="lab-empty-state">
+                        <div class="lab-icon">"\u{1F331}"</div>
+                        <p>"You haven't authored any local standards yet. Start by defining a node for your community guild."</p>
+                    </div>
+                }.into_any()
+            }}
+        </div>
+    }
+}
+
+#[component]
+fn ObligationSlider(label: &'static str) -> impl IntoView {
+    let (val, set_val) = signal(850u16);
+    view! {
+        <div class="obligation-slider-row">
+            <span class="obj-label">{label}</span>
+            <input 
+                type="range" 
+                min="0" max="1000" step="10"
+                prop:value=val
+                on:input=move |ev| set_val.set(event_target_value(&ev).parse().unwrap_or(0))
+            />
+            <span class="obj-value">{move || val.get() / 10}"%"</span>
+        </div>
+    }
+}
+
+#[component]
+fn SovereignStandardEditor(on_close: impl Fn() + 'static) -> impl IntoView {
+    let (title, set_title) = signal("Highveld Soil Regeneration".to_string());
+    let (semantic_tags, set_semantic_tags) = signal("permaculture, soil-health, sustainable-ag".to_string());
+    
+    // HDC Vector Preview (Mocked based on tags)
+    let hdc_vector_id = move || title.get().to_lowercase().replace(' ', "_");
+
+    view! {
+        <div class="standard-editor-modal">
+            <div class="editor-header">
+                <h4>"New Sovereign Standard"</h4>
+                <button class="btn-close" on:click=move |_| on_close()>"\u{00D7}"</button>
+            </div>
+
+            <div class="editor-body">
+                <div class="field-group">
+                    <label>"Node Title (Local Name)"</label>
+                    <input 
+                        type="text" 
+                        prop:value=title
+                        on:input=move |ev| set_title.set(event_target_value(&ev))
+                    />
+                </div>
+
+                <div class="field-group">
+                    <label>"Semantic Mesh Binding (Keywords)"</label>
+                    <input 
+                        type="text" 
+                        placeholder="e.g. soil-science, biology, compost"
+                        prop:value=semantic_tags
+                        on:input=move |ev| set_semantic_tags.set(event_target_value(&ev))
+                    />
+                    <p class="field-hint">"These tags generate the 16,384-dimensional HDC vector for global mapping."</p>
+                </div>
+
+                <div class="moral-algebra-section">
+                    <h5>"\u{2696} Geometric Alignment (The 16 Obligations)"</h5>
+                    <p class="field-hint">"Score your standard against the constitutive axioms of the Mycelix ecosystem."</p>
+                    
+                    <div class="obligations-grid">
+                        <div class="obligation-col">
+                            <h6>"Perfect (Required)"</h6>
+                            <ObligationSlider label="Non-harm (Ahimsa)" />
+                            <ObligationSlider label="Reversibility" />
+                            <ObligationSlider label="Reciprocity" />
+                            <ObligationSlider label="Thermodynamic Eff." />
+                        </div>
+                        <div class="obligation-col">
+                            <h6>"Imperfect (Aspirational)"</h6>
+                            <ObligationSlider label="Eco Stewardship" />
+                            <ObligationSlider label="Ubuntu Mentorship" />
+                            <ObligationSlider label="Collective Flourishing" />
+                            <ObligationSlider label="Resilience" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="hdc-binding-preview">
+                    <label>"Semantic Signature (HDC Holograph)"</label>
+                    <div class="preview-container">
+                        <crate::games::universal::hdc_holograph::HdcHolograph />
+                    </div>
+                    <div class="match-projection">
+                        <span class="match-label">"Global Mesh Projection:"</span>
+                        <div class="match-chips">
+                            <span class="badge-match">"94% Match: Sustainable Agriculture (ESCO)"</span>
+                            <span class="badge-match">"81% Match: Soil Science (O*NET)"</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="editor-footer">
+                <button class="btn-secondary" on:click=move |_| on_close()>"Cancel"</button>
+                <button class="btn-primary">"Publish to Local DAO"</button>
             </div>
         </div>
     }
@@ -391,16 +522,19 @@ pub fn TeacherDashboardPage() -> impl IntoView {
         <div class="teacher-dashboard">
             <ClassHeader />
 
-            <MasteryHeatmap students=students.clone() />
-
-            <div class="teacher-bottom-grid">
-                <AtRiskPanel alerts=at_risk />
-                <ClassStatsCard stats=stats />
+            <div class="teacher-main-grid">
+                <div class="left-col">
+                    <MasteryHeatmap students=students.clone() />
+                    <CurriculumLab />
+                </div>
+                
+                <div class="right-col">
+                    <AtRiskPanel alerts=at_risk />
+                    <ClassStatsCard stats=stats />
+                    <SkillBreakdown students=students />
+                    <TeacherActions />
+                </div>
             </div>
-
-            <SkillBreakdown students=students />
-
-            <TeacherActions />
         </div>
     }
 }

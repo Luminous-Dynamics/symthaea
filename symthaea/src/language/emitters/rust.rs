@@ -104,7 +104,10 @@ impl CodeEmitter for RustEmitter {
             if purpose_lower.contains("pi") {
                 parts.push("pub const PI: f64 = std::f64::consts::PI;".to_string());
             } else if purpose_lower.contains("max") {
-                parts.push(format!("pub const MAX_{}: usize = 1024;", spec.name.to_uppercase()));
+                parts.push(format!(
+                    "pub const MAX_{}: usize = 1024;",
+                    spec.name.to_uppercase()
+                ));
             } else {
                 parts.push(format!("pub const {}: i32 = 0;", spec.name.to_uppercase()));
             }
@@ -277,10 +280,13 @@ impl CodeEmitter for RustEmitter {
                 // Apply causal type reasoning to fix return type mismatches
                 #[cfg(feature = "code_generation")]
                 let body = {
-                    let param_types: Vec<&str> = sig.params.iter().map(|(_, t)| t.as_str()).collect();
+                    let param_types: Vec<&str> =
+                        sig.params.iter().map(|(_, t)| t.as_str()).collect();
                     let ret = sig.return_type.as_deref().unwrap_or("");
                     crate::language::type_causal_model::TypeCausalModel::fix_return_type(
-                        &raw_body, ret, &param_types,
+                        &raw_body,
+                        ret,
+                        &param_types,
                     )
                 };
                 #[cfg(not(feature = "code_generation"))]

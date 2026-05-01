@@ -12,12 +12,12 @@ use crate::types::FossilDeposit;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Epoch {
-    Foundation,  // 0-25: building the base
-    Growth,      // 26-50: rapid expansion
-    Expansion,   // 51-100: global reach
-    Maturation,  // 101-150: systems mature
-    Hardening,   // 151-300: resilient civilization
-    DeepTime,    // 301+: long-term stewardship
+    Foundation, // 0-25: building the base
+    Growth,     // 26-50: rapid expansion
+    Expansion,  // 51-100: global reach
+    Maturation, // 101-150: systems mature
+    Hardening,  // 151-300: resilient civilization
+    DeepTime,   // 301+: long-term stewardship
 }
 
 impl Epoch {
@@ -122,7 +122,8 @@ mod tests {
     fn deposit(status: &str) -> FossilDeposit {
         FossilDeposit {
             name: "Test".into(),
-            lat: 0.0, lon: 0.0,
+            lat: 0.0,
+            lon: 0.0,
             fuel_type: FuelType::Oil,
             proven_reserves_mboe: 1000.0,
             annual_production_mboe: 100.0,
@@ -197,7 +198,10 @@ mod tests {
     fn test_eroi_tar_sands_declines_fastest() {
         let oil_100 = fossil_eroi_at_year(10.0, &FuelType::Oil, 100);
         let tar_100 = fossil_eroi_at_year(10.0, &FuelType::TarSands, 100);
-        assert!(tar_100 < oil_100, "tar sands should decline faster than oil");
+        assert!(
+            tar_100 < oil_100,
+            "tar sands should decline faster than oil"
+        );
     }
 
     #[test]

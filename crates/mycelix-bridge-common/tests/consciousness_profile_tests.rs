@@ -18,12 +18,29 @@ const BASE_US: u64 = 1_767_225_600_000_000; // 2026-01-01T00:00:00Z
 const HOUR_US: u64 = 3_600_000_000;
 const DAY_US: u64 = 86_400_000_000;
 
-fn make_credential(identity: f64, reputation: f64, community: f64, engagement: f64) -> ConsciousnessCredential {
-    let profile = ConsciousnessProfile { identity, reputation, community, engagement };
+fn make_credential(
+    identity: f64,
+    reputation: f64,
+    community: f64,
+    engagement: f64,
+) -> ConsciousnessCredential {
+    let profile = ConsciousnessProfile {
+        identity,
+        reputation,
+        community,
+        engagement,
+    };
     ConsciousnessCredential {
         did: "did:mycelix:test-agent".into(),
         profile,
-        tier: ConsciousnessProfile { identity, reputation, community, engagement }.clamped().tier(),
+        tier: ConsciousnessProfile {
+            identity,
+            reputation,
+            community,
+            engagement,
+        }
+        .clamped()
+        .tier(),
         issued_at: BASE_US,
         expires_at: BASE_US + DAY_US,
         issuer: "did:mycelix:test-bridge".into(),
@@ -105,32 +122,57 @@ fn test_combined_score_clamped() {
 
 #[test]
 fn test_tier_observer() {
-    let p = ConsciousnessProfile { identity: 0.1, reputation: 0.1, community: 0.1, engagement: 0.1 };
+    let p = ConsciousnessProfile {
+        identity: 0.1,
+        reputation: 0.1,
+        community: 0.1,
+        engagement: 0.1,
+    };
     assert_eq!(p.tier(), ConsciousnessTier::Observer);
 }
 
 #[test]
 fn test_tier_participant() {
     // Combined 0.3 = Participant
-    let p = ConsciousnessProfile { identity: 0.3, reputation: 0.3, community: 0.3, engagement: 0.3 };
+    let p = ConsciousnessProfile {
+        identity: 0.3,
+        reputation: 0.3,
+        community: 0.3,
+        engagement: 0.3,
+    };
     assert_eq!(p.tier(), ConsciousnessTier::Participant);
 }
 
 #[test]
 fn test_tier_citizen() {
-    let p = ConsciousnessProfile { identity: 0.4, reputation: 0.4, community: 0.4, engagement: 0.4 };
+    let p = ConsciousnessProfile {
+        identity: 0.4,
+        reputation: 0.4,
+        community: 0.4,
+        engagement: 0.4,
+    };
     assert_eq!(p.tier(), ConsciousnessTier::Citizen);
 }
 
 #[test]
 fn test_tier_steward() {
-    let p = ConsciousnessProfile { identity: 0.6, reputation: 0.6, community: 0.6, engagement: 0.6 };
+    let p = ConsciousnessProfile {
+        identity: 0.6,
+        reputation: 0.6,
+        community: 0.6,
+        engagement: 0.6,
+    };
     assert_eq!(p.tier(), ConsciousnessTier::Steward);
 }
 
 #[test]
 fn test_tier_guardian() {
-    let p = ConsciousnessProfile { identity: 0.8, reputation: 0.8, community: 0.8, engagement: 0.8 };
+    let p = ConsciousnessProfile {
+        identity: 0.8,
+        reputation: 0.8,
+        community: 0.8,
+        engagement: 0.8,
+    };
     assert_eq!(p.tier(), ConsciousnessTier::Guardian);
 }
 
@@ -149,15 +191,29 @@ fn test_tier_ordering() {
 #[test]
 fn test_tier_hysteresis_prevents_oscillation() {
     // Score at Citizen boundary (0.4): should NOT demote from Citizen to Participant
-    let p = ConsciousnessProfile { identity: 0.4, reputation: 0.4, community: 0.4, engagement: 0.4 };
+    let p = ConsciousnessProfile {
+        identity: 0.4,
+        reputation: 0.4,
+        community: 0.4,
+        engagement: 0.4,
+    };
     let tier = p.tier_with_hysteresis(ConsciousnessTier::Citizen);
-    assert_eq!(tier, ConsciousnessTier::Citizen, "hysteresis should prevent demotion at boundary");
+    assert_eq!(
+        tier,
+        ConsciousnessTier::Citizen,
+        "hysteresis should prevent demotion at boundary"
+    );
 }
 
 #[test]
 fn test_tier_hysteresis_allows_clear_promotion() {
     // Score well above Steward boundary (0.6): should promote from Citizen
-    let p = ConsciousnessProfile { identity: 0.7, reputation: 0.7, community: 0.7, engagement: 0.7 };
+    let p = ConsciousnessProfile {
+        identity: 0.7,
+        reputation: 0.7,
+        community: 0.7,
+        engagement: 0.7,
+    };
     let tier = p.tier_with_hysteresis(ConsciousnessTier::Citizen);
     assert_eq!(tier, ConsciousnessTier::Steward);
 }
@@ -165,7 +221,12 @@ fn test_tier_hysteresis_allows_clear_promotion() {
 #[test]
 fn test_tier_hysteresis_allows_clear_demotion() {
     // Score well below Citizen boundary: should demote from Citizen
-    let p = ConsciousnessProfile { identity: 0.2, reputation: 0.2, community: 0.2, engagement: 0.2 };
+    let p = ConsciousnessProfile {
+        identity: 0.2,
+        reputation: 0.2,
+        community: 0.2,
+        engagement: 0.2,
+    };
     let tier = p.tier_with_hysteresis(ConsciousnessTier::Citizen);
     assert!(tier < ConsciousnessTier::Citizen);
 }
@@ -197,14 +258,11 @@ fn test_from_symthaea_weights() {
     // engagement = 0.35*phi + 0.25*meta + 0.20*coherence + 0.20*care
     let p = ConsciousnessProfile::from_symthaea(
         1.0, 0.0, 0.0, 0.0, // phi only
-        0.5, 0.5, 0.5,       // identity/rep/community
+        0.5, 0.5, 0.5, // identity/rep/community
     );
     assert!((p.engagement - 0.35).abs() < 1e-10);
 
-    let p2 = ConsciousnessProfile::from_symthaea(
-        0.0, 1.0, 0.0, 0.0,
-        0.5, 0.5, 0.5,
-    );
+    let p2 = ConsciousnessProfile::from_symthaea(0.0, 1.0, 0.0, 0.0, 0.5, 0.5, 0.5);
     assert!((p2.engagement - 0.25).abs() < 1e-10);
 }
 
@@ -215,8 +273,16 @@ fn test_from_symthaea_weights() {
 #[test]
 fn test_is_valid() {
     assert!(ConsciousnessProfile::zero().is_valid());
-    assert!(!ConsciousnessProfile { identity: f64::NAN, ..ConsciousnessProfile::zero() }.is_valid());
-    assert!(!ConsciousnessProfile { reputation: f64::INFINITY, ..ConsciousnessProfile::zero() }.is_valid());
+    assert!(!ConsciousnessProfile {
+        identity: f64::NAN,
+        ..ConsciousnessProfile::zero()
+    }
+    .is_valid());
+    assert!(!ConsciousnessProfile {
+        reputation: f64::INFINITY,
+        ..ConsciousnessProfile::zero()
+    }
+    .is_valid());
 }
 
 #[test]
@@ -283,12 +349,18 @@ fn test_credential_expiry() {
 fn test_credential_from_unified() {
     let cred = ConsciousnessCredential::from_unified_consciousness(
         "did:test:agent".into(),
-        0.7, 0.8, 0.6, 0.5,
+        0.7,
+        0.8,
+        0.6,
+        0.5,
         "did:test:bridge".into(),
         BASE_US,
     );
     assert_eq!(cred.profile.engagement, 0.7);
-    assert_eq!(cred.expires_at, BASE_US + ConsciousnessCredential::DEFAULT_TTL_US);
+    assert_eq!(
+        cred.expires_at,
+        BASE_US + ConsciousnessCredential::DEFAULT_TTL_US
+    );
     assert!(cred.tier >= ConsciousnessTier::Participant);
 }
 
@@ -296,8 +368,13 @@ fn test_credential_from_unified() {
 fn test_credential_from_symthaea() {
     let cred = ConsciousnessCredential::from_symthaea(
         "did:test:agent".into(),
-        0.8, 0.6, 0.7, 0.5, // phi, meta, coherence, care
-        0.9, 0.7, 0.6,       // identity, reputation, community
+        0.8,
+        0.6,
+        0.7,
+        0.5, // phi, meta, coherence, care
+        0.9,
+        0.7,
+        0.6, // identity, reputation, community
         "did:test:bridge".into(),
         BASE_US,
     );
@@ -311,7 +388,10 @@ fn test_credential_extensions() {
     assert!(cred.get_extension(ExtensionKey::SUBSTRATE_TYPE).is_none());
 
     cred.set_extension(ExtensionKey::SUBSTRATE_TYPE, vec![1]);
-    assert_eq!(cred.get_extension(ExtensionKey::SUBSTRATE_TYPE), Some(&vec![1]));
+    assert_eq!(
+        cred.get_extension(ExtensionKey::SUBSTRATE_TYPE),
+        Some(&vec![1])
+    );
 
     let removed = cred.remove_extension(ExtensionKey::SUBSTRATE_TYPE);
     assert_eq!(removed, Some(vec![1]));
@@ -335,7 +415,10 @@ fn test_governance_basic_eligible() {
     let cred = make_credential(0.5, 0.5, 0.5, 0.5);
     let req = requirement_for_basic();
     let result = evaluate_governance(&cred, &req, BASE_US + HOUR_US);
-    assert!(result.eligible, "Citizen-level agent should pass basic requirement");
+    assert!(
+        result.eligible,
+        "Citizen-level agent should pass basic requirement"
+    );
     assert!(result.weight_bp > 0);
 }
 
@@ -344,7 +427,11 @@ fn test_governance_voting_eligible() {
     let cred = make_credential(0.6, 0.6, 0.6, 0.6);
     let req = requirement_for_voting();
     let result = evaluate_governance(&cred, &req, BASE_US + HOUR_US);
-    assert!(result.eligible, "Steward should pass voting: {:?}", result.reasons);
+    assert!(
+        result.eligible,
+        "Steward should pass voting: {:?}",
+        result.reasons
+    );
 }
 
 #[test]
@@ -360,7 +447,11 @@ fn test_governance_guardian_requires_high_scores() {
     let cred = make_credential(0.9, 0.9, 0.9, 0.9);
     let req = requirement_for_guardian();
     let result = evaluate_governance(&cred, &req, BASE_US + HOUR_US);
-    assert!(result.eligible, "Full Guardian should pass: {:?}", result.reasons);
+    assert!(
+        result.eligible,
+        "Full Guardian should pass: {:?}",
+        result.reasons
+    );
 }
 
 #[test]
@@ -377,10 +468,17 @@ fn test_governance_grace_period_basic_only() {
     let cred = make_credential(0.5, 0.5, 0.5, 0.5);
     // Just past expiry but well within 30-minute grace period
     let in_grace = BASE_US + DAY_US + 60_000_000; // 1 minute past expiry
-    assert!(in_grace < cred.expires_at + GRACE_PERIOD_US, "should be within grace period");
+    assert!(
+        in_grace < cred.expires_at + GRACE_PERIOD_US,
+        "should be within grace period"
+    );
 
     let basic = evaluate_governance(&cred, &requirement_for_basic(), in_grace);
-    assert!(basic.eligible, "Grace period should allow basic ops: {:?}", basic.reasons);
+    assert!(
+        basic.eligible,
+        "Grace period should allow basic ops: {:?}",
+        basic.reasons
+    );
 
     let voting = evaluate_governance(&cred, &requirement_for_voting(), in_grace);
     assert!(!voting.eligible, "Grace period should NOT allow voting");
@@ -391,7 +489,11 @@ fn test_governance_proposal_requirement() {
     let req = requirement_for_proposal();
     let cred = make_credential(0.4, 0.4, 0.4, 0.4);
     let result = evaluate_governance(&cred, &req, BASE_US + HOUR_US);
-    assert!(result.eligible, "Citizen should be able to propose: {:?}", result.reasons);
+    assert!(
+        result.eligible,
+        "Citizen should be able to propose: {:?}",
+        result.reasons
+    );
 }
 
 #[test]
@@ -399,7 +501,11 @@ fn test_governance_constitutional_requirement() {
     let req = requirement_for_constitutional();
     let cred = make_credential(0.7, 0.7, 0.7, 0.7);
     let result = evaluate_governance(&cred, &req, BASE_US + HOUR_US);
-    assert!(result.eligible, "Steward should pass constitutional: {:?}", result.reasons);
+    assert!(
+        result.eligible,
+        "Steward should pass constitutional: {:?}",
+        result.reasons
+    );
 }
 
 // ============================================================================
@@ -408,7 +514,12 @@ fn test_governance_constitutional_requirement() {
 
 #[test]
 fn test_reputation_decay_zero_days() {
-    let p = ConsciousnessProfile { identity: 0.5, reputation: 0.8, community: 0.6, engagement: 0.4 };
+    let p = ConsciousnessProfile {
+        identity: 0.5,
+        reputation: 0.8,
+        community: 0.6,
+        engagement: 0.4,
+    };
     let decayed = decay_reputation(&p, 0.0);
     assert!((decayed.reputation - 0.8).abs() < 1e-10);
     // Identity, community, engagement unchanged
@@ -420,19 +531,30 @@ fn test_reputation_decay_zero_days() {
 #[test]
 fn test_reputation_decay_30_days() {
     // Decay rate is 0.998/day, so after 30 days: 1.0 * 0.998^30 ≈ 0.9417
-    let p = ConsciousnessProfile { identity: 0.5, reputation: 1.0, community: 0.5, engagement: 0.5 };
+    let p = ConsciousnessProfile {
+        identity: 0.5,
+        reputation: 1.0,
+        community: 0.5,
+        engagement: 0.5,
+    };
     let decayed = decay_reputation(&p, 30.0);
     let expected = REPUTATION_DECAY_PER_DAY.powi(30);
     assert!(
         (decayed.reputation - expected).abs() < 0.01,
         "30-day decay should be ~{:.4}, got: {}",
-        expected, decayed.reputation
+        expected,
+        decayed.reputation
     );
 }
 
 #[test]
 fn test_reputation_decay_negative_days_no_growth() {
-    let p = ConsciousnessProfile { identity: 0.5, reputation: 0.5, community: 0.5, engagement: 0.5 };
+    let p = ConsciousnessProfile {
+        identity: 0.5,
+        reputation: 0.5,
+        community: 0.5,
+        engagement: 0.5,
+    };
     let decayed = decay_reputation(&p, -10.0);
     // Negative days should not increase reputation
     assert!(decayed.reputation <= 0.5 + 1e-10);
@@ -454,7 +576,11 @@ fn test_governance_with_reputation_blacklisted() {
 
     let req = requirement_for_basic();
     let result = evaluate_governance_with_reputation(&cred, &req, &rep, BASE_US + HOUR_US);
-    assert!(!result.eligible, "Blacklisted agent should be rejected: {:?}", result.reasons);
+    assert!(
+        !result.eligible,
+        "Blacklisted agent should be rejected: {:?}",
+        result.reasons
+    );
 }
 
 #[test]
@@ -463,7 +589,11 @@ fn test_governance_with_reputation_good_standing() {
     let rep = ReputationState::new(0.8, BASE_US);
     let req = requirement_for_voting();
     let result = evaluate_governance_with_reputation(&cred, &req, &rep, BASE_US + HOUR_US);
-    assert!(result.eligible, "Good rep + Steward should pass: {:?}", result.reasons);
+    assert!(
+        result.eligible,
+        "Good rep + Steward should pass: {:?}",
+        result.reasons
+    );
 }
 
 // ============================================================================
@@ -492,20 +622,23 @@ fn test_bootstrap_eligible() {
 
 #[test]
 fn test_bootstrap_governance_evaluation() {
-    let cred = bootstrap_credential(
-        "did:mycelix:new-agent".into(),
-        0.5,
-        BASE_US,
-    );
+    let cred = bootstrap_credential("did:mycelix:new-agent".into(), 0.5, BASE_US);
     // Bootstrap TTL is 15 minutes — test within that window
     let within_ttl = BASE_US + 600_000_000; // 10 minutes after issuance
     let result = evaluate_bootstrap_governance(&cred, &requirement_for_basic(), within_ttl);
-    assert!(result.eligible, "Bootstrap agent should pass basic: {:?}", result.reasons);
+    assert!(
+        result.eligible,
+        "Bootstrap agent should pass basic: {:?}",
+        result.reasons
+    );
 
     // After 15 minutes, bootstrap credential expires
     let past_ttl = BASE_US + BOOTSTRAP_TTL_US + 1;
     let expired_result = evaluate_bootstrap_governance(&cred, &requirement_for_basic(), past_ttl);
-    assert!(!expired_result.eligible, "Expired bootstrap should be rejected");
+    assert!(
+        !expired_result.eligible,
+        "Expired bootstrap should be rejected"
+    );
 }
 
 // ============================================================================
@@ -535,7 +668,12 @@ fn test_vote_weight_continuous_gradient() {
     let weights: Vec<f64> = (0..=10)
         .map(|i| {
             let score = i as f64 / 10.0;
-            let p = ConsciousnessProfile { identity: score, reputation: score, community: score, engagement: score };
+            let p = ConsciousnessProfile {
+                identity: score,
+                reputation: score,
+                community: score,
+                engagement: score,
+            };
             p.vote_weight_continuous()
         })
         .collect();
@@ -545,7 +683,10 @@ fn test_vote_weight_continuous_gradient() {
         assert!(
             weights[i] >= weights[i - 1],
             "vote weight should be monotonic: w[{}]={} < w[{}]={}",
-            i, weights[i], i - 1, weights[i - 1]
+            i,
+            weights[i],
+            i - 1,
+            weights[i - 1]
         );
     }
 }

@@ -1,0 +1,112 @@
+{
+  "metadata": {
+    "title": "Computational Cognition & AI Stewardship",
+    "framework": "Symthaea Core",
+    "source": "https://mycelix.org",
+    "grade_level": "Undergraduate/Graduate",
+    "subject_area": "Cognitive Science",
+    "domain": "Symthaea",
+    "version": "1.0",
+    "total_standards": 5,
+    "domains": [
+      "Active Inference",
+      "Semantic Mapping",
+      "AI Alignment"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Technical deep-dive into the Symthaea cognitive substrate."
+  },
+  "nodes": [
+    {
+      "id": "SYM-ADV-101",
+      "title": "Neural Homeostasis & FEP",
+      "description": "Mathematics of the Free Energy Principle. Minimizing variational free energy in neural state-spaces. Active Inference as a model for both biological and silicon cognition.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Active Inference",
+      "subdomain": "Computational Cognition",
+      "tags": ["math", "neuroscience", "fep", "ai"],
+      "estimated_hours": 90,
+      "grade_levels": ["Graduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Science"
+    },
+    {
+      "id": "SYM-ADV-201",
+      "title": "HDC Language Processing (Broca)",
+      "description": "Encoding and decoding communicative intent. How high-dimensional vectors are bound into semantic text-strings using autoregressive HDC models.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Semantic Mapping",
+      "subdomain": "Computational Cognition",
+      "tags": ["hdc", "linguistics", "nlp", "logic"],
+      "estimated_hours": 60,
+      "grade_levels": ["Graduate"],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "SYM-ADV-401",
+      "title": "EML Proof-Writing for Auditors",
+      "description": "Practical training for the Symthaea Auditor. How to draft formal mathematical proofs in Elementary Math Language to verify agent safety and alignment.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "AI Alignment",
+      "subdomain": "Computational Cognition",
+      "tags": ["eml", "audit", "logic", "formal-verification"],
+      "estimated_hours": 120,
+      "grade_levels": ["Doctoral"],
+      "bloom_level": "Create",
+      "subject_area": "Mathematics"
+    },
+    {
+      "id": "SYM-CAP-05",
+      "title": "The Steward AI Capstone",
+      "description": "Design, implement, and formally verify a local 'Pod Mentor' agent that assists a learning pod without violating the Moral Algebra axioms.",
+      "node_type": "Capstone",
+      "difficulty": "Expert",
+      "domain": "Universal",
+      "subdomain": "Computational Cognition",
+      "tags": ["capstone", "stewardship", "ai", "alignment"],
+      "estimated_hours": 270,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Create",
+      "subject_area": "Cognitive Science",
+      "holonic_capstone": {
+        "required_node_ids": ["SYM-ADV-101", "SYM-ADV-201", "SYM-ADV-401"],
+        "deliverable": "A functioning Steward AI node with a verified EML alignment proof and 5+ peer endorsements from a graduated Learning Pod.",
+        "min_peer_endorsements": 5
+      },
+      "alignment_vector": {
+        "ahimsa": 995,
+        "sovereignty_respect": 1000,
+        "truthfulness": 990,
+        "reciprocity": 950,
+        "epistemic_humility": 990
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "SYM-201",
+      "to": "SYM-ADV-101",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Active inference in neural networks requires foundational HDC logic."
+    },
+    {
+      "from": "SYM-ADV-101",
+      "to": "SYM-ADV-401",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "One cannot verify neural alignment without understanding neural homeostasis."
+    },
+    {
+      "from": "SCI-INFO-401",
+      "to": "SYM-ADV-201",
+      "edge_type": "Recommended",
+      "strength_permille": 700,
+      "rationale": "Information theory provides the limits for semantic density in HDC language processing."
+    }
+  ]
+}

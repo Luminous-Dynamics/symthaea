@@ -1058,7 +1058,8 @@ mod tests {
     // ═══════════════════════════════════════════════════════════════════════
 
     use crate::hdc::conjecture_engine::{
-        Conjecture, ConjectureEngine, ConjectureStatus, MathDomain, ObservedSequence,
+        attach_eml_metadata, Conjecture, ConjectureEngine, ConjectureStatus, MathDomain,
+        ObservedSequence,
     };
 
     fn make_verified_conjecture(formula: Expr, domain: MathDomain, source: &str) -> Conjecture {
@@ -1075,6 +1076,14 @@ mod tests {
             status: ConjectureStatus::FormallyVerified { proof_steps: 5 },
             confidence: 0.95,
             macro_promotion_tier: crate::hdc::conjecture_engine::MacroPromotionTier::Formal,
+            eml_compiled: None,
+            eml_metrics: None,
+            eml_verified_real: None,
+            eml_real_domain: None,
+            eml_verified_complex: None,
+            eml_constructive_compiled: None,
+            eml_constructive_metrics: None,
+            eml_verified_constructive_real: None,
         }
     }
 
@@ -1101,6 +1110,29 @@ mod tests {
             )),
             Box::new(Expr::Const(c)),
         )
+    }
+
+    fn strict_eml_fast_track_expr() -> Expr {
+        Expr::BinOp(
+            BinOp::Div,
+            Box::new(Expr::Func(
+                UnaryFn::Exp,
+                Box::new(Expr::Var("x".to_string())),
+            )),
+            Box::new(Expr::Var("y".to_string())),
+        )
+    }
+
+    fn constructive_eml_expr() -> Expr {
+        Expr::BinOp(
+            BinOp::Add,
+            Box::new(Expr::Var("x".to_string())),
+            Box::new(Expr::Var("y".to_string())),
+        )
+    }
+
+    fn simple_unary_strict_expr() -> Expr {
+        Expr::Func(UnaryFn::Exp, Box::new(Expr::Var("x".to_string())))
     }
 
     #[test]
@@ -1183,6 +1215,139 @@ mod tests {
             "Should detect cross-domain pattern, got diversity {}",
             max_diversity
         );
+    }
+
+    #[test]
+    fn test_reflect_prefers_strict_eml_macro_when_capacity_is_tight() {
+        let prims = make_primitives();
+        let mut engine = ConjectureEngine::new();
+        engine.enable_abstract_thought();
+        engine
+            .abstract_thought
+            .as_mut()
+            .expect("abstract thought enabled")
+            .dynamic_grammar
+            .max_operators = 1;
+
+        let strict_domains = [
+            (MathDomain::NumberTheory, "strict_nt"),
+            (MathDomain::Physics, "strict_phys"),
+            (MathDomain::Chemistry, "strict_chem"),
+        ];
+        for (domain, source) in strict_domains {
+            let mut conjecture =
+                make_verified_conjecture(strict_eml_fast_track_expr(), domain, source);
+            attach_eml_metadata(&mut conjecture);
+            assert!(
+                conjecture.eml_compiled.is_some(),
+                "strict test setup requires strict EML compilation"
+            );
+            engine.conjectures.push(conjecture);
+        }
+
+        let constructive_domains = [
+            (MathDomain::Biology, "constructive_bio"),
+            (MathDomain::Economics, "constructive_econ"),
+            (MathDomain::Combinatorics, "constructive_comb"),
+        ];
+        for (domain, source) in constructive_domains {
+            let mut conjecture = make_verified_conjecture(constructive_eml_expr(), domain, source);
+            attach_eml_metadata(&mut conjecture);
+            assert!(
+                conjecture.eml_constructive_compiled.is_some(),
+                "constructive test setup requires constructive EML compilation"
+            );
+            engine.conjectures.push(conjecture);
+        }
+
+        engine.reflect(&prims);
+
+        let macros = engine.macro_operators();
+        assert_eq!(
+            macros.len(),
+            1,
+            "operator cap should admit exactly one macro"
+        );
+        assert!(
+            macros[0].canonical.starts_with("eml:strict:"),
+            "strict EML macro should win under tight capacity, got {}",
+            macros[0].canonical
+        );
+    }
+
+    #[test]
+    fn test_reflect_macro_pool_metrics_capture_eml_mix_under_capacity() {
+        let prims = make_primitives();
+        let mut engine = ConjectureEngine::new();
+        engine.enable_abstract_thought();
+        engine
+            .abstract_thought
+            .as_mut()
+            .expect("abstract thought enabled")
+            .dynamic_grammar
+            .max_operators = 2;
+
+        let strict_domains = [
+            (MathDomain::NumberTheory, "strict_nt"),
+            (MathDomain::Physics, "strict_phys"),
+            (MathDomain::Chemistry, "strict_chem"),
+        ];
+        for (domain, source) in strict_domains {
+            let mut conjecture =
+                make_verified_conjecture(strict_eml_fast_track_expr(), domain, source);
+            attach_eml_metadata(&mut conjecture);
+            engine.conjectures.push(conjecture);
+        }
+
+        let constructive_domains = [
+            (MathDomain::Biology, "constructive_bio"),
+            (MathDomain::Economics, "constructive_econ"),
+            (MathDomain::Combinatorics, "constructive_comb"),
+        ];
+        for (domain, source) in constructive_domains {
+            let mut conjecture = make_verified_conjecture(constructive_eml_expr(), domain, source);
+            attach_eml_metadata(&mut conjecture);
+            engine.conjectures.push(conjecture);
+        }
+
+        let mut deferred = make_verified_conjecture(
+            simple_unary_strict_expr(),
+            MathDomain::InformationTheory,
+            "simple_unary_strict",
+        );
+        attach_eml_metadata(&mut deferred);
+        engine.conjectures.push(deferred);
+
+        engine.reflect(&prims);
+
+        let macros = engine.macro_operators();
+        assert_eq!(
+            macros.len(),
+            2,
+            "capacity cap should keep only two operators"
+        );
+        assert!(
+            macros[0].canonical.starts_with("eml:strict:"),
+            "strict EML macro should rank first, got {}",
+            macros[0].canonical
+        );
+        assert!(
+            macros[1].canonical.starts_with("eml:constructive:"),
+            "constructive EML macro should fill the second slot, got {}",
+            macros[1].canonical
+        );
+
+        let metrics = engine.macro_pool_metrics().expect("metrics available");
+        assert_eq!(metrics.total_operators, 2);
+        assert_eq!(metrics.formal_operators, 2);
+        assert_eq!(metrics.recurrent_operators, 0);
+        assert_eq!(metrics.used_operators, 0);
+        assert_eq!(metrics.total_promoted, 2);
+        assert!((metrics.avg_source_count - 3.0).abs() < 1e-9);
+        assert!((metrics.survival_rate - 1.0).abs() < 1e-9);
+        assert_eq!(metrics.signature_stats.len(), 1);
+        assert_eq!(metrics.signature_stats[0].signature, "x|y");
+        assert_eq!(metrics.signature_stats[0].operator_count, 2);
     }
 
     #[test]

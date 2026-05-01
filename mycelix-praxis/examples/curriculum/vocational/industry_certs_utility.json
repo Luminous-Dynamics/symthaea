@@ -1,0 +1,116 @@
+{
+  "metadata": {
+    "title": "Utility Professional Seed: High-Volume Readiness",
+    "framework": "Global Workforce Mesh",
+    "source": "https://mycelix.org/certs-utility",
+    "grade_level": "Professional/Entry",
+    "subject_area": "Multi-Sector",
+    "domain": "Professional Certification",
+    "version": "1.0",
+    "total_standards": 6,
+    "domains": [
+      "IT Support",
+      "Sales & CRM",
+      "Digital Marketing",
+      "Hospitality",
+      "Project Coordination"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Foundational certifications for high-volume entry-level employment."
+  },
+  "nodes": [
+    {
+      "id": "CERT-IT-GOOGLE-SUPPORT",
+      "title": "Google IT Support Professional Certificate",
+      "description": "Technical support fundamentals, computer networking, operating systems, system administration, and security. The industry standard for entry-level IT roles.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "IT Support",
+      "subdomain": "Certification Bridge",
+      "tags": ["google", "it-support", "helpdesk", "standard"],
+      "estimated_hours": 150,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "CERT-SALES-FORCE",
+      "title": "Salesforce Certified Associate",
+      "description": "Foundational knowledge of the Salesforce platform. CRM usage, data integrity, and business reporting. Mapping value topology to enterprise CRM.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Sales & CRM",
+      "subdomain": "Certification Bridge",
+      "tags": ["salesforce", "crm", "sales", "standard"],
+      "estimated_hours": 40,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Understand",
+      "subject_area": "Social Studies"
+    },
+    {
+      "id": "CERT-META-MARKETING",
+      "title": "Meta Certified Digital Marketing Associate",
+      "description": "Foundations of digital marketing and advertising on Meta platforms. Creating ads, campaign management, and reporting.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Digital Marketing",
+      "subdomain": "Certification Bridge",
+      "tags": ["meta", "marketing", "facebook", "standard"],
+      "estimated_hours": 30,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Social Studies"
+    },
+    {
+      "id": "CERT-CUL-HANDLER",
+      "title": "ServSafe Food Handler",
+      "description": "Essential food safety for front-line workers. Basic hygiene, cleaning and sanitizing, and time/temperature control.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Hospitality",
+      "subdomain": "Certification Bridge",
+      "tags": ["culinary", "food-safety", "entry-level", "standard"],
+      "estimated_hours": 8,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Health Sciences"
+    },
+    {
+      "id": "CERT-MGT-CAPM",
+      "title": "Certified Associate in Project Management (CAPM)",
+      "description": "Foundational project management knowledge. Understanding the lifecycle, terminology, and processes of project coordination.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Project Coordination",
+      "subdomain": "Certification Bridge",
+      "tags": ["management", "project", "pmp-entry", "standard"],
+      "estimated_hours": 60,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Understand",
+      "subject_area": "Social Studies"
+    }
+  ],
+  "edges": [
+    {
+      "from": "DIG-GEN-050",
+      "to": "CERT-IT-GOOGLE-SUPPORT",
+      "edge_type": "Recommended",
+      "strength_permille": 800,
+      "rationale": "The Cryptographic Mind provides the necessary intuition for Google IT security domains."
+    },
+    {
+      "from": "VOC-DT-201",
+      "to": "CERT-SALES-FORCE",
+      "edge_type": "Recommended",
+      "strength_permille": 600,
+      "rationale": "SME bookkeeping intuition maps directly to CRM data management and reporting."
+    },
+    {
+      "from": "VITA-101",
+      "to": "CERT-CUL-HANDLER",
+      "edge_type": "Recommended",
+      "strength_permille": 900,
+      "rationale": "Microbial sanitation mastery covers 90% of the ServSafe Food Handler syllabus."
+    }
+  ]
+}

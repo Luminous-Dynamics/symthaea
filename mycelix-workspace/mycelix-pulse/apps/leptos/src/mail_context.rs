@@ -8,9 +8,9 @@
 //! Includes optimistic actions (star, read, archive, delete) and real-time signals.
 
 use leptos::prelude::*;
-use wasm_bindgen_futures::spawn_local;
 use mail_leptos_types::*;
 use std::collections::HashMap;
+use wasm_bindgen_futures::spawn_local;
 
 use std::collections::HashSet;
 
@@ -72,7 +72,11 @@ pub struct MailCtx {
 
 impl MailCtx {
     pub fn unread_count(&self) -> usize {
-        self.inbox.get_untracked().iter().filter(|e| !e.is_read).count()
+        self.inbox
+            .get_untracked()
+            .iter()
+            .filter(|e| !e.is_read)
+            .count()
     }
 
     /// Get emails grouped by thread. Non-threaded emails get their own group.
@@ -89,39 +93,48 @@ impl MailCtx {
             }
         }
 
-        let mut result: Vec<ThreadView> = threads.into_iter().map(|(tid, mut msgs)| {
-            msgs.sort_by_key(|m| m.timestamp);
-            let subject = msgs.first()
-                .and_then(|m| m.subject.clone())
-                .unwrap_or_else(|| "(encrypted)".to_string())
-                // Strip "Re: " prefix for thread display
-                .trim_start_matches("Re: ").to_string();
-            let participants: Vec<String> = msgs.iter()
-                .filter_map(|m| m.sender_name.clone())
-                .collect::<Vec<_>>();
-            // Deduplicate
-            let mut unique_participants = Vec::new();
-            for p in &participants {
-                if !unique_participants.contains(p) {
-                    unique_participants.push(p.clone());
+        let mut result: Vec<ThreadView> = threads
+            .into_iter()
+            .map(|(tid, mut msgs)| {
+                msgs.sort_by_key(|m| m.timestamp);
+                let subject = msgs
+                    .first()
+                    .and_then(|m| m.subject.clone())
+                    .unwrap_or_else(|| "(encrypted)".to_string())
+                    // Strip "Re: " prefix for thread display
+                    .trim_start_matches("Re: ")
+                    .to_string();
+                let participants: Vec<String> = msgs
+                    .iter()
+                    .filter_map(|m| m.sender_name.clone())
+                    .collect::<Vec<_>>();
+                // Deduplicate
+                let mut unique_participants = Vec::new();
+                for p in &participants {
+                    if !unique_participants.contains(p) {
+                        unique_participants.push(p.clone());
+                    }
                 }
-            }
-            let last_activity = msgs.iter().map(|m| m.timestamp).max().unwrap_or(0);
-            let unread_count = msgs.iter().filter(|m| !m.is_read).count() as u32;
+                let last_activity = msgs.iter().map(|m| m.timestamp).max().unwrap_or(0);
+                let unread_count = msgs.iter().filter(|m| !m.is_read).count() as u32;
 
-            ThreadView {
-                thread_id: tid,
-                subject,
-                participants: unique_participants,
-                messages: msgs,
-                last_activity,
-                unread_count,
-            }
-        }).collect();
+                ThreadView {
+                    thread_id: tid,
+                    subject,
+                    participants: unique_participants,
+                    messages: msgs,
+                    last_activity,
+                    unread_count,
+                }
+            })
+            .collect();
 
         // Add standalone emails as single-message threads
         for email in standalone {
-            let subject = email.subject.clone().unwrap_or_else(|| "(encrypted)".to_string());
+            let subject = email
+                .subject
+                .clone()
+                .unwrap_or_else(|| "(encrypted)".to_string());
             let participants = email.sender_name.clone().into_iter().collect();
             let unread = if email.is_read { 0 } else { 1 };
             let ts = email.timestamp;
@@ -150,8 +163,16 @@ impl MailCtx {
     pub fn toggle_star(&self, hash: &str) {
         let hash = hash.to_string();
         // Fire karma event
-        if let Some(sender) = self.inbox.get_untracked().iter().find(|e| e.hash == hash).map(|e| e.sender.clone()) {
-            if let Ok(karma) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| crate::karma::use_karma())) {
+        if let Some(sender) = self
+            .inbox
+            .get_untracked()
+            .iter()
+            .find(|e| e.hash == hash)
+            .map(|e| e.sender.clone())
+        {
+            if let Ok(karma) =
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| crate::karma::use_karma()))
+            {
                 karma.record_event(&sender, crate::karma::KarmaEvent::Star);
             }
         }
@@ -164,11 +185,16 @@ impl MailCtx {
         let hc = use_holochain();
         let h = hash.clone();
         spawn_local(async move {
-            if hc.is_mock() { return; }
-            let _ = hc.call_zome::<serde_json::Value, serde_json::Value>(
-                "mail_messages", "update_email_state",
-                &serde_json::json!([h, { "is_starred": true }]),
-            ).await;
+            if hc.is_mock() {
+                return;
+            }
+            let _ = hc
+                .call_zome::<serde_json::Value, serde_json::Value>(
+                    "mail_messages",
+                    "update_email_state",
+                    &serde_json::json!([h, { "is_starred": true }]),
+                )
+                .await;
         });
     }
 
@@ -182,11 +208,16 @@ impl MailCtx {
         let hc = use_holochain();
         let h = hash.clone();
         spawn_local(async move {
-            if hc.is_mock() { return; }
-            let _ = hc.call_zome::<serde_json::Value, serde_json::Value>(
-                "mail_messages", "mark_as_read",
-                &serde_json::json!([h, false]),
-            ).await;
+            if hc.is_mock() {
+                return;
+            }
+            let _ = hc
+                .call_zome::<serde_json::Value, serde_json::Value>(
+                    "mail_messages",
+                    "mark_as_read",
+                    &serde_json::json!([h, false]),
+                )
+                .await;
         });
     }
 
@@ -198,11 +229,16 @@ impl MailCtx {
         let hc = use_holochain();
         let h = hash.clone();
         spawn_local(async move {
-            if hc.is_mock() { return; }
-            let _ = hc.call_zome::<serde_json::Value, serde_json::Value>(
-                "mail_messages", "update_email_state",
-                &serde_json::json!([h, { "is_archived": true }]),
-            ).await;
+            if hc.is_mock() {
+                return;
+            }
+            let _ = hc
+                .call_zome::<serde_json::Value, serde_json::Value>(
+                    "mail_messages",
+                    "update_email_state",
+                    &serde_json::json!([h, { "is_archived": true }]),
+                )
+                .await;
         });
     }
 
@@ -214,11 +250,16 @@ impl MailCtx {
         let hc = use_holochain();
         let h = hash.clone();
         spawn_local(async move {
-            if hc.is_mock() { return; }
-            let _ = hc.call_zome::<serde_json::Value, serde_json::Value>(
-                "mail_messages", "update_email_state",
-                &serde_json::json!([h, { "is_trashed": true }]),
-            ).await;
+            if hc.is_mock() {
+                return;
+            }
+            let _ = hc
+                .call_zome::<serde_json::Value, serde_json::Value>(
+                    "mail_messages",
+                    "update_email_state",
+                    &serde_json::json!([h, { "is_trashed": true }]),
+                )
+                .await;
         });
     }
 
@@ -248,7 +289,10 @@ impl MailCtx {
         let hash = hash.to_string();
         self.inbox.update(|emails| {
             // Find the thread_id of this email
-            let tid = emails.iter().find(|e| e.hash == hash).and_then(|e| e.thread_id.clone());
+            let tid = emails
+                .iter()
+                .find(|e| e.hash == hash)
+                .and_then(|e| e.thread_id.clone());
             if let Some(tid) = tid {
                 for e in emails.iter_mut() {
                     if e.thread_id.as_deref() == Some(&tid) {
@@ -301,9 +345,17 @@ impl MailCtx {
 
     /// Get the default signature for new/reply emails.
     pub fn default_signature(&self, is_reply: bool) -> Option<String> {
-        self.signatures.get_untracked().iter().find(|s| {
-            if is_reply { s.use_for_reply } else { s.use_for_new }
-        }).map(|s| s.body_html.clone())
+        self.signatures
+            .get_untracked()
+            .iter()
+            .find(|s| {
+                if is_reply {
+                    s.use_for_reply
+                } else {
+                    s.use_for_new
+                }
+            })
+            .map(|s| s.body_html.clone())
     }
 
     /// Move email to a different folder (#7).
@@ -315,11 +367,16 @@ impl MailCtx {
         });
         let hc = use_holochain();
         spawn_local(async move {
-            if hc.is_mock() { return; }
-            let _ = hc.call_zome::<serde_json::Value, serde_json::Value>(
-                "mail_messages", "move_to_folder",
-                &serde_json::json!([hash, folder]),
-            ).await;
+            if hc.is_mock() {
+                return;
+            }
+            let _ = hc
+                .call_zome::<serde_json::Value, serde_json::Value>(
+                    "mail_messages",
+                    "move_to_folder",
+                    &serde_json::json!([hash, folder]),
+                )
+                .await;
         });
     }
 
@@ -328,12 +385,19 @@ impl MailCtx {
     pub fn toggle_selection(&self, hash: &str) {
         let hash = hash.to_string();
         self.selected_hashes.update(|set| {
-            if !set.remove(&hash) { set.insert(hash); }
+            if !set.remove(&hash) {
+                set.insert(hash);
+            }
         });
     }
 
     pub fn select_all(&self) {
-        let hashes: HashSet<String> = self.inbox.get_untracked().iter().map(|e| e.hash.clone()).collect();
+        let hashes: HashSet<String> = self
+            .inbox
+            .get_untracked()
+            .iter()
+            .map(|e| e.hash.clone())
+            .collect();
         self.selected_hashes.set(hashes);
     }
 
@@ -384,7 +448,14 @@ impl MailCtx {
     /// Handle incoming real-time signal from conductor.
     pub fn handle_signal(&self, signal: MailSignalView) {
         match signal {
-            MailSignalView::EmailReceived { email_hash, sender, sender_name, subject, timestamp, priority } => {
+            MailSignalView::EmailReceived {
+                email_hash,
+                sender,
+                sender_name,
+                subject,
+                timestamp,
+                priority,
+            } => {
                 // Desktop notification + sound
                 crate::notifications::show_desktop_notification(
                     sender_name.as_deref().unwrap_or(&sender),
@@ -393,52 +464,70 @@ impl MailCtx {
                 crate::notifications::play_notification_sound();
 
                 self.inbox.update(|emails| {
-                    emails.insert(0, EmailListItem {
-                        hash: email_hash,
-                        sender: sender.clone(),
-                        sender_name,
-                        encrypted_subject: vec![],
-                        subject,
-                        snippet: None,
-                        timestamp,
-                        priority,
-                        is_read: false,
-                        is_starred: false,
-                        star_type: None,
-                        is_pinned: false,
-                        is_muted: false,
-                        is_snoozed: false,
-                        snooze_until: None,
-                        has_attachments: false,
-                        labels: vec![],
-                        thread_id: None,
-                        crypto_suite: CryptoSuiteView {
-                            key_exchange: "x25519".into(),
-                            symmetric: "chacha20-poly1305".into(),
-                            signature: "ed25519".into(),
+                    emails.insert(
+                        0,
+                        EmailListItem {
+                            hash: email_hash,
+                            sender: sender.clone(),
+                            sender_name,
+                            encrypted_subject: vec![],
+                            subject,
+                            snippet: None,
+                            timestamp,
+                            priority,
+                            is_read: false,
+                            is_starred: false,
+                            star_type: None,
+                            is_pinned: false,
+                            is_muted: false,
+                            is_snoozed: false,
+                            snooze_until: None,
+                            has_attachments: false,
+                            labels: vec![],
+                            thread_id: None,
+                            crypto_suite: CryptoSuiteView {
+                                key_exchange: "x25519".into(),
+                                symmetric: "chacha20-poly1305".into(),
+                                signature: "ed25519".into(),
+                            },
                         },
-                    });
+                    );
                 });
             }
-            MailSignalView::EmailStateChanged { email_hash, is_read, is_starred, is_archived, is_trashed } => {
+            MailSignalView::EmailStateChanged {
+                email_hash,
+                is_read,
+                is_starred,
+                is_archived,
+                is_trashed,
+            } => {
                 if is_archived == Some(true) || is_trashed == Some(true) {
-                    self.inbox.update(|emails| emails.retain(|e| e.hash != email_hash));
+                    self.inbox
+                        .update(|emails| emails.retain(|e| e.hash != email_hash));
                 } else {
                     self.inbox.update(|emails| {
                         if let Some(e) = emails.iter_mut().find(|e| e.hash == email_hash) {
-                            if let Some(r) = is_read { e.is_read = r; }
-                            if let Some(s) = is_starred { e.is_starred = s; }
+                            if let Some(r) = is_read {
+                                e.is_read = r;
+                            }
+                            if let Some(s) = is_starred {
+                                e.is_starred = s;
+                            }
                         }
                     });
                 }
             }
             MailSignalView::TypingIndicator { sender, thread_id } => {
-                self.typing_indicators.update(|m| { m.insert(sender.clone(), thread_id); });
+                self.typing_indicators.update(|m| {
+                    m.insert(sender.clone(), thread_id);
+                });
                 // Auto-clear after 3 seconds
                 let indicators = self.typing_indicators;
                 spawn_local(async move {
                     gloo_timers::future::sleep(std::time::Duration::from_secs(3)).await;
-                    indicators.update(|m| { m.remove(&sender); });
+                    indicators.update(|m| {
+                        m.remove(&sender);
+                    });
                 });
             }
             MailSignalView::ReadReceiptReceived { .. } => {
@@ -459,7 +548,11 @@ pub fn provide_mail_context() {
     let demo = is_demo_mode();
     let ctx = MailCtx {
         versions,
-        folders: RwSignal::new(if demo { mock_data::mock_folders() } else { vec![] }),
+        folders: RwSignal::new(if demo {
+            mock_data::mock_folders()
+        } else {
+            vec![]
+        }),
         inbox: RwSignal::new(if demo {
             mock_data::mock_inbox()
         } else {
@@ -467,15 +560,27 @@ pub fn provide_mail_context() {
             vec![]
         }),
         sent: RwSignal::new(vec![]),
-        contacts: RwSignal::new(if demo { mock_data::mock_contacts() } else { vec![] }),
-        drafts: RwSignal::new(if demo { mock_data::mock_drafts() } else { vec![] }),
+        contacts: RwSignal::new(if demo {
+            mock_data::mock_contacts()
+        } else {
+            vec![]
+        }),
+        drafts: RwSignal::new(if demo {
+            mock_data::mock_drafts()
+        } else {
+            vec![]
+        }),
         key_status: RwSignal::new(BundleStatus::NoBundle),
         active_folder: RwSignal::new("Inbox".to_string()),
         selected_email: RwSignal::new(None),
         compose_mode: RwSignal::new(ComposeMode::New),
         search_query: RwSignal::new(String::new()),
         loading: RwSignal::new(true),
-        sender_trust: RwSignal::new(if demo { mock_data::mock_sender_trust() } else { HashMap::new() }),
+        sender_trust: RwSignal::new(if demo {
+            mock_data::mock_sender_trust()
+        } else {
+            HashMap::new()
+        }),
         typing_indicators: RwSignal::new(HashMap::new()),
         selected_hashes: RwSignal::new(HashSet::new()),
         labels: RwSignal::new(mock_data::mock_labels()),
@@ -523,7 +628,14 @@ pub fn provide_mail_context() {
             if status != crate::holochain::ConnectionStatus::Connecting {
                 break;
             }
-            web_sys::console::log_1(&format!("[Mail] Waiting for conductor (attempt {}, {}ms)...", attempt + 1, delay_ms).into());
+            web_sys::console::log_1(
+                &format!(
+                    "[Mail] Waiting for conductor (attempt {}, {}ms)...",
+                    attempt + 1,
+                    delay_ms
+                )
+                .into(),
+            );
             gloo_timers::future::sleep(std::time::Duration::from_millis(delay_ms)).await;
             delay_ms = (delay_ms * 2).min(5000); // exponential backoff, max 5s
         }
@@ -541,7 +653,9 @@ pub fn provide_mail_context() {
             web_sys::console::log_1(&"[Mail] Conductor not available — waiting...".into());
             gloo_timers::future::sleep(std::time::Duration::from_secs(10)).await;
             if hc_load.status.get_untracked() == crate::holochain::ConnectionStatus::Connected {
-                web_sys::console::log_1(&"[Mail] Late conductor connection — loading data...".into());
+                web_sys::console::log_1(
+                    &"[Mail] Late conductor connection — loading data...".into(),
+                );
                 load_live_mail_data(ctx_load.clone(), &hc_load).await;
             }
             ctx_load.loading.set(false);
@@ -551,22 +665,24 @@ pub fn provide_mail_context() {
     // Reactive: watch connection status — reload data if conductor connects later
     let ctx_reactive = ctx.clone();
     let hc_reactive = hc.clone();
-    Effect::new(move |prev_status: Option<crate::holochain::ConnectionStatus>| {
-        let current = hc_reactive.status.get();
-        if prev_status == Some(crate::holochain::ConnectionStatus::Mock)
-            && current == crate::holochain::ConnectionStatus::Connected
-        {
-            web_sys::console::log_1(&"[Mail] Conductor connected! Reloading data...".into());
-            let ctx = ctx_reactive.clone();
-            let hc = hc_reactive.clone();
-            spawn_local(async move {
-                load_live_mail_data(ctx.clone(), &hc).await;
-                crate::offline::flush_queue();
-                ctx.loading.set(false);
-            });
-        }
-        current
-    });
+    Effect::new(
+        move |prev_status: Option<crate::holochain::ConnectionStatus>| {
+            let current = hc_reactive.status.get();
+            if prev_status == Some(crate::holochain::ConnectionStatus::Mock)
+                && current == crate::holochain::ConnectionStatus::Connected
+            {
+                web_sys::console::log_1(&"[Mail] Conductor connected! Reloading data...".into());
+                let ctx = ctx_reactive.clone();
+                let hc = hc_reactive.clone();
+                spawn_local(async move {
+                    load_live_mail_data(ctx.clone(), &hc).await;
+                    crate::offline::flush_queue();
+                    ctx.loading.set(false);
+                });
+            }
+            current
+        },
+    );
 
     // Reactive refresh hooks for explicit UI-triggered version bumps.
     let ctx_versions = ctx.clone();
@@ -578,7 +694,9 @@ pub fn provide_mail_context() {
             ctx_versions.versions.folders.get(),
         );
 
-        if prev.is_some() && hc_versions.status.get_untracked() == crate::holochain::ConnectionStatus::Connected {
+        if prev.is_some()
+            && hc_versions.status.get_untracked() == crate::holochain::ConnectionStatus::Connected
+        {
             let ctx = ctx_versions.clone();
             let hc = hc_versions.clone();
             spawn_local(async move {
@@ -597,11 +715,15 @@ pub fn provide_mail_context() {
             .or_else(|_| serde_json::from_slice::<MailSignalView>(&bytes));
         match signal {
             Ok(sig) => {
-                web_sys::console::log_1(&format!("[Mail] Signal received: {:?}", std::mem::discriminant(&sig)).into());
+                web_sys::console::log_1(
+                    &format!("[Mail] Signal received: {:?}", std::mem::discriminant(&sig)).into(),
+                );
                 ctx_signals.handle_signal(sig);
             }
             Err(_) => {
-                web_sys::console::log_1(&format!("[Mail] Unrecognized signal ({} bytes)", bytes.len()).into());
+                web_sys::console::log_1(
+                    &format!("[Mail] Unrecognized signal ({} bytes)", bytes.len()).into(),
+                );
             }
         }
     });
@@ -616,28 +738,47 @@ async fn load_inbox(ctx: MailCtx, hc: &crate::holochain::HolochainCtx) {
     web_sys::console::log_1(&"[Mail] Fetching inbox from conductor...".into());
 
     // Try structured response first, fall back to raw JSON logging
-    match hc.call_zome::<serde_json::Value, serde_json::Value>(
-        "mail_messages", "get_inbox", &serde_json::json!({ "limit": 50 })
-    ).await {
+    match hc
+        .call_zome::<serde_json::Value, serde_json::Value>(
+            "mail_messages",
+            "get_inbox",
+            &serde_json::json!({ "limit": 50 }),
+        )
+        .await
+    {
         Ok(response) => {
-            web_sys::console::log_1(&format!("[Mail] get_inbox raw response: {}",
-                serde_json::to_string_pretty(&response).unwrap_or_else(|_| format!("{response:?}"))
-            ).into());
+            web_sys::console::log_1(
+                &format!(
+                    "[Mail] get_inbox raw response: {}",
+                    serde_json::to_string_pretty(&response)
+                        .unwrap_or_else(|_| format!("{response:?}"))
+                )
+                .into(),
+            );
 
             // Try adapter wire types first, then direct parse, then raw JSON
             let wire_data = if response.is_array() {
                 response.clone()
             } else {
-                response.get("records").or(response.get("items")).or(response.get("data"))
-                    .cloned().unwrap_or(serde_json::Value::Null)
+                response
+                    .get("records")
+                    .or(response.get("items"))
+                    .or(response.get("data"))
+                    .cloned()
+                    .unwrap_or(serde_json::Value::Null)
             };
 
             // Attempt 1: Parse as wire types and adapt
-            if let Ok(wire_emails) = serde_json::from_value::<Vec<crate::zome_adapter::WireEmailListItem>>(wire_data.clone()) {
+            if let Ok(wire_emails) = serde_json::from_value::<
+                Vec<crate::zome_adapter::WireEmailListItem>,
+            >(wire_data.clone())
+            {
                 let contacts = ctx.contacts.get_untracked();
                 let emails = crate::zome_adapter::adapt_inbox(wire_emails, &contacts);
                 if !emails.is_empty() {
-                    web_sys::console::log_1(&format!("[Mail] Loaded {} emails via adapter", emails.len()).into());
+                    web_sys::console::log_1(
+                        &format!("[Mail] Loaded {} emails via adapter", emails.len()).into(),
+                    );
                     ctx.inbox.set(emails);
                     hydrate_inbox_previews(ctx.clone(), hc.clone());
                 } else {
@@ -647,31 +788,41 @@ async fn load_inbox(ctx: MailCtx, hc: &crate::holochain::HolochainCtx) {
             // Attempt 2: Direct parse (if zome returns frontend-compatible types)
             else if let Ok(emails) = serde_json::from_value::<Vec<EmailListItem>>(wire_data) {
                 if !emails.is_empty() {
-                    web_sys::console::log_1(&format!("[Mail] Loaded {} emails (direct)", emails.len()).into());
+                    web_sys::console::log_1(
+                        &format!("[Mail] Loaded {} emails (direct)", emails.len()).into(),
+                    );
                     ctx.inbox.set(emails);
                     hydrate_inbox_previews(ctx.clone(), hc.clone());
                 }
             } else {
-                web_sys::console::warn_1(&"[Mail] Could not parse inbox response. Keeping mock data.".into());
+                web_sys::console::warn_1(
+                    &"[Mail] Could not parse inbox response. Keeping mock data.".into(),
+                );
             }
         }
         Err(e) => {
-            web_sys::console::warn_1(&format!("[Mail] get_inbox zome call failed: {e}. Keeping mock data.").into());
+            web_sys::console::warn_1(
+                &format!("[Mail] get_inbox zome call failed: {e}. Keeping mock data.").into(),
+            );
         }
     }
 }
 
 async fn load_contacts(ctx: MailCtx, hc: &crate::holochain::HolochainCtx) {
-    if hc.is_mock() { return; }
+    if hc.is_mock() {
+        return;
+    }
 
-    match hc.call_zome::<(), Vec<serde_json::Value>>(
-        "mail_contacts", "get_all_contacts", &()
-    ).await {
+    match hc
+        .call_zome::<(), Vec<serde_json::Value>>("mail_contacts", "get_all_contacts", &())
+        .await
+    {
         Ok(records) => {
             let contacts = crate::zome_adapter::adapt_contact_values(records);
 
             // Build sender trust map from contacts
-            let trust_map: HashMap<String, f64> = contacts.iter()
+            let trust_map: HashMap<String, f64> = contacts
+                .iter()
                 .filter_map(|c| {
                     let key = c.agent_pub_key.as_ref()?;
                     let score = c.trust_score?;
@@ -689,17 +840,25 @@ async fn load_contacts(ctx: MailCtx, hc: &crate::holochain::HolochainCtx) {
 }
 
 async fn load_folders(ctx: MailCtx, hc: &crate::holochain::HolochainCtx) {
-    if hc.is_mock() { return; }
+    if hc.is_mock() {
+        return;
+    }
 
     web_sys::console::log_1(&"[Mail] Fetching folders from conductor...".into());
 
-    match hc.call_zome::<(), serde_json::Value>(
-        "mail_messages", "get_folders", &()
-    ).await {
+    match hc
+        .call_zome::<(), serde_json::Value>("mail_messages", "get_folders", &())
+        .await
+    {
         Ok(response) => {
-            web_sys::console::log_1(&format!("[Mail] get_folders raw: {}",
-                serde_json::to_string_pretty(&response).unwrap_or_else(|_| format!("{response:?}"))
-            ).into());
+            web_sys::console::log_1(
+                &format!(
+                    "[Mail] get_folders raw: {}",
+                    serde_json::to_string_pretty(&response)
+                        .unwrap_or_else(|_| format!("{response:?}"))
+                )
+                .into(),
+            );
 
             let folders_result = if response.is_array() {
                 serde_json::from_value::<Vec<FolderView>>(response.clone())
@@ -711,25 +870,34 @@ async fn load_folders(ctx: MailCtx, hc: &crate::holochain::HolochainCtx) {
 
             match folders_result {
                 Ok(folders) if !folders.is_empty() => {
-                    web_sys::console::log_1(&format!("[Mail] Loaded {} folders from conductor", folders.len()).into());
+                    web_sys::console::log_1(
+                        &format!("[Mail] Loaded {} folders from conductor", folders.len()).into(),
+                    );
                     ctx.folders.set(folders);
                 }
                 Ok(_) => web_sys::console::log_1(&"[Mail] Conductor returned empty folders".into()),
-                Err(e) => web_sys::console::warn_1(&format!("[Mail] Could not parse folders: {e}. Keeping mock data.").into()),
+                Err(e) => web_sys::console::warn_1(
+                    &format!("[Mail] Could not parse folders: {e}. Keeping mock data.").into(),
+                ),
             }
         }
         Err(e) => {
-            web_sys::console::warn_1(&format!("[Mail] get_folders failed: {e}. Keeping mock data.").into());
+            web_sys::console::warn_1(
+                &format!("[Mail] get_folders failed: {e}. Keeping mock data.").into(),
+            );
         }
     }
 }
 
 async fn load_key_status(ctx: MailCtx, hc: &crate::holochain::HolochainCtx) {
-    if hc.is_mock() { return; }
+    if hc.is_mock() {
+        return;
+    }
 
-    match hc.call_zome::<(), serde_json::Value>(
-        "mail_keys", "needs_refresh", &()
-    ).await {
+    match hc
+        .call_zome::<(), serde_json::Value>("mail_keys", "needs_refresh", &())
+        .await
+    {
         Ok(record) => {
             if let Ok(status) = serde_json::from_value::<BundleStatus>(record) {
                 ctx.key_status.set(status);
@@ -744,21 +912,35 @@ async fn load_key_status(ctx: MailCtx, hc: &crate::holochain::HolochainCtx) {
 /// Initialize CRDT sync state on the conductor.
 async fn init_sync(hc: &crate::holochain::HolochainCtx) {
     // Initialize sync state if not already done
-    match hc.call_zome::<(), serde_json::Value>("mail_sync", "get_sync_state", &()).await {
+    match hc
+        .call_zome::<(), serde_json::Value>("mail_sync", "get_sync_state", &())
+        .await
+    {
         Ok(val) if val.is_null() => {
             web_sys::console::log_1(&"[Mail] Initializing sync state...".into());
-            let _ = hc.call_zome::<(), serde_json::Value>("mail_sync", "init_sync_state", &()).await;
-            let _ = hc.call_zome::<bool, ()>("mail_sync", "set_online_status", &true).await;
+            let _ = hc
+                .call_zome::<(), serde_json::Value>("mail_sync", "init_sync_state", &())
+                .await;
+            let _ = hc
+                .call_zome::<bool, ()>("mail_sync", "set_online_status", &true)
+                .await;
         }
         Ok(_) => {
             // Sync state exists, mark online
-            let _ = hc.call_zome::<bool, ()>("mail_sync", "set_online_status", &true).await;
+            let _ = hc
+                .call_zome::<bool, ()>("mail_sync", "set_online_status", &true)
+                .await;
             // Process any queued offline operations
-            match hc.call_zome::<(), serde_json::Value>("mail_sync", "process_offline_queue", &()).await {
+            match hc
+                .call_zome::<(), serde_json::Value>("mail_sync", "process_offline_queue", &())
+                .await
+            {
                 Ok(val) => {
                     if let Some(n) = val.as_u64() {
                         if n > 0 {
-                            web_sys::console::log_1(&format!("[Mail] Processed {n} offline operations").into());
+                            web_sys::console::log_1(
+                                &format!("[Mail] Processed {n} offline operations").into(),
+                            );
                         }
                     }
                 }
@@ -773,7 +955,9 @@ async fn init_sync(hc: &crate::holochain::HolochainCtx) {
 
 /// Load trust scores for known agents.
 async fn load_trust_scores(ctx: MailCtx, hc: &crate::holochain::HolochainCtx) {
-    if hc.is_mock() { return; }
+    if hc.is_mock() {
+        return;
+    }
 
     // Get trust scores for each contact's agent key
     let contacts = ctx.contacts.get_untracked();
@@ -781,9 +965,14 @@ async fn load_trust_scores(ctx: MailCtx, hc: &crate::holochain::HolochainCtx) {
 
     for contact in &contacts {
         if let Some(agent_key) = &contact.agent_pub_key {
-            match hc.call_zome::<serde_json::Value, serde_json::Value>(
-                "mail_trust", "get_trust_score", &serde_json::json!(agent_key)
-            ).await {
+            match hc
+                .call_zome::<serde_json::Value, serde_json::Value>(
+                    "mail_trust",
+                    "get_trust_score",
+                    &serde_json::json!(agent_key),
+                )
+                .await
+            {
                 Ok(score_val) => {
                     if let Some(score) = score_val.get("score").and_then(|s| s.as_f64()) {
                         trust_map.insert(agent_key.clone(), score);
@@ -830,11 +1019,14 @@ fn hydrate_inbox_previews(ctx: MailCtx, hc: crate::holochain::HolochainCtx) {
             .collect();
 
         for hash in hashes {
-            let response = match hc.call_zome::<serde_json::Value, serde_json::Value>(
-                "mail_messages",
-                "get_email",
-                &serde_json::json!(hash.clone()),
-            ).await {
+            let response = match hc
+                .call_zome::<serde_json::Value, serde_json::Value>(
+                    "mail_messages",
+                    "get_email",
+                    &serde_json::json!(hash.clone()),
+                )
+                .await
+            {
                 Ok(value) if !value.is_null() => value,
                 _ => continue,
             };
@@ -842,28 +1034,47 @@ fn hydrate_inbox_previews(ctx: MailCtx, hc: crate::holochain::HolochainCtx) {
             let encrypted_subject = response
                 .get("encrypted_subject")
                 .and_then(|v| v.as_array())
-                .map(|arr| arr.iter().filter_map(|v| v.as_u64().map(|n| n as u8)).collect::<Vec<_>>())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_u64().map(|n| n as u8))
+                        .collect::<Vec<_>>()
+                })
                 .unwrap_or_default();
             let encrypted_body = response
                 .get("encrypted_body")
                 .and_then(|v| v.as_array())
-                .map(|arr| arr.iter().filter_map(|v| v.as_u64().map(|n| n as u8)).collect::<Vec<_>>())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_u64().map(|n| n as u8))
+                        .collect::<Vec<_>>()
+                })
                 .unwrap_or_default();
             let ephemeral_pubkey = response
                 .get("ephemeral_pubkey")
                 .and_then(|v| v.as_array())
-                .map(|arr| arr.iter().filter_map(|v| v.as_u64().map(|n| n as u8)).collect::<Vec<_>>())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_u64().map(|n| n as u8))
+                        .collect::<Vec<_>>()
+                })
                 .unwrap_or_default();
             let nonce = response
                 .get("nonce")
                 .and_then(|v| v.as_array())
-                .map(|arr| arr.iter().filter_map(|v| v.as_u64().map(|n| n as u8)).collect::<Vec<_>>())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_u64().map(|n| n as u8))
+                        .collect::<Vec<_>>()
+                })
                 .unwrap_or_default();
 
             let mut subject = crate::crypto::decode_transport_text(&encrypted_subject);
             let mut body = crate::crypto::decode_transport_text(&encrypted_body);
 
-            if (subject.is_none() || body.is_none()) && ephemeral_pubkey.len() == 32 && nonce.len() == 24 {
+            if (subject.is_none() || body.is_none())
+                && ephemeral_pubkey.len() == 32
+                && nonce.len() == 24
+            {
                 if let Ok(crypto) = crate::crypto::derive_message_crypto_for_local_recipient(
                     &ephemeral_pubkey,
                     &nonce,
@@ -873,7 +1084,9 @@ fn hydrate_inbox_previews(ctx: MailCtx, hc: crate::holochain::HolochainCtx) {
                             &encrypted_subject,
                             &crypto.subject_key,
                             &crypto.nonce,
-                        ).await {
+                        )
+                        .await
+                        {
                             subject = String::from_utf8(bytes).ok();
                         }
                     }
@@ -883,7 +1096,9 @@ fn hydrate_inbox_previews(ctx: MailCtx, hc: crate::holochain::HolochainCtx) {
                             &encrypted_body,
                             &crypto.body_key,
                             &crypto.nonce,
-                        ).await {
+                        )
+                        .await
+                        {
                             body = String::from_utf8(bytes).ok();
                         }
                     }

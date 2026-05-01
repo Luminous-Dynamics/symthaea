@@ -54,6 +54,8 @@ fn bench_full_pipeline(c: &mut Criterion) {
             window_size: 50,
             min_samples: 10,
             regularization: 1e-6,
+            normalize_variance: true,
+            temporal_decorrelation: true,
         };
 
         // Pre-fill the window
@@ -80,6 +82,8 @@ fn bench_push(c: &mut Criterion) {
             window_size: 50,
             min_samples: 10,
             regularization: 1e-6,
+            normalize_variance: true,
+            temporal_decorrelation: true,
         };
         let mut finder = SpectralMIPFinder::new(config);
 
@@ -100,6 +104,8 @@ fn bench_hierarchical(c: &mut Criterion) {
             window_size: 50,
             min_samples: 10,
             regularization: 1e-6,
+            normalize_variance: true,
+            temporal_decorrelation: true,
         };
 
         let mut finder = SpectralMIPFinder::new(config);

@@ -35,11 +35,15 @@ const MIN_EMERGENCY_DECEL_MPS2: f64 = 4.0; // 4 m/s² minimum (soft target)
 const MAX_LANE_DEVIATION_M: f64 = 1.0; // 1m generous for simulation
 
 /// Convert mph to m/s.
-fn mph_to_mps(mph: f64) -> f64 { mph * 0.44704 }
+fn mph_to_mps(mph: f64) -> f64 {
+    mph * 0.44704
+}
 
 /// Convert m/s to mph.
 #[allow(dead_code)]
-fn mps_to_mph(mps: f64) -> f64 { mps / 0.44704 }
+fn mps_to_mph(mps: f64) -> f64 {
+    mps / 0.44704
+}
 
 // ═══════════════════════════════════════════════════════════════════════
 // Test 1: Emergency Brake at Urban Speed (25 mph ≈ 11 m/s)
@@ -57,7 +61,9 @@ fn aeb_urban_25mph() {
 
     // Accelerate to 25 mph using full throttle
     let accel_cmd = VehicleCommand {
-        steering: 0.0, throttle: 1.0, brake: 0.0,
+        steering: 0.0,
+        throttle: 1.0,
+        brake: 0.0,
     };
     let target_speed = mph_to_mps(25.0);
 
@@ -70,12 +76,19 @@ fn aeb_urban_25mph() {
     let initial_speed = sim.state().speed;
     let start_x = sim.state().position_x;
     let start_y = sim.state().position_y;
-    println!("  Reached {:.1} m/s ({:.1} mph) in {:.2}s", initial_speed, mps_to_mph(initial_speed), t);
+    println!(
+        "  Reached {:.1} m/s ({:.1} mph) in {:.2}s",
+        initial_speed,
+        mps_to_mph(initial_speed),
+        t
+    );
     println!("  Position: ({:.2}, {:.2})", start_x, start_y);
 
     // Apply emergency brake
     let brake_cmd = VehicleCommand {
-        steering: 0.0, throttle: 0.0, brake: 1.0,
+        steering: 0.0,
+        throttle: 0.0,
+        brake: 1.0,
     };
 
     let mut brake_t = 0.0;
@@ -100,16 +113,27 @@ fn aeb_urban_25mph() {
     println!("  Lane deviation:     {:.3}m", lane_deviation);
     println!();
     println!("  NHTSA urban (25mph) target: <12m stopping distance");
-    println!("  Symthaea result:            {:.1}m — {}",
+    println!(
+        "  Symthaea result:            {:.1}m — {}",
         stopping_distance,
-        if stopping_distance < 12.0 { "✓ MEETS SOTA" } else { "⚠️ BEYOND SOTA" });
+        if stopping_distance < 12.0 {
+            "✓ MEETS SOTA"
+        } else {
+            "⚠️ BEYOND SOTA"
+        }
+    );
     println!();
 
     // Invariants
-    assert!(final_speed < 0.5, "Should stop within 5 seconds: got {final_speed}");
+    assert!(
+        final_speed < 0.5,
+        "Should stop within 5 seconds: got {final_speed}"
+    );
     assert!(stopping_distance.is_finite());
-    assert!(lane_deviation < MAX_LANE_DEVIATION_M,
-        "Lane deviation {lane_deviation:.3} should be bounded");
+    assert!(
+        lane_deviation < MAX_LANE_DEVIATION_M,
+        "Lane deviation {lane_deviation:.3} should be bounded"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -128,7 +152,9 @@ fn aeb_highway_60mph() {
 
     // Accelerate to 60 mph
     let accel_cmd = VehicleCommand {
-        steering: 0.0, throttle: 1.0, brake: 0.0,
+        steering: 0.0,
+        throttle: 1.0,
+        brake: 0.0,
     };
     let target_speed = mph_to_mps(60.0);
 
@@ -140,11 +166,18 @@ fn aeb_highway_60mph() {
     }
     let initial_speed = sim.state().speed;
     let start_x = sim.state().position_x;
-    println!("  Reached {:.1} m/s ({:.1} mph) in {:.2}s", initial_speed, mps_to_mph(initial_speed), t);
+    println!(
+        "  Reached {:.1} m/s ({:.1} mph) in {:.2}s",
+        initial_speed,
+        mps_to_mph(initial_speed),
+        t
+    );
 
     // Apply emergency brake
     let brake_cmd = VehicleCommand {
-        steering: 0.0, throttle: 0.0, brake: 1.0,
+        steering: 0.0,
+        throttle: 0.0,
+        brake: 1.0,
     };
 
     let mut brake_t = 0.0;
@@ -159,7 +192,11 @@ fn aeb_highway_60mph() {
 
     println!();
     println!("▶ Highway emergency brake results:");
-    println!("  Initial speed:      {:.1} m/s ({:.1} mph)", initial_speed, mps_to_mph(initial_speed));
+    println!(
+        "  Initial speed:      {:.1} m/s ({:.1} mph)",
+        initial_speed,
+        mps_to_mph(initial_speed)
+    );
     println!("  Stopping time:      {:.3}s", stopping_time);
     println!("  Stopping distance:  {:.2}m", stopping_distance);
     println!("  Average deceleration: {:.2} m/s²", avg_decel);
@@ -168,9 +205,15 @@ fn aeb_highway_60mph() {
     // NHTSA highway AEB target: <50m from 50mph ≈ scaled: <72m from 60mph
     let sota_target = 72.0;
     println!("  SOTA target (60mph): <{}m", sota_target);
-    println!("  Symthaea result:    {:.1}m — {}",
+    println!(
+        "  Symthaea result:    {:.1}m — {}",
         stopping_distance,
-        if stopping_distance < sota_target { "✓ MEETS SOTA" } else { "⚠️ BEYOND SOTA" });
+        if stopping_distance < sota_target {
+            "✓ MEETS SOTA"
+        } else {
+            "⚠️ BEYOND SOTA"
+        }
+    );
 
     assert!(sim.state().speed < 0.5, "Should stop within 15 seconds");
 }
@@ -195,7 +238,9 @@ fn safe_fallback_preserves_braking_authority() {
 
     // Accelerate first
     let accel_cmd = VehicleCommand {
-        steering: 0.0, throttle: 1.0, brake: 0.0,
+        steering: 0.0,
+        throttle: 1.0,
+        brake: 0.0,
     };
     for _ in 0..500 {
         sim.step(&accel_cmd, 0.002);
@@ -227,7 +272,10 @@ fn safe_fallback_preserves_braking_authority() {
     println!("  Final speed:       {:.3} m/s", sim.state().speed);
     println!();
 
-    assert!(sim.state().speed < 0.5, "SafeFallback MUST stop the vehicle");
+    assert!(
+        sim.state().speed < 0.5,
+        "SafeFallback MUST stop the vehicle"
+    );
     assert!(stopping_distance.is_finite());
     println!("  ✓ SafeFallback successfully stopped the vehicle");
     println!("  This proves consciousness degradation does NOT compromise braking.");
@@ -254,7 +302,9 @@ fn naive_zero_force_fallback_is_unsafe() {
 
     // Accelerate to speed
     let accel_cmd = VehicleCommand {
-        steering: 0.0, throttle: 1.0, brake: 0.0,
+        steering: 0.0,
+        throttle: 1.0,
+        brake: 0.0,
     };
     for _ in 0..500 {
         sim.step(&accel_cmd, 0.002);
@@ -265,7 +315,9 @@ fn naive_zero_force_fallback_is_unsafe() {
 
     // Simulate naive "zero everything" fallback
     let zero_cmd = VehicleCommand {
-        steering: 0.0, throttle: 0.0, brake: 0.0, // NAIVE: no brakes
+        steering: 0.0,
+        throttle: 0.0,
+        brake: 0.0, // NAIVE: no brakes
     };
 
     println!("  Applying naive zero-force command for 5 seconds");
@@ -284,19 +336,27 @@ fn naive_zero_force_fallback_is_unsafe() {
     println!("  Final speed:     {:.1} m/s (coasting)", final_speed);
     println!("  Distance in 5s:  {:.2}m", distance_traveled);
     println!();
-    println!("  ⚠️  With naive zero-force, vehicle traveled {:.0}m",
-        distance_traveled);
-    println!("  ⚠️  In 5 seconds at {:.0} mph — deeply unsafe!",
-        mps_to_mph(initial_speed));
+    println!(
+        "  ⚠️  With naive zero-force, vehicle traveled {:.0}m",
+        distance_traveled
+    );
+    println!(
+        "  ⚠️  In 5 seconds at {:.0} mph — deeply unsafe!",
+        mps_to_mph(initial_speed)
+    );
     println!();
     println!("  This is WHY SafeFallback::brake=1.0 is mandatory.");
     println!();
 
     // The vehicle coasts with minimal deceleration (only rolling resistance)
-    assert!(final_speed > 1.0,
-        "Naive zero-force fallback should fail to stop the vehicle");
-    assert!(distance_traveled > 10.0,
-        "Without brakes, vehicle coasts dangerously far");
+    assert!(
+        final_speed > 1.0,
+        "Naive zero-force fallback should fail to stop the vehicle"
+    );
+    assert!(
+        distance_traveled > 10.0,
+        "Without brakes, vehicle coasts dangerously far"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -315,7 +375,14 @@ fn lane_stability_during_emergency_brake() {
 
     // Accelerate straight
     for _ in 0..500 {
-        sim.step(&VehicleCommand { steering: 0.0, throttle: 1.0, brake: 0.0 }, 0.002);
+        sim.step(
+            &VehicleCommand {
+                steering: 0.0,
+                throttle: 1.0,
+                brake: 0.0,
+            },
+            0.002,
+        );
     }
     let start_y = sim.state().position_y;
     let initial_speed = sim.state().speed;
@@ -324,9 +391,18 @@ fn lane_stability_during_emergency_brake() {
     let mut max_deviation: f64 = 0.0;
     let mut t = 0.0;
     while sim.state().speed > 0.1 && t < 10.0 {
-        sim.step(&VehicleCommand { steering: 0.0, throttle: 0.0, brake: 1.0 }, 0.002);
+        sim.step(
+            &VehicleCommand {
+                steering: 0.0,
+                throttle: 0.0,
+                brake: 1.0,
+            },
+            0.002,
+        );
         let deviation = (sim.state().position_y - start_y).abs();
-        if deviation > max_deviation { max_deviation = deviation; }
+        if deviation > max_deviation {
+            max_deviation = deviation;
+        }
         t += 0.002;
     }
 
@@ -334,11 +410,20 @@ fn lane_stability_during_emergency_brake() {
     println!("  Max lateral deviation: {:.4}m", max_deviation);
     println!();
     println!("  ISO 22179 target: <0.3m deviation during emergency");
-    println!("  Symthaea result:  {:.4}m — {}",
+    println!(
+        "  Symthaea result:  {:.4}m — {}",
         max_deviation,
-        if max_deviation < 0.3 { "✓ MEETS SOTA" } else { "⚠️ BEYOND SOTA" });
+        if max_deviation < 0.3 {
+            "✓ MEETS SOTA"
+        } else {
+            "⚠️ BEYOND SOTA"
+        }
+    );
     println!();
 
-    assert!(max_deviation < MAX_LANE_DEVIATION_M,
-        "Lane deviation must stay under {}m", MAX_LANE_DEVIATION_M);
+    assert!(
+        max_deviation < MAX_LANE_DEVIATION_M,
+        "Lane deviation must stay under {}m",
+        MAX_LANE_DEVIATION_M
+    );
 }

@@ -74,7 +74,12 @@ fn make_saga_steps() -> Vec<SagaStep> {
 
 #[test]
 fn test_saga_creation() {
-    let saga = SagaDefinition::new("property-sale", make_saga_steps(), BASE_US, 5 * 60 * 1_000_000);
+    let saga = SagaDefinition::new(
+        "property-sale",
+        make_saga_steps(),
+        BASE_US,
+        5 * 60 * 1_000_000,
+    );
     assert_eq!(saga.name, "property-sale");
     assert_eq!(saga.steps.len(), 3);
     assert_eq!(saga.current_step, 0);
@@ -338,7 +343,11 @@ fn test_offline_credential_custom_grace_period() {
     let offline = OfflineCredential::with_grace_hours(cred, 48);
     // Within custom 48h grace: full tier
     let tier = offline.effective_tier(BASE_US + 36 * HOUR_US);
-    assert_eq!(tier, ConsciousnessTier::Guardian, "Custom 48h grace should maintain tier");
+    assert_eq!(
+        tier,
+        ConsciousnessTier::Guardian,
+        "Custom 48h grace should maintain tier"
+    );
 }
 
 // ============================================================================
@@ -388,7 +397,10 @@ fn test_freshness_attestation_tampered_data_fails() {
     attestation.sign_blake3(&key);
     // Tamper with the tier
     attestation.tier_at_attestation = ConsciousnessTier::Guardian;
-    assert!(!attestation.verify_blake3(&key), "Tampered data should fail verification");
+    assert!(
+        !attestation.verify_blake3(&key),
+        "Tampered data should fail verification"
+    );
 }
 
 #[test]

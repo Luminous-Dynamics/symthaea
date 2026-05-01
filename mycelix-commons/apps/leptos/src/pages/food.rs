@@ -3,6 +3,7 @@
 
 use leptos::prelude::*;
 use crate::contexts::commons_context::use_commons;
+use crate::contexts::commons_actions;
 
 #[component]
 pub fn FoodPage() -> impl IntoView {
@@ -27,6 +28,60 @@ pub fn FoodPage() -> impl IntoView {
                             </div>
                         }
                     }).collect_view()}
+                </div>
+            </section>
+
+            <section data-section="soil" aria-label="soil health and compost">
+                <h2 class="section-title">"Soil & Compost"</h2>
+                <p class="section-subtitle">"regenerating the substrate of life through Terra Preta"</p>
+                
+                <div class="compost-grid" role="list">
+                    {move || commons.compost_batches.get().into_iter().map(|b| {
+                        view! {
+                            <div class="compost-card" data-compost-hash=b.hash.clone() data-status=b.status.to_lowercase() role="listitem">
+                                <h3 class="compost-name">{b.name}</h3>
+                                <div class="compost-type">{b.method}</div>
+                                <div class="compost-metrics">
+                                    <div class="metric">
+                                        <span class="label">"Temp"</span>
+                                        <span class="value">{format!("{:.1}°C", b.temperature_c)}</span>
+                                    </div>
+                                    <div class="metric">
+                                        <span class="label">"pH"</span>
+                                        <span class="value">{format!("{:.1}", b.ph)}</span>
+                                    </div>
+                                    <div class="metric highlight">
+                                        <span class="label">"CO2e Seq."</span>
+                                        <span class="value">{format!("{:.0}kg", b.carbon_seq_est)}</span>
+                                    </div>
+                                </div>
+                                <div class="compost-reward-box">
+                                    <span class="reward-label">"Potential Reward:"</span>
+                                    <span class="reward-value">{format!("{:.1} TEND", b.reward_tend)}</span>
+                                </div>
+                                <div class="compost-footer">
+                                    <div class="compost-status-tag">{b.status.clone()}</div>
+                                    {b.can_claim.then(|| {
+                                        let hash = b.hash.clone();
+                                        view! {
+                                            <button
+                                                class="btn-claim"
+                                                on:click=move |_| commons_actions::claim_compost_reward(hash.clone())
+                                            >
+                                                "Claim TEND"
+                                            </button>
+                                        }
+                                    })}
+                                </div>
+                            </div>
+                        }
+                    }).collect_view()}
+                </div>
+
+                <div class="recipe-promo">
+                    <h3>"Community Soil Recipes"</h3>
+                    <p>"Discover traditional practices for high-integrity Biochar charging and Bokashi fermentation."</p>
+                    <button class="btn-secondary">"View Recipes"</button>
                 </div>
             </section>
 

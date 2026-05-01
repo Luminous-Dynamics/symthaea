@@ -1,0 +1,141 @@
+{
+  "metadata": {
+    "title": "The Civilizational Synthesis: Global Mastery",
+    "framework": "Mycelix Synthesis",
+    "source": "https://mycelix.org",
+    "grade_level": "Lifelong/Doctoral",
+    "subject_area": "Global Stewardship",
+    "domain": "Synthesis",
+    "version": "1.0",
+    "total_standards": 6,
+    "domains": [
+      "Global Governance",
+      "Marine Ecology",
+      "Bio-Manufacturing",
+      "Quantum Epistemics"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "The final integration layer for a global sovereign civilization."
+  },
+  "nodes": [
+    {
+      "id": "CIV-701",
+      "title": "Global Mesh Governance",
+      "description": "Fractal Quorums and Inter-Pod Diplomacy. Scaling the Ubuntu layer to manage global resource commoning without central authorities. Modeling high-trust network topology at scale.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Global Governance",
+      "subdomain": "Synthesis",
+      "tags": ["governance", "diplomacy", "mesh", "topology"],
+      "estimated_hours": 120,
+      "grade_levels": ["Doctoral"],
+      "bloom_level": "Evaluate",
+      "subject_area": "Humanities"
+    },
+    {
+      "id": "HUM-MAR-101",
+      "title": "The Blue Commons",
+      "description": "Maritime reciprocity and oceanic stewardship. Legal rights of the high seas, sustainable aquaculture swarms, and managing the 70% of the living substrate.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Marine Ecology",
+      "subdomain": "Synthesis",
+      "tags": ["ocean", "commons", "maritime", "ecology"],
+      "estimated_hours": 90,
+      "grade_levels": ["Graduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Humanities"
+    },
+    {
+      "id": "BIO-DT-301",
+      "title": "Molecular Mycology & Bio-Fabrication",
+      "description": "Growing the infrastructure. Using mycelial networks to synthesize bioplastics, carbon-negative building materials, and self-healing bio-sensors. (Ref. mk0.5-forge).",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Bio-Manufacturing",
+      "subdomain": "Synthesis",
+      "tags": ["mycology", "bio-manufacturing", "materials", "mycelium"],
+      "estimated_hours": 135,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Create",
+      "subject_area": "Science"
+    },
+    {
+      "id": "SCI-701",
+      "title": "Quantum Logic & Probabilistic Thought",
+      "description": "The successor to HDC. Complex-valued hypervectors, qubit-binding, and the transition from binary certainty to probabilistic amplitude in cognitive substrates.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Quantum Epistemics",
+      "subdomain": "Synthesis",
+      "tags": ["quantum", "logic", "probability", "computing"],
+      "estimated_hours": 180,
+      "grade_levels": ["Doctoral"],
+      "bloom_level": "Evaluate",
+      "subject_area": "Science"
+    },
+    {
+      "id": "HUM-HIST-401",
+      "title": "Archeology of the Future",
+      "description": "Deconstructing the 1602 extractive architecture. A forensic analysis of centralized failures (debt-traps, data-mining, eco-cide) to ensure the Mycelix substrate remains resilient.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Synthesis",
+      "subdomain": "Synthesis",
+      "tags": ["history", "resilience", "archeology", "failure-analysis"],
+      "estimated_hours": 60,
+      "grade_levels": ["Graduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Humanities"
+    },
+    {
+      "id": "CIV-CAP-SYN",
+      "title": "The Civilizational Synthesis Capstone",
+      "description": "The ultimate integration. Propose a modification to the global Mycelix protocol that enhances either Ahimsa, Reciprocity, or Thermodynamic Efficiency across all 16 clusters.",
+      "node_type": "Capstone",
+      "difficulty": "Expert",
+      "domain": "Universal",
+      "subdomain": "Synthesis",
+      "tags": ["capstone", "synthesis", "protocol", "legacy"],
+      "estimated_hours": 450,
+      "grade_levels": ["Doctoral"],
+      "bloom_level": "Create",
+      "subject_area": "Synthesis",
+      "holonic_capstone": {
+        "required_node_ids": ["CIV-701", "SCI-701", "HUM-HIST-401"],
+        "deliverable": "A protocol-level PR or constitutional amendment verified by the Symthaea Auditor and a consensus of 100+ Pod Stewards.",
+        "min_peer_endorsements": 100
+      },
+      "alignment_vector": {
+        "ahimsa": 999,
+        "reciprocity": 999,
+        "truthfulness": 999,
+        "collective_flourishing": 999,
+        "ecological_stewardship": 990
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "CIV-701",
+      "to": "CIV-CAP-SYN",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Global mastery requires understanding the mathematics of decentralized governance."
+    },
+    {
+      "from": "SCI-701",
+      "to": "CIV-CAP-SYN",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "The future of the protocol is grounded in quantum-ready probabilistic logic."
+    },
+    {
+      "from": "HUM-HIST-401",
+      "to": "CIV-CAP-SYN",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "One cannot synthesize the future without deconstructing the failures of the past."
+    }
+  ]
+}

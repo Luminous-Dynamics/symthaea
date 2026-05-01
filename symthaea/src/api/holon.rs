@@ -591,12 +591,8 @@ async fn holon_status(State(state): State<SharedHolonState>) -> Json<StatusRespo
         consciousness: state.get_consciousness(),
         has_tts: cfg!(feature = "voice-tts"),
         has_broca: cfg!(feature = "ssm_language"),
-        swarm_peers: state
-            .peer_count
-            .load(std::sync::atomic::Ordering::Relaxed),
-        iroh_active: state
-            .iroh_active
-            .load(std::sync::atomic::Ordering::Relaxed),
+        swarm_peers: state.peer_count.load(std::sync::atomic::Ordering::Relaxed),
+        iroh_active: state.iroh_active.load(std::sync::atomic::Ordering::Relaxed),
         federation_enabled: cfg!(feature = "swarm"),
     })
 }
@@ -1091,13 +1087,10 @@ mod tests {
         state.push_rdp_outbound(vec![0xAA, 0xBB, 0xCC]);
 
         // The recv() future should be ready immediately.
-        let result = tokio::time::timeout(
-            std::time::Duration::from_millis(50),
-            rx.recv(),
-        )
-        .await
-        .expect("recv should complete within 50ms, not block waiting")
-        .expect("recv should return Ok");
+        let result = tokio::time::timeout(std::time::Duration::from_millis(50), rx.recv())
+            .await
+            .expect("recv should complete within 50ms, not block waiting")
+            .expect("recv should return Ok");
 
         assert_eq!(result, vec![0xAA, 0xBB, 0xCC]);
     }
@@ -1128,13 +1121,10 @@ mod tests {
         state.push_rdp_outbound(vec![7, 8, 9]);
 
         // Broadcast path delivers immediately.
-        let via_broadcast = tokio::time::timeout(
-            std::time::Duration::from_millis(50),
-            rx.recv(),
-        )
-        .await
-        .expect("broadcast delivers")
-        .expect("recv ok");
+        let via_broadcast = tokio::time::timeout(std::time::Duration::from_millis(50), rx.recv())
+            .await
+            .expect("broadcast delivers")
+            .expect("recv ok");
         assert_eq!(via_broadcast, vec![7, 8, 9]);
 
         // VecDeque path ALSO has the same frame (this is what enables
@@ -1173,6 +1163,10 @@ mod tests {
         // After Lagged, the subscriber can re-sync by draining the VecDeque.
         // The VecDeque still holds all 20 frames.
         let recovery = state.drain_rdp_outbound();
-        assert_eq!(recovery.len(), 20, "VecDeque catchup should have all frames");
+        assert_eq!(
+            recovery.len(),
+            20,
+            "VecDeque catchup should have all frames"
+        );
     }
 }

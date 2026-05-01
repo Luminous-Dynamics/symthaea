@@ -54,7 +54,9 @@ pub fn SearchBar() -> impl IntoView {
     let on_submit = move |ev: leptos::ev::SubmitEvent| {
         ev.prevent_default();
         let value = input.get();
-        if value.is_empty() { return; }
+        if value.is_empty() {
+            return;
+        }
 
         // Save to history (only for search queries, not URLs)
         if !engine::is_url(&value) {
@@ -63,11 +65,17 @@ pub fn SearchBar() -> impl IntoView {
         }
 
         if compare_mode.get() && !engine::is_url(&value) {
-            use leptos::prelude::Set;
             use crate::state::PageView;
-            state_submit.set_current_url.set(format!("prism://compare?q={}", value));
-            state_submit.set_page_title.set(format!("Compare: {}", value));
-            state_submit.set_view.set(PageView::Compare { query: value });
+            use leptos::prelude::Set;
+            state_submit
+                .set_current_url
+                .set(format!("prism://compare?q={}", value));
+            state_submit
+                .set_page_title
+                .set(format!("Compare: {}", value));
+            state_submit
+                .set_view
+                .set(PageView::Compare { query: value });
         } else {
             engine_cell.with_value(|opt| {
                 if let Some(search) = opt {
@@ -104,7 +112,8 @@ pub fn SearchBar() -> impl IntoView {
         // Delay hiding so clicks on history items register
         gloo_timers::callback::Timeout::new(200, move || {
             set_show_history.set(false);
-        }).forget();
+        })
+        .forget();
     };
 
     // Keyboard navigation (#4)
@@ -141,7 +150,9 @@ pub fn SearchBar() -> impl IntoView {
         if q.is_empty() {
             h
         } else {
-            h.into_iter().filter(|item| item.to_lowercase().contains(&q)).collect()
+            h.into_iter()
+                .filter(|item| item.to_lowercase().contains(&q))
+                .collect()
         }
     };
 

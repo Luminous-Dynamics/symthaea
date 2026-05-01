@@ -137,8 +137,7 @@ pub fn is_equal_length(a: &Point2D, b: &Point2D, c: &Point2D, d: &Point2D) -> bo
 
 /// `m` is the midpoint of segment `ab`.
 pub fn is_midpoint(m: &Point2D, a: &Point2D, b: &Point2D) -> bool {
-    ((m.x - (a.x + b.x) / 2.0).abs() < GEOM_EPS)
-        && ((m.y - (a.y + b.y) / 2.0).abs() < GEOM_EPS)
+    ((m.x - (a.x + b.x) / 2.0).abs() < GEOM_EPS) && ((m.y - (a.y + b.y) / 2.0).abs() < GEOM_EPS)
 }
 
 /// `b` lies strictly between `a` and `c` on the line through them
@@ -237,9 +236,7 @@ pub enum GeomPredicate {
     /// m is the midpoint of ab.
     Midpoint(String, String, String),
     /// The three lines (p1,p2), (p3,p4), (p5,p6) are concurrent.
-    Concurrent(
-        String, String, String, String, String, String,
-    ),
+    Concurrent(String, String, String, String, String, String),
 }
 
 // ─── GeomState: points + lines + circles + facts ────────────────────────────
@@ -682,10 +679,8 @@ fn rule_midpoint_theorem(state: &GeomState) -> Vec<GeomPredicate> {
     let mut out = Vec::new();
     for f1 in &state.facts {
         for f2 in &state.facts {
-            if let (
-                GeomPredicate::Midpoint(m, a1, b1),
-                GeomPredicate::Midpoint(n, a2, c1),
-            ) = (f1, f2)
+            if let (GeomPredicate::Midpoint(m, a1, b1), GeomPredicate::Midpoint(n, a2, c1)) =
+                (f1, f2)
             {
                 if a1 == a2 && m != n && b1 != c1 {
                     out.push(GeomPredicate::Parallel(
@@ -909,7 +904,11 @@ mod tests {
         s.add_point("C", p(0.0, 1.0));
         // NOT collinear
         assert_eq!(
-            s.verify(&GeomPredicate::Collinear("A".into(), "B".into(), "C".into())),
+            s.verify(&GeomPredicate::Collinear(
+                "A".into(),
+                "B".into(),
+                "C".into()
+            )),
             Some(false)
         );
     }
@@ -918,7 +917,11 @@ mod tests {
     fn test_geomstate_missing_point() {
         let s = GeomState::new();
         assert_eq!(
-            s.verify(&GeomPredicate::Collinear("X".into(), "Y".into(), "Z".into())),
+            s.verify(&GeomPredicate::Collinear(
+                "X".into(),
+                "Y".into(),
+                "Z".into()
+            )),
             None
         );
     }
@@ -955,10 +958,16 @@ mod tests {
         s.add_point("E", p(0.0, 2.0));
         s.add_point("F", p(1.0, 2.0));
         s.add_fact(GeomPredicate::Perpendicular(
-            "A".into(), "B".into(), "C".into(), "D".into(),
+            "A".into(),
+            "B".into(),
+            "C".into(),
+            "D".into(),
         ));
         s.add_fact(GeomPredicate::Perpendicular(
-            "E".into(), "F".into(), "C".into(), "D".into(),
+            "E".into(),
+            "F".into(),
+            "C".into(),
+            "D".into(),
         ));
         s.saturate(10);
         let found = s.facts.iter().any(|f| match f {
@@ -979,7 +988,10 @@ mod tests {
         s.add_point("C", p(-1.0, 0.0));
         s.add_point("D", p(0.0, -1.0));
         s.add_fact(GeomPredicate::Concyclic(
-            "A".into(), "B".into(), "C".into(), "D".into(),
+            "A".into(),
+            "B".into(),
+            "C".into(),
+            "D".into(),
         ));
         let added = s.saturate(10);
         assert!(added > 0, "inscribed-angle rule should fire");
@@ -1024,10 +1036,16 @@ mod tests {
         s.add_point("E", p(0.0, 2.0));
         s.add_point("F", p(1.0, 2.0));
         s.add_fact(GeomPredicate::Parallel(
-            "A".into(), "B".into(), "C".into(), "D".into(),
+            "A".into(),
+            "B".into(),
+            "C".into(),
+            "D".into(),
         ));
         s.add_fact(GeomPredicate::Parallel(
-            "C".into(), "D".into(), "E".into(), "F".into(),
+            "C".into(),
+            "D".into(),
+            "E".into(),
+            "F".into(),
         ));
         s.saturate(10);
         assert!(s.facts.iter().any(|f| matches!(

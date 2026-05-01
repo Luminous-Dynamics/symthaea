@@ -89,7 +89,7 @@ apps/leptos/
 |   |-- app.rs              # Router + provider nesting (Holochain > Consciousness > LearningEngine)
 |   |-- holochain.rs        # HolochainCtx, ConnectionBadge, mock fallback
 |   |-- consciousness.rs    # ConsciousnessProvider, simulated engine, ConsciousnessCard
-|   |-- learning_engine.rs  # Consciousness-aware learning decisions (break enforcement, difficulty, VARK)
+|   |-- learning_engine.rs  # Cognitive-aware learning decisions (break enforcement, difficulty, VARK)
 |   |-- components/         # Shared UI components
 |   '-- pages/
 |       |-- mod.rs

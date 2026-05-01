@@ -111,6 +111,45 @@ pub struct PrivacyParams {
     pub sensitivity_score: f32,
 }
 
+/// Mycelial Oracle: Aggregate curriculum progress signal.
+///
+/// Encapsulates the mass of students at a specific node/percentage,
+/// providing a predictive signal for future resource demand.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct CurriculumVelocity {
+    /// The curriculum node ID (e.g. "VOC-RE-101")
+    pub node_id: String,
+    /// Percentage of completion (0-100)
+    pub progress_bin: u8,
+    /// Number of students in this bin (blurred by differential privacy)
+    pub count: u32,
+    pub timestamp: i64,
+}
+
+/// Sovereign Science: A decentralized research experiment.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct ResearchRound {
+    pub title: String,
+    pub hypothesis_eml: String, // EML-encoded mathematical hypothesis
+    pub required_sample_size: u32,
+    pub sensor_schema_id: String, // ID of the required Sensorium telemetry
+    pub rewards_pledged_tend: f64,
+    pub created_at: i64,
+}
+
+/// An individual experimental result from a Learning Pod.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct ExperimentalArtifact {
+    pub round_hash: ActionHash,
+    pub pod_hash: ActionHash,
+    pub telemetry_commitment: Vec<u8>, // Blinded IoT data
+    pub confidence_score: u16,        // Pod-calculated confidence
+    pub timestamp: i64,
+}
+
 /// All entry types for this integrity zome
 #[hdk_entry_types]
 #[unit_enum(EntryTypesUnit)]
@@ -118,6 +157,9 @@ pub enum EntryTypes {
     FlUpdate(FlUpdate),
     FlRound(FlRound),
     PrivacyParams(PrivacyParams),
+    CurriculumVelocity(CurriculumVelocity),
+    ResearchRound(ResearchRound),
+    ExperimentalArtifact(ExperimentalArtifact),
 }
 
 /// All link types for this integrity zome
@@ -129,6 +171,12 @@ pub enum LinkTypes {
     ModelToRounds,
     /// Links from round to privacy params
     RoundToPrivacy,
+    /// Anchor -> CurriculumVelocity
+    AnchorToVelocity,
+    /// Anchor -> ResearchRounds
+    AllResearchRounds,
+    /// ResearchRound -> ExperimentalArtifacts
+    RoundToArtifacts,
 }
 
 /// Validation function for FlUpdate entries

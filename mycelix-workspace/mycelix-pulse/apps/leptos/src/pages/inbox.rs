@@ -3,12 +3,14 @@
 
 //! Inbox with pinned conversations, date separators, split view, thread grouping, batch actions.
 
-use leptos::prelude::*;
-use crate::mail_context::use_mail;
-use crate::holochain::{use_holochain, ConnectionStatus};
-use crate::toasts::use_toasts;
 use crate::components::{EmailCard, NotificationPrompt, PullToRefresh};
+use crate::holochain::{use_holochain, ConnectionStatus};
+use crate::mail_context::use_mail;
 use crate::semantic;
+use crate::summary::use_pulse_summary;
+use crate::toasts::use_toasts;
+use leptos::prelude::*;
+use mycelix_leptos_core::{FreshnessBadge, FreshnessLevel};
 
 #[component]
 pub fn InboxPage() -> impl IntoView {
@@ -36,7 +38,10 @@ pub fn InboxPage() -> impl IntoView {
 
     // Split into pinned and unpinned
     let pinned = move || {
-        all_emails().into_iter().filter(|e| e.is_pinned).collect::<Vec<_>>()
+        all_emails()
+            .into_iter()
+            .filter(|e| e.is_pinned)
+            .collect::<Vec<_>>()
     };
     let mail_priority = mail.clone();
     let unpinned = move || {
@@ -73,7 +78,10 @@ pub fn InboxPage() -> impl IntoView {
     let split_email = RwSignal::new(Option::<String>::None);
     // Quick peek state (hover preview)
     let peek_email = RwSignal::new(Option::<(String, i32, i32)>::None); // (hash, x, y)
-    let show_split = move || mail.reading_pane.get() != mail_leptos_types::ReadingPanePosition::Off && split_email.get().is_some();
+    let show_split = move || {
+        mail.reading_pane.get() != mail_leptos_types::ReadingPanePosition::Off
+            && split_email.get().is_some()
+    };
     let split_data = move || {
         let id = split_email.get()?;
         mail.inbox.get().into_iter().find(|e| e.hash == id)
@@ -364,6 +372,7 @@ pub fn InboxPage() -> impl IntoView {
 #[component]
 fn EmailDigest() -> impl IntoView {
     let mail = use_mail();
+    let pulse_summary = use_pulse_summary();
     let show = RwSignal::new(true);
 
     view! {
@@ -372,6 +381,52 @@ fn EmailDigest() -> impl IntoView {
                 <h3>"\u{1F4CA} Today's Digest"</h3>
                 <button class="btn btn-icon digest-close" on:click=move |_| show.set(false)>"\u{2715}"</button>
             </div>
+            {move || {
+                let summary = pulse_summary.inbox_summary.get();
+                let urgent = summary.urgent_count;
+                let queued = summary.queued_actions;
+                let quarantined = summary.trust_health.quarantined;
+                let pending = summary.trust_health.introductions_pending;
+                let trust_pct = (summary.trust_health.average_trust_score * 100.0).round() as u32;
+                let status_line = if urgent > 0 {
+                    format!("{urgent} urgent thread{} should be handled before routine triage.", if urgent == 1 { "" } else { "s" })
+                } else if queued > 0 {
+                    format!("{queued} offline action{} waiting to sync when the conductor is available.", if queued == 1 { "" } else { "s" })
+                } else if summary.unread_count > 0 {
+                    format!("{} unread thread{} across {} total conversations.", summary.unread_count, if summary.unread_count == 1 { "" } else { "s" }, summary.total_count)
+                } else {
+                    format!("Pulse posture is quiet across {} tracked conversation{}.", summary.total_count, if summary.total_count == 1 { "" } else { "s" })
+                };
+                view! {
+                    <div class="sensorium-posture">
+                        <div class="sensorium-posture-topline">
+                            <span class="sensorium-label">"Sensorium Posture"</span>
+                            <FreshnessBadge
+                                level=freshness_from_micros(summary.updated_at)
+                                detail=format_summary_updated_at(summary.updated_at)
+                            />
+                        </div>
+                        <p class="sensorium-status">{status_line}</p>
+                        <div class="sensorium-metrics">
+                            <span class="digest-stat">{format!("{} unread", summary.unread_count)}</span>
+                            <span class="digest-stat">{format!("{urgent} urgent")}</span>
+                            <span class="digest-stat">{format!("{} high priority", summary.high_priority_count)}</span>
+                            <span class="digest-stat">{format!("{queued} queued")}</span>
+                            <span class="digest-stat">{format!("{trust_pct}% trust")}</span>
+                        </div>
+                        {((quarantined + pending) > 0).then(|| view! {
+                            <div class="sensorium-attention">
+                                {(quarantined > 0).then(|| view! {
+                                    <span class="digest-stat digest-trust">{format!("{quarantined} quarantined")}</span>
+                                })}
+                                {(pending > 0).then(|| view! {
+                                    <span class="digest-stat digest-trust">{format!("{pending} introductions")}</span>
+                                })}
+                            </div>
+                        })}
+                    </div>
+                }
+            }}
             {move || {
                 let emails = mail.inbox.get();
                 let now = js_sys::Date::now() as u64 / 1000;
@@ -417,6 +472,32 @@ fn EmailDigest() -> impl IntoView {
     }
 }
 
+fn freshness_from_micros(updated_at: Option<i64>) -> FreshnessLevel {
+    let Some(updated_at) = updated_at else {
+        return FreshnessLevel::Unknown;
+    };
+    let now_micros = (js_sys::Date::now() as i64).saturating_mul(1000);
+    let age_minutes = now_micros.saturating_sub(updated_at) / 60_000_000;
+    if age_minutes <= 5 {
+        FreshnessLevel::Fresh
+    } else if age_minutes <= 60 {
+        FreshnessLevel::Aging
+    } else {
+        FreshnessLevel::Stale
+    }
+}
+
+fn format_summary_updated_at(updated_at: Option<i64>) -> String {
+    updated_at
+        .and_then(|micros| {
+            js_sys::Date::new(&wasm_bindgen::JsValue::from_f64((micros / 1000) as f64))
+                .to_locale_string("en-US", &wasm_bindgen::JsValue::UNDEFINED)
+                .as_string()
+        })
+        .map(|date| format!("Updated {date}"))
+        .unwrap_or_else(|| "No summary timestamp".into())
+}
+
 #[component]
 fn BatchToolbar() -> impl IntoView {
     let mail = use_mail();
@@ -424,9 +505,14 @@ fn BatchToolbar() -> impl IntoView {
     let has_selection = move || !mail.selected_hashes.get().is_empty();
     let sel_count = move || mail.selected_hashes.get().len();
 
-    let m1 = mail.clone(); let m2 = mail.clone(); let m3 = mail.clone();
-    let m4 = mail.clone(); let m5 = mail.clone(); let m6 = mail.clone();
-    let t1 = toasts.clone(); let t2 = toasts.clone();
+    let m1 = mail.clone();
+    let m2 = mail.clone();
+    let m3 = mail.clone();
+    let m4 = mail.clone();
+    let m5 = mail.clone();
+    let m6 = mail.clone();
+    let t1 = toasts.clone();
+    let t2 = toasts.clone();
 
     view! {
         <div class="batch-toolbar" style=move || if has_selection() { "display:flex" } else { "display:none" }>
@@ -481,7 +567,8 @@ fn empty_inbox_view() -> impl leptos::IntoView {
         .and_then(|w| w.local_storage().ok().flatten())
         .and_then(|s| s.get_item("mycelix_inbox_zero_streak").ok().flatten())
         .and_then(|v| v.parse::<u32>().ok())
-        .unwrap_or(0) + 1;
+        .unwrap_or(0)
+        + 1;
 
     // Save updated streak
     if let Some(s) = web_sys::window().and_then(|w| w.local_storage().ok().flatten()) {
@@ -523,12 +610,22 @@ fn date_label(ts: u64) -> String {
     let evt_day = (event.get_time() / 86400000.0) as i64;
     let diff = now_day - evt_day;
 
-    if diff == 0 { "Today".into() }
-    else if diff == 1 { "Yesterday".into() }
-    else if diff < 7 { "This Week".into() }
-    else if diff < 30 { "This Month".into() }
-    else {
-        let months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        format!("{} {}", months[event.get_month() as usize], event.get_full_year())
+    if diff == 0 {
+        "Today".into()
+    } else if diff == 1 {
+        "Yesterday".into()
+    } else if diff < 7 {
+        "This Week".into()
+    } else if diff < 30 {
+        "This Month".into()
+    } else {
+        let months = [
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+        ];
+        format!(
+            "{} {}",
+            months[event.get_month() as usize],
+            event.get_full_year()
+        )
     }
 }

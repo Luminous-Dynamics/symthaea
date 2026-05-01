@@ -58,9 +58,7 @@ pub fn coupled_cluster_doubles(
         i * n_vir * n_occ * n_vir + a * n_occ * n_vir + j * n_vir + b
     };
 
-    let eri = |i: usize, a: usize, j: usize, b: usize| -> f64 {
-        eri_mo[idx(i, a, j, b)]
-    };
+    let eri = |i: usize, a: usize, j: usize, b: usize| -> f64 { eri_mo[idx(i, a, j, b)] };
 
     // MP2 initial guess
     for i in 0..n_occ {

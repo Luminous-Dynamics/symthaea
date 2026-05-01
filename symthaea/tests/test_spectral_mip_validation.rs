@@ -310,6 +310,8 @@ fn spectral_phi_from_covariance(
         window_size: num_samples,
         min_samples: num_samples.min(10),
         regularization: 1e-6,
+        normalize_variance: true,
+        temporal_decorrelation: true,
     };
     let mut finder = SpectralMIPFinder::new(config);
 
@@ -377,6 +379,8 @@ fn spectral_phi_direct(cov: &[f64], n: usize) -> Option<SpectralMIPResult> {
         window_size: 50,
         min_samples: 10,
         regularization: 1e-6,
+        normalize_variance: true,
+        temporal_decorrelation: true,
     };
     let finder = SpectralMIPFinder::new(config);
     // Add regularization to match what SpectralMIPFinder's build_covariance_matrix does

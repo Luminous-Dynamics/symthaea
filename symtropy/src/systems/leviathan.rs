@@ -64,7 +64,10 @@ pub fn leviathan_system(
             }
             if leviathan.stirring_duration > STIRRING_TO_AWAKE_SECS {
                 leviathan.phase = SleepPhase::Awake;
-                warn!("Leviathan AWAKE — sustained noise for {}s", STIRRING_TO_AWAKE_SECS);
+                warn!(
+                    "Leviathan AWAKE — sustained noise for {}s",
+                    STIRRING_TO_AWAKE_SECS
+                );
             }
             if leviathan.quiet_duration > QUIET_RESET_SECS {
                 leviathan.phase = SleepPhase::Dormant;

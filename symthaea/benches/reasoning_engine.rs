@@ -90,6 +90,7 @@ mod benches {
             phi: 0.8,
             available_budget_us: 1_000, // force Tier 0
             available_actions: make_actions(),
+            code_context: None,
             tool: None,
             recent_utility: 0.5,
             cycle_id: 0,
@@ -111,6 +112,7 @@ mod benches {
             phi: 0.8,
             available_budget_us: 8_000, // Tier 1
             available_actions: make_actions(),
+            code_context: None,
             tool: None,
             recent_utility: 0.5,
             cycle_id: 0,
@@ -132,6 +134,7 @@ mod benches {
             phi: 0.8,
             available_budget_us: 25_000, // Tier 2
             available_actions: make_actions(),
+            code_context: None,
             tool: Some(
                 ToolDescriptor::from_command("nix build .#pkg")
                     .with_domain("nixos")
@@ -178,6 +181,7 @@ mod benches {
                         phi: 0.8,
                         available_budget_us: 20_000,
                         available_actions: make_actions(),
+                        code_context: None,
                         tool: None,
                         recent_utility: 0.5,
                         cycle_id: i,

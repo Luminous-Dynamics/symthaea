@@ -72,10 +72,13 @@ pub fn generate_ranking_proof(
     };
 
     let formula_commitment = {
-        let h = Sha256::digest(format!(
-            "prism_ranking:{}:{}:{}:{}",
-            WEIGHT_RELEVANCE, WEIGHT_EPISTEMIC, WEIGHT_TRUST, WEIGHT_FRESHNESS
-        ).as_bytes());
+        let h = Sha256::digest(
+            format!(
+                "prism_ranking:{}:{}:{}:{}",
+                WEIGHT_RELEVANCE, WEIGHT_EPISTEMIC, WEIGHT_TRUST, WEIGHT_FRESHNESS
+            )
+            .as_bytes(),
+        );
         let mut hash = [0u8; 32];
         hash.copy_from_slice(&h);
         hash
@@ -84,20 +87,22 @@ pub fn generate_ranking_proof(
     let mut scores: Vec<RankedScore> = results
         .iter()
         .enumerate()
-        .map(|(i, &(rel, epi, trust, fresh))| {
-            RankedScore {
-                rank: i,
-                relevance: rel,
-                epistemic: epi,
-                trust,
-                freshness: fresh,
-                composite: compute_composite(rel, epi, trust, fresh),
-            }
+        .map(|(i, &(rel, epi, trust, fresh))| RankedScore {
+            rank: i,
+            relevance: rel,
+            epistemic: epi,
+            trust,
+            freshness: fresh,
+            composite: compute_composite(rel, epi, trust, fresh),
         })
         .collect();
 
     // Sort by composite score (descending) and re-rank
-    scores.sort_by(|a, b| b.composite.partial_cmp(&a.composite).unwrap_or(std::cmp::Ordering::Equal));
+    scores.sort_by(|a, b| {
+        b.composite
+            .partial_cmp(&a.composite)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     for (i, score) in scores.iter_mut().enumerate() {
         score.rank = i;
     }
@@ -137,8 +142,7 @@ pub fn verify_ranking_proof(proof: &RankingProof) -> Result<(), String> {
         if window[0].composite < window[1].composite - 0.001 {
             return Err(format!(
                 "Rank {} (score {:.4}) < Rank {} (score {:.4})",
-                window[0].rank, window[0].composite,
-                window[1].rank, window[1].composite,
+                window[0].rank, window[0].composite, window[1].rank, window[1].composite,
             ));
         }
     }
@@ -157,11 +161,14 @@ mod tests {
 
     #[test]
     fn test_ranking_proof_correct_order() {
-        let proof = generate_ranking_proof("consciousness", &[
-            (0.9, 0.75, 0.9, 0.8),  // High relevance + epistemic
-            (0.7, 0.5, 0.9, 0.5),   // Medium
-            (0.3, 0.25, 0.9, 0.2),  // Low
-        ]);
+        let proof = generate_ranking_proof(
+            "consciousness",
+            &[
+                (0.9, 0.75, 0.9, 0.8), // High relevance + epistemic
+                (0.7, 0.5, 0.9, 0.5),  // Medium
+                (0.3, 0.25, 0.9, 0.2), // Low
+            ],
+        );
 
         assert!(proof.verified);
         assert_eq!(proof.scores.len(), 3);
@@ -181,9 +188,7 @@ mod tests {
 
     #[test]
     fn test_tampered_score_detected() {
-        let mut proof = generate_ranking_proof("test", &[
-            (0.8, 0.6, 0.9, 0.7),
-        ]);
+        let mut proof = generate_ranking_proof("test", &[(0.8, 0.6, 0.9, 0.7)]);
 
         // Tamper with composite score
         proof.scores[0].composite = 0.999;
@@ -192,14 +197,14 @@ mod tests {
 
     #[test]
     fn test_query_hidden() {
-        let proof = generate_ranking_proof("consciousness neural correlates", &[
-            (0.8, 0.75, 0.9, 0.5),
-        ]);
+        let proof =
+            generate_ranking_proof("consciousness neural correlates", &[(0.8, 0.75, 0.9, 0.5)]);
 
         let json = serde_json::to_string(&proof).unwrap();
-        assert!(!json.contains("consciousness neural"),
-            "query text must NOT appear in proof");
-        assert!(json.contains("query_hash"),
-            "only query hash should appear");
+        assert!(
+            !json.contains("consciousness neural"),
+            "query text must NOT appear in proof"
+        );
+        assert!(json.contains("query_hash"), "only query hash should appear");
     }
 }

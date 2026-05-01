@@ -3,7 +3,7 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Vocal tract HDC encoder: cognitive voice state → ContinuousHV (16,384D).
 //!
-//! Follows the `QuadrotorHdcEncoder` pattern from `crates/symthaea-flight/src/encoder.rs`.
+//! Follows the `QuadrotorHdcEncoder` pattern from `crates/symthaea-multirotor/src/encoder.rs`.
 //! Each of 12 cognitive voice channels gets a genesis-seeded base vector. Values are
 //! level-encoded (thermometer coding) then bound with the base vector. The result is
 //! bundled into a single 16,384D ContinuousHV. Derivative encoding provides temporal context.

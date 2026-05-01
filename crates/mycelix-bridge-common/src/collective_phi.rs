@@ -195,7 +195,11 @@ impl CollectivePhiEngine {
                 .iter()
                 .map(|v| v.reputation.unwrap_or(1.0).clamp(0.0, 1.0))
                 .sum();
-            if weight_sum > 1e-10 { weighted_sum / weight_sum } else { 0.0 }
+            if weight_sum > 1e-10 {
+                weighted_sum / weight_sum
+            } else {
+                0.0
+            }
         };
 
         // Compute pairwise cosine similarity matrix → mean coherence
@@ -443,8 +447,7 @@ mod tests {
     #[test]
     fn test_redteam_cartel_slash_excludes_from_collective_phi() {
         use super::super::consciousness_profile::{
-            apply_cartel_slash, ReputationState, CARTEL_MIN_SIZE,
-            CARTEL_SLASH_MIN_CONFIDENCE,
+            apply_cartel_slash, ReputationState, CARTEL_MIN_SIZE, CARTEL_SLASH_MIN_CONFIDENCE,
         };
 
         // Setup: 5 honest agents + 3 cartel agents (all identical consciousness)
@@ -474,7 +477,10 @@ mod tests {
             })
             .collect();
         let phi_before = CollectivePhiEngine::new(all_vectors).compute();
-        assert_eq!(phi_before.n_agents, 8, "All 8 agents should be included before slash");
+        assert_eq!(
+            phi_before.n_agents, 8,
+            "All 8 agents should be included before slash"
+        );
 
         // Phase 2: Cartel detected with high confidence → slash
         let slash_results = apply_cartel_slash(
@@ -483,7 +489,11 @@ mod tests {
             0.85, // above CARTEL_SLASH_MIN_CONFIDENCE (0.7)
             1_000_000,
         );
-        assert_eq!(slash_results.len(), 3, "All 3 cartel members should be slashed");
+        assert_eq!(
+            slash_results.len(),
+            3,
+            "All 3 cartel members should be slashed"
+        );
         for (id, score) in &slash_results {
             assert!(
                 *score < 0.2,

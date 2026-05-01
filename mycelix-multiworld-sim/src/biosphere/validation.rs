@@ -143,14 +143,18 @@ pub fn validate_against_sepkoski() -> ValidationResult {
         }
 
         let denom = (var_x * var_y).sqrt();
-        if denom > 1e-15 { cov / denom } else { 0.0 }
+        if denom > 1e-15 {
+            cov / denom
+        } else {
+            0.0
+        }
     } else {
         0.0
     };
 
     let r_squared = pearson_r * pearson_r;
-    let mean_absolute_error = comparisons.iter().map(|c| c.abs_error).sum::<f64>()
-        / comparisons.len().max(1) as f64;
+    let mean_absolute_error =
+        comparisons.iter().map(|c| c.abs_error).sum::<f64>() / comparisons.len().max(1) as f64;
 
     // Identify divergent points (>30% difference)
     let divergent_points: Vec<DivergentPoint> = comparisons
@@ -212,11 +216,19 @@ pub fn validate_non_circular() -> (f64, usize) {
 
     let mut complexity_values: Vec<f64> = Vec::new();
     let mut ref_values: Vec<f64> = Vec::new();
-    let sepkoski_max = reference.iter().map(|r| r.marine_genera).fold(0.0_f64, f64::max);
+    let sepkoski_max = reference
+        .iter()
+        .map(|r| r.marine_genera)
+        .fold(0.0_f64, f64::max);
 
     for ref_pt in &reference {
-        let bin = bins.iter().find(|b| ref_pt.age_ma >= b.end_ma && ref_pt.age_ma <= b.start_ma);
-        let bin = match bin { Some(b) => b, None => continue };
+        let bin = bins
+            .iter()
+            .find(|b| ref_pt.age_ma >= b.end_ma && ref_pt.age_ma <= b.start_ma);
+        let bin = match bin {
+            Some(b) => b,
+            None => continue,
+        };
 
         let raw = compute_raw_dimensions(bin, &data, &extinctions);
         let d13c = Some(data.interpolate_d13c_excursion(bin.midpoint_ma));
@@ -244,7 +256,11 @@ pub fn validate_non_circular() -> (f64, usize) {
             var_y += dy * dy;
         }
         let denom = (var_x * var_y).sqrt();
-        if denom > 1e-15 { cov / denom } else { 0.0 }
+        if denom > 1e-15 {
+            cov / denom
+        } else {
+            0.0
+        }
     } else {
         0.0
     };
@@ -270,7 +286,9 @@ pub fn validate_against_epsilon_p() -> (f64, usize) {
 
     for bin in &bins {
         let age = bin.midpoint_ma;
-        if age > 541.0 { continue; } // Phanerozoic only for fair comparison
+        if age > 541.0 {
+            continue;
+        } // Phanerozoic only for fair comparison
 
         let raw = compute_raw_dimensions(bin, &data, &extinctions);
         let d13c = Some(data.interpolate_d13c_excursion(age));
@@ -299,7 +317,11 @@ pub fn validate_against_epsilon_p() -> (f64, usize) {
             var_y += dy * dy;
         }
         let denom = (var_x * var_y).sqrt();
-        if denom > 1e-15 { cov / denom } else { 0.0 }
+        if denom > 1e-15 {
+            cov / denom
+        } else {
+            0.0
+        }
     } else {
         0.0
     };
@@ -311,10 +333,16 @@ impl ValidationResult {
     pub fn to_markdown(&self) -> String {
         let mut md = String::new();
         md.push_str("# B(t) Validation: Sepkoski/Rohde-Muller Comparison\n\n");
-        md.push_str(&format!("**Comparison points**: {} (Phanerozoic, 541 Ma → present)\n", self.n_points));
+        md.push_str(&format!(
+            "**Comparison points**: {} (Phanerozoic, 541 Ma → present)\n",
+            self.n_points
+        ));
         md.push_str(&format!("**Pearson r**: {:.4}\n", self.pearson_r));
         md.push_str(&format!("**R²**: {:.4}\n", self.r_squared));
-        md.push_str(&format!("**Mean absolute error**: {:.4}\n\n", self.mean_absolute_error));
+        md.push_str(&format!(
+            "**Mean absolute error**: {:.4}\n\n",
+            self.mean_absolute_error
+        ));
 
         let verdict = if self.pearson_r > 0.90 {
             "EXCELLENT — B(t) biodiversity strongly tracks Sepkoski"
@@ -330,7 +358,9 @@ impl ValidationResult {
         // Decoupled validation
         let (nc_r, nc_n) = validate_non_circular();
         md.push_str("## Decoupled Validation (Non-Circular)\n\n");
-        md.push_str(&format!("Non-genus-derived dimensions (Complexity+Resilience) vs Sepkoski:\n"));
+        md.push_str(&format!(
+            "Non-genus-derived dimensions (Complexity+Resilience) vs Sepkoski:\n"
+        ));
         md.push_str(&format!("Pearson $r$ = {:.4} ($n$ = {})\n\n", nc_r, nc_n));
 
         let (ep_r, ep_n) = validate_against_epsilon_p();
@@ -360,7 +390,11 @@ mod tests {
     #[test]
     fn reference_data_loads() {
         let reference = load_reference();
-        assert!(reference.len() >= 30, "Should have >=30 reference points, got {}", reference.len());
+        assert!(
+            reference.len() >= 30,
+            "Should have >=30 reference points, got {}",
+            reference.len()
+        );
     }
 
     #[test]
@@ -414,7 +448,11 @@ mod tests {
     fn non_circular_validation_positive() {
         let (r, n) = validate_non_circular();
         assert!(n >= 20, "Should have >=20 comparison points");
-        assert!(r > 0.0, "Non-circular correlation should be positive, got {}", r);
+        assert!(
+            r > 0.0,
+            "Non-circular correlation should be positive, got {}",
+            r
+        );
     }
 
     #[test]

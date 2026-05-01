@@ -51,9 +51,9 @@
 //! ```
 
 use nalgebra::SVector;
+use symthaea_consciousness_equation::ConsciousnessInputs;
 use symtropy_math::Point;
 use symtropy_physics::PhysicsWorld;
-use symthaea_consciousness_equation::ConsciousnessInputs;
 
 use crate::coupling::ConsciousnessField;
 
@@ -141,9 +141,13 @@ impl BifurcationPoint {
         let n = phi_series.len() as f64;
         if phi_series.is_empty() {
             return Self {
-                k, mean_phi: 0.0, var_phi: 0.0,
-                order_parameter: 0.0, susceptibility: 0.0,
-                binder_cumulant: 0.0, num_agents,
+                k,
+                mean_phi: 0.0,
+                var_phi: 0.0,
+                order_parameter: 0.0,
+                susceptibility: 0.0,
+                binder_cumulant: 0.0,
+                num_agents,
             };
         }
 
@@ -207,7 +211,9 @@ pub const JUMP_THRESHOLD: f64 = 0.15;
 impl BifurcationResult {
     /// Find the index of the peak susceptibility.
     pub fn peak_susceptibility_idx(&self) -> Option<usize> {
-        self.points.iter().enumerate()
+        self.points
+            .iter()
+            .enumerate()
             .max_by(|(_, a), (_, b)| a.susceptibility.partial_cmp(&b.susceptibility).unwrap())
             .map(|(i, _)| i)
     }
@@ -218,11 +224,15 @@ impl BifurcationResult {
     /// Returns `None` if there are fewer than 3 post-critical points.
     pub fn estimate_beta(&self) -> Option<f64> {
         let kc = self.critical_coupling;
-        let post_critical: Vec<(f64, f64)> = self.points.iter()
+        let post_critical: Vec<(f64, f64)> = self
+            .points
+            .iter()
             .filter(|p| p.k > kc && p.order_parameter > 1e-4)
             .map(|p| ((p.k - kc).ln(), p.order_parameter.ln()))
             .collect();
-        if post_critical.len() < 3 { return None; }
+        if post_critical.len() < 3 {
+            return None;
+        }
         // Simple log-log slope (β = Δln(m) / Δln(k-kc))
         let n = post_critical.len() as f64;
         let (sum_x, sum_y, sum_xy, sum_x2) = post_critical.iter().fold(
@@ -230,7 +240,11 @@ impl BifurcationResult {
             |(sx, sy, sxy, sx2), &(x, y)| (sx + x, sy + y, sxy + x * y, sx2 + x * x),
         );
         let beta = (n * sum_xy - sum_x * sum_y) / (n * sum_x2 - sum_x.powi(2));
-        if beta.is_finite() { Some(beta) } else { None }
+        if beta.is_finite() {
+            Some(beta)
+        } else {
+            None
+        }
     }
 }
 
@@ -285,13 +299,25 @@ fn run_single_k(config: &BifurcationConfig, k: f64) -> Vec<f64> {
 
     // Warmup: let system reach quasi-steady state
     for _ in 0..config.warmup_ticks {
-        tick_sim(&mut world, &mut field, &handles, &config.agent_inputs, config.dt);
+        tick_sim(
+            &mut world,
+            &mut field,
+            &handles,
+            &config.agent_inputs,
+            config.dt,
+        );
     }
 
     // Measurement window: record collective Φ each tick
     let mut phi_series = Vec::with_capacity(config.measure_ticks as usize);
     for _ in 0..config.measure_ticks {
-        tick_sim(&mut world, &mut field, &handles, &config.agent_inputs, config.dt);
+        tick_sim(
+            &mut world,
+            &mut field,
+            &handles,
+            &config.agent_inputs,
+            config.dt,
+        );
         phi_series.push(field.collective_phi);
     }
     phi_series
@@ -322,23 +348,31 @@ pub fn run_bifurcation_sweep(config: &BifurcationConfig) -> BifurcationResult {
     let baseline_series = run_single_k(config, 0.0);
     let phi_baseline = baseline_series.iter().sum::<f64>() / baseline_series.len().max(1) as f64;
 
-    let points: Vec<BifurcationPoint> = k_values.iter().map(|&k| {
-        let series = run_single_k(config, k);
-        BifurcationPoint::from_series(k, &series, phi_baseline, config.num_agents)
-    }).collect();
+    let points: Vec<BifurcationPoint> = k_values
+        .iter()
+        .map(|&k| {
+            let series = run_single_k(config, k);
+            BifurcationPoint::from_series(k, &series, phi_baseline, config.num_agents)
+        })
+        .collect();
 
     // Estimate critical coupling (peak susceptibility)
-    let (peak_idx, peak_susceptibility) = points.iter().enumerate()
+    let (peak_idx, peak_susceptibility) = points
+        .iter()
+        .enumerate()
         .map(|(i, p)| (i, p.susceptibility))
-        .fold((0, 0.0f64), |(bi, bv), (i, v)| if v > bv { (i, v) } else { (bi, bv) });
+        .fold(
+            (0, 0.0f64),
+            |(bi, bv), (i, v)| if v > bv { (i, v) } else { (bi, bv) },
+        );
     let critical_coupling = points[peak_idx].k;
 
     let phi_max_coupling = points.last().map(|p| p.mean_phi).unwrap_or(phi_baseline);
 
     // Detect continuity: check for jumps > JUMP_THRESHOLD in order parameter
-    let is_continuous = !points.windows(2).any(|w| {
-        (w[1].order_parameter - w[0].order_parameter).abs() > JUMP_THRESHOLD
-    });
+    let is_continuous = !points
+        .windows(2)
+        .any(|w| (w[1].order_parameter - w[0].order_parameter).abs() > JUMP_THRESHOLD);
 
     BifurcationResult {
         points,
@@ -387,7 +421,9 @@ pub enum TransitionType {
 impl BifurcationResult {
     /// Compute [`CriticalityIndicators`] for paper-ready reporting.
     pub fn criticality_indicators(&self) -> CriticalityIndicators {
-        let order_parameter_max = self.points.last()
+        let order_parameter_max = self
+            .points
+            .last()
             .map(|p| p.order_parameter.max(0.0))
             .unwrap_or(0.0);
 
@@ -485,7 +521,10 @@ mod tests {
         let config = fast_config();
         let result = run_bifurcation_sweep(&config);
         // Inputs phi=0.5 → consciousness should be nonzero
-        assert!(result.phi_baseline > 0.0, "baseline Φ should be positive with phi=0.5 inputs");
+        assert!(
+            result.phi_baseline > 0.0,
+            "baseline Φ should be positive with phi=0.5 inputs"
+        );
     }
 
     #[test]
@@ -524,7 +563,10 @@ mod tests {
 
     #[test]
     fn estimate_beta_none_for_insufficient_points() {
-        let config = BifurcationConfig { k_steps: 2, ..fast_config() };
+        let config = BifurcationConfig {
+            k_steps: 2,
+            ..fast_config()
+        };
         let result = run_bifurcation_sweep(&config);
         // With only 2 k values, beta estimation can't have 3+ post-critical points
         let _ = result.estimate_beta(); // Should not panic
@@ -544,7 +586,10 @@ mod tests {
         let p = BifurcationPoint::from_series(0.5, &series, 0.0, 8);
         // When var=0, m_series is constant. m²² = m4 = const.
         // U₄ = 1 - const^2/(3*const^2) = 2/3
-        assert!((p.binder_cumulant - 2.0/3.0).abs() < 1e-6,
-                "Binder cumulant for constant series should be 2/3, got {}", p.binder_cumulant);
+        assert!(
+            (p.binder_cumulant - 2.0 / 3.0).abs() < 1e-6,
+            "Binder cumulant for constant series should be 2/3, got {}",
+            p.binder_cumulant
+        );
     }
 }

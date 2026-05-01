@@ -1,0 +1,127 @@
+{
+  "metadata": {
+    "title": "Sovereign Network Defense: IT & Cyber Resilience",
+    "framework": "Mycelix Security",
+    "source": "https://mycelix.org",
+    "grade_level": "Undergraduate/Professional",
+    "subject_area": "Computer Science",
+    "domain": "Security",
+    "version": "1.0",
+    "total_standards": 8,
+    "domains": [
+      "Hardware Security",
+      "Network Immunity",
+      "Cryptographic Hygiene",
+      "Mesh Resilience"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Defensive epistemics and technical security for the Mycelix mesh."
+  },
+  "nodes": [
+    {
+      "id": "IT-SEC-101",
+      "title": "Physical Root-of-Trust",
+      "description": "Securing the hardware node. Understanding TPM/HSM modules, BIOS protection, and physical tampering detection for off-grid mesh servers (SBCs).",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Hardware Security",
+      "subdomain": "Network Defense",
+      "tags": ["hardware", "tpm", "security", "sbc"],
+      "estimated_hours": 45,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "IT-SEC-201",
+      "title": "Mesh Immunity & Sybil Resistance",
+      "description": "Protecting the social fabric. Mathematical models for identifying fake identities (Sybils) and information-mining nodes. Using MATL as a defensive firewall.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Network Immunity",
+      "subdomain": "Network Defense",
+      "tags": ["mesh", "security", "sybil-attack", "matl"],
+      "estimated_hours": 60,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "IT-SEC-301",
+      "title": "Key Stewardship & Social Recovery",
+      "description": "The physics of the private key. Threshold signatures (Shamir's Secret Sharing) and pod-based social recovery protocols. Preventing permanent data loss.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Cryptographic Hygiene",
+      "subdomain": "Network Defense",
+      "tags": ["cryptography", "keys", "recovery", "privacy"],
+      "estimated_hours": 60,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "IT-SEC-401",
+      "title": "HDC & Post-Quantum Resilience",
+      "description": "Using high-dimensional math as a shield. Why HDC vectors are naturally resilient to signal jamming and noise-injection attacks. (Ref. HDC Sandbox).",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Mesh Resilience",
+      "subdomain": "Network Defense",
+      "tags": ["hdc", "quantum-ready", "resilience", "defense"],
+      "estimated_hours": 90,
+      "grade_levels": ["Graduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "IT-CAP-Immune",
+      "title": "The Mesh Architect Capstone",
+      "description": "Design and execute a stress-test for a local pod-mesh. Successfully identify a simulated Sybil attack and maintain network coherence during a physical blackout.",
+      "node_type": "Capstone",
+      "difficulty": "Expert",
+      "domain": "Universal",
+      "subdomain": "Network Defense",
+      "tags": ["capstone", "security", "leadership", "blackout-ready"],
+      "estimated_hours": 180,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Create",
+      "subject_area": "Computer Science",
+      "holonic_capstone": {
+        "required_node_ids": ["IT-SEC-101", "IT-SEC-201", "IT-SEC-301"],
+        "deliverable": "A verified 'Network Immunity Report' showing zero structural leakage and successful social recovery of a test key.",
+        "min_peer_endorsements": 8
+      },
+      "alignment_vector": {
+        "ahimsa": 900,
+        "truthfulness": 1000,
+        "sovereignty_respect": 1000,
+        "resilience": 1000,
+        "epistemic_humility": 950
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "DIG-GEN-050",
+      "to": "IT-SEC-301",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Foundational cryptographic literacy is required for advanced key stewardship."
+    },
+    {
+      "from": "MATH-ADV-301",
+      "to": "IT-SEC-201",
+      "edge_type": "Recommended",
+      "strength_permille": 700,
+      "rationale": "Graph theory provides the mathematical tools for identifying Sybil-subgraphs."
+    },
+    {
+      "from": "SYM-201",
+      "to": "IT-SEC-401",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Post-quantum resilience training is an application of high-dimensional computing logic."
+    }
+  ]
+}

@@ -30,9 +30,9 @@ use symthaea_logparse::{evtx_source, LogEvent};
 const KILL_CRITERION: f32 = 0.50;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let arg = std::env::args().nth(1).ok_or(
-        "usage:\n  cluster_evtx --synthetic\n  cluster_evtx <corpus_dir>",
-    )?;
+    let arg = std::env::args()
+        .nth(1)
+        .ok_or("usage:\n  cluster_evtx --synthetic\n  cluster_evtx <corpus_dir>")?;
 
     let (events, mode_label) = if arg == "--synthetic" {
         let corpus = generate_synthetic_corpus(40, 0xC0FFEE);
@@ -78,13 +78,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // HDBSCAN SWEEP: try several min_cluster values to separate
     // "parameter failure" from "encoder failure".
     // ------------------------------------------------------------------
-    let sweep: Vec<usize> = vec![
-        10,
-        20,
-        40,
-        80,
-        (hvs.len() / 20).max(5),
-    ];
+    let sweep: Vec<usize> = vec![10, 20, 40, 80, (hvs.len() / 20).max(5)];
 
     let mut best_p = f32::NEG_INFINITY;
     let mut best_cfg: (usize, usize, usize) = (0, 0, 0); // (min_cluster, clusters, noise)
@@ -97,8 +91,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for &mc in &sweep {
         let labels = hdbscan_cluster(&hvs, Some(mc))?;
         let noise = labels.iter().filter(|&&c| c == -1).count();
-        let distinct: std::collections::HashSet<_> =
-            labels.iter().filter(|&&c| c != -1).collect();
+        let distinct: std::collections::HashSet<_> = labels.iter().filter(|&&c| c != -1).collect();
         let p = purity(&labels, &gt_refs);
         println!(
             "{:>12}  {:>10}  {:>10}  {:>10.3}",
@@ -127,8 +120,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
              required for Phase 1 kill-criterion evaluation."
         );
     } else {
-        let nc_verdict = if nc_purity >= KILL_CRITERION { "PASS" } else { "FAIL" };
-        let hd_verdict = if best_p >= KILL_CRITERION { "PASS" } else { "FAIL" };
+        let nc_verdict = if nc_purity >= KILL_CRITERION {
+            "PASS"
+        } else {
+            "FAIL"
+        };
+        let hd_verdict = if best_p >= KILL_CRITERION {
+            "PASS"
+        } else {
+            "FAIL"
+        };
         let chance = 1.0 / count_classes(&gt) as f32;
         println!("\nchance level (1/n_classes): {chance:.3}");
         println!("kill criterion (>= {KILL_CRITERION:.2}):");
@@ -231,7 +232,11 @@ fn load_real_corpus(corpus_dir: &PathBuf) -> Result<Vec<LogEvent>, Box<dyn std::
             parsed
         } else {
             let stride = parsed_len / MAX_PER_FILE;
-            parsed.into_iter().step_by(stride.max(1)).take(MAX_PER_FILE).collect()
+            parsed
+                .into_iter()
+                .step_by(stride.max(1))
+                .take(MAX_PER_FILE)
+                .collect()
         };
 
         let kept = capped.len();
@@ -261,13 +266,12 @@ fn load_real_corpus(corpus_dir: &PathBuf) -> Result<Vec<LogEvent>, Box<dyn std::
     for (label, bucket) in by_label.iter() {
         let take = bucket.len().min(per_label_budget);
         let stride = (bucket.len() / take.max(1)).max(1);
-        let sampled: Vec<LogEvent> = bucket
-            .iter()
-            .step_by(stride)
-            .take(take)
-            .cloned()
-            .collect();
-        println!("[sample] {label}: {} -> {} events", bucket.len(), sampled.len());
+        let sampled: Vec<LogEvent> = bucket.iter().step_by(stride).take(take).cloned().collect();
+        println!(
+            "[sample] {label}: {} -> {} events",
+            bucket.len(),
+            sampled.len()
+        );
         events.extend(sampled);
     }
     println!(

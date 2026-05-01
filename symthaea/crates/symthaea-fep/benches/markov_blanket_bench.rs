@@ -24,7 +24,10 @@ fn bench_compute_permeability(c: &mut Criterion) {
         peer_trust: 0.7,
     };
     c.bench_function("compute_permeability", |b| {
-        b.iter(|| op.compute_permeability(black_box(&inputs)))
+        b.iter(|| {
+            let permeability = op.compute_permeability(black_box(&inputs)).clone();
+            black_box(permeability)
+        })
     });
 }
 
@@ -79,7 +82,11 @@ fn bench_coalition_identification(c: &mut Criterion) {
             }
         }
         group.bench_function(format!("{}_peers", n), |b| {
-            b.iter(|| identify_coalitions(black_box(&peers), black_box(&edges), 0.5))
+            b.iter(|| {
+                let peers = black_box(peers.as_slice());
+                let edges = black_box(edges.as_slice());
+                identify_coalitions(peers, edges, 0.5)
+            })
         });
     }
     group.finish();

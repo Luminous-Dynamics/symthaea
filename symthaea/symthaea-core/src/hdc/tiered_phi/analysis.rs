@@ -41,7 +41,7 @@ impl Default for PhiPyramidConfig {
             max_scales: 8,
             scale_factor: 2, // Each level has 2x more components
             parallel_scales: true,
-            phi_tier: ApproximationTier::SpectralConnectivity,
+            phi_tier: ApproximationTier::SampledPartition,
         }
     }
 }
@@ -62,7 +62,7 @@ impl PhiPyramidConfig {
         Self {
             max_scales: 12,
             parallel_scales: true,
-            phi_tier: ApproximationTier::SpectralConnectivity,
+            phi_tier: ApproximationTier::ExhaustivePartition,
             ..Default::default()
         }
     }

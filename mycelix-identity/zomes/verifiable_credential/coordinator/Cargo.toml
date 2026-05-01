@@ -9,6 +9,7 @@ description = "W3C Verifiable Credentials coordinator zome"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+mycelix-zome-helpers = { workspace = true }
 hdk = { workspace = true }
 verifiable_credential_integrity = { path = "../integrity" }
 holochain_serialized_bytes = { workspace = true }

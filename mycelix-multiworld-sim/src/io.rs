@@ -14,9 +14,9 @@
 //!                         output.json (structured results)
 //! ```
 
-use serde::{Deserialize, Serialize};
-use crate::config::{SimulationConfig, BirthPolicy, ProjectStrategy, ResourcePriority};
+use crate::config::{BirthPolicy, ProjectStrategy, ResourcePriority, SimulationConfig};
 use crate::constants::SimulationParams;
+use serde::{Deserialize, Serialize};
 
 /// TOML-friendly scenario configuration.
 /// All fields optional — defaults from SimulationConfig::default_300_year().
@@ -61,10 +61,9 @@ pub struct ParamsToml {
 impl ScenarioToml {
     /// Load from a TOML file path.
     pub fn load(path: &str) -> Result<Self, String> {
-        let content = std::fs::read_to_string(path)
-            .map_err(|e| format!("Failed to read {}: {}", path, e))?;
-        toml::from_str(&content)
-            .map_err(|e| format!("Failed to parse TOML: {}", e))
+        let content =
+            std::fs::read_to_string(path).map_err(|e| format!("Failed to read {}: {}", path, e))?;
+        toml::from_str(&content).map_err(|e| format!("Failed to parse TOML: {}", e))
     }
 
     /// Convert to simulation config, policy, and params.
@@ -109,25 +108,53 @@ impl ScenarioToml {
                     _ => ResourcePriority::Balanced,
                 };
             }
-            if let Some(v) = pol.trade_openness { config.policy.trade_openness = v; }
-            if let Some(v) = pol.defense_spending { config.policy.defense_spending = v; }
-            if let Some(v) = pol.exploration_investment { config.policy.exploration_investment = v; }
-            if let Some(v) = pol.trust_weighted_governance { config.policy.trust_weighted_governance = v; }
-            if let Some(v) = pol.disasters_enabled { config.policy.disasters_enabled = v; }
+            if let Some(v) = pol.trade_openness {
+                config.policy.trade_openness = v;
+            }
+            if let Some(v) = pol.defense_spending {
+                config.policy.defense_spending = v;
+            }
+            if let Some(v) = pol.exploration_investment {
+                config.policy.exploration_investment = v;
+            }
+            if let Some(v) = pol.trust_weighted_governance {
+                config.policy.trust_weighted_governance = v;
+            }
+            if let Some(v) = pol.disasters_enabled {
+                config.policy.disasters_enabled = v;
+            }
         }
 
         // Apply params overrides
         let mut params = SimulationParams::default();
         if let Some(p) = self.params {
-            if let Some(v) = p.radiation_mars_sv_month { params.radiation_mars_sv_month = v; }
-            if let Some(v) = p.spoilage_food { params.spoilage_food = v; }
-            if let Some(v) = p.spoilage_energy { params.spoilage_energy = v; }
-            if let Some(v) = p.stress_baseline { params.stress_baseline = v; }
-            if let Some(v) = p.trauma_decay_base { params.trauma_decay_base = v; }
-            if let Some(v) = p.project_setback_probability { params.project_setback_probability = v; }
-            if let Some(v) = p.project_failure_probability { params.project_failure_probability = v; }
-            if let Some(v) = p.solar_dust_mars { params.solar_dust_mars = v; }
-            if let Some(v) = p.memory_half_life_ticks { params.memory_half_life_ticks = v; }
+            if let Some(v) = p.radiation_mars_sv_month {
+                params.radiation_mars_sv_month = v;
+            }
+            if let Some(v) = p.spoilage_food {
+                params.spoilage_food = v;
+            }
+            if let Some(v) = p.spoilage_energy {
+                params.spoilage_energy = v;
+            }
+            if let Some(v) = p.stress_baseline {
+                params.stress_baseline = v;
+            }
+            if let Some(v) = p.trauma_decay_base {
+                params.trauma_decay_base = v;
+            }
+            if let Some(v) = p.project_setback_probability {
+                params.project_setback_probability = v;
+            }
+            if let Some(v) = p.project_failure_probability {
+                params.project_failure_probability = v;
+            }
+            if let Some(v) = p.solar_dust_mars {
+                params.solar_dust_mars = v;
+            }
+            if let Some(v) = p.memory_half_life_ticks {
+                params.memory_half_life_ticks = v;
+            }
         }
 
         (config, params)
@@ -191,29 +218,44 @@ pub fn build_output(
     sim: &crate::MultiWorldSimulator,
     report: &crate::report::CivilizationReport,
 ) -> SimulationOutput {
-    let worlds: Vec<WorldOutput> = sim.worlds.iter().map(|w| {
-        let living: Vec<_> = w.agents.iter().filter(|a| a.is_alive()).collect();
-        let mean_conatus = if living.is_empty() { 0.0 } else {
-            living.iter().map(|a| a.needs.affect.net_conatus()).sum::<f64>() / living.len() as f64
-        };
-        WorldOutput {
-            name: w.name.clone(),
-            location: w.location.clone(),
-            population: w.population(),
-            phi: w.collective_phi(),
-            conatus: mean_conatus,
-            load: {
-                let living: Vec<_> = w.agents.iter().filter(|a| a.is_alive()).collect();
-                if living.is_empty() { 0.0 } else {
-                    living.iter().map(|a| a.needs.allostatic_load).sum::<f64>() / living.len() as f64
-                }
-            },
-            self_sufficiency: w.resources.self_sufficiency(),
-            robot_count: w.fleet.total_units(),
-        }
-    }).collect();
+    let worlds: Vec<WorldOutput> = sim
+        .worlds
+        .iter()
+        .map(|w| {
+            let living: Vec<_> = w.agents.iter().filter(|a| a.is_alive()).collect();
+            let mean_conatus = if living.is_empty() {
+                0.0
+            } else {
+                living
+                    .iter()
+                    .map(|a| a.needs.affect.net_conatus())
+                    .sum::<f64>()
+                    / living.len() as f64
+            };
+            WorldOutput {
+                name: w.name.clone(),
+                location: w.location.clone(),
+                population: w.population(),
+                phi: w.collective_phi(),
+                conatus: mean_conatus,
+                load: {
+                    let living: Vec<_> = w.agents.iter().filter(|a| a.is_alive()).collect();
+                    if living.is_empty() {
+                        0.0
+                    } else {
+                        living.iter().map(|a| a.needs.allostatic_load).sum::<f64>()
+                            / living.len() as f64
+                    }
+                },
+                self_sufficiency: w.resources.self_sufficiency(),
+                robot_count: w.fleet.total_units(),
+            }
+        })
+        .collect();
 
-    let cvs_trajectory: Vec<TrajectoryPoint> = report.epoch_snapshots.iter()
+    let cvs_trajectory: Vec<TrajectoryPoint> = report
+        .epoch_snapshots
+        .iter()
         .filter(|s| s.tick % 600 == 0) // Every 50 years
         .map(|s| TrajectoryPoint {
             year: s.tick as f64 / 12.0,
@@ -226,12 +268,21 @@ pub fn build_output(
         .collect();
 
     let robot_count: usize = sim.worlds.iter().map(|w| w.fleet.total_units()).sum();
-    let brownout_count = sim.events.iter()
-        .filter(|e| e.description.contains("BROWNOUT")).count();
-    let exploration_count = sim.events.iter()
-        .filter(|e| e.description.contains("EXPLORATION")).count();
-    let independence_count = sim.events.iter()
-        .filter(|e| e.description.contains("INDEPENDENCE")).count();
+    let brownout_count = sim
+        .events
+        .iter()
+        .filter(|e| e.description.contains("BROWNOUT"))
+        .count();
+    let exploration_count = sim
+        .events
+        .iter()
+        .filter(|e| e.description.contains("EXPLORATION"))
+        .count();
+    let independence_count = sim
+        .events
+        .iter()
+        .filter(|e| e.description.contains("INDEPENDENCE"))
+        .count();
 
     SimulationOutput {
         seed: sim.config.seed,
@@ -243,7 +294,9 @@ pub fn build_output(
         tech_milestones: report.tech_milestones_achieved,
         cvs_trajectory,
         worlds,
-        milestones: sim.events.iter()
+        milestones: sim
+            .events
+            .iter()
             .filter(|e| e.description.contains("MILESTONE"))
             .map(|e| e.description.clone())
             .collect(),

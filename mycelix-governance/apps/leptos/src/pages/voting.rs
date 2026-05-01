@@ -6,6 +6,7 @@
 
 use leptos::prelude::*;
 use crate::contexts::governance_context::use_governance;
+use mycelix_leptos_core::consciousness::{combined_score, DIMENSION_LABELS, SovereignDimension};
 use mycelix_leptos_core::use_consciousness;
 use governance_leptos_types::*;
 
@@ -37,44 +38,35 @@ pub fn VotingPage() -> impl IntoView {
                     <div class="weight-visual">
                         <span
                             class="weight-value"
-                            data-weight=move || format!("{:.2}", consciousness.profile.get().combined_score())
+                            data-weight=move || format!("{:.2}", combined_score(&consciousness.profile.get()))
                         >
-                            {move || format!("{:.2}", consciousness.profile.get().combined_score())}
+                            {move || format!("{:.2}", combined_score(&consciousness.profile.get()))}
                         </span>
                         <span class="weight-label">"effective weight"</span>
                     </div>
                     <div class="weight-breakdown" data-component="weight-breakdown">
                         {move || {
                             let p = consciousness.profile.get();
+                            let dims = [
+                                SovereignDimension::EpistemicIntegrity,
+                                SovereignDimension::NetworkResilience,
+                                SovereignDimension::CivicParticipation,
+                                SovereignDimension::SemanticResonance,
+                            ];
                             view! {
-                                <div class="weight-dim" data-dimension="identity" data-value=format!("{:.2}", p.identity)>
-                                    <span class="dim-label">"identity"</span>
-                                    <div class="dim-bar">
-                                        <div class="dim-fill" style=format!("width: {}%", p.identity * 100.0)></div>
-                                    </div>
-                                    <span class="dim-value">{format!("{:.2}", p.identity)}</span>
-                                </div>
-                                <div class="weight-dim" data-dimension="reputation" data-value=format!("{:.2}", p.reputation)>
-                                    <span class="dim-label">"reputation"</span>
-                                    <div class="dim-bar">
-                                        <div class="dim-fill" style=format!("width: {}%", p.reputation * 100.0)></div>
-                                    </div>
-                                    <span class="dim-value">{format!("{:.2}", p.reputation)}</span>
-                                </div>
-                                <div class="weight-dim" data-dimension="community" data-value=format!("{:.2}", p.community)>
-                                    <span class="dim-label">"community"</span>
-                                    <div class="dim-bar">
-                                        <div class="dim-fill" style=format!("width: {}%", p.community * 100.0)></div>
-                                    </div>
-                                    <span class="dim-value">{format!("{:.2}", p.community)}</span>
-                                </div>
-                                <div class="weight-dim" data-dimension="engagement" data-value=format!("{:.2}", p.engagement)>
-                                    <span class="dim-label">"engagement"</span>
-                                    <div class="dim-bar">
-                                        <div class="dim-fill" style=format!("width: {}%", p.engagement * 100.0)></div>
-                                    </div>
-                                    <span class="dim-value">{format!("{:.2}", p.engagement)}</span>
-                                </div>
+                                {dims.into_iter().map(|dim| {
+                                    let value = p.get(dim);
+                                    let label = &DIMENSION_LABELS[dim.index()];
+                                    view! {
+                                        <div class="weight-dim" data-dimension=label.key data-value=format!("{value:.2}")>
+                                            <span class="dim-label">{label.name_en}</span>
+                                            <div class="dim-bar">
+                                                <div class="dim-fill" style=format!("width: {}%", value * 100.0)></div>
+                                            </div>
+                                            <span class="dim-value">{format!("{value:.2}")}</span>
+                                        </div>
+                                    }
+                                }).collect_view()}
                             }
                         }}
                     </div>

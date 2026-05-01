@@ -12,8 +12,8 @@
 // HDC byte-level operations use explicit indexing for clarity and performance.
 #![allow(clippy::needless_range_loop)]
 
-use prism_common::{EmpiricalLevel, NormativeLevel, MaterialityLevel, SearchResult};
-use serde::{Serialize, Deserialize};
+use prism_common::{EmpiricalLevel, MaterialityLevel, NormativeLevel, SearchResult};
+use serde::{Deserialize, Serialize};
 
 pub mod binary_hv;
 use binary_hv::BinaryHV;
@@ -152,9 +152,19 @@ impl SearchEngine {
     /// Merge another engine's claims into this one (for lazy-loading).
     pub fn merge(&mut self, other: Self) {
         for (claim, vector) in other.claims.into_iter().zip(other.vectors) {
-            let prefix: String = claim.content.chars().take(80).collect::<String>().to_lowercase();
+            let prefix: String = claim
+                .content
+                .chars()
+                .take(80)
+                .collect::<String>()
+                .to_lowercase();
             let is_dup = self.claims.iter().any(|c| {
-                c.content.chars().take(80).collect::<String>().to_lowercase() == prefix
+                c.content
+                    .chars()
+                    .take(80)
+                    .collect::<String>()
+                    .to_lowercase()
+                    == prefix
             });
             if !is_dup {
                 self.claims.push(claim);
@@ -223,20 +233,28 @@ impl SearchEngine {
         });
 
         let candidates: Vec<usize> = if self.vectors.len() > 200 {
-            self.vectors.iter().enumerate().filter_map(|(i, v)| {
-                let mut matches = 0u32;
-                for h in 0..NUM_HASHES {
-                    let p0 = (h * 31 + 7) % 2048;
-                    let p1 = (h * 67 + 13) % 2048;
-                    let p2 = (h * 97 + 29) % 2048;
-                    let vh = v.0[p0] ^ v.0[p1] ^ v.0[p2];
-                    // Count matching bits between query hash and candidate hash
-                    matches += (!(query_hashes[h] ^ vh)).count_ones();
-                }
-                // 64 hashes × 8 bits = 512 possible matching bits
-                // Threshold: require above random expectation (256)
-                if matches > (MATCH_THRESHOLD as u32 * 8) { Some(i) } else { None }
-            }).collect()
+            self.vectors
+                .iter()
+                .enumerate()
+                .filter_map(|(i, v)| {
+                    let mut matches = 0u32;
+                    for h in 0..NUM_HASHES {
+                        let p0 = (h * 31 + 7) % 2048;
+                        let p1 = (h * 67 + 13) % 2048;
+                        let p2 = (h * 97 + 29) % 2048;
+                        let vh = v.0[p0] ^ v.0[p1] ^ v.0[p2];
+                        // Count matching bits between query hash and candidate hash
+                        matches += (!(query_hashes[h] ^ vh)).count_ones();
+                    }
+                    // 64 hashes × 8 bits = 512 possible matching bits
+                    // Threshold: require above random expectation (256)
+                    if matches > (MATCH_THRESHOLD as u32 * 8) {
+                        Some(i)
+                    } else {
+                        None
+                    }
+                })
+                .collect()
         } else {
             (0..self.vectors.len()).collect()
         };
@@ -292,7 +310,11 @@ impl Default for SearchEngine {
 }
 
 /// Encode text with IDF weighting (used for indexing claims when corpus stats available).
-fn encode_text_idf(text: &str, word_df: &std::collections::HashMap<String, usize>, n_docs: f32) -> BinaryHV {
+fn encode_text_idf(
+    text: &str,
+    word_df: &std::collections::HashMap<String, usize>,
+    n_docs: f32,
+) -> BinaryHV {
     let lowered = text.to_lowercase();
     let words: Vec<&str> = lowered
         .split(|c: char| !c.is_alphanumeric())
@@ -316,7 +338,9 @@ fn encode_text_idf(text: &str, word_df: &std::collections::HashMap<String, usize
 
     // Bigrams (high IDF — very specific)
     for pair in words.windows(2) {
-        let bigram_seed = hash_word(pair[0]).wrapping_mul(31).wrapping_add(hash_word(pair[1]));
+        let bigram_seed = hash_word(pair[0])
+            .wrapping_mul(31)
+            .wrapping_add(hash_word(pair[1]));
         hvs.push(BinaryHV::random(bigram_seed));
         weights.push(3.0); // Bigrams get high weight
     }
@@ -355,7 +379,9 @@ pub fn encode_text(text: &str) -> BinaryHV {
 
     // Bigrams (adjacent word pairs — captures "ocean acidification", "quantum physics")
     for pair in words.windows(2) {
-        let bigram_seed = hash_word(pair[0]).wrapping_mul(31).wrapping_add(hash_word(pair[1]));
+        let bigram_seed = hash_word(pair[0])
+            .wrapping_mul(31)
+            .wrapping_add(hash_word(pair[1]));
         hvs.push(BinaryHV::random(bigram_seed));
     }
 
@@ -366,18 +392,82 @@ pub fn encode_text(text: &str) -> BinaryHV {
 fn is_stop_word(word: &str) -> bool {
     matches!(
         word,
-        "the" | "is" | "are" | "was" | "were" | "be" | "been" | "being"
-            | "have" | "has" | "had" | "do" | "does" | "did"
-            | "will" | "would" | "could" | "should" | "may" | "might"
-            | "shall" | "can" | "need" | "must"
-            | "am" | "it" | "its" | "in" | "on" | "at" | "to" | "for"
-            | "of" | "with" | "by" | "from" | "as" | "into" | "about"
-            | "an" | "and" | "or" | "but" | "not" | "no" | "nor"
-            | "so" | "if" | "than" | "too" | "very" | "just"
-            | "that" | "this" | "these" | "those" | "what" | "which"
-            | "who" | "whom" | "how" | "when" | "where" | "why"
-            | "all" | "each" | "every" | "both" | "few" | "more"
-            | "most" | "other" | "some" | "such" | "only" | "then"
+        "the"
+            | "is"
+            | "are"
+            | "was"
+            | "were"
+            | "be"
+            | "been"
+            | "being"
+            | "have"
+            | "has"
+            | "had"
+            | "do"
+            | "does"
+            | "did"
+            | "will"
+            | "would"
+            | "could"
+            | "should"
+            | "may"
+            | "might"
+            | "shall"
+            | "can"
+            | "need"
+            | "must"
+            | "am"
+            | "it"
+            | "its"
+            | "in"
+            | "on"
+            | "at"
+            | "to"
+            | "for"
+            | "of"
+            | "with"
+            | "by"
+            | "from"
+            | "as"
+            | "into"
+            | "about"
+            | "an"
+            | "and"
+            | "or"
+            | "but"
+            | "not"
+            | "no"
+            | "nor"
+            | "so"
+            | "if"
+            | "than"
+            | "too"
+            | "very"
+            | "just"
+            | "that"
+            | "this"
+            | "these"
+            | "those"
+            | "what"
+            | "which"
+            | "who"
+            | "whom"
+            | "how"
+            | "when"
+            | "where"
+            | "why"
+            | "all"
+            | "each"
+            | "every"
+            | "both"
+            | "few"
+            | "more"
+            | "most"
+            | "other"
+            | "some"
+            | "such"
+            | "only"
+            | "then"
     )
 }
 
@@ -484,12 +574,17 @@ mod tests {
     fn search_returns_relevant_results() {
         let engine = SearchEngine::with_seed_claims();
         let results = engine.search("ocean acidification", 5);
-        assert!(!results.is_empty(), "Should find results for ocean acidification");
+        assert!(
+            !results.is_empty(),
+            "Should find results for ocean acidification"
+        );
         // Top result should mention ocean or CO2
         let top = &results[0];
         let content_lower = top.content.to_lowercase();
         assert!(
-            content_lower.contains("ocean") || content_lower.contains("co2") || content_lower.contains("acid"),
+            content_lower.contains("ocean")
+                || content_lower.contains("co2")
+                || content_lower.contains("acid"),
             "Top result should be relevant: {}",
             top.content
         );
@@ -517,7 +612,11 @@ mod tests {
     #[test]
     fn seed_claims_loaded() {
         let engine = SearchEngine::with_seed_claims();
-        assert!(engine.claim_count() >= 50, "Should have at least 50 seed claims, got {}", engine.claim_count());
+        assert!(
+            engine.claim_count() >= 50,
+            "Should have at least 50 seed claims, got {}",
+            engine.claim_count()
+        );
     }
 
     #[test]

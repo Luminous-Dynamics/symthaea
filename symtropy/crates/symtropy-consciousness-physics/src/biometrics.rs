@@ -166,14 +166,14 @@ pub struct BiometricNormParams {
 impl Default for BiometricNormParams {
     fn default() -> Self {
         Self {
-            hrv:         ChannelNorm::new(10.0, 100.0),  // ms RMSSD
-            gamma:       ChannelNorm::new(0.0, 1.0),     // dimensionless coherence
-            gsr:         ChannelNorm::new(0.5, 25.0),    // μS
-            respiration: ChannelNorm::new(4.0, 24.0),    // bpm
-            heart_rate:  ChannelNorm::new(45.0, 110.0),  // bpm
-            alpha:       ChannelNorm::new(0.5, 80.0),    // μV²/Hz
-            theta:       ChannelNorm::new(0.5, 40.0),    // μV²/Hz
-            beta:        ChannelNorm::new(0.5, 25.0),    // μV²/Hz
+            hrv: ChannelNorm::new(10.0, 100.0),        // ms RMSSD
+            gamma: ChannelNorm::new(0.0, 1.0),         // dimensionless coherence
+            gsr: ChannelNorm::new(0.5, 25.0),          // μS
+            respiration: ChannelNorm::new(4.0, 24.0),  // bpm
+            heart_rate: ChannelNorm::new(45.0, 110.0), // bpm
+            alpha: ChannelNorm::new(0.5, 80.0),        // μV²/Hz
+            theta: ChannelNorm::new(0.5, 40.0),        // μV²/Hz
+            beta: ChannelNorm::new(0.5, 25.0),         // μV²/Hz
         }
     }
 }
@@ -248,24 +248,56 @@ impl BiometricHistory {
         }
 
         // Accumulate per-channel sums and presence counts
-        let mut hrv_sum = 0.0f64;   let mut hrv_n   = 0u32;
-        let mut gam_sum = 0.0f64;   let mut gam_n   = 0u32;
-        let mut gsr_sum = 0.0f64;   let mut gsr_n   = 0u32;
-        let mut resp_sum = 0.0f64;  let mut resp_n  = 0u32;
-        let mut hr_sum  = 0.0f64;   let mut hr_n    = 0u32;
-        let mut alp_sum = 0.0f64;   let mut alp_n   = 0u32;
-        let mut the_sum = 0.0f64;   let mut the_n   = 0u32;
-        let mut bet_sum = 0.0f64;   let mut bet_n   = 0u32;
+        let mut hrv_sum = 0.0f64;
+        let mut hrv_n = 0u32;
+        let mut gam_sum = 0.0f64;
+        let mut gam_n = 0u32;
+        let mut gsr_sum = 0.0f64;
+        let mut gsr_n = 0u32;
+        let mut resp_sum = 0.0f64;
+        let mut resp_n = 0u32;
+        let mut hr_sum = 0.0f64;
+        let mut hr_n = 0u32;
+        let mut alp_sum = 0.0f64;
+        let mut alp_n = 0u32;
+        let mut the_sum = 0.0f64;
+        let mut the_n = 0u32;
+        let mut bet_sum = 0.0f64;
+        let mut bet_n = 0u32;
 
         for s in &self.samples {
-            if let Some(v) = s.hrv_rmssd            { hrv_sum  += v; hrv_n  += 1; }
-            if let Some(v) = s.eeg_gamma_coherence  { gam_sum  += v; gam_n  += 1; }
-            if let Some(v) = s.gsr_microsiemens     { gsr_sum  += v; gsr_n  += 1; }
-            if let Some(v) = s.respiration_bpm      { resp_sum += v; resp_n += 1; }
-            if let Some(v) = s.heart_rate_bpm       { hr_sum   += v; hr_n   += 1; }
-            if let Some(v) = s.eeg_alpha_power      { alp_sum  += v; alp_n  += 1; }
-            if let Some(v) = s.eeg_theta_power      { the_sum  += v; the_n  += 1; }
-            if let Some(v) = s.eeg_beta_power       { bet_sum  += v; bet_n  += 1; }
+            if let Some(v) = s.hrv_rmssd {
+                hrv_sum += v;
+                hrv_n += 1;
+            }
+            if let Some(v) = s.eeg_gamma_coherence {
+                gam_sum += v;
+                gam_n += 1;
+            }
+            if let Some(v) = s.gsr_microsiemens {
+                gsr_sum += v;
+                gsr_n += 1;
+            }
+            if let Some(v) = s.respiration_bpm {
+                resp_sum += v;
+                resp_n += 1;
+            }
+            if let Some(v) = s.heart_rate_bpm {
+                hr_sum += v;
+                hr_n += 1;
+            }
+            if let Some(v) = s.eeg_alpha_power {
+                alp_sum += v;
+                alp_n += 1;
+            }
+            if let Some(v) = s.eeg_theta_power {
+                the_sum += v;
+                the_n += 1;
+            }
+            if let Some(v) = s.eeg_beta_power {
+                bet_sum += v;
+                bet_n += 1;
+            }
         }
 
         // Majority-presence threshold: channel must be present in >50% of the window
@@ -275,46 +307,62 @@ impl BiometricHistory {
         // phi ← gamma coherence (direct integration proxy, no inversion)
         let phi = if gam_n > thresh {
             self.norm.gamma.update(gam_sum / gam_n as f64)
-        } else { 0.5 };
+        } else {
+            0.5
+        };
 
         // synchrony ← HRV RMSSD (higher = more synchrony)
         let synchrony = if hrv_n > thresh {
             self.norm.hrv.update(hrv_sum / hrv_n as f64)
-        } else { 0.5 };
+        } else {
+            0.5
+        };
 
         // attention ← GSR (Yerkes-Dodson inverted-U: peak at mid-arousal)
         let attention = if gsr_n > thresh {
             let norm = self.norm.gsr.update(gsr_sum / gsr_n as f64);
             // Inverted-U: f(x) = 1 − 4(x − 0.5)²  →  1.0 at x=0.5, 0.0 at x=0 or x=1
             (1.0 - 4.0 * (norm - 0.5).powi(2)).clamp(0.0, 1.0)
-        } else { 0.5 };
+        } else {
+            0.5
+        };
 
         // embodiment ← respiration (invert: slower rate = more grounded)
         let embodiment = if resp_n > thresh {
             let norm = self.norm.respiration.update(resp_sum / resp_n as f64);
             1.0 - norm
-        } else { 0.5 };
+        } else {
+            0.5
+        };
 
         // broadcast ← heart rate (invert: lower rate = better cardiac-neural entrainment)
         let broadcast = if hr_n > thresh {
             let norm = self.norm.heart_rate.update(hr_sum / hr_n as f64);
             1.0 - norm
-        } else { 0.5 };
+        } else {
+            0.5
+        };
 
         // recurrence ← alpha power (higher alpha = more recurrent/default-mode)
         let recurrence = if alp_n > thresh {
             self.norm.alpha.update(alp_sum / alp_n as f64)
-        } else { 0.5 };
+        } else {
+            0.5
+        };
 
         // working_memory ← theta power
         let working_memory = if the_n > thresh {
             self.norm.theta.update(the_sum / the_n as f64)
-        } else { 0.5 };
+        } else {
+            0.5
+        };
 
         // knowledge ← beta power
         let knowledge = if bet_n > thresh {
             self.norm.beta.update(bet_sum / bet_n as f64)
-        } else { 0.5 };
+        } else {
+            0.5
+        };
 
         ConsciousnessInputs {
             phi,
@@ -357,14 +405,14 @@ mod tests {
 
     fn make_full_sample(v: f64) -> BiometricSample {
         BiometricSample {
-            hrv_rmssd:           Some(v * 100.0),   // 0→0 ms, 1→100 ms
+            hrv_rmssd: Some(v * 100.0), // 0→0 ms, 1→100 ms
             eeg_gamma_coherence: Some(v),
-            gsr_microsiemens:    Some(v * 20.0),
-            respiration_bpm:     Some(4.0 + v * 20.0),
-            heart_rate_bpm:      Some(45.0 + v * 65.0),
-            eeg_alpha_power:     Some(v * 80.0),
-            eeg_theta_power:     Some(v * 40.0),
-            eeg_beta_power:      Some(v * 25.0),
+            gsr_microsiemens: Some(v * 20.0),
+            respiration_bpm: Some(4.0 + v * 20.0),
+            heart_rate_bpm: Some(45.0 + v * 65.0),
+            eeg_alpha_power: Some(v * 80.0),
+            eeg_theta_power: Some(v * 40.0),
+            eeg_beta_power: Some(v * 25.0),
         }
     }
 
@@ -397,20 +445,34 @@ mod tests {
         let mut h = BiometricHistory::new(5);
         // Fill window with high-HRV samples (80ms — near top of default range)
         for _ in 0..5 {
-            h.push(BiometricSample { hrv_rmssd: Some(85.0), ..Default::default() });
+            h.push(BiometricSample {
+                hrv_rmssd: Some(85.0),
+                ..Default::default()
+            });
         }
         let inputs = h.to_consciousness_inputs();
-        assert!(inputs.synchrony > 0.6, "high HRV should yield high synchrony, got {}", inputs.synchrony);
+        assert!(
+            inputs.synchrony > 0.6,
+            "high HRV should yield high synchrony, got {}",
+            inputs.synchrony
+        );
     }
 
     #[test]
     fn low_hrv_produces_low_synchrony() {
         let mut h = BiometricHistory::new(5);
         for _ in 0..5 {
-            h.push(BiometricSample { hrv_rmssd: Some(12.0), ..Default::default() });
+            h.push(BiometricSample {
+                hrv_rmssd: Some(12.0),
+                ..Default::default()
+            });
         }
         let inputs = h.to_consciousness_inputs();
-        assert!(inputs.synchrony < 0.4, "low HRV should yield low synchrony, got {}", inputs.synchrony);
+        assert!(
+            inputs.synchrony < 0.4,
+            "low HRV should yield low synchrony, got {}",
+            inputs.synchrony
+        );
     }
 
     #[test]
@@ -418,10 +480,17 @@ mod tests {
         let mut h = BiometricHistory::new(5);
         // 5 bpm — coherent breathing (near bottom of range)
         for _ in 0..5 {
-            h.push(BiometricSample { respiration_bpm: Some(5.0), ..Default::default() });
+            h.push(BiometricSample {
+                respiration_bpm: Some(5.0),
+                ..Default::default()
+            });
         }
         let inputs = h.to_consciousness_inputs();
-        assert!(inputs.embodiment > 0.6, "slow breathing should yield high embodiment, got {}", inputs.embodiment);
+        assert!(
+            inputs.embodiment > 0.6,
+            "slow breathing should yield high embodiment, got {}",
+            inputs.embodiment
+        );
     }
 
     #[test]
@@ -429,10 +498,17 @@ mod tests {
         let mut h = BiometricHistory::new(5);
         // 22 bpm — near top of range
         for _ in 0..5 {
-            h.push(BiometricSample { respiration_bpm: Some(22.0), ..Default::default() });
+            h.push(BiometricSample {
+                respiration_bpm: Some(22.0),
+                ..Default::default()
+            });
         }
         let inputs = h.to_consciousness_inputs();
-        assert!(inputs.embodiment < 0.4, "fast breathing should yield low embodiment, got {}", inputs.embodiment);
+        assert!(
+            inputs.embodiment < 0.4,
+            "fast breathing should yield low embodiment, got {}",
+            inputs.embodiment
+        );
     }
 
     #[test]
@@ -443,15 +519,30 @@ mod tests {
 
         // GSR default range: 0.5–25 μS. Mid ≈ 12 μS.
         for _ in 0..5 {
-            low.push(BiometricSample { gsr_microsiemens: Some(1.0), ..Default::default() });
-            mid.push(BiometricSample { gsr_microsiemens: Some(12.5), ..Default::default() });
-            high.push(BiometricSample { gsr_microsiemens: Some(24.0), ..Default::default() });
+            low.push(BiometricSample {
+                gsr_microsiemens: Some(1.0),
+                ..Default::default()
+            });
+            mid.push(BiometricSample {
+                gsr_microsiemens: Some(12.5),
+                ..Default::default()
+            });
+            high.push(BiometricSample {
+                gsr_microsiemens: Some(24.0),
+                ..Default::default()
+            });
         }
-        let attn_low  = low.to_consciousness_inputs().attention;
-        let attn_mid  = mid.to_consciousness_inputs().attention;
+        let attn_low = low.to_consciousness_inputs().attention;
+        let attn_mid = mid.to_consciousness_inputs().attention;
         let attn_high = high.to_consciousness_inputs().attention;
-        assert!(attn_mid > attn_low,  "mid GSR should yield more attention than low: {attn_mid} vs {attn_low}");
-        assert!(attn_mid > attn_high, "mid GSR should yield more attention than high: {attn_mid} vs {attn_high}");
+        assert!(
+            attn_mid > attn_low,
+            "mid GSR should yield more attention than low: {attn_mid} vs {attn_low}"
+        );
+        assert!(
+            attn_mid > attn_high,
+            "mid GSR should yield more attention than high: {attn_mid} vs {attn_high}"
+        );
     }
 
     #[test]
@@ -459,16 +550,37 @@ mod tests {
         let mut h = BiometricHistory::new(5);
         // Only HRV set; all others missing
         for _ in 0..5 {
-            h.push(BiometricSample { hrv_rmssd: Some(50.0), ..Default::default() });
+            h.push(BiometricSample {
+                hrv_rmssd: Some(50.0),
+                ..Default::default()
+            });
         }
         let inputs = h.to_consciousness_inputs();
-        assert!((inputs.phi - 0.5).abs() < 1e-9,           "missing gamma → phi=0.5");
-        assert!((inputs.attention - 0.5).abs() < 1e-9,     "missing GSR → attention=0.5");
-        assert!((inputs.embodiment - 0.5).abs() < 1e-9,    "missing respiration → embodiment=0.5");
-        assert!((inputs.broadcast - 0.5).abs() < 1e-9,     "missing HR → broadcast=0.5");
-        assert!((inputs.recurrence - 0.5).abs() < 1e-9,    "missing alpha → recurrence=0.5");
-        assert!((inputs.working_memory - 0.5).abs() < 1e-9,"missing theta → working_memory=0.5");
-        assert!((inputs.knowledge - 0.5).abs() < 1e-9,     "missing beta → knowledge=0.5");
+        assert!((inputs.phi - 0.5).abs() < 1e-9, "missing gamma → phi=0.5");
+        assert!(
+            (inputs.attention - 0.5).abs() < 1e-9,
+            "missing GSR → attention=0.5"
+        );
+        assert!(
+            (inputs.embodiment - 0.5).abs() < 1e-9,
+            "missing respiration → embodiment=0.5"
+        );
+        assert!(
+            (inputs.broadcast - 0.5).abs() < 1e-9,
+            "missing HR → broadcast=0.5"
+        );
+        assert!(
+            (inputs.recurrence - 0.5).abs() < 1e-9,
+            "missing alpha → recurrence=0.5"
+        );
+        assert!(
+            (inputs.working_memory - 0.5).abs() < 1e-9,
+            "missing theta → working_memory=0.5"
+        );
+        assert!(
+            (inputs.knowledge - 0.5).abs() < 1e-9,
+            "missing beta → knowledge=0.5"
+        );
     }
 
     #[test]
@@ -476,7 +588,10 @@ mod tests {
         let mut h = BiometricHistory::new(3);
         // Push 5 samples: first 3 should be evicted
         for i in 0..5u32 {
-            h.push(BiometricSample { hrv_rmssd: Some(i as f64 * 10.0), ..Default::default() });
+            h.push(BiometricSample {
+                hrv_rmssd: Some(i as f64 * 10.0),
+                ..Default::default()
+            });
         }
         assert_eq!(h.len(), 3, "window should hold at most 3 samples");
     }
@@ -499,7 +614,10 @@ mod tests {
         let mut norm = ChannelNorm::new(10.0, 50.0);
         // Push a value below the soft_min
         let v = norm.update(5.0);
-        assert!(v < 0.1, "value below soft_min should normalize near 0, got {v}");
+        assert!(
+            v < 0.1,
+            "value below soft_min should normalize near 0, got {v}"
+        );
         assert!(norm.soft_min < 10.0, "soft_min should have drifted down");
     }
 

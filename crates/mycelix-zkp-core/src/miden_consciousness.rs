@@ -62,11 +62,7 @@ pub struct MidenConsciousnessProof {
 ///
 /// The nonce and epoch_secs ensure each commitment is unique and time-bound,
 /// preventing replay attacks where a valid proof is reused across sessions.
-pub fn compute_score_commitment(
-    phi_score: f64,
-    nonce: &[u8; 32],
-    epoch_secs: u64,
-) -> [u8; 32] {
+pub fn compute_score_commitment(phi_score: f64, nonce: &[u8; 32], epoch_secs: u64) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(phi_score.to_le_bytes());
     hasher.update(b"MYCELIX:CivicTier:v2");
@@ -214,11 +210,8 @@ pub fn prove_consciousness_tier_miden(
     phi_permille: u32,
     threshold_permille: u32,
 ) -> MidenResult<MidenConsciousnessProof> {
-        use miden_core::Felt;
-    use miden_vm::{
-        Assembler, DefaultHost, ProvingOptions, StackInputs,
-        advice::AdviceInputs,
-    };
+    use miden_core::Felt;
+    use miden_vm::{advice::AdviceInputs, Assembler, DefaultHost, ProvingOptions, StackInputs};
 
     // Validate inputs
     if phi_permille > 1000 {
@@ -336,10 +329,7 @@ pub fn verify_consciousness_tier_miden(
     program_hash: &[u64; 4],
 ) -> MidenResult<bool> {
     use miden_core::Felt;
-    use miden_vm::{
-        StackInputs, StackOutputs, ProgramInfo, Kernel,
-        ExecutionProof, Word,
-    };
+    use miden_vm::{ExecutionProof, Kernel, ProgramInfo, StackInputs, StackOutputs, Word};
 
     // Structural validation first
     validate_miden_proof_structure(proof)?;
@@ -353,11 +343,7 @@ pub fn verify_consciousness_tier_miden(
         .map_err(|e| ZkpError::VerificationFailed(format!("Stack input error: {}", e)))?;
 
     // Reconstruct outputs
-    let output_felts: Vec<Felt> = proof
-        .stack_outputs
-        .iter()
-        .map(|&v| Felt::new(v))
-        .collect();
+    let output_felts: Vec<Felt> = proof.stack_outputs.iter().map(|&v| Felt::new(v)).collect();
     let stack_outputs = StackOutputs::new(&output_felts)
         .map_err(|e| ZkpError::VerificationFailed(format!("Stack output error: {}", e)))?;
 
@@ -436,14 +422,20 @@ mod tests {
         let epoch = 1_776_000_000u64;
         let c1 = compute_score_commitment(0.5, &nonce, epoch);
         let c2 = compute_score_commitment(0.6, &nonce, epoch);
-        assert_ne!(c1, c2, "Different scores should produce different commitments");
+        assert_ne!(
+            c1, c2,
+            "Different scores should produce different commitments"
+        );
     }
 
     #[test]
     fn test_score_commitment_non_zero() {
         let nonce = [0u8; 32];
         let c = compute_score_commitment(0.0, &nonce, 0);
-        assert_ne!(c, [0u8; 32], "Even zero inputs should produce non-zero commitment");
+        assert_ne!(
+            c, [0u8; 32],
+            "Even zero inputs should produce non-zero commitment"
+        );
     }
 
     #[test]
@@ -453,7 +445,10 @@ mod tests {
         let epoch = 1_776_000_000u64;
         let c1 = compute_score_commitment(0.5, &n1, epoch);
         let c2 = compute_score_commitment(0.5, &n2, epoch);
-        assert_ne!(c1, c2, "Different nonces must produce different commitments (replay prevention)");
+        assert_ne!(
+            c1, c2,
+            "Different nonces must produce different commitments (replay prevention)"
+        );
     }
 
     #[test]
@@ -461,7 +456,10 @@ mod tests {
         let nonce = [0xCCu8; 32];
         let c1 = compute_score_commitment(0.5, &nonce, 1_000_000);
         let c2 = compute_score_commitment(0.5, &nonce, 2_000_000);
-        assert_ne!(c1, c2, "Different epochs must produce different commitments");
+        assert_ne!(
+            c1, c2,
+            "Different epochs must produce different commitments"
+        );
     }
 
     #[test]
@@ -567,8 +565,7 @@ mod tests {
         );
 
         // Get program hash for verification
-        let program_hash = consciousness_program_hash()
-            .expect("Program hash should be computable");
+        let program_hash = consciousness_program_hash().expect("Program hash should be computable");
 
         // Verify
         let verified = verify_consciousness_tier_miden(&proof, 400, &program_hash)
@@ -588,8 +585,8 @@ mod tests {
     #[cfg(feature = "backend-miden")]
     #[test]
     fn test_prove_guardian_tier() {
-        let proof = prove_consciousness_tier_miden(900, 600)
-            .expect("Guardian proof should succeed");
+        let proof =
+            prove_consciousness_tier_miden(900, 600).expect("Guardian proof should succeed");
         assert_eq!(proof.proven_tier, CivicTier::Guardian);
 
         let program_hash = consciousness_program_hash().unwrap();

@@ -5,10 +5,10 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::proposal::{Proposal, ProposalStatus, ProposalVotingState};
-use crate::vote::VoteCollection;
-use crate::validator::ValidatorSet;
 use crate::error::{ConsensusError, ConsensusResult};
+use crate::proposal::{Proposal, ProposalStatus, ProposalVotingState};
+use crate::validator::ValidatorSet;
+use crate::vote::VoteCollection;
 
 /// State of a consensus round
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -86,7 +86,10 @@ impl ConsensusRound {
 
         if proposal.round != self.number {
             return Err(ConsensusError::InvalidProposal {
-                reason: format!("Wrong round: expected {}, got {}", self.number, proposal.round),
+                reason: format!(
+                    "Wrong round: expected {}, got {}",
+                    self.number, proposal.round
+                ),
             });
         }
 
@@ -210,7 +213,10 @@ impl RoundManager {
     }
 
     /// Start a new round
-    pub fn start_new_round(&mut self, validators: &ValidatorSet) -> ConsensusResult<&ConsensusRound> {
+    pub fn start_new_round(
+        &mut self,
+        validators: &ValidatorSet,
+    ) -> ConsensusResult<&ConsensusRound> {
         // Complete any active round first
         if let Some(ref round) = self.active_round {
             if !round.is_complete() {
@@ -230,12 +236,12 @@ impl RoundManager {
         self.current_round += 1;
 
         // Select leader for new round
-        let leader = validators
-            .select_leader(self.current_round)
-            .ok_or(ConsensusError::InsufficientValidators {
+        let leader = validators.select_leader(self.current_round).ok_or(
+            ConsensusError::InsufficientValidators {
                 have: validators.active_count(),
                 need: 1,
-            })?;
+            },
+        )?;
 
         // Create and start new round
         let mut round = ConsensusRound::new(
@@ -246,7 +252,10 @@ impl RoundManager {
         round.start();
 
         self.active_round = Some(round);
-        Ok(self.active_round.as_ref().expect("active_round set to Some on line above"))
+        Ok(self
+            .active_round
+            .as_ref()
+            .expect("active_round set to Some on line above"))
     }
 
     /// Archive a completed round
@@ -277,18 +286,28 @@ impl RoundManager {
     /// Get statistics
     pub fn stats(&self) -> RoundStats {
         let total = self.completed_rounds.len();
-        let committed = self.completed_rounds.iter()
+        let committed = self
+            .completed_rounds
+            .iter()
             .filter(|r| r.state == RoundState::Committed)
             .count();
-        let failed = self.completed_rounds.iter()
+        let failed = self
+            .completed_rounds
+            .iter()
             .filter(|r| r.state == RoundState::Failed)
             .count();
-        let skipped = self.completed_rounds.iter()
+        let skipped = self
+            .completed_rounds
+            .iter()
             .filter(|r| r.state == RoundState::Skipped)
             .count();
 
         let avg_duration = if total > 0 {
-            self.completed_rounds.iter().map(|r| r.duration_secs).sum::<i64>() as f64 / total as f64
+            self.completed_rounds
+                .iter()
+                .map(|r| r.duration_secs)
+                .sum::<i64>() as f64
+                / total as f64
         } else {
             0.0
         };
@@ -298,7 +317,11 @@ impl RoundManager {
             committed_rounds: committed,
             failed_rounds: failed,
             skipped_rounds: skipped,
-            success_rate: if total > 0 { committed as f64 / total as f64 } else { 0.0 },
+            success_rate: if total > 0 {
+                committed as f64 / total as f64
+            } else {
+                0.0
+            },
             avg_duration_secs: avg_duration,
         }
     }

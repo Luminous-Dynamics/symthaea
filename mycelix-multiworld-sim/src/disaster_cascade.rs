@@ -25,35 +25,135 @@ pub struct CascadeEdge {
 pub fn build_default_cascade_graph() -> Vec<CascadeEdge> {
     vec![
         // Solar → infrastructure
-        CascadeEdge { trigger: "carrington".into(), consequence: "power_failure".into(), probability: 0.8, delay_ticks: 0 },
-        CascadeEdge { trigger: "carrington".into(), consequence: "comms_failure".into(), probability: 0.6, delay_ticks: 0 },
-        CascadeEdge { trigger: "x_class_flare".into(), consequence: "power_failure".into(), probability: 0.3, delay_ticks: 0 },
+        CascadeEdge {
+            trigger: "carrington".into(),
+            consequence: "power_failure".into(),
+            probability: 0.8,
+            delay_ticks: 0,
+        },
+        CascadeEdge {
+            trigger: "carrington".into(),
+            consequence: "comms_failure".into(),
+            probability: 0.6,
+            delay_ticks: 0,
+        },
+        CascadeEdge {
+            trigger: "x_class_flare".into(),
+            consequence: "power_failure".into(),
+            probability: 0.3,
+            delay_ticks: 0,
+        },
         // Power → life support
-        CascadeEdge { trigger: "power_failure".into(), consequence: "thermal_failure".into(), probability: 0.6, delay_ticks: 0 },
-        CascadeEdge { trigger: "power_failure".into(), consequence: "water_failure".into(), probability: 0.4, delay_ticks: 1 },
-        CascadeEdge { trigger: "power_failure".into(), consequence: "hydroponic_failure".into(), probability: 0.5, delay_ticks: 1 },
+        CascadeEdge {
+            trigger: "power_failure".into(),
+            consequence: "thermal_failure".into(),
+            probability: 0.6,
+            delay_ticks: 0,
+        },
+        CascadeEdge {
+            trigger: "power_failure".into(),
+            consequence: "water_failure".into(),
+            probability: 0.4,
+            delay_ticks: 1,
+        },
+        CascadeEdge {
+            trigger: "power_failure".into(),
+            consequence: "hydroponic_failure".into(),
+            probability: 0.5,
+            delay_ticks: 1,
+        },
         // Thermal → atmosphere
-        CascadeEdge { trigger: "thermal_failure".into(), consequence: "o2_failure".into(), probability: 0.4, delay_ticks: 1 },
-        CascadeEdge { trigger: "thermal_failure".into(), consequence: "co2_failure".into(), probability: 0.3, delay_ticks: 1 },
+        CascadeEdge {
+            trigger: "thermal_failure".into(),
+            consequence: "o2_failure".into(),
+            probability: 0.4,
+            delay_ticks: 1,
+        },
+        CascadeEdge {
+            trigger: "thermal_failure".into(),
+            consequence: "co2_failure".into(),
+            probability: 0.3,
+            delay_ticks: 1,
+        },
         // Seismic → structural
-        CascadeEdge { trigger: "moonquake".into(), consequence: "seal_failure".into(), probability: 0.3, delay_ticks: 0 },
-        CascadeEdge { trigger: "seal_failure".into(), consequence: "o2_loss".into(), probability: 0.5, delay_ticks: 0 },
-        CascadeEdge { trigger: "seal_failure".into(), consequence: "pressure_loss".into(), probability: 0.4, delay_ticks: 0 },
+        CascadeEdge {
+            trigger: "moonquake".into(),
+            consequence: "seal_failure".into(),
+            probability: 0.3,
+            delay_ticks: 0,
+        },
+        CascadeEdge {
+            trigger: "seal_failure".into(),
+            consequence: "o2_loss".into(),
+            probability: 0.5,
+            delay_ticks: 0,
+        },
+        CascadeEdge {
+            trigger: "seal_failure".into(),
+            consequence: "pressure_loss".into(),
+            probability: 0.4,
+            delay_ticks: 0,
+        },
         // Europa-specific
-        CascadeEdge { trigger: "tidal_quake".into(), consequence: "seal_failure".into(), probability: 0.25, delay_ticks: 0 },
-        CascadeEdge { trigger: "ice_instability".into(), consequence: "seal_failure".into(), probability: 0.6, delay_ticks: 0 },
-        CascadeEdge { trigger: "radiation_surge".into(), consequence: "comms_failure".into(), probability: 0.4, delay_ticks: 0 },
+        CascadeEdge {
+            trigger: "tidal_quake".into(),
+            consequence: "seal_failure".into(),
+            probability: 0.25,
+            delay_ticks: 0,
+        },
+        CascadeEdge {
+            trigger: "ice_instability".into(),
+            consequence: "seal_failure".into(),
+            probability: 0.6,
+            delay_ticks: 0,
+        },
+        CascadeEdge {
+            trigger: "radiation_surge".into(),
+            consequence: "comms_failure".into(),
+            probability: 0.4,
+            delay_ticks: 0,
+        },
         // Titan-specific
-        CascadeEdge { trigger: "heating_failure".into(), consequence: "embrittlement_spike".into(), probability: 0.5, delay_ticks: 1 },
-        CascadeEdge { trigger: "methane_storm".into(), consequence: "seal_failure".into(), probability: 0.2, delay_ticks: 0 },
+        CascadeEdge {
+            trigger: "heating_failure".into(),
+            consequence: "embrittlement_spike".into(),
+            probability: 0.5,
+            delay_ticks: 1,
+        },
+        CascadeEdge {
+            trigger: "methane_storm".into(),
+            consequence: "seal_failure".into(),
+            probability: 0.2,
+            delay_ticks: 0,
+        },
         // Hydroponic → food
-        CascadeEdge { trigger: "hydroponic_failure".into(), consequence: "food_shortage".into(), probability: 0.7, delay_ticks: 2 },
+        CascadeEdge {
+            trigger: "hydroponic_failure".into(),
+            consequence: "food_shortage".into(),
+            probability: 0.7,
+            delay_ticks: 2,
+        },
         // Comms → governance
-        CascadeEdge { trigger: "comms_failure".into(), consequence: "governance_disruption".into(), probability: 0.3, delay_ticks: 1 },
+        CascadeEdge {
+            trigger: "comms_failure".into(),
+            consequence: "governance_disruption".into(),
+            probability: 0.3,
+            delay_ticks: 1,
+        },
         // Water → health
-        CascadeEdge { trigger: "water_failure".into(), consequence: "health_crisis".into(), probability: 0.5, delay_ticks: 2 },
+        CascadeEdge {
+            trigger: "water_failure".into(),
+            consequence: "health_crisis".into(),
+            probability: 0.5,
+            delay_ticks: 2,
+        },
         // Compound
-        CascadeEdge { trigger: "food_shortage".into(), consequence: "social_unrest".into(), probability: 0.4, delay_ticks: 3 },
+        CascadeEdge {
+            trigger: "food_shortage".into(),
+            consequence: "social_unrest".into(),
+            probability: 0.4,
+            delay_ticks: 3,
+        },
     ]
 }
 
@@ -72,7 +172,10 @@ pub fn propagate_cascade(triggered: &str, graph: &[CascadeEdge], rng_val: f64) -
     visited.insert(triggered.to_string());
 
     while let Some(current) = queue.pop() {
-        for edge in graph.iter().filter(|e| e.trigger == current && e.delay_ticks == 0) {
+        for edge in graph
+            .iter()
+            .filter(|e| e.trigger == current && e.delay_ticks == 0)
+        {
             if !visited.contains(&edge.consequence) && rng_val < edge.probability {
                 visited.insert(edge.consequence.clone());
                 fired.push(edge.consequence.clone());
@@ -134,12 +237,20 @@ mod tests {
     #[test]
     fn test_cascade_graph_has_expected_edges() {
         let graph = build_default_cascade_graph();
-        assert!(graph.len() >= 15, "Should have at least 15 cascade edges, got {}", graph.len());
+        assert!(
+            graph.len() >= 15,
+            "Should have at least 15 cascade edges, got {}",
+            graph.len()
+        );
         // All probabilities in valid range
         for edge in &graph {
-            assert!(edge.probability > 0.0 && edge.probability <= 1.0,
+            assert!(
+                edge.probability > 0.0 && edge.probability <= 1.0,
                 "Edge {} -> {} has invalid probability {}",
-                edge.trigger, edge.consequence, edge.probability);
+                edge.trigger,
+                edge.consequence,
+                edge.probability
+            );
         }
     }
 
@@ -147,8 +258,18 @@ mod tests {
     fn test_no_infinite_loop() {
         // Even with a cycle in the graph, visited set prevents infinite loops
         let graph = vec![
-            CascadeEdge { trigger: "a".into(), consequence: "b".into(), probability: 1.0, delay_ticks: 0 },
-            CascadeEdge { trigger: "b".into(), consequence: "a".into(), probability: 1.0, delay_ticks: 0 },
+            CascadeEdge {
+                trigger: "a".into(),
+                consequence: "b".into(),
+                probability: 1.0,
+                delay_ticks: 0,
+            },
+            CascadeEdge {
+                trigger: "b".into(),
+                consequence: "a".into(),
+                probability: 1.0,
+                delay_ticks: 0,
+            },
         ];
         let consequences = propagate_cascade("a", &graph, 0.0);
         assert_eq!(consequences, vec!["b".to_string()]);

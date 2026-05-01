@@ -115,7 +115,7 @@ From integration audit (2026-04-19):
 | PQC email (Pulse) | Phase 0/1 in `session-pulse-readiness` worktree; main has DNA only | ~6 wk (merge + productionize) |
 | Xenia remote support | Alpha on crates.io; synthetic frames, ML-KEM placeholder | ~6-8 wk (cross-platform via `scap` — see [ADR 0001](mycelix-sovereign/docs/adr/0001-screen-capture-backend.md)) |
 | Athena L1 agent | REPL + tool-use works; no KB, no ticket API | ~4 wk |
-| Unified shell / auth | Portal is a container; no cross-cluster auth | ~5 wk |
+| Unified shell / auth | Sensorium is a shell; no cross-cluster auth | ~5 wk |
 | Device enrollment | Holon is a sensor bridge; no DID binding | **year 2** |
 
 **Honest Suite-beta estimate: ~17 weeks** (parallel streams; see §6).

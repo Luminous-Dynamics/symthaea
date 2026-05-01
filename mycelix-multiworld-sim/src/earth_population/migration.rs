@@ -13,9 +13,9 @@
 //! LIMITATION: No diaspora networks, no policy barriers (visa systems),
 //! no cultural affinity modeling. All regions are equally accessible.
 
+use super::cohort::{CohortSex, EducationBand, FineAgeBand, RegionCohortKey, RegionDemographics};
 use crate::earth_regions::EarthRegion;
 use crate::stochastic::StochasticEngine;
-use super::cohort::{RegionDemographics, RegionCohortKey, FineAgeBand, CohortSex, EducationBand};
 
 use serde::{Deserialize, Serialize};
 
@@ -58,17 +58,21 @@ impl MigrationEngine {
         demographics: &mut [RegionDemographics],
         _rng: &mut StochasticEngine,
     ) {
-        if regions.len() < 2 { return; }
+        if regions.len() < 2 {
+            return;
+        }
 
         self.total_migration_this_tick = 0.0;
 
         // Compute push-pull for each pair
         for i in 0..regions.len().min(self.num_regions) {
             for j in 0..regions.len().min(self.num_regions) {
-                if i == j { continue; }
+                if i == j {
+                    continue;
+                }
 
-                let flow = self.compute_flow(&regions[i], &regions[j],
-                    &demographics[i], &demographics[j]);
+                let flow =
+                    self.compute_flow(&regions[i], &regions[j], &demographics[i], &demographics[j]);
                 self.flow_matrix[i][j] = flow;
             }
         }
@@ -78,7 +82,9 @@ impl MigrationEngine {
         let mut transfers: Vec<(usize, usize, f64)> = Vec::new();
         for i in 0..self.num_regions.min(regions.len()) {
             for j in 0..self.num_regions.min(regions.len()) {
-                if i == j { continue; }
+                if i == j {
+                    continue;
+                }
                 let monthly_flow = self.flow_matrix[i][j] / 12.0;
                 if monthly_flow > 0.001 {
                     transfers.push((i, j, monthly_flow));
@@ -107,16 +113,18 @@ impl MigrationEngine {
         let push = 0.3 * (1.0 - from.gdp_per_capita / 60_000.0).max(0.0)  // poverty
             + 0.3 * from.climate_vulnerability                               // climate
             + 0.2 * (1.0 - from.infrastructure_level)                        // poor infra
-            + 0.2 * (1.0 - from.education_index);                            // low opportunity
+            + 0.2 * (1.0 - from.education_index); // low opportunity
 
         // Pull factors (to): what attracts people
         let pull = 0.4 * (to.gdp_per_capita / 60_000.0).min(1.0)            // wages
             + 0.3 * (1.0 - to.climate_vulnerability)                          // safety
             + 0.2 * to.education_index                                        // opportunity
-            + 0.1 * to.infrastructure_level;                                  // quality of life
+            + 0.1 * to.infrastructure_level; // quality of life
 
         // Gravity: proportional to geometric mean of populations
-        let pop_factor = (from_demo.total_population * to_demo.total_population).max(0.0).sqrt();
+        let pop_factor = (from_demo.total_population * to_demo.total_population)
+            .max(0.0)
+            .sqrt();
 
         (push * pull * pop_factor * FLOW_SCALE).max(0.0)
     }
@@ -130,8 +138,12 @@ impl MigrationEngine {
         amount_millions: f64,
         demographics: &mut [RegionDemographics],
     ) {
-        if from_idx >= demographics.len() || to_idx >= demographics.len() { return; }
-        if amount_millions < 0.0001 { return; }
+        if from_idx >= demographics.len() || to_idx >= demographics.len() {
+            return;
+        }
+        if amount_millions < 0.0001 {
+            return;
+        }
 
         // Migrants are predominantly working-age (20-39, bands 4-7)
         // with secondary or tertiary education
@@ -169,13 +181,14 @@ impl MigrationEngine {
                 };
 
                 // Remove from source
-                let actual_transfer = if let Some(cohort) = demographics[from_idx].cohorts.get_mut(&from_key) {
-                    let transfer = sex_amount.min(cohort.count * 0.05); // max 5% of cohort per tick
-                    cohort.count -= transfer;
-                    transfer
-                } else {
-                    0.0
-                };
+                let actual_transfer =
+                    if let Some(cohort) = demographics[from_idx].cohorts.get_mut(&from_key) {
+                        let transfer = sex_amount.min(cohort.count * 0.05); // max 5% of cohort per tick
+                        cohort.count -= transfer;
+                        transfer
+                    } else {
+                        0.0
+                    };
 
                 if actual_transfer > 0.0001 {
                     // Add to destination
@@ -186,16 +199,21 @@ impl MigrationEngine {
         }
 
         // Update cached totals
-        demographics[from_idx].total_population = demographics[from_idx].cohorts.values().map(|c| c.count).sum();
-        demographics[to_idx].total_population = demographics[to_idx].cohorts.values().map(|c| c.count).sum();
+        demographics[from_idx].total_population = demographics[from_idx]
+            .cohorts
+            .values()
+            .map(|c| c.count)
+            .sum();
+        demographics[to_idx].total_population =
+            demographics[to_idx].cohorts.values().map(|c| c.count).sum();
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::earth_regions::build_earth_regions;
     use crate::earth_population::EarthPopulationModel;
+    use crate::earth_regions::build_earth_regions;
 
     #[test]
     fn test_migration_flows_from_poor_to_rich() {
@@ -205,18 +223,24 @@ mod tests {
 
         // South Asia (idx 1, poor) → North America (idx 7, rich)
         let flow_poor_to_rich = engine.compute_flow(
-            &regions[1], &regions[7],
-            &model.demographics[1], &model.demographics[7],
+            &regions[1],
+            &regions[7],
+            &model.demographics[1],
+            &model.demographics[7],
         );
 
         // North America → South Asia (reverse)
         let flow_rich_to_poor = engine.compute_flow(
-            &regions[7], &regions[1],
-            &model.demographics[7], &model.demographics[1],
+            &regions[7],
+            &regions[1],
+            &model.demographics[7],
+            &model.demographics[1],
         );
 
-        assert!(flow_poor_to_rich > flow_rich_to_poor,
-            "Migration should flow from poor to rich: {flow_poor_to_rich} vs {flow_rich_to_poor}");
+        assert!(
+            flow_poor_to_rich > flow_rich_to_poor,
+            "Migration should flow from poor to rich: {flow_poor_to_rich} vs {flow_rich_to_poor}"
+        );
     }
 
     #[test]
@@ -226,12 +250,16 @@ mod tests {
         let total_before: f64 = model.demographics.iter().map(|d| d.total_population).sum();
 
         let mut rng = StochasticEngine::new(42);
-        model.migration.tick(&regions, &mut model.demographics, &mut rng);
+        model
+            .migration
+            .tick(&regions, &mut model.demographics, &mut rng);
 
         let total_after: f64 = model.demographics.iter().map(|d| d.total_population).sum();
 
         // Migration should only move people, not create or destroy
-        assert!((total_before - total_after).abs() < total_before * 0.001,
-            "Population changed: {total_before} → {total_after}");
+        assert!(
+            (total_before - total_after).abs() < total_before * 0.001,
+            "Population changed: {total_before} → {total_after}"
+        );
     }
 }

@@ -420,9 +420,9 @@ impl IrohNode {
         })?;
 
         // Await handshake completion; connection is fully established
-        let connection = accepting.await.map_err(|e| {
-            SwarmError::Internal(format!("Inbound QUIC handshake failed: {e}"))
-        })?;
+        let connection = accepting
+            .await
+            .map_err(|e| SwarmError::Internal(format!("Inbound QUIC handshake failed: {e}")))?;
 
         // remote_id() is available on Connection<HandshakeCompleted> — cryptographically verified
         let peer_id = connection.remote_id().to_string();

@@ -27,9 +27,9 @@
 //! // User approves → phone.execute_action(proposed)?;
 //! ```
 
+pub mod actions;
 pub mod adb;
 pub mod bridge;
-pub mod actions;
 pub mod task;
 
 /// scrcpy-server lifecycle, binary framing, HEVC decode.
@@ -47,4 +47,4 @@ pub mod streaming_bridge;
 
 pub use actions::PhoneAction;
 pub use bridge::PhoneBridge;
-pub use task::{Task, TaskStep, StepTarget, StepAction};
+pub use task::{StepAction, StepTarget, Task, TaskStep};

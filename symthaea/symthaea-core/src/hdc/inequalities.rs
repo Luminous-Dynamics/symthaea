@@ -196,9 +196,7 @@ pub fn schur_t1_holds(a: f64, b: f64, c: f64) -> bool {
 ///     a²(a − b)(a − c) + b²(b − a)(b − c) + c²(c − a)(c − b) ≥ 0
 pub fn schur_t2_holds(a: f64, b: f64, c: f64) -> bool {
     assert!(a >= -INEQ_EPS && b >= -INEQ_EPS && c >= -INEQ_EPS);
-    let s = a * a * (a - b) * (a - c)
-        + b * b * (b - a) * (b - c)
-        + c * c * (c - a) * (c - b);
+    let s = a * a * (a - b) * (a - c) + b * b * (b - a) * (b - c) + c * c * (c - a) * (c - b);
     nonneg(s)
 }
 
@@ -328,8 +326,20 @@ mod tests {
             (10.0, 1.0, 1.0),
             (1.0, 1.0, 10.0),
         ] {
-            assert!(schur_t1_holds(a, b, c), "Schur t=1 failed on ({}, {}, {})", a, b, c);
-            assert!(schur_t2_holds(a, b, c), "Schur t=2 failed on ({}, {}, {})", a, b, c);
+            assert!(
+                schur_t1_holds(a, b, c),
+                "Schur t=1 failed on ({}, {}, {})",
+                a,
+                b,
+                c
+            );
+            assert!(
+                schur_t2_holds(a, b, c),
+                "Schur t=2 failed on ({}, {}, {})",
+                a,
+                b,
+                c
+            );
         }
     }
 
@@ -337,8 +347,7 @@ mod tests {
     fn test_schur_equality_case() {
         // All equal: Schur is tight at 0.
         let a: f64 = 2.5;
-        let s: f64 =
-            a * (a - a) * (a - a) + a * (a - a) * (a - a) + a * (a - a) * (a - a);
+        let s: f64 = a * (a - a) * (a - a) + a * (a - a) * (a - a) + a * (a - a) * (a - a);
         assert!(s.abs() < 1e-9);
         assert!(schur_t1_holds(a, a, a));
     }

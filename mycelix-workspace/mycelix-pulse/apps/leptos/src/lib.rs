@@ -4,23 +4,24 @@
 //! Mycelix Pulse — Decentralized encrypted communication on Holochain.
 
 pub mod app;
+pub mod body_renderer;
+pub mod components;
+pub mod crypto;
+pub mod dsid;
 pub mod holochain;
+pub mod karma;
+pub mod keyboard;
 pub mod mail_context;
 pub mod mock_data;
-pub mod toasts;
-pub mod keyboard;
-pub mod body_renderer;
+pub mod nlp_time;
 pub mod notifications;
-pub mod theme;
 pub mod offline;
-pub mod crypto;
+pub mod pages;
 pub mod persistence;
 pub mod preferences;
-pub mod nlp_time;
 pub mod semantic;
+pub mod summary;
+pub mod theme;
+pub mod toasts;
 pub mod webrtc;
-pub mod karma;
-pub mod dsid;
 pub mod zome_adapter;
-pub mod components;
-pub mod pages;

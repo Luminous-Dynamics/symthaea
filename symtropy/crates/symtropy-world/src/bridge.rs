@@ -9,10 +9,7 @@ use std::thread;
 use crossbeam_channel::{bounded, Receiver, Sender, TryRecvError};
 
 use mycelix_multiworld_sim::{
-    config::PolicyConfig,
-    factions::FactionEngine,
-    stochastic::StochasticEngine,
-    world::World,
+    config::PolicyConfig, factions::FactionEngine, stochastic::StochasticEngine, world::World,
 };
 
 use crate::scale::WorldScale;

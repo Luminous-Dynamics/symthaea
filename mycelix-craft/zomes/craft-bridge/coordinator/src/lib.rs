@@ -1,3 +1,4 @@
+use mycelix_zome_helpers as _;
 #![deny(unsafe_code)]
 #![allow(deprecated)] // Uses legacy ConsciousnessCredential/Tier for fallback path
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics

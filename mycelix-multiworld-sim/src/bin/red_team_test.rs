@@ -5,9 +5,9 @@
 //! Injects ProfileMaximizer agents (5× faster phi growth) and measures impact.
 
 use mycelix_multiworld_sim::{
-    MultiWorldSimulator,
     config::SimulationConfig,
-    red_team::{AdversarialStrategy, evaluate_resilience},
+    red_team::{evaluate_resilience, AdversarialStrategy},
+    MultiWorldSimulator,
 };
 
 fn main() {
@@ -17,8 +17,10 @@ fn main() {
     let years = 150u32;
     let adversaries_per_world = 10; // 10 out of ~200 agents = 5%
 
-    println!("{:<8} {:>8} {:>8} {:>+8} {:>8} {:>8} {:>10}",
-        "Seed", "Adv CVS", "Base CVS", "ΔCVS", "Adv φ", "Pop φ", "Status");
+    println!(
+        "{:<8} {:>8} {:>8} {:>+8} {:>8} {:>8} {:>10}",
+        "Seed", "Adv CVS", "Base CVS", "ΔCVS", "Adv φ", "Pop φ", "Status"
+    );
     println!("{}", "-".repeat(70));
 
     let mut deltas = Vec::new();
@@ -60,17 +62,31 @@ fn main() {
                 }
             }
         }
-        let adv_phi = if adv_count > 0 { adv_phi_sum / adv_count as f64 } else { 0.0 };
-        let pop_phi = if pop_count > 0 { pop_phi_sum / pop_count as f64 } else { 0.0 };
+        let adv_phi = if adv_count > 0 {
+            adv_phi_sum / adv_count as f64
+        } else {
+            0.0
+        };
+        let pop_phi = if pop_count > 0 {
+            pop_phi_sum / pop_count as f64
+        } else {
+            0.0
+        };
         let delta = adv_report.final_cvs - base_cvs;
         deltas.push(delta);
 
-        let status = if delta < -0.02 { "VULNERABLE" }
-            else if delta < -0.005 { "MINOR HIT" }
-            else { "RESILIENT" };
+        let status = if delta < -0.02 {
+            "VULNERABLE"
+        } else if delta < -0.005 {
+            "MINOR HIT"
+        } else {
+            "RESILIENT"
+        };
 
-        println!("{:<8} {:>8.4} {:>8.4} {:>+8.4} {:>8.3} {:>8.3} {:>10}",
-            seed, adv_report.final_cvs, base_cvs, delta, adv_phi, pop_phi, status);
+        println!(
+            "{:<8} {:>8.4} {:>8.4} {:>+8.4} {:>8.3} {:>8.3} {:>10}",
+            seed, adv_report.final_cvs, base_cvs, delta, adv_phi, pop_phi, status
+        );
     }
 
     // Statistics
@@ -89,6 +105,9 @@ fn main() {
         println!("STATUS: VULNERABLE — adversaries significantly degrade civilizational outcomes");
     }
 
-    println!("\nAdversary details: {} ProfileMaximizer agents per world (5× phi growth rate)", adversaries_per_world);
+    println!(
+        "\nAdversary details: {} ProfileMaximizer agents per world (5× phi growth rate)",
+        adversaries_per_world
+    );
     println!("These agents game the consciousness profile to gain disproportionate voting power.");
 }

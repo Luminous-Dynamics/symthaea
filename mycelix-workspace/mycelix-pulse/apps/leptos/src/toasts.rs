@@ -51,7 +51,11 @@ impl ToastCtx {
     }
 
     /// Push a toast with an undo callback. The undo button is shown for 5 seconds.
-    pub fn push_with_undo(&self, message: impl Into<String>, undo_fn: impl Fn() + Send + Sync + 'static) {
+    pub fn push_with_undo(
+        &self,
+        message: impl Into<String>,
+        undo_fn: impl Fn() + Send + Sync + 'static,
+    ) {
         let id = self.next_id.get_untracked();
         self.next_id.update(|n| *n += 1);
         let undo = std::sync::Arc::new(undo_fn);
@@ -61,7 +65,9 @@ impl ToastCtx {
                 category: "undo".into(),
                 id,
             });
-            while t.len() > 5 { t.pop_front(); }
+            while t.len() > 5 {
+                t.pop_front();
+            }
         });
 
         // Store undo action
@@ -80,10 +86,16 @@ impl ToastCtx {
 
     /// Execute undo for a given toast ID.
     pub fn execute_undo(&self, id: u32) {
-        let action = self.undo_actions.get_untracked().iter().find(|a| a.id == id).cloned();
+        let action = self
+            .undo_actions
+            .get_untracked()
+            .iter()
+            .find(|a| a.id == id)
+            .cloned();
         if let Some(a) = action {
             (a.callback)();
-            self.undo_actions.update(|actions| actions.retain(|u| u.id != id));
+            self.undo_actions
+                .update(|actions| actions.retain(|u| u.id != id));
             self.toasts.update(|t| t.retain(|toast| toast.id != id));
             self.push("Undone", "success");
         }

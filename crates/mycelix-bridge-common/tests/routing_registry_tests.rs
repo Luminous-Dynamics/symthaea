@@ -17,25 +17,49 @@ use mycelix_bridge_common::routing_registry::*;
 #[test]
 fn test_commons_to_civic_allowed_zomes() {
     // Justice zomes should be reachable from Commons
-    assert!(is_allowed(CrossClusterRole::Commons, CrossClusterRole::Civic, "justice_cases"));
-    assert!(is_allowed(CrossClusterRole::Commons, CrossClusterRole::Civic, "emergency_incidents"));
+    assert!(is_allowed(
+        CrossClusterRole::Commons,
+        CrossClusterRole::Civic,
+        "justice_cases"
+    ));
+    assert!(is_allowed(
+        CrossClusterRole::Commons,
+        CrossClusterRole::Civic,
+        "emergency_incidents"
+    ));
 }
 
 #[test]
 fn test_civic_to_commons_allowed_zomes() {
     // Civic can reach commons property, water, care etc.
-    assert!(is_allowed(CrossClusterRole::Civic, CrossClusterRole::Commons, "property_registry"));
-    assert!(is_allowed(CrossClusterRole::Civic, CrossClusterRole::Commons, "water_flow"));
+    assert!(is_allowed(
+        CrossClusterRole::Civic,
+        CrossClusterRole::Commons,
+        "property_registry"
+    ));
+    assert!(is_allowed(
+        CrossClusterRole::Civic,
+        CrossClusterRole::Commons,
+        "water_flow"
+    ));
 }
 
 #[test]
 fn test_commons_to_identity_allowed() {
-    assert!(is_allowed(CrossClusterRole::Commons, CrossClusterRole::Identity, "did_registry"));
+    assert!(is_allowed(
+        CrossClusterRole::Commons,
+        CrossClusterRole::Identity,
+        "did_registry"
+    ));
 }
 
 #[test]
 fn test_commons_to_finance_allowed() {
-    assert!(is_allowed(CrossClusterRole::Commons, CrossClusterRole::Finance, "payments"));
+    assert!(is_allowed(
+        CrossClusterRole::Commons,
+        CrossClusterRole::Finance,
+        "payments"
+    ));
 }
 
 // ============================================================================
@@ -45,15 +69,35 @@ fn test_commons_to_finance_allowed() {
 #[test]
 fn test_self_to_self_not_allowed() {
     // Self-referential cross-cluster calls should return empty
-    assert!(!is_allowed(CrossClusterRole::Commons, CrossClusterRole::Commons, "property_registry"));
-    assert!(!is_allowed(CrossClusterRole::Civic, CrossClusterRole::Civic, "justice_cases"));
+    assert!(!is_allowed(
+        CrossClusterRole::Commons,
+        CrossClusterRole::Commons,
+        "property_registry"
+    ));
+    assert!(!is_allowed(
+        CrossClusterRole::Civic,
+        CrossClusterRole::Civic,
+        "justice_cases"
+    ));
 }
 
 #[test]
 fn test_unknown_zome_not_allowed() {
-    assert!(!is_allowed(CrossClusterRole::Commons, CrossClusterRole::Civic, "nonexistent_zome"));
-    assert!(!is_allowed(CrossClusterRole::Commons, CrossClusterRole::Civic, ""));
-    assert!(!is_allowed(CrossClusterRole::Commons, CrossClusterRole::Identity, "admin_override"));
+    assert!(!is_allowed(
+        CrossClusterRole::Commons,
+        CrossClusterRole::Civic,
+        "nonexistent_zome"
+    ));
+    assert!(!is_allowed(
+        CrossClusterRole::Commons,
+        CrossClusterRole::Civic,
+        ""
+    ));
+    assert!(!is_allowed(
+        CrossClusterRole::Commons,
+        CrossClusterRole::Identity,
+        "admin_override"
+    ));
 }
 
 #[test]
@@ -71,7 +115,8 @@ fn test_reverse_route_not_symmetric() {
 
 #[test]
 fn test_local_zomes_commons() {
-    let zomes = get_local_zomes(CrossClusterRole::Commons).expect("Commons should have local zomes");
+    let zomes =
+        get_local_zomes(CrossClusterRole::Commons).expect("Commons should have local zomes");
     assert!(zomes.contains(&"property_registry"));
     assert!(zomes.contains(&"water_flow"));
     assert!(zomes.contains(&"care_timebank"));
@@ -94,7 +139,8 @@ fn test_local_zomes_hearth() {
 
 #[test]
 fn test_local_zomes_personal() {
-    let zomes = get_local_zomes(CrossClusterRole::Personal).expect("Personal should have local zomes");
+    let zomes =
+        get_local_zomes(CrossClusterRole::Personal).expect("Personal should have local zomes");
     assert!(zomes.contains(&"identity_vault"));
     assert!(zomes.contains(&"health_vault"));
     assert!(zomes.contains(&"credential_wallet"));
@@ -175,7 +221,11 @@ fn test_no_duplicate_local_zomes_commons() {
     sorted.sort();
     let len_before = sorted.len();
     sorted.dedup();
-    assert_eq!(sorted.len(), len_before, "Commons has duplicate local zomes");
+    assert_eq!(
+        sorted.len(),
+        len_before,
+        "Commons has duplicate local zomes"
+    );
 }
 
 #[test]

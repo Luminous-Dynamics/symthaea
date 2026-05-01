@@ -128,7 +128,11 @@ pub struct EnergySource {
 
 impl EnergySource {
     pub fn new(name: &str, gross: f64, invested: f64) -> Self {
-        let eroi = if invested > 0.0 { gross / invested } else { f64::INFINITY };
+        let eroi = if invested > 0.0 {
+            gross / invested
+        } else {
+            f64::INFINITY
+        };
         Self {
             name: name.to_string(),
             gross_production: gross,
@@ -246,10 +250,7 @@ pub enum ViabilityViolation {
         tier_name: String,
     },
     /// Entropy production exceeding export capacity.
-    EntropyAccumulation {
-        world_id: u32,
-        entropy_rate: f64,
-    },
+    EntropyAccumulation { world_id: u32, entropy_rate: f64 },
     /// Innovation stagnation — no tech milestones for too long.
     InnovationStagnation {
         world_id: u32,
@@ -304,9 +305,12 @@ impl ViabilityEngine {
         // Default: single source "mixed" with EROI based on tech level.
         // Early colony: solar panels, EROI ~10:1.
         let invested = energy_production / 10.0;
-        ledger.sources.push(EnergySource::new("mixed", energy_production, invested));
+        ledger
+            .sources
+            .push(EnergySource::new("mixed", energy_production, invested));
         self.ledgers.insert(world_id, ledger);
-        self.scaling.insert(world_id, ScalingFactors::compute(population));
+        self.scaling
+            .insert(world_id, ScalingFactors::compute(population));
     }
 
     /// Tick Phase 0: Compute energy budgets and scaling factors for all worlds.
@@ -334,8 +338,16 @@ impl ViabilityEngine {
 
             // Energy invested = sum of source investments
             // For now, estimate: 1/EROI of gross per source
-            ledger.total_invested = ledger.sources.iter()
-                .map(|s| if s.eroi > 0.0 { s.gross_production / s.eroi } else { 0.0 })
+            ledger.total_invested = ledger
+                .sources
+                .iter()
+                .map(|s| {
+                    if s.eroi > 0.0 {
+                        s.gross_production / s.eroi
+                    } else {
+                        0.0
+                    }
+                })
                 .sum();
 
             // Net production after investment
@@ -346,16 +358,21 @@ impl ViabilityEngine {
 
             // Complexity/infrastructure maintenance cost
             // Scales with infrastructure level AND benefits from West-Bettencourt sublinear scaling
-            ledger.complexity_cost = infra_level * 50.0 * ENERGY_PER_INFRASTRUCTURE_UNIT
+            ledger.complexity_cost = infra_level
+                * 50.0
+                * ENERGY_PER_INFRASTRUCTURE_UNIT
                 * scaling.infrastructure_efficiency; // sublinear: large pops need less per capita
 
             // Net surplus
-            ledger.net_surplus = ledger.net_production - ledger.population_cost - ledger.complexity_cost;
+            ledger.net_surplus =
+                ledger.net_production - ledger.population_cost - ledger.complexity_cost;
 
             // Aggregate EROI (production-weighted average of sources)
             let total_gross: f64 = ledger.sources.iter().map(|s| s.gross_production).sum();
             ledger.aggregate_eroi = if total_gross > 0.0 {
-                ledger.sources.iter()
+                ledger
+                    .sources
+                    .iter()
                     .map(|s| s.eroi * s.gross_production / total_gross)
                     .sum()
             } else {
@@ -394,8 +411,13 @@ impl ViabilityEngine {
 
             // 4. Check viability conditions (uses snapshots, not the borrow)
             self.check_viability_from_snapshot(
-                world_id, snap_surplus, snap_eroi, snap_deficit_streak,
-                snap_waste_heat, snap_eroi_history_len, current_tick,
+                world_id,
+                snap_surplus,
+                snap_eroi,
+                snap_deficit_streak,
+                snap_waste_heat,
+                snap_eroi_history_len,
+                current_tick,
             );
 
             // 5. Record snapshot
@@ -406,13 +428,21 @@ impl ViabilityEngine {
                 aggregate_eroi: snap_eroi,
                 cumulative_entropy: snap_entropy,
                 scaling_innovation: scaling.innovation_multiplier,
-                violations: self.violations.iter()
+                violations: self
+                    .violations
+                    .iter()
                     .filter(|v| match v {
                         ViabilityViolation::EnergyDeficit { world_id: wid, .. } => *wid == world_id,
                         ViabilityViolation::EROIBelowTier { world_id: wid, .. } => *wid == world_id,
-                        ViabilityViolation::EntropyAccumulation { world_id: wid, .. } => *wid == world_id,
-                        ViabilityViolation::InnovationStagnation { world_id: wid, .. } => *wid == world_id,
-                        ViabilityViolation::CoordinationOverload { world_id: wid, .. } => *wid == world_id,
+                        ViabilityViolation::EntropyAccumulation { world_id: wid, .. } => {
+                            *wid == world_id
+                        }
+                        ViabilityViolation::InnovationStagnation { world_id: wid, .. } => {
+                            *wid == world_id
+                        }
+                        ViabilityViolation::CoordinationOverload { world_id: wid, .. } => {
+                            *wid == world_id
+                        }
                     })
                     .cloned()
                     .collect(),
@@ -460,10 +490,11 @@ impl ViabilityEngine {
         // Condition 3: Entropy accumulation rate
         // If EROI is declining and waste heat is significant, entropy export is failing
         if eroi_history_len >= 12 && aggregate_eroi > 0.0 && aggregate_eroi < EROI_SURVIVAL {
-            self.violations.push(ViabilityViolation::EntropyAccumulation {
-                world_id,
-                entropy_rate: waste_heat,
-            });
+            self.violations
+                .push(ViabilityViolation::EntropyAccumulation {
+                    world_id,
+                    entropy_rate: waste_heat,
+                });
         }
     }
 
@@ -487,12 +518,15 @@ impl ViabilityEngine {
 
     /// Get scaling factors for a world (used by economy, knowledge, governance).
     pub fn scaling_for(&self, world_id: u32) -> ScalingFactors {
-        self.scaling.get(&world_id).copied().unwrap_or(ScalingFactors {
-            population: 0.0,
-            infrastructure_efficiency: 1.0,
-            innovation_multiplier: 1.0,
-            pace_multiplier: 1.0,
-        })
+        self.scaling
+            .get(&world_id)
+            .copied()
+            .unwrap_or(ScalingFactors {
+                population: 0.0,
+                infrastructure_efficiency: 1.0,
+                innovation_multiplier: 1.0,
+                pace_multiplier: 1.0,
+            })
     }
 
     /// Get energy ledger for a world (used by economy for energy-constrained production).
@@ -519,9 +553,12 @@ mod tests {
         let sf_1k = ScalingFactors::compute(1000.0);
         let sf_10k = ScalingFactors::compute(10000.0);
         // 10x more people should need LESS infra per capita
-        assert!(sf_10k.infrastructure_efficiency < sf_1k.infrastructure_efficiency,
+        assert!(
+            sf_10k.infrastructure_efficiency < sf_1k.infrastructure_efficiency,
             "Infrastructure efficiency should decrease per-capita with larger pop: {} vs {}",
-            sf_10k.infrastructure_efficiency, sf_1k.infrastructure_efficiency);
+            sf_10k.infrastructure_efficiency,
+            sf_1k.infrastructure_efficiency
+        );
     }
 
     #[test]
@@ -529,9 +566,12 @@ mod tests {
         let sf_1k = ScalingFactors::compute(1000.0);
         let sf_10k = ScalingFactors::compute(10000.0);
         // 10x more people should produce MORE innovation per capita
-        assert!(sf_10k.innovation_multiplier > sf_1k.innovation_multiplier,
+        assert!(
+            sf_10k.innovation_multiplier > sf_1k.innovation_multiplier,
             "Innovation multiplier should increase per-capita with larger pop: {} vs {}",
-            sf_10k.innovation_multiplier, sf_1k.innovation_multiplier);
+            sf_10k.innovation_multiplier,
+            sf_1k.innovation_multiplier
+        );
     }
 
     #[test]
@@ -543,8 +583,11 @@ mod tests {
 
         // At N=10000, innovation = (10)^(1/6) ≈ 1.468
         let sf = ScalingFactors::compute(10000.0);
-        assert!((sf.innovation_multiplier - 10_f64.powf(1.0/6.0)).abs() < 0.01,
-            "Expected ~1.468, got {}", sf.innovation_multiplier);
+        assert!(
+            (sf.innovation_multiplier - 10_f64.powf(1.0 / 6.0)).abs() < 0.01,
+            "Expected ~1.468, got {}",
+            sf.innovation_multiplier
+        );
     }
 
     #[test]
@@ -558,8 +601,14 @@ mod tests {
         }
         let ledger = engine.ledger_for(0).unwrap();
         assert!(ledger.net_surplus < 0.0, "Should be in deficit");
-        assert!(ledger.deficit_streak >= 6, "Should have deficit streak >= 6");
-        assert!(!engine.violations.is_empty(), "Should have viability violations");
+        assert!(
+            ledger.deficit_streak >= 6,
+            "Should have deficit streak >= 6"
+        );
+        assert!(
+            !engine.violations.is_empty(),
+            "Should have viability violations"
+        );
     }
 
     #[test]
@@ -571,11 +620,18 @@ mod tests {
         for tick in 0..24 {
             engine.tick(&[(0, 100.0, 100.0, 0.5)], tick);
             let ledger = engine.ledger_for(0).unwrap();
-            assert!(ledger.cumulative_entropy >= prev_entropy,
-                "Entropy must monotonically increase: {} < {}", ledger.cumulative_entropy, prev_entropy);
+            assert!(
+                ledger.cumulative_entropy >= prev_entropy,
+                "Entropy must monotonically increase: {} < {}",
+                ledger.cumulative_entropy,
+                prev_entropy
+            );
             prev_entropy = ledger.cumulative_entropy;
         }
-        assert!(prev_entropy > 0.0, "Entropy should be positive after 24 ticks");
+        assert!(
+            prev_entropy > 0.0,
+            "Entropy should be positive after 24 ticks"
+        );
     }
 
     #[test]

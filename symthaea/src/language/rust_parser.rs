@@ -31,8 +31,8 @@ impl RustParser {
         &self,
         node: &tree_sitter::Node,
         source: &str,
-        entities: &mut Vec<CodeEntity>,
-        relations: &mut Vec<CodeRelation>,
+        entities: &mut Vec<Entity>,
+        relations: &mut Vec<EntityRelation>,
     ) {
         match node.kind() {
             "function_item" => {
@@ -86,9 +86,8 @@ impl RustParser {
                 }
             }
             "unsafe_block" => {
-                let entity =
-                    CodeEntity::new(EntityKind::UnsafeBlock, "unsafe", Span::from_node(node))
-                        .with_source(node_text(node, source).to_string());
+                let entity = Entity::new(EntityKind::UnsafeBlock, "unsafe", Span::from_node(node))
+                    .with_source(node_text(node, source).to_string());
                 entities.push(entity);
             }
             _ => {}
@@ -101,9 +100,9 @@ impl RustParser {
         }
     }
 
-    fn parse_function(&self, node: &tree_sitter::Node, source: &str) -> Option<CodeEntity> {
+    fn parse_function(&self, node: &tree_sitter::Node, source: &str) -> Option<Entity> {
         let name = self.find_child_text(node, "name", source)?;
-        let mut entity = CodeEntity::new(EntityKind::Function, &name, Span::from_node(node))
+        let mut entity = Entity::new(EntityKind::Function, &name, Span::from_node(node))
             .with_source(node_text(node, source).to_string());
 
         // Check for visibility
@@ -145,9 +144,9 @@ impl RustParser {
         Some(entity)
     }
 
-    fn parse_struct(&self, node: &tree_sitter::Node, source: &str) -> Option<CodeEntity> {
+    fn parse_struct(&self, node: &tree_sitter::Node, source: &str) -> Option<Entity> {
         let name = self.find_child_text(node, "name", source)?;
-        let mut entity = CodeEntity::new(EntityKind::Struct, &name, Span::from_node(node))
+        let mut entity = Entity::new(EntityKind::Struct, &name, Span::from_node(node))
             .with_source(node_text(node, source).to_string());
 
         if let Some(vis) = self.find_child_kind(node, "visibility_modifier") {
@@ -164,7 +163,7 @@ impl RustParser {
             for field in body.children(&mut cursor) {
                 if field.kind() == "field_declaration" {
                     if let Some(field_name) = field.child_by_field_name("name") {
-                        let field_entity = CodeEntity::new(
+                        let field_entity = Entity::new(
                             EntityKind::Variable,
                             node_text(&field_name, source),
                             Span::from_node(&field),
@@ -179,9 +178,9 @@ impl RustParser {
         Some(entity)
     }
 
-    fn parse_enum(&self, node: &tree_sitter::Node, source: &str) -> Option<CodeEntity> {
+    fn parse_enum(&self, node: &tree_sitter::Node, source: &str) -> Option<Entity> {
         let name = self.find_child_text(node, "name", source)?;
-        let mut entity = CodeEntity::new(EntityKind::Enum, &name, Span::from_node(node))
+        let mut entity = Entity::new(EntityKind::Enum, &name, Span::from_node(node))
             .with_source(node_text(node, source).to_string());
 
         if let Some(vis) = self.find_child_kind(node, "visibility_modifier") {
@@ -198,7 +197,7 @@ impl RustParser {
             for variant in body.children(&mut cursor) {
                 if variant.kind() == "enum_variant" {
                     if let Some(vname) = variant.child_by_field_name("name") {
-                        let v_entity = CodeEntity::new(
+                        let v_entity = Entity::new(
                             EntityKind::Variable,
                             node_text(&vname, source),
                             Span::from_node(&variant),
@@ -213,9 +212,9 @@ impl RustParser {
         Some(entity)
     }
 
-    fn parse_trait(&self, node: &tree_sitter::Node, source: &str) -> Option<CodeEntity> {
+    fn parse_trait(&self, node: &tree_sitter::Node, source: &str) -> Option<Entity> {
         let name = self.find_child_text(node, "name", source)?;
-        let mut entity = CodeEntity::new(EntityKind::Trait, &name, Span::from_node(node))
+        let mut entity = Entity::new(EntityKind::Trait, &name, Span::from_node(node))
             .with_source(node_text(node, source).to_string());
 
         if let Some(vis) = self.find_child_kind(node, "visibility_modifier") {
@@ -232,7 +231,7 @@ impl RustParser {
             for item in body.children(&mut cursor) {
                 if item.kind() == "function_item" || item.kind() == "function_signature_item" {
                     if let Some(method) = self.parse_function(&item, source) {
-                        let method = CodeEntity {
+                        let method = Entity {
                             kind: EntityKind::Method,
                             ..method
                         };
@@ -249,8 +248,8 @@ impl RustParser {
         &self,
         node: &tree_sitter::Node,
         source: &str,
-        relations: &mut Vec<CodeRelation>,
-    ) -> Option<CodeEntity> {
+        relations: &mut Vec<EntityRelation>,
+    ) -> Option<Entity> {
         let type_name = node
             .child_by_field_name("type")
             .map(|n| node_text(&n, source).to_string())
@@ -273,13 +272,13 @@ impl RustParser {
             type_name.clone()
         };
 
-        let mut entity = CodeEntity::new(kind, &display_name, Span::from_node(node))
+        let mut entity = Entity::new(kind, &display_name, Span::from_node(node))
             .with_source(node_text(node, source).to_string())
             .with_annotation("type", &type_name);
 
         if let Some(ref t) = trait_name {
             entity = entity.with_annotation("trait", t);
-            relations.push(CodeRelation {
+            relations.push(EntityRelation {
                 source: type_name.clone(),
                 relation: Relation::Implements,
                 target: t.clone(),
@@ -292,7 +291,7 @@ impl RustParser {
             for item in body.children(&mut cursor) {
                 if item.kind() == "function_item" {
                     if let Some(method) = self.parse_function(&item, source) {
-                        let method = CodeEntity {
+                        let method = Entity {
                             kind: EntityKind::Method,
                             ..method
                         };
@@ -305,7 +304,7 @@ impl RustParser {
         Some(entity)
     }
 
-    fn parse_use(&self, node: &tree_sitter::Node, source: &str) -> Option<CodeEntity> {
+    fn parse_use(&self, node: &tree_sitter::Node, source: &str) -> Option<Entity> {
         let text = node_text(node, source).to_string();
         // Extract the path from the use statement
         let path = text
@@ -316,12 +315,12 @@ impl RustParser {
             .trim()
             .to_string();
 
-        Some(CodeEntity::new(EntityKind::Import, &path, Span::from_node(node)).with_source(text))
+        Some(Entity::new(EntityKind::Import, &path, Span::from_node(node)).with_source(text))
     }
 
-    fn parse_mod(&self, node: &tree_sitter::Node, source: &str) -> Option<CodeEntity> {
+    fn parse_mod(&self, node: &tree_sitter::Node, source: &str) -> Option<Entity> {
         let name = self.find_child_text(node, "name", source)?;
-        let mut entity = CodeEntity::new(EntityKind::Module, &name, Span::from_node(node))
+        let mut entity = Entity::new(EntityKind::Module, &name, Span::from_node(node))
             .with_source(node_text(node, source).to_string());
 
         if let Some(vis) = self.find_child_kind(node, "visibility_modifier") {
@@ -331,26 +330,26 @@ impl RustParser {
         Some(entity)
     }
 
-    fn parse_macro_def(&self, node: &tree_sitter::Node, source: &str) -> Option<CodeEntity> {
+    fn parse_macro_def(&self, node: &tree_sitter::Node, source: &str) -> Option<Entity> {
         let name = self.find_child_text(node, "name", source)?;
         Some(
-            CodeEntity::new(EntityKind::Macro, &name, Span::from_node(node))
+            Entity::new(EntityKind::Macro, &name, Span::from_node(node))
                 .with_source(node_text(node, source).to_string()),
         )
     }
 
-    fn parse_type_alias(&self, node: &tree_sitter::Node, source: &str) -> Option<CodeEntity> {
+    fn parse_type_alias(&self, node: &tree_sitter::Node, source: &str) -> Option<Entity> {
         let name = self.find_child_text(node, "name", source)?;
         Some(
-            CodeEntity::new(EntityKind::TypeAlias, &name, Span::from_node(node))
+            Entity::new(EntityKind::TypeAlias, &name, Span::from_node(node))
                 .with_source(node_text(node, source).to_string()),
         )
     }
 
-    fn parse_const(&self, node: &tree_sitter::Node, source: &str) -> Option<CodeEntity> {
+    fn parse_const(&self, node: &tree_sitter::Node, source: &str) -> Option<Entity> {
         let name = self.find_child_text(node, "name", source)?;
         Some(
-            CodeEntity::new(EntityKind::Constant, &name, Span::from_node(node))
+            Entity::new(EntityKind::Constant, &name, Span::from_node(node))
                 .with_source(node_text(node, source).to_string()),
         )
     }
@@ -418,7 +417,7 @@ impl CodeParser for RustParser {
         Ok(parsed)
     }
 
-    fn extract_entities(&self, parsed: &ParsedCode) -> Vec<CodeEntity> {
+    fn extract_entities(&self, parsed: &ParsedCode) -> Vec<Entity> {
         parsed.entities.clone()
     }
 
@@ -621,7 +620,7 @@ impl Point {
         assert_eq!(structs[0].name, "Point");
         assert_eq!(structs[0].children.len(), 2); // x, y fields
 
-        let impls: Vec<&CodeEntity> = result
+        let impls: Vec<&Entity> = result
             .entities
             .iter()
             .filter(|e| e.kind == EntityKind::TraitImpl)

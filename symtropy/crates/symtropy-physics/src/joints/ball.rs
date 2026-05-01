@@ -1,5 +1,5 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Ball joint (spherical joint): constrains a point on body A to coincide
 //! with a point on body B, removing all translational DOF at the joint.
@@ -141,8 +141,10 @@ mod tests {
 
     #[test]
     fn ball_joint_connects_bodies() {
-        let mut a = RigidBody::<3>::dynamic_sphere(BodyHandle(0), Point::new([0.0, 0.0, 0.0]), 0.5, 1.0);
-        let mut b = RigidBody::<3>::dynamic_sphere(BodyHandle(1), Point::new([4.0, 0.0, 0.0]), 0.5, 1.0);
+        let mut a =
+            RigidBody::<3>::dynamic_sphere(BodyHandle(0), Point::new([0.0, 0.0, 0.0]), 0.5, 1.0);
+        let mut b =
+            RigidBody::<3>::dynamic_sphere(BodyHandle(1), Point::new([4.0, 0.0, 0.0]), 0.5, 1.0);
 
         let joint = BallJoint::new(BodyHandle(0), BodyHandle(1));
 
@@ -151,13 +153,18 @@ mod tests {
         }
 
         let dist = a.transform.translation.distance(&b.transform.translation);
-        assert!(dist < 0.1, "ball joint should connect bodies, dist = {dist}");
+        assert!(
+            dist < 0.1,
+            "ball joint should connect bodies, dist = {dist}"
+        );
     }
 
     #[test]
     fn ball_joint_with_offset_anchors() {
-        let mut a = RigidBody::<3>::dynamic_sphere(BodyHandle(0), Point::new([0.0, 0.0, 0.0]), 0.5, 1.0);
-        let mut b = RigidBody::<3>::dynamic_sphere(BodyHandle(1), Point::new([5.0, 0.0, 0.0]), 0.5, 1.0);
+        let mut a =
+            RigidBody::<3>::dynamic_sphere(BodyHandle(0), Point::new([0.0, 0.0, 0.0]), 0.5, 1.0);
+        let mut b =
+            RigidBody::<3>::dynamic_sphere(BodyHandle(1), Point::new([5.0, 0.0, 0.0]), 0.5, 1.0);
 
         // Anchor at the tip of A (+1 along X) meets anchor at base of B (-1 along X)
         let joint = BallJoint::with_anchors(
@@ -194,12 +201,8 @@ mod tests {
             Point::origin(),
             Box::new(symtropy_math::Sphere::new(Point::origin(), 0.1)),
         );
-        let mut b = RigidBody::<3>::dynamic_sphere(
-            BodyHandle(1),
-            Point::new([4.0, 0.0, 0.0]),
-            0.5,
-            1.0,
-        );
+        let mut b =
+            RigidBody::<3>::dynamic_sphere(BodyHandle(1), Point::new([4.0, 0.0, 0.0]), 0.5, 1.0);
 
         let joint = BallJoint::with_anchors(
             BodyHandle(0),
@@ -252,12 +255,8 @@ mod tests {
             Point::new([0.0, 0.0, 0.0]),
             Box::new(symtropy_math::Sphere::new(Point::origin(), 0.1)),
         );
-        let mut free = RigidBody::<3>::dynamic_sphere(
-            BodyHandle(1),
-            Point::new([5.0, 0.0, 0.0]),
-            0.5,
-            1.0,
-        );
+        let mut free =
+            RigidBody::<3>::dynamic_sphere(BodyHandle(1), Point::new([5.0, 0.0, 0.0]), 0.5, 1.0);
 
         let joint = BallJoint::new(BodyHandle(0), BodyHandle(1));
 
@@ -271,7 +270,10 @@ mod tests {
             "static anchor moved!"
         );
         // Free body should move to the anchor
-        let dist = anchor.transform.translation.distance(&free.transform.translation);
+        let dist = anchor
+            .transform
+            .translation
+            .distance(&free.transform.translation);
         assert!(dist < 0.1, "free body should reach anchor, dist = {dist}");
     }
 }

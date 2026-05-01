@@ -56,15 +56,24 @@ impl CascadeDomain {
             Water => &[Food, Health],
             Communications => &[Governance, Transport],
             Governance => &[Food, Transport], // governance failure → distribution breakdown
-            Health => &[Governance],           // health crisis → governance overload
-            Transport => &[Food, Water],       // transport failure → supply disruption
+            Health => &[Governance],          // health crisis → governance overload
+            Transport => &[Food, Water],      // transport failure → supply disruption
         }
     }
 
     /// All domain variants.
     pub fn all() -> &'static [CascadeDomain] {
         use CascadeDomain::*;
-        &[Power, LifeSupport, Food, Water, Communications, Governance, Health, Transport]
+        &[
+            Power,
+            LifeSupport,
+            Food,
+            Water,
+            Communications,
+            Governance,
+            Health,
+            Transport,
+        ]
     }
 }
 
@@ -123,25 +132,30 @@ impl CascadeEngine {
         // Power stress: inverse of infrastructure
         stress[CascadeDomain::Power as usize] = (1.0 - infrastructure_level).clamp(0.0, 1.0);
         // Life support stress: inverse of oxygen fraction
-        stress[CascadeDomain::LifeSupport as usize] = resource_fractions.iter()
+        stress[CascadeDomain::LifeSupport as usize] = resource_fractions
+            .iter()
             .find(|(n, _)| *n == "oxygen")
             .map(|(_, f)| (1.0 - f).clamp(0.0, 1.0))
             .unwrap_or(0.3);
         // Food stress
-        stress[CascadeDomain::Food as usize] = resource_fractions.iter()
+        stress[CascadeDomain::Food as usize] = resource_fractions
+            .iter()
             .find(|(n, _)| *n == "food")
             .map(|(_, f)| (1.0 - f).clamp(0.0, 1.0))
             .unwrap_or(0.3);
         // Water stress
-        stress[CascadeDomain::Water as usize] = resource_fractions.iter()
+        stress[CascadeDomain::Water as usize] = resource_fractions
+            .iter()
             .find(|(n, _)| *n == "water")
             .map(|(_, f)| (1.0 - f).clamp(0.0, 1.0))
             .unwrap_or(0.3);
         // Governance stress
         stress[CascadeDomain::Governance as usize] = (1.0 - governance_stability).clamp(0.0, 1.0);
         // Others: moderate default
-        stress[CascadeDomain::Communications as usize] = stress[CascadeDomain::Power as usize] * 0.5;
-        stress[CascadeDomain::Health as usize] = (stress[CascadeDomain::Food as usize] + stress[CascadeDomain::Water as usize]) * 0.3;
+        stress[CascadeDomain::Communications as usize] =
+            stress[CascadeDomain::Power as usize] * 0.5;
+        stress[CascadeDomain::Health as usize] =
+            (stress[CascadeDomain::Food as usize] + stress[CascadeDomain::Water as usize]) * 0.3;
         stress[CascadeDomain::Transport as usize] = stress[CascadeDomain::Power as usize] * 0.3;
     }
 
@@ -155,16 +169,17 @@ impl CascadeEngine {
         initial_severity: f64,
         rng: &mut StochasticEngine,
     ) -> Option<CascadeEvent> {
-        if world_idx >= self.domain_stress.len() { return None; }
+        if world_idx >= self.domain_stress.len() {
+            return None;
+        }
 
         let stress = self.domain_stress[world_idx];
         let origin_stress = stress[origin as usize];
 
         // Cascade probability: base × (1 + stress) × severity
         // Higher stress and higher initial severity = more likely to cascade
-        let cascade_prob = CASCADE_PROPAGATION_BASE
-            * (1.0 + origin_stress)
-            * initial_severity.clamp(0.1, 1.0);
+        let cascade_prob =
+            CASCADE_PROPAGATION_BASE * (1.0 + origin_stress) * initial_severity.clamp(0.1, 1.0);
 
         if !rng.bernoulli(cascade_prob.min(0.5)) {
             return None;
@@ -182,14 +197,15 @@ impl CascadeEngine {
 
             for (domain, parent_severity) in &frontier {
                 for &downstream in domain.downstream() {
-                    if affected.contains(&downstream) { continue; }
+                    if affected.contains(&downstream) {
+                        continue;
+                    }
 
                     let down_stress = stress[downstream as usize];
                     // Propagation: probability decreases with depth, increases with stress
-                    let prop_prob = CASCADE_PROPAGATION_BASE
-                        * (1.0 + down_stress)
-                        * parent_severity
-                        / (depth as f64 + 1.0); // Attenuate with depth
+                    let prop_prob =
+                        CASCADE_PROPAGATION_BASE * (1.0 + down_stress) * parent_severity
+                            / (depth as f64 + 1.0); // Attenuate with depth
 
                     if rng.bernoulli(prop_prob.min(0.4)) {
                         // Power-law severity: child severity = parent × random^(1/τ)
@@ -206,7 +222,9 @@ impl CascadeEngine {
             frontier = next_frontier;
         }
 
-        if affected.len() <= 1 { return None; } // No cascade, just the origin
+        if affected.len() <= 1 {
+            return None;
+        } // No cascade, just the origin
 
         let event = CascadeEvent {
             origin,
@@ -219,7 +237,9 @@ impl CascadeEngine {
         self.total_cascades += 1;
         self.max_cascade_size = self.max_cascade_size.max(affected.len() as u32);
         self.history.push(event.clone());
-        if self.history.len() > 100 { self.history.remove(0); }
+        if self.history.len() > 100 {
+            self.history.remove(0);
+        }
 
         Some(event)
     }
@@ -246,12 +266,18 @@ mod tests {
         engine.domain_stress[0] = [0.0; 8];
         let mut cascades = 0;
         for _ in 0..100 {
-            if engine.try_cascade(0, 0, CascadeDomain::Power, 0.1, &mut rng).is_some() {
+            if engine
+                .try_cascade(0, 0, CascadeDomain::Power, 0.1, &mut rng)
+                .is_some()
+            {
                 cascades += 1;
             }
         }
         // Should be rare (prob ≈ 0.15 × 1.0 × 0.1 = 1.5%)
-        assert!(cascades < 10, "Low stress should rarely cascade: {cascades}/100");
+        assert!(
+            cascades < 10,
+            "Low stress should rarely cascade: {cascades}/100"
+        );
     }
 
     #[test]
@@ -263,12 +289,18 @@ mod tests {
         engine.domain_stress[0] = [0.9; 8];
         let mut cascades = 0;
         for _ in 0..100 {
-            if engine.try_cascade(0, 0, CascadeDomain::Power, 0.8, &mut rng).is_some() {
+            if engine
+                .try_cascade(0, 0, CascadeDomain::Power, 0.8, &mut rng)
+                .is_some()
+            {
                 cascades += 1;
             }
         }
         // Should be more frequent than low stress (probabilistic — use relaxed threshold)
-        assert!(cascades > 3, "High stress should cascade sometimes: {cascades}/100");
+        assert!(
+            cascades > 3,
+            "High stress should cascade sometimes: {cascades}/100"
+        );
     }
 
     #[test]
@@ -279,10 +311,16 @@ mod tests {
 
         for _ in 0..50 {
             if let Some(event) = engine.try_cascade(0, 0, CascadeDomain::Power, 1.0, &mut rng) {
-                assert!(event.depth <= MAX_CASCADE_DEPTH,
-                    "Cascade depth {} exceeds max {}", event.depth, MAX_CASCADE_DEPTH);
-                assert!(event.affected.len() <= CascadeDomain::all().len(),
-                    "Cascade can't affect more domains than exist");
+                assert!(
+                    event.depth <= MAX_CASCADE_DEPTH,
+                    "Cascade depth {} exceeds max {}",
+                    event.depth,
+                    MAX_CASCADE_DEPTH
+                );
+                assert!(
+                    event.affected.len() <= CascadeDomain::all().len(),
+                    "Cascade can't affect more domains than exist"
+                );
             }
         }
     }
@@ -307,8 +345,10 @@ mod tests {
             // Power-law: max should be larger than median (fat tail)
             // Note: total_severity sums across domains, so the ratio is
             // compressed compared to single-domain power-law distribution.
-            assert!(max > &(median * 1.1),
-                "Cascades should have variance: max={max}, median={median}");
+            assert!(
+                max > &(median * 1.1),
+                "Cascades should have variance: max={max}, median={median}"
+            );
         }
     }
 

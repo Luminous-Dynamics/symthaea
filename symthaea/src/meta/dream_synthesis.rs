@@ -185,7 +185,7 @@ impl Default for DreamSynthesizer {
 mod tests {
     use super::*;
     use crate::hdc::code_encoder::CodeHDEncoder;
-    use crate::language::code_parser::{CodeEntity, EntityKind, ParsedCode, Span};
+    use crate::language::code_parser::{Entity, EntityKind, ParsedCode, Span};
     use std::path::Path;
 
     fn test_span() -> Span {
@@ -205,19 +205,19 @@ mod tests {
         let mut parsed = ParsedCode::new("", "rust");
         parsed
             .entities
-            .push(CodeEntity::new(EntityKind::Function, "sort", test_span()));
+            .push(Entity::new(EntityKind::Function, "sort", test_span()));
         parsed
             .entities
-            .push(CodeEntity::new(EntityKind::Function, "filter", test_span()));
+            .push(Entity::new(EntityKind::Function, "filter", test_span()));
         parsed
             .entities
-            .push(CodeEntity::new(EntityKind::Function, "map", test_span()));
+            .push(Entity::new(EntityKind::Function, "map", test_span()));
         parsed
             .entities
-            .push(CodeEntity::new(EntityKind::Struct, "Config", test_span()));
+            .push(Entity::new(EntityKind::Struct, "Config", test_span()));
         parsed
             .entities
-            .push(CodeEntity::new(EntityKind::Struct, "Parser", test_span()));
+            .push(Entity::new(EntityKind::Struct, "Parser", test_span()));
         memory.index_file(Path::new("src/lib.rs"), &parsed);
 
         memory

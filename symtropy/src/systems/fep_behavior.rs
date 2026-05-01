@@ -23,16 +23,35 @@ use symtropy_render_bridge::PhysicsBody;
 /// Uses free_energy_gradient() to compute the optimal movement direction
 /// based on energy state, nearby agents, energy wells, and danger.
 pub fn fep_behavior_system(
-    mut npcs: Query<(&mut CrewNpc, &Transform, &mut MoveTarget, &mut NoiseEmitter, &PhysicsBody, Option<&crate::systems::psychology::PsychologicalNeeds>), Without<Player>>,
+    mut npcs: Query<
+        (
+            &mut CrewNpc,
+            &Transform,
+            &mut MoveTarget,
+            &mut NoiseEmitter,
+            &PhysicsBody,
+            Option<&crate::systems::psychology::PsychologicalNeeds>,
+        ),
+        Without<Player>,
+    >,
     player_query: Query<(&Transform, &PhysicsBody), With<Player>>,
     other_npcs: Query<(&Transform, &PhysicsBody), (With<CrewNpc>, Without<Player>)>,
     wells: Query<(&Transform, &EnergyWell)>,
     biometrics: Res<BiometricsCtx>,
     leviathan: Res<LeviathanState>,
     physics: Res<PhysicsWorldRes>,
-    core_query: Query<&Transform, (With<crate::components::FusionCore>, Without<Player>, Without<CrewNpc>)>,
+    core_query: Query<
+        &Transform,
+        (
+            With<crate::components::FusionCore>,
+            Without<Player>,
+            Without<CrewNpc>,
+        ),
+    >,
 ) {
-    let Ok((player_tf, player_body)) = player_query.single() else { return };
+    let Ok((player_tf, player_body)) = player_query.single() else {
+        return;
+    };
     let player_pos = player_tf.translation.truncate();
 
     let danger = match leviathan.phase {
@@ -44,19 +63,23 @@ pub fn fep_behavior_system(
 
     // Leviathan danger source (near the fusion core)
     let danger_source: Option<nalgebra::SVector<f64, 2>> = if danger > 0.1 {
-        core_query.iter().next().map(|tf| {
-            nalgebra::SVector::from([tf.translation.x as f64, tf.translation.y as f64])
-        })
+        core_query
+            .iter()
+            .next()
+            .map(|tf| nalgebra::SVector::from([tf.translation.x as f64, tf.translation.y as f64]))
     } else {
         None
     };
 
     // Collect energy well data
-    let well_data: Vec<(nalgebra::SVector<f64, 2>, f64)> = wells.iter()
+    let well_data: Vec<(nalgebra::SVector<f64, 2>, f64)> = wells
+        .iter()
         .filter(|(_, w)| w.is_active())
         .map(|(tf, w)| {
-            (nalgebra::SVector::from([tf.translation.x as f64, tf.translation.y as f64]),
-             w.fraction_remaining())
+            (
+                nalgebra::SVector::from([tf.translation.x as f64, tf.translation.y as f64]),
+                w.fraction_remaining(),
+            )
         })
         .collect();
 
@@ -85,9 +108,18 @@ pub fn fep_behavior_system(
         let pos = nalgebra::SVector::from([npc_pos.x as f64, npc_pos.y as f64]);
 
         // Get this NPC's consciousness state
-        let (energy_frac, harmony, prediction_error, npc_phi) = physics.consciousness.entities
+        let (energy_frac, harmony, prediction_error, npc_phi) = physics
+            .consciousness
+            .entities
             .get(&body.handle)
-            .map(|e| (e.energy.fraction_remaining(), e.harmony_activations, e.prediction_error, e.phi()))
+            .map(|e| {
+                (
+                    e.energy.fraction_remaining(),
+                    e.harmony_activations,
+                    e.prediction_error,
+                    e.phi(),
+                )
+            })
             .unwrap_or((1.0, [0.5; 8], 0.0, 0.5));
 
         // FEP perception (still feeds the internal model)
@@ -104,7 +136,8 @@ pub fn fep_behavior_system(
         let _perception = npc.fep.perceive(&obs);
 
         // Build nearby agents list (exclude self)
-        let nearby: Vec<_> = all_agents.iter()
+        let nearby: Vec<_> = all_agents
+            .iter()
             .filter(|(agent_pos, _)| {
                 let d = (agent_pos - pos).norm();
                 d > 2.0 // exclude self (distance ~0)
@@ -117,7 +150,7 @@ pub fn fep_behavior_system(
         let direction = symtropy_consciousness_physics::fep_gradient::free_energy_gradient_phi(
             &pos,
             energy_frac,
-            Some(npc_phi),  // consciousness-aware behavior
+            Some(npc_phi), // consciousness-aware behavior
             &harmony,
             &nearby,
             &well_data,
@@ -133,7 +166,11 @@ pub fn fep_behavior_system(
         let engagement = psych.map(|p| p.engagement).unwrap_or(1.0);
 
         // Danger overrides disengagement — survival instinct
-        let effective_engagement = if danger > 0.5 { engagement.max(0.5) } else { engagement };
+        let effective_engagement = if danger > 0.5 {
+            engagement.max(0.5)
+        } else {
+            engagement
+        };
 
         if dir_vec.length_squared() > 0.01 && effective_engagement > 0.15 {
             // Move in gradient direction
@@ -172,7 +209,14 @@ pub fn fep_behavior_system(
 /// Reads MoveTarget (set by FEP behavior) and sets velocity on the NPC's
 /// physics body. Wall collision handled by the physics system via TileGrid.
 pub fn npc_movement_system(
-    mut query: Query<(&Transform, &MoveTarget, &symtropy_render_bridge::PhysicsBody), With<CrewNpc>>,
+    mut query: Query<
+        (
+            &Transform,
+            &MoveTarget,
+            &symtropy_render_bridge::PhysicsBody,
+        ),
+        With<CrewNpc>,
+    >,
     mut physics: ResMut<crate::resources::PhysicsWorldRes>,
     tile_grid: Option<Res<crate::resources::TileGrid>>,
 ) {
@@ -192,8 +236,12 @@ pub fn npc_movement_system(
                         let dt = 1.0 / 64.0_f32;
                         let new_x = tf.translation.x + vx as f32 * dt;
                         let new_y = tf.translation.y + vy as f32 * dt;
-                        if !grid.is_walkable(new_x, tf.translation.y) { vx = 0.0; }
-                        if !grid.is_walkable(tf.translation.x, new_y) { vy = 0.0; }
+                        if !grid.is_walkable(new_x, tf.translation.y) {
+                            vx = 0.0;
+                        }
+                        if !grid.is_walkable(tf.translation.x, new_y) {
+                            vy = 0.0;
+                        }
                     }
 
                     body.linear_velocity = nalgebra::SVector::from([vx, vy]);

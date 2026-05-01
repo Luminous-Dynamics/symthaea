@@ -3,14 +3,14 @@
 
 //! Search page with zome-backed BM25 search (#8), client-side fallback for mock mode.
 
+use crate::components::EmailCard;
+use crate::holochain::{use_holochain, ConnectionStatus};
+use crate::mail_context::use_mail;
+use crate::semantic;
 use leptos::prelude::*;
+use mail_leptos_types::EmailListItem;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::spawn_local;
-use crate::mail_context::use_mail;
-use crate::holochain::{use_holochain, ConnectionStatus};
-use crate::components::EmailCard;
-use crate::semantic;
-use mail_leptos_types::EmailListItem;
 
 #[component]
 pub fn SearchPage() -> impl IntoView {
@@ -26,7 +26,9 @@ pub fn SearchPage() -> impl IntoView {
     let mail_client = mail.clone();
     let client_results = move || {
         let raw = query.get();
-        if raw.len() < 2 { return vec![]; }
+        if raw.len() < 2 {
+            return vec![];
+        }
         let attach_filter = has_attachments.get();
         let star_filter = starred_only.get();
 
@@ -56,26 +58,42 @@ pub fn SearchPage() -> impl IntoView {
         }
 
         let text_query = free_text.join(" ");
-        let _has_operators = from_filter.is_some() || subject_filter.is_some()
-            || force_attachment || force_unread || force_starred;
+        let _has_operators = from_filter.is_some()
+            || subject_filter.is_some()
+            || force_attachment
+            || force_unread
+            || force_starred;
 
         let emails = mail_client.inbox.get();
 
         // Apply operator filters first
-        let filtered: Vec<_> = emails.into_iter().filter(|e| {
-            if let Some(ref f) = from_filter {
-                let sender_name = e.sender_name.as_deref().unwrap_or("").to_lowercase();
-                if !sender_name.contains(f) { return false; }
-            }
-            if let Some(ref s) = subject_filter {
-                let subj = e.subject.as_deref().unwrap_or("").to_lowercase();
-                if !subj.contains(s) { return false; }
-            }
-            if force_attachment && !e.has_attachments { return false; }
-            if force_unread && e.is_read { return false; }
-            if force_starred && !e.is_starred { return false; }
-            true
-        }).collect();
+        let filtered: Vec<_> = emails
+            .into_iter()
+            .filter(|e| {
+                if let Some(ref f) = from_filter {
+                    let sender_name = e.sender_name.as_deref().unwrap_or("").to_lowercase();
+                    if !sender_name.contains(f) {
+                        return false;
+                    }
+                }
+                if let Some(ref s) = subject_filter {
+                    let subj = e.subject.as_deref().unwrap_or("").to_lowercase();
+                    if !subj.contains(s) {
+                        return false;
+                    }
+                }
+                if force_attachment && !e.has_attachments {
+                    return false;
+                }
+                if force_unread && e.is_read {
+                    return false;
+                }
+                if force_starred && !e.is_starred {
+                    return false;
+                }
+                true
+            })
+            .collect();
 
         if text_query.is_empty() {
             return filtered;
@@ -83,30 +101,63 @@ pub fn SearchPage() -> impl IntoView {
 
         // Semantic search: encode query and all emails, rank by similarity
         let query_hv = semantic::encode_text(&text_query);
-        let email_texts: Vec<String> = filtered.iter().map(|e| {
-            format!("{} {} {}",
-                e.subject.as_deref().unwrap_or(""),
-                e.snippet.as_deref().unwrap_or(""),
-                e.sender_name.as_deref().unwrap_or(""))
-        }).collect();
-        let email_hvs: Vec<semantic::HyperVector> = email_texts.iter()
-            .map(|t| semantic::encode_text(t)).collect();
+        let email_texts: Vec<String> = filtered
+            .iter()
+            .map(|e| {
+                format!(
+                    "{} {} {}",
+                    e.subject.as_deref().unwrap_or(""),
+                    e.snippet.as_deref().unwrap_or(""),
+                    e.sender_name.as_deref().unwrap_or("")
+                )
+            })
+            .collect();
+        let email_hvs: Vec<semantic::HyperVector> = email_texts
+            .iter()
+            .map(|t| semantic::encode_text(t))
+            .collect();
 
         let mut results = semantic::semantic_search(&query_hv, &email_hvs, 0.05);
 
         // Also include exact keyword matches (boost them)
         for (i, e) in filtered.iter().enumerate() {
-            let subject_match = e.subject.as_deref().unwrap_or("").to_lowercase().contains(&text_query);
-            let snippet_match = e.snippet.as_deref().unwrap_or("").to_lowercase().contains(&text_query);
-            let sender_match = e.sender_name.as_deref().unwrap_or("").to_lowercase().contains(&text_query);
-            if (subject_match || snippet_match || sender_match) &&
-                !results.iter().any(|r| r.index == i) {
-                results.push(semantic::SemanticResult { index: i, similarity: 1.0 });
+            let subject_match = e
+                .subject
+                .as_deref()
+                .unwrap_or("")
+                .to_lowercase()
+                .contains(&text_query);
+            let snippet_match = e
+                .snippet
+                .as_deref()
+                .unwrap_or("")
+                .to_lowercase()
+                .contains(&text_query);
+            let sender_match = e
+                .sender_name
+                .as_deref()
+                .unwrap_or("")
+                .to_lowercase()
+                .contains(&text_query);
+            if (subject_match || snippet_match || sender_match)
+                && !results.iter().any(|r| r.index == i)
+            {
+                results.push(semantic::SemanticResult {
+                    index: i,
+                    similarity: 1.0,
+                });
             }
         }
 
-        results.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
-        results.into_iter().filter_map(|r| filtered.get(r.index).cloned()).collect()
+        results.sort_by(|a, b| {
+            b.similarity
+                .partial_cmp(&a.similarity)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        results
+            .into_iter()
+            .filter_map(|r| filtered.get(r.index).cloned())
+            .collect()
     };
 
     let results = move || zome_results.get().unwrap_or_else(client_results);
@@ -116,16 +167,29 @@ pub fn SearchPage() -> impl IntoView {
     let mail_contacts = mail.clone();
     let contact_results = move || {
         let q = query.get().to_lowercase();
-        if q.len() < 2 { return vec![]; }
-        mail_contacts.contacts.get().into_iter().filter(|c| {
-            c.display_name.to_lowercase().contains(&q)
-            || c.email.as_deref().unwrap_or("").to_lowercase().contains(&q)
-            || c.organization.as_deref().unwrap_or("").to_lowercase().contains(&q)
-        }).take(5).collect::<Vec<_>>()
+        if q.len() < 2 {
+            return vec![];
+        }
+        mail_contacts
+            .contacts
+            .get()
+            .into_iter()
+            .filter(|c| {
+                c.display_name.to_lowercase().contains(&q)
+                    || c.email.as_deref().unwrap_or("").to_lowercase().contains(&q)
+                    || c.organization
+                        .as_deref()
+                        .unwrap_or("")
+                        .to_lowercase()
+                        .contains(&q)
+            })
+            .take(5)
+            .collect::<Vec<_>>()
     };
 
     let on_input = move |ev: leptos::ev::Event| {
-        let val = ev.target()
+        let val = ev
+            .target()
             .and_then(|t| t.dyn_into::<web_sys::HtmlInputElement>().ok())
             .map(|el| el.value())
             .unwrap_or_default();
@@ -143,17 +207,26 @@ pub fn SearchPage() -> impl IntoView {
                     "query": val, "filters": { "has_attachments": attach, "is_starred": star },
                     "limit": 50, "fuzzy": true, "sort_by": "Relevance",
                 });
-                match hc2.call_zome::<serde_json::Value, serde_json::Value>(
-                    "mail_search", "search", &input
-                ).await {
+                match hc2
+                    .call_zome::<serde_json::Value, serde_json::Value>(
+                        "mail_search",
+                        "search",
+                        &input,
+                    )
+                    .await
+                {
                     Ok(response) => {
                         if let Some(results) = response.get("results") {
-                            if let Ok(emails) = serde_json::from_value::<Vec<EmailListItem>>(results.clone()) {
+                            if let Ok(emails) =
+                                serde_json::from_value::<Vec<EmailListItem>>(results.clone())
+                            {
                                 zome_results.set(Some(emails));
                             }
                         }
                     }
-                    Err(_) => { zome_results.set(None); }
+                    Err(_) => {
+                        zome_results.set(None);
+                    }
                 }
                 searching.set(false);
             });

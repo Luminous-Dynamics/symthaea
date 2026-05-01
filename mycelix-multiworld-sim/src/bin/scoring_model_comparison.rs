@@ -19,9 +19,9 @@
 //! ```
 
 use mycelix_multiworld_sim::{
-    MultiWorldSimulator,
     config::SimulationConfig,
     scoring_bridge::{builtin_scoring_models, ScoringModelGovernance},
+    MultiWorldSimulator,
 };
 
 use mycelix_bridge_common::sovereign_gate::CivicTier;
@@ -44,8 +44,10 @@ fn main() {
     let report = sim.run();
     let final_tick = years * 12;
 
-    eprintln!("Simulation complete: CVS={:.4}, Pop={}, Worlds={}, Disasters={}",
-        report.final_cvs, report.final_population, report.final_worlds, report.total_disasters);
+    eprintln!(
+        "Simulation complete: CVS={:.4}, Pop={}, Worlds={}, Disasters={}",
+        report.final_cvs, report.final_population, report.final_worlds, report.total_disasters
+    );
 
     // Collect living agents
     let agents: Vec<&mycelix_multiworld_sim::agent::CivAgent> = sim
@@ -56,7 +58,10 @@ fn main() {
         .collect();
 
     let total = agents.len();
-    eprintln!("\nEvaluating {} living agents across {} scoring models...\n", total, 3);
+    eprintln!(
+        "\nEvaluating {} living agents across {} scoring models...\n",
+        total, 3
+    );
 
     if total == 0 {
         eprintln!("No surviving agents — cannot evaluate.");
@@ -143,7 +148,10 @@ fn main() {
                 eprintln!("  Score diff:    {:.4}", score_diff);
                 eprintln!("  Weight diff:   {:.4}", weight_diff);
                 eprintln!("  Citizen+ diff: {:.1}%", tier_diff * 100.0);
-                eprintln!("  Gini diff:     {:.4}", (pop_a.gini_weight - pop_b.gini_weight).abs());
+                eprintln!(
+                    "  Gini diff:     {:.4}",
+                    (pop_a.gini_weight - pop_b.gini_weight).abs()
+                );
                 eprintln!();
             }
         }
@@ -195,8 +203,16 @@ fn evaluate_population(
     }
 
     let n = agents.len() as f64;
-    let mean_score = if n > 0.0 { scores.iter().sum::<f64>() / n } else { 0.0 };
-    let mean_weight = if n > 0.0 { weights.iter().sum::<f64>() / n } else { 0.0 };
+    let mean_score = if n > 0.0 {
+        scores.iter().sum::<f64>() / n
+    } else {
+        0.0
+    };
+    let mean_weight = if n > 0.0 {
+        weights.iter().sum::<f64>() / n
+    } else {
+        0.0
+    };
 
     PopulationResults {
         mean_score,

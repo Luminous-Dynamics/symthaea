@@ -25,7 +25,10 @@ pub struct HeisenbergChain {
 
 impl HeisenbergChain {
     pub fn new(n_sites: usize, j_coupling: f64) -> Self {
-        Self { n_sites, j_coupling }
+        Self {
+            n_sites,
+            j_coupling,
+        }
     }
 
     /// Compute ground state energy via exact diagonalization (small systems only).
@@ -106,7 +109,8 @@ pub fn states_needed_for_accuracy(eigenvalues: &[f64], target_accuracy: f64) -> 
 
 /// Von Neumann entropy from density matrix eigenvalues.
 pub fn entanglement_entropy(eigenvalues: &[f64]) -> f64 {
-    eigenvalues.iter()
+    eigenvalues
+        .iter()
         .filter(|&&ev| ev > 1e-15)
         .map(|&ev| -ev * ev.ln())
         .sum()
@@ -120,7 +124,11 @@ mod tests {
     fn test_two_site_singlet() {
         let chain = HeisenbergChain::new(2, 1.0);
         let e0 = chain.ground_state_energy_exact();
-        assert!((e0 - (-0.75)).abs() < 1e-14, "E_0(2 sites) = {:.4}, expected -0.75", e0);
+        assert!(
+            (e0 - (-0.75)).abs() < 1e-14,
+            "E_0(2 sites) = {:.4}, expected -0.75",
+            e0
+        );
     }
 
     #[test]
@@ -128,7 +136,11 @@ mod tests {
         // Energy should scale roughly linearly with system size
         let e4 = HeisenbergChain::new(4, 1.0).ground_state_energy_exact();
         let e8 = HeisenbergChain::new(8, 1.0).ground_state_energy_exact();
-        assert!((e8 / e4 - 2.0).abs() < 0.5, "Energy should be roughly extensive: E8/E4 = {:.3}", e8 / e4);
+        assert!(
+            (e8 / e4 - 2.0).abs() < 0.5,
+            "Energy should be roughly extensive: E8/E4 = {:.3}",
+            e8 / e4
+        );
     }
 
     #[test]
@@ -145,7 +157,11 @@ mod tests {
         let chain = HeisenbergChain::new(20, 1.0);
         let spectrum = chain.schmidt_spectrum(10, 10);
         let total: f64 = spectrum.iter().sum();
-        assert!((total - 1.0).abs() < 1e-10, "Spectrum should sum to 1: {:.6}", total);
+        assert!(
+            (total - 1.0).abs() < 1e-10,
+            "Spectrum should sum to 1: {:.6}",
+            total
+        );
     }
 
     #[test]
@@ -153,7 +169,12 @@ mod tests {
         let chain = HeisenbergChain::new(20, 1.0);
         let e5 = chain.truncation_error(5, 10);
         let e10 = chain.truncation_error(10, 10);
-        assert!(e10 <= e5, "More states = less error: ε(5)={:.6}, ε(10)={:.6}", e5, e10);
+        assert!(
+            e10 <= e5,
+            "More states = less error: ε(5)={:.6}, ε(10)={:.6}",
+            e5,
+            e10
+        );
     }
 
     #[test]

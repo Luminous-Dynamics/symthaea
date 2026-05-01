@@ -21,16 +21,25 @@
 //! The orchestrator wraps the existing `IntelligentDispatcher` and `CodeGenerator`,
 //! adding verification layers and code-by-analogy before falling back to LLM.
 
+use parking_lot::Mutex;
+use std::io;
+use std::path::Path;
+use std::sync::Arc;
+
 use symthaea_core::synthesis_trait::{
     BackendCapabilities, CodeSynthesisBackend, SynthesisRequest, SynthesisResponse,
     VerificationLayer, VerificationReport,
 };
 
 use super::code_certificate::CodeCertificate;
-use super::code_generator::{CodeGenerator, GeneratedCode};
+use super::code_executor::{CodeExecutor, ExecutionResult};
+use super::code_generator::{CodeContext, CodeGenerator, GeneratedCode};
 use super::code_intent::{CodeIntent, CodeSpec, CodeTarget};
 use super::code_parser::EntityKind;
 use super::code_verifier::{CodeVerifier, VerificationPolicy};
+use super::repo_map::{RepoMap, RepoMapStats};
+use super::rust_lsp::RustAnalyzerClient;
+use super::verified_generation::{generate_verified_full, VerifiedCode};
 use crate::hdc::code_algebra::CodeAlgebra;
 use crate::hdc::code_encoder::CodeHDEncoder;
 use crate::mind::structured_thought::EpistemicStatus;
@@ -45,10 +54,22 @@ pub struct CodeOrchestrator {
     generator: CodeGenerator,
     /// Round-trip verification
     verifier: CodeVerifier,
+    /// Thread-safe mutable state
+    state: Arc<Mutex<OrchestratorState>>,
     /// HDC code algebra for analogy-based generation
     algebra: CodeAlgebra,
     /// Minimum similarity threshold for accepting generated code
     verification_policy: VerificationPolicy,
+    /// Optional AST/HDC repository map used to enrich generation context.
+    repo_map: Option<RepoMap>,
+}
+
+/// Internal mutable state of the orchestrator.
+struct OrchestratorState {
+    /// Real execution sandbox for compiler-grounded verification
+    executor: CodeExecutor,
+    /// Optional LSP client for high-precision repair
+    lsp_client: Option<RustAnalyzerClient>,
     /// Energy budget remaining for this session
     energy_budget: f32,
     /// Total energy spent across all generations
@@ -57,11 +78,8 @@ pub struct CodeOrchestrator {
     attempt_history: Vec<SynthesisAttempt>,
     /// Distillation buffer: (ThoughtChannels-as-f32-vec, source_code, quality) triples
     /// captured from successful generations for Broca SSM training.
-    /// The flywheel: LLM teaches native → native improves → less LLM needed.
     distillation_buffer: Vec<DistillationCapture>,
-    /// Sequencer training buffer: (purpose, plan_actions) pairs captured from
-    /// successful generations. When this reaches `sequencer_retrain_threshold`,
-    /// the CfC sequencer can be retrained to handle these patterns natively.
+    /// Sequencer training buffer: (purpose, plan_actions) pairs
     sequencer_training_buffer: Vec<SequencerTrainingCapture>,
     /// Number of captures before triggering sequencer retraining
     sequencer_retrain_threshold: usize,
@@ -122,9 +140,7 @@ pub struct SynthesisAttempt {
 }
 
 /// Conversion from synthesis_trait EpistemicStatus to crate-local EpistemicStatus
-fn to_local_epistemic(
-    status: symthaea_core::synthesis_trait::EpistemicStatus,
-) -> EpistemicStatus {
+fn to_local_epistemic(status: symthaea_core::synthesis_trait::EpistemicStatus) -> EpistemicStatus {
     match status {
         symthaea_core::synthesis_trait::EpistemicStatus::Certain => EpistemicStatus::Certain,
         symthaea_core::synthesis_trait::EpistemicStatus::Probable => EpistemicStatus::Probable,
@@ -137,9 +153,7 @@ fn to_local_epistemic(
 }
 
 /// Conversion from crate-local EpistemicStatus to synthesis_trait EpistemicStatus
-fn to_trait_epistemic(
-    status: EpistemicStatus,
-) -> symthaea_core::synthesis_trait::EpistemicStatus {
+fn to_trait_epistemic(status: EpistemicStatus) -> symthaea_core::synthesis_trait::EpistemicStatus {
     match status {
         EpistemicStatus::Certain => symthaea_core::synthesis_trait::EpistemicStatus::Certain,
         EpistemicStatus::Probable => symthaea_core::synthesis_trait::EpistemicStatus::Probable,
@@ -161,16 +175,27 @@ impl CodeOrchestrator {
         Self {
             generator: CodeGenerator::new(encoder),
             verifier: CodeVerifier::new(verifier_encoder),
+            state: Arc::new(Mutex::new(OrchestratorState {
+                executor: CodeExecutor::with_real_execution(),
+                lsp_client: None,
+                energy_budget: 100.0,
+                energy_spent: 0.0,
+                attempt_history: Vec::new(),
+                distillation_buffer: Vec::new(),
+                sequencer_training_buffer: Vec::new(),
+                sequencer_retrain_threshold: 50,
+                certificates: Vec::new(),
+            })),
             algebra: CodeAlgebra::new(algebra_encoder),
             verification_policy: VerificationPolicy::Standard,
-            energy_budget: 100.0,
-            energy_spent: 0.0,
-            attempt_history: Vec::new(),
-            distillation_buffer: Vec::new(),
-            sequencer_training_buffer: Vec::new(),
-            sequencer_retrain_threshold: 50,
-            certificates: Vec::new(),
+            repo_map: None,
         }
+    }
+
+    /// Attach a Rust Analyzer LSP client for high-precision repairs.
+    pub fn with_lsp(self, lsp_client: RustAnalyzerClient) -> Self {
+        self.state.lock().lsp_client = Some(lsp_client);
+        self
     }
 
     /// Create with a specific verification policy.
@@ -181,36 +206,62 @@ impl CodeOrchestrator {
     }
 
     /// Create with a custom energy budget.
-    pub fn with_energy_budget(mut self, budget: f32) -> Self {
-        self.energy_budget = budget;
+    pub fn with_energy_budget(self, budget: f32) -> Self {
+        self.state.lock().energy_budget = budget;
         self
+    }
+
+    /// Attach an already-built repository map.
+    pub fn with_repo_map(mut self, repo_map: RepoMap) -> Self {
+        self.repo_map = Some(repo_map);
+        self
+    }
+
+    /// Index a project into the orchestrator's AST/HDC repository map.
+    pub fn index_project(&mut self, root: impl AsRef<Path>) -> io::Result<RepoMapStats> {
+        let root = root.as_ref();
+        let mut repo_map = RepoMap::new(root.to_path_buf());
+        let stats = repo_map.scan()?;
+        self.repo_map = Some(repo_map);
+        Ok(stats)
+    }
+
+    /// Get the indexed repository map, if present.
+    pub fn repo_map(&self) -> Option<&RepoMap> {
+        self.repo_map.as_ref()
+    }
+
+    /// Clear any indexed repository context.
+    pub fn clear_repo_map(&mut self) {
+        self.repo_map = None;
     }
 
     /// Get remaining energy budget.
     pub fn remaining_energy(&self) -> f32 {
-        self.energy_budget - self.energy_spent
+        let state = self.state.lock();
+        state.energy_budget - state.energy_spent
     }
 
     /// Get total energy spent.
     pub fn energy_spent(&self) -> f32 {
-        self.energy_spent
+        self.state.lock().energy_spent
     }
 
     /// Get the audit trail of all attempts.
-    pub fn attempt_history(&self) -> &[SynthesisAttempt] {
-        &self.attempt_history
+    pub fn attempt_history(&self) -> Vec<SynthesisAttempt> {
+        self.state.lock().attempt_history.clone()
     }
 
     /// Get the distillation buffer — captured (intent, code, quality) triples.
     ///
     /// These are ready to be serialized as JSONL for Broca SSM training.
-    pub fn distillation_buffer(&self) -> &[DistillationCapture] {
-        &self.distillation_buffer
+    pub fn distillation_buffer(&self) -> Vec<DistillationCapture> {
+        self.state.lock().distillation_buffer.clone()
     }
 
     /// Get issued certificates.
-    pub fn certificates(&self) -> &[CodeCertificate] {
-        &self.certificates
+    pub fn certificates(&self) -> Vec<CodeCertificate> {
+        self.state.lock().certificates.clone()
     }
 
     /// Export the distillation buffer as JSONL suitable for Broca training.
@@ -221,7 +272,9 @@ impl CodeOrchestrator {
     pub fn export_distillation_jsonl(&self) -> String {
         use serde_json::json;
 
-        self.distillation_buffer
+        let state = self.state.lock();
+        state
+            .distillation_buffer
             .iter()
             .map(|cap| {
                 json!({
@@ -250,11 +303,12 @@ impl CodeOrchestrator {
     /// and stores it alongside the verified source code. This is the core of the
     /// self-improvement flywheel: every successful generation becomes training data.
     fn capture_distillation(
-        &mut self,
+        &self,
         request: &SynthesisRequest,
         source: &str,
         backend: &str,
         similarity: f32,
+        surprise: f32,
     ) {
         // Build a 43-element channel vector from the request
         let mut channels = vec![0.0f32; 43];
@@ -281,14 +335,13 @@ impl CodeOrchestrator {
         channels[18] = 1.0;
 
         // Channel 19: concept_count (number of constraints + examples)
-        channels[19] = (request.constraints.len() + request.examples.len())
-            .min(10) as f32;
+        channels[19] = (request.constraints.len() + request.examples.len()).min(10) as f32;
 
         // Channels 24-27: code-specific
         channels[24] = 0.5; // syntax_complexity (mid-range default)
         channels[25] = similarity; // type_confidence (use verification similarity)
         channels[26] = 0.5; // algorithm_pattern
-        channels[27] = 0.0; // error_likelihood (low — code passed verification)
+        channels[27] = surprise; // error_likelihood (surprise from failures)
 
         // Epistemic Cube: E3 (proven), N2 (network), M2 (persistent)
         channels[31] = 1.0; // E3 (proven by compilation)
@@ -300,7 +353,8 @@ impl CodeOrchestrator {
         // Quality = similarity × (1 - error_penalty)
         let quality = similarity;
 
-        self.distillation_buffer.push(DistillationCapture {
+        let mut state = self.state.lock();
+        state.distillation_buffer.push(DistillationCapture {
             channels,
             source: source.to_string(),
             quality,
@@ -312,19 +366,23 @@ impl CodeOrchestrator {
         // Infer the plan actions the CfC sequencer should have produced
         // based on the structure of the successful output.
         let target_actions = Self::infer_plan_from_source(source);
-        self.sequencer_training_buffer.push(SequencerTrainingCapture {
-            purpose: request.purpose.clone(),
-            target_actions,
-            quality,
-            backend: backend.to_string(),
-        });
+        state
+            .sequencer_training_buffer
+            .push(SequencerTrainingCapture {
+                purpose: request.purpose.clone(),
+                target_actions,
+                quality,
+                backend: backend.to_string(),
+            });
     }
 
     /// Infer PlanAction sequence from generated source code.
     ///
     /// Analyzes the code structure to determine what plan steps the
     /// sequencer should learn to produce for similar inputs.
-    fn infer_plan_from_source(source: &str) -> Vec<crate::dynamics::cfc_code_sequencer::PlanAction> {
+    fn infer_plan_from_source(
+        source: &str,
+    ) -> Vec<crate::dynamics::cfc_code_sequencer::PlanAction> {
         use crate::dynamics::cfc_code_sequencer::PlanAction;
 
         let mut actions = Vec::new();
@@ -368,8 +426,10 @@ impl CodeOrchestrator {
         if source.contains("use ") {
             actions.push(PlanAction::AddImport);
         }
-        if source.contains("Result<") || source.contains("Result ")
-            || source.contains(".map_err(") || source.contains("?;")
+        if source.contains("Result<")
+            || source.contains("Result ")
+            || source.contains(".map_err(")
+            || source.contains("?;")
         {
             actions.push(PlanAction::AddErrorHandling);
         }
@@ -389,8 +449,10 @@ impl CodeOrchestrator {
         }
         if source.contains("|") && (source.contains("||") || source.contains("| ")) {
             // Simple heuristic for closures — avoid false positives from logical OR
-            if source.contains(".map(|") || source.contains(".filter(|")
-                || source.contains(".for_each(|") || source.contains("= |")
+            if source.contains(".map(|")
+                || source.contains(".filter(|")
+                || source.contains(".for_each(|")
+                || source.contains("= |")
             {
                 actions.push(PlanAction::ClosureDefine);
             }
@@ -427,23 +489,24 @@ impl CodeOrchestrator {
     }
 
     /// Get the sequencer training buffer for retraining.
-    pub fn sequencer_training_buffer(&self) -> &[SequencerTrainingCapture] {
-        &self.sequencer_training_buffer
+    pub fn sequencer_training_buffer(&self) -> Vec<SequencerTrainingCapture> {
+        self.state.lock().sequencer_training_buffer.clone()
     }
 
     /// Take the sequencer training buffer (drains it for consumption by the trainer).
-    pub fn take_sequencer_training_buffer(&mut self) -> Vec<SequencerTrainingCapture> {
-        std::mem::take(&mut self.sequencer_training_buffer)
+    pub fn take_sequencer_training_buffer(&self) -> Vec<SequencerTrainingCapture> {
+        std::mem::take(&mut self.state.lock().sequencer_training_buffer)
     }
 
     /// Check if the sequencer training buffer has reached the retrain threshold.
     pub fn should_retrain_sequencer(&self) -> bool {
-        self.sequencer_training_buffer.len() >= self.sequencer_retrain_threshold
+        let state = self.state.lock();
+        state.sequencer_training_buffer.len() >= state.sequencer_retrain_threshold
     }
 
     /// Generate a CodeCertificate for verified code.
     fn issue_certificate(
-        &mut self,
+        &self,
         request: &SynthesisRequest,
         source: &str,
         backend: &str,
@@ -455,7 +518,7 @@ impl CodeOrchestrator {
             .with_verification_layers(verification_layers)
             .with_safety_critical(request.safety_critical);
 
-        self.certificates.push(cert.clone());
+        self.state.lock().certificates.push(cert.clone());
         cert
     }
 
@@ -467,13 +530,13 @@ impl CodeOrchestrator {
     /// 3. Returns failed response if budget exhausted (LLM fallback handled by caller)
     ///
     /// Each attempt is verified against the verification policy before acceptance.
-    pub fn synthesize(&mut self, request: &SynthesisRequest) -> SynthesisResponse {
+    pub fn synthesize(&self, request: &SynthesisRequest) -> SynthesisResponse {
         let mut verification_layers = Vec::new();
 
         // ─── Backend 1: Native CodeGenerator ───────────────────────────────
         if self.remaining_energy() >= 1.0 {
             let native_result = self.try_native_generation(request);
-            self.energy_spent += 1.0;
+            self.state.lock().energy_spent += 1.0;
 
             let attempt = SynthesisAttempt {
                 backend: "CodeGenerator".to_string(),
@@ -482,7 +545,7 @@ impl CodeOrchestrator {
                 energy_cost: 1.0,
                 rejection_reason: native_result.rejection.clone(),
             };
-            self.attempt_history.push(attempt);
+            self.state.lock().attempt_history.push(attempt);
 
             if native_result.verified {
                 verification_layers.push(VerificationLayer {
@@ -498,6 +561,7 @@ impl CodeOrchestrator {
                     &native_result.source,
                     "CodeGenerator",
                     native_result.similarity,
+                    native_result.surprise,
                 );
 
                 // ── Certificate: machine-verifiable audit trail ──
@@ -537,7 +601,7 @@ impl CodeOrchestrator {
         // ─── Backend 2: Code Algebra Analogy ───────────────────────────────
         if self.remaining_energy() >= 0.5 {
             let analogy_result = self.try_analogy_generation(request);
-            self.energy_spent += 0.5;
+            self.state.lock().energy_spent += 0.5;
 
             let attempt = SynthesisAttempt {
                 backend: "CodeAlgebra::analogy".to_string(),
@@ -546,7 +610,7 @@ impl CodeOrchestrator {
                 energy_cost: 0.5,
                 rejection_reason: analogy_result.rejection.clone(),
             };
-            self.attempt_history.push(attempt);
+            self.state.lock().attempt_history.push(attempt);
 
             if analogy_result.verified {
                 verification_layers.push(VerificationLayer {
@@ -562,6 +626,7 @@ impl CodeOrchestrator {
                     &analogy_result.source,
                     "CodeAlgebra::analogy",
                     analogy_result.similarity,
+                    analogy_result.surprise,
                 );
 
                 // ── Certificate: machine-verifiable audit trail ──
@@ -599,6 +664,7 @@ impl CodeOrchestrator {
         }
 
         // ─── All native backends exhausted ─────────────────────────────────
+        let energy_spent = self.state.lock().energy_spent;
         SynthesisResponse {
             source: String::new(),
             backend_name: "none".to_string(),
@@ -606,58 +672,94 @@ impl CodeOrchestrator {
             epistemic_status: symthaea_core::synthesis_trait::EpistemicStatus::Unknown,
             verification: verification_layers,
             accepted: false,
-            energy_cost: self.energy_spent,
-            narrative: Some(
-                "All native backends exhausted. LLM fallback recommended.".to_string(),
-            ),
+            energy_cost: energy_spent,
+            narrative: Some("All native backends exhausted. LLM fallback recommended.".to_string()),
         }
     }
 
     /// Attempt native code generation via CodeGenerator.
     fn try_native_generation(&self, request: &SynthesisRequest) -> BackendResult {
         let spec = self.request_to_spec(request);
-        let target = CodeTarget::new(&request.name, EntityKind::Function)
-            .with_language(&request.language);
+        let context = self.context_for_request(request);
 
-        let intent = CodeIntent::Create { target, spec };
-        let context = super::code_generator::CodeContext::default();
-        let generated = self.generator.generate(&intent, &context);
+        // Step 1: Use the robust verified-generation loop (with optional LSP)
+        let mut state = self.state.lock();
+        let verified = generate_verified_full(
+            &self.generator,
+            &mut state.executor,
+            &spec,
+            &context,
+            self.repo_map.as_ref(),
+            state.lsp_client.as_mut(),
+        );
 
-        // Verify: check for empty/stub output
-        if generated.source.is_empty()
-            || generated.source.contains("todo!()")
-            || generated.source.contains("unimplemented!()")
-        {
+        // Compute surprise scalar (magnitude of failure)
+        let surprise = if verified.is_guaranteed() {
+            0.0
+        } else if !verified.compiled {
+            1.0 // Maximum surprise: didn't even compile
+        } else {
+            // Compiled but tests failed — moderate surprise
+            0.5
+        };
+
+        // If it didn't even compile after retries, reject early
+        if !verified.compiled {
             return BackendResult {
-                source: generated.source,
+                source: verified.source,
                 verified: false,
                 similarity: 0.0,
-                epistemic: generated.epistemic_status,
-                rejection: Some("Generated code contains stubs or is empty".to_string()),
+                surprise,
+                epistemic: EpistemicStatus::Uncertain,
+                rejection: Some(format!(
+                    "Failed to compile after {} retries: {}",
+                    verified.compile_retries,
+                    verified
+                        .compile_errors
+                        .first()
+                        .cloned()
+                        .unwrap_or_else(|| "Unknown error".to_string())
+                )),
             };
         }
 
-        // Verify: HDC round-trip similarity
+        // Step 2: HDC round-trip similarity verification
+        // (even if it compiles, we must ensure it matches the user's intent)
         let intent_hv = self.generator.encoder().encode_name(&request.name);
-        let parsed =
-            super::code_parser::ParsedCode::new(&generated.source, &request.language);
+        let parsed = super::code_parser::ParsedCode::new(&verified.source, &request.language);
         let verification = self.verifier.verify_against_intent(&parsed, &intent_hv);
 
+        // Step 3: Check if tests passed (high-signal quality indicator)
+        let mut rejection = None;
+        let mut is_verified = verification.is_acceptable();
+
+        if !verified.tests_passed {
+            is_verified = false;
+            rejection = Some(format!(
+                "Code compiled but {}/{} tests failed",
+                verified.test_count_failed,
+                verified.test_count_passed + verified.test_count_failed
+            ));
+        } else if !is_verified {
+            rejection = Some(format!(
+                "Similarity {:.3} below {} threshold {:.3}",
+                verification.semantic_similarity,
+                format!("{:?}", self.verification_policy),
+                self.verification_policy.threshold(),
+            ));
+        }
+
         BackendResult {
-            source: generated.source,
-            verified: verification.is_acceptable(),
+            source: verified.source,
+            verified: is_verified,
             similarity: verification.semantic_similarity,
-            epistemic: generated.epistemic_status,
-            rejection: if verification.is_acceptable() {
-                None
+            surprise,
+            epistemic: if is_verified {
+                EpistemicStatus::Certain
             } else {
-                Some(format!(
-                    "Similarity {:.3} below {} threshold {:.3}",
-                    verification.semantic_similarity,
-                    format!("{:?}", self.verification_policy),
-                    self.verification_policy.threshold(),
-                ))
+                EpistemicStatus::Probable
             },
+            rejection,
         }
     }
 
@@ -708,11 +810,11 @@ impl CodeOrchestrator {
 
         // Generate using the analogy-informed context
         let spec = self.request_to_spec(request);
-        let target = CodeTarget::new(&request.name, EntityKind::Function)
-            .with_language(&request.language);
+        let target =
+            CodeTarget::new(&request.name, EntityKind::Function).with_language(&request.language);
 
         let intent = CodeIntent::Create { target, spec };
-        let context = super::code_generator::CodeContext::default();
+        let context = self.context_for_request(request);
         let generated = self.generator.generate(&intent, &context);
 
         if generated.source.is_empty()
@@ -732,6 +834,7 @@ impl CodeOrchestrator {
             source: generated.source,
             verified: true, // Analogy-derived code is accepted at lower threshold
             similarity: best_sim,
+            surprise: 0.0,
             epistemic: generated.epistemic_status,
             rejection: None,
         }
@@ -739,12 +842,8 @@ impl CodeOrchestrator {
 
     /// Convert a SynthesisRequest to the crate-local CodeSpec type.
     fn request_to_spec(&self, request: &SynthesisRequest) -> CodeSpec {
-        let mut spec = CodeSpec::new(
-            &request.language,
-            &request.name,
-            &request.purpose,
-        )
-        .with_epistemic(to_local_epistemic(request.epistemic_status));
+        let mut spec = CodeSpec::new(&request.language, &request.name, &request.purpose)
+            .with_epistemic(to_local_epistemic(request.epistemic_status));
 
         if let Some(ref sig) = request.signature {
             spec = spec.with_signature(sig);
@@ -760,6 +859,25 @@ impl CodeOrchestrator {
 
         spec
     }
+
+    /// Build code-generation context from the indexed repository map when present.
+    fn context_for_request(&self, request: &SynthesisRequest) -> CodeContext<'_> {
+        let Some(repo_map) = self.repo_map.as_ref() else {
+            return CodeContext::default();
+        };
+
+        let mut query = format!("{} {}", request.name, request.purpose);
+        if let Some(signature) = &request.signature {
+            query.push(' ');
+            query.push_str(signature);
+        }
+        for constraint in &request.constraints {
+            query.push(' ');
+            query.push_str(constraint);
+        }
+
+        repo_map.code_context_for_query(&query, 5)
+    }
 }
 
 /// Internal result from a backend attempt.
@@ -767,6 +885,8 @@ struct BackendResult {
     source: String,
     verified: bool,
     similarity: f32,
+    /// Surprise scalar (0.0-1.0) derived from compiler/test failures.
+    surprise: f32,
     epistemic: EpistemicStatus,
     rejection: Option<String>,
 }
@@ -780,10 +900,10 @@ impl CodeSynthesisBackend for CodeOrchestrator {
         // The trait requires &self but our synthesize needs &mut self for tracking.
         // Create a minimal pass-through for trait compliance.
         let spec = self.request_to_spec(request);
-        let target = CodeTarget::new(&request.name, EntityKind::Function)
-            .with_language(&request.language);
+        let target =
+            CodeTarget::new(&request.name, EntityKind::Function).with_language(&request.language);
         let intent = CodeIntent::Create { target, spec };
-        let context = super::code_generator::CodeContext::default();
+        let context = self.context_for_request(request);
         let generated = self.generator.generate(&intent, &context);
 
         SynthesisResponse {
@@ -823,8 +943,8 @@ impl CodeSynthesisBackend for CodeOrchestrator {
         let parsed = super::code_parser::ParsedCode::new(code, &request.language);
 
         let spec = self.request_to_spec(request);
-        let target = CodeTarget::new(&request.name, EntityKind::Function)
-            .with_language(&request.language);
+        let target =
+            CodeTarget::new(&request.name, EntityKind::Function).with_language(&request.language);
         let intent = CodeIntent::Create { target, spec };
 
         let intent_hv = self.generator.encoder().encode_name(&request.name);
@@ -909,8 +1029,54 @@ mod tests {
     }
 
     #[test]
-    fn test_synthesize_simple_function() {
+    fn test_orchestrator_indexes_project_repo_map() {
+        let dir = tempfile::tempdir().unwrap();
+        let src_dir = dir.path().join("src");
+        std::fs::create_dir_all(&src_dir).unwrap();
+        std::fs::write(
+            src_dir.join("lib.rs"),
+            "pub fn normalize_name(name: &str) -> String {\n    name.trim().to_lowercase()\n}\n",
+        )
+        .unwrap();
+
         let mut orch = CodeOrchestrator::new();
+        let stats = orch.index_project(dir.path()).unwrap();
+
+        assert_eq!(stats.files_indexed, 1);
+        assert!(orch.repo_map().is_some());
+        assert!(orch
+            .repo_map()
+            .unwrap()
+            .find_symbol("normalize_name")
+            .iter()
+            .any(|symbol| symbol.snippet.contains("to_lowercase")));
+    }
+
+    #[test]
+    fn test_orchestrator_request_context_uses_repo_map() {
+        let mut repo_map = RepoMap::new(".");
+        repo_map
+            .index_source(
+                "src/users.rs",
+                "pub fn normalize_name(name: &str) -> String {\n    name.trim().to_lowercase()\n}\n",
+            )
+            .unwrap();
+        let orch = CodeOrchestrator::new().with_repo_map(repo_map);
+        let request = SynthesisRequest::new("rust", "normalize_user", "normalize user name")
+            .with_signature("fn normalize_user(name: &str) -> String");
+
+        let context = orch.context_for_request(&request);
+
+        assert!(context.memory.is_some());
+        assert!(context
+            .source_files
+            .iter()
+            .any(|(_, snippet)| snippet.contains("normalize_name")));
+    }
+
+    #[test]
+    fn test_synthesize_simple_function() {
+        let orch = CodeOrchestrator::new();
 
         let request = SynthesisRequest::new("rust", "add", "Add two integers")
             .with_signature("fn add(a: i32, b: i32) -> i32");
@@ -925,7 +1091,7 @@ mod tests {
 
     #[test]
     fn test_synthesize_tracks_attempts() {
-        let mut orch = CodeOrchestrator::new();
+        let orch = CodeOrchestrator::new();
 
         let request = SynthesisRequest::new("rust", "fibonacci", "Calculate nth Fibonacci number")
             .with_signature("fn fibonacci(n: u64) -> u64");
@@ -991,7 +1157,7 @@ mod tests {
 
     #[test]
     fn test_budget_exhaustion() {
-        let mut orch = CodeOrchestrator::new().with_energy_budget(0.5);
+        let orch = CodeOrchestrator::new().with_energy_budget(0.5);
 
         let request = SynthesisRequest::new("rust", "add", "Add two integers");
         let response = orch.synthesize(&request);

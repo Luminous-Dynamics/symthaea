@@ -12,6 +12,7 @@
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use symthaea_core::hdc::binary_hv::BinaryHV;
+use symthaea_core::hdc::dynamical_system::HarmonicOscillator;
 use symthaea_core::hdc::math_bridge::{MathValue, UnifiedMathEngine};
 use symthaea_core::physics::simulation_bridge::{
     state_to_binary_hv, PhysicsSimulator, SimulationAnalysis,
@@ -57,7 +58,6 @@ fn bench_math_multiply_complex(c: &mut Criterion) {
 fn bench_math_sqrt_promotion(c: &mut Criterion) {
     let engine = UnifiedMathEngine::new();
     let a = MathValue::Integer(-4);
-    let dummy = MathValue::Natural(0);
     c.bench_function("math_sqrt_negative_promotion", |bench| {
         bench.iter(|| {
             let result = engine.sqrt(black_box(&a));
@@ -174,8 +174,10 @@ fn bench_full_pipeline_harmonic(c: &mut Criterion) {
         bench.iter(|| {
             // Simulate → Analyze → Encode
             let sim = PhysicsSimulator::harmonic(2.0, 1.0, 0.0);
+            let osc = HarmonicOscillator::simple(2.0);
             let result = sim.simulate(2.0, 0.01);
-            let analysis = SimulationAnalysis::from_result(&result).with_harmonic_energy(2.0);
+            let analysis =
+                SimulationAnalysis::from_result(&result).with_harmonic_energy(&osc, &result);
 
             let hvs: Vec<BinaryHV> = result
                 .states

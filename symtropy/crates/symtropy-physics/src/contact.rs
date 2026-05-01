@@ -1,5 +1,5 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 use arrayvec::ArrayVec;
 use nalgebra::SVector;
@@ -69,7 +69,11 @@ impl<const D: usize> ContactManifold<D> {
         depth: f64,
     ) -> Self {
         let mut points = ArrayVec::new();
-        points.push(ContactPoint { position: point, depth, lambda: 0.0 });
+        points.push(ContactPoint {
+            position: point,
+            depth,
+            lambda: 0.0,
+        });
         Self {
             body_a,
             body_b,
@@ -223,7 +227,8 @@ mod tests {
     #[test]
     fn single_point_manifold() {
         let m = ContactManifold::<3>::single(
-            BodyHandle(0), BodyHandle(1),
+            BodyHandle(0),
+            BodyHandle(1),
             SVector::from([0.0, 1.0, 0.0]),
             SVector::from([1.0, 0.0, 0.0]),
             0.5,
@@ -235,7 +240,8 @@ mod tests {
     #[test]
     fn multi_point_primary_is_deepest() {
         let mut m = ContactManifold::<3>::single(
-            BodyHandle(0), BodyHandle(1),
+            BodyHandle(0),
+            BodyHandle(1),
             SVector::from([0.0, 1.0, 0.0]),
             SVector::from([1.0, 0.0, 0.0]),
             0.3,
@@ -263,7 +269,13 @@ mod tests {
     #[test]
     fn contact_cache_proximity_match() {
         let mut cache = ContactCache::<3>::new();
-        cache.store(BodyHandle(0), BodyHandle(1), SVector::from([1.0, 0.0, 0.0]), 5.0, 1.0);
+        cache.store(
+            BodyHandle(0),
+            BodyHandle(1),
+            SVector::from([1.0, 0.0, 0.0]),
+            5.0,
+            1.0,
+        );
 
         // Slightly displaced point should still match
         let nearby = SVector::from([1.5, 0.0, 0.0]);

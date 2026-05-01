@@ -68,7 +68,6 @@ pub enum ApproximationTier {
     /// Retained for graph analysis (mixing time, robustness) — NOT for
     /// consciousness measurement. Removed from `auto_tier()` 2026-04-11.
     #[serde(alias = "Spectral")]
-    #[deprecated(note = "measures spectral gap, not IIT Φ — use SampledPartition or ExhaustivePartition")]
     SpectralConnectivity,
 
     /// O(2^n) - Exhaustive partition search (closest to IIT MIP).
@@ -80,6 +79,7 @@ pub enum ApproximationTier {
 
 impl ApproximationTier {
     /// Get the computational complexity class
+    #[allow(deprecated)]
     pub fn complexity(&self) -> &'static str {
         match self {
             ApproximationTier::RandomBaseline => "O(1)",
@@ -90,6 +90,7 @@ impl ApproximationTier {
     }
 
     /// Check if this tier is suitable for a given component count
+    #[allow(deprecated)]
     pub fn is_suitable_for(&self, n: usize) -> bool {
         match self {
             ApproximationTier::RandomBaseline => true, // Always suitable
@@ -349,6 +350,7 @@ impl TieredPhi {
         }
 
         // Calculate using current tier
+        #[allow(deprecated)]
         let result = match self.config.tier {
             ApproximationTier::RandomBaseline => self.compute_mock(components),
             ApproximationTier::SampledPartition => self.compute_heuristic(components),
@@ -377,6 +379,7 @@ impl TieredPhi {
             return 0.0;
         }
 
+        #[allow(deprecated)]
         match tier {
             ApproximationTier::RandomBaseline => self.compute_mock(components),
             ApproximationTier::SampledPartition => self.compute_heuristic(components),

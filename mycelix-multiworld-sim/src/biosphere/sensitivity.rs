@@ -14,9 +14,7 @@
 //!
 //! For each combination, we check: does the suppressed branch reach meta-cognition?
 
-use super::consciousness_emergence::{
-    SubstrateFromBiosphere, THRESHOLD_REFLECTIVE,
-};
+use super::consciousness_emergence::{SubstrateFromBiosphere, THRESHOLD_REFLECTIVE};
 use super::deep_time_data::DeepTimeData;
 use super::dimensions::{compute_raw_dimensions, BiosphereDimensionsNorm, BiosphereMaxima};
 use super::mass_extinctions::{canonical_mass_extinctions, MassExtinctionEvent};
@@ -85,7 +83,12 @@ pub fn run_sensitivity() -> SensitivityResult {
 
     let pre_raw = compute_raw_dimensions(pre_kpg_bin, &data, &all_extinctions);
     let pre_d13c = Some(data.interpolate_d13c_excursion(pre_kpg_bin.midpoint_ma));
-    let pre_norm = pre_raw.normalize(&maxima, pre_kpg_bin.resolution, pre_kpg_bin.midpoint_ma, pre_d13c);
+    let pre_norm = pre_raw.normalize(
+        &maxima,
+        pre_kpg_bin.resolution,
+        pre_kpg_bin.midpoint_ma,
+        pre_d13c,
+    );
     let baseline_complexity_cap = pre_norm.values[1];
     let baseline_energy_cap = pre_norm.values[4];
     let baseline_info_cap = pre_norm.values[5];
@@ -102,7 +105,9 @@ pub fn run_sensitivity() -> SensitivityResult {
         .collect();
 
     // Sweep parameters
-    let info_cap_values: Vec<f64> = (0..=8).map(|i| baseline_info_cap * (0.7 + i as f64 * 0.075)).collect();
+    let info_cap_values: Vec<f64> = (0..=8)
+        .map(|i| baseline_info_cap * (0.7 + i as f64 * 0.075))
+        .collect();
     let threshold_values: Vec<f64> = (0..=6).map(|i| 0.20 + i as f64 * 0.025).collect();
 
     let mut trials = Vec::new();
@@ -179,8 +184,16 @@ impl SensitivityResult {
         let mut md = String::new();
         md.push_str("# Sensitivity Analysis: Is \"Asteroid Required\" Robust?\n\n");
         md.push_str(&format!("**Total trials**: {}\n", self.total_trials));
-        md.push_str(&format!("**Asteroid required**: {} ({:.0}%)\n", self.asteroid_required_count, self.robustness * 100.0));
-        md.push_str(&format!("**Meta-cognition possible without**: {} ({:.0}%)\n\n", self.meta_possible_count, (1.0 - self.robustness) * 100.0));
+        md.push_str(&format!(
+            "**Asteroid required**: {} ({:.0}%)\n",
+            self.asteroid_required_count,
+            self.robustness * 100.0
+        ));
+        md.push_str(&format!(
+            "**Meta-cognition possible without**: {} ({:.0}%)\n\n",
+            self.meta_possible_count,
+            (1.0 - self.robustness) * 100.0
+        ));
 
         let verdict = if self.robustness > 0.90 {
             "ROBUST — asteroid requirement holds across >90% of parameter space"
@@ -216,7 +229,10 @@ impl SensitivityResult {
             if !unique_info.iter().any(|v| (*v - t.info_cap).abs() < 0.001) {
                 unique_info.push(t.info_cap);
             }
-            if !unique_thresh.iter().any(|v| (*v - t.threshold).abs() < 0.001) {
+            if !unique_thresh
+                .iter()
+                .any(|v| (*v - t.threshold).abs() < 0.001)
+            {
                 unique_thresh.push(t.threshold);
             }
         }
@@ -232,9 +248,10 @@ impl SensitivityResult {
         for &ic in &unique_info {
             md.push_str(&format!("{:<12.3}", ic));
             for &th in &unique_thresh {
-                let trial = self.trials.iter().find(|t| {
-                    (t.info_cap - ic).abs() < 0.001 && (t.threshold - th).abs() < 0.001
-                });
+                let trial = self
+                    .trials
+                    .iter()
+                    .find(|t| (t.info_cap - ic).abs() < 0.001 && (t.threshold - th).abs() < 0.001);
                 let ch = match trial {
                     Some(t) if t.meta_cognition_reached => "  P  ",
                     Some(_) => "  R  ",
@@ -256,22 +273,26 @@ mod tests {
     #[test]
     fn sensitivity_runs() {
         let result = run_sensitivity();
-        assert!(result.total_trials > 30, "Should have >30 trials, got {}", result.total_trials);
+        assert!(
+            result.total_trials > 30,
+            "Should have >30 trials, got {}",
+            result.total_trials
+        );
     }
 
     #[test]
     fn baseline_parameters_require_asteroid() {
         let result = run_sensitivity();
         // At baseline info_cap (~0.33) and threshold (0.30), asteroid should be required
-        let baseline_trial = result.trials.iter().find(|t| {
-            (t.info_cap - 0.33).abs() < 0.05 && (t.threshold - 0.30).abs() < 0.01
-        });
+        let baseline_trial = result
+            .trials
+            .iter()
+            .find(|t| (t.info_cap - 0.33).abs() < 0.05 && (t.threshold - 0.30).abs() < 0.01);
         if let Some(trial) = baseline_trial {
             assert!(
                 !trial.meta_cognition_reached,
                 "Baseline parameters should require asteroid (peak: {:.4}, threshold: {:.2})",
-                trial.peak_feasibility,
-                trial.threshold,
+                trial.peak_feasibility, trial.threshold,
             );
         }
     }

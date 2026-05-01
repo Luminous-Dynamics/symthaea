@@ -47,8 +47,14 @@ const COMPLEX_SKILL_THRESHOLD: f64 = 0.5;
 
 /// Sector names for reporting.
 pub const SECTOR_NAMES: [&str; 8] = [
-    "Engineering", "Agriculture", "Medicine", "Governance",
-    "Science", "Education", "Art/Culture", "Logistics",
+    "Engineering",
+    "Agriculture",
+    "Medicine",
+    "Governance",
+    "Science",
+    "Education",
+    "Art/Culture",
+    "Logistics",
 ];
 
 /// Tick skill dynamics for a single agent.
@@ -96,7 +102,11 @@ pub fn tick_agent_skills(
         if is_active {
             // Active practice: skill grows
             let growth = PRACTICE_RATE * learning_mult;
-            let mentored_growth = if has_mentor { growth * MENTOR_MULTIPLIER } else { growth };
+            let mentored_growth = if has_mentor {
+                growth * MENTOR_MULTIPLIER
+            } else {
+                growth
+            };
             agent.skills.learn(sector, mentored_growth);
         } else {
             // Inactive: skill atrophies
@@ -134,9 +144,13 @@ pub fn tick_agent_skills(
 pub fn compute_mentor_availability(agents: &[CivAgent], current_tick: u32) -> [bool; 8] {
     let mut available = [false; 8];
     for agent in agents {
-        if agent.death_tick.is_some() { continue; }
+        if agent.death_tick.is_some() {
+            continue;
+        }
         let age = current_tick.wrapping_sub(agent.birth_tick);
-        if age < LEARNING_AGE_MONTHS { continue; }
+        if age < LEARNING_AGE_MONTHS {
+            continue;
+        }
 
         let skills = agent.skills.as_slice();
         for sector in 0..8 {
@@ -163,9 +177,13 @@ pub fn knowledge_gaps(mentor_availability: &[bool; 8]) -> Vec<&'static str> {
 pub fn last_expert_risk(agents: &[CivAgent], current_tick: u32) -> Vec<(&'static str, u64)> {
     let mut expert_counts: [Vec<u64>; 8] = Default::default();
     for agent in agents {
-        if agent.death_tick.is_some() { continue; }
+        if agent.death_tick.is_some() {
+            continue;
+        }
         let age = current_tick.wrapping_sub(agent.birth_tick);
-        if age < LEARNING_AGE_MONTHS { continue; }
+        if age < LEARNING_AGE_MONTHS {
+            continue;
+        }
 
         let skills = agent.skills.as_slice();
         for sector in 0..8 {
@@ -187,7 +205,7 @@ pub fn last_expert_risk(agents: &[CivAgent], current_tick: u32) -> Vec<(&'static
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::agent::{CivAgent, SkillVector, ConsciousnessState, BiologicalSex};
+    use crate::agent::{BiologicalSex, CivAgent, ConsciousnessState, SkillVector};
     use crate::needs::PsychologicalNeeds;
 
     fn make_agent(id: u64, birth_tick: u32, skills: [f64; 8]) -> CivAgent {
@@ -199,10 +217,14 @@ mod tests {
             world_id: 0,
             health: 1.0,
             skills: SkillVector {
-                engineering: skills[0], agriculture: skills[1],
-                medicine: skills[2], governance: skills[3],
-                science: skills[4], education: skills[5],
-                art_culture: skills[6], logistics: skills[7],
+                engineering: skills[0],
+                agriculture: skills[1],
+                medicine: skills[2],
+                governance: skills[3],
+                science: skills[4],
+                education: skills[5],
+                art_culture: skills[6],
+                logistics: skills[7],
             },
             education_level: 0.5,
             consciousness: ConsciousnessState::nascent(),
@@ -215,7 +237,13 @@ mod tests {
             faction_id: None,
             generation: 0,
             trauma_level: 0.0,
-            cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
+            cumulative_dose_sv: 0.0,
+            adversarial: None,
+            coordination_understanding: 0.0,
+            mycel_score: 0.1,
+            sap_balance: 100.0,
+            is_biological: true,
+            wounds: Vec::new(),
             ethics: crate::agent::EthicalOrientation::default(),
             sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
             justice: crate::sub_passport::RestorativeJustice::new(),
@@ -227,8 +255,11 @@ mod tests {
         let mut agent = make_agent(1, 0, [0.3; 8]);
         let mentors = [true; 8];
         tick_agent_skills(&mut agent, Some(0), &mentors, 300); // Engineering active
-        assert!(agent.skills.engineering > 0.3,
-            "Active skill should grow: {}", agent.skills.engineering);
+        assert!(
+            agent.skills.engineering > 0.3,
+            "Active skill should grow: {}",
+            agent.skills.engineering
+        );
     }
 
     #[test]
@@ -236,11 +267,15 @@ mod tests {
         let mut agent = make_agent(1, 0, [0.5; 8]);
         let mentors = [false; 8];
         // No active sector — all skills decay
-        for _ in 0..12 { // 1 year
+        for _ in 0..12 {
+            // 1 year
             tick_agent_skills(&mut agent, None, &mentors, 300);
         }
-        assert!(agent.skills.engineering < 0.5,
-            "Unpracticed skill should decay: {}", agent.skills.engineering);
+        assert!(
+            agent.skills.engineering < 0.5,
+            "Unpracticed skill should decay: {}",
+            agent.skills.engineering
+        );
     }
 
     #[test]
@@ -254,9 +289,12 @@ mod tests {
             tick_agent_skills(&mut agent_mentored, Some(0), &mentors, 300);
             tick_agent_skills(&mut agent_solo, Some(0), &no_mentors, 300);
         }
-        assert!(agent_mentored.skills.engineering > agent_solo.skills.engineering,
+        assert!(
+            agent_mentored.skills.engineering > agent_solo.skills.engineering,
             "Mentored should learn faster: {:.3} vs {:.3}",
-            agent_mentored.skills.engineering, agent_solo.skills.engineering);
+            agent_mentored.skills.engineering,
+            agent_solo.skills.engineering
+        );
     }
 
     #[test]
@@ -267,13 +305,17 @@ mod tests {
         let no_mentors = [false; 8];
 
         // Both inactive — but solo loses complex skills faster
-        for _ in 0..24 { // 2 years
+        for _ in 0..24 {
+            // 2 years
             tick_agent_skills(&mut agent_mentored, None, &mentors, 300);
             tick_agent_skills(&mut agent_solo, None, &no_mentors, 300);
         }
-        assert!(agent_solo.skills.engineering < agent_mentored.skills.engineering,
+        assert!(
+            agent_solo.skills.engineering < agent_mentored.skills.engineering,
             "Unmentored complex skills decay faster: {:.3} vs {:.3}",
-            agent_solo.skills.engineering, agent_mentored.skills.engineering);
+            agent_solo.skills.engineering,
+            agent_mentored.skills.engineering
+        );
     }
 
     #[test]
@@ -282,8 +324,10 @@ mod tests {
         let mentors = [true; 8];
         let eng_before = child.skills.engineering;
         tick_agent_skills(&mut child, Some(0), &mentors, 300); // Age 20 months
-        assert!((child.skills.engineering - eng_before).abs() < 1e-10,
-            "Children shouldn't learn");
+        assert!(
+            (child.skills.engineering - eng_before).abs() < 1e-10,
+            "Children shouldn't learn"
+        );
     }
 
     #[test]
@@ -297,20 +341,27 @@ mod tests {
             tick_agent_skills(&mut healthy, Some(0), &mentors, 300);
             tick_agent_skills(&mut traumatized, Some(0), &mentors, 300);
         }
-        assert!(healthy.skills.engineering > traumatized.skills.engineering,
+        assert!(
+            healthy.skills.engineering > traumatized.skills.engineering,
             "Trauma should impair learning: {:.3} vs {:.3}",
-            healthy.skills.engineering, traumatized.skills.engineering);
+            healthy.skills.engineering,
+            traumatized.skills.engineering
+        );
     }
 
     #[test]
     fn skill_floor_prevents_total_loss() {
         let mut agent = make_agent(1, 0, [0.1; 8]);
         let no_mentors = [false; 8];
-        for _ in 0..120 { // 10 years of decay
+        for _ in 0..120 {
+            // 10 years of decay
             tick_agent_skills(&mut agent, None, &no_mentors, 300);
         }
-        assert!(agent.skills.engineering >= SKILL_FLOOR,
-            "Skills shouldn't drop below floor: {}", agent.skills.engineering);
+        assert!(
+            agent.skills.engineering >= SKILL_FLOOR,
+            "Skills shouldn't drop below floor: {}",
+            agent.skills.engineering
+        );
     }
 
     #[test]

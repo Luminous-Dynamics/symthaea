@@ -128,7 +128,10 @@ mod tests {
         assert_eq!(a.dim(), HDC_DIMENSION);
         assert!(a.values.iter().any(|v| *v != 0.0), "should be nonzero");
         let sim = a.similarity(&b);
-        assert!(sim > 0.999, "dimensionless ↔ dimensionless = 1.0, got {sim}");
+        assert!(
+            sim > 0.999,
+            "dimensionless ↔ dimensionless = 1.0, got {sim}"
+        );
     }
 
     #[test]

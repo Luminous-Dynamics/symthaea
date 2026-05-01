@@ -1,0 +1,116 @@
+{
+  "metadata": {
+    "title": "Ascendant Professional Seed: 2026 Strategic Standards",
+    "framework": "Global Ascendant Mesh",
+    "source": "https://mycelix.org/certs-ascendant",
+    "grade_level": "Professional/Expert",
+    "subject_area": "Multi-Sector",
+    "domain": "Professional Certification",
+    "version": "1.0",
+    "total_standards": 6,
+    "domains": [
+      "AI Orchestration",
+      "Climate Risk",
+      "Digital Forensics",
+      "Specialized Logistics",
+      "Telehealth"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Closing the gap for the most strategic and high-growth professional roles."
+  },
+  "nodes": [
+    {
+      "id": "CERT-AI-PROMPT-SPEC",
+      "title": "Prompt Engineering Specialist Certification",
+      "description": "Designing, optimizing, and securing prompts for Large Language Models. Mastering few-shot, chain-of-thought, and adversarial prompting. Linked to Conceptual Blending.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "AI Orchestration",
+      "subdomain": "Certification Bridge",
+      "tags": ["ai", "prompt-engineering", "llm", "standard"],
+      "estimated_hours": 60,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Create",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "CERT-CLIM-GARP-SCR",
+      "title": "GARP Sustainability and Climate Risk (SCR)",
+      "description": "Climate change risk management, policy, and reporting. Understanding physical and transition risks in the global economy. Linked to Planetary Repair.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Climate Risk",
+      "subdomain": "Certification Bridge",
+      "tags": ["climate", "risk", "finance", "esg", "standard"],
+      "estimated_hours": 100,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Analyze",
+      "subject_area": "Social Studies"
+    },
+    {
+      "id": "CERT-CYBER-GCFA",
+      "title": "GIAC Certified Forensic Analyst (GCFA)",
+      "description": "Advanced incident response and digital forensics. Analysis of memory, file systems, and network logs. Mapping Epistemic Witness to professional forensics.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Digital Forensics",
+      "subdomain": "Certification Bridge",
+      "tags": ["forensics", "giac", "cybersecurity", "standard"],
+      "estimated_hours": 180,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "CERT-LOG-IATA-DGR",
+      "title": "IATA Dangerous Goods Regulations (DGR)",
+      "description": "Standards for the safe handling and transport of dangerous goods by air. Identification, classification, and packaging. Linked to Material Stewardship.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Specialized Logistics",
+      "subdomain": "Certification Bridge",
+      "tags": ["iata", "logistics", "hazmat", "safety", "standard"],
+      "estimated_hours": 40,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "CERT-HLTH-TELEHEALTH",
+      "title": "Board Certified Telehealth Professional",
+      "description": "Foundations of telehealth delivery. Legal, ethical, and clinical standards for remote patient care. Linked to Bioregional Vitality.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Telehealth",
+      "subdomain": "Certification Bridge",
+      "tags": ["telehealth", "nursing", "medical", "standard"],
+      "estimated_hours": 30,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Health Sciences"
+    }
+  ],
+  "edges": [
+    {
+      "from": "HUM-LANG-301",
+      "to": "CERT-AI-PROMPT-SPEC",
+      "edge_type": "Recommended",
+      "strength_permille": 900,
+      "rationale": "Conceptual blending and linguistic sovereignty provide the cognitive basis for effective prompt engineering."
+    },
+    {
+      "from": "REPAIR-CAP-01",
+      "to": "CERT-CLIM-GARP-SCR",
+      "edge_type": "Recommended",
+      "strength_permille": 750,
+      "rationale": "Planetary repair capstones provide the physical context for climate risk assessment."
+    },
+    {
+      "from": "HUM-EPI-201",
+      "to": "CERT-CYBER-GCFA",
+      "edge_type": "Recommended",
+      "strength_permille": 800,
+      "rationale": "Epistemic witness training provides the ethical and logical grounding required for high-stakes digital forensics."
+    }
+  ]
+}

@@ -79,12 +79,7 @@ impl NodePoGQState {
     /// 5. **Warm-up override**: never quarantine during first `warm_up_rounds`
     ///
     /// Returns whether the node is quarantined after this update.
-    pub fn update(
-        &mut self,
-        hybrid_score: f64,
-        threshold: f64,
-        config: &PoGQv41Config,
-    ) -> bool {
+    pub fn update(&mut self, hybrid_score: f64, threshold: f64, config: &PoGQv41Config) -> bool {
         self.rounds_seen += 1;
 
         // 1. EMA update
@@ -92,8 +87,7 @@ impl NodePoGQState {
             // First round: initialize EMA to the raw score
             self.ema_score = hybrid_score;
         } else {
-            self.ema_score =
-                config.beta * self.ema_score + (1.0 - config.beta) * hybrid_score;
+            self.ema_score = config.beta * self.ema_score + (1.0 - config.beta) * hybrid_score;
         }
 
         // 2. Violation check

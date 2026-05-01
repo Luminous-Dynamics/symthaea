@@ -10,13 +10,13 @@
 //! Run: cargo run --example adversarial_threshold --release
 
 use nalgebra::SVector;
-use symtropy_consciousness_physics::convergence::{mann_whitney_u, cohens_d};
+use symthaea_consciousness_equation::ConsciousnessInputs;
+use symtropy_consciousness_physics::convergence::{cohens_d, mann_whitney_u};
 use symtropy_consciousness_physics::fep_gradient;
 use symtropy_consciousness_physics::harmony_field::HarmonyField;
 use symtropy_consciousness_physics::{ConsciousnessField, ThermodynamicConstants};
 use symtropy_math::Point;
 use symtropy_physics::PhysicsWorld;
-use symthaea_consciousness_equation::ConsciousnessInputs;
 
 const TOTAL_AGENTS: usize = 20;
 const TICKS: usize = 5_000;
@@ -54,8 +54,14 @@ fn run_experiment(adversary_fraction: f64, seed: u64) -> AdversarialResult {
         let x = (rng_f64(&mut rng) - 0.5) * 120.0;
         let y = (rng_f64(&mut rng) - 0.5) * 120.0;
         let h = world.add_sphere(Point::new([x, y]), 1.0, 1.0);
-        if let Some(b) = world.body_mut(h) { b.linear_damping = 0.05; }
-        consciousness.register(h, consciousness.constants.initial_energy, consciousness.constants.harmony_range);
+        if let Some(b) = world.body_mut(h) {
+            b.linear_damping = 0.05;
+        }
+        consciousness.register(
+            h,
+            consciousness.constants.initial_energy,
+            consciousness.constants.harmony_range,
+        );
         if let Some(e) = consciousness.entities.get_mut(&h) {
             match i % 4 {
                 0 => e.harmony_activations = [0.8, 0.3, 0.2, 0.1, 0.2, 0.3, 0.2, 0.7, 0.3],
@@ -72,8 +78,14 @@ fn run_experiment(adversary_fraction: f64, seed: u64) -> AdversarialResult {
         let x = (rng_f64(&mut rng) - 0.5) * 120.0;
         let y = (rng_f64(&mut rng) - 0.5) * 120.0;
         let h = world.add_sphere(Point::new([x, y]), 1.0, 1.5); // slightly heavier
-        if let Some(b) = world.body_mut(h) { b.linear_damping = 0.03; } // faster
-        consciousness.register(h, consciousness.constants.initial_energy, consciousness.constants.harmony_range);
+        if let Some(b) = world.body_mut(h) {
+            b.linear_damping = 0.03;
+        } // faster
+        consciousness.register(
+            h,
+            consciousness.constants.initial_energy,
+            consciousness.constants.harmony_range,
+        );
         if let Some(e) = consciousness.entities.get_mut(&h) {
             // Inverted: high where cooperators are low, low where they're high
             e.harmony_activations = [0.1, 0.1, 0.9, 0.9, 0.9, 0.1, 0.1, 0.1, 0.9];
@@ -81,7 +93,11 @@ fn run_experiment(adversary_fraction: f64, seed: u64) -> AdversarialResult {
         adv_handles.push(h);
     }
 
-    let all_handles: Vec<_> = coop_handles.iter().chain(adv_handles.iter()).cloned().collect();
+    let all_handles: Vec<_> = coop_handles
+        .iter()
+        .chain(adv_handles.iter())
+        .cloned()
+        .collect();
     let mut cooperation_events = 0u64;
 
     for _tick in 0..TICKS {
@@ -93,33 +109,76 @@ fn run_experiment(adversary_fraction: f64, seed: u64) -> AdversarialResult {
             let ht = e.map(|e| e.total_harmony_energy()).unwrap_or(0.0);
             let collapsed = e.map(|e| e.energy.is_collapsed()).unwrap_or(true);
             let inputs = if collapsed {
-                ConsciousnessInputs { phi: 0.0, broadcast: 0.0, working_memory: 0.0,
-                    attention: 0.0, recurrence: 0.0, embodiment: 0.0, knowledge: 0.0, synchrony: 0.0 }
+                ConsciousnessInputs {
+                    phi: 0.0,
+                    broadcast: 0.0,
+                    working_memory: 0.0,
+                    attention: 0.0,
+                    recurrence: 0.0,
+                    embodiment: 0.0,
+                    knowledge: 0.0,
+                    synchrony: 0.0,
+                }
             } else {
                 ConsciousnessInputs {
-                    phi: ef, broadcast: 0.5, working_memory: (1.0 - pe).max(0.0),
-                    attention: 0.5, recurrence: 1.0, embodiment: 0.7,
-                    knowledge: (ht / 8.0).min(1.0), synchrony: consciousness.collective_phi.max(0.5),
+                    phi: ef,
+                    broadcast: 0.5,
+                    working_memory: (1.0 - pe).max(0.0),
+                    attention: 0.5,
+                    recurrence: 1.0,
+                    embodiment: 0.7,
+                    knowledge: (ht / 8.0).min(1.0),
+                    synchrony: consciousness.collective_phi.max(0.5),
                 }
             };
             consciousness.update_entity(h, &inputs, Point::origin());
         }
 
         // FEP gradient
-        let adata: Vec<_> = all_handles.iter().filter_map(|&h| {
-            Some((world.body(h)?.position().0, consciousness.entities.get(&h)?.harmony_activations))
-        }).collect();
-        let wdata: Vec<_> = wells.iter().zip(well_remaining.iter())
-            .filter(|(_, &r)| r > 0.0).map(|(&p, &r)| (p, (r / 3000.0).min(1.0))).collect();
+        let adata: Vec<_> = all_handles
+            .iter()
+            .filter_map(|&h| {
+                Some((
+                    world.body(h)?.position().0,
+                    consciousness.entities.get(&h)?.harmony_activations,
+                ))
+            })
+            .collect();
+        let wdata: Vec<_> = wells
+            .iter()
+            .zip(well_remaining.iter())
+            .filter(|(_, &r)| r > 0.0)
+            .map(|(&p, &r)| (p, (r / 3000.0).min(1.0)))
+            .collect();
         for &h in &all_handles {
             let Some(b) = world.body(h) else { continue };
-            let Some(e) = consciousness.entities.get(&h) else { continue };
-            if e.energy.is_collapsed() { continue; }
+            let Some(e) = consciousness.entities.get(&h) else {
+                continue;
+            };
+            if e.energy.is_collapsed() {
+                continue;
+            }
             let pos = b.position().0;
-            let near: Vec<_> = adata.iter().filter(|(p, _)| (p - pos).norm() > 2.0 && (p - pos).norm() < consciousness.constants.harmony_range).cloned().collect();
-            let dir = fep_gradient::free_energy_gradient(&pos, e.energy.fraction_remaining(),
-                &e.harmony_activations, &near, &wdata, None, 0.0);
-            if let Some(b) = world.body_mut(h) { b.linear_velocity = dir * 25.0; }
+            let near: Vec<_> = adata
+                .iter()
+                .filter(|(p, _)| {
+                    (p - pos).norm() > 2.0
+                        && (p - pos).norm() < consciousness.constants.harmony_range
+                })
+                .cloned()
+                .collect();
+            let dir = fep_gradient::free_energy_gradient(
+                &pos,
+                e.energy.fraction_remaining(),
+                &e.harmony_activations,
+                &near,
+                &wdata,
+                None,
+                0.0,
+            );
+            if let Some(b) = world.body_mut(h) {
+                b.linear_velocity = dir * 25.0;
+            }
         }
 
         // Maintenance + regen with well depletion
@@ -127,14 +186,23 @@ fn run_experiment(adversary_fraction: f64, seed: u64) -> AdversarialResult {
         let mr = consciousness.constants.consciousness_maintenance_per_tick;
         let ar = consciousness.constants.ambient_regen_rate;
         let wr = consciousness.constants.energy_well_regen_rate;
-        let nw: Vec<Option<usize>> = all_handles.iter().map(|&h| {
-            world.body(h).and_then(|b| {
-                let pos = b.position().0;
-                wells.iter().enumerate().find(|(i, &w)| (pos - w).norm() < 35.0 && well_remaining[*i] > 0.0).map(|(i,_)| i)
+        let nw: Vec<Option<usize>> = all_handles
+            .iter()
+            .map(|&h| {
+                world.body(h).and_then(|b| {
+                    let pos = b.position().0;
+                    wells
+                        .iter()
+                        .enumerate()
+                        .find(|(i, &w)| (pos - w).norm() < 35.0 && well_remaining[*i] > 0.0)
+                        .map(|(i, _)| i)
+                })
             })
-        }).collect();
+            .collect();
         for (idx, &h) in all_handles.iter().enumerate() {
-            if let Some(e) = consciousness.entities.get_mut(&h) { e.energy.tick_reset(); }
+            if let Some(e) = consciousness.entities.get_mut(&h) {
+                e.energy.tick_reset();
+            }
             let phi = consciousness.phi(h);
             consciousness.consume_energy(h, mr * (1.0 + phi * 0.5));
             if let Some(e) = consciousness.entities.get_mut(&h) {
@@ -149,27 +217,44 @@ fn run_experiment(adversary_fraction: f64, seed: u64) -> AdversarialResult {
 
         // Cooperation + adversarial disruption
         for i in 0..all_handles.len() {
-            for j in (i+1)..all_handles.len() {
+            for j in (i + 1)..all_handles.len() {
                 let (ha, hb) = (all_handles[i], all_handles[j]);
                 let in_range = match (world.body(ha), world.body(hb)) {
-                    (Some(a), Some(b)) => a.position().distance(b.position()) < consciousness.constants.harmony_range,
+                    (Some(a), Some(b)) => {
+                        a.position().distance(b.position()) < consciousness.constants.harmony_range
+                    }
                     _ => false,
                 };
-                if !in_range { continue; }
-                let (a, b) = match (consciousness.entities.get(&ha), consciousness.entities.get(&hb)) {
-                    (Some(a), Some(b)) => (a.harmony_activations, b.harmony_activations), _ => continue,
+                if !in_range {
+                    continue;
+                }
+                let (a, b) = match (
+                    consciousness.entities.get(&ha),
+                    consciousness.entities.get(&hb),
+                ) {
+                    (Some(a), Some(b)) => (a.harmony_activations, b.harmony_activations),
+                    _ => continue,
                 };
                 let res = HarmonyField::<2>::resonance(&a, &b);
                 if res > 0.5 {
-                    let rg = consciousness.constants.harmony_resonance_regen_rate * (res - 0.5) * 2.0;
-                    if let Some(e) = consciousness.entities.get_mut(&ha) { e.energy.regenerate(rg); }
-                    if let Some(e) = consciousness.entities.get_mut(&hb) { e.energy.regenerate(rg); }
+                    let rg =
+                        consciousness.constants.harmony_resonance_regen_rate * (res - 0.5) * 2.0;
+                    if let Some(e) = consciousness.entities.get_mut(&ha) {
+                        e.energy.regenerate(rg);
+                    }
+                    if let Some(e) = consciousness.entities.get_mut(&hb) {
+                        e.energy.regenerate(rg);
+                    }
                     cooperation_events += 1;
                 } else if res < 0.2 {
                     // Adversarial disruption: low resonance DRAINS energy (conflict cost)
                     let drain = (0.2 - res) * 0.05;
-                    if let Some(e) = consciousness.entities.get_mut(&ha) { e.energy.consume(drain); }
-                    if let Some(e) = consciousness.entities.get_mut(&hb) { e.energy.consume(drain); }
+                    if let Some(e) = consciousness.entities.get_mut(&ha) {
+                        e.energy.consume(drain);
+                    }
+                    if let Some(e) = consciousness.entities.get_mut(&hb) {
+                        e.energy.consume(drain);
+                    }
                 }
             }
         }
@@ -179,25 +264,96 @@ fn run_experiment(adversary_fraction: f64, seed: u64) -> AdversarialResult {
         consciousness.tick_thermodynamics();
     }
 
-    let coop_alive = coop_handles.iter().filter(|h| consciousness.entities.get(h).map(|e| !e.energy.is_collapsed()).unwrap_or(false)).count() as f64;
-    let adv_alive = adv_handles.iter().filter(|h| consciousness.entities.get(h).map(|e| !e.energy.is_collapsed()).unwrap_or(false)).count() as f64;
-    let coop_energy = coop_handles.iter().filter_map(|h| consciousness.entities.get(h).map(|e| e.energy.available)).sum::<f64>() / num_cooperators.max(1) as f64;
-    let adv_energy = if num_adversaries > 0 { adv_handles.iter().filter_map(|h| consciousness.entities.get(h).map(|e| e.energy.available)).sum::<f64>() / num_adversaries as f64 } else { 0.0 };
+    let coop_alive = coop_handles
+        .iter()
+        .filter(|h| {
+            consciousness
+                .entities
+                .get(h)
+                .map(|e| !e.energy.is_collapsed())
+                .unwrap_or(false)
+        })
+        .count() as f64;
+    let adv_alive = adv_handles
+        .iter()
+        .filter(|h| {
+            consciousness
+                .entities
+                .get(h)
+                .map(|e| !e.energy.is_collapsed())
+                .unwrap_or(false)
+        })
+        .count() as f64;
+    let coop_energy = coop_handles
+        .iter()
+        .filter_map(|h| consciousness.entities.get(h).map(|e| e.energy.available))
+        .sum::<f64>()
+        / num_cooperators.max(1) as f64;
+    let adv_energy = if num_adversaries > 0 {
+        adv_handles
+            .iter()
+            .filter_map(|h| consciousness.entities.get(h).map(|e| e.energy.available))
+            .sum::<f64>()
+            / num_adversaries as f64
+    } else {
+        0.0
+    };
 
-    let pos: Vec<SVector<f64, 2>> = all_handles.iter().filter_map(|h| world.body(*h).map(|b| b.position().0)).collect();
+    let pos: Vec<SVector<f64, 2>> = all_handles
+        .iter()
+        .filter_map(|h| world.body(*h).map(|b| b.position().0))
+        .collect();
     let clustering = if pos.len() >= 2 {
-        pos.iter().enumerate().map(|(i, p)| pos.iter().enumerate().filter(|(j,_)| *j!=i).map(|(_,q)| (p-q).norm()).fold(f64::MAX, f64::min)).sum::<f64>() / pos.len() as f64
-    } else { f64::MAX };
+        pos.iter()
+            .enumerate()
+            .map(|(i, p)| {
+                pos.iter()
+                    .enumerate()
+                    .filter(|(j, _)| *j != i)
+                    .map(|(_, q)| (p - q).norm())
+                    .fold(f64::MAX, f64::min)
+            })
+            .sum::<f64>()
+            / pos.len() as f64
+    } else {
+        f64::MAX
+    };
 
     // Polarization: variance of harmony across all agents
     let n = all_handles.len() as f64;
     let mut mean_h = [0.0f64; 9];
-    for &h in &all_handles { if let Some(e) = consciousness.entities.get(&h) { for i in 0..8 { mean_h[i] += e.harmony_activations[i]; } } }
-    for v in &mut mean_h { *v /= n; }
-    let polarization: f64 = all_handles.iter().filter_map(|h| consciousness.entities.get(h).map(|e| (0..8).map(|i| (e.harmony_activations[i] - mean_h[i]).powi(2)).sum::<f64>())).sum::<f64>() / n;
+    for &h in &all_handles {
+        if let Some(e) = consciousness.entities.get(&h) {
+            for i in 0..8 {
+                mean_h[i] += e.harmony_activations[i];
+            }
+        }
+    }
+    for v in &mut mean_h {
+        *v /= n;
+    }
+    let polarization: f64 = all_handles
+        .iter()
+        .filter_map(|h| {
+            consciousness.entities.get(h).map(|e| {
+                (0..8)
+                    .map(|i| (e.harmony_activations[i] - mean_h[i]).powi(2))
+                    .sum::<f64>()
+            })
+        })
+        .sum::<f64>()
+        / n;
 
-    AdversarialResult { fraction: adversary_fraction, cooperator_alive: coop_alive, adversary_alive: adv_alive,
-        clustering, polarization, coop_energy, adv_energy, cooperation_events: cooperation_events as f64 }
+    AdversarialResult {
+        fraction: adversary_fraction,
+        cooperator_alive: coop_alive,
+        adversary_alive: adv_alive,
+        clustering,
+        polarization,
+        coop_energy,
+        adv_energy,
+        cooperation_events: cooperation_events as f64,
+    }
 }
 
 fn main() {
@@ -215,9 +371,17 @@ fn main() {
             let seed = 42 + s as u64 * 997;
             eprintln!("  {:.0}% adversaries, seed={seed}...", frac * 100.0);
             let r = run_experiment(frac, seed);
-            println!("{:.2},{seed},{:.1},{:.1},{:.2},{:.4},{:.1},{:.1},{:.0}",
-                r.fraction, r.cooperator_alive, r.adversary_alive, r.clustering,
-                r.polarization, r.coop_energy, r.adv_energy, r.cooperation_events);
+            println!(
+                "{:.2},{seed},{:.1},{:.1},{:.2},{:.4},{:.1},{:.1},{:.0}",
+                r.fraction,
+                r.cooperator_alive,
+                r.adversary_alive,
+                r.clustering,
+                r.polarization,
+                r.coop_energy,
+                r.adv_energy,
+                r.cooperation_events
+            );
             results.push(r);
         }
 
@@ -238,10 +402,19 @@ fn main() {
     eprintln!("\n── Critical Threshold Analysis ──");
     for (frac, results) in &all_results {
         let nc = (TOTAL_AGENTS as f64 * (1.0 - frac)).round();
-        let mean_alive = results.iter().map(|r| r.cooperator_alive).sum::<f64>() / results.len() as f64;
+        let mean_alive =
+            results.iter().map(|r| r.cooperator_alive).sum::<f64>() / results.len() as f64;
         let survival_rate = if nc > 0.0 { mean_alive / nc } else { 1.0 };
-        eprintln!("  {:.0}%: cooperator survival = {:.1}%{}", frac * 100.0, survival_rate * 100.0,
-            if survival_rate < 0.5 { " ← CRITICAL THRESHOLD" } else { "" });
+        eprintln!(
+            "  {:.0}%: cooperator survival = {:.1}%{}",
+            frac * 100.0,
+            survival_rate * 100.0,
+            if survival_rate < 0.5 {
+                " ← CRITICAL THRESHOLD"
+            } else {
+                ""
+            }
+        );
     }
 
     // Statistical comparison: 0% vs highest fraction
@@ -254,14 +427,31 @@ fn main() {
         let d = cohens_d(&b_alive, &w_alive);
         eprintln!("\n  0% vs 50% adversaries (cooperator survival):");
         eprintln!("    Mann-Whitney U={:.1}, z={:.3}, p={:.4}", u, z, p);
-        eprintln!("    Cohen's d={:.3} ({})", d, if d.abs() > 0.8 { "large" } else { "medium/small" });
-        eprintln!("    {}", if p < 0.05 { "SIGNIFICANT" } else { "not significant" });
+        eprintln!(
+            "    Cohen's d={:.3} ({})",
+            d,
+            if d.abs() > 0.8 {
+                "large"
+            } else {
+                "medium/small"
+            }
+        );
+        eprintln!(
+            "    {}",
+            if p < 0.05 {
+                "SIGNIFICANT"
+            } else {
+                "not significant"
+            }
+        );
     }
 
     eprintln!("\n=== Complete ===");
 }
 
 fn rng_f64(s: &mut u64) -> f64 {
-    *s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+    *s = s
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
     (*s >> 11) as f64 / (1u64 << 53) as f64
 }

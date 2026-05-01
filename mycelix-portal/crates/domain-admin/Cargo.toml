@@ -1,9 +1,0 @@
-[package]
-name = "domain-admin"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-
-[dependencies]
-portal-domain-trait = { path = "../portal-domain-trait" }
-serde = { version = "1", features = ["derive"] }

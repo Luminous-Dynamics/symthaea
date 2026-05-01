@@ -230,9 +230,8 @@ pub fn attack_noise(sample_idx: usize, attack_samples: usize, brightness: f32) -
     // instead of 22kHz white noise. Prevents sample-to-sample discontinuities
     // from creating audible clicks in the 2nd derivative.
     let sample_group = (sample_idx / 8) as u32;
-    let noise = (sample_group.wrapping_mul(1103515245).wrapping_add(12345) >> 16) as f32
-        / 32768.0
-        - 1.0;
+    let noise =
+        (sample_group.wrapping_mul(1103515245).wrapping_add(12345) >> 16) as f32 / 32768.0 - 1.0;
 
     noise * envelope * brightness * 0.08 // also reduced from 0.15
 }

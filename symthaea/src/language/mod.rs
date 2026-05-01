@@ -82,6 +82,8 @@ pub mod compose_codegen;
 #[cfg(feature = "code_generation")]
 pub mod compose_scorer;
 #[cfg(feature = "code_generation")]
+pub mod config_parser;
+#[cfg(feature = "code_generation")]
 pub mod emitters;
 #[cfg(feature = "code_generation")]
 pub mod epistemic_generation;
@@ -118,6 +120,10 @@ pub mod parser_registry;
 pub mod program_node_translator;
 #[cfg(feature = "code_generation")]
 pub mod python_parser;
+#[cfg(feature = "code_generation")]
+pub mod repo_map;
+#[cfg(feature = "code_generation")]
+pub mod rust_lsp;
 #[cfg(feature = "code_generation")]
 pub mod rust_parser;
 #[cfg(feature = "code_generation")]

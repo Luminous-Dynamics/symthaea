@@ -3,7 +3,7 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Helicopter controller: HdcLtcUnifiedNetwork + output projection (16,384D → 6D).
 //!
-//! Same architecture as symthaea-flight FlightController but with 6 output channels
+//! Same architecture as symthaea-multirotor FlightController but with 6 output channels
 //! (collective, cyclic_lon, cyclic_lat, pedal, thrust, tail_rotor) and bias initialized
 //! to hover command rather than zero.
 

@@ -3,7 +3,7 @@
 //! Position estimates integrity zome: validates fused position entries.
 
 use hdi::prelude::*;
-use mycelix_position_shared::{PositionEstimateEntry, validate_geodetic, validate_node_id};
+use mycelix_position_shared::{validate_geodetic, validate_node_id, PositionEstimateEntry};
 
 #[hdk_entry_types]
 #[unit_enum(UnitEntryTypes)]
@@ -43,9 +43,10 @@ fn validate_entry(entry: EntryTypes) -> ExternResult<ValidateCallbackResult> {
                 return Ok(ValidateCallbackResult::Invalid(e));
             }
             if est.covariance.len() != 9 {
-                return Ok(ValidateCallbackResult::Invalid(
-                    format!("Covariance must have 9 elements (3×3), got {}", est.covariance.len()),
-                ));
+                return Ok(ValidateCallbackResult::Invalid(format!(
+                    "Covariance must have 9 elements (3×3), got {}",
+                    est.covariance.len()
+                )));
             }
             // Check diagonal is positive (valid covariance)
             if est.covariance[0] < 0.0 || est.covariance[4] < 0.0 || est.covariance[8] < 0.0 {

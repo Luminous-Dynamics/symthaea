@@ -30,7 +30,12 @@ fn main() {
     let mut results: Vec<RunResult> = Vec::with_capacity(SEEDS.len());
 
     for (i, &seed) in SEEDS.iter().enumerate() {
-        eprint!("  Running seed {:>5} ({:>2}/{}) ...", seed, i + 1, SEEDS.len());
+        eprint!(
+            "  Running seed {:>5} ({:>2}/{}) ...",
+            seed,
+            i + 1,
+            SEEDS.len()
+        );
 
         let mut config = SimulationConfig::default_150_year();
         config.seed = seed;
@@ -49,7 +54,10 @@ fn main() {
         let raw_tech: f64 = if sim.worlds.is_empty() {
             1.0
         } else {
-            sim.worlds.iter().map(|w| w.knowledge.mean_tech_level()).sum::<f64>()
+            sim.worlds
+                .iter()
+                .map(|w| w.knowledge.mean_tech_level())
+                .sum::<f64>()
                 / sim.worlds.len() as f64
         };
         let tech_norm = ((raw_tech - 1.0) / 9.0).clamp(0.0, 1.0);
@@ -76,8 +84,16 @@ fn main() {
             report.final_population,
             off_earth_pop,
             report.final_cvs,
-            if report.survived { "SURVIVED" } else { "COLLAPSED" },
-            format!("[{}/{}]", report.checkpoints_passed, report.checkpoints_passed + report.checkpoints_failed),
+            if report.survived {
+                "SURVIVED"
+            } else {
+                "COLLAPSED"
+            },
+            format!(
+                "[{}/{}]",
+                report.checkpoints_passed,
+                report.checkpoints_passed + report.checkpoints_failed
+            ),
         );
     }
 
@@ -87,7 +103,18 @@ fn main() {
     println!();
     println!(
         "{:<7}| {:<8}| {:<8}| {:<6}| {:<7}| {:<7}| {:<7}| {:<10}| {:<7}| {:<10}| {:<10}| {}",
-        "Seed", "Pop", "OffErth", "Wrlds", "CVS", "Phi", "Love", "Genetics", "Tech", "Birth Yr", "Trade Yr", "Survived"
+        "Seed",
+        "Pop",
+        "OffErth",
+        "Wrlds",
+        "CVS",
+        "Phi",
+        "Love",
+        "Genetics",
+        "Tech",
+        "Birth Yr",
+        "Trade Yr",
+        "Survived"
     );
     println!("{}", "-".repeat(115));
 
@@ -122,7 +149,12 @@ fn main() {
     let survived_count = results.iter().filter(|r| r.survived).count();
 
     let mean_cvs = results.iter().map(|r| r.cvs).sum::<f64>() / n;
-    let std_cvs = (results.iter().map(|r| (r.cvs - mean_cvs).powi(2)).sum::<f64>() / n).sqrt();
+    let std_cvs = (results
+        .iter()
+        .map(|r| (r.cvs - mean_cvs).powi(2))
+        .sum::<f64>()
+        / n)
+        .sqrt();
 
     let mean_pop = results.iter().map(|r| r.population as f64).sum::<f64>() / n;
     let std_pop = (results
@@ -141,10 +173,20 @@ fn main() {
         .sqrt();
 
     let mean_love = results.iter().map(|r| r.love).sum::<f64>() / n;
-    let std_love = (results.iter().map(|r| (r.love - mean_love).powi(2)).sum::<f64>() / n).sqrt();
+    let std_love = (results
+        .iter()
+        .map(|r| (r.love - mean_love).powi(2))
+        .sum::<f64>()
+        / n)
+        .sqrt();
 
     let mean_phi = results.iter().map(|r| r.phi).sum::<f64>() / n;
-    let std_phi = (results.iter().map(|r| (r.phi - mean_phi).powi(2)).sum::<f64>() / n).sqrt();
+    let std_phi = (results
+        .iter()
+        .map(|r| (r.phi - mean_phi).powi(2))
+        .sum::<f64>()
+        / n)
+        .sqrt();
 
     let mean_genetics = results.iter().map(|r| r.genetics).sum::<f64>() / n;
     let std_genetics = (results
@@ -155,7 +197,12 @@ fn main() {
         .sqrt();
 
     let mean_tech = results.iter().map(|r| r.tech).sum::<f64>() / n;
-    let std_tech = (results.iter().map(|r| (r.tech - mean_tech).powi(2)).sum::<f64>() / n).sqrt();
+    let std_tech = (results
+        .iter()
+        .map(|r| (r.tech - mean_tech).powi(2))
+        .sum::<f64>()
+        / n)
+        .sqrt();
 
     let mean_checkpoints: f64 = results
         .iter()
@@ -171,7 +218,10 @@ fn main() {
         results.len(),
         survived_count as f64 / n * 100.0,
     );
-    println!("  Mean CVS:               {:.3} +/- {:.3}", mean_cvs, std_cvs);
+    println!(
+        "  Mean CVS:               {:.3} +/- {:.3}",
+        mean_cvs, std_cvs
+    );
     println!(
         "  Mean final population:  {:.0} +/- {:.0}",
         mean_pop, std_pop,
@@ -180,15 +230,21 @@ fn main() {
         "  Mean off-Earth pop:     {:.0} +/- {:.0}",
         mean_off, std_off,
     );
-    println!("  Mean love coherence:    {:.3} +/- {:.3}", mean_love, std_love);
-    println!("  Mean collective phi:    {:.3} +/- {:.3}", mean_phi, std_phi);
+    println!(
+        "  Mean love coherence:    {:.3} +/- {:.3}",
+        mean_love, std_love
+    );
+    println!(
+        "  Mean collective phi:    {:.3} +/- {:.3}",
+        mean_phi, std_phi
+    );
     println!(
         "  Mean genetic diversity: {:.4} +/- {:.4}",
         mean_genetics, std_genetics,
     );
-    println!("  Mean tech level:        {:.3} +/- {:.3}", mean_tech, std_tech);
     println!(
-        "  Mean checkpoint rate:   {:.1}%",
-        mean_checkpoints * 100.0,
+        "  Mean tech level:        {:.3} +/- {:.3}",
+        mean_tech, std_tech
     );
+    println!("  Mean checkpoint rate:   {:.1}%", mean_checkpoints * 100.0,);
 }

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Paired TierGate vs SprintFloor comparison on quadrotor using
 //! **RoboticAgent-driven Φ** (vs the synthetic-signal version in
-//! `symthaea-flight/examples/flight_benchmark.rs`).
+//! `symthaea-multirotor/examples/flight_benchmark.rs`).
 //!
 //! Complements Figure 3 of the Φ-gated-safety paper. Figure 3's
 //! flight_benchmark synthesizes a sinusoidal signal in [0.05, 0.95]

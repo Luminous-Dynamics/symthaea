@@ -6,6 +6,7 @@
 //!
 //! Updated to use HDK 0.6 patterns
 
+use mycelix_zome_helpers as _;
 use hdk::prelude::*;
 use revocation_integrity::*;
 

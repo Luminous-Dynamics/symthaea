@@ -202,7 +202,9 @@ impl BrowserWsTransport {
                 let wire_bytes = rmp_serde::to_vec_named(&envelope)
                     .map_err(|e| ClientError::SerializationError(e.to_string()))?;
 
-                let timeout_ms = state.connect_config.as_ref()
+                let timeout_ms = state
+                    .connect_config
+                    .as_ref()
                     .and_then(|c| c.request_timeout_ms)
                     .unwrap_or(30_000);
 
@@ -344,7 +346,9 @@ impl BrowserWsTransport {
                     state.ws = None;
 
                     // Check if auto-reconnect is configured
-                    let reconnect_config = state.connect_config.as_ref()
+                    let reconnect_config = state
+                        .connect_config
+                        .as_ref()
                         .and_then(|c| c.reconnect.clone());
 
                     if let Some(ref rc) = reconnect_config {
@@ -367,25 +371,30 @@ impl BrowserWsTransport {
                                 (req.resolve)(Err(ClientError::ConnectionFailed(reason.clone())));
                             }
 
-                            web_sys::console::log_1(&format!(
-                                "[HC] Reconnect attempt {attempt}/{} in {delay}ms",
-                                rc.max_attempts
-                            ).into());
+                            web_sys::console::log_1(
+                                &format!(
+                                    "[HC] Reconnect attempt {attempt}/{} in {delay}ms",
+                                    rc.max_attempts
+                                )
+                                .into(),
+                            );
 
                             // Schedule reconnect after delay
                             let closure = Closure::once(move || {
-                                let transport = BrowserWsTransport { inner: inner_for_reconnect };
+                                let transport = BrowserWsTransport {
+                                    inner: inner_for_reconnect,
+                                };
                                 wasm_bindgen_futures::spawn_local(async move {
                                     match transport.connect(config).await {
                                         Ok(()) => {
                                             web_sys::console::log_1(
-                                                &"[HC] Reconnected successfully".into()
+                                                &"[HC] Reconnected successfully".into(),
                                             );
                                             transport.inner.borrow_mut().reconnect_attempt = 0;
                                         }
                                         Err(e) => {
                                             web_sys::console::warn_1(
-                                                &format!("[HC] Reconnect failed: {e}").into()
+                                                &format!("[HC] Reconnect failed: {e}").into(),
                                             );
                                             // on_close will fire again → next attempt
                                         }

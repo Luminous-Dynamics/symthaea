@@ -158,10 +158,7 @@ impl HarmonyTracker {
         // Shelter: overcrowding hurts; 1.0 when pop << max, 0.0 when at capacity
         // Allostatic load degrades flourishing even when physical health is fine.
         let shelter_frac = (1.0 - pop / world.max_population.max(1) as f64).max(0.0);
-        let base_flourishing = world
-            .mean_health()
-            .min(inputs.food_level)
-            .min(shelter_frac);
+        let base_flourishing = world.mean_health().min(inputs.food_level).min(shelter_frac);
         self.current_scores[1] =
             (base_flourishing * (1.0 - inputs.mean_allostatic_load * 0.3)).clamp(0.0, 1.0);
 
@@ -177,12 +174,13 @@ impl HarmonyTracker {
         // Bug #3 fix: Product of two small numbers (e.g., 0.1 × 0.2 = 0.02) produces
         // a near-zero score. Geometric mean (sqrt of product) is more appropriate —
         // a civilization with modest art AND modest innovation should score ~0.14, not 0.02.
-        self.current_scores[3] =
-            (inputs.art_per_capita * inputs.innovation_rate).max(0.0).sqrt().clamp(0.0, 1.0);
+        self.current_scores[3] = (inputs.art_per_capita * inputs.innovation_rate)
+            .max(0.0)
+            .sqrt()
+            .clamp(0.0, 1.0);
 
         // 5. Universal Interconnectedness = trade_connections / 5 (max 5)
-        self.current_scores[4] =
-            (inputs.trade_connections as f64 / 5.0).clamp(0.0, 1.0);
+        self.current_scores[4] = (inputs.trade_connections as f64 / 5.0).clamp(0.0, 1.0);
 
         // 6. Sacred Reciprocity = (1 - gini) * self_sufficiency
         self.current_scores[5] =
@@ -222,11 +220,16 @@ impl HarmonyTracker {
             0.0
         };
 
-        self.diversity_factor =
-            self.current_scores.iter().filter(|&&s| s > DIVERSITY_THRESHOLD).count() as f64 / 8.0;
+        self.diversity_factor = self
+            .current_scores
+            .iter()
+            .filter(|&&s| s > DIVERSITY_THRESHOLD)
+            .count() as f64
+            / 8.0;
 
-        self.love_coherence = (mean_01 * (1.0 - self.tension_ratio.min(1.0)) * self.diversity_factor)
-            .min(LOVE_COHERENCE_CEILING);
+        self.love_coherence =
+            (mean_01 * (1.0 - self.tension_ratio.min(1.0)) * self.diversity_factor)
+                .min(LOVE_COHERENCE_CEILING);
 
         // History
         self.history.push(HarmonySnapshot {
@@ -385,7 +388,9 @@ mod tests {
             economy: crate::economy::WorldEconomy::new(),
             harmony: crate::harmony::HarmonyTracker::new(),
             governance: crate::governance::WorldGovernance::new(),
-            metabolism_state: crate::metabolism::MetabolismState::default(), currency_state: crate::currency::WorldCurrencyState::default(), policy_state: crate::proposals::PolicyState::default(),
+            metabolism_state: crate::metabolism::MetabolismState::default(),
+            currency_state: crate::currency::WorldCurrencyState::default(),
+            policy_state: crate::proposals::PolicyState::default(),
             power_generation_kw: 0.0,
             power_demand_kw: 0.0,
             narrative_identity: crate::world::NarrativeIdentity::default(),
@@ -443,10 +448,16 @@ mod tests {
                 faction_id: None,
                 generation: 0,
                 trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
-                    ethics: crate::agent::EthicalOrientation::default(),
-                    sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
-                    justice: crate::sub_passport::RestorativeJustice::new(),
+                cumulative_dose_sv: 0.0,
+                adversarial: None,
+                coordination_understanding: 0.0,
+                mycel_score: 0.1,
+                sap_balance: 100.0,
+                is_biological: true,
+                wounds: Vec::new(),
+                ethics: crate::agent::EthicalOrientation::default(),
+                sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
+                justice: crate::sub_passport::RestorativeJustice::new(),
             });
         }
         world.next_agent_id = pop as u64;
@@ -522,13 +533,15 @@ mod tests {
         tracker.current_scores = [0.0; 8];
         tracker.current_scores[0] = 1.0;
         let mean2: f64 = 1.0 / 8.0;
-        let var2: f64 =
-            (1.0 * (1.0 - mean2).powi(2) + 7.0 * (0.0 - mean2).powi(2)) / 8.0;
+        let var2: f64 = (1.0 * (1.0 - mean2).powi(2) + 7.0 * (0.0 - mean2).powi(2)) / 8.0;
         let tension2 = var2 / mean2;
         let diversity2 = 1.0 / 8.0; // only 1 above 0.3
         let coherence2 = (mean2 * (1.0 - tension2.min(1.0)) * diversity2).min(0.95);
         // Should be very low due to poor diversity and high tension
-        assert!(coherence2 < 0.1, "Imbalanced harmonies should yield low coherence: {coherence2}");
+        assert!(
+            coherence2 < 0.1,
+            "Imbalanced harmonies should yield low coherence: {coherence2}"
+        );
     }
 
     #[test]
@@ -576,16 +589,22 @@ mod tests {
 
         // All above threshold
         tracker.current_scores = [0.5; 8];
-        let diversity_all =
-            tracker.current_scores.iter().filter(|&&s| s > DIVERSITY_THRESHOLD).count() as f64
-                / 8.0;
+        let diversity_all = tracker
+            .current_scores
+            .iter()
+            .filter(|&&s| s > DIVERSITY_THRESHOLD)
+            .count() as f64
+            / 8.0;
         assert!((diversity_all - 1.0).abs() < 1e-10);
 
         // Only 2 above threshold
         tracker.current_scores = [0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.5, 0.0];
-        let diversity_two =
-            tracker.current_scores.iter().filter(|&&s| s > DIVERSITY_THRESHOLD).count() as f64
-                / 8.0;
+        let diversity_two = tracker
+            .current_scores
+            .iter()
+            .filter(|&&s| s > DIVERSITY_THRESHOLD)
+            .count() as f64
+            / 8.0;
         assert!((diversity_two - 0.25).abs() < 1e-10);
     }
 

@@ -50,27 +50,42 @@ impl ThresholdConfig {
                 reason: "Threshold cannot exceed max signers".to_string(),
             });
         }
-        Ok(Self { threshold, max_signers })
+        Ok(Self {
+            threshold,
+            max_signers,
+        })
     }
 
     /// 2-of-3 threshold (minimal)
     pub fn two_of_three() -> Self {
-        Self { threshold: 2, max_signers: 3 }
+        Self {
+            threshold: 2,
+            max_signers: 3,
+        }
     }
 
     /// 3-of-5 threshold (common)
     pub fn three_of_five() -> Self {
-        Self { threshold: 3, max_signers: 5 }
+        Self {
+            threshold: 3,
+            max_signers: 5,
+        }
     }
 
     /// 5-of-7 threshold (high availability)
     pub fn five_of_seven() -> Self {
-        Self { threshold: 5, max_signers: 7 }
+        Self {
+            threshold: 5,
+            max_signers: 7,
+        }
     }
 
     /// 11-of-21 threshold (large committee)
     pub fn eleven_of_twenty_one() -> Self {
-        Self { threshold: 11, max_signers: 21 }
+        Self {
+            threshold: 11,
+            max_signers: 21,
+        }
     }
 
     /// Calculate Byzantine tolerance for this configuration
@@ -136,7 +151,8 @@ impl GroupPublicKey {
 
     /// Serialize to bytes
     pub fn to_bytes(&self) -> ConsensusResult<Vec<u8>> {
-        self.verifying_key.serialize()
+        self.verifying_key
+            .serialize()
             .map_err(|e| ConsensusError::InvalidSignature {
                 reason: format!("Failed to serialize group public key: {:?}", e),
             })
@@ -144,24 +160,27 @@ impl GroupPublicKey {
 
     /// Deserialize from bytes
     pub fn from_bytes(bytes: &[u8]) -> ConsensusResult<Self> {
-        let verifying_key = frost::VerifyingKey::deserialize(bytes)
-            .map_err(|e| ConsensusError::InvalidSignature {
+        let verifying_key = frost::VerifyingKey::deserialize(bytes).map_err(|e| {
+            ConsensusError::InvalidSignature {
                 reason: format!("Invalid group public key: {:?}", e),
-            })?;
+            }
+        })?;
         Ok(Self { verifying_key })
     }
 
     /// Verify a threshold signature
     pub fn verify(&self, message: &[u8], signature: &ThresholdSignature) -> ConsensusResult<()> {
-        let frost_sig = frost::Signature::deserialize(&signature.signature)
-            .map_err(|e| ConsensusError::InvalidSignature {
+        let frost_sig = frost::Signature::deserialize(&signature.signature).map_err(|e| {
+            ConsensusError::InvalidSignature {
                 reason: format!("Invalid signature format: {:?}", e),
-            })?;
+            }
+        })?;
 
-        self.verifying_key.verify(message, &frost_sig)
-            .map_err(|e| ConsensusError::InvalidSignature {
+        self.verifying_key.verify(message, &frost_sig).map_err(|e| {
+            ConsensusError::InvalidSignature {
                 reason: format!("Threshold signature verification failed: {:?}", e),
-            })
+            }
+        })
     }
 }
 
@@ -188,13 +207,18 @@ impl ThresholdSignature {
 /// For testing and bootstrap only. Production should use DKG.
 pub fn generate_shares_with_dealer(
     config: &ThresholdConfig,
-) -> ConsensusResult<(Vec<ValidatorKeyShare>, GroupPublicKey, frost::keys::PublicKeyPackage)> {
+) -> ConsensusResult<(
+    Vec<ValidatorKeyShare>,
+    GroupPublicKey,
+    frost::keys::PublicKeyPackage,
+)> {
     let (shares_map, pubkey_package) = frost::keys::generate_with_dealer(
         config.max_signers,
         config.threshold,
         frost::keys::IdentifierList::Default,
         &mut OsRng,
-    ).map_err(|e| ConsensusError::InvalidConfiguration {
+    )
+    .map_err(|e| ConsensusError::InvalidConfiguration {
         reason: format!("Key generation failed: {:?}", e),
     })?;
 
@@ -202,15 +226,16 @@ pub fn generate_shares_with_dealer(
 
     let shares: Vec<ValidatorKeyShare> = shares_map
         .into_iter()
-        .map(|(id, secret_share)| {
-            ValidatorKeyShare {
-                identifier: id,
-                signing_share: secret_share.signing_share().clone(),
-                verifying_share: pubkey_package.verifying_shares().get(&id)
-                    .expect("verifying share must exist for every generated share id").clone(),
-                group_public_key: pubkey_package.verifying_key().clone(),
-                min_signers: config.threshold,
-            }
+        .map(|(id, secret_share)| ValidatorKeyShare {
+            identifier: id,
+            signing_share: secret_share.signing_share().clone(),
+            verifying_share: pubkey_package
+                .verifying_shares()
+                .get(&id)
+                .expect("verifying share must exist for every generated share id")
+                .clone(),
+            group_public_key: pubkey_package.verifying_key().clone(),
+            min_signers: config.threshold,
         })
         .collect();
 
@@ -241,10 +266,8 @@ impl ThresholdSigner {
 
     /// Round 1: Generate nonce commitment
     pub fn generate_commitment(&mut self) -> frost::round1::SigningCommitments {
-        let (nonces, commitments) = frost::round1::commit(
-            self.key_package.signing_share(),
-            &mut OsRng,
-        );
+        let (nonces, commitments) =
+            frost::round1::commit(self.key_package.signing_share(), &mut OsRng);
         self.signing_nonces = Some(nonces);
         commitments
     }
@@ -254,15 +277,18 @@ impl ThresholdSigner {
         &self,
         signing_package: &frost::SigningPackage,
     ) -> ConsensusResult<frost::round2::SignatureShare> {
-        let nonces = self.signing_nonces.as_ref()
-            .ok_or_else(|| ConsensusError::InvalidSignature {
-                reason: "Must call generate_commitment first".to_string(),
-            })?;
+        let nonces =
+            self.signing_nonces
+                .as_ref()
+                .ok_or_else(|| ConsensusError::InvalidSignature {
+                    reason: "Must call generate_commitment first".to_string(),
+                })?;
 
-        frost::round2::sign(signing_package, nonces, &self.key_package)
-            .map_err(|e| ConsensusError::InvalidSignature {
+        frost::round2::sign(signing_package, nonces, &self.key_package).map_err(|e| {
+            ConsensusError::InvalidSignature {
                 reason: format!("Signing failed: {:?}", e),
-            })
+            }
+        })
     }
 }
 
@@ -305,7 +331,10 @@ impl ThresholdCoordinator {
 
     /// Create the signing package for round 2
     pub fn create_signing_package(&self) -> ConsensusResult<frost::SigningPackage> {
-        Ok(frost::SigningPackage::new(self.commitments.clone(), &self.message))
+        Ok(frost::SigningPackage::new(
+            self.commitments.clone(),
+            &self.message,
+        ))
     }
 
     /// Add a signature share from a participant
@@ -327,16 +356,15 @@ impl ThresholdCoordinator {
         &self,
         signing_package: &frost::SigningPackage,
     ) -> ConsensusResult<ThresholdSignature> {
-        let signature = frost::aggregate(
-            signing_package,
-            &self.shares,
-            &self.pubkey_package,
-        ).map_err(|e| ConsensusError::InvalidSignature {
-            reason: format!("Signature aggregation failed: {:?}", e),
-        })?;
+        let signature = frost::aggregate(signing_package, &self.shares, &self.pubkey_package)
+            .map_err(|e| ConsensusError::InvalidSignature {
+                reason: format!("Signature aggregation failed: {:?}", e),
+            })?;
 
         // Extract signer IDs
-        let signer_ids: Vec<u16> = self.shares.keys()
+        let signer_ids: Vec<u16> = self
+            .shares
+            .keys()
             .map(|id| {
                 // Convert identifier to u16 (FROST identifiers are 1-indexed)
                 let bytes = id.serialize();
@@ -344,7 +372,8 @@ impl ThresholdCoordinator {
             })
             .collect();
 
-        let sig_bytes = signature.serialize()
+        let sig_bytes = signature
+            .serialize()
             .map_err(|e| ConsensusError::InvalidSignature {
                 reason: format!("Failed to serialize signature: {:?}", e),
             })?;

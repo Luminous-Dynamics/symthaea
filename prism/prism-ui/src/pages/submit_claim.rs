@@ -6,9 +6,9 @@
 //! The voice of the people: users don't just consume knowledge,
 //! they contribute it with evidence levels and sources.
 
-use leptos::prelude::*;
-use prism_common::{EmpiricalLevel, NormativeLevel, MaterialityLevel};
 use crate::holochain::DhtClaim;
+use leptos::prelude::*;
+use prism_common::{EmpiricalLevel, MaterialityLevel, NormativeLevel};
 
 #[component]
 pub fn SubmitClaimPage() -> impl IntoView {
@@ -22,7 +22,9 @@ pub fn SubmitClaimPage() -> impl IntoView {
     let on_submit = move |ev: leptos::ev::SubmitEvent| {
         ev.prevent_default();
         let claim_text = content.get();
-        if claim_text.trim().is_empty() { return; }
+        if claim_text.trim().is_empty() {
+            return;
+        }
 
         set_submitting.set(true);
 
@@ -39,8 +41,18 @@ pub fn SubmitClaimPage() -> impl IntoView {
             empirical: e,
             normative: NormativeLevel::N2,
             materiality: MaterialityLevel::M2,
-            sources: source.get().split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect(),
-            tags: tags.get().split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect(),
+            sources: source
+                .get()
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect(),
+            tags: tags
+                .get()
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect(),
             claim_type: "Fact".to_string(),
             confidence: 0.8,
         };

@@ -1,0 +1,137 @@
+{
+  "metadata": {
+    "title": "The Mycelial Humanities: Collective Wisdom & Commoning",
+    "framework": "Mycelix Collective Wisdom",
+    "source": "https://mycelix.org",
+    "grade_level": "Lifelong/Universal",
+    "subject_area": "Humanities",
+    "domain": "Humanities",
+    "version": "1.0",
+    "total_standards": 8,
+    "domains": [
+      "Indigenous Knowledge",
+      "Sense-Making",
+      "Commoning",
+      "Justice"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Foundational humanities for a decentralized, high-trust society."
+  },
+  "nodes": [
+    {
+      "id": "HUM-IKS-101",
+      "title": "Biological Reciprocity (IKS)",
+      "description": "Learning from the living substrate. Indigenous perspectives on land stewardship, medicinal plants, and the ethics of taking only what is needed. Grounding Ubuntu in ecology.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Indigenous Knowledge",
+      "subdomain": "Mycelial Humanities",
+      "tags": ["reciprocity", "ecology", "ancestral-wisdom", "ubuntu"],
+      "estimated_hours": 45,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Understand",
+      "subject_area": "Humanities"
+    },
+    {
+      "id": "HUM-COM-101",
+      "title": "History of the Commons",
+      "description": "Before the State and the Market: how humans managed shared water, forests, and knowledge for millennia. Elinor Ostrom's 8 principles for managing the commons.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Commoning",
+      "subdomain": "Mycelial Humanities",
+      "tags": ["commons", "governance", "history", "ostrom"],
+      "estimated_hours": 45,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Understand",
+      "subject_area": "Humanities"
+    },
+    {
+      "id": "HUM-SENSE-201",
+      "title": "Collaborative Sense-Making",
+      "description": "Techniques for collective intelligence: Socratic dialogue, Non-Violent Communication (NVC), and identifying logical fallacies in real-time group settings.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Sense-Making",
+      "subdomain": "Mycelial Humanities",
+      "tags": ["dialogue", "nvc", "intelligence", "logic"],
+      "estimated_hours": 60,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Apply",
+      "subject_area": "Humanities"
+    },
+    {
+      "id": "HUM-JUST-201",
+      "title": "Restorative Justice Circles",
+      "description": "Moving from punitive to restorative justice. The architecture of the 'Healing Circle' and the role of the community in repairing trust after a violation.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Justice",
+      "subdomain": "Mycelial Humanities",
+      "tags": ["justice", "healing", "accountability", "peace"],
+      "estimated_hours": 60,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Humanities"
+    },
+    {
+      "id": "HUM-CAP-01",
+      "title": "The Ubuntu Stewardship Capstone",
+      "description": "Facilitate a real-world community dialogue or manage a shared resource project (e.g., a community tool library) using the principles of the commons and restorative justice.",
+      "node_type": "Capstone",
+      "difficulty": "Advanced",
+      "domain": "Universal",
+      "subdomain": "Mycelial Humanities",
+      "tags": ["capstone", "stewardship", "leadership", "ubuntu"],
+      "estimated_hours": 120,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Create",
+      "subject_area": "Humanities",
+      "holonic_capstone": {
+        "required_node_ids": ["HUM-COM-101", "HUM-SENSE-201", "HUM-JUST-201"],
+        "deliverable": "A verified record of community facilitation or resource management, endorsed by the affected Learning Pod.",
+        "min_peer_endorsements": 5
+      },
+      "alignment_vector": {
+        "ahimsa": 950,
+        "reciprocity": 980,
+        "truthfulness": 900,
+        "sovereignty_respect": 920,
+        "ecological_stewardship": 850,
+        "mentorship": 900,
+        "resilience": 880,
+        "collective_flourishing": 950
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "HUM-COM-101",
+      "to": "HUM-CAP-01",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Stewardship requires understanding the historical principles of the commons."
+    },
+    {
+      "from": "HUM-SENSE-201",
+      "to": "HUM-CAP-01",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Effective stewardship requires advanced collaborative sense-making."
+    },
+    {
+      "from": "HUM-JUST-201",
+      "to": "HUM-CAP-01",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Resolving community conflict is a core skill for long-term stewardship."
+    },
+    {
+      "from": "HUM-IKS-101",
+      "to": "HUM-CAP-01",
+      "edge_type": "Recommended",
+      "strength_permille": 600,
+      "rationale": "Ecological reciprocity provides the spiritual grounding for physical stewardship."
+    }
+  ]
+}

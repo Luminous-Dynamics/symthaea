@@ -13,10 +13,10 @@
 //! - **pogq** — Stateful PoGQ v4.1 Enhanced Byzantine detection
 //! - **coordinator** — Full FL round orchestrator
 
-pub mod types;
+pub mod coordinator;
 pub mod defenses;
 pub mod pogq;
-pub mod coordinator;
+pub mod types;
 
 use pyo3::prelude::*;
 

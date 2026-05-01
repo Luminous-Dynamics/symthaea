@@ -17,6 +17,7 @@
 //! - Validates DID exists via `did_registry` before creating MFA state
 //! - Provides `get_mfa_for_did` for use by identity_bridge
 
+use mycelix_zome_helpers as _;
 use hdk::prelude::*;
 use mfa_integrity::*;
 use mycelix_crypto::AlgorithmId;

@@ -2,7 +2,7 @@
 
 **Version**: v0.2.0-dev (Holochain 0.6)
 **Status**: Phase 10 (Live at praxis.mycelix.net), 210+ tests passing
-**Features**: 29 learning science frameworks, Spore consciousness integration, Craft credential pipeline
+**Features**: 29 learning science frameworks, Spore cognitive integration, Craft credential pipeline
 **Live**: https://praxis.mycelix.net (Cloudflare Tunnel → :8107)
 **Credential Pipeline**: Praxis issues (PoL + BKT mastery) → Craft publishes (living credentials + guild context)
 

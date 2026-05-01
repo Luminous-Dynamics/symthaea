@@ -15,6 +15,7 @@
 //! Run: cargo run --example hdc_cooperation --release --features consciousness-hdc
 
 use nalgebra::SVector;
+use symthaea_consciousness_equation::ConsciousnessInputs;
 use symtropy_consciousness_physics::convergence::ConvergenceDetector;
 use symtropy_consciousness_physics::fep_gradient;
 use symtropy_consciousness_physics::harmony_field::HarmonyField;
@@ -22,7 +23,6 @@ use symtropy_consciousness_physics::hdc_context::{self, HdcConsciousnessContext}
 use symtropy_consciousness_physics::{ConsciousnessField, ThermodynamicConstants};
 use symtropy_math::Point;
 use symtropy_physics::PhysicsWorld;
-use symthaea_consciousness_equation::ConsciousnessInputs;
 
 const AGENTS: usize = 12;
 const MAX_TICKS: usize = 5_000;
@@ -30,11 +30,17 @@ const DT: f64 = 1.0 / 64.0;
 const NUM_SEEDS: usize = 10;
 
 #[derive(Clone, Copy)]
-enum Condition { Scalar, Hdc }
+enum Condition {
+    Scalar,
+    Hdc,
+}
 
 impl Condition {
     fn name(&self) -> &'static str {
-        match self { Condition::Scalar => "SCALAR", Condition::Hdc => "HDC" }
+        match self {
+            Condition::Scalar => "SCALAR",
+            Condition::Hdc => "HDC",
+        }
     }
 }
 
@@ -53,10 +59,7 @@ fn run_experiment(condition: Condition, seed: u64) -> RunResult {
     let mut consciousness = ConsciousnessField::<2>::new();
     consciousness.constants = ThermodynamicConstants::research();
 
-    let well_positions = vec![
-        SVector::from([25.0, 25.0]),
-        SVector::from([-25.0, -25.0]),
-    ];
+    let well_positions = vec![SVector::from([25.0, 25.0]), SVector::from([-25.0, -25.0])];
 
     // HDC contexts (one per agent for HDC condition)
     let mut hdc_contexts: Vec<Option<HdcConsciousnessContext>> = Vec::new();
@@ -71,7 +74,11 @@ fn run_experiment(condition: Condition, seed: u64) -> RunResult {
         if let Some(body) = world.body_mut(h) {
             body.linear_damping = 0.05;
         }
-        consciousness.register(h, consciousness.constants.initial_energy, consciousness.constants.harmony_range);
+        consciousness.register(
+            h,
+            consciousness.constants.initial_energy,
+            consciousness.constants.harmony_range,
+        );
 
         if let Some(entity) = consciousness.entities.get_mut(&h) {
             match i % 4 {
@@ -108,10 +115,22 @@ fn run_experiment(condition: Condition, seed: u64) -> RunResult {
 
             let nearby = if let Some(body) = world.body(h) {
                 let pos = body.position().0;
-                handles.iter().filter(|&&oh| {
-                    oh != h && world.body(oh).map(|ob| (ob.position().0 - pos).norm() < consciousness.constants.harmony_range).unwrap_or(false)
-                }).count()
-            } else { 0 };
+                handles
+                    .iter()
+                    .filter(|&&oh| {
+                        oh != h
+                            && world
+                                .body(oh)
+                                .map(|ob| {
+                                    (ob.position().0 - pos).norm()
+                                        < consciousness.constants.harmony_range
+                                })
+                                .unwrap_or(false)
+                    })
+                    .count()
+            } else {
+                0
+            };
 
             if !collapsed {
                 match condition {
@@ -134,7 +153,13 @@ fn run_experiment(condition: Condition, seed: u64) -> RunResult {
                     Condition::Hdc => {
                         // Step HDC context with dynamic inputs
                         let inputs_arr = hdc_context::inputs_from_state(
-                            energy_frac, nearby, pred_error, 0.0, motor_prec, harmony_total, consciousness.collective_phi,
+                            energy_frac,
+                            nearby,
+                            pred_error,
+                            0.0,
+                            motor_prec,
+                            harmony_total,
+                            consciousness.collective_phi,
                         );
                         if let Some(ref mut hdc) = hdc_contexts[idx] {
                             hdc.step(&inputs_arr, &harmony_acts, DT as f32);
@@ -144,22 +169,29 @@ fn run_experiment(condition: Condition, seed: u64) -> RunResult {
                             if let Some(entity) = consciousness.entities.get_mut(&h) {
                                 let old_phi = entity.phi();
                                 // Override the equation result with HDC phi
-                                entity.result = Some(symthaea_consciousness_equation::ConsciousnessResult {
-                                    consciousness_level: hdc_phi,
-                                    bottleneck_factor: energy_frac,
-                                    weighted_sum: hdc_phi,
-                                    embodiment_factor: 1.0,
-                                    narrative_coherence: 1.0,
-                                    social_embedding: 1.0,
-                                    temporal_stability: 1.0,
-                                    bottleneck_name: "hdc".to_string(),
-                                    factors: ConsciousnessInputs {
-                                        phi: energy_frac, broadcast: 0.5, working_memory: 0.5,
-                                        attention: 0.5, recurrence: 0.5, embodiment: 0.5,
-                                        knowledge: 0.5, synchrony: 0.5,
-                                    },
-                                });
-                                entity.safety_tier = symtropy_consciousness_physics::SafetyTier::from_phi(hdc_phi);
+                                entity.result =
+                                    Some(symthaea_consciousness_equation::ConsciousnessResult {
+                                        consciousness_level: hdc_phi,
+                                        bottleneck_factor: energy_frac,
+                                        weighted_sum: hdc_phi,
+                                        embodiment_factor: 1.0,
+                                        narrative_coherence: 1.0,
+                                        social_embedding: 1.0,
+                                        temporal_stability: 1.0,
+                                        bottleneck_name: "hdc".to_string(),
+                                        factors: ConsciousnessInputs {
+                                            phi: energy_frac,
+                                            broadcast: 0.5,
+                                            working_memory: 0.5,
+                                            attention: 0.5,
+                                            recurrence: 0.5,
+                                            embodiment: 0.5,
+                                            knowledge: 0.5,
+                                            synchrony: 0.5,
+                                        },
+                                    });
+                                entity.safety_tier =
+                                    symtropy_consciousness_physics::SafetyTier::from_phi(hdc_phi);
                                 consciousness.ledger.record_phi_change(hdc_phi - old_phi);
                             }
                         }
@@ -168,33 +200,53 @@ fn run_experiment(condition: Condition, seed: u64) -> RunResult {
             } else {
                 // Collapsed: zero phi
                 let inputs = ConsciousnessInputs {
-                    phi: 0.0, broadcast: 0.0, working_memory: 0.0,
-                    attention: 0.0, recurrence: 0.0, embodiment: 0.0,
-                    knowledge: 0.0, synchrony: 0.0,
+                    phi: 0.0,
+                    broadcast: 0.0,
+                    working_memory: 0.0,
+                    attention: 0.0,
+                    recurrence: 0.0,
+                    embodiment: 0.0,
+                    knowledge: 0.0,
+                    synchrony: 0.0,
                 };
                 consciousness.update_entity(h, &inputs, Point::origin());
             }
         }
 
         // 2. FEP gradient movement
-        let agent_data: Vec<(SVector<f64, 2>, [f64; 9])> = handles.iter()
+        let agent_data: Vec<(SVector<f64, 2>, [f64; 9])> = handles
+            .iter()
             .filter_map(|&h| {
                 let body = world.body(h)?;
                 let entity = consciousness.entities.get(&h)?;
                 Some((body.position().0, entity.harmony_activations))
-            }).collect();
-        let well_data: Vec<(SVector<f64, 2>, f64)> = well_positions.iter().map(|&p| (p, 1.0)).collect();
+            })
+            .collect();
+        let well_data: Vec<(SVector<f64, 2>, f64)> =
+            well_positions.iter().map(|&p| (p, 1.0)).collect();
 
         for &h in &handles {
             let Some(body) = world.body(h) else { continue };
-            let Some(entity) = consciousness.entities.get(&h) else { continue };
-            if entity.energy.is_collapsed() { continue; }
+            let Some(entity) = consciousness.entities.get(&h) else {
+                continue;
+            };
+            if entity.energy.is_collapsed() {
+                continue;
+            }
             let pos = body.position().0;
             let ef = entity.energy.fraction_remaining();
             let harmony = entity.harmony_activations;
-            let nearby: Vec<_> = agent_data.iter().filter(|(p, _)| (p - pos).norm() > 2.0).cloned().collect();
-            let dir = fep_gradient::free_energy_gradient(&pos, ef, &harmony, &nearby, &well_data, None, 0.0);
-            if let Some(body) = world.body_mut(h) { body.linear_velocity = dir * 25.0; }
+            let nearby: Vec<_> = agent_data
+                .iter()
+                .filter(|(p, _)| (p - pos).norm() > 2.0)
+                .cloned()
+                .collect();
+            let dir = fep_gradient::free_energy_gradient(
+                &pos, ef, &harmony, &nearby, &well_data, None, 0.0,
+            );
+            if let Some(body) = world.body_mut(h) {
+                body.linear_velocity = dir * 25.0;
+            }
         }
 
         // 3. Maintenance + regen
@@ -203,37 +255,56 @@ fn run_experiment(condition: Condition, seed: u64) -> RunResult {
         let well_rate = consciousness.constants.energy_well_regen_rate;
         let regen_mult = consciousness.resource_regeneration_multiplier();
 
-        let near_wells: Vec<bool> = handles.iter().map(|&h| {
-            world.body(h).map(|body| {
-                let pos = body.position().0;
-                well_positions.iter().any(|&wp| (pos - wp).norm() < 35.0)
-            }).unwrap_or(false)
-        }).collect();
+        let near_wells: Vec<bool> = handles
+            .iter()
+            .map(|&h| {
+                world
+                    .body(h)
+                    .map(|body| {
+                        let pos = body.position().0;
+                        well_positions.iter().any(|&wp| (pos - wp).norm() < 35.0)
+                    })
+                    .unwrap_or(false)
+            })
+            .collect();
 
         for (idx, &h) in handles.iter().enumerate() {
-            if let Some(entity) = consciousness.entities.get_mut(&h) { entity.energy.tick_reset(); }
+            if let Some(entity) = consciousness.entities.get_mut(&h) {
+                entity.energy.tick_reset();
+            }
             let phi = consciousness.phi(h);
             consciousness.consume_energy(h, maintenance_rate * (1.0 + phi * 0.5));
             if let Some(entity) = consciousness.entities.get_mut(&h) {
                 entity.energy.regenerate(ambient_rate * regen_mult);
-                if near_wells[idx] { entity.energy.regenerate(well_rate); }
+                if near_wells[idx] {
+                    entity.energy.regenerate(well_rate);
+                }
             }
         }
 
         // 4. Harmony offloading
         for i in 0..handles.len() {
-            for j in (i+1)..handles.len() {
+            for j in (i + 1)..handles.len() {
                 let (ha, hb) = (handles[i], handles[j]);
                 let (harm_a, harm_b) = {
                     let ea = consciousness.entities.get(&ha);
                     let eb = consciousness.entities.get(&hb);
-                    match (ea, eb) { (Some(a), Some(b)) => (a.harmony_activations, b.harmony_activations), _ => continue }
+                    match (ea, eb) {
+                        (Some(a), Some(b)) => (a.harmony_activations, b.harmony_activations),
+                        _ => continue,
+                    }
                 };
                 let resonance = HarmonyField::<2>::resonance(&harm_a, &harm_b);
                 if resonance > 0.5 {
-                    let regen = consciousness.constants.harmony_resonance_regen_rate * (resonance - 0.5) * 2.0;
-                    if let Some(e) = consciousness.entities.get_mut(&ha) { e.energy.regenerate(regen); }
-                    if let Some(e) = consciousness.entities.get_mut(&hb) { e.energy.regenerate(regen); }
+                    let regen = consciousness.constants.harmony_resonance_regen_rate
+                        * (resonance - 0.5)
+                        * 2.0;
+                    if let Some(e) = consciousness.entities.get_mut(&ha) {
+                        e.energy.regenerate(regen);
+                    }
+                    if let Some(e) = consciousness.entities.get_mut(&hb) {
+                        e.energy.regenerate(regen);
+                    }
                 }
             }
         }
@@ -253,37 +324,73 @@ fn run_experiment(condition: Condition, seed: u64) -> RunResult {
 
         // CSV every 500 ticks
         if tick % 500 == 0 {
-            let alive = handles.iter().filter(|h| consciousness.entities.get(h).map(|e| !e.energy.is_collapsed()).unwrap_or(false)).count();
+            let alive = handles
+                .iter()
+                .filter(|h| {
+                    consciousness
+                        .entities
+                        .get(h)
+                        .map(|e| !e.energy.is_collapsed())
+                        .unwrap_or(false)
+                })
+                .count();
             let clustering = avg_nn(&world, &handles);
-            let jphi_str = balance.joules_per_phi.filter(|j| j.is_finite()).map(|j| format!("{j:.2}")).unwrap_or("N/A".into());
-            println!("{},{seed},{tick},{:.4},{jphi_str},{alive},{clustering:.2}",
-                condition.name(), consciousness.collective_phi);
+            let jphi_str = balance
+                .joules_per_phi
+                .filter(|j| j.is_finite())
+                .map(|j| format!("{j:.2}"))
+                .unwrap_or("N/A".into());
+            println!(
+                "{},{seed},{tick},{:.4},{jphi_str},{alive},{clustering:.2}",
+                condition.name(),
+                consciousness.collective_phi
+            );
         }
     }
 
-    let alive = handles.iter().filter(|h| consciousness.entities.get(h).map(|e| !e.energy.is_collapsed()).unwrap_or(false)).count();
+    let alive = handles
+        .iter()
+        .filter(|h| {
+            consciousness
+                .entities
+                .get(h)
+                .map(|e| !e.energy.is_collapsed())
+                .unwrap_or(false)
+        })
+        .count();
 
     // Thought diversity (HDC only)
     let thought_diversity = match condition {
         Condition::Hdc => {
-            let active: Vec<&HdcConsciousnessContext> = hdc_contexts.iter().filter_map(|c| c.as_ref()).collect();
+            let active: Vec<&HdcConsciousnessContext> =
+                hdc_contexts.iter().filter_map(|c| c.as_ref()).collect();
             if active.len() >= 2 {
                 let mut total_sim = 0.0;
                 let mut count = 0;
                 for i in 0..active.len() {
-                    for j in (i+1)..active.len() {
-                        total_sim += hdc_context::thought_resonance(active[i].thought_hv(), active[j].thought_hv());
+                    for j in (i + 1)..active.len() {
+                        total_sim += hdc_context::thought_resonance(
+                            active[i].thought_hv(),
+                            active[j].thought_hv(),
+                        );
                         count += 1;
                     }
                 }
-                if count > 0 { total_sim / count as f64 } else { 0.0 }
-            } else { 0.0 }
+                if count > 0 {
+                    total_sim / count as f64
+                } else {
+                    0.0
+                }
+            } else {
+                0.0
+            }
         }
         Condition::Scalar => 0.0,
     };
 
     RunResult {
-        converged, convergence_tick,
+        converged,
+        convergence_tick,
         final_jphi: jphi_detector.rolling_mean(),
         final_phi: consciousness.collective_phi,
         alive,
@@ -316,33 +423,58 @@ fn main() {
         let phi_vals: Vec<f64> = results.iter().map(|r| r.final_phi).collect();
         let phi_ci = 1.96 * std_dev(&phi_vals) / n.sqrt();
 
-        eprintln!("\n── {} ({}/{} converged) ──", condition.name(), converged_count, NUM_SEEDS);
+        eprintln!(
+            "\n── {} ({}/{} converged) ──",
+            condition.name(),
+            converged_count,
+            NUM_SEEDS
+        );
         eprintln!("  Final Φ:           {:.4} ± {:.4}", mean_phi, phi_ci);
         eprintln!("  Alive:             {:.1}/{AGENTS}", mean_alive);
         eprintln!("  Clustering:        {:.2}", mean_cluster);
         if matches!(condition, Condition::Hdc) {
-            eprintln!("  Thought diversity: {:.4} (mean pairwise similarity)", mean_diversity);
+            eprintln!(
+                "  Thought diversity: {:.4} (mean pairwise similarity)",
+                mean_diversity
+            );
         }
     }
     eprintln!("\n=== Complete ===");
 }
 
 fn avg_nn(world: &PhysicsWorld<2>, handles: &[symtropy_physics::BodyHandle]) -> f64 {
-    let pos: Vec<SVector<f64, 2>> = handles.iter().filter_map(|h| world.body(*h).map(|b| b.position().0)).collect();
-    if pos.len() < 2 { return f64::MAX; }
-    pos.iter().enumerate().map(|(i, p)| {
-        pos.iter().enumerate().filter(|(j, _)| *j != i).map(|(_, q)| (p - q).norm()).fold(f64::MAX, f64::min)
-    }).sum::<f64>() / pos.len() as f64
+    let pos: Vec<SVector<f64, 2>> = handles
+        .iter()
+        .filter_map(|h| world.body(*h).map(|b| b.position().0))
+        .collect();
+    if pos.len() < 2 {
+        return f64::MAX;
+    }
+    pos.iter()
+        .enumerate()
+        .map(|(i, p)| {
+            pos.iter()
+                .enumerate()
+                .filter(|(j, _)| *j != i)
+                .map(|(_, q)| (p - q).norm())
+                .fold(f64::MAX, f64::min)
+        })
+        .sum::<f64>()
+        / pos.len() as f64
 }
 
 fn std_dev(v: &[f64]) -> f64 {
     let n = v.len() as f64;
-    if n < 2.0 { return 0.0; }
+    if n < 2.0 {
+        return 0.0;
+    }
     let m = v.iter().sum::<f64>() / n;
     (v.iter().map(|x| (x - m).powi(2)).sum::<f64>() / (n - 1.0)).sqrt()
 }
 
 fn rng_f64(state: &mut u64) -> f64 {
-    *state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+    *state = state
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
     (*state >> 11) as f64 / (1u64 << 53) as f64
 }

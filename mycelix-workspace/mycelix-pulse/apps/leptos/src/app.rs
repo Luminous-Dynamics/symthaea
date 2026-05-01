@@ -21,6 +21,7 @@ use crate::notifications::provide_notification_context;
 use crate::offline::provide_offline_context;
 use crate::pages::*;
 use crate::preferences::provide_preferences_context;
+use crate::summary::provide_pulse_summary_context;
 use crate::theme::provide_theme_context;
 use crate::toasts::{provide_toast_context, ToastContainer};
 
@@ -40,6 +41,7 @@ fn AppInner() -> impl IntoView {
     provide_preferences_context();
     provide_theme_context();
     provide_offline_context();
+    provide_pulse_summary_context();
     provide_keyboard_context();
     provide_notification_context();
     crate::karma::provide_karma_context();

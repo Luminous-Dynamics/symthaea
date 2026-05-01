@@ -1,0 +1,112 @@
+{
+  "metadata": {
+    "title": "Sovereign Lineage: The History of the Future",
+    "framework": "Mycelix Historical Context",
+    "source": "https://mycelix.org",
+    "grade_level": "Undergraduate/Graduate",
+    "subject_area": "Humanities",
+    "domain": "Humanities",
+    "version": "1.0",
+    "total_standards": 4,
+    "domains": [
+      "History",
+      "Political Philosophy",
+      "Civilizational Studies"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Understanding the movements and patterns that led to the Mycelix architecture."
+  },
+  "nodes": [
+    {
+      "id": "HUM-HIST-101",
+      "title": "Lineages of Sovereignty",
+      "description": "The struggle for autonomy across history. From the Diggers and Levelers to the Haudenosaunee Confederacy, the Cyber-optimists, and the birth of agent-centric computing.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "History",
+      "subdomain": "Sovereign Lineage",
+      "tags": ["history", "sovereignty", "autonomy", "philosophy"],
+      "estimated_hours": 60,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "History"
+    },
+    {
+      "id": "HUM-HIST-201",
+      "title": "Comparative Civilizational Stability",
+      "description": "Forensic analysis of past complex societies. Studying the invariants of flourishing in Rome, Edo Japan, the Maya, and the industrial 1602 architecture. Why systems last or collapse.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "History",
+      "subdomain": "Sovereign Lineage",
+      "tags": ["history", "civilization", "failure-analysis", "resilience"],
+      "estimated_hours": 90,
+      "grade_levels": ["Graduate"],
+      "bloom_level": "Evaluate",
+      "subject_area": "History"
+    },
+    {
+      "id": "HUM-PHIL-201",
+      "title": "The Philosophy of Enough",
+      "description": "Challenging infinite growth. The ethics of steady-state economics, bioregional limits, and the transition from accumulation to stewardship as a primary life-goal.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Political Philosophy",
+      "subdomain": "Sovereign Lineage",
+      "tags": ["philosophy", "economics", "ethics", "sustainability"],
+      "estimated_hours": 45,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Philosophy"
+    },
+    {
+      "id": "HUM-HIST-CAP",
+      "title": "The Ancestral Bridge Capstone",
+      "description": "Map a local community challenge today to its historical counterpart in a past successful civilization. Propose a Mycelix-based solution that leverages that historical wisdom.",
+      "node_type": "Capstone",
+      "difficulty": "Advanced",
+      "domain": "Universal",
+      "subdomain": "Sovereign Lineage",
+      "tags": ["capstone", "history", "stewardship", "integration"],
+      "estimated_hours": 120,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Create",
+      "subject_area": "History",
+      "holonic_capstone": {
+        "required_node_ids": ["HUM-HIST-101", "HUM-HIST-201", "HUM-PHIL-201"],
+        "deliverable": "A comparative analysis report and a community implementation charter that honors historical lineage.",
+        "min_peer_endorsements": 5
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "HUM-COM-101",
+      "to": "HUM-HIST-101",
+      "edge_type": "Recommended",
+      "strength_permille": 600,
+      "rationale": "Understanding the history of the commons provides the necessary context for the lineages of sovereignty."
+    },
+    {
+      "from": "HUM-HIST-101",
+      "to": "HUM-HIST-CAP",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "One must understand historical lineages before they can bridge them to the future."
+    },
+    {
+      "from": "HUM-HIST-201",
+      "to": "HUM-HIST-CAP",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Stability analysis is required for designing resilient ancestral bridges."
+    },
+    {
+      "from": "HUM-PHIL-201",
+      "to": "HUM-HIST-CAP",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "The ethics of stewardship are the core of any ancestral bridge."
+    }
+  ]
+}

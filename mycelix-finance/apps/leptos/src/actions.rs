@@ -52,7 +52,7 @@ pub fn record_tend_exchange(receiver_did: String, hours: f32, description: Strin
         return;
     }
 
-    let Some(dao_did) = config_store.get_untracked().dao_did.clone() else {
+    let Some(dao_did) = config_store.config.get_untracked().dao_did.clone() else {
         toasts.push(
             "Recording TEND exchanges requires a configured or discovered finance DAO DID",
             ToastKind::Error,
@@ -66,7 +66,7 @@ pub fn record_tend_exchange(receiver_did: String, hours: f32, description: Strin
             receiver_did,
             hours,
             service_description: description,
-            service_category: ServiceCategory::GeneralAssistance,
+            service_category: wire::ServiceCategory::GeneralAssistance,
             cultural_alias: None,
             dao_did,
             service_date: None,
@@ -156,8 +156,8 @@ pub fn send_sap_payment(to_did: String, amount: u64, memo: String) {
         {
             Ok(record) => {
                 if let Some(payment) = extract_entry::<wire::Payment>(&record) {
-                    let payment_view = map_payment(payment.clone());
                     let total_debit = payment.amount.saturating_add(payment.fee);
+                    let payment_view = map_payment(payment);
                     ctx.sap_payments.update(|payments| {
                         payments.insert(0, payment_view);
                     });
@@ -213,7 +213,15 @@ pub fn recognize_member(recipient_did: String, contribution_type: ContributionTy
     spawn_local(async move {
         let input = wire::RecognizeMemberInput {
             recipient_did: recipient_did.clone(),
-            contribution_type: contribution_type.clone(),
+            contribution_type: match contribution_type {
+                ContributionType::Technical => wire::ContributionType::Technical,
+                ContributionType::Community => wire::ContributionType::Community,
+                ContributionType::Care => wire::ContributionType::Care,
+                ContributionType::Governance => wire::ContributionType::Governance,
+                ContributionType::Creative => wire::ContributionType::Creative,
+                ContributionType::Education => wire::ContributionType::Education,
+                ContributionType::General => wire::ContributionType::General,
+            },
             cycle_id: current_cycle_id(),
         };
 

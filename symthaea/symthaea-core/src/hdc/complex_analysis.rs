@@ -22,26 +22,46 @@ pub type C64 = Complex;
 // callers can write `c_add(a, b)` instead of `(a + b)`.
 
 #[inline]
-pub fn c_add(a: C64, b: C64) -> C64 { a + b }
+pub fn c_add(a: C64, b: C64) -> C64 {
+    a + b
+}
 #[inline]
-pub fn c_sub(a: C64, b: C64) -> C64 { a - b }
+pub fn c_sub(a: C64, b: C64) -> C64 {
+    a - b
+}
 #[inline]
-pub fn c_mul(a: C64, b: C64) -> C64 { a * b }
+pub fn c_mul(a: C64, b: C64) -> C64 {
+    a * b
+}
 #[inline]
-pub fn c_div(a: C64, b: C64) -> C64 { a / b }
+pub fn c_div(a: C64, b: C64) -> C64 {
+    a / b
+}
 #[inline]
-pub fn c_conj(z: C64) -> C64 { z.conjugate() }
+pub fn c_conj(z: C64) -> C64 {
+    z.conjugate()
+}
 #[inline]
-pub fn c_abs(z: C64) -> f64 { z.magnitude() }
+pub fn c_abs(z: C64) -> f64 {
+    z.magnitude()
+}
 #[inline]
-pub fn c_arg(z: C64) -> f64 { z.phase() }
+pub fn c_arg(z: C64) -> f64 {
+    z.phase()
+}
 #[inline]
-pub fn c_exp(z: C64) -> C64 { z.exp() }
+pub fn c_exp(z: C64) -> C64 {
+    z.exp()
+}
 #[inline]
-pub fn c_ln(z: C64) -> C64 { z.ln() }
+pub fn c_ln(z: C64) -> C64 {
+    z.ln()
+}
 /// z^w = e^(w * ln z).
 #[inline]
-pub fn c_pow(z: C64, w: C64) -> C64 { c_exp(c_mul(w, c_ln(z))) }
+pub fn c_pow(z: C64, w: C64) -> C64 {
+    c_exp(c_mul(w, c_ln(z)))
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MÖBIUS TRANSFORMATIONS
@@ -212,10 +232,7 @@ where
         let t = k as f64 * dt;
         let z = c_add(center, C64::from_polar(radius, t));
         // dz = i·radius·e^{it} dt
-        let dz = c_mul(
-            C64::new(0.0, radius),
-            C64::from_polar(1.0, t),
-        );
+        let dz = c_mul(C64::new(0.0, radius), C64::from_polar(1.0, t));
         sum = c_add(sum, c_mul(f(z), c_mul(dz, C64::new(dt, 0.0))));
     }
     sum
@@ -392,7 +409,7 @@ pub fn exp_series(z: C64, terms: usize) -> C64 {
 pub fn sin_series(z: C64, terms: usize) -> C64 {
     let mut sum = C64::ZERO;
     let mut term = z; // z^1 / 1!
-    let mut z2 = c_mul(z, z);
+    let z2 = c_mul(z, z);
     for n in 0..terms {
         let two_n_1 = 2 * n + 1;
         sum = c_add(sum, term);
@@ -407,7 +424,7 @@ pub fn sin_series(z: C64, terms: usize) -> C64 {
 pub fn cos_series(z: C64, terms: usize) -> C64 {
     let mut sum = C64::ZERO;
     let mut term = C64::ONE; // z^0 / 0!
-    let mut z2 = c_mul(z, z);
+    let z2 = c_mul(z, z);
     for n in 0..terms {
         let two_n = 2 * n;
         sum = c_add(sum, term);
@@ -460,10 +477,7 @@ pub fn cayley_map(z: C64) -> C64 {
 pub fn inverse_cayley(w: C64) -> C64 {
     let i = C64::I;
     let one = C64::ONE;
-    c_div(
-        c_mul(i, c_add(one, w)),
-        c_sub(one, w),
-    )
+    c_div(c_mul(i, c_add(one, w)), c_sub(one, w))
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -474,12 +488,7 @@ pub fn inverse_cayley(w: C64) -> C64 {
 /// principle: (1/2πi) ∮ f'(z)/f(z) dz = Z − P.
 ///
 /// Numerically computes the winding number of the image curve f(γ) around 0.
-pub fn count_zeros_minus_poles<F>(
-    f: F,
-    center: C64,
-    radius: f64,
-    n_points: usize,
-) -> i32
+pub fn count_zeros_minus_poles<F>(f: F, center: C64, radius: f64, n_points: usize) -> i32
 where
     F: Fn(C64) -> C64,
 {
@@ -633,7 +642,12 @@ mod tests {
         let z = C64::new(1.0, 0.5);
         let series = exp_series(z, 30);
         let exact = z.exp();
-        assert!(approx_eq(series, exact, EPS_COARSE), "series={:?} exact={:?}", series, exact);
+        assert!(
+            approx_eq(series, exact, EPS_COARSE),
+            "series={:?} exact={:?}",
+            series,
+            exact
+        );
     }
 
     #[test]
@@ -678,7 +692,12 @@ mod tests {
         let z = C64::new(0.5, 2.0);
         let w = cayley_map(z);
         let z2 = inverse_cayley(w);
-        assert!(approx_eq(z, z2, EPS_COARSE), "roundtrip: {:?} vs {:?}", z, z2);
+        assert!(
+            approx_eq(z, z2, EPS_COARSE),
+            "roundtrip: {:?} vs {:?}",
+            z,
+            z2
+        );
     }
 
     #[test]
@@ -694,12 +713,7 @@ mod tests {
     #[test]
     fn test_count_zeros_of_z_squared() {
         // f(z) = z^2 has a zero of order 2 at origin — count = 2
-        let count = count_zeros_minus_poles(
-            |z| c_mul(z, z),
-            C64::ZERO,
-            0.5,
-            1024,
-        );
+        let count = count_zeros_minus_poles(|z| c_mul(z, z), C64::ZERO, 0.5, 1024);
         assert_eq!(count, 2, "got {}", count);
     }
 }

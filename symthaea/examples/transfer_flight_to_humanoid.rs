@@ -7,13 +7,13 @@
 //! dynamics to a humanoid controller. Compares transfer-initialized vs
 //! random-initialized humanoid training.
 //!
-//! Run: `cargo run --features flight,humanoid --example transfer_flight_to_humanoid --release`
+//! Run: `cargo run --features multirotor,humanoid --example transfer_flight_to_humanoid --release`
 
-use symthaea::flight::{
-    FlightConfig, FlightController, FlightState, QuadrotorCommand, QuadrotorHdcEncoder,
-};
 use symthaea::humanoid::transfer::{transfer_learning_comparison, MorphologicalTransfer};
 use symthaea::humanoid::HumanoidConfig;
+use symthaea::multirotor::{
+    FlightConfig, FlightController, FlightState, QuadrotorCommand, QuadrotorHdcEncoder,
+};
 use symthaea::symthaea_core::genesis::GenesisSeed;
 use symthaea::symthaea_core::hdc::ContinuousHV;
 
@@ -23,7 +23,7 @@ fn main() {
 
     // ── Phase 1: Train a flight controller on hover ──
     println!("Phase 1: Training flight controller on hover...");
-    let flight_genesis = GenesisSeed::from_phrase("symthaea-flight-quadrotor");
+    let flight_genesis = GenesisSeed::from_phrase("symthaea-multirotor-quadrotor");
     let flight_config = FlightConfig::default();
     let mut flight_ctrl = FlightController::new(&flight_genesis, &flight_config);
     let mut flight_encoder = QuadrotorHdcEncoder::new(&flight_genesis, flight_config.num_levels);

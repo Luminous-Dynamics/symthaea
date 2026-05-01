@@ -19,7 +19,7 @@
 //! E-levels: E4 (established), E3 (replicated), E2 (tested), E1 (preliminary)
 
 use crate::RawClaim;
-use prism_common::{EmpiricalLevel, NormativeLevel, MaterialityLevel};
+use prism_common::{EmpiricalLevel, MaterialityLevel, NormativeLevel};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -45,18 +45,35 @@ fn infer_nm(e: EmpiricalLevel, tags: &[String]) -> (NormativeLevel, MaterialityL
         EmpiricalLevel::E3 => NormativeLevel::N2,
         _ => NormativeLevel::N1,
     };
-    let applied = tags.iter().any(|t|
-        matches!(t.as_str(), "climate" | "energy" | "ecology" | "health"
-            | "medicine" | "agriculture" | "engineering" | "nutrition"
-            | "water" | "environment" | "public-health")
-    );
-    let abstract_ = tags.iter().any(|t|
-        matches!(t.as_str(), "mathematics" | "physics" | "quantum"
-            | "philosophy" | "logic" | "epistemology")
-    );
-    let m = if applied { MaterialityLevel::M3 }
-        else if abstract_ { MaterialityLevel::M1 }
-        else { MaterialityLevel::M2 };
+    let applied = tags.iter().any(|t| {
+        matches!(
+            t.as_str(),
+            "climate"
+                | "energy"
+                | "ecology"
+                | "health"
+                | "medicine"
+                | "agriculture"
+                | "engineering"
+                | "nutrition"
+                | "water"
+                | "environment"
+                | "public-health"
+        )
+    });
+    let abstract_ = tags.iter().any(|t| {
+        matches!(
+            t.as_str(),
+            "mathematics" | "physics" | "quantum" | "philosophy" | "logic" | "epistemology"
+        )
+    });
+    let m = if applied {
+        MaterialityLevel::M3
+    } else if abstract_ {
+        MaterialityLevel::M1
+    } else {
+        MaterialityLevel::M2
+    };
     (n, m)
 }
 
@@ -68,22 +85,25 @@ fn load_json(json: &str) -> Vec<RawClaim> {
             return vec![];
         }
     };
-    entries.into_iter().filter_map(|entry| {
-        let content = entry.claim.trim().to_string();
-        if content.len() < 20 || content.len() > 300 {
-            return None;
-        }
-        let e = parse_level(&entry.level);
-        let (n, m) = infer_nm(e, &entry.tags);
-        Some(RawClaim {
-            content,
-            empirical_level: e,
-            normative_level: n,
-            materiality_level: m,
-            sources: entry.sources,
-            tags: entry.tags,
+    entries
+        .into_iter()
+        .filter_map(|entry| {
+            let content = entry.claim.trim().to_string();
+            if content.len() < 20 || content.len() > 300 {
+                return None;
+            }
+            let e = parse_level(&entry.level);
+            let (n, m) = infer_nm(e, &entry.tags);
+            Some(RawClaim {
+                content,
+                empirical_level: e,
+                normative_level: n,
+                materiality_level: m,
+                sources: entry.sources,
+                tags: entry.tags,
+            })
         })
-    }).collect()
+        .collect()
 }
 
 // Embed all claim JSON files at compile time.
@@ -126,20 +146,32 @@ mod tests {
     #[test]
     fn loads_pipeline_claims() {
         let claims = load_pipeline_claims();
-        assert!(claims.len() >= 100, "Expected 100+ pipeline claims, got {}", claims.len());
+        assert!(
+            claims.len() >= 100,
+            "Expected 100+ pipeline claims, got {}",
+            claims.len()
+        );
     }
 
     #[test]
     fn all_claims_have_tags() {
         for c in load_pipeline_claims() {
-            assert!(!c.tags.is_empty(), "Claim has no tags: {}", &c.content[..c.content.len().min(60)]);
+            assert!(
+                !c.tags.is_empty(),
+                "Claim has no tags: {}",
+                &c.content[..c.content.len().min(60)]
+            );
         }
     }
 
     #[test]
     fn all_claims_have_sources() {
         for c in load_pipeline_claims() {
-            assert!(!c.sources.is_empty(), "Claim has no sources: {}", &c.content[..c.content.len().min(60)]);
+            assert!(
+                !c.sources.is_empty(),
+                "Claim has no sources: {}",
+                &c.content[..c.content.len().min(60)]
+            );
         }
     }
 
@@ -148,8 +180,17 @@ mod tests {
         let claims = load_pipeline_claims();
         let mut seen = std::collections::HashSet::new();
         for c in &claims {
-            let key: String = c.content.chars().take(80).collect::<String>().to_lowercase();
-            assert!(seen.insert(key), "Duplicate pipeline claim: {}", &c.content[..c.content.len().min(60)]);
+            let key: String = c
+                .content
+                .chars()
+                .take(80)
+                .collect::<String>()
+                .to_lowercase();
+            assert!(
+                seen.insert(key),
+                "Duplicate pipeline claim: {}",
+                &c.content[..c.content.len().min(60)]
+            );
         }
     }
 }

@@ -117,8 +117,7 @@ pub fn mp2_correlation_energy(rhf: &RhfResult, eri_ao: &[f64]) -> Mp2Result {
                     let mut val = 0.0;
                     for mu in 0..n {
                         val += c[mu * n_mo + i]
-                            * eri_3
-                                [mu * n_vir * n_occ * n_vir + a * n_occ * n_vir + j * n_vir + b];
+                            * eri_3[mu * n_vir * n_occ * n_vir + a * n_occ * n_vir + j * n_vir + b];
                     }
                     eri_mo[i * n_vir * n_occ * n_vir + a * n_occ * n_vir + j * n_vir + b] = val;
                 }
@@ -137,10 +136,9 @@ pub fn mp2_correlation_energy(rhf: &RhfResult, eri_ao: &[f64]) -> Mp2Result {
     let mut e_os = 0.0; // opposite-spin
     let mut e_ss = 0.0; // same-spin
 
-    let eri_idx =
-        |i: usize, a: usize, j: usize, b: usize| -> f64 {
-            eri_mo[i * n_vir * n_occ * n_vir + a * n_occ * n_vir + j * n_vir + b]
-        };
+    let eri_idx = |i: usize, a: usize, j: usize, b: usize| -> f64 {
+        eri_mo[i * n_vir * n_occ * n_vir + a * n_occ * n_vir + j * n_vir + b]
+    };
 
     for i in 0..n_occ {
         for j in 0..n_occ {

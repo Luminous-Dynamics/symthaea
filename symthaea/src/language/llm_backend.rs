@@ -75,7 +75,7 @@ impl ConsciousnessContext {
         }
         if self.epistemic_status == "Uncertain" || self.epistemic_status == "Unknown" {
             parts.push(
-                "NOTE: Low epistemic confidence — add TODO comments for uncertain logic."
+                "NOTE: Low epistemic confidence — prefer the simplest well-typed implementation and explicit validation."
                     .to_string(),
             );
         }

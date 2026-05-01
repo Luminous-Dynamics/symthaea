@@ -184,10 +184,8 @@ impl GroundingEstimator {
             if mean < 0.3 {
                 // Check trend: compare first half mean to second half mean
                 let half = self.capacity / 2;
-                let first_half: f32 =
-                    self.window[..half].iter().sum::<f32>() / half as f32;
-                let second_half: f32 =
-                    self.window[half..].iter().sum::<f32>() / half as f32;
+                let first_half: f32 = self.window[..half].iter().sum::<f32>() / half as f32;
+                let second_half: f32 = self.window[half..].iter().sum::<f32>() / half as f32;
                 if second_half <= first_half {
                     return GROUNDING_TEMPORAL;
                 }
@@ -241,6 +239,18 @@ pub enum EmbodimentPlatform {
     Orbital,
     /// Legged quadruped — CPG-modulated locomotion.
     Quadruped,
+    /// Subterranean scout / boring platform — digging, spoil, thermal load.
+    Subterranean,
+    /// Stationary infrastructure agent — hub, storage, microgrid, routing.
+    Infrastructure,
+    /// Recovery / recycling platform — salvage, teardown, materials sorting.
+    Scavenger,
+    /// Ecological stewardship platform — soil, water, light, crop tending.
+    Agribot,
+    /// Interspecies sanctuary platform — animal right-of-way and distress sensing.
+    Biota,
+    /// Habitat homeostasis platform — atmosphere, HVAC, circadian support.
+    Clime,
     /// Virtual caregiver agent — no physical embodiment.
     CareProvider,
     /// Browser agent — web pages as sensory environment via CDP.
@@ -479,7 +489,9 @@ pub struct PlatformRegistry {
 impl PlatformRegistry {
     /// Create an empty registry.
     pub fn new() -> Self {
-        Self { plugins: Vec::new() }
+        Self {
+            plugins: Vec::new(),
+        }
     }
 
     /// Register a platform plugin.
@@ -569,8 +581,14 @@ mod tests {
     #[test]
     fn test_from_phi_non_finite_returns_red() {
         assert_eq!(MotorSafetyLevel::from_phi(f64::NAN), MotorSafetyLevel::Red);
-        assert_eq!(MotorSafetyLevel::from_phi(f64::INFINITY), MotorSafetyLevel::Red);
-        assert_eq!(MotorSafetyLevel::from_phi(f64::NEG_INFINITY), MotorSafetyLevel::Red);
+        assert_eq!(
+            MotorSafetyLevel::from_phi(f64::INFINITY),
+            MotorSafetyLevel::Red
+        );
+        assert_eq!(
+            MotorSafetyLevel::from_phi(f64::NEG_INFINITY),
+            MotorSafetyLevel::Red
+        );
     }
 
     #[test]

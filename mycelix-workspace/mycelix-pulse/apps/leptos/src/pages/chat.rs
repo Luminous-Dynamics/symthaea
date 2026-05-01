@@ -7,10 +7,10 @@
 //! "Consolidate to Record" commits the chat to the DHT as a permanent mail thread.
 //! This prevents DHT bloat while enabling sub-100ms chat delivery.
 
-use leptos::prelude::*;
-use wasm_bindgen::JsCast;
-use mail_leptos_types::*;
 use crate::toasts::use_toasts;
+use leptos::prelude::*;
+use mail_leptos_types::*;
+use wasm_bindgen::JsCast;
 
 #[component]
 pub fn ChatPage() -> impl IntoView {
@@ -36,9 +36,13 @@ pub fn ChatPage() -> impl IntoView {
     let toasts_channel = toasts.clone();
     let on_send = move |_| {
         let text = input.get_untracked();
-        if text.trim().is_empty() { return; }
+        if text.trim().is_empty() {
+            return;
+        }
         let channel = active_channel.get_untracked();
-        if channel.is_none() { return; }
+        if channel.is_none() {
+            return;
+        }
 
         let now = (js_sys::Date::now() / 1000.0) as u64;
         let msg = ChatMessage {
@@ -70,11 +74,18 @@ pub fn ChatPage() -> impl IntoView {
                 }
             });
             wasm_bindgen_futures::spawn_local(async move {
-                match hc.call_zome::<serde_json::Value, serde_json::Value>(
-                    "mail_federation", "send_signal", &signal_payload
-                ).await {
+                match hc
+                    .call_zome::<serde_json::Value, serde_json::Value>(
+                        "mail_federation",
+                        "send_signal",
+                        &signal_payload,
+                    )
+                    .await
+                {
                     Ok(_) => web_sys::console::log_1(&"[Chat] Message sent via P2P signal".into()),
-                    Err(e) => web_sys::console::warn_1(&format!("[Chat] Signal failed: {e}").into()),
+                    Err(e) => {
+                        web_sys::console::warn_1(&format!("[Chat] Signal failed: {e}").into())
+                    }
                 }
             });
         }
@@ -123,12 +134,20 @@ pub fn ChatPage() -> impl IntoView {
 
     let active_channel_name = move || {
         let id = active_channel.get()?;
-        channels.get().iter().find(|c| c.id == id).map(|c| c.name.clone())
+        channels
+            .get()
+            .iter()
+            .find(|c| c.id == id)
+            .map(|c| c.name.clone())
     };
 
     let active_channel_desc = move || {
         let id = active_channel.get()?;
-        channels.get().iter().find(|c| c.id == id).and_then(|c| c.description.clone())
+        channels
+            .get()
+            .iter()
+            .find(|c| c.id == id)
+            .and_then(|c| c.description.clone())
     };
 
     view! {
@@ -532,30 +551,45 @@ fn PinnedMessages(messages: RwSignal<Vec<ChatMessage>>) -> impl IntoView {
 
 /// @mention autocomplete — shows suggestions when typing @.
 #[component]
-fn MentionAutocomplete(input: RwSignal<String>, channels: RwSignal<Vec<ChatChannel>>) -> impl IntoView {
+fn MentionAutocomplete(
+    input: RwSignal<String>,
+    channels: RwSignal<Vec<ChatChannel>>,
+) -> impl IntoView {
     let show = move || {
         let text = input.get();
-        text.rfind('@').map(|pos| {
-            let after = &text[pos+1..];
-            !after.contains(' ') && !after.is_empty()
-        }).unwrap_or(false)
+        text.rfind('@')
+            .map(|pos| {
+                let after = &text[pos + 1..];
+                !after.contains(' ') && !after.is_empty()
+            })
+            .unwrap_or(false)
     };
 
     let query = move || {
         let text = input.get();
-        text.rfind('@').map(|pos| text[pos+1..].to_lowercase()).unwrap_or_default()
+        text.rfind('@')
+            .map(|pos| text[pos + 1..].to_lowercase())
+            .unwrap_or_default()
     };
 
     let suggestions = move || {
         let q = query();
-        if q.is_empty() { return vec![]; }
+        if q.is_empty() {
+            return vec![];
+        }
         // Get member names from channels
-        let mut names: Vec<String> = channels.get().iter()
+        let mut names: Vec<String> = channels
+            .get()
+            .iter()
             .flat_map(|c| c.member_names.iter().cloned())
             .collect();
         names.sort();
         names.dedup();
-        names.into_iter().filter(|n| n.to_lowercase().contains(&q)).take(5).collect::<Vec<_>>()
+        names
+            .into_iter()
+            .filter(|n| n.to_lowercase().contains(&q))
+            .take(5)
+            .collect::<Vec<_>>()
     };
 
     view! {
@@ -612,7 +646,10 @@ fn SelfDestructToggle() -> impl IntoView {
 
 /// Poll creator — create quick polls in chat.
 #[component]
-fn PollCreator(messages: RwSignal<Vec<ChatMessage>>, active_channel: RwSignal<Option<String>>) -> impl IntoView {
+fn PollCreator(
+    messages: RwSignal<Vec<ChatMessage>>,
+    active_channel: RwSignal<Option<String>>,
+) -> impl IntoView {
     let open = RwSignal::new(false);
     let question = RwSignal::new(String::new());
     let options = RwSignal::new(vec![String::new(), String::new()]);
@@ -714,11 +751,102 @@ fn EmojiPicker(on_select: impl Fn(String) + 'static + Clone + Send) -> impl Into
     let category = RwSignal::new(0usize);
 
     let categories: &[(&str, &[&str])] = &[
-        ("\u{1F600}", &["\u{1F600}","\u{1F602}","\u{1F60A}","\u{1F60D}","\u{1F914}","\u{1F60E}","\u{1F622}","\u{1F621}","\u{1F631}","\u{1F389}","\u{1F44D}","\u{1F44E}","\u{1F64F}","\u{1F4AA}","\u{1F440}","\u{2764}","\u{1F525}","\u{1F4AF}","\u{1F91D}","\u{1F917}"]),
-        ("\u{1F436}", &["\u{1F436}","\u{1F431}","\u{1F422}","\u{1F419}","\u{1F427}","\u{1F98B}","\u{1F339}","\u{1F333}","\u{1F31E}","\u{1F30D}","\u{1F308}","\u{2B50}","\u{1F30A}","\u{26A1}","\u{1F343}","\u{1F33B}"]),
-        ("\u{1F354}", &["\u{1F354}","\u{1F355}","\u{1F382}","\u{2615}","\u{1F377}","\u{1F34E}","\u{1F96A}","\u{1F35C}","\u{1F363}","\u{1F370}","\u{1F36B}","\u{1F347}"]),
-        ("\u{1F3B5}", &["\u{1F3B5}","\u{1F3B6}","\u{1F3A4}","\u{1F3B8}","\u{1F941}","\u{1F3BA}","\u{1F3B9}","\u{1F3BB}","\u{1FA97}","\u{1F4BF}","\u{1F399}"]),
-        ("\u{1F4BB}", &["\u{1F4BB}","\u{1F4F1}","\u{1F50D}","\u{1F512}","\u{1F6E1}","\u{2699}","\u{1F4E7}","\u{1F4CE}","\u{1F4C4}","\u{1F5C3}","\u{1F5A5}","\u{2328}"]),
+        (
+            "\u{1F600}",
+            &[
+                "\u{1F600}",
+                "\u{1F602}",
+                "\u{1F60A}",
+                "\u{1F60D}",
+                "\u{1F914}",
+                "\u{1F60E}",
+                "\u{1F622}",
+                "\u{1F621}",
+                "\u{1F631}",
+                "\u{1F389}",
+                "\u{1F44D}",
+                "\u{1F44E}",
+                "\u{1F64F}",
+                "\u{1F4AA}",
+                "\u{1F440}",
+                "\u{2764}",
+                "\u{1F525}",
+                "\u{1F4AF}",
+                "\u{1F91D}",
+                "\u{1F917}",
+            ],
+        ),
+        (
+            "\u{1F436}",
+            &[
+                "\u{1F436}",
+                "\u{1F431}",
+                "\u{1F422}",
+                "\u{1F419}",
+                "\u{1F427}",
+                "\u{1F98B}",
+                "\u{1F339}",
+                "\u{1F333}",
+                "\u{1F31E}",
+                "\u{1F30D}",
+                "\u{1F308}",
+                "\u{2B50}",
+                "\u{1F30A}",
+                "\u{26A1}",
+                "\u{1F343}",
+                "\u{1F33B}",
+            ],
+        ),
+        (
+            "\u{1F354}",
+            &[
+                "\u{1F354}",
+                "\u{1F355}",
+                "\u{1F382}",
+                "\u{2615}",
+                "\u{1F377}",
+                "\u{1F34E}",
+                "\u{1F96A}",
+                "\u{1F35C}",
+                "\u{1F363}",
+                "\u{1F370}",
+                "\u{1F36B}",
+                "\u{1F347}",
+            ],
+        ),
+        (
+            "\u{1F3B5}",
+            &[
+                "\u{1F3B5}",
+                "\u{1F3B6}",
+                "\u{1F3A4}",
+                "\u{1F3B8}",
+                "\u{1F941}",
+                "\u{1F3BA}",
+                "\u{1F3B9}",
+                "\u{1F3BB}",
+                "\u{1FA97}",
+                "\u{1F4BF}",
+                "\u{1F399}",
+            ],
+        ),
+        (
+            "\u{1F4BB}",
+            &[
+                "\u{1F4BB}",
+                "\u{1F4F1}",
+                "\u{1F50D}",
+                "\u{1F512}",
+                "\u{1F6E1}",
+                "\u{2699}",
+                "\u{1F4E7}",
+                "\u{1F4CE}",
+                "\u{1F4C4}",
+                "\u{1F5C3}",
+                "\u{1F5A5}",
+                "\u{2328}",
+            ],
+        ),
     ];
 
     view! {

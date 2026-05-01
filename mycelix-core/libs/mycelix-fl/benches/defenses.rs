@@ -16,8 +16,7 @@ fn generate_gradients(n_nodes: usize, dim: usize, seed: u64) -> Vec<Gradient> {
             .map(|d| {
                 let x = (seed
                     .wrapping_mul(6364136223846793005)
-                    .wrapping_add(i as u64 * 1000 + d as u64))
-                    as f32
+                    .wrapping_add(i as u64 * 1000 + d as u64)) as f32
                     / u64::MAX as f32;
                 x * 2.0 - 1.0
             })

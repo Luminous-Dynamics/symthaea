@@ -1,3 +1,4 @@
+use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -298,6 +299,36 @@ fn enforce_rate_limit(target_fn: &str) -> ExternResult<()> {
     )?;
 
     Ok(())
+}
+
+// ==================== TIER GATING (8D-AWARE) ====================
+
+/// Check if the caller meets the Participant consciousness tier (combined >= 0.3).
+#[hdk_extern]
+pub fn check_participant_tier(_: ()) -> ExternResult<bool> {
+    check_tier_for_requirement(sovereign_profile::CivicTier::Participant)
+}
+
+/// Check if the caller meets the Citizen consciousness tier (combined >= 0.4).
+#[hdk_extern]
+pub fn check_citizen_tier(_: ()) -> ExternResult<bool> {
+    check_tier_for_requirement(sovereign_profile::CivicTier::Citizen)
+}
+
+/// Check if the caller meets the Steward consciousness tier (combined >= 0.6).
+#[hdk_extern]
+pub fn check_steward_tier(_: ()) -> ExternResult<bool> {
+    check_tier_for_requirement(sovereign_profile::CivicTier::Steward)
+}
+
+fn check_tier_for_requirement(min_tier: sovereign_profile::CivicTier) -> ExternResult<bool> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let did = format!("did:mycelix:{}", agent);
+
+    // Issue a fresh 8D credential to check the current tier
+    let cred = issue_sovereign_credential(did)?;
+
+    Ok(cred.tier >= min_tier)
 }
 
 // ==================== API VERSION ====================
@@ -1567,13 +1598,29 @@ pub fn issue_sovereign_credential(
 
     // Build 8D profile — all 8 dimensions wired to real data sources
     let profile = sovereign_profile::SovereignProfile {
-        epistemic_integrity: if epistemic > 0.0 { epistemic } else { identity_score },
+        epistemic_integrity: if epistemic > 0.0 {
+            epistemic
+        } else {
+            identity_score
+        },
         thermodynamic_yield: thermodynamic,
-        network_resilience: if network > 0.0 { network } else { identity_score },
+        network_resilience: if network > 0.0 {
+            network
+        } else {
+            identity_score
+        },
         economic_velocity: economic,
         civic_participation: community_score.max(civic_extra),
-        stewardship_care: if stewardship > 0.0 { stewardship } else { reputation_score },
-        semantic_resonance: if resonance > 0.0 { resonance } else { community_score },
+        stewardship_care: if stewardship > 0.0 {
+            stewardship
+        } else {
+            reputation_score
+        },
+        semantic_resonance: if resonance > 0.0 {
+            resonance
+        } else {
+            community_score
+        },
         domain_competence: competence,
     };
 
@@ -1616,9 +1663,7 @@ fn collect_epistemic_integrity(did: &str) -> f64 {
         None,
         did.to_string(),
     ) {
-        Ok(ZomeCallResponse::Ok(result)) => {
-            result.decode::<f64>().unwrap_or(0.0).clamp(0.0, 1.0)
-        }
+        Ok(ZomeCallResponse::Ok(result)) => result.decode::<f64>().unwrap_or(0.0).clamp(0.0, 1.0),
         _ => 0.0,
     }
 }
@@ -1632,9 +1677,7 @@ fn collect_network_resilience() -> f64 {
         None,
         (),
     ) {
-        Ok(ZomeCallResponse::Ok(result)) => {
-            result.decode::<f64>().unwrap_or(0.0).clamp(0.0, 1.0)
-        }
+        Ok(ZomeCallResponse::Ok(result)) => result.decode::<f64>().unwrap_or(0.0).clamp(0.0, 1.0),
         _ => 0.0,
     }
 }
@@ -1648,9 +1691,7 @@ fn collect_stewardship_care(did: &str) -> f64 {
         None,
         did.to_string(),
     ) {
-        Ok(ZomeCallResponse::Ok(result)) => {
-            result.decode::<f64>().unwrap_or(0.0).clamp(0.0, 1.0)
-        }
+        Ok(ZomeCallResponse::Ok(result)) => result.decode::<f64>().unwrap_or(0.0).clamp(0.0, 1.0),
         _ => 0.0,
     }
 }
@@ -1664,9 +1705,7 @@ fn collect_thermodynamic_yield(did: &str) -> f64 {
         None,
         did.to_string(),
     ) {
-        Ok(ZomeCallResponse::Ok(result)) => {
-            result.decode::<f64>().unwrap_or(0.0).clamp(0.0, 1.0)
-        }
+        Ok(ZomeCallResponse::Ok(result)) => result.decode::<f64>().unwrap_or(0.0).clamp(0.0, 1.0),
         _ => 0.0,
     }
 }
@@ -1701,9 +1740,7 @@ fn collect_semantic_resonance() -> f64 {
         None,
         round,
     ) {
-        Ok(ZomeCallResponse::Ok(result)) => {
-            result.decode::<f64>().unwrap_or(0.0).clamp(0.0, 1.0)
-        }
+        Ok(ZomeCallResponse::Ok(result)) => result.decode::<f64>().unwrap_or(0.0).clamp(0.0, 1.0),
         _ => 0.0,
     }
 }

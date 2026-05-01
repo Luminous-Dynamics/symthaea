@@ -81,24 +81,21 @@ pub const NO_PTS: u64 = PTS_MASK;
 #[derive(Debug, PartialEq, Eq)]
 pub enum WireError {
     /// Caller handed in fewer bytes than the requested header needs.
-    ShortRead {
-        expected: usize,
-        got: usize,
-    },
+    ShortRead { expected: usize, got: usize },
     /// `codec_id` fourcc isn't one we understand.
     UnknownCodec([u8; 4]),
     /// Width or height is zero — the encoder is misbehaving.
-    ZeroDimensions {
-        width: u32,
-        height: u32,
-    },
+    ZeroDimensions { width: u32, height: u32 },
 }
 
 impl std::fmt::Display for WireError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             WireError::ShortRead { expected, got } => {
-                write!(f, "scrcpy wire short read: need {expected} bytes, have {got}")
+                write!(
+                    f,
+                    "scrcpy wire short read: need {expected} bytes, have {got}"
+                )
             }
             WireError::UnknownCodec(b) => {
                 write!(

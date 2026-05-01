@@ -773,8 +773,15 @@ impl SomaEngine {
                         {
                             let prism_results = self.prism_search(query, 3);
                             if !prism_results.is_empty() {
-                                let claims: Vec<String> = prism_results.iter()
-                                    .map(|r| format!("[E{}] {}", r.empirical_level.as_f32() as u8, r.content))
+                                let claims: Vec<String> = prism_results
+                                    .iter()
+                                    .map(|r| {
+                                        format!(
+                                            "[E{}] {}",
+                                            r.empirical_level.as_f32() as u8,
+                                            r.content
+                                        )
+                                    })
                                     .collect();
                                 ToolResult {
                                     name: "web_search".into(),

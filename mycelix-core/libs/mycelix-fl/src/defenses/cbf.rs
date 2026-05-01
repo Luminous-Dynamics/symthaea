@@ -169,10 +169,7 @@ impl ConformalBehavioralFilter {
             self.prev_gradients
                 .insert(g.node_id.clone(), g.values.clone());
 
-            let history = self
-                .feature_history
-                .entry(g.node_id.clone())
-                .or_default();
+            let history = self.feature_history.entry(g.node_id.clone()).or_default();
             history.push(features[i].clone());
             if history.len() > self.history_window {
                 history.remove(0);
@@ -202,9 +199,17 @@ impl ConformalBehavioralFilter {
             return vec![0.0; NUM_FEATURES];
         }
 
-        let norm: f64 = values.iter().map(|&v| (v as f64).powi(2)).sum::<f64>().sqrt();
+        let norm: f64 = values
+            .iter()
+            .map(|&v| (v as f64).powi(2))
+            .sum::<f64>()
+            .sqrt();
         let mean: f64 = values.iter().map(|&v| v as f64).sum::<f64>() / n;
-        let variance: f64 = values.iter().map(|&v| ((v as f64) - mean).powi(2)).sum::<f64>() / n;
+        let variance: f64 = values
+            .iter()
+            .map(|&v| ((v as f64) - mean).powi(2))
+            .sum::<f64>()
+            / n;
         let std = variance.sqrt();
         let sparsity = values.iter().filter(|&&v| v.abs() < 1e-6).count() as f64 / n;
 
@@ -220,7 +225,11 @@ impl ConformalBehavioralFilter {
                     norm_b += b * b;
                 }
                 let denom = norm_a.sqrt() * norm_b.sqrt();
-                if denom > 1e-12 { 1.0 - (dot / denom) } else { 0.0 }
+                if denom > 1e-12 {
+                    1.0 - (dot / denom)
+                } else {
+                    0.0
+                }
             }
             _ => 0.0,
         };
@@ -295,7 +304,12 @@ pub fn pca_transform(features: &[Vec<f64>], n_components: usize) -> Vec<Vec<f64>
     let mean = feature_centroid(features);
     let centered: Vec<Vec<f64>> = features
         .iter()
-        .map(|f| f.iter().zip(mean.iter()).map(|(&fi, &mi)| fi - mi).collect())
+        .map(|f| {
+            f.iter()
+                .zip(mean.iter())
+                .map(|(&fi, &mi)| fi - mi)
+                .collect()
+        })
         .collect();
 
     let cov = covariance_matrix(&centered);
@@ -431,7 +445,11 @@ mod tests {
     use super::*;
 
     fn grad(id: &str, values: Vec<f32>) -> Gradient {
-        Gradient { node_id: id.into(), values, round: 0 }
+        Gradient {
+            node_id: id.into(),
+            values,
+            round: 0,
+        }
     }
 
     #[test]
@@ -480,7 +498,12 @@ mod tests {
         let mut cbf = ConformalBehavioralFilter::new(0.1);
 
         let normal: Vec<Gradient> = (0..10)
-            .map(|i| grad(&format!("cal_{i}"), vec![1.0 + (i as f32) * 0.1, 2.0, 3.0, 1.0]))
+            .map(|i| {
+                grad(
+                    &format!("cal_{i}"),
+                    vec![1.0 + (i as f32) * 0.1, 2.0, 3.0, 1.0],
+                )
+            })
             .collect();
         cbf.calibrate(&normal).unwrap();
 
@@ -494,8 +517,18 @@ mod tests {
 
         let result = cbf.aggregate(&gradients).unwrap();
 
-        let anomaly_score = result.scores.iter().find(|(id, _)| id == "anomaly").map(|(_, w)| *w).unwrap_or(1.0);
-        let max_normal_score = result.scores.iter().filter(|(id, _)| id != "anomaly").map(|(_, w)| *w).fold(0.0_f64, f64::max);
+        let anomaly_score = result
+            .scores
+            .iter()
+            .find(|(id, _)| id == "anomaly")
+            .map(|(_, w)| *w)
+            .unwrap_or(1.0);
+        let max_normal_score = result
+            .scores
+            .iter()
+            .filter(|(id, _)| id != "anomaly")
+            .map(|(_, w)| *w)
+            .fold(0.0_f64, f64::max);
 
         assert!(
             anomaly_score <= max_normal_score || !result.excluded_nodes.is_empty(),

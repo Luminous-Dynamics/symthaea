@@ -65,8 +65,8 @@ impl TransferState {
         self.cycles_since_transfer += 1;
 
         // EMA update
-        self.prediction_error_ema =
-            Self::EMA_ALPHA * prediction_error + (1.0 - Self::EMA_ALPHA) * self.prediction_error_ema;
+        self.prediction_error_ema = Self::EMA_ALPHA * prediction_error
+            + (1.0 - Self::EMA_ALPHA) * self.prediction_error_ema;
 
         // Confidence = 1 - PE_ema (clamped)
         self.transfer_confidence = (1.0 - self.prediction_error_ema as f64).clamp(0.0, 1.0);
@@ -138,7 +138,8 @@ mod tests {
 
     #[test]
     fn test_transfer_converges_with_low_pe() {
-        let mut state = TransferState::begin(EmbodimentPlatform::Auv, EmbodimentPlatform::Quadrotor);
+        let mut state =
+            TransferState::begin(EmbodimentPlatform::Auv, EmbodimentPlatform::Quadrotor);
 
         // Feed consistently low prediction errors
         for _ in 0..50 {
@@ -152,7 +153,8 @@ mod tests {
 
     #[test]
     fn test_transfer_stays_locked_with_high_pe() {
-        let mut state = TransferState::begin(EmbodimentPlatform::Humanoid, EmbodimentPlatform::Vehicle);
+        let mut state =
+            TransferState::begin(EmbodimentPlatform::Humanoid, EmbodimentPlatform::Vehicle);
 
         // Feed high prediction errors
         for _ in 0..100 {
@@ -165,7 +167,8 @@ mod tests {
 
     #[test]
     fn test_transfer_requires_min_cycles() {
-        let mut state = TransferState::begin(EmbodimentPlatform::Auv, EmbodimentPlatform::Quadrotor);
+        let mut state =
+            TransferState::begin(EmbodimentPlatform::Auv, EmbodimentPlatform::Quadrotor);
 
         // Even with zero PE, should not converge before MIN_CONVERGENCE_CYCLES
         for i in 0..TransferState::MIN_CONVERGENCE_CYCLES {
@@ -181,7 +184,10 @@ mod tests {
 
     #[test]
     fn test_transfer_telemetry() {
-        let state = TransferState::begin(EmbodimentPlatform::Manipulator, EmbodimentPlatform::Helicopter);
+        let state = TransferState::begin(
+            EmbodimentPlatform::Manipulator,
+            EmbodimentPlatform::Helicopter,
+        );
         let tel: TransferTelemetry = (&state).into();
         assert!(tel.active);
         assert_eq!(tel.source_platform, "Manipulator");

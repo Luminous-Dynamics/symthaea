@@ -7,7 +7,7 @@
 //! HDC prediction error and danger level, returning a motor gain that down-weights
 //! aggressive control commands when uncertainty is high.
 //!
-//! - **Physics of record**: `symthaea_flight::SimplePhysicsSimulator` (13-D
+//! - **Physics of record**: `symthaea_multirotor::SimplePhysicsSimulator` (13-D
 //!   position + quaternion + velocities, motor lag, aero drag).
 //! - **Consciousness side-channel**: `symtropy_robotics_bridge::RoboticAgent`
 //!   runs FEP perceive → action → MasterConsciousnessEquation → safety tier.

@@ -8,10 +8,10 @@
 //! If it doesn't, something is wrong with the experiment or the encoder is
 //! leaking signal through a channel we didn't model.
 
+use std::collections::HashMap;
 use symthaea_logparse::cluster::{hdbscan_cluster, nearest_centroid, purity};
 use symthaea_logparse::encoder::{bundle, encode, Hdv};
 use symthaea_logparse::fixtures::generate_noisy_corpus_v2;
-use std::collections::HashMap;
 
 fn main() {
     const N_PER_CLASS: usize = 40;
@@ -19,7 +19,10 @@ fn main() {
     const STEPS: usize = 11;
 
     println!("=== Encoder robustness ablation v2 (full-event contamination) ===");
-    println!("{} events per run, 5 classes, chance=0.200", N_PER_CLASS * 5);
+    println!(
+        "{} events per run, 5 classes, chance=0.200",
+        N_PER_CLASS * 5
+    );
     println!(
         "{:>8}  {:>10}  {:>10}  {:>10}  {:>10}",
         "noise", "nc_purity", "hd_purity", "hd_clusters", "hd_noise"
@@ -31,10 +34,7 @@ fn main() {
         let noise = step as f32 / (STEPS - 1) as f32;
         let corpus = generate_noisy_corpus_v2(N_PER_CLASS, SEED, noise);
         let hvs: Vec<Hdv> = corpus.iter().map(encode).collect();
-        let labels: Vec<String> = corpus
-            .iter()
-            .map(|e| e.label.clone().unwrap())
-            .collect();
+        let labels: Vec<String> = corpus.iter().map(|e| e.label.clone().unwrap()).collect();
         let label_refs: Vec<&str> = labels.iter().map(|s| s.as_str()).collect();
 
         let mut by_label: HashMap<&str, Vec<Hdv>> = HashMap::new();

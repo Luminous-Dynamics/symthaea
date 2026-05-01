@@ -36,10 +36,7 @@ pub struct NexusTransition {
 pub struct NexusFade;
 
 /// Spawn the Symtropy Nexus launcher.
-pub fn setup_menu(
-    mut commands: Commands,
-    registry: Res<ExperienceRegistry>,
-) {
+pub fn setup_menu(mut commands: Commands, registry: Res<ExperienceRegistry>) {
     // Dark background
     commands.insert_resource(ClearColor(Color::srgb(0.02, 0.02, 0.04)));
 
@@ -47,102 +44,153 @@ pub fn setup_menu(
     commands.spawn((Camera2d, MenuUi));
 
     // Root container — full screen, centered
-    commands.spawn((
-        Node {
-            width: Val::Percent(100.0),
-            height: Val::Percent(100.0),
-            flex_direction: FlexDirection::Column,
-            align_items: AlignItems::Center,
-            justify_content: JustifyContent::Center,
-            ..default()
-        },
-        BackgroundColor(Color::srgba(0.02, 0.02, 0.04, 1.0)),
-        MenuUi,
-    )).with_children(|parent| {
-        // Inner block — left-aligned text within centered container
-        parent.spawn(Node {
-            flex_direction: FlexDirection::Column,
-            align_items: AlignItems::FlexStart, // left-align the text
-            width: Val::Px(420.0),
-            ..default()
-        }).with_children(|inner| {
-        // ═══ TITLE (centered within block) ═══════════════
-        inner.spawn((
-            Text::new("SYMTROPY"),
-            TextFont { font_size: 56.0, ..default() },
-            TextColor(Color::srgb(0.3, 0.95, 0.85)),
-            Node { align_self: AlignSelf::Center, ..default() },
-        ));
+    commands
+        .spawn((
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+            BackgroundColor(Color::srgba(0.02, 0.02, 0.04, 1.0)),
+            MenuUi,
+        ))
+        .with_children(|parent| {
+            // Inner block — left-aligned text within centered container
+            parent
+                .spawn(Node {
+                    flex_direction: FlexDirection::Column,
+                    align_items: AlignItems::FlexStart, // left-align the text
+                    width: Val::Px(420.0),
+                    ..default()
+                })
+                .with_children(|inner| {
+                    // ═══ TITLE (centered within block) ═══════════════
+                    inner.spawn((
+                        Text::new("SYMTROPY"),
+                        TextFont {
+                            font_size: 56.0,
+                            ..default()
+                        },
+                        TextColor(Color::srgb(0.3, 0.95, 0.85)),
+                        Node {
+                            align_self: AlignSelf::Center,
+                            ..default()
+                        },
+                    ));
 
-        inner.spawn((
-            Text::new("consciousness-first technology"),
-            TextFont { font_size: 16.0, ..default() },
-            TextColor(Color::srgba(0.5, 0.75, 0.7, 0.7)),
-            Node { margin: UiRect::bottom(Val::Px(40.0)), align_self: AlignSelf::Center, ..default() },
-        ));
+                    inner.spawn((
+                        Text::new("consciousness-first technology"),
+                        TextFont {
+                            font_size: 16.0,
+                            ..default()
+                        },
+                        TextColor(Color::srgba(0.5, 0.75, 0.7, 0.7)),
+                        Node {
+                            margin: UiRect::bottom(Val::Px(40.0)),
+                            align_self: AlignSelf::Center,
+                            ..default()
+                        },
+                    ));
 
-        // ═══ EXPERIENCE ENTRIES ══════════════════════════
-        for (i, exp) in registry.experiences.iter().enumerate() {
-            let is_selected = i == registry.selected;
-            let prefix = if is_selected { "> " } else { "  " };
+                    // ═══ EXPERIENCE ENTRIES ══════════════════════════
+                    for (i, exp) in registry.experiences.iter().enumerate() {
+                        let is_selected = i == registry.selected;
+                        let prefix = if is_selected { "> " } else { "  " };
 
-            // Experience name — selected: full color, unselected: muted slate
-            let (r, g, b, a) = if is_selected {
-                (exp.icon_color[0], exp.icon_color[1], exp.icon_color[2], 1.0)
-            } else {
-                (0.35, 0.45, 0.45, 0.7) // muted slate — legible without straining
-            };
+                        // Experience name — selected: full color, unselected: muted slate
+                        let (r, g, b, a) = if is_selected {
+                            (exp.icon_color[0], exp.icon_color[1], exp.icon_color[2], 1.0)
+                        } else {
+                            (0.35, 0.45, 0.45, 0.7) // muted slate — legible without straining
+                        };
 
-            inner.spawn((
-                Text::new(format!("{}[{}]  {}", prefix, i + 1, exp.name)),
-                TextFont { font_size: 22.0, ..default() },
-                TextColor(Color::srgba(r, g, b, a)),
-                Node { margin: UiRect::bottom(Val::Px(4.0)), ..default() },
-                SelectionIndicator(i),
-            ));
+                        inner.spawn((
+                            Text::new(format!("{}[{}]  {}", prefix, i + 1, exp.name)),
+                            TextFont {
+                                font_size: 22.0,
+                                ..default()
+                            },
+                            TextColor(Color::srgba(r, g, b, a)),
+                            Node {
+                                margin: UiRect::bottom(Val::Px(4.0)),
+                                ..default()
+                            },
+                            SelectionIndicator(i),
+                        ));
 
-            // Subtitle
-            let sub_a = if is_selected { 0.6 } else { 0.4 };
-            inner.spawn((
-                Text::new(format!("      {}", exp.subtitle)),
-                TextFont { font_size: 13.0, ..default() },
-                TextColor(Color::srgba(0.45, 0.55, 0.5, sub_a)),
-                Node { margin: UiRect::bottom(Val::Px(16.0)), ..default() },
-                SelectionIndicator(i),
-            ));
-        }
+                        // Subtitle
+                        let sub_a = if is_selected { 0.6 } else { 0.4 };
+                        inner.spawn((
+                            Text::new(format!("      {}", exp.subtitle)),
+                            TextFont {
+                                font_size: 13.0,
+                                ..default()
+                            },
+                            TextColor(Color::srgba(0.45, 0.55, 0.5, sub_a)),
+                            Node {
+                                margin: UiRect::bottom(Val::Px(16.0)),
+                                ..default()
+                            },
+                            SelectionIndicator(i),
+                        ));
+                    }
 
-        // Settings option
-        inner.spawn((
-            Text::new("  [S]  Settings"),
-            TextFont { font_size: 18.0, ..default() },
-            TextColor(Color::srgba(0.4, 0.55, 0.5, 0.5)),
-            Node { margin: UiRect::bottom(Val::Px(8.0)), ..default() },
-        ));
+                    // Settings option
+                    inner.spawn((
+                        Text::new("  [S]  Settings"),
+                        TextFont {
+                            font_size: 18.0,
+                            ..default()
+                        },
+                        TextColor(Color::srgba(0.4, 0.55, 0.5, 0.5)),
+                        Node {
+                            margin: UiRect::bottom(Val::Px(8.0)),
+                            ..default()
+                        },
+                    ));
 
-        inner.spawn((
-            Text::new("  [Esc]  Quit"),
-            TextFont { font_size: 18.0, ..default() },
-            TextColor(Color::srgba(0.4, 0.5, 0.45, 0.5)),
-            Node { margin: UiRect::bottom(Val::Px(40.0)), ..default() },
-        ));
+                    inner.spawn((
+                        Text::new("  [Esc]  Quit"),
+                        TextFont {
+                            font_size: 18.0,
+                            ..default()
+                        },
+                        TextColor(Color::srgba(0.4, 0.5, 0.45, 0.5)),
+                        Node {
+                            margin: UiRect::bottom(Val::Px(40.0)),
+                            ..default()
+                        },
+                    ));
 
-        // ═══ FOOTER ═════════════════════════════════════
-        inner.spawn((
-            Text::new("Powered by Symthaea | Mycelix | Eight Harmonies"),
-            TextFont { font_size: 11.0, ..default() },
-            TextColor(Color::srgba(0.35, 0.5, 0.45, 0.5)),
-        ));
+                    // ═══ FOOTER ═════════════════════════════════════
+                    inner.spawn((
+                        Text::new("Powered by Symthaea | Mycelix | Eight Harmonies"),
+                        TextFont {
+                            font_size: 11.0,
+                            ..default()
+                        },
+                        TextColor(Color::srgba(0.35, 0.5, 0.45, 0.5)),
+                    ));
 
-        // Version
-        inner.spawn((
-            Text::new("v0.1.0"),
-            TextFont { font_size: 10.0, ..default() },
-            TextColor(Color::srgba(0.3, 0.4, 0.35, 0.4)),
-            Node { margin: UiRect::top(Val::Px(4.0)), align_self: AlignSelf::Center, ..default() },
-        ));
-        }); // close inner block
-    }); // close root
+                    // Version
+                    inner.spawn((
+                        Text::new("v0.1.0"),
+                        TextFont {
+                            font_size: 10.0,
+                            ..default()
+                        },
+                        TextColor(Color::srgba(0.3, 0.4, 0.35, 0.4)),
+                        Node {
+                            margin: UiRect::top(Val::Px(4.0)),
+                            align_self: AlignSelf::Center,
+                            ..default()
+                        },
+                    ));
+                }); // close inner block
+        }); // close root
 
     // Transition fade overlay (initially transparent)
     commands.spawn((
@@ -160,7 +208,10 @@ pub fn setup_menu(
 
     commands.insert_resource(NexusTransition::default());
 
-    eprintln!("[symtropy] Nexus displayed — {} experiences available", registry.experiences.len());
+    eprintln!(
+        "[symtropy] Nexus displayed — {} experiences available",
+        registry.experiences.len()
+    );
 }
 
 /// Nexus input — navigate and launch experiences.
@@ -182,9 +233,15 @@ pub fn menu_input_system(
     }
 
     // Quick-select: number keys
-    if keyboard.just_pressed(KeyCode::Digit1) && count > 0 { registry.selected = 0; }
-    if keyboard.just_pressed(KeyCode::Digit2) && count > 1 { registry.selected = 1; }
-    if keyboard.just_pressed(KeyCode::Digit3) && count > 2 { registry.selected = 2; }
+    if keyboard.just_pressed(KeyCode::Digit1) && count > 0 {
+        registry.selected = 0;
+    }
+    if keyboard.just_pressed(KeyCode::Digit2) && count > 1 {
+        registry.selected = 1;
+    }
+    if keyboard.just_pressed(KeyCode::Digit3) && count > 2 {
+        registry.selected = 2;
+    }
 
     // Update visual selection — selected: experience color, unselected: muted slate
     for (indicator, mut color) in indicators.iter_mut() {
@@ -226,10 +283,7 @@ pub fn menu_input_system(
 }
 
 /// Living mycelial background — breathing network of nodes and connections.
-pub fn nexus_background_system(
-    mut gizmos: Gizmos,
-    time: Res<Time>,
-) {
+pub fn nexus_background_system(mut gizmos: Gizmos, time: Res<Time>) {
     let t = time.elapsed_secs();
     let node_count = 60;
 
@@ -267,10 +321,7 @@ pub fn nexus_background_system(
 }
 
 /// Despawn Nexus UI when leaving MainMenu state.
-pub fn cleanup_menu(
-    mut commands: Commands,
-    query: Query<Entity, With<MenuUi>>,
-) {
+pub fn cleanup_menu(mut commands: Commands, query: Query<Entity, With<MenuUi>>) {
     for entity in &query {
         commands.entity(entity).despawn();
     }
@@ -278,29 +329,40 @@ pub fn cleanup_menu(
 
 /// Spawn loading screen.
 pub fn setup_loading(mut commands: Commands, seed: Res<DungeonSeed>) {
-    commands.spawn((
-        Node {
-            width: Val::Percent(100.0),
-            height: Val::Percent(100.0),
-            flex_direction: FlexDirection::Column,
-            align_items: AlignItems::Center,
-            justify_content: JustifyContent::Center,
-            ..default()
-        },
-        LoadingUi,
-    )).with_children(|parent| {
-        parent.spawn((
-            Text::new("Generating dungeon..."),
-            TextFont { font_size: 28.0, ..default() },
-            TextColor(Color::srgb(0.5, 0.8, 0.7)),
-        ));
-        parent.spawn((
-            Text::new(format!("Seed: {}", seed.0)),
-            TextFont { font_size: 16.0, ..default() },
-            TextColor(Color::srgb(0.4, 0.6, 0.5)),
-            Node { margin: UiRect::top(Val::Px(12.0)), ..default() },
-        ));
-    });
+    commands
+        .spawn((
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+            LoadingUi,
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                Text::new("Generating dungeon..."),
+                TextFont {
+                    font_size: 28.0,
+                    ..default()
+                },
+                TextColor(Color::srgb(0.5, 0.8, 0.7)),
+            ));
+            parent.spawn((
+                Text::new(format!("Seed: {}", seed.0)),
+                TextFont {
+                    font_size: 16.0,
+                    ..default()
+                },
+                TextColor(Color::srgb(0.4, 0.6, 0.5)),
+                Node {
+                    margin: UiRect::top(Val::Px(12.0)),
+                    ..default()
+                },
+            ));
+        });
 }
 
 /// Cleanup loading screen.

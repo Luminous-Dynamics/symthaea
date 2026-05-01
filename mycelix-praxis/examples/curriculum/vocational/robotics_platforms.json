@@ -1,0 +1,163 @@
+{
+  "metadata": {
+    "title": "Robotics & Autonomous Stewardship",
+    "framework": "Mycelix Robotics Foundation",
+    "source": "https://mycelix.org",
+    "grade_level": "Undergraduate/Professional",
+    "subject_area": "Robotics",
+    "domain": "Engineering",
+    "version": "1.0",
+    "total_standards": 8,
+    "domains": [
+      "Locomotion",
+      "Subsurface",
+      "Industrial",
+      "Logistics"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Comprehensive training for the operators and stewards of the Symtropy platform fleet."
+  },
+  "nodes": [
+    {
+      "id": "ROB-101",
+      "title": "Bipedal & Rugged Locomotion",
+      "description": "Mechanics of the 'Humanoid' and 'Quadruped' platforms. Balance homeostasis, center-of-mass (CoM) optimization, and terrain-adaptive gait planning using FEP.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Locomotion",
+      "subdomain": "Robotics",
+      "tags": ["humanoid", "quadruped", "locomotion", "balance"],
+      "estimated_hours": 90,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "ROB-201",
+      "title": "Subsurface Boring & Pressure Sealing",
+      "description": "Operating the 'Subterranean' and 'Vault' platforms. Boring through dense friction regimes, managing spoil-removal, and implementing geopolymer vacuum sealing for habitats.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Subsurface",
+      "subdomain": "Robotics",
+      "tags": ["boring", "tunneling", "vault", "mars-ready"],
+      "estimated_hours": 120,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Engineering",
+      "industry_mappings": [
+        {
+          "framework": "ESCO",
+          "version": "1.2",
+          "code": "http://data.europa.eu/esco/occupation/9e3a9c7b-3b3b-4f7e-8c8a-1a1a1a1a1a1a",
+          "label": "mining engineer"
+        }
+      ]
+    },
+    {
+      "id": "ROB-301",
+      "title": "Autonomous Recovery & Fracture Physics",
+      "description": "Managing the 'Scavenger' and 'Detritivore' fleets. Non-destructive teardown, fracture-point detection, and high-efficiency material sorting for local recycling loops.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Industrial",
+      "subdomain": "Robotics",
+      "tags": ["scavenger", "recycling", "unbuild", "circular-economy"],
+      "estimated_hours": 90,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "ROB-401",
+      "title": "In-Space Assembly & Truss Weaving",
+      "description": "The 'Spindle' and 'Cycler' regimes. Brachiating locomotion in zero-G, carbon-fiber composite extrusion, and laser-welding massive orbital solar arrays.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Industrial",
+      "subdomain": "Robotics",
+      "tags": ["space-manufacturing", "spindle", "zero-g", "construction"],
+      "estimated_hours": 135,
+      "grade_levels": ["Graduate"],
+      "bloom_level": "Create",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "ROB-501",
+      "title": "Fluid-Coupled Harbor Swarms",
+      "description": "Commanding the 'Pilot' and 'Stevedore' platforms. Precision multi-agent maneuvering of high-inertia cargo (Leviathan) in tidal and wind-shear environments.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Logistics",
+      "subdomain": "Robotics",
+      "tags": ["harbor-tug", "pilot", "maritime", "swarm"],
+      "estimated_hours": 90,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "ROB-601",
+      "title": "Metabolic Infrastructure Maintenance",
+      "description": "Diagnostics and repair for 'Stratum' (roads) and 'Plexus' (utility manifolds). Using autonomous telemetry to predict fault-points before they occur.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Industrial",
+      "subdomain": "Robotics",
+      "tags": ["infrastructure", "plexus", "maintenance", "preventative"],
+      "estimated_hours": 60,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Evaluate",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "ROB-CAP-SWARM",
+      "title": "Multi-Platform Swarm Capstone",
+      "description": "Coordinate a mixed swarm (e.g. 1 Scavenger, 2 Vectors, 1 Fabricator) to complete a complex assembly task in a high-entropy environment.",
+      "node_type": "Capstone",
+      "difficulty": "Expert",
+      "domain": "Universal",
+      "subdomain": "Robotics",
+      "tags": ["capstone", "swarm", "leadership", "systems"],
+      "estimated_hours": 180,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Create",
+      "subject_area": "Engineering",
+      "holonic_capstone": {
+        "required_node_ids": ["ROB-101", "ROB-301"],
+        "deliverable": "A functioning multi-agent mission plan with verified collision-free execution and 90% energy efficiency.",
+        "min_peer_endorsements": 5
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "VOC-DT-101",
+      "to": "ROB-301",
+      "edge_type": "Recommended",
+      "strength_permille": 600,
+      "rationale": "Understanding digital fabrication helps identify how to take things apart efficiently."
+    },
+    {
+      "from": "ROB-101",
+      "to": "ROB-CAP-SWARM",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Swarm coordination requires mastery of individual locomotion regimes."
+    },
+    {
+      "from": "ROB-301",
+      "to": "ROB-CAP-SWARM",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "The industrial loop requires mastery of material recovery."
+    },
+    {
+      "from": "SYM-201",
+      "to": "ROB-101",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Platform command vectors are encoded as HDC hypervectors."
+    }
+  ]
+}

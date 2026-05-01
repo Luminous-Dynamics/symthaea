@@ -26,11 +26,14 @@ Symthaea is a cognitive architecture that combines hyperdimensional computing, c
 git clone https://github.com/Luminous-Dynamics/symthaea.git
 cd symthaea
 
+# Enter the pinned development shell
+nix develop
+
 # Build
 cargo build --release
 
 # Run tests (21K+ workspace-wide)
-cargo test --lib
+cargo nextest run --workspace --lib
 
 # Run ZKP benchmarks
 cd crates/mycelix-zkp-core && cargo test --features full --lib
@@ -118,6 +121,47 @@ cd papers/binius-hdc && bash reproduce.sh
 # Run consciousness psych-bench
 cargo run --features psych_bench --example run_all_benchmarks
 ```
+
+## Rust Workflow
+
+Use the flake shell for day-to-day development:
+
+```bash
+cd symthaea
+nix develop
+```
+
+Inside the shell:
+
+```bash
+# Fast, isolated test runner
+cargo nextest run --workspace --lib
+
+# Focused crate test run
+cargo nextest run -p symthaea-core --lib
+
+# Background compile/watch loop
+bacon
+
+# Narrow spike for EML/e-graph work
+cargo test -p symthaea-eml-egraph
+
+# Real-data conjecture quality dashboard
+cargo run -p symthaea-core --example real_discovery_report --features abstract_thought
+
+# Same dashboard, but exit non-zero when health thresholds are breached
+cargo run -p symthaea-core --example real_discovery_report --features abstract_thought -- --strict
+```
+
+The `symthaea-eml-egraph` crate is an isolated `egg` prototype for equality
+saturation experiments around EML normalization. It is intentionally separate
+from production conjecture ranking and verification logic.
+
+For discovery work, prefer `real_discovery_report` as the project-health
+baseline. It summarizes real observation families by verification rate, EML
+coverage, macro-candidate pressure, promoted operators, suspicious formulas, and
+runtime. Use `--strict` only for opt-in CI guardrails; the current default is a
+soft warning report.
 
 `psych-bench` is an internal benchmark suite. For the honest per-module status of math and science capabilities (Lie theory, Langlands, thermodynamics, persistent homology, frontier physics, etc.), see [`MODULE_STATUS.md`](MODULE_STATUS.md). External-benchmark results (miniF2F, PutnamBench, ARC-AGI-2) are planned for Phase 1.
 

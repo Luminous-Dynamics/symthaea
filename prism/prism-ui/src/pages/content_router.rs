@@ -3,15 +3,15 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Routes to the correct page view based on BrowserState.
 
-use leptos::prelude::*;
-use prism_common::SearchResult;
-use prism_search::SearchEngine;
 use crate::components::compare_view::CompareView;
 use crate::components::result_card::ResultCard;
 use crate::components::sentient_overlay;
 use crate::pages::settings::SettingsPage;
 use crate::pages::submit_claim::SubmitClaimPage;
 use crate::state::{BrowserState, PageView};
+use leptos::prelude::*;
+use prism_common::SearchResult;
+use prism_search::SearchEngine;
 
 #[component]
 pub fn ContentRouter() -> impl IntoView {
@@ -30,28 +30,26 @@ pub fn ContentRouter() -> impl IntoView {
         match current_view {
             PageView::Welcome => view! { <WelcomePage /> }.into_any(),
             PageView::Search { query, results } => {
-                view! { <SearchResultsPage query=query.clone() results=results.clone() /> }.into_any()
+                view! { <SearchResultsPage query=query.clone() results=results.clone() /> }
+                    .into_any()
             }
             PageView::Page { html } => {
                 // Apply the Sentient Overlay if enabled in settings
                 let overlay_enabled = crate::persistence::load::<bool>("overlay").unwrap_or(true);
                 let annotated = if overlay_enabled {
-                    search_engine.with_value(|e| {
-                        match e {
-                            Some(eng) => sentient_overlay::annotate_html(&html, eng),
-                            None => html.clone(),
-                        }
+                    search_engine.with_value(|e| match e {
+                        Some(eng) => sentient_overlay::annotate_html(&html, eng),
+                        None => html.clone(),
                     })
                 } else {
                     html.clone()
                 };
                 view! {
                     <div class="reader-content" inner_html=annotated></div>
-                }.into_any()
+                }
+                .into_any()
             }
-            PageView::Compare { query } => {
-                view! { <CompareView query=query.clone() /> }.into_any()
-            }
+            PageView::Compare { query } => view! { <CompareView query=query.clone() /> }.into_any(),
             PageView::FullPageIframe { url } => {
                 let url_display = url.clone();
                 view! {
@@ -63,28 +61,20 @@ pub fn ContentRouter() -> impl IntoView {
                         ></iframe>
                         <EpistemicDrawer url=url_display />
                     </div>
-                }.into_any()
+                }
+                .into_any()
             }
-            PageView::Settings => {
-                view! { <SettingsPage /> }.into_any()
+            PageView::Settings => view! { <SettingsPage /> }.into_any(),
+            PageView::SubmitClaim => view! { <SubmitClaimPage /> }.into_any(),
+            PageView::Bookmarks => view! { <BookmarksPage /> }.into_any(),
+            PageView::Error { message } => view! {
+                <div class="reader-content">
+                    <h1>"Navigation Error"</h1>
+                    <p>{message.clone()}</p>
+                </div>
             }
-            PageView::SubmitClaim => {
-                view! { <SubmitClaimPage /> }.into_any()
-            }
-            PageView::Bookmarks => {
-                view! { <BookmarksPage /> }.into_any()
-            }
-            PageView::Error { message } => {
-                view! {
-                    <div class="reader-content">
-                        <h1>"Navigation Error"</h1>
-                        <p>{message.clone()}</p>
-                    </div>
-                }.into_any()
-            }
-            PageView::Loading => {
-                view! { <div class="loading">"Loading..."</div> }.into_any()
-            }
+            .into_any(),
+            PageView::Loading => view! { <div class="loading">"Loading..."</div> }.into_any(),
         }
     }
 }
@@ -159,9 +149,13 @@ fn SearchResultsPage(query: String, results: Vec<SearchResult>) -> impl IntoView
     let state = expect_context::<BrowserState>();
     let count = results.len();
     let search_engine = expect_context::<StoredValue<Option<SearchEngine>>>();
-    let total_claims = search_engine.with_value(|e| e.as_ref().map(|s| s.claim_count()).unwrap_or(0));
+    let total_claims =
+        search_engine.with_value(|e| e.as_ref().map(|s| s.claim_count()).unwrap_or(0));
 
-    let max_sim = results.iter().map(|r| r.query_similarity).fold(0.0_f32, f32::max);
+    let max_sim = results
+        .iter()
+        .map(|r| r.query_similarity)
+        .fold(0.0_f32, f32::max);
     let weak_results = max_sim < 0.08;
 
     view! {
@@ -292,10 +286,20 @@ fn EpistemicDrawer(url: String) -> impl IntoView {
     let related_claims = search_engine.with_value(|opt| {
         if let Some(engine) = opt {
             // Extract host + path keywords for search
-            let query = url::Url::parse(&url_query).ok()
+            let query = url::Url::parse(&url_query)
+                .ok()
                 .map(|u| {
-                    let host = u.host_str().unwrap_or("").replace("www.", "").replace(".com", "").replace(".org", "");
-                    let path = u.path().replace('/', " ").replace('-', " ").replace('_', " ");
+                    let host = u
+                        .host_str()
+                        .unwrap_or("")
+                        .replace("www.", "")
+                        .replace(".com", "")
+                        .replace(".org", "");
+                    let path = u
+                        .path()
+                        .replace('/', " ")
+                        .replace('-', " ")
+                        .replace('_', " ");
                     format!("{} {}", host, path)
                 })
                 .unwrap_or_default();

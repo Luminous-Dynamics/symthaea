@@ -161,10 +161,7 @@ pub struct MycelInputs {
 ///
 /// Applies growth (capped at MYCEL_MONTHLY_CAP), passive decay for
 /// inactive agents, and floor enforcement.
-pub fn compute_mycel(
-    current: f64,
-    inputs: &MycelInputs,
-) -> f64 {
+pub fn compute_mycel(current: f64, inputs: &MycelInputs) -> f64 {
     // Component scores
     let participation = if inputs.participated { 1.0 } else { 0.0 };
     let recognition = inputs.recognition.clamp(0.0, 1.0);
@@ -251,7 +248,8 @@ pub struct CommonsSpending {
 /// Returns the spending allocation. Deducts from commons_local.
 pub fn spend_commons(state: &mut WorldCurrencyState, rate: f64) -> CommonsSpending {
     let reserve_min = state.sap_total_supply * SAP_COMMONS_RESERVE_FRACTION;
-    let total_commons = state.sap_commons_local + state.sap_commons_planetary + state.sap_commons_system;
+    let total_commons =
+        state.sap_commons_local + state.sap_commons_planetary + state.sap_commons_system;
     let excess = (total_commons - reserve_min).max(0.0);
     let spend = excess * rate.clamp(0.0, 0.5);
 
@@ -273,7 +271,8 @@ pub fn check_commons_reserve(state: &WorldCurrencyState) -> bool {
     if state.sap_total_supply <= 0.0 {
         return true; // no supply = trivially satisfied
     }
-    let commons_total = state.sap_commons_local + state.sap_commons_planetary + state.sap_commons_system;
+    let commons_total =
+        state.sap_commons_local + state.sap_commons_planetary + state.sap_commons_system;
     commons_total / state.sap_total_supply >= SAP_COMMONS_RESERVE_FRACTION
 }
 
@@ -285,11 +284,7 @@ pub fn check_commons_reserve(state: &WorldCurrencyState) -> bool {
 ///
 /// Returns true if the transaction succeeded (within bounds).
 /// TEND is zero-sum: sender loses, receiver gains.
-pub fn tend_transfer(
-    sender_balance: &mut f64,
-    receiver_balance: &mut f64,
-    amount: f64,
-) -> bool {
+pub fn tend_transfer(sender_balance: &mut f64, receiver_balance: &mut f64, amount: f64) -> bool {
     if amount <= 0.0 {
         return false;
     }
@@ -338,45 +333,65 @@ mod tests {
 
     #[test]
     fn mycel_grows_with_participation() {
-        let score = compute_mycel(0.1, &MycelInputs {
-            participated: true,
-            recognition: 0.5,
-            quality: 0.7,
-            years_active: 5.0,
-        });
-        assert!(score > 0.1, "Active participation should grow MYCEL: {}", score);
+        let score = compute_mycel(
+            0.1,
+            &MycelInputs {
+                participated: true,
+                recognition: 0.5,
+                quality: 0.7,
+                years_active: 5.0,
+            },
+        );
+        assert!(
+            score > 0.1,
+            "Active participation should grow MYCEL: {}",
+            score
+        );
     }
 
     #[test]
     fn mycel_decays_without_participation() {
-        let score = compute_mycel(0.5, &MycelInputs {
-            participated: false,
-            recognition: 0.0,
-            quality: 0.0,
-            years_active: 10.0,
-        });
+        let score = compute_mycel(
+            0.5,
+            &MycelInputs {
+                participated: false,
+                recognition: 0.0,
+                quality: 0.0,
+                years_active: 10.0,
+            },
+        );
         assert!(score < 0.5, "Inactive agent should decay: {}", score);
     }
 
     #[test]
     fn mycel_never_below_floor() {
-        let score = compute_mycel(0.06, &MycelInputs {
-            participated: false,
-            recognition: 0.0,
-            quality: 0.0,
-            years_active: 0.0,
-        });
-        assert!(score >= MYCEL_FLOOR, "MYCEL should never go below floor: {}", score);
+        let score = compute_mycel(
+            0.06,
+            &MycelInputs {
+                participated: false,
+                recognition: 0.0,
+                quality: 0.0,
+                years_active: 0.0,
+            },
+        );
+        assert!(
+            score >= MYCEL_FLOOR,
+            "MYCEL should never go below floor: {}",
+            score
+        );
     }
 
     #[test]
     fn mycel_never_above_one() {
-        let score = compute_mycel(0.95, &MycelInputs {
-            participated: true,
-            recognition: 1.0,
-            quality: 1.0,
-            years_active: 50.0,
-        });
+        let score = compute_mycel(
+            0.95,
+            &MycelInputs {
+                participated: true,
+                recognition: 1.0,
+                quality: 1.0,
+                years_active: 50.0,
+            },
+        );
         assert!(score <= 1.0, "MYCEL should never exceed 1.0: {}", score);
     }
 
@@ -395,8 +410,14 @@ mod tests {
         let longevity_5yr = (5.0f64 / 50.0).clamp(0.0, 1.0);
         let longevity_50yr = (50.0f64 / 50.0).clamp(0.0, 1.0);
         let longevity_100yr = (100.0f64 / 50.0).clamp(0.0, 1.0);
-        assert!(longevity_50yr > longevity_5yr, "50yr should score higher than 5yr");
-        assert_eq!(longevity_50yr, longevity_100yr, "Longevity saturates at 50yr");
+        assert!(
+            longevity_50yr > longevity_5yr,
+            "50yr should score higher than 5yr"
+        );
+        assert_eq!(
+            longevity_50yr, longevity_100yr,
+            "Longevity saturates at 50yr"
+        );
         assert_eq!(longevity_50yr, 1.0, "50yr gives max longevity");
     }
 
@@ -472,7 +493,10 @@ mod tests {
         let sum_before = a + b;
         tend_transfer(&mut a, &mut b, 15.0);
         let sum_after = a + b;
-        assert!((sum_before - sum_after).abs() < 1e-10, "TEND must be zero-sum");
+        assert!(
+            (sum_before - sum_after).abs() < 1e-10,
+            "TEND must be zero-sum"
+        );
     }
 
     #[test]
@@ -501,7 +525,10 @@ mod tests {
     #[test]
     fn sap_flow_fractions_sum_to_one() {
         let sum = SAP_FLOW_LOCAL + SAP_FLOW_PLANETARY + SAP_FLOW_SYSTEM;
-        assert!((sum - 1.0).abs() < 1e-10, "SAP flow fractions must sum to 1.0");
+        assert!(
+            (sum - 1.0).abs() < 1e-10,
+            "SAP flow fractions must sum to 1.0"
+        );
     }
 
     #[test]

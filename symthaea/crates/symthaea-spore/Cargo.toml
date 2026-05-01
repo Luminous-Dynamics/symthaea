@@ -68,6 +68,7 @@ broca-pipeline = ["dep:symthaea-broca"]
 neuroevolution = ["dep:symthaea-neuroevolution"]
 # Server-side features (eval-api, ssh-relay) — NOT for WASM builds
 server = ["dep:axum", "dep:tokio", "dep:tokio-tungstenite", "dep:tungstenite", "dep:tower-http", "dep:futures-util", "dep:tokio-rustls", "dep:rustls", "dep:rustls-pemfile", "dep:rcgen"]
+__soma_integration_tests = []
 
 [[bin]]
 name = "train-broca-lite"

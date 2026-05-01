@@ -6,7 +6,7 @@
 //! Top-right: consciousness readout (Φ, safety tier, motor gain, PE, gust).
 
 use bevy::prelude::*;
-use symthaea_flight::simulator::PhysicsSimulator;
+use symthaea_multirotor::simulator::PhysicsSimulator;
 use symtropy_consciousness_physics::safety::SafetyTier;
 
 use crate::resources::*;

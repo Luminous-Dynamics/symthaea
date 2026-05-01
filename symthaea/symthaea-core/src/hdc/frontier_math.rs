@@ -10,7 +10,7 @@
 //! 3. **Knot Invariants** — Alexander polynomials for the Volume Conjecture
 //! 4. **abc Conjecture Triples** — find extremal triples where rad(abc) << c
 
-use super::conjecture_engine::{ObservedSequence, MathDomain};
+use super::conjecture_engine::{MathDomain, ObservedSequence};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 1. MONTGOMERY PAIR CORRELATION (Number Theory ↔ Quantum Chaos)
@@ -45,11 +45,15 @@ pub fn zeta(sigma: f64, t: f64) -> (f64, f64) {
     // and R(t) is the correction term involving the fractional part.
     let pi = std::f64::consts::PI;
     let tau = t.abs();
-    if tau < 2.0 { return (0.0, 0.0); } // too small for R-S
+    if tau < 2.0 {
+        return (0.0, 0.0);
+    } // too small for R-S
 
     let n_max_f = (tau / (2.0 * pi)).sqrt();
     let n_max = n_max_f.floor() as usize;
-    if n_max < 1 { return (0.0, 0.0); }
+    if n_max < 1 {
+        return (0.0, 0.0);
+    }
 
     // Riemann-Siegel theta function (Stirling-based, accurate for t > 10):
     // θ(t) = t/2·ln(t/(2π)) - t/2 - π/8 + 1/(48t) + ...
@@ -97,7 +101,12 @@ pub fn find_zeta_zeros(t_start: f64, t_end: f64, dt: f64) -> Vec<f64> {
             for _ in 0..50 {
                 let mid = (lo + hi) / 2.0;
                 let mid_val = zeta(0.5, mid).0;
-                if prev_val * mid_val < 0.0 { hi = mid; } else { lo = mid; prev_val = mid_val; }
+                if prev_val * mid_val < 0.0 {
+                    hi = mid;
+                } else {
+                    lo = mid;
+                    prev_val = mid_val;
+                }
             }
             zeros.push((lo + hi) / 2.0);
         }
@@ -116,19 +125,25 @@ pub fn find_zeta_zeros(t_start: f64, t_end: f64, dt: f64) -> Vec<f64> {
 /// The Montgomery conjecture: the pair correlation function of these
 /// spacings is 1 - (sin(πx)/(πx))² — the GUE prediction.
 pub fn pair_correlation_histogram(zeros: &[f64], n_bins: usize) -> Vec<(f64, f64)> {
-    if zeros.len() < 3 { return vec![]; }
+    if zeros.len() < 3 {
+        return vec![];
+    }
 
     // Compute normalized spacings
     let mut spacings = Vec::new();
     for w in zeros.windows(2) {
         let gamma = w[0];
-        if gamma < 10.0 { continue; } // skip very small zeros (irregular)
+        if gamma < 10.0 {
+            continue;
+        } // skip very small zeros (irregular)
         let mean_spacing = 2.0 * std::f64::consts::PI / (gamma / (2.0 * std::f64::consts::PI)).ln();
         let delta = (w[1] - w[0]) / mean_spacing;
         spacings.push(delta);
     }
 
-    if spacings.is_empty() { return vec![]; }
+    if spacings.is_empty() {
+        return vec![];
+    }
 
     // Histogram over [0, 3] with n_bins
     let max_x = 3.0;
@@ -138,19 +153,26 @@ pub fn pair_correlation_histogram(zeros: &[f64], n_bins: usize) -> Vec<(f64, f64
 
     for &s in &spacings {
         let idx = ((s / max_x) * n_bins as f64).floor() as usize;
-        if idx < n_bins { bins[idx] += 1; }
+        if idx < n_bins {
+            bins[idx] += 1;
+        }
     }
 
-    bins.iter().enumerate().map(|(i, &count)| {
-        let center = (i as f64 + 0.5) * bin_width;
-        let density = count as f64 / (total as f64 * bin_width);
-        (center, density)
-    }).collect()
+    bins.iter()
+        .enumerate()
+        .map(|(i, &count)| {
+            let center = (i as f64 + 0.5) * bin_width;
+            let density = count as f64 / (total as f64 * bin_width);
+            (center, density)
+        })
+        .collect()
 }
 
 /// The GUE pair correlation prediction: 1 - (sin(πx)/(πx))²
 pub fn gue_pair_correlation(x: f64) -> f64 {
-    if x.abs() < 1e-10 { return 0.0; } // limit as x→0
+    if x.abs() < 1e-10 {
+        return 0.0;
+    } // limit as x→0
     let sinc = (std::f64::consts::PI * x).sin() / (std::f64::consts::PI * x);
     1.0 - sinc * sinc
 }
@@ -165,10 +187,12 @@ pub fn observe_zeta_zero_spacings(t_max: f64) -> ObservedSequence {
 /// Generate GUE eigenvalue spacings as an ObservedSequence.
 pub fn observe_gue_prediction(n_bins: usize) -> ObservedSequence {
     let max_x = 3.0;
-    let data: Vec<(f64, f64)> = (0..n_bins).map(|i| {
-        let x = (i as f64 + 0.5) * max_x / n_bins as f64;
-        (x, gue_pair_correlation(x))
-    }).collect();
+    let data: Vec<(f64, f64)> = (0..n_bins)
+        .map(|i| {
+            let x = (i as f64 + 0.5) * max_x / n_bins as f64;
+            (x, gue_pair_correlation(x))
+        })
+        .collect();
     ObservedSequence::new("GUE_pair_correlation", MathDomain::Physics, data)
 }
 
@@ -191,7 +215,7 @@ pub fn ramsey_sat_encoding(n: usize, k: usize, l: usize) -> String {
 
     // Declare edge variables
     for i in 0..n {
-        for j in (i+1)..n {
+        for j in (i + 1)..n {
             smt.push_str(&format!("(declare-const e_{}_{} Bool)\n", i, j));
         }
     }
@@ -200,7 +224,7 @@ pub fn ramsey_sat_encoding(n: usize, k: usize, l: usize) -> String {
     for subset in combinations(n, k) {
         let mut clause = String::from("(assert (or");
         for i in 0..k {
-            for j in (i+1)..k {
+            for j in (i + 1)..k {
                 let (a, b) = (subset[i], subset[j]);
                 let (lo, hi) = if a < b { (a, b) } else { (b, a) };
                 clause.push_str(&format!(" (not e_{}_{})", lo, hi));
@@ -214,10 +238,10 @@ pub fn ramsey_sat_encoding(n: usize, k: usize, l: usize) -> String {
     for subset in combinations(n, l) {
         let mut clause = String::from("(assert (or");
         for i in 0..l {
-            for j in (i+1)..l {
+            for j in (i + 1)..l {
                 let (a, b) = (subset[i], subset[j]);
                 let (lo, hi) = if a < b { (a, b) } else { (b, a) };
-                clause.push_str(&format!(" e_{}_{}",  lo, hi));
+                clause.push_str(&format!(" e_{}_{}", lo, hi));
             }
         }
         clause.push_str("))\n");
@@ -232,8 +256,17 @@ pub fn ramsey_sat_encoding(n: usize, k: usize, l: usize) -> String {
 fn combinations(n: usize, k: usize) -> Vec<Vec<usize>> {
     let mut result = Vec::new();
     let mut combo = Vec::with_capacity(k);
-    fn generate(start: usize, n: usize, k: usize, combo: &mut Vec<usize>, result: &mut Vec<Vec<usize>>) {
-        if combo.len() == k { result.push(combo.clone()); return; }
+    fn generate(
+        start: usize,
+        n: usize,
+        k: usize,
+        combo: &mut Vec<usize>,
+        result: &mut Vec<Vec<usize>>,
+    ) {
+        if combo.len() == k {
+            result.push(combo.clone());
+            return;
+        }
         for i in start..n {
             combo.push(i);
             generate(i + 1, n, k, combo, result);
@@ -279,7 +312,9 @@ impl Knot {
     /// We return the polynomial part after multiplying by t^g.
     pub fn alexander_polynomial(&self) -> Vec<i64> {
         let n = self.seifert_matrix.len();
-        if n == 0 { return vec![1]; }
+        if n == 0 {
+            return vec![1];
+        }
 
         // Compute det(V - t·V^T) symbolically
         // For small matrices, expand directly
@@ -338,7 +373,9 @@ impl Knot {
     /// Observe Alexander polynomial coefficients as a sequence.
     pub fn observe_alexander(&self) -> ObservedSequence {
         let coeffs = self.alexander_polynomial();
-        let data: Vec<(f64, f64)> = coeffs.iter().enumerate()
+        let data: Vec<(f64, f64)> = coeffs
+            .iter()
+            .enumerate()
             .map(|(i, &c)| (i as f64, c as f64))
             .collect();
         ObservedSequence::new(
@@ -397,24 +434,34 @@ pub struct AbcTriple {
 
 impl std::fmt::Display for AbcTriple {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({}, {}, {}) rad={} q={:.4}", self.a, self.b, self.c, self.radical, self.quality)
+        write!(
+            f,
+            "({}, {}, {}) rad={} q={:.4}",
+            self.a, self.b, self.c, self.radical, self.quality
+        )
     }
 }
 
 /// Compute rad(n) = product of distinct prime factors of n.
 pub fn radical(n: u64) -> u64 {
-    if n <= 1 { return n; }
+    if n <= 1 {
+        return n;
+    }
     let mut rad = 1u64;
     let mut m = n;
     let mut p = 2u64;
     while p * p <= m {
         if m % p == 0 {
             rad *= p;
-            while m % p == 0 { m /= p; }
+            while m % p == 0 {
+                m /= p;
+            }
         }
         p += 1;
     }
-    if m > 1 { rad *= m; }
+    if m > 1 {
+        rad *= m;
+    }
     rad
 }
 
@@ -426,28 +473,48 @@ pub fn search_abc_triples(max_c: u64, min_quality: f64) -> Vec<AbcTriple> {
     let mut triples = Vec::new();
 
     for c in 3..=max_c {
-        for a in 1..c/2+1 {
+        for a in 1..c / 2 + 1 {
             let b = c - a;
-            if a >= b { continue; } // avoid duplicates
-            if gcd_u64(a, b) != 1 { continue; } // coprime
+            if a >= b {
+                continue;
+            } // avoid duplicates
+            if gcd_u64(a, b) != 1 {
+                continue;
+            } // coprime
 
             let rad_abc = radical(a) * radical(b) * radical(c);
             // Avoid overflow: if rad > c, quality < 1 (not interesting)
-            if rad_abc >= c { continue; }
+            if rad_abc >= c {
+                continue;
+            }
 
             let quality = (c as f64).ln() / (rad_abc as f64).ln();
             if quality > min_quality {
-                triples.push(AbcTriple { a, b, c, radical: rad_abc, quality });
+                triples.push(AbcTriple {
+                    a,
+                    b,
+                    c,
+                    radical: rad_abc,
+                    quality,
+                });
             }
         }
     }
 
-    triples.sort_by(|a, b| b.quality.partial_cmp(&a.quality).unwrap_or(std::cmp::Ordering::Equal));
+    triples.sort_by(|a, b| {
+        b.quality
+            .partial_cmp(&a.quality)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     triples
 }
 
 fn gcd_u64(a: u64, b: u64) -> u64 {
-    if b == 0 { a } else { gcd_u64(b, a % b) }
+    if b == 0 {
+        a
+    } else {
+        gcd_u64(b, a % b)
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -462,7 +529,9 @@ fn gcd_u64(a: u64, b: u64) -> u64 {
 /// Is the coefficient 0.64 universal or scale-dependent?
 pub fn abc_quality_distribution(max_c: u64, min_q: f64) -> ObservedSequence {
     let triples = search_abc_triples(max_c, min_q);
-    let data: Vec<(f64, f64)> = triples.iter().enumerate()
+    let data: Vec<(f64, f64)> = triples
+        .iter()
+        .enumerate()
         .map(|(i, t)| ((i + 1) as f64, t.quality))
         .collect();
     ObservedSequence::new(
@@ -480,12 +549,15 @@ pub fn abc_quality_distribution(max_c: u64, min_q: f64) -> ObservedSequence {
 pub fn fit_abc_decay(qualities: &[(f64, f64)]) -> (f64, f64, f64) {
     // q(n) - 1 = A / n^B → ln(q-1) = ln(A) - B·ln(n)
     // Linear regression in log-log space
-    let log_data: Vec<(f64, f64)> = qualities.iter()
+    let log_data: Vec<(f64, f64)> = qualities
+        .iter()
         .filter(|&&(_, q)| q > 1.001) // need q > 1 for log(q-1)
         .map(|&(n, q)| (n.ln(), (q - 1.0).ln()))
         .collect();
 
-    if log_data.len() < 3 { return (0.0, 0.0, 0.0); }
+    if log_data.len() < 3 {
+        return (0.0, 0.0, 0.0);
+    }
 
     let n = log_data.len() as f64;
     let sx: f64 = log_data.iter().map(|(x, _)| x).sum();
@@ -494,21 +566,30 @@ pub fn fit_abc_decay(qualities: &[(f64, f64)]) -> (f64, f64, f64) {
     let sx2: f64 = log_data.iter().map(|(x, _)| x * x).sum();
 
     let denom = n * sx2 - sx * sx;
-    if denom.abs() < 1e-10 { return (0.0, 0.0, 0.0); }
+    if denom.abs() < 1e-10 {
+        return (0.0, 0.0, 0.0);
+    }
 
     let neg_b = (n * sxy - sx * sy) / denom; // slope = -B
-    let ln_a = (sy - neg_b * sx) / n;        // intercept = ln(A)
+    let ln_a = (sy - neg_b * sx) / n; // intercept = ln(A)
 
     let b = -neg_b;
     let a = ln_a.exp();
 
     // R² goodness of fit
-    let ss_res: f64 = log_data.iter().map(|(x, y)| {
-        let pred = ln_a + neg_b * x;
-        (y - pred).powi(2)
-    }).sum();
+    let ss_res: f64 = log_data
+        .iter()
+        .map(|(x, y)| {
+            let pred = ln_a + neg_b * x;
+            (y - pred).powi(2)
+        })
+        .sum();
     let ss_tot: f64 = log_data.iter().map(|(_, y)| (y - sy / n).powi(2)).sum();
-    let r2 = if ss_tot > 1e-10 { 1.0 - ss_res / ss_tot } else { 0.0 };
+    let r2 = if ss_tot > 1e-10 {
+        1.0 - ss_res / ss_tot
+    } else {
+        0.0
+    };
 
     (a, b, r2)
 }
@@ -538,40 +619,49 @@ pub struct ModelFit {
 ///
 /// Returns fits sorted by AIC (best first).
 pub fn fit_competing_models(data: &[(f64, f64)]) -> Vec<ModelFit> {
-    let excess: Vec<(f64, f64)> = data.iter()
+    let excess: Vec<(f64, f64)> = data
+        .iter()
         .filter(|&&(_, q)| q > 1.001)
         .map(|&(n, q)| (n, q - 1.0))
         .collect();
 
-    if excess.len() < 5 { return vec![]; }
+    if excess.len() < 5 {
+        return vec![];
+    }
     let n_data = excess.len() as f64;
     let mut fits = Vec::new();
 
     // Model 1: Power law — ln(q-1) = ln(A) - B·ln(n)
     {
-        let log_data: Vec<(f64, f64)> = excess.iter()
+        let log_data: Vec<(f64, f64)> = excess
+            .iter()
             .map(|&(n, e)| (n.ln(), e.ln()))
             .filter(|(_, y)| y.is_finite())
             .collect();
         let (slope, intercept, r2) = linear_regression(&log_data);
         let a = intercept.exp();
         let b = -slope;
-        let residuals: Vec<f64> = excess.iter()
-            .map(|&(n, e)| e - a / n.powf(b))
-            .collect();
+        let residuals: Vec<f64> = excess.iter().map(|&(n, e)| e - a / n.powf(b)).collect();
         let rms = (residuals.iter().map(|r| r * r).sum::<f64>() / n_data).sqrt();
         let aic = n_data * (rms * rms).ln() + 2.0 * 2.0; // 2 params
-        fits.push(ModelFit { name: "power_law: A/n^B", params: vec![a, b], r_squared: r2, aic, residual_rms: rms });
+        fits.push(ModelFit {
+            name: "power_law: A/n^B",
+            params: vec![a, b],
+            r_squared: r2,
+            aic,
+            residual_rms: rms,
+        });
     }
 
     // Model 2: Log-corrected — ln(q-1) = ln(A) - ln(n) - C·ln(ln(n))
     // i.e., q-1 = A / (n · ln(n)^C)
     {
-        let log_data: Vec<(f64, f64)> = excess.iter()
+        let log_data: Vec<(f64, f64)> = excess
+            .iter()
             .filter(|&&(n, _)| n > 1.0)
             .map(|&(n, e)| {
                 let y = e.ln() + n.ln(); // ln(q-1) + ln(n) = ln(A) - C·ln(ln(n))
-                let x = n.ln().ln();      // ln(ln(n))
+                let x = n.ln().ln(); // ln(ln(n))
                 (x, y)
             })
             .filter(|(x, y)| x.is_finite() && y.is_finite())
@@ -579,51 +669,81 @@ pub fn fit_competing_models(data: &[(f64, f64)]) -> Vec<ModelFit> {
         let (slope, intercept, r2) = linear_regression(&log_data);
         let a = intercept.exp();
         let c_param = -slope;
-        let residuals: Vec<f64> = excess.iter()
+        let residuals: Vec<f64> = excess
+            .iter()
             .filter(|&&(n, _)| n > 1.0)
             .map(|&(n, e)| e - a / (n * n.ln().powf(c_param)))
             .collect();
         let rms = (residuals.iter().map(|r| r * r).sum::<f64>() / n_data).sqrt();
         let aic = n_data * (rms * rms).max(1e-30).ln() + 2.0 * 2.0;
-        fits.push(ModelFit { name: "log_corrected: A/(n·ln(n)^C)", params: vec![a, c_param], r_squared: r2, aic, residual_rms: rms });
+        fits.push(ModelFit {
+            name: "log_corrected: A/(n·ln(n)^C)",
+            params: vec![a, c_param],
+            r_squared: r2,
+            aic,
+            residual_rms: rms,
+        });
     }
 
     // Model 3: Exponential — ln(q-1) = ln(A) - B·n
     {
-        let log_data: Vec<(f64, f64)> = excess.iter()
+        let log_data: Vec<(f64, f64)> = excess
+            .iter()
             .map(|&(n, e)| (n, e.ln()))
             .filter(|(_, y)| y.is_finite())
             .collect();
         let (slope, intercept, r2) = linear_regression(&log_data);
         let a = intercept.exp();
         let b = -slope;
-        let residuals: Vec<f64> = excess.iter()
+        let residuals: Vec<f64> = excess
+            .iter()
             .map(|&(n, e)| e - a * (-b * n).exp())
             .collect();
         let rms = (residuals.iter().map(|r| r * r).sum::<f64>() / n_data).sqrt();
         let aic = n_data * (rms * rms).max(1e-30).ln() + 2.0 * 2.0;
-        fits.push(ModelFit { name: "exponential: A·exp(-Bn)", params: vec![a, b], r_squared: r2, aic, residual_rms: rms });
+        fits.push(ModelFit {
+            name: "exponential: A·exp(-Bn)",
+            params: vec![a, b],
+            r_squared: r2,
+            aic,
+            residual_rms: rms,
+        });
     }
 
-    fits.sort_by(|a, b| a.aic.partial_cmp(&b.aic).unwrap_or(std::cmp::Ordering::Equal));
+    fits.sort_by(|a, b| {
+        a.aic
+            .partial_cmp(&b.aic)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     fits
 }
 
 /// Simple linear regression returning (slope, intercept, R²).
 fn linear_regression(data: &[(f64, f64)]) -> (f64, f64, f64) {
     let n = data.len() as f64;
-    if n < 2.0 { return (0.0, 0.0, 0.0); }
+    if n < 2.0 {
+        return (0.0, 0.0, 0.0);
+    }
     let sx: f64 = data.iter().map(|(x, _)| x).sum();
     let sy: f64 = data.iter().map(|(_, y)| y).sum();
     let sxy: f64 = data.iter().map(|(x, y)| x * y).sum();
     let sx2: f64 = data.iter().map(|(x, _)| x * x).sum();
     let denom = n * sx2 - sx * sx;
-    if denom.abs() < 1e-15 { return (0.0, sy / n, 0.0); }
+    if denom.abs() < 1e-15 {
+        return (0.0, sy / n, 0.0);
+    }
     let slope = (n * sxy - sx * sy) / denom;
     let intercept = (sy - slope * sx) / n;
-    let ss_res: f64 = data.iter().map(|(x, y)| (y - (slope * x + intercept)).powi(2)).sum();
+    let ss_res: f64 = data
+        .iter()
+        .map(|(x, y)| (y - (slope * x + intercept)).powi(2))
+        .sum();
     let ss_tot: f64 = data.iter().map(|(_, y)| (y - sy / n).powi(2)).sum();
-    let r2 = if ss_tot > 1e-15 { 1.0 - ss_res / ss_tot } else { 0.0 };
+    let r2 = if ss_tot > 1e-15 {
+        1.0 - ss_res / ss_tot
+    } else {
+        0.0
+    };
     (slope, intercept, r2)
 }
 
@@ -631,11 +751,14 @@ fn linear_regression(data: &[(f64, f64)]) -> (f64, f64, f64) {
 /// ρ = 1 - 6Σd²/(n(n²-1)) where d_i = rank(x_i) - rank(y_i).
 fn spearman_correlation(x: &[f64], y: &[f64]) -> f64 {
     let n = x.len().min(y.len());
-    if n < 3 { return 0.0; }
+    if n < 3 {
+        return 0.0;
+    }
 
     // Compute ranks
     let rank = |v: &[f64]| -> Vec<f64> {
-        let mut indexed: Vec<(usize, f64)> = v.iter().enumerate().map(|(i, &val)| (i, val)).collect();
+        let mut indexed: Vec<(usize, f64)> =
+            v.iter().enumerate().map(|(i, &val)| (i, val)).collect();
         indexed.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
         let mut ranks = vec![0.0f64; v.len()];
         for (rank, &(idx, _)) in indexed.iter().enumerate() {
@@ -659,18 +782,24 @@ fn spearman_correlation(x: &[f64], y: &[f64]) -> f64 {
 /// and returns (mean_B, lower_95, upper_95).
 pub fn bootstrap_exponent(data: &[(f64, f64)], n_boot: usize, seed: u64) -> (f64, f64, f64) {
     let n = data.len();
-    if n < 5 { return (0.0, 0.0, 0.0); }
+    if n < 5 {
+        return (0.0, 0.0, 0.0);
+    }
 
     let mut rng = seed;
     let mut b_samples = Vec::with_capacity(n_boot);
 
     for _ in 0..n_boot {
         // Resample with replacement
-        let sample: Vec<(f64, f64)> = (0..n).map(|_| {
-            rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
-            let idx = (rng >> 33) as usize % n;
-            data[idx]
-        }).collect();
+        let sample: Vec<(f64, f64)> = (0..n)
+            .map(|_| {
+                rng = rng
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1442695040888963407);
+                let idx = (rng >> 33) as usize % n;
+                data[idx]
+            })
+            .collect();
 
         let (_, b, r2) = fit_abc_decay(&sample);
         if r2 > 0.3 && b > 0.0 && b < 5.0 {
@@ -678,7 +807,9 @@ pub fn bootstrap_exponent(data: &[(f64, f64)], n_boot: usize, seed: u64) -> (f64
         }
     }
 
-    if b_samples.is_empty() { return (0.0, 0.0, 0.0); }
+    if b_samples.is_empty() {
+        return (0.0, 0.0, 0.0);
+    }
     b_samples.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
     let mean = b_samples.iter().sum::<f64>() / b_samples.len() as f64;
@@ -698,7 +829,8 @@ pub fn search_abc_triples_sieved(max_c: u64, min_quality: f64) -> Vec<AbcTriple>
     // Sieve: compute rad(n) for all n ≤ max_c
     let mut rad = vec![1u64; max + 1];
     for p in 2..=max {
-        if rad[p] == 1 { // p is prime (not yet marked)
+        if rad[p] == 1 {
+            // p is prime (not yet marked)
             // Mark all multiples
             let mut m = p;
             while m <= max {
@@ -713,22 +845,38 @@ pub fn search_abc_triples_sieved(max_c: u64, min_quality: f64) -> Vec<AbcTriple>
         let rad_c = rad[c as usize];
         for a in 1..c / 2 + 1 {
             let b = c - a;
-            if a >= b { continue; }
-            if gcd_u64(a, b) != 1 { continue; }
+            if a >= b {
+                continue;
+            }
+            if gcd_u64(a, b) != 1 {
+                continue;
+            }
 
             let rad_abc = rad[a as usize]
                 .saturating_mul(rad[b as usize])
                 .saturating_mul(rad_c);
-            if rad_abc >= c || rad_abc == 0 { continue; }
+            if rad_abc >= c || rad_abc == 0 {
+                continue;
+            }
 
             let quality = (c as f64).ln() / (rad_abc as f64).ln();
             if quality > min_quality {
-                triples.push(AbcTriple { a, b, c, radical: rad_abc, quality });
+                triples.push(AbcTriple {
+                    a,
+                    b,
+                    c,
+                    radical: rad_abc,
+                    quality,
+                });
             }
         }
     }
 
-    triples.sort_by(|a, b| b.quality.partial_cmp(&a.quality).unwrap_or(std::cmp::Ordering::Equal));
+    triples.sort_by(|a, b| {
+        b.quality
+            .partial_cmp(&a.quality)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     triples
 }
 
@@ -744,10 +892,16 @@ pub fn search_abc_triples_sieved(max_c: u64, min_quality: f64) -> Vec<AbcTriple>
 /// This is one of the deepest arithmetic sequences — no known closed form,
 /// connected to L-functions, modular forms, and the BSD conjecture.
 pub fn class_number(d: u64) -> u64 {
-    if d == 0 { return 0; }
+    if d == 0 {
+        return 0;
+    }
 
     // Discriminant: D = -4d if d ≡ 1,2 (mod 4), D = -d if d ≡ 3 (mod 4)
-    let disc: i64 = if d % 4 == 3 { -(d as i64) } else { -4 * (d as i64) };
+    let disc: i64 = if d % 4 == 3 {
+        -(d as i64)
+    } else {
+        -4 * (d as i64)
+    };
     let disc_abs = disc.unsigned_abs();
 
     // For small discriminants, use the analytic class number formula:
@@ -778,35 +932,57 @@ pub fn class_number(d: u64) -> u64 {
 
 /// Kronecker symbol for class number computation.
 fn kronecker_symbol_i64(d: i64, n: i64) -> i64 {
-    if n == 0 { return 0; }
-    if n == 1 { return 1; }
-    if n < 0 { return kronecker_symbol_i64(d, -n) * if d < 0 { -1 } else { 1 }; }
+    if n == 0 {
+        return 0;
+    }
+    if n == 1 {
+        return 1;
+    }
+    if n < 0 {
+        return kronecker_symbol_i64(d, -n) * if d < 0 { -1 } else { 1 };
+    }
 
     let n_abs = n.unsigned_abs();
 
     // Handle n = 2 separately
     if n_abs == 2 {
         let d_mod8 = ((d % 8) + 8) % 8;
-        return match d_mod8 { 1 | 7 => 1, 3 | 5 => -1, _ => 0 };
+        return match d_mod8 {
+            1 | 7 => 1,
+            3 | 5 => -1,
+            _ => 0,
+        };
     }
 
     // For odd prime n: Euler criterion
-    if n_abs % 2 == 0 { return 0; } // even > 2
+    if n_abs % 2 == 0 {
+        return 0;
+    } // even > 2
 
     let d_mod = ((d % n) + n.abs()) as u64 % n_abs;
-    if d_mod == 0 { return 0; }
+    if d_mod == 0 {
+        return 0;
+    }
 
     // a^((p-1)/2) mod p
     let mut result = 1u64;
     let mut base = d_mod;
     let mut exp = (n_abs - 1) / 2;
     while exp > 0 {
-        if exp % 2 == 1 { result = (result as u128 * base as u128 % n_abs as u128) as u64; }
+        if exp % 2 == 1 {
+            result = (result as u128 * base as u128 % n_abs as u128) as u64;
+        }
         base = (base as u128 * base as u128 % n_abs as u128) as u64;
         exp /= 2;
     }
 
-    if result == 1 { 1 } else if result == n_abs - 1 { -1 } else { 0 }
+    if result == 1 {
+        1
+    } else if result == n_abs - 1 {
+        -1
+    } else {
+        0
+    }
 }
 
 /// Generate class numbers h(-d) for d = 1..max_d as an ObservedSequence.
@@ -814,10 +990,12 @@ pub fn observe_class_numbers(max_d: u64) -> ObservedSequence {
     let data: Vec<(f64, f64)> = (1..=max_d)
         .filter(|&d| {
             // Only squarefree d (fundamental discriminants)
-            let mut m = d;
+            let m = d;
             let mut p = 2u64;
             while p * p <= m {
-                if m % (p * p) == 0 { return false; }
+                if m % (p * p) == 0 {
+                    return false;
+                }
                 p += 1;
             }
             true
@@ -843,20 +1021,36 @@ mod tests {
         // ζ(1/2 + 14.134i) ≈ 0 (first nontrivial zero)
         let (re, _im) = zeta(0.5, 14.134);
         eprintln!("ζ(1/2 + 14.134i) ≈ {:.6}", re);
-        assert!(re.abs() < 1.0, "should be near zero at first nontrivial zero");
+        assert!(
+            re.abs() < 1.0,
+            "should be near zero at first nontrivial zero"
+        );
     }
 
     #[test]
     fn test_find_zeta_zeros() {
         // Known first few zeros: 14.134, 21.022, 25.011, 30.425, 32.935
         let zeros = find_zeta_zeros(12.0, 35.0, 0.05);
-        eprintln!("\nZeta zeros found: {:?}", zeros.iter().map(|z| format!("{:.3}", z)).collect::<Vec<_>>());
-        assert!(zeros.len() >= 3, "should find at least 3 zeros in [12, 35], found {}", zeros.len());
+        eprintln!(
+            "\nZeta zeros found: {:?}",
+            zeros
+                .iter()
+                .map(|z| format!("{:.3}", z))
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            zeros.len() >= 3,
+            "should find at least 3 zeros in [12, 35], found {}",
+            zeros.len()
+        );
 
         // First zero should be near 14.134
         if let Some(&first) = zeros.first() {
-            assert!((first - 14.134).abs() < 1.0,
-                "first zero should be near 14.134, got {:.3}", first);
+            assert!(
+                (first - 14.134).abs() < 1.0,
+                "first zero should be near 14.134, got {:.3}",
+                first
+            );
         }
     }
 
@@ -887,32 +1081,58 @@ mod tests {
         eprintln!("  --------|----------|--------------------|--------------");
         for &(x, density) in &hist {
             let gue = gue_pair_correlation(x);
-            if gue > 0.01 { // avoid division by near-zero
+            if gue > 0.01 {
+                // avoid division by near-zero
                 let contrib = (density - gue).powi(2) / gue;
                 chi_sq += contrib;
                 n_bins_used += 1;
                 let match_char = if contrib < 0.5 { "~" } else { " " };
-                eprintln!("    {:.2}  |  {:.4}  |       {:.4}       |   {:.4}  {}",
-                    x, density, gue, contrib, match_char);
+                eprintln!(
+                    "    {:.2}  |  {:.4}  |       {:.4}       |   {:.4}  {}",
+                    x, density, gue, contrib, match_char
+                );
             }
         }
 
         let df = n_bins_used.saturating_sub(1); // degrees of freedom
         eprintln!("\n  Chi-squared: {:.4} (df={})", chi_sq, df);
-        eprintln!("  5% critical value for df={}: ~{:.1}", df,
-            if df > 0 { df as f64 + 2.0 * (2.0 * df as f64).sqrt() } else { 0.0 });
+        eprintln!(
+            "  5% critical value for df={}: ~{:.1}",
+            df,
+            if df > 0 {
+                df as f64 + 2.0 * (2.0 * df as f64).sqrt()
+            } else {
+                0.0
+            }
+        );
 
         // Key structural tests
         if !hist.is_empty() {
-            let near_zero = hist.iter().find(|&&(x, _)| x < 0.2).map(|&(_, d)| d).unwrap_or(0.0);
-            let mid_range = hist.iter()
+            let near_zero = hist
+                .iter()
+                .find(|&&(x, _)| x < 0.2)
+                .map(|&(_, d)| d)
+                .unwrap_or(0.0);
+            let mid_range = hist
+                .iter()
                 .filter(|&&(x, _)| x > 0.8 && x < 1.5)
                 .map(|&(_, d)| d)
-                .sum::<f64>() / hist.iter().filter(|&&(x, _)| x > 0.8 && x < 1.5).count().max(1) as f64;
+                .sum::<f64>()
+                / hist
+                    .iter()
+                    .filter(|&&(x, _)| x > 0.8 && x < 1.5)
+                    .count()
+                    .max(1) as f64;
 
             eprintln!("\n  STRUCTURAL TESTS:");
-            eprintln!("  Level repulsion (density near 0): {:.4} (GUE predicts: ~0)", near_zero);
-            eprintln!("  Mid-range density (0.8-1.5):      {:.4} (GUE predicts: ~0.9-1.0)", mid_range);
+            eprintln!(
+                "  Level repulsion (density near 0): {:.4} (GUE predicts: ~0)",
+                near_zero
+            );
+            eprintln!(
+                "  Mid-range density (0.8-1.5):      {:.4} (GUE predicts: ~0.9-1.0)",
+                mid_range
+            );
 
             let repulsion_ok = near_zero < 0.3;
             let midrange_ok = mid_range > 0.3;
@@ -935,15 +1155,28 @@ mod tests {
     fn test_combinations() {
         let c = combinations(4, 2);
         assert_eq!(c.len(), 6); // C(4,2) = 6
-        assert_eq!(c, vec![vec![0,1], vec![0,2], vec![0,3], vec![1,2], vec![1,3], vec![2,3]]);
+        assert_eq!(
+            c,
+            vec![
+                vec![0, 1],
+                vec![0, 2],
+                vec![0, 3],
+                vec![1, 2],
+                vec![1, 3],
+                vec![2, 3]
+            ]
+        );
     }
 
     #[test]
     fn test_ramsey_encoding_small() {
         // R(3,3) = 6, so R(3,3) > 5 should be SAT (valid 2-coloring of K_5 exists)
         let smt = ramsey_sat_encoding(5, 3, 3);
-        eprintln!("\nR(3,3) > 5 SAT encoding: {} bytes, {} lines",
-            smt.len(), smt.lines().count());
+        eprintln!(
+            "\nR(3,3) > 5 SAT encoding: {} bytes, {} lines",
+            smt.len(),
+            smt.lines().count()
+        );
         // Just verify encoding is well-formed
         assert!(smt.contains("(check-sat)"));
         assert!(smt.contains("e_0_1")); // edge variable exists
@@ -955,7 +1188,11 @@ mod tests {
         let smt = ramsey_sat_encoding(5, 3, 3);
         let clause_count = smt.matches("(assert").count();
         // C(5,3) = 10 for red cliques + C(5,3) = 10 for blue cliques = 20
-        assert_eq!(clause_count, 20, "R(3,3)>5 should have 20 clauses, got {}", clause_count);
+        assert_eq!(
+            clause_count, 20,
+            "R(3,3)>5 should have 20 clauses, got {}",
+            clause_count
+        );
     }
 
     /// FORMAL PROOF: R(3,3) = 6 via Z3.
@@ -967,14 +1204,20 @@ mod tests {
         let smt_6 = ramsey_sat_encoding(6, 3, 3);
 
         eprintln!("\n═══ RAMSEY R(3,3) = 6 PROOF ═══\n");
-        eprintln!("  R(3,3) > 5: {} variables, {} clauses",
-            5 * 4 / 2, smt_5.matches("(assert").count());
-        eprintln!("  R(3,3) > 6: {} variables, {} clauses",
-            6 * 5 / 2, smt_6.matches("(assert").count());
+        eprintln!(
+            "  R(3,3) > 5: {} variables, {} clauses",
+            5 * 4 / 2,
+            smt_5.matches("(assert").count()
+        );
+        eprintln!(
+            "  R(3,3) > 6: {} variables, {} clauses",
+            6 * 5 / 2,
+            smt_6.matches("(assert").count()
+        );
 
         // Try Z3 if available
-        let z3_path = std::path::Path::new(
-            "/nix/store/fyvrsfnsqsbalrfhmq3sfjnqc316mlmw-z3-4.15.8/bin/z3");
+        let z3_path =
+            std::path::Path::new("/nix/store/fyvrsfnsqsbalrfhmq3sfjnqc316mlmw-z3-4.15.8/bin/z3");
         if !z3_path.exists() {
             eprintln!("  Z3 not available — skipping formal proof");
             return;
@@ -982,10 +1225,17 @@ mod tests {
 
         // R(3,3) > 5: should be SAT
         let output_5 = std::process::Command::new(z3_path)
-            .arg("-in").stdin(std::process::Stdio::piped())
+            .arg("-in")
+            .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
-            .spawn().and_then(|mut child| {
-                child.stdin.as_mut().unwrap().write_all(smt_5.as_bytes()).ok();
+            .spawn()
+            .and_then(|mut child| {
+                child
+                    .stdin
+                    .as_mut()
+                    .unwrap()
+                    .write_all(smt_5.as_bytes())
+                    .ok();
                 child.wait_with_output()
             });
 
@@ -997,17 +1247,27 @@ mod tests {
 
         // R(3,3) > 6: should be UNSAT (the PROOF)
         let output_6 = std::process::Command::new(z3_path)
-            .arg("-in").stdin(std::process::Stdio::piped())
+            .arg("-in")
+            .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
-            .spawn().and_then(|mut child| {
-                child.stdin.as_mut().unwrap().write_all(smt_6.as_bytes()).ok();
+            .spawn()
+            .and_then(|mut child| {
+                child
+                    .stdin
+                    .as_mut()
+                    .unwrap()
+                    .write_all(smt_6.as_bytes())
+                    .ok();
                 child.wait_with_output()
             });
 
         if let Ok(out) = output_6 {
             let result = String::from_utf8_lossy(&out.stdout).trim().to_string();
             eprintln!("  R(3,3) > 6: {} (expected: unsat)", result);
-            assert_eq!(result, "unsat", "R(3,3) > 6 should be UNSAT — this proves R(3,3) = 6");
+            assert_eq!(
+                result, "unsat",
+                "R(3,3) > 6 should be UNSAT — this proves R(3,3) = 6"
+            );
             eprintln!("\n  >>> R(3,3) = 6 FORMALLY PROVED BY Z3!");
         }
     }
@@ -1022,7 +1282,10 @@ mod tests {
         eprintln!("\nAlexander polynomial of trefoil: {:?}", alex);
         // Trefoil Δ(t) = t - 1 + t^{-1}, after clearing denominators: t² - t + 1
         // Our 2×2 Seifert matrix should give something related
-        assert!(alex.len() >= 2, "trefoil should have degree ≥ 1 Alexander polynomial");
+        assert!(
+            alex.len() >= 2,
+            "trefoil should have degree ≥ 1 Alexander polynomial"
+        );
     }
 
     #[test]
@@ -1031,21 +1294,26 @@ mod tests {
         eprintln!("\nKnot table:");
         for knot in &knots {
             let alex = knot.alexander_polynomial();
-            eprintln!("  {} — Alexander: {:?}, volume: {:?}",
-                knot.name, alex, knot.volume);
+            eprintln!(
+                "  {} — Alexander: {:?}, volume: {:?}",
+                knot.name, alex, knot.volume
+            );
         }
         // Figure-eight should have nonzero volume (hyperbolic)
         let fig8 = &knots[1];
-        assert!(fig8.volume.unwrap_or(0.0) > 2.0, "figure-eight volume should be ~2.03");
+        assert!(
+            fig8.volume.unwrap_or(0.0) > 2.0,
+            "figure-eight volume should be ~2.03"
+        );
     }
 
     // ── abc Conjecture ──────────────────────────────────────────────────
 
     #[test]
     fn test_radical() {
-        assert_eq!(radical(12), 6);  // 12 = 2²·3, rad = 2·3 = 6
+        assert_eq!(radical(12), 6); // 12 = 2²·3, rad = 2·3 = 6
         assert_eq!(radical(30), 30); // 30 = 2·3·5, rad = 30
-        assert_eq!(radical(64), 2);  // 64 = 2⁶, rad = 2
+        assert_eq!(radical(64), 2); // 64 = 2⁶, rad = 2
         assert_eq!(radical(1), 1);
     }
 
@@ -1067,7 +1335,10 @@ mod tests {
         // Best known high-quality triple under 10000:
         // (1, 4374, 4375): rad = 2·3·5·7 = 210, q = log(4375)/log(210) ≈ 1.568
         if let Some(best) = triples.first() {
-            eprintln!("\n  >>> BEST TRIPLE: {} (quality {:.4})", best, best.quality);
+            eprintln!(
+                "\n  >>> BEST TRIPLE: {} (quality {:.4})",
+                best, best.quality
+            );
         }
     }
 
@@ -1083,12 +1354,15 @@ mod tests {
 
         // Generate data: (Alexander polynomial evaluation at -1, volume)
         // Δ(-1) is the determinant of the knot, a classical invariant
-        let data: Vec<(f64, f64)> = knots.iter()
+        let data: Vec<(f64, f64)> = knots
+            .iter()
             .filter(|k| k.volume.is_some())
             .map(|k| {
                 let alex = k.alexander_polynomial();
                 // Evaluate at t = -1 (gives knot determinant)
-                let det: f64 = alex.iter().enumerate()
+                let det: f64 = alex
+                    .iter()
+                    .enumerate()
                     .map(|(i, &c)| c as f64 * (-1.0f64).powi(i as i32))
                     .sum();
                 let vol = k.volume.unwrap();
@@ -1124,7 +1398,10 @@ mod tests {
         let abc_seq = ObservedSequence::new(
             "abc_quality",
             MathDomain::NumberTheory,
-            abc_triples.iter().enumerate().take(50)
+            abc_triples
+                .iter()
+                .enumerate()
+                .take(50)
                 .map(|(i, t)| (i as f64, t.quality))
                 .collect(),
         );
@@ -1132,7 +1409,9 @@ mod tests {
 
         // 2. Zeta zero spacings
         let zeros = find_zeta_zeros(14.0, 100.0, 0.1);
-        let spacings: Vec<(f64, f64)> = zeros.windows(2).enumerate()
+        let spacings: Vec<(f64, f64)> = zeros
+            .windows(2)
+            .enumerate()
             .map(|(i, w)| (i as f64, w[1] - w[0]))
             .collect();
         let zeta_seq = ObservedSequence::new(
@@ -1147,13 +1426,19 @@ mod tests {
         let knot_seq = ObservedSequence::new(
             "knot_determinants",
             MathDomain::Combinatorics,
-            knots.iter().enumerate().map(|(i, k)| {
-                let alex = k.alexander_polynomial();
-                let det: f64 = alex.iter().enumerate()
-                    .map(|(j, &c)| c as f64 * (-1.0f64).powi(j as i32))
-                    .sum();
-                (i as f64, det.abs())
-            }).collect(),
+            knots
+                .iter()
+                .enumerate()
+                .map(|(i, k)| {
+                    let alex = k.alexander_polynomial();
+                    let det: f64 = alex
+                        .iter()
+                        .enumerate()
+                        .map(|(j, &c)| c as f64 * (-1.0f64).powi(j as i32))
+                        .sum();
+                    (i as f64, det.abs())
+                })
+                .collect(),
         );
         eprintln!("  Knot determinants: {} points", knot_seq.data.len());
 
@@ -1166,7 +1451,8 @@ mod tests {
                 max_complexity: 8,
                 seed: 42,
                 ..super::super::conjecture_engine::RegressorConfig::default()
-            });
+            },
+        );
 
         engine.observe(abc_seq);
         engine.observe(zeta_seq);
@@ -1177,7 +1463,10 @@ mod tests {
 
         eprintln!("\n  Conjectures discovered:");
         for c in engine.conjectures.iter().take(5) {
-            eprintln!("    {} ≈ {} (MSE={:.2e})", c.source, c.formula_str, c.training_mse);
+            eprintln!(
+                "    {} ≈ {} (MSE={:.2e})",
+                c.source, c.formula_str, c.training_mse
+            );
         }
 
         // Try cross-domain formula matching
@@ -1217,8 +1506,14 @@ mod tests {
         for &max_c in &scales {
             let dist = abc_quality_distribution(max_c, 1.0);
             let (a, b, r2) = fit_abc_decay(&dist.data);
-            eprintln!("  c ≤ {:6}: {} triples, q(n) ≈ 1 + {:.4}/n^{:.4} (R²={:.4})",
-                max_c, dist.data.len(), a, b, r2);
+            eprintln!(
+                "  c ≤ {:6}: {} triples, q(n) ≈ 1 + {:.4}/n^{:.4} (R²={:.4})",
+                max_c,
+                dist.data.len(),
+                a,
+                b,
+                r2
+            );
             if r2 > 0.8 {
                 exponents.push((max_c, b, r2));
             }
@@ -1229,7 +1524,8 @@ mod tests {
             let b_values: Vec<f64> = exponents.iter().map(|&(_, b, _)| b).collect();
             let b_mean = b_values.iter().sum::<f64>() / b_values.len() as f64;
             let b_std = (b_values.iter().map(|b| (b - b_mean).powi(2)).sum::<f64>()
-                / b_values.len() as f64).sqrt();
+                / b_values.len() as f64)
+                .sqrt();
 
             for &(scale, b, r2) in &exponents {
                 eprintln!("    c ≤ {:6}: B = {:.4} (R²={:.4})", scale, b, r2);
@@ -1238,8 +1534,14 @@ mod tests {
 
             if b_std < 0.1 * b_mean.abs() {
                 eprintln!("  >>> UNIVERSAL DECAY LAW DETECTED!");
-                eprintln!("  >>> q(rank) ≈ 1 + A/rank^{:.3} holds across scales", b_mean);
-                eprintln!("  >>> Coefficient of variation: {:.1}%", 100.0 * b_std / b_mean.abs());
+                eprintln!(
+                    "  >>> q(rank) ≈ 1 + A/rank^{:.3} holds across scales",
+                    b_mean
+                );
+                eprintln!(
+                    "  >>> Coefficient of variation: {:.1}%",
+                    100.0 * b_std / b_mean.abs()
+                );
             } else {
                 eprintln!("  Exponent varies across scales (not universal)");
                 eprintln!("  CV = {:.1}%", 100.0 * b_std / b_mean.abs());
@@ -1261,15 +1563,35 @@ mod tests {
         eprintln!("\n═══ EXPLORATION: CLASS NUMBER CORRESPONDENCES ═══\n");
 
         // Verify known class numbers first
-        let known = [(1, 1), (2, 1), (3, 1), (5, 2), (6, 2), (7, 1),
-                     (10, 2), (11, 1), (13, 2), (14, 4), (15, 2), (23, 3)];
+        let known = [
+            (1, 1),
+            (2, 1),
+            (3, 1),
+            (5, 2),
+            (6, 2),
+            (7, 1),
+            (10, 2),
+            (11, 1),
+            (13, 2),
+            (14, 4),
+            (15, 2),
+            (23, 3),
+        ];
         eprintln!("  Known class numbers (verification):");
         let mut all_correct = true;
         for &(d, expected) in &known {
             let h = class_number(d);
             let ok = h == expected;
-            if !ok { all_correct = false; }
-            eprintln!("    h(-{}) = {} (expected {}) {}", d, h, expected, if ok { "✓" } else { "✗" });
+            if !ok {
+                all_correct = false;
+            }
+            eprintln!(
+                "    h(-{}) = {} (expected {}) {}",
+                d,
+                h,
+                expected,
+                if ok { "✓" } else { "✗" }
+            );
         }
 
         if !all_correct {
@@ -1279,7 +1601,10 @@ mod tests {
 
         // Generate sequences
         let class_seq = observe_class_numbers(200);
-        eprintln!("\n  Class numbers computed: {} values", class_seq.data.len());
+        eprintln!(
+            "\n  Class numbers computed: {} values",
+            class_seq.data.len()
+        );
 
         // Generate comparison sequences
         let partition_seq = super::super::conjecture_engine::observe_partitions(50);
@@ -1294,7 +1619,8 @@ mod tests {
                 max_complexity: 12,
                 seed: 42,
                 ..super::super::conjecture_engine::RegressorConfig::default()
-            });
+            },
+        );
 
         engine.observe(class_seq.clone());
         engine.observe(partition_seq);
@@ -1306,24 +1632,38 @@ mod tests {
 
         // Add zeta zero spacings
         let zeros = find_zeta_zeros(14.0, 100.0, 0.1);
-        let spacings: Vec<(f64, f64)> = zeros.windows(2).enumerate()
+        let spacings: Vec<(f64, f64)> = zeros
+            .windows(2)
+            .enumerate()
             .map(|(i, w)| (i as f64, w[1] - w[0]))
             .collect();
-        engine.observe(ObservedSequence::new("zeta_spacings", MathDomain::Physics, spacings));
+        engine.observe(ObservedSequence::new(
+            "zeta_spacings",
+            MathDomain::Physics,
+            spacings,
+        ));
 
         // Discover
         engine.generate_conjectures(2);
         engine.verify_numerical();
 
         eprintln!("\n  CONJECTURES FOR CLASS NUMBERS:");
-        for c in engine.conjectures.iter().filter(|c| c.source.contains("class")) {
-            eprintln!("    h(d) ≈ {} (MSE={:.2e}, {:?})", c.formula_str, c.training_mse, c.status);
+        for c in engine
+            .conjectures
+            .iter()
+            .filter(|c| c.source.contains("class"))
+        {
+            eprintln!(
+                "    h(d) ≈ {} (MSE={:.2e}, {:?})",
+                c.formula_str, c.training_mse, c.status
+            );
         }
 
         // Cross-domain search: does h(d) correlate with anything unexpected?
         let cross = engine.discover_cross_domain_formulas(3.0);
         eprintln!("\n  CROSS-DOMAIN MATCHES (class numbers ↔ other sequences):");
-        let class_matches: Vec<_> = cross.iter()
+        let class_matches: Vec<_> = cross
+            .iter()
             .filter(|m| m.source_seq.contains("class") || m.target_seq.contains("class"))
             .collect();
 
@@ -1334,7 +1674,10 @@ mod tests {
             for m in &class_matches {
                 eprintln!("    >>> {}", m);
             }
-            eprintln!("\n    {} potential cross-domain bridges found!", class_matches.len());
+            eprintln!(
+                "\n    {} potential cross-domain bridges found!",
+                class_matches.len()
+            );
         }
 
         // Statistical analysis: what's the growth rate of h(d)?
@@ -1358,8 +1701,13 @@ mod tests {
         }
         let correlation = if sq_d_sum > 0.0 && h_sum > 0.0 {
             corr_sum / (sq_d_sum.sqrt() * h_sum.sqrt())
-        } else { 0.0 };
-        eprintln!("    Correlation with √d/ln(d): {:.4} (Siegel's theorem predicts ~1.0)", correlation);
+        } else {
+            0.0
+        };
+        eprintln!(
+            "    Correlation with √d/ln(d): {:.4} (Siegel's theorem predicts ~1.0)",
+            correlation
+        );
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -1377,14 +1725,25 @@ mod tests {
         eprintln!("  Models ranked by AIC (lower = better):\n");
         for (i, f) in fits.iter().enumerate() {
             let marker = if i == 0 { " ← BEST" } else { "" };
-            eprintln!("  #{}: {} — R²={:.4}, AIC={:.1}, RMS={:.4}, params={:?}{}",
-                i + 1, f.name, f.r_squared, f.aic, f.residual_rms, f.params, marker);
+            eprintln!(
+                "  #{}: {} — R²={:.4}, AIC={:.1}, RMS={:.4}, params={:?}{}",
+                i + 1,
+                f.name,
+                f.r_squared,
+                f.aic,
+                f.residual_rms,
+                f.params,
+                marker
+            );
         }
 
         let best = &fits[0];
         eprintln!("\n  VERDICT: Best model is '{}'", best.name);
         if best.name.contains("power_law") {
-            eprintln!("  >>> Power law IS the best fit (supports B ≈ {:.3})", best.params[1]);
+            eprintln!(
+                "  >>> Power law IS the best fit (supports B ≈ {:.3})",
+                best.params[1]
+            );
         } else {
             eprintln!("  >>> Power law is NOT the best fit — {} wins", best.name);
             eprintln!("  >>> The 'universal exponent' claim may be an artifact of model choice");
@@ -1403,12 +1762,20 @@ mod tests {
 
         for &max_c in &scales {
             let triples = search_abc_triples_sieved(max_c, 1.0);
-            let data: Vec<(f64, f64)> = triples.iter().enumerate()
+            let data: Vec<(f64, f64)> = triples
+                .iter()
+                .enumerate()
                 .map(|(i, t)| ((i + 1) as f64, t.quality))
                 .collect();
             let (a, b, r2) = fit_abc_decay(&data);
-            eprintln!("  c ≤ {:7}: {:4} triples, B = {:.4}, A = {:.4}, R² = {:.4}",
-                max_c, triples.len(), b, a, r2);
+            eprintln!(
+                "  c ≤ {:7}: {:4} triples, B = {:.4}, A = {:.4}, R² = {:.4}",
+                max_c,
+                triples.len(),
+                b,
+                a,
+                r2
+            );
             results.push((max_c, triples.len(), b, r2));
 
             if let Some(best) = triples.first() {
@@ -1424,7 +1791,10 @@ mod tests {
             let b_range = b_max - b_min;
             let b_mean = b_vals.iter().sum::<f64>() / b_vals.len() as f64;
 
-            eprintln!("  B range: [{:.4}, {:.4}] (spread = {:.4})", b_min, b_max, b_range);
+            eprintln!(
+                "  B range: [{:.4}, {:.4}] (spread = {:.4})",
+                b_min, b_max, b_range
+            );
             eprintln!("  B mean:  {:.4}", b_mean);
 
             if b_range < 0.1 {
@@ -1443,7 +1813,10 @@ mod tests {
         eprintln!("\n═══ RIGOROUS: BOOTSTRAP CI FOR EXPONENT B ═══\n");
 
         let dist = abc_quality_distribution(50000, 1.0);
-        eprintln!("  Data: {} triples with q > 1.0 for c ≤ 50000", dist.data.len());
+        eprintln!(
+            "  Data: {} triples with q > 1.0 for c ≤ 50000",
+            dist.data.len()
+        );
 
         let (b_mean, b_lower, b_upper) = bootstrap_exponent(&dist.data, 1000, 42);
         let ci_width = b_upper - b_lower;
@@ -1454,9 +1827,16 @@ mod tests {
         eprintln!("    CI width = {:.4}", ci_width);
 
         if ci_width < 0.2 {
-            eprintln!("\n  >>> TIGHT CI — exponent B = {:.3} ± {:.3} is robust", b_mean, ci_width / 2.0);
+            eprintln!(
+                "\n  >>> TIGHT CI — exponent B = {:.3} ± {:.3} is robust",
+                b_mean,
+                ci_width / 2.0
+            );
         } else if ci_width < 0.5 {
-            eprintln!("\n  Moderate CI — some uncertainty but B ≈ {:.2} is plausible", b_mean);
+            eprintln!(
+                "\n  Moderate CI — some uncertainty but B ≈ {:.2} is plausible",
+                b_mean
+            );
         } else {
             eprintln!("\n  WIDE CI — B is poorly determined, power law fit is uncertain");
         }
@@ -1491,12 +1871,29 @@ mod tests {
         let primes = {
             let max = 600usize;
             let mut is_p = vec![true; max + 1];
-            is_p[0] = false; if max > 0 { is_p[1] = false; }
-            for i in 2..=(max as f64).sqrt() as usize { if is_p[i] { let mut j = i*i; while j <= max { is_p[j] = false; j += i; } } }
-            (2..=max).filter(|&i| is_p[i]).map(|i| i as u64).collect::<Vec<u64>>()
+            is_p[0] = false;
+            if max > 0 {
+                is_p[1] = false;
+            }
+            for i in 2..=(max as f64).sqrt() as usize {
+                if is_p[i] {
+                    let mut j = i * i;
+                    while j <= max {
+                        is_p[j] = false;
+                        j += i;
+                    }
+                }
+            }
+            (2..=max)
+                .filter(|&i| is_p[i])
+                .map(|i| i as u64)
+                .collect::<Vec<u64>>()
         };
-        let prime_gaps: Vec<f64> = primes.windows(2).take(max_n)
-            .map(|w| (w[1] - w[0]) as f64).collect();
+        let prime_gaps: Vec<f64> = primes
+            .windows(2)
+            .take(max_n)
+            .map(|w| (w[1] - w[0]) as f64)
+            .collect();
 
         // 2. abc qualities (ranked)
         let abc = super::search_abc_triples(10000, 1.0);
@@ -1504,30 +1901,47 @@ mod tests {
 
         // 3. Partition counts p(n)
         let partitions: Vec<f64> = (1..=max_n)
-            .map(|n| super::super::conjecture_engine::observe_partitions(n).data.last()
-                .map(|&(_, y)| y).unwrap_or(0.0))
+            .map(|n| {
+                super::super::conjecture_engine::observe_partitions(n)
+                    .data
+                    .last()
+                    .map(|&(_, y)| y)
+                    .unwrap_or(0.0)
+            })
             .collect();
 
         // 4. Class numbers h(-d) for squarefree d
         let class_nums: Vec<f64> = (1..=200u64)
-            .filter(|&d| { let mut m = d; let mut p = 2u64; while p*p <= m { if m%(p*p)==0 { return false; } p+=1; } true })
+            .filter(|&d| {
+                let mut m = d;
+                let mut p = 2u64;
+                while p * p <= m {
+                    if m % (p * p) == 0 {
+                        return false;
+                    }
+                    p += 1;
+                }
+                true
+            })
             .take(max_n)
             .map(|d| super::class_number(d) as f64)
             .collect();
 
         // 5. Zeta zero spacings
         let zeros = super::find_zeta_zeros(14.0, 300.0, 0.05);
-        let zeta_spaces: Vec<f64> = zeros.windows(2).take(max_n)
-            .map(|w| w[1] - w[0]).collect();
+        let zeta_spaces: Vec<f64> = zeros.windows(2).take(max_n).map(|w| w[1] - w[0]).collect();
 
         // 6. Sato-Tate angles for 11a1
         let curve = super::super::langlands::curve_11a1();
         let st_data = curve.l_function_coefficients(600);
-        let sato_tate: Vec<f64> = st_data.iter().take(max_n)
+        let sato_tate: Vec<f64> = st_data
+            .iter()
+            .take(max_n)
             .map(|&(p, ap)| {
                 let norm = (ap as f64 / (2.0 * (p as f64).sqrt())).max(-1.0).min(1.0);
                 norm.acos()
-            }).collect();
+            })
+            .collect();
 
         let sequences: Vec<(&str, &[f64])> = vec![
             ("prime_gaps", &prime_gaps),
@@ -1539,11 +1953,17 @@ mod tests {
         ];
 
         // Compute Spearman rank correlation for every pair
-        eprintln!("  Sequences: {} (each up to {} values)\n", sequences.len(), max_n);
+        eprintln!(
+            "  Sequences: {} (each up to {} values)\n",
+            sequences.len(),
+            max_n
+        );
 
         // Header
         eprint!("  {:>12}", "");
-        for (name, _) in &sequences { eprint!(" {:>12}", &name[..name.len().min(12)]); }
+        for (name, _) in &sequences {
+            eprint!(" {:>12}", &name[..name.len().min(12)]);
+        }
         eprintln!();
 
         let mut significant_pairs = Vec::new();
@@ -1575,15 +1995,20 @@ mod tests {
             eprintln!("    None found (sequences are statistically independent)");
         } else {
             for (a, b, rho, n) in &significant_pairs {
-                let strength = if rho.abs() > 0.7 { "STRONG" }
-                    else if rho.abs() > 0.5 { "MODERATE" }
-                    else { "weak" };
+                let strength = if rho.abs() > 0.7 {
+                    "STRONG"
+                } else if rho.abs() > 0.5 {
+                    "MODERATE"
+                } else {
+                    "weak"
+                };
                 eprintln!("    {} ↔ {}: ρ = {:.4} ({}, n={})", a, b, rho, strength, n);
             }
         }
 
         // The key question: do any CROSS-DOMAIN pairs show significant correlation?
-        let cross_domain: Vec<_> = significant_pairs.iter()
+        let cross_domain: Vec<_> = significant_pairs
+            .iter()
             .filter(|(a, b, rho, _)| rho.abs() > 0.5 && a != b)
             .collect();
 
@@ -1608,14 +2033,21 @@ mod tests {
 
         // The correlation matrix from the previous test (hardcoded for reproducibility)
         // Rows/cols: prime_gaps, abc_quality, partitions, class_nums, zeta_spaces, sato_tate
-        let names = ["prime_gaps", "abc_quality", "partitions", "class_nums", "zeta_spaces", "sato_tate"];
+        let names = [
+            "prime_gaps",
+            "abc_quality",
+            "partitions",
+            "class_nums",
+            "zeta_spaces",
+            "sato_tate",
+        ];
         let corr: Vec<Vec<f64>> = vec![
-            vec![ 1.000, -0.507,  0.508,  0.308, -0.395, -0.029],
-            vec![-0.507,  1.000, -1.000, -0.617,  0.437,  0.017],
-            vec![ 0.508, -1.000,  1.000,  0.616, -0.437, -0.016],
-            vec![ 0.308, -0.617,  0.616,  1.000, -0.222, -0.092],
-            vec![-0.395,  0.437, -0.437, -0.222,  1.000, -0.076],
-            vec![-0.029,  0.017, -0.016, -0.092, -0.076,  1.000],
+            vec![1.000, -0.507, 0.508, 0.308, -0.395, -0.029],
+            vec![-0.507, 1.000, -1.000, -0.617, 0.437, 0.017],
+            vec![0.508, -1.000, 1.000, 0.616, -0.437, -0.016],
+            vec![0.308, -0.617, 0.616, 1.000, -0.222, -0.092],
+            vec![-0.395, 0.437, -0.437, -0.222, 1.000, -0.076],
+            vec![-0.029, 0.017, -0.016, -0.092, -0.076, 1.000],
         ];
 
         let n = names.len();
@@ -1644,7 +2076,10 @@ mod tests {
         }
 
         // Compute eigenvalues via the linear algebra module
-        let flat: Vec<f64> = laplacian.iter().flat_map(|row| row.iter().copied()).collect();
+        let flat: Vec<f64> = laplacian
+            .iter()
+            .flat_map(|row| row.iter().copied())
+            .collect();
         let mat = super::super::linear_algebra::HdcMatrix::new(flat, n, n);
         let (mut eigenvalues, eigenvectors, _) = mat.eigen_symmetric();
         eigenvalues.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
@@ -1656,11 +2091,21 @@ mod tests {
 
         // λ₁ should be ≈ 0 (connected graph)
         eprintln!("\n  STRUCTURAL ANALYSIS:");
-        eprintln!("    λ₁ = {:.6} (should be ≈ 0 for connected graph)", eigenvalues[0]);
+        eprintln!(
+            "    λ₁ = {:.6} (should be ≈ 0 for connected graph)",
+            eigenvalues[0]
+        );
 
         // λ₂ = algebraic connectivity (Fiedler value)
-        let fiedler_value = if eigenvalues.len() >= 2 { eigenvalues[1] } else { 0.0 };
-        eprintln!("    λ₂ = {:.6} (algebraic connectivity — Fiedler value)", fiedler_value);
+        let fiedler_value = if eigenvalues.len() >= 2 {
+            eigenvalues[1]
+        } else {
+            0.0
+        };
+        eprintln!(
+            "    λ₂ = {:.6} (algebraic connectivity — Fiedler value)",
+            fiedler_value
+        );
 
         if fiedler_value < 0.01 {
             eprintln!("    >>> Mathematics has DISCONNECTED ISLANDS (λ₂ ≈ 0)");
@@ -1688,12 +2133,19 @@ mod tests {
 
         // Simple approach: find the eigenvector closest to λ₂
         let (orig_evals, _, _) = mat.eigen_symmetric();
-        let mut eval_idx: Vec<(f64, usize)> = orig_evals.iter().enumerate()
-            .map(|(i, &v)| (v, i)).collect();
+        let mut eval_idx: Vec<(f64, usize)> = orig_evals
+            .iter()
+            .enumerate()
+            .map(|(i, &v)| (v, i))
+            .collect();
         eval_idx.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
 
         // The second-smallest eigenvalue's original index
-        let fiedler_col = if eval_idx.len() >= 2 { eval_idx[1].1 } else { 0 };
+        let fiedler_col = if eval_idx.len() >= 2 {
+            eval_idx[1].1
+        } else {
+            0
+        };
 
         let mut cluster_a = Vec::new();
         let mut cluster_b = Vec::new();
@@ -1701,15 +2153,24 @@ mod tests {
         for i in 0..n {
             let component = eigenvectors.get(i, fiedler_col);
             let cluster = if component >= 0.0 { "A (+)" } else { "B (-)" };
-            eprintln!("    {:>12}: {:+.4}  [Cluster {}]", names[i], component, cluster);
-            if component >= 0.0 { cluster_a.push(names[i]); }
-            else { cluster_b.push(names[i]); }
+            eprintln!(
+                "    {:>12}: {:+.4}  [Cluster {}]",
+                names[i], component, cluster
+            );
+            if component >= 0.0 {
+                cluster_a.push(names[i]);
+            } else {
+                cluster_b.push(names[i]);
+            }
         }
 
         eprintln!("\n  ═══ THE MAP OF MATHEMATICS ═══");
         eprintln!("    Cluster A: {}", cluster_a.join(", "));
         eprintln!("    Cluster B: {}", cluster_b.join(", "));
-        eprintln!("    Bridge strength (algebraic connectivity): {:.4}", fiedler_value);
+        eprintln!(
+            "    Bridge strength (algebraic connectivity): {:.4}",
+            fiedler_value
+        );
 
         // Number of near-zero eigenvalues = number of connected components
         let n_components = eigenvalues.iter().filter(|&&e| e.abs() < 0.01).count();
@@ -1722,7 +2183,10 @@ mod tests {
             eprintln!("    >>> Mathematics has {} isolated islands", n_components);
         }
 
-        assert!(eigenvalues[0].abs() < 0.1, "smallest eigenvalue should be near 0");
+        assert!(
+            eigenvalues[0].abs() < 0.1,
+            "smallest eigenvalue should be near 0"
+        );
     }
 
     /// GUMBEL DISTRIBUTION TEST: Do abc qualities follow extreme value statistics?
@@ -1777,7 +2241,10 @@ mod tests {
             eprintln!("    >>> abc qualities are CONSISTENT with extreme value statistics.");
             eprintln!("    >>> This connects Diophantine analysis to statistical mechanics.");
         } else {
-            eprintln!("    Gumbel REJECTED (KS = {:.4} > critical {:.4})", ks_stat, ks_critical);
+            eprintln!(
+                "    Gumbel REJECTED (KS = {:.4} > critical {:.4})",
+                ks_stat, ks_critical
+            );
             eprintln!("    abc qualities do NOT follow a simple Gumbel distribution.");
 
             // Try: maybe it's a Gumbel for the EXCESS q - 1?
@@ -1799,7 +2266,10 @@ mod tests {
             }
 
             eprintln!("\n    Testing EXCESS (q-1) against Gumbel:");
-            eprintln!("    KS for excess: {:.4} (critical: {:.4})", ks2, ks_critical);
+            eprintln!(
+                "    KS for excess: {:.4} (critical: {:.4})",
+                ks2, ks_critical
+            );
             if ks2 < ks_critical {
                 eprintln!("    >>> Excess q-1 IS Gumbel-distributed!");
             }
@@ -1821,8 +2291,15 @@ mod tests {
             let mid = (lo + hi) / 2.0;
             let z = (mid - mu) / beta;
             let gumbel_pdf = (1.0 / beta) * (-z).exp() * (-(-z).exp()).exp();
-            let match_c = if (density - gumbel_pdf).abs() < gumbel_pdf.max(0.1) * 0.5 { "~" } else { " " };
-            eprintln!("    [{:.3},{:.3}) | {:.4}  | {:.4}  {}", lo, hi, density, gumbel_pdf, match_c);
+            let match_c = if (density - gumbel_pdf).abs() < gumbel_pdf.max(0.1) * 0.5 {
+                "~"
+            } else {
+                " "
+            };
+            eprintln!(
+                "    [{:.3},{:.3}) | {:.4}  | {:.4}  {}",
+                lo, hi, density, gumbel_pdf, match_c
+            );
         }
     }
 
@@ -1852,20 +2329,29 @@ mod tests {
         let partitions: Vec<f64> = (1..=max_n)
             .map(|n| {
                 super::super::conjecture_engine::observe_partitions(n)
-                    .data.last().map(|&(_, y)| y).unwrap_or(0.0)
+                    .data
+                    .last()
+                    .map(|&(_, y)| y)
+                    .unwrap_or(0.0)
             })
             .collect();
 
         let squarefree: Vec<u64> = (1..=500u64)
             .filter(|&d| {
                 let mut p = 2u64;
-                while p * p <= d { if d % (p * p) == 0 { return false; } p += 1; }
+                while p * p <= d {
+                    if d % (p * p) == 0 {
+                        return false;
+                    }
+                    p += 1;
+                }
                 true
             })
             .take(max_n)
             .collect();
 
-        let class_nums: Vec<f64> = squarefree.iter()
+        let class_nums: Vec<f64> = squarefree
+            .iter()
             .map(|&d| super::class_number(d) as f64)
             .collect();
 
@@ -1879,20 +2365,25 @@ mod tests {
 
         // Detrend: fit log(y) = a + b·log(x) (power-law trend), subtract
         let detrend = |seq: &[f64]| -> Vec<f64> {
-            let log_data: Vec<(f64, f64)> = seq.iter().enumerate()
+            let log_data: Vec<(f64, f64)> = seq
+                .iter()
+                .enumerate()
                 .filter(|(_, &y)| y > 0.0)
                 .map(|(i, &y)| ((i as f64 + 1.0).ln(), y.ln()))
                 .collect();
             let (slope, intercept, _) = super::linear_regression(&log_data);
 
-            seq.iter().enumerate().map(|(i, &y)| {
-                if y > 0.0 {
-                    let predicted = (intercept + slope * (i as f64 + 1.0).ln()).exp();
-                    y - predicted // residual
-                } else {
-                    0.0
-                }
-            }).collect()
+            seq.iter()
+                .enumerate()
+                .map(|(i, &y)| {
+                    if y > 0.0 {
+                        let predicted = (intercept + slope * (i as f64 + 1.0).ln()).exp();
+                        y - predicted // residual
+                    } else {
+                        0.0
+                    }
+                })
+                .collect()
         };
 
         let part_residuals = detrend(partitions);
@@ -1904,9 +2395,7 @@ mod tests {
 
         // Also try: rank-difference correlation (remove monotonic trend entirely)
         // by computing first differences Δy = y_{n+1} - y_n and correlating those
-        let diff = |seq: &[f64]| -> Vec<f64> {
-            seq.windows(2).map(|w| w[1] - w[0]).collect()
-        };
+        let diff = |seq: &[f64]| -> Vec<f64> { seq.windows(2).map(|w| w[1] - w[0]).collect() };
 
         let part_diffs = diff(partitions);
         let class_diffs = diff(class_nums);
@@ -1916,22 +2405,37 @@ mod tests {
 
         eprintln!("\n  VERDICT:");
         if detrended_rho.abs() > 0.3 {
-            eprintln!("  >>> REAL STRUCTURE: detrended ρ = {:.4} survives trend removal", detrended_rho);
+            eprintln!(
+                "  >>> REAL STRUCTURE: detrended ρ = {:.4} survives trend removal",
+                detrended_rho
+            );
             eprintln!("  >>> Class numbers and partitions share arithmetic structure");
             eprintln!("  >>> beyond their common growth rate.");
         } else if detrended_rho.abs() > 0.15 {
-            eprintln!("  Weak residual correlation ({:.4}) — suggestive but not conclusive", detrended_rho);
+            eprintln!(
+                "  Weak residual correlation ({:.4}) — suggestive but not conclusive",
+                detrended_rho
+            );
         } else {
             eprintln!("  >>> SPURIOUS: detrended ρ = {:.4} ≈ 0", detrended_rho);
-            eprintln!("  >>> The raw ρ = {:.4} was entirely due to shared growth rate.", raw_rho);
+            eprintln!(
+                "  >>> The raw ρ = {:.4} was entirely due to shared growth rate.",
+                raw_rho
+            );
             eprintln!("  >>> No deep arithmetic connection detected.");
         }
 
         if diff_rho.abs() > 0.2 {
-            eprintln!("  First-difference correlation ({:.4}) suggests local fluctuations", diff_rho);
+            eprintln!(
+                "  First-difference correlation ({:.4}) suggests local fluctuations",
+                diff_rho
+            );
             eprintln!("  in class numbers track local fluctuations in partitions.");
         } else {
-            eprintln!("  First-differences uncorrelated ({:.4}) — growth fluctuations independent.", diff_rho);
+            eprintln!(
+                "  First-differences uncorrelated ({:.4}) — growth fluctuations independent.",
+                diff_rho
+            );
         }
     }
 
@@ -1956,58 +2460,90 @@ mod tests {
         let primes = {
             let max = 600usize;
             let mut is_p = vec![true; max + 1];
-            is_p[0] = false; if max > 0 { is_p[1] = false; }
-            for i in 2..=(max as f64).sqrt() as usize {
-                if is_p[i] { let mut j = i*i; while j <= max { is_p[j] = false; j += i; } }
+            is_p[0] = false;
+            if max > 0 {
+                is_p[1] = false;
             }
-            (2..=max).filter(|&i| is_p[i]).map(|i| i as u64).collect::<Vec<u64>>()
+            for i in 2..=(max as f64).sqrt() as usize {
+                if is_p[i] {
+                    let mut j = i * i;
+                    while j <= max {
+                        is_p[j] = false;
+                        j += i;
+                    }
+                }
+            }
+            (2..=max)
+                .filter(|&i| is_p[i])
+                .map(|i| i as u64)
+                .collect::<Vec<u64>>()
         };
-        let prime_gaps: Vec<f64> = primes.windows(2).take(max_n)
-            .map(|w| (w[1] - w[0]) as f64).collect();
+        let prime_gaps: Vec<f64> = primes
+            .windows(2)
+            .take(max_n)
+            .map(|w| (w[1] - w[0]) as f64)
+            .collect();
 
         let abc = super::search_abc_triples(10000, 1.0);
         let abc_quals: Vec<f64> = abc.iter().take(max_n).map(|t| t.quality).collect();
 
         let partitions: Vec<f64> = (1..=max_n)
-            .map(|n| super::super::conjecture_engine::observe_partitions(n)
-                .data.last().map(|&(_, y)| y).unwrap_or(0.0))
+            .map(|n| {
+                super::super::conjecture_engine::observe_partitions(n)
+                    .data
+                    .last()
+                    .map(|&(_, y)| y)
+                    .unwrap_or(0.0)
+            })
             .collect();
 
         let squarefree: Vec<u64> = (1..=500u64)
             .filter(|&d| {
                 let mut p = 2u64;
-                while p * p <= d { if d % (p * p) == 0 { return false; } p += 1; }
+                while p * p <= d {
+                    if d % (p * p) == 0 {
+                        return false;
+                    }
+                    p += 1;
+                }
                 true
             })
             .take(max_n)
             .collect();
-        let class_nums: Vec<f64> = squarefree.iter()
+        let class_nums: Vec<f64> = squarefree
+            .iter()
             .map(|&d| super::class_number(d) as f64)
             .collect();
 
         let zeros = super::find_zeta_zeros(14.0, 300.0, 0.05);
-        let zeta_spaces: Vec<f64> = zeros.windows(2).take(max_n)
-            .map(|w| w[1] - w[0]).collect();
+        let zeta_spaces: Vec<f64> = zeros.windows(2).take(max_n).map(|w| w[1] - w[0]).collect();
 
         // Detrending function: subtract power-law fit in log-log space
         let detrend = |seq: &[f64]| -> Vec<f64> {
-            let log_data: Vec<(f64, f64)> = seq.iter().enumerate()
+            let log_data: Vec<(f64, f64)> = seq
+                .iter()
+                .enumerate()
                 .filter(|(_, &y)| y > 0.0)
                 .map(|(i, &y)| ((i as f64 + 1.0).ln(), y.ln()))
                 .collect();
-            if log_data.len() < 3 { return seq.to_vec(); }
+            if log_data.len() < 3 {
+                return seq.to_vec();
+            }
             let (slope, intercept, _) = super::linear_regression(&log_data);
-            seq.iter().enumerate().map(|(i, &y)| {
-                if y > 0.0 {
-                    y - (intercept + slope * (i as f64 + 1.0).ln()).exp()
-                } else { 0.0 }
-            }).collect()
+            seq.iter()
+                .enumerate()
+                .map(|(i, &y)| {
+                    if y > 0.0 {
+                        y - (intercept + slope * (i as f64 + 1.0).ln()).exp()
+                    } else {
+                        0.0
+                    }
+                })
+                .collect()
         };
 
         // First differences
-        let diff = |seq: &[f64]| -> Vec<f64> {
-            seq.windows(2).map(|w| w[1] - w[0]).collect()
-        };
+        let diff = |seq: &[f64]| -> Vec<f64> { seq.windows(2).map(|w| w[1] - w[0]).collect() };
 
         // All named sequences
         let seqs: Vec<(&str, Vec<f64>)> = vec![
@@ -2019,18 +2555,25 @@ mod tests {
         ];
 
         // Test all pairs with raw |ρ| > 0.3
-        eprintln!("  {:>14} ↔ {:<14} | raw ρ  | detrend | Δ-diff | verdict", "seq A", "seq B");
+        eprintln!(
+            "  {:>14} ↔ {:<14} | raw ρ  | detrend | Δ-diff | verdict",
+            "seq A", "seq B"
+        );
         eprintln!("  {}", "-".repeat(78));
 
         let mut any_survived = false;
 
         for i in 0..seqs.len() {
-            for j in (i+1)..seqs.len() {
+            for j in (i + 1)..seqs.len() {
                 let n = seqs[i].1.len().min(seqs[j].1.len());
-                if n < 10 { continue; }
+                if n < 10 {
+                    continue;
+                }
 
                 let raw = spearman_correlation(&seqs[i].1[..n], &seqs[j].1[..n]);
-                if raw.abs() < 0.3 { continue; } // only test significant pairs
+                if raw.abs() < 0.3 {
+                    continue;
+                } // only test significant pairs
 
                 let dt_a = detrend(&seqs[i].1[..n]);
                 let dt_b = detrend(&seqs[j].1[..n]);
@@ -2050,8 +2593,10 @@ mod tests {
                     "SPURIOUS"
                 };
 
-                eprintln!("  {:>14} ↔ {:<14} | {:+.3} | {:+.4}  | {:+.4} | {}",
-                    seqs[i].0, seqs[j].0, raw, detrended, diff_rho, verdict);
+                eprintln!(
+                    "  {:>14} ↔ {:<14} | {:+.3} | {:+.4}  | {:+.4} | {}",
+                    seqs[i].0, seqs[j].0, raw, detrended, diff_rho, verdict
+                );
             }
         }
 
@@ -2094,8 +2639,13 @@ mod tests {
 
         // Real data
         let partitions: Vec<f64> = (1..=max_n)
-            .map(|n| super::super::conjecture_engine::observe_partitions(n)
-                .data.last().map(|&(_, y)| y).unwrap_or(0.0))
+            .map(|n| {
+                super::super::conjecture_engine::observe_partitions(n)
+                    .data
+                    .last()
+                    .map(|&(_, y)| y)
+                    .unwrap_or(0.0)
+            })
             .collect();
         let abc = super::search_abc_triples(10000, 1.0);
         let abc_quals: Vec<f64> = abc.iter().take(max_n).map(|t| t.quality).collect();
@@ -2105,17 +2655,26 @@ mod tests {
 
         // Detrending function
         let detrend = |seq: &[f64]| -> Vec<f64> {
-            let log_data: Vec<(f64, f64)> = seq.iter().enumerate()
+            let log_data: Vec<(f64, f64)> = seq
+                .iter()
+                .enumerate()
                 .filter(|(_, &y)| y > 0.0)
                 .map(|(i, &y)| ((i as f64 + 1.0).ln(), y.ln()))
                 .collect();
-            if log_data.len() < 3 { return seq.to_vec(); }
+            if log_data.len() < 3 {
+                return seq.to_vec();
+            }
             let (slope, intercept, _) = super::linear_regression(&log_data);
-            seq.iter().enumerate().map(|(i, &y)| {
-                if y > 0.0 {
-                    y - (intercept + slope * (i as f64 + 1.0).ln()).exp()
-                } else { 0.0 }
-            }).collect()
+            seq.iter()
+                .enumerate()
+                .map(|(i, &y)| {
+                    if y > 0.0 {
+                        y - (intercept + slope * (i as f64 + 1.0).ln()).exp()
+                    } else {
+                        0.0
+                    }
+                })
+                .collect()
         };
 
         // Real correlation (baseline to beat)
@@ -2135,7 +2694,9 @@ mod tests {
             let mut shuffled: Vec<f64> = abc_quals.to_vec();
             // Fisher-Yates shuffle
             for i in (1..n).rev() {
-                rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                rng = rng
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1442695040888963407);
                 let j = (rng >> 33) as usize % (i + 1);
                 shuffled.swap(i, j);
             }
@@ -2143,9 +2704,16 @@ mod tests {
             shuffled_rhos.push(spearman_correlation(&real_dt_p, &dt_shuffled));
         }
         let shuffle_mean: f64 = shuffled_rhos.iter().sum::<f64>() / shuffled_rhos.len() as f64;
-        let shuffle_std: f64 = (shuffled_rhos.iter().map(|r| (r - shuffle_mean).powi(2)).sum::<f64>()
-            / shuffled_rhos.len() as f64).sqrt();
-        eprintln!("    Shuffled ρ mean = {:.4} ± {:.4} (should be ≈ 0)", shuffle_mean, shuffle_std);
+        let shuffle_std: f64 = (shuffled_rhos
+            .iter()
+            .map(|r| (r - shuffle_mean).powi(2))
+            .sum::<f64>()
+            / shuffled_rhos.len() as f64)
+            .sqrt();
+        eprintln!(
+            "    Shuffled ρ mean = {:.4} ± {:.4} (should be ≈ 0)",
+            shuffle_mean, shuffle_std
+        );
         let z_shuffle = (real_rho - shuffle_mean).abs() / shuffle_std.max(1e-6);
         eprintln!("    Real ρ is {:.2} std devs from shuffle mean", z_shuffle);
 
@@ -2155,36 +2723,53 @@ mod tests {
         eprintln!("\n  TEST 2: Random monotonic sequence with similar growth");
         let mut random_rhos = Vec::new();
         for _ in 0..20 {
-            let mut random_seq: Vec<f64> = (0..n).map(|i| {
-                rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
-                let noise = ((rng >> 33) as f64 / u32::MAX as f64 - 0.5) * 0.1;
-                // Mimic abc quality decay: 1 + 0.5 * exp(-0.03 * i) + noise
-                1.0 + 0.5 * (-0.03 * i as f64).exp() + noise
-            }).collect();
+            let mut random_seq: Vec<f64> = (0..n)
+                .map(|i| {
+                    rng = rng
+                        .wrapping_mul(6364136223846793005)
+                        .wrapping_add(1442695040888963407);
+                    let noise = ((rng >> 33) as f64 / u32::MAX as f64 - 0.5) * 0.1;
+                    // Mimic abc quality decay: 1 + 0.5 * exp(-0.03 * i) + noise
+                    1.0 + 0.5 * (-0.03 * i as f64).exp() + noise
+                })
+                .collect();
             // Sort descending to mimic ranked quality
             random_seq.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
             let dt_rand = detrend(&random_seq);
             random_rhos.push(spearman_correlation(&real_dt_p, &dt_rand));
         }
         let random_mean: f64 = random_rhos.iter().sum::<f64>() / random_rhos.len() as f64;
-        let random_std: f64 = (random_rhos.iter().map(|r| (r - random_mean).powi(2)).sum::<f64>()
-            / random_rhos.len() as f64).sqrt();
-        eprintln!("    Random-seq ρ mean = {:.4} ± {:.4}", random_mean, random_std);
+        let random_std: f64 = (random_rhos
+            .iter()
+            .map(|r| (r - random_mean).powi(2))
+            .sum::<f64>()
+            / random_rhos.len() as f64)
+            .sqrt();
+        eprintln!(
+            "    Random-seq ρ mean = {:.4} ± {:.4}",
+            random_mean, random_std
+        );
         let z_random = (real_rho - random_mean).abs() / random_std.max(1e-6);
-        eprintln!("    Real ρ is {:.2} std devs from random-seq mean", z_random);
+        eprintln!(
+            "    Real ρ is {:.2} std devs from random-seq mean",
+            z_random
+        );
 
         // ── Test 3: Alternative trend models ───────────────────────────
         eprintln!("\n  TEST 3: Alternative trend models");
 
         // 3a: Linear trend removal (not power law)
         let linear_detrend = |seq: &[f64]| -> Vec<f64> {
-            let data: Vec<(f64, f64)> = seq.iter().enumerate()
+            let data: Vec<(f64, f64)> = seq
+                .iter()
+                .enumerate()
                 .map(|(i, &y)| (i as f64 + 1.0, y))
                 .collect();
             let (slope, intercept, _) = super::linear_regression(&data);
-            seq.iter().enumerate().map(|(i, &y)| {
-                y - (intercept + slope * (i as f64 + 1.0))
-            }).collect()
+            seq.iter()
+                .enumerate()
+                .map(|(i, &y)| y - (intercept + slope * (i as f64 + 1.0)))
+                .collect()
         };
         let lin_p = linear_detrend(partitions);
         let lin_a = linear_detrend(abc_quals);
@@ -2193,7 +2778,9 @@ mod tests {
 
         // 3b: Simple ratio — y_i / y_{i-1} (local growth rate)
         let ratio_seq = |seq: &[f64]| -> Vec<f64> {
-            seq.windows(2).map(|w| if w[0].abs() > 1e-10 { w[1] / w[0] } else { 0.0 }).collect()
+            seq.windows(2)
+                .map(|w| if w[0].abs() > 1e-10 { w[1] / w[0] } else { 0.0 })
+                .collect()
         };
         let rat_p = ratio_seq(partitions);
         let rat_a = ratio_seq(abc_quals);
@@ -2221,14 +2808,26 @@ mod tests {
             eprintln!("  >>> REAL: abc↔partitions detrended correlation is GENUINE.");
             eprintln!("      The local fluctuations are truly linked.");
         } else if !random_ok && random_mean.abs() > 0.4 {
-            eprintln!("  >>> ARTIFACT: random sequences also show ρ ≈ {:.2}", random_mean);
+            eprintln!(
+                "  >>> ARTIFACT: random sequences also show ρ ≈ {:.2}",
+                random_mean
+            );
             eprintln!("      The detrending procedure INDUCES the correlation.");
-            eprintln!("      The abc↔partitions ρ = {:.2} is not mathematically real.", real_rho);
+            eprintln!(
+                "      The abc↔partitions ρ = {:.2} is not mathematically real.",
+                real_rho
+            );
         } else {
             eprintln!("  >>> INCONCLUSIVE: signals mixed.");
             eprintln!("      real ρ = {:.4}", real_rho);
-            eprintln!("      shuffle baseline = {:.4} ± {:.4}", shuffle_mean, shuffle_std);
-            eprintln!("      random baseline  = {:.4} ± {:.4}", random_mean, random_std);
+            eprintln!(
+                "      shuffle baseline = {:.4} ± {:.4}",
+                shuffle_mean, shuffle_std
+            );
+            eprintln!(
+                "      random baseline  = {:.4} ± {:.4}",
+                random_mean, random_std
+            );
         }
     }
 }

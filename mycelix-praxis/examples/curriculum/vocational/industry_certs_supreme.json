@@ -1,0 +1,137 @@
+{
+  "metadata": {
+    "title": "Supreme Professional Seed: The Final Roster",
+    "framework": "Global Industry Mesh",
+    "source": "https://mycelix.org/certs-supreme",
+    "grade_level": "Professional",
+    "subject_area": "Multi-Sector",
+    "domain": "Professional Certification",
+    "version": "1.0",
+    "total_standards": 12,
+    "domains": [
+      "Marketing",
+      "Human Resources",
+      "Construction",
+      "Automotive",
+      "Pharmacy"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Ensuring 100% coverage of reputable global professional paths."
+  },
+  "nodes": [
+    {
+      "id": "CERT-MKT-GADS",
+      "title": "Google Ads Search Certification",
+      "description": "Designing and optimizing Google Search campaigns. Keyword research, bidding strategies, and performance tracking. Mapping semantic reach to digital marketing standards.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Marketing",
+      "subdomain": "Certification Bridge",
+      "tags": ["marketing", "google", "ads", "digital-business"],
+      "estimated_hours": 30,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Social Studies"
+    },
+    {
+      "id": "CERT-HR-SHRM",
+      "title": "SHRM Certified Professional (SHRM-CP)",
+      "description": "HR expertise: Leadership, Navigation, Ethical Practice, and Relationship Management. Mapping Ubuntu collective psychology to professional HR standards.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Human Resources",
+      "subdomain": "Certification Bridge",
+      "tags": ["hr", "management", "leadership", "ethics"],
+      "estimated_hours": 180,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Analyze",
+      "subject_area": "Humanities"
+    },
+    {
+      "id": "CERT-CON-NCCER",
+      "title": "NCCER Core: Introduction to Basic Construction",
+      "description": "Basic safety, construction math, hand tools, power tools, blueprints, and rigging. The foundational standard for all craft trades.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Construction",
+      "subdomain": "Certification Bridge",
+      "tags": ["construction", "safety", "trades", "tools"],
+      "estimated_hours": 80,
+      "grade_levels": ["Vocational"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "CERT-HLTH-PTCB",
+      "title": "PTCB Pharmacy Technician (CPhT)",
+      "description": "Medication safety, pharmacy law, and quality assurance. Linking phytochemistry and bioregional vitality to clinical pharmacy standards.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Pharmacy",
+      "subdomain": "Certification Bridge",
+      "tags": ["healthcare", "pharmacy", "medical", "safety"],
+      "estimated_hours": 120,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Health Sciences"
+    },
+    {
+      "id": "CERT-AUTO-ASE",
+      "title": "ASE G1: Maintenance and Light Repair",
+      "description": "Automotive service excellence. Engine systems, automatic transmission, manual drive train, suspension, brakes, and electrical. Linked to the Mk0 Motor Teardown track.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Automotive",
+      "subdomain": "Certification Bridge",
+      "tags": ["automotive", "mechanics", "engineering", "standard"],
+      "estimated_hours": 90,
+      "grade_levels": ["Vocational"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "CERT-LOG-CIPS",
+      "title": "CIPS Level 2 Certificate: Procurement & Supply",
+      "description": "Core principles of sourcing and supply chain. Understanding the value of procurement in decentralized economies. Linked to the Mycelial Oracle track.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Logistics",
+      "subdomain": "Certification Bridge",
+      "tags": ["supply-chain", "procurement", "logistics", "management"],
+      "estimated_hours": 60,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Understand",
+      "subject_area": "Social Studies"
+    }
+  ],
+  "edges": [
+    {
+      "from": "HUM-PSY-101",
+      "to": "CERT-HR-SHRM",
+      "edge_type": "Recommended",
+      "strength_permille": 700,
+      "rationale": "Sovereign psychology provides the foundation for ethical HR leadership."
+    },
+    {
+      "from": "VOC-000-S",
+      "to": "CERT-CON-NCCER",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Mk0 safety training is a direct prerequisite for basic construction standards."
+    },
+    {
+      "from": "VITA-301",
+      "to": "CERT-HLTH-PTCB",
+      "edge_type": "Recommended",
+      "strength_permille": 800,
+      "rationale": "Applied phytochemistry provides the chemical intuition for professional pharmacy technician work."
+    },
+    {
+      "from": "VOC-001",
+      "to": "CERT-AUTO-ASE",
+      "edge_type": "Recommended",
+      "strength_permille": 600,
+      "rationale": "Industrial motor teardown is the perfect introduction to automotive light repair."
+    }
+  ]
+}

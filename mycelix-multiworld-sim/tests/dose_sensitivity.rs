@@ -7,11 +7,16 @@
 //! broader 4-dose × 3-seed sweep lives in
 //! `examples/dose_sensitivity_sweep.rs`.
 
-use mycelix_multiworld_sim::MultiWorldSimulator;
 use mycelix_multiworld_sim::config::{PolicyConfig, SimulationConfig};
 use mycelix_multiworld_sim::red_team::AdversarialStrategy;
+use mycelix_multiworld_sim::MultiWorldSimulator;
 
-fn run(seed: u64, years: u32, phase2: bool, per_strategy: usize) -> mycelix_multiworld_sim::report::CivilizationReport {
+fn run(
+    seed: u64,
+    years: u32,
+    phase2: bool,
+    per_strategy: usize,
+) -> mycelix_multiworld_sim::report::CivilizationReport {
     let mut config = SimulationConfig::default_150_year();
     config.total_ticks = years * 12;
     config.seed = seed;

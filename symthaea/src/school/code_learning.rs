@@ -70,6 +70,8 @@ pub struct LessonOutcome {
     pub objective_id: String,
     /// The generated source code
     pub source: String,
+    /// Whether execution was simulated rather than actually compiled/tested
+    pub simulated_execution: bool,
     /// Whether the code compiled
     pub compiled: bool,
     /// Tests passed count
@@ -103,12 +105,12 @@ pub struct LessonOutcome {
 impl LessonOutcome {
     /// Whether the lesson was fully successful
     pub fn is_success(&self) -> bool {
-        self.compiled && self.tests_failed == 0
+        !self.simulated_execution && self.compiled && self.tests_failed == 0
     }
 
     /// Mastery signal: 1.0 for perfect, scaled down for partial success
     pub fn mastery_signal(&self) -> f32 {
-        if !self.compiled {
+        if self.simulated_execution || !self.compiled {
             return 0.0;
         }
         let total_tests = self.tests_passed + self.tests_failed;
@@ -215,6 +217,8 @@ impl Default for MetabolicBudget {
 pub struct SessionSummary {
     /// Total lessons attempted
     pub lessons_attempted: usize,
+    /// Lessons whose execution was simulated rather than actually compiled/tested
+    pub simulated_lessons: usize,
     /// Lessons that compiled
     pub lessons_compiled: usize,
     /// Lessons where all tests passed
@@ -242,6 +246,14 @@ pub struct SessionSummary {
 }
 
 impl SessionSummary {
+    /// Fraction of lessons that were simulated rather than actually verified.
+    pub fn simulated_rate(&self) -> f32 {
+        if self.lessons_attempted == 0 {
+            return 0.0;
+        }
+        self.simulated_lessons as f32 / self.lessons_attempted as f32 * 100.0
+    }
+
     /// Compile rate as a percentage
     pub fn compile_rate(&self) -> f32 {
         if self.lessons_attempted == 0 {
@@ -998,6 +1010,11 @@ impl CodeLearningEngine {
         }
     }
 
+    /// Whether this engine can perform real compilation and test execution.
+    pub fn supports_real_execution(&self) -> bool {
+        self.executor.supports_real_execution()
+    }
+
     /// Set a coding experience store for persistent error/fix tracking.
     pub fn with_experience_store(
         mut self,
@@ -1090,8 +1107,16 @@ impl CodeLearningEngine {
         // 4. Execute and auto-fix retry loop
         let mut retries = 0;
         let mut exec_result = self.execute_lesson(&source, lesson.test_source.as_deref());
+        let mut simulated_execution = false;
+        if exec_result.simulated {
+            simulated_execution = true;
+            exec_result = Self::mark_simulated_execution_failed(exec_result);
+        }
 
         while !exec_result.compiled && retries < MAX_RETRIES {
+            if simulated_execution {
+                break;
+            }
             // Item #3: Track errors before attempting fix
             let fix_applied = try_auto_fix(&source, &exec_result.compile_errors);
             // Item #3: Track errors (fix_hint is "auto-fix applied" if a fix was found)
@@ -1117,13 +1142,22 @@ impl CodeLearningEngine {
                 retries += 1;
                 energy_spent += ENERGY_AUTO_FIX;
                 exec_result = self.execute_lesson(&source, lesson.test_source.as_deref());
+                if exec_result.simulated {
+                    simulated_execution = true;
+                    exec_result = Self::mark_simulated_execution_failed(exec_result);
+                    break;
+                }
             } else {
                 break;
             }
         }
 
         // 5. If still failing and we have LLM, retry with error feedback
-        if !exec_result.compiled && self.llm_prompt_fn.is_some() && self.budget.can_afford_llm() {
+        if !simulated_execution
+            && !exec_result.compiled
+            && self.llm_prompt_fn.is_some()
+            && self.budget.can_afford_llm()
+        {
             while !exec_result.compiled && llm_retries < MAX_LLM_RETRIES {
                 if let Some(llm_source) =
                     self.try_llm_generation(&lesson.spec, &exec_result.compile_errors)
@@ -1133,6 +1167,11 @@ impl CodeLearningEngine {
                     llm_retries += 1;
                     energy_spent += ENERGY_LLM_RETRY;
                     exec_result = self.execute_lesson(&source, lesson.test_source.as_deref());
+                    if exec_result.simulated {
+                        simulated_execution = true;
+                        exec_result = Self::mark_simulated_execution_failed(exec_result);
+                        break;
+                    }
 
                     // Also try auto-fix on LLM output
                     if !exec_result.compiled {
@@ -1141,6 +1180,11 @@ impl CodeLearningEngine {
                             energy_spent += ENERGY_AUTO_FIX;
                             exec_result =
                                 self.execute_lesson(&source, lesson.test_source.as_deref());
+                            if exec_result.simulated {
+                                simulated_execution = true;
+                                exec_result = Self::mark_simulated_execution_failed(exec_result);
+                                break;
+                            }
                         }
                     }
                 } else {
@@ -1153,12 +1197,13 @@ impl CodeLearningEngine {
         self.budget.spend(energy_spent);
 
         // 6. Build outcome
-        let distillation_eligible = exec_result.compiled
+        let distillation_eligible = !simulated_execution
+            && exec_result.compiled
             && exec_result.tests_failed == 0
             && generated.plan_coverage >= MIN_PLAN_COVERAGE;
 
         // Item #1: Compute actual quality and reality-check the prediction
-        let actual_quality = if !exec_result.compiled {
+        let actual_quality = if simulated_execution || !exec_result.compiled {
             0.0
         } else if exec_result.tests_failed > 0 {
             let total = exec_result.tests_passed + exec_result.tests_failed;
@@ -1175,6 +1220,7 @@ impl CodeLearningEngine {
         let outcome = LessonOutcome {
             objective_id: lesson.objective_id.clone(),
             source: source.clone(),
+            simulated_execution,
             compiled: exec_result.compiled,
             tests_passed: exec_result.tests_passed,
             tests_failed: exec_result.tests_failed,
@@ -1218,7 +1264,7 @@ impl CodeLearningEngine {
 
                 // Store learned template in experience store
                 if let Some(ref mut store) = self.experience_store {
-                    store.store_learned_template(&lesson.spec.purpose, &src);
+                    store.store_learned_template(&lesson.spec.purpose, &src, None);
                 }
             }
             // Add to past examples (capped at 16)
@@ -1323,6 +1369,9 @@ impl CodeLearningEngine {
             let outcomes = self.run_objective(obj_id);
             for outcome in outcomes {
                 summary.lessons_attempted += 1;
+                if outcome.simulated_execution {
+                    summary.simulated_lessons += 1;
+                }
                 if outcome.compiled {
                     summary.lessons_compiled += 1;
                 }
@@ -1480,6 +1529,22 @@ impl CodeLearningEngine {
         self.executor.execute_rust(source, test_source)
     }
 
+    fn mark_simulated_execution_failed(mut result: ExecutionResult) -> ExecutionResult {
+        result.compiled = false;
+        result.tests_passed = 0;
+        result.tests_failed = 0;
+        if result.compile_errors.is_empty() {
+            result.compile_errors.push(
+                "Execution was simulated; lesson results cannot count as real compilation or test verification"
+                    .to_string(),
+            );
+        }
+        result.runtime_error.get_or_insert_with(|| {
+            "Execution was simulated; rerun with real execution enabled".to_string()
+        });
+        result
+    }
+
     /// Reset the metabolic budget for a new session.
     pub fn reset_budget(&mut self) {
         self.budget = MetabolicBudget::default_session();
@@ -1557,6 +1622,7 @@ impl LessonOutcome {
         Self {
             objective_id: objective_id.to_string(),
             source: String::new(),
+            simulated_execution: false,
             compiled: false,
             tests_passed: 0,
             tests_failed: 0,
@@ -1848,8 +1914,11 @@ mod tests {
         let lesson = &bank["codegen_simple_arithmetic"][0];
 
         let outcome = engine.run_lesson(lesson);
-        // In simulation mode, should always "compile"
-        assert!(outcome.compiled, "Simulated execution should succeed");
+        assert!(outcome.simulated_execution);
+        assert!(
+            !outcome.compiled,
+            "Simulated execution must not count as a real compile"
+        );
         assert_eq!(outcome.objective_id, "codegen_simple_arithmetic");
     }
 
@@ -1859,7 +1928,8 @@ mod tests {
         let outcomes = engine.run_objective("codegen_simple_arithmetic");
         assert_eq!(outcomes.len(), 3, "Should run all 3 arithmetic lessons");
         for outcome in &outcomes {
-            assert!(outcome.compiled);
+            assert!(outcome.simulated_execution);
+            assert!(!outcome.compiled);
         }
     }
 
@@ -1872,8 +1942,8 @@ mod tests {
             "Tier 1 has 12 lessons total, got {}",
             summary.lessons_attempted,
         );
-        // All should compile in simulation mode
-        assert_eq!(summary.lessons_compiled, summary.lessons_attempted);
+        assert_eq!(summary.simulated_lessons, summary.lessons_attempted);
+        assert_eq!(summary.lessons_compiled, 0);
     }
 
     #[test]
@@ -1888,6 +1958,7 @@ mod tests {
         let success = LessonOutcome {
             objective_id: "test".into(),
             source: String::new(),
+            simulated_execution: false,
             compiled: true,
             tests_passed: 3,
             tests_failed: 0,
@@ -1923,10 +1994,12 @@ mod tests {
     fn test_session_summary_rates() {
         let summary = SessionSummary {
             lessons_attempted: 10,
+            simulated_lessons: 2,
             lessons_compiled: 8,
             lessons_passed: 6,
             ..Default::default()
         };
+        assert!((summary.simulated_rate() - 20.0).abs() < 0.01);
         assert!((summary.compile_rate() - 80.0).abs() < 0.01);
         assert!((summary.pass_rate() - 60.0).abs() < 0.01);
     }
@@ -2113,10 +2186,9 @@ mod tests {
             "Should have 12+ predictions, got {}",
             engine.predictions().prediction_count(),
         );
-        // Simulation mode = all succeed, so hallucination rate should be 0
-        assert_eq!(
-            summary.hallucination_rate, 0.0,
-            "No hallucinations in simulation mode"
+        assert!(
+            summary.hallucination_rate > 0.0,
+            "Simulated lessons should not be credited as real success"
         );
     }
 
@@ -2178,7 +2250,6 @@ mod tests {
     fn test_session_tracks_error_patterns() {
         let mut engine = make_engine();
         let summary = engine.run_session(TIER1_OBJECTIVES);
-        // In simulation mode, all compile — no errors to track
         assert_eq!(
             summary.error_patterns_learned, 0,
             "No error patterns in simulation mode"
@@ -2191,17 +2262,10 @@ mod tests {
     fn test_distillation_records_populated() {
         let mut engine = make_engine();
         let _summary = engine.run_session(TIER1_OBJECTIVES);
-        // Simulation mode: all pass, so all should produce distillation records
         assert!(
-            !engine.distillation_records().is_empty(),
-            "Should have distillation records after session"
+            engine.distillation_records().is_empty(),
+            "Simulated sessions must not produce distillation records"
         );
-        for record in engine.distillation_records() {
-            assert!(record.quality > 0.0);
-            assert!(record.native_only, "Simulation mode uses no LLM");
-            assert!(!record.purpose.is_empty());
-            assert!(!record.source.is_empty());
-        }
     }
 
     #[test]
@@ -2209,14 +2273,7 @@ mod tests {
         let mut engine = make_engine();
         let _summary = engine.run_session(TIER1_OBJECTIVES);
         let jsonl = engine.export_distillation_jsonl();
-        assert!(!jsonl.is_empty());
-        // Each line should be valid-ish JSON
-        for line in jsonl.lines() {
-            assert!(line.starts_with('{'));
-            assert!(line.ends_with('}'));
-            assert!(line.contains("\"purpose\""));
-            assert!(line.contains("\"quality\""));
-        }
+        assert!(jsonl.is_empty());
     }
 
     #[test]
@@ -2226,7 +2283,7 @@ mod tests {
         let tmp = tempfile::NamedTempFile::new().unwrap();
         engine.save_distillation(tmp.path()).unwrap();
         let contents = std::fs::read_to_string(tmp.path()).unwrap();
-        assert!(!contents.is_empty());
+        assert!(contents.is_empty());
     }
 
     #[test]

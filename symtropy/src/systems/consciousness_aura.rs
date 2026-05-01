@@ -109,10 +109,19 @@ pub fn spawn_auras(
 /// Update aura geometry every frame — the shape IS the consciousness state.
 pub fn aura_update_system(
     entities: Query<
-        (Entity, &Transform, Option<&PhysicsBody>, Option<&NpcConsciousness>, Option<&PsychologicalNeeds>),
+        (
+            Entity,
+            &Transform,
+            Option<&PhysicsBody>,
+            Option<&NpcConsciousness>,
+            Option<&PsychologicalNeeds>,
+        ),
         (Or<(With<Player>, With<CrewNpc>)>, Without<AuraSprite>),
     >,
-    mut auras: Query<(&mut Transform, &mut Sprite, &AuraSprite), (Without<Player>, Without<CrewNpc>)>,
+    mut auras: Query<
+        (&mut Transform, &mut Sprite, &AuraSprite),
+        (Without<Player>, Without<CrewNpc>),
+    >,
     physics: Res<PhysicsWorldRes>,
     harmony: Res<crate::systems::harmonies::LocalHarmonyState>,
     player_consciousness: Res<crate::systems::consciousness::PlayerConsciousness>,
@@ -130,13 +139,17 @@ pub fn aura_update_system(
 
         // Get consciousness metrics from physics engine or NPC consciousness
         let (energy_frac, phi, prediction_error) = if let Some(body) = body {
-            physics.consciousness.entities
+            physics
+                .consciousness
+                .entities
                 .get(&body.handle)
-                .map(|e| (
-                    e.energy.fraction_remaining() as f32,
-                    e.phi() as f32,
-                    e.prediction_error as f32,
-                ))
+                .map(|e| {
+                    (
+                        e.energy.fraction_remaining() as f32,
+                        e.phi() as f32,
+                        e.prediction_error as f32,
+                    )
+                })
                 .unwrap_or((1.0, 0.5, 0.0))
         } else {
             (1.0, player_consciousness.level as f32, 0.0)
@@ -161,13 +174,12 @@ pub fn aura_update_system(
         // More noise = lower Phi = more chaos in the boundary
         let noise_freq = 7.0 + prediction_error * 5.0; // higher PE = higher frequency noise
         let noise_phase = aura.segment as f32 * 1.618 + t * (3.0 + allostatic_load * 4.0);
-        let noise_component = (noise_phase * noise_freq).sin()
-            * (noise_phase * noise_freq * 1.3).cos()
-            * 0.4; // raw noise amplitude
+        let noise_component =
+            (noise_phase * noise_freq).sin() * (noise_phase * noise_freq * 1.3).cos() * 0.4; // raw noise amplitude
 
         // Blend: high consciousness = smooth, low consciousness = noisy
-        let boundary_modulation = smooth_component * consciousness_level
-            + noise_component * (1.0 - consciousness_level);
+        let boundary_modulation =
+            smooth_component * consciousness_level + noise_component * (1.0 - consciousness_level);
 
         let radius = base_radius * (1.0 + boundary_modulation);
 
@@ -178,10 +190,16 @@ pub fn aura_update_system(
         aura_tf.translation.z = 2.5;
 
         // === COLOR: dominant harmony + energy state ===
-        let harmony_color = harmony.dominant
+        let harmony_color = harmony
+            .dominant
             .map(|h| h.color())
             .unwrap_or(Color::srgb(0.5, 0.8, 0.6));
-        let Srgba { red: hr, green: hg, blue: hb, .. } = harmony_color.to_srgba();
+        let Srgba {
+            red: hr,
+            green: hg,
+            blue: hb,
+            ..
+        } = harmony_color.to_srgba();
 
         // Energy depletion: desaturate toward gray
         let energy_blend = energy_frac.sqrt(); // sqrt for perceptual linearity
@@ -225,17 +243,25 @@ pub fn resonance_wave_system(
     time: Res<Time>,
 ) {
     timer.0 += time.delta_secs();
-    if timer.0 < 2.0 { return; } // Check every 2 seconds
+    if timer.0 < 2.0 {
+        return;
+    } // Check every 2 seconds
     timer.0 = 0.0;
 
     // Find agents with high harmony resonance
-    if harmony.total_energy < 2.0 { return; }
+    if harmony.total_energy < 2.0 {
+        return;
+    }
 
-    let Some(dominant) = harmony.dominant else { return };
+    let Some(dominant) = harmony.dominant else {
+        return;
+    };
     let wave_color = dominant.color();
 
     for (tf, body) in &entities {
-        let phi = physics.consciousness.entities
+        let phi = physics
+            .consciousness
+            .entities
             .get(&body.handle)
             .map(|e| e.phi() as f32)
             .unwrap_or(0.0);
@@ -265,7 +291,10 @@ pub fn resonance_wave_system(
 /// Animate resonance waves: expand outward, fade, tint tiles.
 pub fn resonance_wave_animate_system(
     mut commands: Commands,
-    mut waves: Query<(Entity, &mut ResonanceWave, &mut Transform, &mut Sprite), Without<crate::components::Tile>>,
+    mut waves: Query<
+        (Entity, &mut ResonanceWave, &mut Transform, &mut Sprite),
+        Without<crate::components::Tile>,
+    >,
     mut tiles: Query<(&Transform, &mut Sprite, &crate::components::Tile), Without<ResonanceWave>>,
     time: Res<Time>,
 ) {
@@ -285,13 +314,20 @@ pub fn resonance_wave_animate_system(
         tf.translation.y = wave.origin.y;
 
         // Wave ring visibility
-        let Srgba { red: wr, green: wg, blue: wb, .. } = wave.color.to_srgba();
+        let Srgba {
+            red: wr,
+            green: wg,
+            blue: wb,
+            ..
+        } = wave.color.to_srgba();
         sprite.color = Color::srgba(wr, wg, wb, wave.life * 0.3);
 
         // Tint tiles the wave passes through
         let wave_width = 20.0; // ring thickness
         for (tile_tf, mut tile_sprite, tile) in &mut tiles {
-            if !tile.walkable { continue; }
+            if !tile.walkable {
+                continue;
+            }
 
             let tile_pos = tile_tf.translation.truncate();
             let dist = tile_pos.distance(wave.origin);
@@ -301,7 +337,12 @@ pub fn resonance_wave_animate_system(
                 let ring_falloff = 1.0 - (dist - wave.radius).abs() / wave_width;
                 let blend = ring_falloff * wave.life * 0.2;
 
-                let Srgba { red: tr, green: tg, blue: tb, .. } = tile_sprite.color.to_srgba();
+                let Srgba {
+                    red: tr,
+                    green: tg,
+                    blue: tb,
+                    ..
+                } = tile_sprite.color.to_srgba();
                 tile_sprite.color = Color::srgb(
                     (tr + wr * blend).clamp(0.0, 1.0),
                     (tg + wg * blend).clamp(0.0, 1.0),
@@ -321,7 +362,10 @@ pub fn resonance_wave_animate_system(
 pub fn consciousness_perception_gate_system(
     mut four_d_secrets: Query<
         (&mut Sprite, &crate::systems::four_d_rendering::FourDBody),
-        (With<crate::systems::four_d_rendering::FourDOnly>, Without<AuraSprite>),
+        (
+            With<crate::systems::four_d_rendering::FourDOnly>,
+            Without<AuraSprite>,
+        ),
     >,
     player_consciousness: Res<crate::systems::consciousness::PlayerConsciousness>,
     dim: Res<crate::systems::dimension_transition::DimensionTransition>,
@@ -336,13 +380,17 @@ pub fn consciousness_perception_gate_system(
     // 0.7+: clear visibility
     let perception = ((phi - 0.5) / 0.2).clamp(0.0, 1.0);
 
-    if perception <= 0.0 { return; }
+    if perception <= 0.0 {
+        return;
+    }
 
     // Only active in 4D mode (or when consciousness is high enough to "pierce the veil")
     let in_4d = dim.target == crate::systems::dimension_transition::DimensionMode::D4;
     let phi_piercing = phi > 0.7; // high consciousness sees through dimensions regardless
 
-    if !in_4d && !phi_piercing { return; }
+    if !in_4d && !phi_piercing {
+        return;
+    }
 
     for (mut sprite, body) in &mut four_d_secrets {
         // Base visibility from 4D projection system
@@ -362,7 +410,9 @@ pub fn consciousness_perception_gate_system(
             consciousness_alpha * 0.4 // very faint — a reward for high consciousness
         };
 
-        let Srgba { red, green, blue, .. } = sprite.color.to_srgba();
+        let Srgba {
+            red, green, blue, ..
+        } = sprite.color.to_srgba();
         sprite.color = Color::srgba(red, green, blue, alpha);
     }
 }

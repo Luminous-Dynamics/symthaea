@@ -197,7 +197,10 @@ mod tests {
         rj.record_violation(11);
         rj.record_violation(12);
         assert_eq!(rj.tier_penalty, 1);
-        assert_eq!(rj.effective_tier(CivicTier::Citizen), CivicTier::Participant);
+        assert_eq!(
+            rj.effective_tier(CivicTier::Citizen),
+            CivicTier::Participant
+        );
         assert_eq!(rj.effective_tier(CivicTier::Guardian), CivicTier::Steward);
     }
 
@@ -231,7 +234,10 @@ mod tests {
         for _ in 0..10 {
             rj.record_correction(5);
         }
-        assert_eq!(rj.tier_penalty, 1, "restore blocked by cooldown + rate limit");
+        assert_eq!(
+            rj.tier_penalty, 1,
+            "restore blocked by cooldown + rate limit"
+        );
         assert!(rj.corrections <= MAX_CORRECTIONS_PER_TICK);
 
         // Accumulate the remaining corrections needed (up to 10 total) at

@@ -3248,6 +3248,36 @@ input:focus-visible, textarea:focus-visible {
 .digest-trust { color: #f59e0b; }
 .digest-senders { display: flex; gap: var(--space-sm); flex-wrap: wrap; margin-top: var(--space-xs); }
 .digest-sender { font-size: var(--text-xs); color: var(--text-secondary); background: var(--surface-2); padding: 2px 8px; border-radius: var(--radius-xs); }
+.sensorium-posture {
+    padding: var(--space-sm); margin-bottom: var(--space-sm);
+    background: linear-gradient(135deg, rgba(6,214,200,0.08), rgba(251,191,36,0.05));
+    border: 1px solid rgba(6,214,200,0.16); border-radius: var(--radius-sm);
+}
+.sensorium-posture-topline {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: var(--space-sm); margin-bottom: var(--space-xs); flex-wrap: wrap;
+}
+.sensorium-label {
+    color: var(--primary); font-size: 0.65rem; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase;
+}
+.sensorium-status {
+    margin: 0 0 var(--space-xs); color: var(--text-secondary);
+    font-size: var(--text-xs); line-height: 1.5;
+}
+.sensorium-metrics,
+.sensorium-attention {
+    display: flex; gap: var(--space-sm); flex-wrap: wrap;
+}
+.sensorium-attention { margin-top: var(--space-xs); }
+.freshness-badge {
+    border-radius: var(--radius-pill); padding: 2px 8px;
+    font-size: 0.65rem; font-weight: 600;
+}
+.freshness-fresh { color: var(--success); background: rgba(74,222,128,0.1); }
+.freshness-aging { color: var(--warning); background: rgba(245,158,11,0.1); }
+.freshness-stale { color: var(--error); background: rgba(239,68,68,0.1); }
+.freshness-unknown { color: var(--text-muted); background: rgba(136,144,168,0.1); }
 
 /* ================================================================
    67. COMPOSE SHORTCUTS HINT

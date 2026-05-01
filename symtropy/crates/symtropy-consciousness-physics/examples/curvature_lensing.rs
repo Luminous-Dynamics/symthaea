@@ -31,7 +31,9 @@ fn run_lensing(curvature_scale: f64, seed: u64) -> LensingResult {
     // Source at origin with high harmony
     let mut field = HarmonyField::<2>::new();
     let mut activations = [0.0; 9];
-    for i in 0..8 { activations[i] = 0.8 + (seed as f64 * 0.01 * (i as f64 + 1.0)).sin() * 0.2; }
+    for i in 0..8 {
+        activations[i] = 0.8 + (seed as f64 * 0.01 * (i as f64 + 1.0)).sin() * 0.2;
+    }
 
     field.sources.push(HarmonySource {
         position: Point::new([0.0, 0.0]),
@@ -62,11 +64,19 @@ fn run_lensing(curvature_scale: f64, seed: u64) -> LensingResult {
         pos += vel * DT;
 
         let deflection = (pos[1] - initial_y).abs();
-        if deflection > max_deflection { max_deflection = deflection; }
+        if deflection > max_deflection {
+            max_deflection = deflection;
+        }
     }
 
     let final_speed = vel.norm();
-    LensingResult { scale: curvature_scale, seed, final_y: pos[1], max_deflection, final_speed }
+    LensingResult {
+        scale: curvature_scale,
+        seed,
+        final_y: pos[1],
+        max_deflection,
+        final_speed,
+    }
 }
 
 fn main() {
@@ -83,7 +93,10 @@ fn main() {
         for s in 0..NUM_SEEDS {
             let seed = 42 + s as u64 * 137;
             let r = run_lensing(scale, seed);
-            println!("{},{},{:.4},{:.4},{:.4}", r.scale, r.seed, r.final_y, r.max_deflection, r.final_speed);
+            println!(
+                "{},{},{:.4},{:.4},{:.4}",
+                r.scale, r.seed, r.final_y, r.max_deflection, r.final_speed
+            );
             results.push(r);
         }
 
@@ -92,21 +105,44 @@ fn main() {
         let mean_y = results.iter().map(|r| r.final_y).sum::<f64>() / n;
         let mean_speed = results.iter().map(|r| r.final_speed).sum::<f64>() / n;
 
-        eprintln!("\n  scale={:.3}: deflection={:.4}, final_y={:.4}, speed={:.4}",
-            scale, mean_defl, mean_y, mean_speed);
+        eprintln!(
+            "\n  scale={:.3}: deflection={:.4}, final_y={:.4}, speed={:.4}",
+            scale, mean_defl, mean_y, mean_speed
+        );
     }
 
     // Statistical comparison: scale=0 vs scale=0.05
-    let zero_defl: Vec<f64> = (0..NUM_SEEDS).map(|s| run_lensing(0.0, 42 + s as u64 * 137).max_deflection).collect();
-    let high_defl: Vec<f64> = (0..NUM_SEEDS).map(|s| run_lensing(0.05, 42 + s as u64 * 137).max_deflection).collect();
+    let zero_defl: Vec<f64> = (0..NUM_SEEDS)
+        .map(|s| run_lensing(0.0, 42 + s as u64 * 137).max_deflection)
+        .collect();
+    let high_defl: Vec<f64> = (0..NUM_SEEDS)
+        .map(|s| run_lensing(0.05, 42 + s as u64 * 137).max_deflection)
+        .collect();
 
-    use symtropy_consciousness_physics::convergence::{mann_whitney_u, cohens_d};
+    use symtropy_consciousness_physics::convergence::{cohens_d, mann_whitney_u};
     let (u, z, p) = mann_whitney_u(&zero_defl, &high_defl);
     let d = cohens_d(&zero_defl, &high_defl);
 
     eprintln!("\n── Statistical Test: scale=0 vs scale=0.05 ──");
     eprintln!("  Mann-Whitney U={:.1}, z={:.3}, p={:.4}", u, z, p);
-    eprintln!("  Cohen's d={:.3} ({})", d, if d.abs() > 0.8 { "large" } else if d.abs() > 0.5 { "medium" } else { "small" });
-    eprintln!("  {} at α=0.05", if p < 0.05 { "SIGNIFICANT" } else { "not significant" });
+    eprintln!(
+        "  Cohen's d={:.3} ({})",
+        d,
+        if d.abs() > 0.8 {
+            "large"
+        } else if d.abs() > 0.5 {
+            "medium"
+        } else {
+            "small"
+        }
+    );
+    eprintln!(
+        "  {} at α=0.05",
+        if p < 0.05 {
+            "SIGNIFICANT"
+        } else {
+            "not significant"
+        }
+    );
     eprintln!("\n=== Complete ===");
 }

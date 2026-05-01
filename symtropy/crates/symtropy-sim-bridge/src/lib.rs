@@ -10,11 +10,17 @@
 
 use bevy::prelude::*;
 
+mod mk0;
+pub use mk0::*;
+
 // Re-export Mycelix types for game systems to use via symtropy_sim_bridge::
-pub use mycelix_fl::defenses::{Defense as FlDefense, TrimmedMean};
-pub use mycelix_fl::types::{DefenseConfig as FlDefenseConfig, Gradient as FlGradient, AggregationResult as FlAggregationResult};
-pub use feldman_dkg::{DkgCeremony, DkgConfig, CeremonyPhase};
 pub use feldman_dkg::participant::ParticipantId;
+pub use feldman_dkg::{CeremonyPhase, DkgCeremony, DkgConfig};
+pub use mycelix_fl::defenses::{Defense as FlDefense, TrimmedMean};
+pub use mycelix_fl::types::{
+    AggregationResult as FlAggregationResult, DefenseConfig as FlDefenseConfig,
+    Gradient as FlGradient,
+};
 
 /// Veto override threshold — the fraction of weighted votes needed to override a Guardian veto.
 ///
@@ -85,11 +91,9 @@ impl GovernanceState {
     /// Run one governance tick. Returns events generated.
     pub fn tick(&mut self) -> Vec<CivEvent> {
         self.sim_tick += 1;
-        let events = self.governance.tick_governance(
-            &self.world,
-            self.sim_tick,
-            &mut self.rng,
-        );
+        let events = self
+            .governance
+            .tick_governance(&self.world, self.sim_tick, &mut self.rng);
         self.last_events = events.clone();
         events
     }
@@ -188,7 +192,11 @@ impl FactionState {
 
     /// Civil unrest for a given world (default 0.0).
     pub fn civil_unrest(&self, world_id: u32) -> f64 {
-        self.engine.civil_unrest.get(&world_id).copied().unwrap_or(0.0)
+        self.engine
+            .civil_unrest
+            .get(&world_id)
+            .copied()
+            .unwrap_or(0.0)
     }
 }
 
@@ -577,7 +585,7 @@ mod tests {
 
     #[test]
     fn consciousness_tier_boundaries_match_canonical() {
-        use mycelix_bridge_common::{ConsciousnessProfile, CivicTier};
+        use mycelix_bridge_common::{CivicTier, ConsciousnessProfile};
 
         // The canonical tier boundaries from mycelix-bridge-common
         assert_eq!(CivicTier::from_score(0.0), CivicTier::Observer);
@@ -604,7 +612,11 @@ mod tests {
             engagement: 0.0,
         };
         let score = profile.combined_score();
-        assert!((score - 0.25).abs() < 0.01, "identity weight should be 0.25, got {}", score);
+        assert!(
+            (score - 0.25).abs() < 0.01,
+            "identity weight should be 0.25, got {}",
+            score
+        );
 
         let profile2 = ConsciousnessProfile {
             identity: 0.0,
@@ -613,7 +625,11 @@ mod tests {
             engagement: 0.0,
         };
         let score2 = profile2.combined_score();
-        assert!((score2 - 0.30).abs() < 0.01, "community weight should be 0.30, got {}", score2);
+        assert!(
+            (score2 - 0.30).abs() < 0.01,
+            "community weight should be 0.30, got {}",
+            score2
+        );
     }
 
     #[test]
@@ -667,16 +683,31 @@ mod tests {
         let result = TrimmedMean.aggregate(&gradients, &config).unwrap();
 
         // After trimming: the 3 middle values should average close to [1.0, 2.0, 3.0]
-        assert!((result.gradient[0] - 1.0).abs() < 0.15, "dim 0: {}", result.gradient[0]);
-        assert!((result.gradient[1] - 2.0).abs() < 0.15, "dim 1: {}", result.gradient[1]);
-        assert!((result.gradient[2] - 3.0).abs() < 0.15, "dim 2: {}", result.gradient[2]);
+        assert!(
+            (result.gradient[0] - 1.0).abs() < 0.15,
+            "dim 0: {}",
+            result.gradient[0]
+        );
+        assert!(
+            (result.gradient[1] - 2.0).abs() < 0.15,
+            "dim 1: {}",
+            result.gradient[1]
+        );
+        assert!(
+            (result.gradient[2] - 3.0).abs() < 0.15,
+            "dim 2: {}",
+            result.gradient[2]
+        );
     }
 
     #[test]
     fn veto_override_uses_governance_zome_threshold() {
         // The game uses 0.67 (governance zome), not 0.80 (multiworld-sim)
-        assert!((VETO_OVERRIDE_THRESHOLD - 0.67).abs() < f64::EPSILON,
-            "Game should use governance zome threshold (0.67), got {}", VETO_OVERRIDE_THRESHOLD);
+        assert!(
+            (VETO_OVERRIDE_THRESHOLD - 0.67).abs() < f64::EPSILON,
+            "Game should use governance zome threshold (0.67), got {}",
+            VETO_OVERRIDE_THRESHOLD
+        );
 
         let mut prop = ActiveProposal::new("Test", 0, 1);
         prop.cast_vote("A", 0.9, true);
@@ -685,13 +716,19 @@ mod tests {
         // 66% should NOT override at 67% threshold
         prop.cast_override_vote("A", 0.66, true);
         prop.cast_override_vote("B", 0.34, false);
-        assert!(!prop.override_succeeded(), "66% should not override at 67% threshold");
+        assert!(
+            !prop.override_succeeded(),
+            "66% should not override at 67% threshold"
+        );
 
         // 68% SHOULD override
         prop.override_votes.clear();
         prop.cast_override_vote("X", 0.68, true);
         prop.cast_override_vote("Y", 0.32, false);
-        assert!(prop.override_succeeded(), "68% should override at 67% threshold");
+        assert!(
+            prop.override_succeeded(),
+            "68% should override at 67% threshold"
+        );
     }
 
     #[test]

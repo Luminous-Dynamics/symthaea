@@ -5,8 +5,8 @@
 use bevy::prelude::*;
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
-use symthaea_flight::encoder::QuadrotorHdcEncoder;
-use symthaea_flight::simulator::SimplePhysicsSimulator;
+use symthaea_multirotor::encoder::QuadrotorHdcEncoder;
+use symthaea_multirotor::simulator::SimplePhysicsSimulator;
 use symtropy_consciousness_physics::safety::SafetyTier;
 use symtropy_physics::body::BodyHandle;
 use symtropy_robotics_bridge::agent::RoboticAgent;

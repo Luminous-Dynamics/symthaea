@@ -71,7 +71,8 @@ impl EarthPopulationModel {
     /// Decomposes each region's aggregate population into cohorts using
     /// standard demographic pyramids calibrated to UN WPP 2024 data.
     pub fn from_regions(regions: &[EarthRegion]) -> Self {
-        let demographics: Vec<RegionDemographics> = regions.iter()
+        let demographics: Vec<RegionDemographics> = regions
+            .iter()
             .enumerate()
             .map(|(i, region)| RegionDemographics::from_region(i as u8, region))
             .collect();
@@ -169,51 +170,119 @@ impl EarthPopulationModel {
 fn regional_gdp_growth(region_name: &str, year: f64) -> f64 {
     match region_name {
         "East Asia" => {
-            if year < 1990.0 { 0.08 }       // Japan/Korea miracle
-            else if year < 2010.0 { 0.09 }   // China boom
-            else { 0.055 }                    // Maturing
+            if year < 1990.0 {
+                0.08
+            }
+            // Japan/Korea miracle
+            else if year < 2010.0 {
+                0.09
+            }
+            // China boom
+            else {
+                0.055
+            } // Maturing
         }
         "South Asia" => {
-            if year < 2000.0 { 0.04 }        // Pre-liberalization
-            else if year < 2010.0 { 0.07 }   // India IT boom
-            else { 0.06 }                     // Continued growth
+            if year < 2000.0 {
+                0.04
+            }
+            // Pre-liberalization
+            else if year < 2010.0 {
+                0.07
+            }
+            // India IT boom
+            else {
+                0.06
+            } // Continued growth
         }
         "Southeast Asia" => {
-            if year < 1997.0 { 0.07 }         // Tiger economies
-            else if year < 2000.0 { 0.02 }   // Asian financial crisis
-            else { 0.05 }                     // Recovery
+            if year < 1997.0 {
+                0.07
+            }
+            // Tiger economies
+            else if year < 2000.0 {
+                0.02
+            }
+            // Asian financial crisis
+            else {
+                0.05
+            } // Recovery
         }
         "Central Asia" => 0.04,
         "Middle East & N Africa" => {
-            if year < 2010.0 { 0.04 }
-            else { 0.025 }                    // Arab Spring + oil price decline
+            if year < 2010.0 {
+                0.04
+            } else {
+                0.025
+            } // Arab Spring + oil price decline
         }
         "Sub-Saharan Africa" => {
-            if year < 2000.0 { 0.02 }        // Lost decades
-            else { 0.04 }                     // Commodity boom
+            if year < 2000.0 {
+                0.02
+            }
+            // Lost decades
+            else {
+                0.04
+            } // Commodity boom
         }
         "Europe" => {
-            if year < 2008.0 { 0.025 }       // Stable growth
-            else if year < 2012.0 { 0.005 }  // Great Recession + Euro crisis
-            else { 0.018 }                    // Slow recovery
+            if year < 2008.0 {
+                0.025
+            }
+            // Stable growth
+            else if year < 2012.0 {
+                0.005
+            }
+            // Great Recession + Euro crisis
+            else {
+                0.018
+            } // Slow recovery
         }
         "North America" => {
-            if year < 2008.0 { 0.03 }
-            else if year < 2010.0 { -0.01 }  // Great Recession
-            else { 0.022 }
+            if year < 2008.0 {
+                0.03
+            } else if year < 2010.0 {
+                -0.01
+            }
+            // Great Recession
+            else {
+                0.022
+            }
         }
         "Latin America" => {
-            if year < 1982.0 { 0.05 }        // Pre-debt crisis
-            else if year < 1990.0 { 0.02 }   // Lost decade
-            else if year < 2014.0 { 0.04 }   // Commodity boom
-            else { 0.015 }                    // Stagnation
+            if year < 1982.0 {
+                0.05
+            }
+            // Pre-debt crisis
+            else if year < 1990.0 {
+                0.02
+            }
+            // Lost decade
+            else if year < 2014.0 {
+                0.04
+            }
+            // Commodity boom
+            else {
+                0.015
+            } // Stagnation
         }
         "Oceania" => 0.03,
         "Russia/N Asia" => {
-            if year < 1991.0 { 0.03 }        // Soviet era
-            else if year < 1998.0 { -0.05 }  // Collapse
-            else if year < 2014.0 { 0.06 }   // Oil-driven recovery
-            else { 0.015 }                    // Sanctions + stagnation
+            if year < 1991.0 {
+                0.03
+            }
+            // Soviet era
+            else if year < 1998.0 {
+                -0.05
+            }
+            // Collapse
+            else if year < 2014.0 {
+                0.06
+            }
+            // Oil-driven recovery
+            else {
+                0.015
+            } // Sanctions + stagnation
         }
         _ => 0.03, // default
     }
@@ -232,8 +301,16 @@ mod tests {
         assert!(model.initialized);
         assert_eq!(model.demographics.len(), 12);
         // Total should be close to 7.8 billion
-        assert!(model.total_population > 7000.0, "Expected >7000M, got {}", model.total_population);
-        assert!(model.total_population < 9000.0, "Expected <9000M, got {}", model.total_population);
+        assert!(
+            model.total_population > 7000.0,
+            "Expected >7000M, got {}",
+            model.total_population
+        );
+        assert!(
+            model.total_population < 9000.0,
+            "Expected <9000M, got {}",
+            model.total_population
+        );
     }
 
     #[test]
@@ -247,7 +324,10 @@ mod tests {
             let region_pop = regions[i].population;
             assert!(
                 (cohort_sum - region_pop).abs() < region_pop * 0.01,
-                "Region {} cohort sum {} vs region pop {}", i, cohort_sum, region_pop
+                "Region {} cohort sum {} vs region pop {}",
+                i,
+                cohort_sum,
+                region_pop
             );
         }
     }

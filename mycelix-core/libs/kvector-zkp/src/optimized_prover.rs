@@ -131,42 +131,42 @@ impl SecurityLevel {
     pub fn proof_options(&self) -> ProofOptions {
         match self {
             SecurityLevel::Standard => ProofOptions::new(
-                32,  // queries
-                8,   // blowup factor
-                0,   // grinding factor
+                32, // queries
+                8,  // blowup factor
+                0,  // grinding factor
                 winterfell::FieldExtension::None,
-                8,   // FRI folding factor
-                31,  // max remainder degree
+                8,  // FRI folding factor
+                31, // max remainder degree
                 BatchingMethod::Linear,
                 BatchingMethod::Linear,
             ),
             SecurityLevel::Optimized => ProofOptions::new(
-                28,  // slightly reduced queries (still 128-bit with blowup)
-                8,   // keep blowup for security
-                0,   // no grinding
+                28, // slightly reduced queries (still 128-bit with blowup)
+                8,  // keep blowup for security
+                0,  // no grinding
                 winterfell::FieldExtension::None,
-                16,  // higher folding (fewer FRI rounds) — must be power of 2
-                63,  // larger remainder (faster final round) — must be (2^n)-1
+                16, // higher folding (fewer FRI rounds) — must be power of 2
+                63, // larger remainder (faster final round) — must be (2^n)-1
                 BatchingMethod::Linear,
                 BatchingMethod::Linear,
             ),
             SecurityLevel::Fast => ProofOptions::new(
-                20,  // reduced queries for speed
-                4,   // reduced blowup (faster FFT)
-                0,   // no grinding
+                20, // reduced queries for speed
+                4,  // reduced blowup (faster FFT)
+                0,  // no grinding
                 winterfell::FieldExtension::None,
-                16,  // higher folding (fewer rounds)
-                63,  // larger remainder (fewer FRI rounds)
+                16, // higher folding (fewer rounds)
+                63, // larger remainder (fewer FRI rounds)
                 BatchingMethod::Linear,
                 BatchingMethod::Linear,
             ),
             SecurityLevel::High => ProofOptions::new(
-                64,  // increased queries
-                16,  // higher blowup for security
-                8,   // grinding for additional security
+                64, // increased queries
+                16, // higher blowup for security
+                8,  // grinding for additional security
                 winterfell::FieldExtension::None,
-                4,   // lower folding (more rounds)
-                15,  // smaller remainder
+                4,  // lower folding (more rounds)
+                15, // smaller remainder
                 BatchingMethod::Linear,
                 BatchingMethod::Linear,
             ),
@@ -207,7 +207,9 @@ impl OptimizedKVectorProver {
     pub fn new() -> Self {
         Self {
             security_level: SecurityLevel::Fast, // Default to fast for throughput
-            cache: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(100).expect("100 is non-zero")))),
+            cache: Arc::new(Mutex::new(LruCache::new(
+                NonZeroUsize::new(100).expect("100 is non-zero"),
+            ))),
             enable_caching: true,
         }
     }
@@ -216,7 +218,9 @@ impl OptimizedKVectorProver {
     pub fn with_security_level(level: SecurityLevel) -> Self {
         Self {
             security_level: level,
-            cache: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(100).expect("100 is non-zero")))),
+            cache: Arc::new(Mutex::new(LruCache::new(
+                NonZeroUsize::new(100).expect("100 is non-zero"),
+            ))),
             enable_caching: true,
         }
     }
@@ -481,14 +485,38 @@ mod tests {
     #[test]
     fn test_minimum_level_for_bits() {
         // Test boundary conditions
-        assert_eq!(SecurityLevel::minimum_level_for_bits(1), Some(SecurityLevel::Fast));
-        assert_eq!(SecurityLevel::minimum_level_for_bits(40), Some(SecurityLevel::Fast));
-        assert_eq!(SecurityLevel::minimum_level_for_bits(41), Some(SecurityLevel::Optimized));
-        assert_eq!(SecurityLevel::minimum_level_for_bits(84), Some(SecurityLevel::Optimized));
-        assert_eq!(SecurityLevel::minimum_level_for_bits(85), Some(SecurityLevel::Standard));
-        assert_eq!(SecurityLevel::minimum_level_for_bits(96), Some(SecurityLevel::Standard));
-        assert_eq!(SecurityLevel::minimum_level_for_bits(97), Some(SecurityLevel::High));
-        assert_eq!(SecurityLevel::minimum_level_for_bits(264), Some(SecurityLevel::High));
+        assert_eq!(
+            SecurityLevel::minimum_level_for_bits(1),
+            Some(SecurityLevel::Fast)
+        );
+        assert_eq!(
+            SecurityLevel::minimum_level_for_bits(40),
+            Some(SecurityLevel::Fast)
+        );
+        assert_eq!(
+            SecurityLevel::minimum_level_for_bits(41),
+            Some(SecurityLevel::Optimized)
+        );
+        assert_eq!(
+            SecurityLevel::minimum_level_for_bits(84),
+            Some(SecurityLevel::Optimized)
+        );
+        assert_eq!(
+            SecurityLevel::minimum_level_for_bits(85),
+            Some(SecurityLevel::Standard)
+        );
+        assert_eq!(
+            SecurityLevel::minimum_level_for_bits(96),
+            Some(SecurityLevel::Standard)
+        );
+        assert_eq!(
+            SecurityLevel::minimum_level_for_bits(97),
+            Some(SecurityLevel::High)
+        );
+        assert_eq!(
+            SecurityLevel::minimum_level_for_bits(264),
+            Some(SecurityLevel::High)
+        );
         assert_eq!(SecurityLevel::minimum_level_for_bits(265), None);
     }
 

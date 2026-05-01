@@ -187,7 +187,124 @@ body {
 
 /* Sections */
 section { margin: 2rem 0; }
-section h2 { margin-bottom: 1rem; font-size: 1.3rem; }
+section h2 { margin-bottom: 0.25rem; font-size: 1.3rem; }
+.section-subtitle { color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.5rem; }
+
+/* Food & Soil Grids */
+.plot-grid, .market-grid, .compost-grid, .food-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 2rem;
+}
+
+.plot-card, .market-card, .compost-card, .food-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+    transition: transform 0.2s, border-color 0.2s;
+}
+
+.plot-card:hover, .market-card:hover, .compost-card:hover, .food-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+}
+
+.compost-type { font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1rem; }
+
+.compost-metrics {
+    display: flex;
+    justify-content: space-between;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.compost-metrics .metric {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.compost-metrics .label { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; }
+.compost-metrics .value { font-weight: 700; font-size: 1rem; }
+.compost-metrics .metric.highlight .value { color: var(--accent); }
+
+.compost-status-tag {
+    display: inline-block;
+    font-size: 0.75rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 99px;
+    background: #3b82f622;
+    color: #60a5fa;
+}
+
+.compost-reward-box {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding: 0.5rem;
+    background: #22c55e11;
+    border: 1px dashed var(--accent);
+    border-radius: 6px;
+    font-size: 0.85rem;
+}
+
+.reward-value { font-weight: 700; color: var(--accent); }
+
+.compost-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.btn-claim {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 0.3rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-claim:hover { background: var(--accent-hover); }
+
+.compost-card[data-status="charging"] .compost-status-tag { background: #eab30822; color: #eab308; }
+.compost-card[data-status="mature"] .compost-status-tag { background: #16a34a22; color: #22c55e; }
+.compost-card[data-status="claimed"] .compost-status-tag { background: var(--border); color: var(--text-secondary); }
+
+.recipe-promo {
+    background: linear-gradient(135deg, #1a2332 0%, #111827 100%);
+    border: 1px solid var(--accent);
+    border-radius: 12px;
+    padding: 2rem;
+    text-align: center;
+}
+
+.recipe-promo h3 { margin-bottom: 0.5rem; }
+.recipe-promo p { color: var(--text-secondary); margin-bottom: 1.5rem; max-width: 500px; margin-left: auto; margin-right: auto; }
+
+.btn-secondary {
+    background: transparent;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    padding: 0.6rem 1.5rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+    background: var(--accent);
+    color: white;
+}
 
 /* Mobile */
 @media (max-width: 768px) {

@@ -60,10 +60,18 @@ fn all_polynomial_invariants_formally_proven() {
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let lines: Vec<&str> = stdout.lines().collect();
-    assert!(lines.len() >= 2, "expected CSV header + data rows, got: {}", stdout);
+    assert!(
+        lines.len() >= 2,
+        "expected CSV header + data rows, got: {}",
+        stdout
+    );
 
     let header = lines[0];
-    assert!(header.starts_with("problem,"), "unexpected header: {}", header);
+    assert!(
+        header.starts_with("problem,"),
+        "unexpected header: {}",
+        header
+    );
     let proven_col = header
         .split(',')
         .position(|c| c == "formally_proven")
@@ -100,7 +108,8 @@ fn all_polynomial_invariants_formally_proven() {
     assert!(
         proven_count >= 9,
         "expected ≥9 formally-proven invariants, got {} (skipped={})",
-        proven_count, skipped_count
+        proven_count,
+        skipped_count
     );
     eprintln!(
         "formal_invariants test: {} proven, {} skipped (transcendental, honest)",

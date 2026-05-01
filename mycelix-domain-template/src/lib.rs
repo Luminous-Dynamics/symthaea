@@ -1,21 +1,21 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! Template domain module for the Mycelix Portal.
+//! Template domain module for Mycelix Sensorium.
 //!
 //! # Creating a New Domain
 //!
-//! 1. Copy this crate to `mycelix-portal/crates/domain-yourdomain/`
+//! 1. Copy this crate to `mycelix-sensorium/crates/domain-yourdomain/`
 //! 2. Rename `TemplateDomain` to `YourDomain`
 //! 3. Fill in the trait methods with your domain's real data
-//! 4. Add to `mycelix-portal/Cargo.toml`:
+//! 4. Add to `mycelix-sensorium/Cargo.toml`:
 //!    ```toml
 //!    domain-yourdomain = { path = "crates/domain-yourdomain", optional = true }
 //!    # ...
 //!    [features]
 //!    yourdomain = ["dep:domain-yourdomain"]
 //!    ```
-//! 5. Add to `portal-shell/src/main.rs` in `build_registry()`:
+//! 5. Add to `sensorium-shell/src/main.rs` in `build_registry()`:
 //!    ```rust
 //!    #[cfg(feature = "yourdomain")]
 //!    registry.register(Box::new(domain_yourdomain::YourDomain));
@@ -24,7 +24,7 @@
 //! # External Frontend (Alternative)
 //!
 //! If you prefer to run your frontend as a separate web app instead of
-//! compiling into the portal, create a JSON manifest:
+//! compiling into the Sensorium, create a JSON manifest:
 //!
 //! ```json
 //! {

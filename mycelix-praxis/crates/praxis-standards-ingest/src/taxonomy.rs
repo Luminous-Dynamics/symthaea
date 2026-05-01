@@ -108,7 +108,7 @@ pub enum BroadField {
     AgricultureEnvironment,
     HealthWelfare,
     Services,
-    /// Our addition: meta-learning about consciousness computing
+    /// Our addition: meta-learning about cognitive computing
     MetaLearning,
 }
 
@@ -171,7 +171,7 @@ impl BroadField {
             || s.contains("tourism") || s.contains("culinary")
         {
             BroadField::Services
-        } else if s.contains("symthaea") || s.contains("mycelix") || s.contains("consciousness computing")
+        } else if s.contains("symthaea") || s.contains("mycelix") || s.contains("cognitive computing")
             || s.contains("holographic") || s.contains("hdc")
         {
             BroadField::MetaLearning
@@ -193,7 +193,7 @@ impl BroadField {
             BroadField::AgricultureEnvironment => "Agriculture & Environment",
             BroadField::HealthWelfare => "Health & Welfare",
             BroadField::Services => "Services & Recreation",
-            BroadField::MetaLearning => "Meta-Learning (Consciousness Computing)",
+            BroadField::MetaLearning => "Meta-Learning (Cognitive Computing)",
         }
     }
 }

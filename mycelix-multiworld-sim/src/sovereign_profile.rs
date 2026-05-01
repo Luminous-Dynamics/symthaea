@@ -156,7 +156,11 @@ impl SovereignProfile {
     }
 
     fn sanitize(v: f64) -> f64 {
-        if v.is_finite() { v.clamp(0.0, 1.0) } else { 0.0 }
+        if v.is_finite() {
+            v.clamp(0.0, 1.0)
+        } else {
+            0.0
+        }
     }
 
     /// Weighted combined score, clamped to [0, 1].
@@ -298,7 +302,9 @@ pub struct DimensionWeights {
 
 impl DimensionWeights {
     pub fn equal() -> Self {
-        Self { weights: [0.125; 8] }
+        Self {
+            weights: [0.125; 8],
+        }
     }
 
     /// Default governance weights — slight emphasis on epistemic integrity

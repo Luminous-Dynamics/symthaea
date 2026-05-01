@@ -1,5 +1,5 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Compound shape: a rigid body composed of multiple convex sub-shapes.
 //!
@@ -137,7 +137,7 @@ impl<const D: usize> Shape<D> for CompoundShape<D> {
     }
 
     fn bounding_sphere(&self) -> (Point<D>, f64) {
-        (self.cached_center.clone(), self.cached_radius)
+        (self.cached_center, self.cached_radius)
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

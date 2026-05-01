@@ -7,8 +7,7 @@
 //! Chicxulub asteroid necessary for meta-cognitive consciousness?
 
 use super::consciousness_emergence::{
-    compute_emergence_curve, ConsciousnessEmergencePoint,
-    THRESHOLD_AWARE, THRESHOLD_REFLECTIVE,
+    compute_emergence_curve, ConsciousnessEmergencePoint, THRESHOLD_AWARE, THRESHOLD_REFLECTIVE,
 };
 use super::counterfactual::CapRegime;
 use super::deep_time_data::DeepTimeData;
@@ -43,13 +42,20 @@ pub struct CounterfactualConsciousnessResult {
 /// Compute K-Pg suppressed dimensions under a given cap regime.
 fn compute_kpg_suppressed_dims(
     regime: &CapRegime,
-) -> (Vec<MaAge>, Vec<super::dimensions::BiosphereDimensionsNorm>, (f64, f64, f64)) {
+) -> (
+    Vec<MaAge>,
+    Vec<super::dimensions::BiosphereDimensionsNorm>,
+    (f64, f64, f64),
+) {
     let data = DeepTimeData::load();
     let all_extinctions = canonical_mass_extinctions();
     let bins = build_deep_time_bins();
     let maxima = BiosphereMaxima::default();
 
-    let kpg = all_extinctions.iter().find(|e| e.name.contains("End-Cretaceous")).unwrap();
+    let kpg = all_extinctions
+        .iter()
+        .find(|e| e.name.contains("End-Cretaceous"))
+        .unwrap();
 
     let filtered: Vec<MassExtinctionEvent> = all_extinctions
         .iter()
@@ -61,52 +67,66 @@ fn compute_kpg_suppressed_dims(
         .iter()
         .filter(|b| b.midpoint_ma > kpg.age_ma)
         .min_by(|a, b| {
-            (a.midpoint_ma - kpg.age_ma).abs().partial_cmp(&(b.midpoint_ma - kpg.age_ma).abs()).unwrap()
+            (a.midpoint_ma - kpg.age_ma)
+                .abs()
+                .partial_cmp(&(b.midpoint_ma - kpg.age_ma).abs())
+                .unwrap()
         })
         .unwrap();
 
     let pre_raw = compute_raw_dimensions(pre_kpg_bin, &data, &all_extinctions);
     let pre_d13c = Some(data.interpolate_d13c_excursion(pre_kpg_bin.midpoint_ma));
-    let pre_norm = pre_raw.normalize(&maxima, pre_kpg_bin.resolution, pre_kpg_bin.midpoint_ma, pre_d13c);
+    let pre_norm = pre_raw.normalize(
+        &maxima,
+        pre_kpg_bin.resolution,
+        pre_kpg_bin.midpoint_ma,
+        pre_d13c,
+    );
 
     let ceil_c = pre_norm.values[1];
     let ceil_e = pre_norm.values[4];
     let ceil_i = pre_norm.values[5];
 
     let ages: Vec<MaAge> = bins.iter().map(|b| b.midpoint_ma).collect();
-    let dims: Vec<_> = bins.iter().map(|bin| {
-        let raw = compute_raw_dimensions(bin, &data, &filtered);
-        let d13c = Some(data.interpolate_d13c_excursion(bin.midpoint_ma));
-        let mut norm = raw.normalize(&maxima, bin.resolution, bin.midpoint_ma, d13c);
+    let dims: Vec<_> = bins
+        .iter()
+        .map(|bin| {
+            let raw = compute_raw_dimensions(bin, &data, &filtered);
+            let d13c = Some(data.interpolate_d13c_excursion(bin.midpoint_ma));
+            let mut norm = raw.normalize(&maxima, bin.resolution, bin.midpoint_ma, d13c);
 
-        if bin.midpoint_ma < kpg.age_ma {
-            let time_since = kpg.age_ma - bin.midpoint_ma;
+            if bin.midpoint_ma < kpg.age_ma {
+                let time_since = kpg.age_ma - bin.midpoint_ma;
 
-            match regime {
-                CapRegime::HardCap => {
-                    norm.values[1] = norm.values[1].min(ceil_c);
-                    norm.values[4] = norm.values[4].min(ceil_e);
-                    norm.values[5] = norm.values[5].min(ceil_i);
-                }
-                CapRegime::SoftCap { leakage_rate } => {
-                    let leak = (leakage_rate * time_since / 100.0).min(1.0);
-                    norm.values[1] = norm.values[1].min(ceil_c + leak * (norm.values[1] - ceil_c).max(0.0));
-                    norm.values[4] = norm.values[4].min(ceil_e + leak * (norm.values[4] - ceil_e).max(0.0));
-                    norm.values[5] = norm.values[5].min(ceil_i + leak * (norm.values[5] - ceil_i).max(0.0));
-                }
-                CapRegime::DelayedEscape { hold_ma } => {
-                    if time_since < *hold_ma {
+                match regime {
+                    CapRegime::HardCap => {
                         norm.values[1] = norm.values[1].min(ceil_c);
                         norm.values[4] = norm.values[4].min(ceil_e);
                         norm.values[5] = norm.values[5].min(ceil_i);
                     }
+                    CapRegime::SoftCap { leakage_rate } => {
+                        let leak = (leakage_rate * time_since / 100.0).min(1.0);
+                        norm.values[1] =
+                            norm.values[1].min(ceil_c + leak * (norm.values[1] - ceil_c).max(0.0));
+                        norm.values[4] =
+                            norm.values[4].min(ceil_e + leak * (norm.values[4] - ceil_e).max(0.0));
+                        norm.values[5] =
+                            norm.values[5].min(ceil_i + leak * (norm.values[5] - ceil_i).max(0.0));
+                    }
+                    CapRegime::DelayedEscape { hold_ma } => {
+                        if time_since < *hold_ma {
+                            norm.values[1] = norm.values[1].min(ceil_c);
+                            norm.values[4] = norm.values[4].min(ceil_e);
+                            norm.values[5] = norm.values[5].min(ceil_i);
+                        }
+                    }
+                    CapRegime::NoCap => {}
                 }
-                CapRegime::NoCap => {}
             }
-        }
 
-        norm
-    }).collect();
+            norm
+        })
+        .collect();
 
     (ages, dims, (ceil_c, ceil_e, ceil_i))
 }
@@ -120,14 +140,20 @@ pub fn run_counterfactual_consciousness() -> CounterfactualConsciousnessResult {
 
     // Baseline
     let baseline_ages: Vec<MaAge> = bins.iter().map(|b| b.midpoint_ma).collect();
-    let baseline_dims: Vec<_> = bins.iter().map(|bin| {
-        let raw = compute_raw_dimensions(bin, &data, &extinctions);
-        let d13c = Some(data.interpolate_d13c_excursion(bin.midpoint_ma));
-        raw.normalize(&maxima, bin.resolution, bin.midpoint_ma, d13c)
-    }).collect();
+    let baseline_dims: Vec<_> = bins
+        .iter()
+        .map(|bin| {
+            let raw = compute_raw_dimensions(bin, &data, &extinctions);
+            let d13c = Some(data.interpolate_d13c_excursion(bin.midpoint_ma));
+            raw.normalize(&maxima, bin.resolution, bin.midpoint_ma, d13c)
+        })
+        .collect();
     let baseline_curve = compute_emergence_curve(&baseline_ages, &baseline_dims);
     let baseline_milestones = extract_milestones(&baseline_curve);
-    let baseline_peak = baseline_curve.iter().map(|p| p.feasibility).fold(0.0_f64, f64::max);
+    let baseline_peak = baseline_curve
+        .iter()
+        .map(|p| p.feasibility)
+        .fold(0.0_f64, f64::max);
 
     // Run all 4 regimes
     let regimes = [
@@ -157,7 +183,10 @@ pub fn run_counterfactual_consciousness() -> CounterfactualConsciousnessResult {
         });
     }
 
-    let requiring = regime_results.iter().filter(|r| !r.meta_cognition_reached).count();
+    let requiring = regime_results
+        .iter()
+        .filter(|r| !r.meta_cognition_reached)
+        .count();
 
     CounterfactualConsciousnessResult {
         baseline_milestones,
@@ -169,7 +198,8 @@ pub fn run_counterfactual_consciousness() -> CounterfactualConsciousnessResult {
 }
 
 fn extract_milestones(curve: &[ConsciousnessEmergencePoint]) -> Vec<(String, MaAge)> {
-    curve.iter()
+    curve
+        .iter()
         .filter_map(|pt| pt.milestone.as_ref().map(|m| (m.clone(), pt.age_ma)))
         .collect()
 }
@@ -182,7 +212,10 @@ impl CounterfactualConsciousnessResult {
         for (m, age) in &self.baseline_milestones {
             md.push_str(&format!("- **{}**: ~{:.0} Ma\n", m, age));
         }
-        md.push_str(&format!("- Peak feasibility: {:.4}\n\n", self.baseline_peak_feasibility));
+        md.push_str(&format!(
+            "- Peak feasibility: {:.4}\n\n",
+            self.baseline_peak_feasibility
+        ));
 
         md.push_str(&format!(
             "## K-Pg Suppressed (Ceiling: C={:.2}, E={:.2}, I={:.2})\n\n",
@@ -194,9 +227,18 @@ impl CounterfactualConsciousnessResult {
         for r in &self.regime_results {
             md.push_str(&format!(
                 "| {} | {:.4} | {} | {} |\n",
-                r.regime, r.peak_feasibility,
-                if r.meta_cognition_reached { "YES" } else { "NO" },
-                if r.self_awareness_reached { "YES" } else { "NO" },
+                r.regime,
+                r.peak_feasibility,
+                if r.meta_cognition_reached {
+                    "YES"
+                } else {
+                    "NO"
+                },
+                if r.self_awareness_reached {
+                    "YES"
+                } else {
+                    "NO"
+                },
             ));
         }
 
@@ -247,8 +289,16 @@ mod tests {
     #[test]
     fn hard_cap_most_restrictive() {
         let result = run_counterfactual_consciousness();
-        let hard = result.regime_results.iter().find(|r| r.regime.contains("HardCap")).unwrap();
-        let no_cap = result.regime_results.iter().find(|r| r.regime.contains("NoCap")).unwrap();
+        let hard = result
+            .regime_results
+            .iter()
+            .find(|r| r.regime.contains("HardCap"))
+            .unwrap();
+        let no_cap = result
+            .regime_results
+            .iter()
+            .find(|r| r.regime.contains("NoCap"))
+            .unwrap();
         assert!(hard.peak_feasibility <= no_cap.peak_feasibility + 0.001);
     }
 
@@ -256,9 +306,23 @@ mod tests {
     fn regime_results_ordered() {
         let result = run_counterfactual_consciousness();
         // HardCap ≤ SoftCap ≤ NoCap for peak feasibility
-        let peaks: Vec<f64> = result.regime_results.iter().map(|r| r.peak_feasibility).collect();
-        assert!(peaks[0] <= peaks[1] + 0.01, "HardCap ({}) > SoftCap ({})", peaks[0], peaks[1]);
-        assert!(peaks[1] <= peaks[3] + 0.01, "SoftCap ({}) > NoCap ({})", peaks[1], peaks[3]);
+        let peaks: Vec<f64> = result
+            .regime_results
+            .iter()
+            .map(|r| r.peak_feasibility)
+            .collect();
+        assert!(
+            peaks[0] <= peaks[1] + 0.01,
+            "HardCap ({}) > SoftCap ({})",
+            peaks[0],
+            peaks[1]
+        );
+        assert!(
+            peaks[1] <= peaks[3] + 0.01,
+            "SoftCap ({}) > NoCap ({})",
+            peaks[1],
+            peaks[3]
+        );
     }
 
     #[test]

@@ -277,7 +277,7 @@ pub struct EquivalenceResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::language::code_parser::{CodeEntity, EntityKind, Span};
+    use crate::language::code_parser::{Entity, EntityKind, Span};
 
     fn test_span() -> Span {
         Span {
@@ -299,7 +299,7 @@ mod tests {
         let mut parsed = ParsedCode::new("fn sort() {}", "rust");
         parsed
             .entities
-            .push(CodeEntity::new(EntityKind::Function, "sort", test_span()));
+            .push(Entity::new(EntityKind::Function, "sort", test_span()));
 
         // Create an intent HV by encoding "sort"
         let intent_hv = encoder.encode_name("sort");
@@ -336,19 +336,19 @@ mod tests {
         let mut original = ParsedCode::new("fn a() {} fn b() {}", "rust");
         original
             .entities
-            .push(CodeEntity::new(EntityKind::Function, "a", test_span()));
+            .push(Entity::new(EntityKind::Function, "a", test_span()));
         original
             .entities
-            .push(CodeEntity::new(EntityKind::Function, "b", test_span()));
+            .push(Entity::new(EntityKind::Function, "b", test_span()));
 
         // Same code, same structure
         let mut transformed = ParsedCode::new("fn a() {} fn b() {}", "rust");
         transformed
             .entities
-            .push(CodeEntity::new(EntityKind::Function, "a", test_span()));
+            .push(Entity::new(EntityKind::Function, "a", test_span()));
         transformed
             .entities
-            .push(CodeEntity::new(EntityKind::Function, "b", test_span()));
+            .push(Entity::new(EntityKind::Function, "b", test_span()));
 
         let result = verifier.verify_equivalence(&original, &transformed);
         assert!(result.semantic_similarity > 0.9);
@@ -363,12 +363,12 @@ mod tests {
         let mut original = ParsedCode::new("fn sort() {}", "rust");
         original
             .entities
-            .push(CodeEntity::new(EntityKind::Function, "sort", test_span()));
+            .push(Entity::new(EntityKind::Function, "sort", test_span()));
 
         let mut transformed = ParsedCode::new("struct Config {}", "rust");
         transformed
             .entities
-            .push(CodeEntity::new(EntityKind::Struct, "Config", test_span()));
+            .push(Entity::new(EntityKind::Struct, "Config", test_span()));
 
         let result = verifier.verify_equivalence(&original, &transformed);
         assert!(result.semantic_similarity < 0.9);

@@ -51,12 +51,19 @@ pub struct SimulationSection {
     pub years: u32,
 }
 
-fn default_seed() -> u64 { 42 }
-fn default_years() -> u32 { 150 }
+fn default_seed() -> u64 {
+    42
+}
+fn default_years() -> u32 {
+    150
+}
 
 impl Default for SimulationSection {
     fn default() -> Self {
-        Self { seed: default_seed(), years: default_years() }
+        Self {
+            seed: default_seed(),
+            years: default_years(),
+        }
     }
 }
 
@@ -119,7 +126,9 @@ pub struct FeedbackLoopsSection {
     pub cultural_memory: bool,
 }
 
-fn default_true() -> bool { true }
+fn default_true() -> bool {
+    true
+}
 
 impl Default for FeedbackLoopsSection {
     fn default() -> Self {
@@ -150,7 +159,10 @@ impl StandardizedReport {
     pub fn to_markdown(&self) -> String {
         let mut s = String::new();
         s.push_str(&format!("# {}\n\n", self.executive_summary.title));
-        s.push_str(&format!("**Outcome**: {}\n\n", self.executive_summary.outcome));
+        s.push_str(&format!(
+            "**Outcome**: {}\n\n",
+            self.executive_summary.outcome
+        ));
         s.push_str("## Key Findings\n\n");
         for finding in &self.executive_summary.key_findings {
             s.push_str(&format!("- {}\n", finding));

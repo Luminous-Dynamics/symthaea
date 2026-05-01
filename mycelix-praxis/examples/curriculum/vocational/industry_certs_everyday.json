@@ -1,0 +1,116 @@
+{
+  "metadata": {
+    "title": "Everyday Mastery Seed: High-Demand Work Standards",
+    "framework": "Global Everyday Mesh",
+    "source": "https://mycelix.org/certs-everyday",
+    "grade_level": "Professional/Vocational",
+    "subject_area": "Multi-Sector",
+    "domain": "Professional Certification",
+    "version": "1.0",
+    "total_standards": 6,
+    "domains": [
+      "Logistics & Transport",
+      "Healthcare Support",
+      "Electrical Safety",
+      "Property & Habitat",
+      "Project Management"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Essential certifications for high-demand work in the current economy."
+  },
+  "nodes": [
+    {
+      "id": "CERT-LOG-CDL-THEORY",
+      "title": "CDL Class A: Theory Mapping",
+      "description": "Fundamental knowledge for commercial driving. Vehicle inspections, air brakes, safe driving practices, and cargo handling.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Logistics & Transport",
+      "subdomain": "Certification Bridge",
+      "tags": ["trucking", "logistics", "cdl", "transport"],
+      "estimated_hours": 40,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "CERT-HLTH-CNA-SKILLS",
+      "title": "Certified Nursing Assistant (CNA) Foundation",
+      "description": "Patient care, safety, and infection control. Measuring vital signs and assisting with daily living activities. Linked to Bioregional Vitality.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Healthcare Support",
+      "subdomain": "Certification Bridge",
+      "tags": ["healthcare", "nursing", "cna", "medical"],
+      "estimated_hours": 120,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Health Sciences"
+    },
+    {
+      "id": "CERT-ENG-NFPA-70E",
+      "title": "NFPA 70E: Standard for Electrical Safety",
+      "description": "Workplace safety standard for electrical workers. Arc flash hazards, shock protection, and safe work practices. Essential for Solar and Microgrid work.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Electrical Safety",
+      "subdomain": "Certification Bridge",
+      "tags": ["electrical", "safety", "standard", "nfpa"],
+      "estimated_hours": 20,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "CERT-PROP-MGMT",
+      "title": "Property Management Professional Basics",
+      "description": "Lease management, maintenance coordination, and tenant relations. Understanding the legal rights and responsibilities of property stewardship.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Property & Habitat",
+      "subdomain": "Certification Bridge",
+      "tags": ["property", "real-estate", "habitat", "stewardship"],
+      "estimated_hours": 45,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Social Studies"
+    },
+    {
+      "id": "CERT-MGT-GOOGLE-PM",
+      "title": "Google Project Management Certificate",
+      "description": "Foundations of project management: initiating, planning, and executing projects. Agile, Waterfall, and Lean methodologies. Practical skills for guild leaders.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Project Management",
+      "subdomain": "Certification Bridge",
+      "tags": ["google", "management", "project", "standard"],
+      "estimated_hours": 120,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Social Studies"
+    }
+  ],
+  "edges": [
+    {
+      "from": "VOC-H2O-101",
+      "to": "CERT-PROP-MGMT",
+      "edge_type": "Recommended",
+      "strength_permille": 600,
+      "rationale": "Water stewardship knowledge is critical for maintenance coordination in property management."
+    },
+    {
+      "from": "VITA-001",
+      "to": "CERT-HLTH-CNA-SKILLS",
+      "edge_type": "Recommended",
+      "strength_permille": 750,
+      "rationale": "First-line emergency care provides the medical foundation for nursing assistant skills."
+    },
+    {
+      "from": "SCI-GEN-050",
+      "to": "CERT-ENG-NFPA-70E",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Electrical safety training requires a foundational understanding of circuits and physics."
+    }
+  ]
+}

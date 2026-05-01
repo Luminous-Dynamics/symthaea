@@ -48,7 +48,8 @@ pub fn schwarzschild_g_rr(r: f64, r_s: f64) -> f64 {
 ///
 /// `mass` in GeV, `semi_major` in GeV⁻¹, `eccentricity` dimensionless.
 pub fn perihelion_precession(mass_gev: f64, semi_major_gev_inv: f64, eccentricity: f64) -> f64 {
-    6.0 * PI * G_NEWTON_NATURAL * mass_gev / (semi_major_gev_inv * (1.0 - eccentricity * eccentricity))
+    6.0 * PI * G_NEWTON_NATURAL * mass_gev
+        / (semi_major_gev_inv * (1.0 - eccentricity * eccentricity))
 }
 
 /// Hawking temperature of a black hole: T_H = ℏc³/(8πGMk_B)
@@ -68,14 +69,13 @@ pub fn black_hole_entropy(mass_gev: f64) -> f64 {
 ///
 /// Returns the Hubble parameter H for given energy density ρ,
 /// curvature k, scale factor a, and cosmological constant Λ.
-pub fn hubble_parameter(
-    rho_gev4: f64,
-    k: f64,
-    a: f64,
-    lambda_gev2: f64,
-) -> f64 {
+pub fn hubble_parameter(rho_gev4: f64, k: f64, a: f64, lambda_gev2: f64) -> f64 {
     let h_sq = 8.0 * PI * G_NEWTON_NATURAL * rho_gev4 / 3.0 - k / (a * a) + lambda_gev2 / 3.0;
-    if h_sq > 0.0 { h_sq.sqrt() } else { 0.0 }
+    if h_sq > 0.0 {
+        h_sq.sqrt()
+    } else {
+        0.0
+    }
 }
 
 /// Critical density: ρ_c = 3H²/(8πG)

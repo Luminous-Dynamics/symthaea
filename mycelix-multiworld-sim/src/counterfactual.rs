@@ -95,10 +95,12 @@ impl CounterfactualComparison {
             .chain(self.alternatives.iter())
             .collect();
 
-        let best = all_branches.iter()
+        let best = all_branches
+            .iter()
             .max_by(|a, b| a.final_cvs.partial_cmp(&b.final_cvs).unwrap())
             .unwrap();
-        let worst = all_branches.iter()
+        let worst = all_branches
+            .iter()
             .min_by(|a, b| a.final_cvs.partial_cmp(&b.final_cvs).unwrap())
             .unwrap();
 
@@ -112,10 +114,16 @@ impl CounterfactualComparison {
             fork_is_material: cvs_spread > 0.05,
             summary: format!(
                 "Best: {} (CVS {:.4}), Worst: {} (CVS {:.4}). Delta: {:.4} ({})",
-                best.name, best.final_cvs,
-                worst.name, worst.final_cvs,
+                best.name,
+                best.final_cvs,
+                worst.name,
+                worst.final_cvs,
                 cvs_spread,
-                if cvs_spread > 0.05 { "MATERIAL" } else { "not material" }
+                if cvs_spread > 0.05 {
+                    "MATERIAL"
+                } else {
+                    "not material"
+                }
             ),
         };
         self
@@ -125,17 +133,23 @@ impl CounterfactualComparison {
     pub fn to_markdown(&self) -> String {
         let mut md = String::new();
         md.push_str("# Counterfactual Analysis\n\n");
-        md.push_str(&format!("**Fork Point**: Year {:.1} (tick {})\n\n",
-            self.fork_point.year, self.fork_point.tick));
+        md.push_str(&format!(
+            "**Fork Point**: Year {:.1} (tick {})\n\n",
+            self.fork_point.year, self.fork_point.tick
+        ));
 
         md.push_str("## Branches\n\n");
         md.push_str("| Branch | CVS | Population | Modification |\n");
         md.push_str("|--------|-----|------------|-------------|\n");
-        md.push_str(&format!("| {} | {:.4} | {} | Baseline |\n",
-            self.baseline.name, self.baseline.final_cvs, self.baseline.final_population));
+        md.push_str(&format!(
+            "| {} | {:.4} | {} | Baseline |\n",
+            self.baseline.name, self.baseline.final_cvs, self.baseline.final_population
+        ));
         for alt in &self.alternatives {
-            md.push_str(&format!("| {} | {:.4} | {} | {} |\n",
-                alt.name, alt.final_cvs, alt.final_population, alt.modification));
+            md.push_str(&format!(
+                "| {} | {:.4} | {} | {} |\n",
+                alt.name, alt.final_cvs, alt.final_population, alt.modification
+            ));
         }
 
         md.push_str(&format!("\n## Analysis\n\n{}\n", self.analysis.summary));
@@ -151,9 +165,15 @@ mod tests {
     fn test_comparison_analysis() {
         let comparison = CounterfactualComparison {
             fork_point: SimCheckpoint {
-                tick: 540, year: 45.0, rng_seed: 42, rng_offset: 540,
-                cvs: 0.7, population: 15000, collective_phi: 0.5,
-                harmony_scores: [0.5; 8], total_disasters: 100,
+                tick: 540,
+                year: 45.0,
+                rng_seed: 42,
+                rng_offset: 540,
+                cvs: 0.7,
+                population: 15000,
+                collective_phi: 0.5,
+                harmony_scores: [0.5; 8],
+                total_disasters: 100,
                 description: "Before Carrington event".into(),
             },
             baseline: CounterfactualBranch {
@@ -171,11 +191,14 @@ mod tests {
                 trajectory: vec![],
             }],
             analysis: ComparisonAnalysis {
-                best_branch: String::new(), cvs_spread: 0.0,
-                population_spread: 0, fork_is_material: false,
+                best_branch: String::new(),
+                cvs_spread: 0.0,
+                population_spread: 0,
+                fork_is_material: false,
                 summary: String::new(),
             },
-        }.analyze();
+        }
+        .analyze();
 
         assert_eq!(comparison.analysis.best_branch, "Without Carrington");
         assert!(comparison.analysis.cvs_spread > 0.05);
@@ -187,19 +210,30 @@ mod tests {
     fn test_markdown_output() {
         let comparison = CounterfactualComparison {
             fork_point: SimCheckpoint {
-                tick: 540, year: 45.0, rng_seed: 42, rng_offset: 540,
-                cvs: 0.7, population: 15000, collective_phi: 0.5,
-                harmony_scores: [0.5; 8], total_disasters: 100,
+                tick: 540,
+                year: 45.0,
+                rng_seed: 42,
+                rng_offset: 540,
+                cvs: 0.7,
+                population: 15000,
+                collective_phi: 0.5,
+                harmony_scores: [0.5; 8],
+                total_disasters: 100,
                 description: "Test fork".into(),
             },
             baseline: CounterfactualBranch {
-                name: "Baseline".into(), modification: "None".into(),
-                final_cvs: 0.65, final_population: 18000, trajectory: vec![],
+                name: "Baseline".into(),
+                modification: "None".into(),
+                final_cvs: 0.65,
+                final_population: 18000,
+                trajectory: vec![],
             },
             alternatives: vec![],
             analysis: ComparisonAnalysis {
-                best_branch: "Baseline".into(), cvs_spread: 0.0,
-                population_spread: 0, fork_is_material: false,
+                best_branch: "Baseline".into(),
+                cvs_spread: 0.0,
+                population_spread: 0,
+                fork_is_material: false,
                 summary: "Single branch".into(),
             },
         };

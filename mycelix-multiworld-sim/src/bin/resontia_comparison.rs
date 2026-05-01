@@ -25,19 +25,34 @@ fn main() {
     eprintln!(" done (CVS: {:.3})", report_res.final_cvs);
 
     println!("\n=== RESULTS ===");
-    println!("{:<12} | {:>8} | {:>8} | {:>8} | {:>8} | {:>10}",
-        "Condition", "CVS", "Pop", "Phi", "Love", "Disasters");
+    println!(
+        "{:<12} | {:>8} | {:>8} | {:>8} | {:>8} | {:>10}",
+        "Condition", "CVS", "Pop", "Phi", "Love", "Disasters"
+    );
     println!("{}", "-".repeat(70));
-    println!("{:<12} | {:>8.3} | {:>8} | {:>8.3} | {:>8.3} | {:>10}",
-        "Standard", report_std.final_cvs, report_std.final_population,
-        report_std.final_collective_phi, report_std.final_love_coherence,
-        report_std.total_disasters);
-    println!("{:<12} | {:>8.3} | {:>8} | {:>8.3} | {:>8.3} | {:>10}",
-        "Resontia", report_res.final_cvs, report_res.final_population,
-        report_res.final_collective_phi, report_res.final_love_coherence,
-        report_res.total_disasters);
-    
+    println!(
+        "{:<12} | {:>8.3} | {:>8} | {:>8.3} | {:>8.3} | {:>10}",
+        "Standard",
+        report_std.final_cvs,
+        report_std.final_population,
+        report_std.final_collective_phi,
+        report_std.final_love_coherence,
+        report_std.total_disasters
+    );
+    println!(
+        "{:<12} | {:>8.3} | {:>8} | {:>8.3} | {:>8.3} | {:>10}",
+        "Resontia",
+        report_res.final_cvs,
+        report_res.final_population,
+        report_res.final_collective_phi,
+        report_res.final_love_coherence,
+        report_res.total_disasters
+    );
+
     let cvs_delta = ((report_res.final_cvs - report_std.final_cvs) / report_std.final_cvs) * 100.0;
     let pop_delta = report_res.final_population as f64 - report_std.final_population as f64;
-    println!("\nDelta: CVS {:+.1}%, Population {:+.0}", cvs_delta, pop_delta);
+    println!(
+        "\nDelta: CVS {:+.1}%, Population {:+.0}",
+        cvs_delta, pop_delta
+    );
 }

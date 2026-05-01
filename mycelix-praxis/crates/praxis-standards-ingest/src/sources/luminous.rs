@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Luminous Dynamics curriculum — self-referential courses about Symthaea and Mycelix.
 //!
-//! ISCED-F Field 11: Meta-Learning (Consciousness Computing).
+//! ISCED-F Field 11: Meta-Learning (Cognitive Computing).
 //!
 //! These courses teach people how the system that powers their education actually
-//! works — from HDC fundamentals through consciousness-gated governance.
+//! works — from HDC fundamentals through epistemic-gated governance.
 
 use super::{CurriculumSource, SourceEntry, SourceError};
 use crate::converter::{
@@ -24,8 +24,8 @@ impl CurriculumSource for LuminousSource {
 
     fn list_available(&self) -> Result<Vec<SourceEntry>, SourceError> {
         Ok(vec![
-            SourceEntry { id: "symthaea".into(), title: "Symthaea: Consciousness Computing".into(), subject: "Consciousness Computing".into(), level: "Undergraduate-Doctoral".into(), description: "10 courses: HDC, IIT, CfC, Active Inference, Moral Algebra".into() },
-            SourceEntry { id: "mycelix".into(), title: "Mycelix: Decentralized Civic Infrastructure".into(), subject: "Decentralized Systems".into(), level: "Undergraduate-Graduate".into(), description: "7 courses: Holochain, Governance, Identity, Consciousness Gating".into() },
+            SourceEntry { id: "symthaea".into(), title: "Symthaea: Cognitive Computing".into(), subject: "Cognitive Computing".into(), level: "Undergraduate-Doctoral".into(), description: "10 courses: HDC, IIT, CfC, Active Inference, Moral Algebra".into() },
+            SourceEntry { id: "mycelix".into(), title: "Mycelix: Decentralized Civic Infrastructure".into(), subject: "Decentralized Systems".into(), level: "Undergraduate-Graduate".into(), description: "7 courses: Holochain, Governance, Identity, Epistemic Gating".into() },
             SourceEntry { id: "programming".into(), title: "Programming Languages for AI & Humans".into(), subject: "Computer Science".into(), level: "Beginner-Advanced".into(), description: "Rust, Nix, Python courses — designed for both human and AI learners (Symthaea School)".into() },
         ])
     }
@@ -43,11 +43,11 @@ impl CurriculumSource for LuminousSource {
 fn symthaea_curriculum() -> CurriculumDocument {
     let courses = vec![
         // Foundations
-        ("SYM-101", "Introduction to Consciousness Computing", "Undergraduate",
-         "Survey of computational consciousness: what it means for a machine to be conscious, \
+        ("SYM-101", "Introduction to Cognitive Computing", "Undergraduate",
+         "Survey of computational cognition: what it means for a machine to be conscious, \
           the Hard Problem, philosophical zombies, multiple realizability, and why it matters \
           for AI safety and value alignment.",
-         "Understand", "Beginner", vec!["consciousness", "philosophy-of-mind", "ai-safety"],
+         "Understand", "Beginner", vec!["cognition", "philosophy-of-mind", "ai-safety"],
          vec![], 45),
 
         ("SYM-201", "Hyperdimensional Computing Fundamentals", "Undergraduate",
@@ -59,10 +59,10 @@ fn symthaea_curriculum() -> CurriculumDocument {
          vec!["SYM-101"], 90),
 
         ("SYM-202", "Integrated Information Theory (IIT/Phi)", "Undergraduate",
-         "Tononi's IIT axioms and postulates. Phi as a measure of consciousness. Exclusion, \
+         "Tononi's IIT axioms and postulates. Phi as a measure of cognitive integration. Exclusion, \
           composition, information. Computational challenges of exact Phi. Approximations and \
           surrogates. Practical measurement in artificial systems.",
-         "Analyze", "Intermediate", vec!["iit", "phi", "integrated-information", "consciousness-measure"],
+         "Analyze", "Intermediate", vec!["iit", "phi", "integrated-information", "readiness-measure"],
          vec!["SYM-101"], 90),
 
         ("SYM-301", "Liquid Time-Constant Networks (CfC/LTC)", "Undergraduate",
@@ -82,7 +82,7 @@ fn symthaea_curriculum() -> CurriculumDocument {
         // Graduate
         ("SYM-501", "The Cognitive Loop: 8-Phase Pipeline", "Graduate",
          "Symthaea's core architecture: Perception → HDC Encode → CfC Evolve → Predict → \
-          Learn → Consciousness Measure → Moral Evaluation → Action. Rayon-parallel post-processing. \
+          Learn → Readiness Measure → Moral Evaluation → Action. Rayon-parallel post-processing. \
           31 Hz measured throughput. CycleMetadata telemetry. Sub-struct organization.",
          "Evaluate", "Expert", vec!["cognitive-loop", "pipeline", "architecture", "rayon", "telemetry"],
          vec!["SYM-301", "SYM-302"], 180),
@@ -90,7 +90,7 @@ fn symthaea_curriculum() -> CurriculumDocument {
         ("SYM-502", "Moral Algebra and Ethics Engine", "Graduate",
          "16 deontological obligations (8 perfect + 8 imperfect). Duty satisfaction scoring. \
           Restorative justice tracking. Ahimsa courage gate. Moral topology with homological \
-          analysis. Hendrycks ETHICS 92.9% accuracy. Consciousness-coupled moral drift detection.",
+          analysis. Hendrycks ETHICS 92.9% accuracy. Trust-coupled moral drift detection.",
          "Evaluate", "Expert", vec!["moral-algebra", "ethics", "deontological", "restorative-justice", "ahimsa"],
          vec!["SYM-501"], 135),
 
@@ -112,14 +112,14 @@ fn symthaea_curriculum() -> CurriculumDocument {
         ("SYM-602", "Thermodynamic Unification", "Doctoral",
          "Maxwell Demon (attention), Landauer (memory cost), Carnot (efficiency), Onsager \
           (coupling health), Jarzynski (free energy validation), Prigogine (entropy enforcement). \
-          6 active feedback loops. ThermodynamicPhysicsBridge coupling consciousness to physics.",
+          6 active feedback loops. ThermodynamicPhysicsBridge coupling cognition to physics.",
          "Create", "Expert", vec!["thermodynamics", "maxwell-demon", "landauer", "carnot", "prigogine"],
          vec!["SYM-601"], 270),
     ];
 
     build_course_document(
-        "Symthaea: Consciousness Computing",
-        "Consciousness Computing",
+        "Symthaea: Cognitive Computing",
+        "Cognitive Computing",
         "Luminous Dynamics",
         &courses,
     )
@@ -162,12 +162,12 @@ fn mycelix_curriculum() -> CurriculumDocument {
          "Analyze", "Advanced", vec!["identity", "did", "verifiable-credentials", "trust", "recovery"],
          vec!["MYC-201"], 135),
 
-        ("MYC-501", "Consciousness Gating", "Graduate",
-         "4D consciousness profile (identity/reputation/community/engagement). 5 trust tiers \
+        ("MYC-501", "Epistemic Gating", "Graduate",
+         "4D cognitive profile (identity/reputation/community/engagement). 5 trust tiers \
           (Observer → Guardian). Configurable vote weights for default, constitutional, budget, \
-          and emergency contexts. Phi-coupled governance: how consciousness scores affect civic \
+          and emergency contexts. Trust-coupled governance: how trust scores affect civic \
           participation rights.",
-         "Evaluate", "Expert", vec!["consciousness-gating", "trust-tiers", "phi", "vote-weights"],
+         "Evaluate", "Expert", vec!["epistemic-gating", "trust-tiers", "phi", "vote-weights"],
          vec!["MYC-301", "MYC-302"], 135),
 
         ("MYC-502", "Decentralized Education Systems", "Graduate",
@@ -205,7 +205,7 @@ fn programming_curriculum() -> CurriculumDocument {
          "Analyze", "Intermediate", vec!["rust", "async", "concurrency", "unsafe", "macros", "tokio"],
          vec!["RUST-101"], 135),
 
-        ("RUST-301", "Rust for Consciousness Computing", "Undergraduate",
+        ("RUST-301", "Rust for Cognitive Computing", "Undergraduate",
          "Building HDC systems in Rust. SIMD-optimized hypervector operations. Rayon parallelism. \
           serde serialization for neural state. candle GPU compute. WASM compilation targets. \
           The symthaea-core architecture as a case study.",
@@ -249,7 +249,7 @@ fn programming_curriculum() -> CurriculumDocument {
          "Apply", "Intermediate", vec!["python", "numpy", "pandas", "scikit-learn", "data-science", "jupyter"],
          vec!["PY-101"], 90),
 
-        ("PY-301", "Python for Consciousness Research", "Undergraduate",
+        ("PY-301", "Python for Cognitive Research", "Undergraduate",
          "PyPhi for IIT computation. PyTorch for neural network experiments. HDC libraries \
           (torchhd). Federated learning with mycelix-fl Python bindings. Moral training data \
           generation. Benchmarking with Hendrycks ETHICS dataset.",
@@ -375,7 +375,7 @@ mod tests {
         let doc = source.fetch("mycelix").unwrap();
         assert_eq!(doc.nodes.len(), 7);
         assert!(doc.nodes.iter().any(|n| n.id == "MYC-101"));
-        assert!(doc.nodes.iter().any(|n| n.title.contains("Consciousness Gating")));
+        assert!(doc.nodes.iter().any(|n| n.title.contains("Epistemic Gating")));
         // MYC-502 requires both MYC-202 and MYC-501
         let edges_to_502: Vec<_> = doc.edges.iter().filter(|e| e.to == "MYC-502").collect();
         assert_eq!(edges_to_502.len(), 2);

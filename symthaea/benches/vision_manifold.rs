@@ -26,7 +26,11 @@ fn bench_observe_frame(c: &mut Criterion) {
     let mut group = c.benchmark_group("observe_frame");
     group.sample_size(20);
 
-    for &(w, h, label) in &[(64, 64, "64x64"), (320, 240, "320x240"), (640, 480, "640x480")] {
+    for &(w, h, label) in &[
+        (64, 64, "64x64"),
+        (320, 240, "320x240"),
+        (640, 480, "640x480"),
+    ] {
         let cfg = VisionConfig::default();
         let mut m = VisionManifold::new(cfg, w, h);
         let frame = make_frame(w, h, 3, 42);

@@ -1,0 +1,123 @@
+{
+  "metadata": {
+    "title": "Vanguard Professional Seed: Advanced Readiness",
+    "framework": "Global Vanguard Mesh",
+    "source": "https://mycelix.org/certs-vanguard",
+    "grade_level": "Professional/Expert",
+    "subject_area": "Multi-Sector",
+    "domain": "Professional Certification",
+    "version": "1.0",
+    "total_standards": 8,
+    "domains": [
+      "Cyber Analyst",
+      "Data Engineering",
+      "Cardiac Support",
+      "Cloud Security",
+      "Agile Practice"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Closing the remaining gaps for advanced professional roles today."
+  },
+  "nodes": [
+    {
+      "id": "CERT-CYBER-CYSA",
+      "title": "CompTIA CySA+ (Cybersecurity Analyst)",
+      "description": "Continuous security monitoring, threat detection, and incident response. Mapping mesh-immunity monitoring to professional analyst standards.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Cyber Analyst",
+      "subdomain": "Certification Bridge",
+      "tags": ["comptia", "cysa+", "cybersecurity", "analyst"],
+      "estimated_hours": 150,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "CERT-DATA-GOOGLE-PDE",
+      "title": "Google Cloud Professional Data Engineer",
+      "description": "Designing, building, and maintaining data processing systems. Mapping the Mycelial Oracle and predictive ledger logic to GCP data pipelines.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Data Engineering",
+      "subdomain": "Certification Bridge",
+      "tags": ["google", "cloud", "data-engineering", "pde"],
+      "estimated_hours": 180,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Create",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "CERT-HLTH-NHA-CET",
+      "title": "NHA Certified EKG Technician (CET)",
+      "description": "EKG testing, Holter monitoring, and stress testing. Linking physiological homeostasis and mk0-vita telemetry to professional cardiac support.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Cardiac Support",
+      "subdomain": "Certification Bridge",
+      "tags": ["healthcare", "ekg", "medical", "standard"],
+      "estimated_hours": 100,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Health Sciences"
+    },
+    {
+      "id": "CERT-SEC-AWS-SPECIALTY",
+      "title": "AWS Certified Security - Specialty",
+      "description": "Advanced security on AWS. Data protection, encryption, and infrastructure security. Mapping root-of-trust and key stewardship to AWS security pillars.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Cloud Security",
+      "subdomain": "Certification Bridge",
+      "tags": ["aws", "security", "cloud", "standard"],
+      "estimated_hours": 150,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "CERT-MGT-PMI-ACP",
+      "title": "PMI Agile Certified Practitioner (PMI-ACP)",
+      "description": "Agile principles, practices, and tools. Kanban, Lean, and Test-Driven Development. Mapping Ubuntu pod-cooperation to professional Agile practice.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Agile Practice",
+      "subdomain": "Certification Bridge",
+      "tags": ["agile", "pm", "scrum", "standard"],
+      "estimated_hours": 90,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Social Studies"
+    }
+  ],
+  "edges": [
+    {
+      "from": "IT-SEC-201",
+      "to": "CERT-CYBER-CYSA",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Mesh immunity and Sybil resistance are the prerequisites for professional cybersecurity analysis."
+    },
+    {
+      "from": "CIV-501",
+      "to": "CERT-DATA-GOOGLE-PDE",
+      "edge_type": "Recommended",
+      "strength_permille": 750,
+      "rationale": "Thermodynamic governance provides the systemic context for professional data engineering."
+    },
+    {
+      "from": "VITA-CAP-01",
+      "to": "CERT-HLTH-NHA-CET",
+      "edge_type": "Recommended",
+      "strength_permille": 850,
+      "rationale": "Community vitality stewardship covers the majority of EKG technician field-competencies."
+    },
+    {
+      "from": "IT-SEC-101",
+      "to": "CERT-SEC-AWS-SPECIALTY",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Physical root-of-trust mastery is the foundation for advanced cloud security certification."
+    }
+  ]
+}

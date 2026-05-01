@@ -80,9 +80,9 @@ const TRUST_DECAY_PER_TICK: f64 = 0.005;
 impl Default for PsychologicalNeeds {
     fn default() -> Self {
         Self {
-            allostatic_load: 0.15,   // start slightly stressed (you're on a derelict ship)
-            social_satiation: 0.5,   // recently formed crew
-            engagement: 0.8,         // high initial motivation
+            allostatic_load: 0.15, // start slightly stressed (you're on a derelict ship)
+            social_satiation: 0.5, // recently formed crew
+            engagement: 0.8,       // high initial motivation
             burnout_ticks: 0,
         }
     }
@@ -105,7 +105,17 @@ impl Default for PsychologyTimer {
 /// This is intentional — cooperation is thermodynamically mandatory.
 pub fn psychology_tick_system(
     mut commands: Commands,
-    mut npcs: Query<(Entity, &mut PsychologicalNeeds, &Transform, &PhysicsBody, &mut NpcTrust, Option<&NpcCollapsed>), With<CrewNpc>>,
+    mut npcs: Query<
+        (
+            Entity,
+            &mut PsychologicalNeeds,
+            &Transform,
+            &PhysicsBody,
+            &mut NpcTrust,
+            Option<&NpcCollapsed>,
+        ),
+        With<CrewNpc>,
+    >,
     other_agents: Query<&Transform, With<CrewNpc>>,
     player_query: Query<&Transform, With<crate::components::Player>>,
     leviathan: Res<LeviathanState>,
@@ -128,7 +138,8 @@ pub fn psychology_tick_system(
     };
 
     // Collect all agent positions INCLUDING the player for proximity checks
-    let mut positions: Vec<Vec2> = other_agents.iter()
+    let mut positions: Vec<Vec2> = other_agents
+        .iter()
         .map(|t| t.translation.truncate())
         .collect();
     if let Ok(player_tf) = player_query.single() {
@@ -145,7 +156,8 @@ pub fn psychology_tick_system(
 
         // Count nearby agents including player (within harmony range)
         let harmony_range = physics.consciousness.constants.harmony_range as f32;
-        let nearby_count = positions.iter()
+        let nearby_count = positions
+            .iter()
             .filter(|p| {
                 let d = (**p - pos).length();
                 d > 2.0 && d < harmony_range
@@ -153,7 +165,9 @@ pub fn psychology_tick_system(
             .count();
 
         let is_isolated = nearby_count == 0;
-        let energy_frac = physics.consciousness.entities
+        let energy_frac = physics
+            .consciousness
+            .entities
             .get(&body.handle)
             .map(|e| e.energy.fraction_remaining() as f32)
             .unwrap_or(1.0);
@@ -187,7 +201,10 @@ pub fn psychology_tick_system(
         needs.social_satiation = needs.social_satiation.clamp(0.0, 1.0);
 
         // --- Engagement ---
-        if needs.allostatic_load > 0.5 && needs.social_satiation < ISOLATION_THRESHOLD && danger < 0.3 {
+        if needs.allostatic_load > 0.5
+            && needs.social_satiation < ISOLATION_THRESHOLD
+            && danger < 0.3
+        {
             needs.engagement -= ESCAPISM_DECAY;
         } else if danger > 0.5 {
             needs.engagement = (needs.engagement + 0.05).min(1.0);
@@ -200,9 +217,14 @@ pub fn psychology_tick_system(
         if needs.allostatic_load > COLLAPSE_THRESHOLD {
             needs.burnout_ticks += 1;
             if needs.burnout_ticks >= COLLAPSE_TICKS_REQUIRED {
-                eprintln!("[psychology] NPC collapsed from sustained burnout (load={:.2})", needs.allostatic_load);
+                eprintln!(
+                    "[psychology] NPC collapsed from sustained burnout (load={:.2})",
+                    needs.allostatic_load
+                );
                 needs.engagement = 0.0;
-                commands.entity(entity).insert(NpcCollapsed { recovery_tend_spent: 0 });
+                commands.entity(entity).insert(NpcCollapsed {
+                    recovery_tend_spent: 0,
+                });
             }
         } else {
             needs.burnout_ticks = 0;
@@ -226,7 +248,15 @@ pub struct CrewSavedCount(pub u32);
 /// On recovery: NPC revives, crew saved count increases, Leviathan threshold drops.
 pub fn npc_collapse_recovery_system(
     mut commands: Commands,
-    mut collapsed_npcs: Query<(Entity, &Transform, &mut NpcCollapsed, &mut PsychologicalNeeds), With<CrewNpc>>,
+    mut collapsed_npcs: Query<
+        (
+            Entity,
+            &Transform,
+            &mut NpcCollapsed,
+            &mut PsychologicalNeeds,
+        ),
+        With<CrewNpc>,
+    >,
     player_query: Query<&Transform, With<Player>>,
     wells: Query<(&Transform, &EnergyWell)>,
     keyboard: Res<ButtonInput<KeyCode>>,
@@ -234,7 +264,9 @@ pub fn npc_collapse_recovery_system(
     mut saved: ResMut<CrewSavedCount>,
     mut leviathan: ResMut<LeviathanState>,
 ) {
-    let Ok(player_tf) = player_query.single() else { return };
+    let Ok(player_tf) = player_query.single() else {
+        return;
+    };
     let player_pos = player_tf.translation.truncate();
 
     for (entity, npc_tf, mut collapsed, mut needs) in &mut collapsed_npcs {
@@ -270,7 +302,10 @@ pub fn npc_collapse_recovery_system(
 
         // Check if recovery threshold met.
         if collapsed.recovery_tend_spent >= 3 {
-            eprintln!("[psychology] NPC revived! Crew saved count: {}", saved.0 + 1);
+            eprintln!(
+                "[psychology] NPC revived! Crew saved count: {}",
+                saved.0 + 1
+            );
             commands.entity(entity).remove::<NpcCollapsed>();
             needs.allostatic_load = 0.4;
             needs.engagement = 0.5;
@@ -322,7 +357,9 @@ pub fn npc_visual_state_system(
         };
 
         // Apply visual state (preserve base green-ish color from spawn, just modulate brightness).
-        let Srgba { red, green, blue, .. } = sprite.color.to_srgba();
+        let Srgba {
+            red, green, blue, ..
+        } = sprite.color.to_srgba();
         let factor = load_dim * social_pulse;
         sprite.color = Color::srgb(
             (red * factor).clamp(0.0, 1.0),
@@ -369,9 +406,13 @@ mod tests {
 
     #[test]
     fn recovery_needs_three_tend() {
-        let collapsed = NpcCollapsed { recovery_tend_spent: 2 };
+        let collapsed = NpcCollapsed {
+            recovery_tend_spent: 2,
+        };
         assert!(collapsed.recovery_tend_spent < 3);
-        let recovered = NpcCollapsed { recovery_tend_spent: 3 };
+        let recovered = NpcCollapsed {
+            recovery_tend_spent: 3,
+        };
         assert!(recovered.recovery_tend_spent >= 3);
     }
 

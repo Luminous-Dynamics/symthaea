@@ -1,0 +1,138 @@
+{
+  "metadata": {
+    "title": "Zenith Professional Seed: The Complete Civilizational Roster",
+    "framework": "Global Zenith Mesh",
+    "source": "https://mycelix.org/certs-zenith",
+    "grade_level": "Professional/Expert",
+    "subject_area": "Multi-Sector",
+    "domain": "Professional Certification",
+    "version": "1.0",
+    "total_standards": 8,
+    "domains": [
+      "Wind Energy",
+      "Industrial Trades",
+      "HVAC & Thermal",
+      "High Finance",
+      "Agile Leadership"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "The final, exhaustive mapping of reputable global industry standards."
+  },
+  "nodes": [
+    {
+      "id": "CERT-WIND-GWO",
+      "title": "GWO Basic Safety Training (BST)",
+      "description": "The global standard for wind energy safety. Working at heights, fire awareness, and manual handling for offshore and onshore wind technicians.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Wind Energy",
+      "subdomain": "Certification Bridge",
+      "tags": ["wind", "safety", "energy", "renewable"],
+      "estimated_hours": 40,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering",
+      "academic_standards": [
+        {
+          "framework": "GWO",
+          "code": "BST",
+          "description": "Basic Safety Training",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "CERT-WELD-AWS",
+      "title": "AWS Certified Welder (SMAW/GTAW)",
+      "description": "Professional welding standards. Structural steel, pipe welding, and safety. Essential for industrial assembly and foundry operations.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Industrial Trades",
+      "subdomain": "Certification Bridge",
+      "tags": ["welding", "mfg", "trades", "safety"],
+      "estimated_hours": 180,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "CERT-HVAC-EPA608",
+      "title": "EPA Section 608 Universal",
+      "description": "Regulatory certification for the handling of refrigerants. High-pressure and low-pressure system safety and environmental protection.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "HVAC & Thermal",
+      "subdomain": "Certification Bridge",
+      "tags": ["hvac", "epa", "thermal", "safety"],
+      "estimated_hours": 30,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "CERT-FIN-CFA",
+      "title": "CFA Level 1 (Financial Science Mapping)",
+      "description": "Elite financial standards. Ethics, professional standards, quantitative methods, economics, and financial statement analysis.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "High Finance",
+      "subdomain": "Certification Bridge",
+      "tags": ["finance", "cfa", "economics", "expert"],
+      "estimated_hours": 300,
+      "grade_levels": ["Graduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Social Studies"
+    },
+    {
+      "id": "CERT-MGT-SCRUM",
+      "title": "Professional Scrum Master (PSM I)",
+      "description": "Agile leadership and empirical process control. The Scrum framework, roles, events, and artifacts. Mapping pod-facilitation to Agile standards.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Agile Leadership",
+      "subdomain": "Certification Bridge",
+      "tags": ["agile", "scrum", "leadership", "management"],
+      "estimated_hours": 40,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Social Studies"
+    }
+  ],
+  "edges": [
+    {
+      "from": "VOC-RE-101",
+      "to": "CERT-WIND-GWO",
+      "edge_type": "Recommended",
+      "strength_permille": 600,
+      "rationale": "General solar energy fundamentals provide the electrical safety baseline for wind technicians."
+    },
+    {
+      "from": "VOC-DT-101",
+      "to": "CERT-WELD-AWS",
+      "edge_type": "Recommended",
+      "strength_permille": 700,
+      "rationale": "Digital fabrication and CNC work provide the mechanical intuition for advanced welding."
+    },
+    {
+      "from": "CON-VOC-301",
+      "to": "CERT-HVAC-EPA608",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "Passive atmospheric management is the theoretical prerequisite for professional HVAC certification."
+    },
+    {
+      "from": "ECO-ADV-201",
+      "to": "CERT-FIN-CFA",
+      "edge_type": "Recommended",
+      "strength_permille": 600,
+      "rationale": "Mutual credit and value topology training provide the systemic foundation for CFA financial analysis."
+    },
+    {
+      "from": "HUM-CAP-04",
+      "to": "CERT-MGT-SCRUM",
+      "edge_type": "Recommended",
+      "strength_permille": 900,
+      "rationale": "Leading a sovereign pod charter is a direct application of Scrum servant-leadership principles."
+    }
+  ]
+}

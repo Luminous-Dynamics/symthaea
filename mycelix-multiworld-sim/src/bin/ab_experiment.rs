@@ -7,8 +7,8 @@
 //!
 //! Run: cargo run --release --bin ab_experiment
 
+use mycelix_multiworld_sim::config::{PolicyConfig, SimulationConfig};
 use mycelix_multiworld_sim::MultiWorldSimulator;
-use mycelix_multiworld_sim::config::{SimulationConfig, PolicyConfig};
 
 fn run_experiment(label: &str, policy: PolicyConfig, seed: u64, years: u32) {
     let mut config = SimulationConfig::default_150_year();
@@ -51,15 +51,22 @@ fn main() {
 
     println!("=== A/B EXPERIMENT: Symthaea vs Legacy Governance ===");
     println!("Seed: {} | Duration: {} years\n", seed, years);
-    println!("  {:<20} | {:<9} | {:<8} | {:<7} | {:<5} | {:<5} | {:<9} | {:<9} | {}",
-        "Condition", "CVS", "Pop", "Phi", "Wars", "Sec", "Turchin", "Trauma", "Result");
+    println!(
+        "  {:<20} | {:<9} | {:<8} | {:<7} | {:<5} | {:<5} | {:<9} | {:<9} | {}",
+        "Condition", "CVS", "Pop", "Phi", "Wars", "Sec", "Turchin", "Trauma", "Result"
+    );
     println!("  {}", "-".repeat(100));
 
     // Condition A: Full Symthaea (default)
     run_experiment("Symthaea (default)", PolicyConfig::default(), seed, years);
 
     // Condition B: Legacy mode (no trust-weighted governance, no FEP, no Sacred Stillness)
-    run_experiment("Legacy (no gating)", PolicyConfig::legacy_mode(), seed, years);
+    run_experiment(
+        "Legacy (no gating)",
+        PolicyConfig::legacy_mode(),
+        seed,
+        years,
+    );
 
     // Condition C: Utopia (no disasters, no conflict) — the ceiling
     run_experiment("Utopia (ceiling)", PolicyConfig::utopia_mode(), seed, years);

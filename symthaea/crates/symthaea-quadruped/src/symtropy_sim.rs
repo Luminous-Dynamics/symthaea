@@ -27,11 +27,19 @@ pub struct ConsciousnessQuadrupedCallback {
 }
 
 impl PhysicsCallback<3> for ConsciousnessQuadrupedCallback {
-    fn modulate_force(&self, _body: BodyHandle, force: &nalgebra::SVector<f64, 3>) -> nalgebra::SVector<f64, 3> {
+    fn modulate_force(
+        &self,
+        _body: BodyHandle,
+        force: &nalgebra::SVector<f64, 3>,
+    ) -> nalgebra::SVector<f64, 3> {
         *force * self.motor_gain as f64
     }
-    fn modulate_impulse(&self, impulse: f64, _contact: &nalgebra::SVector<f64, 3>) -> f64 { impulse }
-    fn friction_multiplier(&self, _contact: &nalgebra::SVector<f64, 3>, _body: BodyHandle) -> f64 { 1.0 }
+    fn modulate_impulse(&self, impulse: f64, _contact: &nalgebra::SVector<f64, 3>) -> f64 {
+        impulse
+    }
+    fn friction_multiplier(&self, _contact: &nalgebra::SVector<f64, 3>, _body: BodyHandle) -> f64 {
+        1.0
+    }
     fn on_collision(&mut self, _event: &CollisionEvent<3>) {}
     fn record_dissipation(&mut self, _energy: f64) {}
 }
@@ -75,9 +83,36 @@ impl SymtropyQuadrupedSimulator {
         ];
 
         let leg_spec = [
-            LinkSpec { mass: 0.5, length: 0.12, radius: 0.02, plane_a: 0, plane_b: 2, motor_max_force: Some(20.0), angle_limits: Some((-1.0, 1.0)), ..Default::default() },
-            LinkSpec { mass: 0.4, length: 0.15, radius: 0.015, plane_a: 1, plane_b: 2, motor_max_force: Some(15.0), angle_limits: Some((-2.0, 0.5)), ..Default::default() },
-            LinkSpec { mass: 0.3, length: 0.15, radius: 0.012, plane_a: 1, plane_b: 2, motor_max_force: Some(10.0), angle_limits: Some((-0.5, 2.5)), ..Default::default() },
+            LinkSpec {
+                mass: 0.5,
+                length: 0.12,
+                radius: 0.02,
+                plane_a: 0,
+                plane_b: 2,
+                motor_max_force: Some(20.0),
+                angle_limits: Some((-1.0, 1.0)),
+                ..Default::default()
+            },
+            LinkSpec {
+                mass: 0.4,
+                length: 0.15,
+                radius: 0.015,
+                plane_a: 1,
+                plane_b: 2,
+                motor_max_force: Some(15.0),
+                angle_limits: Some((-2.0, 0.5)),
+                ..Default::default()
+            },
+            LinkSpec {
+                mass: 0.3,
+                length: 0.15,
+                radius: 0.012,
+                plane_a: 1,
+                plane_b: 2,
+                motor_max_force: Some(10.0),
+                angle_limits: Some((-0.5, 2.5)),
+                ..Default::default()
+            },
         ];
 
         let mut legs = Vec::with_capacity(4);
@@ -110,7 +145,8 @@ impl SymtropyQuadrupedSimulator {
 
     /// Get torso height above ground.
     pub fn torso_height(&self) -> f64 {
-        self.world.body(self.torso)
+        self.world
+            .body(self.torso)
             .map(|b| b.transform.translation.0[2])
             .unwrap_or(0.0)
     }
@@ -121,7 +157,9 @@ impl SymtropyQuadrupedSimulator {
             let p = &body.transform.translation.0;
             self.state.base_position = [p[0], p[1], p[2]];
             self.state.base_linear_velocity = [
-                body.linear_velocity[0], body.linear_velocity[1], body.linear_velocity[2],
+                body.linear_velocity[0],
+                body.linear_velocity[1],
+                body.linear_velocity[2],
             ];
         }
         // Read joint angles from all 4 legs (3 joints each = 12 total)
@@ -149,8 +187,11 @@ impl QuadrupedPhysicsSimulator for SymtropyQuadrupedSimulator {
                     let target = cmd.joint_torques[cmd_idx] as f64 * gain * 3.0;
                     if let Some(body) = self.world.body_mut(link) {
                         let plane = if j == 0 { (0, 2) } else { (1, 2) };
-                        body.angular_velocity.set(plane.0, plane.1,
-                            body.angular_velocity.get(plane.0, plane.1) + target * dt);
+                        body.angular_velocity.set(
+                            plane.0,
+                            plane.1,
+                            body.angular_velocity.get(plane.0, plane.1) + target * dt,
+                        );
                     }
                 }
             }
@@ -160,13 +201,19 @@ impl QuadrupedPhysicsSimulator for SymtropyQuadrupedSimulator {
         self.sync_state();
     }
 
-    fn state(&self) -> &QuadrupedState { &self.state }
+    fn state(&self) -> &QuadrupedState {
+        &self.state
+    }
 
-    fn reset(&mut self) { *self = Self::new(); }
+    fn reset(&mut self) {
+        *self = Self::new();
+    }
 }
 
 impl Default for SymtropyQuadrupedSimulator {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -177,23 +224,36 @@ mod tests {
     fn test_construction() {
         let sim = SymtropyQuadrupedSimulator::new();
         assert_eq!(sim.legs.len(), 4);
-        for leg in &sim.legs { assert_eq!(leg.num_joints, 3); }
+        for leg in &sim.legs {
+            assert_eq!(leg.num_joints, 3);
+        }
     }
 
     #[test]
     fn test_stepping_stays_finite() {
         let mut sim = SymtropyQuadrupedSimulator::new();
-        let cmd = QuadrupedCommand { joint_torques: [0.0; NUM_ACTUATORS] };
-        for _ in 0..200 { sim.step(&cmd, 0.005); }
-        assert!(sim.state().is_finite(), "State should remain finite after stepping");
+        let cmd = QuadrupedCommand {
+            joint_torques: [0.0; NUM_ACTUATORS],
+        };
+        for _ in 0..200 {
+            sim.step(&cmd, 0.005);
+        }
+        assert!(
+            sim.state().is_finite(),
+            "State should remain finite after stepping"
+        );
     }
 
     #[test]
     fn test_torque_produces_motion() {
         let mut sim = SymtropyQuadrupedSimulator::new();
         let h0 = sim.torso_height();
-        let mut cmd = QuadrupedCommand { joint_torques: [0.3; NUM_ACTUATORS] };
-        for _ in 0..50 { sim.step(&cmd, 0.005); }
+        let mut cmd = QuadrupedCommand {
+            joint_torques: [0.3; NUM_ACTUATORS],
+        };
+        for _ in 0..50 {
+            sim.step(&cmd, 0.005);
+        }
         let h1 = sim.torso_height();
         assert!((h1 - h0).abs() > 0.001, "Torque should produce motion");
     }
@@ -202,16 +262,24 @@ mod tests {
     fn test_consciousness_zero_gain() {
         let mut sim = SymtropyQuadrupedSimulator::new();
         sim.set_motor_gain(0.0);
-        let mut cmd = QuadrupedCommand { joint_torques: [1.0; NUM_ACTUATORS] };
-        for _ in 0..50 { sim.step(&cmd, 0.005); }
+        let mut cmd = QuadrupedCommand {
+            joint_torques: [1.0; NUM_ACTUATORS],
+        };
+        for _ in 0..50 {
+            sim.step(&cmd, 0.005);
+        }
         assert!(sim.state().is_finite());
     }
 
     #[test]
     fn test_reset() {
         let mut sim = SymtropyQuadrupedSimulator::new();
-        let mut cmd = QuadrupedCommand { joint_torques: [0.5; NUM_ACTUATORS] };
-        for _ in 0..100 { sim.step(&cmd, 0.005); }
+        let mut cmd = QuadrupedCommand {
+            joint_torques: [0.5; NUM_ACTUATORS],
+        };
+        for _ in 0..100 {
+            sim.step(&cmd, 0.005);
+        }
         sim.reset();
         assert_eq!(sim.legs.len(), 4);
         assert!(sim.state().is_finite());

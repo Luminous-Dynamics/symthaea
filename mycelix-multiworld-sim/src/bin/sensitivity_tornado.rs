@@ -127,15 +127,21 @@ fn run_seed(seed: u64, ticks: u32, policy: &PolicyConfig, params: &SimulationPar
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    let n_seeds: usize = args.iter().position(|a| a == "--seeds")
+    let n_seeds: usize = args
+        .iter()
+        .position(|a| a == "--seeds")
         .and_then(|i| args.get(i + 1))
         .and_then(|s| s.parse().ok())
         .unwrap_or(10);
-    let ticks: u32 = args.iter().position(|a| a == "--ticks")
+    let ticks: u32 = args
+        .iter()
+        .position(|a| a == "--ticks")
         .and_then(|i| args.get(i + 1))
         .and_then(|s| s.parse().ok())
         .unwrap_or(1800);
-    let perturbation: f64 = args.iter().position(|a| a == "--perturbation")
+    let perturbation: f64 = args
+        .iter()
+        .position(|a| a == "--perturbation")
         .and_then(|i| args.get(i + 1))
         .and_then(|s| s.parse().ok())
         .unwrap_or(0.20); // ±20%
@@ -145,13 +151,17 @@ fn main() {
     let default_params = SimulationParams::default();
 
     eprintln!("=== SENSITIVITY TORNADO ===");
-    eprintln!("Seeds: {n_seeds}, Ticks: {ticks} ({:.0} years), Perturbation: ±{:.0}%",
-        ticks as f64 / 12.0, perturbation * 100.0);
+    eprintln!(
+        "Seeds: {n_seeds}, Ticks: {ticks} ({:.0} years), Perturbation: ±{:.0}%",
+        ticks as f64 / 12.0,
+        perturbation * 100.0
+    );
     eprintln!();
 
     // Run baseline
     eprintln!("Running baseline ({n_seeds} seeds)...");
-    let baseline_cvs: Vec<f64> = seeds.iter()
+    let baseline_cvs: Vec<f64> = seeds
+        .iter()
         .map(|&s| run_seed(s, ticks, &default_policy, &default_params))
         .collect();
     let mean_baseline = baseline_cvs.iter().sum::<f64>() / baseline_cvs.len() as f64;
@@ -175,25 +185,42 @@ fn main() {
         let low_val = default_val * (1.0 - perturbation);
         let high_val = default_val * (1.0 + perturbation);
 
-        eprint!("Testing {} ({:.4} → [{:.4}, {:.4}])...", param.name, default_val, low_val, high_val);
+        eprint!(
+            "Testing {} ({:.4} → [{:.4}, {:.4}])...",
+            param.name, default_val, low_val, high_val
+        );
 
         // Run low
-        let low_cvs: Vec<f64> = seeds.iter().map(|&s| {
-            let mut pol = default_policy.clone();
-            let mut par = default_params.clone();
-            if let Some(setter) = param.set_policy { setter(&mut pol, low_val); }
-            if let Some(setter) = param.set_params { setter(&mut par, low_val); }
-            run_seed(s, ticks, &pol, &par)
-        }).collect();
+        let low_cvs: Vec<f64> = seeds
+            .iter()
+            .map(|&s| {
+                let mut pol = default_policy.clone();
+                let mut par = default_params.clone();
+                if let Some(setter) = param.set_policy {
+                    setter(&mut pol, low_val);
+                }
+                if let Some(setter) = param.set_params {
+                    setter(&mut par, low_val);
+                }
+                run_seed(s, ticks, &pol, &par)
+            })
+            .collect();
 
         // Run high
-        let high_cvs: Vec<f64> = seeds.iter().map(|&s| {
-            let mut pol = default_policy.clone();
-            let mut par = default_params.clone();
-            if let Some(setter) = param.set_policy { setter(&mut pol, high_val); }
-            if let Some(setter) = param.set_params { setter(&mut par, high_val); }
-            run_seed(s, ticks, &pol, &par)
-        }).collect();
+        let high_cvs: Vec<f64> = seeds
+            .iter()
+            .map(|&s| {
+                let mut pol = default_policy.clone();
+                let mut par = default_params.clone();
+                if let Some(setter) = param.set_policy {
+                    setter(&mut pol, high_val);
+                }
+                if let Some(setter) = param.set_params {
+                    setter(&mut par, high_val);
+                }
+                run_seed(s, ticks, &pol, &par)
+            })
+            .collect();
 
         let mean_low = low_cvs.iter().sum::<f64>() / low_cvs.len() as f64;
         let mean_high = high_cvs.iter().sum::<f64>() / high_cvs.len() as f64;
@@ -202,19 +229,33 @@ fn main() {
         let range = (delta_high - delta_low).abs();
 
         // Bootstrap CI on the range
-        let range_samples: Vec<f64> = low_cvs.iter().zip(high_cvs.iter())
-            .map(|(l, h)| (h - l).abs()).collect();
+        let range_samples: Vec<f64> = low_cvs
+            .iter()
+            .zip(high_cvs.iter())
+            .map(|(l, h)| (h - l).abs())
+            .collect();
         let mut rng = StochasticEngine::new(42);
         let ci = bootstrap_ci(&range_samples, 0.95, 1000, &mut rng);
 
-        println!("{},{:.4},{:.4},{:.4},{:.4},{:.4},{:+.4},{:+.4},{:.4},{:.4},{:.4}",
-            param.name, default_val, low_val, high_val,
-            mean_low, mean_high, delta_low, delta_high, range,
+        println!(
+            "{},{:.4},{:.4},{:.4},{:.4},{:.4},{:+.4},{:+.4},{:.4},{:.4},{:.4}",
+            param.name,
+            default_val,
+            low_val,
+            high_val,
+            mean_low,
+            mean_high,
+            delta_low,
+            delta_high,
+            range,
             ci.as_ref().map(|c| c.lower).unwrap_or(0.0),
             ci.as_ref().map(|c| c.upper).unwrap_or(0.0),
         );
 
-        eprintln!(" range={:.4} (low {:+.4}, high {:+.4})", range, delta_low, delta_high);
+        eprintln!(
+            " range={:.4} (low {:+.4}, high {:+.4})",
+            range, delta_low, delta_high
+        );
         results.push((param.name, delta_low, delta_high, range));
     }
 
@@ -222,11 +263,17 @@ fn main() {
     results.sort_by(|a, b| b.3.partial_cmp(&a.3).unwrap_or(std::cmp::Ordering::Equal));
     eprintln!();
     eprintln!("=== TORNADO RANKING (by sensitivity range) ===");
-    eprintln!("{:<25} {:>10} {:>10} {:>10}", "Parameter", "Δ at -20%", "Δ at +20%", "Range");
+    eprintln!(
+        "{:<25} {:>10} {:>10} {:>10}",
+        "Parameter", "Δ at -20%", "Δ at +20%", "Range"
+    );
     eprintln!("{}", "-".repeat(60));
     for (name, dl, dh, range) in &results {
         let bar_len = (range / results[0].3 * 30.0).round() as usize;
         let bar: String = "█".repeat(bar_len.max(1));
-        eprintln!("{:<25} {:>+10.4} {:>+10.4} {:>10.4} {}", name, dl, dh, range, bar);
+        eprintln!(
+            "{:<25} {:>+10.4} {:>+10.4} {:>10.4} {}",
+            name, dl, dh, range, bar
+        );
     }
 }

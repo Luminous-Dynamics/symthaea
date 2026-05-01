@@ -33,10 +33,10 @@
 //! - Henrich, J. (2004). Demography and cultural evolution: How adaptive
 //!   cultural processes can produce maladaptive losses. American Antiquity.
 
+use crate::epistemic_decay::EpistemicState;
+use crate::relativistic_dht::RelativisticReconciliation;
 use crate::stochastic::StochasticEngine;
 use crate::stoichiometry::ElementalLedger;
-use crate::relativistic_dht::RelativisticReconciliation;
-use crate::epistemic_decay::EpistemicState;
 use serde::{Deserialize, Serialize};
 
 // ============================================================================
@@ -248,7 +248,8 @@ impl GenerationShip {
         }
 
         // Communication delay grows with distance
-        let distance_traveled_ly = self.cruise_velocity_c * (self.elapsed_ticks as f64 / TICKS_PER_YEAR);
+        let distance_traveled_ly =
+            self.cruise_velocity_c * (self.elapsed_ticks as f64 / TICKS_PER_YEAR);
         self.comms_delay_ticks = (distance_traveled_ly * TICKS_PER_YEAR) as u32; // 1 tick per light-month
 
         // Hull degradation
@@ -258,7 +259,11 @@ impl GenerationShip {
 
         // Cosmic ray accumulation (higher outside heliosphere)
         let heliosphere_crossed = self.elapsed_ticks > 24; // ~2 years to exit heliosphere
-        let ray_multiplier = if heliosphere_crossed { INTERSTELLAR_COSMIC_RAY_MULTIPLIER } else { 1.0 };
+        let ray_multiplier = if heliosphere_crossed {
+            INTERSTELLAR_COSMIC_RAY_MULTIPLIER
+        } else {
+            1.0
+        };
         self.cosmic_ray_dose += 0.001 * ray_multiplier;
 
         // Cultural speciation check
@@ -302,7 +307,9 @@ impl GenerationShip {
             self.hull_integrity = self.hull_integrity.max(0.0);
             // Hull breach loses atmosphere mass (stoichiometric consequence)
             self.mass_ledger.hull_breach(damage);
-            disasters.push(InterstellarDisaster::MicrometeoiteImpact { hull_damage: damage });
+            disasters.push(InterstellarDisaster::MicrometeoiteImpact {
+                hull_damage: damage,
+            });
         }
 
         // Navigation drift (0.2% chance per tick during cruise)
@@ -310,20 +317,26 @@ impl GenerationShip {
             let fuel_cost = 0.001 + rng.next_f64() * 0.005;
             self.fuel_fraction -= fuel_cost;
             self.fuel_fraction = self.fuel_fraction.max(0.0);
-            disasters.push(InterstellarDisaster::NavigationDrift { correction_fuel_fraction: fuel_cost });
+            disasters.push(InterstellarDisaster::NavigationDrift {
+                correction_fuel_fraction: fuel_cost,
+            });
         }
 
         // Knowledge attrition (Henrich effect — 0.3% chance per tick)
         if rng.next_f64() < 0.003 {
             let loss = 0.005 + rng.next_f64() * 0.02;
-            disasters.push(InterstellarDisaster::KnowledgeAttrition { skill_loss_fraction: loss });
+            disasters.push(InterstellarDisaster::KnowledgeAttrition {
+                skill_loss_fraction: loss,
+            });
         }
 
         // Social fracture (0.1% chance per tick, increases with isolation)
         let fracture_prob = 0.001 * (1.0 + self.isolation_ticks as f64 / 600.0);
         if rng.next_f64() < fracture_prob {
             let loss = 0.01 + rng.next_f64() * 0.05;
-            disasters.push(InterstellarDisaster::SocialFracture { cohesion_loss: loss });
+            disasters.push(InterstellarDisaster::SocialFracture {
+                cohesion_loss: loss,
+            });
         }
 
         for d in &disasters {
@@ -335,7 +348,9 @@ impl GenerationShip {
 
     /// Fraction of transit completed (0.0 to 1.0).
     pub fn transit_progress(&self) -> f64 {
-        if self.transit_ticks == 0 { return 0.0; }
+        if self.transit_ticks == 0 {
+            return 0.0;
+        }
         (self.elapsed_ticks as f64 / self.transit_ticks as f64).min(1.0)
     }
 
@@ -394,9 +409,21 @@ impl GenerationShip {
             self.cosmic_ray_dose,
             self.comms_roundtrip_years(),
             self.isolation_ticks as f64 / TICKS_PER_YEAR,
-            if self.culturally_speciated { "YES" } else { "No" },
-            if self.below_minimum_viable(current_pop) { "YES — CRITICAL" } else { "No" },
-            if self.henrich_risk(current_pop) { "YES — knowledge loss risk" } else { "No" },
+            if self.culturally_speciated {
+                "YES"
+            } else {
+                "No"
+            },
+            if self.below_minimum_viable(current_pop) {
+                "YES — CRITICAL"
+            } else {
+                "No"
+            },
+            if self.henrich_risk(current_pop) {
+                "YES — knowledge loss risk"
+            } else {
+                "No"
+            },
             self.disasters_survived.len(),
         );
         result.push_str(&format!(
@@ -433,29 +460,30 @@ mod tests {
 
     #[test]
     fn proxima_transit_time() {
-        let ship = GenerationShip::new(
-            1, InterstellarDestination::ProximaCentauri, 0.05, 0, 500,
-        );
+        let ship = GenerationShip::new(1, InterstellarDestination::ProximaCentauri, 0.05, 0, 500);
         // 4.24 ly / 0.05c = 84.8 years = ~1018 ticks
-        assert!((ship.transit_ticks as f64 - 1017.6).abs() < 2.0,
-            "Transit ticks: {}", ship.transit_ticks);
+        assert!(
+            (ship.transit_ticks as f64 - 1017.6).abs() < 2.0,
+            "Transit ticks: {}",
+            ship.transit_ticks
+        );
     }
 
     #[test]
     fn barnards_transit_time() {
-        let ship = GenerationShip::new(
-            1, InterstellarDestination::BarnardsStar, 0.05, 0, 500,
-        );
+        let ship = GenerationShip::new(1, InterstellarDestination::BarnardsStar, 0.05, 0, 500);
         // 5.96 ly / 0.05c = 119.2 years = ~1430 ticks
-        assert!(ship.transit_ticks > 1400 && ship.transit_ticks < 1500,
-            "Transit ticks: {}", ship.transit_ticks);
+        assert!(
+            ship.transit_ticks > 1400 && ship.transit_ticks < 1500,
+            "Transit ticks: {}",
+            ship.transit_ticks
+        );
     }
 
     #[test]
     fn ship_arrives() {
-        let mut ship = GenerationShip::new(
-            1, InterstellarDestination::ProximaCentauri, 0.05, 0, 500,
-        );
+        let mut ship =
+            GenerationShip::new(1, InterstellarDestination::ProximaCentauri, 0.05, 0, 500);
         let mut rng = make_rng();
         let total = ship.transit_ticks;
         for _ in 0..total + 10 {
@@ -467,51 +495,62 @@ mod tests {
 
     #[test]
     fn hull_degrades() {
-        let mut ship = GenerationShip::new(
-            1, InterstellarDestination::ProximaCentauri, 0.05, 0, 500,
-        );
+        let mut ship =
+            GenerationShip::new(1, InterstellarDestination::ProximaCentauri, 0.05, 0, 500);
         let mut rng = make_rng();
         let initial = ship.hull_integrity;
-        for _ in 0..120 { // 10 years
+        for _ in 0..120 {
+            // 10 years
             ship.tick(&mut rng);
         }
-        assert!(ship.hull_integrity < initial,
-            "Hull should degrade: {} → {}", initial, ship.hull_integrity);
-        assert!(ship.hull_integrity > 0.9,
-            "Hull shouldn't fail in 10 years: {}", ship.hull_integrity);
+        assert!(
+            ship.hull_integrity < initial,
+            "Hull should degrade: {} → {}",
+            initial,
+            ship.hull_integrity
+        );
+        assert!(
+            ship.hull_integrity > 0.9,
+            "Hull shouldn't fail in 10 years: {}",
+            ship.hull_integrity
+        );
     }
 
     #[test]
     fn comms_delay_grows() {
-        let mut ship = GenerationShip::new(
-            1, InterstellarDestination::ProximaCentauri, 0.05, 0, 500,
-        );
+        let mut ship =
+            GenerationShip::new(1, InterstellarDestination::ProximaCentauri, 0.05, 0, 500);
         let mut rng = make_rng();
-        for _ in 0..120 { // 10 years
+        for _ in 0..120 {
+            // 10 years
             ship.tick(&mut rng);
         }
         assert!(ship.comms_delay_ticks > 0, "Comms delay should grow");
-        assert!(ship.comms_roundtrip_years() > 0.5, "Should have >6 month RT delay at 10 years");
+        assert!(
+            ship.comms_roundtrip_years() > 0.5,
+            "Should have >6 month RT delay at 10 years"
+        );
     }
 
     #[test]
     fn cultural_speciation_at_50_years() {
-        let mut ship = GenerationShip::new(
-            1, InterstellarDestination::ProximaCentauri, 0.05, 0, 500,
-        );
+        let mut ship =
+            GenerationShip::new(1, InterstellarDestination::ProximaCentauri, 0.05, 0, 500);
         let mut rng = make_rng();
         assert!(!ship.culturally_speciated);
         for _ in 0..CULTURAL_SPECIATION_TICKS + 10 {
             ship.tick(&mut rng);
         }
-        assert!(ship.culturally_speciated, "Should speciate after 50 years isolation");
+        assert!(
+            ship.culturally_speciated,
+            "Should speciate after 50 years isolation"
+        );
     }
 
     #[test]
     fn fuel_consumed_during_accel_decel() {
-        let mut ship = GenerationShip::new(
-            1, InterstellarDestination::ProximaCentauri, 0.05, 0, 500,
-        );
+        let mut ship =
+            GenerationShip::new(1, InterstellarDestination::ProximaCentauri, 0.05, 0, 500);
         let mut rng = make_rng();
         let initial_fuel = ship.fuel_fraction;
         // Run through full transit
@@ -520,27 +559,31 @@ mod tests {
         }
         assert!(ship.fuel_fraction < initial_fuel, "Should consume fuel");
         // Navigation drift may consume additional fuel
-        assert!(ship.fuel_fraction > -0.1, "Shouldn't go deeply negative: {}", ship.fuel_fraction);
+        assert!(
+            ship.fuel_fraction > -0.1,
+            "Shouldn't go deeply negative: {}",
+            ship.fuel_fraction
+        );
     }
 
     #[test]
     fn disasters_accumulate() {
-        let mut ship = GenerationShip::new(
-            1, InterstellarDestination::ProximaCentauri, 0.05, 0, 500,
-        );
+        let mut ship =
+            GenerationShip::new(1, InterstellarDestination::ProximaCentauri, 0.05, 0, 500);
         let mut rng = make_rng();
-        for _ in 0..600 { // 50 years
+        for _ in 0..600 {
+            // 50 years
             ship.tick(&mut rng);
         }
-        assert!(!ship.disasters_survived.is_empty(),
-            "Should have some disasters in 50 years");
+        assert!(
+            !ship.disasters_survived.is_empty(),
+            "Should have some disasters in 50 years"
+        );
     }
 
     #[test]
     fn minimum_viable_population() {
-        let ship = GenerationShip::new(
-            1, InterstellarDestination::ProximaCentauri, 0.05, 0, 500,
-        );
+        let ship = GenerationShip::new(1, InterstellarDestination::ProximaCentauri, 0.05, 0, 500);
         assert!(!ship.below_minimum_viable(500));
         assert!(!ship.below_minimum_viable(100));
         assert!(ship.below_minimum_viable(50));
@@ -548,9 +591,7 @@ mod tests {
 
     #[test]
     fn henrich_threshold() {
-        let ship = GenerationShip::new(
-            1, InterstellarDestination::ProximaCentauri, 0.05, 0, 500,
-        );
+        let ship = GenerationShip::new(1, InterstellarDestination::ProximaCentauri, 0.05, 0, 500);
         assert!(!ship.henrich_risk(500));
         assert!(!ship.henrich_risk(200));
         assert!(ship.henrich_risk(150));
@@ -558,23 +599,24 @@ mod tests {
 
     #[test]
     fn comms_impossible_at_distance() {
-        let mut ship = GenerationShip::new(
-            1, InterstellarDestination::ProximaCentauri, 0.05, 0, 500,
-        );
+        let mut ship =
+            GenerationShip::new(1, InterstellarDestination::ProximaCentauri, 0.05, 0, 500);
         let mut rng = make_rng();
         // At 0.05c, after ~60 years (720 ticks), distance > 3 ly, RT > 6 years
-        for _ in 0..900 { // 75 years
+        for _ in 0..900 {
+            // 75 years
             ship.tick(&mut rng);
         }
-        assert!(ship.comms_roundtrip_years() > 5.0,
-            "RT delay: {} years", ship.comms_roundtrip_years());
+        assert!(
+            ship.comms_roundtrip_years() > 5.0,
+            "RT delay: {} years",
+            ship.comms_roundtrip_years()
+        );
     }
 
     #[test]
     fn status_report_generates() {
-        let ship = GenerationShip::new(
-            1, InterstellarDestination::ProximaCentauri, 0.05, 0, 500,
-        );
+        let ship = GenerationShip::new(1, InterstellarDestination::ProximaCentauri, 0.05, 0, 500);
         let report = ship.status_report(480);
         assert!(report.contains("Proxima Centauri"));
         assert!(report.contains("480"));
@@ -594,7 +636,10 @@ mod tests {
         );
         assert_eq!(ship.destination.name(), "Alpha Centauri A");
         // 4.37 ly / 0.10c = 43.7 years = ~524 ticks
-        assert!(ship.transit_ticks > 500 && ship.transit_ticks < 550,
-            "Transit ticks: {}", ship.transit_ticks);
+        assert!(
+            ship.transit_ticks > 500 && ship.transit_ticks < 550,
+            "Transit ticks: {}",
+            ship.transit_ticks
+        );
     }
 }

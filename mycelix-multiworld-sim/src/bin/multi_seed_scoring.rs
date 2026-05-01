@@ -12,12 +12,12 @@
 //! cargo run --release --bin multi_seed_scoring -- --seeds 50 --years 150
 //! ```
 
+use mycelix_bridge_common::sovereign_gate::CivicTier;
 use mycelix_multiworld_sim::{
-    MultiWorldSimulator,
     config::SimulationConfig,
     scoring_bridge::{builtin_scoring_models, ScoringModelGovernance},
+    MultiWorldSimulator,
 };
-use mycelix_bridge_common::sovereign_gate::CivicTier;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -63,9 +63,15 @@ fn main() {
     }
 
     // Aggregate statistics per model
-    eprintln!("\n=== AGGREGATE RESULTS ({} seeds × {} years) ===\n", n_seeds, years);
+    eprintln!(
+        "\n=== AGGREGATE RESULTS ({} seeds × {} years) ===\n",
+        n_seeds, years
+    );
 
-    let model_names: Vec<&str> = models.iter().map(|m| m.descriptor.model_id.as_str()).collect();
+    let model_names: Vec<&str> = models
+        .iter()
+        .map(|m| m.descriptor.model_id.as_str())
+        .collect();
 
     eprintln!(
         "{:<25} {:>10} {:>10} {:>12} {:>12} {:>10}",
@@ -77,7 +83,10 @@ fn main() {
 
     for (m_idx, name) in model_names.iter().enumerate() {
         let scores: Vec<f64> = all_results.iter().map(|r| r[m_idx].mean_score).collect();
-        let stewards: Vec<f64> = all_results.iter().map(|r| r[m_idx].steward_plus_pct).collect();
+        let stewards: Vec<f64> = all_results
+            .iter()
+            .map(|r| r[m_idx].steward_plus_pct)
+            .collect();
         let ginis: Vec<f64> = all_results.iter().map(|r| r[m_idx].gini).collect();
         let cvss: Vec<f64> = all_results.iter().map(|r| r[m_idx].cvs).collect();
         let votings: Vec<f64> = all_results.iter().map(|r| r[m_idx].voting_pct).collect();
@@ -95,10 +104,18 @@ fn main() {
             "{:<25} {:>10} {:>10} {:>12} {:>12} {:>10}",
             name,
             format!("{:.3}±{:.3}", agg.score.mean, agg.score.ci95),
-            format!("{:.1}±{:.1}", agg.steward_plus.mean * 100.0, agg.steward_plus.ci95 * 100.0),
+            format!(
+                "{:.1}±{:.1}",
+                agg.steward_plus.mean * 100.0,
+                agg.steward_plus.ci95 * 100.0
+            ),
             format!("{:.3}±{:.3}", agg.gini.mean, agg.gini.ci95),
             format!("{:.3}±{:.3}", agg.cvs.mean, agg.cvs.ci95),
-            format!("{:.1}±{:.1}", agg.voting.mean * 100.0, agg.voting.ci95 * 100.0),
+            format!(
+                "{:.1}±{:.1}",
+                agg.voting.mean * 100.0,
+                agg.voting.ci95 * 100.0
+            ),
         );
 
         model_aggregates.push(agg);
@@ -123,15 +140,25 @@ fn main() {
             let d_gini = cohens_d(&ginis_a, &ginis_b);
 
             eprintln!("{} vs {}:", model_names[i], model_names[j]);
-            eprintln!("  Score:    d = {:+.3} ({})", d_score, effect_label(d_score));
-            eprintln!("  Steward+: d = {:+.3} ({})", d_steward, effect_label(d_steward));
+            eprintln!(
+                "  Score:    d = {:+.3} ({})",
+                d_score,
+                effect_label(d_score)
+            );
+            eprintln!(
+                "  Steward+: d = {:+.3} ({})",
+                d_steward,
+                effect_label(d_steward)
+            );
             eprintln!("  Gini:     d = {:+.3} ({})", d_gini, effect_label(d_gini));
             eprintln!();
         }
     }
 
     // CSV output to stdout
-    println!("seed,model_id,mean_score,steward_plus_pct,citizen_plus_pct,gini,cvs,voting_pct,population");
+    println!(
+        "seed,model_id,mean_score,steward_plus_pct,citizen_plus_pct,gini,cvs,voting_pct,population"
+    );
     for (seed_idx, seed_results) in all_results.iter().enumerate() {
         let actual_seed = seed_idx as u64 * 7 + 42;
         for stats in seed_results {
@@ -184,7 +211,11 @@ struct ModelAggregate {
 fn aggregate(values: &[f64]) -> AggStat {
     let n = values.len() as f64;
     if n == 0.0 {
-        return AggStat { mean: 0.0, stddev: 0.0, ci95: 0.0 };
+        return AggStat {
+            mean: 0.0,
+            stddev: 0.0,
+            ci95: 0.0,
+        };
     }
     let mean = values.iter().sum::<f64>() / n;
     let variance = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / n;
@@ -240,7 +271,9 @@ fn evaluate_model_stats(
             CivicTier::Guardian => 4,
         };
         tier_counts[idx] += 1;
-        if result.vote_weight > 0.0 { voting += 1; }
+        if result.vote_weight > 0.0 {
+            voting += 1;
+        }
     }
 
     let n = agents.len() as f64;
@@ -261,11 +294,15 @@ fn evaluate_model_stats(
 
 fn gini_coefficient(values: &[f64]) -> f64 {
     let n = values.len();
-    if n == 0 { return 0.0; }
+    if n == 0 {
+        return 0.0;
+    }
     let mut sorted = values.to_vec();
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     let sum: f64 = sorted.iter().sum();
-    if sum <= 0.0 { return 0.0; }
+    if sum <= 0.0 {
+        return 0.0;
+    }
     let mut num = 0.0f64;
     for (i, &v) in sorted.iter().enumerate() {
         num += (2.0 * (i + 1) as f64 - n as f64 - 1.0) * v;

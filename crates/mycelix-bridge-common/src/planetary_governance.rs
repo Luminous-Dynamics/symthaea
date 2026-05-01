@@ -72,14 +72,20 @@ impl SimConsciousnessVector {
     /// - Community = "your care for others" (care_activation)
     /// - Engagement = "your participation" (harmonic_alignment)
     pub fn to_mycelix_profile(&self) -> MycelixConsciousnessMapping {
-        let identity = (self.level * 0.4 + self.meta_awareness * 0.3
-            + self.epistemic_confidence * 0.3).clamp(0.0, 1.0);
+        let identity =
+            (self.level * 0.4 + self.meta_awareness * 0.3 + self.epistemic_confidence * 0.3)
+                .clamp(0.0, 1.0);
         let reputation = self.coherence.clamp(0.0, 1.0);
         let community = self.care_activation.clamp(0.0, 1.0);
         let engagement = self.harmonic_alignment.clamp(0.0, 1.0);
-        let combined = identity * 0.25 + reputation * 0.25
-            + community * 0.30 + engagement * 0.20;
-        MycelixConsciousnessMapping { identity, reputation, community, engagement, combined }
+        let combined = identity * 0.25 + reputation * 0.25 + community * 0.30 + engagement * 0.20;
+        MycelixConsciousnessMapping {
+            identity,
+            reputation,
+            community,
+            engagement,
+            combined,
+        }
     }
 }
 
@@ -107,7 +113,9 @@ pub enum LatencyClass {
 impl LatencyClass {
     pub fn from_body(body: PlanetaryBody) -> Self {
         match body {
-            PlanetaryBody::Earth | PlanetaryBody::Moon | PlanetaryBody::OrbitalHabitat => Self::RealTime,
+            PlanetaryBody::Earth | PlanetaryBody::Moon | PlanetaryBody::OrbitalHabitat => {
+                Self::RealTime
+            }
             PlanetaryBody::Mars | PlanetaryBody::Ceres => Self::NearRealTime,
             PlanetaryBody::Europa => Self::HighLatency,
             PlanetaryBody::Titan => Self::ExtremeLatency,
@@ -120,9 +128,9 @@ impl LatencyClass {
     pub fn governance_penalty(&self) -> f64 {
         match self {
             Self::RealTime => 0.0,
-            Self::NearRealTime => 0.15,      // Can't do live debate, but async works
-            Self::HighLatency => 0.35,        // Deliberation takes days per round
-            Self::ExtremeLatency => 0.50,     // Effectively autonomous governance
+            Self::NearRealTime => 0.15, // Can't do live debate, but async works
+            Self::HighLatency => 0.35,  // Deliberation takes days per round
+            Self::ExtremeLatency => 0.50, // Effectively autonomous governance
         }
     }
 
@@ -212,10 +220,15 @@ impl TendEquivalence {
 
     /// Vitality tier recommendation based on output level.
     pub fn recommended_vitality_tier(&self) -> &'static str {
-        if self.total_per_capita > 30.0 { "Emergency" }
-        else if self.total_per_capita > 20.0 { "High" }
-        else if self.total_per_capita > 10.0 { "Elevated" }
-        else { "Normal" }
+        if self.total_per_capita > 30.0 {
+            "Emergency"
+        } else if self.total_per_capita > 20.0 {
+            "High"
+        } else if self.total_per_capita > 10.0 {
+            "Elevated"
+        } else {
+            "Normal"
+        }
     }
 }
 
@@ -256,8 +269,12 @@ mod tests {
     #[test]
     fn test_consciousness_mapping_preserves_range() {
         let sim = SimConsciousnessVector {
-            level: 0.8, meta_awareness: 0.6, coherence: 0.7,
-            care_activation: 0.9, harmonic_alignment: 0.5, epistemic_confidence: 0.4,
+            level: 0.8,
+            meta_awareness: 0.6,
+            coherence: 0.7,
+            care_activation: 0.9,
+            harmonic_alignment: 0.5,
+            epistemic_confidence: 0.4,
         };
         let mycelix = sim.to_mycelix_profile();
         assert!(mycelix.identity >= 0.0 && mycelix.identity <= 1.0);
@@ -268,10 +285,22 @@ mod tests {
 
     #[test]
     fn test_latency_classes() {
-        assert_eq!(LatencyClass::from_body(PlanetaryBody::Moon), LatencyClass::RealTime);
-        assert_eq!(LatencyClass::from_body(PlanetaryBody::Mars), LatencyClass::NearRealTime);
-        assert_eq!(LatencyClass::from_body(PlanetaryBody::Europa), LatencyClass::HighLatency);
-        assert_eq!(LatencyClass::from_body(PlanetaryBody::Titan), LatencyClass::ExtremeLatency);
+        assert_eq!(
+            LatencyClass::from_body(PlanetaryBody::Moon),
+            LatencyClass::RealTime
+        );
+        assert_eq!(
+            LatencyClass::from_body(PlanetaryBody::Mars),
+            LatencyClass::NearRealTime
+        );
+        assert_eq!(
+            LatencyClass::from_body(PlanetaryBody::Europa),
+            LatencyClass::HighLatency
+        );
+        assert_eq!(
+            LatencyClass::from_body(PlanetaryBody::Titan),
+            LatencyClass::ExtremeLatency
+        );
     }
 
     #[test]
@@ -284,11 +313,17 @@ mod tests {
 
     #[test]
     fn test_governance_penalty_ordering() {
-        assert!(LatencyClass::RealTime.governance_penalty()
-            < LatencyClass::NearRealTime.governance_penalty());
-        assert!(LatencyClass::NearRealTime.governance_penalty()
-            < LatencyClass::HighLatency.governance_penalty());
-        assert!(LatencyClass::HighLatency.governance_penalty()
-            < LatencyClass::ExtremeLatency.governance_penalty());
+        assert!(
+            LatencyClass::RealTime.governance_penalty()
+                < LatencyClass::NearRealTime.governance_penalty()
+        );
+        assert!(
+            LatencyClass::NearRealTime.governance_penalty()
+                < LatencyClass::HighLatency.governance_penalty()
+        );
+        assert!(
+            LatencyClass::HighLatency.governance_penalty()
+                < LatencyClass::ExtremeLatency.governance_penalty()
+        );
     }
 }

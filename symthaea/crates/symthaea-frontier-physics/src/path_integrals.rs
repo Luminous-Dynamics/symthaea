@@ -31,8 +31,18 @@ pub struct PathIntegral1D {
 }
 
 impl PathIntegral1D {
-    pub fn new(n_slices: usize, total_time: f64, mass: f64, potential: Box<dyn Fn(f64) -> f64>) -> Self {
-        Self { n_slices, total_time, mass, potential }
+    pub fn new(
+        n_slices: usize,
+        total_time: f64,
+        mass: f64,
+        potential: Box<dyn Fn(f64) -> f64>,
+    ) -> Self {
+        Self {
+            n_slices,
+            total_time,
+            mass,
+            potential,
+        }
     }
 
     /// Compute the Euclidean action S_E[path] = Σ [½m(Δx/Δt)² + V(x)] Δt.
@@ -63,7 +73,9 @@ impl PathIntegral1D {
 
         let mut rng_state = seed;
         let mut pseudo_random = || -> f64 {
-            rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            rng_state = rng_state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             (rng_state >> 33) as f64 / (1u64 << 31) as f64
         };
 
@@ -108,7 +120,9 @@ impl PathIntegral1D {
 /// Free particle propagator (exact): K(x_f, x_i; t) = √(m/2πiℏt) exp(im(x_f-x_i)²/2ℏt)
 /// Returns |K|² (probability density).
 pub fn free_particle_propagator_sq(x_f: f64, x_i: f64, mass: f64, time: f64) -> f64 {
-    if time <= 0.0 { return 0.0; }
+    if time <= 0.0 {
+        return 0.0;
+    }
     let prefactor = mass / (2.0 * PI * time);
     let dx = x_f - x_i;
     prefactor * (-mass * dx * dx / (2.0 * time)).exp()
@@ -118,17 +132,17 @@ pub fn free_particle_propagator_sq(x_f: f64, x_i: f64, mass: f64, time: f64) -> 
 
 /// Harmonic oscillator propagator (exact, Euclidean/thermal).
 /// K_E(x_f, x_i; β) = √(mω/2πsinh(ωβ)) × exp(-mω/(2sinh(ωβ))[(x_f²+x_i²)cosh(ωβ) - 2x_f x_i])
-pub fn harmonic_oscillator_propagator(
-    x_f: f64, x_i: f64, mass: f64, omega: f64, beta: f64,
-) -> f64 {
+pub fn harmonic_oscillator_propagator(x_f: f64, x_i: f64, mass: f64, omega: f64, beta: f64) -> f64 {
     let sinh_ob = (omega * beta).sinh();
     let cosh_ob = (omega * beta).cosh();
 
-    if sinh_ob.abs() < 1e-30 { return 0.0; }
+    if sinh_ob.abs() < 1e-30 {
+        return 0.0;
+    }
 
     let prefactor = (mass * omega / (2.0 * PI * sinh_ob)).sqrt();
-    let exponent = -mass * omega / (2.0 * sinh_ob)
-        * ((x_f * x_f + x_i * x_i) * cosh_ob - 2.0 * x_f * x_i);
+    let exponent =
+        -mass * omega / (2.0 * sinh_ob) * ((x_f * x_f + x_i * x_i) * cosh_ob - 2.0 * x_f * x_i);
 
     prefactor * exponent.exp()
 }
@@ -165,14 +179,23 @@ mod tests {
         // At origin (x_f = x_i), propagator increases with time (Euclidean localization)
         let p_origin_short = free_particle_propagator_sq(0.0, 0.0, 1.0, 0.1);
         let p_origin_long = free_particle_propagator_sq(0.0, 0.0, 1.0, 1.0);
-        assert!(p_origin_short > p_origin_long, "Origin propagator decreases: {:.6} > {:.6}", p_origin_short, p_origin_long);
+        assert!(
+            p_origin_short > p_origin_long,
+            "Origin propagator decreases: {:.6} > {:.6}",
+            p_origin_short,
+            p_origin_long
+        );
     }
 
     #[test]
     fn test_harmonic_propagator_ground_state() {
         // At β→∞ (T→0), propagator projects onto ground state
         let k = harmonic_oscillator_propagator(0.0, 0.0, 1.0, 1.0, 100.0);
-        assert!(k > 0.0, "Ground state propagator should be positive: {:.6}", k);
+        assert!(
+            k > 0.0,
+            "Ground state propagator should be positive: {:.6}",
+            k
+        );
     }
 
     #[test]
@@ -189,13 +212,21 @@ mod tests {
         // Straight path from 0 to 1: S = ½m(Δx)²/T = 0.5
         let path: Vec<f64> = (0..=10).map(|i| i as f64 / 10.0).collect();
         let s = pi.euclidean_action(&path);
-        assert!((s - 0.5).abs() < 0.1, "Free particle action = {:.4}, expected ~0.5", s);
+        assert!(
+            (s - 0.5).abs() < 0.1,
+            "Free particle action = {:.4}, expected ~0.5",
+            s
+        );
     }
 
     #[test]
     fn test_path_integral_mc_runs() {
         let pi = PathIntegral1D::new(20, 1.0, 1.0, Box::new(|x| 0.5 * x * x));
         let z = pi.partition_function_mc(1.0, 1000, 42);
-        assert!(z > 0.0 && z.is_finite(), "Z should be positive and finite: {:.6}", z);
+        assert!(
+            z > 0.0 && z.is_finite(),
+            "Z should be positive and finite: {:.6}",
+            z
+        );
     }
 }

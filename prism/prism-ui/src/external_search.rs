@@ -37,13 +37,25 @@ pub struct ExternalResult {
 
 impl ExternalResult {
     pub fn loading(engine: &str) -> Self {
-        Self { engine: engine.to_string(), hits: vec![], status: SearchStatus::Loading }
+        Self {
+            engine: engine.to_string(),
+            hits: vec![],
+            status: SearchStatus::Loading,
+        }
     }
     pub fn error(engine: &str, msg: &str) -> Self {
-        Self { engine: engine.to_string(), hits: vec![], status: SearchStatus::Error(msg.to_string()) }
+        Self {
+            engine: engine.to_string(),
+            hits: vec![],
+            status: SearchStatus::Error(msg.to_string()),
+        }
     }
     pub fn done(engine: &str, hits: Vec<ExternalHit>) -> Self {
-        Self { engine: engine.to_string(), hits, status: SearchStatus::Done }
+        Self {
+            engine: engine.to_string(),
+            hits,
+            status: SearchStatus::Done,
+        }
     }
 }
 
@@ -72,17 +84,22 @@ pub async fn search_wikipedia(query: &str) -> ExternalResult {
     match gloo_net::http::Request::get(&url).send().await {
         Ok(resp) => match resp.json::<WikiResponse>().await {
             Ok(data) => {
-                let hits: Vec<ExternalHit> = data.pages.unwrap_or_default().into_iter().map(|p| {
-                    let title = p.title.unwrap_or_default();
-                    let snippet = strip_html_tags(&p.excerpt.unwrap_or_default());
-                    let key = p.key.unwrap_or_default();
-                    ExternalHit {
-                        title: title.clone(),
-                        snippet,
-                        url: Some(format!("https://en.wikipedia.org/wiki/{}", key)),
-                        source_type: "article".to_string(),
-                    }
-                }).collect();
+                let hits: Vec<ExternalHit> = data
+                    .pages
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|p| {
+                        let title = p.title.unwrap_or_default();
+                        let snippet = strip_html_tags(&p.excerpt.unwrap_or_default());
+                        let key = p.key.unwrap_or_default();
+                        ExternalHit {
+                            title: title.clone(),
+                            snippet,
+                            url: Some(format!("https://en.wikipedia.org/wiki/{}", key)),
+                            source_type: "article".to_string(),
+                        }
+                    })
+                    .collect();
                 ExternalResult::done("Wikipedia", hits)
             }
             Err(e) => ExternalResult::error("Wikipedia", &format!("Parse error: {}", e)),
@@ -182,7 +199,10 @@ pub async fn search_duckduckgo(query: &str) -> ExternalResult {
             }
             Err(e) => ExternalResult::error("DuckDuckGo", &format!("Parse error: {}", e)),
         },
-        Err(_) => ExternalResult::error("DuckDuckGo", "CORS proxy not running. Start with: cargo run -p prism-proxy"),
+        Err(_) => ExternalResult::error(
+            "DuckDuckGo",
+            "CORS proxy not running. Start with: cargo run -p prism-proxy",
+        ),
     }
 }
 
@@ -217,18 +237,21 @@ pub async fn query_ollama(query: &str) -> ExternalResult {
             Ok(data) => {
                 let model = data.model.unwrap_or_else(|| "unknown".to_string());
                 let text = data.response.unwrap_or_else(|| "No response".to_string());
-                ExternalResult::done("Ollama", vec![ExternalHit {
-                    title: format!("AI Response ({})", model),
-                    snippet: text,
-                    url: None,
-                    source_type: "ai-generated".to_string(),
-                }])
+                ExternalResult::done(
+                    "Ollama",
+                    vec![ExternalHit {
+                        title: format!("AI Response ({})", model),
+                        snippet: text,
+                        url: None,
+                        source_type: "ai-generated".to_string(),
+                    }],
+                )
             }
             Err(e) => ExternalResult::error("Ollama", &format!("Parse error: {}", e)),
         },
         Err(_) => ExternalResult::error(
             "Ollama",
-            "Local Ollama not detected.\n\nTo enable AI comparison, start Ollama with CORS:\nOLLAMA_ORIGINS=\"*\" ollama serve"
+            "Local Ollama not detected.\n\nTo enable AI comparison, start Ollama with CORS:\nOLLAMA_ORIGINS=\"*\" ollama serve",
         ),
     }
 }
@@ -268,11 +291,7 @@ pub async fn search_brave(query: &str) -> ExternalResult {
     };
 
     let proxy_base = get_proxy_base();
-    let url = format!(
-        "{}/api/brave?q={}",
-        proxy_base,
-        urlencoding(query),
-    );
+    let url = format!("{}/api/brave?q={}", proxy_base, urlencoding(query),);
 
     match gloo_net::http::Request::get(&url)
         .header("X-Brave-Key", &api_key)
@@ -296,19 +315,28 @@ pub async fn search_brave(query: &str) -> ExternalResult {
                     .collect();
 
                 if hits.is_empty() {
-                    ExternalResult::done("Brave", vec![ExternalHit {
-                        title: "No results".to_string(),
-                        snippet: "Brave Search returned no results for this query.".to_string(),
-                        url: Some(format!("https://search.brave.com/search?q={}", urlencoding(query))),
-                        source_type: "link".to_string(),
-                    }])
+                    ExternalResult::done(
+                        "Brave",
+                        vec![ExternalHit {
+                            title: "No results".to_string(),
+                            snippet: "Brave Search returned no results for this query.".to_string(),
+                            url: Some(format!(
+                                "https://search.brave.com/search?q={}",
+                                urlencoding(query)
+                            )),
+                            source_type: "link".to_string(),
+                        }],
+                    )
                 } else {
                     ExternalResult::done("Brave", hits)
                 }
             }
             Err(e) => ExternalResult::error("Brave", &format!("Parse error: {}", e)),
         },
-        Err(_) => ExternalResult::error("Brave", "CORS proxy not running. Start with: cargo run -p prism-proxy"),
+        Err(_) => ExternalResult::error(
+            "Brave",
+            "CORS proxy not running. Start with: cargo run -p prism-proxy",
+        ),
     }
 }
 
@@ -361,7 +389,9 @@ pub async fn query_perplexity(query: &str) -> ExternalResult {
         .body(body.to_string())
     {
         Ok(r) => r,
-        Err(e) => return ExternalResult::error("Perplexity", &format!("Request build error: {}", e)),
+        Err(e) => {
+            return ExternalResult::error("Perplexity", &format!("Request build error: {}", e));
+        }
     };
 
     match request.send().await {
@@ -375,16 +405,22 @@ pub async fn query_perplexity(query: &str) -> ExternalResult {
                     .and_then(|m| m.content)
                     .unwrap_or_else(|| "No response".to_string());
 
-                ExternalResult::done("Perplexity", vec![ExternalHit {
-                    title: format!("AI Response ({})", model),
-                    snippet: text,
-                    url: None,
-                    source_type: "ai-generated".to_string(),
-                }])
+                ExternalResult::done(
+                    "Perplexity",
+                    vec![ExternalHit {
+                        title: format!("AI Response ({})", model),
+                        snippet: text,
+                        url: None,
+                        source_type: "ai-generated".to_string(),
+                    }],
+                )
             }
             Err(e) => ExternalResult::error("Perplexity", &format!("Parse error: {}", e)),
         },
-        Err(_) => ExternalResult::error("Perplexity", "CORS proxy not running. Start with: cargo run -p prism-proxy"),
+        Err(_) => ExternalResult::error(
+            "Perplexity",
+            "CORS proxy not running. Start with: cargo run -p prism-proxy",
+        ),
     }
 }
 
@@ -393,11 +429,13 @@ pub async fn query_perplexity(query: &str) -> ExternalResult {
 // ═══════════════════════════════════════════════════════════════
 
 fn urlencoding(s: &str) -> String {
-    s.chars().map(|c| match c {
-        ' ' => '+'.to_string(),
-        'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' | '.' | '~' => c.to_string(),
-        _ => format!("%{:02X}", c as u32),
-    }).collect()
+    s.chars()
+        .map(|c| match c {
+            ' ' => '+'.to_string(),
+            'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' | '.' | '~' => c.to_string(),
+            _ => format!("%{:02X}", c as u32),
+        })
+        .collect()
 }
 
 fn strip_html_tags(html: &str) -> String {

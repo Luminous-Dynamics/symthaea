@@ -55,7 +55,7 @@ pub fn ConnectionStatusIndicator(
         signal(ConnectionState::MockMode).0
     });
     let dot_color = move || match state.get() {
-        ConnectionState::Connected => "#22c55e",   // green-500
+        ConnectionState::Connected => "#22c55e",    // green-500
         ConnectionState::Connecting => "#eab308",   // yellow-500
         ConnectionState::Disconnected => "#ef4444", // red-500
         ConnectionState::MockMode => "#a855f7",     // purple-500

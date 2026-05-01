@@ -4,8 +4,8 @@
 //! Orbital camera for the globe — mouse drag to rotate, scroll to zoom,
 //! golden-ratio Lissajous drift when idle.
 
-use bevy::prelude::*;
 use bevy::input::mouse::{AccumulatedMouseMotion, AccumulatedMouseScroll};
+use bevy::prelude::*;
 use sol_atlas_core::constants::*;
 
 /// Marker component for the orbital camera.
@@ -44,8 +44,7 @@ impl Default for OrbitalCameraConfig {
 pub fn spawn_camera(mut commands: Commands) {
     commands.spawn((
         Camera3d::default(),
-        Transform::from_xyz(0.0, 0.0, CAMERA_INITIAL_DISTANCE)
-            .looking_at(Vec3::ZERO, Vec3::Y),
+        Transform::from_xyz(0.0, 0.0, CAMERA_INITIAL_DISTANCE).looking_at(Vec3::ZERO, Vec3::Y),
         OrbitalCamera,
     ));
 }
@@ -80,8 +79,7 @@ pub fn orbital_camera_system(
     // Zoom
     let scroll = accumulated_scroll.delta.y;
     if scroll.abs() > 0.001 {
-        config.distance = (config.distance - scroll * 0.3)
-            .clamp(CAMERA_ZOOM_MIN, CAMERA_ZOOM_MAX);
+        config.distance = (config.distance - scroll * 0.3).clamp(CAMERA_ZOOM_MIN, CAMERA_ZOOM_MAX);
     }
 
     // Inertia decay

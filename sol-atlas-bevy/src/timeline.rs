@@ -38,10 +38,7 @@ pub enum TimelineLayer {
 
 /// Keyboard input for timeline scrubbing.
 /// Left/Right: ±1 year. Shift+Left/Right: ±10. Space: toggle auto-play.
-pub fn timeline_input_system(
-    kb: Res<ButtonInput<KeyCode>>,
-    mut state: ResMut<TimelineState>,
-) {
+pub fn timeline_input_system(kb: Res<ButtonInput<KeyCode>>, mut state: ResMut<TimelineState>) {
     let shift = kb.pressed(KeyCode::ShiftLeft) || kb.pressed(KeyCode::ShiftRight);
     let step = if shift { 10 } else { 1 };
 
@@ -57,10 +54,7 @@ pub fn timeline_input_system(
 }
 
 /// Auto-play: advance timeline when playing.
-pub fn timeline_autoplay_system(
-    time: Res<Time>,
-    mut state: ResMut<TimelineState>,
-) {
+pub fn timeline_autoplay_system(time: Res<Time>, mut state: ResMut<TimelineState>) {
     if state.playing {
         state.accumulator += time.delta_secs() * state.speed;
         while state.accumulator >= 1.0 {

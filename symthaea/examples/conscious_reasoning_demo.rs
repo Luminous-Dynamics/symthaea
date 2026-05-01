@@ -58,6 +58,7 @@ fn main() {
             },
         ],
         tool: Some(ToolDescriptor::read_only("nix search nixpkgs firefox")),
+        code_context: None,
         recent_utility: 0.5,
         cycle_id: 1,
         neuromod_exploration_mod: 1.0,
@@ -121,6 +122,7 @@ fn main() {
                 .with_rollback("nixos-rebuild switch --rollback")
                 .with_calibration_count(100),
         ),
+        code_context: None,
         recent_utility: 0.3,
         cycle_id: 2,
         neuromod_exploration_mod: 1.0,
@@ -175,6 +177,7 @@ fn main() {
         available_budget_us: 800, // <2ms → Tier 0
         available_actions: vec![],
         tool: None,
+        code_context: None,
         recent_utility: 0.5,
         cycle_id: 3,
         neuromod_exploration_mod: 1.0,

@@ -204,7 +204,9 @@ impl EducationEngine {
                     let strongest = skills
                         .iter()
                         .enumerate()
-                        .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                        .max_by(|(_, a), (_, b)| {
+                            a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
+                        })
                         .map(|(i, _)| i)
                         .unwrap_or(0);
                     agent.skills.learn(strongest, REVIEW_SKILL_GAIN);
@@ -303,8 +305,8 @@ impl EducationEngine {
                     .min(1.0);
 
             // Social boost with diminishing returns (capped per tick)
-            let learner_remaining = MAX_EDUCATION_SOCIAL_BOOST_PER_TICK
-                - social_boost_this_tick[m.learner_idx];
+            let learner_remaining =
+                MAX_EDUCATION_SOCIAL_BOOST_PER_TICK - social_boost_this_tick[m.learner_idx];
             let learner_boost = TEACHING_SOCIAL_BOOST.min(learner_remaining.max(0.0));
             world.agents[m.learner_idx].needs.social_satiation =
                 (world.agents[m.learner_idx].needs.social_satiation + learner_boost).min(1.0);
@@ -319,12 +321,11 @@ impl EducationEngine {
             // Teacher cognitive fatigue: projecting knowledge outward costs bandwidth.
             // Teaching is care work, and care work is real work.
             world.agents[m.teacher_idx].needs.allostatic_load =
-                (world.agents[m.teacher_idx].needs.allostatic_load + TEACHER_FATIGUE_COST)
-                    .min(1.0);
+                (world.agents[m.teacher_idx].needs.allostatic_load + TEACHER_FATIGUE_COST).min(1.0);
 
             // Social boost with diminishing returns
-            let teacher_remaining = MAX_EDUCATION_SOCIAL_BOOST_PER_TICK
-                - social_boost_this_tick[m.teacher_idx];
+            let teacher_remaining =
+                MAX_EDUCATION_SOCIAL_BOOST_PER_TICK - social_boost_this_tick[m.teacher_idx];
             let teacher_boost = TEACHING_SOCIAL_BOOST.min(teacher_remaining.max(0.0));
             world.agents[m.teacher_idx].needs.social_satiation =
                 (world.agents[m.teacher_idx].needs.social_satiation + teacher_boost).min(1.0);
@@ -339,10 +340,14 @@ impl EducationEngine {
             // to shift a dimension by one full unit. Students aren't blank slates.
             let teacher_ethics = world.agents[m.teacher_idx].ethics.clone();
             let student = &mut world.agents[m.learner_idx];
-            student.ethics.deontological += (teacher_ethics.deontological - student.ethics.deontological) * 0.03;
-            student.ethics.consequentialist += (teacher_ethics.consequentialist - student.ethics.consequentialist) * 0.03;
-            student.ethics.virtue_care += (teacher_ethics.virtue_care - student.ethics.virtue_care) * 0.03;
-            student.ethics.relational += (teacher_ethics.relational - student.ethics.relational) * 0.03;
+            student.ethics.deontological +=
+                (teacher_ethics.deontological - student.ethics.deontological) * 0.03;
+            student.ethics.consequentialist +=
+                (teacher_ethics.consequentialist - student.ethics.consequentialist) * 0.03;
+            student.ethics.virtue_care +=
+                (teacher_ethics.virtue_care - student.ethics.virtue_care) * 0.03;
+            student.ethics.relational +=
+                (teacher_ethics.relational - student.ethics.relational) * 0.03;
 
             summary.teaching_interactions += 1;
             summary.tend_distributed += TEACHING_TEND_REWARD;
@@ -365,11 +370,8 @@ impl EducationEngine {
         // First pass: compute mean skills and education (immutable borrow)
         let n = world.agents.iter().filter(|a| a.is_alive()).count() as f64;
         if n > 0.0 {
-            let critical_sectors: [(usize, &str); 3] = [
-                (1, "agriculture"),
-                (2, "medicine"),
-                (0, "engineering"),
-            ];
+            let critical_sectors: [(usize, &str); 3] =
+                [(1, "agriculture"), (2, "medicine"), (0, "engineering")];
             let mut crisis_sectors: Vec<(usize, &str, f64)> = Vec::new();
 
             for &(sector, name) in &critical_sectors {
@@ -487,10 +489,16 @@ mod tests {
             faction_id: None,
             generation: 0,
             trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
-                    ethics: crate::agent::EthicalOrientation::default(),
-                    sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
-                    justice: crate::sub_passport::RestorativeJustice::new(),
+            cumulative_dose_sv: 0.0,
+            adversarial: None,
+            coordination_understanding: 0.0,
+            mycel_score: 0.1,
+            sap_balance: 100.0,
+            is_biological: true,
+            wounds: Vec::new(),
+            ethics: crate::agent::EthicalOrientation::default(),
+            sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
+            justice: crate::sub_passport::RestorativeJustice::new(),
         }
     }
 
@@ -515,7 +523,9 @@ mod tests {
             economy: crate::economy::WorldEconomy::new(),
             harmony: crate::harmony::HarmonyTracker::new(),
             governance: crate::governance::WorldGovernance::new(),
-            metabolism_state: crate::metabolism::MetabolismState::default(), currency_state: crate::currency::WorldCurrencyState::default(), policy_state: crate::proposals::PolicyState::default(),
+            metabolism_state: crate::metabolism::MetabolismState::default(),
+            currency_state: crate::currency::WorldCurrencyState::default(),
+            policy_state: crate::proposals::PolicyState::default(),
             power_generation_kw: 0.0,
             power_demand_kw: 0.0,
             narrative_identity: crate::world::NarrativeIdentity::default(),
@@ -575,7 +585,7 @@ mod tests {
     fn test_medium_stress_agent_reviews() {
         let mut agent = make_agent(0, 30);
         agent.needs.allostatic_load = 0.4; // between 0.3 and 0.6
-        // Give a clear strongest skill
+                                           // Give a clear strongest skill
         agent.skills.learn(2, 0.5); // medicine = 0.6
 
         let initial_medicine = agent.skills.as_slice()[2];
@@ -706,7 +716,7 @@ mod tests {
         let mut a2 = make_agent(1, 25);
         a2.needs.allostatic_load = 0.1;
         a2.skills.learn(2, 0.45); // medicine = 0.55
-        // Gap = 0.10 < TEACHING_SKILL_GAP (0.2)
+                                  // Gap = 0.10 < TEACHING_SKILL_GAP (0.2)
 
         let mut world = make_world(vec![a1, a2]);
         let mut rng = StochasticEngine::new(42);
@@ -784,7 +794,10 @@ mod tests {
 
         let (_, summary) = EducationEngine::tick(&mut world, TEST_TICK, &mut rng);
 
-        assert!(summary.teaching_interactions > 0, "Should have teaching interaction");
+        assert!(
+            summary.teaching_interactions > 0,
+            "Should have teaching interaction"
+        );
         let new_teacher_med = world.agents[0].skills.as_slice()[2];
         assert!(
             new_teacher_med > initial_teacher_med,
@@ -799,7 +812,7 @@ mod tests {
         let mut teacher = make_agent(0, 30);
         teacher.needs.allostatic_load = 0.1;
         teacher.skills.learn(2, 0.7); // medicine = 0.8
-        // Raise teacher's other skills so learners can't teach back
+                                      // Raise teacher's other skills so learners can't teach back
         for s in [0, 1, 3, 4, 5, 6, 7] {
             teacher.skills.learn(s, 0.55); // becomes 0.65
         }
@@ -983,7 +996,10 @@ mod tests {
 
         let (events, summary) = EducationEngine::tick(&mut world, TEST_TICK, &mut rng);
 
-        assert!(summary.teaching_interactions > 0, "Should have teaching interaction");
+        assert!(
+            summary.teaching_interactions > 0,
+            "Should have teaching interaction"
+        );
         let teaching_events: Vec<_> = events
             .iter()
             .filter(|e| e.event_type == CivEventType::TeachingInteraction)

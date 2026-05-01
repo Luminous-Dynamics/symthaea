@@ -36,6 +36,8 @@ logs/
 # Environment
 .env
 .env.local
+.venv/
+**/.venv/
 
 # Benchmark intermediate files (keep history)
 # .benchmark-history/
@@ -69,6 +71,10 @@ archive/
 !crates/symthaea-spore/data/broca-pipeline-distilled.bin
 !crates/symthaea-stt/data/mini_cmudict.txt
 !src/voice/data/cmudict.dict
+!data/benchmarks/
+!data/benchmarks/humaneval/
+!data/benchmarks/humaneval/README.md
+!data/benchmarks/humaneval/rust_smoke.jsonl
 models/
 results/
 zenodo-dataset/

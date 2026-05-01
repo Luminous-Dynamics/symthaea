@@ -129,9 +129,9 @@ pub struct ConsciousnessEmergencePoint {
 }
 
 /// Consciousness feasibility thresholds.
-pub const THRESHOLD_MINIMAL: f64 = 0.01;  // Any consciousness at all
+pub const THRESHOLD_MINIMAL: f64 = 0.01; // Any consciousness at all
 pub const THRESHOLD_SENTIENT: f64 = 0.05; // Sentient experience possible
-pub const THRESHOLD_AWARE: f64 = 0.15;    // Self-aware organisms possible
+pub const THRESHOLD_AWARE: f64 = 0.15; // Self-aware organisms possible
 pub const THRESHOLD_REFLECTIVE: f64 = 0.30; // Meta-cognitive reflection possible
 
 /// Compute the consciousness emergence curve from B(t) dimension history.
@@ -199,10 +199,7 @@ pub fn emergence_report(curve: &[ConsciousnessEmergencePoint]) -> String {
     report.push_str("|----------|-------------|------------|----------|\n");
 
     for pt in curve {
-        let milestone_str = pt
-            .milestone
-            .as_deref()
-            .unwrap_or("");
+        let milestone_str = pt.milestone.as_deref().unwrap_or("");
         if !milestone_str.is_empty() || pt.feasibility > 0.01 {
             report.push_str(&format!(
                 "| {:.1} | {:.4} | {} | {} |\n",
@@ -219,16 +216,28 @@ pub fn emergence_report(curve: &[ConsciousnessEmergencePoint]) -> String {
 
     report.push_str("\n## Key Findings\n\n");
     if let Some(pt) = first_minimal {
-        report.push_str(&format!("- **First minimal consciousness**: ~{:.0} Ma (bottleneck: {})\n", pt.age_ma, pt.bottleneck));
+        report.push_str(&format!(
+            "- **First minimal consciousness**: ~{:.0} Ma (bottleneck: {})\n",
+            pt.age_ma, pt.bottleneck
+        ));
     }
     if let Some(pt) = first_sentient {
-        report.push_str(&format!("- **Sentient experience possible**: ~{:.0} Ma (bottleneck: {})\n", pt.age_ma, pt.bottleneck));
+        report.push_str(&format!(
+            "- **Sentient experience possible**: ~{:.0} Ma (bottleneck: {})\n",
+            pt.age_ma, pt.bottleneck
+        ));
     }
     if let Some(pt) = first_aware {
-        report.push_str(&format!("- **Self-awareness possible**: ~{:.0} Ma (bottleneck: {})\n", pt.age_ma, pt.bottleneck));
+        report.push_str(&format!(
+            "- **Self-awareness possible**: ~{:.0} Ma (bottleneck: {})\n",
+            pt.age_ma, pt.bottleneck
+        ));
     }
     if let Some(pt) = first_reflective {
-        report.push_str(&format!("- **Meta-cognitive reflection**: ~{:.0} Ma (bottleneck: {})\n", pt.age_ma, pt.bottleneck));
+        report.push_str(&format!(
+            "- **Meta-cognitive reflection**: ~{:.0} Ma (bottleneck: {})\n",
+            pt.age_ma, pt.bottleneck
+        ));
     }
 
     report
@@ -334,7 +343,8 @@ mod tests {
             .count();
         // workspace or integration should be the most common bottleneck
         assert!(
-            workspace_bottleneck_count > 0 || precambrian.iter().any(|p| p.bottleneck == "integration"),
+            workspace_bottleneck_count > 0
+                || precambrian.iter().any(|p| p.bottleneck == "integration"),
             "Precambrian bottleneck should be workspace or integration"
         );
     }

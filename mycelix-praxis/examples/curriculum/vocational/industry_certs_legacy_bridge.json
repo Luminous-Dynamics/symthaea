@@ -1,0 +1,156 @@
+{
+  "metadata": {
+    "title": "Legacy Bridge Seed: Enterprise Dominance Standards",
+    "framework": "Global Legacy Mesh",
+    "source": "https://mycelix.org/certs-legacy",
+    "grade_level": "Professional/Senior",
+    "subject_area": "Multi-Sector",
+    "domain": "Professional Certification",
+    "version": "1.0",
+    "total_standards": 6,
+    "domains": [
+      "Enterprise Resource Planning",
+      "Advanced Networking",
+      "Project Leadership",
+      "Database Systems",
+      "Executive HR"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Closing the gap between decentralized mastery and the pillars of legacy enterprise infrastructure."
+  },
+  "nodes": [
+    {
+      "id": "CERT-ERP-SAP-ASSOC",
+      "title": "SAP Certified Associate: Business Process Integration",
+      "description": "Fundamental knowledge of SAP ERP business processes. Financials, logistics, and human capital. Mapping collective procurement to the world's leading ERP.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Enterprise Resource Planning",
+      "subdomain": "Certification Bridge",
+      "tags": ["sap", "erp", "business", "logistics", "standard"],
+      "estimated_hours": 180,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Social Studies",
+      "economic_signals": {
+        "average_starting_salary": 85000,
+        "market_demand": "Extreme",
+        "growth_rate_percent": 12
+      },
+      "wisdom_bridge": {
+        "pattern_name": "The Code of Hammurabi",
+        "tradition": "Ancient Mesopotamia",
+        "description": "The logic of standardized social and economic order. SAP is the modern digital instantiation of the desire for a unified 'Code of Business'."
+      }
+    },
+    {
+      "id": "CERT-NET-CCNP-ENT",
+      "title": "Cisco CCNP Enterprise (350-401 ENCOR Mapping)",
+      "description": "Advanced routing, switching, wireless, and security. Designing and implementing enterprise network core technologies. Linked to Mesh Infrastructure.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Advanced Networking",
+      "subdomain": "Certification Bridge",
+      "tags": ["cisco", "ccnp", "networking", "core", "standard"],
+      "estimated_hours": 250,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science",
+      "economic_signals": {
+        "average_starting_salary": 95000,
+        "market_demand": "High",
+        "growth_rate_percent": 8
+      },
+      "wisdom_bridge": {
+        "pattern_name": "The Hermetic Web",
+        "tradition": "Hermeticism",
+        "description": "As above, so below; the principle of mental and physical connectedness. Advanced routing is the geometric expression of the interconnected mind."
+      }
+    },
+    {
+      "id": "CERT-MGT-PMP",
+      "title": "PMP (Project Management Professional) Mapping",
+      "description": "The gold standard for project management. Predictive, agile, and hybrid approaches. Mapping Ubuntu pod-leadership and charters to the PMBOK Guide.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Project Leadership",
+      "subdomain": "Certification Bridge",
+      "tags": ["pmp", "pmi", "management", "leadership", "standard"],
+      "estimated_hours": 200,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Evaluate",
+      "subject_area": "Social Studies",
+      "economic_signals": {
+        "average_starting_salary": 110000,
+        "market_demand": "Extreme",
+        "growth_rate_percent": 15
+      },
+      "wisdom_bridge": {
+        "pattern_name": "Roman Engineering",
+        "tradition": "Ancient Rome",
+        "description": "The logic of building for eternity through disciplined coordination. The PMP is the modern ritual of the Master Builder."
+      }
+    },
+    {
+      "id": "CERT-DATA-ORACLE-DBA",
+      "title": "Oracle Database Administration Professional",
+      "description": "Installation, configuration, performance tuning, and backup/recovery. Mapping predictive ledger integrity to enterprise SQL standards.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Database Systems",
+      "subdomain": "Certification Bridge",
+      "tags": ["oracle", "database", "sql", "dba", "standard"],
+      "estimated_hours": 180,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science",
+      "economic_signals": {
+        "average_starting_salary": 90000,
+        "market_demand": "Steady",
+        "growth_rate_percent": 5
+      }
+    },
+    {
+      "id": "CERT-HR-SHRM-SCP",
+      "title": "SHRM Senior Certified Professional (SHRM-SCP)",
+      "description": "Developing and implementing HR strategy. Executive leadership and organizational effectiveness. Mapping Ubuntu governance to the highest HR standard.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Executive HR",
+      "subdomain": "Certification Bridge",
+      "tags": ["hr", "executive", "shrm", "governance", "standard"],
+      "estimated_hours": 250,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Create",
+      "subject_area": "Social Studies",
+      "economic_signals": {
+        "average_starting_salary": 120000,
+        "market_demand": "High",
+        "growth_rate_percent": 7
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "CIV-GEN-050",
+      "to": "CERT-ERP-SAP-ASSOC",
+      "edge_type": "Recommended",
+      "strength_permille": 700,
+      "rationale": "Collective decision-making provides the organizational context for SAP business integration."
+    },
+    {
+      "from": "CERT-IT-COMPTIA-NET",
+      "to": "CERT-NET-CCNP-ENT",
+      "edge_type": "Requires",
+      "strength_permille": 950,
+      "rationale": "CCNP assumes the foundational networking knowledge established in Network+."
+    },
+    {
+      "from": "CERT-MGT-CAPM",
+      "to": "CERT-MGT-PMP",
+      "edge_type": "Requires",
+      "strength_permille": 850,
+      "rationale": "PMP is the advanced culmination of the Project Management Associate standard."
+    }
+  ]
+}

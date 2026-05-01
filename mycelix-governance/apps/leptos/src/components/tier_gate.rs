@@ -8,6 +8,7 @@
 //! so children are rendered once.
 
 use leptos::prelude::*;
+use mycelix_leptos_core::consciousness::{combined_score, DIMENSION_LABELS, SovereignDimension};
 use personal_leptos_types::TrustTier;
 use mycelix_leptos_core::use_consciousness;
 
@@ -36,7 +37,7 @@ pub fn TierGate(
         >
             {move || {
                 let profile = consciousness.profile.get();
-                let score = profile.combined_score();
+                let score = combined_score(&profile);
                 let needed = min_tier.min_score();
                 let gap = needed - score;
                 view! {
@@ -60,10 +61,16 @@ pub fn TierGate(
                         </span>
                     </div>
                     <div class="gate-dimensions">
-                        <span class="dim">{format!("identity: {:.2}", profile.identity)}</span>
-                        <span class="dim">{format!("reputation: {:.2}", profile.reputation)}</span>
-                        <span class="dim">{format!("community: {:.2}", profile.community)}</span>
-                        <span class="dim">{format!("engagement: {:.2}", profile.engagement)}</span>
+                        {[
+                            SovereignDimension::EpistemicIntegrity,
+                            SovereignDimension::NetworkResilience,
+                            SovereignDimension::CivicParticipation,
+                            SovereignDimension::SemanticResonance,
+                        ].into_iter().map(|dim| {
+                            let label = &DIMENSION_LABELS[dim.index()];
+                            let value = profile.get(dim);
+                            view! { <span class="dim">{format!("{}: {:.2}", label.name_en, value)}</span> }
+                        }).collect_view()}
                     </div>
                 }
             }}

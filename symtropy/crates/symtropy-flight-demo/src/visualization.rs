@@ -3,7 +3,7 @@
 //! 3D scene: ground, quadrotor body + rotors, and waypoint markers.
 
 use bevy::prelude::*;
-use symthaea_flight::simulator::PhysicsSimulator;
+use symthaea_multirotor::simulator::PhysicsSimulator;
 
 use crate::resources::*;
 

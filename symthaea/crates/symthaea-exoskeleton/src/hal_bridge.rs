@@ -96,7 +96,10 @@ pub fn run_bridged_session(
 
     report.final_phi_gain = sim.callback.motor_gain;
     // Check that at least one chain tip is still finite
-    let spine_finite = sim.spine_chain.links.first()
+    let spine_finite = sim
+        .spine_chain
+        .links
+        .first()
         .and_then(|&h| sim.world.body(h))
         .map(|b| b.transform.translation.0.iter().all(|v| v.is_finite()))
         .unwrap_or(false);
@@ -140,7 +143,10 @@ mod tests {
     fn test_bridged_session_respects_consciousness() {
         let mut sim = FullFrameSimulator::new();
         sim.set_consciousness(0.5); // Yellow tier
-        let config = HalBridgeConfig { max_ticks: Some(20), use_mock_i2c: true };
+        let config = HalBridgeConfig {
+            max_ticks: Some(20),
+            use_mock_i2c: true,
+        };
         let report = run_bridged_session(&mut sim, config);
         // motor_gain for phi=0.5 is 0.6 (Yellow)
         assert_eq!(report.final_phi_gain, 0.6);

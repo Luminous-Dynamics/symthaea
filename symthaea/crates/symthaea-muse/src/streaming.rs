@@ -467,7 +467,8 @@ impl StreamingSynth {
         // rich but not piercing — the arousal-brightness inverse relationship
         // matches how real music is mixed (loud passages darken, not brighten).
         let arousal_dampen = 1.0 - (self.state.arousal.max(0.5) - 0.5) * 1.0; // 1.0 at arousal≤0.5, 0.5 at arousal=1.0
-        let brightness = (BRIGHTNESS_FLOOR + self.state.dopamine * BRIGHTNESS_DA_SCALE * arousal_dampen)
+        let brightness = (BRIGHTNESS_FLOOR
+            + self.state.dopamine * BRIGHTNESS_DA_SCALE * arousal_dampen)
             .clamp(0.25, 0.75);
 
         // NE → vibrato rate scaling: high stress = faster, more agitated vibrato
@@ -492,7 +493,9 @@ impl StreamingSynth {
         let (atk, dec, sus, rel) = match instruments::select_instrument(&self.state) {
             Instrument::Piano | Instrument::PianoPP => (0.005, 0.3, 0.15, 0.4),
             Instrument::Violin | Instrument::Cello => (0.08, 0.1, 0.7, 0.3),
-            Instrument::AcousticGuitar | Instrument::Harp | Instrument::Koto => (0.003, 0.2, 0.1, 0.3),
+            Instrument::AcousticGuitar | Instrument::Harp | Instrument::Koto => {
+                (0.003, 0.2, 0.1, 0.3)
+            }
             Instrument::Oud | Instrument::UprightBass => (0.008, 0.15, 0.4, 0.5),
             Instrument::Flute | Instrument::Ney => (0.05, 0.1, 0.6, 0.2),
             Instrument::Clarinet => (0.03, 0.08, 0.7, 0.15),
@@ -745,7 +748,8 @@ impl StreamingSynth {
                 let attack_samples = (0.015 * sr) as usize;
                 let noise =
                     crate::dramatic::attack_noise(active.sample_pos, attack_samples, brightness)
-                        * noise_scale * noise_density_factor;
+                        * noise_scale
+                        * noise_density_factor;
                 let sample = sample + noise + stochastic * noise_scale * noise_density_factor;
 
                 // Gain staging: ensure all consciousness states are audible.
@@ -862,8 +866,8 @@ impl StreamingSynth {
                     let idx = local_offset + j;
                     if idx < buffer.len() {
                         // Drums: consciousness-weighted gain with emotion
-                        let drum_gain = 0.15 + self.state.arousal * 0.15
-                            + self.state.dopamine * 0.05;
+                        let drum_gain =
+                            0.15 + self.state.arousal * 0.15 + self.state.dopamine * 0.05;
                         buffer[idx][0] += s * drum_gain;
                         buffer[idx][1] += s * drum_gain;
                     }
@@ -1356,10 +1360,10 @@ impl StreamingSynth {
 
             // Collect for MIDI export — hard clamp to singable MIDI range
             let midi_freq = note.frequency.clamp(196.0, 988.0); // G3 (MIDI 55) to B5 (MIDI 83)
-            // Quantize start_time to the nearest 8th-note grid position.
-            // Without quantization, notes land at chunk boundaries (arbitrary),
-            // producing chaotic inter-onset intervals and 0.07 rhythmic regularity.
-            // With quantization, notes snap to a musical pulse (CV→0, regularity→0.5+).
+                                                                // Quantize start_time to the nearest 8th-note grid position.
+                                                                // Without quantization, notes land at chunk boundaries (arbitrary),
+                                                                // producing chaotic inter-onset intervals and 0.07 rhythmic regularity.
+                                                                // With quantization, notes snap to a musical pulse (CV→0, regularity→0.5+).
             let raw_time = self.total_samples_rendered as f32 / self.sample_rate as f32;
             let beat_dur = 60.0 / self.muse_stream.tempo().max(30.0); // seconds per beat
             let grid_unit = beat_dur * 0.5; // 8th-note grid
@@ -1432,7 +1436,11 @@ impl StreamingSynth {
                     // Harmony: perfect 5th above for positive valence, minor 3rd for negative.
                     // CRITICAL: drop an octave if resulting pitch exceeds 1400 Hz to prevent
                     // ear-piercing stacking when lead melody is already in high register.
-                    let harm_ratio = if self.state.valence > 0.0 { 1.4983 } else { 1.1892 };
+                    let harm_ratio = if self.state.valence > 0.0 {
+                        1.4983
+                    } else {
+                        1.1892
+                    };
                     let mut harm_freq = note.frequency * harm_ratio;
                     while harm_freq > 1400.0 {
                         harm_freq *= 0.5; // drop octave until in safe register
@@ -1445,112 +1453,113 @@ impl StreamingSynth {
                 }
 
                 for &(voice_idx, voice_freq, vel_scale) in &voices_to_spawn {
-                let mut note = note;
-                note.frequency = voice_freq;
-                note.velocity *= vel_scale;
+                    let mut note = note;
+                    note.frequency = voice_freq;
+                    note.velocity *= vel_scale;
 
-                // Clear old notes in this voice to prevent mud
-                // Allow more overlap when sustain pedal is engaged (high Phi)
-                let max_per_voice = if self.state.consciousness_level > 0.5 {
-                    4
-                } else {
-                    2
-                };
-                let voice_count = self
-                    .active_notes
-                    .iter()
-                    .filter(|n| n.voice_idx == voice_idx)
-                    .count();
-                if voice_count >= max_per_voice {
-                    // Force-expire the oldest note in this voice
-                    if let Some(oldest) = self
+                    // Clear old notes in this voice to prevent mud
+                    // Allow more overlap when sustain pedal is engaged (high Phi)
+                    let max_per_voice = if self.state.consciousness_level > 0.5 {
+                        4
+                    } else {
+                        2
+                    };
+                    let voice_count = self
                         .active_notes
-                        .iter_mut()
+                        .iter()
                         .filter(|n| n.voice_idx == voice_idx)
-                        .min_by_key(|n| n.sample_pos)
-                    {
-                        oldest.total_samples = oldest.sample_pos; // expire it
-                    }
-                }
-
-                // Select instrument per voice role for variety
-                // Lead follows consciousness, others get complementary instruments
-                let instrument = match voice_idx {
-                    0 => instruments::select_instrument(&self.state), // lead: consciousness-driven
-                    1 => {
-                        // bass: organ or pad (sustained low register)
-                        if self.state.harmony_activations[7] > 0.4 {
-                            Instrument::Organ
-                        } else {
-                            Instrument::Pad
+                        .count();
+                    if voice_count >= max_per_voice {
+                        // Force-expire the oldest note in this voice
+                        if let Some(oldest) = self
+                            .active_notes
+                            .iter_mut()
+                            .filter(|n| n.voice_idx == voice_idx)
+                            .min_by_key(|n| n.sample_pos)
+                        {
+                            oldest.total_samples = oldest.sample_pos; // expire it
                         }
                     }
-                    2 => {
-                        // harmony: harp or electric piano
-                        if self.state.dopamine > 0.5 {
-                            Instrument::ElectricPiano
-                        } else {
-                            Instrument::Harp
-                        }
-                    }
-                    _ => {
-                        // ostinato: vibraphone or bell (rhythmic shimmer)
-                        if self.state.arousal > 0.5 {
-                            Instrument::Bell
-                        } else {
-                            Instrument::AcousticGuitar
-                        }
-                    }
-                };
 
-                // Initialize instrument-specific synthesis state
-                let ks = if instrument.uses_karplus_strong() {
-                    let (damp, bright, _stiff) = instrument.ks_params();
-                    let mut ks = KarplusStrong::new(note.frequency, self.sample_rate, damp, bright);
-                    ks.excite(note.velocity);
-                    Some(ks)
-                } else {
-                    None
-                };
+                    // Select instrument per voice role for variety
+                    // Lead follows consciousness, others get complementary instruments
+                    let instrument = match voice_idx {
+                        0 => instruments::select_instrument(&self.state), // lead: consciousness-driven
+                        1 => {
+                            // bass: organ or pad (sustained low register)
+                            if self.state.harmony_activations[7] > 0.4 {
+                                Instrument::Organ
+                            } else {
+                                Instrument::Pad
+                            }
+                        }
+                        2 => {
+                            // harmony: harp or electric piano
+                            if self.state.dopamine > 0.5 {
+                                Instrument::ElectricPiano
+                            } else {
+                                Instrument::Harp
+                            }
+                        }
+                        _ => {
+                            // ostinato: vibraphone or bell (rhythmic shimmer)
+                            if self.state.arousal > 0.5 {
+                                Instrument::Bell
+                            } else {
+                                Instrument::AcousticGuitar
+                            }
+                        }
+                    };
 
-                let fm_buffer = if instrument.uses_fm() {
-                    Some(instruments::render_fm_instrument(
+                    // Initialize instrument-specific synthesis state
+                    let ks = if instrument.uses_karplus_strong() {
+                        let (damp, bright, _stiff) = instrument.ks_params();
+                        let mut ks =
+                            KarplusStrong::new(note.frequency, self.sample_rate, damp, bright);
+                        ks.excite(note.velocity);
+                        Some(ks)
+                    } else {
+                        None
+                    };
+
+                    let fm_buffer = if instrument.uses_fm() {
+                        Some(instruments::render_fm_instrument(
+                            instrument,
+                            note.frequency,
+                            note.velocity,
+                            note.duration,
+                            self.sample_rate,
+                        ))
+                    } else {
+                        None
+                    };
+
+                    // Prediction error → onset jitter: surprise makes timing unpredictable
+                    let pe = self.state.prediction_error;
+                    let jitter_max = (pe * 0.005 * sr) as i32; // ±5ms at PE=1.0
+                    let jitter = if jitter_max > 0 {
+                        let hash = self.note_counter.wrapping_mul(2654435761);
+                        (hash as i32 % (jitter_max * 2 + 1)) - jitter_max
+                    } else {
+                        0
+                    };
+                    let onset_offset = jitter.max(0) as usize;
+
+                    self.active_notes.push(ActiveNote {
+                        total_samples: (note.duration * sr) as usize + release_samples,
+                        note,
+                        sample_pos: onset_offset, // jittered onset
+                        partial_phases: vec![0.0; 16],
+                        fm_phase: 0.0,
+                        pan: [0.0, -0.2, 0.4, -0.3][voice_idx],
+                        volume: [1.0, 0.7, 0.5, 0.3][voice_idx],
+                        voice_idx,
+                        wavetable_osc: WavetableOscillator::new(),
+                        vibrato_phase: 0.0,
                         instrument,
-                        note.frequency,
-                        note.velocity,
-                        note.duration,
-                        self.sample_rate,
-                    ))
-                } else {
-                    None
-                };
-
-                // Prediction error → onset jitter: surprise makes timing unpredictable
-                let pe = self.state.prediction_error;
-                let jitter_max = (pe * 0.005 * sr) as i32; // ±5ms at PE=1.0
-                let jitter = if jitter_max > 0 {
-                    let hash = self.note_counter.wrapping_mul(2654435761);
-                    (hash as i32 % (jitter_max * 2 + 1)) - jitter_max
-                } else {
-                    0
-                };
-                let onset_offset = jitter.max(0) as usize;
-
-                self.active_notes.push(ActiveNote {
-                    total_samples: (note.duration * sr) as usize + release_samples,
-                    note,
-                    sample_pos: onset_offset, // jittered onset
-                    partial_phases: vec![0.0; 16],
-                    fm_phase: 0.0,
-                    pan: [0.0, -0.2, 0.4, -0.3][voice_idx],
-                    volume: [1.0, 0.7, 0.5, 0.3][voice_idx],
-                    voice_idx,
-                    wavetable_osc: WavetableOscillator::new(),
-                    vibrato_phase: 0.0,
-                    instrument,
-                    ks,
-                    fm_buffer,
-                });
+                        ks,
+                        fm_buffer,
+                    });
                 } // end for voice_idx in voices_to_spawn
             }
         }

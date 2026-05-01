@@ -4,9 +4,9 @@
 // Mycelix strategies). Prints per-seed metrics and aggregate stats so
 // the single-seed claims from Phase 2c can be checked for robustness.
 
-use mycelix_multiworld_sim::MultiWorldSimulator;
 use mycelix_multiworld_sim::config::{PolicyConfig, SimulationConfig};
 use mycelix_multiworld_sim::red_team::AdversarialStrategy;
+use mycelix_multiworld_sim::MultiWorldSimulator;
 
 #[derive(Debug, Clone, Copy)]
 struct SeedResult {
@@ -106,7 +106,14 @@ fn main() {
     println!();
     println!(
         "{:>6} {:>8} {:>8} {:>7} {:>9} {:>10} {:>10} {:>10} {:>10}",
-        "seed", "survive", "cvs", "pop", "farm_scr", "f_rejected", "f_credited", "tb_delta",
+        "seed",
+        "survive",
+        "cvs",
+        "pop",
+        "farm_scr",
+        "f_rejected",
+        "f_credited",
+        "tb_delta",
         "resilnc",
     );
     println!("{}", "-".repeat(93));

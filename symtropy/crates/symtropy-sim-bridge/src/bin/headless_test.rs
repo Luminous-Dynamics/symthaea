@@ -16,8 +16,8 @@
 //!   byzantine-fl        Poisoned gradients → TrimmedMean filters them
 //!   emergency-abuse     4th emergency blocked by MAX_EMERGENCY_SESSIONS
 
-use mycelix_bridge_common::{ConsciousnessProfile, CivicTier};
 use mycelix_bridge_common::consciousness_thresholds::ConsciousnessThresholds;
+use mycelix_bridge_common::{CivicTier, ConsciousnessProfile};
 use mycelix_fl::defenses::{Defense, TrimmedMean};
 use mycelix_fl::types::{DefenseConfig, Gradient};
 use mycelix_multiworld_sim::governance::WorldGovernance;
@@ -27,14 +27,20 @@ use symtropy_sim_bridge::VETO_OVERRIDE_THRESHOLD;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    let seed = args.iter().position(|a| a == "--seed")
+    let seed = args
+        .iter()
+        .position(|a| a == "--seed")
         .and_then(|i| args.get(i + 1))
         .and_then(|s| s.parse::<u64>().ok())
         .unwrap_or(42);
-    let scenario = args.iter().position(|a| a == "--scenario")
+    let scenario = args
+        .iter()
+        .position(|a| a == "--scenario")
         .and_then(|i| args.get(i + 1).cloned())
         .unwrap_or_else(|| "all".to_string());
-    let ticks = args.iter().position(|a| a == "--ticks")
+    let ticks = args
+        .iter()
+        .position(|a| a == "--ticks")
         .and_then(|i| args.get(i + 1))
         .and_then(|s| s.parse::<u32>().ok())
         .unwrap_or(100);
@@ -158,7 +164,10 @@ fn scenario_consciousness_weights(_seed: u64, _ticks: u32) -> Result<(), String>
     ];
     for ((i, r, c, e), expected) in &test_cases {
         let profile = ConsciousnessProfile {
-            identity: *i, reputation: *r, community: *c, engagement: *e,
+            identity: *i,
+            reputation: *r,
+            community: *c,
+            engagement: *e,
         };
         let score = profile.combined_score();
         if (score - expected).abs() > 0.02 {
@@ -198,7 +207,8 @@ fn scenario_byzantine_fl(_seed: u64, _ticks: u32) -> Result<(), String> {
     let mut config = DefenseConfig::default();
     config.trim_ratio = 0.2;
 
-    let result = TrimmedMean.aggregate(&gradients, &config)
+    let result = TrimmedMean
+        .aggregate(&gradients, &config)
         .map_err(|e| format!("FL aggregation failed: {:?}", e))?;
 
     // After trimming: remaining values should be close to honest_val
@@ -238,10 +248,16 @@ fn scenario_governance_invariants(seed: u64, ticks: u32) -> Result<(), String> {
 
     // Verify canonical threshold values
     if thresholds.consciousness_gate_basic < 0.1 {
-        return Err(format!("Gate basic {} too low", thresholds.consciousness_gate_basic));
+        return Err(format!(
+            "Gate basic {} too low",
+            thresholds.consciousness_gate_basic
+        ));
     }
     if thresholds.consciousness_gate_constitutional < 0.5 {
-        return Err(format!("Gate constitutional {} too low", thresholds.consciousness_gate_constitutional));
+        return Err(format!(
+            "Gate constitutional {} too low",
+            thresholds.consciousness_gate_constitutional
+        ));
     }
 
     // Run governance for N ticks, assert invariants
@@ -262,7 +278,11 @@ fn scenario_epistemic_transitions(_seed: u64, _ticks: u32) -> Result<(), String>
         let level = EmpiricalLevel::from_value(i)
             .ok_or_else(|| format!("EmpiricalLevel::from_value({}) returned None", i))?;
         if level.value() != i {
-            return Err(format!("Level {} roundtrip failed: got {}", i, level.value()));
+            return Err(format!(
+                "Level {} roundtrip failed: got {}",
+                i,
+                level.value()
+            ));
         }
     }
     if EmpiricalLevel::from_value(5).is_some() {
@@ -272,25 +292,29 @@ fn scenario_epistemic_transitions(_seed: u64, _ticks: u32) -> Result<(), String>
 }
 
 fn scenario_dkg_threshold(_seed: u64, _ticks: u32) -> Result<(), String> {
-    use feldman_dkg::{DkgCeremony, DkgConfig, CeremonyPhase};
     use feldman_dkg::participant::ParticipantId;
+    use feldman_dkg::{CeremonyPhase, DkgCeremony, DkgConfig};
 
     // Valid: t=3, n=4 (the game's extraction ceremony)
-    let config = DkgConfig::new(3, 4)
-        .map_err(|e| format!("DkgConfig(3,4) failed: {:?}", e))?;
+    let config = DkgConfig::new(3, 4).map_err(|e| format!("DkgConfig(3,4) failed: {:?}", e))?;
     let mut ceremony = DkgCeremony::new(config, 0);
 
     // Register 3 of 4 — should stay in Registration
     for i in 1..=3 {
-        ceremony.add_participant(ParticipantId(i), 0)
+        ceremony
+            .add_participant(ParticipantId(i), 0)
             .map_err(|e| format!("Registration {} failed: {:?}", i, e))?;
     }
     if ceremony.phase() != CeremonyPhase::Registration {
-        return Err(format!("3/4 registered but phase is {:?} (expected Registration)", ceremony.phase()));
+        return Err(format!(
+            "3/4 registered but phase is {:?} (expected Registration)",
+            ceremony.phase()
+        ));
     }
 
     // Register 4th → should auto-transition to Dealing
-    ceremony.add_participant(ParticipantId(4), 0)
+    ceremony
+        .add_participant(ParticipantId(4), 0)
         .map_err(|e| format!("Registration 4 failed: {:?}", e))?;
     if ceremony.phase() == CeremonyPhase::Registration {
         return Err("4/4 registered but still in Registration (should be Dealing)".into());
@@ -324,15 +348,19 @@ fn scenario_tyranny_resistance(seed: u64, ticks: u32) -> Result<(), String> {
     // After 300 ticks with hostile guardian:
     // - Stability should still be positive (governance didn't collapse)
     if gov.stability_score <= 0.0 {
-        return Err(format!("Stability collapsed to {} after {} ticks with hostile guardian",
-            gov.stability_score, run_ticks));
+        return Err(format!(
+            "Stability collapsed to {} after {} ticks with hostile guardian",
+            gov.stability_score, run_ticks
+        ));
     }
 
     // - Veto count should be rate-limited (not 300 vetoes)
     // The cooldown is 7 ticks, so max ~42 vetoes in 300 ticks
     if gov.veto_count > 50 {
-        return Err(format!("Veto count {} exceeds rate-limit expectation (~42 in 300 ticks)",
-            gov.veto_count));
+        return Err(format!(
+            "Veto count {} exceeds rate-limit expectation (~42 in 300 ticks)",
+            gov.veto_count
+        ));
     }
 
     Ok(())
@@ -373,7 +401,8 @@ fn scenario_fl_overwhelm(_seed: u64, _ticks: u32) -> Result<(), String> {
     let mut config = DefenseConfig::default();
     config.trim_ratio = 0.2;
 
-    let result = TrimmedMean.aggregate(&gradients, &config)
+    let result = TrimmedMean
+        .aggregate(&gradients, &config)
         .map_err(|e| format!("FL aggregation failed at 40% Byzantine: {:?}", e))?;
 
     // With 20% trim on 10 nodes: trim 2 from each end = keep 6 middle
@@ -397,7 +426,8 @@ fn scenario_fl_overwhelm(_seed: u64, _ticks: u32) -> Result<(), String> {
         gradients2.push(Gradient::new(format!("poison_{}", i), vec![100.0; 4], 1));
     }
 
-    let result2 = TrimmedMean.aggregate(&gradients2, &config)
+    let result2 = TrimmedMean
+        .aggregate(&gradients2, &config)
         .map_err(|e| format!("FL aggregation failed at 50% Byzantine: {:?}", e))?;
 
     // At 50% with 20% trim: trim 2 from each end of 10 = keep 6

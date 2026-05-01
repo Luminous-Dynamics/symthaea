@@ -113,7 +113,11 @@ pub fn demo_director_system(
     // Progress within current phase (0.0 to 1.0)
     let t = (director.phase_timer / director.phase.duration()).clamp(0.0, 1.0);
     // Smooth easing (cubic ease-in-out)
-    let ease = if t < 0.5 { 4.0 * t * t * t } else { 1.0 - (-2.0 * t + 2.0).powi(3) / 2.0 };
+    let ease = if t < 0.5 {
+        4.0 * t * t * t
+    } else {
+        1.0 - (-2.0 * t + 2.0).powi(3) / 2.0
+    };
 
     match director.phase {
         DemoPhase::Opening => {
@@ -138,7 +142,7 @@ pub fn demo_director_system(
             // Hold camera, scrub timeline from 50 to 200
             camera.distance += (2.8 - camera.distance) * 0.02;
             timeline.year = 50 + (ease * 150.0) as u32; // 50 → 200
-            // Slow rotation during scrub
+                                                        // Slow rotation during scrub
             camera.theta += 0.0003;
         }
 
@@ -223,7 +227,10 @@ pub fn demo_director_system(
         director.phase = director.phase.next();
         director.phase_timer = 0.0;
         if director.phase != DemoPhase::Done {
-            info!("[demo] Phase: {:?} → {:?} (t={:.1}s)", old, director.phase, director.total_time);
+            info!(
+                "[demo] Phase: {:?} → {:?} (t={:.1}s)",
+                old, director.phase, director.total_time
+            );
         } else {
             info!("[demo] Complete! {:.1}s total", director.total_time);
         }

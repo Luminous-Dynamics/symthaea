@@ -1,12 +1,12 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use nalgebra::SVector;
 use symtropy_math::{Capsule, ConvexHull, HyperBox, Point, Sphere};
-use symtropy_physics::{PhysicsWorld, RigidBody, BodyHandle};
 use symtropy_physics::gjk;
 use symtropy_physics::raycast;
+use symtropy_physics::{BodyHandle, PhysicsWorld, RigidBody};
 
 fn bench_gjk_sphere_sphere(c: &mut Criterion) {
     let a = Sphere::<3>::unit();
@@ -53,13 +53,8 @@ fn bench_physics_step_10_bodies(c: &mut Criterion) {
             || {
                 let mut world = PhysicsWorld::<3>::new(SVector::from([0.0, -9.81, 0.0]));
                 for i in 0..10 {
-                    let h = world.add_sphere(
-                        Point::new([i as f64 * 3.0, 10.0, 0.0]),
-                        0.5,
-                        1.0,
-                    );
-                    world.body_mut(h).unwrap().linear_velocity =
-                        SVector::from([0.0, -5.0, 0.0]);
+                    let h = world.add_sphere(Point::new([i as f64 * 3.0, 10.0, 0.0]), 0.5, 1.0);
+                    world.body_mut(h).unwrap().linear_velocity = SVector::from([0.0, -5.0, 0.0]);
                 }
                 world
             },
@@ -163,7 +158,13 @@ fn bench_epa_sphere_sphere(c: &mut Criterion) {
     c.bench_function("epa_sphere_sphere_3d", |bench| {
         let result = gjk::intersects(&a, &pa, &b, &pb);
         bench.iter(|| {
-            black_box(symtropy_physics::epa::penetration(&a, &pa, &b, &pb, &result.simplex));
+            black_box(symtropy_physics::epa::penetration(
+                &a,
+                &pa,
+                &b,
+                &pb,
+                &result.simplex,
+            ));
         });
     });
 }

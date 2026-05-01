@@ -303,8 +303,7 @@ mod tests {
 
     #[test]
     fn test_serializable_proof_structure() {
-        let commitment =
-            "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
+        let commitment = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";
         let proof_data = "SGVsbG8="; // "Hello" in base64
 
         let serializable = SerializableProof {
@@ -325,19 +324,18 @@ mod tests {
     fn test_e2e_prove_verify_typical_values() {
         // Typical K-Vector values representing a moderately trusted node
         let witness = KVectorWitness {
-            k_r: 0.75,   // Reputation
-            k_a: 0.60,   // Activity
-            k_i: 0.85,   // Integrity
-            k_p: 0.70,   // Performance
-            k_m: 0.50,   // Membership duration
-            k_s: 0.40,   // Stake weight
-            k_h: 0.80,   // Historical consistency
+            k_r: 0.75,    // Reputation
+            k_a: 0.60,    // Activity
+            k_i: 0.85,    // Integrity
+            k_p: 0.70,    // Performance
+            k_m: 0.50,    // Membership duration
+            k_s: 0.40,    // Stake weight
+            k_h: 0.80,    // Historical consistency
             k_topo: 0.65, // Network topology
         };
 
         // Generate proof
-        let proof = KVectorRangeProof::prove(&witness)
-            .expect("Proof generation should succeed");
+        let proof = KVectorRangeProof::prove(&witness).expect("Proof generation should succeed");
 
         // Verify proof
         proof.verify().expect("Proof verification should succeed");
@@ -366,7 +364,9 @@ mod tests {
         let proof = KVectorRangeProof::prove(&witness)
             .expect("Proof generation should succeed for near-minimum values");
 
-        proof.verify().expect("Proof verification should succeed for near-minimum values");
+        proof
+            .verify()
+            .expect("Proof verification should succeed for near-minimum values");
 
         // Targets should be small scaled values
         assert!(proof.targets.iter().all(|&t| t <= 1000));
@@ -407,7 +407,9 @@ mod tests {
         let proof = KVectorRangeProof::prove(&witness)
             .expect("Proof generation should succeed for near-max values");
 
-        proof.verify().expect("Proof verification should succeed for near-max values");
+        proof
+            .verify()
+            .expect("Proof verification should succeed for near-max values");
 
         // All targets should be high values (> 9000)
         assert!(proof.targets.iter().all(|&t| t >= 9000));
@@ -427,8 +429,7 @@ mod tests {
             k_topo: 1.0,
         };
 
-        let proof = KVectorRangeProof::prove(&witness)
-            .expect("Proof generation should succeed");
+        let proof = KVectorRangeProof::prove(&witness).expect("Proof generation should succeed");
 
         proof.verify().expect("Proof verification should succeed");
     }
@@ -446,18 +447,20 @@ mod tests {
             k_topo: 0.75,
         };
 
-        let original_proof = KVectorRangeProof::prove(&witness)
-            .expect("Proof generation should succeed");
+        let original_proof =
+            KVectorRangeProof::prove(&witness).expect("Proof generation should succeed");
 
         // Serialize to bytes
         let bytes = original_proof.to_bytes();
 
         // Deserialize from bytes
-        let restored_proof = KVectorRangeProof::from_bytes(&bytes)
-            .expect("Deserialization should succeed");
+        let restored_proof =
+            KVectorRangeProof::from_bytes(&bytes).expect("Deserialization should succeed");
 
         // Verify restored proof
-        restored_proof.verify().expect("Restored proof should verify");
+        restored_proof
+            .verify()
+            .expect("Restored proof should verify");
 
         // Check fields match
         assert_eq!(original_proof.commitment, restored_proof.commitment);
@@ -477,18 +480,20 @@ mod tests {
             k_topo: 0.15,
         };
 
-        let original_proof = KVectorRangeProof::prove(&witness)
-            .expect("Proof generation should succeed");
+        let original_proof =
+            KVectorRangeProof::prove(&witness).expect("Proof generation should succeed");
 
         // Convert to serializable format
         let serializable = SerializableProof::from(&original_proof);
 
         // Convert back
-        let restored_proof = KVectorRangeProof::try_from(&serializable)
-            .expect("Conversion should succeed");
+        let restored_proof =
+            KVectorRangeProof::try_from(&serializable).expect("Conversion should succeed");
 
         // Verify restored proof
-        restored_proof.verify().expect("Restored proof should verify");
+        restored_proof
+            .verify()
+            .expect("Restored proof should verify");
     }
 
     #[test]
@@ -540,8 +545,8 @@ mod tests {
             k_topo: 0.75,
         };
 
-        let mut proof = KVectorRangeProof::prove(&witness)
-            .expect("Proof generation should succeed");
+        let mut proof =
+            KVectorRangeProof::prove(&witness).expect("Proof generation should succeed");
 
         // Tamper with commitment
         proof.commitment[0] ^= 0xFF;
@@ -564,8 +569,8 @@ mod tests {
             k_topo: 0.75,
         };
 
-        let mut proof = KVectorRangeProof::prove(&witness)
-            .expect("Proof generation should succeed");
+        let mut proof =
+            KVectorRangeProof::prove(&witness).expect("Proof generation should succeed");
 
         // Tamper with targets
         proof.targets[0] = 9999; // Change from 8000
@@ -588,8 +593,7 @@ mod tests {
             k_topo: 0.75,
         };
 
-        let proof = KVectorRangeProof::prove(&witness)
-            .expect("Proof generation should succeed");
+        let proof = KVectorRangeProof::prove(&witness).expect("Proof generation should succeed");
 
         let size = proof.size();
 
@@ -597,7 +601,11 @@ mod tests {
         assert!(size < 100_000, "Proof size {} bytes is too large", size);
 
         // But also not trivially small (> 1KB)
-        assert!(size > 1_000, "Proof size {} bytes is suspiciously small", size);
+        assert!(
+            size > 1_000,
+            "Proof size {} bytes is suspiciously small",
+            size
+        );
     }
 
     #[test]

@@ -1,0 +1,14 @@
+[package]
+name = "sensorium-games"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Interactive educational games for Mycelix Sensorium — ported from Praxis Leptos"
+
+[dependencies]
+leptos = { version = "0.8", features = ["csr"] }
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = ["console", "HtmlInputElement", "Window"] }
+gloo-timers = { version = "0.3", features = ["futures"] }

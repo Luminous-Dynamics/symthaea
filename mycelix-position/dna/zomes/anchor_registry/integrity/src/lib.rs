@@ -4,7 +4,7 @@
 
 use hdi::prelude::*;
 use mycelix_position_shared::{
-    AnchorNode, AnchorCertification, validate_geodetic, validate_node_id,
+    validate_geodetic, validate_node_id, AnchorCertification, AnchorNode,
 };
 
 #[hdk_entry_types]
@@ -56,9 +56,10 @@ fn validate_anchor_node(node: &AnchorNode) -> ExternResult<ValidateCallbackResul
         return Ok(ValidateCallbackResult::Invalid(e));
     }
     if node.accuracy_m <= 0.0 {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!("Accuracy must be positive, got {}", node.accuracy_m),
-        ));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Accuracy must be positive, got {}",
+            node.accuracy_m
+        )));
     }
     if node.accuracy_m > 100_000.0 {
         return Ok(ValidateCallbackResult::Invalid(

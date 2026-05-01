@@ -1,3 +1,4 @@
+use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -269,7 +270,10 @@ pub fn create_did() -> ExternResult<Record> {
     // This gives every user a recovery fallback from Day 0, even before they
     // join a Hearth or add social recovery guardians.
     if let Err(e) = auto_create_self_recovery(&did_id) {
-        debug!("Self-recovery auto-creation failed (DID created without recovery): {:?}", e);
+        debug!(
+            "Self-recovery auto-creation failed (DID created without recovery): {:?}",
+            e
+        );
     }
 
     // Broadcast DidCreated event to bridge for ecosystem-wide awareness

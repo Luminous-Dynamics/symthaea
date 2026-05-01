@@ -16,8 +16,8 @@ use prism_privacy::ConsentStore;
 use prism_reflex::ReflexArc;
 use prism_search::SearchEngine;
 use serde::{Deserialize, Serialize};
-use tauri::State;
 use std::sync::Mutex;
+use tauri::State;
 
 /// Shared application state managed by Tauri.
 struct PrismState {
@@ -104,18 +104,21 @@ fn search_claims(
     let state = state.lock().map_err(|e| format!("Lock error: {}", e))?;
     let results = state.search.search(&query, top_k);
 
-    Ok(results.into_iter().map(|r| {
-        let score = r.rank_score();
-        SearchResultJson {
-            content: r.content,
-            sources: r.sources,
-            empirical_level: format!("{:?}", r.empirical_level),
-            query_similarity: r.query_similarity,
-            author_reputation: r.author_reputation,
-            tags: r.tags,
-            rank_score: score,
-        }
-    }).collect())
+    Ok(results
+        .into_iter()
+        .map(|r| {
+            let score = r.rank_score();
+            SearchResultJson {
+                content: r.content,
+                sources: r.sources,
+                empirical_level: format!("{:?}", r.empirical_level),
+                query_similarity: r.query_similarity,
+                author_reputation: r.author_reputation,
+                tags: r.tags,
+                rank_score: score,
+            }
+        })
+        .collect())
 }
 
 /// Get claim count.
@@ -178,15 +181,17 @@ fn main() {
                          document.body.style.width='100vw';\
                          document.body.style.margin='0';\
                          document.body.style.overflow='hidden auto';\
-                         window.dispatchEvent(new Event('resize'));"
+                         window.dispatchEvent(new Event('resize'));",
                     );
                     if let Ok(size) = w.inner_size() {
                         let _ = w.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(
-                            size.width - 1, size.height,
+                            size.width - 1,
+                            size.height,
                         )));
                         std::thread::sleep(std::time::Duration::from_millis(50));
                         let _ = w.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(
-                            size.width, size.height,
+                            size.width,
+                            size.height,
                         )));
                     }
                 });

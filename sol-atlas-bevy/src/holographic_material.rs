@@ -5,10 +5,10 @@
 //! Uses Bevy's ExtendedMaterial pattern to add Fresnel edge glow,
 //! scanlines, and noise on top of the standard PBR material.
 
+use bevy::pbr::{ExtendedMaterial, MaterialExtension};
 use bevy::prelude::*;
 use bevy::render::render_resource::AsBindGroup;
 use bevy::shader::ShaderRef;
-use bevy::pbr::{ExtendedMaterial, MaterialExtension};
 
 /// Holographic material extension — adds Fresnel, scanlines, and noise
 /// on top of StandardMaterial's PBR pipeline.

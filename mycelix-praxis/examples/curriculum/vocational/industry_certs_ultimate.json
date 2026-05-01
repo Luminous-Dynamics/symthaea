@@ -1,0 +1,108 @@
+{
+  "metadata": {
+    "title": "Ultimate Professional Mosaic: Multi-Subject Master Mesh",
+    "framework": "Global Mastery Protocol",
+    "source": "https://mycelix.org/certs-ultimate",
+    "grade_level": "Professional/Expert",
+    "subject_area": "Multi-Sector",
+    "domain": "Professional Certification",
+    "version": "1.0",
+    "total_standards": 8,
+    "domains": [
+      "Creative Design",
+      "Artificial Intelligence",
+      "Industrial Quality",
+      "Regional Trade"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "The most comprehensive mapping of specialized and regional professional standards."
+  },
+  "nodes": [
+    {
+      "id": "CERT-CREAT-ADOBE",
+      "title": "Adobe Certified Professional (Visual Design)",
+      "description": "Graphic design, image manipulation, and layout fundamentals using industry-standard tools. Linked to the Muralism and Spatial Narrative track.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Creative Design",
+      "subdomain": "Certification Bridge",
+      "tags": ["design", "adobe", "graphics", "standard"],
+      "estimated_hours": 90,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Arts"
+    },
+    {
+      "id": "CERT-AI-NVIDIA",
+      "title": "NVIDIA Deep Learning Institute: Fundamentals",
+      "description": "Computer vision, natural language processing, and neural network optimization. Linked to the Cognitive Computing and HDC tracks.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Artificial Intelligence",
+      "subdomain": "Certification Bridge",
+      "tags": ["ai", "nvidia", "gpu", "deep-learning"],
+      "estimated_hours": 60,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "CERT-QUAL-SIXSIGMA",
+      "title": "Six Sigma Green Belt",
+      "description": "Statistical quality control and process improvement. DMAIC methodology. Mapping the Mycelial Oracle predictive logic to industrial quality standards.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Industrial Quality",
+      "subdomain": "Certification Bridge",
+      "tags": ["quality", "six-sigma", "stats", "standard"],
+      "estimated_hours": 120,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics"
+    },
+    {
+      "id": "CERT-TRADE-REGT",
+      "title": "Regional Trade Unit Standard: Electrical",
+      "description": "Generalized national unit standard for basic electrical work. Safe wiring, load calculation, and circuit testing. Linked to the Mk0 Lantern and Solar tracks.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Regional Trade",
+      "subdomain": "Certification Bridge",
+      "tags": ["trade", "electrical", "safety", "seta"],
+      "estimated_hours": 60,
+      "grade_levels": ["Vocational"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering"
+    }
+  ],
+  "edges": [
+    {
+      "from": "ART-VIS-101",
+      "to": "CERT-CREAT-ADOBE",
+      "edge_type": "Recommended",
+      "strength_permille": 700,
+      "rationale": "Muralism provides the creative foundation for digital visual design standards."
+    },
+    {
+      "from": "SYM-ADV-101",
+      "to": "CERT-AI-NVIDIA",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Active inference and neural homeostasis are the theoretical prerequisites for NVIDIA deep learning."
+    },
+    {
+      "from": "MATH-UNI-101",
+      "to": "CERT-QUAL-SIXSIGMA",
+      "edge_type": "Recommended",
+      "strength_permille": 600,
+      "rationale": "Understanding power-laws and growth patterns helps in industrial process improvement."
+    },
+    {
+      "from": "VOC-000",
+      "to": "CERT-TRADE-REGT",
+      "edge_type": "Recommended",
+      "strength_permille": 850,
+      "rationale": "Building a Mycelial Lantern covers the majority of basic safe-wiring unit standards."
+    }
+  ]
+}

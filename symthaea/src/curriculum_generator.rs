@@ -342,7 +342,10 @@ pub fn generate_amgm_lemmas(bridge: &Z3Bridge) -> Vec<VerifiedLemma> {
 
 /// SMTLIB2 source asserting the negation of (Σaᵢbᵢ)² ≤ (Σaᵢ²)(Σbᵢ²).
 pub fn encode_cauchy_schwarz(n: usize) -> String {
-    assert!((2..=3).contains(&n), "encode_cauchy_schwarz: n must be in 2..=3");
+    assert!(
+        (2..=3).contains(&n),
+        "encode_cauchy_schwarz: n must be in 2..=3"
+    );
     let mut s = String::new();
     s.push_str(&format!(
         "; Cauchy-Schwarz at n={}: (Σaᵢbᵢ)² ≤ (Σaᵢ²)(Σbᵢ²) on real vectors.\n",
@@ -659,7 +662,11 @@ mod tests {
         let bridge = test_bridge_no_z3();
         let all = generate_all_lemmas(&bridge);
         // 4 pigeonhole + 3 AM-GM + 2 Cauchy-Schwarz + 1 Pell stub + 1 functional eq stub
-        assert_eq!(all.len(), 11, "expected 11 lemmas in commit 2 (10 real + 2 stubs)");
+        assert_eq!(
+            all.len(),
+            11,
+            "expected 11 lemmas in commit 2 (10 real + 2 stubs)"
+        );
         // L3 should be the first 4
         assert!(all[0].id.starts_with("L3."));
         assert!(all[3].id.starts_with("L3."));

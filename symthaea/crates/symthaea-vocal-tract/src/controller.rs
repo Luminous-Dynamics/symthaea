@@ -3,7 +3,7 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Vocal tract controller: wraps HdcLtcUnifiedNetwork + output projection (16,384D → 9D).
 //!
-//! Follows the `FlightController` pattern from `crates/symthaea-flight/src/controller.rs`.
+//! Follows the `FlightController` pattern from `crates/symthaea-multirotor/src/controller.rs`.
 //! The controller uses the full 16,384D HDC-LTC temporal dynamics engine.
 //! Cognitive HVs are evolved through the network, then a linear output projection
 //! maps the final-layer HV to 9D `FormantFrame` parameters.

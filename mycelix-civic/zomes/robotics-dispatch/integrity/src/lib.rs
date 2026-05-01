@@ -11,6 +11,7 @@
 
 use hdi::prelude::*;
 use mycelix_bridge_entry_types::check_author_match;
+use mycelix_bridge_common::SovereignProfile;
 
 /// Anchor entry for deterministic link bases.
 #[hdk_entry_helper]
@@ -33,8 +34,8 @@ pub struct RoboticAsset {
     pub platform_type: PlatformType,
     /// Sponsoring agent (community member responsible for this robot).
     pub owner: AgentPubKey,
-    /// Current measured consciousness level (Phi, 0.0–1.0).
-    pub consciousness_level: f64,
+    /// 8D Sovereign Profile (replaces legacy 1D consciousness_level).
+    pub sovereign_profile: SovereignProfile,
     /// Maximum governance tier (capped below Participant for robots).
     pub max_tier: TierCap,
     /// Location (latitude, longitude).
@@ -474,4 +475,6 @@ fn validate_robotic_credential(credential: &RoboticCredential) -> ExternResult<V
         ));
     }
     Ok(ValidateCallbackResult::Valid)
+}
+   Ok(ValidateCallbackResult::Valid)
 }

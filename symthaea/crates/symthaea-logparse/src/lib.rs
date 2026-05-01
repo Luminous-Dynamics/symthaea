@@ -16,14 +16,14 @@
 //!   - `encoder` — HDC hypervector encoding (feature-gated on `hdc-encoder`)
 //!   - `cluster` — HDBSCAN wrapper + purity metric
 
+pub mod cluster;
+pub mod encoder;
 pub mod event;
 pub mod evtx_source;
-pub mod syslog_source;
-pub mod otrf_source;
-pub mod encoder;
-pub mod cluster;
 pub mod fixtures;
+pub mod otrf_source;
 pub mod probe;
+pub mod syslog_source;
 
 pub use event::{LogEvent, Severity, Source};
 

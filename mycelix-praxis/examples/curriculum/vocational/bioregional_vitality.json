@@ -1,0 +1,127 @@
+{
+  "metadata": {
+    "title": "Bioregional Vitality: Healthcare as Stewardship",
+    "framework": "Mycelix Vitality",
+    "source": "https://mycelix.org",
+    "grade_level": "Lifelong/Universal",
+    "subject_area": "Health Sciences",
+    "domain": "Vitality",
+    "version": "1.0",
+    "total_standards": 6,
+    "domains": [
+      "Emergency Care",
+      "Sanitation",
+      "Nutrition",
+      "Phytochemistry"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Community-based preventative health and emergency resilience."
+  },
+  "nodes": [
+    {
+      "id": "VITA-001",
+      "title": "First-Line Emergency Care",
+      "description": "Stabilizing trauma in off-grid environments. Using the mesh for triage coordination. Hemorrhage control, airway management, and shock protocols.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Emergency Care",
+      "subdomain": "Bioregional Vitality",
+      "tags": ["medical", "first-aid", "triage", "resilience"],
+      "estimated_hours": 30,
+      "grade_levels": ["Vocational"],
+      "bloom_level": "Apply",
+      "subject_area": "Health Sciences"
+    },
+    {
+      "id": "VITA-101",
+      "title": "Microbial Sanitation & Water Testing",
+      "description": "Pathogen identification in community water sources. Designing low-cost sanitation loops. Managing cross-contamination in shared labs.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Sanitation",
+      "subdomain": "Bioregional Vitality",
+      "tags": ["sanitation", "microbiology", "public-health", "water"],
+      "estimated_hours": 45,
+      "grade_levels": ["Vocational"],
+      "bloom_level": "Analyze",
+      "subject_area": "Health Sciences"
+    },
+    {
+      "id": "VITA-201",
+      "title": "Soil-to-Body Nutrition",
+      "description": "The link between soil health and human metabolic health. Nutrient density analysis of regenerative vs conventional crops. Designing local food as medicine.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Nutrition",
+      "subdomain": "Bioregional Vitality",
+      "tags": ["nutrition", "metabolism", "agriculture", "wellness"],
+      "estimated_hours": 60,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Apply",
+      "subject_area": "Health Sciences"
+    },
+    {
+      "id": "VITA-301",
+      "title": "Phytochemistry & Local Herbalism",
+      "description": "Extraction and application of local medicinal plants. Binding traditional plant knowledge to scientific chemical profiles in the HDC mesh.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Phytochemistry",
+      "subdomain": "Bioregional Vitality",
+      "tags": ["herbalism", "chemistry", "iks", "pharmacology"],
+      "estimated_hours": 90,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Health Sciences"
+    },
+    {
+      "id": "VITA-CAP-01",
+      "title": "The Community Vitality Capstone",
+      "description": "Design and pilot a community-scale health or nutrition intervention. Must involve IoT tracking of bio-regional health markers and peer validation.",
+      "node_type": "Capstone",
+      "difficulty": "Advanced",
+      "domain": "Universal",
+      "subdomain": "Bioregional Vitality",
+      "tags": ["capstone", "vitality", "stewardship", "integration"],
+      "estimated_hours": 180,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Create",
+      "subject_area": "Health Sciences",
+      "holonic_capstone": {
+        "required_node_ids": ["VITA-001", "VITA-101", "VITA-201"],
+        "deliverable": "A functioning health post or nutrition point with 30 days of verified community impact telemetry.",
+        "min_peer_endorsements": 5
+      },
+      "alignment_vector": {
+        "ahimsa": 980,
+        "reciprocity": 950,
+        "collective_flourishing": 990,
+        "ecological_stewardship": 920,
+        "mentorship": 900
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "HUM-IKS-101",
+      "to": "VITA-301",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Indigenous knowledge of local flora is the prerequisite for applied phytochemistry."
+    },
+    {
+      "from": "VOC-H2O-101",
+      "to": "VITA-101",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Water stewardship mastery is required for advanced sanitation design."
+    },
+    {
+      "from": "VITA-001",
+      "to": "VITA-CAP-01",
+      "edge_type": "Requires",
+      "strength_permille": 1000,
+      "rationale": "One cannot steward a vitality hub without emergency care mastery."
+    }
+  ]
+}

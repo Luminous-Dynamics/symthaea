@@ -51,9 +51,10 @@ pub struct BinaryState(pub Vec<u8>);
 impl BinaryState {
     /// Convert to a state index (little-endian binary → usize).
     pub fn to_index(&self) -> usize {
-        self.0.iter().enumerate().fold(0, |acc, (i, &bit)| {
-            acc | ((bit as usize) << i)
-        })
+        self.0
+            .iter()
+            .enumerate()
+            .fold(0, |acc, (i, &bit)| acc | ((bit as usize) << i))
     }
 
     /// Create from a state index.
@@ -135,8 +136,7 @@ impl EmpiricalTpm {
                         on_count += self.counts[from_idx][to_idx];
                     }
                 }
-                tpm[from_idx][node] =
-                    on_count as f64 / self.totals[from_idx] as f64;
+                tpm[from_idx][node] = on_count as f64 / self.totals[from_idx] as f64;
             }
         }
 
@@ -276,18 +276,14 @@ pub fn call_pyphi(
     let script_path = find_pyphi_script()?;
 
     // Shell out to Python — check PYPHI_PYTHON env var first, then common venv paths
-    let python = std::env::var("PYPHI_PYTHON")
-        .unwrap_or_else(|_| {
-            for candidate in &[
-                "/tmp/pyphi-venv/bin/python3",
-                "/tmp/pyphi310/bin/python3",
-            ] {
-                if std::path::Path::new(candidate).exists() {
-                    return candidate.to_string();
-                }
+    let python = std::env::var("PYPHI_PYTHON").unwrap_or_else(|_| {
+        for candidate in &["/tmp/pyphi-venv/bin/python3", "/tmp/pyphi310/bin/python3"] {
+            if std::path::Path::new(candidate).exists() {
+                return candidate.to_string();
             }
-            "python3".to_string()
-        });
+        }
+        "python3".to_string()
+    });
 
     let mut child = Command::new(&python)
         .arg(&script_path)
@@ -311,10 +307,7 @@ pub fn call_pyphi(
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!(
-            "python3 exited with {}: {}",
-            output.status, stderr
-        ));
+        return Err(format!("python3 exited with {}: {}", output.status, stderr));
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -349,10 +342,7 @@ fn find_pyphi_script() -> Result<String, String> {
         "scripts/pyphi_compute.py",
         "crates/symtropy-consciousness-physics/scripts/pyphi_compute.py",
         // From workspace root
-        concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/scripts/pyphi_compute.py"
-        ),
+        concat!(env!("CARGO_MANIFEST_DIR"), "/scripts/pyphi_compute.py"),
     ];
 
     for path in &candidates {
@@ -392,7 +382,9 @@ fn extract_f64(json: &str, key: &str) -> Option<f64> {
     if rest.starts_with("null") {
         return None;
     }
-    let end = rest.find(|c: char| c == ',' || c == '}').unwrap_or(rest.len());
+    let end = rest
+        .find(|c: char| c == ',' || c == '}')
+        .unwrap_or(rest.len());
     rest[..end].trim().parse().ok()
 }
 
@@ -502,7 +494,11 @@ mod tests {
         for n in 2..=5 {
             for idx in 0..(1 << n) {
                 let state = BinaryState::from_index(idx, n);
-                assert_eq!(state.to_index(), idx, "Roundtrip failed for n={n}, idx={idx}");
+                assert_eq!(
+                    state.to_index(),
+                    idx,
+                    "Roundtrip failed for n={n}, idx={idx}"
+                );
             }
         }
     }
@@ -578,23 +574,38 @@ mod tests {
 
         let mut e0 = EntityConsciousness::new(100.0);
         e0.result = Some(symthaea_consciousness_equation::ConsciousnessResult {
-            consciousness_level: 0.5, bottleneck_factor: 0.5, weighted_sum: 0.5,
-            embodiment_factor: 1.0, narrative_coherence: 1.0, social_embedding: 1.0,
-            temporal_stability: 1.0, bottleneck_name: "phi".to_string(),
+            consciousness_level: 0.5,
+            bottleneck_factor: 0.5,
+            weighted_sum: 0.5,
+            embodiment_factor: 1.0,
+            narrative_coherence: 1.0,
+            social_embedding: 1.0,
+            temporal_stability: 1.0,
+            bottleneck_name: "phi".to_string(),
             factors: symthaea_consciousness_equation::ConsciousnessInputs::default(),
         }); // above threshold
         let mut e1 = EntityConsciousness::new(100.0);
         e1.result = Some(symthaea_consciousness_equation::ConsciousnessResult {
-            consciousness_level: 0.1, bottleneck_factor: 0.1, weighted_sum: 0.1,
-            embodiment_factor: 1.0, narrative_coherence: 1.0, social_embedding: 1.0,
-            temporal_stability: 1.0, bottleneck_name: "phi".to_string(),
+            consciousness_level: 0.1,
+            bottleneck_factor: 0.1,
+            weighted_sum: 0.1,
+            embodiment_factor: 1.0,
+            narrative_coherence: 1.0,
+            social_embedding: 1.0,
+            temporal_stability: 1.0,
+            bottleneck_name: "phi".to_string(),
             factors: symthaea_consciousness_equation::ConsciousnessInputs::default(),
         }); // below threshold
         let mut e2 = EntityConsciousness::new(100.0);
         e2.result = Some(symthaea_consciousness_equation::ConsciousnessResult {
-            consciousness_level: 0.3, bottleneck_factor: 0.3, weighted_sum: 0.3,
-            embodiment_factor: 1.0, narrative_coherence: 1.0, social_embedding: 1.0,
-            temporal_stability: 1.0, bottleneck_name: "phi".to_string(),
+            consciousness_level: 0.3,
+            bottleneck_factor: 0.3,
+            weighted_sum: 0.3,
+            embodiment_factor: 1.0,
+            narrative_coherence: 1.0,
+            social_embedding: 1.0,
+            temporal_stability: 1.0,
+            bottleneck_name: "phi".to_string(),
             factors: symthaea_consciousness_equation::ConsciousnessInputs::default(),
         }); // at threshold (≥ means ON)
 

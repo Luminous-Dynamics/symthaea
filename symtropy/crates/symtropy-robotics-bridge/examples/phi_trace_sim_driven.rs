@@ -30,9 +30,9 @@ use std::io::Write;
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
-use symthaea_flight::encoder::QuadrotorHdcEncoder;
-use symthaea_flight::simulator::{PhysicsSimulator, SimplePhysicsSimulator};
-use symthaea_flight::types::{pd_baseline, FlightSetpoint, PdGains, QuadrotorCommand};
+use symthaea_multirotor::encoder::QuadrotorHdcEncoder;
+use symthaea_multirotor::simulator::{PhysicsSimulator, SimplePhysicsSimulator};
+use symthaea_multirotor::types::{pd_baseline, FlightSetpoint, PdGains, QuadrotorCommand};
 use symtropy_physics::BodyHandle;
 use symtropy_robotics_bridge::agent::RoboticAgent;
 use symtropy_robotics_bridge::platform::PlatformType;

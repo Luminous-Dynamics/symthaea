@@ -69,11 +69,7 @@ impl LogisticProbe {
     ///
     /// `hvs[i]` has label `labels[i]`. Labels are arbitrary strings; the
     /// probe learns one binary classifier per distinct label.
-    pub fn train(
-        hvs: &[Hdv],
-        labels: &[String],
-        cfg: TrainConfig,
-    ) -> Self {
+    pub fn train(hvs: &[Hdv], labels: &[String], cfg: TrainConfig) -> Self {
         assert_eq!(hvs.len(), labels.len());
         assert!(!hvs.is_empty());
         let dim = hvs[0].len();
@@ -292,8 +288,7 @@ mod tests {
         let hvs: Vec<Hdv> = corpus.iter().map(encode).collect();
         let labels: Vec<String> = corpus.iter().map(|e| e.label.clone().unwrap()).collect();
 
-        let (train_x, train_y, test_x, test_y) =
-            stratified_split(&hvs, &labels, 0.8, 0x1234);
+        let (train_x, train_y, test_x, test_y) = stratified_split(&hvs, &labels, 0.8, 0x1234);
 
         let cfg = TrainConfig {
             epochs: 30,

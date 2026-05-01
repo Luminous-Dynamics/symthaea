@@ -17,9 +17,7 @@
 
 use bevy::prelude::*;
 
-use crate::components::{
-    ConsciousnessComp, CrewNpc, EpistemicTag, Flashlight, NpcTrust, Player,
-};
+use crate::components::{ConsciousnessComp, CrewNpc, EpistemicTag, Flashlight, NpcTrust, Player};
 use crate::resources::GovernanceLog;
 use crate::systems::fl_simulation::FlPool;
 
@@ -85,7 +83,9 @@ pub fn epistemic_flashlight_system(
     mut flashlights: Query<&mut Flashlight, With<Player>>,
     biometrics: Res<crate::resources::BiometricsCtx>,
 ) {
-    let Ok(mut flashlight) = flashlights.single_mut() else { return };
+    let Ok(mut flashlight) = flashlights.single_mut() else {
+        return;
+    };
 
     let level = epistemic.level as usize;
     let base_radius = RADIUS_PER_LEVEL[level.min(4)];

@@ -7,11 +7,11 @@
 //! experience buffer. After training, the swarm's collective knowledge produces
 //! lower error than any single drone trained alone.
 //!
-//! Run: `cargo run --example mujoco_swarm_training --features flight-swarm --release`
+//! Run: `cargo run --example mujoco_swarm_training --features multirotor-swarm --release`
 
-#[cfg(feature = "flight-swarm")]
+#[cfg(any(feature = "multirotor-swarm", feature = "flight-swarm"))]
 fn main() {
-    use symthaea::symthaea_flight::{
+    use symthaea::multirotor::{
         swarm::{train_swarm, SwarmConfig},
         FlightConfig,
     };
@@ -53,7 +53,7 @@ fn main() {
     println!("  Best final err:  {:.4}m", result.best_final_error);
 }
 
-#[cfg(not(feature = "flight-swarm"))]
+#[cfg(not(any(feature = "multirotor-swarm", feature = "flight-swarm")))]
 fn main() {
-    eprintln!("This example requires: --features flight-swarm");
+    eprintln!("This example requires: --features multirotor-swarm");
 }

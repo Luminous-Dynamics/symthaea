@@ -9,10 +9,10 @@
 //! Failure here means the pipeline is broken. Success here means the pipeline
 //! works — it does NOT mean the thesis is validated.
 
+use std::collections::HashMap;
 use symthaea_logparse::cluster::{hdbscan_cluster, nearest_centroid, purity};
 use symthaea_logparse::encoder::{bundle, encode, Hdv};
 use symthaea_logparse::fixtures::generate_synthetic_corpus;
-use std::collections::HashMap;
 
 /// Nearest-centroid baseline on synthetic fixtures.
 ///
@@ -24,10 +24,7 @@ use std::collections::HashMap;
 fn synthetic_nearest_centroid_high_purity() {
     let corpus = generate_synthetic_corpus(20, 0xC0FFEE);
     let hvs: Vec<Hdv> = corpus.iter().map(encode).collect();
-    let labels: Vec<String> = corpus
-        .iter()
-        .map(|e| e.label.clone().unwrap())
-        .collect();
+    let labels: Vec<String> = corpus.iter().map(|e| e.label.clone().unwrap()).collect();
     let label_refs: Vec<&str> = labels.iter().map(|s| s.as_str()).collect();
 
     // Build centroids in a stable order.
@@ -59,10 +56,7 @@ fn synthetic_nearest_centroid_high_purity() {
 fn synthetic_hdbscan_reasonable_purity() {
     let corpus = generate_synthetic_corpus(20, 0xBEEF);
     let hvs: Vec<Hdv> = corpus.iter().map(encode).collect();
-    let labels: Vec<String> = corpus
-        .iter()
-        .map(|e| e.label.clone().unwrap())
-        .collect();
+    let labels: Vec<String> = corpus.iter().map(|e| e.label.clone().unwrap()).collect();
     let label_refs: Vec<&str> = labels.iter().map(|s| s.as_str()).collect();
 
     let assignments = hdbscan_cluster(&hvs, Some(5)).expect("hdbscan should run");

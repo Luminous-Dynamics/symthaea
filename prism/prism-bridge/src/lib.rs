@@ -8,7 +8,7 @@
 //!
 //! The bridge is async (tokio) with bounded channels to prevent backpressure.
 
-use prism_common::{ContentZone, SafetyLevel, SearchResult, TabId, QueryId};
+use prism_common::{ContentZone, QueryId, SafetyLevel, SearchResult, TabId};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -56,10 +56,7 @@ pub enum RendererToSpore {
         zone: ContentZone,
     },
     /// Epistemic search query.
-    SearchQuery {
-        query_id: QueryId,
-        text: String,
-    },
+    SearchQuery { query_id: QueryId, text: String },
     /// Ping/keepalive.
     Ping(u64),
 }
@@ -156,7 +153,11 @@ mod tests {
         let frame = encode_frame(&msg).unwrap();
         let decoded: SporeToRenderer = decode_payload(&frame[4..]).unwrap();
         match decoded {
-            SporeToRenderer::Heartbeat { phi, safety_level, cycle } => {
+            SporeToRenderer::Heartbeat {
+                phi,
+                safety_level,
+                cycle,
+            } => {
                 assert!((phi - 0.72).abs() < 0.001);
                 assert_eq!(safety_level, SafetyLevel::Green);
                 assert_eq!(cycle, 1000);
@@ -177,7 +178,9 @@ mod tests {
         let frame = encode_frame(&msg).unwrap();
         let decoded: RendererToSpore = decode_payload(&frame[4..]).unwrap();
         match decoded {
-            RendererToSpore::EscalatedContent { content_hash: h, .. } => {
+            RendererToSpore::EscalatedContent {
+                content_hash: h, ..
+            } => {
                 assert_eq!(h, hash);
             }
             _ => panic!("Wrong variant"),
@@ -193,7 +196,10 @@ mod tests {
             text_content: big,
             zone: ContentZone::Local,
         };
-        assert!(matches!(encode_frame(&msg), Err(BridgeError::FrameTooLarge { .. })));
+        assert!(matches!(
+            encode_frame(&msg),
+            Err(BridgeError::FrameTooLarge { .. })
+        ));
     }
 
     #[test]
@@ -207,7 +213,7 @@ mod tests {
 
     #[test]
     fn roundtrip_search_results() {
-        use prism_common::{EmpiricalLevel, NormativeLevel, MaterialityLevel};
+        use prism_common::{EmpiricalLevel, MaterialityLevel, NormativeLevel};
 
         let msg = SporeToRenderer::SearchResults {
             query_id: 99,

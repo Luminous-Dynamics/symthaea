@@ -1,0 +1,147 @@
+{
+  "metadata": {
+    "title": "Mk0 Bootstrapper: Scrap-Stack Mechanics",
+    "framework": "Mycelix Genesis Foundation",
+    "source": "https://mycelix.org",
+    "grade_level": "Entry-Level/Vocational",
+    "subject_area": "Applied Resilience",
+    "domain": "Vocational",
+    "version": "1.0",
+    "total_standards": 4,
+    "domains": [
+      "Energy Stewardship",
+      "Material Recovery",
+      "Mesh Basics"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "The lowest-level on-ramp for the local pilot. Visceral, tactile, and immediately useful."
+  },
+  "nodes": [
+    {
+      "id": "VOC-000-S",
+      "title": "\u{26A0} Kinetic & Chemical Safety (MANDATORY)",
+      "description": "Zero-entry requirement. Identify fire extinguisher locations, demonstrate proper Li-ion cell handling to prevent thermal runaway, and master the 'Dead Short' multimeter test. Soldering irons remain locked until this node is mastered.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Safety",
+      "subdomain": "Scrap-Stack",
+      "tags": ["safety", "battery", "hazard-control"],
+      "estimated_hours": 4,
+      "grade_levels": ["Vocational"],
+      "bloom_level": "Apply",
+      "subject_area": "Applied Resilience"
+    },
+    {
+      "id": "VOC-000",
+      "title": "The Mycelial Lantern (Entry Point)",
+      "description": "The first step of the Sovereign Quickening. Salvage a battery cell, wire a solar charger, and provide light to your pod. MASTERING THIS UNLOCKS: 1.0 TEND + 1 hour of 3D printer time.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Energy Stewardship",
+      "subdomain": "Scrap-Stack",
+      "tags": ["solar", "battery", "light", "entry-point"],
+      "estimated_hours": 10,
+      "grade_levels": ["Vocational"],
+      "bloom_level": "Apply",
+      "subject_area": "Applied Resilience",
+      "academic_standards": [
+        {
+          "framework": "Luminous Dynamics",
+          "code": "MK0-HEL",
+          "description": "Basic Energy Stewardship",
+          "grade_level": "Entry"
+        }
+      ]
+    },
+    {
+      "id": "VOC-001",
+      "title": "Washing Machine Teardown (Copper Recovery)",
+      "description": "Harvesting high-value materials from 'e-waste'. MASTERING THIS UNLOCKS: 2.0 TEND + access to the Scrap Metal Commons.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Material Recovery",
+      "subdomain": "Scrap-Stack",
+      "tags": ["salvage", "copper", "recycling", "motors"],
+      "estimated_hours": 15,
+      "grade_levels": ["Vocational"],
+      "bloom_level": "Apply",
+      "subject_area": "Applied Resilience"
+    },
+    {
+      "id": "VOC-002",
+      "title": "ESP32 & The Mesh Handshake",
+      "description": "Your first digital node. Flash an ESP32 and see your harvested energy appear on the local dashboard. MASTERING THIS UNLOCKS: 5.0 TEND + entry to the Professional Technician track.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Mesh Basics",
+      "subdomain": "Scrap-Stack",
+      "tags": ["iot", "mesh", "esp32", "coding"],
+      "estimated_hours": 20,
+      "grade_levels": ["Vocational"],
+      "bloom_level": "Apply",
+      "subject_area": "Applied Resilience"
+    },
+    {
+      "id": "VOC-CAP-00",
+      "title": "The Warehouse Steward Capstone",
+      "description": "Maintain a physical metabolic loop for 7 days. Performance is verified by IoT sensors. COMPLETION DIVIDEND: 20 TEND + 'Citizen' trust tier elevation + physical key to the Community Greenhouse.",
+      "node_type": "Capstone",
+      "difficulty": "Intermediate",
+      "domain": "Universal",
+      "subdomain": "Scrap-Stack",
+      "tags": ["capstone", "stewardship", "proof-of-dirt"],
+      "estimated_hours": 40,
+      "grade_levels": ["Vocational"],
+      "bloom_level": "Create",
+      "subject_area": "Applied Resilience",
+      "holonic_capstone": {
+        "required_node_ids": ["VOC-000-S", "VOC-000", "VOC-001", "VOC-002"],
+        "deliverable": "7 days of telemetry data showing positive energy/nutrient balance, verified by the 'Isibaya' (Genesis Cohort).",
+        "min_peer_endorsements": 1
+      },
+      "alignment_vector": {
+        "ahimsa": 950,
+        "reciprocity": 950,
+        "thermodynamic_efficiency": 800,
+        "resilience": 900
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "VOC-000-S",
+      "to": "VOC-000",
+      "edge_type": "Requires",
+      "strength_permille": 1000,
+      "rationale": "SAFETY FIRST: You cannot handle battery cells without passing the safety node."
+    },
+    {
+      "from": "VOC-000-S",
+      "to": "VOC-001",
+      "edge_type": "Requires",
+      "strength_permille": 1000,
+      "rationale": "SAFETY FIRST: Motor teardown requires sharp tool and magnetic safety training."
+    },
+    {
+      "from": "VOC-000",
+      "to": "VOC-002",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "You must build the lantern before you can connect it to the mesh."
+    },
+    {
+      "from": "VOC-001",
+      "to": "VOC-CAP-00",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Material recovery is a prerequisite for long-term warehouse stewardship."
+    },
+    {
+      "from": "VOC-CAP-00",
+      "to": "VOC-RE-101",
+      "edge_type": "LeadsTo",
+      "strength_permille": 800,
+      "rationale": "Completing the Mk0 capstone qualifies you for the Solar PV Technician track."
+    }
+  ]
+}

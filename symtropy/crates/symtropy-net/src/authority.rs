@@ -84,7 +84,10 @@ impl SpatialAuthority {
         remote_peer_claims: &HashMap<BodyHandle, PeerId>,
     ) {
         for &body in bodies {
-            let local_dist = body_distances_to_local.get(&body).copied().unwrap_or(f64::MAX);
+            let local_dist = body_distances_to_local
+                .get(&body)
+                .copied()
+                .unwrap_or(f64::MAX);
 
             if local_dist < self.authority_radius {
                 // Check if a remote peer has a stronger claim

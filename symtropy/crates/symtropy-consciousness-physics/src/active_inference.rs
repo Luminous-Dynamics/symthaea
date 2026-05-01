@@ -93,7 +93,11 @@ impl BeliefMessage {
     /// proportionally more to the fused posterior.
     #[inline]
     pub fn precision(&self) -> f64 {
-        if self.uncertainty < 1e-10 { 1e10 } else { 1.0 / self.uncertainty }
+        if self.uncertainty < 1e-10 {
+            1e10
+        } else {
+            1.0 / self.uncertainty
+        }
     }
 
     /// Effective uncertainty after accounting for meso-temporal decay.
@@ -333,7 +337,9 @@ impl ActiveInferenceAgent {
         //
         // Scaling constant 0.002: calibrated so KL stays at the same order of
         // magnitude as surprise (both typically 0–0.5 per tick at default params).
-        let complexity: f64 = self.model.well_beliefs
+        let complexity: f64 = self
+            .model
+            .well_beliefs
             .iter()
             .map(|b| {
                 well_belief_kl(b.uncertainty, self.model.prior_well_uncertainty) * b.confidence
@@ -343,7 +349,12 @@ impl ActiveInferenceAgent {
 
         let total = epistemic_value + pragmatic_value + complexity;
 
-        EfeParts { epistemic_value, pragmatic_value, complexity, total }
+        EfeParts {
+            epistemic_value,
+            pragmatic_value,
+            complexity,
+            total,
+        }
     }
 
     /// Compute scalar EFE (for backward-compatible callers).
@@ -357,10 +368,14 @@ impl ActiveInferenceAgent {
         resonance_regen_rate: f64,
     ) -> f64 {
         self.efe_components(
-            candidate_pos, energy_fraction,
-            visible_wells, visible_agents,
-            well_regen_rate, resonance_regen_rate,
-        ).total
+            candidate_pos,
+            energy_fraction,
+            visible_wells,
+            visible_agents,
+            well_regen_rate,
+            resonance_regen_rate,
+        )
+        .total
     }
 
     /// Select action that minimizes expected free energy.
@@ -381,7 +396,10 @@ impl ActiveInferenceAgent {
     ) -> SVector<f64, 2> {
         self.model.ticks_since_update += 1;
 
-        let mut best_efe = EfeParts { total: f64::MAX, ..EfeParts::default() };
+        let mut best_efe = EfeParts {
+            total: f64::MAX,
+            ..EfeParts::default()
+        };
         let mut best_dir = SVector::zeros();
 
         // 8 angles × 3 distances = 24 candidates
@@ -392,9 +410,12 @@ impl ActiveInferenceAgent {
             for &dist in &[5.0, 15.0, 30.0] {
                 let candidate = pos + dir * dist;
                 let efe = self.efe_components(
-                    &candidate, energy_fraction,
-                    visible_wells, visible_agents,
-                    well_regen_rate, resonance_regen_rate,
+                    &candidate,
+                    energy_fraction,
+                    visible_wells,
+                    visible_agents,
+                    well_regen_rate,
+                    resonance_regen_rate,
                 );
                 if efe.is_better_than(&best_efe) {
                     best_efe = efe;
@@ -405,8 +426,12 @@ impl ActiveInferenceAgent {
 
         // Also evaluate staying still
         let stay_efe = self.efe_components(
-            pos, energy_fraction, visible_wells, visible_agents,
-            well_regen_rate, resonance_regen_rate,
+            pos,
+            energy_fraction,
+            visible_wells,
+            visible_agents,
+            well_regen_rate,
+            resonance_regen_rate,
         );
         if stay_efe.is_better_than(&best_efe) {
             best_efe = stay_efe;
@@ -431,12 +456,14 @@ impl ActiveInferenceAgent {
         current_tick: usize,
     ) {
         // Update energy forecast (EMA)
-        self.model.energy_forecast =
-            0.95 * self.model.energy_forecast + 0.05 * energy_fraction;
+        self.model.energy_forecast = 0.95 * self.model.energy_forecast + 0.05 * energy_fraction;
 
         // Incorporate discovered wells
         for well_pos in discovered_wells {
-            let existing = self.model.well_beliefs.iter_mut()
+            let existing = self
+                .model
+                .well_beliefs
+                .iter_mut()
                 .find(|b| (b.position - well_pos).norm() < 15.0);
             if let Some(belief) = existing {
                 // Reduce uncertainty (we confirmed it's here)
@@ -447,7 +474,11 @@ impl ActiveInferenceAgent {
                 // New well discovery
                 if self.model.well_beliefs.len() >= self.model.max_well_beliefs {
                     // Evict oldest/least confident
-                    if let Some(min_idx) = self.model.well_beliefs.iter().enumerate()
+                    if let Some(min_idx) = self
+                        .model
+                        .well_beliefs
+                        .iter()
+                        .enumerate()
                         .min_by(|(_, a), (_, b)| a.confidence.partial_cmp(&b.confidence).unwrap())
                         .map(|(i, _)| i)
                     {
@@ -474,7 +505,10 @@ impl ActiveInferenceAgent {
 
         // Update partner beliefs
         for &(handle, resonance) in nearby_partners {
-            let existing = self.model.partner_beliefs.iter_mut()
+            let existing = self
+                .model
+                .partner_beliefs
+                .iter_mut()
                 .find(|b| b.handle_bits == handle);
             if let Some(belief) = existing {
                 if resonance > 0.5 {
@@ -484,7 +518,11 @@ impl ActiveInferenceAgent {
                 }
             } else {
                 if self.model.partner_beliefs.len() >= self.model.max_partner_beliefs {
-                    if let Some(min_idx) = self.model.partner_beliefs.iter().enumerate()
+                    if let Some(min_idx) = self
+                        .model
+                        .partner_beliefs
+                        .iter()
+                        .enumerate()
                         .min_by(|(_, a), (_, b)| {
                             (a.alpha + a.beta).partial_cmp(&(b.alpha + b.beta)).unwrap()
                         })
@@ -493,8 +531,16 @@ impl ActiveInferenceAgent {
                         self.model.partner_beliefs.swap_remove(min_idx);
                     }
                 }
-                let (alpha, beta) = if resonance > 0.5 { (1.1, 1.0) } else { (1.0, 1.1) };
-                self.model.partner_beliefs.push(PartnerBelief { handle_bits: handle, alpha, beta });
+                let (alpha, beta) = if resonance > 0.5 {
+                    (1.1, 1.0)
+                } else {
+                    (1.0, 1.1)
+                };
+                self.model.partner_beliefs.push(PartnerBelief {
+                    handle_bits: handle,
+                    alpha,
+                    beta,
+                });
             }
         }
 
@@ -516,7 +562,8 @@ impl ActiveInferenceAgent {
         current_tick: usize,
         min_confidence: f64,
     ) -> Vec<BeliefMessage> {
-        self.model.well_beliefs
+        self.model
+            .well_beliefs
             .iter()
             .filter(|b| b.confidence >= min_confidence)
             .map(|b| BeliefMessage {
@@ -556,29 +603,47 @@ impl ActiveInferenceAgent {
     ) {
         for msg in messages {
             // Skip own messages (echo-chamber guard)
-            if msg.sender_bits == own_bits { continue; }
+            if msg.sender_bits == own_bits {
+                continue;
+            }
             // Skip expired messages (meso-temporal guard)
-            if msg.is_expired(current_tick) { continue; }
+            if msg.is_expired(current_tick) {
+                continue;
+            }
 
             // Age the uncertainty before fusion
             let msg_uncertainty = msg.aged_uncertainty(current_tick);
             // Skip messages that have decayed to near-prior (not informative)
-            if msg_uncertainty >= self.model.prior_well_uncertainty * 0.95 { continue; }
+            if msg_uncertainty >= self.model.prior_well_uncertainty * 0.95 {
+                continue;
+            }
 
             // Find an existing belief to fuse with
-            let existing = self.model.well_beliefs.iter_mut()
+            let existing = self
+                .model
+                .well_beliefs
+                .iter_mut()
                 .find(|b| (b.position - msg.well_position).norm() < 20.0);
 
             if let Some(belief) = existing {
                 // Gaussian precision fusion: combine posterior with message.
                 // σ²_new = 1 / (1/σ²_self + 1/σ²_msg)
-                let prec_self = if belief.uncertainty > 1e-10 { 1.0 / belief.uncertainty } else { 1e10 };
-                let prec_msg  = if msg_uncertainty > 1e-10  { 1.0 / msg_uncertainty }  else { 1e10 };
-                let prec_new  = prec_self + prec_msg;
+                let prec_self = if belief.uncertainty > 1e-10 {
+                    1.0 / belief.uncertainty
+                } else {
+                    1e10
+                };
+                let prec_msg = if msg_uncertainty > 1e-10 {
+                    1.0 / msg_uncertainty
+                } else {
+                    1e10
+                };
+                let prec_new = prec_self + prec_msg;
                 let sigma_new = 1.0 / prec_new;
 
                 // μ_new = σ²_new × (μ_self × prec_self + μ_msg × prec_msg)
-                let pos_new = (belief.position * prec_self + msg.well_position * prec_msg) * sigma_new;
+                let pos_new =
+                    (belief.position * prec_self + msg.well_position * prec_msg) * sigma_new;
 
                 belief.uncertainty = sigma_new;
                 belief.position = pos_new;
@@ -589,7 +654,11 @@ impl ActiveInferenceAgent {
                 // New well from peer observation — insert with reduced confidence
                 // (we haven't seen it ourselves yet)
                 if self.model.well_beliefs.len() >= self.model.max_well_beliefs {
-                    if let Some(min_idx) = self.model.well_beliefs.iter().enumerate()
+                    if let Some(min_idx) = self
+                        .model
+                        .well_beliefs
+                        .iter()
+                        .enumerate()
                         .min_by(|(_, a), (_, b)| a.confidence.partial_cmp(&b.confidence).unwrap())
                         .map(|(i, _)| i)
                     {
@@ -663,12 +732,13 @@ mod tests {
             confidence: 0.9,
             last_updated: 0,
         });
-        let dir = agent.infer_action(
-            &SVector::from([0.0, 0.0]), 0.3,
-            &[], &[], 0.12, 0.06,
-        );
+        let dir = agent.infer_action(&SVector::from([0.0, 0.0]), 0.3, &[], &[], 0.12, 0.06);
         // Should point roughly toward the believed well (positive x)
-        assert!(dir[0] > 0.5, "Should move toward believed well, got {:?}", dir);
+        assert!(
+            dir[0] > 0.5,
+            "Should move toward believed well, got {:?}",
+            dir
+        );
     }
 
     #[test]
@@ -677,8 +747,16 @@ mod tests {
         let pos = SVector::from([0.0, 0.0]);
         agent.update_beliefs(&pos, 0.5, &[], &[(42, 0.8), (99, 0.2)], 100);
         assert_eq!(agent.partners_known(), 2);
-        let p42 = agent.model.partner_beliefs.iter().find(|p| p.handle_bits == 42).unwrap();
-        assert!(p42.expected_value() > 0.5, "High-resonance partner should have high value");
+        let p42 = agent
+            .model
+            .partner_beliefs
+            .iter()
+            .find(|p| p.handle_bits == 42)
+            .unwrap();
+        assert!(
+            p42.expected_value() > 0.5,
+            "High-resonance partner should have high value"
+        );
     }
 
     #[test]
@@ -706,7 +784,10 @@ mod tests {
             created_at_tick: 0,
             max_age_ticks: 500,
         };
-        assert!((msg.precision() - 0.25).abs() < 1e-12, "precision = 1/σ² = 1/4 = 0.25");
+        assert!(
+            (msg.precision() - 0.25).abs() < 1e-12,
+            "precision = 1/σ² = 1/4 = 0.25"
+        );
     }
 
     #[test]
@@ -741,7 +822,10 @@ mod tests {
             created_at_tick: 0,
             max_age_ticks: 100,
         };
-        assert!(!msg.is_expired(50), "should not expire before max_age_ticks");
+        assert!(
+            !msg.is_expired(50),
+            "should not expire before max_age_ticks"
+        );
         assert!(msg.is_expired(101), "should expire after max_age_ticks");
     }
 
@@ -751,17 +835,21 @@ mod tests {
         agent.model.well_beliefs.push(WellBelief {
             position: SVector::from([30.0, 0.0]),
             uncertainty: 10.0,
-            confidence: 0.9,  // above threshold
+            confidence: 0.9, // above threshold
             last_updated: 0,
         });
         agent.model.well_beliefs.push(WellBelief {
             position: SVector::from([60.0, 0.0]),
             uncertainty: 50.0,
-            confidence: 0.1,  // below threshold 0.3
+            confidence: 0.1, // below threshold 0.3
             last_updated: 0,
         });
         let msgs = agent.collect_messages(42, 100, 0.3);
-        assert_eq!(msgs.len(), 1, "only high-confidence beliefs should be shared");
+        assert_eq!(
+            msgs.len(),
+            1,
+            "only high-confidence beliefs should be shared"
+        );
         assert!((msgs[0].well_position[0] - 30.0).abs() < 1e-10);
     }
 
@@ -770,17 +858,17 @@ mod tests {
         let mut agent = ActiveInferenceAgent::default();
         agent.model.well_beliefs.push(WellBelief {
             position: SVector::from([30.0, 0.0]),
-            uncertainty: 40.0,  // moderately uncertain
+            uncertainty: 40.0, // moderately uncertain
             confidence: 0.5,
             last_updated: 0,
         });
 
         // Peer has more certain belief about the same well
         let msg = BeliefMessage {
-            well_position: SVector::from([32.0, 0.0]),  // slightly offset
-            uncertainty: 10.0,   // more certain
+            well_position: SVector::from([32.0, 0.0]), // slightly offset
+            uncertainty: 10.0,                         // more certain
             confidence: 0.8,
-            sender_bits: 99,    // different agent
+            sender_bits: 99, // different agent
             created_at_tick: 0,
             max_age_ticks: 500,
         };
@@ -792,7 +880,8 @@ mod tests {
         assert!(
             uncertainty_after < uncertainty_before,
             "precision fusion should reduce uncertainty: {} < {}",
-            uncertainty_after, uncertainty_before
+            uncertainty_after,
+            uncertainty_before
         );
         // Fused position should be between the two (precision-weighted)
         assert!(
@@ -808,7 +897,7 @@ mod tests {
             well_position: SVector::from([30.0, 0.0]),
             uncertainty: 5.0,
             confidence: 0.9,
-            sender_bits: 42,  // same as own_bits
+            sender_bits: 42, // same as own_bits
             created_at_tick: 0,
             max_age_ticks: 500,
         };
@@ -828,7 +917,11 @@ mod tests {
             max_age_ticks: 100,
         };
         agent.receive_messages(&[msg], 1, 200); // current_tick 200 > created+max_age=100
-        assert_eq!(agent.wells_known(), 0, "expired messages should be rejected");
+        assert_eq!(
+            agent.wells_known(),
+            0,
+            "expired messages should be rejected"
+        );
     }
 
     #[test]
@@ -857,17 +950,18 @@ mod tests {
         // A message that has aged to near-prior uncertainty should be ignored
         let msg = BeliefMessage {
             well_position: SVector::from([30.0, 0.0]),
-            uncertainty: 5.0,     // starts certain
+            uncertainty: 5.0, // starts certain
             confidence: 0.9,
             sender_bits: 99,
-            created_at_tick: 0,   // created at tick 0
-            max_age_ticks: 5000,  // not expired by age
+            created_at_tick: 0,  // created at tick 0
+            max_age_ticks: 5000, // not expired by age
         };
         // But aged_uncertainty at tick 500 = 5.0 + 500 * 0.2 = 105 ≥ prior (100) * 0.95 = 95
         // So the message's effective uncertainty has diffused to near-prior
         agent.receive_messages(&[msg], 1, 500);
         assert_eq!(
-            agent.wells_known(), 0,
+            agent.wells_known(),
+            0,
             "message aged to near-prior uncertainty should be ignored"
         );
     }
@@ -892,13 +986,17 @@ mod tests {
         agent_b.receive_messages(&messages, 2, 100);
 
         assert_eq!(
-            agent_b.wells_known(), 1,
+            agent_b.wells_known(),
+            1,
             "agent B should learn about the well via belief propagation"
         );
         // B's knowledge should be less certain than A's (peer discount applied)
         let a_conf = agent_a.model.well_beliefs[0].confidence;
         let b_conf = agent_b.model.well_beliefs[0].confidence;
-        assert!(b_conf <= a_conf, "B's confidence should be ≤ A's (peer discount)");
+        assert!(
+            b_conf <= a_conf,
+            "B's confidence should be ≤ A's (peer discount)"
+        );
     }
 
     // ── EFE decomposition ─────────────────────────────────────────────────────
@@ -914,8 +1012,14 @@ mod tests {
 
     #[test]
     fn efe_is_better_than_compares_total() {
-        let good = EfeParts { total: -1.0, ..EfeParts::default() };
-        let bad = EfeParts { total: 1.0, ..EfeParts::default() };
+        let good = EfeParts {
+            total: -1.0,
+            ..EfeParts::default()
+        };
+        let bad = EfeParts {
+            total: 1.0,
+            ..EfeParts::default()
+        };
         assert!(good.is_better_than(&bad));
         assert!(!bad.is_better_than(&good));
     }
@@ -926,7 +1030,10 @@ mod tests {
         let pos = SVector::from([0.0, 0.0]);
         agent.infer_action(&pos, 0.5, &[], &[], 0.12, 0.06);
         // last_efe total should be finite after inference
-        assert!(agent.last_efe.total.is_finite(), "last_efe should be finite after infer_action");
+        assert!(
+            agent.last_efe.total.is_finite(),
+            "last_efe should be finite after infer_action"
+        );
     }
 
     #[test]
@@ -936,14 +1043,18 @@ mod tests {
         let mut agent = ActiveInferenceAgent::default();
         agent.model.well_beliefs.push(WellBelief {
             position: SVector::from([25.0, 0.0]),
-            uncertainty: 80.0,    // high = lots to learn
+            uncertainty: 80.0, // high = lots to learn
             confidence: 0.8,
             last_updated: 0,
         });
 
         let efe = agent.efe_components(
-            &SVector::from([0.0, 0.0]), 0.7,  // high energy = no urgency
-            &[], &[], 0.12, 0.06,
+            &SVector::from([0.0, 0.0]),
+            0.7, // high energy = no urgency
+            &[],
+            &[],
+            0.12,
+            0.06,
         );
         // With the well 25 units away and high uncertainty, info_gain > 0
         // → epistemic_value < 0 (exploration is beneficial)
@@ -962,29 +1073,25 @@ mod tests {
         let well_pos = SVector::from([0.0, 0.0]);
         let far_pos = SVector::from([100.0, 100.0]);
 
-        let efe_on_well = agent.efe_components(
-            &well_pos, 0.3,
-            &[(well_pos, 1.0)], &[], 0.12, 0.06,
-        );
-        let efe_far = agent.efe_components(
-            &far_pos, 0.3,
-            &[(well_pos, 1.0)], &[], 0.12, 0.06,
-        );
+        let efe_on_well = agent.efe_components(&well_pos, 0.3, &[(well_pos, 1.0)], &[], 0.12, 0.06);
+        let efe_far = agent.efe_components(&far_pos, 0.3, &[(well_pos, 1.0)], &[], 0.12, 0.06);
         assert!(
             efe_on_well.pragmatic_value < efe_far.pragmatic_value,
             "being on the well should have lower pragmatic_value: on={}, far={}",
-            efe_on_well.pragmatic_value, efe_far.pragmatic_value
+            efe_on_well.pragmatic_value,
+            efe_far.pragmatic_value
         );
     }
 
     #[test]
     fn efe_complexity_zero_with_no_beliefs() {
         let agent = ActiveInferenceAgent::default();
-        let efe = agent.efe_components(
-            &SVector::from([0.0, 0.0]), 0.5,
-            &[], &[], 0.12, 0.06,
+        let efe = agent.efe_components(&SVector::from([0.0, 0.0]), 0.5, &[], &[], 0.12, 0.06);
+        assert!(
+            efe.complexity.abs() < 1e-12,
+            "no beliefs → no complexity, got {}",
+            efe.complexity
         );
-        assert!(efe.complexity.abs() < 1e-12, "no beliefs → no complexity, got {}", efe.complexity);
     }
 
     #[test]
@@ -994,13 +1101,13 @@ mod tests {
 
         agent_confident.model.well_beliefs.push(WellBelief {
             position: SVector::from([30.0, 0.0]),
-            uncertainty: 1.0,     // very certain
+            uncertainty: 1.0, // very certain
             confidence: 0.9,
             last_updated: 0,
         });
         agent_uncertain.model.well_beliefs.push(WellBelief {
             position: SVector::from([30.0, 0.0]),
-            uncertainty: 90.0,    // close to prior (100.0)
+            uncertainty: 90.0, // close to prior (100.0)
             confidence: 0.9,
             last_updated: 0,
         });
@@ -1011,7 +1118,8 @@ mod tests {
         assert!(
             efe_c.complexity > efe_u.complexity,
             "confident agent should have higher complexity: certain={}, uncertain={}",
-            efe_c.complexity, efe_u.complexity
+            efe_c.complexity,
+            efe_u.complexity
         );
     }
 
@@ -1025,14 +1133,19 @@ mod tests {
             last_updated: 0,
         });
         let efe = agent.efe_components(
-            &SVector::from([10.0, 0.0]), 0.4,
-            &[(SVector::from([20.0, 0.0]), 0.8)], &[], 0.12, 0.06,
+            &SVector::from([10.0, 0.0]),
+            0.4,
+            &[(SVector::from([20.0, 0.0]), 0.8)],
+            &[],
+            0.12,
+            0.06,
         );
         let expected_total = efe.epistemic_value + efe.pragmatic_value + efe.complexity;
         assert!(
             (efe.total - expected_total).abs() < 1e-10,
             "total should equal sum of parts: total={}, sum={}",
-            efe.total, expected_total
+            efe.total,
+            expected_total
         );
     }
 
@@ -1041,7 +1154,10 @@ mod tests {
         // When current uncertainty equals the prior, KL should be zero.
         let prior = 100.0;
         let kl = well_belief_kl(prior, prior);
-        assert!(kl.abs() < 1e-12, "KL at prior uncertainty should be 0, got {kl}");
+        assert!(
+            kl.abs() < 1e-12,
+            "KL at prior uncertainty should be 0, got {kl}"
+        );
     }
 
     #[test]
@@ -1090,7 +1206,7 @@ mod tests {
         // certain agent: very confident
         agent_certain.model.well_beliefs.push(WellBelief {
             position: well_pos,
-            uncertainty: 0.5,   // very certain
+            uncertainty: 0.5, // very certain
             confidence: 0.9,
             last_updated: 0,
         });
@@ -1098,7 +1214,7 @@ mod tests {
         // uncertain agent: same well but unsure
         agent_uncertain.model.well_beliefs.push(WellBelief {
             position: well_pos,
-            uncertainty: 80.0,  // close to prior
+            uncertainty: 80.0, // close to prior
             confidence: 0.9,
             last_updated: 0,
         });
@@ -1111,8 +1227,14 @@ mod tests {
         // Both should still seek the well (energy is low), but the certain agent's
         // choice is influenced by the KL cost term in the VFE.
         // At minimum, neither should panic and both should return normalized directions.
-        assert!(dir_certain.norm() <= 1.01, "certain: direction should be unit/zero");
-        assert!(dir_uncertain.norm() <= 1.01, "uncertain: direction should be unit/zero");
+        assert!(
+            dir_certain.norm() <= 1.01,
+            "certain: direction should be unit/zero"
+        );
+        assert!(
+            dir_uncertain.norm() <= 1.01,
+            "uncertain: direction should be unit/zero"
+        );
     }
 
     #[test]
@@ -1129,6 +1251,9 @@ mod tests {
             });
         }
         let dir = agent.infer_action(&SVector::zeros(), 0.5, &[], &[], 0.12, 0.06);
-        assert!(dir.norm().is_finite(), "VFE complexity should remain finite");
+        assert!(
+            dir.norm().is_finite(),
+            "VFE complexity should remain finite"
+        );
     }
 }

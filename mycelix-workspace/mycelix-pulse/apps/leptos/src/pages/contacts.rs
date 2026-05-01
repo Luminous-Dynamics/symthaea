@@ -1,12 +1,12 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+use crate::components::ContactCard;
+use crate::holochain::{use_holochain, ConnectionStatus};
+use crate::mail_context::use_mail;
+use crate::toasts::use_toasts;
 use leptos::prelude::*;
 use wasm_bindgen_futures::spawn_local;
-use crate::mail_context::use_mail;
-use crate::holochain::{use_holochain, ConnectionStatus};
-use crate::toasts::use_toasts;
-use crate::components::ContactCard;
 
 #[component]
 pub fn ContactsPage() -> impl IntoView {
@@ -24,14 +24,26 @@ pub fn ContactsPage() -> impl IntoView {
     let filtered = move || {
         let query = search.get().to_lowercase();
         let favs_only = show_favorites_only.get();
-        mail.contacts.get().into_iter().filter(|c| {
-            let matches_search = query.is_empty()
-                || c.display_name.to_lowercase().contains(&query)
-                || c.email.as_deref().unwrap_or("").to_lowercase().contains(&query)
-                || c.organization.as_deref().unwrap_or("").to_lowercase().contains(&query);
-            let matches_fav = !favs_only || c.is_favorite;
-            matches_search && matches_fav
-        }).collect::<Vec<_>>()
+        mail.contacts
+            .get()
+            .into_iter()
+            .filter(|c| {
+                let matches_search = query.is_empty()
+                    || c.display_name.to_lowercase().contains(&query)
+                    || c.email
+                        .as_deref()
+                        .unwrap_or("")
+                        .to_lowercase()
+                        .contains(&query)
+                    || c.organization
+                        .as_deref()
+                        .unwrap_or("")
+                        .to_lowercase()
+                        .contains(&query);
+                let matches_fav = !favs_only || c.is_favorite;
+                matches_search && matches_fav
+            })
+            .collect::<Vec<_>>()
     };
 
     view! {
@@ -301,7 +313,10 @@ fn contact_id_from_discovery(result: &DiscoverResult) -> String {
         .to_string()
 }
 
-fn contact_matches_discovery(contact: &mail_leptos_types::ContactView, result: &DiscoverResult) -> bool {
+fn contact_matches_discovery(
+    contact: &mail_leptos_types::ContactView,
+    result: &DiscoverResult,
+) -> bool {
     if let Some(agent_pub_key) = result.agent_pub_key.as_deref() {
         if contact.agent_pub_key.as_deref() == Some(agent_pub_key) {
             return true;
@@ -393,10 +408,25 @@ mod tests {
         let result = sample_result();
         let payload = build_discovered_contact_payload(&result, 1234);
 
-        assert_eq!(payload.get("id").and_then(|v| v.as_str()), Some("dsid-mycelix-alice"));
-        assert_eq!(payload.get("display_name").and_then(|v| v.as_str()), Some("Alice Example"));
-        assert_eq!(payload.get("notes").and_then(|v| v.as_str()), Some("Added from DSID discovery: dsid:mycelix:alice"));
-        assert_eq!(payload.get("agent_pub_key").and_then(|v| v.as_str()), Some("uhCAk_alice"));
-        assert_eq!(payload.get("created_at").and_then(|v| v.as_u64()), Some(1234));
+        assert_eq!(
+            payload.get("id").and_then(|v| v.as_str()),
+            Some("dsid-mycelix-alice")
+        );
+        assert_eq!(
+            payload.get("display_name").and_then(|v| v.as_str()),
+            Some("Alice Example")
+        );
+        assert_eq!(
+            payload.get("notes").and_then(|v| v.as_str()),
+            Some("Added from DSID discovery: dsid:mycelix:alice")
+        );
+        assert_eq!(
+            payload.get("agent_pub_key").and_then(|v| v.as_str()),
+            Some("uhCAk_alice")
+        );
+        assert_eq!(
+            payload.get("created_at").and_then(|v| v.as_u64()),
+            Some(1234)
+        );
     }
 }

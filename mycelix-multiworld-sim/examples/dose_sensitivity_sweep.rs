@@ -10,9 +10,9 @@
 // - delta (phase2=on − phase2=off) per dose
 // - whether Phase 2 starts helping at some dose
 
-use mycelix_multiworld_sim::MultiWorldSimulator;
 use mycelix_multiworld_sim::config::{PolicyConfig, SimulationConfig};
 use mycelix_multiworld_sim::red_team::AdversarialStrategy;
+use mycelix_multiworld_sim::MultiWorldSimulator;
 
 fn run(seed: u64, years: u32, phase2: bool, per_strategy: usize) -> (bool, f64) {
     let mut config = SimulationConfig::default_150_year();

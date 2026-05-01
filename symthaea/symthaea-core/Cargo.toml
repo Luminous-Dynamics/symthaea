@@ -13,6 +13,15 @@ categories = ["science", "simulation", "algorithms"]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
+[[bench]]
+name = "eml_derivation_speed"
+harness = false
+
+[[bench]]
+name = "abstract_thought_reflect"
+harness = false
+required-features = ["abstract_thought"]
+
 [dependencies]
 ndarray = { workspace = true }
 rand = { workspace = true }
@@ -30,6 +39,7 @@ ordered-float = "4.2"
 parking_lot = { workspace = true }
 once_cell = { workspace = true }
 nalgebra = { workspace = true }
+num-complex = "0.4"
 bumpalo = "3.16"
 chrono = { workspace = true }
 
@@ -73,6 +83,11 @@ required-features = ["abstract_thought"]
 [[example]]
 name = "macro_acceleration_benchmark"
 path = "examples/macro_acceleration_benchmark.rs"
+required-features = ["abstract_thought"]
+
+[[example]]
+name = "real_discovery_report"
+path = "examples/real_discovery_report.rs"
 required-features = ["abstract_thought"]
 
 [[example]]

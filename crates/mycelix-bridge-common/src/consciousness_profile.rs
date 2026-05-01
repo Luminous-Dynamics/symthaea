@@ -75,9 +75,12 @@ pub fn continuous_vote_weight(
     temperature: f64,
     max_weight: f64,
 ) -> f64 {
-    if !temperature.is_finite() || temperature <= 0.0
-        || !score.is_finite() || !threshold.is_finite()
-        || !max_weight.is_finite() || max_weight < 0.0
+    if !temperature.is_finite()
+        || temperature <= 0.0
+        || !score.is_finite()
+        || !threshold.is_finite()
+        || !max_weight.is_finite()
+        || max_weight < 0.0
     {
         warn!("NaN/Inf fallback in continuous_vote_weight: score={}, threshold={}, temperature={}, max_weight={}", score, threshold, temperature, max_weight);
         return 0.0;
@@ -149,17 +152,29 @@ impl ConsciousnessProfile {
     pub fn combined_score(&self) -> f64 {
         // Sanitize inputs first — prevents NaN from entering arithmetic.
         // Non-finite dimensions clamp to 0.0 (safest default: no contribution).
-        let i = if self.identity.is_finite() { self.identity.clamp(0.0, 1.0) } else {
-            warn!("NaN/Inf in combined_score: identity={}", self.identity); 0.0
+        let i = if self.identity.is_finite() {
+            self.identity.clamp(0.0, 1.0)
+        } else {
+            warn!("NaN/Inf in combined_score: identity={}", self.identity);
+            0.0
         };
-        let r = if self.reputation.is_finite() { self.reputation.clamp(0.0, 1.0) } else {
-            warn!("NaN/Inf in combined_score: reputation={}", self.reputation); 0.0
+        let r = if self.reputation.is_finite() {
+            self.reputation.clamp(0.0, 1.0)
+        } else {
+            warn!("NaN/Inf in combined_score: reputation={}", self.reputation);
+            0.0
         };
-        let c = if self.community.is_finite() { self.community.clamp(0.0, 1.0) } else {
-            warn!("NaN/Inf in combined_score: community={}", self.community); 0.0
+        let c = if self.community.is_finite() {
+            self.community.clamp(0.0, 1.0)
+        } else {
+            warn!("NaN/Inf in combined_score: community={}", self.community);
+            0.0
         };
-        let e = if self.engagement.is_finite() { self.engagement.clamp(0.0, 1.0) } else {
-            warn!("NaN/Inf in combined_score: engagement={}", self.engagement); 0.0
+        let e = if self.engagement.is_finite() {
+            self.engagement.clamp(0.0, 1.0)
+        } else {
+            warn!("NaN/Inf in combined_score: engagement={}", self.engagement);
+            0.0
         };
         (i * 0.25 + r * 0.25 + c * 0.30 + e * 0.20).clamp(0.0, 1.0)
     }
@@ -294,8 +309,8 @@ impl ConsciousnessProfile {
         let coh_c = coherence.clamp(0.0, 1.0);
         let care_c = care_activation.clamp(0.0, 1.0);
 
-        let engagement = (0.35 * phi_c + 0.25 * meta_c + 0.20 * coh_c + 0.20 * care_c)
-            .clamp(0.0, 1.0);
+        let engagement =
+            (0.35 * phi_c + 0.25 * meta_c + 0.20 * coh_c + 0.20 * care_c).clamp(0.0, 1.0);
 
         Self {
             identity: identity.clamp(0.0, 1.0),
@@ -320,7 +335,10 @@ impl Default for ConsciousnessProfile {
 ///
 /// **Deprecated**: Use `sovereign_gate::SovereignCredential` (8D) instead.
 /// This 4D type is retained for backward compatibility during the migration.
-#[deprecated(since = "0.9.0", note = "Use sovereign_gate::SovereignCredential (8D) instead")]
+#[deprecated(
+    since = "0.9.0",
+    note = "Use sovereign_gate::SovereignCredential (8D) instead"
+)]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ConsciousnessCredential {
     /// Agent's DID (e.g., "did:mycelix:<pubkey>").
@@ -430,8 +448,13 @@ impl ConsciousnessCredential {
         now_us: u64,
     ) -> Self {
         let profile = ConsciousnessProfile::from_symthaea(
-            phi, meta_awareness, coherence, care_activation,
-            identity, reputation, community,
+            phi,
+            meta_awareness,
+            coherence,
+            care_activation,
+            identity,
+            reputation,
+            community,
         );
         let tier = profile.clamped().tier();
         Self {
@@ -637,7 +660,10 @@ impl ConsciousnessTier {
 /// minimum identity verification AND community trust).
 ///
 /// **Deprecated**: Use `sovereign_gate::CivicRequirement` (8D) instead.
-#[deprecated(since = "0.9.0", note = "Use sovereign_gate::CivicRequirement (8D) instead")]
+#[deprecated(
+    since = "0.9.0",
+    note = "Use sovereign_gate::CivicRequirement (8D) instead"
+)]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GovernanceRequirement {
     /// Minimum consciousness tier required.
@@ -966,8 +992,7 @@ pub fn evaluate_governance(
         let credential_age_us = now_us.saturating_sub(credential.issued_at);
         const SYBIL_MATURATION_PERIOD_US: u64 = 72 * 3600 * 1_000_000; // 72 hours
         if credential_age_us < SYBIL_MATURATION_PERIOD_US {
-            let maturation_ratio =
-                credential_age_us as f64 / SYBIL_MATURATION_PERIOD_US as f64;
+            let maturation_ratio = credential_age_us as f64 / SYBIL_MATURATION_PERIOD_US as f64;
             // Scale weight from 10% at creation to 100% at maturation
             let age_factor = 0.1 + 0.9 * maturation_ratio;
             let reduced = (weight_bp as f64 * age_factor) as u32;
@@ -1304,7 +1329,10 @@ impl ReputationState {
         let sanitized = if initial_score.is_finite() {
             initial_score.clamp(0.0, 1.0)
         } else {
-            warn!("NaN/Inf in ReputationState::new: initial_score={}", initial_score);
+            warn!(
+                "NaN/Inf in ReputationState::new: initial_score={}",
+                initial_score
+            );
             0.0
         };
         Self {
@@ -1337,7 +1365,10 @@ impl ReputationState {
         if decay_factor.is_finite() {
             self.score = (self.score * decay_factor).clamp(0.0, 1.0);
         } else {
-            warn!("NaN/Inf decay_factor in apply_decay: elapsed_days={}, decay_factor={}", elapsed_days, decay_factor);
+            warn!(
+                "NaN/Inf decay_factor in apply_decay: elapsed_days={}, decay_factor={}",
+                elapsed_days, decay_factor
+            );
             self.score = 0.0; // Extreme elapsed time -> full decay
         }
         self.last_updated_us = now_us;
@@ -1486,7 +1517,10 @@ pub fn decay_reputation(profile: &ConsciousnessProfile, elapsed_days: f64) -> Co
     let decayed_rep = if decay_factor.is_finite() {
         (profile.reputation * decay_factor).clamp(0.0, 1.0)
     } else {
-        warn!("NaN/Inf decay_factor in decay_reputation: elapsed_days={}, decay_factor={}", elapsed_days, decay_factor);
+        warn!(
+            "NaN/Inf decay_factor in decay_reputation: elapsed_days={}, decay_factor={}",
+            elapsed_days, decay_factor
+        );
         0.0
     };
     ConsciousnessProfile {
@@ -2842,7 +2876,7 @@ mod tests {
         //            = 0.28 + 0.15 + 0.10 + 0.14 = 0.67
         let profile = ConsciousnessProfile::from_symthaea(
             0.8, 0.6, 0.5, 0.7, // Symthaea signals
-            0.75, 0.50, 0.40,    // identity/reputation/community
+            0.75, 0.50, 0.40, // identity/reputation/community
         );
         let expected_engagement = 0.35 * 0.8 + 0.25 * 0.6 + 0.20 * 0.5 + 0.20 * 0.7;
         assert!((profile.engagement - expected_engagement).abs() < 1e-10);
@@ -2853,9 +2887,7 @@ mod tests {
 
     #[test]
     fn symthaea_bridge_all_max() {
-        let profile = ConsciousnessProfile::from_symthaea(
-            1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
-        );
+        let profile = ConsciousnessProfile::from_symthaea(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0);
         assert_eq!(profile.engagement, 1.0);
         assert_eq!(profile.combined_score(), 1.0);
         assert_eq!(profile.tier(), ConsciousnessTier::Guardian);
@@ -2863,9 +2895,7 @@ mod tests {
 
     #[test]
     fn symthaea_bridge_all_zero() {
-        let profile = ConsciousnessProfile::from_symthaea(
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        );
+        let profile = ConsciousnessProfile::from_symthaea(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
         assert_eq!(profile.engagement, 0.0);
         assert_eq!(profile.combined_score(), 0.0);
         assert_eq!(profile.tier(), ConsciousnessTier::Observer);
@@ -2888,8 +2918,13 @@ mod tests {
         let now = 1_000_000_000_000_u64;
         let cred = ConsciousnessCredential::from_symthaea(
             "did:mycelix:enriched".into(),
-            0.7, 0.6, 0.5, 0.8, // phi, meta, coherence, care
-            0.80, 0.50, 0.40,    // identity, reputation, community
+            0.7,
+            0.6,
+            0.5,
+            0.8, // phi, meta, coherence, care
+            0.80,
+            0.50,
+            0.40, // identity, reputation, community
             "did:mycelix:bridge".into(),
             now,
         );

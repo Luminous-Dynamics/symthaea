@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use html5ever::tendril::*;
 use html5ever::tree_builder::{ElementFlags, NodeOrText, QuirksMode, TreeSink};
 use html5ever::{Attribute, ExpandedName, QualName};
-use html5ever::{parse_document, ParseOpts};
+use html5ever::{ParseOpts, parse_document};
 
 use crate::node::{ElementData, NodeData, NodeId};
 use crate::tree::DomTree;
@@ -93,22 +93,28 @@ impl TreeSink for PrismSink {
             .map(|a| (a.name.local.to_string(), a.value.to_string()))
             .collect();
 
-        self.tree.borrow_mut().new_node(NodeData::Element(ElementData {
-            tag: name.local.to_string(),
-            qual_name: name,
-            attributes,
-        }))
+        self.tree
+            .borrow_mut()
+            .new_node(NodeData::Element(ElementData {
+                tag: name.local.to_string(),
+                qual_name: name,
+                attributes,
+            }))
     }
 
     fn create_comment(&self, text: StrTendril) -> NodeId {
-        self.tree.borrow_mut().new_node(NodeData::Comment(text.to_string()))
+        self.tree
+            .borrow_mut()
+            .new_node(NodeData::Comment(text.to_string()))
     }
 
     fn create_pi(&self, target: StrTendril, data: StrTendril) -> NodeId {
-        self.tree.borrow_mut().new_node(NodeData::ProcessingInstruction {
-            target: target.to_string(),
-            data: data.to_string(),
-        })
+        self.tree
+            .borrow_mut()
+            .new_node(NodeData::ProcessingInstruction {
+                target: target.to_string(),
+                data: data.to_string(),
+            })
     }
 
     fn append(&self, parent: &NodeId, child: NodeOrText<NodeId>) {
@@ -127,12 +133,11 @@ impl TreeSink for PrismSink {
                     .map(|(id, _)| id);
 
                 if let Some(last_id) = should_merge
-                    && let NodeData::Text(ref mut existing) =
-                        tree.get_mut(last_id).unwrap().data
-                    {
-                        existing.push_str(&text);
-                        return;
-                    }
+                    && let NodeData::Text(ref mut existing) = tree.get_mut(last_id).unwrap().data
+                {
+                    existing.push_str(&text);
+                    return;
+                }
                 let text_id = tree.new_node(NodeData::Text(text.to_string()));
                 tree.append_child(*parent, text_id);
             }
@@ -197,13 +202,14 @@ impl TreeSink for PrismSink {
     fn add_attrs_if_missing(&self, target: &NodeId, attrs: Vec<Attribute>) {
         let mut tree = self.tree.borrow_mut();
         if let Some(node) = tree.get_mut(*target)
-            && let NodeData::Element(ref mut el) = node.data {
-                for attr in attrs {
-                    el.attributes
-                        .entry(attr.name.local.to_string())
-                        .or_insert_with(|| attr.value.to_string());
-                }
+            && let NodeData::Element(ref mut el) = node.data
+        {
+            for attr in attrs {
+                el.attributes
+                    .entry(attr.name.local.to_string())
+                    .or_insert_with(|| attr.value.to_string());
             }
+        }
     }
 
     fn remove_from_parent(&self, target: &NodeId) {
@@ -229,9 +235,8 @@ mod tests {
 
     #[test]
     fn parse_basic_html() {
-        let tree = parse_html(
-            "<html><head><title>Test</title></head><body><p>Hello</p></body></html>",
-        );
+        let tree =
+            parse_html("<html><head><title>Test</title></head><body><p>Hello</p></body></html>");
         assert!(!tree.is_empty());
         assert_eq!(tree.title(), Some("Test".to_string()));
         let text = tree.extract_visible_text();
@@ -263,15 +268,13 @@ mod tests {
 
     #[test]
     fn parse_detects_password() {
-        let tree =
-            parse_html(r#"<form><input type="text" /><input type="password" /></form>"#);
+        let tree = parse_html(r#"<form><input type="text" /><input type="password" /></form>"#);
         assert!(tree.has_password_field());
     }
 
     #[test]
     fn parse_no_password() {
-        let tree =
-            parse_html(r#"<form><input type="text" /><input type="email" /></form>"#);
+        let tree = parse_html(r#"<form><input type="text" /><input type="email" /></form>"#);
         assert!(!tree.has_password_field());
     }
 

@@ -532,7 +532,7 @@ mod student_result_validation_tests {
             rubric_scores: vec![40, 45],
             attempt_number: 1,
             reasoning_trace: None,
-            consciousness_level_permille: Some(750),
+            cognitive_readiness_permille: Some(750),
             feedback: Some("Good work".to_string()),
             graded_by: Some(AgentPubKey::from_raw_36(vec![0xab; 36])),
             completed_at: 1700000000,
@@ -557,7 +557,7 @@ mod student_result_validation_tests {
     #[test]
     fn test_student_result_consciousness_over_1000() {
         let mut r = create_valid_student_result();
-        r.consciousness_level_permille = Some(1001);
+        r.cognitive_readiness_permille = Some(1001);
         let result = validate_student_result(&r);
         assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
     }
@@ -565,15 +565,15 @@ mod student_result_validation_tests {
     #[test]
     fn test_student_result_consciousness_at_1000() {
         let mut r = create_valid_student_result();
-        r.consciousness_level_permille = Some(1000);
+        r.cognitive_readiness_permille = Some(1000);
         let result = validate_student_result(&r);
         assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
     }
 
     #[test]
-    fn test_student_result_no_consciousness_level() {
+    fn test_student_result_no_cognitive_readiness() {
         let mut r = create_valid_student_result();
-        r.consciousness_level_permille = None;
+        r.cognitive_readiness_permille = None;
         let result = validate_student_result(&r);
         assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
     }

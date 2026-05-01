@@ -1,5 +1,5 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Sync ND physics bodies to Bevy Transform components.
 
@@ -132,7 +132,9 @@ mod tests {
     #[test]
     fn physics_world_res_4d() {
         let res = PhysicsWorldRes4D {
-            world: symtropy_physics::PhysicsWorld::new(nalgebra::SVector::from([0.0, -9.81, 0.0, 0.0])),
+            world: symtropy_physics::PhysicsWorld::new(nalgebra::SVector::from([
+                0.0, -9.81, 0.0, 0.0,
+            ])),
         };
         assert_eq!(res.world.body_count(), 0);
     }

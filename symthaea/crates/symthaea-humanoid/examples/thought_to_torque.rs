@@ -3,7 +3,7 @@
 //! From thought to torque (humanoid) — legibility demo for the
 //! HDC-LTC → 21-DOF motor command pipeline via `HumanoidEmbodiment`.
 //!
-//! Analogous to `symthaea-flight/examples/thought_to_torque.rs`, but
+//! Analogous to `symthaea-multirotor/examples/thought_to_torque.rs`, but
 //! for the 21-DOF bipedal humanoid. Renders the full cognition-to-
 //! actuation pathway:
 //!

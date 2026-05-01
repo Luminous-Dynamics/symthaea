@@ -205,7 +205,9 @@ mod tests {
             assert!(
                 (hz - hz_back).abs() < 0.01,
                 "roundtrip failed: {} → {} → {}",
-                hz, mel, hz_back
+                hz,
+                mel,
+                hz_back
             );
         }
     }
@@ -237,7 +239,8 @@ mod tests {
         // The mel bin containing 440 Hz should have highest energy
         let target_mel = hz_to_mel(440.0);
         let mel_range = hz_to_mel(config.f_max) - hz_to_mel(config.f_min);
-        let target_bin = (((target_mel - hz_to_mel(config.f_min)) / mel_range) * config.n_mels as f32) as usize;
+        let target_bin =
+            (((target_mel - hz_to_mel(config.f_min)) / mel_range) * config.n_mels as f32) as usize;
 
         let frame = &frames[frames.len() / 2]; // middle frame
         let max_bin = (0..config.n_mels)
@@ -248,7 +251,8 @@ mod tests {
         assert!(
             (max_bin as i32 - target_bin as i32).abs() <= 3,
             "440Hz should peak near bin {}, found bin {}",
-            target_bin, max_bin
+            target_bin,
+            max_bin
         );
     }
 

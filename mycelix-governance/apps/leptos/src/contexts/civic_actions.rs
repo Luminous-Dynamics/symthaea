@@ -7,6 +7,7 @@
 use leptos::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use governance_leptos_types::*;
+use mycelix_leptos_core::consciousness::combined_score;
 use mycelix_leptos_core::holochain_provider::use_holochain;
 use mycelix_leptos_core::{use_toasts, use_consciousness, ToastKind};
 use crate::contexts::governance_context::use_governance;
@@ -28,7 +29,7 @@ pub fn cast_vote(proposal_id: String, choice: VoteChoice, reasoning: Option<Stri
 
     if hc.is_mock() {
         let my_did = gov.my_agent_did.get_untracked();
-        let phi = consciousness.profile.get_untracked().combined_score();
+        let phi = combined_score(&consciousness.profile.get_untracked());
         gov.my_votes.update(|votes| {
             votes.retain(|v| v.proposal_id != proposal_id);
             votes.push(PhiVoteView {

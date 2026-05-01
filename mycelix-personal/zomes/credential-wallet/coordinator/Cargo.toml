@@ -15,4 +15,6 @@ serde_json = { workspace = true }
 holochain_serialized_bytes = { workspace = true }
 credential_wallet_integrity = { path = "../integrity" }
 personal-types = { workspace = true }
+personal-leptos-types = { workspace = true }
+getrandom = { workspace = true, features = ["custom"] }
 mycelix-zkp-core = { workspace = true }

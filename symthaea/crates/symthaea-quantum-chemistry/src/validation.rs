@@ -11,12 +11,10 @@
 //! Each benchmark molecule has known HF and MP2 energies at STO-3G and 6-31G
 //! that have been independently computed by multiple groups over 50+ years.
 
-use crate::basis::sto3g::Sto3g;
 use crate::basis::basis_631g::Basis631G;
+use crate::basis::sto3g::Sto3g;
 use crate::basis::BasisSetProvider;
-use crate::integrals::eri::compute_eri_tensor;
 use crate::molecule::{Atom, Molecule};
-use crate::post_hf::mp2::mp2_correlation_energy;
 use crate::scf::rhf::{restricted_hartree_fock, RhfConfig};
 
 /// A benchmark reference value.
@@ -36,15 +34,15 @@ pub fn hf_sto3g_references() -> Vec<(&'static str, f64, f64)> {
     // (molecule, reference_energy, tolerance)
     vec![
         // Szabo & Ostlund Table 3.15 (exact STO-3G values)
-        ("H2", -1.1175, 0.01),         // R = 1.4 Bohr
-        ("HeH+", -2.8607, 0.05),       // R = 1.4632 Bohr
+        ("H2", -1.1175, 0.01),   // R = 1.4 Bohr
+        ("HeH+", -2.8607, 0.05), // R = 1.4632 Bohr
         // Hehre et al. / CCCBDB
-        ("H2O", -74.9659, 0.5),        // Experimental geometry
-        ("NH3", -55.4554, 0.5),        // Experimental geometry
-        ("CH4", -39.7269, 0.5),        // Tetrahedral
-        ("HF", -98.5708, 0.5),         // R = 1.7328 Bohr
-        ("N2", -107.4964, 1.0),        // R = 2.074 Bohr (note: our basis may give different value)
-        ("LiH", -7.8633, 0.5),         // R = 3.015 Bohr
+        ("H2O", -74.9659, 0.5), // Experimental geometry
+        ("NH3", -55.4554, 0.5), // Experimental geometry
+        ("CH4", -39.7269, 0.5), // Tetrahedral
+        ("HF", -98.5708, 0.5),  // R = 1.7328 Bohr
+        ("N2", -107.4964, 1.0), // R = 2.074 Bohr (note: our basis may give different value)
+        ("LiH", -7.8633, 0.5),  // R = 3.015 Bohr
     ]
 }
 
@@ -64,29 +62,47 @@ pub fn benchmark_molecules() -> Vec<(&'static str, Molecule)> {
     vec![
         ("H2", Molecule::h2()),
         ("HeH+", Molecule::heh_plus()),
-        ("LiH", Molecule::new(vec![
-            Atom::new(3, 0.0, 0.0, 0.0), Atom::new(1, 0.0, 0.0, 3.015),
-        ])),
-        ("HF", Molecule::new(vec![
-            Atom::new(1, 0.0, 0.0, 0.0), Atom::new(9, 0.0, 0.0, 1.7328),
-        ])),
+        (
+            "LiH",
+            Molecule::new(vec![
+                Atom::new(3, 0.0, 0.0, 0.0),
+                Atom::new(1, 0.0, 0.0, 3.015),
+            ]),
+        ),
+        (
+            "HF",
+            Molecule::new(vec![
+                Atom::new(1, 0.0, 0.0, 0.0),
+                Atom::new(9, 0.0, 0.0, 1.7328),
+            ]),
+        ),
         ("H2O", Molecule::water()),
-        ("NH3", Molecule::new(vec![
-            Atom::from_angstrom(7, 0.0, 0.0, 0.0),
-            Atom::from_angstrom(1, 0.0, 0.9377, -0.3816),
-            Atom::from_angstrom(1, 0.8121, -0.4689, -0.3816),
-            Atom::from_angstrom(1, -0.8121, -0.4689, -0.3816),
-        ])),
-        ("CH4", Molecule::new(vec![
-            Atom::new(6, 0.0, 0.0, 0.0),
-            Atom::new(1, 1.185, 1.185, 1.185),
-            Atom::new(1, -1.185, -1.185, 1.185),
-            Atom::new(1, -1.185, 1.185, -1.185),
-            Atom::new(1, 1.185, -1.185, -1.185),
-        ])),
-        ("N2", Molecule::new(vec![
-            Atom::new(7, 0.0, 0.0, 0.0), Atom::new(7, 0.0, 0.0, 2.074),
-        ])),
+        (
+            "NH3",
+            Molecule::new(vec![
+                Atom::from_angstrom(7, 0.0, 0.0, 0.0),
+                Atom::from_angstrom(1, 0.0, 0.9377, -0.3816),
+                Atom::from_angstrom(1, 0.8121, -0.4689, -0.3816),
+                Atom::from_angstrom(1, -0.8121, -0.4689, -0.3816),
+            ]),
+        ),
+        (
+            "CH4",
+            Molecule::new(vec![
+                Atom::new(6, 0.0, 0.0, 0.0),
+                Atom::new(1, 1.185, 1.185, 1.185),
+                Atom::new(1, -1.185, -1.185, 1.185),
+                Atom::new(1, -1.185, 1.185, -1.185),
+                Atom::new(1, 1.185, -1.185, -1.185),
+            ]),
+        ),
+        (
+            "N2",
+            Molecule::new(vec![
+                Atom::new(7, 0.0, 0.0, 0.0),
+                Atom::new(7, 0.0, 0.0, 2.074),
+            ]),
+        ),
     ]
 }
 
@@ -164,12 +180,15 @@ pub fn validate_hf_631g() -> Vec<ValidationResult> {
 /// Test normalization sensitivity: do the multi-theory correlations survive
 /// different normalization schemes?
 pub fn normalization_sensitivity() -> NormalizationSensitivityResult {
-    use crate::multi_theory::{compute_theory_scores, theory_correlation_matrix, N_THEORIES, TheoryScores};
+    use crate::multi_theory::{
+        compute_theory_scores, theory_correlation_matrix, TheoryScores, N_THEORIES,
+    };
 
     let molecules = benchmark_molecules();
 
     // Scheme 1: our default normalization
-    let scores_default: Vec<TheoryScores> = molecules.iter()
+    let scores_default: Vec<TheoryScores> = molecules
+        .iter()
         .map(|(name, mol)| compute_theory_scores(mol, name, 300.0))
         .collect();
     let corr_default = theory_correlation_matrix(&scores_default);
@@ -177,7 +196,9 @@ pub fn normalization_sensitivity() -> NormalizationSensitivityResult {
     // Scheme 2: rank-based normalization (replace values with ranks / n)
     let mut scores_rank = scores_default.clone();
     for theory_idx in 0..N_THEORIES {
-        let mut vals: Vec<(usize, f64)> = scores_rank.iter().enumerate()
+        let mut vals: Vec<(usize, f64)> = scores_rank
+            .iter()
+            .enumerate()
             .map(|(i, s)| (i, s.normalized[theory_idx]))
             .collect();
         vals.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
@@ -191,7 +212,10 @@ pub fn normalization_sensitivity() -> NormalizationSensitivityResult {
     // Scheme 3: min-max normalization (rescale to [0,1] per theory)
     let mut scores_minmax = scores_default.clone();
     for theory_idx in 0..N_THEORIES {
-        let vals: Vec<f64> = scores_minmax.iter().map(|s| s.normalized[theory_idx]).collect();
+        let vals: Vec<f64> = scores_minmax
+            .iter()
+            .map(|s| s.normalized[theory_idx])
+            .collect();
         let min = vals.iter().cloned().fold(f64::INFINITY, f64::min);
         let max = vals.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
         let range = (max - min).max(1e-15);
@@ -269,7 +293,9 @@ mod tests {
                 assert!(
                     r631.computed < rsto.computed + 0.001,
                     "{}: 6-31G ({:.4}) should be ≤ STO-3G ({:.4})",
-                    r631.molecule, r631.computed, rsto.computed
+                    r631.molecule,
+                    r631.computed,
+                    rsto.computed
                 );
             }
         }
@@ -312,7 +338,9 @@ mod tests {
         assert!(
             pass_rate >= 0.75,
             "Pass rate {:.0}% is too low ({}/{} passed)",
-            pass_rate * 100.0, results.len() - failures.len(), results.len()
+            pass_rate * 100.0,
+            results.len() - failures.len(),
+            results.len()
         );
     }
 }

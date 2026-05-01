@@ -199,23 +199,15 @@ impl SelfHealer {
 
             // Repair.
             let repaired_values = match self.config.repair_method {
-                RepairMethod::ProjectToMean => {
-                    self.project_to_mean(&g.values, &mean, mean_norm)
-                }
-                RepairMethod::ClipToRange => {
-                    self.clip_to_range(&g.values, &coord_min, &coord_max)
-                }
+                RepairMethod::ProjectToMean => self.project_to_mean(&g.values, &mean, mean_norm),
+                RepairMethod::ClipToRange => self.clip_to_range(&g.values, &coord_min, &coord_max),
                 RepairMethod::WeightedInterpolate => {
                     self.weighted_interpolate(&g.values, &mean, dist_ratio)
                 }
             };
 
             repaired_nodes.push(g.node_id.clone());
-            repaired_gradients.push(Gradient::new(
-                g.node_id.clone(),
-                repaired_values,
-                g.round,
-            ));
+            repaired_gradients.push(Gradient::new(g.node_id.clone(), repaired_values, g.round));
         }
 
         Ok(HealingResult {
@@ -278,12 +270,7 @@ impl SelfHealer {
 
     /// Interpolate toward honest mean. Weight = 1 - (dist_ratio / max_repair_distance).
     /// At dist_ratio=0, keep original. At dist_ratio=max, fully replace with mean.
-    fn weighted_interpolate(
-        &self,
-        values: &[f32],
-        mean: &[f64],
-        dist_ratio: f64,
-    ) -> Vec<f32> {
+    fn weighted_interpolate(&self, values: &[f32], mean: &[f64], dist_ratio: f64) -> Vec<f32> {
         let alpha = (dist_ratio / self.config.max_repair_distance).clamp(0.0, 1.0);
         values
             .iter()
@@ -424,10 +411,7 @@ mod tests {
     /// Empty suspicious list -> no repairs needed.
     #[test]
     fn test_empty_suspicious_no_repairs() {
-        let gradients = vec![
-            grad("a", vec![1.0, 2.0]),
-            grad("b", vec![1.1, 2.1]),
-        ];
+        let gradients = vec![grad("a", vec![1.0, 2.0]), grad("b", vec![1.1, 2.1])];
 
         let healer = SelfHealer::with_defaults();
         let result = healer.heal(&gradients, &[]).unwrap();
@@ -440,10 +424,7 @@ mod tests {
     /// WeightedInterpolate: repaired gradient should be between original and mean.
     #[test]
     fn test_weighted_interpolate() {
-        let honest = vec![
-            grad("h0", vec![1.0, 2.0]),
-            grad("h1", vec![1.0, 2.0]),
-        ];
+        let honest = vec![grad("h0", vec![1.0, 2.0]), grad("h1", vec![1.0, 2.0])];
         let sus = grad("s0", vec![3.0, 4.0]);
 
         let mut all = honest;

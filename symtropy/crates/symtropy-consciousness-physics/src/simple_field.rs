@@ -32,8 +32,8 @@
 //! world.step_with_callback(0.016, &mut field);
 //! ```
 
-use std::collections::BTreeMap;
 use nalgebra::SVector;
+use std::collections::BTreeMap;
 use symtropy_math::Point;
 
 use crate::energy::EnergyBudget;
@@ -188,18 +188,26 @@ impl<const D: usize> SimpleCoupledField<D> {
 
     /// Get safety tier.
     pub fn safety_tier(&self, handle: BodyHandle) -> SafetyTier {
-        self.entities.get(&handle).map(|e| e.safety_tier).unwrap_or(SafetyTier::Green)
+        self.entities
+            .get(&handle)
+            .map(|e| e.safety_tier)
+            .unwrap_or(SafetyTier::Green)
     }
 
     /// Whether entity has energy.
     pub fn has_energy(&self, handle: BodyHandle) -> bool {
-        self.entities.get(&handle).map(|e| e.energy.has_energy()).unwrap_or(false)
+        self.entities
+            .get(&handle)
+            .map(|e| e.energy.has_energy())
+            .unwrap_or(false)
     }
 
     /// Consume energy from an entity.
     pub fn consume_energy(&mut self, handle: BodyHandle, amount: f64) -> f64 {
         let metric = self.metric(handle);
-        let consumed = self.entities.get_mut(&handle)
+        let consumed = self
+            .entities
+            .get_mut(&handle)
             .map(|e| e.energy.consume(amount))
             .unwrap_or(0.0);
         if consumed > 0.0 {
@@ -250,7 +258,9 @@ impl<const D: usize> SimpleCoupledField<D> {
     }
 
     fn drain_sanctuary_absorption(&mut self) {
-        let bits = self.sanctuary_absorbed.swap(0, std::sync::atomic::Ordering::Relaxed);
+        let bits = self
+            .sanctuary_absorbed
+            .swap(0, std::sync::atomic::Ordering::Relaxed);
         let absorbed = f64::from_bits(bits);
         if absorbed > 1e-15 {
             self.ledger.record_dissipation(absorbed);
@@ -276,7 +286,9 @@ impl<const D: usize> Default for SimpleCoupledField<D> {
 /// PhysicsCallback implementation — same 5-channel coupling as ConsciousnessField.
 impl<const D: usize> PhysicsCallback<D> for SimpleCoupledField<D> {
     fn modulate_force(&self, body: BodyHandle, force: &SVector<f64, D>) -> SVector<f64, D> {
-        let gain = self.entities.get(&body)
+        let gain = self
+            .entities
+            .get(&body)
             .map(|e| e.effective_motor_gain())
             .unwrap_or(1.0);
         force * gain
@@ -294,7 +306,8 @@ impl<const D: usize> PhysicsCallback<D> for SimpleCoupledField<D> {
             use std::sync::atomic::Ordering;
             let absorbed_energy = absorbed * 0.5;
             let _ = self.sanctuary_absorbed.fetch_update(
-                Ordering::Relaxed, Ordering::Relaxed,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
                 |bits| Some((f64::from_bits(bits) + absorbed_energy).to_bits()),
             );
         }
@@ -305,7 +318,9 @@ impl<const D: usize> PhysicsCallback<D> for SimpleCoupledField<D> {
         if self.harmony_field.sources.is_empty() {
             return 1.0;
         }
-        let harmonies = self.entities.get(&body)
+        let harmonies = self
+            .entities
+            .get(&body)
             .map(|e| e.harmony_activations)
             .unwrap_or([0.0; NUM_HARMONIES]);
         let point = Point(*contact_point);
@@ -317,8 +332,14 @@ impl<const D: usize> PhysicsCallback<D> for SimpleCoupledField<D> {
         let drain_rate = self.constants.collision_energy_drain;
 
         let resonance = {
-            let ha = self.entities.get(&event.body_a).map(|e| e.harmony_activations);
-            let hb = self.entities.get(&event.body_b).map(|e| e.harmony_activations);
+            let ha = self
+                .entities
+                .get(&event.body_a)
+                .map(|e| e.harmony_activations);
+            let hb = self
+                .entities
+                .get(&event.body_b)
+                .map(|e| e.harmony_activations);
             match (ha, hb) {
                 (Some(a), Some(b)) => HarmonyField::<D>::resonance(&a, &b),
                 _ => 0.0,
@@ -367,7 +388,11 @@ mod tests {
         let force = SVector::from([10.0, 0.0, 0.0]);
         let modulated = PhysicsCallback::<3>::modulate_force(&field, h, &force);
         // High metric (0.9) → Green tier → gain = 1.0
-        assert!(modulated[0] > 5.0, "high metric should give strong force, got {}", modulated[0]);
+        assert!(
+            modulated[0] > 5.0,
+            "high metric should give strong force, got {}",
+            modulated[0]
+        );
     }
 
     #[test]
@@ -380,7 +405,11 @@ mod tests {
         let force = SVector::from([10.0, 0.0, 0.0]);
         let modulated = PhysicsCallback::<3>::modulate_force(&field, h, &force);
         // Low metric (0.05) → Red tier → gain = 0.0
-        assert!(modulated[0] < 1.0, "low metric should reduce force, got {}", modulated[0]);
+        assert!(
+            modulated[0] < 1.0,
+            "low metric should reduce force, got {}",
+            modulated[0]
+        );
     }
 
     #[test]
@@ -423,7 +452,10 @@ mod tests {
         field.entities.get_mut(&h).unwrap().on_collision(100.0);
 
         let gain_after = field.entities.get(&h).unwrap().effective_motor_gain();
-        assert!(gain_after < gain_before, "collision should reduce motor gain");
+        assert!(
+            gain_after < gain_before,
+            "collision should reduce motor gain"
+        );
 
         // Decay recovers precision
         for _ in 0..40 {

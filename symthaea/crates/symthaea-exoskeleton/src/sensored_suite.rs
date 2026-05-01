@@ -61,7 +61,9 @@ impl SuiteReading {
     /// Sum of absolute joint angular velocities — rough "motion magnitude".
     pub fn total_angular_speed(&self) -> f64 {
         let mut sum = 0.0;
-        for r in self.spine.iter()
+        for r in self
+            .spine
+            .iter()
             .chain(self.left_arm.iter())
             .chain(self.right_arm.iter())
             .chain(self.left_leg.iter())
@@ -136,11 +138,21 @@ impl SensoredFullFrame {
     /// Read all sensors without stepping.
     pub fn read_sensors(&mut self, dt: f64) -> SuiteReading {
         SuiteReading {
-            spine: self.spine_encoder.read(&self.sim.spine_chain, &self.sim.world),
-            left_arm: self.left_arm_encoder.read(&self.sim.left_arm, &self.sim.world),
-            right_arm: self.right_arm_encoder.read(&self.sim.right_arm, &self.sim.world),
-            left_leg: self.left_leg_encoder.read(&self.sim.left_leg, &self.sim.world),
-            right_leg: self.right_leg_encoder.read(&self.sim.right_leg, &self.sim.world),
+            spine: self
+                .spine_encoder
+                .read(&self.sim.spine_chain, &self.sim.world),
+            left_arm: self
+                .left_arm_encoder
+                .read(&self.sim.left_arm, &self.sim.world),
+            right_arm: self
+                .right_arm_encoder
+                .read(&self.sim.right_arm, &self.sim.world),
+            left_leg: self
+                .left_leg_encoder
+                .read(&self.sim.left_leg, &self.sim.world),
+            right_leg: self
+                .right_leg_encoder
+                .read(&self.sim.right_leg, &self.sim.world),
             imu: self.spine_imu.read(&self.sim.world, dt),
         }
     }
@@ -183,12 +195,17 @@ mod tests {
         let c_reading = clean.read_sensors(0.001);
 
         // IMU should differ due to noise
-        let accel_diff: f64 = n_reading.imu.acceleration.iter()
+        let accel_diff: f64 = n_reading
+            .imu
+            .acceleration
+            .iter()
             .zip(c_reading.imu.acceleration.iter())
             .map(|(a, b)| (a - b).abs())
             .sum();
-        assert!(accel_diff > 0.0 || n_reading.imu.acceleration[2] != 0.0,
-            "Noisy IMU should produce different readings than clean");
+        assert!(
+            accel_diff > 0.0 || n_reading.imu.acceleration[2] != 0.0,
+            "Noisy IMU should produce different readings than clean"
+        );
     }
 
     #[test]
@@ -197,7 +214,9 @@ mod tests {
         for _ in 0..20 {
             let reading = suite.step(0.001);
             // All joint angles should be finite
-            for r in reading.spine.iter()
+            for r in reading
+                .spine
+                .iter()
                 .chain(reading.left_arm.iter())
                 .chain(reading.left_leg.iter())
             {
@@ -213,7 +232,9 @@ mod tests {
     fn test_consciousness_affects_motion() {
         let mut suite = SensoredFullFrame::new_noiseless();
         suite.sim.set_consciousness(0.9);
-        for _ in 0..20 { suite.step(0.001); }
+        for _ in 0..20 {
+            suite.step(0.001);
+        }
         let reading = suite.read_sensors(0.001);
 
         // Total angular speed is finite and computable

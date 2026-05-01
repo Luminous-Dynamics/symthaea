@@ -12,9 +12,9 @@
 //! and future platforms including the full-frame exoskeleton.
 
 use nalgebra::SVector;
+use symtropy_physics::articulation::ArticulatedChain;
 use symtropy_physics::body::{BodyHandle, RigidBody};
 use symtropy_physics::world::PhysicsWorld;
-use symtropy_physics::articulation::ArticulatedChain;
 
 // ── Sensor Config ──────────────────────────────────────────────────────
 
@@ -31,7 +31,11 @@ pub struct NoiseConfig {
 
 impl Default for NoiseConfig {
     fn default() -> Self {
-        Self { noise_std: 0.0, bias: 0.0, update_rate_hz: 0.0 }
+        Self {
+            noise_std: 0.0,
+            bias: 0.0,
+            update_rate_hz: 0.0,
+        }
     }
 }
 
@@ -43,7 +47,9 @@ impl NoiseConfig {
         }
         // Deterministic pseudo-noise (xorshift)
         let mut s = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
-        s ^= s >> 12; s ^= s << 25; s ^= s >> 27;
+        s ^= s >> 12;
+        s ^= s << 25;
+        s ^= s >> 27;
         let uniform = (s as f64) / (u64::MAX as f64);
         let gaussian = (uniform - 0.5) * 3.464; // Approx N(0,1)
         clean + gaussian * self.noise_std + self.bias
@@ -68,17 +74,24 @@ pub struct JointEncoderArray {
 
 impl JointEncoderArray {
     pub fn new() -> Self {
-        Self { noise: NoiseConfig::default(), step_counter: 0 }
+        Self {
+            noise: NoiseConfig::default(),
+            step_counter: 0,
+        }
     }
 
     pub fn with_noise(noise: NoiseConfig) -> Self {
-        Self { noise, step_counter: 0 }
+        Self {
+            noise,
+            step_counter: 0,
+        }
     }
 
     /// Read all joint states from the chain.
     pub fn read(&mut self, chain: &ArticulatedChain, world: &PhysicsWorld<3>) -> Vec<JointReading> {
         self.step_counter += 1;
-        chain.read_joint_states(world)
+        chain
+            .read_joint_states(world)
             .iter()
             .enumerate()
             .map(|(i, &(angle, vel))| {
@@ -93,7 +106,9 @@ impl JointEncoderArray {
 }
 
 impl Default for JointEncoderArray {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ── IMU Sensor ─────────────────────────────────────────────────────────
@@ -129,7 +144,13 @@ impl ImuSensor {
     }
 
     pub fn with_noise(body: BodyHandle, accel_noise: NoiseConfig, gyro_noise: NoiseConfig) -> Self {
-        Self { body, accel_noise, gyro_noise, prev_velocity: SVector::zeros(), step_counter: 0 }
+        Self {
+            body,
+            accel_noise,
+            gyro_noise,
+            prev_velocity: SVector::zeros(),
+            step_counter: 0,
+        }
     }
 
     /// Read IMU from the physics world.
@@ -156,9 +177,12 @@ impl ImuSensor {
                 self.accel_noise.apply(accel[2], seed + 2),
             ],
             angular_velocity: [
-                self.gyro_noise.apply(body.angular_velocity.get(1, 2), seed + 3), // roll
-                self.gyro_noise.apply(body.angular_velocity.get(0, 2), seed + 4), // pitch
-                self.gyro_noise.apply(body.angular_velocity.get(0, 1), seed + 5), // yaw
+                self.gyro_noise
+                    .apply(body.angular_velocity.get(1, 2), seed + 3), // roll
+                self.gyro_noise
+                    .apply(body.angular_velocity.get(0, 2), seed + 4), // pitch
+                self.gyro_noise
+                    .apply(body.angular_velocity.get(0, 1), seed + 5), // yaw
             ],
         }
     }
@@ -184,7 +208,10 @@ pub struct ContactSensor {
 
 impl ContactSensor {
     pub fn new(body: BodyHandle) -> Self {
-        Self { body, prev_velocity_z: 0.0 }
+        Self {
+            body,
+            prev_velocity_z: 0.0,
+        }
     }
 
     /// Read contact state from physics world.
@@ -195,7 +222,11 @@ impl ContactSensor {
         };
 
         let vz = body.linear_velocity[2];
-        let accel_z = if dt > 0.0 { (vz - self.prev_velocity_z) / dt } else { 0.0 };
+        let accel_z = if dt > 0.0 {
+            (vz - self.prev_velocity_z) / dt
+        } else {
+            0.0
+        };
         self.prev_velocity_z = vz;
 
         // Contact detected when vertical acceleration exceeds gravity
@@ -224,7 +255,11 @@ mod tests {
 
     #[test]
     fn test_noise_config_adds_noise() {
-        let cfg = NoiseConfig { noise_std: 1.0, bias: 0.0, update_rate_hz: 0.0 };
+        let cfg = NoiseConfig {
+            noise_std: 1.0,
+            bias: 0.0,
+            update_rate_hz: 0.0,
+        };
         let readings: Vec<f64> = (0..100).map(|i| cfg.apply(5.0, i)).collect();
         let mean: f64 = readings.iter().sum::<f64>() / 100.0;
         let variance: f64 = readings.iter().map(|r| (r - mean).powi(2)).sum::<f64>() / 100.0;
@@ -233,7 +268,11 @@ mod tests {
 
     #[test]
     fn test_noise_config_bias() {
-        let cfg = NoiseConfig { noise_std: 0.0, bias: 2.0, update_rate_hz: 0.0 };
+        let cfg = NoiseConfig {
+            noise_std: 0.0,
+            bias: 2.0,
+            update_rate_hz: 0.0,
+        };
         assert_eq!(cfg.apply(5.0, 42), 7.0);
     }
 
@@ -261,7 +300,8 @@ mod tests {
         let handle = world.add_body(RigidBody::dynamic_sphere(
             BodyHandle(0),
             symtropy_math::Point::new([0.0, 0.0, 1.0]),
-            0.1, 1.0,
+            0.1,
+            1.0,
         ));
 
         let mut imu = ImuSensor::new(handle);
@@ -277,7 +317,8 @@ mod tests {
         let handle = world.add_body(RigidBody::dynamic_sphere(
             BodyHandle(0),
             symtropy_math::Point::new([0.0, 0.0, 5.0]), // High up, no ground contact
-            0.1, 1.0,
+            0.1,
+            1.0,
         ));
 
         let mut contact = ContactSensor::new(handle);

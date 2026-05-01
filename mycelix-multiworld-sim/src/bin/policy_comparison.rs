@@ -26,12 +26,7 @@ struct PolicyResult {
     mean_projects: f64,
 }
 
-fn run_policy(
-    name: &str,
-    policy: PolicyConfig,
-    seeds: usize,
-    ticks: u32,
-) -> PolicyResult {
+fn run_policy(name: &str, policy: PolicyConfig, seeds: usize, ticks: u32) -> PolicyResult {
     let mut survived = 0u32;
     let mut total_cvs = 0.0;
     let mut total_pop = 0.0;
@@ -52,18 +47,27 @@ fn run_policy(
         let mut sim = MultiWorldSimulator::new(config);
         let report = sim.run();
 
-        if report.survived { survived += 1; }
+        if report.survived {
+            survived += 1;
+        }
         total_cvs += report.final_cvs;
         total_pop += report.final_population as f64;
         total_ms += report.tech_milestones_achieved as f64;
 
-        let mars: f64 = sim.worlds.iter()
+        let mars: f64 = sim
+            .worlds
+            .iter()
             .filter(|w| w.location == "Mars")
-            .map(|w| w.population() as f64).sum();
-        let indep = sim.events.iter()
+            .map(|w| w.population() as f64)
+            .sum();
+        let indep = sim
+            .events
+            .iter()
             .filter(|e| e.description.contains("INDEPENDENCE"))
             .count() as f64;
-        let projects = sim.events.iter()
+        let projects = sim
+            .events
+            .iter()
             .filter(|e| e.description.contains("PROJECT COMPLETE"))
             .count() as f64;
 
@@ -71,8 +75,12 @@ fn run_policy(
         total_indep += indep;
         total_projects += projects;
 
-        eprintln!(" CVS={:.3} pop={:.0} {}", report.final_cvs, report.final_population,
-            if report.survived { "OK" } else { "FAIL" });
+        eprintln!(
+            " CVS={:.3} pop={:.0} {}",
+            report.final_cvs,
+            report.final_population,
+            if report.survived { "OK" } else { "FAIL" }
+        );
     }
 
     let n = seeds as f64;
@@ -93,14 +101,18 @@ fn main() {
     let seeds: usize = args.get(1).and_then(|s| s.parse().ok()).unwrap_or(3);
     let ticks: u32 = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(6000);
 
-    eprintln!("=== POLICY COMPARISON: {} seeds × {} ticks ({} years) ===\n",
-        seeds, ticks, ticks / 12);
+    eprintln!(
+        "=== POLICY COMPARISON: {} seeds × {} ticks ({} years) ===\n",
+        seeds,
+        ticks,
+        ticks / 12
+    );
 
     let policies: Vec<(&str, PolicyConfig)> = vec![
-        ("Balanced",     PolicyConfig::default()),
-        ("Survival",     PolicyConfig::survival_first()),
-        ("Growth",       PolicyConfig::growth_first()),
-        ("Science",      PolicyConfig::science_first()),
+        ("Balanced", PolicyConfig::default()),
+        ("Survival", PolicyConfig::survival_first()),
+        ("Growth", PolicyConfig::growth_first()),
+        ("Science", PolicyConfig::science_first()),
         ("Independence", PolicyConfig::independence_first()),
     ];
 
@@ -114,27 +126,62 @@ fn main() {
     println!("║  POLICY COMPARISON: Which governance produces the best civilization? ║");
     println!("╚══════════════════════════════════════════════════════════════════════╝\n");
 
-    println!("{:<14} {:>8} {:>8} {:>10} {:>8} {:>10} {:>8} {:>8}",
-        "Policy", "Survive", "CVS", "Population", "Milstn", "Mars Pop", "Indep", "Projects");
+    println!(
+        "{:<14} {:>8} {:>8} {:>10} {:>8} {:>10} {:>8} {:>8}",
+        "Policy", "Survive", "CVS", "Population", "Milstn", "Mars Pop", "Indep", "Projects"
+    );
     println!("{}", "-".repeat(82));
 
     for r in &results {
-        println!("{:<14} {:>7.0}% {:>8.3} {:>10.0} {:>8.1} {:>10.0} {:>8.1} {:>8.0}",
-            r.name, r.survival_rate * 100.0, r.mean_cvs, r.mean_population,
-            r.mean_milestones, r.mean_mars_pop, r.mean_independence, r.mean_projects);
+        println!(
+            "{:<14} {:>7.0}% {:>8.3} {:>10.0} {:>8.1} {:>10.0} {:>8.1} {:>8.0}",
+            r.name,
+            r.survival_rate * 100.0,
+            r.mean_cvs,
+            r.mean_population,
+            r.mean_milestones,
+            r.mean_mars_pop,
+            r.mean_independence,
+            r.mean_projects
+        );
     }
 
     // Winner analysis
     println!("\n{}", "=".repeat(82));
-    let best_cvs = results.iter().max_by(|a, b| a.mean_cvs.partial_cmp(&b.mean_cvs).unwrap()).unwrap();
-    let best_pop = results.iter().max_by(|a, b| a.mean_population.partial_cmp(&b.mean_population).unwrap()).unwrap();
-    let best_ms = results.iter().max_by(|a, b| a.mean_milestones.partial_cmp(&b.mean_milestones).unwrap()).unwrap();
-    println!("  Best CVS (resilience):  {} ({:.3})", best_cvs.name, best_cvs.mean_cvs);
-    println!("  Best Population:        {} ({:.0})", best_pop.name, best_pop.mean_population);
-    println!("  Best Tech:              {} ({:.1} milestones)", best_ms.name, best_ms.mean_milestones);
+    let best_cvs = results
+        .iter()
+        .max_by(|a, b| a.mean_cvs.partial_cmp(&b.mean_cvs).unwrap())
+        .unwrap();
+    let best_pop = results
+        .iter()
+        .max_by(|a, b| a.mean_population.partial_cmp(&b.mean_population).unwrap())
+        .unwrap();
+    let best_ms = results
+        .iter()
+        .max_by(|a, b| a.mean_milestones.partial_cmp(&b.mean_milestones).unwrap())
+        .unwrap();
+    println!(
+        "  Best CVS (resilience):  {} ({:.3})",
+        best_cvs.name, best_cvs.mean_cvs
+    );
+    println!(
+        "  Best Population:        {} ({:.0})",
+        best_pop.name, best_pop.mean_population
+    );
+    println!(
+        "  Best Tech:              {} ({:.1} milestones)",
+        best_ms.name, best_ms.mean_milestones
+    );
 
     // Mycelix governance recommendation
     println!("\n  MYCELIX GOVERNANCE RECOMMENDATION:");
-    println!("  The {} policy produces the highest civilization viability score.", best_cvs.name);
-    println!("  Validated across {} seeds × {} years of simulation.", seeds, ticks / 12);
+    println!(
+        "  The {} policy produces the highest civilization viability score.",
+        best_cvs.name
+    );
+    println!(
+        "  Validated across {} seeds × {} years of simulation.",
+        seeds,
+        ticks / 12
+    );
 }

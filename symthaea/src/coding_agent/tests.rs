@@ -1019,6 +1019,18 @@
     }
 
     #[test]
+    fn test_quality_gate_rejects_not_implemented_error() {
+        let code = "def foo():\n    raise NotImplementedError(\"todo\")\n";
+        assert!(CodingAgent::check_code_quality(code).is_some());
+    }
+
+    #[test]
+    fn test_quality_gate_rejects_placeholder_text() {
+        let code = "def foo(n):\n    return n  # placeholder for real implementation\n";
+        assert!(CodingAgent::check_code_quality(code).is_some());
+    }
+
+    #[test]
     fn test_quality_gate_rejects_empty() {
         assert!(CodingAgent::check_code_quality("").is_some());
         assert!(CodingAgent::check_code_quality("   ").is_some());
@@ -2419,6 +2431,7 @@ assertion `left == right` failed
             store.store_learned_template(
                 "implement xyzzy quux frobnicate nonsense widget",
                 "pub struct XyzzyWidget { quux: Vec<u8> }\nimpl XyzzyWidget {\n    pub fn new() -> Self { Self { quux: vec![] } }\n}\n",
+                None,
             );
         }
 
@@ -2452,6 +2465,7 @@ assertion `left == right` failed
             store.store_learned_template(
                 "create a function to validate email addresses",
                 "pub fn validate_email(s: &str) -> bool { s.contains('@') && s.contains('.') }",
+                None,
             );
         }
 

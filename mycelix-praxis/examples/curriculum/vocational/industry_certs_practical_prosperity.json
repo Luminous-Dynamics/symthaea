@@ -1,0 +1,116 @@
+{
+  "metadata": {
+    "title": "Practical Prosperity: Creative & Community Standards",
+    "framework": "Global Prosperity Mesh",
+    "source": "https://mycelix.org/certs-prosperity",
+    "grade_level": "Professional",
+    "subject_area": "Multi-Sector",
+    "domain": "Professional Certification",
+    "version": "1.0",
+    "total_standards": 6,
+    "domains": [
+      "Permaculture & Design",
+      "Social Support",
+      "Community Finance",
+      "Creative Design",
+      "User Experience"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "High-utility certifications for creative, social, and environmental prosperity."
+  },
+  "nodes": [
+    {
+      "id": "CERT-ENV-PDC",
+      "title": "Permaculture Design Certificate (PDC)",
+      "description": "The global standard for regenerative design. Ethics, principles, and practical application of permaculture in landscape and community. Linked to Regenerative Agriculture.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Permaculture & Design",
+      "subdomain": "Certification Bridge",
+      "tags": ["permaculture", "pdc", "regenerative", "design", "standard"],
+      "estimated_hours": 72,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Science"
+    },
+    {
+      "id": "CERT-SOC-PEER-SUPPORT",
+      "title": "Certified Peer Support Specialist",
+      "description": "Using lived experience to support others in recovery or mental health challenges. Advocacy, mentoring, and support groups. Linked to Community Care.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Social Support",
+      "subdomain": "Certification Bridge",
+      "tags": ["social-work", "peer-support", "care", "standard"],
+      "estimated_hours": 60,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Health Sciences"
+    },
+    {
+      "id": "CERT-FIN-GRANT-WRITING",
+      "title": "Professional Grant Writing Certificate",
+      "description": "Identifying funding sources, developing proposals, and managing grant budgets. Mapping sovereign governance and mutual credit to institutional fundraising.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Community Finance",
+      "subdomain": "Certification Bridge",
+      "tags": ["grants", "finance", "non-profit", "standard"],
+      "estimated_hours": 40,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Social Studies"
+    },
+    {
+      "id": "CERT-DIG-ADOBE-ACP",
+      "title": "Adobe Certified Professional: Visual Design",
+      "description": "Mastery of Adobe Photoshop and Illustrator. Creating professional graphics, layouts, and visual assets. Linked to Visual Mesh-Weaving.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Creative Design",
+      "subdomain": "Certification Bridge",
+      "tags": ["adobe", "design", "graphic-design", "standard"],
+      "estimated_hours": 120,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Create",
+      "subject_area": "Arts"
+    },
+    {
+      "id": "CERT-DIG-GOOGLE-UX",
+      "title": "Google UX Design Professional Certificate",
+      "description": "Foundations of user experience (UX) design. Empathizing with users, defining pain points, ideating solutions, and creating prototypes. Linked to Frontend Engineering.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "User Experience",
+      "subdomain": "Certification Bridge",
+      "tags": ["google", "ux", "ui", "design", "standard"],
+      "estimated_hours": 180,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science"
+    }
+  ],
+  "edges": [
+    {
+      "from": "VOC-AG-CAP",
+      "to": "CERT-ENV-PDC",
+      "edge_type": "Recommended",
+      "strength_permille": 950,
+      "rationale": "Sovereign regenerative stewardship is the practical fulfillment of the PDC design curriculum."
+    },
+    {
+      "from": "VITA-101",
+      "to": "CERT-SOC-PEER-SUPPORT",
+      "edge_type": "Recommended",
+      "strength_permille": 750,
+      "rationale": "Community vitality and homeostasis training provide the empathy baseline for peer support roles."
+    },
+    {
+      "from": "CIV-GEN-050",
+      "to": "CERT-FIN-GRANT-WRITING",
+      "edge_type": "Recommended",
+      "strength_permille": 700,
+      "rationale": "Collective decision-making and project scoping are the core skills of professional grant writing."
+    }
+  ]
+}

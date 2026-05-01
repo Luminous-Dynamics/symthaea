@@ -42,16 +42,22 @@ pub struct GridStress {
 pub fn simulate_trades(sites: &[(f64, f64, f64)], time: f64) -> Vec<EnergyTrade> {
     let mut trades = Vec::new();
     let n = sites.len();
-    if n < 2 { return trades; }
+    if n < 2 {
+        return trades;
+    }
 
     // Simulate trades between nearby sites based on time
     for i in 0..n {
         let j = (i + 1 + (time as usize * 7 + i * 3) % (n - 1)) % n;
-        if i == j { continue; }
+        if i == j {
+            continue;
+        }
 
         // Trade probability based on distance and time of day
         let phase = (time * 0.1 + i as f64 * 0.7).sin();
-        if phase < 0.3 { continue; } // only ~35% of pairs trade at any time
+        if phase < 0.3 {
+            continue;
+        } // only ~35% of pairs trade at any time
 
         trades.push(EnergyTrade {
             seller_lat: sites[i].0,
@@ -82,7 +88,7 @@ pub fn simulate_grid_stress(year: u32) -> Vec<GridStress> {
         (35.7, 139.7, "Tokyo", 0.3),
         (40.7, -74.0, "New York", 0.25),
         (51.5, -0.1, "London", 0.2),
-        (-26.2, 28.0, "Johannesburg", 0.8),   // Eskom crisis
+        (-26.2, 28.0, "Johannesburg", 0.8), // Eskom crisis
         (19.4, -99.1, "Mexico City", 0.6),
         (6.5, 3.4, "Lagos", 0.75),
         (-23.5, -46.6, "São Paulo", 0.4),
@@ -90,27 +96,35 @@ pub fn simulate_grid_stress(year: u32) -> Vec<GridStress> {
         (30.0, 31.2, "Cairo", 0.65),
         (13.75, 100.5, "Bangkok", 0.5),
         (37.6, 127.0, "Seoul", 0.25),
-        (-33.9, 18.4, "Cape Town", 0.7),       // Load shedding
+        (-33.9, 18.4, "Cape Town", 0.7), // Load shedding
         (12.97, 77.6, "Bangalore", 0.55),
         (41.0, 29.0, "Istanbul", 0.45),
     ];
 
-    centers.iter().map(|(lat, lon, name, base_stress)| {
-        // Stress increases as fossil EROI drops, decreases with renewables
-        let stress = (base_stress + fossil_decline * 0.4 - renewable_growth * 0.3).clamp(0.0, 1.0);
-        let pe = stress * 0.8 + (year as f32 * 0.03 + (*lat as f32).abs() * 0.01).sin().abs() * 0.2;
-        let phi = 1.0 - stress * 0.7; // high stress = low integration
+    centers
+        .iter()
+        .map(|(lat, lon, name, base_stress)| {
+            // Stress increases as fossil EROI drops, decreases with renewables
+            let stress =
+                (base_stress + fossil_decline * 0.4 - renewable_growth * 0.3).clamp(0.0, 1.0);
+            let pe = stress * 0.8
+                + (year as f32 * 0.03 + (*lat as f32).abs() * 0.01)
+                    .sin()
+                    .abs()
+                    * 0.2;
+            let phi = 1.0 - stress * 0.7; // high stress = low integration
 
-        GridStress {
-            lat: *lat,
-            lon: *lon,
-            name: name.to_string(),
-            allostatic_load: stress,
-            prediction_error: pe.clamp(0.0, 1.0),
-            phi: phi.clamp(0.0, 1.0),
-            renewable_fraction: renewable_growth * (1.0 - base_stress * 0.5),
-        }
-    }).collect()
+            GridStress {
+                lat: *lat,
+                lon: *lon,
+                name: name.to_string(),
+                allostatic_load: stress,
+                prediction_error: pe.clamp(0.0, 1.0),
+                phi: phi.clamp(0.0, 1.0),
+                renewable_fraction: renewable_growth * (1.0 - base_stress * 0.5),
+            }
+        })
+        .collect()
 }
 
 /// Color for grid stress visualization: green (healthy) → amber → red (critical).
@@ -137,9 +151,9 @@ mod tests {
     #[test]
     fn test_simulate_trades_produces_output() {
         let sites = vec![
-            (51.5, -0.1, 500.0),  // London
-            (48.9, 2.3, 300.0),   // Paris
-            (52.5, 13.4, 400.0),  // Berlin
+            (51.5, -0.1, 500.0), // London
+            (48.9, 2.3, 300.0),  // Paris
+            (52.5, 13.4, 400.0), // Berlin
         ];
         let trades = simulate_trades(&sites, 5.0);
         assert!(!trades.is_empty());
@@ -160,10 +174,15 @@ mod tests {
         assert!(joburg.allostatic_load > 0.5);
 
         // Stress should generally increase over time as fossils decline
-        let avg_0: f32 = stress_y0.iter().map(|s| s.allostatic_load).sum::<f32>() / stress_y0.len() as f32;
-        let avg_200: f32 = stress_y200.iter().map(|s| s.allostatic_load).sum::<f32>() / stress_y200.len() as f32;
+        let avg_0: f32 =
+            stress_y0.iter().map(|s| s.allostatic_load).sum::<f32>() / stress_y0.len() as f32;
+        let avg_200: f32 =
+            stress_y200.iter().map(|s| s.allostatic_load).sum::<f32>() / stress_y200.len() as f32;
         // But renewable growth offsets some stress, so check specific high-stress regions
-        let joburg_200 = stress_y200.iter().find(|s| s.name == "Johannesburg").unwrap();
+        let joburg_200 = stress_y200
+            .iter()
+            .find(|s| s.name == "Johannesburg")
+            .unwrap();
         assert!(joburg_200.allostatic_load > joburg.allostatic_load * 0.8);
     }
 

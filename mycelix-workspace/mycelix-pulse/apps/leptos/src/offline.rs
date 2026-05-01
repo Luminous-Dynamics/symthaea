@@ -6,10 +6,10 @@
 //! When conductor is unavailable, queues actions in localStorage.
 //! Flushes queue automatically when connection is restored.
 
-use leptos::prelude::*;
-use wasm_bindgen_futures::spawn_local;
-use mail_leptos_types::OfflineAction;
 use crate::holochain::use_holochain;
+use leptos::prelude::*;
+use mail_leptos_types::OfflineAction;
+use wasm_bindgen_futures::spawn_local;
 
 const QUEUE_KEY: &str = "mycelix_mail_offline_queue";
 
@@ -42,10 +42,14 @@ pub fn enqueue_action(action: OfflineAction) {
 /// Attempt to flush all queued actions to the conductor.
 pub fn flush_queue() {
     let hc = use_holochain();
-    if hc.is_mock() { return; }
+    if hc.is_mock() {
+        return;
+    }
 
     let queue = load_queue();
-    if queue.is_empty() { return; }
+    if queue.is_empty() {
+        return;
+    }
 
     let state = use_offline();
 
@@ -66,7 +70,7 @@ pub fn flush_queue() {
             web_sys::console::log_1(&"[Mail] Offline queue flushed successfully".into());
         } else {
             web_sys::console::warn_1(
-                &format!("[Mail] {} actions remain in offline queue", remaining.len()).into()
+                &format!("[Mail] {} actions remain in offline queue", remaining.len()).into(),
             );
         }
     });
@@ -77,40 +81,59 @@ async fn execute_action(
     action: &OfflineAction,
 ) -> Result<(), String> {
     match action {
-        OfflineAction::ToggleStar { hash } => {
-            hc.call_zome::<serde_json::Value, serde_json::Value>(
-                "mail_messages", "update_email_state",
+        OfflineAction::ToggleStar { hash } => hc
+            .call_zome::<serde_json::Value, serde_json::Value>(
+                "mail_messages",
+                "update_email_state",
                 &serde_json::json!([hash, { "is_starred": true }]),
-            ).await.map(|_| ())
-        }
-        OfflineAction::ToggleRead { hash } => {
-            hc.call_zome::<serde_json::Value, serde_json::Value>(
-                "mail_messages", "mark_as_read",
+            )
+            .await
+            .map(|_| ()),
+        OfflineAction::ToggleRead { hash } => hc
+            .call_zome::<serde_json::Value, serde_json::Value>(
+                "mail_messages",
+                "mark_as_read",
                 &serde_json::json!([hash, false]),
-            ).await.map(|_| ())
-        }
-        OfflineAction::Archive { hash } => {
-            hc.call_zome::<serde_json::Value, serde_json::Value>(
-                "mail_messages", "update_email_state",
+            )
+            .await
+            .map(|_| ()),
+        OfflineAction::Archive { hash } => hc
+            .call_zome::<serde_json::Value, serde_json::Value>(
+                "mail_messages",
+                "update_email_state",
                 &serde_json::json!([hash, { "is_archived": true }]),
-            ).await.map(|_| ())
-        }
-        OfflineAction::Delete { hash } => {
-            hc.call_zome::<serde_json::Value, serde_json::Value>(
-                "mail_messages", "update_email_state",
+            )
+            .await
+            .map(|_| ()),
+        OfflineAction::Delete { hash } => hc
+            .call_zome::<serde_json::Value, serde_json::Value>(
+                "mail_messages",
+                "update_email_state",
                 &serde_json::json!([hash, { "is_trashed": true }]),
-            ).await.map(|_| ())
-        }
-        OfflineAction::MoveToFolder { hash, folder_hash } => {
-            hc.call_zome::<serde_json::Value, serde_json::Value>(
-                "mail_messages", "move_to_folder",
+            )
+            .await
+            .map(|_| ()),
+        OfflineAction::MoveToFolder { hash, folder_hash } => hc
+            .call_zome::<serde_json::Value, serde_json::Value>(
+                "mail_messages",
+                "move_to_folder",
                 &serde_json::json!([hash, folder_hash]),
-            ).await.map(|_| ())
-        }
-        OfflineAction::Send { to, subject, body, use_pqc } => {
-            let recipient_bundle = hc.call_zome::<serde_json::Value, serde_json::Value>(
-                "mail_keys", "get_pre_key_bundle", &serde_json::json!(to)
-            ).await?;
+            )
+            .await
+            .map(|_| ()),
+        OfflineAction::Send {
+            to,
+            subject,
+            body,
+            use_pqc,
+        } => {
+            let recipient_bundle = hc
+                .call_zome::<serde_json::Value, serde_json::Value>(
+                    "mail_keys",
+                    "get_pre_key_bundle",
+                    &serde_json::json!(to),
+                )
+                .await?;
             let recipient_pubkey: Vec<u8> = recipient_bundle
                 .get("identity_key")
                 .and_then(|v| v.as_array())
@@ -129,12 +152,11 @@ async fn execute_action(
                 subject.as_bytes(),
                 &crypto.subject_key,
                 &crypto.nonce,
-            ).await?;
-            let encrypted_body = crate::crypto::encrypt_with_key(
-                body.as_bytes(),
-                &crypto.body_key,
-                &crypto.nonce,
-            ).await?;
+            )
+            .await?;
+            let encrypted_body =
+                crate::crypto::encrypt_with_key(body.as_bytes(), &crypto.body_key, &crypto.nonce)
+                    .await?;
             let crypto_suite = serde_json::json!({
                 "key_exchange": "x25519",
                 "symmetric": "aes-256-gcm",
@@ -167,8 +189,12 @@ async fn execute_action(
             });
 
             hc.call_zome::<serde_json::Value, serde_json::Value>(
-                "mail_messages", "send_email", &payload,
-            ).await.map(|_| ())
+                "mail_messages",
+                "send_email",
+                &payload,
+            )
+            .await
+            .map(|_| ())
         }
     }
 }
@@ -182,9 +208,7 @@ fn load_queue() -> Vec<OfflineAction> {
 }
 
 fn save_queue(queue: &[OfflineAction]) {
-    if let Some(storage) = web_sys::window()
-        .and_then(|w| w.local_storage().ok().flatten())
-    {
+    if let Some(storage) = web_sys::window().and_then(|w| w.local_storage().ok().flatten()) {
         if queue.is_empty() {
             let _ = storage.remove_item(QUEUE_KEY);
         } else if let Ok(json) = serde_json::to_string(queue) {

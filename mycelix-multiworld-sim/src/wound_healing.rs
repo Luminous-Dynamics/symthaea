@@ -236,7 +236,12 @@ fn transition_probability(wound: &WoundState, ctx: &HealingContext) -> f64 {
     let base = match wound.phase {
         HealingPhase::Inflammation => {
             // P = 0.7 + 0.2 * medicine (somatic) or mediation (social)
-            0.7 + 0.2 * if wound.origin.is_somatic() { ctx.medicine } else { ctx.mediation_factor }
+            0.7 + 0.2
+                * if wound.origin.is_somatic() {
+                    ctx.medicine
+                } else {
+                    ctx.mediation_factor
+                }
         }
         HealingPhase::Proliferation => {
             // P = 0.4 + 0.3 * care_ratio + 0.1 * collective_phi
@@ -356,10 +361,26 @@ mod tests {
 
     #[test]
     fn wound_severity_decreases_through_phases() {
-        let w1 = WoundState { phase: HealingPhase::Inflammation, initial_severity: 1.0, ..WoundState::new(1.0, WoundOrigin::Disaster, 0) };
-        let w2 = WoundState { phase: HealingPhase::Proliferation, initial_severity: 1.0, ..WoundState::new(1.0, WoundOrigin::Disaster, 0) };
-        let w3 = WoundState { phase: HealingPhase::Remodeling, initial_severity: 1.0, ..WoundState::new(1.0, WoundOrigin::Disaster, 0) };
-        let w4 = WoundState { phase: HealingPhase::Integration, initial_severity: 1.0, ..WoundState::new(1.0, WoundOrigin::Disaster, 0) };
+        let w1 = WoundState {
+            phase: HealingPhase::Inflammation,
+            initial_severity: 1.0,
+            ..WoundState::new(1.0, WoundOrigin::Disaster, 0)
+        };
+        let w2 = WoundState {
+            phase: HealingPhase::Proliferation,
+            initial_severity: 1.0,
+            ..WoundState::new(1.0, WoundOrigin::Disaster, 0)
+        };
+        let w3 = WoundState {
+            phase: HealingPhase::Remodeling,
+            initial_severity: 1.0,
+            ..WoundState::new(1.0, WoundOrigin::Disaster, 0)
+        };
+        let w4 = WoundState {
+            phase: HealingPhase::Integration,
+            initial_severity: 1.0,
+            ..WoundState::new(1.0, WoundOrigin::Disaster, 0)
+        };
 
         assert!(w1.current_severity() > w2.current_severity());
         assert!(w2.current_severity() > w3.current_severity());
@@ -368,7 +389,10 @@ mod tests {
 
     #[test]
     fn healed_wound_has_zero_severity() {
-        let w = WoundState { phase: HealingPhase::Healed, ..WoundState::new(1.0, WoundOrigin::Disaster, 0) };
+        let w = WoundState {
+            phase: HealingPhase::Healed,
+            ..WoundState::new(1.0, WoundOrigin::Disaster, 0)
+        };
         assert_eq!(w.current_severity(), 0.0);
         assert!(w.is_healed());
     }
@@ -382,7 +406,11 @@ mod tests {
         for _ in 0..50 {
             tick_wound(&mut w, &ctx);
         }
-        assert!(w.is_healed(), "Wound should heal within 50 ticks with good care, phase={:?}", w.phase);
+        assert!(
+            w.is_healed(),
+            "Wound should heal within 50 ticks with good care, phase={:?}",
+            w.phase
+        );
     }
 
     #[test]
@@ -391,7 +419,10 @@ mod tests {
         let mut w_unmediated = WoundState::new(0.8, WoundOrigin::Faction, 0);
 
         let ctx_good = good_ctx();
-        let ctx_no_mediation = HealingContext { mediation_factor: 0.0, ..good_ctx() };
+        let ctx_no_mediation = HealingContext {
+            mediation_factor: 0.0,
+            ..good_ctx()
+        };
 
         for _ in 0..20 {
             tick_wound(&mut w_mediated, &ctx_good);
@@ -402,7 +433,8 @@ mod tests {
         assert!(
             w_mediated.phase.severity_weight() <= w_unmediated.phase.severity_weight(),
             "Mediated wound should heal faster: {:?} vs {:?}",
-            w_mediated.phase, w_unmediated.phase
+            w_mediated.phase,
+            w_unmediated.phase
         );
     }
 
@@ -437,19 +469,24 @@ mod tests {
 
     #[test]
     fn kenosis_activates_during_remodeling() {
-        let mut wounds = vec![
-            WoundState { phase: HealingPhase::Remodeling, ..WoundState::new(0.5, WoundOrigin::Disaster, 0) },
-        ];
+        let mut wounds = vec![WoundState {
+            phase: HealingPhase::Remodeling,
+            ..WoundState::new(0.5, WoundOrigin::Disaster, 0)
+        }];
         let activated = attempt_kenosis(&mut wounds, 0.8);
-        assert!(activated, "Kenosis should activate with high care_activation");
+        assert!(
+            activated,
+            "Kenosis should activate with high care_activation"
+        );
         assert!(wounds[0].kenosis_active);
     }
 
     #[test]
     fn kenosis_does_not_activate_outside_remodeling() {
-        let mut wounds = vec![
-            WoundState { phase: HealingPhase::Inflammation, ..WoundState::new(0.5, WoundOrigin::Disaster, 0) },
-        ];
+        let mut wounds = vec![WoundState {
+            phase: HealingPhase::Inflammation,
+            ..WoundState::new(0.5, WoundOrigin::Disaster, 0)
+        }];
         let activated = attempt_kenosis(&mut wounds, 0.9);
         assert!(!activated, "Kenosis should not activate outside Remodeling");
     }
@@ -457,10 +494,22 @@ mod tests {
     #[test]
     fn wound_phase_distribution_counts_correctly() {
         let wounds = vec![
-            WoundState { phase: HealingPhase::Inflammation, ..WoundState::new(0.5, WoundOrigin::Disaster, 0) },
-            WoundState { phase: HealingPhase::Inflammation, ..WoundState::new(0.3, WoundOrigin::Burnout, 0) },
-            WoundState { phase: HealingPhase::Remodeling, ..WoundState::new(0.4, WoundOrigin::Faction, 0) },
-            WoundState { phase: HealingPhase::Healed, ..WoundState::new(0.1, WoundOrigin::Disaster, 0) },
+            WoundState {
+                phase: HealingPhase::Inflammation,
+                ..WoundState::new(0.5, WoundOrigin::Disaster, 0)
+            },
+            WoundState {
+                phase: HealingPhase::Inflammation,
+                ..WoundState::new(0.3, WoundOrigin::Burnout, 0)
+            },
+            WoundState {
+                phase: HealingPhase::Remodeling,
+                ..WoundState::new(0.4, WoundOrigin::Faction, 0)
+            },
+            WoundState {
+                phase: HealingPhase::Healed,
+                ..WoundState::new(0.1, WoundOrigin::Disaster, 0)
+            },
         ];
         let dist = wound_phase_distribution(&wounds);
         assert_eq!(dist[0], 2); // Inflammation
@@ -491,7 +540,10 @@ mod tests {
         let mut w_boosted = WoundState::new(0.8, WoundOrigin::Disaster, 0);
 
         let ctx_normal = good_ctx();
-        let ctx_boosted = HealingContext { metabolism_healing_mult: 3.0, ..good_ctx() };
+        let ctx_boosted = HealingContext {
+            metabolism_healing_mult: 3.0,
+            ..good_ctx()
+        };
 
         for _ in 0..10 {
             tick_wound(&mut w_normal, &ctx_normal);
@@ -501,7 +553,8 @@ mod tests {
         assert!(
             w_boosted.phase.severity_weight() <= w_normal.phase.severity_weight(),
             "Boosted metabolism should accelerate healing: {:?} vs {:?}",
-            w_boosted.phase, w_normal.phase
+            w_boosted.phase,
+            w_normal.phase
         );
     }
 

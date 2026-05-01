@@ -9,8 +9,8 @@
 //!
 //! Gmail's "Undo Send" works for 5 seconds. Ours works forever.
 
-use leptos::prelude::*;
 use crate::toasts::use_toasts;
+use leptos::prelude::*;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum AccessStatus {
@@ -58,7 +58,7 @@ pub fn RevokeAccessButton(
         revoked.set(true);
         toasts.push(
             "Access revoked. Recipient can no longer view this email or attachments.",
-            "success"
+            "success",
         );
 
         // Destroy the session decryption key on the DHT
@@ -77,18 +77,26 @@ pub fn RevokeAccessButton(
                 "reason": "UserRevoked"
             });
 
-            match hc.call_zome::<serde_json::Value, serde_json::Value>(
-                "mail_keys", "rotate_keys", &payload
-            ).await {
+            match hc
+                .call_zome::<serde_json::Value, serde_json::Value>(
+                    "mail_keys",
+                    "rotate_keys",
+                    &payload,
+                )
+                .await
+            {
                 Ok(response) => {
-                    web_sys::console::log_1(&format!(
-                        "[Mail] Session key revoked for {}: {:?}", hash, response
-                    ).into());
+                    web_sys::console::log_1(
+                        &format!("[Mail] Session key revoked for {}: {:?}", hash, response).into(),
+                    );
                 }
                 Err(e) => {
-                    web_sys::console::warn_1(&format!(
-                        "[Mail] Key revocation failed: {e}. The key may already be destroyed."
-                    ).into());
+                    web_sys::console::warn_1(
+                        &format!(
+                            "[Mail] Key revocation failed: {e}. The key may already be destroyed."
+                        )
+                        .into(),
+                    );
                 }
             }
         });

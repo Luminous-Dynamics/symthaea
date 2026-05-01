@@ -26,10 +26,10 @@ pub fn emission_factor(fuel_type: &FuelType) -> f64 {
 /// Reference market price per barrel of oil equivalent by fuel type (USD, ~2024 averages).
 pub fn reference_price_per_boe(fuel_type: &FuelType) -> f64 {
     match fuel_type {
-        FuelType::Oil => 75.0,       // WTI/Brent average
-        FuelType::Gas => 28.0,       // Henry Hub equivalent per boe
-        FuelType::Coal => 18.0,      // thermal coal equivalent per boe
-        FuelType::TarSands => 65.0,  // discounted heavy crude
+        FuelType::Oil => 75.0,      // WTI/Brent average
+        FuelType::Gas => 28.0,      // Henry Hub equivalent per boe
+        FuelType::Coal => 18.0,     // thermal coal equivalent per boe
+        FuelType::TarSands => 65.0, // discounted heavy crude
     }
 }
 
@@ -93,10 +93,10 @@ pub fn compute_eroi(deposit: &FossilDeposit) -> Option<f64> {
 /// EROI-based color for visualization: green → amber → red → dark red.
 pub fn eroi_color(eroi: f64) -> [f32; 3] {
     match EroiTier::from_eroi(eroi) {
-        EroiTier::Civilization => [0.06, 0.73, 0.51],   // teal-green
+        EroiTier::Civilization => [0.06, 0.73, 0.51], // teal-green
         EroiTier::Sustainability => [0.98, 0.75, 0.14], // amber
-        EroiTier::Marginal => [0.94, 0.27, 0.27],       // red
-        EroiTier::Unviable => [0.50, 0.10, 0.10],       // dark red
+        EroiTier::Marginal => [0.94, 0.27, 0.27],     // red
+        EroiTier::Unviable => [0.50, 0.10, 0.10],     // dark red
     }
 }
 
@@ -135,20 +135,32 @@ pub fn compute_economics(deposit: &FossilDeposit) -> Option<FossilEconomics> {
     let ef = emission_factor(&deposit.fuel_type);
     let prod = deposit.annual_production_mboe; // million boe/yr
 
-    let revenue = prod * price;           // $M/yr
-    let cost = prod * extraction_cost;    // $M/yr
-    let co2_mt = prod * ef;               // Mt CO2/yr
+    let revenue = prod * price; // $M/yr
+    let cost = prod * extraction_cost; // $M/yr
+    let co2_mt = prod * ef; // Mt CO2/yr
     let carbon_cost = co2_mt * SOCIAL_COST_OF_CARBON; // $M/yr
 
     let profit_no_carbon = revenue - cost;
     let profit_with_carbon = profit_no_carbon - carbon_cost;
 
     // ROI as profit / revenue (operating margin)
-    let roi_no_carbon = if revenue > 0.0 { profit_no_carbon / revenue * 100.0 } else { 0.0 };
-    let roi_with_carbon = if revenue > 0.0 { profit_with_carbon / revenue * 100.0 } else { 0.0 };
+    let roi_no_carbon = if revenue > 0.0 {
+        profit_no_carbon / revenue * 100.0
+    } else {
+        0.0
+    };
+    let roi_with_carbon = if revenue > 0.0 {
+        profit_with_carbon / revenue * 100.0
+    } else {
+        0.0
+    };
 
     // Breakeven: profit_no_carbon - co2_mt * breakeven_price = 0
-    let breakeven = if co2_mt > 0.0 { profit_no_carbon / co2_mt } else { f64::INFINITY };
+    let breakeven = if co2_mt > 0.0 {
+        profit_no_carbon / co2_mt
+    } else {
+        f64::INFINITY
+    };
 
     let years = if prod > 0.0 {
         deposit.proven_reserves_mboe / prod

@@ -10,14 +10,13 @@
 
 use image::GenericImageView;
 use symthaea_core::embodiment::{
-    EmbodimentPlatform, EmbodimentResult, EmbodimentTelemetry, MotorSafetyLevel,
-    GROUNDING_TEMPORAL,
+    EmbodimentPlatform, EmbodimentResult, EmbodimentTelemetry, MotorSafetyLevel, GROUNDING_TEMPORAL,
 };
 use symthaea_core::hdc::ContinuousHV;
 use symthaea_vision_manifold::{VisionConfig, VisionManifold};
 
-use crate::adb::AdbDevice;
 use crate::actions::PhoneAction;
+use crate::adb::AdbDevice;
 
 /// Phone screen embodiment bridge.
 ///
@@ -111,8 +110,8 @@ impl PhoneBridge {
         dt: f32,
     ) -> Result<symthaea_vision_manifold::VisionTelemetry, String> {
         let png_bytes = self.adb.screenshot()?;
-        let img = image::load_from_memory(&png_bytes)
-            .map_err(|e| format!("Image decode failed: {e}"))?;
+        let img =
+            image::load_from_memory(&png_bytes).map_err(|e| format!("Image decode failed: {e}"))?;
 
         // Update native screen dimensions from actual capture
         let (w, h) = img.dimensions();
@@ -128,7 +127,9 @@ impl PhoneBridge {
         let rgb = resized.to_rgb8();
         let pixels: Vec<u8> = rgb.into_raw();
 
-        let tel = self.vision.observe_frame(&pixels, self.target_w, self.target_h, 3, dt);
+        let tel = self
+            .vision
+            .observe_frame(&pixels, self.target_w, self.target_h, 3, dt);
         Ok(tel)
     }
 
@@ -143,8 +144,8 @@ impl PhoneBridge {
         dt: f32,
     ) -> Result<(symthaea_vision_manifold::VisionTelemetry, Vec<u8>, u32, u32), String> {
         let png_bytes = self.adb.screenshot()?;
-        let img = image::load_from_memory(&png_bytes)
-            .map_err(|e| format!("Image decode failed: {e}"))?;
+        let img =
+            image::load_from_memory(&png_bytes).map_err(|e| format!("Image decode failed: {e}"))?;
 
         let (w, h) = img.dimensions();
         self.screen_w = w;
@@ -171,7 +172,7 @@ impl PhoneBridge {
     /// Converts from the 8×8 grid (at 64×64) to native screen pixels.
     pub fn grid_to_screen(&self, grid_row: usize, grid_col: usize) -> (u32, u32) {
         let patch_size = 8; // VisionConfig default
-        // Center of the patch
+                            // Center of the patch
         let vision_x = (grid_col * patch_size + patch_size / 2) as f32;
         let vision_y = (grid_row * patch_size + patch_size / 2) as f32;
         // Scale to screen
@@ -205,12 +206,18 @@ impl PhoneBridge {
         // Find the highest-saliency working memory object
         let action = if let Some(wm) = self.vision.working_memory() {
             if let Some(best) = wm.slots().iter().max_by(|a, b| {
-                a.saliency.partial_cmp(&b.saliency).unwrap_or(std::cmp::Ordering::Equal)
+                a.saliency
+                    .partial_cmp(&b.saliency)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             }) {
-                let (screen_x, screen_y) = self.grid_to_screen(best.centroid_row, best.centroid_col);
+                let (screen_x, screen_y) =
+                    self.grid_to_screen(best.centroid_row, best.centroid_col);
                 // Only tap if Phi allows it
                 if phi >= (PhoneAction::Tap { x: 0, y: 0 }).required_phi() {
-                    PhoneAction::Tap { x: screen_x, y: screen_y }
+                    PhoneAction::Tap {
+                        x: screen_x,
+                        y: screen_y,
+                    }
                 } else {
                     PhoneAction::Screenshot
                 }
@@ -268,7 +275,16 @@ impl PhoneBridge {
         }
 
         // Strategy 2: No match found — explore by swiping down
-        if phi >= (PhoneAction::Swipe { x1: 0, y1: 0, x2: 0, y2: 0, duration_ms: 0 }).required_phi() {
+        if phi
+            >= (PhoneAction::Swipe {
+                x1: 0,
+                y1: 0,
+                x2: 0,
+                y2: 0,
+                duration_ms: 0,
+            })
+            .required_phi()
+        {
             let mid_x = self.screen_w / 2;
             let action = PhoneAction::Swipe {
                 x1: mid_x,
@@ -337,10 +353,7 @@ impl PhoneBridge {
     /// through the patch encoder, then **unbinds all position components**
     /// to produce a pure appearance template. This template will match
     /// the same visual content regardless of screen position.
-    pub fn learn_template_from_file(
-        &self,
-        path: &std::path::Path,
-    ) -> Result<ContinuousHV, String> {
+    pub fn learn_template_from_file(&self, path: &std::path::Path) -> Result<ContinuousHV, String> {
         let img = image::open(path).map_err(|e| format!("Load failed: {e}"))?;
         let resized = img.resize_exact(
             self.target_w,
@@ -352,11 +365,8 @@ impl PhoneBridge {
 
         // Encode through a temporary encoder (same config as manifold)
         let cfg = self.vision.config().clone();
-        let mut encoder = symthaea_vision_manifold::PatchHdcEncoder::new(
-            &cfg,
-            self.target_w,
-            self.target_h,
-        );
+        let mut encoder =
+            symthaea_vision_manifold::PatchHdcEncoder::new(&cfg, self.target_w, self.target_h);
         let (_, patch_hvs) = encoder.encode_frame(&pixels, self.target_w, self.target_h, 3);
 
         // Unbind position from each patch to get appearance-only HVs,
@@ -433,7 +443,9 @@ impl PhoneBridge {
         let idx = grid_row * grid_cols + grid_col;
 
         patch_hvs.get(idx).map(|phv| {
-            self.vision.encoder().unbind_position(phv, grid_row, grid_col)
+            self.vision
+                .encoder()
+                .unbind_position(phv, grid_row, grid_col)
         })
     }
 
@@ -494,8 +506,7 @@ impl PhoneBridge {
 
     /// Execute the proposed action (after user confirmation).
     pub fn confirm_and_execute(&mut self) -> Result<(), String> {
-        let action = self.proposed_action.take()
-            .ok_or("No action proposed")?;
+        let action = self.proposed_action.take().ok_or("No action proposed")?;
         self.execute_action(&action)
     }
 
@@ -510,9 +521,13 @@ impl PhoneBridge {
             PhoneAction::Back => self.adb.back(),
             PhoneAction::Home => self.adb.home(),
             PhoneAction::OpenUrl { url } => self.adb.open_url(url),
-            PhoneAction::Swipe { x1, y1, x2, y2, duration_ms } => {
-                self.adb.swipe(*x1, *y1, *x2, *y2, *duration_ms)
-            }
+            PhoneAction::Swipe {
+                x1,
+                y1,
+                x2,
+                y2,
+                duration_ms,
+            } => self.adb.swipe(*x1, *y1, *x2, *y2, *duration_ms),
             PhoneAction::Tap { x, y } => self.adb.tap(*x, *y),
             PhoneAction::Type { text } => self.adb.input_text(text),
         }?;
@@ -571,17 +586,15 @@ impl PhoneBridge {
 
     /// Working memory contents.
     pub fn working_memory_summary(&self) -> Vec<(u64, f32, u32, u32)> {
-        self.vision
-            .working_memory()
-            .map_or(Vec::new(), |wm| {
-                wm.slots()
-                    .iter()
-                    .map(|s| {
-                        let (sx, sy) = self.grid_to_screen(s.centroid_row, s.centroid_col);
-                        (s.track_id, s.saliency, sx, sy)
-                    })
-                    .collect()
-            })
+        self.vision.working_memory().map_or(Vec::new(), |wm| {
+            wm.slots()
+                .iter()
+                .map(|s| {
+                    let (sx, sy) = self.grid_to_screen(s.centroid_row, s.centroid_col);
+                    (s.track_id, s.saliency, sx, sy)
+                })
+                .collect()
+        })
     }
 }
 

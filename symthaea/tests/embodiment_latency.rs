@@ -277,7 +277,7 @@ fn latency_humanoid() {
 #[cfg(feature = "flight")]
 #[test]
 fn latency_flight() {
-    let bridge = symthaea_flight::embodiment::FlightEmbodiment::new(&GenesisSeed::from_phrase(
+    let bridge = symthaea_multirotor::embodiment::FlightEmbodiment::new(&GenesisSeed::from_phrase(
         "latency-flight",
     ));
     measure_latency(bridge, "flight", 0.002);

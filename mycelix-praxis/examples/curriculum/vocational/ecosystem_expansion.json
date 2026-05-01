@@ -1,0 +1,183 @@
+{
+  "metadata": {
+    "title": "Ecosystem Expansion: The Connective Mycelium",
+    "framework": "Mycelix Universal",
+    "source": "https://mycelix.org",
+    "grade_level": "Lifelong/Universal",
+    "subject_area": "Multi-Subject",
+    "domain": "Expansion",
+    "version": "1.0",
+    "total_standards": 12,
+    "domains": [
+      "Sovereign Economics",
+      "Protocol Design",
+      "Foundational Logic",
+      "Linguistic Ecology"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Closing the remaining gaps in civilizational breadth and depth."
+  },
+  "nodes": [
+    {
+      "id": "ECO-ADV-101",
+      "title": "Value Topology",
+      "description": "Graph theory applied to economics. Mapping how TEND and resources flow through a mesh. Identifying extractive bottlenecks and creating regenerative 'Eddies' in the local economy.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Sovereign Economics",
+      "subdomain": "Expansion",
+      "tags": ["economics", "graph-theory", "math", "topology"],
+      "estimated_hours": 60,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Social Studies"
+    },
+    {
+      "id": "ECO-ADV-201",
+      "title": "Mutual Credit & Demurrage",
+      "description": "The math of non-extractive credit. How to design a currency that encourages circulation rather than hoarding. Calculating trust-weighted credit limits.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Sovereign Economics",
+      "subdomain": "Expansion",
+      "tags": ["finance", "mutual-credit", "demurrage", "tend"],
+      "estimated_hours": 60,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Apply",
+      "subject_area": "Social Studies"
+    },
+    {
+      "id": "DIG-ADV-101",
+      "title": "The Architecture of Agency",
+      "description": "Formal proof of agent-centricity. Why keeping data on the source chain is a technical requirement for human sovereignty. Comparison with centralized data-silos.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Protocol Design",
+      "subdomain": "Expansion",
+      "tags": ["protocol", "sovereignty", "holochain", "philosophy"],
+      "estimated_hours": 45,
+      "grade_levels": ["Graduate"],
+      "bloom_level": "Evaluate",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "DIG-ADV-301",
+      "title": "P2P Network Topology",
+      "description": "The physics of the mesh. Gossip protocols, DHT sharding, and the mathematics of local discovery via LoRa and Wi-Fi. Optimizing for resilient, off-grid routing.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Protocol Design",
+      "subdomain": "Expansion",
+      "tags": ["networking", "p2p", "mesh", "physics"],
+      "estimated_hours": 90,
+      "grade_levels": ["Graduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "SCI-GEN-010",
+      "title": "Physical Logic: Pulleys & Levers",
+      "description": "The first computers. Mechanical advantage as a form of physical logic. Understanding ratios, torque, and leverage as prerequisites for engineering.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Foundational Logic",
+      "subdomain": "Expansion",
+      "tags": ["physics", "mechanics", "foundations", "logic"],
+      "estimated_hours": 30,
+      "grade_levels": ["Grade6", "Grade7", "Grade8"],
+      "bloom_level": "Understand",
+      "subject_area": "Science"
+    },
+    {
+      "id": "SCI-GEN-020",
+      "title": "Biological Feedback & Homeostasis",
+      "description": "Nature's Active Inference. How plants regulate water and bodies regulate heat. The foundation for understanding complex feedback loops in cities.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Foundational Logic",
+      "subdomain": "Expansion",
+      "tags": ["biology", "homeostasis", "feedback", "fep"],
+      "estimated_hours": 30,
+      "grade_levels": ["Grade7", "Grade8", "Grade9"],
+      "bloom_level": "Understand",
+      "subject_area": "Science"
+    },
+    {
+      "id": "MATH-GEN-010",
+      "title": "Logical Connectives in the World",
+      "description": "AND, OR, NOT and XOR. Visualizing Boolean logic through physical switches, water valves, and circuit gates. The grammar of all following technical tracks.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Foundational Logic",
+      "subdomain": "Expansion",
+      "tags": ["math", "logic", "foundations", "boolean"],
+      "estimated_hours": 30,
+      "grade_levels": ["Grade6", "Grade7", "Grade8"],
+      "bloom_level": "Apply",
+      "subject_area": "Mathematics"
+    },
+    {
+      "id": "HUM-LANG-301",
+      "title": "Conceptual Blending & Metaphor",
+      "description": "How the mind builds new meaning. Blending HDC-bound semantic concepts into resonant cultural metaphors. The linguistics of collective intelligence.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Linguistic Ecology",
+      "subdomain": "Expansion",
+      "tags": ["linguistics", "metaphor", "cognition", "culture"],
+      "estimated_hours": 45,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Humanities"
+    },
+    {
+      "id": "DIG-CAP-PROTOCOL",
+      "title": "Sovereign Protocol Capstone",
+      "description": "Design and formally verify a new Mycelix protocol extension (zome or bridge) that addresses a specific community need while maintaining the 16 obligations.",
+      "node_type": "Capstone",
+      "difficulty": "Expert",
+      "domain": "Universal",
+      "subdomain": "Expansion",
+      "tags": ["capstone", "protocol", "coding", "holochain"],
+      "estimated_hours": 300,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Create",
+      "subject_area": "Computer Science",
+      "holonic_capstone": {
+        "required_node_ids": ["DIG-ADV-101", "DIG-ADV-301", "SYM-ADV-401"],
+        "deliverable": "A functioning, auditable Holochain zome with a verified EML proof of alignment.",
+        "min_peer_endorsements": 10
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "MATH-GEN-010",
+      "to": "SYM-201",
+      "edge_type": "Requires",
+      "strength_permille": 1000,
+      "rationale": "Hyperdimensional logic is built upon the foundation of Boolean connectives."
+    },
+    {
+      "from": "SCI-GEN-010",
+      "to": "ROB-101",
+      "edge_type": "Recommended",
+      "strength_permille": 700,
+      "rationale": "Mechanical advantage is the first step toward understanding bipedal torque and balance."
+    },
+    {
+      "from": "ECO-ADV-101",
+      "to": "CIV-501",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Thermodynamic governance requires a deep understanding of value topology."
+    },
+    {
+      "from": "DIG-ADV-101",
+      "to": "DIG-CAP-PROTOCOL",
+      "edge_type": "Requires",
+      "strength_permille": 1000,
+      "rationale": "One cannot design a sovereign protocol without mastering the architecture of agency."
+    }
+  ]
+}

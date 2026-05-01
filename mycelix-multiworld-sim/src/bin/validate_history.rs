@@ -5,11 +5,11 @@
 //! This is the credibility test: can we reproduce the last 50 years?
 
 use mycelix_multiworld_sim::{
-    MultiWorldSimulator,
     config::SimulationConfig,
     earth_population::EarthPopulationModel,
     earth_regions::build_earth_regions,
-    validation::{self, ObservedData, format_validation_report},
+    validation::{self, format_validation_report, ObservedData},
+    MultiWorldSimulator,
 };
 
 fn main() {
@@ -31,8 +31,15 @@ fn main() {
     let mut regions_mut = regions.clone();
 
     let initial_pop = model.total_population;
-    println!("Initial Earth population: {:.0}M ({:.2}B)", initial_pop, initial_pop / 1000.0);
-    println!("Initial global temp anomaly: {:.2}°C", model.climate.global_temp_anomaly);
+    println!(
+        "Initial Earth population: {:.0}M ({:.2}B)",
+        initial_pop,
+        initial_pop / 1000.0
+    );
+    println!(
+        "Initial global temp anomaly: {:.2}°C",
+        model.climate.global_temp_anomaly
+    );
     println!("Running 54 years (1970-2024) at monthly resolution...\n");
 
     // Track trajectories
@@ -42,22 +49,34 @@ fn main() {
     let mut tfr_trajectory = Vec::new();
 
     let mut rng = mycelix_multiworld_sim::stochastic::StochasticEngine::new(42);
-    let mut primitives = mycelix_multiworld_sim::primitives::CivilizationalPrimitives::earth_defaults();
+    let mut primitives =
+        mycelix_multiworld_sim::primitives::CivilizationalPrimitives::earth_defaults();
 
     // Run 54 years (648 ticks)
     for tick in 0..648 {
-        let scaling: Vec<_> = regions_mut.iter()
-            .map(|r| mycelix_multiworld_sim::viability::ScalingFactors::compute(r.population * 1_000_000.0))
+        let scaling: Vec<_> = regions_mut
+            .iter()
+            .map(|r| {
+                mycelix_multiworld_sim::viability::ScalingFactors::compute(
+                    r.population * 1_000_000.0,
+                )
+            })
             .collect();
         model.tick(&regions_mut, &scaling, tick, &mut rng);
         model.sync_to_regions(&mut regions_mut);
 
         // Tick primitives with Earth aggregate state
         let total_pop: f64 = regions_mut.iter().map(|r| r.population).sum();
-        let mean_urban: f64 = regions_mut.iter()
-            .map(|r| r.urbanization * r.population).sum::<f64>() / total_pop.max(1.0);
-        let mean_gdp: f64 = regions_mut.iter()
-            .map(|r| r.gdp_per_capita * r.population).sum::<f64>() / total_pop.max(1.0);
+        let mean_urban: f64 = regions_mut
+            .iter()
+            .map(|r| r.urbanization * r.population)
+            .sum::<f64>()
+            / total_pop.max(1.0);
+        let mean_gdp: f64 = regions_mut
+            .iter()
+            .map(|r| r.gdp_per_capita * r.population)
+            .sum::<f64>()
+            / total_pop.max(1.0);
         primitives.tick(total_pop, mean_urban, mean_gdp, 0.05, 0.3, 0.1);
 
         // Feedback: resource EROI → GDP (only when significantly depleted)
@@ -89,19 +108,27 @@ fn main() {
             emission_trajectory.push((year, model.climate.annual_emissions));
 
             // Estimate global TFR from demographics
-            let total_births: f64 = model.demographics.iter()
+            let total_births: f64 = model
+                .demographics
+                .iter()
                 .flat_map(|d| d.cohorts.values())
                 .map(|c| c.fertility_rate * c.count / 12.0)
                 .sum();
-            let women_reproductive: f64 = model.demographics.iter()
+            let women_reproductive: f64 = model
+                .demographics
+                .iter()
                 .flat_map(|d| d.cohorts.iter())
-                .filter(|(k, _)| k.sex == mycelix_multiworld_sim::earth_population::cohort::CohortSex::Female
-                    && k.age_band.can_reproduce())
+                .filter(|(k, _)| {
+                    k.sex == mycelix_multiworld_sim::earth_population::cohort::CohortSex::Female
+                        && k.age_band.can_reproduce()
+                })
                 .map(|(_, c)| c.count)
                 .sum();
             let tfr_estimate = if women_reproductive > 0.0 {
                 total_births / women_reproductive * 12.0 * 35.0 // births/woman × years of fertility
-            } else { 0.0 };
+            } else {
+                0.0
+            };
             tfr_trajectory.push((year, tfr_estimate.clamp(0.5, 8.0)));
         }
     }
@@ -134,42 +161,85 @@ fn main() {
     println!("{}", format_validation_report(&validations));
 
     // Summary
-    let overall_mape: f64 = validations.iter().map(|v| v.mape).sum::<f64>() / validations.len() as f64;
+    let overall_mape: f64 =
+        validations.iter().map(|v| v.mape).sum::<f64>() / validations.len() as f64;
     println!("=== VERDICT ===");
     if overall_mape < 15.0 {
-        println!("Overall MAPE: {:.1}% — Model is CREDIBLE for trend analysis", overall_mape);
+        println!(
+            "Overall MAPE: {:.1}% — Model is CREDIBLE for trend analysis",
+            overall_mape
+        );
     } else if overall_mape < 30.0 {
-        println!("Overall MAPE: {:.1}% — Model captures DIRECTION but not magnitude", overall_mape);
+        println!(
+            "Overall MAPE: {:.1}% — Model captures DIRECTION but not magnitude",
+            overall_mape
+        );
     } else {
-        println!("Overall MAPE: {:.1}% — Model needs RECALIBRATION", overall_mape);
+        println!(
+            "Overall MAPE: {:.1}% — Model needs RECALIBRATION",
+            overall_mape
+        );
     }
 
     println!("\nFinal state (year 2024):");
-    println!("  Population: {:.2}B (observed: 8.12B)", model.total_population / 1000.0);
-    println!("  Temp anomaly: {:.2}°C (observed: 1.29°C)", model.climate.global_temp_anomaly);
-    println!("  CO₂ emissions: {:.1} GtCO₂/yr (observed: 37.4)", model.climate.annual_emissions);
+    println!(
+        "  Population: {:.2}B (observed: 8.12B)",
+        model.total_population / 1000.0
+    );
+    println!(
+        "  Temp anomaly: {:.2}°C (observed: 1.29°C)",
+        model.climate.global_temp_anomaly
+    );
+    println!(
+        "  CO₂ emissions: {:.1} GtCO₂/yr (observed: 37.4)",
+        model.climate.annual_emissions
+    );
 
     // Primitives state at 2024
     println!("\n=== CIVILIZATIONAL PRIMITIVES (2024) ===");
-    println!("  Ecosystem service index: {:.3} (1.0=pristine, <0.3=critical)", primitives.ecosystem.service_index());
-    println!("    Biodiversity: {:.3}  Forest: {:.3}  Soil: {:.3}  Ocean: {:.3}",
-        primitives.ecosystem.biodiversity, primitives.ecosystem.forest_cover,
-        primitives.ecosystem.soil_health, primitives.ecosystem.ocean_health);
+    println!(
+        "  Ecosystem service index: {:.3} (1.0=pristine, <0.3=critical)",
+        primitives.ecosystem.service_index()
+    );
+    println!(
+        "    Biodiversity: {:.3}  Forest: {:.3}  Soil: {:.3}  Ocean: {:.3}",
+        primitives.ecosystem.biodiversity,
+        primitives.ecosystem.forest_cover,
+        primitives.ecosystem.soil_health,
+        primitives.ecosystem.ocean_health
+    );
     if let Some(oil) = primitives.resources.iter().find(|r| r.name == "Oil") {
-        println!("  Oil: {:.0}% remaining, EROI {:.1}:1",
-            oil.fraction_remaining() * 100.0, oil.current_eroi());
+        println!(
+            "  Oil: {:.0}% remaining, EROI {:.1}:1",
+            oil.fraction_remaining() * 100.0,
+            oil.current_eroi()
+        );
     }
-    println!("  Network: mean degree {:.0}, clustering {:.3}, path length {:.1}",
-        primitives.network.mean_degree, primitives.network.clustering, primitives.network.avg_path_length);
-    println!("  Knowledge: {} known, {} adjacent possible, {} paradigm shifts",
-        primitives.knowledge.known_count, primitives.knowledge.adjacent_possible,
-        primitives.knowledge.paradigm_shifts);
-    println!("  Institutional lock-in: {:.3}, quality: {:.3}",
-        primitives.institutions.lock_in_strength, primitives.institutions.quality);
-    println!("  Trust: {:.3}, betrayals: {}", primitives.trust.level, primitives.trust.betrayal_count);
+    println!(
+        "  Network: mean degree {:.0}, clustering {:.3}, path length {:.1}",
+        primitives.network.mean_degree,
+        primitives.network.clustering,
+        primitives.network.avg_path_length
+    );
+    println!(
+        "  Knowledge: {} known, {} adjacent possible, {} paradigm shifts",
+        primitives.knowledge.known_count,
+        primitives.knowledge.adjacent_possible,
+        primitives.knowledge.paradigm_shifts
+    );
+    println!(
+        "  Institutional lock-in: {:.3}, quality: {:.3}",
+        primitives.institutions.lock_in_strength, primitives.institutions.quality
+    );
+    println!(
+        "  Trust: {:.3}, betrayals: {}",
+        primitives.trust.level, primitives.trust.betrayal_count
+    );
     let tips = primitives.ecosystem.tipping_points();
     if !tips.is_empty() {
         println!("  TIPPING POINTS CROSSED:");
-        for tip in &tips { println!("    - {}", tip); }
+        for tip in &tips {
+            println!("    - {}", tip);
+        }
     }
 }

@@ -30865,14 +30865,14 @@
     },
     {
       "id": "MYC-501",
-      "title": "Consciousness Gating",
+      "title": "Epistemic Gating",
       "description": "4D consciousness profile (identity/reputation/community/engagement). 5 trust tiers (Observer \u2192 Guardian). Configurable vote weights for default, constitutional, budget, and emergency contexts. Phi-coupled governance: how consciousness scores affect civic participation rights.",
       "node_type": "Course",
       "difficulty": "Expert",
       "domain": "Decentralized Systems",
       "subdomain": "Mycelix",
       "tags": [
-        "consciousness-gating",
+        "epistemic-gating",
         "trust-tiers",
         "phi",
         "vote-weights"
@@ -30887,7 +30887,7 @@
         {
           "framework": "Luminous Dynamics",
           "code": "MYC-501",
-          "description": "Consciousness Gating",
+          "description": "Epistemic Gating",
           "grade_level": "Graduate"
         }
       ],
@@ -30993,7 +30993,7 @@
     },
     {
       "id": "RUST-301",
-      "title": "Rust for Consciousness Computing",
+      "title": "Rust for Cognitive Computing",
       "description": "Building HDC systems in Rust. SIMD-optimized hypervector operations. Rayon parallelism. serde serialization for neural state. candle GPU compute. WASM compilation targets. The symthaea-core architecture as a case study.",
       "node_type": "Course",
       "difficulty": "Advanced",
@@ -31018,7 +31018,7 @@
         {
           "framework": "Luminous Dynamics",
           "code": "RUST-301",
-          "description": "Rust for Consciousness Computing",
+          "description": "Rust for Cognitive Computing",
           "grade_level": "Undergraduate"
         }
       ],
@@ -31254,11 +31254,11 @@
     },
     {
       "id": "SYM-101",
-      "title": "Introduction to Consciousness Computing",
+      "title": "Introduction to Cognitive Computing",
       "description": "Survey of computational consciousness: what it means for a machine to be conscious, the Hard Problem, philosophical zombies, multiple realizability, and why it matters for AI safety and value alignment.",
       "node_type": "Course",
       "difficulty": "Beginner",
-      "domain": "Consciousness Computing",
+      "domain": "Cognitive Computing",
       "subdomain": "Symthaea",
       "tags": [
         "consciousness",
@@ -31270,12 +31270,12 @@
         "Undergraduate"
       ],
       "bloom_level": "Understand",
-      "subject_area": "Consciousness Computing",
+      "subject_area": "Cognitive Computing",
       "academic_standards": [
         {
           "framework": "Luminous Dynamics",
           "code": "SYM-101",
-          "description": "Introduction to Consciousness Computing",
+          "description": "Introduction to Cognitive Computing",
           "grade_level": "Undergraduate"
         }
       ],
@@ -31288,7 +31288,7 @@
       "description": "16,384-dimensional binary and continuous hypervectors. Encoding (random indexing, spatial, temporal), binding (XOR/Hadamard), bundling (majority/sum), similarity (Hamming/cosine). Holographic reduced representations. Applications to classification, reasoning, and memory.",
       "node_type": "Course",
       "difficulty": "Intermediate",
-      "domain": "Consciousness Computing",
+      "domain": "Cognitive Computing",
       "subdomain": "Symthaea",
       "tags": [
         "hdc",
@@ -31302,7 +31302,7 @@
         "Undergraduate"
       ],
       "bloom_level": "Apply",
-      "subject_area": "Consciousness Computing",
+      "subject_area": "Cognitive Computing",
       "academic_standards": [
         {
           "framework": "Luminous Dynamics",
@@ -31320,7 +31320,7 @@
       "description": "Tononi's IIT axioms and postulates. Phi as a measure of consciousness. Exclusion, composition, information. Computational challenges of exact Phi. Approximations and surrogates. Practical measurement in artificial systems.",
       "node_type": "Course",
       "difficulty": "Intermediate",
-      "domain": "Consciousness Computing",
+      "domain": "Cognitive Computing",
       "subdomain": "Symthaea",
       "tags": [
         "iit",
@@ -31333,7 +31333,7 @@
         "Undergraduate"
       ],
       "bloom_level": "Analyze",
-      "subject_area": "Consciousness Computing",
+      "subject_area": "Cognitive Computing",
       "academic_standards": [
         {
           "framework": "Luminous Dynamics",
@@ -31351,7 +31351,7 @@
       "description": "Closed-form continuous-depth neural networks. ODE-based neurons with learned time constants. CfC as a closed-form approximation eliminating numerical ODE solving. Temporal processing, causal reasoning, and the unified HDC-LTC neuron.",
       "node_type": "Course",
       "difficulty": "Advanced",
-      "domain": "Consciousness Computing",
+      "domain": "Cognitive Computing",
       "subdomain": "Symthaea",
       "tags": [
         "cfc",
@@ -31365,7 +31365,7 @@
         "Undergraduate"
       ],
       "bloom_level": "Analyze",
-      "subject_area": "Consciousness Computing",
+      "subject_area": "Cognitive Computing",
       "academic_standards": [
         {
           "framework": "Luminous Dynamics",
@@ -31383,7 +31383,7 @@
       "description": "The Free Energy Principle (Friston). Predictive coding, prediction error minimization. Active inference as perception-action loops. Variational free energy and the Markov blanket. Applications to embodied cognition and autonomous behavior.",
       "node_type": "Course",
       "difficulty": "Advanced",
-      "domain": "Consciousness Computing",
+      "domain": "Cognitive Computing",
       "subdomain": "Symthaea",
       "tags": [
         "active-inference",
@@ -31396,7 +31396,7 @@
         "Undergraduate"
       ],
       "bloom_level": "Analyze",
-      "subject_area": "Consciousness Computing",
+      "subject_area": "Cognitive Computing",
       "academic_standards": [
         {
           "framework": "Luminous Dynamics",
@@ -31414,7 +31414,7 @@
       "description": "Symthaea's core architecture: Perception \u2192 HDC Encode \u2192 CfC Evolve \u2192 Predict \u2192 Learn \u2192 Consciousness Measure \u2192 Moral Evaluation \u2192 Action. Rayon-parallel post-processing. 31 Hz measured throughput. CycleMetadata telemetry. Sub-struct organization.",
       "node_type": "Course",
       "difficulty": "Expert",
-      "domain": "Consciousness Computing",
+      "domain": "Cognitive Computing",
       "subdomain": "Symthaea",
       "tags": [
         "cognitive-loop",
@@ -31428,7 +31428,7 @@
         "Graduate"
       ],
       "bloom_level": "Evaluate",
-      "subject_area": "Consciousness Computing",
+      "subject_area": "Cognitive Computing",
       "academic_standards": [
         {
           "framework": "Luminous Dynamics",
@@ -31446,7 +31446,7 @@
       "description": "16 deontological obligations (8 perfect + 8 imperfect). Duty satisfaction scoring. Restorative justice tracking. Ahimsa courage gate. Moral topology with homological analysis. Hendrycks ETHICS 92.9% accuracy. Consciousness-coupled moral drift detection.",
       "node_type": "Course",
       "difficulty": "Expert",
-      "domain": "Consciousness Computing",
+      "domain": "Cognitive Computing",
       "subdomain": "Symthaea",
       "tags": [
         "moral-algebra",
@@ -31460,7 +31460,7 @@
         "Graduate"
       ],
       "bloom_level": "Evaluate",
-      "subject_area": "Consciousness Computing",
+      "subject_area": "Cognitive Computing",
       "academic_standards": [
         {
           "framework": "Luminous Dynamics",
@@ -31478,7 +31478,7 @@
       "description": "Thought-to-text generation via 43-channel ThoughtEncoder. 15 Epistemic Cube channels. HDC binding \u2192 autoregressive generation. Per-axis EpistemicCubeGate. Epistemic gating physically prevents hallucination at logit level. GPU training via candle CUDA.",
       "node_type": "Course",
       "difficulty": "Expert",
-      "domain": "Consciousness Computing",
+      "domain": "Cognitive Computing",
       "subdomain": "Symthaea",
       "tags": [
         "broca",
@@ -31491,7 +31491,7 @@
         "Graduate"
       ],
       "bloom_level": "Create",
-      "subject_area": "Consciousness Computing",
+      "subject_area": "Cognitive Computing",
       "academic_standards": [
         {
           "framework": "Luminous Dynamics",
@@ -31509,7 +31509,7 @@
       "description": "Multiple realizability thesis. 8 substrate types (biological, silicon, quantum, photonic, neuromorphic, biochemical, hybrid, exotic). 9-dimensional feasibility scoring. Validation framework with honest confidence. Per-region hybrid substrate modeling. Energy budgets and tau-factor speed modulation.",
       "node_type": "Course",
       "difficulty": "Expert",
-      "domain": "Consciousness Computing",
+      "domain": "Cognitive Computing",
       "subdomain": "Symthaea",
       "tags": [
         "substrate-independence",
@@ -31522,7 +31522,7 @@
         "Doctoral"
       ],
       "bloom_level": "Create",
-      "subject_area": "Consciousness Computing",
+      "subject_area": "Cognitive Computing",
       "academic_standards": [
         {
           "framework": "Luminous Dynamics",
@@ -31540,7 +31540,7 @@
       "description": "Maxwell Demon (attention), Landauer (memory cost), Carnot (efficiency), Onsager (coupling health), Jarzynski (free energy validation), Prigogine (entropy enforcement). 6 active feedback loops. ThermodynamicPhysicsBridge coupling consciousness to physics.",
       "node_type": "Course",
       "difficulty": "Expert",
-      "domain": "Consciousness Computing",
+      "domain": "Cognitive Computing",
       "subdomain": "Symthaea",
       "tags": [
         "thermodynamics",
@@ -31554,7 +31554,7 @@
         "Doctoral"
       ],
       "bloom_level": "Create",
-      "subject_area": "Consciousness Computing",
+      "subject_area": "Cognitive Computing",
       "academic_standards": [
         {
           "framework": "Luminous Dynamics",
@@ -67703,14 +67703,14 @@
       "to": "MYC-501",
       "edge_type": "Requires",
       "strength_permille": 900,
-      "rationale": "Consciousness Gating requires MYC-301"
+      "rationale": "Epistemic Gating requires MYC-301"
     },
     {
       "from": "MYC-302",
       "to": "MYC-501",
       "edge_type": "Requires",
       "strength_permille": 900,
-      "rationale": "Consciousness Gating requires MYC-302"
+      "rationale": "Epistemic Gating requires MYC-302"
     },
     {
       "from": "MYC-202",
@@ -67738,7 +67738,7 @@
       "to": "RUST-301",
       "edge_type": "Requires",
       "strength_permille": 900,
-      "rationale": "Rust for Consciousness Computing requires RUST-201"
+      "rationale": "Rust for Cognitive Computing requires RUST-201"
     },
     {
       "from": "NIX-101",

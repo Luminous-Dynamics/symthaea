@@ -67,14 +67,14 @@ impl Harmony {
     /// The color this harmony manifests as in the environment.
     pub fn color(&self) -> Color {
         match self {
-            Self::ResonantCoherence => Color::srgb(0.9, 0.85, 0.6),        // warm gold
-            Self::PanSentientFlourishing => Color::srgb(0.4, 0.9, 0.5),    // verdant green
-            Self::IntegralWisdom => Color::srgb(0.5, 0.6, 0.9),            // deep blue
-            Self::InfinitePlay => Color::srgb(0.9, 0.5, 0.8),              // playful magenta
+            Self::ResonantCoherence => Color::srgb(0.9, 0.85, 0.6), // warm gold
+            Self::PanSentientFlourishing => Color::srgb(0.4, 0.9, 0.5), // verdant green
+            Self::IntegralWisdom => Color::srgb(0.5, 0.6, 0.9),     // deep blue
+            Self::InfinitePlay => Color::srgb(0.9, 0.5, 0.8),       // playful magenta
             Self::UniversalInterconnectedness => Color::srgb(0.3, 0.8, 0.8), // teal
-            Self::SacredReciprocity => Color::srgb(0.9, 0.7, 0.4),         // amber
-            Self::EvolutionaryProgression => Color::srgb(0.6, 0.9, 0.3),   // lime
-            Self::SacredStillness => Color::srgb(0.95, 0.9, 0.7),          // soft white-gold
+            Self::SacredReciprocity => Color::srgb(0.9, 0.7, 0.4),  // amber
+            Self::EvolutionaryProgression => Color::srgb(0.6, 0.9, 0.3), // lime
+            Self::SacredStillness => Color::srgb(0.95, 0.9, 0.7),   // soft white-gold
         }
     }
 
@@ -164,14 +164,18 @@ pub fn harmony_update_system(
 
     // Compute dominant and total
     harmony.total_energy = harmony.activations.iter().sum();
-    let (max_idx, max_val) = harmony.activations.iter().enumerate()
-        .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
-        .unwrap();
-    harmony.dominant = if *max_val > 0.3 {
-        Some(Harmony::ALL[max_idx])
-    } else {
-        None
-    };
+    harmony.dominant = harmony
+        .activations
+        .iter()
+        .enumerate()
+        .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+        .and_then(|(max_idx, max_val)| {
+            if *max_val > 0.3 {
+                Some(Harmony::ALL[max_idx])
+            } else {
+                None
+            }
+        });
 
     // Sacred Stillness sanctuary: active when stillness > 0.6 and total energy > 2.0
     harmony.is_sanctuary = harmony.activations[7] > 0.6 && harmony.total_energy > 2.0;
@@ -184,10 +188,14 @@ pub fn harmony_visual_system(
     mut tiles: Query<(&Transform, &mut Sprite, &Tile), Without<Player>>,
     time: Res<Time>,
 ) {
-    let Ok(player_tf) = player.single() else { return };
+    let Ok(player_tf) = player.single() else {
+        return;
+    };
     let player_pos = player_tf.translation.truncate();
 
-    let Some(dominant) = harmony.dominant else { return };
+    let Some(dominant) = harmony.dominant else {
+        return;
+    };
     let harmony_color = dominant.color();
     let intensity = harmony.activations[dominant.index()];
 
@@ -195,7 +203,9 @@ pub fn harmony_visual_system(
     let radius = 120.0 + intensity * 80.0; // 120-200px
 
     for (tile_tf, mut sprite, tile) in &mut tiles {
-        if !tile.walkable { continue; }
+        if !tile.walkable {
+            continue;
+        }
 
         let tile_pos = tile_tf.translation.truncate();
         let dist = player_pos.distance(tile_pos);
@@ -208,8 +218,18 @@ pub fn harmony_visual_system(
             let pulse = 1.0 + (time.elapsed_secs() * 1.5 + dist * 0.01).sin() * 0.1;
 
             let base = Color::srgb(0.22, 0.22, 0.30); // floor color
-            let Srgba { red: br, green: bg, blue: bb, .. } = base.to_srgba();
-            let Srgba { red: hr, green: hg, blue: hb, .. } = harmony_color.to_srgba();
+            let Srgba {
+                red: br,
+                green: bg,
+                blue: bb,
+                ..
+            } = base.to_srgba();
+            let Srgba {
+                red: hr,
+                green: hg,
+                blue: hb,
+                ..
+            } = harmony_color.to_srgba();
 
             sprite.color = Color::srgb(
                 (br * (1.0 - blend) + hr * blend * pulse).clamp(0.0, 1.0),
@@ -221,10 +241,7 @@ pub fn harmony_visual_system(
 }
 
 /// Sanctuary mechanic: Sacred Stillness rooms make you invisible to the Leviathan.
-pub fn sanctuary_system(
-    harmony: Res<LocalHarmonyState>,
-    mut leviathan: ResMut<LeviathanState>,
-) {
+pub fn sanctuary_system(harmony: Res<LocalHarmonyState>, mut leviathan: ResMut<LeviathanState>) {
     if harmony.is_sanctuary {
         // Suppress noise accumulation while in sanctuary
         leviathan.noise_accumulator *= 0.95;

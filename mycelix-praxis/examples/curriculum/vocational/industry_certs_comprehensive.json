@@ -1,0 +1,123 @@
+{
+  "metadata": {
+    "title": "Comprehensive Professional Seed: specialized Readiness",
+    "framework": "Global Comprehensive Mesh",
+    "source": "https://mycelix.org/certs-comprehensive",
+    "grade_level": "Professional",
+    "subject_area": "Multi-Sector",
+    "domain": "Professional Certification",
+    "version": "1.0",
+    "total_standards": 10,
+    "domains": [
+      "Information Auditing",
+      "Creative Strategy",
+      "Clinical Support",
+      "Sustainability Excellence",
+      "Financial Planning"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Ensuring expert-level readiness across specialized professional sectors."
+  },
+  "nodes": [
+    {
+      "id": "CERT-IT-ISACA-CISA",
+      "title": "ISACA CISA (Information Systems Auditor)",
+      "description": "Standard for auditing, control, and security of information systems. Mapping the Symthaea Auditor and EML backend to global IT audit standards.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Information Auditing",
+      "subdomain": "Certification Bridge",
+      "tags": ["isaca", "cisa", "audit", "standard"],
+      "estimated_hours": 150,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "CERT-MKT-META-STRATEGY",
+      "title": "Meta Certified Creative Strategy Professional",
+      "description": "Designing effective creative briefs and campaign strategies. Mapping conceptual blending and semantic reach to Meta's creative standards.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Creative Strategy",
+      "subdomain": "Certification Bridge",
+      "tags": ["meta", "marketing", "strategy", "standard"],
+      "estimated_hours": 45,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Social Studies"
+    },
+    {
+      "id": "CERT-HLTH-NHA-CCMA",
+      "title": "NHA Certified Clinical Medical Assistant (CCMA)",
+      "description": "Clinical and administrative medical assistant tasks. Patient intake, pharmacology, and clinical procedures. Linked to Bioregional Vitality.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Clinical Support",
+      "subdomain": "Certification Bridge",
+      "tags": ["healthcare", "ccma", "medical", "standard"],
+      "estimated_hours": 180,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Health Sciences"
+    },
+    {
+      "id": "CERT-SUST-ISSP-SEA",
+      "title": "ISSP Sustainability Excellence Associate (SEA)",
+      "description": "Foundational knowledge of sustainability. Social, economic, and environmental stewardship principles. Linked to the collective flourishing tracks.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Sustainability Excellence",
+      "subdomain": "Certification Bridge",
+      "tags": ["issp", "sustainability", "stewardship", "standard"],
+      "estimated_hours": 40,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Understand",
+      "subject_area": "Science"
+    },
+    {
+      "id": "CERT-FIN-CFP-FOUNDATION",
+      "title": "CFP: Financial Planning Fundamentals",
+      "description": "The logic of financial planning. Risk management, retirement planning, and professional ethics. Mapping sovereign risk-commoning to CFP standards.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Financial Planning",
+      "subdomain": "Certification Bridge",
+      "tags": ["finance", "cfp", "planning", "standard"],
+      "estimated_hours": 90,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Social Studies"
+    }
+  ],
+  "edges": [
+    {
+      "from": "IT-SEC-201",
+      "to": "CERT-IT-ISACA-CISA",
+      "edge_type": "Recommended",
+      "strength_permille": 800,
+      "rationale": "Mesh immunity and defensive logic provide the foundation for ISACA auditing domains."
+    },
+    {
+      "from": "HUM-LANG-301",
+      "to": "CERT-MKT-META-STRATEGY",
+      "edge_type": "Recommended",
+      "strength_permille": 700,
+      "rationale": "Conceptual blending mastery maps directly to the creative strategy domains of Meta."
+    },
+    {
+      "from": "VITA-CAP-01",
+      "to": "CERT-HLTH-NHA-CCMA",
+      "edge_type": "Recommended",
+      "strength_permille": 850,
+      "rationale": "Community health stewardship satisfies the majority of clinical assistant field-requirements."
+    },
+    {
+      "from": "HUM-CAP-02",
+      "to": "CERT-SUST-ISSP-SEA",
+      "edge_type": "Recommended",
+      "strength_permille": 900,
+      "rationale": "Completing a flourishing masterpiece capstone is the practical fulfillment of the ISSP sustainability framework."
+    }
+  ]
+}

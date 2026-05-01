@@ -4,7 +4,7 @@
 //! Dark/light theme toggle (#9).
 
 use leptos::prelude::*;
-use mail_leptos_types::{Theme, Density};
+use mail_leptos_types::{Density, Theme};
 
 const STORAGE_KEY: &str = "mycelix_mail_theme";
 const DENSITY_KEY: &str = "mycelix_mail_density";
@@ -49,9 +49,7 @@ pub fn provide_theme_context() {
     Effect::new(move |_| {
         let theme = state.current.get();
         apply_theme(theme);
-        if let Some(storage) = web_sys::window()
-            .and_then(|w| w.local_storage().ok().flatten())
-        {
+        if let Some(storage) = web_sys::window().and_then(|w| w.local_storage().ok().flatten()) {
             let _ = storage.set_item(STORAGE_KEY, theme.data_attr());
         }
     });
@@ -59,9 +57,7 @@ pub fn provide_theme_context() {
     Effect::new(move |_| {
         let density = state.density.get();
         apply_density(density);
-        if let Some(storage) = web_sys::window()
-            .and_then(|w| w.local_storage().ok().flatten())
-        {
+        if let Some(storage) = web_sys::window().and_then(|w| w.local_storage().ok().flatten()) {
             let _ = storage.set_item(DENSITY_KEY, density.data_attr());
         }
     });
@@ -94,7 +90,11 @@ fn check_auto_theme_schedule(state: ThemeState) {
     if auto_enabled {
         let hour = js_sys::Date::new_0().get_hours();
         // Dark after 19:00, light during day (7:00-19:00)
-        let target = if hour >= 19 || hour < 7 { Theme::Dark } else { Theme::Light };
+        let target = if hour >= 19 || hour < 7 {
+            Theme::Dark
+        } else {
+            Theme::Light
+        };
         if state.current.get_untracked() != target {
             state.current.set(target);
         }

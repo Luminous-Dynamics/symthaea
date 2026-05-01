@@ -216,7 +216,11 @@ impl SovereignProfile {
 
     /// Sanitize a single dimension value: NaN/Inf → 0.0, then clamp [0.0, 1.0].
     fn sanitize(v: f64) -> f64 {
-        if v.is_finite() { v.clamp(0.0, 1.0) } else { 0.0 }
+        if v.is_finite() {
+            v.clamp(0.0, 1.0)
+        } else {
+            0.0
+        }
     }
 
     /// Combined score using the given dimension weights.
@@ -387,9 +391,7 @@ pub fn civic_requirement_basic() -> CivicRequirement {
 pub fn civic_requirement_proposal() -> CivicRequirement {
     CivicRequirement {
         min_tier: CivicTier::Participant,
-        min_dimensions: vec![
-            (SovereignDimension::EpistemicIntegrity, 0.25),
-        ],
+        min_dimensions: vec![(SovereignDimension::EpistemicIntegrity, 0.25)],
     }
 }
 
@@ -397,9 +399,7 @@ pub fn civic_requirement_proposal() -> CivicRequirement {
 pub fn civic_requirement_voting() -> CivicRequirement {
     CivicRequirement {
         min_tier: CivicTier::Citizen,
-        min_dimensions: vec![
-            (SovereignDimension::EpistemicIntegrity, 0.25),
-        ],
+        min_dimensions: vec![(SovereignDimension::EpistemicIntegrity, 0.25)],
     }
 }
 

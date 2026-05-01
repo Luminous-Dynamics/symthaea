@@ -28,15 +28,10 @@ use leptos::prelude::*;
 /// // }
 /// ```
 #[component]
-pub fn AppErrorBoundary(
-    children: Children,
-) -> impl IntoView {
+pub fn AppErrorBoundary(children: Children) -> impl IntoView {
     let fallback = move |errors: ArcRwSignal<Errors>| {
-        let error_messages: Vec<String> = errors
-            .read()
-            .iter()
-            .map(|(_, e)| e.to_string())
-            .collect();
+        let error_messages: Vec<String> =
+            errors.read().iter().map(|(_, e)| e.to_string()).collect();
 
         let errors_clone = errors.clone();
 

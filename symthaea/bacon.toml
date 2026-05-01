@@ -1,0 +1,17 @@
+default_job = "check-symthaea-core"
+
+[jobs.check-symthaea-core]
+command = ["cargo", "check", "-p", "symthaea-core", "--all-targets"]
+need_stdout = false
+
+[jobs.check-workspace]
+command = ["cargo", "check", "--workspace", "--all-targets"]
+need_stdout = false
+
+[jobs.test-core]
+command = ["cargo", "nextest", "run", "-p", "symthaea-core", "--lib"]
+need_stdout = true
+
+[jobs.test-eml-egraph]
+command = ["cargo", "test", "-p", "symthaea-eml-egraph"]
+need_stdout = true

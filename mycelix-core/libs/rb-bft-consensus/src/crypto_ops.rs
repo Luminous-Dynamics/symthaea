@@ -45,17 +45,17 @@
 //!        Commit
 //! ```
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
-use crate::error::{ConsensusError, ConsensusResult};
+use crate::batch::{BatchVerificationResult, BatchVerifier};
 use crate::crypto::{ConsensusSignature, ValidatorKeypair};
+use crate::error::{ConsensusError, ConsensusResult};
 use crate::vote::Vote;
 use crate::vrf::{VrfKeypair, VrfOutput, VrfPublicKey};
-use crate::batch::{BatchVerifier, BatchVerificationResult};
 
 #[cfg(feature = "bls")]
-use crate::bls::{BlsKeypair, BlsPublicKey, BlsSignature, BlsAggregateSignature, DST_VOTE};
+use crate::bls::{BlsAggregateSignature, BlsKeypair, BlsPublicKey, BlsSignature, DST_VOTE};
 
 /// Validator cryptographic identity combining all key types
 #[derive(Debug)]
@@ -156,10 +156,12 @@ impl LeaderElectionResult {
 
     /// Verify weighted election (lowest VRF/reputation² wins)
     fn verify_weighted(&self, weights: &HashMap<String, f64>) -> ConsensusResult<()> {
-        let leader_rep = weights.get(&self.leader_id)
-            .ok_or_else(|| ConsensusError::InvalidSignature {
-                reason: format!("Missing reputation weight for leader {}", self.leader_id),
-            })?;
+        let leader_rep =
+            weights
+                .get(&self.leader_id)
+                .ok_or_else(|| ConsensusError::InvalidSignature {
+                    reason: format!("Missing reputation weight for leader {}", self.leader_id),
+                })?;
 
         if *leader_rep <= 0.0 {
             return Err(ConsensusError::InvalidSignature {
@@ -262,11 +264,15 @@ pub fn elect_leader_vrf_weighted(
         .iter()
         .zip(all_outputs.iter())
         .filter(|((_, _, rep), _)| *rep > 0.0)
-        .min_by(|((_, _, rep_a), (_, _, out_a)), ((_, _, rep_b), (_, _, out_b))| {
-            let priority_a = out_a.output_as_f64() / (rep_a * rep_a);
-            let priority_b = out_b.output_as_f64() / (rep_b * rep_b);
-            priority_a.partial_cmp(&priority_b).unwrap_or(std::cmp::Ordering::Equal)
-        })
+        .min_by(
+            |((_, _, rep_a), (_, _, out_a)), ((_, _, rep_b), (_, _, out_b))| {
+                let priority_a = out_a.output_as_f64() / (rep_a * rep_a);
+                let priority_b = out_b.output_as_f64() / (rep_b * rep_b);
+                priority_a
+                    .partial_cmp(&priority_b)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            },
+        )
         .map(|(_, (id, pk, out))| (id.clone(), pk.clone(), out.clone()))
         .ok_or(ConsensusError::InsufficientValidators { have: 0, need: 1 })?;
 
@@ -304,14 +310,20 @@ pub fn batch_verify_vote_signatures(
             });
         }
 
-        let pubkey: [u8; 32] = vote.signature.signer_pubkey.as_slice()
-            .try_into()
-            .map_err(|_| ConsensusError::InvalidVote {
-                validator: vote.voter.clone(),
-                reason: "Invalid public key size".to_string(),
-            })?;
+        let pubkey: [u8; 32] =
+            vote.signature
+                .signer_pubkey
+                .as_slice()
+                .try_into()
+                .map_err(|_| ConsensusError::InvalidVote {
+                    validator: vote.voter.clone(),
+                    reason: "Invalid public key size".to_string(),
+                })?;
 
-        let sig: [u8; 64] = vote.signature.signature.as_slice()
+        let sig: [u8; 64] = vote
+            .signature
+            .signature
+            .as_slice()
             .try_into()
             .map_err(|_| ConsensusError::InvalidVote {
                 validator: vote.voter.clone(),
@@ -401,21 +413,25 @@ pub fn aggregate_vote_signatures(
         });
     }
 
-    let signatures: Vec<BlsSignature> = vote_signatures.iter()
+    let signatures: Vec<BlsSignature> = vote_signatures
+        .iter()
         .map(|vs| vs.signature.clone())
         .collect();
 
     let aggregate_signature = crate::bls::aggregate_signatures(&signatures)?;
 
-    let signer_pubkeys: Vec<BlsPublicKey> = vote_signatures.iter()
+    let signer_pubkeys: Vec<BlsPublicKey> = vote_signatures
+        .iter()
         .map(|vs| vs.bls_pubkey.clone())
         .collect();
 
-    let signer_ids: Vec<String> = vote_signatures.iter()
+    let signer_ids: Vec<String> = vote_signatures
+        .iter()
         .map(|vs| vs.validator_id.clone())
         .collect();
 
-    let total_weight: f32 = vote_signatures.iter()
+    let total_weight: f32 = vote_signatures
+        .iter()
         .filter(|vs| vs.approve)
         .map(|vs| vs.weight)
         .sum();
@@ -461,7 +477,8 @@ impl CommitProof {
             .map(|v| (v.voter.clone(), v.signature.clone()))
             .collect();
 
-        let total_weight: f32 = votes.iter()
+        let total_weight: f32 = votes
+            .iter()
             .filter(|v| v.decision.is_approval())
             .map(|v| v.reputation.powi(2))
             .sum();
@@ -490,22 +507,23 @@ impl CommitProof {
         let mut batch = BatchVerifier::with_capacity(self.signatures.len());
 
         for (validator_id, sig) in &self.signatures {
-            let message = vote_messages.get(validator_id)
-                .ok_or_else(|| ConsensusError::InvalidSignature {
+            let message = vote_messages.get(validator_id).ok_or_else(|| {
+                ConsensusError::InvalidSignature {
                     reason: format!("Missing message for validator {}", validator_id),
-                })?;
+                }
+            })?;
 
-            let pubkey: [u8; 32] = sig.signer_pubkey.as_slice()
-                .try_into()
-                .map_err(|_| ConsensusError::InvalidSignature {
+            let pubkey: [u8; 32] = sig.signer_pubkey.as_slice().try_into().map_err(|_| {
+                ConsensusError::InvalidSignature {
                     reason: "Invalid public key size".to_string(),
-                })?;
+                }
+            })?;
 
-            let signature: [u8; 64] = sig.signature.as_slice()
-                .try_into()
-                .map_err(|_| ConsensusError::InvalidSignature {
+            let signature: [u8; 64] = sig.signature.as_slice().try_into().map_err(|_| {
+                ConsensusError::InvalidSignature {
                     reason: "Invalid signature size".to_string(),
-                })?;
+                }
+            })?;
 
             batch.add_signature_labeled(&pubkey, &signature, message, validator_id.clone());
         }
@@ -555,17 +573,18 @@ impl CommitProof {
 ///
 /// This allows validators to provide both ed25519 and BLS signatures for their votes.
 #[cfg(feature = "bls")]
-pub fn sign_vote_bls(
-    vote: &Vote,
-    bls_keypair: &BlsKeypair,
-) -> BlsVoteSignature {
+pub fn sign_vote_bls(vote: &Vote, bls_keypair: &BlsKeypair) -> BlsVoteSignature {
     // Create the message to sign (same as ed25519 but for BLS domain)
     let message = format!(
         "vote:{}:{}:{}:{}",
         vote.round,
         vote.proposal_id,
         vote.voter,
-        if vote.decision.is_approval() { "approve" } else { "reject" }
+        if vote.decision.is_approval() {
+            "approve"
+        } else {
+            "reject"
+        }
     );
 
     BlsVoteSignature {
@@ -746,10 +765,8 @@ mod tests {
             .map(|i| (format!("validator_{}", i), VrfKeypair::generate()))
             .collect();
 
-        let validator_refs: Vec<(String, &VrfKeypair)> = validators
-            .iter()
-            .map(|(id, kp)| (id.clone(), kp))
-            .collect();
+        let validator_refs: Vec<(String, &VrfKeypair)> =
+            validators.iter().map(|(id, kp)| (id.clone(), kp)).collect();
 
         let result = elect_leader_vrf(42, &validator_refs).unwrap();
 
@@ -801,12 +818,7 @@ mod tests {
     #[test]
     fn test_commit_proof_from_votes() {
         let keypair = ValidatorKeypair::generate();
-        let mut vote = Vote::approve(
-            "proposal-123".to_string(),
-            1,
-            keypair.public_key_hex(),
-            0.8,
-        );
+        let mut vote = Vote::approve("proposal-123".to_string(), 1, keypair.public_key_hex(), 0.8);
         vote.sign(&keypair).unwrap();
 
         let proof = CommitProof::from_votes(1, "proposal-hash".to_string(), &[vote]);
@@ -888,18 +900,13 @@ mod tests {
     #[test]
     fn test_build_commit_proof_with_bls() {
         // Create validators and collect their IDs first
-        let ed_keypairs: Vec<ValidatorKeypair> = (0..5)
-            .map(|_| ValidatorKeypair::generate())
-            .collect();
+        let ed_keypairs: Vec<ValidatorKeypair> =
+            (0..5).map(|_| ValidatorKeypair::generate()).collect();
 
-        let ids: Vec<String> = ed_keypairs.iter()
-            .map(|kp| kp.public_key_hex())
-            .collect();
+        let ids: Vec<String> = ed_keypairs.iter().map(|kp| kp.public_key_hex()).collect();
 
         // Create BLS keypairs separately (can't clone them for security)
-        let bls_keypairs_vec: Vec<BlsKeypair> = (0..5)
-            .map(|_| BlsKeypair::generate())
-            .collect();
+        let bls_keypairs_vec: Vec<BlsKeypair> = (0..5).map(|_| BlsKeypair::generate()).collect();
 
         // Build the hashmap by moving keypairs
         let mut bls_keypairs: HashMap<String, BlsKeypair> = HashMap::new();
@@ -910,23 +917,16 @@ mod tests {
         // Create and sign votes
         let mut votes: Vec<Vote> = Vec::new();
         for ed_kp in &ed_keypairs {
-            let mut vote = Vote::approve(
-                "proposal-123".to_string(),
-                1,
-                ed_kp.public_key_hex(),
-                0.8,
-            );
+            let mut vote =
+                Vote::approve("proposal-123".to_string(), 1, ed_kp.public_key_hex(), 0.8);
             vote.sign(ed_kp).unwrap();
             votes.push(vote);
         }
 
         // Build commit proof with BLS
-        let proof = build_commit_proof_with_bls(
-            1,
-            "proposal-123".to_string(),
-            &votes,
-            Some(&bls_keypairs),
-        ).unwrap();
+        let proof =
+            build_commit_proof_with_bls(1, "proposal-123".to_string(), &votes, Some(&bls_keypairs))
+                .unwrap();
 
         assert_eq!(proof.round, 1);
         assert_eq!(proof.signer_count, 5);
@@ -941,12 +941,7 @@ mod tests {
     #[test]
     fn test_consensus_commit() {
         let keypair = ValidatorKeypair::generate();
-        let mut vote = Vote::approve(
-            "proposal-123".to_string(),
-            1,
-            keypair.public_key_hex(),
-            0.8,
-        );
+        let mut vote = Vote::approve("proposal-123".to_string(), 1, keypair.public_key_hex(), 0.8);
         vote.sign(&keypair).unwrap();
 
         let proof = CommitProof::from_votes(1, "proposal-123".to_string(), &[vote]);
@@ -969,12 +964,7 @@ mod tests {
     #[test]
     fn test_commit_proof_size_estimation() {
         let keypair = ValidatorKeypair::generate();
-        let mut vote = Vote::approve(
-            "proposal-123".to_string(),
-            1,
-            keypair.public_key_hex(),
-            0.8,
-        );
+        let mut vote = Vote::approve("proposal-123".to_string(), 1, keypair.public_key_hex(), 0.8);
         vote.sign(&keypair).unwrap();
 
         let proof = CommitProof::from_votes(1, "proposal-123".to_string(), &[vote]);

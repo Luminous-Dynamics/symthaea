@@ -17,7 +17,7 @@ nalgebra = "0.34"
 # truth observation streams. Example-only; not part of the library API.
 [dev-dependencies]
 symthaea-core = { path = "../../../symthaea/symthaea-core" }
-symthaea-flight = { path = "../../../symthaea/crates/symthaea-flight" }
+symthaea-multirotor = { path = "../../../symthaea/crates/symthaea-multirotor" }
 symthaea-manipulator = { path = "../../../symthaea/crates/symthaea-manipulator" }
 symthaea-helicopter = { path = "../../../symthaea/crates/symthaea-helicopter" }
 symthaea-auv = { path = "../../../symthaea/crates/symthaea-auv" }

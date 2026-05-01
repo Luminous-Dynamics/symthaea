@@ -300,7 +300,11 @@ impl ModelDescriptor {
         Self {
             model_id: model.model_id().to_string(),
             display_name: model.display_name().to_string(),
-            dimension_names: model.dimension_names().iter().map(|s| s.to_string()).collect(),
+            dimension_names: model
+                .dimension_names()
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
             weights: model.weights().to_vec(),
             lambda: model.decay_lambda(),
             registered_at,
@@ -334,8 +338,8 @@ impl ModelDescriptor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::constitutional_envelope::score_to_tier;
     use crate::consciousness_profile::ConsciousnessTier;
+    use crate::constitutional_envelope::score_to_tier;
 
     // ---- Canonical 4D ----
 
@@ -358,11 +362,7 @@ mod tests {
         // I=0.8, R=0.6, C=0.7, E=0.5
         let score = model.compute_score(&[0.8, 0.6, 0.7, 0.5]);
         // 0.8*0.25 + 0.6*0.25 + 0.7*0.30 + 0.5*0.20 = 0.20+0.15+0.21+0.10 = 0.66
-        assert!(
-            (score - 0.66).abs() < 1e-6,
-            "Expected 0.66, got {}",
-            score
-        );
+        assert!((score - 0.66).abs() < 1e-6, "Expected 0.66, got {}", score);
         assert_eq!(score_to_tier(score), ConsciousnessTier::Steward);
     }
 
@@ -471,7 +471,10 @@ mod tests {
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
             .unwrap()
             .0;
-        assert_eq!(max_idx, 1, "Energy preset should weight Thermodynamic Yield highest");
+        assert_eq!(
+            max_idx, 1,
+            "Energy preset should weight Thermodynamic Yield highest"
+        );
     }
 
     // ---- Minimal Civic ----
@@ -492,11 +495,7 @@ mod tests {
         let model = MinimalCivic::default();
         let score = model.compute_score(&[0.8, 0.6, 0.5]);
         // 0.8*0.35 + 0.6*0.35 + 0.5*0.30 = 0.28+0.21+0.15 = 0.64
-        assert!(
-            (score - 0.64).abs() < 1e-6,
-            "Expected 0.64, got {}",
-            score
-        );
+        assert!((score - 0.64).abs() < 1e-6, "Expected 0.64, got {}", score);
     }
 
     // ---- Model Descriptor ----
@@ -595,7 +594,8 @@ mod tests {
             let zeros = vec![0.0; model.dimension_count()];
             let score = model.compute_score(&zeros);
             assert_eq!(
-                score, 0.0,
+                score,
+                0.0,
                 "Model '{}' should return 0.0 for zero input",
                 model.model_id()
             );
@@ -625,7 +625,10 @@ mod tests {
     fn sanitize_nan_dimension_produces_valid_score() {
         let model = Canonical4D::default();
         let score = model.compute_score(&[f64::NAN, 0.5, 0.5, 0.5]);
-        assert!(score.is_finite(), "NaN dimension should produce finite score");
+        assert!(
+            score.is_finite(),
+            "NaN dimension should produce finite score"
+        );
         assert!(score >= 0.0 && score <= 1.0);
     }
 }

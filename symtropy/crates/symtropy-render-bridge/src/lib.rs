@@ -1,5 +1,5 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! ND physics → Bevy rendering bridge.
 //!
@@ -16,4 +16,4 @@ pub mod projection;
 pub mod sync;
 
 pub use projection::{Projector, Projector2D, Projector3D, Projector4D};
-pub use sync::{PhysicsBody, sync_physics_2d, sync_physics_3d, sync_physics_4d};
+pub use sync::{sync_physics_2d, sync_physics_3d, sync_physics_4d, PhysicsBody};

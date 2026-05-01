@@ -128,5 +128,9 @@ impl From<CivicTier> for LegacyTier {
 }
 
 fn sanitize(v: f64) -> f64 {
-    if v.is_finite() { v.clamp(0.0, 1.0) } else { 0.0 }
+    if v.is_finite() {
+        v.clamp(0.0, 1.0)
+    } else {
+        0.0
+    }
 }

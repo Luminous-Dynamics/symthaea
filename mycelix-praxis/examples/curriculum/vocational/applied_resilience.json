@@ -1,0 +1,264 @@
+{
+  "metadata": {
+    "title": "Applied Resilience: Vocational-Technical Tracks",
+    "framework": "Mycelix Applied Resilience",
+    "source": "https://mycelix.org",
+    "grade_level": "Undergraduate/Professional",
+    "subject_area": "Applied Resilience",
+    "domain": "Applied Resilience",
+    "version": "1.0",
+    "total_standards": 10,
+    "domains": [
+      "Renewable Energy",
+      "Regenerative Agriculture",
+      "Digital Trades"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Established, high-demand vocational tracks designed for the Mycelix lifecycle."
+  },
+  "nodes": [
+    {
+      "id": "VOC-RE-101",
+      "title": "Solar PV Fundamentals",
+      "description": "Introduction to photovoltaic systems: cell physics, panel types, array sizing, and basic circuit safety. Focus on standard grid-tie and simple off-grid setups.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Renewable Energy",
+      "subdomain": "Applied Resilience",
+      "tags": ["solar", "pv", "electricity", "safety"],
+      "estimated_hours": 45,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Understand",
+      "subject_area": "Renewable Energy",
+      "industry_mappings": [
+        {
+          "framework": "ESCO",
+          "version": "1.2",
+          "code": "http://data.europa.eu/esco/occupation/777f9e8a-e99d-43c3-8e4a-4e6a8d6e3f6b",
+          "label": "solar energy technician"
+        }
+      ]
+    },
+    {
+      "id": "VOC-RE-201",
+      "title": "Off-Grid Battery Systems",
+      "description": "Deep dive into energy storage: Lithium vs Lead-Acid, Battery Management Systems (BMS), charge controllers, and inverter synchronization.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Renewable Energy",
+      "subdomain": "Applied Resilience",
+      "tags": ["battery", "bms", "off-grid", "storage"],
+      "estimated_hours": 90,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Renewable Energy"
+    },
+    {
+      "id": "VOC-RE-CAP",
+      "title": "Solar Mini-Grid Capstone",
+      "description": "Full design and commissioning of a 5kW community mini-grid. Requires integration of array, storage, and IoT monitoring.",
+      "node_type": "Capstone",
+      "difficulty": "Advanced",
+      "domain": "Renewable Energy",
+      "subdomain": "Applied Resilience",
+      "tags": ["capstone", "mini-grid", "engineering"],
+      "estimated_hours": 180,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Create",
+      "subject_area": "Renewable Energy",
+      "holonic_capstone": {
+        "required_node_ids": ["VOC-RE-101", "VOC-RE-201"],
+        "deliverable": "A functioning solar mini-grid with real-time performance telemetry broadcast over LoRa.",
+        "min_peer_endorsements": 3
+      }
+    },
+    {
+      "id": "VOC-AG-101",
+      "title": "Soil Microbiology Basics",
+      "description": "The living soil: bacteria, fungi, protozoa, and nematodes. The soil food web and its role in nutrient cycling and carbon sequestration.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Regenerative Agriculture",
+      "subdomain": "Applied Resilience",
+      "tags": ["soil", "biology", "ecology", "microbiology"],
+      "estimated_hours": 45,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Understand",
+      "subject_area": "Sustainable Agriculture",
+      "industry_mappings": [
+        {
+          "framework": "ESCO",
+          "version": "1.2",
+          "code": "http://data.europa.eu/esco/occupation/7e3a9c7b-3b3b-4f7e-8c8a-9e9e9e9e9e9e",
+          "label": "soil scientist"
+        }
+      ]
+    },
+    {
+      "id": "VOC-AG-201",
+      "title": "Permaculture Design Principles",
+      "description": "Systemic design for food security: water harvesting (swales), guild planting, zone management, and biological waste cycling.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Regenerative Agriculture",
+      "subdomain": "Applied Resilience",
+      "tags": ["permaculture", "design", "water", "food-security"],
+      "estimated_hours": 90,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Apply",
+      "subject_area": "Sustainable Agriculture"
+    },
+    {
+      "id": "VOC-AG-CAP",
+      "title": "Regenerative Plot Capstone",
+      "description": "Implementation of a restorative design on a 1/4 acre plot, showing measurable improvement in soil health and biodiversity.",
+      "node_type": "Capstone",
+      "difficulty": "Advanced",
+      "domain": "Regenerative Agriculture",
+      "subdomain": "Applied Resilience",
+      "tags": ["capstone", "regeneration", "agriculture"],
+      "estimated_hours": 180,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Create",
+      "subject_area": "Sustainable Agriculture",
+      "holonic_capstone": {
+        "required_node_ids": ["VOC-AG-101", "VOC-AG-201"],
+        "deliverable": "Documented soil health increase (ref. Symthaea Auditor) and 4-season planting plan.",
+        "min_peer_endorsements": 3
+      }
+    },
+    {
+      "id": "VOC-DT-101",
+      "title": "Digital Fabrication (CNC/3D)",
+      "description": "Additive and subtractive manufacturing fundamentals. CAD/CAM workflow, toolpath generation, and machine safety for CNC routers and 3D printers.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Digital Trades",
+      "subdomain": "Applied Resilience",
+      "tags": ["cnc", "3d-printing", "cad", "cam", "maker"],
+      "estimated_hours": 60,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Apply",
+      "subject_area": "Digital Trades"
+    },
+    {
+      "id": "VOC-DT-201",
+      "title": "SME Mutual Credit Bookkeeping",
+      "description": "Operationalizing the TEND economy: managing SME ledgers, accounts payable/receivable in mutual credit, and reputational accounting.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Digital Trades",
+      "subdomain": "Applied Resilience",
+      "tags": ["accounting", "mutual-credit", "sme", "finance"],
+      "estimated_hours": 60,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Digital Trades"
+    },
+    {
+      "id": "VOC-DT-CAP",
+      "title": "Micro-Enterprise Launch Capstone",
+      "description": "Setup and operation of a small manufacturing or service guild using Mycelix tools and TEND-based bookkeeping.",
+      "node_type": "Capstone",
+      "difficulty": "Advanced",
+      "domain": "Digital Trades",
+      "subdomain": "Applied Resilience",
+      "tags": ["capstone", "entrepreneurship", "trade"],
+      "estimated_hours": 120,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Create",
+      "subject_area": "Digital Trades",
+      "holonic_capstone": {
+        "required_node_ids": ["VOC-DT-101", "VOC-DT-201"],
+        "deliverable": "Verified guild ledger with 3+ months of transactions and a completed fabrication project.",
+        "min_peer_endorsements": 4
+      }
+    },
+    {
+      "id": "VOC-UNI-101",
+      "title": "Applied Resilience Fundamentals",
+      "description": "The intersection of energy, food, and economics. How to build and maintain sovereign community infrastructure.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Universal",
+      "subdomain": "Applied Resilience",
+      "tags": ["resilience", "universal", "sovereignty"],
+      "estimated_hours": 30,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Understand",
+      "subject_area": "Applied Resilience"
+    }
+  ],
+  "edges": [
+    {
+      "from": "VOC-RE-101",
+      "to": "VOC-RE-201",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Off-Grid storage requires understanding basic Solar PV physics."
+    },
+    {
+      "from": "VOC-RE-101",
+      "to": "VOC-RE-CAP",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Mini-grid integration requires basic PV knowledge."
+    },
+    {
+      "from": "VOC-RE-201",
+      "to": "VOC-RE-CAP",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Storage systems are the core of a functioning mini-grid."
+    },
+    {
+      "from": "VOC-AG-101",
+      "to": "VOC-AG-201",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Permaculture design is ineffective without understanding soil microbiology."
+    },
+    {
+      "from": "VOC-AG-101",
+      "to": "VOC-AG-CAP",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Soil restoration requires baseline microbial knowledge."
+    },
+    {
+      "from": "VOC-AG-201",
+      "to": "VOC-AG-CAP",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "The capstone requires applying permaculture design principles."
+    },
+    {
+      "from": "VOC-DT-101",
+      "to": "VOC-DT-CAP",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Launching a guild requires a core technical trade (Fabrication)."
+    },
+    {
+      "from": "VOC-DT-201",
+      "to": "VOC-DT-CAP",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Professional guild operation requires TEND-based bookkeeping."
+    },
+    {
+      "from": "VOC-UNI-101",
+      "to": "VOC-RE-101",
+      "edge_type": "Recommended",
+      "strength_permille": 600,
+      "rationale": "Applied resilience provides context for why solar energy matters."
+    },
+    {
+      "from": "VOC-UNI-101",
+      "to": "VOC-AG-101",
+      "edge_type": "Recommended",
+      "strength_permille": 600,
+      "rationale": "Understanding general resilience helps ground soil science."
+    }
+  ]
+}

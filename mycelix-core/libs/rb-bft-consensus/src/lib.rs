@@ -25,46 +25,46 @@
 #[cfg(test)]
 mod tests;
 
+pub mod batch;
 pub mod consensus;
 pub mod crypto;
+pub mod crypto_ops;
+pub mod error;
+pub mod network;
 pub mod proposal;
-pub mod validator;
-pub mod vote;
 pub mod round;
 pub mod slashing;
-pub mod error;
-pub mod batch;
-pub mod network;
-pub mod crypto_ops;
+pub mod validator;
+pub mod vote;
 
 // Advanced cryptographic modules
 #[cfg(feature = "bls")]
 pub mod bls;
-pub mod vrf;
 #[cfg(feature = "pq")]
 pub mod pq;
 #[cfg(feature = "threshold")]
 pub mod threshold;
+pub mod vrf;
 
+pub use batch::*;
 pub use consensus::*;
 pub use crypto::*;
+pub use crypto_ops::*;
+pub use error::*;
+pub use network::*;
 pub use proposal::*;
-pub use validator::*;
-pub use vote::*;
 pub use round::*;
 pub use slashing::*;
-pub use error::*;
-pub use batch::*;
-pub use network::*;
-pub use crypto_ops::*;
+pub use validator::*;
+pub use vote::*;
 
 #[cfg(feature = "bls")]
 pub use bls::*;
-pub use vrf::*;
 #[cfg(feature = "pq")]
 pub use pq::*;
 #[cfg(feature = "threshold")]
 pub use threshold::*;
+pub use vrf::*;
 
 use mycelix_core_types::MAX_BYZANTINE_TOLERANCE;
 

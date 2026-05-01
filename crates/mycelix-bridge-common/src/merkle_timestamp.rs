@@ -414,7 +414,9 @@ mod tests {
     #[test]
     fn four_leaves_balanced() {
         let mut builder = MerkleTimestampBuilder::new();
-        let leaves: Vec<_> = (0..4).map(|i| make_leaf(&format!("inv-{i}"), i as u64)).collect();
+        let leaves: Vec<_> = (0..4)
+            .map(|i| make_leaf(&format!("inv-{i}"), i as u64))
+            .collect();
         let hashes: Vec<_> = leaves.iter().map(|l| blake3_leaf(l)).collect();
         for l in leaves {
             builder.add_leaf(l);
@@ -432,15 +434,23 @@ mod tests {
     #[test]
     fn eight_leaves_balanced() {
         let mut builder = MerkleTimestampBuilder::new();
-        let leaves: Vec<_> = (0..8).map(|i| make_leaf(&format!("inv-{i}"), i as u64)).collect();
+        let leaves: Vec<_> = (0..8)
+            .map(|i| make_leaf(&format!("inv-{i}"), i as u64))
+            .collect();
         let hashes: Vec<_> = leaves.iter().map(|l| blake3_leaf(l)).collect();
         for l in leaves {
             builder.add_leaf(l);
         }
 
         // Manually compute balanced tree.
-        let l1: Vec<_> = hashes.chunks(2).map(|c| blake3_hash_pair(&c[0], &c[1])).collect();
-        let l2: Vec<_> = l1.chunks(2).map(|c| blake3_hash_pair(&c[0], &c[1])).collect();
+        let l1: Vec<_> = hashes
+            .chunks(2)
+            .map(|c| blake3_hash_pair(&c[0], &c[1]))
+            .collect();
+        let l2: Vec<_> = l1
+            .chunks(2)
+            .map(|c| blake3_hash_pair(&c[0], &c[1]))
+            .collect();
         let expected = blake3_hash_pair(&l2[0], &l2[1]);
 
         let root = builder.compute_root(100);

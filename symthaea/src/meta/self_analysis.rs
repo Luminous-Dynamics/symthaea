@@ -308,7 +308,7 @@ impl SelfAnalyzer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::language::code_parser::{CodeEntity, Span};
+    use crate::language::code_parser::{Entity, Span};
 
     fn test_span() -> Span {
         Span {
@@ -326,12 +326,12 @@ mod tests {
         for f in funcs {
             parsed
                 .entities
-                .push(CodeEntity::new(EntityKind::Function, *f, test_span()));
+                .push(Entity::new(EntityKind::Function, *f, test_span()));
         }
         for t in types {
             parsed
                 .entities
-                .push(CodeEntity::new(EntityKind::Struct, *t, test_span()));
+                .push(Entity::new(EntityKind::Struct, *t, test_span()));
         }
         parsed
     }

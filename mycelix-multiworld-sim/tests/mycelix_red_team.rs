@@ -102,7 +102,11 @@ fn mycelix_resilience_summarizes_5_surfaces() {
 
     // Mean should be ~0.76 — strong overall but with a clear weak surface.
     let mean = r.mean();
-    assert!(mean > 0.7 && mean < 0.85, "mean out of expected band: {}", mean);
+    assert!(
+        mean > 0.7 && mean < 0.85,
+        "mean out of expected band: {}",
+        mean
+    );
 
     // 0.3 floor excludes correction-farming; we should flag no weak surface
     // above 0.3 but fail if we raise the floor.

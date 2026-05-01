@@ -33,7 +33,7 @@ pub struct FinanceCtx {
 pub fn provide_finance_context() {
     let identity = use_local_identity();
     let config_store = use_finance_runtime_config();
-    let initial_config = config_store.get_untracked();
+    let initial_config = config_store.config.get_untracked();
     let default_dao_did = initial_config
         .dao_did
         .clone()
@@ -88,7 +88,7 @@ async fn load_runtime_discovery(
     config_store: &crate::finance_config::FinanceRuntimeConfigStore,
     member_did: &str,
 ) -> crate::finance_config::FinanceRuntimeConfig {
-    let configured = config_store.get_untracked();
+    let configured = config_store.config.get_untracked();
     if let Ok(discovered) = hc
         .call_zome_default::<_, wire::FinanceRuntimeDiscovery>(
             "finance_bridge",
@@ -98,8 +98,8 @@ async fn load_runtime_discovery(
         .await
     {
         if discovered.member_did == member_did {
-            let merged = merge_runtime_discovery(&configured, &discovered);
-            config_store.set(merged.clone());
+            let merged = merge_runtime_discovery(&discovered, &configured);
+            config_store.set_config.set(merged.clone());
             return merged;
         }
     }
@@ -140,7 +140,7 @@ async fn load_member_scoped_views(
             "get_payment_history",
             &wire::GetPaymentHistoryInput {
                 did: member_did.to_string(),
-                limit: Some(LOAD_LIMIT),
+                limit: Some(LOAD_LIMIT as u32),
             },
         )
         .await

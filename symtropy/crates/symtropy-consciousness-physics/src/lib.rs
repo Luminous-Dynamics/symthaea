@@ -28,9 +28,6 @@
 
 pub mod active_inference;
 pub mod biometrics;
-pub mod macro_bridge;
-pub mod phase_transition;
-pub mod proc_gen;
 pub mod convergence;
 pub mod coupling;
 #[cfg(feature = "consciousness-curvature")]
@@ -41,9 +38,12 @@ pub mod fep_gradient;
 pub mod harmony_field;
 #[cfg(feature = "consciousness-hdc")]
 pub mod hdc_context;
+pub mod macro_bridge;
+pub mod phase_transition;
+pub mod prey;
+pub mod proc_gen;
 #[cfg(feature = "pyphi-validation")]
 pub mod pyphi_validation;
-pub mod prey;
 pub mod safety;
 pub mod sanctuary;
 pub mod simple_field;
@@ -52,7 +52,12 @@ pub mod thermodynamics;
 #[cfg(feature = "wasm")]
 pub mod wasm_bindings;
 
-pub use biometrics::{BiometricHistory, BiometricNormParams, BiometricSample, ChannelNorm, neutral_inputs};
+pub use biometrics::{
+    neutral_inputs, BiometricHistory, BiometricNormParams, BiometricSample, ChannelNorm,
+};
+pub use coupling::{ConsciousnessField, EntityConsciousness};
+pub use energy::EnergyBudget;
+pub use harmony_field::HarmonyField;
 pub use macro_bridge::{apply_macro_modifiers, MacroWorldModifiers};
 pub use phase_transition::{
     run_bifurcation_sweep, BifurcationConfig, BifurcationResult, CriticalityIndicators,
@@ -62,10 +67,7 @@ pub use proc_gen::{
     ConsciousnessRegime, EnvironmentEvent, PhiEnvironmentCoupler, RoomProfile,
     PHI_THRESHOLD_EMERGING, PHI_THRESHOLD_INTEGRATED, PHI_THRESHOLD_TRANSCENDENT,
 };
-pub use coupling::{ConsciousnessField, EntityConsciousness};
-pub use simple_field::{SimpleCoupledField, SimpleEntity};
-pub use energy::EnergyBudget;
-pub use harmony_field::HarmonyField;
 pub use safety::SafetyTier;
 pub use sanctuary::SanctuaryZone;
+pub use simple_field::{SimpleCoupledField, SimpleEntity};
 pub use thermodynamics::{ThermodynamicConstants, ThermodynamicLedger};

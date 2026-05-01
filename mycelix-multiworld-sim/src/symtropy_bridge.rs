@@ -107,20 +107,18 @@ pub struct NarrativeSnippet {
 }
 
 /// Generate player decisions from current simulation state.
-pub fn generate_decisions(
-    sim: &crate::MultiWorldSimulator,
-) -> Vec<PlayerDecision> {
+pub fn generate_decisions(sim: &crate::MultiWorldSimulator) -> Vec<PlayerDecision> {
     let mut decisions = Vec::new();
     let tick = sim.current_tick;
     let _year = tick as f64 / 12.0;
 
     for world in &sim.worlds {
-        if world.population() == 0 { continue; }
+        if world.population() == 0 {
+            continue;
+        }
 
         // Project selection (when queue is empty)
-        if world.project_manager.active.is_empty()
-            && world.project_manager.queue.is_empty()
-        {
+        if world.project_manager.active.is_empty() && world.project_manager.queue.is_empty() {
             let mut choices = Vec::new();
             let priorities = crate::projects::prioritize_projects(
                 world.population(),
@@ -128,8 +126,12 @@ pub fn generate_decisions(
                 world.resources.fraction_of_capacity("food"),
                 world.max_population,
                 world.population() > (world.max_population as f64 * 0.8) as usize,
-                world.project_manager.has_completed(crate::projects::ProjectBlueprint::MedicalFacility),
-                world.project_manager.has_completed(crate::projects::ProjectBlueprint::FabricationWorkshop),
+                world
+                    .project_manager
+                    .has_completed(crate::projects::ProjectBlueprint::MedicalFacility),
+                world
+                    .project_manager
+                    .has_completed(crate::projects::ProjectBlueprint::FabricationWorkshop),
                 &world.location,
                 &world.project_manager.completed,
             );
@@ -137,15 +139,21 @@ pub fn generate_decisions(
                 choices.push(Choice {
                     id: format!("{:?}", bp),
                     label: bp.name().to_string(),
-                    description: format!("{} months, {} labor/tick",
-                        bp.duration(), bp.labor_per_tick()),
+                    description: format!(
+                        "{} months, {} labor/tick",
+                        bp.duration(),
+                        bp.labor_per_tick()
+                    ),
                     forecast: match bp {
-                        crate::projects::ProjectBlueprint::FissionReactor =>
-                            "Energy independence — everything else becomes possible".into(),
-                        crate::projects::ProjectBlueprint::GreenhouseModule =>
-                            "Feeds 50 more people — reduces food pressure".into(),
-                        crate::projects::ProjectBlueprint::CentrifugeHabitat =>
-                            "Enables reproduction — the colony can grow naturally".into(),
+                        crate::projects::ProjectBlueprint::FissionReactor => {
+                            "Energy independence — everything else becomes possible".into()
+                        }
+                        crate::projects::ProjectBlueprint::GreenhouseModule => {
+                            "Feeds 50 more people — reduces food pressure".into()
+                        }
+                        crate::projects::ProjectBlueprint::CentrifugeHabitat => {
+                            "Enables reproduction — the colony can grow naturally".into()
+                        }
                         _ => format!("Expands {} capability", bp.name()),
                     },
                     risk: 0,
@@ -153,11 +161,14 @@ pub fn generate_decisions(
             }
             if !choices.is_empty() {
                 decisions.push(PlayerDecision {
-                    tick, world_name: world.name.clone(),
+                    tick,
+                    world_name: world.name.clone(),
                     category: DecisionCategory::ProjectSelection,
                     choices,
-                    context: format!("{} has no active construction projects. What should we build?",
-                        world.name),
+                    context: format!(
+                        "{} has no active construction projects. What should we build?",
+                        world.name
+                    ),
                     urgency: 1,
                 });
             }
@@ -169,7 +180,8 @@ pub fn generate_decisions(
             && world.resources.self_sufficiency() > 0.7
         {
             decisions.push(PlayerDecision {
-                tick, world_name: world.name.clone(),
+                tick,
+                world_name: world.name.clone(),
                 category: DecisionCategory::IndependenceChoice,
                 choices: vec![
                     Choice {
@@ -177,15 +189,18 @@ pub fn generate_decisions(
                         label: "Declare Independence".into(),
                         description: "Sever political ties with Earth. Full sovereignty.".into(),
                         forecast: "Trade disruption likely. Earth may reduce funding. \
-                            But self-determination and cultural identity strengthen.".into(),
+                            But self-determination and cultural identity strengthen."
+                            .into(),
                         risk: 2,
                     },
                     Choice {
                         id: "negotiate".into(),
                         label: "Negotiate Federation".into(),
-                        description: "Propose equal partnership with Earth. Shared governance.".into(),
+                        description: "Propose equal partnership with Earth. Shared governance."
+                            .into(),
                         forecast: "Maintains trade routes. Slower cultural independence. \
-                            Less risk of conflict.".into(),
+                            Less risk of conflict."
+                            .into(),
                         risk: 1,
                     },
                     Choice {
@@ -196,10 +211,13 @@ pub fn generate_decisions(
                         risk: 0,
                     },
                 ],
-                context: format!("{} has {} people and {:.0}% self-sufficiency. \
+                context: format!(
+                    "{} has {} people and {:.0}% self-sufficiency. \
                     \"We can govern ourselves.\" The question is: should we?",
-                    world.name, world.population(),
-                    world.resources.self_sufficiency() * 100.0),
+                    world.name,
+                    world.population(),
+                    world.resources.self_sufficiency() * 100.0
+                ),
                 urgency: 2,
             });
         }
@@ -214,7 +232,9 @@ pub fn narrative_to_snippets(
     recent_ticks: u32,
     current_tick: u32,
 ) -> Vec<NarrativeSnippet> {
-    engine.events.iter()
+    engine
+        .events
+        .iter()
         .filter(|e| e.tick + recent_ticks >= current_tick)
         .map(|e| {
             let tone = if e.joy > 0.5 || e.care > 0.5 {

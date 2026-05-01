@@ -899,7 +899,7 @@ impl HumanoidTrainer {
                 // Collect OOD states by running controller alone
                 let mut ood_samples: Vec<(ContinuousHV, HumanoidCommand)> = Vec::new();
 
-                for step in 0..dagger_steps {
+                for _step in 0..dagger_steps {
                     let state = dagger_sim.state().clone();
                     let hv = dagger_encoder.encode(&state);
 

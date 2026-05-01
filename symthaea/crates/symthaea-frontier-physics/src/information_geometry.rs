@@ -14,13 +14,13 @@
 //! - Ay, N. et al. (2017). *Information Geometry*. Springer.
 //! - Tononi, G. (2008). Consciousness as Integrated Information (geometric Φ).
 
-use std::f64::consts::PI;
-
 /// Fisher information for a single parameter: I(θ) = E[(d/dθ log p)²]
 ///
 /// For discrete distribution p_i(θ): I = Σ_i (dp_i/dθ)² / p_i
 pub fn fisher_information(probs: &[f64], dprobs_dtheta: &[f64]) -> f64 {
-    probs.iter().zip(dprobs_dtheta.iter())
+    probs
+        .iter()
+        .zip(dprobs_dtheta.iter())
         .filter(|(&p, _)| p > 1e-15)
         .map(|(&p, &dp)| dp * dp / p)
         .sum()
@@ -64,7 +64,9 @@ pub fn fisher_gaussian(sigma: f64) -> [f64; 4] {
 /// For two distributions p and q on the probability simplex:
 /// d(p, q) = 2 arccos(Σ √(p_i × q_i))  (Bhattacharyya angle)
 pub fn fisher_rao_distance(p: &[f64], q: &[f64]) -> f64 {
-    let bc: f64 = p.iter().zip(q.iter())
+    let bc: f64 = p
+        .iter()
+        .zip(q.iter())
         .map(|(&pi, &qi)| (pi * qi).sqrt())
         .sum();
     2.0 * bc.clamp(0.0, 1.0).acos()
@@ -73,7 +75,8 @@ pub fn fisher_rao_distance(p: &[f64], q: &[f64]) -> f64 {
 /// KL divergence: D_KL(p || q) = Σ p_i ln(p_i / q_i)
 /// This is NOT a distance (asymmetric) but induces the Fisher metric locally.
 pub fn kl_divergence(p: &[f64], q: &[f64]) -> f64 {
-    p.iter().zip(q.iter())
+    p.iter()
+        .zip(q.iter())
         .filter(|(&pi, &qi)| pi > 1e-15 && qi > 1e-15)
         .map(|(&pi, &qi)| pi * (pi / qi).ln())
         .sum()
@@ -85,7 +88,9 @@ pub fn kl_divergence(p: &[f64], q: &[f64]) -> f64 {
 /// R = 2/(n-1) where n is the number of states.
 /// This is the curvature of the sphere (positive curvature).
 pub fn simplex_scalar_curvature(n_states: usize) -> f64 {
-    if n_states <= 1 { return 0.0; }
+    if n_states <= 1 {
+        return 0.0;
+    }
     2.0 / (n_states as f64 - 1.0)
 }
 
@@ -99,7 +104,7 @@ pub fn simplex_scalar_curvature(n_states: usize) -> f64 {
 /// For a bipartite system with joint distribution p(a,b) and marginals p(a), p(b):
 /// Φ = Σ_{a,b} p(a,b) ln[p(a,b) / (p(a) × p(b))]
 pub fn phi_information_geometric(
-    joint: &[f64],     // p(a,b) flattened: joint[a * n_b + b]
+    joint: &[f64], // p(a,b) flattened: joint[a * n_b + b]
     n_a: usize,
     n_b: usize,
 ) -> f64 {
@@ -135,7 +140,11 @@ pub fn phi_information_geometric(
 ///
 /// Natural gradient descent converges faster because it follows geodesics
 /// on the statistical manifold rather than straight lines in parameter space.
-pub fn natural_gradient(fisher_metric_inv: &[f64], euclidean_gradient: &[f64], n: usize) -> Vec<f64> {
+pub fn natural_gradient(
+    fisher_metric_inv: &[f64],
+    euclidean_gradient: &[f64],
+    n: usize,
+) -> Vec<f64> {
     let mut nat_grad = vec![0.0; n];
     for i in 0..n {
         for j in 0..n {
@@ -190,17 +199,25 @@ mod tests {
         let p = vec![0.3, 0.7];
         let q = vec![0.5, 0.5];
         let d = kl_divergence(&p, &q);
-        assert!(d >= -1e-14, "KL divergence should be non-negative: {:.6}", d);
+        assert!(
+            d >= -1e-14,
+            "KL divergence should be non-negative: {:.6}",
+            d
+        );
     }
 
     #[test]
     fn test_phi_ig_independent() {
         // Independent: p(a,b) = p(a)*p(b) → Φ = 0
         let joint = vec![0.15, 0.35, 0.1, 0.4]; // p(a) = [0.5, 0.5], p(b) = [0.25, 0.75]
-        // Actually: [0.5*0.5, 0.5*0.5, 0.5*0.5, 0.5*0.5] for independence
+                                                // Actually: [0.5*0.5, 0.5*0.5, 0.5*0.5, 0.5*0.5] for independence
         let independent = vec![0.25, 0.25, 0.25, 0.25];
         let phi = phi_information_geometric(&independent, 2, 2);
-        assert!(phi.abs() < 1e-10, "Independent system Φ = 0: got {:.6}", phi);
+        assert!(
+            phi.abs() < 1e-10,
+            "Independent system Φ = 0: got {:.6}",
+            phi
+        );
     }
 
     #[test]
@@ -208,7 +225,11 @@ mod tests {
         // Maximally correlated: p(0,0) = p(1,1) = 0.5
         let correlated = vec![0.5, 0.0, 0.0, 0.5];
         let phi = phi_information_geometric(&correlated, 2, 2);
-        assert!(phi > 0.5, "Correlated system should have high Φ: {:.4}", phi);
+        assert!(
+            phi > 0.5,
+            "Correlated system should have high Φ: {:.4}",
+            phi
+        );
     }
 
     #[test]

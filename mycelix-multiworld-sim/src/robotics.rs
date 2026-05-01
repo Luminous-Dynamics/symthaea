@@ -58,12 +58,12 @@ impl RobotPlatform {
     /// The consciousness tax: thinking costs Joules.
     pub fn power_watts(&self) -> f64 {
         match self {
-            Self::Manipulator => 150.0,  // Simple kinematics, low Phi needed
-            Self::Quadrotor => 200.0,    // Flight + navigation
-            Self::Auv => 250.0,          // Hydrodynamics + chemical sensors
-            Self::Vehicle => 300.0,      // Locomotion + mesh coordination
-            Self::Humanoid => 500.0,     // Full-body dynamics + FEP
-            Self::Helicopter => 800.0,   // Rotor dynamics + SAR autonomy
+            Self::Manipulator => 150.0, // Simple kinematics, low Phi needed
+            Self::Quadrotor => 200.0,   // Flight + navigation
+            Self::Auv => 250.0,         // Hydrodynamics + chemical sensors
+            Self::Vehicle => 300.0,     // Locomotion + mesh coordination
+            Self::Humanoid => 500.0,    // Full-body dynamics + FEP
+            Self::Helicopter => 800.0,  // Rotor dynamics + SAR autonomy
         }
     }
 
@@ -71,12 +71,12 @@ impl RobotPlatform {
     /// Below this, the robot enters safe-mode (halts).
     pub fn min_phi(&self) -> f64 {
         match self {
-            Self::Manipulator => 0.1,    // Can operate at Orange level
-            Self::Quadrotor => 0.3,      // Needs Yellow for flight
-            Self::Auv => 0.3,            // Needs Yellow for navigation
-            Self::Vehicle => 0.1,        // Can crawl at Orange
-            Self::Humanoid => 0.3,       // Needs Yellow for walking
-            Self::Helicopter => 0.6,     // Needs Green for full flight
+            Self::Manipulator => 0.1, // Can operate at Orange level
+            Self::Quadrotor => 0.3,   // Needs Yellow for flight
+            Self::Auv => 0.3,         // Needs Yellow for navigation
+            Self::Vehicle => 0.1,     // Can crawl at Orange
+            Self::Humanoid => 0.3,    // Needs Yellow for walking
+            Self::Helicopter => 0.6,  // Needs Green for full flight
         }
     }
 
@@ -84,12 +84,12 @@ impl RobotPlatform {
     /// From NASA crew time studies + IFR manufacturing data.
     pub fn labor_hours_replaced(&self) -> f64 {
         match self {
-            Self::Manipulator => 6.0,    // 1 arm ≈ 0.75 human-shift
-            Self::Quadrotor => 3.0,      // Scout/survey, not physical labor
-            Self::Auv => 4.0,            // Continuous monitoring
-            Self::Vehicle => 8.0,        // 24/7 transport (3 shifts)
-            Self::Humanoid => 12.0,      // General-purpose labor
-            Self::Helicopter => 5.0,     // SAR + aerial survey
+            Self::Manipulator => 6.0, // 1 arm ≈ 0.75 human-shift
+            Self::Quadrotor => 3.0,   // Scout/survey, not physical labor
+            Self::Auv => 4.0,         // Continuous monitoring
+            Self::Vehicle => 8.0,     // 24/7 transport (3 shifts)
+            Self::Humanoid => 12.0,   // General-purpose labor
+            Self::Helicopter => 5.0,  // SAR + aerial survey
         }
     }
 
@@ -98,11 +98,11 @@ impl RobotPlatform {
         use crate::habitat::ModuleFunction;
         match self {
             Self::Manipulator => ModuleFunction::Workshop,
-            Self::Quadrotor => ModuleFunction::Laboratory,  // Exploration
-            Self::Auv => ModuleFunction::LifeSupport,       // Water systems
-            Self::Vehicle => ModuleFunction::Storage,        // Logistics
-            Self::Humanoid => ModuleFunction::Agriculture,   // Ag-Bay labor
-            Self::Helicopter => ModuleFunction::Commons,     // SAR staging
+            Self::Quadrotor => ModuleFunction::Laboratory, // Exploration
+            Self::Auv => ModuleFunction::LifeSupport,      // Water systems
+            Self::Vehicle => ModuleFunction::Storage,      // Logistics
+            Self::Humanoid => ModuleFunction::Agriculture, // Ag-Bay labor
+            Self::Helicopter => ModuleFunction::Commons,   // SAR staging
         }
     }
 }
@@ -139,10 +139,14 @@ impl RobotUnit {
 
     /// Effective labor hours replaced, accounting for Phi degradation.
     pub fn effective_labor_hours(&self) -> f64 {
-        if !self.operational { return 0.0; }
+        if !self.operational {
+            return 0.0;
+        }
         // Labor scales with Phi above minimum threshold
         let min = self.platform.min_phi();
-        if self.phi < min { return 0.0; }
+        if self.phi < min {
+            return 0.0;
+        }
         let phi_fraction = (self.phi - min) / (1.0 - min);
         self.platform.labor_hours_replaced() * phi_fraction
     }
@@ -161,7 +165,9 @@ pub struct RoboticFleet {
 }
 
 impl RoboticFleet {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     /// Add a robot to the fleet.
     pub fn deploy(&mut self, platform: RobotPlatform) {
@@ -181,9 +187,7 @@ impl RoboticFleet {
         let available_watts = available_power_kw * 1000.0;
 
         // Total fleet demand
-        let total_demand: f64 = self.units.iter()
-            .map(|u| u.platform.power_watts())
-            .sum();
+        let total_demand: f64 = self.units.iter().map(|u| u.platform.power_watts()).sum();
 
         // Power fraction: how much of demand can be met
         let power_fraction = if total_demand > 0.0 {
@@ -230,7 +234,8 @@ impl RoboticFleet {
 
     /// Count operational units of a specific platform.
     pub fn count_operational(&self, platform: RobotPlatform) -> usize {
-        self.units.iter()
+        self.units
+            .iter()
             .filter(|u| u.platform == platform && u.operational)
             .count()
     }
@@ -242,9 +247,10 @@ impl RoboticFleet {
 
     /// Fraction of fleet that is operational.
     pub fn operational_fraction(&self) -> f64 {
-        if self.units.is_empty() { return 0.0; }
-        self.units.iter().filter(|u| u.operational).count() as f64
-            / self.units.len() as f64
+        if self.units.is_empty() {
+            return 0.0;
+        }
+        self.units.iter().filter(|u| u.operational).count() as f64 / self.units.len() as f64
     }
 }
 
@@ -286,9 +292,11 @@ mod tests {
 
         // Helicopter (min_phi 0.6) should be in safe-mode
         // Humanoid (min_phi 0.3) may also be in safe-mode at 15% power
-        assert!(fleet.units_in_safe_mode > 0,
+        assert!(
+            fleet.units_in_safe_mode > 0,
             "At least one robot should be in safe-mode. Safe: {}",
-            fleet.units_in_safe_mode);
+            fleet.units_in_safe_mode
+        );
     }
 
     #[test]

@@ -114,9 +114,10 @@ pub fn elite_persistence_index(world: &World, _current_tick: u32) -> f64 {
     for g in &guardians {
         if let Some((mother_id, father_id)) = g.parent_ids {
             with_parents += 1;
-            let parent_guardian = world.agents.iter().any(|a| {
-                (a.id == mother_id || a.id == father_id) && a.consciousness.phi() >= 0.8
-            });
+            let parent_guardian = world
+                .agents
+                .iter()
+                .any(|a| (a.id == mother_id || a.id == father_id) && a.consciousness.phi() >= 0.8);
             if parent_guardian {
                 inherited += 1;
             }
@@ -160,10 +161,7 @@ pub fn innovation_stagnation_index(
     };
     let recent = &tech_history[start..];
 
-    let min_tech = recent
-        .iter()
-        .map(|(_, v)| *v)
-        .fold(f64::INFINITY, f64::min);
+    let min_tech = recent.iter().map(|(_, v)| *v).fold(f64::INFINITY, f64::min);
     let max_tech = recent
         .iter()
         .map(|(_, v)| *v)
@@ -345,7 +343,9 @@ mod tests {
             economy: crate::economy::WorldEconomy::new(),
             harmony: crate::harmony::HarmonyTracker::new(),
             governance: crate::governance::WorldGovernance::new(),
-            metabolism_state: crate::metabolism::MetabolismState::default(), currency_state: crate::currency::WorldCurrencyState::default(), policy_state: crate::proposals::PolicyState::default(),
+            metabolism_state: crate::metabolism::MetabolismState::default(),
+            currency_state: crate::currency::WorldCurrencyState::default(),
+            policy_state: crate::proposals::PolicyState::default(),
             power_generation_kw: 0.0,
             power_demand_kw: 0.0,
             narrative_identity: crate::world::NarrativeIdentity::default(),
@@ -396,10 +396,16 @@ mod tests {
                 faction_id: None,
                 generation: 0,
                 trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
-                    ethics: crate::agent::EthicalOrientation::default(),
-                    sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
-                    justice: crate::sub_passport::RestorativeJustice::new(),
+                cumulative_dose_sv: 0.0,
+                adversarial: None,
+                coordination_understanding: 0.0,
+                mycel_score: 0.1,
+                sap_balance: 100.0,
+                is_biological: true,
+                wounds: Vec::new(),
+                ethics: crate::agent::EthicalOrientation::default(),
+                sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
+                justice: crate::sub_passport::RestorativeJustice::new(),
             };
             world.agents.push(agent);
             world.next_agent_id += 1;
@@ -464,7 +470,10 @@ mod tests {
         // Modify culture of w2 to create distance
         w2.culture.harmony_weights = [0.5, 0.1, 0.1, 0.1, 0.05, 0.05, 0.05, 0.05];
         let d = inter_world_divergence(&[w1, w2]);
-        assert!(d > 0.0, "Different cultures should have divergence > 0, got {d}");
+        assert!(
+            d > 0.0,
+            "Different cultures should have divergence > 0, got {d}"
+        );
     }
 
     #[test]

@@ -2,7 +2,7 @@
 name = "symtropy"
 version = "0.1.0"
 edition = "2021"
-license = "Apache-2.0 OR MIT"
+license = "AGPL-3.0-or-later"
 description = "The Symtropy distribution: an opinionated Bevy bundle with consciousness-coupled physics, scene scaffolding, and a built-in dev console. One dependency for the full Symtropy game-dev experience."
 repository = "https://github.com/luminous-dynamics/symtropy"
 keywords = ["bevy", "game-engine", "symtropy", "physics", "distribution"]

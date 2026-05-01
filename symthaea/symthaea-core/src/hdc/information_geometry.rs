@@ -110,7 +110,11 @@ pub fn natural_gradient_step(
     lr: f64,
 ) -> Vec<f64> {
     let ng = natural_gradient(gradient, fim);
-    params.iter().zip(ng.iter()).map(|(&p, &g)| p - lr * g).collect()
+    params
+        .iter()
+        .zip(ng.iter())
+        .map(|(&p, &g)| p - lr * g)
+        .collect()
 }
 
 // ─── KL Divergence Geometry ───────────────────────────────────────────────────
@@ -202,8 +206,7 @@ pub fn alpha_connection_christoffel(
     // Then Γ^(α)_{ijk} = (1-α)/2 Γ^(0)_{ijk} + (1+α)/2 Γ^(0)_{kij}
 
     let lc = |i: usize, j: usize, k: usize| -> f64 {
-        if i < dfim.len() && j < n && k < n && i < n && j < dfim[i].len() && k < dfim[i][j].len()
-        {
+        if i < dfim.len() && j < n && k < n && i < n && j < dfim[i].len() && k < dfim[i][j].len() {
             let d_i_jk = if i < dfim.len() && j < dfim[i].len() && k < dfim[i][j].len() {
                 dfim[i][j][k]
             } else {
@@ -261,7 +264,11 @@ pub fn natural_to_mean_params(theta: &[f64], family: &str) -> Vec<f64> {
             } else {
                 1.0
             };
-            let mu = if !theta.is_empty() { theta[0] * sigma2 } else { 0.0 };
+            let mu = if !theta.is_empty() {
+                theta[0] * sigma2
+            } else {
+                0.0
+            };
             vec![mu, mu * mu + sigma2] // η₁ = μ, η₂ = μ² + σ²
         }
         "bernoulli" => {
@@ -275,7 +282,11 @@ pub fn natural_to_mean_params(theta: &[f64], family: &str) -> Vec<f64> {
         }
         "poisson" => {
             // θ = log(λ) → λ = exp(θ)
-            let lambda = if !theta.is_empty() { theta[0].exp() } else { 1.0 };
+            let lambda = if !theta.is_empty() {
+                theta[0].exp()
+            } else {
+                1.0
+            };
             vec![lambda]
         }
         _ => theta.to_vec(),
@@ -289,7 +300,11 @@ pub fn log_likelihood(x: &[f64], theta: &[f64], family: &str) -> f64 {
         "normal" => {
             // θ = [μ, σ] directly for simplicity (mean parameterisation)
             let mu = if !theta.is_empty() { theta[0] } else { 0.0 };
-            let sigma = if theta.len() > 1 { theta[1].max(1e-10) } else { 1.0 };
+            let sigma = if theta.len() > 1 {
+                theta[1].max(1e-10)
+            } else {
+                1.0
+            };
             let n = x.len() as f64;
             let log_2pi = (2.0 * std::f64::consts::PI).ln();
             let sse: f64 = x.iter().map(|&xi| (xi - mu).powi(2)).sum();
@@ -306,7 +321,11 @@ pub fn log_likelihood(x: &[f64], theta: &[f64], family: &str) -> f64 {
                 .sum()
         }
         "poisson" => {
-            let lambda = if !theta.is_empty() { theta[0].max(1e-10) } else { 1.0 };
+            let lambda = if !theta.is_empty() {
+                theta[0].max(1e-10)
+            } else {
+                1.0
+            };
             x.iter()
                 .map(|&xi| xi * lambda.ln() - lambda - log_factorial(xi as usize))
                 .sum()
@@ -426,7 +445,10 @@ mod tests {
         let q = vec![0.1, 0.7, 0.2];
         let skl_pq = symmetrized_kl(&p, &q);
         let skl_qp = symmetrized_kl(&q, &p);
-        assert!((skl_pq - skl_qp).abs() < 1e-10, "Symmetrized KL is symmetric");
+        assert!(
+            (skl_pq - skl_qp).abs() < 1e-10,
+            "Symmetrized KL is symmetric"
+        );
     }
 
     #[test]
@@ -465,7 +487,9 @@ mod tests {
                     assert!(
                         christoffel[i][j][k].abs() < 1e-10,
                         "Flat manifold: Γ^(0)_{{{}{}{}}} = 0",
-                        i, j, k
+                        i,
+                        j,
+                        k
                     );
                 }
             }

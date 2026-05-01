@@ -134,10 +134,10 @@ impl HumanLoadModel {
         // Simplified gait pattern: legs alternate, arms swing opposite
         for i in 0..NUM_FULL_FRAME_JOINTS {
             let phase_offset = match i {
-                14..=16 => 0.0,                              // Left leg
-                17..=19 => std::f64::consts::PI,             // Right leg (opposite)
-                2..=7 => std::f64::consts::PI,               // Left arm (opposite leg)
-                8..=13 => 0.0,                               // Right arm
+                14..=16 => 0.0,                  // Left leg
+                17..=19 => std::f64::consts::PI, // Right leg (opposite)
+                2..=7 => std::f64::consts::PI,   // Left arm (opposite leg)
+                8..=13 => 0.0,                   // Right arm
                 _ => 0.0,
             };
             self.human_torques[i] = base * (self.gait_phase + phase_offset).sin();
@@ -160,10 +160,16 @@ pub struct FullFrameCallback {
 }
 
 impl PhysicsCallback<3> for FullFrameCallback {
-    fn modulate_force(&self, _body: BodyHandle, force: &nalgebra::SVector<f64, 3>) -> nalgebra::SVector<f64, 3> {
+    fn modulate_force(
+        &self,
+        _body: BodyHandle,
+        force: &nalgebra::SVector<f64, 3>,
+    ) -> nalgebra::SVector<f64, 3> {
         *force * self.motor_gain as f64 * self.stiffness
     }
-    fn modulate_impulse(&self, impulse: f64, _contact: &nalgebra::SVector<f64, 3>) -> f64 { impulse }
+    fn modulate_impulse(&self, impulse: f64, _contact: &nalgebra::SVector<f64, 3>) -> f64 {
+        impulse
+    }
     fn friction_multiplier(&self, _contact: &nalgebra::SVector<f64, 3>, _body: BodyHandle) -> f64 {
         0.3 + 0.7 * self.motor_gain as f64 // More backdrivable at low Φ
     }
@@ -199,39 +205,144 @@ impl FullFrameSimulator {
         // Spine: 2 joints (neck, lumbar) — gentle motors, high damping
         let spine_chain = ChainBuilder::new()
             .base_position(Point::new([0.0, 0.0, 1.7]))
-            .add_link(LinkSpec { mass: 5.0, length: 0.15, radius: 0.06, motor_max_force: Some(5.0), motor_damping: Some(2.0), ..Default::default() })
-            .add_link(LinkSpec { mass: 20.0, length: 0.5, radius: 0.12, motor_max_force: Some(10.0), motor_damping: Some(5.0), ..Default::default() })
+            .add_link(LinkSpec {
+                mass: 5.0,
+                length: 0.15,
+                radius: 0.06,
+                motor_max_force: Some(5.0),
+                motor_damping: Some(2.0),
+                ..Default::default()
+            })
+            .add_link(LinkSpec {
+                mass: 20.0,
+                length: 0.5,
+                radius: 0.12,
+                motor_max_force: Some(10.0),
+                motor_damping: Some(5.0),
+                ..Default::default()
+            })
             .build(&mut world);
 
         // Left arm: 6 joints (shoulder×3, elbow, wrist×2) — reduced motor forces for stability
         let arm_spec = [
-            LinkSpec { mass: 2.5, length: 0.05, radius: 0.05, plane_a: 0, plane_b: 2, motor_max_force: Some(5.0), motor_damping: Some(2.0), ..Default::default() },
-            LinkSpec { mass: 2.0, length: 0.05, radius: 0.04, plane_a: 1, plane_b: 2, motor_max_force: Some(5.0), motor_damping: Some(2.0), ..Default::default() },
-            LinkSpec { mass: 1.8, length: 0.27, radius: 0.04, plane_a: 0, plane_b: 1, motor_max_force: Some(4.0), motor_damping: Some(1.5), ..Default::default() },
-            LinkSpec { mass: 1.5, length: 0.26, radius: 0.035, plane_a: 0, plane_b: 2, motor_max_force: Some(3.0), motor_damping: Some(1.5), angle_limits: Some((0.0, 2.5)), ..Default::default() },
-            LinkSpec { mass: 0.5, length: 0.05, radius: 0.025, plane_a: 0, plane_b: 2, motor_max_force: Some(2.0), motor_damping: Some(1.0), ..Default::default() },
-            LinkSpec { mass: 0.5, length: 0.1, radius: 0.025, plane_a: 1, plane_b: 2, motor_max_force: Some(2.0), motor_damping: Some(1.0), ..Default::default() },
+            LinkSpec {
+                mass: 2.5,
+                length: 0.05,
+                radius: 0.05,
+                plane_a: 0,
+                plane_b: 2,
+                motor_max_force: Some(5.0),
+                motor_damping: Some(2.0),
+                ..Default::default()
+            },
+            LinkSpec {
+                mass: 2.0,
+                length: 0.05,
+                radius: 0.04,
+                plane_a: 1,
+                plane_b: 2,
+                motor_max_force: Some(5.0),
+                motor_damping: Some(2.0),
+                ..Default::default()
+            },
+            LinkSpec {
+                mass: 1.8,
+                length: 0.27,
+                radius: 0.04,
+                plane_a: 0,
+                plane_b: 1,
+                motor_max_force: Some(4.0),
+                motor_damping: Some(1.5),
+                ..Default::default()
+            },
+            LinkSpec {
+                mass: 1.5,
+                length: 0.26,
+                radius: 0.035,
+                plane_a: 0,
+                plane_b: 2,
+                motor_max_force: Some(3.0),
+                motor_damping: Some(1.5),
+                angle_limits: Some((0.0, 2.5)),
+                ..Default::default()
+            },
+            LinkSpec {
+                mass: 0.5,
+                length: 0.05,
+                radius: 0.025,
+                plane_a: 0,
+                plane_b: 2,
+                motor_max_force: Some(2.0),
+                motor_damping: Some(1.0),
+                ..Default::default()
+            },
+            LinkSpec {
+                mass: 0.5,
+                length: 0.1,
+                radius: 0.025,
+                plane_a: 1,
+                plane_b: 2,
+                motor_max_force: Some(2.0),
+                motor_damping: Some(1.0),
+                ..Default::default()
+            },
         ];
         let mut left_builder = ChainBuilder::new().base_position(Point::new([0.0, 0.2, 1.5]));
-        for spec in &arm_spec { left_builder = left_builder.add_link(spec.clone()); }
+        for spec in &arm_spec {
+            left_builder = left_builder.add_link(spec.clone());
+        }
         let left_arm = left_builder.build(&mut world);
 
         let mut right_builder = ChainBuilder::new().base_position(Point::new([0.0, -0.2, 1.5]));
-        for spec in &arm_spec { right_builder = right_builder.add_link(spec.clone()); }
+        for spec in &arm_spec {
+            right_builder = right_builder.add_link(spec.clone());
+        }
         let right_arm = right_builder.build(&mut world);
 
         // Left leg: 3 joints (hip, knee, ankle) — gentle motors for stability
         let leg_spec = [
-            LinkSpec { mass: 8.0, length: 0.1, radius: 0.06, plane_a: 0, plane_b: 2, motor_max_force: Some(15.0), motor_damping: Some(5.0), ..Default::default() },
-            LinkSpec { mass: 4.0, length: 0.42, radius: 0.05, plane_a: 1, plane_b: 2, motor_max_force: Some(10.0), motor_damping: Some(4.0), angle_limits: Some((0.0, 2.5)), ..Default::default() },
-            LinkSpec { mass: 1.5, length: 0.1, radius: 0.035, plane_a: 1, plane_b: 2, motor_max_force: Some(5.0), motor_damping: Some(2.0), ..Default::default() },
+            LinkSpec {
+                mass: 8.0,
+                length: 0.1,
+                radius: 0.06,
+                plane_a: 0,
+                plane_b: 2,
+                motor_max_force: Some(15.0),
+                motor_damping: Some(5.0),
+                ..Default::default()
+            },
+            LinkSpec {
+                mass: 4.0,
+                length: 0.42,
+                radius: 0.05,
+                plane_a: 1,
+                plane_b: 2,
+                motor_max_force: Some(10.0),
+                motor_damping: Some(4.0),
+                angle_limits: Some((0.0, 2.5)),
+                ..Default::default()
+            },
+            LinkSpec {
+                mass: 1.5,
+                length: 0.1,
+                radius: 0.035,
+                plane_a: 1,
+                plane_b: 2,
+                motor_max_force: Some(5.0),
+                motor_damping: Some(2.0),
+                ..Default::default()
+            },
         ];
         let mut left_leg_builder = ChainBuilder::new().base_position(Point::new([0.0, 0.1, 0.9]));
-        for spec in &leg_spec { left_leg_builder = left_leg_builder.add_link(spec.clone()); }
+        for spec in &leg_spec {
+            left_leg_builder = left_leg_builder.add_link(spec.clone());
+        }
         let left_leg = left_leg_builder.build(&mut world);
 
         let mut right_leg_builder = ChainBuilder::new().base_position(Point::new([0.0, -0.1, 0.9]));
-        for spec in &leg_spec { right_leg_builder = right_leg_builder.add_link(spec.clone()); }
+        for spec in &leg_spec {
+            right_leg_builder = right_leg_builder.add_link(spec.clone());
+        }
         let right_leg = right_leg_builder.build(&mut world);
 
         Self {
@@ -242,7 +353,10 @@ impl FullFrameSimulator {
             left_leg,
             right_leg,
             human: HumanLoadModel::standard_adult(),
-            callback: FullFrameCallback { motor_gain: 1.0, stiffness: 1.0 },
+            callback: FullFrameCallback {
+                motor_gain: 1.0,
+                stiffness: 1.0,
+            },
         }
     }
 
@@ -275,7 +389,9 @@ impl FullFrameSimulator {
 }
 
 impl Default for FullFrameSimulator {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -301,7 +417,10 @@ mod tests {
 
         // Update gait and verify torques are generated
         model.update(0.1);
-        assert!(model.human_power() > 0.0, "Gait should generate human torques");
+        assert!(
+            model.human_power() > 0.0,
+            "Gait should generate human torques"
+        );
     }
 
     #[test]
@@ -341,13 +460,21 @@ mod tests {
         // (constraint compliance, damping, smaller dt). For now, verify the
         // initial construction produces finite positions.
         let sim = FullFrameSimulator::new();
-        let chains = [&sim.spine_chain, &sim.left_arm, &sim.right_arm, &sim.left_leg, &sim.right_leg];
+        let chains = [
+            &sim.spine_chain,
+            &sim.left_arm,
+            &sim.right_arm,
+            &sim.left_leg,
+            &sim.right_leg,
+        ];
         for chain in chains {
             for &handle in &chain.links {
                 if let Some(body) = sim.world.body(handle) {
                     let p = &body.transform.translation.0;
-                    assert!(p[0].is_finite() && p[1].is_finite() && p[2].is_finite(),
-                        "Link should be finite at construction, got {p:?}");
+                    assert!(
+                        p[0].is_finite() && p[1].is_finite() && p[2].is_finite(),
+                        "Link should be finite at construction, got {p:?}"
+                    );
                 }
             }
         }
@@ -362,8 +489,10 @@ mod tests {
         fresh.update(0.25);
         tired.update(0.25);
 
-        assert!(fresh.human_power() > tired.human_power(),
-            "Fresh human should generate more power than fatigued");
+        assert!(
+            fresh.human_power() > tired.human_power(),
+            "Fresh human should generate more power than fatigued"
+        );
     }
 
     #[test]

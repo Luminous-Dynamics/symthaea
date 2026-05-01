@@ -31,10 +31,10 @@
 //! switching crates.
 
 pub mod biometrics;
-pub mod macro_bridge;
-pub mod plugin;
 #[cfg(feature = "debug-gizmos")]
 pub mod debug;
+pub mod macro_bridge;
+pub mod plugin;
 
 pub use biometrics::{biometric_to_phi_system, PlayerBiometrics};
 pub use macro_bridge::{apply_macro_modifiers_system, MacroWorldState};

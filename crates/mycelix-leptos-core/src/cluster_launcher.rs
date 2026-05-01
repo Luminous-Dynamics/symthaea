@@ -34,39 +34,151 @@ fn is_public_domain() -> bool {
 
 fn public_clusters() -> Vec<ClusterLink> {
     vec![
-        ClusterLink { name: "Climate", icon: "🌍", href: "https://climate.mycelix.net".into() },
-        ClusterLink { name: "Knowledge", icon: "🧠", href: "https://knowledge.mycelix.net".into() },
-        ClusterLink { name: "Energy", icon: "⚡", href: "https://energy.mycelix.net".into() },
-        ClusterLink { name: "Finance", icon: "💰", href: "https://finance.mycelix.net".into() },
-        ClusterLink { name: "Governance", icon: "⚖", href: "https://governance.mycelix.net".into() },
-        ClusterLink { name: "Health", icon: "💚", href: "https://health.mycelix.net".into() },
-        ClusterLink { name: "Hearth", icon: "🏠", href: "https://hearth.mycelix.net".into() },
-        ClusterLink { name: "Commons", icon: "🤲", href: "https://commons.mycelix.net".into() },
-        ClusterLink { name: "Music", icon: "🎵", href: "https://music.mycelix.net".into() },
-        ClusterLink { name: "Praxis", icon: "📚", href: "https://praxis.mycelix.net".into() },
-        ClusterLink { name: "Portal", icon: "🌀", href: "https://portal.mycelix.net".into() },
-        ClusterLink { name: "Attribution", icon: "🏷", href: "https://attribution.mycelix.net".into() },
-        ClusterLink { name: "Space", icon: "🛰", href: "https://space.mycelix.net".into() },
-        ClusterLink { name: "Supply Chain", icon: "📦", href: "https://supplychain.mycelix.net".into() },
+        ClusterLink {
+            name: "Climate",
+            icon: "🌍",
+            href: "https://climate.mycelix.net".into(),
+        },
+        ClusterLink {
+            name: "Knowledge",
+            icon: "🧠",
+            href: "https://knowledge.mycelix.net".into(),
+        },
+        ClusterLink {
+            name: "Energy",
+            icon: "⚡",
+            href: "https://energy.mycelix.net".into(),
+        },
+        ClusterLink {
+            name: "Finance",
+            icon: "💰",
+            href: "https://finance.mycelix.net".into(),
+        },
+        ClusterLink {
+            name: "Governance",
+            icon: "⚖",
+            href: "https://governance.mycelix.net".into(),
+        },
+        ClusterLink {
+            name: "Health",
+            icon: "💚",
+            href: "https://health.mycelix.net".into(),
+        },
+        ClusterLink {
+            name: "Hearth",
+            icon: "🏠",
+            href: "https://hearth.mycelix.net".into(),
+        },
+        ClusterLink {
+            name: "Commons",
+            icon: "🤲",
+            href: "https://commons.mycelix.net".into(),
+        },
+        ClusterLink {
+            name: "Music",
+            icon: "🎵",
+            href: "https://music.mycelix.net".into(),
+        },
+        ClusterLink {
+            name: "Praxis",
+            icon: "📚",
+            href: "https://praxis.mycelix.net".into(),
+        },
+        ClusterLink {
+            name: "Sensorium",
+            icon: "🌀",
+            href: "https://sensorium.mycelix.net".into(),
+        },
+        ClusterLink {
+            name: "Attribution",
+            icon: "🏷",
+            href: "https://attribution.mycelix.net".into(),
+        },
+        ClusterLink {
+            name: "Space",
+            icon: "🛰",
+            href: "https://space.mycelix.net".into(),
+        },
+        ClusterLink {
+            name: "Supply Chain",
+            icon: "📦",
+            href: "https://supplychain.mycelix.net".into(),
+        },
     ]
 }
 
 fn localhost_clusters() -> Vec<ClusterLink> {
     vec![
-        ClusterLink { name: "Climate", icon: "🌍", href: "http://localhost:8103".into() },
-        ClusterLink { name: "Knowledge", icon: "🧠", href: "http://localhost:8114".into() },
-        ClusterLink { name: "Energy", icon: "⚡", href: "http://localhost:8108".into() },
-        ClusterLink { name: "Finance", icon: "💰", href: "http://localhost:8109".into() },
-        ClusterLink { name: "Governance", icon: "⚖", href: "http://localhost:8110".into() },
-        ClusterLink { name: "Health", icon: "💚", href: "http://localhost:8111".into() },
-        ClusterLink { name: "Hearth", icon: "🏠", href: "http://localhost:8112".into() },
-        ClusterLink { name: "Commons", icon: "🤲", href: "http://localhost:8104".into() },
-        ClusterLink { name: "Music", icon: "🎵", href: "http://localhost:8121".into() },
-        ClusterLink { name: "Praxis", icon: "📚", href: "http://localhost:8107".into() },
-        ClusterLink { name: "Portal", icon: "🌀", href: "http://localhost:8124".into() },
-        ClusterLink { name: "Attribution", icon: "🏷", href: "http://localhost:8101".into() },
-        ClusterLink { name: "Space", icon: "🛰", href: "http://localhost:8126".into() },
-        ClusterLink { name: "Supply Chain", icon: "📦", href: "http://localhost:8127".into() },
+        ClusterLink {
+            name: "Climate",
+            icon: "🌍",
+            href: "http://localhost:8103".into(),
+        },
+        ClusterLink {
+            name: "Knowledge",
+            icon: "🧠",
+            href: "http://localhost:8114".into(),
+        },
+        ClusterLink {
+            name: "Energy",
+            icon: "⚡",
+            href: "http://localhost:8108".into(),
+        },
+        ClusterLink {
+            name: "Finance",
+            icon: "💰",
+            href: "http://localhost:8109".into(),
+        },
+        ClusterLink {
+            name: "Governance",
+            icon: "⚖",
+            href: "http://localhost:8110".into(),
+        },
+        ClusterLink {
+            name: "Health",
+            icon: "💚",
+            href: "http://localhost:8111".into(),
+        },
+        ClusterLink {
+            name: "Hearth",
+            icon: "🏠",
+            href: "http://localhost:8112".into(),
+        },
+        ClusterLink {
+            name: "Commons",
+            icon: "🤲",
+            href: "http://localhost:8104".into(),
+        },
+        ClusterLink {
+            name: "Music",
+            icon: "🎵",
+            href: "http://localhost:8121".into(),
+        },
+        ClusterLink {
+            name: "Praxis",
+            icon: "📚",
+            href: "http://localhost:8107".into(),
+        },
+        ClusterLink {
+            name: "Portal",
+            icon: "🌀",
+            href: "http://localhost:8124".into(),
+        },
+        ClusterLink {
+            name: "Attribution",
+            icon: "🏷",
+            href: "http://localhost:8101".into(),
+        },
+        ClusterLink {
+            name: "Space",
+            icon: "🛰",
+            href: "http://localhost:8126".into(),
+        },
+        ClusterLink {
+            name: "Supply Chain",
+            icon: "📦",
+            href: "http://localhost:8127".into(),
+        },
     ]
 }
 
@@ -79,10 +191,7 @@ pub fn ClusterLauncher(
     let (open, set_open) = signal(false);
     let all = clusters.unwrap_or_else(default_clusters);
     let current_name = current.clone();
-    let filtered: Vec<ClusterLink> = all
-        .into_iter()
-        .filter(|c| c.name != current_name)
-        .collect();
+    let filtered: Vec<ClusterLink> = all.into_iter().filter(|c| c.name != current_name).collect();
 
     view! {
         <div class="cluster-launcher">

@@ -63,89 +63,344 @@ pub fn build_deep_time_bins() -> Vec<TemporalBin> {
 
     // ── Precambrian (3800 - 541 Ma) ──
     // Hadean
-    bins.push(TemporalBin::new(3800.0, 3500.0, "Early Hadean", TimeResolution::Precambrian));
-    bins.push(TemporalBin::new(3500.0, 3200.0, "Late Hadean/Early Archean", TimeResolution::Precambrian));
+    bins.push(TemporalBin::new(
+        3800.0,
+        3500.0,
+        "Early Hadean",
+        TimeResolution::Precambrian,
+    ));
+    bins.push(TemporalBin::new(
+        3500.0,
+        3200.0,
+        "Late Hadean/Early Archean",
+        TimeResolution::Precambrian,
+    ));
 
     // Archean
-    bins.push(TemporalBin::new(3200.0, 2800.0, "Mesoarchean", TimeResolution::Precambrian));
-    bins.push(TemporalBin::new(2800.0, 2500.0, "Neoarchean", TimeResolution::Precambrian));
+    bins.push(TemporalBin::new(
+        3200.0,
+        2800.0,
+        "Mesoarchean",
+        TimeResolution::Precambrian,
+    ));
+    bins.push(TemporalBin::new(
+        2800.0,
+        2500.0,
+        "Neoarchean",
+        TimeResolution::Precambrian,
+    ));
 
     // Proterozoic
-    bins.push(TemporalBin::new(2500.0, 2400.0, "Pre-GOE Paleoproterozoic", TimeResolution::Precambrian));
-    bins.push(TemporalBin::new(2400.0, 2300.0, "Great Oxidation Event", TimeResolution::Precambrian));
-    bins.push(TemporalBin::new(2300.0, 2050.0, "Post-GOE/Huronian Glaciation", TimeResolution::Precambrian));
-    bins.push(TemporalBin::new(2050.0, 1800.0, "Late Paleoproterozoic", TimeResolution::Precambrian));
-    bins.push(TemporalBin::new(1800.0, 1600.0, "Early Mesoproterozoic", TimeResolution::Precambrian));
-    bins.push(TemporalBin::new(1600.0, 1400.0, "Mid Mesoproterozoic", TimeResolution::Precambrian));
-    bins.push(TemporalBin::new(1400.0, 1200.0, "Late Mesoproterozoic", TimeResolution::Precambrian));
-    bins.push(TemporalBin::new(1200.0, 1000.0, "Stenian", TimeResolution::Precambrian));
-    bins.push(TemporalBin::new(1000.0, 850.0, "Tonian (early)", TimeResolution::Precambrian));
-    bins.push(TemporalBin::new(850.0, 720.0, "Tonian (late)", TimeResolution::Precambrian));
-    bins.push(TemporalBin::new(720.0, 635.0, "Cryogenian (Snowball Earth)", TimeResolution::Precambrian));
-    bins.push(TemporalBin::new(635.0, 541.0, "Ediacaran", TimeResolution::Precambrian));
+    bins.push(TemporalBin::new(
+        2500.0,
+        2400.0,
+        "Pre-GOE Paleoproterozoic",
+        TimeResolution::Precambrian,
+    ));
+    bins.push(TemporalBin::new(
+        2400.0,
+        2300.0,
+        "Great Oxidation Event",
+        TimeResolution::Precambrian,
+    ));
+    bins.push(TemporalBin::new(
+        2300.0,
+        2050.0,
+        "Post-GOE/Huronian Glaciation",
+        TimeResolution::Precambrian,
+    ));
+    bins.push(TemporalBin::new(
+        2050.0,
+        1800.0,
+        "Late Paleoproterozoic",
+        TimeResolution::Precambrian,
+    ));
+    bins.push(TemporalBin::new(
+        1800.0,
+        1600.0,
+        "Early Mesoproterozoic",
+        TimeResolution::Precambrian,
+    ));
+    bins.push(TemporalBin::new(
+        1600.0,
+        1400.0,
+        "Mid Mesoproterozoic",
+        TimeResolution::Precambrian,
+    ));
+    bins.push(TemporalBin::new(
+        1400.0,
+        1200.0,
+        "Late Mesoproterozoic",
+        TimeResolution::Precambrian,
+    ));
+    bins.push(TemporalBin::new(
+        1200.0,
+        1000.0,
+        "Stenian",
+        TimeResolution::Precambrian,
+    ));
+    bins.push(TemporalBin::new(
+        1000.0,
+        850.0,
+        "Tonian (early)",
+        TimeResolution::Precambrian,
+    ));
+    bins.push(TemporalBin::new(
+        850.0,
+        720.0,
+        "Tonian (late)",
+        TimeResolution::Precambrian,
+    ));
+    bins.push(TemporalBin::new(
+        720.0,
+        635.0,
+        "Cryogenian (Snowball Earth)",
+        TimeResolution::Precambrian,
+    ));
+    bins.push(TemporalBin::new(
+        635.0,
+        541.0,
+        "Ediacaran",
+        TimeResolution::Precambrian,
+    ));
 
     // ── Phanerozoic (541 - 0.0117 Ma): ICS stages ──
 
     // Cambrian
-    bins.push(TemporalBin::new(541.0, 521.0, "Terreneuvian", TimeResolution::PhanerozoicStage));
-    bins.push(TemporalBin::new(521.0, 509.0, "Cambrian Series 2", TimeResolution::PhanerozoicStage));
-    bins.push(TemporalBin::new(509.0, 497.0, "Miaolingian", TimeResolution::PhanerozoicStage));
-    bins.push(TemporalBin::new(497.0, 485.4, "Furongian", TimeResolution::PhanerozoicStage));
+    bins.push(TemporalBin::new(
+        541.0,
+        521.0,
+        "Terreneuvian",
+        TimeResolution::PhanerozoicStage,
+    ));
+    bins.push(TemporalBin::new(
+        521.0,
+        509.0,
+        "Cambrian Series 2",
+        TimeResolution::PhanerozoicStage,
+    ));
+    bins.push(TemporalBin::new(
+        509.0,
+        497.0,
+        "Miaolingian",
+        TimeResolution::PhanerozoicStage,
+    ));
+    bins.push(TemporalBin::new(
+        497.0,
+        485.4,
+        "Furongian",
+        TimeResolution::PhanerozoicStage,
+    ));
 
     // Ordovician
-    bins.push(TemporalBin::new(485.4, 470.0, "Early Ordovician", TimeResolution::PhanerozoicStage));
-    bins.push(TemporalBin::new(470.0, 458.4, "Middle Ordovician", TimeResolution::PhanerozoicStage));
-    bins.push(TemporalBin::new(458.4, 443.8, "Late Ordovician", TimeResolution::PhanerozoicStage));
+    bins.push(TemporalBin::new(
+        485.4,
+        470.0,
+        "Early Ordovician",
+        TimeResolution::PhanerozoicStage,
+    ));
+    bins.push(TemporalBin::new(
+        470.0,
+        458.4,
+        "Middle Ordovician",
+        TimeResolution::PhanerozoicStage,
+    ));
+    bins.push(TemporalBin::new(
+        458.4,
+        443.8,
+        "Late Ordovician",
+        TimeResolution::PhanerozoicStage,
+    ));
 
     // Silurian
-    bins.push(TemporalBin::new(443.8, 433.4, "Llandovery", TimeResolution::PhanerozoicStage));
-    bins.push(TemporalBin::new(433.4, 427.4, "Wenlock", TimeResolution::PhanerozoicStage));
-    bins.push(TemporalBin::new(427.4, 419.2, "Ludlow-Pridoli", TimeResolution::PhanerozoicStage));
+    bins.push(TemporalBin::new(
+        443.8,
+        433.4,
+        "Llandovery",
+        TimeResolution::PhanerozoicStage,
+    ));
+    bins.push(TemporalBin::new(
+        433.4,
+        427.4,
+        "Wenlock",
+        TimeResolution::PhanerozoicStage,
+    ));
+    bins.push(TemporalBin::new(
+        427.4,
+        419.2,
+        "Ludlow-Pridoli",
+        TimeResolution::PhanerozoicStage,
+    ));
 
     // Devonian
-    bins.push(TemporalBin::new(419.2, 393.3, "Early Devonian", TimeResolution::PhanerozoicStage));
-    bins.push(TemporalBin::new(393.3, 382.7, "Middle Devonian", TimeResolution::PhanerozoicStage));
-    bins.push(TemporalBin::new(382.7, 358.9, "Late Devonian", TimeResolution::PhanerozoicStage));
+    bins.push(TemporalBin::new(
+        419.2,
+        393.3,
+        "Early Devonian",
+        TimeResolution::PhanerozoicStage,
+    ));
+    bins.push(TemporalBin::new(
+        393.3,
+        382.7,
+        "Middle Devonian",
+        TimeResolution::PhanerozoicStage,
+    ));
+    bins.push(TemporalBin::new(
+        382.7,
+        358.9,
+        "Late Devonian",
+        TimeResolution::PhanerozoicStage,
+    ));
 
     // Carboniferous
-    bins.push(TemporalBin::new(358.9, 323.2, "Mississippian", TimeResolution::PhanerozoicStage));
-    bins.push(TemporalBin::new(323.2, 298.9, "Pennsylvanian", TimeResolution::PhanerozoicStage));
+    bins.push(TemporalBin::new(
+        358.9,
+        323.2,
+        "Mississippian",
+        TimeResolution::PhanerozoicStage,
+    ));
+    bins.push(TemporalBin::new(
+        323.2,
+        298.9,
+        "Pennsylvanian",
+        TimeResolution::PhanerozoicStage,
+    ));
 
     // Permian
-    bins.push(TemporalBin::new(298.9, 272.95, "Cisuralian", TimeResolution::PhanerozoicStage));
-    bins.push(TemporalBin::new(272.95, 259.51, "Guadalupian", TimeResolution::PhanerozoicStage));
-    bins.push(TemporalBin::new(259.51, 251.9, "Lopingian", TimeResolution::PhanerozoicStage));
+    bins.push(TemporalBin::new(
+        298.9,
+        272.95,
+        "Cisuralian",
+        TimeResolution::PhanerozoicStage,
+    ));
+    bins.push(TemporalBin::new(
+        272.95,
+        259.51,
+        "Guadalupian",
+        TimeResolution::PhanerozoicStage,
+    ));
+    bins.push(TemporalBin::new(
+        259.51,
+        251.9,
+        "Lopingian",
+        TimeResolution::PhanerozoicStage,
+    ));
 
     // Triassic
-    bins.push(TemporalBin::new(251.9, 247.2, "Early Triassic", TimeResolution::PhanerozoicStage));
-    bins.push(TemporalBin::new(247.2, 237.0, "Middle Triassic", TimeResolution::PhanerozoicStage));
-    bins.push(TemporalBin::new(237.0, 201.4, "Late Triassic", TimeResolution::PhanerozoicStage));
+    bins.push(TemporalBin::new(
+        251.9,
+        247.2,
+        "Early Triassic",
+        TimeResolution::PhanerozoicStage,
+    ));
+    bins.push(TemporalBin::new(
+        247.2,
+        237.0,
+        "Middle Triassic",
+        TimeResolution::PhanerozoicStage,
+    ));
+    bins.push(TemporalBin::new(
+        237.0,
+        201.4,
+        "Late Triassic",
+        TimeResolution::PhanerozoicStage,
+    ));
 
     // Jurassic
-    bins.push(TemporalBin::new(201.4, 174.7, "Early Jurassic", TimeResolution::PhanerozoicStage));
-    bins.push(TemporalBin::new(174.7, 161.5, "Middle Jurassic", TimeResolution::PhanerozoicStage));
-    bins.push(TemporalBin::new(161.5, 145.0, "Late Jurassic", TimeResolution::PhanerozoicStage));
+    bins.push(TemporalBin::new(
+        201.4,
+        174.7,
+        "Early Jurassic",
+        TimeResolution::PhanerozoicStage,
+    ));
+    bins.push(TemporalBin::new(
+        174.7,
+        161.5,
+        "Middle Jurassic",
+        TimeResolution::PhanerozoicStage,
+    ));
+    bins.push(TemporalBin::new(
+        161.5,
+        145.0,
+        "Late Jurassic",
+        TimeResolution::PhanerozoicStage,
+    ));
 
     // Cretaceous
-    bins.push(TemporalBin::new(145.0, 100.5, "Early Cretaceous", TimeResolution::PhanerozoicStage));
-    bins.push(TemporalBin::new(100.5, 66.0, "Late Cretaceous", TimeResolution::PhanerozoicStage));
+    bins.push(TemporalBin::new(
+        145.0,
+        100.5,
+        "Early Cretaceous",
+        TimeResolution::PhanerozoicStage,
+    ));
+    bins.push(TemporalBin::new(
+        100.5,
+        66.0,
+        "Late Cretaceous",
+        TimeResolution::PhanerozoicStage,
+    ));
 
     // Paleogene
-    bins.push(TemporalBin::new(66.0, 56.0, "Paleocene", TimeResolution::PhanerozoicStage));
-    bins.push(TemporalBin::new(56.0, 33.9, "Eocene", TimeResolution::PhanerozoicStage));
-    bins.push(TemporalBin::new(33.9, 23.03, "Oligocene", TimeResolution::PhanerozoicStage));
+    bins.push(TemporalBin::new(
+        66.0,
+        56.0,
+        "Paleocene",
+        TimeResolution::PhanerozoicStage,
+    ));
+    bins.push(TemporalBin::new(
+        56.0,
+        33.9,
+        "Eocene",
+        TimeResolution::PhanerozoicStage,
+    ));
+    bins.push(TemporalBin::new(
+        33.9,
+        23.03,
+        "Oligocene",
+        TimeResolution::PhanerozoicStage,
+    ));
 
     // Neogene
-    bins.push(TemporalBin::new(23.03, 5.333, "Miocene", TimeResolution::PhanerozoicStage));
-    bins.push(TemporalBin::new(5.333, 2.58, "Pliocene", TimeResolution::PhanerozoicStage));
+    bins.push(TemporalBin::new(
+        23.03,
+        5.333,
+        "Miocene",
+        TimeResolution::PhanerozoicStage,
+    ));
+    bins.push(TemporalBin::new(
+        5.333,
+        2.58,
+        "Pliocene",
+        TimeResolution::PhanerozoicStage,
+    ));
 
     // Quaternary (pre-Holocene)
-    bins.push(TemporalBin::new(2.58, 0.0117, "Pleistocene", TimeResolution::PhanerozoicStage));
+    bins.push(TemporalBin::new(
+        2.58,
+        0.0117,
+        "Pleistocene",
+        TimeResolution::PhanerozoicStage,
+    ));
 
     // ── Holocene (11,700 BP - 3,000 BCE = 0.0117 - 0.005 Ma) ──
-    bins.push(TemporalBin::new(0.0117, 0.009, "Early Holocene (Greenlandian)", TimeResolution::Holocene));
-    bins.push(TemporalBin::new(0.009, 0.007, "Middle Holocene (Northgrippian)", TimeResolution::Holocene));
-    bins.push(TemporalBin::new(0.007, 0.005, "Late Holocene (Meghalayan)", TimeResolution::Holocene));
+    bins.push(TemporalBin::new(
+        0.0117,
+        0.009,
+        "Early Holocene (Greenlandian)",
+        TimeResolution::Holocene,
+    ));
+    bins.push(TemporalBin::new(
+        0.009,
+        0.007,
+        "Middle Holocene (Northgrippian)",
+        TimeResolution::Holocene,
+    ));
+    bins.push(TemporalBin::new(
+        0.007,
+        0.005,
+        "Late Holocene (Meghalayan)",
+        TimeResolution::Holocene,
+    ));
 
     bins
 }
@@ -194,8 +449,16 @@ mod tests {
     #[test]
     fn bin_count_reasonable() {
         let bins = build_deep_time_bins();
-        assert!(bins.len() >= 50, "Expected at least 50 bins, got {}", bins.len());
-        assert!(bins.len() <= 100, "Expected at most 100 bins, got {}", bins.len());
+        assert!(
+            bins.len() >= 50,
+            "Expected at least 50 bins, got {}",
+            bins.len()
+        );
+        assert!(
+            bins.len() <= 100,
+            "Expected at most 100 bins, got {}",
+            bins.len()
+        );
     }
 
     #[test]

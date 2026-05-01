@@ -10,10 +10,7 @@ use thiserror::Error;
 pub enum ZkpError {
     /// Invalid K-Vector value (out of range)
     #[error("K-Vector component out of range [0, 1]: {component} = {value}")]
-    ValueOutOfRange {
-        component: &'static str,
-        value: f32,
-    },
+    ValueOutOfRange { component: &'static str, value: f32 },
 
     /// Degenerate input that would produce trivial constraints
     #[error("Degenerate K-Vector: {0}")]

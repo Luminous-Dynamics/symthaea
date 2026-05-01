@@ -24,9 +24,9 @@ use symthaea_logparse::probe::{stratified_split, LogisticProbe, TrainConfig};
 use symthaea_logparse::{evtx_source, LogEvent};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let arg = std::env::args().nth(1).ok_or(
-        "usage:\n  supervised_probe --synthetic\n  supervised_probe <corpus_dir>",
-    )?;
+    let arg = std::env::args()
+        .nth(1)
+        .ok_or("usage:\n  supervised_probe --synthetic\n  supervised_probe <corpus_dir>")?;
 
     let (events, mode_label) = if arg == "--synthetic" {
         let corpus = generate_synthetic_corpus(100, 0xC0FFEE);
@@ -179,7 +179,11 @@ fn load_real_corpus(corpus_dir: &PathBuf) -> Result<Vec<LogEvent>, Box<dyn std::
             parsed
         } else {
             let stride = parsed.len() / MAX_PER_FILE;
-            parsed.into_iter().step_by(stride.max(1)).take(MAX_PER_FILE).collect()
+            parsed
+                .into_iter()
+                .step_by(stride.max(1))
+                .take(MAX_PER_FILE)
+                .collect()
         };
         let bucket = by_label.entry(label.clone()).or_default();
         for mut ev in capped {

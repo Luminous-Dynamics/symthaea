@@ -6,8 +6,8 @@
 //! Enabled by default via the `debug-gizmos` feature flag.
 //! Disable with `default-features = false` in your Cargo.toml.
 
-use bevy::prelude::*;
 use crate::plugin::SymtropyPhysics;
+use bevy::prelude::*;
 use symtropy_bevy_core::PhysicsBody;
 use symtropy_consciousness_physics::safety::SafetyTier;
 
@@ -48,7 +48,9 @@ pub fn draw_debug_gizmos<const D: usize>(
         let pos = transform.translation;
 
         // Check if sensor
-        let is_sensor = physics.world.body(handle)
+        let is_sensor = physics
+            .world
+            .body(handle)
             .map(|b| b.is_sensor)
             .unwrap_or(false);
 
@@ -58,11 +60,7 @@ pub fn draw_debug_gizmos<const D: usize>(
             for i in 0..segments {
                 let a = (i as f32 / segments as f32) * std::f32::consts::TAU;
                 let b_angle = ((i as f32 + 0.5) / segments as f32) * std::f32::consts::TAU;
-                let start = Vec3::new(
-                    pos.x + a.cos() * radius,
-                    pos.y + a.sin() * radius,
-                    pos.z,
-                );
+                let start = Vec3::new(pos.x + a.cos() * radius, pos.y + a.sin() * radius, pos.z);
                 let end = Vec3::new(
                     pos.x + b_angle.cos() * radius,
                     pos.y + b_angle.sin() * radius,
@@ -72,11 +70,7 @@ pub fn draw_debug_gizmos<const D: usize>(
             }
         } else {
             // Solid circle for regular bodies
-            gizmos.circle(
-                Isometry3d::from_translation(pos),
-                radius,
-                color,
-            );
+            gizmos.circle(Isometry3d::from_translation(pos), radius, color);
         }
 
         // Energy bar above the body

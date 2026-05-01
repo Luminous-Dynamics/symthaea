@@ -326,7 +326,8 @@ impl Bulyan {
 
         // Step 1: Multi-Krum selection of (n - 2f) gradients.
         let selection_k = n - 2 * f;
-        let selected_indices = MultiKrum::select_indices(gradients, num_byzantine, Some(selection_k))?;
+        let selected_indices =
+            MultiKrum::select_indices(gradients, num_byzantine, Some(selection_k))?;
         let selected: Vec<&Gradient> = selected_indices.iter().map(|&i| &gradients[i]).collect();
 
         // Step 2: Coordinate-wise trimmed mean.
@@ -393,11 +394,11 @@ mod tests {
     /// Build a set of clustered "honest" gradients plus one distant Byzantine.
     fn honest_plus_byzantine() -> Vec<Gradient> {
         vec![
-            grad(&[1.0, 1.0, 1.0]),  // honest 0
-            grad(&[1.1, 0.9, 1.0]),  // honest 1
-            grad(&[0.9, 1.1, 1.0]),  // honest 2
-            grad(&[1.0, 1.0, 0.9]),  // honest 3
-            grad(&[1.0, 1.0, 1.1]),  // honest 4
+            grad(&[1.0, 1.0, 1.0]),       // honest 0
+            grad(&[1.1, 0.9, 1.0]),       // honest 1
+            grad(&[0.9, 1.1, 1.0]),       // honest 2
+            grad(&[1.0, 1.0, 0.9]),       // honest 3
+            grad(&[1.0, 1.0, 1.1]),       // honest 4
             grad(&[100.0, 100.0, 100.0]), // Byzantine
         ]
     }
@@ -437,12 +438,7 @@ mod tests {
     #[test]
     fn krum_insufficient_gradients() {
         // f=2 requires 2*2+3 = 7, but we only have 4
-        let gradients = vec![
-            grad(&[1.0]),
-            grad(&[2.0]),
-            grad(&[3.0]),
-            grad(&[4.0]),
-        ];
+        let gradients = vec![grad(&[1.0]), grad(&[2.0]), grad(&[3.0]), grad(&[4.0])];
         let err = Krum::aggregate(&gradients, 2).unwrap_err();
         match err {
             FlError::InsufficientGradients { got, need } => {

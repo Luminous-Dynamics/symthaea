@@ -9,7 +9,7 @@ use symthaea_core::hdc::ContinuousHV;
 use crate::controller::VehicleController;
 use crate::encoder::VehicleHdcEncoder;
 use crate::simulator::{BicycleModelSimulator, VehiclePhysicsSimulator};
-use crate::types::VehicleConfig;
+use crate::types::{BiotaRightOfWaySignal, VehicleConfig};
 
 pub use symthaea_core::embodiment::{
     grounding_from_prediction_error, grounding_label, EmbodimentResult, EmbodimentTelemetry,
@@ -93,6 +93,28 @@ impl VehicleEmbodiment {
             } else {
                 None
             };
+    }
+
+    /// Apply right-of-way guidance from a biota / sanctuary system.
+    ///
+    /// This composes into the existing moral safety lane so civic cohabitation
+    /// signals reuse the same fallback chain as ethics-triggered slow/stop
+    /// behavior.
+    pub fn apply_biota_right_of_way(&mut self, signal: BiotaRightOfWaySignal) {
+        let biota_safety = if signal.should_hold_red() {
+            Some(MotorSafetyLevel::Red)
+        } else if signal.should_yield_orange() {
+            Some(MotorSafetyLevel::Orange)
+        } else if signal.should_caution_yellow() {
+            Some(MotorSafetyLevel::Yellow)
+        } else {
+            None
+        };
+        self.moral_safety = match (self.moral_safety, biota_safety) {
+            (Some(existing), Some(incoming)) => Some(existing.max(incoming)),
+            (None, incoming) => incoming,
+            (existing, None) => existing,
+        };
     }
 
     /// Advance the multi-stage fallback state machine based on speed and time.
@@ -438,6 +460,40 @@ mod tests {
             r.safety_level,
             MotorSafetyLevel::Orange,
             "consent violation → Orange"
+        );
+    }
+
+    #[test]
+    fn test_biota_sanctuary_conflict_forces_orange_yield() {
+        let mut bridge = VehicleEmbodiment::new(&GenesisSeed::from_phrase("test"));
+        bridge.apply_biota_right_of_way(BiotaRightOfWaySignal {
+            distress_signal: 0.15,
+            path_conflict_risk: 0.52,
+            sanctuary_signal: 0.72,
+            route_clear_confidence: 0.35,
+            classification_confidence: 0.8,
+        });
+        let hv = ContinuousHV::random(16384, 42);
+        let r = bridge.step(&hv, 0.005, 0.9);
+        assert_eq!(r.safety_level, MotorSafetyLevel::Orange);
+    }
+
+    #[test]
+    fn test_biota_distressed_crossing_forces_red_fallback() {
+        let mut bridge = VehicleEmbodiment::new(&GenesisSeed::from_phrase("test"));
+        bridge.apply_biota_right_of_way(BiotaRightOfWaySignal {
+            distress_signal: 0.92,
+            path_conflict_risk: 0.81,
+            sanctuary_signal: 0.4,
+            route_clear_confidence: 0.1,
+            classification_confidence: 0.9,
+        });
+        let hv = ContinuousHV::random(16384, 42);
+        let r = bridge.step(&hv, 0.005, 0.9);
+        assert_eq!(r.safety_level, MotorSafetyLevel::Red);
+        assert_eq!(
+            bridge.fallback_stage(),
+            VehicleFallbackStage::MaintainCourse
         );
     }
 }

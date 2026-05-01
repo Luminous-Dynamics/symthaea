@@ -8,16 +8,15 @@
 //! JS-status-only connection strategies.
 
 use leptos::prelude::*;
+use send_wrapper::SendWrapper;
 use serde::{de::DeserializeOwned, Serialize};
 use std::cell::RefCell;
 use std::rc::Rc;
-use send_wrapper::SendWrapper;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::spawn_local;
 
 use mycelix_leptos_client::{
-    BrowserWsTransport, ConnectConfig, ReconnectConfig, HolochainTransport,
-    encode, decode,
+    decode, encode, BrowserWsTransport, ConnectConfig, HolochainTransport, ReconnectConfig,
 };
 
 // ---------------------------------------------------------------------------
@@ -152,9 +151,10 @@ impl HolochainCtx {
         fn_name: &str,
         input: &I,
     ) -> Result<O, String> {
-        let role = self.default_role.as_deref().expect(
-            "call_zome_default requires a default_role in HolochainProviderConfig"
-        );
+        let role = self
+            .default_role
+            .as_deref()
+            .expect("call_zome_default requires a default_role in HolochainProviderConfig");
         self.call_zome(role, zome, fn_name, input).await
     }
 
@@ -239,10 +239,7 @@ fn read_js_conductor_status() -> ConnectionStatus {
 /// Provides [`HolochainCtx`] via Leptos context. On mount, connects to the
 /// conductor using the configured strategy, falling back to mock mode.
 #[component]
-pub fn HolochainProviderAuto(
-    config: HolochainProviderConfig,
-    children: Children,
-) -> impl IntoView {
+pub fn HolochainProviderAuto(config: HolochainProviderConfig, children: Children) -> impl IntoView {
     let initial_status = match &config.connect_strategy {
         ConnectStrategy::WebSocket => ConnectionStatus::Connecting,
         ConnectStrategy::JsStatusOnly => read_js_conductor_status(),
@@ -294,7 +291,8 @@ pub fn HolochainProviderAuto(
                     }
                     Err(e) => {
                         web_sys::console::log_1(
-                            &format!("{log_prefix} Could not connect: {e}. Running in mock mode.").into(),
+                            &format!("{log_prefix} Could not connect: {e}. Running in mock mode.")
+                                .into(),
                         );
                         set_status.set(ConnectionStatus::Mock);
                     }

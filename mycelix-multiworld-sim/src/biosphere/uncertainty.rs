@@ -40,12 +40,12 @@ pub fn base_ci_half_width(resolution: TimeResolution, dim_idx: usize) -> f64 {
     // Dimension-specific base uncertainty (at Precambrian resolution).
     // Better-constrained dimensions get lower base values.
     let dim_base = match dim_idx {
-        DIM_BIODIVERSITY => 0.25,  // Fossil record exists, preservation bias known
-        DIM_COMPLEXITY => 0.15,    // First appearances well-dated
-        DIM_RESILIENCE => 0.20,    // Recovery times reasonably constrained
-        DIM_NETWORK => 0.35,       // Theoretical — trophic webs rarely preserved
-        DIM_ENERGY => 0.20,        // O2 proxy is decent via GEOCARB
-        DIM_INFORMATION => 0.30,   // Genome reconstruction is speculative
+        DIM_BIODIVERSITY => 0.25, // Fossil record exists, preservation bias known
+        DIM_COMPLEXITY => 0.15,   // First appearances well-dated
+        DIM_RESILIENCE => 0.20,   // Recovery times reasonably constrained
+        DIM_NETWORK => 0.35,      // Theoretical — trophic webs rarely preserved
+        DIM_ENERGY => 0.20,       // O2 proxy is decent via GEOCARB
+        DIM_INFORMATION => 0.30,  // Genome reconstruction is speculative
         _ => 0.30,
     };
 
@@ -119,8 +119,16 @@ mod tests {
             let pre = base_ci_half_width(TimeResolution::Precambrian, dim);
             let pha = base_ci_half_width(TimeResolution::PhanerozoicStage, dim);
             let hol = base_ci_half_width(TimeResolution::Holocene, dim);
-            assert!(pre > pha, "Precambrian should be wider than Phanerozoic for dim {}", dim);
-            assert!(pha > hol, "Phanerozoic should be wider than Holocene for dim {}", dim);
+            assert!(
+                pre > pha,
+                "Precambrian should be wider than Phanerozoic for dim {}",
+                dim
+            );
+            assert!(
+                pha > hol,
+                "Phanerozoic should be wider than Holocene for dim {}",
+                dim
+            );
         }
     }
 
@@ -128,14 +136,24 @@ mod tests {
     fn geochemical_bounding_tightens_ci() {
         let no_signal = geochemical_ci_correction(0.0, DIM_BIODIVERSITY);
         let strong_signal = geochemical_ci_correction(5.0, DIM_BIODIVERSITY);
-        assert!((no_signal - 1.0).abs() < 0.01, "No signal should not tighten");
-        assert!(strong_signal < 0.85, "Strong signal should tighten by >15%, got {}", strong_signal);
+        assert!(
+            (no_signal - 1.0).abs() < 0.01,
+            "No signal should not tighten"
+        );
+        assert!(
+            strong_signal < 0.85,
+            "Strong signal should tighten by >15%, got {}",
+            strong_signal
+        );
     }
 
     #[test]
     fn non_bio_dimensions_unaffected_by_d13c() {
         let correction = geochemical_ci_correction(5.0, DIM_COMPLEXITY);
-        assert!((correction - 1.0).abs() < 0.01, "Complexity should be unaffected by δ¹³C");
+        assert!(
+            (correction - 1.0).abs() < 0.01,
+            "Complexity should be unaffected by δ¹³C"
+        );
     }
 
     #[test]

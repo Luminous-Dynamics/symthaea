@@ -54,11 +54,17 @@ pub enum AssuranceLevel {
 
 impl AssuranceLevel {
     pub fn from_score(score: f64) -> Self {
-        if score >= 1.0 { Self::ConstitutionallyCritical }
-        else if score >= 0.75 { Self::HighlyAssured }
-        else if score >= 0.5 { Self::Verified }
-        else if score >= 0.25 { Self::Basic }
-        else { Self::Anonymous }
+        if score >= 1.0 {
+            Self::ConstitutionallyCritical
+        } else if score >= 0.75 {
+            Self::HighlyAssured
+        } else if score >= 0.5 {
+            Self::Verified
+        } else if score >= 0.25 {
+            Self::Basic
+        } else {
+            Self::Anonymous
+        }
     }
 
     pub fn from_u8(level: u8) -> Self {
@@ -93,10 +99,10 @@ impl AssuranceLevel {
 
     pub fn icon(&self) -> &'static str {
         match self {
-            Self::Anonymous => "\u{26AB}",          // ⚫
-            Self::Basic => "\u{1F535}",             // 🔵
-            Self::Verified => "\u{2705}",           // ✅
-            Self::HighlyAssured => "\u{1F7E2}",     // 🟢
+            Self::Anonymous => "\u{26AB}",                // ⚫
+            Self::Basic => "\u{1F535}",                   // 🔵
+            Self::Verified => "\u{2705}",                 // ✅
+            Self::HighlyAssured => "\u{1F7E2}",           // 🟢
             Self::ConstitutionallyCritical => "\u{2B50}", // ⭐
         }
     }
@@ -129,11 +135,17 @@ pub enum TrustTier {
 
 impl TrustTier {
     pub fn from_score(score: f64) -> Self {
-        if score >= 0.8 { Self::Guardian }
-        else if score >= 0.6 { Self::Elevated }
-        else if score >= 0.4 { Self::Standard }
-        else if score >= 0.3 { Self::Basic }
-        else { Self::Observer }
+        if score >= 0.8 {
+            Self::Guardian
+        } else if score >= 0.6 {
+            Self::Elevated
+        } else if score >= 0.4 {
+            Self::Standard
+        } else if score >= 0.3 {
+            Self::Basic
+        } else {
+            Self::Observer
+        }
     }
 
     pub fn label(&self) -> &'static str {
@@ -148,11 +160,11 @@ impl TrustTier {
 
     pub fn icon(&self) -> &'static str {
         match self {
-            Self::Observer => "\u{26AB}",     // ⚫
-            Self::Basic => "\u{1F535}",       // 🔵
-            Self::Standard => "\u{1F7E2}",    // 🟢
-            Self::Elevated => "\u{1F536}",    // 🔶
-            Self::Guardian => "\u{1F451}",    // 👑
+            Self::Observer => "\u{26AB}",  // ⚫
+            Self::Basic => "\u{1F535}",    // 🔵
+            Self::Standard => "\u{1F7E2}", // 🟢
+            Self::Elevated => "\u{1F536}", // 🔶
+            Self::Guardian => "\u{1F451}", // 👑
         }
     }
 }

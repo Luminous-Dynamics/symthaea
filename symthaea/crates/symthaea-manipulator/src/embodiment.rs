@@ -185,18 +185,42 @@ impl ManipulatorEmbodiment {
 }
 
 impl symthaea_core::embodiment::EmbodimentBridge for ManipulatorEmbodiment {
-    fn step(&mut self, hv: &ContinuousHV, dt: f32, phi: f64) -> EmbodimentResult { self.step(hv, dt, phi) }
-    fn encode_perception(&mut self) -> ContinuousHV { self.encode_perception() }
-    fn reset(&mut self) { self.reset() }
-    fn safety_level(&self) -> MotorSafetyLevel { self.safety_level() }
-    fn set_safety_override(&mut self, level: MotorSafetyLevel) { self.set_safety_override(level) }
-    fn clear_safety_override(&mut self) { self.clear_safety_override() }
-    fn platform(&self) -> symthaea_core::embodiment::EmbodimentPlatform { symthaea_core::embodiment::EmbodimentPlatform::Manipulator }
-    fn num_actuators(&self) -> usize { 8 }
-    fn total_steps(&self) -> usize { self.total_steps() }
-    fn telemetry(&self) -> EmbodimentTelemetry { self.telemetry() }
-    fn apply_moral_gate(&mut self, gate: symthaea_core::embodiment::MoralGateInput) { self.apply_moral_gate(gate) }
-    fn platform_telemetry_bytes(&self) -> Vec<u8> { self.platform_telemetry_bytes() }
+    fn step(&mut self, hv: &ContinuousHV, dt: f32, phi: f64) -> EmbodimentResult {
+        self.step(hv, dt, phi)
+    }
+    fn encode_perception(&mut self) -> ContinuousHV {
+        self.encode_perception()
+    }
+    fn reset(&mut self) {
+        self.reset()
+    }
+    fn safety_level(&self) -> MotorSafetyLevel {
+        self.safety_level()
+    }
+    fn set_safety_override(&mut self, level: MotorSafetyLevel) {
+        self.set_safety_override(level)
+    }
+    fn clear_safety_override(&mut self) {
+        self.clear_safety_override()
+    }
+    fn platform(&self) -> symthaea_core::embodiment::EmbodimentPlatform {
+        symthaea_core::embodiment::EmbodimentPlatform::Manipulator
+    }
+    fn num_actuators(&self) -> usize {
+        8
+    }
+    fn total_steps(&self) -> usize {
+        self.total_steps()
+    }
+    fn telemetry(&self) -> EmbodimentTelemetry {
+        self.telemetry()
+    }
+    fn apply_moral_gate(&mut self, gate: symthaea_core::embodiment::MoralGateInput) {
+        self.apply_moral_gate(gate)
+    }
+    fn platform_telemetry_bytes(&self) -> Vec<u8> {
+        self.platform_telemetry_bytes()
+    }
 }
 
 #[cfg(test)]

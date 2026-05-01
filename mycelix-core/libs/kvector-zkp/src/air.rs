@@ -67,7 +67,10 @@ pub struct KVectorPublicInputs {
 impl KVectorPublicInputs {
     /// Create public inputs from commitment and targets
     pub fn new(commitment: [u8; 32], targets: [u64; NUM_COMPONENTS]) -> Self {
-        Self { commitment, targets }
+        Self {
+            commitment,
+            targets,
+        }
     }
 }
 
@@ -206,7 +209,11 @@ impl Air for KVectorRangeAir {
             Assertion::single(columns::COMPONENT, 0, BaseElement::ZERO),
             Assertion::single(columns::BIT_INDEX, 0, BaseElement::ZERO),
             // Last computation row assertions
-            Assertion::single(columns::STEP, last_comp_row, BaseElement::from(last_comp_row as u64)),
+            Assertion::single(
+                columns::STEP,
+                last_comp_row,
+                BaseElement::from(last_comp_row as u64),
+            ),
             Assertion::single(columns::COMPONENT, last_comp_row, BaseElement::from(7u64)),
             Assertion::single(columns::BIT_INDEX, last_comp_row, BaseElement::from(13u64)),
         ];
@@ -349,7 +356,12 @@ mod tests {
 
         for &v in &test_values {
             let scaled = scale_value(v);
-            assert!(scaled <= SCALE_FACTOR, "Value {} scaled to {} exceeds max", v, scaled);
+            assert!(
+                scaled <= SCALE_FACTOR,
+                "Value {} scaled to {} exceeds max",
+                v,
+                scaled
+            );
 
             // Round-trip should be close
             let recovered = unscale_value(scaled);

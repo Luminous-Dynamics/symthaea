@@ -145,7 +145,7 @@ impl MorphologicalTransfer {
         ];
 
         Self {
-            source_genesis: GenesisSeed::from_phrase("symthaea-flight-quadrotor"),
+            source_genesis: GenesisSeed::from_phrase("symthaea-multirotor-quadrotor"),
             target_genesis: GenesisSeed::from_phrase("symthaea-humanoid-dmc"),
             channel_mapping,
             blend_factor: 0.5,
@@ -335,7 +335,7 @@ mod tests {
 
     /// Create a small trained flight network for testing.
     fn make_trained_flight_network() -> HdcLtcUnifiedNetwork {
-        let genesis = GenesisSeed::from_phrase("symthaea-flight-quadrotor");
+        let genesis = GenesisSeed::from_phrase("symthaea-multirotor-quadrotor");
         let config = UnifiedNetworkConfig {
             layer_sizes: vec![4; 2], // 2×4 flight config
             neuron_config: UnifiedConfig {

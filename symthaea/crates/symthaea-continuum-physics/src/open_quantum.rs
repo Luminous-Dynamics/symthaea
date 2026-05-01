@@ -76,14 +76,14 @@ impl DensityMatrix {
     /// Purity: Tr(ρ²). Pure state = 1, maximally mixed = 1/n.
     pub fn purity(&self) -> f64 {
         let n = self.n;
-        let mut tr = 0.0;
+        let mut _tr = 0.0;
         for i in 0..n {
             for k in 0..n {
                 let re_ik = self.re[i * n + k];
                 let im_ik = self.im[i * n + k];
                 let re_ki = self.re[k * n + i];
                 let im_ki = self.im[k * n + i];
-                tr += re_ik * re_ki - im_ik * im_ki; // Real part of (ρ²)_ii via ρ_ik × ρ_ki
+                _tr += re_ik * re_ki - im_ik * im_ki; // Real part of (ρ²)_ii via ρ_ik × ρ_ki
             }
         }
         // Actually this computes Σ_i (ρ²)_ii wrong. Let me fix:
@@ -248,7 +248,7 @@ impl LindbladSolver {
                     let mut rho_ldl_im = 0.0;
                     for k in 0..n {
                         // (L†L)_ik only has diagonal contribution for our simple L
-                        let ldl_ik = if i == k { ldl_ij } else { 0.0 };
+                        let _ldl_ik = if i == k { ldl_ij } else { 0.0 };
                         // Actually need proper (L†L)_ik:
                         let mut ldl_ik_val = 0.0;
                         for m in 0..n {
@@ -279,7 +279,12 @@ impl LindbladSolver {
     }
 
     /// Evolve for n_steps and return the purity at each step.
-    pub fn evolve_purity_trace(&self, rho: &mut DensityMatrix, dt: f64, n_steps: usize) -> Vec<f64> {
+    pub fn evolve_purity_trace(
+        &self,
+        rho: &mut DensityMatrix,
+        dt: f64,
+        n_steps: usize,
+    ) -> Vec<f64> {
         let mut trace = Vec::with_capacity(n_steps);
         for _ in 0..n_steps {
             self.step(rho, dt);
@@ -351,7 +356,8 @@ mod tests {
         assert!(
             coh_after < coh_before * 0.5,
             "Dephasing should reduce coherence: before={:.4}, after={:.4}",
-            coh_before, coh_after
+            coh_before,
+            coh_after
         );
     }
 
@@ -415,7 +421,8 @@ mod tests {
         assert!(
             purity_after < purity_before,
             "Purity should decrease: before={:.4}, after={:.4}",
-            purity_before, purity_after
+            purity_before,
+            purity_after
         );
     }
 }

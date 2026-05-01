@@ -15,8 +15,8 @@ use std::path::Path;
 /// Returns events in file order. Errors on individual records are logged to
 /// stderr and skipped — a corrupt record should not kill the whole corpus run.
 pub fn parse_evtx_file(path: &Path) -> Result<Vec<LogEvent>> {
-    let mut parser = evtx::EvtxParser::from_path(path)
-        .map_err(|e| LogParseError::Evtx(e.to_string()))?;
+    let mut parser =
+        evtx::EvtxParser::from_path(path).map_err(|e| LogParseError::Evtx(e.to_string()))?;
 
     let mut out = Vec::new();
     for record in parser.records_json_value() {
@@ -51,15 +51,9 @@ fn record_to_log_event(data: &serde_json::Value) -> Option<LogEvent> {
         .unwrap_or("")
         .to_string();
 
-    let event_id = system
-        .get("EventID")
-        .and_then(extract_u32)
-        .unwrap_or(0);
+    let event_id = system.get("EventID").and_then(extract_u32).unwrap_or(0);
 
-    let level = system
-        .get("Level")
-        .and_then(extract_u32)
-        .unwrap_or(4);
+    let level = system.get("Level").and_then(extract_u32).unwrap_or(4);
     let severity = evtx_level_to_severity(level);
 
     let timestamp = system

@@ -2,7 +2,15 @@
 # Usage: just <command>
 
 # NixOS pkg-config paths for build
-export PKG_CONFIG_PATH := `nix-build '<nixpkgs>' -A alsa-lib.dev --no-out-link 2>/dev/null`/lib/pkgconfig + ":" + `nix-build '<nixpkgs>' -A xorg.libX11.dev --no-out-link 2>/dev/null`/lib/pkgconfig + ":" + `nix-build '<nixpkgs>' -A xorg.libXcursor.dev --no-out-link 2>/dev/null`/lib/pkgconfig + ":" + `nix-build '<nixpkgs>' -A xorg.libXi.dev --no-out-link 2>/dev/null`/lib/pkgconfig + ":" + `nix-build '<nixpkgs>' -A xorg.libXrandr.dev --no-out-link 2>/dev/null`/lib/pkgconfig + ":" + `nix-build '<nixpkgs>' -A libxkbcommon.dev --no-out-link 2>/dev/null`/lib/pkgconfig + ":" + `nix-build '<nixpkgs>' -A wayland.dev --no-out-link 2>/dev/null`/lib/pkgconfig + ":" + env("PKG_CONFIG_PATH", "")
+alsa_path := `nix-build '<nixpkgs>' -A alsa-lib.dev --no-out-link 2>/dev/null` + "/lib/pkgconfig"
+x11_path := `nix-build '<nixpkgs>' -A xorg.libX11.dev --no-out-link 2>/dev/null` + "/lib/pkgconfig"
+xcursor_path := `nix-build '<nixpkgs>' -A xorg.libXcursor.dev --no-out-link 2>/dev/null` + "/lib/pkgconfig"
+xi_path := `nix-build '<nixpkgs>' -A xorg.libXi.dev --no-out-link 2>/dev/null` + "/lib/pkgconfig"
+xrandr_path := `nix-build '<nixpkgs>' -A xorg.libXrandr.dev --no-out-link 2>/dev/null` + "/lib/pkgconfig"
+xkbcommon_path := `nix-build '<nixpkgs>' -A libxkbcommon.dev --no-out-link 2>/dev/null` + "/lib/pkgconfig"
+wayland_path := `nix-build '<nixpkgs>' -A wayland.dev --no-out-link 2>/dev/null` + "/lib/pkgconfig"
+
+export PKG_CONFIG_PATH := alsa_path + ":" + x11_path + ":" + xcursor_path + ":" + xi_path + ":" + xrandr_path + ":" + xkbcommon_path + ":" + wayland_path + ":" + env("PKG_CONFIG_PATH", "")
 
 # Default: build and run debug
 default: run
@@ -30,6 +38,20 @@ run-x11: build
 # Check compilation only (fast)
 check:
     cargo check
+
+# Canonical core verification gate for Phase 0.1.
+# This intentionally avoids demo/runtime crates so it can run on headless CI.
+verify-core:
+    # 1. License check
+    ./scripts/check-licenses.sh
+    # 2. Formatting (check only)
+    cargo fmt --all -- --check
+    # 3. Compilation & Clippy (deny warnings on core crates)
+    RUSTC_WRAPPER= SCCACHE_DISABLE=1 cargo clippy -p symtropy-math -p symtropy-physics -p symtropy-render-bridge -p symtropy-bevy-core -p symtropy-consciousness-physics -- -D warnings
+    RUSTC_WRAPPER= SCCACHE_DISABLE=1 cargo check -p symtropy-cli
+    # 4. Core Tests
+    RUSTC_WRAPPER= SCCACHE_DISABLE=1 cargo test -p symtropy-math -p symtropy-physics -p symtropy-consciousness-physics --lib
+    RUSTC_WRAPPER= SCCACHE_DISABLE=1 cargo test -p symtropy-physics --test replay_harness
 
 # Run all symtropy workspace tests in release mode (required for perf guards)
 test:

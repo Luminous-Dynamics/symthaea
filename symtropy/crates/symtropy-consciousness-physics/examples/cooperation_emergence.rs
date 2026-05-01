@@ -14,12 +14,12 @@
 //! Run: cargo run -p symtropy-consciousness-physics --example cooperation_emergence
 
 use nalgebra::SVector;
+use symthaea_consciousness_equation::ConsciousnessInputs;
 use symtropy_consciousness_physics::fep_gradient;
 use symtropy_consciousness_physics::harmony_field::HarmonyField;
 use symtropy_consciousness_physics::{ConsciousnessField, ThermodynamicConstants};
 use symtropy_math::Point;
 use symtropy_physics::PhysicsWorld;
-use symthaea_consciousness_equation::ConsciousnessInputs;
 
 const AGENTS: usize = 12;
 const TICKS: usize = 5000;
@@ -29,8 +29,8 @@ const DT: f64 = 1.0 / 64.0;
 struct ExperimentResult {
     name: &'static str,
     alive_at_end: usize,
-    avg_clustering: f64,      // average distance to nearest neighbor
-    cooperation_ticks: u64,   // ticks where epistemic offloading occurred
+    avg_clustering: f64,    // average distance to nearest neighbor
+    cooperation_ticks: u64, // ticks where epistemic offloading occurred
     avg_energy_at_end: f64,
     collapses: u64,
     recoveries: u64,
@@ -96,12 +96,20 @@ fn run_experiment(name: &'static str, enforce: bool, seed: u64) -> ExperimentRes
     for tick in 0..TICKS {
         // Update consciousness
         for &h in &handles {
-            let collapsed = consciousness.entities.get(&h)
-                .map(|e| e.energy.is_collapsed()).unwrap_or(true);
+            let collapsed = consciousness
+                .entities
+                .get(&h)
+                .map(|e| e.energy.is_collapsed())
+                .unwrap_or(true);
             let inputs = ConsciousnessInputs {
                 phi: if collapsed { 0.0 } else { 0.5 },
-                broadcast: 0.6, working_memory: 0.5, attention: 0.5,
-                recurrence: 0.4, embodiment: 0.6, knowledge: 0.4, synchrony: 0.5,
+                broadcast: 0.6,
+                working_memory: 0.5,
+                attention: 0.5,
+                recurrence: 0.4,
+                embodiment: 0.6,
+                knowledge: 0.4,
+                synchrony: 0.5,
             };
             consciousness.update_entity(h, &inputs, Point::origin());
         }
@@ -109,7 +117,8 @@ fn run_experiment(name: &'static str, enforce: bool, seed: u64) -> ExperimentRes
         // FEP gradient-driven movement (only in enforced condition)
         if enforce {
             // Gather nearby agent data for gradient computation
-            let agent_data: Vec<(SVector<f64, 2>, [f64; 9])> = handles.iter()
+            let agent_data: Vec<(SVector<f64, 2>, [f64; 9])> = handles
+                .iter()
                 .filter_map(|&h| {
                     let body = world.body(h)?;
                     let entity = consciousness.entities.get(&h)?;
@@ -118,28 +127,46 @@ fn run_experiment(name: &'static str, enforce: bool, seed: u64) -> ExperimentRes
                 .collect();
 
             for (idx, &h) in handles.iter().enumerate() {
-                let collapsed = consciousness.entities.get(&h)
-                    .map(|e| e.energy.is_collapsed()).unwrap_or(true);
-                if collapsed { continue; }
+                let collapsed = consciousness
+                    .entities
+                    .get(&h)
+                    .map(|e| e.energy.is_collapsed())
+                    .unwrap_or(true);
+                if collapsed {
+                    continue;
+                }
 
                 let pos = match world.body(h) {
                     Some(b) => b.position().0,
                     None => continue,
                 };
-                let energy_frac = consciousness.entities.get(&h)
-                    .map(|e| e.energy.fraction_remaining()).unwrap_or(0.0);
-                let harmony = consciousness.entities.get(&h)
-                    .map(|e| e.harmony_activations).unwrap_or([0.0; 9]);
+                let energy_frac = consciousness
+                    .entities
+                    .get(&h)
+                    .map(|e| e.energy.fraction_remaining())
+                    .unwrap_or(0.0);
+                let harmony = consciousness
+                    .entities
+                    .get(&h)
+                    .map(|e| e.harmony_activations)
+                    .unwrap_or([0.0; 9]);
 
                 // Build nearby agents list (exclude self)
-                let nearby: Vec<_> = agent_data.iter()
+                let nearby: Vec<_> = agent_data
+                    .iter()
                     .enumerate()
                     .filter(|(i, _)| *i != idx)
                     .map(|(_, data)| data.clone())
                     .collect();
 
                 let direction = fep_gradient::free_energy_gradient(
-                    &pos, energy_frac, &harmony, &nearby, &[], None, 0.0,
+                    &pos,
+                    energy_frac,
+                    &harmony,
+                    &nearby,
+                    &[],
+                    None,
+                    0.0,
                 );
 
                 // Apply as velocity (speed 30 units/sec)
@@ -157,9 +184,12 @@ fn run_experiment(name: &'static str, enforce: bool, seed: u64) -> ExperimentRes
                     entity.energy.tick_reset();
                     let phi = entity.phi();
                     entity.energy.consume(
-                        consciousness.constants.consciousness_maintenance_per_tick * (1.0 + phi * 0.5)
+                        consciousness.constants.consciousness_maintenance_per_tick
+                            * (1.0 + phi * 0.5),
                     );
-                    entity.energy.regenerate(consciousness.constants.ambient_regen_rate * regen_mult);
+                    entity
+                        .energy
+                        .regenerate(consciousness.constants.ambient_regen_rate * regen_mult);
                 }
             }
         }
@@ -177,7 +207,9 @@ fn run_experiment(name: &'static str, enforce: bool, seed: u64) -> ExperimentRes
                         _ => continue,
                     }
                 };
-                if dist > consciousness.constants.harmony_range { continue; }
+                if dist > consciousness.constants.harmony_range {
+                    continue;
+                }
 
                 let (harm_a, harm_b) = {
                     let ea = consciousness.entities.get(&ha);
@@ -194,28 +226,41 @@ fn run_experiment(name: &'static str, enforce: bool, seed: u64) -> ExperimentRes
                         e.prediction_error *= 1.0 - offload * 0.1;
                         e.motor_precision = 1.0 / (1.0 + e.prediction_error);
                         e.energy.regenerate(
-                            consciousness.constants.consciousness_maintenance_per_tick * offload * 0.5
+                            consciousness.constants.consciousness_maintenance_per_tick
+                                * offload
+                                * 0.5,
                         );
                     }
                     if let Some(e) = consciousness.entities.get_mut(&hb) {
                         e.prediction_error *= 1.0 - offload * 0.1;
                         e.motor_precision = 1.0 / (1.0 + e.prediction_error);
                         e.energy.regenerate(
-                            consciousness.constants.consciousness_maintenance_per_tick * offload * 0.5
+                            consciousness.constants.consciousness_maintenance_per_tick
+                                * offload
+                                * 0.5,
                         );
                     }
                     any_offloading = true;
                 }
             }
         }
-        if any_offloading { cooperation_ticks += 1; }
+        if any_offloading {
+            cooperation_ticks += 1;
+        }
 
         // Track collapses and recoveries
         for (idx, &h) in handles.iter().enumerate() {
-            let now_collapsed = consciousness.entities.get(&h)
-                .map(|e| e.energy.is_collapsed()).unwrap_or(false);
-            if now_collapsed && !prev_collapsed[idx] { collapses += 1; }
-            if !now_collapsed && prev_collapsed[idx] { recoveries += 1; }
+            let now_collapsed = consciousness
+                .entities
+                .get(&h)
+                .map(|e| e.energy.is_collapsed())
+                .unwrap_or(false);
+            if now_collapsed && !prev_collapsed[idx] {
+                collapses += 1;
+            }
+            if !now_collapsed && prev_collapsed[idx] {
+                recoveries += 1;
+            }
             prev_collapsed[idx] = now_collapsed;
         }
 
@@ -230,23 +275,36 @@ fn run_experiment(name: &'static str, enforce: bool, seed: u64) -> ExperimentRes
     }
 
     // Final measurements
-    let alive = handles.iter().filter(|h| {
-        consciousness.entities.get(h).map(|e| !e.energy.is_collapsed()).unwrap_or(false)
-    }).count();
+    let alive = handles
+        .iter()
+        .filter(|h| {
+            consciousness
+                .entities
+                .get(h)
+                .map(|e| !e.energy.is_collapsed())
+                .unwrap_or(false)
+        })
+        .count();
 
-    let avg_energy = handles.iter()
+    let avg_energy = handles
+        .iter()
         .filter_map(|h| consciousness.entities.get(h).map(|e| e.energy.available))
-        .sum::<f64>() / AGENTS as f64;
+        .sum::<f64>()
+        / AGENTS as f64;
 
     // Clustering: average distance to nearest neighbor
     let mut total_nearest = 0.0;
     for i in 0..handles.len() {
         let mut min_dist = f64::MAX;
         for j in 0..handles.len() {
-            if i == j { continue; }
+            if i == j {
+                continue;
+            }
             if let (Some(a), Some(b)) = (world.body(handles[i]), world.body(handles[j])) {
                 let d = a.position().distance(b.position());
-                if d < min_dist { min_dist = d; }
+                if d < min_dist {
+                    min_dist = d;
+                }
             }
         }
         total_nearest += min_dist;
@@ -270,8 +328,12 @@ fn main() {
     println!("║  THE DEFINITIVE EXPERIMENT: Does Thermodynamic Enforcement  ║");
     println!("║  Produce Emergent Cooperation?                             ║");
     println!("╚══════════════════════════════════════════════════════════════╝\n");
-    println!("Configuration: {} agents, {} ticks (~{:.0}s), 3 seeds\n",
-        AGENTS, TICKS, TICKS as f64 / 64.0);
+    println!(
+        "Configuration: {} agents, {} ticks (~{:.0}s), 3 seeds\n",
+        AGENTS,
+        TICKS,
+        TICKS as f64 / 64.0
+    );
 
     let seeds = [42, 137, 2718];
 
@@ -303,7 +365,10 @@ fn main() {
 
     let e_cluster = avg(&enforced_results, |r| r.avg_clustering);
     let f_cluster = avg(&free_results, |r| r.avg_clustering);
-    println!("│ Avg clustering  │ {:>6.1} │ {:>6.1} │", e_cluster, f_cluster);
+    println!(
+        "│ Avg clustering  │ {:>6.1} │ {:>6.1} │",
+        e_cluster, f_cluster
+    );
 
     let e_coop = avg(&enforced_results, |r| r.cooperation_ticks as f64);
     let f_coop = avg(&free_results, |r| r.cooperation_ticks as f64);
@@ -311,41 +376,70 @@ fn main() {
 
     let e_energy = avg(&enforced_results, |r| r.avg_energy_at_end);
     let f_energy = avg(&free_results, |r| r.avg_energy_at_end);
-    println!("│ Avg energy      │ {:>6.1} │ {:>6.1} │", e_energy, f_energy);
+    println!(
+        "│ Avg energy      │ {:>6.1} │ {:>6.1} │",
+        e_energy, f_energy
+    );
 
     let e_collapses = avg(&enforced_results, |r| r.collapses as f64);
     let f_collapses = avg(&free_results, |r| r.collapses as f64);
-    println!("│ Collapses       │ {:>6.1} │ {:>6.1} │", e_collapses, f_collapses);
+    println!(
+        "│ Collapses       │ {:>6.1} │ {:>6.1} │",
+        e_collapses, f_collapses
+    );
 
     println!("└─────────────────┴─────────┴─────────┘");
 
     // Phi trends
     println!("\nCollective Φ over time (sampled every 100 ticks):");
-    println!("  ENFORCED: {:?}",
-        enforced_results[0].collective_phi_trend.iter()
-            .map(|p| format!("{:.3}", p)).collect::<Vec<_>>().join(", "));
-    println!("  FREE:     {:?}",
-        free_results[0].collective_phi_trend.iter()
-            .map(|p| format!("{:.3}", p)).collect::<Vec<_>>().join(", "));
+    println!(
+        "  ENFORCED: {:?}",
+        enforced_results[0]
+            .collective_phi_trend
+            .iter()
+            .map(|p| format!("{:.3}", p))
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+    println!(
+        "  FREE:     {:?}",
+        free_results[0]
+            .collective_phi_trend
+            .iter()
+            .map(|p| format!("{:.3}", p))
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
 
     // Verdict
     println!("\n═══════════════════════════════════════════");
     let cluster_diff = (f_cluster - e_cluster) / f_cluster * 100.0;
     if e_cluster < f_cluster && cluster_diff > 5.0 {
-        println!("RESULT: Enforced agents cluster {:.1}% more tightly.", cluster_diff);
+        println!(
+            "RESULT: Enforced agents cluster {:.1}% more tightly.",
+            cluster_diff
+        );
         println!("VERDICT: Thermodynamic enforcement produces emergent cooperation.");
     } else if (e_cluster - f_cluster).abs() / f_cluster < 0.05 {
-        println!("RESULT: No significant clustering difference ({:.1}%).", cluster_diff.abs());
+        println!(
+            "RESULT: No significant clustering difference ({:.1}%).",
+            cluster_diff.abs()
+        );
         println!("VERDICT: Cooperation emerges equally in both conditions.");
         println!("NOTE: Agents may need movement-toward-resonance behavior to show effect.");
     } else {
-        println!("RESULT: Free agents cluster {:.1}% more tightly.", -cluster_diff);
+        println!(
+            "RESULT: Free agents cluster {:.1}% more tightly.",
+            -cluster_diff
+        );
         println!("VERDICT: Unexpected — investigate.");
     }
     println!("═══════════════════════════════════════════");
 }
 
 fn next_rng(state: &mut u64) -> f64 {
-    *state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+    *state = state
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
     (*state >> 11) as f64 / (1u64 << 53) as f64
 }

@@ -10,7 +10,7 @@
 //!
 //! Measures: CVS, Phi, population, civil wars, faction count
 
-use mycelix_multiworld_sim::{MultiWorldSimulator, config::SimulationConfig};
+use mycelix_multiworld_sim::{config::SimulationConfig, MultiWorldSimulator};
 
 struct ArmConfig {
     name: &'static str,
@@ -49,12 +49,16 @@ fn run_arm(arm: &ArmConfig, seed: u64) -> RunResult {
 }
 
 fn mean(values: &[f64]) -> f64 {
-    if values.is_empty() { return 0.0; }
+    if values.is_empty() {
+        return 0.0;
+    }
     values.iter().sum::<f64>() / values.len() as f64
 }
 
 fn std_dev(values: &[f64]) -> f64 {
-    if values.len() < 2 { return 0.0; }
+    if values.len() < 2 {
+        return 0.0;
+    }
     let m = mean(values);
     let var = values.iter().map(|v| (v - m).powi(2)).sum::<f64>() / (values.len() - 1) as f64;
     var.sqrt()
@@ -62,9 +66,21 @@ fn std_dev(values: &[f64]) -> f64 {
 
 fn main() {
     let arms = [
-        ArmConfig { name: "A_Baseline", coordination_understanding: 0.0, education_boost: 0.0 },
-        ArmConfig { name: "B_Education", coordination_understanding: 0.0, education_boost: 0.2 },
-        ArmConfig { name: "C_Coordination", coordination_understanding: 0.5, education_boost: 0.0 },
+        ArmConfig {
+            name: "A_Baseline",
+            coordination_understanding: 0.0,
+            education_boost: 0.0,
+        },
+        ArmConfig {
+            name: "B_Education",
+            coordination_understanding: 0.0,
+            education_boost: 0.2,
+        },
+        ArmConfig {
+            name: "C_Coordination",
+            coordination_understanding: 0.5,
+            education_boost: 0.0,
+        },
     ];
 
     let seeds: Vec<u64> = (42..52).collect(); // 10 seeds
@@ -72,7 +88,11 @@ fn main() {
 
     println!("╔══════════════════════════════════════════════════════════════╗");
     println!("║  Experiment 1: Coordination Science vs General Education    ║");
-    println!("║  3 arms × {} seeds = {} simulations (150 years each)        ║", n_seeds, arms.len() * n_seeds);
+    println!(
+        "║  3 arms × {} seeds = {} simulations (150 years each)        ║",
+        n_seeds,
+        arms.len() * n_seeds
+    );
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 
     let mut all_results: Vec<RunResult> = Vec::new();
@@ -81,9 +101,15 @@ fn main() {
         println!("── Running {} ──", arm.name);
         for &seed in &seeds {
             let result = run_arm(arm, seed);
-            print!("  seed={}: CVS={:.4}, pop={}, phi={:.4}, wars={}, {}",
-                seed, result.cvs, result.population, result.phi,
-                result.civil_wars, if result.survived { "OK" } else { "COLLAPSED" });
+            print!(
+                "  seed={}: CVS={:.4}, pop={}, phi={:.4}, wars={}, {}",
+                seed,
+                result.cvs,
+                result.population,
+                result.phi,
+                result.civil_wars,
+                if result.survived { "OK" } else { "COLLAPSED" }
+            );
             println!();
             all_results.push(result);
         }
@@ -95,20 +121,23 @@ fn main() {
     println!("  RESULTS SUMMARY");
     println!("══════════════════════════════════════════════════════════════\n");
 
-    println!("{:<20} {:>10} {:>10} {:>10} {:>10} {:>10}", "Arm", "CVS", "±", "Phi", "Pop", "Wars");
+    println!(
+        "{:<20} {:>10} {:>10} {:>10} {:>10} {:>10}",
+        "Arm", "CVS", "±", "Phi", "Pop", "Wars"
+    );
     println!("{}", "-".repeat(72));
 
     for arm in &arms {
-        let arm_results: Vec<&RunResult> = all_results.iter()
-            .filter(|r| r.arm == arm.name)
-            .collect();
+        let arm_results: Vec<&RunResult> =
+            all_results.iter().filter(|r| r.arm == arm.name).collect();
 
         let cvs_vals: Vec<f64> = arm_results.iter().map(|r| r.cvs).collect();
         let phi_vals: Vec<f64> = arm_results.iter().map(|r| r.phi).collect();
         let pop_vals: Vec<f64> = arm_results.iter().map(|r| r.population as f64).collect();
         let war_vals: Vec<f64> = arm_results.iter().map(|r| r.civil_wars as f64).collect();
 
-        println!("{:<20} {:>10.4} {:>10.4} {:>10.4} {:>10.0} {:>10.1}",
+        println!(
+            "{:<20} {:>10.4} {:>10.4} {:>10.4} {:>10.0} {:>10.1}",
             arm.name,
             mean(&cvs_vals),
             std_dev(&cvs_vals),
@@ -119,12 +148,21 @@ fn main() {
     }
 
     // ── Effect sizes ──
-    let baseline_cvs: Vec<f64> = all_results.iter()
-        .filter(|r| r.arm == "A_Baseline").map(|r| r.cvs).collect();
-    let education_cvs: Vec<f64> = all_results.iter()
-        .filter(|r| r.arm == "B_Education").map(|r| r.cvs).collect();
-    let coordination_cvs: Vec<f64> = all_results.iter()
-        .filter(|r| r.arm == "C_Coordination").map(|r| r.cvs).collect();
+    let baseline_cvs: Vec<f64> = all_results
+        .iter()
+        .filter(|r| r.arm == "A_Baseline")
+        .map(|r| r.cvs)
+        .collect();
+    let education_cvs: Vec<f64> = all_results
+        .iter()
+        .filter(|r| r.arm == "B_Education")
+        .map(|r| r.cvs)
+        .collect();
+    let coordination_cvs: Vec<f64> = all_results
+        .iter()
+        .filter(|r| r.arm == "C_Coordination")
+        .map(|r| r.cvs)
+        .collect();
 
     let delta_edu = mean(&education_cvs) - mean(&baseline_cvs);
     let delta_coord = mean(&coordination_cvs) - mean(&baseline_cvs);
@@ -148,18 +186,36 @@ fn main() {
     }
 
     // Phi comparison
-    let baseline_phi: Vec<f64> = all_results.iter()
-        .filter(|r| r.arm == "A_Baseline").map(|r| r.phi).collect();
-    let coordination_phi: Vec<f64> = all_results.iter()
-        .filter(|r| r.arm == "C_Coordination").map(|r| r.phi).collect();
+    let baseline_phi: Vec<f64> = all_results
+        .iter()
+        .filter(|r| r.arm == "A_Baseline")
+        .map(|r| r.phi)
+        .collect();
+    let coordination_phi: Vec<f64> = all_results
+        .iter()
+        .filter(|r| r.arm == "C_Coordination")
+        .map(|r| r.phi)
+        .collect();
     let phi_delta = mean(&coordination_phi) - mean(&baseline_phi);
-    println!("\n  Phi effect (Coordination vs Baseline): {:+.4}", phi_delta);
+    println!(
+        "\n  Phi effect (Coordination vs Baseline): {:+.4}",
+        phi_delta
+    );
 
     // Conflict reduction
-    let baseline_wars: Vec<f64> = all_results.iter()
-        .filter(|r| r.arm == "A_Baseline").map(|r| r.civil_wars as f64).collect();
-    let coordination_wars: Vec<f64> = all_results.iter()
-        .filter(|r| r.arm == "C_Coordination").map(|r| r.civil_wars as f64).collect();
+    let baseline_wars: Vec<f64> = all_results
+        .iter()
+        .filter(|r| r.arm == "A_Baseline")
+        .map(|r| r.civil_wars as f64)
+        .collect();
+    let coordination_wars: Vec<f64> = all_results
+        .iter()
+        .filter(|r| r.arm == "C_Coordination")
+        .map(|r| r.civil_wars as f64)
+        .collect();
     let war_reduction = mean(&baseline_wars) - mean(&coordination_wars);
-    println!("  Conflict reduction (wars):             {:+.1}", war_reduction);
+    println!(
+        "  Conflict reduction (wars):             {:+.1}",
+        war_reduction
+    );
 }

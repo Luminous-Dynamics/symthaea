@@ -48,7 +48,7 @@ Genesis crates (all depend on core + fep):
 Physics & embodiment (all depend on core):
   symthaea-physics       — tokamak plasma encoding
   symthaea-physics-bridge — HDC semantic physics
-  symthaea-flight        — quadrotor FEP control
+  symthaea-multirotor    — multirotor FEP control
   symthaea-humanoid      — bipedal DMC benchmark
   symthaea-hal           — hardware abstraction
   symthaea-vehicle       — ground vehicle control

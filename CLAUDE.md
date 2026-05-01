@@ -55,7 +55,7 @@ cargo login <token>   # Already configured in ~/.cargo/credentials.toml
 | 8112 | Hearth UI | hearth.luminousdynamics.io |
 | 8117 | Pulse (Decentralized Email) | mail.mycelix.net |
 | 8121 | Music UI | music.luminousdynamics.io |
-| 8124 | Portal UI | portal.mycelix.net |
+| 8124 | Sensorium UI | sensorium.mycelix.net |
 | 8129 | Craft UI | craft.mycelix.net |
 | 8130 | Prism (Epistemic Browser) | prism.mycelix.net |
 | 8134 | Xenia Admin (Mycelix Sovereign) | admin.sovereign.mycelix.net |
@@ -191,8 +191,8 @@ Consciousness-first robotics via `EmbodimentBridge` trait: thought → motor →
 
 | Crate | Platform | State/Cmd | Tests | Key Physics / Status |
 |-------|----------|-----------|-------|----------------------|
-| `symthaea-humanoid` | Bipedal (DMC) | 72D/21D | **191** | Contact dynamics, gait analysis, PD curriculum. Wired via `MotorBridge` in main crate. |
-| `symthaea-flight` | Quadrotor | 13D/4D | **205** | Ballistic + MuJoCo, formation control, 128-instance swarm training |
+| `symthaea-humanoid` | Bipedal / dexterous humanoid | 72ch/21D base -> 167ch/64D variants | **191** | DMC21 base plus `Dexterous53` / `WithNeckWrist` / `FullSpine` morphologies, predictive HDC encoder, gait analysis, PD baselines for stand/walk/run/reach/grasp, gravity-scaled curriculum. Wired via `MotorBridge` in main crate. |
+| `symthaea-multirotor` | Multirotor family | 13D/4D | **205** | Simple + MuJoCo Crazyflie 2 physics, formation control, 128-instance swarm training, scenario variants (`survival_reflex`, `kinetic_sacrifice`, multi-scenario benchmarks). Rust API is `symthaea_multirotor`. |
 | `symthaea-vehicle` | Autonomous car | 20D/3D | **181** | Bicycle model, Pacejka tires, mesh swarm |
 | `symthaea-manipulator` | Industrial arm | 21D/8D | **111** | 7-DOF DH kinematics, DLS IK (Wampler 1986), joint limits. Coffee Cup Gate 5/5 PASSED. |
 | `symthaea-auv` | Water steward | 32D/8D | **90** | 6DOF hydrodynamics (added mass, quadratic drag, buoyancy), 8 WHO-compliant chemical sensors |
@@ -206,9 +206,103 @@ Consciousness-first robotics via `EmbodimentBridge` trait: thought → motor →
 
 - **EmbodimentBridge trait**: `symthaea-core/src/embodiment.rs:355` — `step(thought_hv, dt, phi)`, `encode_perception()`, `reset()`, 4-tier safety (Green/Yellow/Orange/Red from Phi), `apply_moral_gate()` default method (ethics → motor)
 - **Proprioceptive loop**: Phase 2.5 in `cycle.rs` blends body state into perception at configurable weight (`embodiment_blend_weight`, default 0.1)
+- **Humanoid status (important correction)**: this is not just a 21-actuator DMC scaffold anymore. `symthaea-humanoid` already includes morphology-aware expansion from `Dmc21` to `Dexterous53`, `WithNeckWrist`, and `FullSpine`; dynamic channel layouts in `encoder.rs`; reach/grasp PD baselines; gait metrics; morphology transfer; and gravity-scaled/adaptive curriculum machinery in training.
+- **Flight status (important correction)**: `symthaea-multirotor` is the current multirotor crate, and it already behaves like a family internally: simple simulator + MuJoCo backend + formation + swarm + named mission/scenario variants. Do not describe it as "just a quadrotor hover demo."
+- **Missing aerial coverage (important correction)**: there is no real fixed-wing, passenger-aircraft, or eVTOL platform crate yet. The old `symthaea-flight` identity has now been renamed to `symthaea-multirotor`.
 - **Dispatch zome**: `mycelix-civic/zomes/robotics-dispatch/` — RoboticAsset, DispatchOrder, TelemetryReport with 24h authority expiry. **Schema only — not yet wired to symthaea runtime telemetry.**
 - **Features**: `humanoid`, `helicopter`, `flight`, `vehicle`, `auv`, `manipulator`, `exoskeleton`, `surgical`, `orbital`, `quadruped`, `phone` — each enables its platform in the cognitive loop constructor
 - **Build**: `cargo test -p symthaea-<platform> --lib` (each crate independently testable). Scaffold new platform via `./scripts/new-platform.sh`.
+
+**Current integration stack**
+- `symthaea-core` is the contract layer: `EmbodimentBridge`, `PlatformPlugin`, safety overrides, telemetry hooks, moral-gate hook.
+- Platform crates (`symthaea-multirotor`, `symthaea-manipulator`, etc.) own the actual body model, controller, encoder, perturbations, and training harnesses.
+- `symtropy/crates/symtropy-robotics-bridge` is the game-engine wrapper: `RoboticAgent`, `PlatformType`, `MotorPlanner`, `tick_motor_commands()`. It should stay thin and platform-aware, not absorb platform physics.
+- `symtropy` demo crates are the public proof surface: one crate per platform demo, plus `symtropy-cli` for launcher/discovery.
+- `mycelix-civic/zomes/robotics-dispatch` is the future coordination plane, but today it is schema-first. Do not claim live dispatch integration until runtime telemetry and authority flows are actually wired.
+
+**Robotics crate plan (recommended sequence, 2026-04)**
+
+1. **Finish the current bridge stack before adding more prestige platforms**
+   - Stabilize the current Phase 1 roster: `symthaea-manipulator`, `symthaea-quadruped`, `symthaea-humanoid`, `symthaea-multirotor`, `symthaea-vehicle`.
+   - Make the contract honest across all five:
+     - explicit state/cmd dimensional metadata
+     - common telemetry shape for dispatch/export
+     - deterministic benchmark/replay harness per platform
+     - `symtropy-robotics-bridge` planner path validated against each platform's native controller
+   - For `symthaea-humanoid`, prioritize gait/contact honesty before pushing farther up the dexterity ladder:
+     - keep `Dmc21` walking and balance bulletproof
+     - treat `Dexterous53+` as real in-tree variants, not future fiction
+     - validate the proprioceptive encoder and morphology transfer path before claiming exoskeleton readiness
+   - For `symthaea-multirotor`, prefer a variant architecture before a crate explosion:
+     - keep one shared multirotor physics/controller crate short-term
+     - package rename is now in place as `symthaea-multirotor`; downstream code should import `symthaea_multirotor`
+     - expose named configurations or modules for likely multirotor variants such as scout, interceptor / sacrifice, cargo-lift, and air-taxi / passenger eVTOL
+     - add separate aerial crates once the body model genuinely diverges:
+       - `symthaea-fixedwing` for efficient cruise and long-range routing
+       - `symthaea-evtol` for transition flight and urban air mobility
+       - `symthaea-aerostat` for buoyant relay / observation
+     - do not pretend passenger-plane support exists until a fixed-wing or lift+cruise stack is actually implemented
+   - Near-term engine dependencies: Symtropy motor/drive support, prismatic joints, Rapier3D bridge, and replayable verification commands.
+
+2. **Promote the bridge split into a real crate architecture**
+   - `symtropy-robotics-bridge-core`:
+     - `PlatformType`
+     - `RoboticAgent`-adjacent traits / spawn contracts
+     - planner interfaces
+     - telemetry envelope types
+   - `symtropy-robotics-bridge` (AGPL layer):
+     - Symthaea FEP + consciousness-equation coupling
+     - Mycelix-facing coordination hooks
+     - demo/runtime adapters
+   - Rule: platform physics stays in Symthaea crates; game-world spawning and coordination stay in Symtropy crates.
+
+3. **Add the next four platforms because they open new regimes, not because they sound impressive**
+   - `symthaea-subterranean`: highest-priority new platform. Start with a scout/mole crate, not a giant TBM. New regime: digging, spoil, heat, occlusion, intermittent comms.
+   - `symthaea-infrastructure`: stationary agent crate for microgrids / hubs / storage / routing. New regime: buildings as embodied agents.
+   - `symthaea-scavenger`: disassembly / recycling / salvage. New regime: fracture, recovery, closed-loop materials.
+   - `symthaea-agribot`: stewardship platform. New regime: soil/water/light/ecology instead of pure mobility.
+
+4. **Only then add differentiators**
+   - `symthaea-aerostat`
+   - `symthaea-weaver`
+   - `symthaea-brachiator`
+
+5. **Keep research/prestige platforms out of the critical path**
+   - `symthaea-softbot`
+   - `symthaea-abyssal`
+   - `symthaea-tesseract`
+
+**Minimal crate template for new robotics platforms**
+- `types.rs` — state, command, config, safety mode enums
+- `controller.rs` — platform-native low-level controller / actuation mapping
+- `simulator.rs` or `symtropy_sim.rs` — body/environment stepping
+- `encoder.rs` — body state → proprioceptive HV
+- `embodiment.rs` — `EmbodimentBridge` impl
+- `training.rs` — platform-specific benchmarks or curriculum
+- `plugin.rs` — `PlatformPlugin` registration
+
+**What "done" means for a robotics crate**
+- Implements `EmbodimentBridge` cleanly with no shims hidden in the main `symthaea` crate
+- Has at least one scenario/benchmark that exposes failure modes, not just happy-path movement
+- Exports enough telemetry to support future `robotics-dispatch` integration
+- Has a corresponding Symtropy demo or harness, unless the crate is explicitly research-only
+
+**Near-term flagship thesis**
+- The roster becomes strategically stronger when it stops being "more robots" and becomes a civilization stack:
+  - mobility: flight / vehicle / quadruped / humanoid
+  - manipulation: manipulator / surgical / exoskeleton
+  - stewardship: AUV / agribot
+  - infrastructure: infrastructure / aerostat
+  - subsurface and repair: subterranean / scavenger
+
+**Aerial platform split (recommended)**
+- `symthaea-multirotor` is the multirotor line, not the whole aviation story.
+- Recommended taxonomy:
+  - `symthaea-multirotor` — quad/hexa/octo rotorcraft, swarm, hover, local inspection, SAR, sacrifice/intercept missions
+  - `symthaea-evtol` — lift+cruise / tilt-rotor urban air mobility, vertiports, battery-to-fare coupling
+  - `symthaea-fixedwing` — efficient cruise, mapping, cargo relay, passenger aircraft foundations
+  - `symthaea-aerostat` — long-duration buoyant relay / observation / mesh anchor
+- If only one aerial platform is actively maintained near-term, it should be multirotor. But the roadmap should explicitly acknowledge that passenger aircraft belong under fixed-wing / eVTOL, not under the current quadrotor crate.
 
 ### Mycelix Fractal Architecture (16-cluster unified hApp)
 Fractal CivOS with 5 tiers, consolidated into cluster DNAs (single DNA = cross-domain `call(CallTargetCell::Local, ...)`):

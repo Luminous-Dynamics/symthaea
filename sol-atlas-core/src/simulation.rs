@@ -20,16 +20,56 @@ pub struct TechMilestone {
 /// All technology milestones (from multiworld-sim empirical timelines).
 pub fn tech_milestones() -> Vec<TechMilestone> {
     vec![
-        TechMilestone { year: 27, name: "NTP Demo", description: "Nuclear Thermal Propulsion demonstration" },
-        TechMilestone { year: 28, name: "Fission Surface", description: "Kilopower fission reactor on lunar surface" },
-        TechMilestone { year: 35, name: "Luna Base", description: "Permanent lunar habitat (pop 12)" },
-        TechMilestone { year: 45, name: "Mars Colony", description: "First Mars settlement (pop 50)" },
-        TechMilestone { year: 60, name: "Fusion Demo", description: "Net-positive fusion ignition" },
-        TechMilestone { year: 80, name: "Europa Station", description: "Research outpost under ice shell" },
-        TechMilestone { year: 100, name: "Fusion Grid", description: "First grid-scale fusion plant" },
-        TechMilestone { year: 120, name: "Titan Outpost", description: "Hydrocarbon harvesting station" },
-        TechMilestone { year: 150, name: "Mars Self-Sufficient", description: "Colony reaches 70% self-sufficiency" },
-        TechMilestone { year: 200, name: "Interstellar Probe", description: "First 0.1c probe launched" },
+        TechMilestone {
+            year: 27,
+            name: "NTP Demo",
+            description: "Nuclear Thermal Propulsion demonstration",
+        },
+        TechMilestone {
+            year: 28,
+            name: "Fission Surface",
+            description: "Kilopower fission reactor on lunar surface",
+        },
+        TechMilestone {
+            year: 35,
+            name: "Luna Base",
+            description: "Permanent lunar habitat (pop 12)",
+        },
+        TechMilestone {
+            year: 45,
+            name: "Mars Colony",
+            description: "First Mars settlement (pop 50)",
+        },
+        TechMilestone {
+            year: 60,
+            name: "Fusion Demo",
+            description: "Net-positive fusion ignition",
+        },
+        TechMilestone {
+            year: 80,
+            name: "Europa Station",
+            description: "Research outpost under ice shell",
+        },
+        TechMilestone {
+            year: 100,
+            name: "Fusion Grid",
+            description: "First grid-scale fusion plant",
+        },
+        TechMilestone {
+            year: 120,
+            name: "Titan Outpost",
+            description: "Hydrocarbon harvesting station",
+        },
+        TechMilestone {
+            year: 150,
+            name: "Mars Self-Sufficient",
+            description: "Colony reaches 70% self-sufficiency",
+        },
+        TechMilestone {
+            year: 200,
+            name: "Interstellar Probe",
+            description: "First 0.1c probe launched",
+        },
     ]
 }
 
@@ -55,10 +95,10 @@ impl SecularPhase {
     /// Color for the cycle phase indicator.
     pub fn color(&self) -> [f32; 3] {
         match self {
-            Self::Growth => [0.1, 0.8, 0.3],       // green
-            Self::Stagflation => [0.9, 0.7, 0.1],  // amber
-            Self::Crisis => [0.9, 0.2, 0.1],       // red
-            Self::Depression => [0.4, 0.1, 0.1],    // dark red
+            Self::Growth => [0.1, 0.8, 0.3],      // green
+            Self::Stagflation => [0.9, 0.7, 0.1], // amber
+            Self::Crisis => [0.9, 0.2, 0.1],      // red
+            Self::Depression => [0.4, 0.1, 0.1],  // dark red
         }
     }
 }
@@ -69,13 +109,13 @@ pub fn secular_phase_at_year(year: u32) -> SecularPhase {
     // Simplified: 80-year cycle with phase proportions
     let cycle_pos = (year % 80) as f32 / 80.0;
     if cycle_pos < 0.4 {
-        SecularPhase::Growth        // 0-32 years: expansion
+        SecularPhase::Growth // 0-32 years: expansion
     } else if cycle_pos < 0.65 {
-        SecularPhase::Stagflation   // 32-52 years: elite overproduction rising
+        SecularPhase::Stagflation // 32-52 years: elite overproduction rising
     } else if cycle_pos < 0.85 {
-        SecularPhase::Crisis        // 52-68 years: instability, possible civil war
+        SecularPhase::Crisis // 52-68 years: instability, possible civil war
     } else {
-        SecularPhase::Depression    // 68-80 years: population decline, reset
+        SecularPhase::Depression // 68-80 years: population decline, reset
     }
 }
 
@@ -190,7 +230,12 @@ mod tests {
         let milestones = tech_milestones();
         assert!(milestones.len() >= 8);
         for w in milestones.windows(2) {
-            assert!(w[0].year <= w[1].year, "Milestones not ordered: {} > {}", w[0].year, w[1].year);
+            assert!(
+                w[0].year <= w[1].year,
+                "Milestones not ordered: {} > {}",
+                w[0].year,
+                w[1].year
+            );
         }
     }
 
@@ -214,8 +259,10 @@ mod tests {
         // Delhi should be more stressed at year 200 (fossil decline)
         let delhi_0 = stress_0.iter().find(|s| s.name == "Delhi").unwrap();
         let delhi_200 = stress_200.iter().find(|s| s.name == "Delhi").unwrap();
-        assert!(delhi_200.allostatic_load >= delhi_0.allostatic_load * 0.8,
-            "Delhi stress should not dramatically decrease");
+        assert!(
+            delhi_200.allostatic_load >= delhi_0.allostatic_load * 0.8,
+            "Delhi stress should not dramatically decrease"
+        );
     }
 
     #[test]
@@ -227,7 +274,10 @@ mod tests {
 
         let europe_now = regional_population_at_year("Europe", 450.0, 0);
         let europe_100 = regional_population_at_year("Europe", 450.0, 100);
-        assert!(europe_100 < europe_now, "Europe should shrink (negative growth)");
+        assert!(
+            europe_100 < europe_now,
+            "Europe should shrink (negative growth)"
+        );
     }
 
     #[test]
@@ -252,8 +302,14 @@ mod tests {
 
     #[test]
     fn colony_populations_grow() {
-        let mars_50 = colonies_at_year(50).into_iter().find(|c| c.body == "Mars").unwrap();
-        let mars_150 = colonies_at_year(150).into_iter().find(|c| c.body == "Mars").unwrap();
+        let mars_50 = colonies_at_year(50)
+            .into_iter()
+            .find(|c| c.body == "Mars")
+            .unwrap();
+        let mars_150 = colonies_at_year(150)
+            .into_iter()
+            .find(|c| c.body == "Mars")
+            .unwrap();
         assert!(mars_150.population > mars_50.population);
         assert!(mars_150.self_sufficiency > mars_50.self_sufficiency);
     }
@@ -278,10 +334,10 @@ mod integration_tests {
         for year in (0..500).step_by(10) {
             let stress = evolve_grid_stress(year);
             assert_eq!(stress.len(), 16, "Expected 16 cities at year {}", year);
-            
+
             let phase = secular_phase_at_year(year);
             assert!(!phase.label().is_empty());
-            
+
             let colonies = colonies_at_year(year);
             // Colonies should grow monotonically
             if year >= 120 {
@@ -295,8 +351,12 @@ mod integration_tests {
         for load in [0.0, 0.15, 0.3, 0.5, 0.6, 0.8, 1.0] {
             let c = energy_trading::stress_color(load);
             for channel in c {
-                assert!(channel >= 0.0 && channel <= 1.0,
-                    "Color channel out of range at load {}: {:?}", load, c);
+                assert!(
+                    channel >= 0.0 && channel <= 1.0,
+                    "Color channel out of range at load {}: {:?}",
+                    load,
+                    c
+                );
             }
         }
     }
@@ -305,12 +365,20 @@ mod integration_tests {
     fn colony_self_sufficiency_bounded() {
         for year in (0..500).step_by(25) {
             for colony in colonies_at_year(year) {
-                assert!(colony.self_sufficiency >= 0.0 && colony.self_sufficiency <= 1.0,
+                assert!(
+                    colony.self_sufficiency >= 0.0 && colony.self_sufficiency <= 1.0,
                     "Self-sufficiency out of range for {} at year {}: {}",
-                    colony.name, year, colony.self_sufficiency);
-                assert!(colony.phi >= 0.0 && colony.phi <= 1.0,
+                    colony.name,
+                    year,
+                    colony.self_sufficiency
+                );
+                assert!(
+                    colony.phi >= 0.0 && colony.phi <= 1.0,
                     "Phi out of range for {} at year {}: {}",
-                    colony.name, year, colony.phi);
+                    colony.name,
+                    year,
+                    colony.phi
+                );
             }
         }
     }

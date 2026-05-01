@@ -6,7 +6,7 @@
 //! Run with: cargo bench -p kvector-zkp
 //! Run specific benchmark: cargo bench -p kvector-zkp -- fast_proof
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use kvector_zkp::{
     optimized_prover::{OptimizedKVectorProver, SecurityLevel},
     prover::{KVectorProver, KVectorTrace, KVectorWitness},
@@ -63,7 +63,11 @@ fn benchmark_security_levels(c: &mut Criterion) {
     group.sample_size(10);
     group.measurement_time(std::time::Duration::from_secs(60));
 
-    for level in [SecurityLevel::Fast, SecurityLevel::Standard, SecurityLevel::High] {
+    for level in [
+        SecurityLevel::Fast,
+        SecurityLevel::Standard,
+        SecurityLevel::High,
+    ] {
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{:?}", level)),
             &level,
@@ -71,9 +75,7 @@ fn benchmark_security_levels(c: &mut Criterion) {
                 let prover = OptimizedKVectorProver::with_security_level(level);
                 prover.clear_cache(); // Ensure no caching affects benchmark
 
-                b.iter(|| {
-                    prover.prove(black_box(&witness)).unwrap()
-                })
+                b.iter(|| prover.prove(black_box(&witness)).unwrap())
             },
         );
     }
@@ -98,9 +100,7 @@ fn benchmark_caching(c: &mut Criterion) {
     let _ = prover.prove(&witness).unwrap();
 
     group.bench_function("warm_cache", |b| {
-        b.iter(|| {
-            prover.prove(black_box(&witness)).unwrap()
-        })
+        b.iter(|| prover.prove(black_box(&witness)).unwrap())
     });
 
     group.finish();
@@ -110,9 +110,7 @@ fn benchmark_trace_creation(c: &mut Criterion) {
     let witness = sample_witness();
 
     c.bench_function("trace_creation", |b| {
-        b.iter(|| {
-            KVectorTrace::new(black_box(&witness)).unwrap()
-        })
+        b.iter(|| KVectorTrace::new(black_box(&witness)).unwrap())
     });
 }
 
@@ -120,9 +118,7 @@ fn benchmark_commitment_hash(c: &mut Criterion) {
     let witness = sample_witness();
 
     c.bench_function("commitment_hash", |b| {
-        b.iter(|| {
-            black_box(&witness).commitment()
-        })
+        b.iter(|| black_box(&witness).commitment())
     });
 }
 
@@ -133,17 +129,13 @@ fn benchmark_batch_proving(c: &mut Criterion) {
 
     for batch_size in [2, 4, 8] {
         let witnesses: Vec<_> = (0..batch_size).map(|_| random_witness()).collect();
-        let prover = OptimizedKVectorProver::with_security_level(SecurityLevel::Fast)
-            .without_caching();
+        let prover =
+            OptimizedKVectorProver::with_security_level(SecurityLevel::Fast).without_caching();
 
         group.bench_with_input(
             BenchmarkId::from_parameter(batch_size),
             &witnesses,
-            |b, witnesses| {
-                b.iter(|| {
-                    prover.prove_batch(black_box(witnesses))
-                })
-            },
+            |b, witnesses| b.iter(|| prover.prove_batch(black_box(witnesses))),
         );
     }
 
@@ -159,9 +151,7 @@ fn benchmark_verification(c: &mut Criterion) {
     let proof = KVectorRangeProof::prove(&witness).expect("proof generation");
 
     c.bench_function("verification", |b| {
-        b.iter(|| {
-            black_box(&proof).verify().unwrap()
-        })
+        b.iter(|| black_box(&proof).verify().unwrap())
     });
 }
 
@@ -192,13 +182,13 @@ fn benchmark_proof_size(c: &mut Criterion) {
     let proof = KVectorRangeProof::prove(&witness).expect("proof generation");
 
     println!("\n=== Proof Size ===");
-    println!("Binary size: {} bytes ({:.2} KB)", proof.size(), proof.size() as f64 / 1024.0);
+    println!(
+        "Binary size: {} bytes ({:.2} KB)",
+        proof.size(),
+        proof.size() as f64 / 1024.0
+    );
 
-    c.bench_function("serialization", |b| {
-        b.iter(|| {
-            black_box(&proof).to_bytes()
-        })
-    });
+    c.bench_function("serialization", |b| b.iter(|| black_box(&proof).to_bytes()));
 }
 
 // Fast benchmarks for quick iteration

@@ -37,6 +37,8 @@ fn bench_config(dim: usize) -> UnifiedConfig {
         weight_decay: 0.0001,
         gating_steepness: 1.0,
         interp_bias: 0.0,
+        fourier_frequencies: Vec::new(),
+        fourier_amplitude: 0.1,
     }
 }
 

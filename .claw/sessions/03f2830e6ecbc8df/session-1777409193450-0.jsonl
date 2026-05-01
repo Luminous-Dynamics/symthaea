@@ -1,0 +1,4 @@
+{"created_at_ms":1777409193449,"model":"openai/qwen2.5-coder:7b","session_id":"session-1777409193450-0","type":"session_meta","updated_at_ms":1777409313892,"version":1,"workspace_root":"/srv/luminous-dynamics"}
+{"text":"List all directories in the root. Find the symthaea-core crate and read the Cargo.toml to tell me its dependencies.","timestamp_ms":1777409264786,"type":"prompt_history"}
+{"message":{"blocks":[{"text":"List all directories in the root. Find the symthaea-core crate and read the Cargo.toml to tell me its dependencies.","type":"text"}],"role":"user"},"type":"message"}
+{"message":{"blocks":[{"text":"{\"name\": \"ReadMcpResource\", \"arguments\": {\"uri\": \"/root/symthaea-core/Cargo.toml\", \"server\": \"local\"}}","type":"text"}],"role":"assistant","usage":{"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"input_tokens":4096,"output_tokens":34}},"type":"message"}

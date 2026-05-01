@@ -6,6 +6,7 @@
 //! AI-interactable: data-agent-did, data-tier, all balances as data-* attributes.
 
 use leptos::prelude::*;
+use mycelix_leptos_core::consciousness::combined_score;
 use mycelix_leptos_core::{use_consciousness, SovereignRadar, SovereignRadarSize};
 use crate::contexts::governance_context::use_governance;
 use crate::contexts::finance_context::use_finance;
@@ -32,7 +33,7 @@ pub fn ProfilePage() -> impl IntoView {
                             class="identity-card"
                             data-agent-did=did.clone()
                             data-tier=tier.label().to_string()
-                            data-consciousness=format!("{:.3}", profile.combined_score())
+                            data-consciousness=format!("{:.3}", combined_score(&profile))
                         >
                             <div class="identity-header">
                                 <span class="identity-did" data-field="did">{short_did}</span>

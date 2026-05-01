@@ -57,9 +57,9 @@ impl GovernanceModel {
     /// Returns a weight in [0, 1] that scales the agent's voting influence.
     pub fn voting_weight(
         &self,
-        phi: f64,          // consciousness level [0, 1]
-        age_years: f64,    // agent age
-        max_skill: f64,    // highest skill level [0, 1]
+        phi: f64,            // consciousness level [0, 1]
+        age_years: f64,      // agent age
+        max_skill: f64,      // highest skill level [0, 1]
         _rng_selected: bool, // whether agent was selected by sortition this period
     ) -> f64 {
         match self {
@@ -70,20 +70,34 @@ impl GovernanceModel {
             }
             Self::EqualWeight => {
                 // Everyone above minimum age votes equally
-                if age_years >= 15.0 { 1.0 } else { 0.0 }
+                if age_years >= 15.0 {
+                    1.0
+                } else {
+                    0.0
+                }
             }
             Self::Sortition => {
                 // Selected agents have full weight, others have none
                 // Selection happens externally; here we just gate by selection flag
-                if _rng_selected && age_years >= 15.0 { 1.0 } else { 0.0 }
+                if _rng_selected && age_years >= 15.0 {
+                    1.0
+                } else {
+                    0.0
+                }
             }
             Self::Meritocratic => {
                 // Weight proportional to highest skill
-                if age_years >= 15.0 { max_skill.clamp(0.1, 1.0) } else { 0.0 }
+                if age_years >= 15.0 {
+                    max_skill.clamp(0.1, 1.0)
+                } else {
+                    0.0
+                }
             }
             Self::ElderCouncil => {
                 // Weight increases with age: peaks at 60-70, slight decline after 80
-                if age_years < 15.0 { return 0.0; }
+                if age_years < 15.0 {
+                    return 0.0;
+                }
                 let age_weight = if age_years < 30.0 {
                     0.3
                 } else if age_years < 50.0 {
@@ -123,7 +137,9 @@ impl GovernanceModel {
     /// Parse from string (for TOML config).
     pub fn from_str(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
-            "consciousness" | "consciousnessgated" | "consciousness_gated" => Some(Self::ConsciousnessGated),
+            "consciousness" | "consciousnessgated" | "consciousness_gated" => {
+                Some(Self::ConsciousnessGated)
+            }
             "equal" | "equalweight" | "equal_weight" | "democracy" => Some(Self::EqualWeight),
             "sortition" | "random" | "random_council" => Some(Self::Sortition),
             "meritocratic" | "merit" | "skill" | "technocracy" => Some(Self::Meritocratic),
@@ -170,7 +186,10 @@ mod tests {
         let model = GovernanceModel::Meritocratic;
         let low_skill = model.voting_weight(0.5, 30.0, 0.2, false);
         let high_skill = model.voting_weight(0.5, 30.0, 0.9, false);
-        assert!(high_skill > low_skill, "Higher skill = more weight: {high_skill} vs {low_skill}");
+        assert!(
+            high_skill > low_skill,
+            "Higher skill = more weight: {high_skill} vs {low_skill}"
+        );
     }
 
     #[test]
@@ -179,7 +198,10 @@ mod tests {
         let young = model.voting_weight(0.5, 25.0, 0.5, false);
         let middle = model.voting_weight(0.5, 45.0, 0.5, false);
         let elder = model.voting_weight(0.5, 65.0, 0.5, false);
-        assert!(elder > middle, "Elders should have more weight: {elder} vs {middle}");
+        assert!(
+            elder > middle,
+            "Elders should have more weight: {elder} vs {middle}"
+        );
         assert!(middle > young, "Middle age > young: {middle} vs {young}");
     }
 
@@ -190,11 +212,26 @@ mod tests {
 
     #[test]
     fn test_parse_governance_model() {
-        assert_eq!(GovernanceModel::from_str("consciousness"), Some(GovernanceModel::ConsciousnessGated));
-        assert_eq!(GovernanceModel::from_str("democracy"), Some(GovernanceModel::EqualWeight));
-        assert_eq!(GovernanceModel::from_str("sortition"), Some(GovernanceModel::Sortition));
-        assert_eq!(GovernanceModel::from_str("technocracy"), Some(GovernanceModel::Meritocratic));
-        assert_eq!(GovernanceModel::from_str("elder"), Some(GovernanceModel::ElderCouncil));
+        assert_eq!(
+            GovernanceModel::from_str("consciousness"),
+            Some(GovernanceModel::ConsciousnessGated)
+        );
+        assert_eq!(
+            GovernanceModel::from_str("democracy"),
+            Some(GovernanceModel::EqualWeight)
+        );
+        assert_eq!(
+            GovernanceModel::from_str("sortition"),
+            Some(GovernanceModel::Sortition)
+        );
+        assert_eq!(
+            GovernanceModel::from_str("technocracy"),
+            Some(GovernanceModel::Meritocratic)
+        );
+        assert_eq!(
+            GovernanceModel::from_str("elder"),
+            Some(GovernanceModel::ElderCouncil)
+        );
         assert_eq!(GovernanceModel::from_str("invalid"), None);
     }
 

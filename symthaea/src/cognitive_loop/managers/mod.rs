@@ -36,12 +36,12 @@
 //! for future WASM boundary crossing.
 
 pub mod drive_manager;
+pub mod embodiment_transfer;
 pub mod learning_manager;
 pub mod memory_manager;
 pub mod network_service_bridge;
 pub mod perception_manager;
 pub mod soul_manager;
-pub mod embodiment_transfer;
 pub mod swarm_consciousness;
 pub mod swarm_manager;
 pub mod thermodynamic_manager;

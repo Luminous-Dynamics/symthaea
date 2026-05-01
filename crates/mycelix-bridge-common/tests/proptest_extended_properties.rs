@@ -13,7 +13,7 @@ use mycelix_bridge_common::consciousness_profile::{
     ConsciousnessTier, VOTE_WEIGHT_MAX_BP, VOTE_WEIGHT_TEMPERATURE,
 };
 use mycelix_bridge_common::offline_credential::OfflineCredential;
-use mycelix_bridge_common::saga::{self, SagaDefinition, SagaAction, SagaStep, SagaStatus};
+use mycelix_bridge_common::saga::{self, SagaAction, SagaDefinition, SagaStatus, SagaStep};
 
 const BASE_US: u64 = 1_767_225_600_000_000;
 const DAY_US: u64 = 86_400_000_000;

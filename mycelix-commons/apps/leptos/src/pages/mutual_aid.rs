@@ -9,8 +9,10 @@ use commons_leptos_types::*;
 #[component]
 pub fn MutualAidPage() -> impl IntoView {
     let commons = use_commons();
-    let (title, set_title) = signal(String::new());
-    let (desc, set_desc) = signal(String::new());
+    let (need_title, set_need_title) = signal(String::new());
+    let (need_desc, set_need_desc) = signal(String::new());
+    let (offer_title, set_offer_title) = signal(String::new());
+    let (offer_desc, set_offer_desc) = signal(String::new());
 
     view! {
         <div class="mutual-aid-page" data-page="mutual-aid" role="main">
@@ -22,22 +24,56 @@ pub fn MutualAidPage() -> impl IntoView {
                 <h2 class="section-title">"Share a need"</h2>
                 <form class="need-form" data-form="post-need" on:submit=move |ev| {
                     ev.prevent_default();
-                    if !title.get_untracked().trim().is_empty() {
-                        commons_actions::post_need(title.get_untracked(), desc.get_untracked(), NeedCategory::Other("General".into()), Urgency::Medium);
-                        set_title.set(String::new()); set_desc.set(String::new());
+                    if !need_title.get_untracked().trim().is_empty() {
+                        commons_actions::post_need(
+                            need_title.get_untracked(),
+                            need_desc.get_untracked(),
+                            NeedCategory::Other("General".into()),
+                            Urgency::Medium,
+                        );
+                        set_need_title.set(String::new());
+                        set_need_desc.set(String::new());
                     }
                 }>
                     <div class="form-field">
                         <label for="need-title">"What do you need?"</label>
                         <input id="need-title" type="text" class="form-input" placeholder="a brief description" data-field="title"
-                            prop:value=move || title.get() on:input=move |ev| set_title.set(event_target_value(&ev)) />
+                            prop:value=move || need_title.get() on:input=move |ev| set_need_title.set(event_target_value(&ev)) />
                     </div>
                     <div class="form-field">
                         <label for="need-desc">"Details"</label>
                         <textarea id="need-desc" class="form-textarea" rows="3" placeholder="when, where, how much" data-field="description"
-                            prop:value=move || desc.get() on:input=move |ev| set_desc.set(event_target_value(&ev))></textarea>
+                            prop:value=move || need_desc.get() on:input=move |ev| set_need_desc.set(event_target_value(&ev))></textarea>
                     </div>
-                    <button type="submit" class="submit-btn" data-action="post-need" disabled=move || title.get().trim().is_empty()>"share this need"</button>
+                    <button type="submit" class="submit-btn" data-action="post-need" disabled=move || need_title.get().trim().is_empty()>"share this need"</button>
+                </form>
+            </section>
+
+            <section class="post-offer-section" data-section="post-offer">
+                <h2 class="section-title">"Share an offer"</h2>
+                <form class="need-form" data-form="post-offer" on:submit=move |ev| {
+                    ev.prevent_default();
+                    if !offer_title.get_untracked().trim().is_empty() {
+                        commons_actions::post_offer(
+                            offer_title.get_untracked(),
+                            offer_desc.get_untracked(),
+                            NeedCategory::Other("General".into()),
+                        );
+                        set_offer_title.set(String::new());
+                        set_offer_desc.set(String::new());
+                    }
+                }>
+                    <div class="form-field">
+                        <label for="offer-title">"What can you offer?"</label>
+                        <input id="offer-title" type="text" class="form-input" placeholder="a brief description" data-field="title"
+                            prop:value=move || offer_title.get() on:input=move |ev| set_offer_title.set(event_target_value(&ev)) />
+                    </div>
+                    <div class="form-field">
+                        <label for="offer-desc">"Details"</label>
+                        <textarea id="offer-desc" class="form-textarea" rows="3" placeholder="availability, limits, location" data-field="description"
+                            prop:value=move || offer_desc.get() on:input=move |ev| set_offer_desc.set(event_target_value(&ev))></textarea>
+                    </div>
+                    <button type="submit" class="submit-btn" data-action="post-offer" disabled=move || offer_title.get().trim().is_empty()>"share this offer"</button>
                 </form>
             </section>
 

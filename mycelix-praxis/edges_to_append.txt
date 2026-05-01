@@ -1,0 +1,10 @@
+    {"from":"VOC-RE-101","to":"VOC-RE-201","edge_type":"Requires","strength_permille":900,"rationale":"Off-Grid storage requires understanding basic Solar PV physics."},
+    {"from":"VOC-RE-101","to":"VOC-RE-CAP","edge_type":"Requires","strength_permille":900,"rationale":"Mini-grid integration requires basic PV knowledge."},
+    {"from":"VOC-RE-201","to":"VOC-RE-CAP","edge_type":"Requires","strength_permille":900,"rationale":"Storage systems are the core of a functioning mini-grid."},
+    {"from":"VOC-AG-101","to":"VOC-AG-201","edge_type":"Requires","strength_permille":900,"rationale":"Permaculture design is ineffective without understanding soil microbiology."},
+    {"from":"VOC-AG-101","to":"VOC-AG-CAP","edge_type":"Requires","strength_permille":900,"rationale":"Soil restoration requires baseline microbial knowledge."},
+    {"from":"VOC-AG-201","to":"VOC-AG-CAP","edge_type":"Requires","strength_permille":900,"rationale":"The capstone requires applying permaculture design principles."},
+    {"from":"VOC-DT-101","to":"VOC-DT-CAP","edge_type":"Requires","strength_permille":900,"rationale":"Launching a guild requires a core technical trade (Fabrication)."},
+    {"from":"VOC-DT-201","to":"VOC-DT-CAP","edge_type":"Requires","strength_permille":900,"rationale":"Professional guild operation requires TEND-based bookkeeping."},
+    {"from":"VOC-UNI-101","to":"VOC-RE-101","edge_type":"Recommended","strength_permille":600,"rationale":"Applied resilience provides context for why solar energy matters."},
+    {"from":"VOC-UNI-101","to":"VOC-AG-101","edge_type":"Recommended","strength_permille":600,"rationale":"Understanding general resilience helps ground soil science."}

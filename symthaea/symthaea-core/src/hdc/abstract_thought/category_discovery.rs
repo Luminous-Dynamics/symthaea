@@ -204,31 +204,52 @@ impl CategoryDiscovery {
             verified_paths += 1;
 
             // Quality is the geometric mean of the component qualities
-            let f_quality = self.morphisms.iter().find(|m| &m.name == f_name).map(|m| m.quality).unwrap_or(10.0);
-            let g_quality = self.morphisms.iter().find(|m| &m.name == g_name).map(|m| m.quality).unwrap_or(10.0);
-            let h_quality = self.morphisms.iter().find(|m| &m.name == h_name).map(|m| m.quality).unwrap_or(10.0);
+            let f_quality = self
+                .morphisms
+                .iter()
+                .find(|m| &m.name == f_name)
+                .map(|m| m.quality)
+                .unwrap_or(10.0);
+            let g_quality = self
+                .morphisms
+                .iter()
+                .find(|m| &m.name == g_name)
+                .map(|m| m.quality)
+                .unwrap_or(10.0);
+            let h_quality = self
+                .morphisms
+                .iter()
+                .find(|m| &m.name == h_name)
+                .map(|m| m.quality)
+                .unwrap_or(10.0);
             total_quality += (f_quality * g_quality * h_quality).cbrt();
         }
 
         if verified_paths > 0 {
             let avg_quality = total_quality / verified_paths as f64;
             // Confidence: more paths + better quality = higher confidence
-            let confidence = (1.0 - avg_quality / 10.0).max(0.0) * (1.0 - 1.0 / (verified_paths as f64 + 1.0));
+            let confidence =
+                (1.0 - avg_quality / 10.0).max(0.0) * (1.0 - 1.0 / (verified_paths as f64 + 1.0));
 
             // Collect all morphisms involved in compositions
-            let involved: HashSet<String> = self.compositions.iter().flat_map(|((f, g), h)| {
-                vec![f.clone(), g.clone(), h.clone()]
-            }).collect();
+            let involved: HashSet<String> = self
+                .compositions
+                .iter()
+                .flat_map(|((f, g), h)| vec![f.clone(), g.clone(), h.clone()])
+                .collect();
 
-            let evidence: Vec<DomainMorphism> = self.morphisms.iter()
+            let evidence: Vec<DomainMorphism> = self
+                .morphisms
+                .iter()
                 .filter(|m| involved.contains(&m.name))
                 .cloned()
                 .collect();
 
             // Collect unique domains involved
-            let domains: HashSet<String> = evidence.iter().flat_map(|m| {
-                vec![format!("{:?}", m.source), format!("{:?}", m.target)]
-            }).collect();
+            let domains: HashSet<String> = evidence
+                .iter()
+                .flat_map(|m| vec![format!("{:?}", m.source), format!("{:?}", m.target)])
+                .collect();
 
             self.functors.push(FunctorDiscovery {
                 description: format!(
@@ -343,7 +364,12 @@ mod tests {
     #[test]
     fn test_build_category_from_matches() {
         let matches = vec![
-            make_match(MathDomain::NumberTheory, MathDomain::Combinatorics, "n*(n+1)/2", 1.5),
+            make_match(
+                MathDomain::NumberTheory,
+                MathDomain::Combinatorics,
+                "n*(n+1)/2",
+                1.5,
+            ),
             make_match(MathDomain::NumberTheory, MathDomain::Physics, "n^2", 2.0),
             make_match(MathDomain::Combinatorics, MathDomain::Physics, "2^n", 1.8),
         ];
@@ -361,7 +387,12 @@ mod tests {
     fn test_composition_detection() {
         // A→B, B→C, and A→C — should detect composition
         let matches = vec![
-            make_match(MathDomain::NumberTheory, MathDomain::Combinatorics, "f_ab", 1.5),
+            make_match(
+                MathDomain::NumberTheory,
+                MathDomain::Combinatorics,
+                "f_ab",
+                1.5,
+            ),
             make_match(MathDomain::Combinatorics, MathDomain::Physics, "g_bc", 1.8),
             make_match(MathDomain::NumberTheory, MathDomain::Physics, "h_ac", 2.0),
         ];
@@ -379,7 +410,12 @@ mod tests {
     fn test_no_composition_without_path() {
         // A→B and C→D — no composable path
         let matches = vec![
-            make_match(MathDomain::NumberTheory, MathDomain::Combinatorics, "f", 1.5),
+            make_match(
+                MathDomain::NumberTheory,
+                MathDomain::Combinatorics,
+                "f",
+                1.5,
+            ),
             make_match(MathDomain::Physics, MathDomain::Biology, "g", 1.8),
         ];
 
@@ -395,7 +431,12 @@ mod tests {
     #[test]
     fn test_find_functors_with_composition() {
         let matches = vec![
-            make_match(MathDomain::NumberTheory, MathDomain::Combinatorics, "f_ab", 1.2),
+            make_match(
+                MathDomain::NumberTheory,
+                MathDomain::Combinatorics,
+                "f_ab",
+                1.2,
+            ),
             make_match(MathDomain::Combinatorics, MathDomain::Physics, "g_bc", 1.3),
             make_match(MathDomain::NumberTheory, MathDomain::Physics, "h_ac", 1.5),
         ];
@@ -415,7 +456,12 @@ mod tests {
     #[test]
     fn test_no_functors_without_composition() {
         let matches = vec![
-            make_match(MathDomain::NumberTheory, MathDomain::Combinatorics, "f", 1.5),
+            make_match(
+                MathDomain::NumberTheory,
+                MathDomain::Combinatorics,
+                "f",
+                1.5,
+            ),
             make_match(MathDomain::Physics, MathDomain::Biology, "g", 1.8),
             make_match(MathDomain::Economics, MathDomain::Chemistry, "h", 2.0),
         ];
@@ -444,22 +490,41 @@ mod tests {
     #[test]
     fn test_connected_pairs() {
         let matches = vec![
-            make_match(MathDomain::NumberTheory, MathDomain::Combinatorics, "f", 1.5),
+            make_match(
+                MathDomain::NumberTheory,
+                MathDomain::Combinatorics,
+                "f",
+                1.5,
+            ),
             make_match(MathDomain::NumberTheory, MathDomain::Physics, "g", 1.8),
             // Duplicate pair (different formula)
-            make_match(MathDomain::NumberTheory, MathDomain::Combinatorics, "h", 2.0),
+            make_match(
+                MathDomain::NumberTheory,
+                MathDomain::Combinatorics,
+                "h",
+                2.0,
+            ),
         ];
 
         let mut disc = CategoryDiscovery::new();
         disc.update_from_matches(&matches);
 
-        assert_eq!(disc.connected_pairs(), 2, "Should count unique domain pairs");
+        assert_eq!(
+            disc.connected_pairs(),
+            2,
+            "Should count unique domain pairs"
+        );
     }
 
     #[test]
     fn test_formal_functor_construction() {
         let matches = vec![
-            make_match(MathDomain::NumberTheory, MathDomain::Combinatorics, "f_ab", 1.2),
+            make_match(
+                MathDomain::NumberTheory,
+                MathDomain::Combinatorics,
+                "f_ab",
+                1.2,
+            ),
             make_match(MathDomain::Combinatorics, MathDomain::Physics, "g_bc", 1.3),
             make_match(MathDomain::NumberTheory, MathDomain::Physics, "h_ac", 1.5),
         ];
@@ -479,7 +544,12 @@ mod tests {
     fn test_functor_confidence_improves_with_more_paths() {
         // More composable paths → higher confidence
         let matches_small = vec![
-            make_match(MathDomain::NumberTheory, MathDomain::Combinatorics, "f1", 1.2),
+            make_match(
+                MathDomain::NumberTheory,
+                MathDomain::Combinatorics,
+                "f1",
+                1.2,
+            ),
             make_match(MathDomain::Combinatorics, MathDomain::Physics, "g1", 1.3),
             make_match(MathDomain::NumberTheory, MathDomain::Physics, "h1", 1.5),
         ];
@@ -497,8 +567,18 @@ mod tests {
     #[test]
     fn test_morphism_quality_tracked() {
         let matches = vec![
-            make_match(MathDomain::NumberTheory, MathDomain::Physics, "good_fit", 0.5),
-            make_match(MathDomain::NumberTheory, MathDomain::Biology, "poor_fit", 8.0),
+            make_match(
+                MathDomain::NumberTheory,
+                MathDomain::Physics,
+                "good_fit",
+                0.5,
+            ),
+            make_match(
+                MathDomain::NumberTheory,
+                MathDomain::Biology,
+                "poor_fit",
+                8.0,
+            ),
         ];
 
         let mut disc = CategoryDiscovery::new();

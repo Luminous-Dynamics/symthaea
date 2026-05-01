@@ -13,12 +13,12 @@
 //! the system drifts.
 
 use nalgebra::SVector;
+use symthaea_consciousness_equation::ConsciousnessInputs;
 use symtropy_consciousness_physics::coupling::ConsciousnessField;
 use symtropy_consciousness_physics::fep_gradient::free_energy_gradient_phi;
 use symtropy_consciousness_physics::harmony_field::HarmonyField;
-use symtropy_physics::PhysicsWorld;
 use symtropy_math::Point;
-use symthaea_consciousness_equation::ConsciousnessInputs;
+use symtropy_physics::PhysicsWorld;
 
 fn main() {
     println!();
@@ -32,17 +32,28 @@ fn main() {
 
     println!("  {:>20} {:>12} {:>12}", "", "ENFORCED", "FREE");
     println!("  {:>20} {:>12} {:>12}", "---", "---", "---");
-    println!("  {:>20} {:>12} {:>12}", "Agents alive",
+    println!(
+        "  {:>20} {:>12} {:>12}",
+        "Agents alive",
         format!("{}/{}", results_enforced.alive, results_enforced.total),
-        format!("{}/{}", results_free.alive, results_free.total));
-    println!("  {:>20} {:>12.1} {:>12.1}", "Avg clustering",
-        results_enforced.avg_clustering, results_free.avg_clustering);
-    println!("  {:>20} {:>12} {:>12}", "Cooperation ticks",
-        results_enforced.coop_ticks, results_free.coop_ticks);
-    println!("  {:>20} {:>12.1} {:>12.1}", "Avg energy",
-        results_enforced.avg_energy, results_free.avg_energy);
-    println!("  {:>20} {:>12.4} {:>12.4}", "Final collective Phi",
-        results_enforced.final_phi, results_free.final_phi);
+        format!("{}/{}", results_free.alive, results_free.total)
+    );
+    println!(
+        "  {:>20} {:>12.1} {:>12.1}",
+        "Avg clustering", results_enforced.avg_clustering, results_free.avg_clustering
+    );
+    println!(
+        "  {:>20} {:>12} {:>12}",
+        "Cooperation ticks", results_enforced.coop_ticks, results_free.coop_ticks
+    );
+    println!(
+        "  {:>20} {:>12.1} {:>12.1}",
+        "Avg energy", results_enforced.avg_energy, results_free.avg_energy
+    );
+    println!(
+        "  {:>20} {:>12.4} {:>12.4}",
+        "Final collective Phi", results_enforced.final_phi, results_free.final_phi
+    );
 
     if results_enforced.avg_clustering < results_free.avg_clustering {
         let pct = (1.0 - results_enforced.avg_clustering / results_free.avg_clustering) * 100.0;
@@ -74,10 +85,12 @@ fn run_simulation(enforce: bool, seed: u64) -> SimResult {
     if enforce {
         // Research-grade constants: scarcity-driven dynamics
         // Solo agent ~1000 ticks. Cooperation extends survival to 5000+.
-        field.constants = symtropy_consciousness_physics::thermodynamics::ThermodynamicConstants::research();
+        field.constants =
+            symtropy_consciousness_physics::thermodynamics::ThermodynamicConstants::research();
     } else {
         // Free mode: no energy costs, no enforcement
-        let mut c = symtropy_consciousness_physics::thermodynamics::ThermodynamicConstants::research();
+        let mut c =
+            symtropy_consciousness_physics::thermodynamics::ThermodynamicConstants::research();
         c.consciousness_maintenance_per_tick = 0.0;
         c.movement_cost_per_unit = 0.0;
         c.collision_energy_drain = 0.0;
@@ -117,20 +130,27 @@ fn run_simulation(enforce: bool, seed: u64) -> SimResult {
     for tick in 0..n_ticks {
         // Compute consciousness and FEP gradient for each agent
         for &h in &handles {
-            if !field.has_energy(h) { continue; }
+            if !field.has_energy(h) {
+                continue;
+            }
 
             let phi = field.phi(h);
             let body = world.body(h).unwrap();
             let pos = SVector::from([body.position().coord(0), body.position().coord(1)]);
-            let energy_frac = field.entities.get(&h)
+            let energy_frac = field
+                .entities
+                .get(&h)
                 .map(|e| e.energy.fraction_remaining())
                 .unwrap_or(0.0);
-            let harmony = field.entities.get(&h)
+            let harmony = field
+                .entities
+                .get(&h)
                 .map(|e| e.harmony_activations)
                 .unwrap_or([0.0; 9]);
 
             // Nearby agents for FEP gradient
-            let nearby: Vec<_> = handles.iter()
+            let nearby: Vec<_> = handles
+                .iter()
                 .filter(|&&other| other != h && field.has_energy(other))
                 .filter_map(|&other| {
                     let ob = world.body(other)?;
@@ -140,12 +160,17 @@ fn run_simulation(enforce: bool, seed: u64) -> SimResult {
                 })
                 .collect();
 
-            let energy_wells: Vec<_> = wells.iter()
-                .map(|w| (*w, 200.0f64))
-                .collect();
+            let energy_wells: Vec<_> = wells.iter().map(|w| (*w, 200.0f64)).collect();
 
             let grad = free_energy_gradient_phi(
-                &pos, energy_frac, Some(phi), &harmony, &nearby, &energy_wells, None, 0.0,
+                &pos,
+                energy_frac,
+                Some(phi),
+                &harmony,
+                &nearby,
+                &energy_wells,
+                None,
+                0.0,
             );
 
             // Apply movement
@@ -172,26 +197,44 @@ fn run_simulation(enforce: bool, seed: u64) -> SimResult {
         // Energy enforcement
         if enforce {
             for &h in &handles {
-                field.consume_energy(h, field.constants.consciousness_maintenance_per_tick
-                    * (1.0 + 0.5 * field.phi(h)));
+                field.consume_energy(
+                    h,
+                    field.constants.consciousness_maintenance_per_tick * (1.0 + 0.5 * field.phi(h)),
+                );
             }
 
             // Harmony resonance regeneration
             for i in 0..handles.len() {
-                for j in (i+1)..handles.len() {
+                for j in (i + 1)..handles.len() {
                     let (ha, hb) = (handles[i], handles[j]);
-                    if !field.has_energy(ha) || !field.has_energy(hb) { continue; }
+                    if !field.has_energy(ha) || !field.has_energy(hb) {
+                        continue;
+                    }
                     let (ba, bb) = (world.body(ha), world.body(hb));
                     if let (Some(ba), Some(bb)) = (ba, bb) {
                         let dist = ba.position().distance(bb.position());
                         if dist < field.constants.harmony_range {
-                            let harm_a = field.entities.get(&ha).map(|e| e.harmony_activations).unwrap_or([0.0;9]);
-                            let harm_b = field.entities.get(&hb).map(|e| e.harmony_activations).unwrap_or([0.0;9]);
+                            let harm_a = field
+                                .entities
+                                .get(&ha)
+                                .map(|e| e.harmony_activations)
+                                .unwrap_or([0.0; 9]);
+                            let harm_b = field
+                                .entities
+                                .get(&hb)
+                                .map(|e| e.harmony_activations)
+                                .unwrap_or([0.0; 9]);
                             let res = HarmonyField::<2>::resonance(&harm_a, &harm_b);
                             if res > 0.5 {
-                                let regen = field.constants.harmony_resonance_regen_rate * (res - 0.5) * 2.0;
-                                if let Some(ea) = field.entities.get_mut(&ha) { ea.energy.regenerate(regen); }
-                                if let Some(eb) = field.entities.get_mut(&hb) { eb.energy.regenerate(regen); }
+                                let regen = field.constants.harmony_resonance_regen_rate
+                                    * (res - 0.5)
+                                    * 2.0;
+                                if let Some(ea) = field.entities.get_mut(&ha) {
+                                    ea.energy.regenerate(regen);
+                                }
+                                if let Some(eb) = field.entities.get_mut(&hb) {
+                                    eb.energy.regenerate(regen);
+                                }
                                 coop_ticks += 1;
                             }
                         }
@@ -206,35 +249,49 @@ fn run_simulation(enforce: bool, seed: u64) -> SimResult {
         if tick > 0 && tick % 500 == 0 {
             let alive = handles.iter().filter(|&&h| field.has_energy(h)).count();
             let tag = if enforce { "ENFORCED" } else { "FREE    " };
-            print!("  [{tag}] tick {tick:>5}: {alive:>2} alive, collective Phi = {:.4}\r",
-                field.collective_phi);
+            print!(
+                "  [{tag}] tick {tick:>5}: {alive:>2} alive, collective Phi = {:.4}\r",
+                field.collective_phi
+            );
         }
     }
 
     // Compute final metrics
-    let alive_handles: Vec<_> = handles.iter().filter(|&&h| field.has_energy(h)).cloned().collect();
+    let alive_handles: Vec<_> = handles
+        .iter()
+        .filter(|&&h| field.has_energy(h))
+        .cloned()
+        .collect();
     let alive = alive_handles.len();
 
     let avg_clustering = if alive >= 2 {
         let mut total_dist = 0.0;
         let mut pairs = 0;
         for i in 0..alive_handles.len() {
-            for j in (i+1)..alive_handles.len() {
-                if let (Some(a), Some(b)) = (world.body(alive_handles[i]), world.body(alive_handles[j])) {
+            for j in (i + 1)..alive_handles.len() {
+                if let (Some(a), Some(b)) =
+                    (world.body(alive_handles[i]), world.body(alive_handles[j]))
+                {
                     total_dist += a.position().distance(b.position());
                     pairs += 1;
                 }
             }
         }
-        if pairs > 0 { total_dist / pairs as f64 } else { 0.0 }
+        if pairs > 0 {
+            total_dist / pairs as f64
+        } else {
+            0.0
+        }
     } else {
         0.0
     };
 
-    let avg_energy = alive_handles.iter()
+    let avg_energy = alive_handles
+        .iter()
         .filter_map(|&h| field.entities.get(&h))
         .map(|e| e.energy.available)
-        .sum::<f64>() / alive.max(1) as f64;
+        .sum::<f64>()
+        / alive.max(1) as f64;
 
     println!();
 

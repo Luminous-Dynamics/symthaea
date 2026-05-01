@@ -11,8 +11,8 @@
 //! no Holochain runtime. Pure Rust + serde + blake3.
 
 // Re-export the types the sim needs
-pub use mycelix_bridge_common::earth_colony_protocol::PlanetaryBody;
 pub use mycelix_bridge_common::consciousness_profile::ConsciousnessProfile;
+pub use mycelix_bridge_common::earth_colony_protocol::PlanetaryBody;
 pub use mycelix_bridge_common::sovereign_gate::CivicTier;
 // consciousness_sync is behind the "federated" feature gate in bridge-common.
 // Stub types for downstream compatibility until federated module is restored.
@@ -40,10 +40,10 @@ pub struct PlanetaryConsciousnessState {
     pub population: usize,
     pub coherence: f64,
 }
-pub use mycelix_bridge_common::planetary_governance::TendEquivalence;
 pub use mycelix_bridge_common::collective_phi::{
-    CollectivePhiEngine, CollectivePhiResult, AgentConsciousnessVector,
+    AgentConsciousnessVector, CollectivePhiEngine, CollectivePhiResult,
 };
+pub use mycelix_bridge_common::planetary_governance::TendEquivalence;
 
 /// Convert a location string (used in V1) to a PlanetaryBody.
 /// This is the migration bridge from string-based to enum-based locations.
@@ -112,14 +112,20 @@ mod tests {
     fn test_consciousness_profile_tiers() {
         // Low engagement agent = Observer
         let low = agent_to_profile(0.1, 0.8, 0, false, 20.0);
-        assert_eq!(CivicTier::from_score(low.combined_score()), CivicTier::Observer);
+        assert_eq!(
+            CivicTier::from_score(low.combined_score()),
+            CivicTier::Observer
+        );
 
         // High engagement agent = Citizen or above
         let high = agent_to_profile(0.8, 4.0, 1, true, 160.0);
         let tier = CivicTier::from_score(high.combined_score());
-        assert!(tier as u8 >= CivicTier::Citizen as u8,
+        assert!(
+            tier as u8 >= CivicTier::Citizen as u8,
             "High agent should be Citizen+, got {:?} (score: {:.3})",
-            tier, high.combined_score());
+            tier,
+            high.combined_score()
+        );
     }
 
     #[test]

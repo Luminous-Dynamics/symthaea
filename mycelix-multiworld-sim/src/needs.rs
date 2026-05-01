@@ -192,9 +192,8 @@ impl AffectState {
         let satisfaction = needs.social_satiation * 0.4
             + needs.engagement * 0.3
             + (1.0 - needs.allostatic_load) * 0.3;
-        let suffering = needs.allostatic_load * 0.4
-            + (1.0 - needs.social_satiation) * 0.3
-            + trauma_level * 0.3;
+        let suffering =
+            needs.allostatic_load * 0.4 + (1.0 - needs.social_satiation) * 0.3 + trauma_level * 0.3;
 
         // Competitive exclusion: joy and sadness suppress each other (soft-max).
         // This creates bistable dynamics — the system tips toward one or the other.
@@ -219,7 +218,8 @@ impl AffectState {
             care_base * (needs.social_satiation / 0.3) // Sigmoid collapse below threshold
         } else {
             care_base
-        }.clamp(0.0, 1.0);
+        }
+        .clamp(0.0, 1.0);
 
         // Harm, guilt, and outrage are NOT computed here — they are managed
         // exclusively by the moral emotions system in consciousness.rs.
@@ -238,7 +238,16 @@ impl AffectState {
 
         // harm=0.0, guilt=0.0, outrage=0.0 — all restored from previous state
         // by blend_with_previous, which delegates to consciousness.rs for accumulation.
-        Self { joy, sadness, desire, care, harm: 0.0, consent, guilt: 0.0, outrage: 0.0 }
+        Self {
+            joy,
+            sadness,
+            desire,
+            care,
+            harm: 0.0,
+            consent,
+            guilt: 0.0,
+            outrage: 0.0,
+        }
     }
 
     /// Blend new computed state with previous state (emotional momentum).
@@ -257,7 +266,8 @@ impl AffectState {
             harm: previous.harm,
             // Consent rebuilds slowly but collapses fast (hysteresis)
             consent: if self.consent < previous.consent {
-                previous.consent * (1.0 - alpha * 1.5).max(0.0) + self.consent * (alpha * 1.5).min(1.0)
+                previous.consent * (1.0 - alpha * 1.5).max(0.0)
+                    + self.consent * (alpha * 1.5).min(1.0)
             } else {
                 previous.consent * (1.0 - alpha * 0.5) + self.consent * (alpha * 0.5)
             },
@@ -529,8 +539,16 @@ impl PsychNeedsEngine {
             total_harm += agent.needs.affect.harm;
             total_consent += agent.needs.affect.consent;
         }
-        let (mean_joy, mean_sadness, mean_desire) = (total_joy / count, total_sadness / count, total_desire / count);
-        let (mean_care_aff, mean_harm_aff, mean_consent_aff) = (total_care / count, total_harm / count, total_consent / count);
+        let (mean_joy, mean_sadness, mean_desire) = (
+            total_joy / count,
+            total_sadness / count,
+            total_desire / count,
+        );
+        let (mean_care_aff, mean_harm_aff, mean_consent_aff) = (
+            total_care / count,
+            total_harm / count,
+            total_consent / count,
+        );
 
         let summary = NeedsWorldSummary {
             mean_allostatic_load: mean_load,
@@ -594,10 +612,16 @@ mod tests {
             faction_id: None,
             generation: 0,
             trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
-                    ethics: crate::agent::EthicalOrientation::default(),
-                    sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
-                    justice: crate::sub_passport::RestorativeJustice::new(),
+            cumulative_dose_sv: 0.0,
+            adversarial: None,
+            coordination_understanding: 0.0,
+            mycel_score: 0.1,
+            sap_balance: 100.0,
+            is_biological: true,
+            wounds: Vec::new(),
+            ethics: crate::agent::EthicalOrientation::default(),
+            sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
+            justice: crate::sub_passport::RestorativeJustice::new(),
         }
     }
 
@@ -622,7 +646,9 @@ mod tests {
             economy: crate::economy::WorldEconomy::new(),
             harmony: crate::harmony::HarmonyTracker::new(),
             governance: crate::governance::WorldGovernance::new(),
-            metabolism_state: crate::metabolism::MetabolismState::default(), currency_state: crate::currency::WorldCurrencyState::default(), policy_state: crate::proposals::PolicyState::default(),
+            metabolism_state: crate::metabolism::MetabolismState::default(),
+            currency_state: crate::currency::WorldCurrencyState::default(),
+            policy_state: crate::proposals::PolicyState::default(),
             power_generation_kw: 0.0,
             power_demand_kw: 0.0,
             narrative_identity: crate::world::NarrativeIdentity::default(),
@@ -717,7 +743,18 @@ mod tests {
         agents_with[0].needs.social_satiation = 0.5; // above isolation threshold
         let mut world_with = make_world(agents_with);
         let mut rng1 = StochasticEngine::new(42);
-        PsychNeedsEngine::tick_needs(&mut world_with, tick, 1, 5, 0.3, 0.8, 0.5, 1.0, 1.5, &mut rng1);
+        PsychNeedsEngine::tick_needs(
+            &mut world_with,
+            tick,
+            1,
+            5,
+            0.3,
+            0.8,
+            0.5,
+            1.0,
+            1.5,
+            &mut rng1,
+        );
         let load_with_care = world_with.agents[0].needs.allostatic_load;
 
         // World without care workers
@@ -726,7 +763,18 @@ mod tests {
         agents_without[0].needs.social_satiation = 0.5;
         let mut world_without = make_world(agents_without);
         let mut rng2 = StochasticEngine::new(42);
-        PsychNeedsEngine::tick_needs(&mut world_without, tick, 1, 0, 0.3, 0.8, 0.5, 1.0, 1.5, &mut rng2);
+        PsychNeedsEngine::tick_needs(
+            &mut world_without,
+            tick,
+            1,
+            0,
+            0.3,
+            0.8,
+            0.5,
+            1.0,
+            1.5,
+            &mut rng2,
+        );
         let load_without_care = world_without.agents[0].needs.allostatic_load;
 
         assert!(
@@ -832,7 +880,18 @@ mod tests {
         agents_deep[0].needs.social_satiation = 0.7;
         let mut world_deep = make_world(agents_deep);
         let mut rng1 = StochasticEngine::new(42);
-        PsychNeedsEngine::tick_needs(&mut world_deep, tick, 2, 0, 0.3, 0.8, 0.5, 1.0, 1.5, &mut rng1);
+        PsychNeedsEngine::tick_needs(
+            &mut world_deep,
+            tick,
+            2,
+            0,
+            0.3,
+            0.8,
+            0.5,
+            1.0,
+            1.5,
+            &mut rng1,
+        );
         let social_deep = world_deep.agents[0].needs.social_satiation;
 
         // Epoch 1 (Roots), same world
@@ -840,7 +899,18 @@ mod tests {
         agents_normal[0].needs.social_satiation = 0.7;
         let mut world_normal = make_world(agents_normal);
         let mut rng2 = StochasticEngine::new(42);
-        PsychNeedsEngine::tick_needs(&mut world_normal, tick, 1, 0, 0.3, 0.8, 0.5, 1.0, 1.5, &mut rng2);
+        PsychNeedsEngine::tick_needs(
+            &mut world_normal,
+            tick,
+            1,
+            0,
+            0.3,
+            0.8,
+            0.5,
+            1.0,
+            1.5,
+            &mut rng2,
+        );
         let social_normal = world_normal.agents[0].needs.social_satiation;
 
         assert!(
@@ -856,7 +926,8 @@ mod tests {
         let mut world = make_world(agents);
         let mut rng = StochasticEngine::new(42);
 
-        let (_, summary) = PsychNeedsEngine::tick_needs(&mut world, tick, 1, 0, 0.3, 0.8, 0.5, 1.0, 1.5, &mut rng);
+        let (_, summary) =
+            PsychNeedsEngine::tick_needs(&mut world, tick, 1, 0, 0.3, 0.8, 0.5, 1.0, 1.5, &mut rng);
 
         assert!(summary.mean_allostatic_load >= 0.0 && summary.mean_allostatic_load <= 1.0);
         assert!(summary.mean_social_satiation >= 0.0 && summary.mean_social_satiation <= 1.0);

@@ -2,54 +2,70 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use leptos::prelude::*;
+use crate::contexts::commons_context::use_commons;
 
 #[component]
 pub fn CarePage() -> impl IntoView {
-    view! {
-        <div class="page care-page">
-            <h1>"Mutual Care Network"</h1>
-            <p class="page-desc">"Give and receive care within your community. Every commitment is recorded on your local chain."</p>
+    let commons = use_commons();
 
-            <section class="care-stats">
+    view! {
+        <div class="care-page" data-page="care" role="main">
+            <h1 class="page-title">"Mutual Care Network"</h1>
+            <p class="page-subtitle">"care circles, reciprocity, and direct support within your community"</p>
+
+            <section class="care-stats" data-section="care-stats">
                 <div class="stat-card">
-                    <span class="stat-value">"1,203"</span>
-                    <span class="stat-label">"Active Commitments"</span>
+                    <span class="stat-value">{move || commons.care_circles.get().len()}</span>
+                    <span class="stat-label">"Care Circles"</span>
                 </div>
                 <div class="stat-card">
-                    <span class="stat-value">"456"</span>
-                    <span class="stat-label">"Hours Given This Month"</span>
+                    <span class="stat-value">
+                        {move || commons.care_circles.get().iter().map(|circle| circle.member_count).sum::<u32>()}
+                    </span>
+                    <span class="stat-label">"Circle Memberships"</span>
                 </div>
                 <div class="stat-card">
-                    <span class="stat-value">"98%"</span>
-                    <span class="stat-label">"Fulfillment Rate"</span>
+                    <span class="stat-value">
+                        {move || commons.care_circles.get().iter().filter(|circle| circle.active).count()}
+                    </span>
+                    <span class="stat-label">"Active Circles"</span>
                 </div>
             </section>
 
-            <section class="care-categories">
-                <h2>"Care Categories"</h2>
-                <div class="category-grid">
-                    <div class="category-card">"Childcare — 89 active"</div>
-                    <div class="category-card">"Elder Care — 67 active"</div>
-                    <div class="category-card">"Health Support — 45 active"</div>
-                    <div class="category-card">"Education — 112 active"</div>
-                    <div class="category-card">"Emergency — 23 active"</div>
-                    <div class="category-card">"Household — 156 active"</div>
+            <section class="care-circles-section" data-section="care-circles">
+                <h2 class="section-title">"Care Circles"</h2>
+                <div class="category-grid" role="list">
+                    {move || commons.care_circles.get().into_iter().map(|circle| {
+                        let circle_type = circle.circle_type.label().to_string();
+                        let circle_type_attr = circle_type.clone();
+                        let active = if circle.active { "active" } else { "inactive" };
+                        view! {
+                            <div class="category-card" data-circle-hash=circle.hash.clone() data-circle-type=circle_type_attr role="listitem">
+                                <strong>{circle.name}</strong>
+                                <span>{circle_type}</span>
+                                <span>{format!("{} members", circle.member_count)}</span>
+                                <span>{active}</span>
+                            </div>
+                        }
+                    }).collect_view()}
                 </div>
             </section>
 
             <section class="recent-activity">
-                <h2>"Recent Care Activity"</h2>
+                <h2 class="section-title">"Care Posture"</h2>
                 <div class="activity-list">
-                    <div class="activity-item">
-                        <span class="activity-type">"Childcare"</span>
-                        <span>"After-school pickup — 3 hours"</span>
-                        <span class="activity-status fulfilled">"Fulfilled"</span>
-                    </div>
-                    <div class="activity-item">
-                        <span class="activity-type">"Elder Care"</span>
-                        <span>"Weekly shopping assistance"</span>
-                        <span class="activity-status pending">"Pending"</span>
-                    </div>
+                    {move || commons.care_circles.get().into_iter().map(|circle| {
+                        let circle_type = circle.circle_type.label().to_string();
+                        view! {
+                            <div class="activity-item" data-circle-hash=circle.hash.clone() data-circle-active=circle.active.to_string()>
+                                <span class="activity-type">{circle_type}</span>
+                                <span>{circle.description}</span>
+                                <span class=if circle.active { "activity-status fulfilled" } else { "activity-status pending" }>
+                                    {if circle.active { "Active" } else { "Inactive" }}
+                                </span>
+                            </div>
+                        }
+                    }).collect_view()}
                 </div>
             </section>
         </div>

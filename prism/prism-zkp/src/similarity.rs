@@ -38,8 +38,11 @@ pub fn generate_similarity_proof(
     claim_bytes: &[u8],
     threshold: f32,
 ) -> SimilarityProof {
-    assert_eq!(query_bytes.len(), claim_bytes.len(),
-        "vectors must be same length");
+    assert_eq!(
+        query_bytes.len(),
+        claim_bytes.len(),
+        "vectors must be same length"
+    );
 
     let total_bits = query_bytes.len() * 8;
 
@@ -150,8 +153,11 @@ mod tests {
         let a: Vec<u8> = (0..2048).map(|i| (i * 7 + 3) as u8).collect();
         let b: Vec<u8> = (0..2048).map(|i| (i * 13 + 7) as u8).collect();
         let proof = generate_similarity_proof(&a, &b, 0.4);
-        assert!(proof.similarity > 0.3 && proof.similarity < 0.7,
-            "random similarity should be ~0.5, got {}", proof.similarity);
+        assert!(
+            proof.similarity > 0.3 && proof.similarity < 0.7,
+            "random similarity should be ~0.5, got {}",
+            proof.similarity
+        );
         assert!(verify_similarity_proof(&proof).is_ok());
     }
 

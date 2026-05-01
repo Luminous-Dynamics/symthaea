@@ -21,6 +21,21 @@ baseline run tight. Enable them explicitly:
 
 - `RUSTC_WRAPPER= cargo test -p symthaea --features integration-tests`
 
+## Coding Validation
+
+Run the focused validation lane for Symthaea's Rust coding path:
+
+- `./scripts/run_coding_validation.sh`
+
+This checks that simulated execution cannot receive success credit, verifies the
+real Rust executor path, and runs the Rust-adapted HumanEval smoke testbench.
+The JSON report is written to `target/coding-validation/humaneval-smoke.json`
+unless `SYMTHAEA_CODING_VALIDATION_REPORT` is set.
+
+The same lane is available through:
+
+- `./scripts/ci_check_lanes.sh coding-validation`
+
 ## Meta-study (WebResearcher)
 
 Run the self-research pipeline (requires network access and an LLM backend):

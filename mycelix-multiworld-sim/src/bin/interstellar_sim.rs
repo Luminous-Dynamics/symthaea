@@ -32,9 +32,18 @@ fn main() {
     let mut year_50_report = false;
     let mut year_75_report = false;
 
-    println!("Ship: {} → {} ({:.2} ly at {:.1}%c)",
-        "Sol", ship.destination.name(), ship.distance_ly, ship.cruise_velocity_c * 100.0);
-    println!("Transit: {:.1} years ({} ticks)", ship.transit_ticks as f64 / 12.0, ship.transit_ticks);
+    println!(
+        "Ship: {} → {} ({:.2} ly at {:.1}%c)",
+        "Sol",
+        ship.destination.name(),
+        ship.distance_ly,
+        ship.cruise_velocity_c * 100.0
+    );
+    println!(
+        "Transit: {:.1} years ({} ticks)",
+        ship.transit_ticks as f64 / 12.0,
+        ship.transit_ticks
+    );
     println!("Passengers: {}\n", pop);
 
     // Run transit
@@ -80,13 +89,27 @@ fn main() {
         // Milestone reports
         let years = ship.elapsed_ticks as f64 / 12.0;
         if years >= 10.0 && !year_10_report {
-            println!("  Year {:.0}: Pop {} | Hull {:.1}% | Fuel {:.1}% | Phase {:?} | Disasters {}",
-                years, pop, ship.hull_integrity * 100.0, ship.fuel_fraction * 100.0, ship.phase, total_disasters);
+            println!(
+                "  Year {:.0}: Pop {} | Hull {:.1}% | Fuel {:.1}% | Phase {:?} | Disasters {}",
+                years,
+                pop,
+                ship.hull_integrity * 100.0,
+                ship.fuel_fraction * 100.0,
+                ship.phase,
+                total_disasters
+            );
             year_10_report = true;
         }
         if years >= 25.0 && !year_25_report {
-            println!("  Year {:.0}: Pop {} | Hull {:.1}% | Fuel {:.1}% | Phase {:?} | Disasters {}",
-                years, pop, ship.hull_integrity * 100.0, ship.fuel_fraction * 100.0, ship.phase, total_disasters);
+            println!(
+                "  Year {:.0}: Pop {} | Hull {:.1}% | Fuel {:.1}% | Phase {:?} | Disasters {}",
+                years,
+                pop,
+                ship.hull_integrity * 100.0,
+                ship.fuel_fraction * 100.0,
+                ship.phase,
+                total_disasters
+            );
             year_25_report = true;
         }
         if years >= 50.0 && !year_50_report {
@@ -110,7 +133,10 @@ fn main() {
             break;
         }
         if ship.hull_integrity <= 0.0 {
-            println!("\n  ██ HULL FAILURE at year {:.1} — catastrophic breach", years);
+            println!(
+                "\n  ██ HULL FAILURE at year {:.1} — catastrophic breach",
+                years
+            );
             pop = 0;
             break;
         }
@@ -119,10 +145,17 @@ fn main() {
     println!("\n{}", ship.status_report(pop));
 
     if ship.phase == ShipPhase::Arrived && pop > 0 {
-        println!("\n✓ ARRIVAL at {} with {} colonists", ship.destination.name(), pop);
-        println!("  Population change: {} → {} ({:+.1}%)",
-            ship.launch_population, pop,
-            (pop as f64 / ship.launch_population as f64 - 1.0) * 100.0);
+        println!(
+            "\n✓ ARRIVAL at {} with {} colonists",
+            ship.destination.name(),
+            pop
+        );
+        println!(
+            "  Population change: {} → {} ({:+.1}%)",
+            ship.launch_population,
+            pop,
+            (pop as f64 / ship.launch_population as f64 - 1.0) * 100.0
+        );
         if ship.below_minimum_viable(pop) {
             println!("  ⚠ BELOW MINIMUM VIABLE POPULATION ({} < {})", pop, 98);
         }

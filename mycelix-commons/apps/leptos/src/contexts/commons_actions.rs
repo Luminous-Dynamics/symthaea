@@ -69,3 +69,21 @@ pub fn post_offer(title: String, description: String, category: NeedCategory) {
         });
     }
 }
+
+pub fn claim_compost_reward(batch_hash: String) {
+    let commons = use_commons();
+    let toasts = use_toasts();
+    
+    // In a real app, this would call mycelix-finance bridge
+    // to register a RecognitionEvent or AgriAsset.
+    web_sys::console::log_1(&format!("[Commons] Claiming reward for batch {}", batch_hash).into());
+    
+    commons.compost_batches.update(|batches| {
+        if let Some(batch) = batches.iter_mut().find(|b| b.hash == batch_hash) {
+            batch.can_claim = false;
+            batch.status = "Claimed".into();
+        }
+    });
+    
+    toasts.push("Sequestration reward claimed! TEND allocated.", ToastKind::Custom("commons".into()));
+}

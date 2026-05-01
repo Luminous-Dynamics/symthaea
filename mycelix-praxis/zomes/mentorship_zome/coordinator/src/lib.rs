@@ -1,3 +1,4 @@
+use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -6,7 +7,7 @@
 //! Implements business logic for mentor-mentee pairing, session tracking,
 //! and mentorship lifecycle management within EduNet.
 //!
-//! ## Consciousness Gating
+//! ## Epistemic Gating
 //!
 //! Registering as a mentor or accepting mentorships requires at least
 //! Participant tier. Completing mentorships (which writes ratings) requires

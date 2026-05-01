@@ -148,9 +148,7 @@ pub fn expr_to_equation_node(expr: &Expr) -> EquationNode {
                 exponent: Box::new(exp_node),
             }
         }
-        Expr::Func(UnaryFn::Sqrt, arg) => {
-            EquationNode::Sqrt(Box::new(expr_to_equation_node(arg)))
-        }
+        Expr::Func(UnaryFn::Sqrt, arg) => EquationNode::Sqrt(Box::new(expr_to_equation_node(arg))),
         Expr::Func(UnaryFn::Exp, arg) => {
             EquationNode::Exponential(Box::new(expr_to_equation_node(arg)))
         }
@@ -201,7 +199,6 @@ fn flatten_mul(expr: &Expr, out: &mut Vec<EquationNode>) {
     }
 }
 
-
 /// A full recognition report for a discovered formula.
 #[derive(Debug, Clone)]
 pub struct RecognitionReport {
@@ -230,7 +227,8 @@ impl RecognitionReport {
             (Some(name), score) if score > 0.40 => {
                 format!(
                     "↳ weakly analogous to '{}' ({:.0}%) — possibly novel",
-                    name, score * 100.0
+                    name,
+                    score * 100.0
                 )
             }
             _ => "↳ NO KNOWN MATCH — possibly novel discovery".to_string(),
@@ -244,11 +242,7 @@ impl RecognitionReport {
 /// unit map, leaving the dimensional axis inert. Use this when the caller
 /// has no unit annotations available; otherwise prefer the units-aware
 /// version, which can lift recognition scores past the structural plateau.
-pub fn recognize_expr(
-    engine: &PhysicsSearchEngine,
-    expr: &Expr,
-    name: &str,
-) -> RecognitionReport {
+pub fn recognize_expr(engine: &PhysicsSearchEngine, expr: &Expr, name: &str) -> RecognitionReport {
     recognize_expr_with_units(engine, expr, name, &UnitMap::new())
 }
 
@@ -288,7 +282,9 @@ pub fn recognize_expr_with_units(
     // top-level node type matches catalog entries (which are all stored as
     // Equals trees). See the recognize.rs module docs for full rationale.
     let ast = EquationNode::Equals(
-        Box::new(EquationNode::Constant { name: "result".into() }),
+        Box::new(EquationNode::Constant {
+            name: "result".into(),
+        }),
         Box::new(rhs),
     );
 
@@ -411,11 +407,7 @@ mod tests {
                 Box::new(Expr::Const(2.0)),
             )),
         );
-        let kinetic = Expr::BinOp(
-            BinOp::Mul,
-            Box::new(Expr::Const(0.5)),
-            Box::new(v_sq),
-        );
+        let kinetic = Expr::BinOp(BinOp::Mul, Box::new(Expr::Const(0.5)), Box::new(v_sq));
         let potential = Expr::BinOp(
             BinOp::Div,
             Box::new(Expr::Const(1.0)),
@@ -540,5 +532,4 @@ mod tests {
             panic!("expected Constant");
         }
     }
-
 }

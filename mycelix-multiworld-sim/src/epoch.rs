@@ -122,25 +122,23 @@ pub struct EpochSnapshot {
 impl EpochSnapshot {
     /// Create a snapshot with only the fields available from the current simulation state.
     /// Fields that require subsystems not yet wired default to 0.0.
-    pub fn from_worlds(
-        epoch_id: EpochId,
-        tick: u32,
-        worlds: &[World],
-    ) -> Self {
+    pub fn from_worlds(epoch_id: EpochId, tick: u32, worlds: &[World]) -> Self {
         let total_population: usize = worlds.iter().map(|w| w.population()).sum();
         let world_count = worlds.len();
 
         // Off-Earth worlds are the interesting question for a colony sim.
-        let off_earth_worlds: Vec<&World> = worlds
-            .iter()
-            .filter(|w| w.location != "Earth")
-            .collect();
+        let off_earth_worlds: Vec<&World> =
+            worlds.iter().filter(|w| w.location != "Earth").collect();
         let off_earth_population: usize = off_earth_worlds.iter().map(|w| w.population()).sum();
 
         let mean_self_sufficiency = if worlds.is_empty() {
             0.0
         } else {
-            worlds.iter().map(|w| w.resources.self_sufficiency()).sum::<f64>() / world_count as f64
+            worlds
+                .iter()
+                .map(|w| w.resources.self_sufficiency())
+                .sum::<f64>()
+                / world_count as f64
         };
 
         let mean_phi = if worlds.is_empty() {
@@ -176,22 +174,25 @@ impl EpochSnapshot {
         let mean_tech_level = if worlds.is_empty() {
             0.0
         } else {
-            let raw: f64 = worlds.iter().map(|w| w.knowledge.mean_tech_level()).sum::<f64>()
+            let raw: f64 = worlds
+                .iter()
+                .map(|w| w.knowledge.mean_tech_level())
+                .sum::<f64>()
                 / world_count as f64;
             ((raw - 1.0) / 9.0).clamp(0.0, 1.0)
         };
 
         // Psychological needs aggregates
-        let (total_load, total_engagement, agent_count) = worlds.iter().fold(
-            (0.0f64, 0.0f64, 0usize),
-            |(load, eng, count), w| {
-                let living: Vec<_> = w.agents.iter().filter(|a| a.is_alive()).collect();
-                let n = living.len();
-                let l: f64 = living.iter().map(|a| a.needs.allostatic_load).sum();
-                let e: f64 = living.iter().map(|a| a.needs.engagement).sum();
-                (load + l, eng + e, count + n)
-            },
-        );
+        let (total_load, total_engagement, agent_count) =
+            worlds
+                .iter()
+                .fold((0.0f64, 0.0f64, 0usize), |(load, eng, count), w| {
+                    let living: Vec<_> = w.agents.iter().filter(|a| a.is_alive()).collect();
+                    let n = living.len();
+                    let l: f64 = living.iter().map(|a| a.needs.allostatic_load).sum();
+                    let e: f64 = living.iter().map(|a| a.needs.engagement).sum();
+                    (load + l, eng + e, count + n)
+                });
         let ac = agent_count.max(1) as f64;
         let mean_allostatic_load = total_load / ac;
         let mean_engagement = total_engagement / ac;
@@ -205,24 +206,35 @@ impl EpochSnapshot {
         );
 
         // Per-world snapshots for outer system visibility.
-        let world_snapshots: Vec<WorldSnapshot> = worlds.iter().map(|w| {
-            let living: Vec<_> = w.agents.iter().filter(|a| a.is_alive()).collect();
-            let n = living.len().max(1) as f64;
-            let phi = living.iter().map(|a| a.consciousness.phi()).sum::<f64>() / n;
-            let load = living.iter().map(|a| a.needs.allostatic_load).sum::<f64>() / n;
-            let net_conatus = living.iter().map(|a| a.needs.affect.net_conatus()).sum::<f64>() / n;
-            let moral_balance = living.iter().map(|a| a.needs.affect.moral_balance()).sum::<f64>() / n;
-            WorldSnapshot {
-                name: w.name.clone(),
-                location: w.location.clone(),
-                population: w.population(),
-                phi,
-                allostatic_load: load,
-                net_conatus,
-                moral_balance,
-                self_sufficiency: w.resources.self_sufficiency(),
-            }
-        }).collect();
+        let world_snapshots: Vec<WorldSnapshot> = worlds
+            .iter()
+            .map(|w| {
+                let living: Vec<_> = w.agents.iter().filter(|a| a.is_alive()).collect();
+                let n = living.len().max(1) as f64;
+                let phi = living.iter().map(|a| a.consciousness.phi()).sum::<f64>() / n;
+                let load = living.iter().map(|a| a.needs.allostatic_load).sum::<f64>() / n;
+                let net_conatus = living
+                    .iter()
+                    .map(|a| a.needs.affect.net_conatus())
+                    .sum::<f64>()
+                    / n;
+                let moral_balance = living
+                    .iter()
+                    .map(|a| a.needs.affect.moral_balance())
+                    .sum::<f64>()
+                    / n;
+                WorldSnapshot {
+                    name: w.name.clone(),
+                    location: w.location.clone(),
+                    population: w.population(),
+                    phi,
+                    allostatic_load: load,
+                    net_conatus,
+                    moral_balance,
+                    self_sufficiency: w.resources.self_sufficiency(),
+                }
+            })
+            .collect();
 
         // Ethical composition telemetry (Phase 3: ethical pluralism)
         let mut ethics_sums = [0.0f64; 4];
@@ -237,24 +249,34 @@ impl EpochSnapshot {
                     ethics_sq_sums[d] += v[d] * v[d];
                 }
                 // Count dominant framework for Simpson diversity
-                let max_idx = v.iter().enumerate()
+                let max_idx = v
+                    .iter()
+                    .enumerate()
                     .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
-                    .map(|(i, _)| i).unwrap_or(0);
+                    .map(|(i, _)| i)
+                    .unwrap_or(0);
                 dominant_counts[max_idx] += 1;
             }
         }
         let ethics_mean = [
-            ethics_sums[0] / ethics_n, ethics_sums[1] / ethics_n,
-            ethics_sums[2] / ethics_n, ethics_sums[3] / ethics_n,
+            ethics_sums[0] / ethics_n,
+            ethics_sums[1] / ethics_n,
+            ethics_sums[2] / ethics_n,
+            ethics_sums[3] / ethics_n,
         ];
         let ethics_std = [0, 1, 2, 3].map(|d| {
             let mean = ethics_mean[d];
-            ((ethics_sq_sums[d] / ethics_n) - mean * mean).max(0.0).sqrt()
+            ((ethics_sq_sums[d] / ethics_n) - mean * mean)
+                .max(0.0)
+                .sqrt()
         });
         // Simpson diversity: 1 - Σ(p_i²), range [0, 0.75] for 4 categories
         let ethics_diversity = {
             let total = dominant_counts.iter().sum::<usize>().max(1) as f64;
-            1.0 - dominant_counts.iter().map(|&c| (c as f64 / total).powi(2)).sum::<f64>()
+            1.0 - dominant_counts
+                .iter()
+                .map(|&c| (c as f64 / total).powi(2))
+                .sum::<f64>()
         };
 
         Self {
@@ -383,9 +405,7 @@ impl EpochManager {
             tick: 108,
             epoch_id: EPOCH_SEEDS,
             description: "Crew arrives: population stable".into(),
-            assertions: vec![
-                EpochAssertion::PopulationAbove(8),
-            ],
+            assertions: vec![EpochAssertion::PopulationAbove(8)],
         });
         cps.push(EpochCheckpoint {
             tick: 168,
@@ -402,25 +422,19 @@ impl EpochManager {
             tick: 240,
             epoch_id: EPOCH_ROOTS,
             description: "First birth in colony".into(),
-            assertions: vec![
-                EpochAssertion::FirstBirth,
-            ],
+            assertions: vec![EpochAssertion::FirstBirth],
         });
         cps.push(EpochCheckpoint {
             tick: 300,
             epoch_id: EPOCH_ROOTS,
             description: "Constitution ratified".into(),
-            assertions: vec![
-                EpochAssertion::ConstitutionRatified,
-            ],
+            assertions: vec![EpochAssertion::ConstitutionRatified],
         });
         cps.push(EpochCheckpoint {
             tick: 360,
             epoch_id: EPOCH_ROOTS,
             description: "Self-sufficiency above 0.5".into(),
-            assertions: vec![
-                EpochAssertion::SelfSufficiencyAbove(0.5),
-            ],
+            assertions: vec![EpochAssertion::SelfSufficiencyAbove(0.5)],
         });
         cps.push(EpochCheckpoint {
             tick: 408,
@@ -446,17 +460,13 @@ impl EpochManager {
             tick: 540,
             epoch_id: EPOCH_BRANCHES,
             description: "Inter-world trade established".into(),
-            assertions: vec![
-                EpochAssertion::TradeEstablished,
-            ],
+            assertions: vec![EpochAssertion::TradeEstablished],
         });
         cps.push(EpochCheckpoint {
             tick: 600,
             epoch_id: EPOCH_BRANCHES,
             description: "No oppression crisis active".into(),
-            assertions: vec![
-                EpochAssertion::NoOppressionCrisis,
-            ],
+            assertions: vec![EpochAssertion::NoOppressionCrisis],
         });
         cps.push(EpochCheckpoint {
             tick: 708,
@@ -482,9 +492,7 @@ impl EpochManager {
             tick: 900,
             epoch_id: EPOCH_CANOPY,
             description: "Population growth milestone".into(),
-            assertions: vec![
-                EpochAssertion::PopulationAbove(1000),
-            ],
+            assertions: vec![EpochAssertion::PopulationAbove(1000)],
         });
         cps.push(EpochCheckpoint {
             tick: 960,
@@ -510,17 +518,13 @@ impl EpochManager {
             tick: 1140,
             epoch_id: EPOCH_FRUITING,
             description: "Manufacturing self-sufficiency above 0.8".into(),
-            assertions: vec![
-                EpochAssertion::SelfSufficiencyAbove(0.8),
-            ],
+            assertions: vec![EpochAssertion::SelfSufficiencyAbove(0.8)],
         });
         cps.push(EpochCheckpoint {
             tick: 1200,
             epoch_id: EPOCH_FRUITING,
             description: "Love coherence measurable".into(),
-            assertions: vec![
-                EpochAssertion::LoveCoherenceAbove(0.1),
-            ],
+            assertions: vec![EpochAssertion::LoveCoherenceAbove(0.1)],
         });
         cps.push(EpochCheckpoint {
             tick: 1320,
@@ -555,17 +559,13 @@ impl EpochManager {
             tick: 1620,
             epoch_id: EPOCH_DISPERSAL,
             description: "Genetic diversity preserved across generations".into(),
-            assertions: vec![
-                EpochAssertion::GeneticDiversityAbove(0.2),
-            ],
+            assertions: vec![EpochAssertion::GeneticDiversityAbove(0.2)],
         });
         cps.push(EpochCheckpoint {
             tick: 1740,
             epoch_id: EPOCH_DISPERSAL,
             description: "Love coherence maturing".into(),
-            assertions: vec![
-                EpochAssertion::LoveCoherenceAbove(0.15),
-            ],
+            assertions: vec![EpochAssertion::LoveCoherenceAbove(0.15)],
         });
         cps.push(EpochCheckpoint {
             tick: 1800,
@@ -667,33 +667,25 @@ impl EpochManager {
             tick: 4800,
             epoch_id: EPOCH_SECONDARY_GROWTH,
             description: "Innovation non-stagnant: tech continues advancing".into(),
-            assertions: vec![
-                EpochAssertion::InnovationNonStagnant,
-            ],
+            assertions: vec![EpochAssertion::InnovationNonStagnant],
         });
         cps.push(EpochCheckpoint {
             tick: 5100,
             epoch_id: EPOCH_SECONDARY_GROWTH,
             description: "Divergence stable: cultural distance manageable".into(),
-            assertions: vec![
-                EpochAssertion::InterWorldDivergenceBelow(0.6),
-            ],
+            assertions: vec![EpochAssertion::InterWorldDivergenceBelow(0.6)],
         });
         cps.push(EpochCheckpoint {
             tick: 5400,
             epoch_id: EPOCH_SECONDARY_GROWTH,
             description: "Recovery demonstrated: civilization can bounce back".into(),
-            assertions: vec![
-                EpochAssertion::RecoveryDemonstrated,
-            ],
+            assertions: vec![EpochAssertion::RecoveryDemonstrated],
         });
         cps.push(EpochCheckpoint {
             tick: 5700,
             epoch_id: EPOCH_SECONDARY_GROWTH,
             description: "Elite persistence check: meritocracy maintained".into(),
-            assertions: vec![
-                EpochAssertion::ElitePersistenceBelow(0.5),
-            ],
+            assertions: vec![EpochAssertion::ElitePersistenceBelow(0.5)],
         });
         cps.push(EpochCheckpoint {
             tick: 6048,
@@ -719,17 +711,13 @@ impl EpochManager {
             tick: 7200,
             epoch_id: EPOCH_LEGACY,
             description: "Faction cycle completed: factions emerge and dissolve".into(),
-            assertions: vec![
-                EpochAssertion::FactionCountAbove(0),
-            ],
+            assertions: vec![EpochAssertion::FactionCountAbove(0)],
         });
         cps.push(EpochCheckpoint {
             tick: 7800,
             epoch_id: EPOCH_LEGACY,
             description: "Constitutional vitality: governance evolves".into(),
-            assertions: vec![
-                EpochAssertion::NoOppressionCrisis,
-            ],
+            assertions: vec![EpochAssertion::NoOppressionCrisis],
         });
         cps.push(EpochCheckpoint {
             tick: 8400,
@@ -744,9 +732,7 @@ impl EpochManager {
             tick: 9000,
             epoch_id: EPOCH_LEGACY,
             description: "Self-sufficiency achieved: worlds independent".into(),
-            assertions: vec![
-                EpochAssertion::SelfSufficiencyAbove(0.7),
-            ],
+            assertions: vec![EpochAssertion::SelfSufficiencyAbove(0.7)],
         });
         cps.push(EpochCheckpoint {
             tick: 9324,
@@ -790,9 +776,7 @@ impl EpochManager {
             tick: 11400,
             epoch_id: EPOCH_MILLENNIUM,
             description: "Millennium harmony: love coherence sustained".into(),
-            assertions: vec![
-                EpochAssertion::LoveCoherenceAbove(0.1),
-            ],
+            assertions: vec![EpochAssertion::LoveCoherenceAbove(0.1)],
         });
         cps.push(EpochCheckpoint {
             tick: 12000,
@@ -810,11 +794,7 @@ impl EpochManager {
 
     /// Evaluate any checkpoints whose tick matches the current tick.
     /// Returns events for checkpoint pass/fail.
-    pub fn evaluate_tick(
-        &mut self,
-        tick: u32,
-        worlds: &[World],
-    ) -> Vec<CivEvent> {
+    pub fn evaluate_tick(&mut self, tick: u32, worlds: &[World]) -> Vec<CivEvent> {
         let mut events = Vec::new();
 
         let snapshot = EpochSnapshot::from_worlds(self.current_epoch, tick, worlds);
@@ -1248,22 +1228,24 @@ impl EpochManager {
     }
 
     /// Take a snapshot of the current state.
-    pub fn take_snapshot(
-        &self,
-        tick: u32,
-        worlds: &[World],
-    ) -> EpochSnapshot {
+    pub fn take_snapshot(&self, tick: u32, worlds: &[World]) -> EpochSnapshot {
         EpochSnapshot::from_worlds(self.current_epoch, tick, worlds)
     }
 
     /// Number of checkpoints that passed.
     pub fn checkpoints_passed(&self) -> usize {
-        self.checkpoint_results.iter().filter(|(_, _, p, _)| *p).count()
+        self.checkpoint_results
+            .iter()
+            .filter(|(_, _, p, _)| *p)
+            .count()
     }
 
     /// Number of checkpoints that failed.
     pub fn checkpoints_failed(&self) -> usize {
-        self.checkpoint_results.iter().filter(|(_, _, p, _)| !*p).count()
+        self.checkpoint_results
+            .iter()
+            .filter(|(_, _, p, _)| !*p)
+            .count()
     }
 
     /// Convert a tick number to a fractional year offset from simulation start (2026).
@@ -1304,7 +1286,9 @@ mod tests {
             economy: crate::economy::WorldEconomy::new(),
             harmony: crate::harmony::HarmonyTracker::new(),
             governance: crate::governance::WorldGovernance::new(),
-            metabolism_state: crate::metabolism::MetabolismState::default(), currency_state: crate::currency::WorldCurrencyState::default(), policy_state: crate::proposals::PolicyState::default(),
+            metabolism_state: crate::metabolism::MetabolismState::default(),
+            currency_state: crate::currency::WorldCurrencyState::default(),
+            policy_state: crate::proposals::PolicyState::default(),
             power_generation_kw: 0.0,
             power_demand_kw: 0.0,
             narrative_identity: crate::world::NarrativeIdentity::default(),
@@ -1355,7 +1339,13 @@ mod tests {
                 faction_id: None,
                 generation: 0,
                 trauma_level: 0.0,
-                cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
+                cumulative_dose_sv: 0.0,
+                adversarial: None,
+                coordination_understanding: 0.0,
+                mycel_score: 0.1,
+                sap_balance: 100.0,
+                is_biological: true,
+                wounds: Vec::new(),
                 ethics: crate::agent::EthicalOrientation::default(),
                 sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
                 justice: crate::sub_passport::RestorativeJustice::new(),
@@ -1387,11 +1377,17 @@ mod tests {
     fn test_cvs_computation() {
         // Perfect scores -> 1.0
         let cvs = EpochManager::compute_cvs(1.0, 1.0, 1.0, 0.0, 1.0);
-        assert!((cvs - 1.0).abs() < 1e-9, "Perfect CVS should be 1.0, got {cvs}");
+        assert!(
+            (cvs - 1.0).abs() < 1e-9,
+            "Perfect CVS should be 1.0, got {cvs}"
+        );
 
         // All zeros (with max oppression) -> 0.0
         let cvs_zero = EpochManager::compute_cvs(0.0, 0.0, 0.0, 1.0, 0.0);
-        assert!(cvs_zero.abs() < 1e-9, "Zero CVS should be 0.0, got {cvs_zero}");
+        assert!(
+            cvs_zero.abs() < 1e-9,
+            "Zero CVS should be 0.0, got {cvs_zero}"
+        );
 
         // Mid-range: 0.2*(0.5+0.5+0.5+(1-0)+0.5) = 0.2*3.0 = 0.6
         let cvs_mid = EpochManager::compute_cvs(0.5, 0.5, 0.5, 0.0, 0.5);
@@ -1505,10 +1501,17 @@ mod tests {
 
         // Evaluate tick 60 checkpoint (base assembled: pop >= 5, worlds >= 1)
         let events = mgr.evaluate_tick(60, &worlds);
-        assert!(!events.is_empty(), "Should generate checkpoint event at tick 60");
+        assert!(
+            !events.is_empty(),
+            "Should generate checkpoint event at tick 60"
+        );
 
         let (_, _, passed, failures) = &mgr.checkpoint_results[0];
-        assert!(passed, "Checkpoint should pass with 20 agents; failures: {:?}", failures);
+        assert!(
+            passed,
+            "Checkpoint should pass with 20 agents; failures: {:?}",
+            failures
+        );
     }
 
     #[test]
@@ -1521,10 +1524,7 @@ mod tests {
         assert!(!events.is_empty());
 
         // Find the tick-168 result
-        let result = mgr
-            .checkpoint_results
-            .iter()
-            .find(|(t, _, _, _)| *t == 168);
+        let result = mgr.checkpoint_results.iter().find(|(t, _, _, _)| *t == 168);
         assert!(result.is_some());
         let (_, _, passed, failures) = result.unwrap();
         assert!(!passed, "Checkpoint should fail with only 2 agents");

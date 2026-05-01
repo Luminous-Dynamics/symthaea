@@ -19,7 +19,10 @@
 use serde::{Deserialize, Serialize};
 use symthaea_aesthetic::ValenceArousal;
 
-use crate::{pitch::TuningSystem, structure::SectionType, AudioData, Composition, MuseConfig, MusicalState, Note};
+use crate::{
+    pitch::TuningSystem, structure::SectionType, AudioData, Composition, MuseConfig, MusicalState,
+    Note,
+};
 
 // ─── Bar Directive ────────────────────────────────────────────────────────────
 
@@ -91,7 +94,10 @@ pub struct EmotionalArc {
 
 impl EmotionalArc {
     pub fn new(bars: Vec<BarDirective>) -> Self {
-        Self { bars, tuning_system: None }
+        Self {
+            bars,
+            tuning_system: None,
+        }
     }
 
     /// Set the tuning system for this arc (builder-style).
@@ -110,14 +116,14 @@ impl EmotionalArc {
     /// Classic narrative arc: quiet intro → rising action → climax → resolution.
     pub fn narrative_arc(climax_valence: f32) -> Self {
         Self::new(vec![
-            BarDirective::quiet(0.1),                                 // opening stillness
-            BarDirective::from_va(ValenceArousal::new(0.2, 0.35)),   // rising
-            BarDirective::from_va(ValenceArousal::new(0.3, 0.55)),   // building
-            BarDirective::from_va(ValenceArousal::new(0.2, 0.70)),   // tension
-            BarDirective::climax(climax_valence),                     // climax
-            BarDirective::from_va(ValenceArousal::new(0.5, 0.55)),   // release
-            BarDirective::resolve(),                                   // resolution
-            BarDirective::quiet(0.4),                                 // coda
+            BarDirective::quiet(0.1),                              // opening stillness
+            BarDirective::from_va(ValenceArousal::new(0.2, 0.35)), // rising
+            BarDirective::from_va(ValenceArousal::new(0.3, 0.55)), // building
+            BarDirective::from_va(ValenceArousal::new(0.2, 0.70)), // tension
+            BarDirective::climax(climax_valence),                  // climax
+            BarDirective::from_va(ValenceArousal::new(0.5, 0.55)), // release
+            BarDirective::resolve(),                               // resolution
+            BarDirective::quiet(0.4),                              // coda
         ])
     }
 
@@ -164,7 +170,11 @@ impl EmotionalArc {
         BarDirective {
             va: symthaea_aesthetic::lerp_va(a.va, b.va, frac),
             density: a.density + (b.density - a.density) * frac,
-            section_type: if frac < 0.5 { a.section_type } else { b.section_type },
+            section_type: if frac < 0.5 {
+                a.section_type
+            } else {
+                b.section_type
+            },
             dynamics: a.dynamics + (b.dynamics - a.dynamics) * frac,
         }
     }
@@ -243,8 +253,13 @@ pub fn compose_with_arc(
         let sec_scale: Vec<f32> = base_scale.iter().map(|&f| f * key_ratio).collect();
 
         let sec_seed = seed.wrapping_add(sec_idx as u64 * 31);
-        let mut sec_notes =
-            melody::generate_melody(&sec_config, &section_state, &sec_scale, beat_duration, sec_seed);
+        let mut sec_notes = melody::generate_melody(
+            &sec_config,
+            &section_state,
+            &sec_scale,
+            beat_duration,
+            sec_seed,
+        );
 
         // Apply directive dynamics to velocity
         for note in &mut sec_notes {
@@ -261,7 +276,13 @@ pub fn compose_with_arc(
     // Arrange and synthesize
     let arrangement = voice::arrange(&all_notes, base_state);
     let total_samples = (config.duration_secs * config.sample_rate as f32) as usize;
-    let audio = synth::render_arrangement(&arrangement, config.sample_rate, total_samples, base_state, config);
+    let audio = synth::render_arrangement(
+        &arrangement,
+        config.sample_rate,
+        total_samples,
+        base_state,
+        config,
+    );
 
     Composition {
         audio,
@@ -299,7 +320,10 @@ mod tests {
         // Sample at ~60% should have highest arousal (climax bar)
         let mid = arc.sample(0.6);
         let start = arc.sample(0.0);
-        assert!(mid.va.arousal > start.va.arousal, "climax should exceed start");
+        assert!(
+            mid.va.arousal > start.va.arousal,
+            "climax should exceed start"
+        );
     }
 
     #[test]
@@ -354,10 +378,15 @@ mod tests {
     #[test]
     fn arc_with_maqam_tuning_composes() {
         use crate::pitch::{MaqamMode, TuningSystem};
-        let config = MuseConfig { duration_secs: 4.0, max_notes: 16, ..Default::default() };
+        let config = MuseConfig {
+            duration_secs: 4.0,
+            max_notes: 16,
+            ..Default::default()
+        };
         let state = MusicalState::default();
-        let arc = EmotionalArc::meditative()
-            .with_tuning(TuningSystem::Maqamat { maqam: MaqamMode::Hijaz });
+        let arc = EmotionalArc::meditative().with_tuning(TuningSystem::Maqamat {
+            maqam: MaqamMode::Hijaz,
+        });
         assert!(arc.tuning_system.is_some());
         let comp = compose_with_arc(&config, &state, &arc, 99);
         assert!(!comp.notes.is_empty(), "maqam arc should produce notes");
@@ -366,10 +395,15 @@ mod tests {
     #[test]
     fn arc_with_raga_tuning_composes() {
         use crate::pitch::{RagaMode, TuningSystem};
-        let config = MuseConfig { duration_secs: 4.0, max_notes: 16, ..Default::default() };
+        let config = MuseConfig {
+            duration_secs: 4.0,
+            max_notes: 16,
+            ..Default::default()
+        };
         let state = MusicalState::default();
-        let arc = EmotionalArc::narrative_arc(0.6)
-            .with_tuning(TuningSystem::Raga { raga: RagaMode::Bhairav });
+        let arc = EmotionalArc::narrative_arc(0.6).with_tuning(TuningSystem::Raga {
+            raga: RagaMode::Bhairav,
+        });
         let comp = compose_with_arc(&config, &state, &arc, 77);
         assert!(!comp.notes.is_empty(), "raga arc should produce notes");
     }

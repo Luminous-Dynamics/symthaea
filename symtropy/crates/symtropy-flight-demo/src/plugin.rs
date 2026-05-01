@@ -3,7 +3,7 @@
 //! Main plugin: wires resources + ordered per-frame systems.
 
 use bevy::prelude::*;
-use symthaea_flight::simulator::PhysicsSimulator;
+use symthaea_multirotor::simulator::PhysicsSimulator;
 use symtropy_consciousness_physics::safety::sprint_floor_gain;
 
 use crate::camera;

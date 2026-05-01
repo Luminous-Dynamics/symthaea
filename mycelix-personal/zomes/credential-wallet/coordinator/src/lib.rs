@@ -10,6 +10,19 @@
 
 use credential_wallet_integrity::*;
 use hdk::prelude::*;
+
+getrandom::register_custom_getrandom!(my_custom_getrandom);
+
+pub fn my_custom_getrandom(buf: &mut [u8]) -> Result<(), getrandom::Error> {
+    let bytes = random_bytes(buf.len() as u32).map_err(|_| getrandom::Error::UNSUPPORTED)?;
+    buf.copy_from_slice(bytes.as_ref());
+    Ok(())
+}
+
+use personal_leptos_types::{
+    CredentialType as CredentialTypeView, StoredCredentialView, TrustCredentialView,
+    TrustScoreRange as TrustScoreRangeView, TrustTier as TrustTierView,
+};
 use personal_types::{
     AttestationStatus, CredentialType, KVectorComponent, TrustScoreRange, TrustTier,
 };
@@ -66,6 +79,49 @@ pub fn get_my_credentials(_: ()) -> ExternResult<Vec<Record>> {
         }
     }
     Ok(records)
+}
+
+fn map_credential_type(credential_type: &CredentialType) -> CredentialTypeView {
+    match credential_type {
+        CredentialType::Identity => CredentialTypeView::Identity,
+        CredentialType::Health => CredentialTypeView::Health,
+        CredentialType::FederatedLearning => CredentialTypeView::FederatedLearning,
+        CredentialType::Governance => CredentialTypeView::Governance,
+        CredentialType::Domain(name) => CredentialTypeView::Domain(name.clone()),
+    }
+}
+
+fn map_trust_tier(tier: &TrustTier) -> TrustTierView {
+    match tier {
+        TrustTier::Observer => TrustTierView::Observer,
+        TrustTier::Basic => TrustTierView::Basic,
+        TrustTier::Standard => TrustTierView::Standard,
+        TrustTier::Elevated => TrustTierView::Elevated,
+        TrustTier::Guardian => TrustTierView::Guardian,
+    }
+}
+
+#[hdk_extern]
+pub fn get_my_credentials_view(_: ()) -> ExternResult<Vec<StoredCredentialView>> {
+    let records = get_my_credentials(())?;
+    let mut views = Vec::new();
+    for record in records {
+        if let Some(entry) = record
+            .entry()
+            .to_app_option::<StoredCredential>()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        {
+            views.push(StoredCredentialView {
+                hash: record.action_address().to_string(),
+                credential_type: map_credential_type(&entry.credential_type),
+                issuer: entry.issuer,
+                issued_at: entry.issued_at.as_micros(),
+                expires_at: entry.expires_at.map(|ts| ts.as_micros()),
+                revoked: entry.revoked,
+            });
+        }
+    }
+    Ok(views)
 }
 
 /// Get credentials of a specific type.
@@ -811,6 +867,34 @@ pub fn get_trust_credentials(subject_did: String) -> ExternResult<Vec<Record>> {
     }
 
     Ok(credentials)
+}
+
+#[hdk_extern]
+pub fn get_trust_credentials_view(subject_did: String) -> ExternResult<Vec<TrustCredentialView>> {
+    let records = get_trust_credentials(subject_did)?;
+    let mut views = Vec::new();
+    for record in records {
+        if let Some(entry) = record
+            .entry()
+            .to_app_option::<TrustCredential>()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        {
+            views.push(TrustCredentialView {
+                id: entry.id,
+                subject_did: entry.subject_did,
+                issuer_did: entry.issuer_did,
+                trust_tier: map_trust_tier(&entry.trust_tier),
+                trust_score_range: TrustScoreRangeView {
+                    lower: entry.trust_score_range.lower,
+                    upper: entry.trust_score_range.upper,
+                },
+                issued_at: entry.issued_at.as_micros(),
+                expires_at: entry.expires_at.map(|ts| ts.as_micros()),
+                revoked: entry.revoked,
+            });
+        }
+    }
+    Ok(views)
 }
 
 /// Get trust credentials by tier.

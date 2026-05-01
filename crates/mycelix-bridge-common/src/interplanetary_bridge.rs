@@ -27,17 +27,17 @@ pub fn synodic_period(from: PlanetaryBody, to: PlanetaryBody) -> u32 {
     use PlanetaryBody::*;
     let pair = normalize_pair(from, to);
     match pair {
-        (Earth, Moon) | (Moon, Earth) => 0,     // Continuous (3-day transfer)
-        (Earth, Mars) | (Mars, Earth) => 26,    // 25.6 months
-        (Moon, Mars) | (Mars, Moon) => 26,      // Same as Earth-Mars
+        (Earth, Moon) | (Moon, Earth) => 0, // Continuous (3-day transfer)
+        (Earth, Mars) | (Mars, Earth) => 26, // 25.6 months
+        (Moon, Mars) | (Mars, Moon) => 26,  // Same as Earth-Mars
         (Earth, Europa) | (Europa, Earth) => 13, // 13.1 months
         (Moon, Europa) | (Europa, Moon) => 13,
-        (Earth, Titan) | (Titan, Earth) => 12,  // 12.4 months
+        (Earth, Titan) | (Titan, Earth) => 12, // 12.4 months
         (Moon, Titan) | (Titan, Moon) => 12,
-        (Mars, Europa) | (Europa, Mars) => 27,  // 26.8 months
-        (Mars, Titan) | (Titan, Mars) => 24,    // 24.1 months
-        (Earth, Ceres) | (Ceres, Earth) => 15,  // ~15.6 months
-        _ => 0, // Unknown pairs: continuous (conservative)
+        (Mars, Europa) | (Europa, Mars) => 27, // 26.8 months
+        (Mars, Titan) | (Titan, Mars) => 24,   // 24.1 months
+        (Earth, Ceres) | (Ceres, Earth) => 15, // ~15.6 months
+        _ => 0,                                // Unknown pairs: continuous (conservative)
     }
 }
 
@@ -47,16 +47,16 @@ pub fn transfer_time(from: PlanetaryBody, to: PlanetaryBody) -> u32 {
     use PlanetaryBody::*;
     let pair = normalize_pair(from, to);
     match pair {
-        (Earth, Moon) | (Moon, Earth) => 0,      // ~3 days ≈ 0 ticks
-        (Earth, Mars) | (Mars, Earth) => 9,      // 258 days
+        (Earth, Moon) | (Moon, Earth) => 0, // ~3 days ≈ 0 ticks
+        (Earth, Mars) | (Mars, Earth) => 9, // 258 days
         (Moon, Mars) | (Mars, Moon) => 9,
-        (Earth, Europa) | (Europa, Earth) => 33,  // 2.73 years
+        (Earth, Europa) | (Europa, Earth) => 33, // 2.73 years
         (Moon, Europa) | (Europa, Moon) => 33,
-        (Earth, Titan) | (Titan, Earth) => 73,   // 6.05 years
+        (Earth, Titan) | (Titan, Earth) => 73, // 6.05 years
         (Moon, Titan) | (Titan, Moon) => 73,
-        (Mars, Europa) | (Europa, Mars) => 26,   // 2.16 years
-        (Mars, Titan) | (Titan, Mars) => 59,     // 4.9 years
-        (Earth, Ceres) | (Ceres, Earth) => 16,   // ~1.3 years
+        (Mars, Europa) | (Europa, Mars) => 26, // 2.16 years
+        (Mars, Titan) | (Titan, Mars) => 59,   // 4.9 years
+        (Earth, Ceres) | (Ceres, Earth) => 16, // ~1.3 years
         _ => 0,
     }
 }
@@ -86,7 +86,11 @@ pub const CONJUNCTION_BLACKOUT_TICKS: u32 = 1;
 
 /// Normalize a body pair so the "smaller" enum variant is first.
 fn normalize_pair(a: PlanetaryBody, b: PlanetaryBody) -> (PlanetaryBody, PlanetaryBody) {
-    if (a as u8) <= (b as u8) { (a, b) } else { (b, a) }
+    if (a as u8) <= (b as u8) {
+        (a, b)
+    } else {
+        (b, a)
+    }
 }
 
 // ============================================================================
@@ -130,17 +134,27 @@ impl InterplanetaryRoute {
         let tt = transfer_time(from, to);
         let dv = hohmann_delta_v(from, to);
         Self {
-            from, to,
+            from,
+            to,
             synodic_period: sp,
             transfer_time: tt,
             delta_v: dv,
             cost_per_kg: dv * dv * 0.001,
-            status: if sp == 0 { WindowStatus::ContinuousAccess } else { WindowStatus::Closed },
+            status: if sp == 0 {
+                WindowStatus::ContinuousAccess
+            } else {
+                WindowStatus::Closed
+            },
         }
     }
 
     /// Update window status for current tick.
-    pub fn update_status(&mut self, current_tick: u32, established_tick: u32, has_fusion_drive: bool) {
+    pub fn update_status(
+        &mut self,
+        current_tick: u32,
+        established_tick: u32,
+        has_fusion_drive: bool,
+    ) {
         if has_fusion_drive || self.synodic_period == 0 {
             self.status = WindowStatus::ContinuousAccess;
             return;
@@ -178,9 +192,18 @@ mod tests {
 
     #[test]
     fn test_synodic_periods_match_orbital_mechanics() {
-        assert_eq!(synodic_period(PlanetaryBody::Earth, PlanetaryBody::Mars), 26);
-        assert_eq!(synodic_period(PlanetaryBody::Earth, PlanetaryBody::Europa), 13);
-        assert_eq!(synodic_period(PlanetaryBody::Earth, PlanetaryBody::Titan), 12);
+        assert_eq!(
+            synodic_period(PlanetaryBody::Earth, PlanetaryBody::Mars),
+            26
+        );
+        assert_eq!(
+            synodic_period(PlanetaryBody::Earth, PlanetaryBody::Europa),
+            13
+        );
+        assert_eq!(
+            synodic_period(PlanetaryBody::Earth, PlanetaryBody::Titan),
+            12
+        );
         // Moon-Earth is continuous
         assert_eq!(synodic_period(PlanetaryBody::Earth, PlanetaryBody::Moon), 0);
     }
@@ -188,7 +211,10 @@ mod tests {
     #[test]
     fn test_transfer_times() {
         assert_eq!(transfer_time(PlanetaryBody::Earth, PlanetaryBody::Mars), 9);
-        assert_eq!(transfer_time(PlanetaryBody::Earth, PlanetaryBody::Titan), 73);
+        assert_eq!(
+            transfer_time(PlanetaryBody::Earth, PlanetaryBody::Titan),
+            73
+        );
     }
 
     #[test]

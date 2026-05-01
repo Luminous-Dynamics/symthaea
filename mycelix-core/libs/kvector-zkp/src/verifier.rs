@@ -73,7 +73,7 @@ fn verify_commitment(commitment: &[u8; 32], targets: &[u64; NUM_COMPONENTS]) -> 
 
     if diff != 0 {
         return Err(ZkpError::VerificationFailed(
-            "S-07: commitment does not match targets - possible tampering".into()
+            "S-07: commitment does not match targets - possible tampering".into(),
         ));
     }
 
@@ -129,7 +129,7 @@ pub fn verify_kvector_proof(
             8,
             0,
             winterfell::FieldExtension::None,
-            8,  // FRI folding factor must be power of 2
+            8, // FRI folding factor must be power of 2
             31,
             BatchingMethod::Linear,
             BatchingMethod::Linear,
@@ -225,40 +225,56 @@ pub fn verify_kvector_proof_secure(
     // High security (~264-bit): 64 queries, 16 blowup, 8 grinding
     if min_security_bits <= 264 {
         acceptable_options.push(winterfell::ProofOptions::new(
-            64, 16, 8,
+            64,
+            16,
+            8,
             winterfell::FieldExtension::None,
-            4, 15,
-            BatchingMethod::Linear, BatchingMethod::Linear,
+            4,
+            15,
+            BatchingMethod::Linear,
+            BatchingMethod::Linear,
         ));
     }
 
     // Standard security (~96-bit): 32 queries, 8 blowup
     if min_security_bits <= 96 {
         acceptable_options.push(winterfell::ProofOptions::new(
-            32, 8, 0,
+            32,
+            8,
+            0,
             winterfell::FieldExtension::None,
-            8, 31,
-            BatchingMethod::Linear, BatchingMethod::Linear,
+            8,
+            31,
+            BatchingMethod::Linear,
+            BatchingMethod::Linear,
         ));
     }
 
     // Optimized security (~84-bit): 28 queries, 8 blowup
     if min_security_bits <= 84 {
         acceptable_options.push(winterfell::ProofOptions::new(
-            28, 8, 0,
+            28,
+            8,
+            0,
             winterfell::FieldExtension::None,
-            8, 31,
-            BatchingMethod::Linear, BatchingMethod::Linear,
+            8,
+            31,
+            BatchingMethod::Linear,
+            BatchingMethod::Linear,
         ));
     }
 
     // Fast security (~40-bit): 20 queries, 4 blowup - TESTING ONLY
     if min_security_bits <= 40 {
         acceptable_options.push(winterfell::ProofOptions::new(
-            20, 4, 0,
+            20,
+            4,
+            0,
             winterfell::FieldExtension::None,
-            16, 63,
-            BatchingMethod::Linear, BatchingMethod::Linear,
+            16,
+            63,
+            BatchingMethod::Linear,
+            BatchingMethod::Linear,
         ));
     }
 
@@ -384,7 +400,10 @@ mod tests {
         let commit1 = compute_commitment(&targets1);
         let commit2 = compute_commitment(&targets2);
 
-        assert_ne!(commit1, commit2, "Different targets should have different commitments");
+        assert_ne!(
+            commit1, commit2,
+            "Different targets should have different commitments"
+        );
     }
 
     #[test]
@@ -410,7 +429,10 @@ mod tests {
         match result {
             Err(ZkpError::VerificationFailed(msg)) => {
                 assert!(msg.contains("S-07"), "Error should mention S-07");
-                assert!(msg.contains("commitment"), "Error should mention commitment");
+                assert!(
+                    msg.contains("commitment"),
+                    "Error should mention commitment"
+                );
             }
             _ => panic!("Expected VerificationFailed error"),
         }
@@ -443,7 +465,10 @@ mod tests {
         let commitment = compute_commitment(&targets);
 
         let result = verify_commitment(&commitment, &targets);
-        assert!(result.is_ok(), "All-zero targets with matching commitment should verify");
+        assert!(
+            result.is_ok(),
+            "All-zero targets with matching commitment should verify"
+        );
     }
 
     #[test]
@@ -452,7 +477,10 @@ mod tests {
         let commitment = compute_commitment(&targets);
 
         let result = verify_commitment(&commitment, &targets);
-        assert!(result.is_ok(), "Max value targets with matching commitment should verify");
+        assert!(
+            result.is_ok(),
+            "Max value targets with matching commitment should verify"
+        );
     }
 
     #[test]
@@ -464,7 +492,10 @@ mod tests {
         let commit1 = compute_commitment(&targets1);
         let commit2 = compute_commitment(&targets2);
 
-        assert_ne!(commit1, commit2, "Swapped targets should produce different commitments");
+        assert_ne!(
+            commit1, commit2,
+            "Swapped targets should produce different commitments"
+        );
     }
 
     #[test]
@@ -480,7 +511,11 @@ mod tests {
             wrong[i] = wrong[i].wrapping_add(1);
 
             let result = verify_commitment(&wrong, &targets);
-            assert!(result.is_err(), "Byte {} modification should be detected", i);
+            assert!(
+                result.is_err(),
+                "Byte {} modification should be detected",
+                i
+            );
         }
     }
 }

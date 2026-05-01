@@ -36,8 +36,14 @@ fn main() {
     }));
 
     eprintln!("[symtropy] Starting...");
-    eprintln!("[symtropy] DISPLAY={}", std::env::var("DISPLAY").unwrap_or_default());
-    eprintln!("[symtropy] WAYLAND_DISPLAY={}", std::env::var("WAYLAND_DISPLAY").unwrap_or_default());
+    eprintln!(
+        "[symtropy] DISPLAY={}",
+        std::env::var("DISPLAY").unwrap_or_default()
+    );
+    eprintln!(
+        "[symtropy] WAYLAND_DISPLAY={}",
+        std::env::var("WAYLAND_DISPLAY").unwrap_or_default()
+    );
 
     // Configure wgpu to be more resilient — prefer Vulkan, fall back to GL
     let wgpu_settings = WgpuSettings {
@@ -59,64 +65,85 @@ fn main() {
 
     let mut app = App::new();
     app.add_plugins(
-            DefaultPlugins
-                .set(WindowPlugin {
-                    primary_window: Some(Window {
-                        title: "Symtropy Engine".into(),
-                        resolution: bevy::window::WindowResolution::new(1280, 720),
-                        present_mode: bevy::window::PresentMode::AutoVsync,
-                        ..default()
-                    }),
+        DefaultPlugins
+            .set(WindowPlugin {
+                primary_window: Some(Window {
+                    title: "Symtropy Engine".into(),
+                    resolution: bevy::window::WindowResolution::new(1280, 720),
+                    present_mode: bevy::window::PresentMode::AutoVsync,
                     ..default()
-                })
-                .set(RenderPlugin {
-                    render_creation: RenderCreation::Automatic(wgpu_settings),
-                    ..default()
-                })
-                .set(ImagePlugin::default_nearest()),
-        )
-        // MSAA: Bevy 0.18 defaults to Sample4 via Msaa enum (set per-camera if needed)
-        .add_plugins(SymtropyPlugin)
-        .add_systems(Startup, log_renderer_info);
+                }),
+                ..default()
+            })
+            .set(RenderPlugin {
+                render_creation: RenderCreation::Automatic(wgpu_settings),
+                ..default()
+            })
+            .set(ImagePlugin::default_nearest()),
+    )
+    // MSAA: Bevy 0.18 defaults to Sample4 via Msaa enum (set per-camera if needed)
+    .add_plugins(SymtropyPlugin)
+    .add_systems(Startup, log_renderer_info);
 
     if autostart || ai_player {
         eprintln!("[symtropy] --autostart: skipping menu, starting game immediately");
-        app.add_systems(Startup, |mut next: ResMut<bevy::prelude::NextState<crate::resources::GamePhase>>| {
-            next.set(crate::resources::GamePhase::Loading);
-        });
+        app.add_systems(
+            Startup,
+            |mut next: ResMut<bevy::prelude::NextState<crate::resources::GamePhase>>| {
+                next.set(crate::resources::GamePhase::Loading);
+            },
+        );
     }
 
     // --globe: enter globe view from main menu (requires --features atlas)
     #[cfg(feature = "atlas")]
     if globe_mode {
         eprintln!("[symtropy] --globe: entering Sol Atlas globe view from MainMenu");
-        app.add_systems(Update, (|mut next: ResMut<bevy::prelude::NextState<crate::resources::GamePhase>>| {
-            next.set(crate::resources::GamePhase::GlobeView);
-        }).run_if(bevy::prelude::in_state(crate::resources::GamePhase::MainMenu)));
+        app.add_systems(
+            Update,
+            (|mut next: ResMut<bevy::prelude::NextState<crate::resources::GamePhase>>| {
+                next.set(crate::resources::GamePhase::GlobeView);
+            })
+            .run_if(bevy::prelude::in_state(
+                crate::resources::GamePhase::MainMenu,
+            )),
+        );
     }
 
     // --demo: auto-start demo director when globe view activates
     #[cfg(feature = "atlas")]
     if demo_mode && globe_mode {
         eprintln!("[symtropy] --demo: cinematic demo director enabled");
-        app.add_systems(Update, (|mut director: ResMut<crate::systems::demo_director::DemoDirector>| {
-            if !director.enabled {
-                director.enabled = true;
-                info!("[demo] Director started — 30s cinematic sequence");
-            }
-        }).run_if(bevy::prelude::in_state(crate::resources::GamePhase::GlobeView)));
+        app.add_systems(
+            Update,
+            (|mut director: ResMut<crate::systems::demo_director::DemoDirector>| {
+                if !director.enabled {
+                    director.enabled = true;
+                    info!("[demo] Director started — 30s cinematic sequence");
+                }
+            })
+            .run_if(bevy::prelude::in_state(
+                crate::resources::GamePhase::GlobeView,
+            )),
+        );
     }
 
     // --record: auto-start frame capture when globe view activates
     #[cfg(feature = "atlas")]
     if record_mode && globe_mode {
         eprintln!("[symtropy] --record: auto-capturing frames to /tmp/terra-atlas-frames/");
-        app.add_systems(Update, (|mut config: ResMut<sol_atlas_bevy::frame_capture::FrameCaptureConfig>| {
-            if !config.active && config.frame_count == 0 {
-                config.active = true;
-                let _ = std::fs::create_dir_all(&config.output_dir);
-            }
-        }).run_if(bevy::prelude::in_state(crate::resources::GamePhase::GlobeView)));
+        app.add_systems(
+            Update,
+            (|mut config: ResMut<sol_atlas_bevy::frame_capture::FrameCaptureConfig>| {
+                if !config.active && config.frame_count == 0 {
+                    config.active = true;
+                    let _ = std::fs::create_dir_all(&config.output_dir);
+                }
+            })
+            .run_if(bevy::prelude::in_state(
+                crate::resources::GamePhase::GlobeView,
+            )),
+        );
     }
 
     // --cinematic: full-spectrum 90s cinematic demo
@@ -142,9 +169,15 @@ fn main() {
         let ai = crate::systems::ai_player::AiPlayer::new();
         app.insert_resource(ai);
         // Auto-start Loading phase
-        app.add_systems(Update, (|mut next: ResMut<bevy::prelude::NextState<crate::resources::GamePhase>>| {
-            next.set(crate::resources::GamePhase::Loading);
-        }).run_if(bevy::prelude::in_state(crate::resources::GamePhase::MainMenu)));
+        app.add_systems(
+            Update,
+            (|mut next: ResMut<bevy::prelude::NextState<crate::resources::GamePhase>>| {
+                next.set(crate::resources::GamePhase::Loading);
+            })
+            .run_if(bevy::prelude::in_state(
+                crate::resources::GamePhase::MainMenu,
+            )),
+        );
     }
 
     if ai_player {
@@ -152,8 +185,12 @@ fn main() {
         let mut ai = crate::systems::ai_player::AiPlayer::new();
         ai.enabled = true;
         app.insert_resource(ai);
-        app.add_systems(Update, crate::systems::ai_player::ai_player_system
-            .run_if(bevy::prelude::in_state(crate::resources::GamePhase::Playing)));
+        app.add_systems(
+            Update,
+            crate::systems::ai_player::ai_player_system.run_if(bevy::prelude::in_state(
+                crate::resources::GamePhase::Playing,
+            )),
+        );
     } else {
         app.insert_resource(crate::systems::ai_player::AiPlayer::new());
     }

@@ -20,16 +20,16 @@ use mycelix_multiworld_sim::MultiWorldSimulator;
 /// Generate a PolicyConfig with randomized knobs within valid ranges.
 fn arb_policy() -> impl Strategy<Value = PolicyConfig> {
     (
-        0.0..0.05f64,         // pair_bond_rate
-        0.0..2.0f64,          // care_effectiveness
-        0.0..1.0f64,          // pharma_boost
-        1.0..3.0f64,          // deep_space_isolation_mult
-        any::<bool>(),        // migration_enabled
-        1..6u32,              // migration_max_per_cycle
-        any::<bool>(),        // education_enabled
-        any::<bool>(),        // trust_weighted_governance
-        any::<bool>(),        // faction_enabled
-        any::<bool>(),        // amendment_enabled
+        0.0..0.05f64,  // pair_bond_rate
+        0.0..2.0f64,   // care_effectiveness
+        0.0..1.0f64,   // pharma_boost
+        1.0..3.0f64,   // deep_space_isolation_mult
+        any::<bool>(), // migration_enabled
+        1..6u32,       // migration_max_per_cycle
+        any::<bool>(), // education_enabled
+        any::<bool>(), // trust_weighted_governance
+        any::<bool>(), // faction_enabled
+        any::<bool>(), // amendment_enabled
     )
         .prop_map(
             |(
@@ -76,36 +76,34 @@ fn arb_policy() -> impl Strategy<Value = PolicyConfig> {
 
 /// Build a short simulation config: Earth + Moon, randomized policy, few ticks.
 fn arb_short_sim(max_ticks: u32) -> impl Strategy<Value = SimulationConfig> {
-    (1..max_ticks, 0..10_000u64, arb_policy()).prop_map(|(ticks, seed, policy)| {
-        SimulationConfig {
-            total_ticks: ticks,
-            seed,
-            initial_worlds: vec![
-                WorldSeedConfig {
-                    name: "Earth".into(),
-                    location: "Earth".into(),
-                    founding_tick: 0,
-                    initial_population: 100,
-                    initial_resources: 1.0,
-                },
-                WorldSeedConfig {
-                    name: "Artemis Base".into(),
-                    location: "Moon".into(),
-                    founding_tick: 0,
-                    initial_population: 12,
-                    initial_resources: 0.3,
-                },
-            ],
-            epoch_configs: vec![EpochConfig {
-                id: 0,
-                name: "Foundation".into(),
-                start_tick: 0,
-                end_tick: ticks,
-                population_trigger: None,
-                self_sufficiency_trigger: None,
-            }],
-            policy,
-        }
+    (1..max_ticks, 0..10_000u64, arb_policy()).prop_map(|(ticks, seed, policy)| SimulationConfig {
+        total_ticks: ticks,
+        seed,
+        initial_worlds: vec![
+            WorldSeedConfig {
+                name: "Earth".into(),
+                location: "Earth".into(),
+                founding_tick: 0,
+                initial_population: 100,
+                initial_resources: 1.0,
+            },
+            WorldSeedConfig {
+                name: "Artemis Base".into(),
+                location: "Moon".into(),
+                founding_tick: 0,
+                initial_population: 12,
+                initial_resources: 0.3,
+            },
+        ],
+        epoch_configs: vec![EpochConfig {
+            id: 0,
+            name: "Foundation".into(),
+            start_tick: 0,
+            end_tick: ticks,
+            population_trigger: None,
+            self_sufficiency_trigger: None,
+        }],
+        policy,
     })
 }
 
@@ -401,23 +399,39 @@ fn outcome_plausibility_100_years() {
     let report = sim.run();
 
     // Population should grow from initial 230 but stay bounded
-    assert!(report.final_population >= 100,
-        "Population should survive 100yr: {}", report.final_population);
-    assert!(report.final_population <= 100_000,
-        "Population should be bounded after 100yr: {}", report.final_population);
+    assert!(
+        report.final_population >= 100,
+        "Population should survive 100yr: {}",
+        report.final_population
+    );
+    assert!(
+        report.final_population <= 100_000,
+        "Population should be bounded after 100yr: {}",
+        report.final_population
+    );
 
     // Consciousness should develop
-    let max_phi: f64 = sim.worlds.iter()
+    let max_phi: f64 = sim
+        .worlds
+        .iter()
         .map(|w| w.mean_phi())
         .fold(0.0f64, f64::max);
-    assert!(max_phi > 0.05,
-        "Some consciousness should develop over 100yr: max_phi={max_phi}");
+    assert!(
+        max_phi > 0.05,
+        "Some consciousness should develop over 100yr: max_phi={max_phi}"
+    );
 
     // CVS should be computed and positive
-    assert!(report.final_cvs > 0.0 && report.final_cvs <= 1.0,
-        "CVS should be positive and bounded: {}", report.final_cvs);
+    assert!(
+        report.final_cvs > 0.0 && report.final_cvs <= 1.0,
+        "CVS should be positive and bounded: {}",
+        report.final_cvs
+    );
 
     // Simulation should have experienced some disasters
-    assert!(report.total_disasters > 0,
-        "100yr sim should have disasters: {}", report.total_disasters);
+    assert!(
+        report.total_disasters > 0,
+        "100yr sim should have disasters: {}",
+        report.total_disasters
+    );
 }

@@ -42,9 +42,7 @@ pub fn ZomeCallButton(
     #[prop(optional)] disabled: Option<ReadSignal<bool>>,
 ) -> impl IntoView {
     let is_loading = move || loading.map_or(false, |s| s.get());
-    let is_disabled = move || {
-        disabled.map_or(false, |s| s.get()) || is_loading()
-    };
+    let is_disabled = move || disabled.map_or(false, |s| s.get()) || is_loading();
 
     let button_style = move || {
         let base = "padding: 8px 20px; border-radius: 6px; font-size: 0.875rem; \

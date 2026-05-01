@@ -19,9 +19,12 @@
 //! ```
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use crate::infrastructure::sandbox::{Sandbox, SandboxError};
+
+static CODE_EXECUTOR_WORKDIR_SEQ: AtomicU64 = AtomicU64::new(0);
 
 /// A parsed test failure with assertion details.
 ///
@@ -68,7 +71,7 @@ pub struct ExecutionResult {
 impl ExecutionResult {
     /// Whether the code is fully successful (compiled + all tests passed)
     pub fn is_success(&self) -> bool {
-        self.compiled && self.tests_failed == 0
+        !self.simulated && self.compiled && self.tests_failed == 0
     }
 
     /// Parse test failures from the raw test output, populating `test_failures`.
@@ -157,8 +160,7 @@ impl CodeExecutor {
         let sandbox = Sandbox::new()
             .with_timeout(Duration::from_secs(30))
             .simulation_only();
-        let work_dir =
-            std::env::temp_dir().join(format!("symthaea-code-exec-{}", std::process::id()));
+        let work_dir = fresh_work_dir();
         Self { sandbox, work_dir }
     }
 
@@ -175,9 +177,18 @@ impl CodeExecutor {
         sandbox.allow_command("nix-instantiate");
         Self {
             sandbox,
-            work_dir: std::env::temp_dir()
-                .join(format!("symthaea-code-exec-{}", std::process::id())),
+            work_dir: fresh_work_dir(),
         }
+    }
+
+    /// Whether this executor can perform real, non-simulated verification work.
+    pub fn supports_real_execution(&self) -> bool {
+        !self.sandbox.is_simulation_only() && self.sandbox.is_real_execution_enabled()
+    }
+
+    /// Access the temporary work directory used by this executor.
+    pub fn work_dir(&self) -> &PathBuf {
+        &self.work_dir
     }
 
     /// Compile Rust source code and optionally run tests.
@@ -231,28 +242,30 @@ impl CodeExecutor {
         // Compile
         let output_path = self.work_dir.join("generated");
         let compile_args = if test_source.is_some() {
-            vec![
-                "--edition",
-                "2021",
-                "--test",
-                source_path.to_str().unwrap_or("generated.rs"),
-                "-o",
-                output_path.to_str().unwrap_or("generated"),
-            ]
+            let mut args = vec![
+                "--edition".to_string(),
+                "2021".to_string(),
+                "--test".to_string(),
+                source_path.to_str().unwrap_or("generated.rs").to_string(),
+                "-o".to_string(),
+                output_path.to_str().unwrap_or("generated").to_string(),
+            ];
+            args.extend(rustc_linker_args());
+            args
         } else {
-            vec![
-                "--edition",
-                "2021",
-                source_path.to_str().unwrap_or("generated.rs"),
-                "-o",
-                output_path.to_str().unwrap_or("generated"),
-            ]
+            let mut args = vec![
+                "--edition".to_string(),
+                "2021".to_string(),
+                source_path.to_str().unwrap_or("generated.rs").to_string(),
+                "-o".to_string(),
+                output_path.to_str().unwrap_or("generated").to_string(),
+            ];
+            args.extend(rustc_linker_args());
+            args
         };
+        let compile_arg_refs: Vec<&str> = compile_args.iter().map(String::as_str).collect();
 
-        match self.sandbox.run(
-            "rustc",
-            &compile_args.iter().map(|s| *s).collect::<Vec<_>>(),
-        ) {
+        match self.sandbox.run("rustc", &compile_arg_refs) {
             Ok(result) => {
                 if !result.success() {
                     let errors = parse_compile_errors(&result.stderr);
@@ -383,16 +396,21 @@ impl CodeExecutor {
         }
 
         let output_path = self.work_dir.join("generated_test");
-        let compile_args: Vec<&str> = vec![
-            "--edition",
-            "2021",
-            "--test",
-            source_path.to_str().unwrap_or("generated_test.rs"),
-            "-o",
-            output_path.to_str().unwrap_or("generated_test"),
+        let mut compile_args = vec![
+            "--edition".to_string(),
+            "2021".to_string(),
+            "--test".to_string(),
+            source_path
+                .to_str()
+                .unwrap_or("generated_test.rs")
+                .to_string(),
+            "-o".to_string(),
+            output_path.to_str().unwrap_or("generated_test").to_string(),
         ];
+        compile_args.extend(rustc_linker_args());
+        let compile_arg_refs: Vec<&str> = compile_args.iter().map(String::as_str).collect();
 
-        match self.sandbox.run("rustc", &compile_args) {
+        match self.sandbox.run("rustc", &compile_arg_refs) {
             Ok(result) => {
                 if !result.success() {
                     let errors = parse_compile_errors(&result.stderr);
@@ -611,6 +629,11 @@ impl CodeExecutor {
     }
 }
 
+fn fresh_work_dir() -> PathBuf {
+    let seq = CODE_EXECUTOR_WORKDIR_SEQ.fetch_add(1, Ordering::Relaxed);
+    std::env::temp_dir().join(format!("symthaea-code-exec-{}-{seq}", std::process::id()))
+}
+
 impl Drop for CodeExecutor {
     fn drop(&mut self) {
         self.cleanup();
@@ -784,11 +807,66 @@ impl CompileError {
 
 /// Parse rustc error output into individual error messages (flat strings).
 fn parse_compile_errors(stderr: &str) -> Vec<String> {
-    stderr
-        .lines()
-        .filter(|line| line.starts_with("error"))
-        .map(|line| line.to_string())
-        .collect()
+    let lines: Vec<&str> = stderr.lines().collect();
+    let mut errors = Vec::new();
+    let mut i = 0;
+
+    while i < lines.len() {
+        if lines[i].starts_with("error") {
+            let mut chunk = vec![lines[i].to_string()];
+            let mut j = i + 1;
+            while j < lines.len()
+                && !lines[j].starts_with("error")
+                && !lines[j].starts_with("warning")
+            {
+                let line = lines[j];
+                if !line.trim().is_empty() {
+                    chunk.push(line.to_string());
+                }
+                j += 1;
+            }
+            errors.push(chunk.join("\n"));
+            i = j;
+        } else {
+            i += 1;
+        }
+    }
+
+    errors
+}
+
+/// Extra rustc linker flags for standalone generated-code checks.
+///
+/// Rustup toolchains on Nix can point their bundled `gcc-ld` shim at a garbage
+/// collected Nix store path. Prefer the system C compiler and GNU ld when
+/// available, while allowing callers to override both choices.
+fn rustc_linker_args() -> Vec<String> {
+    let linker = std::env::var("SYMTHAEA_RUSTC_LINKER").ok().or_else(|| {
+        let system_cc = "/run/current-system/sw/bin/cc";
+        std::path::Path::new(system_cc)
+            .exists()
+            .then(|| system_cc.to_string())
+    });
+
+    let mut args = Vec::new();
+    if let Some(linker) = linker {
+        args.push("-C".to_string());
+        args.push(format!("linker={linker}"));
+    }
+
+    match std::env::var("SYMTHAEA_RUSTC_LINK_ARG") {
+        Ok(link_arg) if !link_arg.trim().is_empty() => {
+            args.push("-C".to_string());
+            args.push(format!("link-arg={link_arg}"));
+        }
+        Err(_) if cfg!(target_os = "linux") => {
+            args.push("-C".to_string());
+            args.push("link-arg=-fuse-ld=bfd".to_string());
+        }
+        _ => {}
+    }
+
+    args
 }
 
 /// Parse rustc error output into structured errors with location info.
@@ -1592,6 +1670,19 @@ mod tests {
         };
         assert!(success.is_success());
 
+        let simulated = ExecutionResult {
+            compiled: true,
+            compile_errors: Vec::new(),
+            tests_passed: 1,
+            tests_failed: 0,
+            test_output: "[Simulated] Compilation successful".to_string(),
+            runtime_error: None,
+            elapsed: Duration::from_millis(10),
+            simulated: true,
+            test_failures: Vec::new(),
+        };
+        assert!(!simulated.is_success());
+
         let failure = ExecutionResult {
             compiled: false,
             compile_errors: vec!["error".into()],
@@ -1612,6 +1703,16 @@ mod tests {
         let errors = parse_compile_errors(stderr);
         assert_eq!(errors.len(), 2);
         assert!(errors[0].contains("E0308"));
+    }
+
+    #[test]
+    fn test_parse_compile_errors_preserves_linker_context() {
+        let stderr = "error: linking with `cc` failed: exit status: 1\n  = note: /nix/store/.../bin/ld: cannot find crt1.o: No such file or directory\n  = note: collect2: error: ld returned 1 exit status\n\nerror: aborting due to 1 previous error";
+        let errors = parse_compile_errors(stderr);
+        assert_eq!(errors.len(), 2);
+        assert!(errors[0].contains("linking with `cc` failed"));
+        assert!(errors[0].contains("cannot find crt1.o"));
+        assert!(errors[0].contains("ld returned 1 exit status"));
     }
 
     #[test]

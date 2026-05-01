@@ -22,13 +22,20 @@ const CANONICAL_SEEDS: &[u64] = &[42, 123, 789, 1337, 2718, 3141, 4242, 5555, 77
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    let ticks: u32 = args.iter().position(|a| a == "--ticks")
+    let ticks: u32 = args
+        .iter()
+        .position(|a| a == "--ticks")
         .and_then(|i| args.get(i + 1))
         .and_then(|s| s.parse().ok())
         .unwrap_or(1800); // 150 years
 
     eprintln!("=== REFERENCE OUTPUT GENERATION ===");
-    eprintln!("Seeds: {}, Ticks: {} ({:.0} years)", CANONICAL_SEEDS.len(), ticks, ticks as f64 / 12.0);
+    eprintln!(
+        "Seeds: {}, Ticks: {} ({:.0} years)",
+        CANONICAL_SEEDS.len(),
+        ticks,
+        ticks as f64 / 12.0
+    );
     eprintln!();
 
     // CSV header
@@ -43,19 +50,36 @@ fn main() {
         let mut sim = MultiWorldSimulator::new(config);
         let report = sim.run();
 
-        let mean_phi: f64 = if sim.worlds.is_empty() { 0.0 } else {
+        let mean_phi: f64 = if sim.worlds.is_empty() {
+            0.0
+        } else {
             sim.worlds.iter().map(|w| w.mean_phi()).sum::<f64>() / sim.worlds.len() as f64
         };
-        let max_phi: f64 = sim.worlds.iter().map(|w| w.mean_phi()).fold(0.0f64, f64::max);
-        let mean_gini: f64 = if sim.worlds.is_empty() { 0.0 } else {
-            sim.worlds.iter().map(|w| w.economy.gini_coefficient).sum::<f64>() / sim.worlds.len() as f64
+        let max_phi: f64 = sim
+            .worlds
+            .iter()
+            .map(|w| w.mean_phi())
+            .fold(0.0f64, f64::max);
+        let mean_gini: f64 = if sim.worlds.is_empty() {
+            0.0
+        } else {
+            sim.worlds
+                .iter()
+                .map(|w| w.economy.gini_coefficient)
+                .sum::<f64>()
+                / sim.worlds.len() as f64
         };
-        let gov = sim.worlds.first()
+        let gov = sim
+            .worlds
+            .first()
             .map(|w| format!("{}", w.governance.authority_level))
             .unwrap_or_else(|| "None".into());
 
-        println!("{},{},{:.1},{},{:.4},{},{},{},{:.4},{:.4},{:.4},{}",
-            seed, ticks, ticks as f64 / 12.0,
+        println!(
+            "{},{},{:.1},{},{:.4},{},{},{},{:.4},{:.4},{:.4},{}",
+            seed,
+            ticks,
+            ticks as f64 / 12.0,
             report.final_population,
             report.final_cvs,
             report.survived,
@@ -66,7 +90,10 @@ fn main() {
             mean_gini,
             gov,
         );
-        eprintln!(" pop={} cvs={:.4} phi={:.4} gov={}", report.final_population, report.final_cvs, mean_phi, gov);
+        eprintln!(
+            " pop={} cvs={:.4} phi={:.4} gov={}",
+            report.final_population, report.final_cvs, mean_phi, gov
+        );
     }
 
     eprintln!();

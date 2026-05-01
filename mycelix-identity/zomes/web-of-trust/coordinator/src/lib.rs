@@ -1,3 +1,4 @@
+use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -6,7 +7,6 @@ use mycelix_bridge_common::{
     civic_requirement_basic, civic_requirement_voting, GovernanceEligibility,
 };
 use web_of_trust_integrity::*;
-
 
 /// Helper to get an anchor entry hash
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -22,7 +22,11 @@ fn ensure_anchor(anchor_str: &str) -> ExternResult<EntryHash> {
 /// Attest trust to another agent (Citizen+).
 #[hdk_extern]
 pub fn attest_trust(attestation: TrustAttestation) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("identity_bridge", &civic_requirement_voting(), "attest_trust")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "identity_bridge",
+        &civic_requirement_voting(),
+        "attest_trust",
+    )?;
 
     let action_hash = create_entry(&EntryTypes::TrustAttestation(attestation.clone()))?;
     let agent = agent_info()?.agent_initial_pubkey;
@@ -61,7 +65,11 @@ pub fn attest_trust(attestation: TrustAttestation) -> ExternResult<Record> {
 /// Revoke a trust attestation (attestor only).
 #[hdk_extern]
 pub fn revoke_trust(revocation: TrustRevocation) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("identity_bridge", &civic_requirement_basic(), "revoke_trust")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "identity_bridge",
+        &civic_requirement_basic(),
+        "revoke_trust",
+    )?;
 
     // Verify caller is the attestor
     let attestation_record = get(revocation.attestation_hash.clone(), GetOptions::default())?

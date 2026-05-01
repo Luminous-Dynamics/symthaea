@@ -1,0 +1,111 @@
+{
+  "metadata": {
+    "title": "Regenerative Habitat Engineering: Building the Hearth",
+    "framework": "Mycelix Habitat",
+    "source": "https://mycelix.org",
+    "grade_level": "Vocational/Undergraduate",
+    "subject_area": "Engineering",
+    "domain": "Habitat",
+    "version": "1.0",
+    "total_standards": 5,
+    "domains": [
+      "Bio-Materials",
+      "Thermal Physics",
+      "Kinetic Architecture"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Physical stewardship of the living space."
+  },
+  "nodes": [
+    {
+      "id": "CON-VOC-101",
+      "title": "Bio-Materials & Carbon-Negative Building",
+      "description": "Building with what is under your feet. Rammed earth, cob, and mycelium-based structural components. The thermodynamics of high-thermal-mass dwellings.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Bio-Materials",
+      "subdomain": "Habitat Engineering",
+      "tags": ["construction", "materials", "ecology", "thermal"],
+      "estimated_hours": 60,
+      "grade_levels": ["Vocational"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "CON-VOC-201",
+      "title": "Kinetic Architecture & Passive Solar",
+      "description": "Designing structures that move with the sun. Leveraging mechanical advantage for manual/automatic shade-tracking and passive heating optimization.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Kinetic Architecture",
+      "subdomain": "Habitat Engineering",
+      "tags": ["design", "solar", "mechanics", "adaptivity"],
+      "estimated_hours": 60,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "CON-VOC-301",
+      "title": "Passive Atmospheric Management",
+      "description": "Engineering convection. Using Venturi effects and solar chimneys for zero-energy cooling and particulate-filtering ventilation. (Ref. mk0-clime).",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Thermal Physics",
+      "subdomain": "Habitat Engineering",
+      "tags": ["hvac", "physics", "ventilation", "passive"],
+      "estimated_hours": 45,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "CON-CAP-01",
+      "title": "The Hearth-Steward Capstone",
+      "description": "Design and assemble a modular 'Spore Pod' (temporary workstation or shelter) that satisfies its own water and energy requirements for 7 days.",
+      "node_type": "Capstone",
+      "difficulty": "Advanced",
+      "domain": "Universal",
+      "subdomain": "Habitat Engineering",
+      "tags": ["capstone", "stewardship", "integration", "shelter"],
+      "estimated_hours": 120,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Create",
+      "subject_area": "Engineering",
+      "holonic_capstone": {
+        "required_node_ids": ["CON-VOC-101", "CON-VOC-201", "CON-VOC-301"],
+        "deliverable": "A functioning modular habitat unit with verified thermal efficiency data broadcast to the mesh.",
+        "min_peer_endorsements": 5
+      },
+      "alignment_vector": {
+        "ahimsa": 950,
+        "reciprocity": 920,
+        "ecological_stewardship": 990,
+        "thermodynamic_efficiency": 980
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "SCI-GEN-050",
+      "to": "CON-VOC-201",
+      "edge_type": "Recommended",
+      "strength_permille": 600,
+      "rationale": "Basic physics of energy and circuits is required for kinetic solar tracking."
+    },
+    {
+      "from": "VOC-MAT-101",
+      "to": "CON-VOC-101",
+      "edge_type": "Recommended",
+      "strength_permille": 700,
+      "rationale": "Material sorting skills help identify useful aggregate for bio-material mixes."
+    },
+    {
+      "from": "CON-VOC-101",
+      "to": "CON-CAP-01",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "One must master the materials before assembling the hearth."
+    }
+  ]
+}

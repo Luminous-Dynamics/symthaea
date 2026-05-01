@@ -21,12 +21,14 @@
 //! - Dilithium signature (~2420 bytes for level 2)
 //! - Domain separator for binding
 
-use ed25519_dalek::{Signer, SigningKey, VerifyingKey, Signature as Ed25519Signature, Verifier};
+use ed25519_dalek::{Signature as Ed25519Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use pqcrypto_dilithium::dilithium2;
-use pqcrypto_traits::sign::{PublicKey as PqPublicKey, SecretKey as PqSecretKey, DetachedSignature};
+use pqcrypto_traits::sign::{
+    DetachedSignature, PublicKey as PqPublicKey, SecretKey as PqSecretKey,
+};
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 // zeroize is used for ed25519 keys automatically
 
 use crate::error::{ConsensusError, ConsensusResult};
@@ -78,14 +80,18 @@ impl HybridKeypair {
         let ed25519_signing = SigningKey::from_bytes(ed25519_bytes);
         let ed25519_verifying = ed25519_signing.verifying_key();
 
-        let dilithium_secret = dilithium2::SecretKey::from_bytes(dilithium_secret_bytes)
-            .map_err(|_| ConsensusError::InvalidSignature {
-                reason: "Invalid Dilithium secret key bytes".to_string(),
+        let dilithium_secret =
+            dilithium2::SecretKey::from_bytes(dilithium_secret_bytes).map_err(|_| {
+                ConsensusError::InvalidSignature {
+                    reason: "Invalid Dilithium secret key bytes".to_string(),
+                }
             })?;
 
-        let dilithium_public = dilithium2::PublicKey::from_bytes(dilithium_public_bytes)
-            .map_err(|_| ConsensusError::InvalidSignature {
-                reason: "Invalid Dilithium public key bytes".to_string(),
+        let dilithium_public =
+            dilithium2::PublicKey::from_bytes(dilithium_public_bytes).map_err(|_| {
+                ConsensusError::InvalidSignature {
+                    reason: "Invalid Dilithium public key bytes".to_string(),
+                }
             })?;
 
         Ok(Self {
@@ -149,8 +155,14 @@ impl HybridKeypair {
 impl std::fmt::Debug for HybridKeypair {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("HybridKeypair")
-            .field("ed25519_public", &hex::encode(self.ed25519_verifying.to_bytes()))
-            .field("dilithium_public", &format!("[{} bytes]", self.dilithium_public.as_bytes().len()))
+            .field(
+                "ed25519_public",
+                &hex::encode(self.ed25519_verifying.to_bytes()),
+            )
+            .field(
+                "dilithium_public",
+                &format!("[{} bytes]", self.dilithium_public.as_bytes().len()),
+            )
             .field("secrets", &"[REDACTED]")
             .finish()
     }
@@ -220,27 +232,32 @@ impl HybridPublicKey {
     /// Verify against a pre-computed digest
     fn verify_digest(&self, digest: &[u8; 32], signature: &HybridSignature) -> ConsensusResult<()> {
         // Verify ed25519 signature
-        let ed25519_pubkey = VerifyingKey::from_bytes(&self.ed25519)
-            .map_err(|e| ConsensusError::InvalidSignature {
+        let ed25519_pubkey = VerifyingKey::from_bytes(&self.ed25519).map_err(|e| {
+            ConsensusError::InvalidSignature {
                 reason: format!("Invalid ed25519 public key: {}", e),
-            })?;
+            }
+        })?;
 
-        let ed25519_sig_bytes: [u8; 64] = signature.ed25519.as_slice()
-            .try_into()
-            .map_err(|_| ConsensusError::InvalidSignature {
-                reason: "Ed25519 signature must be 64 bytes".to_string(),
+        let ed25519_sig_bytes: [u8; 64] =
+            signature.ed25519.as_slice().try_into().map_err(|_| {
+                ConsensusError::InvalidSignature {
+                    reason: "Ed25519 signature must be 64 bytes".to_string(),
+                }
             })?;
         let ed25519_sig = Ed25519Signature::from_bytes(&ed25519_sig_bytes);
 
-        ed25519_pubkey.verify(digest, &ed25519_sig)
-            .map_err(|e| ConsensusError::InvalidSignature {
+        ed25519_pubkey.verify(digest, &ed25519_sig).map_err(|e| {
+            ConsensusError::InvalidSignature {
                 reason: format!("Ed25519 verification failed: {}", e),
-            })?;
+            }
+        })?;
 
         // Verify Dilithium signature
-        let dilithium_pubkey = dilithium2::PublicKey::from_bytes(&self.dilithium)
-            .map_err(|_| ConsensusError::InvalidSignature {
-                reason: "Invalid Dilithium public key".to_string(),
+        let dilithium_pubkey =
+            dilithium2::PublicKey::from_bytes(&self.dilithium).map_err(|_| {
+                ConsensusError::InvalidSignature {
+                    reason: "Invalid Dilithium public key".to_string(),
+                }
             })?;
 
         let dilithium_sig = dilithium2::DetachedSignature::from_bytes(&signature.dilithium)
@@ -248,10 +265,11 @@ impl HybridPublicKey {
                 reason: "Invalid Dilithium signature".to_string(),
             })?;
 
-        dilithium2::verify_detached_signature(&dilithium_sig, digest, &dilithium_pubkey)
-            .map_err(|_| ConsensusError::InvalidSignature {
+        dilithium2::verify_detached_signature(&dilithium_sig, digest, &dilithium_pubkey).map_err(
+            |_| ConsensusError::InvalidSignature {
                 reason: "Dilithium verification failed".to_string(),
-            })?;
+            },
+        )?;
 
         Ok(())
     }
@@ -335,7 +353,8 @@ impl HybridStats {
         self.signatures_generated += 1;
         let size = sig.size() as u64;
         self.total_signature_bytes += size;
-        self.avg_signature_size = self.total_signature_bytes as f64 / self.signatures_generated as f64;
+        self.avg_signature_size =
+            self.total_signature_bytes as f64 / self.signatures_generated as f64;
     }
 
     /// Record a verification
@@ -414,7 +433,10 @@ mod tests {
 
         // Ed25519: 64 bytes, Dilithium2: ~2420 bytes
         assert_eq!(sig.ed25519.len(), 64);
-        assert!(sig.dilithium.len() > 2000, "Dilithium sig should be > 2000 bytes");
+        assert!(
+            sig.dilithium.len() > 2000,
+            "Dilithium sig should be > 2000 bytes"
+        );
 
         println!("Hybrid signature size: {} bytes", sig.size());
         println!("  - Ed25519: {} bytes", sig.ed25519.len());

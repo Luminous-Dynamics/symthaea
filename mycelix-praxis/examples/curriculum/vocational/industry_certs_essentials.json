@@ -1,0 +1,124 @@
+{
+  "metadata": {
+    "title": "Professional Essentials Seed: High-Utility Standards",
+    "framework": "Global Essentials Mesh",
+    "source": "https://mycelix.org/certs-essentials",
+    "grade_level": "Professional/Entry",
+    "subject_area": "Multi-Sector",
+    "domain": "Professional Certification",
+    "version": "1.0",
+    "total_standards": 6,
+    "domains": [
+      "Industrial Safety",
+      "Fitness & Wellness",
+      "Digital Programming",
+      "Hospitality",
+      "Business Law"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Ubiquitous certifications for immediate employment in any local community."
+  },
+  "nodes": [
+    {
+      "id": "CERT-OSHA-10",
+      "title": "OSHA 10-Hour Construction Safety",
+      "description": "Foundational safety for construction and industry. Fall protection, electrical safety, caught-in or -between, and struck-by hazards.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Industrial Safety",
+      "subdomain": "Certification Bridge",
+      "tags": ["osha", "safety", "construction", "standard"],
+      "estimated_hours": 10,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering",
+      "academic_standards": [
+        {
+          "framework": "OSHA",
+          "code": "10-Hour",
+          "description": "Construction Safety Outreach",
+          "grade_level": "Professional"
+        }
+      ]
+    },
+    {
+      "id": "CERT-FIT-NASM-CPT",
+      "title": "NASM Certified Personal Trainer",
+      "description": "Exercise science, human movement, and performance enhancement. Linking biological vitality to professional fitness coaching.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Fitness & Wellness",
+      "subdomain": "Certification Bridge",
+      "tags": ["fitness", "health", "coaching", "standard"],
+      "estimated_hours": 120,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Health Sciences"
+    },
+    {
+      "id": "CERT-IT-PYTHON-PCEP",
+      "title": "PCEP: Certified Entry-Level Python Programmer",
+      "description": "The fundamentals of Python programming. Mastering the primary language of the Symthaea research stack and global data science.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Digital Programming",
+      "subdomain": "Certification Bridge",
+      "tags": ["python", "coding", "software", "standard"],
+      "estimated_hours": 60,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "CERT-CUL-WSET-1",
+      "title": "WSET Level 1 Award in Wines",
+      "description": "Professional wine knowledge. Types and styles of wine, food and wine pairing, and professional service standards.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Hospitality",
+      "subdomain": "Certification Bridge",
+      "tags": ["culinary", "hospitality", "wine", "standard"],
+      "estimated_hours": 15,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Understand",
+      "subject_area": "Arts"
+    },
+    {
+      "id": "CERT-LAW-NOTARY",
+      "title": "Notary Public Certification Mapping",
+      "description": "The role of the official witness. Legal ethics, identity verification, and the witnessing of signatures for high-stakes contracts.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Business Law",
+      "subdomain": "Certification Bridge",
+      "tags": ["law", "witness", "ethics", "standard"],
+      "estimated_hours": 20,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Humanities"
+    }
+  ],
+  "edges": [
+    {
+      "from": "VOC-000-S",
+      "to": "CERT-OSHA-10",
+      "edge_type": "Recommended",
+      "strength_permille": 900,
+      "rationale": "Mk0 kinetic safety provides 90% of the OSHA construction safety foundation."
+    },
+    {
+      "from": "VITA-201",
+      "to": "CERT-FIT-NASM-CPT",
+      "edge_type": "Recommended",
+      "strength_permille": 750,
+      "rationale": "Metabolic nutrition and body-substrate training map directly to NASM coaching domains."
+    },
+    {
+      "from": "HUM-EPI-201",
+      "to": "CERT-LAW-NOTARY",
+      "edge_type": "Recommended",
+      "strength_permille": 800,
+      "rationale": "Epistemic witness training provides the ethical grounding required for a Notary Public."
+    }
+  ]
+}

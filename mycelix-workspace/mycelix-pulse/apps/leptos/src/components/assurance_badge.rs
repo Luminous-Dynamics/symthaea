@@ -3,8 +3,8 @@
 
 //! DSID assurance level badge — shows MFA verification tier on emails and profiles.
 
-use leptos::prelude::*;
 use crate::dsid::AssuranceLevel;
+use leptos::prelude::*;
 
 /// Compact assurance badge showing E0-E4 level.
 #[component]
@@ -13,9 +13,15 @@ pub fn AssuranceBadge(
     #[prop(optional)]
     level: Option<u8>,
 ) -> impl IntoView {
-    let assurance = level.map(AssuranceLevel::from_u8).unwrap_or(AssuranceLevel::Anonymous);
+    let assurance = level
+        .map(AssuranceLevel::from_u8)
+        .unwrap_or(AssuranceLevel::Anonymous);
     let class = format!("assurance-badge {}", assurance.css_class());
-    let title = format!("DSID Assurance: {} — {}", assurance.short_label(), assurance.label());
+    let title = format!(
+        "DSID Assurance: {} — {}",
+        assurance.short_label(),
+        assurance.label()
+    );
 
     view! {
         <span class=class title=title>

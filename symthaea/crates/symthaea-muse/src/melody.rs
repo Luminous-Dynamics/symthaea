@@ -55,7 +55,8 @@ pub fn generate_melody(
 
     // Velocity: gesture shapes the base level and dynamic range
     let base_velocity = (0.3 + state.consciousness_level * 0.2 + state.dopamine * 0.1)
-        .clamp(0.15, 0.8) * gesture.velocity_scale;
+        .clamp(0.15, 0.8)
+        * gesture.velocity_scale;
     let dynamic_range = (0.10 + state.arousal * 0.20) * gesture.velocity_scale;
 
     for i in 0..config.max_notes {

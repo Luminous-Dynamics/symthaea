@@ -39,9 +39,15 @@ impl PositionQuality {
     pub fn new(score: u8) -> Self {
         Self(score.min(100))
     }
-    pub fn is_high(&self) -> bool { self.0 >= 80 }
-    pub fn is_acceptable(&self) -> bool { self.0 >= 50 }
-    pub fn as_f64(&self) -> f64 { self.0 as f64 / 100.0 }
+    pub fn is_high(&self) -> bool {
+        self.0 >= 80
+    }
+    pub fn is_acceptable(&self) -> bool {
+        self.0 >= 50
+    }
+    pub fn as_f64(&self) -> f64 {
+        self.0 as f64 / 100.0
+    }
 }
 
 // ============================================================================
@@ -165,7 +171,11 @@ pub struct PositionError {
 
 impl PositionError {
     pub fn new(code: PositionErrorCode, message: impl Into<String>) -> Self {
-        Self { code, message: message.into(), context: None }
+        Self {
+            code,
+            message: message.into(),
+            context: None,
+        }
     }
 
     pub fn with_context(mut self, ctx: impl Into<String>) -> Self {
@@ -217,7 +227,10 @@ pub fn validate_node_id(node_id: &str) -> Result<(), String> {
         return Err("Node ID cannot be empty".to_string());
     }
     if node_id.len() > 256 {
-        return Err(format!("Node ID too long: {} chars (max 256)", node_id.len()));
+        return Err(format!(
+            "Node ID too long: {} chars (max 256)",
+            node_id.len()
+        ));
     }
     Ok(())
 }

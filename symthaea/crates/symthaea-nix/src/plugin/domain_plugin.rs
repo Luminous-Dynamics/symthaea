@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 
 use crate::traits::{
-    DomainPlugin, DomainPrompts, Entity, ErrorDiagnosis, ErrorLocation, IntentPrototypes,
+    DomainEntity, DomainPlugin, DomainPrompts, ErrorDiagnosis, ErrorLocation, IntentPrototypes,
     RiskLevel, ValidationResult,
 };
 
@@ -135,7 +135,7 @@ impl DomainPlugin for NixOsPlugin {
         "nixos"
     }
 
-    fn extract_entities(&self, text: &str) -> Vec<Entity> {
+    fn extract_entities(&self, text: &str) -> Vec<DomainEntity> {
         let mut entities = Vec::new();
         let lower = text.to_lowercase();
 
@@ -148,7 +148,7 @@ impl DomainPlugin for NixOsPlugin {
             if end > 0 {
                 let pkg = &rest[..end];
                 entities.push(
-                    Entity::new("package", pkg, i, i + 5 + end)
+                    DomainEntity::new("package", pkg, i, i + 5 + end)
                         .with_confidence(0.95)
                         .with_metadata("source", "pkgs"),
                 );
@@ -173,7 +173,7 @@ impl DomainPlugin for NixOsPlugin {
                 if end > keyword.len() {
                     let option = &rest[..end];
                     entities.push(
-                        Entity::new("nix_option", option, i, i + end)
+                        DomainEntity::new("nix_option", option, i, i + end)
                             .with_confidence(0.9)
                             .with_metadata("category", &keyword[..keyword.len() - 1]),
                     );
@@ -192,8 +192,9 @@ impl DomainPlugin for NixOsPlugin {
         ];
         for cmd in &commands {
             for (i, _) in lower.match_indices(cmd) {
-                entities
-                    .push(Entity::new("nix_command", cmd, i, i + cmd.len()).with_confidence(0.95));
+                entities.push(
+                    DomainEntity::new("nix_command", cmd, i, i + cmd.len()).with_confidence(0.95),
+                );
             }
         }
 
@@ -203,7 +204,7 @@ impl DomainPlugin for NixOsPlugin {
                 let rest = &text[i..];
                 let end = rest.find(|c: char| c.is_whitespace()).unwrap_or(rest.len());
                 entities.push(
-                    Entity::new("flake_ref", &rest[..end], i, i + end)
+                    DomainEntity::new("flake_ref", &rest[..end], i, i + end)
                         .with_confidence(0.9)
                         .with_metadata("type", "github"),
                 );
@@ -242,7 +243,7 @@ impl DomainPlugin for NixOsPlugin {
                     || !lower.as_bytes()[idx + keyword.len()].is_ascii_alphanumeric();
                 if before_ok && after_ok && !existing_values.contains(&keyword.to_string()) {
                     entities.push(
-                        Entity::new("nix_concept", keyword, idx, idx + keyword.len())
+                        DomainEntity::new("nix_concept", keyword, idx, idx + keyword.len())
                             .with_confidence(0.85)
                             .with_metadata("category", category),
                     );

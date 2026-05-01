@@ -25,6 +25,7 @@ native = [
 serde = { workspace = true }
 bs58 = { workspace = true }
 thiserror = { workspace = true }
+getrandom = { workspace = true, features = ["custom"] }
 
 # Native-only PQC dependencies
 ed25519-dalek = { version = "2", optional = true, features = ["rand_core"] }

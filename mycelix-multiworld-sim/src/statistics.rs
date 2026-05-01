@@ -283,7 +283,11 @@ mod tests {
         let ci = bootstrap_ci(&data, 0.95, 1000, &mut rng).unwrap();
         assert!(ci.lower <= ci.mean, "Lower {} > mean {}", ci.lower, ci.mean);
         assert!(ci.mean <= ci.upper, "Mean {} > upper {}", ci.mean, ci.upper);
-        assert!((ci.mean - 5.5).abs() < 0.01, "Mean should be ~5.5: {}", ci.mean);
+        assert!(
+            (ci.mean - 5.5).abs() < 0.01,
+            "Mean should be ~5.5: {}",
+            ci.mean
+        );
     }
 
     #[test]
@@ -292,15 +296,21 @@ mod tests {
         let mut rng = StochasticEngine::new(42);
         let small: Vec<f64> = (0..10).map(|_| 5.0 + rng.next_gaussian(0.0, 1.0)).collect();
         let mut rng2 = StochasticEngine::new(99);
-        let large: Vec<f64> = (0..200).map(|_| 5.0 + rng2.next_gaussian(0.0, 1.0)).collect();
+        let large: Vec<f64> = (0..200)
+            .map(|_| 5.0 + rng2.next_gaussian(0.0, 1.0))
+            .collect();
         let mut rng3 = StochasticEngine::new(42);
         let mut rng4 = StochasticEngine::new(42);
         let ci_small = bootstrap_ci(&small, 0.95, 2000, &mut rng3).unwrap();
         let ci_large = bootstrap_ci(&large, 0.95, 2000, &mut rng4).unwrap();
         let width_small = ci_small.upper - ci_small.lower;
         let width_large = ci_large.upper - ci_large.lower;
-        assert!(width_large < width_small,
-            "Larger sample should have narrower CI: {} vs {}", width_large, width_small);
+        assert!(
+            width_large < width_small,
+            "Larger sample should have narrower CI: {} vs {}",
+            width_large,
+            width_small
+        );
     }
 
     #[test]
@@ -308,20 +318,34 @@ mod tests {
         let a = vec![1.0, 2.0, 3.0, 4.0, 5.0];
         let result = paired_t_test(&a, &a);
         // Identical samples → zero variance in diffs → None
-        assert!(result.is_none(), "Identical samples should return None (zero variance)");
+        assert!(
+            result.is_none(),
+            "Identical samples should return None (zero variance)"
+        );
     }
 
     #[test]
     fn paired_t_test_significant_difference() {
         // Non-constant difference: a[i] = b[i] + noise + 5.0
         let mut rng = StochasticEngine::new(42);
-        let b: Vec<f64> = (0..20).map(|i| i as f64 + rng.next_gaussian(0.0, 0.5)).collect();
-        let a: Vec<f64> = b.iter().map(|x| x + 5.0 + rng.next_gaussian(0.0, 0.3)).collect();
+        let b: Vec<f64> = (0..20)
+            .map(|i| i as f64 + rng.next_gaussian(0.0, 0.5))
+            .collect();
+        let a: Vec<f64> = b
+            .iter()
+            .map(|x| x + 5.0 + rng.next_gaussian(0.0, 0.3))
+            .collect();
         let result = paired_t_test(&a, &b).unwrap();
-        assert!(result.p_value < 0.01,
-            "Clearly different samples should have p < 0.01: {}", result.p_value);
-        assert!(result.mean_diff > 4.0 && result.mean_diff < 6.0,
-            "Mean diff should be ~5.0: {}", result.mean_diff);
+        assert!(
+            result.p_value < 0.01,
+            "Clearly different samples should have p < 0.01: {}",
+            result.p_value
+        );
+        assert!(
+            result.mean_diff > 4.0 && result.mean_diff < 6.0,
+            "Mean diff should be ~5.0: {}",
+            result.mean_diff
+        );
     }
 
     #[test]
@@ -330,8 +354,11 @@ mod tests {
         let a = vec![5.01, 4.99, 5.02, 4.98, 5.01, 4.99, 5.00, 5.01, 4.99, 5.00];
         let b = vec![5.00, 5.00, 5.00, 5.00, 5.00, 5.00, 5.00, 5.00, 5.00, 5.00];
         let result = paired_t_test(&a, &b).unwrap();
-        assert!(result.p_value > 0.05,
-            "Tiny differences should not be significant: p={}", result.p_value);
+        assert!(
+            result.p_value > 0.05,
+            "Tiny differences should not be significant: p={}",
+            result.p_value
+        );
     }
 
     #[test]
@@ -349,7 +376,11 @@ mod tests {
         let a: Vec<f64> = (0..50).map(|_| 5.0 + rng.next_gaussian(0.0, 1.0)).collect();
         let b: Vec<f64> = (0..50).map(|_| 5.0 + rng.next_gaussian(0.0, 1.0)).collect();
         let d = cohens_d(&a, &b).unwrap();
-        assert!(d.abs() < 0.5, "Same-distribution samples should have small d: {}", d);
+        assert!(
+            d.abs() < 0.5,
+            "Same-distribution samples should have small d: {}",
+            d
+        );
     }
 
     #[test]
@@ -366,8 +397,11 @@ mod tests {
         let result = detect_convergence(&series, 10, 0.001);
         assert!(result.is_some(), "Should detect plateau");
         let converge_at = result.unwrap();
-        assert!(converge_at >= 50 && converge_at <= 65,
-            "Should converge around tick 50-65: {}", converge_at);
+        assert!(
+            converge_at >= 50 && converge_at <= 65,
+            "Should converge around tick 50-65: {}",
+            converge_at
+        );
     }
 
     #[test]
@@ -393,10 +427,18 @@ mod tests {
     fn normal_cdf_complement_symmetry() {
         let p_pos = normal_cdf_complement(2.0);
         let p_neg = normal_cdf_complement(-2.0);
-        assert!((p_pos + p_neg - 1.0).abs() < 0.01,
-            "P(Z>2) + P(Z>-2) should ≈ 1.0: {} + {} = {}", p_pos, p_neg, p_pos + p_neg);
+        assert!(
+            (p_pos + p_neg - 1.0).abs() < 0.01,
+            "P(Z>2) + P(Z>-2) should ≈ 1.0: {} + {} = {}",
+            p_pos,
+            p_neg,
+            p_pos + p_neg
+        );
         // P(Z > 2) ≈ 0.0228
-        assert!((p_pos - 0.0228).abs() < 0.005,
-            "P(Z > 2) should be ~0.0228: {}", p_pos);
+        assert!(
+            (p_pos - 0.0228).abs() < 0.005,
+            "P(Z > 2) should be ~0.0228: {}",
+            p_pos
+        );
     }
 }

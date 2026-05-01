@@ -1,9 +1,9 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-use crate::*;
 use crate::compat::{LegacyProfile, LegacyTier};
 use crate::weights::DimensionWeights;
+use crate::*;
 
 // ---------------------------------------------------------------------------
 // SovereignProfile basics
@@ -47,7 +47,8 @@ fn single_dimension_contributes_its_weight() {
         assert!(
             (score - expected).abs() < 1e-10,
             "Dimension {:?} (idx {}) should contribute {expected}, got {score}",
-            dim, dim.index()
+            dim,
+            dim.index()
         );
     }
 }
@@ -133,7 +134,8 @@ fn vote_weights_are_non_decreasing() {
         assert!(
             tiers[i].vote_weight_bp() >= tiers[i - 1].vote_weight_bp(),
             "{:?} weight should be >= {:?} weight",
-            tiers[i], tiers[i - 1]
+            tiers[i],
+            tiers[i - 1]
         );
     }
 }
@@ -250,20 +252,40 @@ fn sovereign_to_legacy_averages_pairs() {
         domain_competence: 0.3,
     };
     let old: LegacyProfile = new.into();
-    assert!((old.identity - 0.6).abs() < 1e-10);     // (0.8+0.4)/2
-    assert!((old.reputation - 0.4).abs() < 1e-10);    // (0.6+0.2)/2
-    assert!((old.community - 0.8).abs() < 1e-10);     // (0.9+0.7)/2
-    assert!((old.engagement - 0.4).abs() < 1e-10);    // (0.5+0.3)/2
+    assert!((old.identity - 0.6).abs() < 1e-10); // (0.8+0.4)/2
+    assert!((old.reputation - 0.4).abs() < 1e-10); // (0.6+0.2)/2
+    assert!((old.community - 0.8).abs() < 1e-10); // (0.9+0.7)/2
+    assert!((old.engagement - 0.4).abs() < 1e-10); // (0.5+0.3)/2
 }
 
 #[test]
 fn legacy_round_trip_preserves_tier() {
     // For any 4D profile, converting to 8D and back should preserve the tier
     let test_cases = [
-        LegacyProfile { identity: 0.1, reputation: 0.1, community: 0.1, engagement: 0.1 },
-        LegacyProfile { identity: 0.5, reputation: 0.5, community: 0.5, engagement: 0.5 },
-        LegacyProfile { identity: 0.8, reputation: 0.7, community: 0.9, engagement: 0.6 },
-        LegacyProfile { identity: 1.0, reputation: 1.0, community: 1.0, engagement: 1.0 },
+        LegacyProfile {
+            identity: 0.1,
+            reputation: 0.1,
+            community: 0.1,
+            engagement: 0.1,
+        },
+        LegacyProfile {
+            identity: 0.5,
+            reputation: 0.5,
+            community: 0.5,
+            engagement: 0.5,
+        },
+        LegacyProfile {
+            identity: 0.8,
+            reputation: 0.7,
+            community: 0.9,
+            engagement: 0.6,
+        },
+        LegacyProfile {
+            identity: 1.0,
+            reputation: 1.0,
+            community: 1.0,
+            engagement: 1.0,
+        },
     ];
 
     // Use equal weights so the 8D average equals the 4D weighted score
@@ -285,7 +307,13 @@ fn legacy_round_trip_preserves_tier() {
 
 #[test]
 fn tier_conversion_is_bijective() {
-    for tier in [LegacyTier::Observer, LegacyTier::Participant, LegacyTier::Citizen, LegacyTier::Steward, LegacyTier::Guardian] {
+    for tier in [
+        LegacyTier::Observer,
+        LegacyTier::Participant,
+        LegacyTier::Citizen,
+        LegacyTier::Steward,
+        LegacyTier::Guardian,
+    ] {
         let civic: CivicTier = tier.into();
         let back: LegacyTier = civic.into();
         assert_eq!(tier, back);
@@ -330,7 +358,13 @@ fn sovereign_profile_json_round_trip() {
 #[cfg(feature = "serde")]
 #[test]
 fn civic_tier_json_round_trip() {
-    for tier in [CivicTier::Observer, CivicTier::Participant, CivicTier::Citizen, CivicTier::Steward, CivicTier::Guardian] {
+    for tier in [
+        CivicTier::Observer,
+        CivicTier::Participant,
+        CivicTier::Citizen,
+        CivicTier::Steward,
+        CivicTier::Guardian,
+    ] {
         let json = serde_json::to_string(&tier).unwrap();
         let deserialized: CivicTier = serde_json::from_str(&json).unwrap();
         assert_eq!(tier, deserialized);
@@ -362,7 +396,7 @@ fn sovereign_credential_json_round_trip() {
 #[cfg(feature = "hdc")]
 #[test]
 fn full_pipeline_collect_normalize_decay_encode_tier() {
-    use crate::collectors::{CollectedDimensions, DimensionInput, normalize_all};
+    use crate::collectors::{normalize_all, CollectedDimensions, DimensionInput};
     use crate::decay::{apply_decay, DecayConfig};
     use crate::hdc::{encode_profile, tier_from_popcount, TierThresholds};
 
@@ -399,10 +433,19 @@ fn full_pipeline_collect_normalize_decay_encode_tier() {
 
     // Step 2: Normalize to [0,1] scores
     let profile = normalize_all(&collected);
-    assert!(profile.epistemic_integrity > 0.5, "Epistemic should be high");
-    assert!(profile.civic_participation > 0.4, "Civic should be moderate");
+    assert!(
+        profile.epistemic_integrity > 0.5,
+        "Epistemic should be high"
+    );
+    assert!(
+        profile.civic_participation > 0.4,
+        "Civic should be moderate"
+    );
     assert!(profile.domain_competence > 0.5, "Competence should be high");
-    assert_eq!(profile.thermodynamic_yield, 0.0, "Thermo should be zero (no data)");
+    assert_eq!(
+        profile.thermodynamic_yield, 0.0,
+        "Thermo should be zero (no data)"
+    );
 
     // Step 3: Apply decay (30 days since last interaction)
     let decay_config = DecayConfig::default_governance();
@@ -412,8 +455,12 @@ fn full_pipeline_collect_normalize_decay_encode_tier() {
     let decayed = apply_decay(&profile, last_interaction, now_us, &decay_config);
 
     // Verify decay reduced scores
-    assert!(decayed.epistemic_integrity < profile.epistemic_integrity,
-        "Decay should reduce epistemic: {} → {}", profile.epistemic_integrity, decayed.epistemic_integrity);
+    assert!(
+        decayed.epistemic_integrity < profile.epistemic_integrity,
+        "Decay should reduce epistemic: {} → {}",
+        profile.epistemic_integrity,
+        decayed.epistemic_integrity
+    );
 
     // Step 4: Derive scalar tier
     let weights = DimensionWeights::governance();
@@ -432,19 +479,39 @@ fn full_pipeline_collect_normalize_decay_encode_tier() {
     // (They should match for well-calibrated thresholds)
     println!(
         "Pipeline: score={:.3}, scalar_tier={:?}, hdc_tier={:?}, popcount={}",
-        scalar_score, scalar_tier, hdc_tier, hv.popcount()
+        scalar_score,
+        scalar_tier,
+        hdc_tier,
+        hv.popcount()
     );
 
     // The tiers should be close (within 1 tier of each other due to
     // threshold calibration imprecision). Exact match not guaranteed
     // because HDC encoding has quantization effects.
-    let scalar_idx = [CivicTier::Observer, CivicTier::Participant, CivicTier::Citizen, CivicTier::Steward, CivicTier::Guardian]
-        .iter().position(|t| *t == scalar_tier).unwrap();
-    let hdc_idx = [CivicTier::Observer, CivicTier::Participant, CivicTier::Citizen, CivicTier::Steward, CivicTier::Guardian]
-        .iter().position(|t| *t == hdc_tier).unwrap();
+    let scalar_idx = [
+        CivicTier::Observer,
+        CivicTier::Participant,
+        CivicTier::Citizen,
+        CivicTier::Steward,
+        CivicTier::Guardian,
+    ]
+    .iter()
+    .position(|t| *t == scalar_tier)
+    .unwrap();
+    let hdc_idx = [
+        CivicTier::Observer,
+        CivicTier::Participant,
+        CivicTier::Citizen,
+        CivicTier::Steward,
+        CivicTier::Guardian,
+    ]
+    .iter()
+    .position(|t| *t == hdc_tier)
+    .unwrap();
     assert!(
         (scalar_idx as i32 - hdc_idx as i32).abs() <= 1,
         "HDC tier {:?} should be within 1 of scalar tier {:?}",
-        hdc_tier, scalar_tier
+        hdc_tier,
+        scalar_tier
     );
 }

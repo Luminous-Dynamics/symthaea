@@ -39,7 +39,7 @@ pub struct ContentChannels {
     pub arousal: f32,
     /// Warmth: 0.0 (formal) to 1.0 (friendly, nurturing)
     pub warmth: f32,
-    /// Consciousness level: 0.0 (verbose) to 1.0 (concise, gated)
+    /// Cognitive readiness: 0.0 (verbose) to 1.0 (concise, gated)
     pub consciousness: f32,
     /// Meta-awareness: self-monitoring during generation
     pub meta_awareness: f32,

@@ -88,31 +88,45 @@ impl AssemblyTask {
     /// Get the current IK target position for this phase.
     pub fn current_target(&self) -> [f64; 3] {
         match self.phase {
-            AssemblyPhase::ApproachPick | AssemblyPhase::ReturnToStart => {
-                [self.pick_position[0], self.pick_position[1], self.approach_height]
-            }
-            AssemblyPhase::Descend | AssemblyPhase::Grasp => {
-                [self.pick_position[0], self.pick_position[1], self.grasp_height]
-            }
-            AssemblyPhase::Lift => {
-                [self.pick_position[0], self.pick_position[1], self.approach_height]
-            }
-            AssemblyPhase::Transit => {
-                [self.place_position[0], self.place_position[1], self.approach_height]
-            }
-            AssemblyPhase::DescendPlace | AssemblyPhase::Release => {
-                [self.place_position[0], self.place_position[1], self.grasp_height]
-            }
-            AssemblyPhase::Retract => {
-                [self.place_position[0], self.place_position[1], self.approach_height]
-            }
+            AssemblyPhase::ApproachPick | AssemblyPhase::ReturnToStart => [
+                self.pick_position[0],
+                self.pick_position[1],
+                self.approach_height,
+            ],
+            AssemblyPhase::Descend | AssemblyPhase::Grasp => [
+                self.pick_position[0],
+                self.pick_position[1],
+                self.grasp_height,
+            ],
+            AssemblyPhase::Lift => [
+                self.pick_position[0],
+                self.pick_position[1],
+                self.approach_height,
+            ],
+            AssemblyPhase::Transit => [
+                self.place_position[0],
+                self.place_position[1],
+                self.approach_height,
+            ],
+            AssemblyPhase::DescendPlace | AssemblyPhase::Release => [
+                self.place_position[0],
+                self.place_position[1],
+                self.grasp_height,
+            ],
+            AssemblyPhase::Retract => [
+                self.place_position[0],
+                self.place_position[1],
+                self.approach_height,
+            ],
         }
     }
 
     /// Desired gripper opening for this phase (0.0 = closed, 1.0 = open).
     pub fn desired_gripper(&self) -> f64 {
         match self.phase {
-            AssemblyPhase::Grasp | AssemblyPhase::Lift | AssemblyPhase::Transit
+            AssemblyPhase::Grasp
+            | AssemblyPhase::Lift
+            | AssemblyPhase::Transit
             | AssemblyPhase::DescendPlace => 0.0, // closed (holding object)
             _ => 1.0, // open
         }
@@ -185,7 +199,10 @@ mod tests {
         let task = AssemblyTask::new();
         let target = task.current_target();
         assert!(target[2] > 0.0, "Target should be above ground");
-        assert!(target[2] <= 0.30, "Target should be at or below approach height");
+        assert!(
+            target[2] <= 0.30,
+            "Target should be at or below approach height"
+        );
     }
 
     #[test]

@@ -1,0 +1,107 @@
+{
+  "metadata": {
+    "title": "Substrate Science & Engineering: Type 1 Foundations",
+    "framework": "Mycelix Substrate Science",
+    "source": "https://mycelix.org",
+    "grade_level": "Undergraduate/Graduate",
+    "subject_area": "Science",
+    "domain": "Science",
+    "version": "1.0",
+    "total_standards": 4,
+    "domains": [
+      "Materials Science",
+      "Synthetic Biology",
+      "Information Theory"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Hard-science depth for the planetary engineering tracks."
+  },
+  "nodes": [
+    {
+      "id": "SCI-MAT-301",
+      "title": "Advanced Carbon-Negative Materials",
+      "description": "Beyond recycling. Synthesizing structural polymers, graphene, and bio-ceramics from atmospheric carbon and local regolith. Linked to the Foundry platform.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Materials Science",
+      "subdomain": "Substrate Science",
+      "tags": ["materials", "carbon-capture", "engineering", "foundry"],
+      "estimated_hours": 90,
+      "grade_levels": ["Graduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "SCI-BIO-301",
+      "title": "Synthetic Biology for Stewards",
+      "description": "Engineering life for remediation. Principles of CRISPR and metabolic engineering applied to microbial heavy-metal sequestration and nutrient production.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Synthetic Biology",
+      "subdomain": "Substrate Science",
+      "tags": ["biology", "synthetic-biology", "remediation", "crispr"],
+      "estimated_hours": 120,
+      "grade_levels": ["Graduate"],
+      "bloom_level": "Create",
+      "subject_area": "Science"
+    },
+    {
+      "id": "SCI-INFO-401",
+      "title": "Applied Information Theory",
+      "description": "Entropy, channel capacity, and the limits of the mesh. Error correction algorithms for noisy LoRa links and the physics of semantic density in HDC.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Information Theory",
+      "subdomain": "Substrate Science",
+      "tags": ["math", "information-theory", "entropy", "comms"],
+      "estimated_hours": 60,
+      "grade_levels": ["Graduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics"
+    },
+    {
+      "id": "SCI-CHEM-301",
+      "title": "Molecular Recycling & Depolymerization",
+      "description": "The chemistry of the Detritivore. Breaking down complex polymers into their monomeric constituents using enzymatic and thermal catalysis.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Chemistry",
+      "subdomain": "Substrate Science",
+      "tags": ["chemistry", "recycling", "materials", "industrial"],
+      "estimated_hours": 90,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Chemistry"
+    }
+  ],
+  "edges": [
+    {
+      "from": "VOC-MAT-101",
+      "to": "SCI-CHEM-301",
+      "edge_type": "Recommended",
+      "strength_permille": 600,
+      "rationale": "Mechanical sorting is the foundation for molecular depolymerization."
+    },
+    {
+      "from": "SCI-CHEM-301",
+      "to": "SCI-MAT-301",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Synthesizing new materials requires mastery of molecular constituents."
+    },
+    {
+      "from": "VITA-101",
+      "to": "SCI-BIO-301",
+      "edge_type": "Recommended",
+      "strength_permille": 700,
+      "rationale": "General microbiology is the prerequisite for synthetic biological engineering."
+    },
+    {
+      "from": "SYM-201",
+      "to": "SCI-INFO-401",
+      "edge_type": "Requires",
+      "strength_permille": 800,
+      "rationale": "Hyperdimensional computing is an application of high-density information theory."
+    }
+  ]
+}

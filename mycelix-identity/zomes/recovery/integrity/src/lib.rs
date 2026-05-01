@@ -215,9 +215,10 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::RecoveryVote(vote) => {
                     validate_create_recovery_vote(EntryCreationAction::Create(action), vote)
                 }
-                EntryTypes::SelfRecoveryConfig(config) => {
-                    validate_create_self_recovery_config(EntryCreationAction::Create(action), config)
-                }
+                EntryTypes::SelfRecoveryConfig(config) => validate_create_self_recovery_config(
+                    EntryCreationAction::Create(action),
+                    config,
+                ),
                 EntryTypes::SelfRecoveryRequest(request) => {
                     validate_create_self_recovery_request(request)
                 }
@@ -635,8 +636,10 @@ fn validate_update_self_recovery_request(
         )))?;
 
     // Immutable fields
-    if request.id != original.id || request.did != original.did
-        || request.new_agent != original.new_agent || request.created != original.created
+    if request.id != original.id
+        || request.did != original.did
+        || request.new_agent != original.new_agent
+        || request.created != original.created
     {
         return Ok(ValidateCallbackResult::Invalid(
             "Self-recovery request immutable fields cannot be changed".into(),
@@ -846,8 +849,14 @@ mod tests {
         };
 
         assert!(valid(&RecoveryStatus::Pending, &RecoveryStatus::Approved));
-        assert!(valid(&RecoveryStatus::Approved, &RecoveryStatus::ReadyToExecute));
-        assert!(valid(&RecoveryStatus::ReadyToExecute, &RecoveryStatus::Completed));
+        assert!(valid(
+            &RecoveryStatus::Approved,
+            &RecoveryStatus::ReadyToExecute
+        ));
+        assert!(valid(
+            &RecoveryStatus::ReadyToExecute,
+            &RecoveryStatus::Completed
+        ));
         assert!(!valid(&RecoveryStatus::Pending, &RecoveryStatus::Completed)); // can't skip
         assert!(!valid(&RecoveryStatus::Completed, &RecoveryStatus::Pending)); // terminal
     }

@@ -7,15 +7,17 @@
 //! The shared infrastructure handles localStorage persistence,
 //! `data-theme` attribute application, and reactive context.
 
+use crate::util::set_root_attribute;
 use leptos::prelude::*;
 use serde::{de::DeserializeOwned, Serialize};
-use crate::util::set_root_attribute;
 
 /// Trait for app-specific theme enums.
 ///
 /// Implement this for your theme enum to get automatic localStorage
 /// persistence and `data-theme` attribute management.
-pub trait AppTheme: Clone + Copy + PartialEq + Eq + Serialize + DeserializeOwned + Send + Sync + 'static {
+pub trait AppTheme:
+    Clone + Copy + PartialEq + Eq + Serialize + DeserializeOwned + Send + Sync + 'static
+{
     /// CSS-safe label used as the `data-theme` attribute value.
     fn label(&self) -> &'static str;
 
@@ -26,7 +28,9 @@ pub trait AppTheme: Clone + Copy + PartialEq + Eq + Serialize + DeserializeOwned
     fn next(&self) -> Self;
 
     /// Whether this is a light theme (for system-level adjustments).
-    fn is_light(&self) -> bool { false }
+    fn is_light(&self) -> bool {
+        false
+    }
 }
 
 /// Reactive theme state.
@@ -53,9 +57,7 @@ pub fn provide_theme_context<T: AppTheme>(storage_key: &'static str, default: T)
         let theme = current.get();
         set_root_attribute("data-theme", theme.label());
 
-        if let Some(storage) = web_sys::window()
-            .and_then(|w| w.local_storage().ok().flatten())
-        {
+        if let Some(storage) = web_sys::window().and_then(|w| w.local_storage().ok().flatten()) {
             let _ = storage.set_item(storage_key, theme.label());
         }
     });

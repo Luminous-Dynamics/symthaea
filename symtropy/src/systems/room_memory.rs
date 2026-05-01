@@ -47,7 +47,9 @@ impl Default for RoomMemory {
 impl RoomMemory {
     /// The room's personality — derived from accumulated play history.
     pub fn room_personality(&self) -> &'static str {
-        if self.runs == 0 { return "Awakening"; }
+        if self.runs == 0 {
+            return "Awakening";
+        }
         let calm_ratio = self.calm_seconds / (self.calm_seconds + self.panic_seconds + 1.0);
         if self.victories > self.deaths && calm_ratio > 0.6 {
             "Sanctuary"
@@ -65,12 +67,12 @@ impl RoomMemory {
     /// Color the room takes based on personality.
     pub fn room_color(&self) -> Color {
         match self.room_personality() {
-            "Sanctuary" => Color::srgb(0.3, 0.5, 0.35),   // warm green
-            "Haunted" => Color::srgb(0.25, 0.15, 0.2),     // dark purple
-            "Turbulent" => Color::srgb(0.35, 0.2, 0.15),   // rusty red
-            "Luminous" => Color::srgb(0.4, 0.38, 0.25),    // golden
-            "Becoming" => Color::srgb(0.2, 0.25, 0.3),     // cool blue
-            _ => Color::srgb(0.15, 0.15, 0.2),             // neutral
+            "Sanctuary" => Color::srgb(0.3, 0.5, 0.35),  // warm green
+            "Haunted" => Color::srgb(0.25, 0.15, 0.2),   // dark purple
+            "Turbulent" => Color::srgb(0.35, 0.2, 0.15), // rusty red
+            "Luminous" => Color::srgb(0.4, 0.38, 0.25),  // golden
+            "Becoming" => Color::srgb(0.2, 0.25, 0.3),   // cool blue
+            _ => Color::srgb(0.15, 0.15, 0.2),           // neutral
         }
     }
 }

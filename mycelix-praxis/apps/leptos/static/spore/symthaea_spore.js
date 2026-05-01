@@ -106,11 +106,11 @@ export class SporeEngine {
         }
     }
     /**
-     * Current consciousness level.
+     * Current cognitive readiness.
      * @returns {number}
      */
-    consciousness_level() {
-        const ret = wasm.sporeengine_consciousness_level(this.__wbg_ptr);
+    cognitive_readiness() {
+        const ret = wasm.sporeengine_cognitive_readiness(this.__wbg_ptr);
         return ret;
     }
     /**
@@ -341,7 +341,7 @@ export class SporeEngine {
         return ret;
     }
     /**
-     * Generate text from current consciousness state.
+     * Generate text from current cognitive state.
      * Returns GenerationResult as JS object with `text`, `num_tokens`, `eos_terminated`.
      * @param {number} max_tokens
      * @returns {any}
@@ -496,7 +496,7 @@ export class SporeEngine {
      *
      * The checkpoint file (broca-spore-v1.bin) contains trained token embeddings,
      * position embeddings, and gate weights. After loading, the autoregressive
-     * generation path produces coherent language at consciousness levels >= 0.15.
+     * generation path produces coherent language at cognitive readinesss >= 0.15.
      * @param {Uint8Array} data
      */
     load_broca_checkpoint(data) {

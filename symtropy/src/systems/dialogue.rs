@@ -22,7 +22,9 @@ pub struct SpeechBubble {
 pub struct DialogueTimer(pub f32);
 
 impl Default for DialogueTimer {
-    fn default() -> Self { Self(0.0) }
+    fn default() -> Self {
+        Self(0.0)
+    }
 }
 
 /// Generate dialogue from consciousness bottleneck + psychological needs.
@@ -91,17 +93,27 @@ fn bottleneck_to_dialogue(
 /// Show NPC dialogue when player is nearby.
 pub fn dialogue_system(
     player: Query<&Transform, With<Player>>,
-    npcs: Query<(Entity, &Transform, &CrewNpc, Option<&NpcConsciousness>, Option<&crate::systems::psychology::PsychologicalNeeds>)>,
+    npcs: Query<(
+        Entity,
+        &Transform,
+        &CrewNpc,
+        Option<&NpcConsciousness>,
+        Option<&crate::systems::psychology::PsychologicalNeeds>,
+    )>,
     mut commands: Commands,
     existing_bubbles: Query<(Entity, &SpeechBubble)>,
     mut timer: ResMut<DialogueTimer>,
     time: Res<Time>,
 ) {
     timer.0 += time.delta_secs();
-    if timer.0 < 3.0 { return; } // Update dialogue every 3 seconds
+    if timer.0 < 3.0 {
+        return;
+    } // Update dialogue every 3 seconds
     timer.0 = 0.0;
 
-    let Ok(player_tf) = player.single() else { return };
+    let Ok(player_tf) = player.single() else {
+        return;
+    };
     let player_pos = player_tf.translation.truncate();
 
     // Remove old bubbles
@@ -130,7 +142,10 @@ pub fn dialogue_system(
         if let Ok((_, npc_tf, _, _, _)) = npcs.get(npc_entity) {
             commands.spawn((
                 Text::new(text),
-                TextFont { font_size: 14.0, ..default() },
+                TextFont {
+                    font_size: 14.0,
+                    ..default()
+                },
                 TextColor(Color::srgba(0.9, 0.9, 0.7, 0.9)),
                 Node {
                     position_type: PositionType::Absolute,
@@ -138,7 +153,10 @@ pub fn dialogue_system(
                     left: Val::Px(12.0),
                     ..default()
                 },
-                SpeechBubble { npc_entity, timer: 0.0 },
+                SpeechBubble {
+                    npc_entity,
+                    timer: 0.0,
+                },
             ));
         }
     }

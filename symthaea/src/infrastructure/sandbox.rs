@@ -13,7 +13,6 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
-use wait_timeout::ChildExt;
 
 /// Sandbox for isolated command execution
 pub struct Sandbox {
@@ -91,6 +90,16 @@ impl Sandbox {
     /// Add allowed command
     pub fn allow_command(&mut self, cmd: impl Into<String>) {
         self.allowed_commands.push(cmd.into());
+    }
+
+    /// Whether this sandbox is configured for simulation-only execution.
+    pub fn is_simulation_only(&self) -> bool {
+        self.simulation_only
+    }
+
+    /// Whether real execution has been explicitly enabled.
+    pub fn is_real_execution_enabled(&self) -> bool {
+        self.real_execution_enabled
     }
 
     /// Set environment variable
@@ -265,17 +274,33 @@ impl Sandbox {
             stderr_buf
         });
 
-        let status = match child
-            .wait_timeout(self.timeout)
-            .map_err(|e| SandboxError::ExecutionFailed(e.to_string()))?
-        {
-            Some(status) => status,
-            None => {
-                let _ = child.kill();
-                let _ = child.wait();
-                let _ = stdout_handle.join();
-                let _ = stderr_handle.join();
-                return Err(SandboxError::Timeout);
+        // Avoid signal-handler based timeout machinery here; some sandboxed
+        // environments reject the internal wakeup fd writes used by
+        // `wait-timeout`, which turns an ordinary child wait into a process
+        // abort. A small polling loop is slower but robust and sufficient for
+        // these short-lived verification commands.
+        let poll_interval = Duration::from_millis(10);
+        let deadline = start + self.timeout;
+        let status = loop {
+            match child.try_wait() {
+                Ok(Some(status)) => break status,
+                Ok(None) => {
+                    if Instant::now() >= deadline {
+                        let _ = child.kill();
+                        let _ = child.wait();
+                        let _ = stdout_handle.join();
+                        let _ = stderr_handle.join();
+                        return Err(SandboxError::Timeout);
+                    }
+                    thread::sleep(poll_interval);
+                }
+                Err(e) => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    let _ = stdout_handle.join();
+                    let _ = stderr_handle.join();
+                    return Err(SandboxError::ExecutionFailed(e.to_string()));
+                }
             }
         };
 

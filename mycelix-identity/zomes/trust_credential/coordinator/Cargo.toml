@@ -9,6 +9,7 @@ description = "K-Vector trust credential coordinator zome with ZKP support"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+mycelix-zome-helpers = { workspace = true }
 hdk = { workspace = true }
 trust_credential_integrity = { path = "../integrity" }
 holochain_serialized_bytes = { workspace = true }

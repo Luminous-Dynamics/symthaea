@@ -13,20 +13,20 @@
 
 #![deny(unsafe_code)]
 
-pub mod types;
-pub mod encoder;
 pub mod controller;
-pub mod simulator;
 pub mod embodiment;
+pub mod encoder;
 pub mod fep_agent;
-pub mod perturbations;
-pub mod training;
-pub mod plugin;
-#[cfg(feature = "symtropy")]
-pub mod symtropy_sim;
 #[cfg(feature = "symtropy")]
 pub mod full_frame;
 #[cfg(feature = "hal")]
 pub mod hal_bridge;
+pub mod perturbations;
+pub mod plugin;
 #[cfg(feature = "sensors")]
 pub mod sensored_suite;
+pub mod simulator;
+#[cfg(feature = "symtropy")]
+pub mod symtropy_sim;
+pub mod training;
+pub mod types;

@@ -368,7 +368,9 @@ impl CollectivePatternRegistry {
         // Extract values we need before checking config
         let emergence_threshold = self.config.emergence_threshold;
         let (is_emergent, discoveries) = {
-            let ctx = self.contexts.get(&pattern_id)
+            let ctx = self
+                .contexts
+                .get(&pattern_id)
                 .expect("context created by get_or_create above");
             (
                 ctx.is_emergent(emergence_threshold),

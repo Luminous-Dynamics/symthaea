@@ -9,6 +9,7 @@ description = "Social recovery coordinator zome"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+mycelix-zome-helpers = { workspace = true }
 hdk = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

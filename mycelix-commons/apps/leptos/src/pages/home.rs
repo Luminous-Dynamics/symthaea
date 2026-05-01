@@ -2,9 +2,35 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use leptos::prelude::*;
+use mycelix_leptos_core::{
+    ActivityFeed, ActivityFeedItem, AvailabilityState, AvailabilityStateKind, FreshnessBadge,
+    FreshnessLevel,
+};
+
+use crate::contexts::commons_context::use_commons;
 
 #[component]
 pub fn HomePage() -> impl IntoView {
+    let commons = use_commons();
+    let hc = mycelix_leptos_core::holochain_provider::use_holochain();
+    let hc_for_freshness = hc.clone();
+    let hc_for_availability = hc.clone();
+    let latest_event = Memo::new(move |_| commons.events.get().into_iter().map(|event| event.start_time).max());
+    let feed_items = move || {
+        commons
+            .events
+            .get()
+            .into_iter()
+            .take(4)
+            .map(|event| ActivityFeedItem {
+                id: event.hash,
+                domain_label: event.category,
+                description: format!("{} — {}", event.title, event.description),
+                emphasis_class: None,
+            })
+            .collect::<Vec<_>>()
+    };
+
     view! {
         <div class="page home-page">
             <section class="hero">
@@ -14,6 +40,33 @@ pub fn HomePage() -> impl IntoView {
                     "Property, housing, care, water, food, and transport — coordinated without middlemen."
                 </p>
             </section>
+
+            <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-bottom: 1rem;">
+                {move || {
+                    if hc_for_freshness.is_mock() {
+                        view! { <FreshnessBadge level=FreshnessLevel::Unknown detail="Mock commons posture" /> }.into_any()
+                    } else {
+                        latest_event.get()
+                            .map(|timestamp| view! { <FreshnessBadge level=freshness_from_secs(timestamp) detail=format!("Events {}", format_relative_secs(timestamp)) /> }.into_any())
+                            .unwrap_or_else(|| view! { <FreshnessBadge level=FreshnessLevel::Unknown detail="No commons events yet" /> }.into_any())
+                    }
+                }}
+            </div>
+
+            {move || {
+                if hc_for_availability.is_mock() {
+                    view! {
+                        <AvailabilityState
+                            kind=AvailabilityStateKind::Mock
+                            title="Mock Commons Mesh"
+                            description="Commons is rendering simulated community resource data while conductor-backed mesh endpoints continue to come online."
+                            action={None}
+                        />
+                    }.into_any()
+                } else {
+                    view! { <></> }.into_any()
+                }
+            }}
 
             <section class="dashboard-grid">
                 <div class="stat-card">
@@ -32,6 +85,11 @@ pub fn HomePage() -> impl IntoView {
                     <span class="stat-value">"89%"</span>
                     <span class="stat-label">"Resource Mesh Uptime"</span>
                 </div>
+            </section>
+
+            <section class="resource-overview">
+                <h2>"Recent Commons Activity"</h2>
+                <ActivityFeed items=feed_items() />
             </section>
 
             <section class="resource-overview">
@@ -76,4 +134,23 @@ pub fn HomePage() -> impl IntoView {
             </section>
         </div>
     }
+}
+
+fn freshness_from_secs(timestamp_secs: i64) -> FreshnessLevel {
+    let now_secs = (js_sys::Date::now() / 1000.0) as i64;
+    let age_minutes = now_secs.saturating_sub(timestamp_secs) / 60;
+    if age_minutes <= 5 {
+        FreshnessLevel::Fresh
+    } else if age_minutes <= 60 {
+        FreshnessLevel::Aging
+    } else {
+        FreshnessLevel::Stale
+    }
+}
+
+fn format_relative_secs(timestamp_secs: i64) -> String {
+    let date = js_sys::Date::new(&wasm_bindgen::JsValue::from_f64((timestamp_secs * 1000) as f64));
+    date.to_locale_string("en-US", &wasm_bindgen::JsValue::UNDEFINED)
+        .as_string()
+        .unwrap_or_else(|| "recently".into())
 }

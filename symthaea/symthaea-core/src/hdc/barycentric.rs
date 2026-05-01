@@ -151,12 +151,11 @@ pub fn orthocenter(a: &Point2D, b: &Point2D, c: &Point2D) -> Point2D {
     // Altitude from A: line from A through foot_from_a
     // Altitude from B: line from B through foot_from_b
     // Intersect.
-    intersect_lines(a, &foot_from_a, b, &foot_from_b)
-        .unwrap_or_else(|| {
-            // Should not happen for non-degenerate triangles.
-            let (_, _, _) = (a2, b2, c2);
-            *a
-        })
+    intersect_lines(a, &foot_from_a, b, &foot_from_b).unwrap_or_else(|| {
+        // Should not happen for non-degenerate triangles.
+        let (_, _, _) = (a2, b2, c2);
+        *a
+    })
 }
 
 /// Foot of the perpendicular from `p` onto the line through `q` and `r`.

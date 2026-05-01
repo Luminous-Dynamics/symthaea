@@ -34,10 +34,7 @@ impl Default for ExploredTiles {
 }
 
 /// Initialize explored tiles from the tile grid.
-pub fn setup_minimap(
-    mut explored: ResMut<ExploredTiles>,
-    tile_grid: Option<Res<TileGrid>>,
-) {
+pub fn setup_minimap(mut explored: ResMut<ExploredTiles>, tile_grid: Option<Res<TileGrid>>) {
     let Some(ref grid) = tile_grid else { return };
     let w = grid.cols as usize;
     let h = grid.rows as usize;
@@ -61,7 +58,9 @@ pub fn update_minimap(
     mut explored: ResMut<ExploredTiles>,
 ) {
     let Some(ref grid) = tile_grid else { return };
-    let Ok(player_tf) = player.single() else { return };
+    let Ok(player_tf) = player.single() else {
+        return;
+    };
 
     let px = player_tf.translation.x;
     let py = player_tf.translation.y;
@@ -77,7 +76,12 @@ pub fn update_minimap(
                 if r < explored.height && c < explored.width && !explored.explored[r][c] {
                     explored.explored[r][c] = true;
                     // Only count walkable tiles as explored
-                    if grid.cells.get(&(c as i32, r as i32)).copied().unwrap_or(false) {
+                    if grid
+                        .cells
+                        .get(&(c as i32, r as i32))
+                        .copied()
+                        .unwrap_or(false)
+                    {
                         explored.explore_count += 1;
                     }
                 }

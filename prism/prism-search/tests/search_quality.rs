@@ -6,7 +6,7 @@
 //! These tests verify that the epistemic search engine returns
 //! relevant results for various query types.
 
-use prism_search::{encode_text, SearchEngine};
+use prism_search::{SearchEngine, encode_text};
 
 fn engine() -> SearchEngine {
     SearchEngine::with_seed_claims()
@@ -20,7 +20,10 @@ fn search_ocean_acidification_top_result() {
     assert!(!results.is_empty());
     let top = results[0].content.to_lowercase();
     assert!(
-        top.contains("ocean") || top.contains("acidification") || top.contains("co2") || top.contains("ph"),
+        top.contains("ocean")
+            || top.contains("acidification")
+            || top.contains("co2")
+            || top.contains("ph"),
         "Top result for 'ocean acidification' should be about oceans/CO2, got: {}",
         results[0].content
     );
@@ -44,7 +47,10 @@ fn search_consciousness_top_result() {
     assert!(!results.is_empty());
     let top = results[0].content.to_lowercase();
     assert!(
-        top.contains("consciousness") || top.contains("awareness") || top.contains("iit") || top.contains("global workspace"),
+        top.contains("consciousness")
+            || top.contains("awareness")
+            || top.contains("iit")
+            || top.contains("global workspace"),
         "Top result for 'consciousness' should be relevant, got: {}",
         results[0].content
     );
@@ -80,7 +86,10 @@ fn search_climate_change_top_result() {
     assert!(!results.is_empty());
     let top = results[0].content.to_lowercase();
     assert!(
-        top.contains("climate") || top.contains("greenhouse") || top.contains("co2") || top.contains("temperature"),
+        top.contains("climate")
+            || top.contains("greenhouse")
+            || top.contains("co2")
+            || top.contains("temperature"),
         "Top result for 'climate change' should be relevant, got: {}",
         results[0].content
     );

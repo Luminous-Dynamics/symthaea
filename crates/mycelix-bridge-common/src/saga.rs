@@ -127,7 +127,12 @@ pub struct CompensationAction {
 
 impl SagaDefinition {
     /// Create a new saga with the given steps and timeout.
-    pub fn new(name: impl Into<String>, steps: Vec<SagaStep>, now_us: u64, timeout_us: u64) -> Self {
+    pub fn new(
+        name: impl Into<String>,
+        steps: Vec<SagaStep>,
+        now_us: u64,
+        timeout_us: u64,
+    ) -> Self {
         let name = name.into();
         let id = format!("saga-{}-{}", &name, now_us);
         Self {
@@ -143,7 +148,10 @@ impl SagaDefinition {
 
     /// Number of completed steps.
     pub fn completed_count(&self) -> usize {
-        self.steps.iter().filter(|s| s.status == SagaStepStatus::Completed).count()
+        self.steps
+            .iter()
+            .filter(|s| s.status == SagaStepStatus::Completed)
+            .count()
     }
 
     /// Whether the saga is in a terminal state.
@@ -330,7 +338,9 @@ pub fn mark_compensation_failed(saga: &mut SagaDefinition, error: String) {
 fn json_kv(pairs: &[(&str, &str)]) -> Vec<u8> {
     let mut s = String::from("{");
     for (i, (k, v)) in pairs.iter().enumerate() {
-        if i > 0 { s.push(','); }
+        if i > 0 {
+            s.push(',');
+        }
         s.push('"');
         s.push_str(k);
         s.push_str("\":\"");
@@ -350,22 +360,30 @@ pub fn property_sale_saga(
 ) -> SagaDefinition {
     let steps = vec![
         SagaStep::new(
-            "commons", "property_transfer", "initiate_transfer",
+            "commons",
+            "property_transfer",
+            "initiate_transfer",
             Some("cancel_transfer".into()),
             json_kv(&[("property_hash", &property_hash), ("buyer_did", &buyer_did)]),
         ),
         SagaStep::new(
-            "finance", "payments", "escrow_payment",
+            "finance",
+            "payments",
+            "escrow_payment",
             Some("release_escrow".into()),
             json_kv(&[("buyer_did", &buyer_did)]),
         ),
         SagaStep::new(
-            "governance", "proposals", "verify_approval",
+            "governance",
+            "proposals",
+            "verify_approval",
             None,
             json_kv(&[("property_hash", &property_hash)]),
         ),
         SagaStep::new(
-            "commons", "property_transfer", "finalize_transfer",
+            "commons",
+            "property_transfer",
+            "finalize_transfer",
             Some("revert_transfer".into()),
             json_kv(&[("property_hash", &property_hash), ("buyer_did", &buyer_did)]),
         ),
@@ -382,17 +400,23 @@ pub fn emergency_response_saga(
 ) -> SagaDefinition {
     let steps = vec![
         SagaStep::new(
-            "civic", "emergency_incidents", "declare_disaster",
+            "civic",
+            "emergency_incidents",
+            "declare_disaster",
             Some("end_disaster".into()),
             json_kv(&[("incident_id", &incident_id)]),
         ),
         SagaStep::new(
-            "commons", "resource_mesh", "emergency_allocate",
+            "commons",
+            "resource_mesh",
+            "emergency_allocate",
             Some("emergency_deallocate".into()),
             json_kv(&[("incident_id", &incident_id)]),
         ),
         SagaStep::new(
-            "finance", "treasury", "emergency_fund_release",
+            "finance",
+            "treasury",
+            "emergency_fund_release",
             Some("emergency_fund_reclaim".into()),
             json_kv(&[("incident_id", &incident_id)]),
         ),
@@ -408,12 +432,20 @@ pub fn course_completion_saga(
 ) -> SagaDefinition {
     let steps = vec![
         SagaStep::new(
-            "identity", "verifiable_credential", "issue_credential",
+            "identity",
+            "verifiable_credential",
+            "issue_credential",
             Some("revoke_credential".into()),
-            json_kv(&[("course_id", &course_id), ("student_did", &student_did), ("credential_type", "course_completion")]),
+            json_kv(&[
+                ("course_id", &course_id),
+                ("student_did", &student_did),
+                ("credential_type", "course_completion"),
+            ]),
         ),
         SagaStep::new(
-            "finance", "recognition", "award_recognition",
+            "finance",
+            "recognition",
+            "award_recognition",
             None,
             json_kv(&[("student_did", &student_did)]),
         ),
@@ -430,12 +462,16 @@ pub fn justice_enforcement_saga(
 ) -> SagaDefinition {
     let steps = vec![
         SagaStep::new(
-            "finance", "payments", "collect_fine",
+            "finance",
+            "payments",
+            "collect_fine",
             Some("refund_fine".into()),
             json_kv(&[("case_id", &case_id), ("defendant_did", &defendant_did)]),
         ),
         SagaStep::new(
-            "commons", "property_registry", "apply_lien",
+            "commons",
+            "property_registry",
+            "apply_lien",
             Some("remove_lien".into()),
             json_kv(&[("case_id", &case_id), ("defendant_did", &defendant_did)]),
         ),
@@ -444,19 +480,19 @@ pub fn justice_enforcement_saga(
 }
 
 /// Create a carbon credit cycle saga template.
-pub fn carbon_credit_saga(
-    route_id: String,
-    _distance_km: f64,
-    now_us: u64,
-) -> SagaDefinition {
+pub fn carbon_credit_saga(route_id: String, _distance_km: f64, now_us: u64) -> SagaDefinition {
     let steps = vec![
         SagaStep::new(
-            "commons", "transport_impact", "record_transport",
+            "commons",
+            "transport_impact",
+            "record_transport",
             None,
             json_kv(&[("route_id", &route_id)]),
         ),
         SagaStep::new(
-            "climate", "carbon", "mint_credit",
+            "climate",
+            "carbon",
+            "mint_credit",
             Some("burn_credit".into()),
             json_kv(&[("route_id", &route_id)]),
         ),
@@ -472,8 +508,20 @@ mod tests {
 
     fn test_steps() -> Vec<SagaStep> {
         vec![
-            SagaStep::new("commons", "property_transfer", "initiate", Some("cancel".into()), vec![1]),
-            SagaStep::new("finance", "payments", "escrow", Some("release".into()), vec![2]),
+            SagaStep::new(
+                "commons",
+                "property_transfer",
+                "initiate",
+                Some("cancel".into()),
+                vec![1],
+            ),
+            SagaStep::new(
+                "finance",
+                "payments",
+                "escrow",
+                Some("release".into()),
+                vec![2],
+            ),
             SagaStep::new("governance", "proposals", "verify", None, vec![3]),
         ]
     }
@@ -491,7 +539,12 @@ mod tests {
     fn advance_dispatches_first_step() {
         let mut saga = SagaDefinition::new("test", test_steps(), NOW, 0);
         match advance(&mut saga, NOW) {
-            SagaAction::Dispatch { role, zome, fn_name, .. } => {
+            SagaAction::Dispatch {
+                role,
+                zome,
+                fn_name,
+                ..
+            } => {
                 assert_eq!(role, "commons");
                 assert_eq!(zome, "property_transfer");
                 assert_eq!(fn_name, "initiate");

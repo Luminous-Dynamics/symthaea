@@ -227,6 +227,7 @@ fn run_once(target: &ObservedSequence, seed: u64, macros: &[Expr], cold: bool) -
         mutation_rate: 0.3,
         seed,
         disable_macro_seeds: cold,
+        ..Default::default()
     };
     let mut regressor = SymbolicRegressor::new(config);
     if !cold {

@@ -37,7 +37,9 @@ pub enum ConsensusError {
     ByzantineBehavior { validator: String, evidence: String },
 
     /// Consensus not reached
-    #[error("Consensus not reached: weighted votes {weighted_votes:.3} < threshold {threshold:.3}")]
+    #[error(
+        "Consensus not reached: weighted votes {weighted_votes:.3} < threshold {threshold:.3}"
+    )]
     ConsensusNotReached { weighted_votes: f32, threshold: f32 },
 
     /// Invalid round state

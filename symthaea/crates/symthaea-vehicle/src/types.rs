@@ -19,6 +19,56 @@ pub const ACT_BRAKE: usize = 2;
 /// Actuator names.
 pub const ACTUATOR_NAMES: [&str; NUM_ACTUATORS] = ["steering", "throttle", "brake"];
 
+/// Cross-platform right-of-way advisory from civic wildlife / cohabitation systems.
+///
+/// This stays outside the core vehicle state packing so the civic signal can
+/// drive safety composition without perturbing historical encoder geometry.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub struct BiotaRightOfWaySignal {
+    /// Animal distress intensity (0..1).
+    pub distress_signal: f32,
+    /// Predicted ego-path conflict with a sanctuary or crossing zone (0..1).
+    pub path_conflict_risk: f32,
+    /// Strength of the active sanctuary / protected-crossing claim (0..1).
+    pub sanctuary_signal: f32,
+    /// Confidence that the route is clear without intervention (0..1).
+    pub route_clear_confidence: f32,
+    /// Confidence the upstream animal classification is valid (0..1).
+    pub classification_confidence: f32,
+}
+
+impl BiotaRightOfWaySignal {
+    pub fn clear() -> Self {
+        Self {
+            distress_signal: 0.0,
+            path_conflict_risk: 0.0,
+            sanctuary_signal: 0.0,
+            route_clear_confidence: 1.0,
+            classification_confidence: 1.0,
+        }
+    }
+
+    pub fn should_hold_red(&self) -> bool {
+        self.classification_confidence >= 0.45
+            && ((self.distress_signal >= 0.75 && self.path_conflict_risk >= 0.6)
+                || (self.sanctuary_signal >= 0.85 && self.path_conflict_risk >= 0.7))
+    }
+
+    pub fn should_yield_orange(&self) -> bool {
+        self.classification_confidence >= 0.35
+            && (self.sanctuary_signal >= 0.55
+                || self.path_conflict_risk >= 0.45
+                || self.route_clear_confidence <= 0.45)
+    }
+
+    pub fn should_caution_yellow(&self) -> bool {
+        self.classification_confidence >= 0.25
+            && (self.path_conflict_risk >= 0.25
+                || self.sanctuary_signal >= 0.25
+                || self.route_clear_confidence <= 0.7)
+    }
+}
+
 /// Channel names matching the `to_channels()` layout.
 pub const CHANNEL_NAMES: [&str; NUM_STATE_CHANNELS] = [
     // Proprioceptive core (14)
@@ -751,6 +801,36 @@ mod tests {
         assert!(cmd.throttle.abs() < 1e-10);
         assert!(cmd.brake.abs() < 1e-10);
         assert!(cmd.control_effort() < 1e-10);
+    }
+
+    #[test]
+    fn test_biota_right_of_way_thresholds() {
+        let red = BiotaRightOfWaySignal {
+            distress_signal: 0.9,
+            path_conflict_risk: 0.8,
+            sanctuary_signal: 0.2,
+            route_clear_confidence: 0.2,
+            classification_confidence: 0.8,
+        };
+        assert!(red.should_hold_red());
+
+        let orange = BiotaRightOfWaySignal {
+            distress_signal: 0.2,
+            path_conflict_risk: 0.5,
+            sanctuary_signal: 0.7,
+            route_clear_confidence: 0.4,
+            classification_confidence: 0.7,
+        };
+        assert!(orange.should_yield_orange());
+
+        let yellow = BiotaRightOfWaySignal {
+            distress_signal: 0.1,
+            path_conflict_risk: 0.3,
+            sanctuary_signal: 0.1,
+            route_clear_confidence: 0.65,
+            classification_confidence: 0.4,
+        };
+        assert!(yellow.should_caution_yellow());
     }
 
     #[test]

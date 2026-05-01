@@ -71,11 +71,14 @@ impl AgentMemory {
     /// Windowed reward: average energy change over window.
     /// Positive = gaining energy on average. Negative = losing.
     pub fn windowed_reward(&self) -> f64 {
-        if self.energy_window.len() < 2 { return 0.0; }
+        if self.energy_window.len() < 2 {
+            return 0.0;
+        }
         let n = self.energy_window.len();
         let half = n / 2;
         let first_half: f64 = self.energy_window.iter().take(half).sum::<f64>() / half as f64;
-        let second_half: f64 = self.energy_window.iter().skip(half).sum::<f64>() / (n - half) as f64;
+        let second_half: f64 =
+            self.energy_window.iter().skip(half).sum::<f64>() / (n - half) as f64;
         second_half - first_half
     }
 
@@ -96,8 +99,13 @@ impl AgentMemory {
         } else {
             if self.partner_history.len() >= self.max_partners {
                 // Evict least-encountered partner
-                if let Some(min_idx) = self.partner_history.iter().enumerate()
-                    .min_by_key(|(_, (_, _, c))| *c).map(|(i, _)| i) {
+                if let Some(min_idx) = self
+                    .partner_history
+                    .iter()
+                    .enumerate()
+                    .min_by_key(|(_, (_, _, c))| *c)
+                    .map(|(i, _)| i)
+                {
                     self.partner_history.swap_remove(min_idx);
                 }
             }
@@ -107,8 +115,12 @@ impl AgentMemory {
 
     /// Mean resonance with known partners.
     pub fn mean_partner_resonance(&self) -> f64 {
-        if self.partner_history.is_empty() { return 0.0; }
-        let total: f64 = self.partner_history.iter()
+        if self.partner_history.is_empty() {
+            return 0.0;
+        }
+        let total: f64 = self
+            .partner_history
+            .iter()
             .map(|(_, res, count)| if *count > 0 { res / *count as f64 } else { 0.0 })
             .sum();
         total / self.partner_history.len() as f64
@@ -282,7 +294,9 @@ impl<const D: usize> ConsciousnessField<D> {
 
     /// Drain accumulated sanctuary absorption into ledger.
     fn drain_sanctuary_absorption(&mut self) {
-        let bits = self.sanctuary_absorbed.swap(0, std::sync::atomic::Ordering::Relaxed);
+        let bits = self
+            .sanctuary_absorbed
+            .swap(0, std::sync::atomic::Ordering::Relaxed);
         let absorbed = f64::from_bits(bits);
         if absorbed > 1e-15 {
             self.ledger.record_dissipation(absorbed);
@@ -311,15 +325,16 @@ impl<const D: usize> ConsciousnessField<D> {
             // Smooth sigmoid from body temperature (310K) → impaired at 360K → floor at 410K+.
             // No binary threshold — the penalty is differentiable at every temperature.
             // Ref: Somjen et al. (2001), Kiyatkin (2010) — see thermodynamics::smooth_temperature_penalty.
-            let temp_penalty = crate::thermodynamics::smooth_temperature_penalty(entity.energy.temperature);
+            let temp_penalty =
+                crate::thermodynamics::smooth_temperature_penalty(entity.energy.temperature);
             let effective_inputs = ConsciousnessInputs {
                 phi: inputs.phi * temp_penalty,
                 broadcast: inputs.broadcast * temp_penalty,
                 working_memory: inputs.working_memory * temp_penalty,
                 attention: inputs.attention * temp_penalty,
-                recurrence: inputs.recurrence,  // temporal structure unaffected
-                embodiment: inputs.embodiment,   // body awareness unaffected
-                knowledge: inputs.knowledge,     // stored knowledge unaffected
+                recurrence: inputs.recurrence, // temporal structure unaffected
+                embodiment: inputs.embodiment, // body awareness unaffected
+                knowledge: inputs.knowledge,   // stored knowledge unaffected
                 synchrony: inputs.synchrony * temp_penalty,
             };
 
@@ -350,11 +365,7 @@ impl<const D: usize> ConsciousnessField<D> {
     /// Modulate force by consciousness level AND prediction error.
     ///
     /// Returns force × effective_motor_gain (safety tier × motor precision).
-    pub fn modulate_force(
-        &self,
-        handle: BodyHandle,
-        force: &SVector<f64, D>,
-    ) -> SVector<f64, D> {
+    pub fn modulate_force(&self, handle: BodyHandle, force: &SVector<f64, D>) -> SVector<f64, D> {
         let gain = self
             .entities
             .get(&handle)
@@ -517,14 +528,18 @@ impl<const D: usize> ConsciousnessField<D> {
         positions: &[(BodyHandle, symtropy_math::Point<D>)],
         dt: f64,
     ) {
-        use crate::harmony_field::{EMOTIONAL_CONTAGION_IDX, contagion_update};
+        use crate::harmony_field::{contagion_update, EMOTIONAL_CONTAGION_IDX};
 
         // Snapshot: (position_as_svector, emotion, phi) for all entities
         let sources: Vec<(SVector<f64, D>, f64, f64)> = positions
             .iter()
             .filter_map(|(h, pos)| {
                 self.entities.get(h).map(|e| {
-                    (pos.0, e.harmony_activations[EMOTIONAL_CONTAGION_IDX], e.phi())
+                    (
+                        pos.0,
+                        e.harmony_activations[EMOTIONAL_CONTAGION_IDX],
+                        e.phi(),
+                    )
                 })
             })
             .collect();
@@ -608,19 +623,16 @@ impl<const D: usize> PhysicsCallback<D> for ConsciousnessField<D> {
 
         // Phi-gravity: conscious entities attract each other (when enabled)
         if self.phi_gravity_strength > 1e-10 {
-            if let (Some(pos), Some(entity)) = (
-                self.entity_positions.get(&body),
-                self.entities.get(&body),
-            ) {
+            if let (Some(pos), Some(entity)) =
+                (self.entity_positions.get(&body), self.entities.get(&body))
+            {
                 let self_phi = entity.phi();
                 if self_phi > 0.01 {
                     let nearby: Vec<_> = self
                         .entity_positions
                         .iter()
                         .filter(|(h, _)| **h != body)
-                        .filter_map(|(h, p)| {
-                            self.entities.get(h).map(|e| (*p, e.phi()))
-                        })
+                        .filter_map(|(h, p)| self.entities.get(h).map(|e| (*p, e.phi())))
                         .collect();
                     let gravity = crate::fep_gradient::phi_gravity(
                         pos,
@@ -637,13 +649,7 @@ impl<const D: usize> PhysicsCallback<D> for ConsciousnessField<D> {
     }
 
     fn modulate_impulse(&self, impulse: f64, contact_point: &SVector<f64, D>) -> f64 {
-        // Sanctuary zone dampening
-        let mut result = impulse;
-        for sanctuary in self.sanctuaries.values() {
-            let m = sanctuary.impulse_multiplier(contact_point);
-            result *= m;
-        }
-        result
+        ConsciousnessField::modulate_impulse(self, impulse, contact_point)
     }
 
     fn friction_multiplier(&self, contact_point: &SVector<f64, D>, body: BodyHandle) -> f64 {
@@ -656,7 +662,8 @@ impl<const D: usize> PhysicsCallback<D> for ConsciousnessField<D> {
             .map(|e| e.harmony_activations)
             .unwrap_or([0.0; crate::harmony_field::NUM_HARMONIES]);
         let point = symtropy_math::Point(*contact_point);
-        self.harmony_field.friction_multiplier(&point, &entity_harmonies)
+        self.harmony_field
+            .friction_multiplier(&point, &entity_harmonies)
     }
 
     fn on_collision(&mut self, event: &symtropy_physics::CollisionEvent<D>) {
@@ -666,8 +673,14 @@ impl<const D: usize> PhysicsCallback<D> for ConsciousnessField<D> {
 
         // Compute resonance between colliding bodies for prediction error scaling
         let resonance = {
-            let harm_a = self.entities.get(&event.body_a).map(|e| e.harmony_activations);
-            let harm_b = self.entities.get(&event.body_b).map(|e| e.harmony_activations);
+            let harm_a = self
+                .entities
+                .get(&event.body_a)
+                .map(|e| e.harmony_activations);
+            let harm_b = self
+                .entities
+                .get(&event.body_b)
+                .map(|e| e.harmony_activations);
             match (harm_a, harm_b) {
                 (Some(a), Some(b)) => crate::harmony_field::HarmonyField::<D>::resonance(&a, &b),
                 _ => 0.0,
@@ -772,7 +785,8 @@ mod tests {
         assert!(
             high_force[0] >= low_force[0],
             "high inputs ({}) should give >= force than low inputs ({})",
-            high_force[0], low_force[0]
+            high_force[0],
+            low_force[0]
         );
     }
 
@@ -874,8 +888,16 @@ mod tests {
         field.register(BodyHandle(0), 100.0, 10.0);
         field.register(BodyHandle(1), 100.0, 10.0);
 
-        field.update_entity(BodyHandle(0), &test_inputs(0.9), symtropy_math::Point::origin());
-        field.update_entity(BodyHandle(1), &test_inputs(0.9), symtropy_math::Point::origin());
+        field.update_entity(
+            BodyHandle(0),
+            &test_inputs(0.9),
+            symtropy_math::Point::origin(),
+        );
+        field.update_entity(
+            BodyHandle(1),
+            &test_inputs(0.9),
+            symtropy_math::Point::origin(),
+        );
 
         // Both entities have some consciousness
         assert!(field.collective_phi > 0.0);
@@ -889,7 +911,11 @@ mod tests {
         assert!((field.resource_regeneration_multiplier() - 0.5).abs() < 1e-10);
 
         field.register(BodyHandle(0), 100.0, 10.0);
-        field.update_entity(BodyHandle(0), &test_inputs(0.9), symtropy_math::Point::origin());
+        field.update_entity(
+            BodyHandle(0),
+            &test_inputs(0.9),
+            symtropy_math::Point::origin(),
+        );
 
         // With consciousness → regen > 0.5
         assert!(field.resource_regeneration_multiplier() > 0.5);
@@ -916,12 +942,7 @@ mod tests {
 
         for &phi in &levels {
             field.update_entity(h, &test_inputs(phi), symtropy_math::Point::origin());
-            let gain = field
-                .entities
-                .get(&h)
-                .unwrap()
-                .safety_tier
-                .motor_gain();
+            let gain = field.entities.get(&h).unwrap().safety_tier.motor_gain();
             assert!(
                 gain >= prev_gain,
                 "phi={phi} gave gain={gain} < prev={prev_gain}"
@@ -941,11 +962,17 @@ mod tests {
         field.register(h1, 100.0, 10.0);
 
         // Set aligned harmonies (Sacred Stillness)
-        field.entities.get_mut(&h0).unwrap().harmony_activations = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0];
-        field.entities.get_mut(&h1).unwrap().harmony_activations = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0];
+        field.entities.get_mut(&h0).unwrap().harmony_activations =
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0];
+        field.entities.get_mut(&h1).unwrap().harmony_activations =
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0];
 
         field.update_entity(h0, &test_inputs(0.8), symtropy_math::Point::origin());
-        field.update_entity(h1, &test_inputs(0.8), symtropy_math::Point::new([5.0, 0.0, 0.0]));
+        field.update_entity(
+            h1,
+            &test_inputs(0.8),
+            symtropy_math::Point::new([5.0, 0.0, 0.0]),
+        );
 
         // Rebuild harmony field with known positions
         let positions = vec![
@@ -976,7 +1003,12 @@ mod tests {
         let energy_before = field.entities.get(&h).unwrap().energy.available;
 
         let mut leakage = DimensionalLeakage::new();
-        leakage.add_point(LeakagePoint::sink(nalgebra::SVector::from([0.0, 0.0, 0.0]), 1.0, 5.0, 50.0));
+        leakage.add_point(LeakagePoint::sink(
+            nalgebra::SVector::from([0.0, 0.0, 0.0]),
+            1.0,
+            5.0,
+            50.0,
+        ));
         leakage.enabled = true;
 
         // Entity at origin, sink at origin → should drain energy
@@ -1000,7 +1032,12 @@ mod tests {
         let energy_before = field.entities.get(&h).unwrap().energy.available;
 
         let mut leakage = DimensionalLeakage::new();
-        leakage.add_point(LeakagePoint::sink(nalgebra::SVector::from([0.0, 0.0, 0.0]), 1.0, 5.0, 50.0));
+        leakage.add_point(LeakagePoint::sink(
+            nalgebra::SVector::from([0.0, 0.0, 0.0]),
+            1.0,
+            5.0,
+            50.0,
+        ));
         // NOT enabled
 
         field.apply_dimensional_leakage(&leakage, &[(h, nalgebra::SVector::from([0.0, 0.0, 0.0]))]);
@@ -1039,14 +1076,30 @@ mod tests {
         field.register(receiver, 100.0, 10.0);
 
         // Emitter has high emotion; receiver has none
-        field.entities.get_mut(&emitter).unwrap().harmony_activations[EMOTIONAL_CONTAGION_IDX] = 0.9;
-        field.entities.get_mut(&receiver).unwrap().harmony_activations[EMOTIONAL_CONTAGION_IDX] = 0.0;
+        field
+            .entities
+            .get_mut(&emitter)
+            .unwrap()
+            .harmony_activations[EMOTIONAL_CONTAGION_IDX] = 0.9;
+        field
+            .entities
+            .get_mut(&receiver)
+            .unwrap()
+            .harmony_activations[EMOTIONAL_CONTAGION_IDX] = 0.0;
 
         // Give emitter some Φ so it broadcasts
         field.update_entity(emitter, &test_inputs(0.9), symtropy_math::Point::origin());
-        field.update_entity(receiver, &test_inputs(0.8), symtropy_math::Point::new([5.0, 0.0, 0.0]));
+        field.update_entity(
+            receiver,
+            &test_inputs(0.8),
+            symtropy_math::Point::new([5.0, 0.0, 0.0]),
+        );
         // Re-set after update_entity (which doesn't touch harmony_activations[8])
-        field.entities.get_mut(&emitter).unwrap().harmony_activations[EMOTIONAL_CONTAGION_IDX] = 0.9;
+        field
+            .entities
+            .get_mut(&emitter)
+            .unwrap()
+            .harmony_activations[EMOTIONAL_CONTAGION_IDX] = 0.9;
 
         let positions = vec![
             (emitter, symtropy_math::Point::new([0.0, 0.0, 0.0])),
@@ -1054,8 +1107,8 @@ mod tests {
         ];
         field.spread_emotional_contagion(&positions, 1.0);
 
-        let receiver_emotion = field.entities.get(&receiver).unwrap()
-            .harmony_activations[EMOTIONAL_CONTAGION_IDX];
+        let receiver_emotion =
+            field.entities.get(&receiver).unwrap().harmony_activations[EMOTIONAL_CONTAGION_IDX];
         assert!(
             receiver_emotion > 0.0,
             "nearby receiver should catch emotion, got {receiver_emotion}"
@@ -1093,8 +1146,16 @@ mod tests {
         field.register(receiver, 100.0, 10.0);
 
         // Set non-contagion harmonies
-        field.entities.get_mut(&receiver).unwrap().harmony_activations[3] = 0.7;
-        field.entities.get_mut(&emitter).unwrap().harmony_activations[EMOTIONAL_CONTAGION_IDX] = 0.9;
+        field
+            .entities
+            .get_mut(&receiver)
+            .unwrap()
+            .harmony_activations[3] = 0.7;
+        field
+            .entities
+            .get_mut(&emitter)
+            .unwrap()
+            .harmony_activations[EMOTIONAL_CONTAGION_IDX] = 0.9;
 
         let positions = vec![
             (emitter, symtropy_math::Point::new([0.0, 0.0, 0.0])),

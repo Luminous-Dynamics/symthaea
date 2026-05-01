@@ -24,12 +24,14 @@
 //! - Koch et al. (2016). Nature Reviews Neuroscience 17, 307.
 //! - Zanardi et al. (2004). Phys. Rev. A 69, 054301 (quantum Φ).
 
-use crate::consciousness::{compute_orbital_phi, build_atom_basis_ranges, OrbitalPhiMeasurement};
-use crate::quantum_info::{von_neumann_entropy, bipartition_entanglement, orbital_mutual_information};
-use crate::scf::rhf::RhfResult;
-use crate::stat_mech::{entropy as thermal_entropy, partition_function, K_BOLTZMANN_HARTREE};
 use crate::basis::ContractedGaussian;
+use crate::consciousness::{build_atom_basis_ranges, compute_orbital_phi};
 use crate::molecule::Atom;
+use crate::quantum_info::{
+    bipartition_entanglement, orbital_mutual_information, von_neumann_entropy,
+};
+use crate::scf::rhf::RhfResult;
+use crate::stat_mech::{entropy as thermal_entropy, K_BOLTZMANN_HARTREE};
 
 /// Complete consciousness profile derived from first principles.
 #[derive(Debug, Clone)]
@@ -151,7 +153,7 @@ pub fn consciousness_from_first_principles(
     // F_consciousness = kT × ln(Z_electronic) — entropy cost of maintaining coherence
     let energies: Vec<f64> = eps.iter().take(n_mo.min(10)).cloned().collect();
     let degeneracies = vec![2.0; energies.len()]; // Spin degeneracy
-    let thermal_s = thermal_entropy(&energies, &degeneracies, temperature.max(100.0));
+    let _thermal_s = thermal_entropy(&energies, &degeneracies, temperature.max(100.0));
     let free_energy_consciousness = (phi_orbital * homo_lumo_gap).max(0.0);
 
     // 7. Von Neumann entropy (from orbital populations)
@@ -244,12 +246,17 @@ mod tests {
         let basis = Sto3g::build(&mol);
         let rhf = restricted_hartree_fock(&mol, &basis, &RhfConfig::default());
 
-        let profile = consciousness_from_first_principles(
-            &rhf, &mol.atoms, &basis.functions, 300.0,
-        );
+        let profile =
+            consciousness_from_first_principles(&rhf, &mol.atoms, &basis.functions, 300.0);
 
-        assert!(profile.phi_orbital > 0.0, "H2 should have orbital integration");
-        assert!(profile.total_score > 0.0, "Consciousness score should be positive");
+        assert!(
+            profile.phi_orbital > 0.0,
+            "H2 should have orbital integration"
+        );
+        assert!(
+            profile.total_score > 0.0,
+            "Consciousness score should be positive"
+        );
         assert!(profile.total_score < 1.0, "Score should be < 1");
         assert!(profile.components.homo_lumo_gap_ev > 0.0);
     }
@@ -262,14 +269,20 @@ mod tests {
         let basis_h2 = Sto3g::build(&mol_h2);
         let rhf_h2 = restricted_hartree_fock(&mol_h2, &basis_h2, &RhfConfig::default());
         let c_h2 = consciousness_from_first_principles(
-            &rhf_h2, &mol_h2.atoms, &basis_h2.functions, 50000.0,
+            &rhf_h2,
+            &mol_h2.atoms,
+            &basis_h2.functions,
+            50000.0,
         );
 
         let mol_water = Molecule::water();
         let basis_water = Sto3g::build(&mol_water);
         let rhf_water = restricted_hartree_fock(&mol_water, &basis_water, &RhfConfig::default());
         let c_water = consciousness_from_first_principles(
-            &rhf_water, &mol_water.atoms, &basis_water.functions, 50000.0,
+            &rhf_water,
+            &mol_water.atoms,
+            &basis_water.functions,
+            50000.0,
         );
 
         // Water should have higher total score (more integration, more orbitals)
@@ -287,12 +300,9 @@ mod tests {
         let basis = Sto3g::build(&mol);
         let rhf = restricted_hartree_fock(&mol, &basis, &RhfConfig::default());
 
-        let c_cold = consciousness_from_first_principles(
-            &rhf, &mol.atoms, &basis.functions, 100.0,
-        );
-        let c_hot = consciousness_from_first_principles(
-            &rhf, &mol.atoms, &basis.functions, 10000.0,
-        );
+        let c_cold = consciousness_from_first_principles(&rhf, &mol.atoms, &basis.functions, 100.0);
+        let c_hot =
+            consciousness_from_first_principles(&rhf, &mol.atoms, &basis.functions, 10000.0);
 
         // Higher temperature → more accessible states → higher differentiation
         assert!(
@@ -309,9 +319,8 @@ mod tests {
         let basis = Sto3g::build(&mol);
         let rhf = restricted_hartree_fock(&mol, &basis, &RhfConfig::default());
 
-        let profile = consciousness_from_first_principles(
-            &rhf, &mol.atoms, &basis.functions, 300.0,
-        );
+        let profile =
+            consciousness_from_first_principles(&rhf, &mol.atoms, &basis.functions, 300.0);
 
         assert!(profile.total_score >= 0.0 && profile.total_score <= 1.0);
         assert!(profile.phi_orbital >= 0.0);

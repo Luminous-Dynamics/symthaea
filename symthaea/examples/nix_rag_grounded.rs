@@ -125,7 +125,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if struct_ok {
                     grounded_fail_with_struct_pass += 1;
                 }
-                ("✗", msg.chars().take(60).collect())
+                // Show a longer slice — 60 chars lied about the
+                // error class (truncated "conflicting definition
+                // values" down to "...does not exist").
+                ("✗", msg.chars().take(140).collect())
             }
             None => {
                 grounded_na += 1;

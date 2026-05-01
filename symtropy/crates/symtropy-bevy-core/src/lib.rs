@@ -62,7 +62,10 @@ pub struct PhysicsBody {
 impl PhysicsBody {
     /// Create a new component for a given body handle and visual radius.
     pub fn new(handle: BodyHandle, visual_radius: f32) -> Self {
-        Self { handle, visual_radius }
+        Self {
+            handle,
+            visual_radius,
+        }
     }
 }
 

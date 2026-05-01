@@ -36,7 +36,7 @@ function safeCall(fn, fallback) {
 function metrics() {
     if (!engine) return null;
     return safeCall(() => ({
-        consciousness_level: engine.consciousness_level(),
+        cognitive_readiness: engine.cognitive_readiness(),
         honest_confidence: engine.honest_confidence(),
         harmony_alignment: engine.harmony_alignment(),
         free_energy: engine.free_energy(),
@@ -99,8 +99,8 @@ self.onmessage = async function(e) {
                     self.postMessage({
                         type: 'cycle',
                         result: {
-                            consciousness_level: m.consciousness_level,
-                            phi: m.consciousness_level,
+                            cognitive_readiness: m.cognitive_readiness,
+                            phi: m.cognitive_readiness,
                             coherence: m.harmony_alignment,
                             free_energy: m.free_energy,
                             cycle_count: Number(m.cycle_count),

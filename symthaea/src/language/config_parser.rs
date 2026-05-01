@@ -20,8 +20,10 @@ use std::fmt;
 
 // Assuming Entity, Span, CodeStructure, CodeDiagnostic, and EntityKind are available
 // from the common library module (code_parser.rs)
-use crate::code_parser::{Entity, Span, CodeStructure, CodeDiagnostic, EntityKind, Relation, EntityRelation, SemanticAnalyzer, SemanticConcept};
-
+use super::code_parser::{
+    CodeDiagnostic, CodeStructure, Entity, EntityKind, Relation, SemanticAnalyzer, SemanticConcept,
+    Span,
+};
 
 /// Represents a structured configuration value.
 #[derive(Debug, Clone)]
@@ -81,19 +83,33 @@ pub struct ConfiguredCode {
 
 // Implementation of the SemanticAnalyzer trait for configuration data
 impl SemanticAnalyzer for ConfiguredCode {
+    fn analyze(&self, _parsed: &super::code_parser::ParsedCode) -> Vec<SemanticConcept> {
+        Vec::new()
+    }
+
     /// Analyzes the configuration structure to infer high-level operational modes.
-    fn analyze_config(&self) -> Vec<SemanticConcept> {
+    fn analyze_config(&self, configured: &ConfiguredCode) -> Vec<SemanticConcept> {
         // Placeholder implementation: In a real AGI, this would traverse the
         // entity graph and relationship structure to infer concepts like
         // "Initial State Definition" or "Simulation Boundary Conditions".
         vec![SemanticConcept {
             concept_name: "System Initialization".to_string(),
             description: "Inferred initial state parameters from configuration map.".to_string(),
-            core_entities: self.entities.iter()
+            core_entities: configured
+                .entities
+                .iter()
                 .filter(|e| e.kind == EntityKind::Variable || e.kind == EntityKind::Constant)
-                .map(|e| e.name.clone()).collect(),
+                .map(|e| e.name.clone())
+                .collect(),
             inferred_relation: Relation::DependsOn,
-            span: self.structure.module_path.get(0).cloned().unwrap_or_default(),
+            span: Span {
+                start_byte: 0,
+                end_byte: 0,
+                start_line: 0,
+                start_col: 0,
+                end_line: 0,
+                end_col: 0,
+            },
         }]
     }
 }

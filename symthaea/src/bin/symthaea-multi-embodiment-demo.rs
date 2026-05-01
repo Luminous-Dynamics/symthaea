@@ -21,7 +21,7 @@
 //!
 //! ```bash
 //! cargo run --bin symthaea-multi-embodiment-demo \
-//!     --features humanoid,helicopter,flight,vehicle,auv,manipulator
+//!     --features humanoid,helicopter,multirotor,vehicle,auv,manipulator
 //! ```
 //!
 //! ## Output

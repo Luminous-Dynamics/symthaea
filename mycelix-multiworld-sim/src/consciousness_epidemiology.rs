@@ -348,17 +348,17 @@ impl ConsciousnessEpidemic {
         let tiers: Vec<CivicTier> = self.agents.iter().map(|a| a.tier).collect();
 
         // Effective contact rate (media campaign boost)
-        let effective_contact_rate = if let Some((remaining, boost)) = &mut self.media_campaign_active
-        {
-            let rate = self.model.contact_rate + *boost;
-            *remaining = remaining.saturating_sub(1);
-            if *remaining == 0 {
-                self.media_campaign_active = None;
-            }
-            rate
-        } else {
-            self.model.contact_rate
-        };
+        let effective_contact_rate =
+            if let Some((remaining, boost)) = &mut self.media_campaign_active {
+                let rate = self.model.contact_rate + *boost;
+                *remaining = remaining.saturating_sub(1);
+                if *remaining == 0 {
+                    self.media_campaign_active = None;
+                }
+                rate
+            } else {
+                self.model.contact_rate
+            };
 
         // Reset per-tick transition counts
         self.state.transition_rates = [[0.0; NUM_TIERS]; NUM_TIERS];
@@ -542,9 +542,8 @@ impl ConsciousnessEpidemic {
 
     /// Generate a summary report at the current state.
     pub fn report(&self) -> EpidemicReport {
-        let aware_plus = self.state.compartments[2]
-            + self.state.compartments[3]
-            + self.state.compartments[4];
+        let aware_plus =
+            self.state.compartments[2] + self.state.compartments[3] + self.state.compartments[4];
         let n = self.agents.len();
         let herd_reached = n > 0 && (aware_plus as f64 / n as f64) >= self.state.herd_threshold;
 
@@ -608,7 +607,9 @@ impl ConsciousnessEpidemic {
                     * self.model.transmission_probability
                     * mean_susceptibility
                     * self.model.cultural_transmission_weight
-                    * (self.state.compartments[tier_idx + 1..].iter().sum::<usize>() as f64
+                    * (self.state.compartments[tier_idx + 1..]
+                        .iter()
+                        .sum::<usize>() as f64
                         / n as f64);
             } else {
                 self.state.r0_per_tier[tier_idx] = 0.0;

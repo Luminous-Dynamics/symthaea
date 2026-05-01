@@ -112,10 +112,7 @@ impl TraversabilityModel {
         Self {
             model_id,
             version: 0,
-            feature_weights: TerrainFeature::ALL
-                .iter()
-                .map(|&f| (f, 0.0))
-                .collect(),
+            feature_weights: TerrainFeature::ALL.iter().map(|&f| (f, 0.0)).collect(),
             bias: 0.0,
             training_samples: 0,
             accuracy: 0.0,
@@ -325,10 +322,7 @@ impl FederatedAggregator {
 
         // If all were rejected, fall back to original medians.
         let final_gradients: Vec<(TerrainFeature, f64)> = if clean_bias_vec.is_empty() {
-            all_features
-                .iter()
-                .map(|&f| (f, medians[&f]))
-                .collect()
+            all_features.iter().map(|&f| (f, medians[&f])).collect()
         } else {
             all_features
                 .iter()
@@ -601,9 +595,7 @@ mod tests {
         model
             .regolith_type_weights
             .insert("highland".to_string(), 0.8);
-        model
-            .regolith_type_weights
-            .insert("mare".to_string(), 0.4);
+        model.regolith_type_weights.insert("mare".to_string(), 0.4);
         model.temperature_factor = 1.2;
         model.energy_factor = 0.001;
 

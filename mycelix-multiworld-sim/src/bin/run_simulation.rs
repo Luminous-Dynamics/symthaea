@@ -2,12 +2,18 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Run a civilization simulation. Usage: run_simulation [DURATION_YEARS] [SEED]
 
-use mycelix_multiworld_sim::{MultiWorldSimulator, config::SimulationConfig};
+use mycelix_multiworld_sim::{config::SimulationConfig, MultiWorldSimulator};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    let duration = args.get(1).and_then(|s| s.parse::<u32>().ok()).unwrap_or(150);
-    let seed = args.get(2).and_then(|s| s.parse::<u64>().ok()).unwrap_or(42);
+    let duration = args
+        .get(1)
+        .and_then(|s| s.parse::<u32>().ok())
+        .unwrap_or(150);
+    let seed = args
+        .get(2)
+        .and_then(|s| s.parse::<u64>().ok())
+        .unwrap_or(42);
 
     let mut config = match duration {
         d if d >= 1000 => SimulationConfig::default_1000_year(),
@@ -17,9 +23,15 @@ fn main() {
     };
     config.seed = seed;
 
-    eprintln!("=== Running {}-year civilization simulation (seed: {}) ===", duration, seed);
-    eprintln!("{} ticks (1 tick = 1 month)...
-", config.total_ticks);
+    eprintln!(
+        "=== Running {}-year civilization simulation (seed: {}) ===",
+        duration, seed
+    );
+    eprintln!(
+        "{} ticks (1 tick = 1 month)...
+",
+        config.total_ticks
+    );
 
     let mut sim = MultiWorldSimulator::new(config);
     let report = sim.run();
@@ -30,13 +42,20 @@ fn main() {
         println!("{}", report.summary());
     }
 
-    println!("
-=== EPOCH SNAPSHOTS ===" );
+    println!(
+        "
+=== EPOCH SNAPSHOTS ==="
+    );
     for snap in &report.epoch_snapshots {
-        println!("  Yr {:>5.1} | Pop {:>6} | Phi {:.3} | CVS {:.3} | Fac {} | Trauma {:.3}",
-            snap.tick as f64 / 12.0, snap.total_population,
-            snap.mean_phi, snap.civilization_viability_score,
-            snap.faction_count, snap.trauma_level);
+        println!(
+            "  Yr {:>5.1} | Pop {:>6} | Phi {:.3} | CVS {:.3} | Fac {} | Trauma {:.3}",
+            snap.tick as f64 / 12.0,
+            snap.total_population,
+            snap.mean_phi,
+            snap.civilization_viability_score,
+            snap.faction_count,
+            snap.trauma_level
+        );
         // Per-world breakdown (show only at 50-year intervals to avoid flooding)
         if snap.tick % 600 == 0 && !snap.worlds.is_empty() {
             for ws in &snap.worlds {
@@ -54,10 +73,16 @@ fn main() {
     }
 
     let years = report.total_ticks / 12;
-    println!("
-{}", "=".repeat(60));
+    println!(
+        "
+{}",
+        "=".repeat(60)
+    );
     if report.survived {
-        println!("  CIVILIZATION SURVIVED {} YEARS (CVS: {:.4})", years, report.final_cvs);
+        println!(
+            "  CIVILIZATION SURVIVED {} YEARS (CVS: {:.4})",
+            years, report.final_cvs
+        );
     } else {
         println!("  CIVILIZATION COLLAPSED (CVS: {:.4})", report.final_cvs);
     }

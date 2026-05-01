@@ -3,8 +3,8 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Root application component with state providers.
 
-use leptos::prelude::*;
 use leptos::prelude::LocalStorage;
+use leptos::prelude::*;
 use wasm_bindgen::JsCast;
 
 use crate::components::search_bar::SearchBar;
@@ -13,14 +13,16 @@ use crate::components::theme_switcher::ThemeSwitcher;
 use crate::holochain::DhtStatusBadge;
 use crate::pages::content_router::ContentRouter;
 use crate::state::{BrowserState, PageView};
-use prism_search::SearchEngine;
 use prism_reflex::ReflexArc;
+use prism_search::SearchEngine;
 use symthaea_spore::engine::SporeEngine;
 
 /// Fetch a precomputed index file, returning None on any failure.
 async fn fetch_index(path: &str) -> Option<SearchEngine> {
     let resp = gloo_net::http::Request::get(path).send().await.ok()?;
-    if !resp.ok() { return None; }
+    if !resp.ok() {
+        return None;
+    }
     let bytes = resp.binary().await.ok()?;
     log::info!("Loaded index from {} ({} bytes)", path, bytes.len());
     Some(SearchEngine::from_precomputed(&bytes))
@@ -120,7 +122,9 @@ pub fn App() -> impl IntoView {
     let state_gear = state.clone();
     let open_settings = move |_| {
         use leptos::prelude::Set;
-        state_gear.set_current_url.set("prism://settings".to_string());
+        state_gear
+            .set_current_url
+            .set("prism://settings".to_string());
         state_gear.set_page_title.set("Settings".to_string());
         state_gear.set_view.set(PageView::Settings);
     };
@@ -239,16 +243,25 @@ fn ConsciousnessBadge() -> impl IntoView {
 
     let psi_class = move || {
         let psi = state.consciousness.get();
-        if psi >= 0.6 { "consciousness-badge high" }
-        else if psi >= 0.3 { "consciousness-badge mid" }
-        else if psi > 0.001 { "consciousness-badge low" }
-        else { "consciousness-badge dormant" }
+        if psi >= 0.6 {
+            "consciousness-badge high"
+        } else if psi >= 0.3 {
+            "consciousness-badge mid"
+        } else if psi > 0.001 {
+            "consciousness-badge low"
+        } else {
+            "consciousness-badge dormant"
+        }
     };
 
     let title = move || {
         let psi = state.consciousness.get();
         let conf = state.epistemic_confidence.get();
-        format!("Consciousness: {:.1}% | Confidence: {:.0}%", psi * 100.0, conf * 100.0)
+        format!(
+            "Consciousness: {:.1}% | Confidence: {:.0}%",
+            psi * 100.0,
+            conf * 100.0
+        )
     };
 
     view! {
@@ -310,23 +323,17 @@ fn RenderModeToggle() -> impl IntoView {
     let state = expect_context::<BrowserState>();
     let s_click = state.clone();
 
-    let label = move || {
-        match state.render_mode.get() {
-            crate::state::RenderMode::Reader => "Reader",
-            crate::state::RenderMode::FullPage => "Full",
-        }
+    let label = move || match state.render_mode.get() {
+        crate::state::RenderMode::Reader => "Reader",
+        crate::state::RenderMode::FullPage => "Full",
     };
-    let title = move || {
-        match state.render_mode.get() {
-            crate::state::RenderMode::Reader => "Reader mode: safe, with epistemic overlay",
-            crate::state::RenderMode::FullPage => "Full page: real JS/CSS, no overlay",
-        }
+    let title = move || match state.render_mode.get() {
+        crate::state::RenderMode::Reader => "Reader mode: safe, with epistemic overlay",
+        crate::state::RenderMode::FullPage => "Full page: real JS/CSS, no overlay",
     };
-    let class = move || {
-        match state.render_mode.get() {
-            crate::state::RenderMode::Reader => "render-mode-btn reader",
-            crate::state::RenderMode::FullPage => "render-mode-btn fullpage",
-        }
+    let class = move || match state.render_mode.get() {
+        crate::state::RenderMode::Reader => "render-mode-btn reader",
+        crate::state::RenderMode::FullPage => "render-mode-btn fullpage",
     };
 
     view! {
@@ -352,10 +359,18 @@ fn BookmarkButton() -> impl IntoView {
     let s_click = state.clone();
 
     let icon = move || {
-        if s_icon.is_bookmarked() { BOOKMARK_STAR_FILLED } else { BOOKMARK_STAR }
+        if s_icon.is_bookmarked() {
+            BOOKMARK_STAR_FILLED
+        } else {
+            BOOKMARK_STAR
+        }
     };
     let class = move || {
-        if s_class.is_bookmarked() { "bookmark-btn active" } else { "bookmark-btn" }
+        if s_class.is_bookmarked() {
+            "bookmark-btn active"
+        } else {
+            "bookmark-btn"
+        }
     };
 
     view! {

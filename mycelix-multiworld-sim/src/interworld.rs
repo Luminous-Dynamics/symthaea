@@ -21,18 +21,18 @@ use serde::{Deserialize, Serialize};
 // ---------------------------------------------------------------------------
 
 /// Synodic periods in ticks (1 tick = 1 month). Time between launch windows.
-const SYNODIC_EARTH_MARS: u32 = 26;     // 25.6 months
-const SYNODIC_EARTH_JUPITER: u32 = 13;  // 13.1 months (Europa)
-const SYNODIC_EARTH_SATURN: u32 = 12;   // 12.4 months (Titan)
-const SYNODIC_MARS_JUPITER: u32 = 27;   // 26.8 months
-const SYNODIC_MARS_SATURN: u32 = 24;    // 24.1 months
+const SYNODIC_EARTH_MARS: u32 = 26; // 25.6 months
+const SYNODIC_EARTH_JUPITER: u32 = 13; // 13.1 months (Europa)
+const SYNODIC_EARTH_SATURN: u32 = 12; // 12.4 months (Titan)
+const SYNODIC_MARS_JUPITER: u32 = 27; // 26.8 months
+const SYNODIC_MARS_SATURN: u32 = 24; // 24.1 months
 
 /// Hohmann transfer times in ticks.
-const TRANSFER_EARTH_MARS: u32 = 9;     // 258 days (Vallado 2013)
+const TRANSFER_EARTH_MARS: u32 = 9; // 258 days (Vallado 2013)
 const TRANSFER_EARTH_JUPITER: u32 = 33; // 2.73 years
-const TRANSFER_EARTH_SATURN: u32 = 73;  // 6.05 years
-const TRANSFER_MARS_JUPITER: u32 = 26;  // 2.16 years
-const TRANSFER_MARS_SATURN: u32 = 59;   // 4.9 years
+const TRANSFER_EARTH_SATURN: u32 = 73; // 6.05 years
+const TRANSFER_MARS_JUPITER: u32 = 26; // 2.16 years
+const TRANSFER_MARS_SATURN: u32 = 59; // 4.9 years
 
 /// Emergency (off-window) transfer delta-v cost multiplier.
 const _EMERGENCY_DV_MULTIPLIER: f64 = 2.5;
@@ -291,8 +291,10 @@ impl InterWorldEngine {
             // Kessler syndrome: degrade volume for routes from/to Earth
             let mut volume = self.trade_routes[route_idx].volume_per_tick;
             if self.leo_access_multiplier < 1.0 {
-                let involves_earth = worlds[from].location == "Earth" || worlds[to].location == "Earth";
-                let is_moon_earth = (worlds[from].location == "Moon" && worlds[to].location == "Earth")
+                let involves_earth =
+                    worlds[from].location == "Earth" || worlds[to].location == "Earth";
+                let is_moon_earth = (worlds[from].location == "Moon"
+                    && worlds[to].location == "Earth")
                     || (worlds[from].location == "Earth" && worlds[to].location == "Moon");
                 if involves_earth {
                     if is_moon_earth {
@@ -392,11 +394,7 @@ impl InterWorldEngine {
                 }
 
                 // Each living agent has a small probability of migrating
-                for agent in worlds[from_idx]
-                    .agents
-                    .iter()
-                    .filter(|a| a.is_alive())
-                {
+                for agent in worlds[from_idx].agents.iter().filter(|a| a.is_alive()) {
                     if rng.bernoulli(MIGRATION_PROB_PER_AGENT) {
                         migrations.push((from_idx, to_idx, agent.id));
                     }
@@ -480,22 +478,14 @@ impl InterWorldEngine {
             if gap > 0.01 {
                 // Diffuse knowledge to lower-tech world
                 let transfer = gap * KNOWLEDGE_DIFFUSION_RATE;
-                for agent in worlds[to]
-                    .agents
-                    .iter_mut()
-                    .filter(|a| a.is_alive())
-                {
+                for agent in worlds[to].agents.iter_mut().filter(|a| a.is_alive()) {
                     agent.education_level = (agent.education_level + transfer).min(1.0);
                 }
                 self.knowledge_transfers += 1;
             } else if gap < -0.01 {
                 // Reverse direction
                 let transfer = (-gap) * KNOWLEDGE_DIFFUSION_RATE;
-                for agent in worlds[from]
-                    .agents
-                    .iter_mut()
-                    .filter(|a| a.is_alive())
-                {
+                for agent in worlds[from].agents.iter_mut().filter(|a| a.is_alive()) {
                     agent.education_level = (agent.education_level + transfer).min(1.0);
                 }
                 self.knowledge_transfers += 1;
@@ -532,15 +522,13 @@ impl InterWorldEngine {
             .agents
             .iter()
             .enumerate()
-            .filter(|(_, a)| {
-                a.is_alive()
-                    && a.age_years(tick) >= 20.0
-                    && a.age_years(tick) <= 55.0
-            })
+            .filter(|(_, a)| a.is_alive() && a.age_years(tick) >= 20.0 && a.age_years(tick) <= 55.0)
             .map(|(i, _)| i)
             .collect();
 
-        let count = settler_count.min(living_adults.len()).min(parent_world.population() / 4);
+        let count = settler_count
+            .min(living_adults.len())
+            .min(parent_world.population() / 4);
 
         // Score settlers by skill diversity (higher total = more skilled)
         let mut scored: Vec<(usize, f64)> = living_adults
@@ -624,7 +612,10 @@ impl InterWorldEngine {
             knowledge: crate::knowledge::WorldKnowledge::new(),
             economy: crate::economy::WorldEconomy::new(),
             harmony: crate::harmony::HarmonyTracker::new(),
-            governance: crate::governance::WorldGovernance::new(), metabolism_state: crate::metabolism::MetabolismState::default(), currency_state: crate::currency::WorldCurrencyState::default(), policy_state: crate::proposals::PolicyState::default(),
+            governance: crate::governance::WorldGovernance::new(),
+            metabolism_state: crate::metabolism::MetabolismState::default(),
+            currency_state: crate::currency::WorldCurrencyState::default(),
+            policy_state: crate::proposals::PolicyState::default(),
             power_generation_kw: 0.0,
             power_demand_kw: 0.0,
             narrative_identity: crate::world::NarrativeIdentity::default(),
@@ -655,8 +646,14 @@ impl InterWorldEngine {
         // Establish trade route with parent (assume Moon-Earth-class delay).
         // "Colony" location has synodic_period=0 (continuous), matching co-orbital.
         let parent_loc = parent_world.location.clone();
-        self.establish_route(parent_world.id, new_world_id, tick, 1.3,
-            &parent_loc, "Colony");
+        self.establish_route(
+            parent_world.id,
+            new_world_id,
+            tick,
+            1.3,
+            &parent_loc,
+            "Colony",
+        );
 
         new_world
     }
@@ -665,7 +662,11 @@ impl InterWorldEngine {
     ///
     /// Returns fertility reduction factor (0.0 = no reduction, up to 0.5 max).
     /// Only applies when worlds have been isolated for > 400 years (4800 ticks).
-    pub fn speciation_friction(world_a_founded: u32, world_b_founded: u32, current_tick: u32) -> f64 {
+    pub fn speciation_friction(
+        world_a_founded: u32,
+        world_b_founded: u32,
+        current_tick: u32,
+    ) -> f64 {
         // Isolation years = min age of the two worlds (proxy for divergence time)
         let age_a = current_tick.saturating_sub(world_a_founded) as f64 / 12.0;
         let age_b = current_tick.saturating_sub(world_b_founded) as f64 / 12.0;
@@ -682,10 +683,7 @@ impl InterWorldEngine {
     ///
     /// When total off-earth pop > 5000 AND mean tech > 0.3, found Europa or Titan.
     /// Returns (should_found_europa, should_found_titan).
-    pub fn check_outer_system_fission(
-        worlds: &[World],
-        _current_tick: u32,
-    ) -> (bool, bool) {
+    pub fn check_outer_system_fission(worlds: &[World], _current_tick: u32) -> (bool, bool) {
         let off_earth_pop: usize = worlds
             .iter()
             .filter(|w| w.location != "Earth")
@@ -695,7 +693,11 @@ impl InterWorldEngine {
         let mean_tech: f64 = if worlds.is_empty() {
             0.0
         } else {
-            worlds.iter().map(|w| w.knowledge.mean_tech_level()).sum::<f64>() / worlds.len() as f64
+            worlds
+                .iter()
+                .map(|w| w.knowledge.mean_tech_level())
+                .sum::<f64>()
+                / worlds.len() as f64
         };
         // Normalize tech to 0-1 range (starts at 1.0, so (mean-1)/9 maps [1,10]->[0,1])
         let tech_norm = ((mean_tech - 1.0) / 9.0).clamp(0.0, 1.0);
@@ -782,7 +784,10 @@ mod tests {
             knowledge: crate::knowledge::WorldKnowledge::new(),
             economy: crate::economy::WorldEconomy::new(),
             harmony: crate::harmony::HarmonyTracker::new(),
-            governance: crate::governance::WorldGovernance::new(), metabolism_state: crate::metabolism::MetabolismState::default(), currency_state: crate::currency::WorldCurrencyState::default(), policy_state: crate::proposals::PolicyState::default(),
+            governance: crate::governance::WorldGovernance::new(),
+            metabolism_state: crate::metabolism::MetabolismState::default(),
+            currency_state: crate::currency::WorldCurrencyState::default(),
+            policy_state: crate::proposals::PolicyState::default(),
             power_generation_kw: 0.0,
             power_demand_kw: 0.0,
             narrative_identity: crate::world::NarrativeIdentity::default(),
@@ -836,10 +841,16 @@ mod tests {
                 faction_id: None,
                 generation: 0,
                 trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
-                    ethics: crate::agent::EthicalOrientation::default(),
-                    sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
-                    justice: crate::sub_passport::RestorativeJustice::new(),
+                cumulative_dose_sv: 0.0,
+                adversarial: None,
+                coordination_understanding: 0.0,
+                mycel_score: 0.1,
+                sap_balance: 100.0,
+                is_biological: true,
+                wounds: Vec::new(),
+                ethics: crate::agent::EthicalOrientation::default(),
+                sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
+                justice: crate::sub_passport::RestorativeJustice::new(),
             });
         }
         world.next_agent_id = n as u64;
@@ -879,7 +890,10 @@ mod tests {
             "Earth-Mars cost: {cost_far} vs expected {expected_far}"
         );
 
-        assert!(cost_far > cost_near, "Mars should be more expensive than Moon");
+        assert!(
+            cost_far > cost_near,
+            "Mars should be more expensive than Moon"
+        );
     }
 
     #[test]
@@ -900,7 +914,11 @@ mod tests {
         let mut rng = StochasticEngine::new(42);
         engine.tick_interworld(&mut worlds, 100, &mut rng);
 
-        let moon_food = worlds[1].resources.get("food").map(|s| s.current).unwrap_or(0.0);
+        let moon_food = worlds[1]
+            .resources
+            .get("food")
+            .map(|s| s.current)
+            .unwrap_or(0.0);
         assert!(
             moon_food >= initial_moon_food,
             "Moon should receive food from Earth: {moon_food} vs {initial_moon_food}"
@@ -933,7 +951,10 @@ mod tests {
         let mut any_migration = false;
         for tick in TEST_TICK..=TEST_TICK + 100 {
             let events = engine.tick_interworld(&mut worlds, tick, &mut rng);
-            if events.iter().any(|e| e.event_type == CivEventType::Migration) {
+            if events
+                .iter()
+                .any(|e| e.event_type == CivEventType::Migration)
+            {
                 any_migration = true;
                 break;
             }
@@ -997,7 +1018,8 @@ mod tests {
         let initial_parent_pop = parent.population();
 
         // Agents born at tick 0; at TEST_TICK they are 30 years old (within 20-55 range).
-        let child = engine.world_fission(&mut parent, 1, "Luna Base".into(), 20, TEST_TICK, &mut rng);
+        let child =
+            engine.world_fission(&mut parent, 1, "Luna Base".into(), 20, TEST_TICK, &mut rng);
 
         assert_eq!(child.id, 1);
         assert_eq!(child.name, "Luna Base");

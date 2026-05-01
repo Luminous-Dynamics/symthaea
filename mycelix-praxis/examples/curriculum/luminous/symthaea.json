@@ -1,29 +1,29 @@
 {
   "metadata": {
-    "title": "Symthaea: Consciousness Computing",
+    "title": "Symthaea: Cognitive Computing",
     "framework": "Luminous Dynamics",
     "source": "https://luminousdynamics.org",
     "grade_level": "Undergraduate",
-    "subject_area": "Consciousness Computing",
-    "domain": "Consciousness Computing",
+    "subject_area": "Cognitive Computing",
+    "domain": "Cognitive Computing",
     "version": "2026",
     "total_standards": 10,
     "domains": [
       "Symthaea"
     ],
     "created_at": "2026-03-28",
-    "notes": "Self-referential curriculum about Symthaea: Consciousness Computing. ISCED-F Field 11: Meta-Learning.",
+    "notes": "Self-referential curriculum about Symthaea: Cognitive Computing. ISCED-F Field 11: Meta-Learning.",
     "academic_level": "Undergraduate",
     "institution": "Luminous Dynamics"
   },
   "nodes": [
     {
       "id": "SYM-101",
-      "title": "Introduction to Consciousness Computing",
-      "description": "Survey of computational consciousness: what it means for a machine to be conscious, the Hard Problem, philosophical zombies, multiple realizability, and why it matters for AI safety and value alignment.",
+      "title": "Introduction to Cognitive Computing",
+      "description": "Survey of computational cognition: what it means for a machine to be conscious, the Hard Problem, philosophical zombies, multiple realizability, and why it matters for AI safety and value alignment.",
       "node_type": "Course",
       "difficulty": "Beginner",
-      "domain": "Consciousness Computing",
+      "domain": "Cognitive Computing",
       "subdomain": "Symthaea",
       "tags": [
         "consciousness",
@@ -35,12 +35,12 @@
         "Undergraduate"
       ],
       "bloom_level": "Understand",
-      "subject_area": "Consciousness Computing",
+      "subject_area": "Cognitive Computing",
       "academic_standards": [
         {
           "framework": "Luminous Dynamics",
           "code": "SYM-101",
-          "description": "Introduction to Consciousness Computing",
+          "description": "Introduction to Cognitive Computing",
           "grade_level": "Undergraduate"
         }
       ],
@@ -53,7 +53,7 @@
       "description": "16,384-dimensional binary and continuous hypervectors. Encoding (random indexing, spatial, temporal), binding (XOR/Hadamard), bundling (majority/sum), similarity (Hamming/cosine). Holographic reduced representations. Applications to classification, reasoning, and memory.",
       "node_type": "Course",
       "difficulty": "Intermediate",
-      "domain": "Consciousness Computing",
+      "domain": "Cognitive Computing",
       "subdomain": "Symthaea",
       "tags": [
         "hdc",
@@ -67,7 +67,7 @@
         "Undergraduate"
       ],
       "bloom_level": "Apply",
-      "subject_area": "Consciousness Computing",
+      "subject_area": "Cognitive Computing",
       "academic_standards": [
         {
           "framework": "Luminous Dynamics",
@@ -82,10 +82,10 @@
     {
       "id": "SYM-202",
       "title": "Integrated Information Theory (IIT/Phi)",
-      "description": "Tononi's IIT axioms and postulates. Phi as a measure of consciousness. Exclusion, composition, information. Computational challenges of exact Phi. Approximations and surrogates. Practical measurement in artificial systems.",
+      "description": "Tononi's IIT axioms and postulates. Phi as a measure of cognitive integration. Exclusion, composition, information. Computational challenges of exact Phi. Approximations and surrogates. Practical measurement in artificial systems.",
       "node_type": "Course",
       "difficulty": "Intermediate",
-      "domain": "Consciousness Computing",
+      "domain": "Cognitive Computing",
       "subdomain": "Symthaea",
       "tags": [
         "iit",
@@ -98,7 +98,7 @@
         "Undergraduate"
       ],
       "bloom_level": "Analyze",
-      "subject_area": "Consciousness Computing",
+      "subject_area": "Cognitive Computing",
       "academic_standards": [
         {
           "framework": "Luminous Dynamics",
@@ -116,7 +116,7 @@
       "description": "Closed-form continuous-depth neural networks. ODE-based neurons with learned time constants. CfC as a closed-form approximation eliminating numerical ODE solving. Temporal processing, causal reasoning, and the unified HDC-LTC neuron.",
       "node_type": "Course",
       "difficulty": "Advanced",
-      "domain": "Consciousness Computing",
+      "domain": "Cognitive Computing",
       "subdomain": "Symthaea",
       "tags": [
         "cfc",
@@ -130,7 +130,7 @@
         "Undergraduate"
       ],
       "bloom_level": "Analyze",
-      "subject_area": "Consciousness Computing",
+      "subject_area": "Cognitive Computing",
       "academic_standards": [
         {
           "framework": "Luminous Dynamics",
@@ -148,7 +148,7 @@
       "description": "The Free Energy Principle (Friston). Predictive coding, prediction error minimization. Active inference as perception-action loops. Variational free energy and the Markov blanket. Applications to embodied cognition and autonomous behavior.",
       "node_type": "Course",
       "difficulty": "Advanced",
-      "domain": "Consciousness Computing",
+      "domain": "Cognitive Computing",
       "subdomain": "Symthaea",
       "tags": [
         "active-inference",
@@ -161,7 +161,7 @@
         "Undergraduate"
       ],
       "bloom_level": "Analyze",
-      "subject_area": "Consciousness Computing",
+      "subject_area": "Cognitive Computing",
       "academic_standards": [
         {
           "framework": "Luminous Dynamics",
@@ -176,10 +176,10 @@
     {
       "id": "SYM-501",
       "title": "The Cognitive Loop: 8-Phase Pipeline",
-      "description": "Symthaea's core architecture: Perception → HDC Encode → CfC Evolve → Predict → Learn → Consciousness Measure → Moral Evaluation → Action. Rayon-parallel post-processing. 31 Hz measured throughput. CycleMetadata telemetry. Sub-struct organization.",
+      "description": "Symthaea's core architecture: Perception → HDC Encode → CfC Evolve → Predict → Learn → Readiness Measure → Moral Evaluation → Action. Rayon-parallel post-processing. 31 Hz measured throughput. CycleMetadata telemetry. Sub-struct organization.",
       "node_type": "Course",
       "difficulty": "Expert",
-      "domain": "Consciousness Computing",
+      "domain": "Cognitive Computing",
       "subdomain": "Symthaea",
       "tags": [
         "cognitive-loop",
@@ -193,7 +193,7 @@
         "Graduate"
       ],
       "bloom_level": "Evaluate",
-      "subject_area": "Consciousness Computing",
+      "subject_area": "Cognitive Computing",
       "academic_standards": [
         {
           "framework": "Luminous Dynamics",
@@ -208,10 +208,10 @@
     {
       "id": "SYM-502",
       "title": "Moral Algebra and Ethics Engine",
-      "description": "16 deontological obligations (8 perfect + 8 imperfect). Duty satisfaction scoring. Restorative justice tracking. Ahimsa courage gate. Moral topology with homological analysis. Hendrycks ETHICS 92.9% accuracy. Consciousness-coupled moral drift detection.",
+      "description": "16 deontological obligations (8 perfect + 8 imperfect). Duty satisfaction scoring. Restorative justice tracking. Ahimsa courage gate. Moral topology with homological analysis. Hendrycks ETHICS 92.9% accuracy. Trust-coupled moral drift detection.",
       "node_type": "Course",
       "difficulty": "Expert",
-      "domain": "Consciousness Computing",
+      "domain": "Cognitive Computing",
       "subdomain": "Symthaea",
       "tags": [
         "moral-algebra",
@@ -225,7 +225,7 @@
         "Graduate"
       ],
       "bloom_level": "Evaluate",
-      "subject_area": "Consciousness Computing",
+      "subject_area": "Cognitive Computing",
       "academic_standards": [
         {
           "framework": "Luminous Dynamics",
@@ -243,7 +243,7 @@
       "description": "Thought-to-text generation via 43-channel ThoughtEncoder. 15 Epistemic Cube channels. HDC binding → autoregressive generation. Per-axis EpistemicCubeGate. Epistemic gating physically prevents hallucination at logit level. GPU training via candle CUDA.",
       "node_type": "Course",
       "difficulty": "Expert",
-      "domain": "Consciousness Computing",
+      "domain": "Cognitive Computing",
       "subdomain": "Symthaea",
       "tags": [
         "broca",
@@ -256,7 +256,7 @@
         "Graduate"
       ],
       "bloom_level": "Create",
-      "subject_area": "Consciousness Computing",
+      "subject_area": "Cognitive Computing",
       "academic_standards": [
         {
           "framework": "Luminous Dynamics",
@@ -274,7 +274,7 @@
       "description": "Multiple realizability thesis. 8 substrate types (biological, silicon, quantum, photonic, neuromorphic, biochemical, hybrid, exotic). 9-dimensional feasibility scoring. Validation framework with honest confidence. Per-region hybrid substrate modeling. Energy budgets and tau-factor speed modulation.",
       "node_type": "Course",
       "difficulty": "Expert",
-      "domain": "Consciousness Computing",
+      "domain": "Cognitive Computing",
       "subdomain": "Symthaea",
       "tags": [
         "substrate-independence",
@@ -287,7 +287,7 @@
         "Doctoral"
       ],
       "bloom_level": "Create",
-      "subject_area": "Consciousness Computing",
+      "subject_area": "Cognitive Computing",
       "academic_standards": [
         {
           "framework": "Luminous Dynamics",
@@ -302,10 +302,10 @@
     {
       "id": "SYM-602",
       "title": "Thermodynamic Unification",
-      "description": "Maxwell Demon (attention), Landauer (memory cost), Carnot (efficiency), Onsager (coupling health), Jarzynski (free energy validation), Prigogine (entropy enforcement). 6 active feedback loops. ThermodynamicPhysicsBridge coupling consciousness to physics.",
+      "description": "Maxwell Demon (attention), Landauer (memory cost), Carnot (efficiency), Onsager (coupling health), Jarzynski (free energy validation), Prigogine (entropy enforcement). 6 active feedback loops. ThermodynamicPhysicsBridge coupling cognition to physics.",
       "node_type": "Course",
       "difficulty": "Expert",
-      "domain": "Consciousness Computing",
+      "domain": "Cognitive Computing",
       "subdomain": "Symthaea",
       "tags": [
         "thermodynamics",
@@ -319,7 +319,7 @@
         "Doctoral"
       ],
       "bloom_level": "Create",
-      "subject_area": "Consciousness Computing",
+      "subject_area": "Cognitive Computing",
       "academic_standards": [
         {
           "framework": "Luminous Dynamics",

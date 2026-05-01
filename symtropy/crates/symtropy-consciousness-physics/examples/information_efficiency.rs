@@ -15,7 +15,9 @@
 //! Test: compute the simulated J/bit, communication/computation ratio,
 //! and compare against biological data.
 
-use symtropy_consciousness_physics::thermodynamics::{LANDAUER_BOUND_310K, ENERGY_PER_COGNITIVE_OP};
+use symtropy_consciousness_physics::thermodynamics::{
+    ENERGY_PER_COGNITIVE_OP, LANDAUER_BOUND_310K,
+};
 use symtropy_consciousness_physics::ThermodynamicConstants;
 
 fn main() {
@@ -69,40 +71,75 @@ fn main() {
     // CSV output
     println!("metric,our_model,biology,unit,match");
 
-    println!("landauer_bound,{:.2e},{:.2e},J/bit,reference",
-        LANDAUER_BOUND_310K, LANDAUER_BOUND_310K);
+    println!(
+        "landauer_bound,{:.2e},{:.2e},J/bit,reference",
+        LANDAUER_BOUND_310K, LANDAUER_BOUND_310K
+    );
 
-    println!("energy_per_cognitive_op,{:.2e},{:.2e},J/op,{}",
-        ENERGY_PER_COGNITIVE_OP, bio_synapse_j_per_op,
-        if (ENERGY_PER_COGNITIVE_OP - bio_synapse_j_per_op).abs() < 1e-21 { "MATCH" } else { "CLOSE" });
+    println!(
+        "energy_per_cognitive_op,{:.2e},{:.2e},J/op,{}",
+        ENERGY_PER_COGNITIVE_OP,
+        bio_synapse_j_per_op,
+        if (ENERGY_PER_COGNITIVE_OP - bio_synapse_j_per_op).abs() < 1e-21 {
+            "MATCH"
+        } else {
+            "CLOSE"
+        }
+    );
 
-    println!("simulated_j_per_bit,{:.2e},{:.2e},J/bit,simulated_ledger",
-        simulated_j_per_bit, bio_synapse_j_per_op);
+    println!(
+        "simulated_j_per_bit,{:.2e},{:.2e},J/bit,simulated_ledger",
+        simulated_j_per_bit, bio_synapse_j_per_op
+    );
 
-    println!("ratio_to_landauer,{:.1},{:.1},×,{}",
-        ratio_to_landauer, 16.6,
-        if (ratio_to_landauer - 16.6).abs() < 100.0 { "SAME_ORDER" } else { "DIFFERENT" });
+    println!(
+        "ratio_to_landauer,{:.1},{:.1},×,{}",
+        ratio_to_landauer,
+        16.6,
+        if (ratio_to_landauer - 16.6).abs() < 100.0 {
+            "SAME_ORDER"
+        } else {
+            "DIFFERENT"
+        }
+    );
 
-    println!("neuron_ratio_to_landauer,N/A,{:.1e},×,biological_reference",
-        bio_neuron_to_landauer);
+    println!(
+        "neuron_ratio_to_landauer,N/A,{:.1e},×,biological_reference",
+        bio_neuron_to_landauer
+    );
 
-    println!("comm_to_comp_ratio,{:.1},{:.1},ratio,{}",
-        comm_to_comp_ratio, bio_comm_to_comp,
-        if (comm_to_comp_ratio - bio_comm_to_comp).abs() < 30.0 { "SAME_ORDER" } else { "DIFFERENT" });
+    println!(
+        "comm_to_comp_ratio,{:.1},{:.1},ratio,{}",
+        comm_to_comp_ratio,
+        bio_comm_to_comp,
+        if (comm_to_comp_ratio - bio_comm_to_comp).abs() < 30.0 {
+            "SAME_ORDER"
+        } else {
+            "DIFFERENT"
+        }
+    );
 
-    println!("consciousness_cost_per_sec,{:.2},{:.2e},J/s,simulated",
-        consciousness_cost_per_sec, 20.0); // brain ~20W
+    println!(
+        "consciousness_cost_per_sec,{:.2},{:.2e},J/s,simulated",
+        consciousness_cost_per_sec, 20.0
+    ); // brain ~20W
 
-    println!("movement_cost_per_sec,{:.2},N/A,J/s,simulated",
-        movement_cost_per_sec);
+    println!(
+        "movement_cost_per_sec,{:.2},N/A,J/s,simulated",
+        movement_cost_per_sec
+    );
 
     // Summary
     eprintln!("\n═══════════════════════════════════════════════════");
     eprintln!("SIMULATED THERMODYNAMIC LEDGER (not CPU costs):");
-    eprintln!("  Consciousness maintenance: {:.2} J/s ({:.2} J/tick × {} Hz)",
-        consciousness_cost_per_sec, consciousness_cost_per_tick, ticks_per_second);
-    eprintln!("  Movement (walking):        {:.2} J/s",
-        movement_cost_per_sec);
+    eprintln!(
+        "  Consciousness maintenance: {:.2} J/s ({:.2} J/tick × {} Hz)",
+        consciousness_cost_per_sec, consciousness_cost_per_tick, ticks_per_second
+    );
+    eprintln!(
+        "  Movement (walking):        {:.2} J/s",
+        movement_cost_per_sec
+    );
     eprintln!("  Comm/Comp ratio:           {:.1}:1", comm_to_comp_ratio);
     eprintln!("  BIOLOGY Comm/Comp:         35:1 (Levy & Calvert 2021 PNAS)");
     if comm_to_comp_ratio < 1.0 {
@@ -116,11 +153,23 @@ fn main() {
     }
     eprintln!();
     eprintln!("INFORMATION EFFICIENCY:");
-    eprintln!("  Estimated bits/tick:       {:.0}", estimated_bits_per_tick);
+    eprintln!(
+        "  Estimated bits/tick:       {:.0}",
+        estimated_bits_per_tick
+    );
     eprintln!("  Simulated J/bit:           {:.2e}", simulated_j_per_bit);
     eprintln!("  Ratio to Landauer:         {:.1e}×", ratio_to_landauer);
-    eprintln!("  Our constant (16.6×):      {:.2e} J/op", ENERGY_PER_COGNITIVE_OP);
-    eprintln!("  Bio synapse (16.6×):       {:.2e} J/op", bio_synapse_j_per_op);
-    eprintln!("  Bio neuron/spike:          {:.2e} J (~{:.0e}× Landauer)", bio_neuron_j_per_spike, bio_neuron_to_landauer);
+    eprintln!(
+        "  Our constant (16.6×):      {:.2e} J/op",
+        ENERGY_PER_COGNITIVE_OP
+    );
+    eprintln!(
+        "  Bio synapse (16.6×):       {:.2e} J/op",
+        bio_synapse_j_per_op
+    );
+    eprintln!(
+        "  Bio neuron/spike:          {:.2e} J (~{:.0e}× Landauer)",
+        bio_neuron_j_per_spike, bio_neuron_to_landauer
+    );
     eprintln!("═══════════════════════════════════════════════════");
 }

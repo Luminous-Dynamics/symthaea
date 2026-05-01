@@ -106,10 +106,7 @@ mod tests {
 
     #[test]
     fn test_aggregate_fedavg() {
-        let gs = vec![
-            grad("a", vec![1.0, 2.0]),
-            grad("b", vec![3.0, 4.0]),
-        ];
+        let gs = vec![grad("a", vec![1.0, 2.0]), grad("b", vec![3.0, 4.0])];
         let result = aggregate_gradients(&gs, "fedavg", &DefenseConfig::default()).unwrap();
         assert!((result.gradient[0] - 2.0).abs() < 1e-6);
         assert!((result.gradient[1] - 3.0).abs() < 1e-6);
@@ -150,13 +147,19 @@ mod tests {
     #[test]
     fn test_validate_gradient_nan() {
         let g = grad("a", vec![1.0, f32::NAN, 3.0]);
-        assert!(matches!(validate_gradient(&g), Err(FlError::InvalidInput(_))));
+        assert!(matches!(
+            validate_gradient(&g),
+            Err(FlError::InvalidInput(_))
+        ));
     }
 
     #[test]
     fn test_validate_gradient_inf() {
         let g = grad("a", vec![f32::INFINITY]);
-        assert!(matches!(validate_gradient(&g), Err(FlError::InvalidInput(_))));
+        assert!(matches!(
+            validate_gradient(&g),
+            Err(FlError::InvalidInput(_))
+        ));
     }
 
     #[test]
@@ -167,10 +170,7 @@ mod tests {
 
     #[test]
     fn test_byzantine_power_one_flagged() {
-        let reps = vec![
-            ("a".to_string(), 0.9),
-            ("b".to_string(), 0.5),
-        ];
+        let reps = vec![("a".to_string(), 0.9), ("b".to_string(), 0.5)];
         let flagged = vec!["b".to_string()];
         let power = compute_byzantine_power(&reps, &flagged);
         assert!((power - 0.25).abs() < 1e-9); // 0.5^2
@@ -178,10 +178,7 @@ mod tests {
 
     #[test]
     fn test_byzantine_power_all_flagged() {
-        let reps = vec![
-            ("a".to_string(), 0.9),
-            ("b".to_string(), 0.5),
-        ];
+        let reps = vec![("a".to_string(), 0.9), ("b".to_string(), 0.5)];
         let flagged = vec!["a".to_string(), "b".to_string()];
         let power = compute_byzantine_power(&reps, &flagged);
         assert!((power - (0.81 + 0.25)).abs() < 1e-9); // 0.9^2 + 0.5^2

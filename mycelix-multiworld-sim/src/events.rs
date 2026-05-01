@@ -126,12 +126,7 @@ mod tests {
 
     #[test]
     fn test_event_logs_correctly() {
-        let e = CivEvent::new(
-            42,
-            Some(1),
-            CivEventType::Birth,
-            "Agent 100 born on Moon",
-        );
+        let e = CivEvent::new(42, Some(1), CivEventType::Birth, "Agent 100 born on Moon");
         assert_eq!(e.tick, 42);
         assert_eq!(e.world_id, Some(1));
         assert_eq!(e.event_type, CivEventType::Birth);
@@ -140,6 +135,9 @@ mod tests {
 
     #[test]
     fn test_event_type_display() {
-        assert_eq!(format!("{}", CivEventType::EpochTransition), "EpochTransition");
+        assert_eq!(
+            format!("{}", CivEventType::EpochTransition),
+            "EpochTransition"
+        );
     }
 }

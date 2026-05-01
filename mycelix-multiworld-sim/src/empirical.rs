@@ -293,8 +293,10 @@ mod tests {
     #[test]
     fn spe_rates_derived_correctly() {
         let computed = SPE_TOTAL_EVENTS_1976_2017 as f64 / SPE_CATALOG_YEARS;
-        assert!((computed - SPE_MEAN_PER_YEAR).abs() < 0.01,
-            "SPE_MEAN_PER_YEAR should be {computed}, got {SPE_MEAN_PER_YEAR}");
+        assert!(
+            (computed - SPE_MEAN_PER_YEAR).abs() < 0.01,
+            "SPE_MEAN_PER_YEAR should be {computed}, got {SPE_MEAN_PER_YEAR}"
+        );
     }
 
     #[test]
@@ -312,8 +314,10 @@ mod tests {
         for (name, days, yield_rate, fraction) in CROP_YIELDS {
             assert!(*days > 0.0, "{name} growth days must be positive");
             assert!(*yield_rate > 0.0, "{name} yield must be positive");
-            assert!(*fraction > 0.0 && *fraction <= 1.0,
-                "{name} edible fraction must be in (0, 1]: {fraction}");
+            assert!(
+                *fraction > 0.0 && *fraction <= 1.0,
+                "{name} edible fraction must be in (0, 1]: {fraction}"
+            );
         }
     }
 
@@ -336,7 +340,9 @@ mod tests {
     fn derived_rates_are_consistent() {
         // O2 production rate should match BPC data
         let derived = BPC_O2_KG_PER_1200_DAYS * 1000.0 / (1200.0 * BPC_AREA_M2);
-        assert!((derived - O2_PRODUCTION_G_M2_DAY).abs() < 0.1,
-            "O2 rate mismatch: computed {derived}, stored {O2_PRODUCTION_G_M2_DAY}");
+        assert!(
+            (derived - O2_PRODUCTION_G_M2_DAY).abs() < 0.1,
+            "O2 rate mismatch: computed {derived}, stored {O2_PRODUCTION_G_M2_DAY}"
+        );
     }
 }

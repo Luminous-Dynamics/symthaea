@@ -12,11 +12,9 @@
 
 use bevy::prelude::*;
 
-use symtropy_sim_bridge::{DkgCeremony, DkgConfig, CeremonyPhase, ParticipantId};
+use symtropy_sim_bridge::{CeremonyPhase, DkgCeremony, DkgConfig, ParticipantId};
 
-use crate::components::{
-    ConsciousnessComp, CrewNpc, FusionCore, NpcTrust, Player,
-};
+use crate::components::{ConsciousnessComp, CrewNpc, FusionCore, NpcTrust, Player};
 use crate::resources::{GovernanceLog, LeviathanState, SleepPhase};
 
 /// Distance (pixels) an entity must be from the core to participate.
@@ -87,22 +85,21 @@ impl Default for DkgCeremonyState {
 pub fn dkg_ceremony_system(
     keyboard: Res<ButtonInput<KeyCode>>,
     player_query: Query<&Transform, With<Player>>,
-    npcs: Query<(
-        &Transform,
-        &CrewNpc,
-        &ConsciousnessComp,
-        &NpcTrust,
-    )>,
+    npcs: Query<(&Transform, &CrewNpc, &ConsciousnessComp, &NpcTrust)>,
     mut core_query: Query<(&Transform, &mut FusionCore)>,
     leviathan: Res<LeviathanState>,
     mut state: ResMut<DkgCeremonyState>,
     mut log: ResMut<GovernanceLog>,
     time: Res<Time>,
 ) {
-    let Ok(player_tf) = player_query.single() else { return };
+    let Ok(player_tf) = player_query.single() else {
+        return;
+    };
     let player_pos = player_tf.translation.truncate();
 
-    let Some((core_tf, mut core)) = core_query.iter_mut().next() else { return };
+    let Some((core_tf, mut core)) = core_query.iter_mut().next() else {
+        return;
+    };
     let core_pos = core_tf.translation.truncate();
     let player_near_core = player_pos.distance(core_pos) < CEREMONY_RANGE;
 
@@ -146,8 +143,10 @@ pub fn dkg_ceremony_system(
         let config = match DkgConfig::new(state.threshold, n) {
             Ok(c) => c,
             Err(e) => {
-                let msg = format!("DKG config failed: {:?} (need {} participants, have {})",
-                    e, state.threshold, qualifying);
+                let msg = format!(
+                    "DKG config failed: {:?} (need {} participants, have {})",
+                    e, state.threshold, qualifying
+                );
                 eprintln!("[dkg] {}", msg);
                 log.push(time.elapsed_secs(), msg, 1);
                 return;
@@ -179,11 +178,17 @@ pub fn dkg_ceremony_system(
             let stress = npc.caution + leviathan_pressure;
 
             if trust.trust < MIN_TRUST_FOR_CEREMONY {
-                state.defected.push((npc.name.clone(), "trust too low".into()));
+                state
+                    .defected
+                    .push((npc.name.clone(), "trust too low".into()));
             } else if stress >= MAX_STRESS_FOR_CEREMONY {
-                state.defected.push((npc.name.clone(), "too stressed".into()));
+                state
+                    .defected
+                    .push((npc.name.clone(), "too stressed".into()));
             } else if consciousness.combined_score() < MIN_CONSCIOUSNESS_FOR_SHARE {
-                state.defected.push((npc.name.clone(), "below Participant tier".into()));
+                state
+                    .defected
+                    .push((npc.name.clone(), "below Participant tier".into()));
             } else if next_id <= n as u32 {
                 // Register this NPC with the REAL ceremony
                 match ceremony.add_participant(ParticipantId(next_id), now_secs) {
@@ -192,7 +197,9 @@ pub fn dkg_ceremony_system(
                         next_id += 1;
                     }
                     Err(e) => {
-                        state.defected.push((npc.name.clone(), format!("DKG error: {:?}", e)));
+                        state
+                            .defected
+                            .push((npc.name.clone(), format!("DKG error: {:?}", e)));
                     }
                 }
             }
@@ -226,7 +233,8 @@ pub fn dkg_ceremony_system(
             // Not enough participants — ceremony stays in Registration
             let msg = format!(
                 "DKG FAILED: Only {}/{} participants. {} defected. Use TEND to rebuild trust!",
-                registered, state.threshold,
+                registered,
+                state.threshold,
                 state.defected.len(),
             );
             eprintln!("[dkg] {}", msg);

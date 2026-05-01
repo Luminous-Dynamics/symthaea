@@ -22,12 +22,7 @@ const WEISZFELD_EPS: f64 = 1e-8;
 impl Rfa {
     /// Compute the geometric median using Weiszfeld's iteratively reweighted
     /// least squares algorithm.
-    fn geometric_median(
-        gradients: &[Gradient],
-        dim: usize,
-        max_iter: usize,
-        tol: f64,
-    ) -> Vec<f32> {
+    fn geometric_median(gradients: &[Gradient], dim: usize, max_iter: usize, tol: f64) -> Vec<f32> {
         let n = gradients.len();
 
         // Initialize at the arithmetic mean
@@ -109,8 +104,12 @@ impl Defense for Rfa {
             });
         }
 
-        let gradient =
-            Self::geometric_median(gradients, dim, config.weiszfeld_max_iter, config.weiszfeld_tol);
+        let gradient = Self::geometric_median(
+            gradients,
+            dim,
+            config.weiszfeld_max_iter,
+            config.weiszfeld_tol,
+        );
 
         Ok(AggregationResult {
             gradient,
@@ -159,17 +158,17 @@ mod tests {
             "geometric median should be closer to honest cluster: honest={dist_honest}, outlier={dist_outlier}"
         );
         // Should be within reasonable range of the honest cluster
-        assert!(dist_honest < 2.0, "should be near honest cluster: {dist_honest}");
+        assert!(
+            dist_honest < 2.0,
+            "should be near honest cluster: {dist_honest}"
+        );
     }
 
     #[test]
     fn test_identical_gradients() {
         let g = grad(vec![3.0, 4.0, 5.0], "a");
         let result = Rfa
-            .aggregate(
-                &[g.clone(), g.clone(), g],
-                &DefenseConfig::default(),
-            )
+            .aggregate(&[g.clone(), g.clone(), g], &DefenseConfig::default())
             .unwrap();
         assert!((result.gradient[0] - 3.0).abs() < 1e-4);
         assert!((result.gradient[1] - 4.0).abs() < 1e-4);
@@ -179,9 +178,7 @@ mod tests {
     #[test]
     fn test_single_gradient() {
         let g = grad(vec![5.0, 10.0], "x");
-        let result = Rfa
-            .aggregate(&[g], &DefenseConfig::default())
-            .unwrap();
+        let result = Rfa.aggregate(&[g], &DefenseConfig::default()).unwrap();
         assert!((result.gradient[0] - 5.0).abs() < 1e-6);
         assert!((result.gradient[1] - 10.0).abs() < 1e-6);
     }
@@ -191,9 +188,7 @@ mod tests {
         // With 2 points, the geometric median is on the line segment between them.
         let a = grad(vec![0.0, 0.0], "a");
         let b = grad(vec![10.0, 0.0], "b");
-        let result = Rfa
-            .aggregate(&[a, b], &DefenseConfig::default())
-            .unwrap();
+        let result = Rfa.aggregate(&[a, b], &DefenseConfig::default()).unwrap();
         // Should be at or very near the midpoint for 2 equidistant points
         assert!((result.gradient[0] - 5.0).abs() < 0.5);
         assert!(result.gradient[1].abs() < 0.5);

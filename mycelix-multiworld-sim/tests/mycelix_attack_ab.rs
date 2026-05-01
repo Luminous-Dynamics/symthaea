@@ -14,9 +14,9 @@
 //! 4. GuildColluder agents have above-mean MYCEL scores — collusion
 //!    mechanic is engaged.
 
-use mycelix_multiworld_sim::MultiWorldSimulator;
 use mycelix_multiworld_sim::config::{PolicyConfig, SimulationConfig};
 use mycelix_multiworld_sim::red_team::AdversarialStrategy;
+use mycelix_multiworld_sim::MultiWorldSimulator;
 
 fn setup(seed: u64, years: u32) -> SimulationConfig {
     let mut config = SimulationConfig::default_150_year();
@@ -40,8 +40,10 @@ fn correction_farmer_attack_is_rate_limited_in_full_sim() {
     let mut farmer_count = 0usize;
     for world in &sim.worlds {
         for agent in world.agents.iter() {
-            if matches!(agent.adversarial, Some(AdversarialStrategy::CorrectionFarmer))
-                && agent.is_alive()
+            if matches!(
+                agent.adversarial,
+                Some(AdversarialStrategy::CorrectionFarmer)
+            ) && agent.is_alive()
             {
                 farmer_count += 1;
                 total_rejected += agent.justice.rejected_corrections;
@@ -114,7 +116,9 @@ fn guild_colluder_boosts_mycel_score() {
         let colluder_mycel: Vec<f64> = world
             .agents
             .iter()
-            .filter(|a| a.is_alive() && matches!(a.adversarial, Some(AdversarialStrategy::GuildColluder)))
+            .filter(|a| {
+                a.is_alive() && matches!(a.adversarial, Some(AdversarialStrategy::GuildColluder))
+            })
             .map(|a| a.mycel_score)
             .collect();
         if colluder_mycel.len() < 2 {
@@ -378,7 +382,11 @@ fn multiseed_attack_defense_holds() {
         }
     }
 
-    assert_eq!(survivors, seeds.len(), "survival should be 100% across seeds");
+    assert_eq!(
+        survivors,
+        seeds.len(),
+        "survival should be 100% across seeds"
+    );
     let mean_cvs = cvs_values.iter().sum::<f64>() / cvs_values.len() as f64;
     assert!(
         mean_cvs >= 0.3,

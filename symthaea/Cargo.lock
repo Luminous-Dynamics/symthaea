@@ -5149,6 +5149,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ab03c107fafeb3ee9f5925686dbb7a73bc76e3932abb0d2b365cb64b169cf04c"
 
 [[package]]
+name = "diff"
+version = "0.1.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56254986775e3233ffa9c4d7d3faaf6d36a2c09d30b20687e9f88bc8bafc16c8"
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5543,6 +5549,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "egg"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "abb749745461743bb477fba3ef87c663d5965876155c676c9489cfe0963de5ab"
+dependencies = [
+ "env_logger",
+ "hashbrown 0.15.5",
+ "indexmap 2.11.1",
+ "log",
+ "num-bigint",
+ "num-traits",
+ "quanta",
+ "rustc-hash 2.1.1",
+ "saturating",
+ "smallvec 1.15.1",
+ "symbol_table",
+ "symbolic_expressions",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "ego-tree"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5865,6 +5892,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
+]
+
+[[package]]
+name = "env_logger"
+version = "0.9.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a12e6657c4c97ebab115a42dcee77225f7f482cdd841cf7088c657a42e9e00e7"
+dependencies = [
+ "log",
 ]
 
 [[package]]
@@ -12844,6 +12880,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8cf8e6a8aa66ce33f63993ffc4ea4271eb5b0530a9002db8455ea6050c77bfa"
 
 [[package]]
+name = "pretty_assertions"
+version = "1.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ae130e2f271fbc2ac3a40fb1d07180839cdbbe443c7a27e1e3c13c5cac0116d"
+dependencies = [
+ "diff",
+ "yansi",
+]
+
+[[package]]
 name = "prettyplease"
 version = "0.2.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -14507,6 +14553,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "saturating"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ece8e78b2f38ec51c51f5d475df0a7187ba5111b2a28bdc761ee05b075d40a71"
+
+[[package]]
 name = "scc"
 version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -15657,6 +15709,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
+name = "symbol_table"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f19bffd69fb182e684d14e3c71d04c0ef33d1641ac0b9e81c712c734e83703bc"
+dependencies = [
+ "crossbeam-utils",
+ "foldhash 0.1.5",
+ "hashbrown 0.15.5",
+]
+
+[[package]]
+name = "symbolic_expressions"
+version = "5.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7c68d531d83ec6c531150584c42a4290911964d5f0d79132b193b67252a23b71"
+
+[[package]]
 name = "symphonia"
 version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -15860,13 +15929,16 @@ dependencies = [
  "shlex",
  "strsim",
  "symthaea-aesthetic",
+ "symthaea-agribot",
  "symthaea-atelier",
  "symthaea-auv",
+ "symthaea-biota",
  "symthaea-broca",
  "symthaea-browser",
  "symthaea-canvas",
  "symthaea-causal-reasoning",
  "symthaea-cell-foundry",
+ "symthaea-clime",
  "symthaea-clinical",
  "symthaea-consciousness-equation",
  "symthaea-consciousness-resonance",
@@ -15884,7 +15956,6 @@ dependencies = [
  "symthaea-factor-graph",
  "symthaea-fep",
  "symthaea-field-dynamics",
- "symthaea-flight",
  "symthaea-foveation",
  "symthaea-genomics",
  "symthaea-geodesic",
@@ -15894,10 +15965,12 @@ dependencies = [
  "symthaea-helicopter",
  "symthaea-hodge",
  "symthaea-humanoid",
+ "symthaea-infrastructure",
  "symthaea-jepa",
  "symthaea-manipulator",
  "symthaea-materials",
  "symthaea-memory",
+ "symthaea-multirotor",
  "symthaea-muse",
  "symthaea-mycelix-conductor",
  "symthaea-narrative-self",
@@ -15917,11 +15990,13 @@ dependencies = [
  "symthaea-psych-bench",
  "symthaea-quadruped",
  "symthaea-quantum-chemistry",
+ "symthaea-scavenger",
  "symthaea-sensorimotor",
  "symthaea-sentinel",
  "symthaea-spore",
  "symthaea-ssm",
  "symthaea-stt",
+ "symthaea-subterranean",
  "symthaea-support",
  "symthaea-surgical",
  "symthaea-therapeutic",
@@ -15959,6 +16034,18 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "symthaea-agribot"
+version = "0.1.0"
+dependencies = [
+ "proptest",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "symthaea-core",
+ "symthaea-fep",
 ]
 
 [[package]]
@@ -16011,6 +16098,18 @@ version = "0.1.0"
 dependencies = [
  "symthaea-core",
  "symthaea-muse",
+]
+
+[[package]]
+name = "symthaea-biota"
+version = "0.1.0"
+dependencies = [
+ "proptest",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "symthaea-core",
+ "symthaea-fep",
 ]
 
 [[package]]
@@ -16091,6 +16190,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-clime"
+version = "0.1.0"
+dependencies = [
+ "proptest",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "symthaea-core",
+ "symthaea-fep",
+]
+
+[[package]]
 name = "symthaea-clinical"
 version = "0.1.0"
 dependencies = [
@@ -16144,6 +16255,7 @@ dependencies = [
  "hf-hub",
  "nalgebra",
  "ndarray 0.16.1",
+ "num-complex",
  "once_cell",
  "ordered-float 4.6.0",
  "ort",
@@ -16226,6 +16338,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-eml-egraph"
+version = "0.1.0"
+dependencies = [
+ "criterion",
+ "egg",
+ "pretty_assertions",
+ "symthaea-core",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "symthaea-enactive"
 version = "0.1.0"
 dependencies = [
@@ -16300,25 +16423,6 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "thiserror 1.0.69",
-]
-
-[[package]]
-name = "symthaea-flight"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "mujoco-rs",
- "parking_lot",
- "positioning",
- "proptest",
- "rand 0.8.5",
- "rand_chacha 0.3.1",
- "rayon",
- "serde",
- "serde_json",
- "symthaea-core",
- "symthaea-fep",
- "symthaea-hal",
 ]
 
 [[package]]
@@ -16450,6 +16554,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-infrastructure"
+version = "0.1.0"
+dependencies = [
+ "proptest",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "symthaea-core",
+ "symthaea-fep",
+]
+
+[[package]]
 name = "symthaea-jepa"
 version = "0.1.0"
 dependencies = [
@@ -16520,6 +16636,25 @@ dependencies = [
  "tokio",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "symthaea-multirotor"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "mujoco-rs",
+ "parking_lot",
+ "positioning",
+ "proptest",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
+ "rayon",
+ "serde",
+ "serde_json",
+ "symthaea-core",
+ "symthaea-fep",
+ "symthaea-hal",
 ]
 
 [[package]]
@@ -16860,6 +16995,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-scavenger"
+version = "0.1.0"
+dependencies = [
+ "proptest",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "symthaea-core",
+ "symthaea-fep",
+]
+
+[[package]]
 name = "symthaea-sensorimotor"
 version = "0.1.0"
 dependencies = [
@@ -16904,6 +17051,7 @@ dependencies = [
  "positioning",
  "prism-common",
  "prism-search",
+ "proptest",
  "serde",
  "serde_json",
  "symthaea-broca",
@@ -16988,6 +17136,18 @@ dependencies = [
  "symthaea-core",
  "tempfile",
  "toml 0.8.23",
+]
+
+[[package]]
+name = "symthaea-subterranean"
+version = "0.1.0"
+dependencies = [
+ "proptest",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "symthaea-core",
+ "symthaea-fep",
 ]
 
 [[package]]

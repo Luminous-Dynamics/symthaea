@@ -554,6 +554,12 @@ impl CognitiveLoopService {
         feature = "surgical",
         feature = "orbital",
         feature = "quadruped",
+        feature = "subterranean",
+        feature = "infrastructure",
+        feature = "scavenger",
+        feature = "agribot",
+        feature = "biota",
+        feature = "clime",
         feature = "phone"
     ))]
     pub fn has_embodiment(&self) -> bool {
@@ -572,6 +578,12 @@ impl CognitiveLoopService {
         feature = "surgical",
         feature = "orbital",
         feature = "quadruped",
+        feature = "subterranean",
+        feature = "infrastructure",
+        feature = "scavenger",
+        feature = "agribot",
+        feature = "biota",
+        feature = "clime",
         feature = "phone"
     ))]
     pub fn embodiment_platform(&self) -> super::super::motor_bridge::EmbodimentPlatform {
@@ -594,6 +606,12 @@ impl CognitiveLoopService {
         feature = "surgical",
         feature = "orbital",
         feature = "quadruped",
+        feature = "subterranean",
+        feature = "infrastructure",
+        feature = "scavenger",
+        feature = "agribot",
+        feature = "biota",
+        feature = "clime",
         feature = "phone"
     ))]
     pub fn embodiment_telemetry(&self) -> &super::super::motor_bridge::EmbodimentTelemetry {
@@ -612,6 +630,12 @@ impl CognitiveLoopService {
         feature = "surgical",
         feature = "orbital",
         feature = "quadruped",
+        feature = "subterranean",
+        feature = "infrastructure",
+        feature = "scavenger",
+        feature = "agribot",
+        feature = "biota",
+        feature = "clime",
         feature = "phone"
     ))]
     pub fn last_proprioceptive_hv(&self) -> Option<&symthaea_core::hdc::ContinuousHV> {
@@ -637,6 +661,12 @@ impl CognitiveLoopService {
         feature = "surgical",
         feature = "orbital",
         feature = "quadruped",
+        feature = "subterranean",
+        feature = "infrastructure",
+        feature = "scavenger",
+        feature = "agribot",
+        feature = "biota",
+        feature = "clime",
         feature = "phone"
     ))]
     pub fn switch_embodiment(&mut self, platform: super::super::motor_bridge::EmbodimentPlatform) {
@@ -664,7 +694,7 @@ impl CognitiveLoopService {
                 )),
                 #[cfg(feature = "flight")]
                 EmbodimentPlatform::Quadrotor => Some(Box::new(
-                    crate::flight::embodiment::FlightEmbodiment::new(&genesis),
+                    crate::multirotor::embodiment::FlightEmbodiment::new(&genesis),
                 )),
                 #[cfg(feature = "vehicle")]
                 EmbodimentPlatform::Vehicle => Some(Box::new(
@@ -693,6 +723,30 @@ impl CognitiveLoopService {
                 #[cfg(feature = "quadruped")]
                 EmbodimentPlatform::Quadruped => Some(Box::new(
                     symthaea_quadruped::embodiment::QuadrupedEmbodiment::new(&genesis),
+                )),
+                #[cfg(feature = "subterranean")]
+                EmbodimentPlatform::Subterranean => Some(Box::new(
+                    symthaea_subterranean::embodiment::SubterraneanEmbodiment::new(&genesis),
+                )),
+                #[cfg(feature = "infrastructure")]
+                EmbodimentPlatform::Infrastructure => Some(Box::new(
+                    symthaea_infrastructure::embodiment::InfrastructureEmbodiment::new(&genesis),
+                )),
+                #[cfg(feature = "scavenger")]
+                EmbodimentPlatform::Scavenger => Some(Box::new(
+                    symthaea_scavenger::embodiment::ScavengerEmbodiment::new(&genesis),
+                )),
+                #[cfg(feature = "agribot")]
+                EmbodimentPlatform::Agribot => Some(Box::new(
+                    symthaea_agribot::embodiment::AgribotEmbodiment::new(&genesis),
+                )),
+                #[cfg(feature = "biota")]
+                EmbodimentPlatform::Biota => Some(Box::new(
+                    symthaea_biota::embodiment::BiotaEmbodiment::new(&genesis),
+                )),
+                #[cfg(feature = "clime")]
+                EmbodimentPlatform::Clime => Some(Box::new(
+                    symthaea_clime::embodiment::ClimeEmbodiment::new(&genesis),
                 )),
                 _ => None,
             };

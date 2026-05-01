@@ -287,10 +287,7 @@ pub fn sos_univariate(p: &Poly) -> Option<Vec<Poly>> {
                     let q2 = Poly::new(vec![delta * gamma.sqrt(), gamma.sqrt()]);
                     let q3 = Poly::constant(eps.max(0.0).sqrt());
                     // Verify numerically
-                    let sos_sum = q1
-                        .square()
-                        .add(&q2.square())
-                        .add(&q3.square());
+                    let sos_sum = q1.square().add(&q2.square()).add(&q3.square());
                     if p.approx_eq(&sos_sum, 1e-6) {
                         return Some(vec![q1, q2, q3]);
                     }

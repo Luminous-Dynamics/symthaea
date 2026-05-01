@@ -73,21 +73,56 @@ fn parse_args() -> Args {
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
-            "--epochs" => { epochs = args[i+1].parse().unwrap(); i += 2; }
-            "--hidden" => { hidden = args[i+1].parse().unwrap(); i += 2; }
-            "--lr" => { lr = args[i+1].parse().unwrap(); i += 2; }
-            "--max-files" => { max_files = Some(args[i+1].parse().unwrap()); i += 2; }
-            "--log-every" => { log_every = args[i+1].parse().unwrap(); i += 2; }
-            "--context" => { context = args[i+1].parse().unwrap(); i += 2; }
-            "--adam" => { adam = true; i += 1; }
-            "--global-mean" => { global_mean = Some(PathBuf::from(&args[i+1])); i += 2; }
-            other => { eprintln!("Unknown arg: {other}"); std::process::exit(1); }
+            "--epochs" => {
+                epochs = args[i + 1].parse().unwrap();
+                i += 2;
+            }
+            "--hidden" => {
+                hidden = args[i + 1].parse().unwrap();
+                i += 2;
+            }
+            "--lr" => {
+                lr = args[i + 1].parse().unwrap();
+                i += 2;
+            }
+            "--max-files" => {
+                max_files = Some(args[i + 1].parse().unwrap());
+                i += 2;
+            }
+            "--log-every" => {
+                log_every = args[i + 1].parse().unwrap();
+                i += 2;
+            }
+            "--context" => {
+                context = args[i + 1].parse().unwrap();
+                i += 2;
+            }
+            "--adam" => {
+                adam = true;
+                i += 1;
+            }
+            "--global-mean" => {
+                global_mean = Some(PathBuf::from(&args[i + 1]));
+                i += 2;
+            }
+            other => {
+                eprintln!("Unknown arg: {other}");
+                std::process::exit(1);
+            }
         }
     }
 
     Args {
-        pairs_dir, ckpt_path, epochs, hidden, lr, max_files, log_every,
-        context, adam, global_mean,
+        pairs_dir,
+        ckpt_path,
+        epochs,
+        hidden,
+        lr,
+        max_files,
+        log_every,
+        context,
+        adam,
+        global_mean,
     }
 }
 
@@ -100,7 +135,10 @@ fn load_global_mean(path: &std::path::Path) -> std::io::Result<Vec<f32>> {
     let n = u32::from_le_bytes(h) as usize;
     let mut buf = vec![0u8; n * 4];
     f.read_exact(&mut buf)?;
-    Ok(buf.chunks_exact(4).map(|c| f32::from_le_bytes(c.try_into().unwrap())).collect())
+    Ok(buf
+        .chunks_exact(4)
+        .map(|c| f32::from_le_bytes(c.try_into().unwrap()))
+        .collect())
 }
 
 /// Build a temporal-context input vector: concatenate normalized states
@@ -110,8 +148,8 @@ fn build_context_input(states: &[[f32; 17]], t: usize, ctx: usize) -> Vec<f32> {
     let window = 2 * ctx + 1;
     let mut out = Vec::with_capacity(window * 17);
     for k in 0..window {
-        let idx = (t as isize + k as isize - ctx as isize)
-            .clamp(0, states.len() as isize - 1) as usize;
+        let idx =
+            (t as isize + k as isize - ctx as isize).clamp(0, states.len() as isize - 1) as usize;
         out.extend_from_slice(&normalize_state(&states[idx]));
     }
     out
@@ -122,8 +160,9 @@ fn find_bin_files(dir: &Path) -> Vec<PathBuf> {
     if let Ok(entries) = std::fs::read_dir(dir) {
         for e in entries.flatten() {
             let p = e.path();
-            if p.is_dir() { out.extend(find_bin_files(&p)); }
-            else if p.extension().and_then(|s| s.to_str()) == Some("bin") {
+            if p.is_dir() {
+                out.extend(find_bin_files(&p));
+            } else if p.extension().and_then(|s| s.to_str()) == Some("bin") {
                 let name = p.to_string_lossy();
                 if name.ends_with(".pred.bin") || name.ends_with("global_mel_mean.bin") {
                     continue;
@@ -140,11 +179,16 @@ fn main() {
     let args = parse_args();
     let files = {
         let mut f = find_bin_files(&args.pairs_dir);
-        if let Some(n) = args.max_files { f.truncate(n); }
+        if let Some(n) = args.max_files {
+            f.truncate(n);
+        }
         f
     };
     if files.is_empty() {
-        eprintln!("No .pairs.bin files found under {}", args.pairs_dir.display());
+        eprintln!(
+            "No .pairs.bin files found under {}",
+            args.pairs_dir.display()
+        );
         std::process::exit(1);
     }
 
@@ -180,7 +224,10 @@ fn main() {
     let base_state_dim = probe_states[0].len();
     let context_window = 2 * args.context + 1;
     let state_dim = base_state_dim * context_window;
-    println!("  base_state: {}  context_half: {}  window: {}", base_state_dim, args.context, context_window);
+    println!(
+        "  base_state: {}  context_half: {}  window: {}",
+        base_state_dim, args.context, context_window
+    );
     println!("  state_dim:  {}", state_dim);
     println!("  n_mels:     {}", n_mels);
 
@@ -219,7 +266,9 @@ fn main() {
     let mut mel_sum = vec![0.0f32; n_mels];
     let mut total_frames = 0usize;
     for (_, mel) in probe_states.iter().zip(probe_mels.iter()) {
-        for j in 0..n_mels { mel_sum[j] += mel[j]; }
+        for j in 0..n_mels {
+            mel_sum[j] += mel[j];
+        }
         total_frames += 1;
     }
     let mel_mean: Vec<f32> = mel_sum.iter().map(|&s| s / total_frames as f32).collect();
@@ -271,7 +320,12 @@ fn main() {
                     let rate = global_step as f64 / t_start.elapsed().as_secs_f64();
                     println!(
                         "  [epoch {}] step {:>10} file {:>4}/{:<4}  mse={:.4}  ({:.0} samples/s)",
-                        epoch, global_step, file_idx + 1, train_files.len(), avg, rate
+                        epoch,
+                        global_step,
+                        file_idx + 1,
+                        train_files.len(),
+                        avg,
+                        rate
                     );
                     window_loss = 0.0;
                     window_count = 0;
@@ -291,7 +345,11 @@ fn main() {
                     // uncentered val_mse.
                     let mut e = 0.0;
                     for j in 0..n_mels {
-                        let pred_full = if let Some(mu) = &mean_vec { pred[j] + mu[j] } else { pred[j] };
+                        let pred_full = if let Some(mu) = &mean_vec {
+                            pred[j] + mu[j]
+                        } else {
+                            pred[j]
+                        };
                         let d = pred_full - m[j];
                         e += d * d;
                     }
@@ -300,7 +358,11 @@ fn main() {
                 }
             }
         }
-        let val_mse = if val_count > 0 { val_loss / val_count as f64 } else { 0.0 };
+        let val_mse = if val_count > 0 {
+            val_loss / val_count as f64
+        } else {
+            0.0
+        };
 
         // Save checkpoint at end of each epoch
         if let Some(parent) = args.ckpt_path.parent() {
@@ -313,7 +375,11 @@ fn main() {
         let r2 = 1.0 - val_mse / GLOBAL_VAR;
         println!(
             "  [epoch {} DONE] val_mse={:.4}  R²={:.3}  ({} frames)  checkpoint → {}",
-            epoch, val_mse, r2, val_count, args.ckpt_path.display()
+            epoch,
+            val_mse,
+            r2,
+            val_count,
+            args.ckpt_path.display()
         );
     }
 
@@ -321,6 +387,9 @@ fn main() {
     println!("\n═══ Training Complete ═══");
     println!("  total steps: {}", global_step);
     println!("  elapsed:     {:.1}s", elapsed.as_secs_f64());
-    println!("  throughput:  {:.0} samples/s", global_step as f64 / elapsed.as_secs_f64());
+    println!(
+        "  throughput:  {:.0} samples/s",
+        global_step as f64 / elapsed.as_secs_f64()
+    );
     println!("  checkpoint:  {}", args.ckpt_path.display());
 }

@@ -1,0 +1,27 @@
+[package]
+name = "sensorium-inference"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Local NLP inference for Mycelix Sensorium — Candle WASM replacement for Xenova Transformers"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Candle ML — optional, heavy dependency tree. Enable when model inference is needed.
+candle-core = { version = "0.8", default-features = false, optional = true }
+candle-nn = { version = "0.8", default-features = false, optional = true }
+candle-transformers = { version = "0.8", default-features = false, optional = true }
+tokenizers = { version = "0.21", default-features = false, features = ["unstable_wasm"], optional = true }
+
+# WASM deps — optional, only for browser target
+wasm-bindgen = { version = "0.2", optional = true }
+wasm-bindgen-futures = { version = "0.4", optional = true }
+js-sys = { version = "0.3", optional = true }
+web-sys = { version = "0.3", features = ["console", "Request", "RequestInit", "Response", "Window"], optional = true }
+
+[features]
+default = []
+candle = ["dep:candle-core", "dep:candle-nn", "dep:candle-transformers", "dep:tokenizers"]
+wasm = ["dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:js-sys", "dep:web-sys"]

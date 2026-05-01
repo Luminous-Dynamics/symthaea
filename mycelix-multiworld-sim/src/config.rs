@@ -29,7 +29,9 @@ pub struct SimulationConfig {
     pub policy: PolicyConfig,
 }
 
-fn default_true() -> bool { true }
+fn default_true() -> bool {
+    true
+}
 
 /// Configurable policy knobs for A/B scenario testing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -70,7 +72,6 @@ pub struct PolicyConfig {
     pub hybrid_earth: bool,
 
     // === CANONICAL GOVERNANCE SYSTEMS ===
-
     /// Metabolism cycle configuration (4-phase governance rhythm).
     #[serde(default)]
     pub metabolism: crate::metabolism::MetabolismConfig,
@@ -80,7 +81,6 @@ pub struct PolicyConfig {
     pub governance_hardening: crate::governance_hardening::GovernanceHardeningConfig,
 
     // === REALISM TOGGLES — scientific instrument controls ===
-
     /// Turchin secular cycles: elite overproduction → crisis → civil war.
     /// When false, no Turchin dynamics — society is conflict-free (utopia).
     #[serde(default = "default_true")]
@@ -111,7 +111,6 @@ pub struct PolicyConfig {
     pub phase2_enabled: bool,
 
     // === DISASTER CATEGORY TOGGLES ===
-
     /// Solar weather events (M-class, X-class, Carrington, SPE).
     #[serde(default = "default_true")]
     pub disasters_solar_enabled: bool,
@@ -135,7 +134,6 @@ pub struct PolicyConfig {
     pub disasters_civilization_enabled: bool,
 
     // === C: SCENARIO MODE — player/researcher policy choices ===
-
     /// Colony project priority strategy.
     pub project_strategy: ProjectStrategy,
     /// Birth policy (affects birth rate modifier).
@@ -150,7 +148,6 @@ pub struct PolicyConfig {
     pub exploration_investment: f64,
 
     // === D: COORDINATION SCIENCE EXPERIMENT CONTROLS ===
-
     /// Initial coordination science understanding for all agents [0.0, 1.0].
     /// 0.0 = no coordination understanding (baseline).
     /// 0.5 = moderate (coordination-literate condition).
@@ -469,19 +466,28 @@ impl SimulationConfig {
         let mut cfg = Self::default_150_year();
         cfg.total_ticks = 300 * TICKS_PER_YEAR;
         cfg.epoch_configs.push(EpochConfig {
-            id: 7, name: "Convergence".into(),
-            start_tick: 150 * TICKS_PER_YEAR, end_tick: 200 * TICKS_PER_YEAR,
-            population_trigger: None, self_sufficiency_trigger: None,
+            id: 7,
+            name: "Convergence".into(),
+            start_tick: 150 * TICKS_PER_YEAR,
+            end_tick: 200 * TICKS_PER_YEAR,
+            population_trigger: None,
+            self_sufficiency_trigger: None,
         });
         cfg.epoch_configs.push(EpochConfig {
-            id: 8, name: "Secondary Growth".into(),
-            start_tick: 200 * TICKS_PER_YEAR, end_tick: 250 * TICKS_PER_YEAR,
-            population_trigger: None, self_sufficiency_trigger: None,
+            id: 8,
+            name: "Secondary Growth".into(),
+            start_tick: 200 * TICKS_PER_YEAR,
+            end_tick: 250 * TICKS_PER_YEAR,
+            population_trigger: None,
+            self_sufficiency_trigger: None,
         });
         cfg.epoch_configs.push(EpochConfig {
-            id: 9, name: "Legacy".into(),
-            start_tick: 250 * TICKS_PER_YEAR, end_tick: 300 * TICKS_PER_YEAR,
-            population_trigger: None, self_sufficiency_trigger: None,
+            id: 9,
+            name: "Legacy".into(),
+            start_tick: 250 * TICKS_PER_YEAR,
+            end_tick: 300 * TICKS_PER_YEAR,
+            population_trigger: None,
+            self_sufficiency_trigger: None,
         });
         cfg
     }
@@ -491,17 +497,26 @@ impl SimulationConfig {
         let mut cfg = Self::default_300_year();
         cfg.total_ticks = 777 * TICKS_PER_YEAR;
         cfg.initial_worlds.push(WorldSeedConfig {
-            name: "Europa Station".into(), location: "Europa".into(),
-            founding_tick: 2400, initial_population: 200, initial_resources: 0.15,
+            name: "Europa Station".into(),
+            location: "Europa".into(),
+            founding_tick: 2400,
+            initial_population: 200,
+            initial_resources: 0.15,
         });
         cfg.initial_worlds.push(WorldSeedConfig {
-            name: "Titan Outpost".into(), location: "Titan".into(),
-            founding_tick: 3600, initial_population: 150, initial_resources: 0.1,
+            name: "Titan Outpost".into(),
+            location: "Titan".into(),
+            founding_tick: 3600,
+            initial_population: 150,
+            initial_resources: 0.1,
         });
         cfg.epoch_configs.push(EpochConfig {
-            id: 10, name: "Millennium".into(),
-            start_tick: 300 * TICKS_PER_YEAR, end_tick: 777 * TICKS_PER_YEAR,
-            population_trigger: None, self_sufficiency_trigger: None,
+            id: 10,
+            name: "Millennium".into(),
+            start_tick: 300 * TICKS_PER_YEAR,
+            end_tick: 777 * TICKS_PER_YEAR,
+            population_trigger: None,
+            self_sufficiency_trigger: None,
         });
         cfg
     }
@@ -534,17 +549,26 @@ impl SimulationConfig {
         let mut cfg = Self::default_300_year();
         cfg.total_ticks = 1000 * TICKS_PER_YEAR;
         cfg.initial_worlds.push(WorldSeedConfig {
-            name: "Europa Station".into(), location: "Europa".into(),
-            founding_tick: 2400, initial_population: 200, initial_resources: 0.15,
+            name: "Europa Station".into(),
+            location: "Europa".into(),
+            founding_tick: 2400,
+            initial_population: 200,
+            initial_resources: 0.15,
         });
         cfg.initial_worlds.push(WorldSeedConfig {
-            name: "Titan Outpost".into(), location: "Titan".into(),
-            founding_tick: 3600, initial_population: 150, initial_resources: 0.1,
+            name: "Titan Outpost".into(),
+            location: "Titan".into(),
+            founding_tick: 3600,
+            initial_population: 150,
+            initial_resources: 0.1,
         });
         cfg.epoch_configs.push(EpochConfig {
-            id: 10, name: "Millennium".into(),
-            start_tick: 300 * TICKS_PER_YEAR, end_tick: 1000 * TICKS_PER_YEAR,
-            population_trigger: None, self_sufficiency_trigger: None,
+            id: 10,
+            name: "Millennium".into(),
+            start_tick: 300 * TICKS_PER_YEAR,
+            end_tick: 1000 * TICKS_PER_YEAR,
+            population_trigger: None,
+            self_sufficiency_trigger: None,
         });
         cfg
     }

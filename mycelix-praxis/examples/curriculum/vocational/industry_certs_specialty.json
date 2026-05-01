@@ -1,0 +1,116 @@
+{
+  "metadata": {
+    "title": "High-Signal Specialty Seed: Specialized Readiness",
+    "framework": "Global Specialty Mesh",
+    "source": "https://mycelix.org/certs-specialty",
+    "grade_level": "Professional",
+    "subject_area": "Multi-Sector",
+    "domain": "Professional Certification",
+    "version": "1.0",
+    "total_standards": 6,
+    "domains": [
+      "Mesh Infrastructure",
+      "Inventory Management",
+      "Property Inspection",
+      "Specialized Hospitality",
+      "Cloud Data"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Focused on specialized, high-utility skills for the current 2026 market."
+  },
+  "nodes": [
+    {
+      "id": "CERT-ENG-FOA-CFOT",
+      "title": "FOA Certified Fiber Optic Technician (CFOT)",
+      "description": "Fiber optic communication systems, terminology, components, and installation. Splicing, termination, and testing. Essential for building the physical mesh substrate.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Mesh Infrastructure",
+      "subdomain": "Certification Bridge",
+      "tags": ["fiber", "telecom", "infrastructure", "mesh", "standard"],
+      "estimated_hours": 40,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "CERT-LOG-APICS-CPIM",
+      "title": "APICS Certified in Planning and Inventory Management",
+      "description": "Internal operations, inventory management, and scheduling. Mapping the Mycelial Oracle and TEND ledger to professional inventory standards.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Inventory Management",
+      "subdomain": "Certification Bridge",
+      "tags": ["inventory", "planning", "apics", "logistics", "standard"],
+      "estimated_hours": 150,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Analyze",
+      "subject_area": "Social Studies"
+    },
+    {
+      "id": "CERT-HAB-INTERNACHI",
+      "title": "InterNACHI Certified Professional Property Inspector",
+      "description": "Inspecting residential properties for safety, structural integrity, and system performance. Mapping habitat engineering to professional property standards.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Property Inspection",
+      "subdomain": "Certification Bridge",
+      "tags": ["inspection", "habitat", "real-estate", "safety", "standard"],
+      "estimated_hours": 120,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "CERT-HOSP-SCA-BARISTA",
+      "title": "SCA Barista Skills: Foundation",
+      "description": "The fundamentals of professional coffee preparation. Setting your grinder, milk techniques, and health/safety. Linked to the Ubuntu Stewardship track.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Specialized Hospitality",
+      "subdomain": "Certification Bridge",
+      "tags": ["coffee", "barista", "hospitality", "service", "standard"],
+      "estimated_hours": 15,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Arts"
+    },
+    {
+      "id": "CERT-DATA-SNOWFLAKE",
+      "title": "Snowflake SnowPro Core Certification",
+      "description": "Architecture, ecosystem, and data loading in the Snowflake Data Cloud. Mapping value topology and oracle predictive models to modern data warehousing.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Cloud Data",
+      "subdomain": "Certification Bridge",
+      "tags": ["snowflake", "data-cloud", "analytics", "sql", "standard"],
+      "estimated_hours": 60,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science"
+    }
+  ],
+  "edges": [
+    {
+      "from": "VOC-SOL-101",
+      "to": "CERT-ENG-FOA-CFOT",
+      "edge_type": "Recommended",
+      "strength_permille": 600,
+      "rationale": "DC electrical fundamentals provide the necessary context for low-voltage signal infrastructure."
+    },
+    {
+      "from": "HAB-VOC-301",
+      "to": "CERT-HAB-INTERNACHI",
+      "edge_type": "Recommended",
+      "strength_permille": 850,
+      "rationale": "Habitat engineering mastery covers 85% of the InterNACHI professional inspection domains."
+    },
+    {
+      "from": "HUM-PSY-101",
+      "to": "CERT-HOSP-SCA-BARISTA",
+      "edge_type": "Recommended",
+      "strength_permille": 700,
+      "rationale": "Sovereign psychology and guest-service empathy provide the basis for professional barista interaction."
+    }
+  ]
+}

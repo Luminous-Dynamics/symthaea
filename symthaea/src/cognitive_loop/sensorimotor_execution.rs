@@ -58,15 +58,69 @@ pub(crate) struct SensoriMotorExecution {
     /// Embodiment bridge: physical motor control with proprioceptive feedback.
     /// When `Some`, each cycle steps the bridge, blending proprioceptive HV
     /// into the next cycle's perception at `embodiment_blend_weight`.
-    #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))]
+    #[cfg(any(
+        feature = "humanoid",
+        feature = "helicopter",
+        feature = "flight",
+        feature = "vehicle",
+        feature = "auv",
+        feature = "manipulator",
+        feature = "exoskeleton",
+        feature = "surgical",
+        feature = "orbital",
+        feature = "quadruped",
+        feature = "subterranean",
+        feature = "infrastructure",
+        feature = "scavenger",
+        feature = "agribot",
+        feature = "biota",
+        feature = "clime",
+        feature = "phone"
+    ))]
     pub embodiment_bridge: Option<Box<dyn symthaea_core::embodiment::EmbodimentBridge>>,
 
     /// Last proprioceptive HV from the embodiment bridge.
-    #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))]
+    #[cfg(any(
+        feature = "humanoid",
+        feature = "helicopter",
+        feature = "flight",
+        feature = "vehicle",
+        feature = "auv",
+        feature = "manipulator",
+        feature = "exoskeleton",
+        feature = "surgical",
+        feature = "orbital",
+        feature = "quadruped",
+        feature = "subterranean",
+        feature = "infrastructure",
+        feature = "scavenger",
+        feature = "agribot",
+        feature = "biota",
+        feature = "clime",
+        feature = "phone"
+    ))]
     pub last_proprioceptive_hv: Option<symthaea_core::hdc::ContinuousHV>,
 
     /// Embodiment telemetry from the most recent step.
-    #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))]
+    #[cfg(any(
+        feature = "humanoid",
+        feature = "helicopter",
+        feature = "flight",
+        feature = "vehicle",
+        feature = "auv",
+        feature = "manipulator",
+        feature = "exoskeleton",
+        feature = "surgical",
+        feature = "orbital",
+        feature = "quadruped",
+        feature = "subterranean",
+        feature = "infrastructure",
+        feature = "scavenger",
+        feature = "agribot",
+        feature = "biota",
+        feature = "clime",
+        feature = "phone"
+    ))]
     pub embodiment_telemetry: symthaea_core::embodiment::EmbodimentTelemetry,
 }
 
@@ -82,13 +136,66 @@ impl SensoriMotorExecution {
         pain_tx: Option<crate::infrastructure::somatic_error_bridge::PainSender>,
         thermal_bridge: crate::infrastructure::thermal_bridge::ThermalBridge,
         thermal_tx: Option<crate::infrastructure::thermal_bridge::ThermalSender>,
-        #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))] embodiment_bridge: Option<
-            Box<dyn symthaea_core::embodiment::EmbodimentBridge>,
-        >,
-        #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))] last_proprioceptive_hv: Option<
-            symthaea_core::hdc::ContinuousHV,
-        >,
-        #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))] embodiment_telemetry: symthaea_core::embodiment::EmbodimentTelemetry,
+        #[cfg(any(
+            feature = "humanoid",
+            feature = "helicopter",
+            feature = "flight",
+            feature = "vehicle",
+            feature = "auv",
+            feature = "manipulator",
+            feature = "exoskeleton",
+            feature = "surgical",
+            feature = "orbital",
+            feature = "quadruped",
+            feature = "subterranean",
+            feature = "infrastructure",
+            feature = "scavenger",
+            feature = "agribot",
+            feature = "biota",
+            feature = "clime",
+            feature = "phone"
+        ))]
+        embodiment_bridge: Option<Box<dyn symthaea_core::embodiment::EmbodimentBridge>>,
+        #[cfg(any(
+            feature = "humanoid",
+            feature = "helicopter",
+            feature = "flight",
+            feature = "vehicle",
+            feature = "auv",
+            feature = "manipulator",
+            feature = "exoskeleton",
+            feature = "surgical",
+            feature = "orbital",
+            feature = "quadruped",
+            feature = "subterranean",
+            feature = "infrastructure",
+            feature = "scavenger",
+            feature = "agribot",
+            feature = "biota",
+            feature = "clime",
+            feature = "phone"
+        ))]
+        last_proprioceptive_hv: Option<symthaea_core::hdc::ContinuousHV>,
+        #[cfg(any(
+            feature = "humanoid",
+            feature = "helicopter",
+            feature = "flight",
+            feature = "vehicle",
+            feature = "auv",
+            feature = "manipulator",
+            feature = "exoskeleton",
+            feature = "surgical",
+            feature = "orbital",
+            feature = "quadruped",
+            feature = "subterranean",
+            feature = "infrastructure",
+            feature = "scavenger",
+            feature = "agribot",
+            feature = "biota",
+            feature = "clime",
+            feature = "phone"
+        ))]
+        embodiment_telemetry: symthaea_core::embodiment::EmbodimentTelemetry,
     ) -> Self {
         Self {
             vision_sensory,
@@ -97,11 +204,65 @@ impl SensoriMotorExecution {
             pain_tx,
             thermal_bridge,
             thermal_tx,
-            #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))]
+            #[cfg(any(
+                feature = "humanoid",
+                feature = "helicopter",
+                feature = "flight",
+                feature = "vehicle",
+                feature = "auv",
+                feature = "manipulator",
+                feature = "exoskeleton",
+                feature = "surgical",
+                feature = "orbital",
+                feature = "quadruped",
+                feature = "subterranean",
+                feature = "infrastructure",
+                feature = "scavenger",
+                feature = "agribot",
+                feature = "biota",
+                feature = "clime",
+                feature = "phone"
+            ))]
             embodiment_bridge,
-            #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))]
+            #[cfg(any(
+                feature = "humanoid",
+                feature = "helicopter",
+                feature = "flight",
+                feature = "vehicle",
+                feature = "auv",
+                feature = "manipulator",
+                feature = "exoskeleton",
+                feature = "surgical",
+                feature = "orbital",
+                feature = "quadruped",
+                feature = "subterranean",
+                feature = "infrastructure",
+                feature = "scavenger",
+                feature = "agribot",
+                feature = "biota",
+                feature = "clime",
+                feature = "phone"
+            ))]
             last_proprioceptive_hv,
-            #[cfg(any(feature = "humanoid", feature = "helicopter", feature = "flight", feature = "vehicle", feature = "auv", feature = "manipulator", feature = "exoskeleton", feature = "surgical", feature = "orbital", feature = "quadruped", feature = "phone"))]
+            #[cfg(any(
+                feature = "humanoid",
+                feature = "helicopter",
+                feature = "flight",
+                feature = "vehicle",
+                feature = "auv",
+                feature = "manipulator",
+                feature = "exoskeleton",
+                feature = "surgical",
+                feature = "orbital",
+                feature = "quadruped",
+                feature = "subterranean",
+                feature = "infrastructure",
+                feature = "scavenger",
+                feature = "agribot",
+                feature = "biota",
+                feature = "clime",
+                feature = "phone"
+            ))]
             embodiment_telemetry,
         }
     }

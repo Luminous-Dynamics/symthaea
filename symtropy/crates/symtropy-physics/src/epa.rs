@@ -1,5 +1,5 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! EPA (Expanding Polytope Algorithm) for penetration depth and contact normal.
 //!
@@ -386,10 +386,11 @@ fn facet_normal_nd<const D: usize>(
     // Gram-Schmidt: find the component of each standard basis vector orthogonal
     // to all edge vectors. The first non-zero result is our normal direction.
     // More robust: start from the centroid→origin direction and orthogonalize.
-    let centroid: SVector<f64, D> = indices.iter().map(|&i| vertices[i]).fold(
-        SVector::zeros(),
-        |acc, v| acc + v,
-    ) / D as f64;
+    let centroid: SVector<f64, D> = indices
+        .iter()
+        .map(|&i| vertices[i])
+        .fold(SVector::zeros(), |acc, v| acc + v)
+        / D as f64;
 
     // Use the centroid→origin vector as a seed for the normal direction
     let seed = -centroid; // Points from centroid toward origin
@@ -480,7 +481,10 @@ fn epa_nd<const D: usize>(
         if dist < 1e-15 {
             let mut n = SVector::zeros();
             n[0] = 1.0;
-            return Some(EpaResult { normal: n, depth: ra + rb });
+            return Some(EpaResult {
+                normal: n,
+                depth: ra + rb,
+            });
         }
         return Some(EpaResult {
             normal: delta / dist,
@@ -530,7 +534,9 @@ fn epa_nd<const D: usize>(
                 // Visible facet — extract its (D-2)-ridges
                 let fi = &facets[i].indices;
                 for skip in 0..fi.len() {
-                    let ridge: Vec<usize> = fi.iter().enumerate()
+                    let ridge: Vec<usize> = fi
+                        .iter()
+                        .enumerate()
                         .filter(|(j, _)| *j != skip)
                         .map(|(_, &v)| v)
                         .collect();
@@ -737,7 +743,10 @@ mod tests {
         let pb = SVector::from([1.5, 0.0, 0.0, 0.0]);
 
         let gjk_result = gjk::intersects(&a, &pa, &b, &pb);
-        assert!(gjk_result.intersecting, "4D boxes at dist 1.5 with half_extent 1.0 should overlap");
+        assert!(
+            gjk_result.intersecting,
+            "4D boxes at dist 1.5 with half_extent 1.0 should overlap"
+        );
 
         let epa = penetration(&a, &pa, &b, &pb, &gjk_result.simplex).unwrap();
         // Two unit tesseracts at distance 1.5: overlap = 2*1.0 - 1.5 = 0.5

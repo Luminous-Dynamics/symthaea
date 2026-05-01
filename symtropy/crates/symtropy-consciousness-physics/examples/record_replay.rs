@@ -10,10 +10,10 @@
 //! Output: JSON replay files to stdout (pipe to file).
 
 use nalgebra::SVector;
+use symthaea_consciousness_equation::ConsciousnessInputs;
 use symtropy_consciousness_physics::coupling::ConsciousnessField;
 use symtropy_math::Point;
 use symtropy_physics::{BodyHandle, PhysicsWorld};
-use symthaea_consciousness_equation::ConsciousnessInputs;
 
 const DT: f64 = 1.0 / 60.0;
 
@@ -42,11 +42,7 @@ fn run_experiment(
     let r = 10.0f64;
     for i in 0..num_agents {
         let angle = std::f64::consts::TAU * i as f64 / num_agents as f64;
-        let h = world.add_sphere(
-            Point::new([r * angle.cos(), r * angle.sin()]),
-            1.0,
-            1.0,
-        );
+        let h = world.add_sphere(Point::new([r * angle.cos(), r * angle.sin()]), 1.0, 1.0);
         field.register(h, 100.0, 2.0);
         handles.push(h);
     }
@@ -58,7 +54,8 @@ fn run_experiment(
     for tick in 0..ticks {
         // Update consciousness
         for &h in &handles {
-            let pos = world.body(h)
+            let pos = world
+                .body(h)
                 .map(|b| {
                     let p = b.position();
                     Point::new([p.coord(0), p.coord(1)])
@@ -70,15 +67,19 @@ fn run_experiment(
         field.tick_prediction_errors();
 
         // Emotional contagion
-        let positions: Vec<(BodyHandle, Point<2>)> = handles.iter().map(|&h| {
-            let pos = world.body(h)
-                .map(|b| {
-                    let p = b.position();
-                    Point::new([p.coord(0), p.coord(1)])
-                })
-                .unwrap_or_else(Point::origin);
-            (h, pos)
-        }).collect();
+        let positions: Vec<(BodyHandle, Point<2>)> = handles
+            .iter()
+            .map(|&h| {
+                let pos = world
+                    .body(h)
+                    .map(|b| {
+                        let p = b.position();
+                        Point::new([p.coord(0), p.coord(1)])
+                    })
+                    .unwrap_or_else(Point::origin);
+                (h, pos)
+            })
+            .collect();
         field.spread_emotional_contagion(&positions, DT);
 
         // Physics step
@@ -86,16 +87,21 @@ fn run_experiment(
 
         // Record snapshot every 10 ticks
         if tick % 10 == 0 {
-            let pos_vec: Vec<[f64; 2]> = handles.iter().map(|&h| {
-                world.body(h)
-                    .map(|b| {
-                        let p = b.position();
-                        [p.coord(0), p.coord(1)]
-                    })
-                    .unwrap_or([0.0, 0.0])
-            }).collect();
+            let pos_vec: Vec<[f64; 2]> = handles
+                .iter()
+                .map(|&h| {
+                    world
+                        .body(h)
+                        .map(|b| {
+                            let p = b.position();
+                            [p.coord(0), p.coord(1)]
+                        })
+                        .unwrap_or([0.0, 0.0])
+                })
+                .collect();
 
-            let phi_vec: Vec<f64> = handles.iter()
+            let phi_vec: Vec<f64> = handles
+                .iter()
                 .map(|&h| field.entities.get(&h).map(|e| e.phi()).unwrap_or(0.0))
                 .collect();
 
@@ -122,7 +128,10 @@ fn print_replay_json(name: &str, snapshots: &[TickSnapshot]) {
     println!("    \"num_snapshots\": {},", snapshots.len());
 
     if let Some(first) = snapshots.first() {
-        println!("    \"initial_collective_phi\": {:.6},", first.collective_phi);
+        println!(
+            "    \"initial_collective_phi\": {:.6},",
+            first.collective_phi
+        );
     }
     if let Some(last) = snapshots.last() {
         println!("    \"final_collective_phi\": {:.6},", last.collective_phi);
@@ -135,10 +144,10 @@ fn print_replay_json(name: &str, snapshots: &[TickSnapshot]) {
             let mut total = 0.0;
             let mut pairs = 0u64;
             for i in 0..n {
-                for j in (i+1)..n {
+                for j in (i + 1)..n {
                     let dx = last.positions[i][0] - last.positions[j][0];
                     let dy = last.positions[i][1] - last.positions[j][1];
-                    total += (dx*dx + dy*dy).sqrt();
+                    total += (dx * dx + dy * dy).sqrt();
                     pairs += 1;
                 }
             }
@@ -150,7 +159,10 @@ fn print_replay_json(name: &str, snapshots: &[TickSnapshot]) {
     println!("    \"phi_trajectory\": [");
     for (i, s) in snapshots.iter().enumerate().step_by(5) {
         let comma = if i + 5 < snapshots.len() { "," } else { "" };
-        println!("      {{\"tick\": {}, \"phi\": {:.6}, \"alive\": {}}}{comma}", s.tick, s.collective_phi, s.alive);
+        println!(
+            "      {{\"tick\": {}, \"phi\": {:.6}, \"alive\": {}}}{comma}",
+            s.tick, s.collective_phi, s.alive
+        );
     }
     println!("    ]");
     println!("  }}");
@@ -162,13 +174,25 @@ fn main() {
     eprintln!("═══════════════════════════════════════════════════════════\n");
 
     let conscious_inputs = ConsciousnessInputs {
-        phi: 0.5, broadcast: 0.5, working_memory: 0.5, attention: 0.5,
-        recurrence: 0.5, embodiment: 0.5, knowledge: 0.5, synchrony: 0.5,
+        phi: 0.5,
+        broadcast: 0.5,
+        working_memory: 0.5,
+        attention: 0.5,
+        recurrence: 0.5,
+        embodiment: 0.5,
+        knowledge: 0.5,
+        synchrony: 0.5,
     };
 
     let unconscious_inputs = ConsciousnessInputs {
-        phi: 0.0, broadcast: 0.0, working_memory: 0.0, attention: 0.0,
-        recurrence: 0.0, embodiment: 0.0, knowledge: 0.0, synchrony: 0.0,
+        phi: 0.0,
+        broadcast: 0.0,
+        working_memory: 0.0,
+        attention: 0.0,
+        recurrence: 0.0,
+        embodiment: 0.0,
+        knowledge: 0.0,
+        synchrony: 0.0,
     };
 
     println!("{{");

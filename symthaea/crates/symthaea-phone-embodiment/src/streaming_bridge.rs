@@ -157,10 +157,8 @@ impl StreamingPhoneBridge {
     pub fn capture_streaming(
         &mut self,
         dt: f32,
-    ) -> Result<
-        Option<(symthaea_vision_manifold::VisionTelemetry, Vec<u8>, u32, u32)>,
-        StreamError,
-    > {
+    ) -> Result<Option<(symthaea_vision_manifold::VisionTelemetry, Vec<u8>, u32, u32)>, StreamError>
+    {
         let frame = match self.stream.next_frame()? {
             Some(f) => f,
             None => return Ok(None),
@@ -174,20 +172,16 @@ impl StreamingPhoneBridge {
         // RGBA buffer because image::RgbaImage takes ownership and we
         // also want to return the original full-resolution bytes to
         // the caller.
-        let img_rgba =
-            image::RgbaImage::from_raw(frame.width, frame.height, frame.rgba.clone())
-                .ok_or_else(|| {
-                    StreamError::Io(std::io::Error::other(
-                        "RGBA buffer length mismatch (decoder bug)",
-                    ))
-                })?;
+        let img_rgba = image::RgbaImage::from_raw(frame.width, frame.height, frame.rgba.clone())
+            .ok_or_else(|| {
+                StreamError::Io(std::io::Error::other(
+                    "RGBA buffer length mismatch (decoder bug)",
+                ))
+            })?;
         let dyn_img = image::DynamicImage::ImageRgba8(img_rgba);
         let (target_w, target_h) = self.inner.vision_target_dims();
-        let resized = dyn_img.resize_exact(
-            target_w,
-            target_h,
-            image::imageops::FilterType::Triangle,
-        );
+        let resized =
+            dyn_img.resize_exact(target_w, target_h, image::imageops::FilterType::Triangle);
         let rgb_pixels: Vec<u8> = resized.to_rgb8().into_raw();
 
         // Drive the vision manifold via the inner bridge's accessor.

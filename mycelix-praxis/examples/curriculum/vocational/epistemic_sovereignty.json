@@ -1,0 +1,113 @@
+{
+  "metadata": {
+    "title": "Epistemic Sovereignty & Collective Mind",
+    "framework": "Mycelix Epistemics",
+    "source": "https://mycelix.org",
+    "grade_level": "Lifelong/Universal",
+    "subject_area": "Humanities",
+    "domain": "Humanities",
+    "version": "1.0",
+    "total_standards": 5,
+    "domains": [
+      "Cognitive Ecology",
+      "Sense-Making",
+      "Philosophy of Technology"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Protecting the integrity of the individual and collective mind in a connected world."
+  },
+  "nodes": [
+    {
+      "id": "HUM-EPI-101",
+      "title": "The Ecology of Attention",
+      "description": "Attention as the primary currency of life. Identifying and resisting extractive attention-mining. Techniques for deep focus and cognitive boundaries in a decentralized mesh.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Cognitive Ecology",
+      "subdomain": "Epistemic Sovereignty",
+      "tags": ["attention", "sovereignty", "mental-health", "boundaries"],
+      "estimated_hours": 45,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Understand",
+      "subject_area": "Humanities"
+    },
+    {
+      "id": "HUM-EPI-201",
+      "title": "Bayesian Sense-Making",
+      "description": "How to update your beliefs in a decentralized network. Understanding information weights based on source reputation (MATL) and graph distance. Detecting network-scale fallacies.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Sense-Making",
+      "subdomain": "Epistemic Sovereignty",
+      "tags": ["logic", "bayes", "trust", "veracity"],
+      "estimated_hours": 60,
+      "grade_levels": ["Undergraduate"],
+      "bloom_level": "Apply",
+      "subject_area": "Humanities"
+    },
+    {
+      "id": "HUM-EPI-301",
+      "title": "Philosophy of the Substrate",
+      "description": "The history of technics from the printing press to Holochain. Why agent-centricity is a prerequisite for human flourishing. Critical analysis of centralized vs decentralized architectures.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Philosophy of Technology",
+      "subdomain": "Epistemic Sovereignty",
+      "tags": ["technology", "philosophy", "history", "sovereignty"],
+      "estimated_hours": 90,
+      "grade_levels": ["Graduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Humanities"
+    },
+    {
+      "id": "HUM-CAP-03",
+      "title": "The Epistemic Witness Capstone",
+      "description": "Produce a high-signal communication artifact (report, audit, or research) that demonstrates perfect internal consistency and objective veracity. Verified by the Symthaea Auditor.",
+      "node_type": "Capstone",
+      "difficulty": "Advanced",
+      "domain": "Universal",
+      "subdomain": "Epistemic Sovereignty",
+      "tags": ["capstone", "truth", "witness", "auditable"],
+      "estimated_hours": 120,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Create",
+      "subject_area": "Humanities",
+      "holonic_capstone": {
+        "required_node_ids": ["HUM-EPI-101", "HUM-EPI-201", "HUM-EPI-301"],
+        "deliverable": "A 'Non-Hallucinating Artifact'—a piece of complex reasoning or reporting that passes the EML Structural Integrity test with a score > 900.",
+        "min_peer_endorsements": 5
+      },
+      "alignment_vector": {
+        "ahimsa": 900,
+        "truthfulness": 990,
+        "reciprocity": 850,
+        "sovereignty_respect": 980,
+        "collective_flourishing": 900,
+        "epistemic_humility": 990
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "HUM-EPI-101",
+      "to": "HUM-CAP-03",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "One cannot witness truth without first mastering the ecology of their own attention."
+    },
+    {
+      "from": "HUM-EPI-201",
+      "to": "HUM-CAP-03",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Bayesian sense-making is the formal requirement for objective reporting."
+    },
+    {
+      "from": "HUM-EPI-301",
+      "to": "HUM-CAP-03",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Truth-telling in the digital age requires understanding the philosophy of the substrate."
+    }
+  ]
+}

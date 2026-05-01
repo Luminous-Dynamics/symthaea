@@ -11,7 +11,7 @@
 //!
 //! Key metric: Does civilization survive DESPITE a hostile Guardian?
 
-use mycelix_multiworld_sim::{MultiWorldSimulator, config::SimulationConfig};
+use mycelix_multiworld_sim::{config::SimulationConfig, MultiWorldSimulator};
 
 fn run_scenario(name: &str, hostile: bool, seed: u64) -> (f64, bool, u32, u32, u32) {
     let mut config = SimulationConfig::default_150_year();
@@ -41,7 +41,13 @@ fn run_scenario(name: &str, hostile: bool, seed: u64) -> (f64, bool, u32, u32, u
         deterred,
     );
 
-    (report.final_cvs, report.survived, vetoes, overrides, deterred)
+    (
+        report.final_cvs,
+        report.survived,
+        vetoes,
+        overrides,
+        deterred,
+    )
 }
 
 fn main() {
@@ -56,7 +62,9 @@ fn main() {
     for &seed in &seeds {
         let (cvs, survived, _, _, _) = run_scenario("baseline", false, seed);
         baseline_cvs.push(cvs);
-        if !survived { baseline_all_survived = false; }
+        if !survived {
+            baseline_all_survived = false;
+        }
     }
 
     println!("\n--- HOSTILE GUARDIAN (vetoes every proposal) ---");
@@ -69,7 +77,9 @@ fn main() {
         hostile_cvs.push(cvs);
         total_vetoes += vetoes;
         total_overrides += overrides;
-        if !survived { hostile_all_survived = false; }
+        if !survived {
+            hostile_all_survived = false;
+        }
     }
 
     // Analysis
@@ -82,10 +92,26 @@ fn main() {
 
     println!("Baseline mean CVS:  {:.3}", baseline_mean);
     println!("Hostile mean CVS:   {:.3}", hostile_mean);
-    println!("CVS delta:          {:.3} ({:.1}%)", cvs_delta, cvs_delta / baseline_mean * 100.0);
+    println!(
+        "CVS delta:          {:.3} ({:.1}%)",
+        cvs_delta,
+        cvs_delta / baseline_mean * 100.0
+    );
     println!();
-    println!("Baseline survival:  {}/{}", if baseline_all_survived { seeds.len() } else { 0 }, seeds.len());
-    println!("Hostile survival:   {}/{}", if hostile_all_survived { seeds.len() } else { 0 }, seeds.len());
+    println!(
+        "Baseline survival:  {}/{}",
+        if baseline_all_survived {
+            seeds.len()
+        } else {
+            0
+        },
+        seeds.len()
+    );
+    println!(
+        "Hostile survival:   {}/{}",
+        if hostile_all_survived { seeds.len() } else { 0 },
+        seeds.len()
+    );
     println!();
     println!("Total hostile vetoes:    {}", total_vetoes);
     println!("Total vetoes overridden: {}", total_overrides);
@@ -98,7 +124,10 @@ fn main() {
     println!();
     if hostile_all_survived && total_overrides > 0 {
         println!("RESULT: Override mechanism PROVEN — civilization survives hostile Guardian");
-        println!("        The 80% supermajority actively reversed {} vetoes", total_overrides);
+        println!(
+            "        The 80% supermajority actively reversed {} vetoes",
+            total_overrides
+        );
     } else if hostile_all_survived && total_vetoes == 0 {
         println!("RESULT: Rate limiting prevented hostile Guardian from exercising any vetoes");
         println!("        (7-tick cooldown limits damage to 1 veto per 7 months)");

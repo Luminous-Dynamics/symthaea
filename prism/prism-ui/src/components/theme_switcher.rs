@@ -6,14 +6,14 @@
 use leptos::prelude::*;
 
 const THEMES: &[(&str, &str, &str)] = &[
-    ("abyss",    "Abyssal Bioluminescence", "#4aecd8"),
-    ("parchment","Mycelial Parchment",      "#8fbc8f"),
-    ("prism",    "Hyperdimensional Prism",   "#a78bfa"),
-    ("solar",    "Solar Resonance",          "#f59e0b"),
-    ("verdant",  "Verdant Canopy",           "#22c55e"),
-    ("arctic",   "Arctic Aurora",            "#38bdf8"),
-    ("obsidian", "Obsidian Forge",           "#ef4444"),
-    ("lavender", "Lavender Twilight",        "#c084fc"),
+    ("abyss", "Abyssal Bioluminescence", "#4aecd8"),
+    ("parchment", "Mycelial Parchment", "#8fbc8f"),
+    ("prism", "Hyperdimensional Prism", "#a78bfa"),
+    ("solar", "Solar Resonance", "#f59e0b"),
+    ("verdant", "Verdant Canopy", "#22c55e"),
+    ("arctic", "Arctic Aurora", "#38bdf8"),
+    ("obsidian", "Obsidian Forge", "#ef4444"),
+    ("lavender", "Lavender Twilight", "#c084fc"),
 ];
 
 #[component]

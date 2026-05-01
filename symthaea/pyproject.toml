@@ -1,0 +1,53 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "symthaea-research"
+version = "0.1.0"
+description = "Python research and validation tooling for Symthaea"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3",
+  "ruff>=0.11",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3",
+  "ruff>=0.11",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["python/symthaea_research"]
+
+[tool.uv]
+package = true
+
+[tool.pytest.ini_options]
+testpaths = [
+  "tests/python",
+]
+python_files = [
+  "test_*.py",
+]
+pythonpath = [
+  "python",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = [
+  "scripts/audio-bench/.venv",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

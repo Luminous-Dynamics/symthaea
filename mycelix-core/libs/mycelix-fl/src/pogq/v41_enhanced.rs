@@ -195,7 +195,10 @@ impl PoGQv41Enhanced {
         }
 
         // Compute IQR of recent norms
-        let window = self.config.gradient_history_window.min(self.norm_history.len());
+        let window = self
+            .config
+            .gradient_history_window
+            .min(self.norm_history.len());
         let start = self.norm_history.len().saturating_sub(window);
         let mut recent: Vec<f64> = self.norm_history[start..].to_vec();
         recent.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
@@ -276,10 +279,7 @@ impl PoGQv41Enhanced {
     ///
     /// Returns [`FlError::EmptyGradients`] if the gradient slice is empty.
     /// Returns [`FlError::DimensionMismatch`] if gradients have inconsistent dimensions.
-    pub fn evaluate_round(
-        &mut self,
-        gradients: &[Gradient],
-    ) -> Result<PoGQRoundResult, FlError> {
+    pub fn evaluate_round(&mut self, gradients: &[Gradient]) -> Result<PoGQRoundResult, FlError> {
         if gradients.is_empty() {
             return Err(FlError::EmptyGradients);
         }
@@ -428,10 +428,7 @@ impl PoGQv41Enhanced {
     /// # Errors
     ///
     /// Returns [`FlError::EmptyGradients`] if the gradient slice is empty.
-    pub fn aggregate(
-        &mut self,
-        gradients: &[Gradient],
-    ) -> Result<AggregationResult, FlError> {
+    pub fn aggregate(&mut self, gradients: &[Gradient]) -> Result<AggregationResult, FlError> {
         let round_result = self.evaluate_round(gradients)?;
 
         let mut included_refs: Vec<&[f32]> = Vec::new();
@@ -746,7 +743,8 @@ mod tests {
         assert!(
             lambda_high > lambda_low,
             "Higher SNR should produce higher lambda: low={}, high={}",
-            lambda_low, lambda_high
+            lambda_low,
+            lambda_high
         );
     }
 
@@ -783,14 +781,8 @@ mod tests {
         }
 
         // Both Byzantine nodes should be quarantined
-        assert!(
-            pogq.is_quarantined("byz-0"),
-            "byz-0 should be quarantined"
-        );
-        assert!(
-            pogq.is_quarantined("byz-1"),
-            "byz-1 should be quarantined"
-        );
+        assert!(pogq.is_quarantined("byz-0"), "byz-0 should be quarantined");
+        assert!(pogq.is_quarantined("byz-1"), "byz-1 should be quarantined");
 
         // Honest nodes should NOT be quarantined
         assert!(

@@ -152,11 +152,7 @@ impl DecayConfig {
     /// Propose a new λ value via governance. Returns the updated config
     /// with the transition ramp initiated. Returns `None` if the new λ
     /// violates constitutional bounds.
-    pub fn propose_lambda_change(
-        &self,
-        new_lambda: f64,
-        vote_timestamp_us: u64,
-    ) -> Option<Self> {
+    pub fn propose_lambda_change(&self, new_lambda: f64, vote_timestamp_us: u64) -> Option<Self> {
         if new_lambda < LAMBDA_MIN || new_lambda > LAMBDA_MAX {
             return None;
         }
@@ -185,8 +181,7 @@ impl DecayConfig {
         let elapsed_days = (now_us - self.lambda_changed_at_us) as f64 / MICROS_PER_DAY;
         let ramp_progress = (elapsed_days / self.ramp_days as f64).min(1.0);
 
-        let effective = self.lambda_previous
-            + (self.lambda - self.lambda_previous) * ramp_progress;
+        let effective = self.lambda_previous + (self.lambda - self.lambda_previous) * ramp_progress;
 
         // Constitutional clamp (belt + suspenders)
         effective.clamp(LAMBDA_MIN, LAMBDA_MAX)
@@ -196,7 +191,11 @@ impl DecayConfig {
     /// Half-life = ln(2) / λ
     pub fn half_life_days(&self, now_us: u64) -> f64 {
         let lambda = self.effective_lambda(now_us);
-        if lambda > 0.0 { core::f64::consts::LN_2 / lambda } else { f64::INFINITY }
+        if lambda > 0.0 {
+            core::f64::consts::LN_2 / lambda
+        } else {
+            f64::INFINITY
+        }
     }
 
     /// Check if a λ transition is currently in progress.
@@ -429,7 +428,8 @@ mod tests {
             assert!(
                 decayed.get(dim) < 0.9,
                 "Dimension {:?} should decay from 0.9, got {}",
-                dim, decayed.get(dim)
+                dim,
+                decayed.get(dim)
             );
             assert!(
                 decayed.get(dim) > 0.0,
@@ -582,7 +582,10 @@ mod tests {
 
         // Score is 0.42, threshold is 0.40 — will drop below within ~25 days
         let needs = needs_grace_notification(&profile, &weights, &config, 0, threshold);
-        assert!(needs, "Should trigger grace notification when close to threshold");
+        assert!(
+            needs,
+            "Should trigger grace notification when close to threshold"
+        );
     }
 
     #[test]
@@ -605,9 +608,21 @@ mod tests {
             DecayConfig::land_trust(),
         ];
         for config in &configs {
-            assert!(config.lambda >= LAMBDA_MIN, "λ below min: {}", config.lambda);
-            assert!(config.lambda <= LAMBDA_MAX, "λ above max: {}", config.lambda);
-            assert!(config.ramp_days >= RAMP_DAYS_MIN, "ramp below min: {}", config.ramp_days);
+            assert!(
+                config.lambda >= LAMBDA_MIN,
+                "λ below min: {}",
+                config.lambda
+            );
+            assert!(
+                config.lambda <= LAMBDA_MAX,
+                "λ above max: {}",
+                config.lambda
+            );
+            assert!(
+                config.ramp_days >= RAMP_DAYS_MIN,
+                "ramp below min: {}",
+                config.ramp_days
+            );
         }
     }
 }

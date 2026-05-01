@@ -254,6 +254,7 @@ impl PhiEngine {
                 // O(2^n) scaling: exponential
                 Duration::from_secs(2u64.saturating_pow((n_nodes as u32).saturating_sub(8)))
             }
+            #[allow(deprecated)]
             PhiMethod::Tiered(ApproximationTier::SpectralConnectivity) => {
                 // Similar to SpectralConnectivity
                 let factor = (n_nodes as f64 / 8.0).powi(3);

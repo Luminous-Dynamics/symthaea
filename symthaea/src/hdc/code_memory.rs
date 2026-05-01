@@ -28,7 +28,7 @@ use std::path::{Path, PathBuf};
 use symthaea_core::hdc::ContinuousHV;
 
 use super::code_encoder::CodeHDEncoder;
-use crate::language::code_parser::{CodeEntity, CodeRelation, EntityKind, ParsedCode};
+use crate::language::code_parser::{Entity, EntityKind, EntityRelation, ParsedCode};
 
 /// A match result from querying the codebase memory
 #[derive(Debug, Clone)]
@@ -620,12 +620,12 @@ mod tests {
         for f in funcs {
             parsed
                 .entities
-                .push(CodeEntity::new(EntityKind::Function, *f, test_span()));
+                .push(Entity::new(EntityKind::Function, *f, test_span()));
         }
         for t in types {
             parsed
                 .entities
-                .push(CodeEntity::new(EntityKind::Struct, *t, test_span()));
+                .push(Entity::new(EntityKind::Struct, *t, test_span()));
         }
         parsed
     }

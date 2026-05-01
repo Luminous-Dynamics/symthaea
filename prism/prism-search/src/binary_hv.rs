@@ -167,7 +167,11 @@ impl BinaryHV {
     /// ```
     #[inline(always)]
     pub fn bind(&self, other: &Self) -> Self {
-        let mut r = [0u8; 2048]; for i in 0..2048 { r[i] = self.0[i] ^ other.0[i]; } Self(r)
+        let mut r = [0u8; 2048];
+        for i in 0..2048 {
+            r[i] = self.0[i] ^ other.0[i];
+        }
+        Self(r)
     }
 
     /// Non-commutative temporal binding: ρ(self) ⊕ other.
@@ -232,9 +236,13 @@ impl BinaryHV {
                 for bit in 0..8 {
                     let mut count = 0usize;
                     for v in &refs {
-                        if v[byte_idx] & (1 << bit) != 0 { count += 1; }
+                        if v[byte_idx] & (1 << bit) != 0 {
+                            count += 1;
+                        }
                     }
-                    if count > threshold { byte |= 1 << bit; }
+                    if count > threshold {
+                        byte |= 1 << bit;
+                    }
                     // Tie: leave as 0 (standard majority vote)
                 }
                 r[byte_idx] = byte;
@@ -847,7 +855,9 @@ impl BinaryHV {
     /// ```
     #[inline(always)]
     pub fn similarity(&self, other: &Self) -> f32 {
-        let matching_bits: u32 = (0..2048).map(|i| (!(self.0[i] ^ other.0[i])).count_ones()).sum();
+        let matching_bits: u32 = (0..2048)
+            .map(|i| (!(self.0[i] ^ other.0[i])).count_ones())
+            .sum();
         matching_bits as f32 / Self::DIM as f32
     }
 
@@ -907,7 +917,9 @@ impl BinaryHV {
     /// ```
     #[inline(always)]
     pub fn hamming_distance(&self, other: &Self) -> u32 {
-        (0..2048).map(|i| (self.0[i] ^ other.0[i]).count_ones()).sum()
+        (0..2048)
+            .map(|i| (self.0[i] ^ other.0[i]).count_ones())
+            .sum()
     }
 
     /// Hamming distance using scalar implementation (for comparison/testing)
@@ -937,7 +949,13 @@ impl BinaryHV {
     /// ```
     #[inline(always)]
     pub fn invert(&self) -> Self {
-        { let mut r = [0u8; 2048]; for i in 0..2048 { r[i] = !self.0[i]; } Self(r) }
+        {
+            let mut r = [0u8; 2048];
+            for i in 0..2048 {
+                r[i] = !self.0[i];
+            }
+            Self(r)
+        }
     }
 
     /// Invert vector using scalar implementation (for comparison/testing)
@@ -967,7 +985,13 @@ impl BinaryHV {
     /// ```
     #[inline(always)]
     pub fn intersection(&self, other: &Self) -> Self {
-        { let mut r = [0u8; 2048]; for i in 0..2048 { r[i] = self.0[i] & other.0[i]; } Self(r) }
+        {
+            let mut r = [0u8; 2048];
+            for i in 0..2048 {
+                r[i] = self.0[i] & other.0[i];
+            }
+            Self(r)
+        }
     }
 
     /// Union (bitwise OR) — SIMD-accelerated
@@ -990,7 +1014,13 @@ impl BinaryHV {
     /// ```
     #[inline(always)]
     pub fn union(&self, other: &Self) -> Self {
-        { let mut r = [0u8; 2048]; for i in 0..2048 { r[i] = self.0[i] | other.0[i]; } Self(r) }
+        {
+            let mut r = [0u8; 2048];
+            for i in 0..2048 {
+                r[i] = self.0[i] | other.0[i];
+            }
+            Self(r)
+        }
     }
 
     /// Get bit at position (0 or 1)
@@ -1309,10 +1339,19 @@ mod serde_arrays {
 
 impl std::fmt::Debug for BinaryHV {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "BinaryHV(popcount={}, first_8_bytes={:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}...)",
+        write!(
+            f,
+            "BinaryHV(popcount={}, first_8_bytes={:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}...)",
             self.popcount(),
-            self.0[0], self.0[1], self.0[2], self.0[3],
-            self.0[4], self.0[5], self.0[6], self.0[7])
+            self.0[0],
+            self.0[1],
+            self.0[2],
+            self.0[3],
+            self.0[4],
+            self.0[5],
+            self.0[6],
+            self.0[7]
+        )
     }
 }
 

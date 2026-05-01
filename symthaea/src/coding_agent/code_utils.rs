@@ -355,6 +355,9 @@ impl CodingAgent {
         if trimmed.contains("unimplemented!(") {
             return Some("code contains unimplemented!() placeholder".into());
         }
+        if trimmed.contains("raise NotImplementedError") {
+            return Some("code contains NotImplementedError placeholder".into());
+        }
 
         for line in trimmed.lines() {
             let l = line.trim();
@@ -397,6 +400,15 @@ impl CodingAgent {
         }
         if trimmed.contains("/* ... */") || trimmed.contains("/* TODO */") {
             return Some("code contains placeholder comment block".into());
+        }
+        for line in non_comment_lines.iter().copied() {
+            let lower = line.to_lowercase();
+            if lower.contains("placeholder for ")
+                || lower.contains("placeholder implementation")
+                || lower.contains("todo placeholder")
+            {
+                return Some("code contains placeholder text".into());
+            }
         }
 
         let explanation_markers = [

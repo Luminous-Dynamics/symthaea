@@ -21,7 +21,8 @@ pub async fn create_offer() -> Result<(String, String), String> {
     })()"#;
 
     let promise = js_sys::eval(js).map_err(|e| format!("{e:?}"))?;
-    let sdp = JsFuture::from(js_sys::Promise::from(promise)).await
+    let sdp = JsFuture::from(js_sys::Promise::from(promise))
+        .await
         .map_err(|e| format!("{e:?}"))?;
 
     Ok((sdp.as_string().unwrap_or_default(), "pc-0".into()))
@@ -43,7 +44,8 @@ pub async fn create_answer(remote_sdp: &str) -> Result<String, String> {
     );
 
     let promise = js_sys::eval(&js).map_err(|e| format!("{e:?}"))?;
-    let sdp = JsFuture::from(js_sys::Promise::from(promise)).await
+    let sdp = JsFuture::from(js_sys::Promise::from(promise))
+        .await
         .map_err(|e| format!("{e:?}"))?;
 
     Ok(sdp.as_string().unwrap_or_default())
@@ -60,7 +62,8 @@ pub async fn get_user_media(video: bool, audio: bool) -> Result<(), String> {
     );
 
     let promise = js_sys::eval(&js).map_err(|e| format!("{e:?}"))?;
-    JsFuture::from(js_sys::Promise::from(promise)).await
+    JsFuture::from(js_sys::Promise::from(promise))
+        .await
         .map_err(|e| format!("{e:?}"))?;
 
     Ok(())
@@ -75,7 +78,8 @@ pub async fn get_display_media() -> Result<(), String> {
     })()"#;
 
     let promise = js_sys::eval(js).map_err(|e| format!("{e:?}"))?;
-    JsFuture::from(js_sys::Promise::from(promise)).await
+    JsFuture::from(js_sys::Promise::from(promise))
+        .await
         .map_err(|e| format!("{e:?}"))?;
 
     Ok(())
@@ -87,6 +91,6 @@ pub fn stop_media() {
         "if(window.__mycelix_stream){window.__mycelix_stream.getTracks().forEach(t=>t.stop())};\
          if(window.__mycelix_screen){window.__mycelix_screen.getTracks().forEach(t=>t.stop())};\
          if(window.__mycelix_pc){window.__mycelix_pc.close()};\
-         if(window.__mycelix_pc_remote){window.__mycelix_pc_remote.close()}"
+         if(window.__mycelix_pc_remote){window.__mycelix_pc_remote.close()}",
     );
 }

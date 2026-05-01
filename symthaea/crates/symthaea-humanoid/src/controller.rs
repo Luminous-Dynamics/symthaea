@@ -150,7 +150,6 @@ impl HumanoidController {
 
         // 2. Get bundled final-layer output, normalized
         let output_hv = self.network.output().normalize();
-        let hv_values = output_hv.as_slice();
 
         // 3. Bottleneck: 16384→64 via fixed random projections (dot products)
         let mut bottleneck = vec![0.0f32; BOTTLENECK_DIM];

@@ -18,12 +18,14 @@ pub fn MeetPage() -> impl IntoView {
     let screen_sharing = RwSignal::new(false);
     let hand_raised = RwSignal::new(false);
 
-    let participants = RwSignal::new(vec![
-        CallParticipant {
-            agent_key: "uhCAk_self_mock".into(), name: "You".into(),
-            is_muted: false, camera_on: true, screen_sharing: false, hand_raised: false,
-        },
-    ]);
+    let participants = RwSignal::new(vec![CallParticipant {
+        agent_key: "uhCAk_self_mock".into(),
+        name: "You".into(),
+        is_muted: false,
+        camera_on: true,
+        screen_sharing: false,
+        hand_raised: false,
+    }]);
 
     let on_start_call = move |ct: CallType| {
         call_type.set(ct);
@@ -35,8 +37,12 @@ pub fn MeetPage() -> impl IntoView {
     let on_end_call = move |_| {
         in_call.set(false);
         participants.set(vec![CallParticipant {
-            agent_key: "uhCAk_self_mock".into(), name: "You".into(),
-            is_muted: false, camera_on: true, screen_sharing: false, hand_raised: false,
+            agent_key: "uhCAk_self_mock".into(),
+            name: "You".into(),
+            is_muted: false,
+            camera_on: true,
+            screen_sharing: false,
+            hand_raised: false,
         }]);
     };
 
@@ -57,7 +63,9 @@ pub fn MeetPage() -> impl IntoView {
             wasm_bindgen_futures::spawn_local(async move {
                 loop {
                     gloo_timers::future::sleep(std::time::Duration::from_secs(1)).await;
-                    if !in_call.get_untracked() { break; }
+                    if !in_call.get_untracked() {
+                        break;
+                    }
                     duration.update(|d| *d += 1);
                 }
             });

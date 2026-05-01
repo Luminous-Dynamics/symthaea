@@ -11,6 +11,7 @@ crate-type = ["cdylib", "rlib"]
 name = "classroom_coordinator"
 
 [dependencies]
+mycelix-zome-helpers = { workspace = true }
 # Holochain Development Kit (HDK) for zome functions
 hdk.workspace = true
 

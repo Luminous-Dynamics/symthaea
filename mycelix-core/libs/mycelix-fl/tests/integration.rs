@@ -225,7 +225,11 @@ fn test_multi_round_convergence() {
         for i in num_honest..total_nodes {
             let byz_values: Vec<f32> = true_gradient.iter().map(|v| -v * 1.5).collect();
             coordinator
-                .submit_gradient(Gradient::new(format!("node-{}", i), byz_values, round as u64))
+                .submit_gradient(Gradient::new(
+                    format!("node-{}", i),
+                    byz_values,
+                    round as u64,
+                ))
                 .unwrap();
         }
 
@@ -292,7 +296,9 @@ fn test_compression_preserves_detection() {
     );
 
     // Create honest gradients
-    let true_gradient: Vec<f32> = (0..original_dim).map(|i| (i as f32 + 1.0) * 0.001).collect();
+    let true_gradient: Vec<f32> = (0..original_dim)
+        .map(|i| (i as f32 + 1.0) * 0.001)
+        .collect();
     let honest_gradients: Vec<Gradient> = (0..5)
         .map(|i| {
             let values = add_noise(&true_gradient, 0.02, i * 1000);
@@ -509,7 +515,9 @@ fn test_coordinator_node_lifecycle() {
     coordinator.complete_round().unwrap();
 
     // --- Blacklist a node ---
-    coordinator.node_manager_mut().blacklist("bob", "byzantine behavior".into());
+    coordinator
+        .node_manager_mut()
+        .blacklist("bob", "byzantine behavior".into());
     assert!(coordinator.node_manager().is_blacklisted("bob"));
 
     // Bob should be rejected when submitting.
@@ -604,11 +612,7 @@ fn test_all_defenses_produce_valid_output() {
 
                 // Output should be finite
                 for &v in &r.gradient {
-                    assert!(
-                        v.is_finite(),
-                        "{}: output contains non-finite value",
-                        name,
-                    );
+                    assert!(v.is_finite(), "{}: output contains non-finite value", name,);
                 }
 
                 // Should not be all zeros

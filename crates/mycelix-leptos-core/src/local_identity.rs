@@ -68,8 +68,10 @@ fn generate_did() -> String {
 
 pub fn load_string(key: &str) -> Option<String> {
     web_sys::window()?
-        .local_storage().ok()??
-        .get_item(key).ok()?
+        .local_storage()
+        .ok()??
+        .get_item(key)
+        .ok()?
 }
 
 pub fn save_string(key: &str, value: &str) {

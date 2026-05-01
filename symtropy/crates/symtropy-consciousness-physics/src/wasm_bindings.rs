@@ -36,8 +36,8 @@
 
 #![cfg(feature = "wasm")]
 
-use wasm_bindgen::prelude::*;
 use serde::Serialize;
+use wasm_bindgen::prelude::*;
 
 use symthaea_consciousness_equation::ConsciousnessInputs;
 use symtropy_math::Point;
@@ -148,7 +148,12 @@ impl WasmPhysicsDemo {
             agents.push(agent);
         }
 
-        WasmPhysicsDemo { agents, field, tick_count: 0, world_size }
+        WasmPhysicsDemo {
+            agents,
+            field,
+            tick_count: 0,
+            world_size,
+        }
     }
 
     /// Advance the simulation by `dt` seconds and return JSON agent state.
@@ -168,11 +173,13 @@ impl WasmPhysicsDemo {
 
         // ── 1. Derive inputs from simulation state ─────────────────────────
         // Collect neighbour data for gradient computation
-        let agent_data: Vec<(nalgebra::SVector<f64, 2>, [f64; NUM_HARMONIES])> = self.agents
+        let agent_data: Vec<(nalgebra::SVector<f64, 2>, [f64; NUM_HARMONIES])> = self
+            .agents
             .iter()
             .map(|a| {
                 let svec = nalgebra::SVector::<f64, 2>::from(a.pos);
-                let harmonies = self.field
+                let harmonies = self
+                    .field
                     .entities
                     .get(&a.handle)
                     .map(|e| e.harmony_activations)
@@ -182,7 +189,8 @@ impl WasmPhysicsDemo {
             .collect();
 
         for (idx, agent) in self.agents.iter_mut().enumerate() {
-            let harmonies = self.field
+            let harmonies = self
+                .field
                 .entities
                 .get(&agent.handle)
                 .map(|e| e.harmony_activations)
@@ -222,9 +230,16 @@ impl WasmPhysicsDemo {
 
         // ── 2. Update entity consciousness ────────────────────────────────
         {
-            let updates: Vec<_> = self.agents
+            let updates: Vec<_> = self
+                .agents
                 .iter()
-                .map(|a| (a.handle, a.inputs.clone(), Point(nalgebra::SVector::<f64, 2>::from(a.pos))))
+                .map(|a| {
+                    (
+                        a.handle,
+                        a.inputs.clone(),
+                        Point(nalgebra::SVector::<f64, 2>::from(a.pos)),
+                    )
+                })
                 .collect();
             for (handle, inputs, point) in updates {
                 self.field.update_entity(handle, &inputs, point);
@@ -233,7 +248,8 @@ impl WasmPhysicsDemo {
 
         // ── 3. Spread emotional contagion ─────────────────────────────────
         {
-            let positions: Vec<_> = self.agents
+            let positions: Vec<_> = self
+                .agents
                 .iter()
                 .map(|a| (a.handle, Point(nalgebra::SVector::<f64, 2>::from(a.pos))))
                 .collect();
@@ -242,7 +258,8 @@ impl WasmPhysicsDemo {
 
         // ── 4. Rebuild harmony field and move agents ──────────────────────
         {
-            let positions: Vec<_> = self.agents
+            let positions: Vec<_> = self
+                .agents
                 .iter()
                 .map(|a| (a.handle, Point(nalgebra::SVector::<f64, 2>::from(a.pos))))
                 .collect();
@@ -251,13 +268,15 @@ impl WasmPhysicsDemo {
 
         for agent in self.agents.iter_mut() {
             let pos_sv = nalgebra::SVector::<f64, 2>::from(agent.pos);
-            let harmonies = self.field
+            let harmonies = self
+                .field
                 .entities
                 .get(&agent.handle)
                 .map(|e| e.harmony_activations)
                 .unwrap_or([0.0; NUM_HARMONIES]);
             let phi = self.field.phi(agent.handle);
-            let energy_frac = self.field
+            let energy_frac = self
+                .field
                 .entities
                 .get(&agent.handle)
                 .map(|e| e.energy.available / e.energy.max_energy.max(1.0))
@@ -283,7 +302,8 @@ impl WasmPhysicsDemo {
             );
 
             // Motor gain from consciousness tier × slow speed cap
-            let motor_gain = self.field
+            let motor_gain = self
+                .field
                 .entities
                 .get(&agent.handle)
                 .map(|e| e.effective_motor_gain())
@@ -312,7 +332,8 @@ impl WasmPhysicsDemo {
         }
 
         // ── 5. Serialise snapshot ─────────────────────────────────────────
-        let snaps: Vec<AgentSnap> = self.agents
+        let snaps: Vec<AgentSnap> = self
+            .agents
             .iter()
             .map(|a| {
                 let phi = self.field.phi(a.handle);
@@ -435,7 +456,9 @@ impl WasmPhysicsDemo {
 
     /// Get per-agent Φ values as a JSON array.
     pub fn phi_values(&self) -> String {
-        let phis: Vec<f64> = self.agents.iter()
+        let phis: Vec<f64> = self
+            .agents
+            .iter()
             .map(|a| self.field.phi(a.handle))
             .collect();
         serde_json::to_string(&phis).unwrap_or_else(|_| "[]".into())
@@ -466,7 +489,10 @@ mod tests {
         let v: serde_json::Value = serde_json::from_str(&json).unwrap();
         let emotion = v["agents"][0]["emotion"].as_f64().unwrap();
         // After one tick the contagion spreads slightly — emotion should be > 0
-        assert!(emotion > 0.0, "injected emotion should appear, got {emotion}");
+        assert!(
+            emotion > 0.0,
+            "injected emotion should appear, got {emotion}"
+        );
     }
 
     #[test]
@@ -498,10 +524,7 @@ mod tests {
         demo.agents[0].vel = [100.0, 0.0]; // fast rightward
         demo.tick(0.1); // will move past +50
         let x = demo.agents[0].pos[0];
-        assert!(
-            x.abs() < demo.world_size,
-            "agent should wrap, got x={x}"
-        );
+        assert!(x.abs() < demo.world_size, "agent should wrap, got x={x}");
     }
 
     #[test]
@@ -511,7 +534,9 @@ mod tests {
         let v: serde_json::Value = serde_json::from_str(&json).unwrap();
         let agent = &v["agents"][0];
         // Required fields
-        for field in &["id", "x", "y", "vx", "vy", "phi", "emotion", "energy", "harmony", "safety"] {
+        for field in &[
+            "id", "x", "y", "vx", "vy", "phi", "emotion", "energy", "harmony", "safety",
+        ] {
             assert!(agent.get(field).is_some(), "missing field: {field}");
         }
         assert_eq!(agent["harmony"].as_array().unwrap().len(), NUM_HARMONIES);

@@ -32,8 +32,13 @@ pub fn WelcomeModal() -> impl IntoView {
         crate::components::tour::start_tour();
     };
 
-    let on_explore = move |_: leptos::ev::MouseEvent| { do_dismiss(); };
-    let on_explore_touch = move |ev: web_sys::TouchEvent| { ev.prevent_default(); do_dismiss(); };
+    let on_explore = move |_: leptos::ev::MouseEvent| {
+        do_dismiss();
+    };
+    let on_explore_touch = move |ev: web_sys::TouchEvent| {
+        ev.prevent_default();
+        do_dismiss();
+    };
     let on_learn = move |_: leptos::ev::MouseEvent| {
         do_dismiss();
         let nav = leptos_router::hooks::use_navigate();

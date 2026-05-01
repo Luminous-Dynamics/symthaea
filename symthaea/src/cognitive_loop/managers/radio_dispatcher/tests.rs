@@ -1984,7 +1984,9 @@ fn perception_hv_nonempty_returns_some() {
         snr_db: 12.0,
         jammed: false,
     });
-    let hv = sm.perception_hv().expect("one observation must produce an HV");
+    let hv = sm
+        .perception_hv()
+        .expect("one observation must produce an HV");
     // 16,384 bits = 2048 bytes (BinaryHV::BYTES).
     assert_eq!(hv.0.len(), 2048);
 }

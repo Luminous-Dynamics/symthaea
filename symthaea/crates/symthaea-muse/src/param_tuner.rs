@@ -356,7 +356,7 @@ pub fn evaluate(genome: &Genome, params: &[ParamDef], seed: u64) -> Fitness {
         + 0.20 * beauty as f64                             // aesthetic
         + 0.15 * (1.0 - harshness) as f64                  // non-harshness
         + 0.10 * verdict.composite as f64                  // critic
-        + 0.10 * (1.0 - rms_error.min(1.0)) as f64;        // RMS target
+        + 0.10 * (1.0 - rms_error.min(1.0)) as f64; // RMS target
 
     Fitness {
         composite: verdict.composite,
@@ -740,7 +740,11 @@ mod tests {
         );
         assert_eq!(metrics.click_count, 0, "clean sine should have 0 clicks");
         let quality = click_quality(&metrics);
-        assert!(quality > 0.9, "clean sine quality should be > 0.9, got {}", quality);
+        assert!(
+            quality > 0.9,
+            "clean sine quality should be > 0.9, got {}",
+            quality
+        );
     }
 
     #[test]
@@ -766,7 +770,11 @@ mod tests {
             metrics.click_count
         );
         let quality = click_quality(&metrics);
-        assert!(quality < 0.5, "Haas bug quality should be low, got {}", quality);
+        assert!(
+            quality < 0.5,
+            "Haas bug quality should be low, got {}",
+            quality
+        );
     }
 
     #[test]

@@ -11,9 +11,9 @@
 //!
 //! This makes spam economically impossible without false positives.
 
-use leptos::prelude::*;
 use crate::mail_context::use_mail;
 use crate::toasts::use_toasts;
+use leptos::prelude::*;
 
 /// Trust gate status for an incoming email.
 #[derive(Clone, Debug, PartialEq)]
@@ -45,8 +45,8 @@ impl GateStatus {
 
     pub fn icon(&self) -> &'static str {
         match self {
-            Self::Trusted { .. } => "\u{1F6E1}",  // shield
-            Self::Staked { .. } => "\u{1FA99}",    // coin
+            Self::Trusted { .. } => "\u{1F6E1}",    // shield
+            Self::Staked { .. } => "\u{1FA99}",     // coin
             Self::Quarantined { .. } => "\u{26A0}", // warning
         }
     }
@@ -60,12 +60,18 @@ pub fn evaluate_gate(sender: &str, trust_score: Option<f64>) -> GateStatus {
 }
 
 /// Assurance-aware gate evaluation.
-pub fn evaluate_gate_with_assurance(sender: &str, trust_score: Option<f64>, assurance: Option<u8>) -> GateStatus {
+pub fn evaluate_gate_with_assurance(
+    sender: &str,
+    trust_score: Option<f64>,
+    assurance: Option<u8>,
+) -> GateStatus {
     let assurance_level = assurance.unwrap_or(255); // 255 = unknown (treat as legacy)
 
     // E0 (Anonymous) — always quarantined (Sybil resistance)
     if assurance_level == 0 {
-        return GateStatus::Quarantined { sender: sender.to_string() };
+        return GateStatus::Quarantined {
+            sender: sender.to_string(),
+        };
     }
 
     // E1 (Basic) — require higher trust threshold
@@ -73,31 +79,41 @@ pub fn evaluate_gate_with_assurance(sender: &str, trust_score: Option<f64>, assu
 
     match trust_score {
         Some(score) if score >= trust_threshold => {
-            let degree = if score >= 0.8 { 1 } else if score >= 0.5 { 2 } else { 3 };
-            GateStatus::Trusted { trust_score: score, degree }
+            let degree = if score >= 0.8 {
+                1
+            } else if score >= 0.5 {
+                2
+            } else {
+                3
+            };
+            GateStatus::Trusted {
+                trust_score: score,
+                degree,
+            }
         }
-        Some(score) if score >= 0.0 => {
-            GateStatus::Staked { amount: 0.1, sender: sender.to_string() }
-        }
-        _ => {
-            GateStatus::Quarantined { sender: sender.to_string() }
-        }
+        Some(score) if score >= 0.0 => GateStatus::Staked {
+            amount: 0.1,
+            sender: sender.to_string(),
+        },
+        _ => GateStatus::Quarantined {
+            sender: sender.to_string(),
+        },
     }
 }
 
 /// Trust gate badge shown on email cards and read view.
 #[component]
-pub fn TrustGateBadge(
-    #[prop(into)] sender: String,
-    trust_score: Option<f64>,
-) -> impl IntoView {
+pub fn TrustGateBadge(#[prop(into)] sender: String, trust_score: Option<f64>) -> impl IntoView {
     let gate = evaluate_gate(&sender, trust_score);
     let class = gate.css_class();
     let icon = gate.icon();
     let label = gate.label();
 
     let detail = match &gate {
-        GateStatus::Trusted { trust_score, degree } => {
+        GateStatus::Trusted {
+            trust_score,
+            degree,
+        } => {
             format!("{label} ({degree}-degree, {:.0}%)", trust_score * 100.0)
         }
         GateStatus::Staked { amount, .. } => {
@@ -127,14 +143,20 @@ pub fn TrustGateActions(
     let toasts = use_toasts();
     let mail = use_mail();
 
-    let show_actions = matches!(gate, GateStatus::Staked { .. } | GateStatus::Quarantined { .. });
+    let show_actions = matches!(
+        gate,
+        GateStatus::Staked { .. } | GateStatus::Quarantined { .. }
+    );
 
     let sender_accept = sender.clone();
     let toasts_accept = toasts.clone();
     let mail_accept = mail.clone();
     let on_accept = move |_| {
         // Accept: return stake, add to trust
-        toasts_accept.push(format!("Accepted message. Stake returned to sender."), "success");
+        toasts_accept.push(
+            format!("Accepted message. Stake returned to sender."),
+            "success",
+        );
         // In production: call trust zome to create positive attestation
         mail_accept.sender_trust.update(|m| {
             m.insert(sender_accept.clone(), 0.3);
@@ -147,7 +169,10 @@ pub fn TrustGateActions(
     let mail_reject = mail.clone();
     let on_reject = move |_| {
         // Reject: slash stake, remove email, decrease trust
-        toasts_reject.push("Rejected. Stake slashed and distributed to network.", "info");
+        toasts_reject.push(
+            "Rejected. Stake slashed and distributed to network.",
+            "info",
+        );
         mail_reject.delete_email(&hash_reject);
         mail_reject.sender_trust.update(|m| {
             m.insert(sender_reject.clone(), -0.5);

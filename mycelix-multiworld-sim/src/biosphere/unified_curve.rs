@@ -107,9 +107,7 @@ fn headroom_composite(bt_hanpp: f64, kt: f64) -> f64 {
 ///
 /// `sim_harmony_scores`: Optional forward projection from sim (year_ce, harmony_mean).
 /// Pass empty slice if no sim data available.
-pub fn build_unified_curve(
-    sim_harmony_scores: &[(f64, f64)],
-) -> Vec<UnifiedPoint> {
+pub fn build_unified_curve(sim_harmony_scores: &[(f64, f64)]) -> Vec<UnifiedPoint> {
     let bt_engine = BiosphereCoherenceEngine::build();
     let mut points = Vec::with_capacity(100);
 
@@ -166,7 +164,8 @@ pub fn build_unified_curve(
         let ct = headroom_composite(bt_hanpp, kt_val);
         // CI from both B(t) and K(t) uncertainty
         let ci_lo = headroom_composite(bt_hanpp * 0.95, kt_val * 0.85);
-        let ci_hi = headroom_composite((bt_hanpp * 1.05).min(1.0), (kt_val * 1.15).min(1.0)).min(1.0);
+        let ci_hi =
+            headroom_composite((bt_hanpp * 1.05).min(1.0), (kt_val * 1.15).min(1.0)).min(1.0);
 
         points.push(UnifiedPoint {
             age_ma: age,
@@ -216,9 +215,18 @@ pub fn unified_to_csv(points: &[UnifiedPoint]) -> String {
 
 /// Summary statistics of the unified curve.
 pub fn unified_summary(points: &[UnifiedPoint]) -> String {
-    let bt_count = points.iter().filter(|p| matches!(p.source, CoherenceSource::Biosphere)).count();
-    let blend_count = points.iter().filter(|p| matches!(p.source, CoherenceSource::Blended)).count();
-    let kt_count = points.iter().filter(|p| matches!(p.source, CoherenceSource::Civilization)).count();
+    let bt_count = points
+        .iter()
+        .filter(|p| matches!(p.source, CoherenceSource::Biosphere))
+        .count();
+    let blend_count = points
+        .iter()
+        .filter(|p| matches!(p.source, CoherenceSource::Blended))
+        .count();
+    let kt_count = points
+        .iter()
+        .filter(|p| matches!(p.source, CoherenceSource::Civilization))
+        .count();
 
     let oldest = points.first().map(|p| p.age_ma).unwrap_or(0.0);
     let newest_year = points.last().map(|p| p.year_ce).unwrap_or(0.0);
@@ -249,7 +257,11 @@ mod tests {
     #[test]
     fn unified_curve_builds() {
         let curve = build_unified_curve(&[]);
-        assert!(curve.len() > 50, "Should have >50 points, got {}", curve.len());
+        assert!(
+            curve.len() > 50,
+            "Should have >50 points, got {}",
+            curve.len()
+        );
     }
 
     #[test]
@@ -275,9 +287,15 @@ mod tests {
     #[test]
     fn all_three_sources_present() {
         let curve = build_unified_curve(&[]);
-        let has_bio = curve.iter().any(|p| matches!(p.source, CoherenceSource::Biosphere));
-        let has_blend = curve.iter().any(|p| matches!(p.source, CoherenceSource::Blended));
-        let has_civ = curve.iter().any(|p| matches!(p.source, CoherenceSource::Civilization));
+        let has_bio = curve
+            .iter()
+            .any(|p| matches!(p.source, CoherenceSource::Biosphere));
+        let has_blend = curve
+            .iter()
+            .any(|p| matches!(p.source, CoherenceSource::Blended));
+        let has_civ = curve
+            .iter()
+            .any(|p| matches!(p.source, CoherenceSource::Civilization));
         assert!(has_bio, "Should have biosphere points");
         assert!(has_blend, "Should have blended points");
         assert!(has_civ, "Should have civilization points");
@@ -301,10 +319,18 @@ mod tests {
     #[test]
     fn kt_interpolation_works() {
         let k1970 = kt_at_year(1970.0).unwrap();
-        assert!((k1970 - 0.343).abs() < 0.01, "K(1970) should be ~0.343, got {}", k1970);
+        assert!(
+            (k1970 - 0.343).abs() < 0.01,
+            "K(1970) should be ~0.343, got {}",
+            k1970
+        );
 
         let k2020 = kt_at_year(2020.0).unwrap();
-        assert!((k2020 - 0.782).abs() < 0.01, "K(2020) should be ~0.782, got {}", k2020);
+        assert!(
+            (k2020 - 0.782).abs() < 0.01,
+            "K(2020) should be ~0.782, got {}",
+            k2020
+        );
     }
 
     #[test]
@@ -317,14 +343,17 @@ mod tests {
         for pair in curve.windows(2) {
             let delta = (pair[0].value - pair[1].value).abs();
             // Only check within pure B(t) and pure blend zones (not at regime boundaries)
-            let same_source = std::mem::discriminant(&pair[0].source) == std::mem::discriminant(&pair[1].source);
+            let same_source =
+                std::mem::discriminant(&pair[0].source) == std::mem::discriminant(&pair[1].source);
             if same_source && pair[0].age_ma < 0.02 && pair[0].age_ma > 0.00001 {
                 assert!(
                     delta < 0.5,
                     "Gap of {} between {:.4} Ma ({:?}) and {:.4} Ma ({:?})",
                     delta,
-                    pair[0].age_ma, pair[0].source,
-                    pair[1].age_ma, pair[1].source,
+                    pair[0].age_ma,
+                    pair[0].source,
+                    pair[1].age_ma,
+                    pair[1].source,
                 );
             }
         }

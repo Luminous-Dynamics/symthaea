@@ -12,8 +12,6 @@
 //! - Kinsler et al. (2000). *Fundamentals of Acoustics*. Wiley.
 //! - de Boer, E. (1996). Mechanics of the Cochlea. Springer Handbook.
 
-use std::f64::consts::PI;
-
 /// Speed of sound in various media (m/s).
 pub const C_AIR: f64 = 343.0;
 pub const C_WATER: f64 = 1480.0;
@@ -44,7 +42,9 @@ impl AcousticWave1D {
             p: vec![0.0; n],
             p_prev: vec![0.0; n],
             c: vec![c_sound; n],
-            dx, dt, n,
+            dx,
+            dt,
+            n,
             step: 0,
         }
     }
@@ -72,7 +72,9 @@ impl AcousticWave1D {
     /// Total acoustic energy: E = Σ ½ p²/(ρc²) dx
     pub fn total_energy(&self) -> f64 {
         let rho = 1.225; // Air density kg/m³
-        self.p.iter().enumerate()
+        self.p
+            .iter()
+            .enumerate()
             .map(|(i, &pi)| 0.5 * pi * pi / (rho * self.c[i] * self.c[i]) * self.dx)
             .sum()
     }
@@ -169,7 +171,11 @@ mod tests {
         // Base (x=1): ~20kHz, Apex (x=0): ~20Hz
         let f_base = greenwood_frequency(1.0);
         let f_apex = greenwood_frequency(0.0);
-        assert!(f_base > 15000.0 && f_base < 25000.0, "Base f = {:.0} Hz", f_base);
+        assert!(
+            f_base > 15000.0 && f_base < 25000.0,
+            "Base f = {:.0} Hz",
+            f_base
+        );
         assert!(f_apex > 10.0 && f_apex < 50.0, "Apex f = {:.0} Hz", f_apex);
     }
 
@@ -178,7 +184,13 @@ mod tests {
         let f = 1000.0; // Hz
         let x = greenwood_position(f);
         let f_back = greenwood_frequency(x);
-        assert!((f - f_back).abs() < 1.0, "Roundtrip: {:.1} → {:.4} → {:.1}", f, x, f_back);
+        assert!(
+            (f - f_back).abs() < 1.0,
+            "Roundtrip: {:.1} → {:.4} → {:.1}",
+            f,
+            x,
+            f_back
+        );
     }
 
     #[test]

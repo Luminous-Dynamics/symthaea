@@ -177,7 +177,9 @@ impl FactionEngine {
             // (disasters cause trauma), trauma should flow naturally into faction emergence.
             let mean_trauma = {
                 let living: Vec<_> = world.agents.iter().filter(|a| a.is_alive()).collect();
-                if living.is_empty() { 0.0 } else {
+                if living.is_empty() {
+                    0.0
+                } else {
                     living.iter().map(|a| a.trauma_level).sum::<f64>() / living.len() as f64
                 }
             };
@@ -212,7 +214,8 @@ impl FactionEngine {
             // Faction ideology: blend of consciousness and ethical orientation
             // from the world's living agents. Factions crystallize around existing
             // ethical-consciousness clusters, not random noise.
-            let living: Vec<_> = worlds.iter()
+            let living: Vec<_> = worlds
+                .iter()
                 .filter(|w| w.id == world.id)
                 .flat_map(|w| w.agents.iter())
                 .filter(|a| a.is_alive())
@@ -228,7 +231,12 @@ impl FactionEngine {
                     a.consciousness.harmonic_alignment * 0.5 + a.ethics.relational * 0.5,
                 ]
             } else {
-                [rng.next_f64(), rng.next_f64(), rng.next_f64(), rng.next_f64()]
+                [
+                    rng.next_f64(),
+                    rng.next_f64(),
+                    rng.next_f64(),
+                    rng.next_f64(),
+                ]
             };
 
             let name = format!("Faction-{id}");
@@ -287,8 +295,8 @@ impl FactionEngine {
                 // Ethical orientation modulates faction joining (Phase 2c):
                 // Relational agents join more readily (community-oriented, Ubuntu).
                 // Deontological agents resist (principled independence).
-                let ethics_adjustment = agent.ethics.relational * 0.06
-                    - agent.ethics.deontological * 0.04;
+                let ethics_adjustment =
+                    agent.ethics.relational * 0.06 - agent.ethics.deontological * 0.04;
                 let threshold = (base_threshold + ethics_adjustment).clamp(0.05, 0.5);
                 if dist < threshold {
                     agent.faction_id = Some(faction.id);
@@ -309,11 +317,7 @@ impl FactionEngine {
     }
 
     /// Update faction strength: grows with member proportion, decays naturally.
-    fn tick_strength(
-        &mut self,
-        worlds: &[World],
-        current_tick: u32,
-    ) -> Vec<CivEvent> {
+    fn tick_strength(&mut self, worlds: &[World], current_tick: u32) -> Vec<CivEvent> {
         let mut events = Vec::new();
         let mut dissolved = Vec::new();
 
@@ -348,7 +352,10 @@ impl FactionEngine {
                     current_tick,
                     Some(faction.world_id),
                     CivEventType::FactionDissolved,
-                    format!("{}: {} dissolved (strength < 0.05)", world_name, faction.name),
+                    format!(
+                        "{}: {} dissolved (strength < 0.05)",
+                        world_name, faction.name
+                    ),
                 ));
             }
         }
@@ -387,10 +394,7 @@ impl FactionEngine {
         // Group factions by world
         let mut world_factions: HashMap<u32, Vec<usize>> = HashMap::new();
         for (i, f) in self.factions.iter().enumerate() {
-            world_factions
-                .entry(f.world_id)
-                .or_default()
-                .push(i);
+            world_factions.entry(f.world_id).or_default().push(i);
         }
 
         for (_world_id, indices) in &world_factions {
@@ -457,13 +461,14 @@ impl FactionEngine {
             // Ethics-modulated conflict decay rate:
             // Base: 0.01/tick. Virtue/care and relational societies heal faster.
             // Deontological societies sustain conflicts longer (rigid principles).
-            let world_opt = self.factions.iter()
+            let world_opt = self
+                .factions
+                .iter()
                 .find(|f| f.id == conflict.faction_a)
                 .and_then(|f| worlds.iter().find(|w| w.id == f.world_id));
             let ethics_decay = if let Some(w) = world_opt {
                 let me = crate::agent::EthicalOrientation::mean_of(&w.agents);
-                0.01 + me.virtue_care * 0.008 + me.relational * 0.006
-                    - me.deontological * 0.004
+                0.01 + me.virtue_care * 0.008 + me.relational * 0.006 - me.deontological * 0.004
             } else {
                 0.01
             };
@@ -569,7 +574,8 @@ impl FactionEngine {
         rng: &mut StochasticEngine,
     ) -> (usize, f64) {
         // Find two largest factions in this world
-        let mut world_factions: Vec<(u32, usize)> = self.factions
+        let mut world_factions: Vec<(u32, usize)> = self
+            .factions
             .iter()
             .filter(|f| f.world_id == world_id)
             .map(|f| (f.id, f.member_count))
@@ -682,7 +688,9 @@ mod tests {
             economy: crate::economy::WorldEconomy::new(),
             harmony: crate::harmony::HarmonyTracker::new(),
             governance: crate::governance::WorldGovernance::new(),
-            metabolism_state: crate::metabolism::MetabolismState::default(), currency_state: crate::currency::WorldCurrencyState::default(), policy_state: crate::proposals::PolicyState::default(),
+            metabolism_state: crate::metabolism::MetabolismState::default(),
+            currency_state: crate::currency::WorldCurrencyState::default(),
+            policy_state: crate::proposals::PolicyState::default(),
             power_generation_kw: 0.0,
             power_demand_kw: 0.0,
             narrative_identity: crate::world::NarrativeIdentity::default(),
@@ -733,10 +741,16 @@ mod tests {
                 faction_id: None,
                 generation: 0,
                 trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
-                    ethics: crate::agent::EthicalOrientation::default(),
-                    sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
-                    justice: crate::sub_passport::RestorativeJustice::new(),
+                cumulative_dose_sv: 0.0,
+                adversarial: None,
+                coordination_understanding: 0.0,
+                mycel_score: 0.1,
+                sap_balance: 100.0,
+                is_biological: true,
+                wounds: Vec::new(),
+                ethics: crate::agent::EthicalOrientation::default(),
+                sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
+                justice: crate::sub_passport::RestorativeJustice::new(),
             };
             world.agents.push(agent);
             world.next_agent_id += 1;
@@ -760,7 +774,10 @@ mod tests {
                 break;
             }
         }
-        assert!(emerged, "Faction should emerge with high Gini after many ticks");
+        assert!(
+            emerged,
+            "Faction should emerge with high Gini after many ticks"
+        );
     }
 
     #[test]
@@ -785,7 +802,10 @@ mod tests {
             .filter(|a| a.faction_id.is_some())
             .count();
         // With nascent consciousness near [0.1, 0.05, 0.3, 0.1], agents should join
-        assert!(affiliated > 0, "Some agents should be recruited, got {affiliated}");
+        assert!(
+            affiliated > 0,
+            "Some agents should be recruited, got {affiliated}"
+        );
     }
 
     #[test]
@@ -877,7 +897,10 @@ mod tests {
                 break;
             }
         }
-        assert!(conflict_found, "Opposing factions should eventually conflict");
+        assert!(
+            conflict_found,
+            "Opposing factions should eventually conflict"
+        );
     }
 
     #[test]
@@ -937,19 +960,11 @@ mod tests {
 
         let world = make_test_world_fac(10, 0);
         let mut worlds = vec![world];
-        let initial_trauma: f64 = worlds[0]
-            .agents
-            .iter()
-            .map(|a| a.trauma_level)
-            .sum::<f64>();
+        let initial_trauma: f64 = worlds[0].agents.iter().map(|a| a.trauma_level).sum::<f64>();
         assert_eq!(initial_trauma, 0.0);
 
         let _ = engine.tick_conflict_resolution(&mut worlds, 10);
-        let final_trauma: f64 = worlds[0]
-            .agents
-            .iter()
-            .map(|a| a.trauma_level)
-            .sum::<f64>();
+        let final_trauma: f64 = worlds[0].agents.iter().map(|a| a.trauma_level).sum::<f64>();
         assert!(
             final_trauma > 0.0,
             "Trauma should increase after conflict resolution"
@@ -961,30 +976,66 @@ mod tests {
         // Fix 4: Factional Warfare
         let mut engine = FactionEngine::new();
         engine.factions.push(Faction {
-            id: 1, name: "Big".into(), ideology: [0.0; 4],
-            founding_tick: 0, member_count: 60, strength: 0.5, world_id: 0,
+            id: 1,
+            name: "Big".into(),
+            ideology: [0.0; 4],
+            founding_tick: 0,
+            member_count: 60,
+            strength: 0.5,
+            world_id: 0,
         });
         engine.factions.push(Faction {
-            id: 2, name: "Small".into(), ideology: [1.0; 4],
-            founding_tick: 0, member_count: 30, strength: 0.3, world_id: 0,
+            id: 2,
+            name: "Small".into(),
+            ideology: [1.0; 4],
+            founding_tick: 0,
+            member_count: 30,
+            strength: 0.3,
+            world_id: 0,
         });
 
-        let mut agents: Vec<CivAgent> = (0..100).map(|i| {
-            CivAgent {
-                id: i as u64, birth_tick: 0, death_tick: None,
-                sex: if i % 2 == 0 { BiologicalSex::Female } else { BiologicalSex::Male },
-                world_id: 0, health: 0.9, skills: SkillVector::new(),
-                education_level: 0.3, consciousness: ConsciousnessState::nascent(),
-                partner_id: None, children_ids: vec![],
-                is_immigrant: false, needs: crate::needs::PsychologicalNeeds::new(),
-                tend_balance: 0.0, parent_ids: None,
-                faction_id: if i < 60 { Some(1) } else if i < 90 { Some(2) } else { None },
-                generation: 0, trauma_level: 0.0, cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
+        let mut agents: Vec<CivAgent> = (0..100)
+            .map(|i| CivAgent {
+                id: i as u64,
+                birth_tick: 0,
+                death_tick: None,
+                sex: if i % 2 == 0 {
+                    BiologicalSex::Female
+                } else {
+                    BiologicalSex::Male
+                },
+                world_id: 0,
+                health: 0.9,
+                skills: SkillVector::new(),
+                education_level: 0.3,
+                consciousness: ConsciousnessState::nascent(),
+                partner_id: None,
+                children_ids: vec![],
+                is_immigrant: false,
+                needs: crate::needs::PsychologicalNeeds::new(),
+                tend_balance: 0.0,
+                parent_ids: None,
+                faction_id: if i < 60 {
+                    Some(1)
+                } else if i < 90 {
+                    Some(2)
+                } else {
+                    None
+                },
+                generation: 0,
+                trauma_level: 0.0,
+                cumulative_dose_sv: 0.0,
+                adversarial: None,
+                coordination_understanding: 0.0,
+                mycel_score: 0.1,
+                sap_balance: 100.0,
+                is_biological: true,
+                wounds: Vec::new(),
                 ethics: crate::agent::EthicalOrientation::default(),
                 sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
                 justice: crate::sub_passport::RestorativeJustice::new(),
-            }
-        }).collect();
+            })
+            .collect();
 
         let mut rng = StochasticEngine::new(42);
         let (deaths, damage) = engine.directed_civil_war(0, &mut agents, 0.8, &mut rng);

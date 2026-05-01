@@ -179,9 +179,7 @@ impl PyPoGQ {
             config.magnitude_weight = v;
         }
 
-        config
-            .validate()
-            .map_err(|e| PyValueError::new_err(e))?;
+        config.validate().map_err(|e| PyValueError::new_err(e))?;
 
         Ok(Self {
             inner: PoGQv41Enhanced::new(config),

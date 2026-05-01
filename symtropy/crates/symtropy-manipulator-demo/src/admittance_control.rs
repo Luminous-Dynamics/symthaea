@@ -54,10 +54,9 @@ impl AdmittanceController {
         }
 
         // If no external force, just scale IK torques by stiffness
-        let force_mag = (external_forces[0].powi(2)
-            + external_forces[1].powi(2)
-            + external_forces[2].powi(2))
-        .sqrt();
+        let force_mag =
+            (external_forces[0].powi(2) + external_forces[1].powi(2) + external_forces[2].powi(2))
+                .sqrt();
         if force_mag < 0.01 {
             let mut result = [0.0f32; NUM_JOINTS];
             for i in 0..NUM_JOINTS {
@@ -67,11 +66,7 @@ impl AdmittanceController {
         }
 
         // Compute Jacobian transpose mapping: τ_compliant = J^T × F_ext
-        let compliant_torques = jacobian_transpose_map(
-            kinematics,
-            joint_angles,
-            external_forces,
-        );
+        let compliant_torques = jacobian_transpose_map(kinematics, joint_angles, external_forces);
 
         // Blend: stiffness × IK + compliance × J^T×F
         let mut result = [0.0f32; NUM_JOINTS];
@@ -150,7 +145,11 @@ mod tests {
         // At least one joint should differ significantly from pure IK
         let ik_only = 0.1 * 0.5;
         let has_compliant_influence = result.iter().any(|&t| (t - ik_only).abs() > 0.02);
-        assert!(has_compliant_influence, "Compliant force should influence output: {:?}", result);
+        assert!(
+            has_compliant_influence,
+            "Compliant force should influence output: {:?}",
+            result
+        );
     }
 
     #[test]
@@ -176,7 +175,12 @@ mod tests {
         let result = ctrl.blend_torques(&ik, &force, &angles, &kin);
         for i in 0..7 {
             let expected = 0.5 * ik[i];
-            assert!((result[i] - expected).abs() < 0.01, "Joint {i}: got {} expected {}", result[i], expected);
+            assert!(
+                (result[i] - expected).abs() < 0.01,
+                "Joint {i}: got {} expected {}",
+                result[i],
+                expected
+            );
         }
     }
 
@@ -188,6 +192,10 @@ mod tests {
 
         let torques = jacobian_transpose_map(&kin, &angles, &force);
         let mag = torques.iter().map(|t| t.abs()).sum::<f64>();
-        assert!(mag > 0.0, "J^T × F should produce nonzero torques: {:?}", torques);
+        assert!(
+            mag > 0.0,
+            "J^T × F should produce nonzero torques: {:?}",
+            torques
+        );
     }
 }

@@ -1,5 +1,5 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Continuous Collision Detection (CCD): prevents fast-moving bodies from
 //! tunneling through surfaces between frames.
@@ -213,7 +213,10 @@ mod tests {
         let vel_b = SVector::zeros();
 
         let hit = sphere_sphere(&pos_a, &vel_a, 1.0, &pos_b, &vel_b, 1.0, 1.0).unwrap();
-        assert!((hit.toi - 0.0).abs() < 1e-12, "already overlapping: TOI should be 0");
+        assert!(
+            (hit.toi - 0.0).abs() < 1e-12,
+            "already overlapping: TOI should be 0"
+        );
     }
 
     #[test]
@@ -251,7 +254,10 @@ mod tests {
         let normal = SVector::from([0.0, 1.0, 0.0]);
 
         let hit = sphere_halfspace(&pos, &vel, 0.5, &normal, 0.0, 1.0).unwrap();
-        assert!((hit.toi - 0.0).abs() < 1e-12, "already penetrating: TOI = 0");
+        assert!(
+            (hit.toi - 0.0).abs() < 1e-12,
+            "already penetrating: TOI = 0"
+        );
     }
 
     #[test]

@@ -38,7 +38,7 @@ fn main() {
         eprintln!("Error: {video_path} not found.");
         eprintln!("Run the moral_drone_video example first:");
         eprintln!(
-            "  cargo run --example moral_drone_video --features flight-mujoco-renderer --release"
+            "  cargo run --example moral_drone_video --features multirotor-mujoco-renderer --release"
         );
         return;
     }

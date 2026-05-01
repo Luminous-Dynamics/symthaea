@@ -34,6 +34,7 @@ pub mod critic;
 pub mod export;
 pub mod fingerprint;
 pub mod form;
+pub mod hdc_mel_decoder;
 #[cfg(feature = "muse-live")]
 pub mod live_output;
 pub mod mel_extractor;
@@ -42,8 +43,6 @@ pub mod midi;
 pub mod midi_loader;
 pub mod neural_melody;
 pub mod notation;
-pub mod training_pairs;
-pub mod hdc_mel_decoder;
 pub mod pitch;
 pub mod rhythm;
 pub mod stream;
@@ -51,6 +50,7 @@ pub mod streaming;
 pub mod structure;
 pub mod synth;
 pub mod training;
+pub mod training_pairs;
 pub mod voice;
 
 use serde::{Deserialize, Serialize};
@@ -409,7 +409,12 @@ pub fn compose(config: &MuseConfig, state: &MusicalState, seed: u64) -> Composit
     // 3.5. Generate chord accompaniment — bass + harmony voices from progression
     let progression = instruments::select_progression(state);
     let chord_notes = generate_chord_accompaniment(
-        &progression, &base_scale, tempo, config.duration_secs, state, seed,
+        &progression,
+        &base_scale,
+        tempo,
+        config.duration_secs,
+        state,
+        seed,
     );
     all_notes.extend(chord_notes);
 
@@ -471,9 +476,8 @@ fn generate_chord_accompaniment(
     let harmony_octave = root_freq;
 
     // Gesture shapes velocity and articulation
-    let gesture = emotional_gestures::gesture_for_emotion(
-        emotional_gestures::detect_emotion(state),
-    );
+    let gesture =
+        emotional_gestures::gesture_for_emotion(emotional_gestures::detect_emotion(state));
     let bass_vel_base = (0.5 * gesture.velocity_scale).clamp(0.2, 0.8);
     let harmony_vel_base = (0.3 * gesture.velocity_scale).clamp(0.15, 0.5);
     // Chord counter for dynamic crescendo/decrescendo across progression
@@ -527,7 +531,9 @@ fn generate_chord_accompaniment(
             // Harmony pad: chord tones sustained through chord, on the beat
             let ratios = chord.chord_type.ratios();
             for (i, &ratio) in ratios.iter().enumerate() {
-                if i == 0 { continue; } // root is in bass
+                if i == 0 {
+                    continue;
+                } // root is in bass
                 let harm_freq = harmony_octave * root_ratio * ratio;
                 let harm_dur = chord_dur_secs * (1.0 - gesture.staccato * 0.4);
                 notes.push(Note {
@@ -740,12 +746,10 @@ mod tests {
     }
 }
 
-pub mod arc;
-pub mod creative_bench;
-pub mod narrative_bridge;
 pub mod ablation;
 pub mod aesthetic_listener;
 pub mod ambient_drone;
+pub mod arc;
 pub mod audio_feedback;
 pub mod auto_master;
 pub mod binaural;
@@ -753,6 +757,7 @@ pub mod collaborative;
 pub mod composer_mind;
 pub mod consciousness_reverb;
 pub mod creative_agency;
+pub mod creative_bench;
 pub mod density_regulator;
 pub mod dramatic;
 pub mod emotional_gestures;
@@ -765,6 +770,7 @@ pub mod midi_trainer;
 pub mod mixing;
 pub mod motif_memory;
 pub mod musical_inference;
+pub mod narrative_bridge;
 pub mod param_tuner;
 pub mod percussion;
 pub mod performance;

@@ -201,6 +201,7 @@ struct SensoryJitterBuffer {
 }
 
 impl SensoryJitterBuffer {
+    #[allow(dead_code)]
     fn new(max_delay: usize) -> Self {
         Self::new_for(max_delay, crate::morphology::HumanoidMorphology::Dmc21)
     }

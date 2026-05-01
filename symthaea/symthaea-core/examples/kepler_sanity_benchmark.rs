@@ -151,8 +151,7 @@ fn main() {
         let mut seed_has_inv_r_in_pool = false;
         for (rank, inv) in invs.iter().enumerate() {
             let f = &inv.formula_str;
-            let has_ang_mom =
-                f.contains("(x * vy)") && f.contains("(y * vx)") && f.contains("-");
+            let has_ang_mom = f.contains("(x * vy)") && f.contains("(y * vx)") && f.contains("-");
             let has_energy_like = (f.contains("(vx ^ 2)") || f.contains("(vy ^ 2)"))
                 && f.contains("sqrt")
                 && (f.contains("(x ^ 2)") || f.contains("(y ^ 2)"));

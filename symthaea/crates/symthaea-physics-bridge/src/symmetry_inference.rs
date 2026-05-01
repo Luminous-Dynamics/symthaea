@@ -198,10 +198,7 @@ mod tests {
     #[test]
     fn angular_momentum_cartesian_infers_so2() {
         // x*vy - y*vx
-        let expr = sub(
-            mul(var("x"), var("vy")),
-            mul(var("y"), var("vx")),
-        );
+        let expr = sub(mul(var("x"), var("vy")), mul(var("y"), var("vx")));
         let sym = infer_symmetry(&expr);
         assert_eq!(sym.lie_groups, vec![LieGroup::SO(2)]);
     }
@@ -229,11 +226,7 @@ mod tests {
         // x² + y³ — not a pure sum of squares, shouldn't trigger.
         let expr = add(
             pow2("x"),
-            Expr::BinOp(
-                BinOp::Pow,
-                Box::new(var("y")),
-                Box::new(Expr::Const(3.0)),
-            ),
+            Expr::BinOp(BinOp::Pow, Box::new(var("y")), Box::new(Expr::Const(3.0))),
         );
         let sym = infer_symmetry(&expr);
         assert!(sym.lie_groups.is_empty());

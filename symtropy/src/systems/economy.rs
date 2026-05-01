@@ -9,7 +9,7 @@
 
 use bevy::prelude::*;
 
-use crate::components::{ConsciousnessComp, CrewNpc, NpcTrust, NoiseEmitter, Player, TendBalance};
+use crate::components::{ConsciousnessComp, CrewNpc, NoiseEmitter, NpcTrust, Player, TendBalance};
 use crate::resources::GovernanceLog;
 
 /// Demurrage rate: 2% per game-minute (applied every tick).
@@ -30,7 +30,13 @@ const EXCHANGE_COOLDOWN_SECS: f32 = 10.0;
 /// Trust grows through successful exchanges. This is the restorative justice path —
 /// after coercion (epistemic decay), the only way to recover NPC trust is TEND exchanges.
 pub fn tend_exchange_system(
-    mut npcs: Query<(Entity, &CrewNpc, &ConsciousnessComp, &mut TendBalance, &mut NpcTrust)>,
+    mut npcs: Query<(
+        Entity,
+        &CrewNpc,
+        &ConsciousnessComp,
+        &mut TendBalance,
+        &mut NpcTrust,
+    )>,
     mut player_tend: Query<&mut TendBalance, (With<Player>, Without<CrewNpc>)>,
     time: Res<Time>,
     mut cooldowns: Local<Vec<(Entity, f32)>>,
@@ -48,7 +54,13 @@ pub fn tend_exchange_system(
     let npc_data: Vec<(Entity, String, f64, f64, i64)> = npcs
         .iter()
         .map(|(e, npc, cp, tend, trust)| {
-            (e, npc.name.clone(), cp.combined_score(), trust.trust, tend.balance)
+            (
+                e,
+                npc.name.clone(),
+                cp.combined_score(),
+                trust.trust,
+                tend.balance,
+            )
         })
         .collect();
 
@@ -66,14 +78,19 @@ pub fn tend_exchange_system(
         }
 
         // Only high-care NPCs initiate exchanges
-        let care_i = npcs.get(entity_i).map(|(_, _, cp, _, _)| cp.sim_dimensions[3]).unwrap_or(0.0);
+        let care_i = npcs
+            .get(entity_i)
+            .map(|(_, _, cp, _, _)| cp.sim_dimensions[3])
+            .unwrap_or(0.0);
         if care_i < 0.5 {
             continue;
         }
 
         // Find an NPC partner who could use help (lower phi, not self)
         for j in 0..npc_data.len() {
-            if i == j { continue; }
+            if i == j {
+                continue;
+            }
             let (entity_j, ref name_j, phi_j, _, balance_j) = npc_data[j];
 
             // Help those with lower consciousness or lower TEND balance
@@ -154,7 +171,13 @@ pub fn player_tend_interaction_system(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut player_query: Query<(&Transform, &mut TendBalance), With<Player>>,
     mut npcs: Query<
-        (&Transform, &CrewNpc, &mut TendBalance, &mut NpcTrust, &mut NoiseEmitter),
+        (
+            &Transform,
+            &CrewNpc,
+            &mut TendBalance,
+            &mut NpcTrust,
+            &mut NoiseEmitter,
+        ),
         Without<Player>,
     >,
     mut log: ResMut<GovernanceLog>,
@@ -177,7 +200,10 @@ pub fn player_tend_interaction_system(
         }
 
         if !player_tend.can_spend(SERVICE_TEND_AMOUNT) {
-            eprintln!("[economy] Player can't afford service (balance={})", player_tend.balance);
+            eprintln!(
+                "[economy] Player can't afford service (balance={})",
+                player_tend.balance
+            );
             break;
         }
 

@@ -3,9 +3,9 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Vote types for RB-BFT consensus
 
-use serde::{Deserialize, Serialize};
-use crate::crypto::{ConsensusSignature, ValidatorKeypair, domains, create_signable_bytes};
+use crate::crypto::{create_signable_bytes, domains, ConsensusSignature, ValidatorKeypair};
 use crate::error::ConsensusResult;
+use serde::{Deserialize, Serialize};
 
 /// A vote cast by a validator on a proposal
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -60,7 +60,7 @@ impl Vote {
 
     /// Compute vote ID using SHA256
     fn compute_id(proposal_id: &str, voter: &str, round: u64) -> String {
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();
         hasher.update(proposal_id.as_bytes());
         hasher.update(voter.as_bytes());
@@ -175,7 +175,7 @@ impl Vote {
     /// This returns the SHA256 hash of (domain + signable_data) which is what
     /// the signature is actually computed over.
     pub fn signable_bytes(&self) -> Vec<u8> {
-        use sha2::{Sha256, Digest};
+        use sha2::{Digest, Sha256};
         let signable = self.signable_data();
         if let Ok(data) = create_signable_bytes(&signable) {
             let mut hasher = Sha256::new();
@@ -435,7 +435,10 @@ impl VoteCollection {
 
     /// Get votes by decision type
     pub fn votes_by_decision(&self, decision: VoteDecision) -> Vec<&Vote> {
-        self.votes.iter().filter(|v| v.decision == decision).collect()
+        self.votes
+            .iter()
+            .filter(|v| v.decision == decision)
+            .collect()
     }
 }
 
@@ -498,12 +501,7 @@ mod tests {
     #[test]
     fn test_vote_signing_and_verification() {
         let keypair = ValidatorKeypair::generate();
-        let mut vote = Vote::approve(
-            "prop-1".to_string(),
-            1,
-            keypair.public_key_hex(),
-            0.8,
-        );
+        let mut vote = Vote::approve("prop-1".to_string(), 1, keypair.public_key_hex(), 0.8);
 
         // Sign the vote
         vote.sign(&keypair).expect("signing should succeed");
@@ -518,12 +516,7 @@ mod tests {
     #[test]
     fn test_vote_tamper_detection() {
         let keypair = ValidatorKeypair::generate();
-        let mut vote = Vote::approve(
-            "prop-1".to_string(),
-            1,
-            keypair.public_key_hex(),
-            0.8,
-        );
+        let mut vote = Vote::approve("prop-1".to_string(), 1, keypair.public_key_hex(), 0.8);
 
         vote.sign(&keypair).unwrap();
         assert!(vote.verify_signature().is_ok());
@@ -551,8 +544,18 @@ mod tests {
     fn test_vote_collection_aggregates_weights() {
         let mut collection = VoteCollection::new();
 
-        collection.add_vote(Vote::approve("prop-1".to_string(), 1, "voter-1".to_string(), 0.8));
-        collection.add_vote(Vote::approve("prop-1".to_string(), 1, "voter-2".to_string(), 0.6));
+        collection.add_vote(Vote::approve(
+            "prop-1".to_string(),
+            1,
+            "voter-1".to_string(),
+            0.8,
+        ));
+        collection.add_vote(Vote::approve(
+            "prop-1".to_string(),
+            1,
+            "voter-2".to_string(),
+            0.6,
+        ));
 
         // 0.8² + 0.6² = 0.64 + 0.36 = 1.0
         assert!((collection.weighted_approvals() - 1.0).abs() < 0.01);
@@ -564,7 +567,13 @@ mod tests {
         let voter_id = keypair.public_key_hex();
 
         let mut vote1 = Vote::approve("prop-1".to_string(), 1, voter_id.clone(), 0.8);
-        let mut vote2 = Vote::reject("prop-1".to_string(), 1, voter_id.clone(), 0.8, "changed mind".to_string());
+        let mut vote2 = Vote::reject(
+            "prop-1".to_string(),
+            1,
+            voter_id.clone(),
+            0.8,
+            "changed mind".to_string(),
+        );
 
         // Sign both votes (this is the Byzantine behavior - signing conflicting votes)
         vote1.sign(&keypair).unwrap();
@@ -583,7 +592,13 @@ mod tests {
     #[test]
     fn test_double_vote_evidence() {
         let vote1 = Vote::approve("prop-1".to_string(), 1, "voter-1".to_string(), 0.8);
-        let vote2 = Vote::reject("prop-1".to_string(), 1, "voter-1".to_string(), 0.8, "changed mind".to_string());
+        let vote2 = Vote::reject(
+            "prop-1".to_string(),
+            1,
+            "voter-1".to_string(),
+            0.8,
+            "changed mind".to_string(),
+        );
 
         let evidence = DoubleVoteEvidence::new(vote1, vote2);
         assert!(evidence.is_some());

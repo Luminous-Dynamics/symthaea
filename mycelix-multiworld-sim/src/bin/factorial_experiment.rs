@@ -13,7 +13,7 @@
 //! | Low Consciousness  | Cell A        | Cell B        |
 //! | High Consciousness | Cell C        | Cell D        |
 
-use mycelix_multiworld_sim::{MultiWorldSimulator, config::SimulationConfig};
+use mycelix_multiworld_sim::{config::SimulationConfig, MultiWorldSimulator};
 
 struct CellConfig {
     name: &'static str,
@@ -30,32 +30,63 @@ fn run_cell(cell: &CellConfig, seed: u64) -> (f64, f64, usize, usize) {
     let mut sim = MultiWorldSimulator::new(config);
     let report = sim.run();
 
-    (report.final_cvs, report.final_collective_phi, report.final_population, report.civil_wars)
+    (
+        report.final_cvs,
+        report.final_collective_phi,
+        report.final_population,
+        report.civil_wars,
+    )
 }
 
 fn mean(v: &[f64]) -> f64 {
-    if v.is_empty() { 0.0 } else { v.iter().sum::<f64>() / v.len() as f64 }
+    if v.is_empty() {
+        0.0
+    } else {
+        v.iter().sum::<f64>() / v.len() as f64
+    }
 }
 
 fn std_dev(v: &[f64]) -> f64 {
-    if v.len() < 2 { return 0.0; }
+    if v.len() < 2 {
+        return 0.0;
+    }
     let m = mean(v);
     (v.iter().map(|x| (x - m).powi(2)).sum::<f64>() / (v.len() - 1) as f64).sqrt()
 }
 
 fn main() {
     let cells = [
-        CellConfig { name: "A: Low_C + Low_CU", consciousness_boost: 0.0, coordination_understanding: 0.0 },
-        CellConfig { name: "B: Low_C + High_CU", consciousness_boost: 0.0, coordination_understanding: 0.5 },
-        CellConfig { name: "C: High_C + Low_CU", consciousness_boost: 0.4, coordination_understanding: 0.0 },
-        CellConfig { name: "D: High_C + High_CU", consciousness_boost: 0.4, coordination_understanding: 0.5 },
+        CellConfig {
+            name: "A: Low_C + Low_CU",
+            consciousness_boost: 0.0,
+            coordination_understanding: 0.0,
+        },
+        CellConfig {
+            name: "B: Low_C + High_CU",
+            consciousness_boost: 0.0,
+            coordination_understanding: 0.5,
+        },
+        CellConfig {
+            name: "C: High_C + Low_CU",
+            consciousness_boost: 0.4,
+            coordination_understanding: 0.0,
+        },
+        CellConfig {
+            name: "D: High_C + High_CU",
+            consciousness_boost: 0.4,
+            coordination_understanding: 0.5,
+        },
     ];
 
     let seeds: Vec<u64> = (42..52).collect();
 
     println!("╔══════════════════════════════════════════════════════════════╗");
     println!("║  Experiment 4: 2×2 Factorial (Consciousness × Coordination) ║");
-    println!("║  4 cells × {} seeds = {} simulations                         ║", seeds.len(), cells.len() * seeds.len());
+    println!(
+        "║  4 cells × {} seeds = {} simulations                         ║",
+        seeds.len(),
+        cells.len() * seeds.len()
+    );
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 
     let mut cell_cvs: Vec<Vec<f64>> = vec![Vec::new(); 4];
@@ -67,7 +98,10 @@ fn main() {
         println!("── {} ──", cell.name);
         for &seed in &seeds {
             let (cvs, phi, pop, wars) = run_cell(cell, seed);
-            print!("  seed={}: CVS={:.4} Phi={:.4} pop={} wars={}", seed, cvs, phi, pop, wars);
+            print!(
+                "  seed={}: CVS={:.4} Phi={:.4} pop={} wars={}",
+                seed, cvs, phi, pop, wars
+            );
             println!();
             cell_cvs[ci].push(cvs);
             cell_phi[ci].push(phi);
@@ -82,13 +116,20 @@ fn main() {
     println!("  2×2 FACTORIAL RESULTS");
     println!("══════════════════════════════════════════════════════════════\n");
 
-    println!("{:<25} {:>8} {:>8} {:>8} {:>8} {:>8}", "Cell", "CVS", "±", "Phi", "Pop", "Wars");
+    println!(
+        "{:<25} {:>8} {:>8} {:>8} {:>8} {:>8}",
+        "Cell", "CVS", "±", "Phi", "Pop", "Wars"
+    );
     println!("{}", "-".repeat(68));
     for (ci, cell) in cells.iter().enumerate() {
-        println!("{:<25} {:>8.4} {:>8.4} {:>8.4} {:>8.0} {:>8.1}",
+        println!(
+            "{:<25} {:>8.4} {:>8.4} {:>8.4} {:>8.0} {:>8.1}",
             cell.name,
-            mean(&cell_cvs[ci]), std_dev(&cell_cvs[ci]),
-            mean(&cell_phi[ci]), mean(&cell_pop[ci]), mean(&cell_wars[ci]),
+            mean(&cell_cvs[ci]),
+            std_dev(&cell_cvs[ci]),
+            mean(&cell_phi[ci]),
+            mean(&cell_pop[ci]),
+            mean(&cell_wars[ci]),
         );
     }
 
@@ -104,7 +145,10 @@ fn main() {
 
     println!("\n── Main Effects (CVS) ──");
     println!("  Coordination Understanding: {:+.4}", main_effect_cu);
-    println!("  Consciousness:              {:+.4}", main_effect_consciousness);
+    println!(
+        "  Consciousness:              {:+.4}",
+        main_effect_consciousness
+    );
     println!("  INTERACTION (C×CU):         {:+.4}", interaction);
 
     // Phi interaction
@@ -115,8 +159,14 @@ fn main() {
     let phi_interaction = (d_phi - c_phi) - (b_phi - a_phi);
 
     println!("\n── Main Effects (Phi) ──");
-    println!("  Coordination Understanding: {:+.4}", ((b_phi - a_phi) + (d_phi - c_phi)) / 2.0);
-    println!("  Consciousness:              {:+.4}", ((c_phi - a_phi) + (d_phi - b_phi)) / 2.0);
+    println!(
+        "  Coordination Understanding: {:+.4}",
+        ((b_phi - a_phi) + (d_phi - c_phi)) / 2.0
+    );
+    println!(
+        "  Consciousness:              {:+.4}",
+        ((c_phi - a_phi) + (d_phi - b_phi)) / 2.0
+    );
     println!("  INTERACTION (C×CU):         {:+.4}", phi_interaction);
 
     // Additive prediction vs actual
@@ -133,7 +183,10 @@ fn main() {
         println!("  INTERACTION EFFECT DETECTED: Consciousness × Coordination");
         println!("  Understanding produces MORE than the sum of individual effects.");
         println!("  The THIRD REGIME is supported by the data.");
-        println!("  Synergy = {:+.4} CVS beyond additive prediction.", synergy);
+        println!(
+            "  Synergy = {:+.4} CVS beyond additive prediction.",
+            synergy
+        );
     } else if interaction > -0.005 {
         println!("  NO INTERACTION: Effects are additive.");
         println!("  Consciousness and coordination understanding contribute independently.");

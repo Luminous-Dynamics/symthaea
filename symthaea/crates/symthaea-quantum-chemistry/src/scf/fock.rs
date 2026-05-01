@@ -16,12 +16,7 @@
 /// `eri` is the ERI tensor, n⁴ flat array.
 ///
 /// Returns F = H_core + G(P) as n×n.
-pub fn build_fock_matrix(
-    h_core: &[f64],
-    density: &[f64],
-    eri: &[f64],
-    n: usize,
-) -> Vec<f64> {
+pub fn build_fock_matrix(h_core: &[f64], density: &[f64], eri: &[f64], n: usize) -> Vec<f64> {
     let n2 = n * n;
     let n3 = n2 * n;
     let mut fock = h_core.to_vec();
@@ -57,12 +52,7 @@ pub fn build_fock_matrix(
 /// Compute the electronic energy from density, core Hamiltonian, and Fock matrix.
 ///
 /// E_elec = ½ Tr[P (H_core + F)]
-pub fn electronic_energy(
-    density: &[f64],
-    h_core: &[f64],
-    fock: &[f64],
-    n: usize,
-) -> f64 {
+pub fn electronic_energy(density: &[f64], h_core: &[f64], fock: &[f64], n: usize) -> f64 {
     let mut energy = 0.0;
     for mu in 0..n {
         for nu in 0..n {

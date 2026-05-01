@@ -137,8 +137,14 @@ mod tests {
         assert!(obj.grasped);
         let new_ee = [0.5, 0.2, 0.4]; // Move EE
         obj.update(&new_ee, 0.1);
-        assert!((obj.position[0] - 0.5).abs() < 0.01, "Object should track EE x");
-        assert!((obj.position[1] - 0.2).abs() < 0.01, "Object should track EE y");
+        assert!(
+            (obj.position[0] - 0.5).abs() < 0.01,
+            "Object should track EE x"
+        );
+        assert!(
+            (obj.position[1] - 0.2).abs() < 0.01,
+            "Object should track EE y"
+        );
     }
 
     #[test]

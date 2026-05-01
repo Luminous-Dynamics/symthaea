@@ -55,7 +55,8 @@ pub struct CodeFragment {
 impl CodeFragment {
     /// Bayesian success rate
     pub fn success_rate(&self) -> f32 {
-        (self.success_count as f32 + 1.0) / (self.success_count as f32 + self.failure_count as f32 + 2.0)
+        (self.success_count as f32 + 1.0)
+            / (self.success_count as f32 + self.failure_count as f32 + 2.0)
     }
 }
 
@@ -109,27 +110,91 @@ impl HvCodeDecoder {
         // Iterator sources
         self.register("iter_slice", ".iter()", FragmentCategory::IteratorSource);
         self.register("iter_chars", ".chars()", FragmentCategory::IteratorSource);
-        self.register("iter_into", ".into_iter()", FragmentCategory::IteratorSource);
+        self.register(
+            "iter_into",
+            ".into_iter()",
+            FragmentCategory::IteratorSource,
+        );
         self.register("iter_bytes", ".bytes()", FragmentCategory::IteratorSource);
         self.register("iter_lines", ".lines()", FragmentCategory::IteratorSource);
         self.register("iter_range", "(0..n)", FragmentCategory::IteratorSource);
-        self.register("iter_range_inc", "(1..=n)", FragmentCategory::IteratorSource);
-        self.register("iter_windows", ".windows(n)", FragmentCategory::IteratorSource);
-        self.register("iter_enumerate", ".enumerate()", FragmentCategory::IteratorAdapter);
-        self.register("iter_zip", ".zip(other.iter())", FragmentCategory::IteratorAdapter);
+        self.register(
+            "iter_range_inc",
+            "(1..=n)",
+            FragmentCategory::IteratorSource,
+        );
+        self.register(
+            "iter_windows",
+            ".windows(n)",
+            FragmentCategory::IteratorSource,
+        );
+        self.register(
+            "iter_enumerate",
+            ".enumerate()",
+            FragmentCategory::IteratorAdapter,
+        );
+        self.register(
+            "iter_zip",
+            ".zip(other.iter())",
+            FragmentCategory::IteratorAdapter,
+        );
 
         // Iterator adapters
-        self.register("filter_even", ".filter(|&x| x % 2 == 0)", FragmentCategory::IteratorAdapter);
-        self.register("filter_odd", ".filter(|&x| x % 2 != 0)", FragmentCategory::IteratorAdapter);
-        self.register("filter_positive", ".filter(|&x| x > 0)", FragmentCategory::IteratorAdapter);
-        self.register("filter_alpha", ".filter(|c| c.is_alphabetic())", FragmentCategory::IteratorAdapter);
-        self.register("filter_digit", ".filter(|c| c.is_ascii_digit())", FragmentCategory::IteratorAdapter);
-        self.register("map_uppercase", ".map(|c| c.to_uppercase().next().unwrap())", FragmentCategory::IteratorAdapter);
-        self.register("map_lowercase", ".map(|c| c.to_lowercase().next().unwrap())", FragmentCategory::IteratorAdapter);
-        self.register("map_square", ".map(|x| x * x)", FragmentCategory::IteratorAdapter);
-        self.register("map_double", ".map(|x| x * 2)", FragmentCategory::IteratorAdapter);
-        self.register("map_to_string", ".map(|x| x.to_string())", FragmentCategory::IteratorAdapter);
-        self.register("flat_map", ".flat_map(|x| x.iter())", FragmentCategory::IteratorAdapter);
+        self.register(
+            "filter_even",
+            ".filter(|&x| x % 2 == 0)",
+            FragmentCategory::IteratorAdapter,
+        );
+        self.register(
+            "filter_odd",
+            ".filter(|&x| x % 2 != 0)",
+            FragmentCategory::IteratorAdapter,
+        );
+        self.register(
+            "filter_positive",
+            ".filter(|&x| x > 0)",
+            FragmentCategory::IteratorAdapter,
+        );
+        self.register(
+            "filter_alpha",
+            ".filter(|c| c.is_alphabetic())",
+            FragmentCategory::IteratorAdapter,
+        );
+        self.register(
+            "filter_digit",
+            ".filter(|c| c.is_ascii_digit())",
+            FragmentCategory::IteratorAdapter,
+        );
+        self.register(
+            "map_uppercase",
+            ".map(|c| c.to_uppercase().next().unwrap())",
+            FragmentCategory::IteratorAdapter,
+        );
+        self.register(
+            "map_lowercase",
+            ".map(|c| c.to_lowercase().next().unwrap())",
+            FragmentCategory::IteratorAdapter,
+        );
+        self.register(
+            "map_square",
+            ".map(|x| x * x)",
+            FragmentCategory::IteratorAdapter,
+        );
+        self.register(
+            "map_double",
+            ".map(|x| x * 2)",
+            FragmentCategory::IteratorAdapter,
+        );
+        self.register(
+            "map_to_string",
+            ".map(|x| x.to_string())",
+            FragmentCategory::IteratorAdapter,
+        );
+        self.register(
+            "flat_map",
+            ".flat_map(|x| x.iter())",
+            FragmentCategory::IteratorAdapter,
+        );
         self.register("copied", ".copied()", FragmentCategory::IteratorAdapter);
         self.register("cloned", ".cloned()", FragmentCategory::IteratorAdapter);
         self.register("rev", ".rev()", FragmentCategory::IteratorAdapter);
@@ -138,19 +203,51 @@ impl HvCodeDecoder {
         self.register("peekable", ".peekable()", FragmentCategory::IteratorAdapter);
 
         // Iterator terminals
-        self.register("collect_vec", ".collect::<Vec<_>>()", FragmentCategory::IteratorTerminal);
-        self.register("collect_string", ".collect::<String>()", FragmentCategory::IteratorTerminal);
-        self.register("collect_hashset", ".collect::<HashSet<_>>()", FragmentCategory::IteratorTerminal);
+        self.register(
+            "collect_vec",
+            ".collect::<Vec<_>>()",
+            FragmentCategory::IteratorTerminal,
+        );
+        self.register(
+            "collect_string",
+            ".collect::<String>()",
+            FragmentCategory::IteratorTerminal,
+        );
+        self.register(
+            "collect_hashset",
+            ".collect::<HashSet<_>>()",
+            FragmentCategory::IteratorTerminal,
+        );
         self.register("sum", ".sum()", FragmentCategory::IteratorTerminal);
         self.register("product", ".product()", FragmentCategory::IteratorTerminal);
         self.register("count", ".count()", FragmentCategory::IteratorTerminal);
-        self.register("any", ".any(|x| condition)", FragmentCategory::IteratorTerminal);
-        self.register("all", ".all(|x| condition)", FragmentCategory::IteratorTerminal);
-        self.register("find", ".find(|x| condition)", FragmentCategory::IteratorTerminal);
+        self.register(
+            "any",
+            ".any(|x| condition)",
+            FragmentCategory::IteratorTerminal,
+        );
+        self.register(
+            "all",
+            ".all(|x| condition)",
+            FragmentCategory::IteratorTerminal,
+        );
+        self.register(
+            "find",
+            ".find(|x| condition)",
+            FragmentCategory::IteratorTerminal,
+        );
         self.register("max", ".max()", FragmentCategory::IteratorTerminal);
         self.register("min", ".min()", FragmentCategory::IteratorTerminal);
-        self.register("fold", ".fold(init, |acc, x| acc + x)", FragmentCategory::IteratorTerminal);
-        self.register("position", ".position(|x| condition)", FragmentCategory::IteratorTerminal);
+        self.register(
+            "fold",
+            ".fold(init, |acc, x| acc + x)",
+            FragmentCategory::IteratorTerminal,
+        );
+        self.register(
+            "position",
+            ".position(|x| condition)",
+            FragmentCategory::IteratorTerminal,
+        );
 
         // Predicates
         self.register("eq_zero", "x == 0", FragmentCategory::Predicate);
@@ -158,15 +255,35 @@ impl HvCodeDecoder {
         self.register("lt_zero", "x < 0", FragmentCategory::Predicate);
         self.register("mod_eq", "x % n == 0", FragmentCategory::Predicate);
         self.register("is_alpha", "c.is_alphabetic()", FragmentCategory::Predicate);
-        self.register("is_digit", "c.is_ascii_digit()", FragmentCategory::Predicate);
+        self.register(
+            "is_digit",
+            "c.is_ascii_digit()",
+            FragmentCategory::Predicate,
+        );
         self.register("is_upper", "c.is_uppercase()", FragmentCategory::Predicate);
         self.register("is_lower", "c.is_lowercase()", FragmentCategory::Predicate);
 
         // Type conversions
-        self.register("to_string", ".to_string()", FragmentCategory::TypeConversion);
-        self.register("to_lowercase", ".to_lowercase()", FragmentCategory::TypeConversion);
-        self.register("to_uppercase", ".to_uppercase()", FragmentCategory::TypeConversion);
-        self.register("parse_int", ".parse::<i32>().unwrap_or(0)", FragmentCategory::TypeConversion);
+        self.register(
+            "to_string",
+            ".to_string()",
+            FragmentCategory::TypeConversion,
+        );
+        self.register(
+            "to_lowercase",
+            ".to_lowercase()",
+            FragmentCategory::TypeConversion,
+        );
+        self.register(
+            "to_uppercase",
+            ".to_uppercase()",
+            FragmentCategory::TypeConversion,
+        );
+        self.register(
+            "parse_int",
+            ".parse::<i32>().unwrap_or(0)",
+            FragmentCategory::TypeConversion,
+        );
         self.register("as_str", ".as_str()", FragmentCategory::TypeConversion);
         self.register("trim", ".trim()", FragmentCategory::TypeConversion);
 
@@ -200,7 +317,11 @@ impl HvCodeDecoder {
     /// Decode a hypervector into code by finding the K nearest fragments.
     ///
     /// Returns the top-K fragments ranked by cosine similarity to the query HV.
-    pub fn decode_nearest(&self, query_hv: &ContinuousHV, top_k: usize) -> Vec<(f32, &CodeFragment)> {
+    pub fn decode_nearest(
+        &self,
+        query_hv: &ContinuousHV,
+        top_k: usize,
+    ) -> Vec<(f32, &CodeFragment)> {
         let mut scored: Vec<(f32, &CodeFragment)> = self
             .fragments
             .iter()
@@ -326,7 +447,10 @@ mod tests {
     #[test]
     fn test_seed_fragments() {
         let decoder = HvCodeDecoder::new(512);
-        assert!(decoder.fragment_count() > 50, "Should have 50+ seeded fragments");
+        assert!(
+            decoder.fragment_count() > 50,
+            "Should have 50+ seeded fragments"
+        );
     }
 
     #[test]
@@ -338,7 +462,8 @@ mod tests {
         assert!(!results.is_empty());
         // Top result should be a filter-related fragment
         assert!(
-            results[0].1.name.contains("filter") || results[0].1.category == FragmentCategory::IteratorAdapter,
+            results[0].1.name.contains("filter")
+                || results[0].1.category == FragmentCategory::IteratorAdapter,
             "Expected filter-like fragment, got: {} ({})",
             results[0].1.name,
             results[0].0
@@ -349,10 +474,7 @@ mod tests {
     fn test_register_discovery() {
         let mut decoder = HvCodeDecoder::new(512);
         let before = decoder.discovery_count();
-        decoder.register_discovery(
-            "divisor_sum",
-            "(1..n).filter(|i| n % i == 0).sum::<u64>()",
-        );
+        decoder.register_discovery("divisor_sum", "(1..n).filter(|i| n % i == 0).sum::<u64>()");
         assert_eq!(decoder.discovery_count(), before + 1);
     }
 
@@ -360,7 +482,9 @@ mod tests {
     fn test_decode_iterator_chain() {
         let decoder = HvCodeDecoder::new(512);
         // Encode a concept similar to "reverse string"
-        let query = decoder.encoder.encode_name("reverse characters collect string");
+        let query = decoder
+            .encoder
+            .encode_name("reverse characters collect string");
         let chain = decoder.decode_iterator_chain(&query, "&str", "String");
         assert!(chain.is_some(), "Should produce an iterator chain");
         let code = chain.unwrap();
@@ -373,7 +497,11 @@ mod tests {
         decoder.record_outcome("iter_slice", true);
         decoder.record_outcome("iter_slice", true);
         decoder.record_outcome("iter_slice", false);
-        let frag = decoder.fragments.iter().find(|f| f.name == "iter_slice").unwrap();
+        let frag = decoder
+            .fragments
+            .iter()
+            .find(|f| f.name == "iter_slice")
+            .unwrap();
         assert_eq!(frag.success_count, 2);
         assert_eq!(frag.failure_count, 1);
         assert!(frag.success_rate() > 0.5);

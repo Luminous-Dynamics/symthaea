@@ -107,7 +107,10 @@ fn main() {
         if (idx + 1) % 10 == 0 || idx == midi_files.len() - 1 {
             println!(
                 "  [{}/{}] processed, {} pairs total, {} errors",
-                processed, midi_files.len(), total_pairs, errors
+                processed,
+                midi_files.len(),
+                total_pairs,
+                errors
             );
         }
     }

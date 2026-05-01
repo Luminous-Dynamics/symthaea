@@ -115,7 +115,10 @@ pub struct EcosystemHealthInit {
 /// The B(t) terminal value (at ~10,000 BCE handoff) represents the pre-civilization
 /// biosphere. We degrade it to 2026 conditions using known HANPP + historical
 /// degradation factors.
-pub fn bt_to_ecosystem_health(bt_terminal_biodiversity: f64, bt_terminal_energy: f64) -> EcosystemHealthInit {
+pub fn bt_to_ecosystem_health(
+    bt_terminal_biodiversity: f64,
+    bt_terminal_energy: f64,
+) -> EcosystemHealthInit {
     // Apply Anthropocene degradation from the pre-industrial biosphere baseline.
     // B(t) terminal is at ~3000 BCE — nearly pristine biosphere.
     // We degrade to 2026 conditions using LPI and FAO estimates.

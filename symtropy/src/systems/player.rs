@@ -37,8 +37,7 @@ pub fn player_movement_system(
         direction.x += 1.0;
     }
 
-    let sprinting =
-        keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
+    let sprinting = keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight);
 
     input.direction = direction;
     input.sprinting = sprinting;
@@ -61,17 +60,12 @@ pub fn flashlight_system(
     let Ok((mut flashlight, mut sprite)) = query.single_mut() else {
         return;
     };
-    flashlight.flicker = biometrics.encoder.velocity_surprise() * 0.4
-        + biometrics.model.allostatic_load * 0.3;
+    flashlight.flicker =
+        biometrics.encoder.velocity_surprise() * 0.4 + biometrics.model.allostatic_load * 0.3;
 
     // Player sprite dims/brightens with stress (visual feedback)
     let stress_dim = 1.0 - biometrics.model.allostatic_load * 0.3;
-    sprite.color = Color::srgba(
-        0.2 * stress_dim,
-        0.9 * stress_dim,
-        1.0 * stress_dim,
-        1.0,
-    );
+    sprite.color = Color::srgba(0.2 * stress_dim, 0.9 * stress_dim, 1.0 * stress_dim, 1.0);
 }
 
 /// Fusion core extraction: hold E near the core. Mouse steadiness matters.

@@ -108,7 +108,8 @@ impl SkillVector {
     /// Index of the strongest skill sector (0-7).
     pub fn strongest_index(&self) -> usize {
         let slice = self.as_slice();
-        slice.iter()
+        slice
+            .iter()
             .enumerate()
             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(i, _)| i)
@@ -262,27 +263,36 @@ impl EthicalOrientation {
     /// Initialize from cultural profile with random variation.
     /// Individualist cultures lean deontological/consequentialist.
     /// Collectivist cultures lean relational/virtue_care.
-    pub fn from_culture(
-        individualism: f64,
-        rng: &mut crate::stochastic::StochasticEngine,
-    ) -> Self {
+    pub fn from_culture(individualism: f64, rng: &mut crate::stochastic::StochasticEngine) -> Self {
         Self {
-            deontological: (0.3 + individualism * 0.4
-                + rng.next_gaussian(0.0, 0.1)).clamp(0.05, 1.0),
-            consequentialist: (0.3 + individualism * 0.3
-                + rng.next_gaussian(0.0, 0.1)).clamp(0.05, 1.0),
-            virtue_care: (0.3 + (1.0 - individualism) * 0.3
-                + rng.next_gaussian(0.0, 0.1)).clamp(0.05, 1.0),
-            relational: (0.3 + (1.0 - individualism) * 0.4
-                + rng.next_gaussian(0.0, 0.1)).clamp(0.05, 1.0),
+            deontological: (0.3 + individualism * 0.4 + rng.next_gaussian(0.0, 0.1))
+                .clamp(0.05, 1.0),
+            consequentialist: (0.3 + individualism * 0.3 + rng.next_gaussian(0.0, 0.1))
+                .clamp(0.05, 1.0),
+            virtue_care: (0.3 + (1.0 - individualism) * 0.3 + rng.next_gaussian(0.0, 0.1))
+                .clamp(0.05, 1.0),
+            relational: (0.3 + (1.0 - individualism) * 0.4 + rng.next_gaussian(0.0, 0.1))
+                .clamp(0.05, 1.0),
         }
     }
 
     /// Dominant ethical framework (highest weight).
     pub fn dominant(&self) -> &'static str {
-        let vals = [self.deontological, self.consequentialist, self.virtue_care, self.relational];
-        let names = ["deontological", "consequentialist", "virtue_care", "relational"];
-        let max_idx = vals.iter().enumerate()
+        let vals = [
+            self.deontological,
+            self.consequentialist,
+            self.virtue_care,
+            self.relational,
+        ];
+        let names = [
+            "deontological",
+            "consequentialist",
+            "virtue_care",
+            "relational",
+        ];
+        let max_idx = vals
+            .iter()
+            .enumerate()
             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(i, _)| i)
             .unwrap_or(0);
@@ -294,8 +304,15 @@ impl EthicalOrientation {
     /// Violating a sacred value triggers moral outrage (Tetlock 2003).
     /// Returns (dimension_index, value).
     pub fn sacred_dimension(&self) -> (usize, f64) {
-        let vals = [self.deontological, self.consequentialist, self.virtue_care, self.relational];
-        let (idx, &val) = vals.iter().enumerate()
+        let vals = [
+            self.deontological,
+            self.consequentialist,
+            self.virtue_care,
+            self.relational,
+        ];
+        let (idx, &val) = vals
+            .iter()
+            .enumerate()
             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
             .unwrap();
         (idx, val)
@@ -305,7 +322,11 @@ impl EthicalOrientation {
     /// Sacred dimension resists 80% of the change. Others accept fully.
     pub fn modify_with_sacred_resistance(&mut self, dim: usize, delta: f64) {
         let (sacred_idx, _) = self.sacred_dimension();
-        let effective = if dim == sacred_idx { delta * 0.2 } else { delta };
+        let effective = if dim == sacred_idx {
+            delta * 0.2
+        } else {
+            delta
+        };
         match dim {
             0 => self.deontological = (self.deontological + effective).clamp(0.05, 1.0),
             1 => self.consequentialist = (self.consequentialist + effective).clamp(0.05, 1.0),
@@ -324,18 +345,23 @@ impl EthicalOrientation {
     /// Consequentialist agents are sector-agnostic (outcome-focused).
     pub fn sector_affinity(&self, sector: usize) -> f64 {
         match sector {
-            2 => self.virtue_care * 0.15,       // medicine
-            5 => self.virtue_care * 0.12,       // education
-            3 => self.deontological * 0.10,     // governance (duty)
-            6 => self.relational * 0.08,        // art/culture (community)
-            1 => self.relational * 0.06,        // agriculture (sustenance)
+            2 => self.virtue_care * 0.15,   // medicine
+            5 => self.virtue_care * 0.12,   // education
+            3 => self.deontological * 0.10, // governance (duty)
+            6 => self.relational * 0.08,    // art/culture (community)
+            1 => self.relational * 0.06,    // agriculture (sustenance)
             _ => 0.0,
         }
     }
 
     /// As a 4D vector for distance/similarity computations.
     pub fn as_vec(&self) -> [f64; 4] {
-        [self.deontological, self.consequentialist, self.virtue_care, self.relational]
+        [
+            self.deontological,
+            self.consequentialist,
+            self.virtue_care,
+            self.relational,
+        ]
     }
 
     /// Inherit from two parents with noise and occasional rebellion.
@@ -353,20 +379,29 @@ impl EthicalOrientation {
     ) -> Self {
         let mut child = Self {
             deontological: ((parent_a.deontological + parent_b.deontological) * 0.5
-                + rng.next_gaussian(0.0, 0.08)).clamp(0.05, 1.0),
+                + rng.next_gaussian(0.0, 0.08))
+            .clamp(0.05, 1.0),
             consequentialist: ((parent_a.consequentialist + parent_b.consequentialist) * 0.5
-                + rng.next_gaussian(0.0, 0.08)).clamp(0.05, 1.0),
+                + rng.next_gaussian(0.0, 0.08))
+            .clamp(0.05, 1.0),
             virtue_care: ((parent_a.virtue_care + parent_b.virtue_care) * 0.5
-                + rng.next_gaussian(0.0, 0.08)).clamp(0.05, 1.0),
+                + rng.next_gaussian(0.0, 0.08))
+            .clamp(0.05, 1.0),
             relational: ((parent_a.relational + parent_b.relational) * 0.5
-                + rng.next_gaussian(0.0, 0.08)).clamp(0.05, 1.0),
+                + rng.next_gaussian(0.0, 0.08))
+            .clamp(0.05, 1.0),
         };
         // Generational rebellion: 15% chance to invert ONE dimension.
         // The child defines themselves in opposition to their parents'
         // strongest ethical commitment — a universal pattern across cultures.
         if rng.next_f64() < 0.15 {
             let rebel_dim = (rng.next_u64() % 4) as usize;
-            let vals = [child.deontological, child.consequentialist, child.virtue_care, child.relational];
+            let vals = [
+                child.deontological,
+                child.consequentialist,
+                child.virtue_care,
+                child.relational,
+            ];
             let inverted = (1.0 - vals[rebel_dim]).clamp(0.05, 1.0);
             match rebel_dim {
                 0 => child.deontological = inverted,
@@ -377,7 +412,6 @@ impl EthicalOrientation {
         }
         child
     }
-
 
     /// Revealed ethics: what the agent ACTUALLY does under stress.
     /// Under low stress, revealed ≈ stated. Under high stress, all agents
@@ -405,7 +439,11 @@ impl EthicalOrientation {
         let n = living.len().max(1) as f64;
         Self {
             deontological: living.iter().map(|a| a.ethics.deontological).sum::<f64>() / n,
-            consequentialist: living.iter().map(|a| a.ethics.consequentialist).sum::<f64>() / n,
+            consequentialist: living
+                .iter()
+                .map(|a| a.ethics.consequentialist)
+                .sum::<f64>()
+                / n,
             virtue_care: living.iter().map(|a| a.ethics.virtue_care).sum::<f64>() / n,
             relational: living.iter().map(|a| a.ethics.relational).sum::<f64>() / n,
         }
@@ -484,9 +522,15 @@ pub struct CivAgent {
     pub justice: crate::sub_passport::RestorativeJustice,
 }
 
-fn default_mycel() -> f64 { 0.1 }
-fn default_sap() -> f64 { 100.0 }
-fn default_biological() -> bool { true }
+fn default_mycel() -> f64 {
+    0.1
+}
+fn default_sap() -> f64 {
+    100.0
+}
+fn default_biological() -> bool {
+    true
+}
 
 impl CivAgent {
     /// Age in months at a given tick.
@@ -588,9 +632,8 @@ impl CivAgent {
         // Dead Loop #6 fix: Affect modulates labor output.
         // Joy boosts productivity, sadness suppresses it.
         // Clamped to [0.5, 1.2] to prevent runaway effects.
-        let affect_factor = (0.7 + 0.3 * (self.needs.affect.joy
-            - self.needs.affect.sadness * 0.5))
-            .clamp(0.5, 1.2);
+        let affect_factor =
+            (0.7 + 0.3 * (self.needs.affect.joy - self.needs.affect.sadness * 0.5)).clamp(0.5, 1.2);
         self.skills.total() * self.health * stage_factor * engagement_factor * affect_factor
     }
 
@@ -617,11 +660,9 @@ impl CivAgent {
             .clamp(0.0, 1.0);
         self.sovereign_profile.economic_velocity = (1.0 - hoard).clamp(0.0, 1.0);
         self.sovereign_profile.civic_participation = self.consciousness.phi().clamp(0.0, 1.0);
-        self.sovereign_profile.stewardship_care = ((self.tend_balance / 40.0)
-            .clamp(0.0, 1.0)
-            * 0.6
-            + self.ethics.virtue_care * 0.4)
-            .clamp(0.0, 1.0);
+        self.sovereign_profile.stewardship_care =
+            ((self.tend_balance / 40.0).clamp(0.0, 1.0) * 0.6 + self.ethics.virtue_care * 0.4)
+                .clamp(0.0, 1.0);
         self.sovereign_profile.semantic_resonance = self.mycel_score.clamp(0.0, 1.0);
         self.sovereign_profile.domain_competence = max_skill.clamp(0.0, 1.0);
     }
@@ -651,10 +692,16 @@ mod tests {
             faction_id: None,
             generation: 0,
             trauma_level: 0.0,
-                    cumulative_dose_sv: 0.0, adversarial: None, coordination_understanding: 0.0, mycel_score: 0.1, sap_balance: 100.0, is_biological: true, wounds: Vec::new(),
-                    ethics: EthicalOrientation::default(),
-                    sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
-                    justice: crate::sub_passport::RestorativeJustice::new(),
+            cumulative_dose_sv: 0.0,
+            adversarial: None,
+            coordination_understanding: 0.0,
+            mycel_score: 0.1,
+            sap_balance: 100.0,
+            is_biological: true,
+            wounds: Vec::new(),
+            ethics: EthicalOrientation::default(),
+            sovereign_profile: crate::sovereign_profile::SovereignProfile::zero(),
+            justice: crate::sub_passport::RestorativeJustice::new(),
         }
     }
 
@@ -756,10 +803,26 @@ mod tests {
         for individualism in [0.0, 0.25, 0.5, 0.75, 1.0] {
             for _ in 0..100 {
                 let e = EthicalOrientation::from_culture(individualism, &mut rng);
-                assert!(e.deontological >= 0.05 && e.deontological <= 1.0, "deont={}", e.deontological);
-                assert!(e.consequentialist >= 0.05 && e.consequentialist <= 1.0, "conseq={}", e.consequentialist);
-                assert!(e.virtue_care >= 0.05 && e.virtue_care <= 1.0, "virtue={}", e.virtue_care);
-                assert!(e.relational >= 0.05 && e.relational <= 1.0, "relat={}", e.relational);
+                assert!(
+                    e.deontological >= 0.05 && e.deontological <= 1.0,
+                    "deont={}",
+                    e.deontological
+                );
+                assert!(
+                    e.consequentialist >= 0.05 && e.consequentialist <= 1.0,
+                    "conseq={}",
+                    e.consequentialist
+                );
+                assert!(
+                    e.virtue_care >= 0.05 && e.virtue_care <= 1.0,
+                    "virtue={}",
+                    e.virtue_care
+                );
+                assert!(
+                    e.relational >= 0.05 && e.relational <= 1.0,
+                    "relat={}",
+                    e.relational
+                );
             }
         }
     }
@@ -768,9 +831,24 @@ mod tests {
     fn test_ethics_inherit_bounds() {
         let mut rng = crate::stochastic::StochasticEngine::new(123);
         let extremes = [
-            EthicalOrientation { deontological: 0.05, consequentialist: 0.05, virtue_care: 0.05, relational: 0.05 },
-            EthicalOrientation { deontological: 1.0, consequentialist: 1.0, virtue_care: 1.0, relational: 1.0 },
-            EthicalOrientation { deontological: 0.9, consequentialist: 0.1, virtue_care: 0.5, relational: 0.5 },
+            EthicalOrientation {
+                deontological: 0.05,
+                consequentialist: 0.05,
+                virtue_care: 0.05,
+                relational: 0.05,
+            },
+            EthicalOrientation {
+                deontological: 1.0,
+                consequentialist: 1.0,
+                virtue_care: 1.0,
+                relational: 1.0,
+            },
+            EthicalOrientation {
+                deontological: 0.9,
+                consequentialist: 0.1,
+                virtue_care: 0.5,
+                relational: 0.5,
+            },
         ];
         for a in &extremes {
             for b in &extremes {
@@ -787,23 +865,47 @@ mod tests {
 
     #[test]
     fn test_ethics_sector_affinity_non_negative() {
-        let e = EthicalOrientation { deontological: 1.0, consequentialist: 1.0, virtue_care: 1.0, relational: 1.0 };
+        let e = EthicalOrientation {
+            deontological: 1.0,
+            consequentialist: 1.0,
+            virtue_care: 1.0,
+            relational: 1.0,
+        };
         for sector in 0..8 {
-            assert!(e.sector_affinity(sector) >= 0.0, "sector {} has negative affinity", sector);
+            assert!(
+                e.sector_affinity(sector) >= 0.0,
+                "sector {} has negative affinity",
+                sector
+            );
         }
     }
 
     #[test]
     fn test_ethics_dominant_correctness() {
-        let deont = EthicalOrientation { deontological: 0.9, consequentialist: 0.1, virtue_care: 0.1, relational: 0.1 };
+        let deont = EthicalOrientation {
+            deontological: 0.9,
+            consequentialist: 0.1,
+            virtue_care: 0.1,
+            relational: 0.1,
+        };
         assert_eq!(deont.dominant(), "deontological");
-        let relat = EthicalOrientation { deontological: 0.1, consequentialist: 0.1, virtue_care: 0.1, relational: 0.9 };
+        let relat = EthicalOrientation {
+            deontological: 0.1,
+            consequentialist: 0.1,
+            virtue_care: 0.1,
+            relational: 0.9,
+        };
         assert_eq!(relat.dominant(), "relational");
     }
 
     #[test]
     fn test_ethics_trauma_shift_stays_bounded() {
-        let mut e = EthicalOrientation { deontological: 0.95, consequentialist: 0.08, virtue_care: 0.5, relational: 0.5 };
+        let mut e = EthicalOrientation {
+            deontological: 0.95,
+            consequentialist: 0.08,
+            virtue_care: 0.5,
+            relational: 0.5,
+        };
         // Simulate 100 severe trauma events
         for _ in 0..100 {
             let trauma_inc = 0.1;
@@ -816,7 +918,12 @@ mod tests {
 
     #[test]
     fn test_ethics_age_drift_stays_bounded() {
-        let mut e = EthicalOrientation { deontological: 0.5, consequentialist: 0.5, virtue_care: 0.95, relational: 0.95 };
+        let mut e = EthicalOrientation {
+            deontological: 0.5,
+            consequentialist: 0.5,
+            virtue_care: 0.95,
+            relational: 0.95,
+        };
         // Simulate 600 ticks of elder drift (50 years)
         for _ in 0..600 {
             e.virtue_care = (e.virtue_care + 0.0001).min(1.0);

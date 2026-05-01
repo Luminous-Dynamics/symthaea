@@ -1052,6 +1052,133 @@ a:hover { color: var(--mycelix-green); text-decoration: underline; text-underlin
     border-color: rgba(91, 160, 201, 0.2);
 }
 
+.freshness-badge {
+    font-size: 0.65rem;
+    letter-spacing: 0.03em;
+}
+
+.freshness-fresh {
+    background: rgba(106, 191, 105, 0.15);
+    color: var(--semantic-success);
+    border-color: rgba(106, 191, 105, 0.2);
+}
+
+.freshness-aging {
+    background: rgba(212, 165, 116, 0.15);
+    color: var(--semantic-warning);
+    border-color: rgba(212, 165, 116, 0.2);
+}
+
+.freshness-stale {
+    background: rgba(199, 92, 92, 0.15);
+    color: var(--semantic-error);
+    border-color: rgba(199, 92, 92, 0.2);
+}
+
+.freshness-unknown {
+    background: rgba(148, 163, 184, 0.12);
+    color: var(--text-muted);
+    border-color: rgba(148, 163, 184, 0.18);
+}
+
+.availability-state {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    padding: var(--space-lg);
+    border-radius: var(--radius-organic);
+    background: linear-gradient(135deg, var(--bg-raised) 0%, var(--bg-surface) 100%);
+    border: 1px solid var(--border);
+}
+
+.availability-state-header {
+    display: flex;
+    gap: var(--space-md);
+    align-items: flex-start;
+}
+
+.availability-state-icon {
+    font-size: 1.25rem;
+    line-height: 1;
+    color: var(--text-secondary);
+}
+
+.availability-state-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.availability-state-meta {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.availability-state-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.availability-state-description {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    line-height: 1.5;
+}
+
+.activity-feed {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+
+.activity-feed-card {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+    padding: 0.8rem 0.95rem;
+    border-radius: var(--radius-organic);
+    background: var(--bg-surface);
+}
+
+.activity-feed-dot {
+    width: 8px;
+    height: 8px;
+    margin-top: 0.4rem;
+    border-radius: 999px;
+    background: var(--mycelix-cyan);
+    box-shadow: 0 0 10px rgba(78, 205, 196, 0.25);
+    flex-shrink: 0;
+}
+
+.activity-feed-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.activity-feed-text {
+    color: var(--text-primary);
+    font-size: 0.84rem;
+    line-height: 1.45;
+}
+
+.activity-feed-domain {
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.activity-feed-empty-copy {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
 /* Toast notifications — organic */
 .toast {
     border-left: 3px solid var(--mycelix-cyan);

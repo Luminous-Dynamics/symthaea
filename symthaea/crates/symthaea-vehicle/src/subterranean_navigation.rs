@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::subterranean::{SubterraneanBridge, SurveyAnchor, TunnelRelayNode, RelayPriority};
+use crate::subterranean::{RelayPriority, SubterraneanBridge, SurveyAnchor, TunnelRelayNode};
 use crate::types::VehicleState;
 
 /// Navigation estimate output.
@@ -98,8 +98,7 @@ impl SubterraneanNavigator {
         let weight = 1.0 / (sigma_m.max(0.1));
         let normalization = 1.0 + weight;
         for i in 0..3 {
-            self.position[i] =
-                (self.position[i] + weight * anchor.position_m[i]) / normalization;
+            self.position[i] = (self.position[i] + weight * anchor.position_m[i]) / normalization;
         }
         self.sigma = (self.sigma * 0.9 + sigma_m * 0.1).max(0.5);
         self.update_count += 1;
@@ -120,7 +119,8 @@ pub fn nearest_subterranean_anchor(
     anchors: &[SurveyAnchor],
     ego_position: [f64; 3],
 ) -> Option<(&SurveyAnchor, f64)> {
-    anchors.iter()
+    anchors
+        .iter()
         .filter(|a| a.admitted)
         .map(|a| {
             let dx = a.position_m[0] - ego_position[0];
@@ -164,8 +164,16 @@ mod tests {
     #[test]
     fn test_nearest_anchor() {
         let anchors = vec![
-            SurveyAnchor { anchor_id: "a".to_string(), position_m: [10.0, 0.0, 0.0], admitted: true },
-            SurveyAnchor { anchor_id: "b".to_string(), position_m: [0.0, 5.0, 0.0], admitted: true },
+            SurveyAnchor {
+                anchor_id: "a".to_string(),
+                position_m: [10.0, 0.0, 0.0],
+                admitted: true,
+            },
+            SurveyAnchor {
+                anchor_id: "b".to_string(),
+                position_m: [0.0, 5.0, 0.0],
+                admitted: true,
+            },
         ];
         let (nearest, dist) = nearest_subterranean_anchor(&anchors, [0.0, 0.0, 0.0]).unwrap();
         assert_eq!(nearest.anchor_id, "b");

@@ -173,12 +173,12 @@ impl AdversarialModifier {
             AdversarialStrategy::ProfileMaximizer => {
                 m.phi_growth_mult = 1.0 + optimization_rate * 5.0; // grows 5× faster
                 m.engagement_mult = 2.0; // artificially high engagement
-                // hardest to detect (already true by baseline)
+                                         // hardest to detect (already true by baseline)
             }
             AdversarialStrategy::FreeRider => {
                 m.phi_growth_mult = 0.5; // lower actual growth
                 m.engagement_mult = 1.5; // fakes engagement
-                // hard to detect
+                                         // hard to detect
             }
             AdversarialStrategy::FactionBuilder => {
                 m.phi_growth_mult = 1.2;
@@ -240,8 +240,8 @@ impl AdversarialModifier {
 pub fn evaluate_resilience(
     adversarial_tier_fraction: f64, // fraction of guardian-tier agents that are adversarial
     governance_decisions_influenced: f64, // fraction of decisions influenced by adversaries
-    cvs_delta: f64, // CVS change due to adversaries (negative = damage)
-    detected_fraction: f64, // fraction of adversaries detected by anti-tyranny
+    cvs_delta: f64,                 // CVS change due to adversaries (negative = damage)
+    detected_fraction: f64,         // fraction of adversaries detected by anti-tyranny
 ) -> f64 {
     // Weighted resilience score
     let tier_resilience = 1.0 - adversarial_tier_fraction;
@@ -347,7 +347,9 @@ pub fn apply_mycelix_adversarial_tick(
     // First pass: count GuildColluders in the world (they amplify each other).
     let guild_count = agents
         .iter()
-        .filter(|a| a.is_alive() && matches!(a.adversarial, Some(AdversarialStrategy::GuildColluder)))
+        .filter(|a| {
+            a.is_alive() && matches!(a.adversarial, Some(AdversarialStrategy::GuildColluder))
+        })
         .count();
     let guild_coordination_boost = if guild_count >= 2 {
         // Each colluder boosts the others proportional to count - 1.
@@ -357,7 +359,9 @@ pub fn apply_mycelix_adversarial_tick(
     };
 
     for agent in agents.iter_mut().filter(|a| a.is_alive()) {
-        let Some(strategy) = agent.adversarial else { continue };
+        let Some(strategy) = agent.adversarial else {
+            continue;
+        };
         let m = AdversarialModifier::for_strategy(strategy, optimization_rate);
 
         match strategy {
@@ -392,8 +396,7 @@ pub fn apply_mycelix_adversarial_tick(
             }
             AdversarialStrategy::GuildColluder => {
                 // Collusion: artificially boost each colluder's MYCEL score.
-                agent.mycel_score =
-                    (agent.mycel_score + guild_coordination_boost).clamp(0.0, 1.0);
+                agent.mycel_score = (agent.mycel_score + guild_coordination_boost).clamp(0.0, 1.0);
                 tel.guild_mycel_boost += guild_coordination_boost;
             }
             _ => {
@@ -424,9 +427,7 @@ pub fn apply_mycelix_adversarial_tick(
 ///   `0.3` (the voter-eligibility MYCEL floor used in governance).
 ///
 /// Each impact is clamped to [0, 1] and mapped to resilience via `1 − x`.
-pub fn compute_resilience_from_worlds(
-    worlds: &[crate::world::World],
-) -> Option<MycelixResilience> {
+pub fn compute_resilience_from_worlds(worlds: &[crate::world::World]) -> Option<MycelixResilience> {
     let mut buyer_sap = 0.0;
     let mut buyer_count = 0usize;
     let mut baseline_sap = 0.0;
@@ -539,15 +540,26 @@ mod tests {
 
     #[test]
     fn test_adversarial_modifiers() {
-        let maximizer = AdversarialModifier::for_strategy(
-            AdversarialStrategy::ProfileMaximizer, 0.01);
-        assert!(maximizer.phi_growth_mult > 1.0, "Maximizer should grow faster");
-        assert!(maximizer.appears_legitimate, "Maximizer should look legitimate");
+        let maximizer =
+            AdversarialModifier::for_strategy(AdversarialStrategy::ProfileMaximizer, 0.01);
+        assert!(
+            maximizer.phi_growth_mult > 1.0,
+            "Maximizer should grow faster"
+        );
+        assert!(
+            maximizer.appears_legitimate,
+            "Maximizer should look legitimate"
+        );
 
-        let saboteur = AdversarialModifier::for_strategy(
-            AdversarialStrategy::Saboteur, 0.01);
-        assert!(saboteur.phi_damage > 0.0, "Saboteur should damage collective phi");
-        assert!(!saboteur.appears_legitimate, "Saboteur should be detectable");
+        let saboteur = AdversarialModifier::for_strategy(AdversarialStrategy::Saboteur, 0.01);
+        assert!(
+            saboteur.phi_damage > 0.0,
+            "Saboteur should damage collective phi"
+        );
+        assert!(
+            !saboteur.appears_legitimate,
+            "Saboteur should be detectable"
+        );
     }
 
     #[test]
@@ -561,14 +573,20 @@ mod tests {
     fn test_resilience_total_capture() {
         // Adversaries control everything → resilience ≈ 0.0
         let score = evaluate_resilience(1.0, 1.0, -0.5, 0.0);
-        assert!(score < 0.15, "Total capture should be low resilience: {score}");
+        assert!(
+            score < 0.15,
+            "Total capture should be low resilience: {score}"
+        );
     }
 
     #[test]
     fn test_resilience_detected_adversaries() {
         // Adversaries present but detected → moderate resilience
         let score = evaluate_resilience(0.3, 0.2, -0.05, 0.8);
-        assert!(score > 0.5, "Detected adversaries = moderate resilience: {score}");
+        assert!(
+            score > 0.5,
+            "Detected adversaries = moderate resilience: {score}"
+        );
     }
 
     #[test]
@@ -602,15 +620,15 @@ mod tests {
         let m = AdversarialModifier::for_strategy(AdversarialStrategy::CorrectionFarmer, 0.01);
         // 0.10/tick corrections offsets 0.03/tick violations under 10:3 parity.
         assert!(m.correction_farm_rate >= 0.05);
-        assert!(m.appears_legitimate, "correction farmer hides behind compliance");
+        assert!(
+            m.appears_legitimate,
+            "correction farmer hides behind compliance"
+        );
     }
 
     #[test]
     fn cross_cluster_amplifier_bypasses_gates() {
-        let m = AdversarialModifier::for_strategy(
-            AdversarialStrategy::CrossClusterAmplifier,
-            0.01,
-        );
+        let m = AdversarialModifier::for_strategy(AdversarialStrategy::CrossClusterAmplifier, 0.01);
         assert!(m.cross_cluster_bypass > 0.5);
     }
 

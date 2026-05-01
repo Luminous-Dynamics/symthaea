@@ -14,11 +14,11 @@
 //! Run: cargo run -p symtropy-consciousness-physics --example self_tuning
 
 use nalgebra::SVector;
+use symthaea_consciousness_equation::ConsciousnessInputs;
 use symtropy_consciousness_physics::harmony_field::HarmonyField;
 use symtropy_consciousness_physics::{ConsciousnessField, ThermodynamicConstants};
 use symtropy_math::Point;
 use symtropy_physics::PhysicsWorld;
-use symthaea_consciousness_equation::ConsciousnessInputs;
 
 const AGENTS: usize = 10;
 const TICKS: usize = 1000; // ~15 seconds of gameplay
@@ -37,11 +37,22 @@ struct RunResult {
 /// Score a configuration: higher is better.
 /// We want a sweet spot where cooperation matters.
 fn score_config(results: &[RunResult]) -> f64 {
-    let avg_alive = results.iter().map(|r| r.alive_at_end as f64).sum::<f64>() / results.len() as f64;
-    let avg_coop = results.iter().map(|r| r.cooperation_events as f64).sum::<f64>() / results.len() as f64;
-    let avg_first_collapse = results.iter()
+    let avg_alive =
+        results.iter().map(|r| r.alive_at_end as f64).sum::<f64>() / results.len() as f64;
+    let avg_coop = results
+        .iter()
+        .map(|r| r.cooperation_events as f64)
+        .sum::<f64>()
+        / results.len() as f64;
+    let avg_first_collapse = results
+        .iter()
         .filter_map(|r| r.ticks_to_first_collapse.map(|t| t as f64))
-        .sum::<f64>() / results.iter().filter(|r| r.ticks_to_first_collapse.is_some()).count().max(1) as f64;
+        .sum::<f64>()
+        / results
+            .iter()
+            .filter(|r| r.ticks_to_first_collapse.is_some())
+            .count()
+            .max(1) as f64;
 
     // Ideal: some agents alive (not all, not none), cooperation happening, first collapse not too early/late
     let survival_score = if avg_alive < 1.0 {
@@ -104,11 +115,20 @@ fn run_simulation(constants: &ThermodynamicConstants, seed: u64) -> RunResult {
     for tick in 0..TICKS {
         // Update consciousness
         for &h in &handles {
-            let collapsed = consciousness.entities.get(&h).map(|e| e.energy.is_collapsed()).unwrap_or(true);
+            let collapsed = consciousness
+                .entities
+                .get(&h)
+                .map(|e| e.energy.is_collapsed())
+                .unwrap_or(true);
             let inputs = ConsciousnessInputs {
                 phi: if collapsed { 0.0 } else { 0.5 },
-                broadcast: 0.6, working_memory: 0.5, attention: 0.5,
-                recurrence: 0.4, embodiment: 0.6, knowledge: 0.4, synchrony: 0.5,
+                broadcast: 0.6,
+                working_memory: 0.5,
+                attention: 0.5,
+                recurrence: 0.4,
+                embodiment: 0.6,
+                knowledge: 0.4,
+                synchrony: 0.5,
             };
             consciousness.update_entity(h, &inputs, Point::origin());
         }
@@ -119,8 +139,12 @@ fn run_simulation(constants: &ThermodynamicConstants, seed: u64) -> RunResult {
             if let Some(entity) = consciousness.entities.get_mut(&h) {
                 entity.energy.tick_reset();
                 let phi = entity.phi();
-                entity.energy.consume(constants.consciousness_maintenance_per_tick * (1.0 + phi * 0.5));
-                entity.energy.regenerate(constants.ambient_regen_rate * regen_mult);
+                entity
+                    .energy
+                    .consume(constants.consciousness_maintenance_per_tick * (1.0 + phi * 0.5));
+                entity
+                    .energy
+                    .regenerate(constants.ambient_regen_rate * regen_mult);
             }
         }
 
@@ -158,12 +182,16 @@ fn run_simulation(constants: &ThermodynamicConstants, seed: u64) -> RunResult {
                     if let Some(e) = consciousness.entities.get_mut(&ha) {
                         e.prediction_error *= 1.0 - offload_factor * 0.1;
                         e.motor_precision = 1.0 / (1.0 + e.prediction_error);
-                        e.energy.regenerate(constants.consciousness_maintenance_per_tick * offload_factor * 0.5);
+                        e.energy.regenerate(
+                            constants.consciousness_maintenance_per_tick * offload_factor * 0.5,
+                        );
                     }
                     if let Some(e) = consciousness.entities.get_mut(&hb) {
                         e.prediction_error *= 1.0 - offload_factor * 0.1;
                         e.motor_precision = 1.0 / (1.0 + e.prediction_error);
-                        e.energy.regenerate(constants.consciousness_maintenance_per_tick * offload_factor * 0.5);
+                        e.energy.regenerate(
+                            constants.consciousness_maintenance_per_tick * offload_factor * 0.5,
+                        );
                     }
                     cooperation_events += 1;
                 }
@@ -177,18 +205,33 @@ fn run_simulation(constants: &ThermodynamicConstants, seed: u64) -> RunResult {
         // Check for first collapse
         if first_collapse.is_none() {
             let any_collapsed = handles.iter().any(|h| {
-                consciousness.entities.get(h).map(|e| e.energy.is_collapsed()).unwrap_or(false)
+                consciousness
+                    .entities
+                    .get(h)
+                    .map(|e| e.energy.is_collapsed())
+                    .unwrap_or(false)
             });
-            if any_collapsed { first_collapse = Some(tick); }
+            if any_collapsed {
+                first_collapse = Some(tick);
+            }
         }
     }
 
-    let alive = handles.iter().filter(|h| {
-        consciousness.entities.get(h).map(|e| !e.energy.is_collapsed()).unwrap_or(false)
-    }).count();
-    let avg_energy = handles.iter()
+    let alive = handles
+        .iter()
+        .filter(|h| {
+            consciousness
+                .entities
+                .get(h)
+                .map(|e| !e.energy.is_collapsed())
+                .unwrap_or(false)
+        })
+        .count();
+    let avg_energy = handles
+        .iter()
         .filter_map(|h| consciousness.entities.get(h).map(|e| e.energy.available))
-        .sum::<f64>() / AGENTS as f64;
+        .sum::<f64>()
+        / AGENTS as f64;
 
     RunResult {
         alive_at_end: alive,
@@ -201,14 +244,18 @@ fn run_simulation(constants: &ThermodynamicConstants, seed: u64) -> RunResult {
 
 fn main() {
     println!("=== Symtropy Self-Tuning Experiment ===\n");
-    println!("Testing {} configurations, {} runs each, {} agents, {} ticks\n",
-        7, RUNS_PER_CONFIG, AGENTS, TICKS);
+    println!(
+        "Testing {} configurations, {} runs each, {} agents, {} ticks\n",
+        7, RUNS_PER_CONFIG, AGENTS, TICKS
+    );
 
     // Test different maintenance costs (the most impactful parameter)
     let maintenance_values = [0.03, 0.05, 0.08, 0.12, 0.18, 0.25, 0.35];
 
-    println!("{:<12} {:<8} {:<8} {:<10} {:<12} {:<8}",
-        "Maintenance", "Alive", "Coop", "1st Death", "AvgEnergy", "Score");
+    println!(
+        "{:<12} {:<8} {:<8} {:<10} {:<12} {:<8}",
+        "Maintenance", "Alive", "Coop", "1st Death", "AvgEnergy", "Score"
+    );
     println!("{}", "-".repeat(62));
 
     let mut best_score = 0.0f64;
@@ -225,16 +272,30 @@ fn main() {
             results.push(run_simulation(&constants, 42 + run as u64 * 1000));
         }
 
-        let avg_alive = results.iter().map(|r| r.alive_at_end as f64).sum::<f64>() / results.len() as f64;
-        let avg_coop = results.iter().map(|r| r.cooperation_events as f64).sum::<f64>() / results.len() as f64;
-        let avg_first = results.iter()
+        let avg_alive =
+            results.iter().map(|r| r.alive_at_end as f64).sum::<f64>() / results.len() as f64;
+        let avg_coop = results
+            .iter()
+            .map(|r| r.cooperation_events as f64)
+            .sum::<f64>()
+            / results.len() as f64;
+        let avg_first = results
+            .iter()
             .filter_map(|r| r.ticks_to_first_collapse.map(|t| t as f64))
-            .sum::<f64>() / results.iter().filter(|r| r.ticks_to_first_collapse.is_some()).count().max(1) as f64;
-        let avg_energy = results.iter().map(|r| r.avg_energy_at_end).sum::<f64>() / results.len() as f64;
+            .sum::<f64>()
+            / results
+                .iter()
+                .filter(|r| r.ticks_to_first_collapse.is_some())
+                .count()
+                .max(1) as f64;
+        let avg_energy =
+            results.iter().map(|r| r.avg_energy_at_end).sum::<f64>() / results.len() as f64;
         let score = score_config(&results);
 
-        println!("{:<12.3} {:<8.1} {:<8.0} {:<10.0} {:<12.1} {:<8.3}",
-            maint, avg_alive, avg_coop, avg_first, avg_energy, score);
+        println!(
+            "{:<12.3} {:<8.1} {:<8.0} {:<10.0} {:<12.1} {:<8.3}",
+            maint, avg_alive, avg_coop, avg_first, avg_energy, score
+        );
 
         if score > best_score {
             best_score = score;
@@ -245,10 +306,15 @@ fn main() {
     println!("\n=== OPTIMAL CONFIGURATION ===");
     println!("Best maintenance cost: {:.3} J/tick", best_maintenance);
     println!("Score: {:.3}", best_score);
-    println!("\nRecommendation: set consciousness_maintenance_per_tick = {:.3}", best_maintenance);
+    println!(
+        "\nRecommendation: set consciousness_maintenance_per_tick = {:.3}",
+        best_maintenance
+    );
 }
 
 fn next_rng(state: &mut u64) -> f64 {
-    *state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+    *state = state
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
     (*state >> 11) as f64 / (1u64 << 53) as f64
 }

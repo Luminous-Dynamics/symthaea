@@ -6,9 +6,9 @@
 //! Trains an HDC-LTC unified neuron network (16,384D) to hover a simulated
 //! Crazyflie 2 quadrotor using FEP Active Inference for precision modulation.
 //!
-//! Run: `cargo run --features flight --example quadrotor_hover --release`
+//! Run: `cargo run --features multirotor --example quadrotor_hover --release`
 
-use symthaea::flight::{FlightConfig, FlightTrainer};
+use symthaea::multirotor::{FlightConfig, FlightTrainer};
 
 fn main() {
     println!("=== Symthaea Flight: Quadrotor Hover Training ===");

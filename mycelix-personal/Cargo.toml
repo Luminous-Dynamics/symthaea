@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     # Shared crates
     "crates/personal-types",
+    "crates/personal-leptos-types",
 
     # Identity vault
     "zomes/identity-vault/integrity",
@@ -15,6 +16,10 @@ members = [
     # Credential wallet
     "zomes/credential-wallet/integrity",
     "zomes/credential-wallet/coordinator",
+
+    # Data preferences
+    "zomes/data_preferences/integrity",
+    "zomes/data_preferences/coordinator",
 
     # Unified bridge
     "zomes/personal-bridge/integrity",
@@ -43,10 +48,12 @@ thiserror = "1.0"
 derive_more = "0.99"
 
 # WASM compatibility
+getrandom = { version = "0.2", features = ["custom"] }
 getrandom_03 = { package = "getrandom", version = "0.3" }
 
 # Internal shared crates
 personal-types = { path = "crates/personal-types" }
+personal-leptos-types = { path = "crates/personal-leptos-types" }
 mycelix-bridge-common = { path = "../crates/mycelix-bridge-common" }
 mycelix-bridge-entry-types = { path = "../crates/mycelix-bridge-entry-types" }
 

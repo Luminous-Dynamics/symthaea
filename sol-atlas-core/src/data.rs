@@ -96,8 +96,14 @@ pub fn parse_climate_projects(json: &str) -> Result<Vec<ClimateProject>, serde_j
 /// Parse infrastructure.json → (emergency_shelters, health_facilities, robotics_dispatch).
 pub fn parse_infrastructure(
     json: &str,
-) -> Result<(Vec<EmergencyShelter>, Vec<HealthFacility>, Vec<RoboticsDispatch>), serde_json::Error>
-{
+) -> Result<
+    (
+        Vec<EmergencyShelter>,
+        Vec<HealthFacility>,
+        Vec<RoboticsDispatch>,
+    ),
+    serde_json::Error,
+> {
     let bundle: InfrastructureBundle = serde_json::from_str(json)?;
     Ok((
         bundle.emergency_shelters,
@@ -163,7 +169,12 @@ pub fn load_all(
         robotics_dispatch,
         fossil_deposits,
         nuclear_sites,
-        natural_events: parse_natural_events(earthquakes_json, fires_json, storms_json, volcanoes_json),
+        natural_events: parse_natural_events(
+            earthquakes_json,
+            fires_json,
+            storms_json,
+            volcanoes_json,
+        ),
         major_cities: serde_json::from_str(cities_json).unwrap_or_default(),
         chokepoints: serde_json::from_str(chokepoints_json).unwrap_or_default(),
         critical_infrastructure: serde_json::from_str(critical_infra_json).unwrap_or_default(),
@@ -187,9 +198,14 @@ fn parse_natural_events(
     // Parse GeoJSON FeatureCollections (all share same structure)
     fn parse_geojson(json: &str, event_type: NaturalEventType) -> Vec<NaturalEvent> {
         #[derive(Deserialize)]
-        struct FeatureCollection { features: Vec<Feature> }
+        struct FeatureCollection {
+            features: Vec<Feature>,
+        }
         #[derive(Deserialize)]
-        struct Feature { properties: Properties, geometry: Geometry }
+        struct Feature {
+            properties: Properties,
+            geometry: Geometry,
+        }
         #[derive(Deserialize)]
         struct Properties {
             #[serde(default)]
@@ -206,26 +222,47 @@ fn parse_natural_events(
             event_kind: Option<String>,
         }
         #[derive(Deserialize)]
-        struct Geometry { coordinates: Vec<f64> }
+        struct Geometry {
+            coordinates: Vec<f64>,
+        }
 
-        let Ok(fc) = serde_json::from_str::<FeatureCollection>(json) else { return vec![] };
-        fc.features.iter().filter_map(|f| {
-            let coords = &f.geometry.coordinates;
-            if coords.len() < 2 { return None; }
-            let lon = coords[0];
-            let lat = coords[1];
-            if lat.abs() > 90.0 || lon.abs() > 180.0 { return None; }
-            let magnitude = f.properties.magnitude
-                .or(f.properties.brightness.map(|b| b / 100.0))
-                .unwrap_or(1.0);
-            let name = f.properties.title
-                .as_deref()
-                .or(f.properties.place.as_deref())
-                .or(f.properties.name.as_deref())
-                .unwrap_or("Unknown")
-                .to_string();
-            Some(NaturalEvent { lat, lon, event_type, magnitude, name })
-        }).collect()
+        let Ok(fc) = serde_json::from_str::<FeatureCollection>(json) else {
+            return vec![];
+        };
+        fc.features
+            .iter()
+            .filter_map(|f| {
+                let coords = &f.geometry.coordinates;
+                if coords.len() < 2 {
+                    return None;
+                }
+                let lon = coords[0];
+                let lat = coords[1];
+                if lat.abs() > 90.0 || lon.abs() > 180.0 {
+                    return None;
+                }
+                let magnitude = f
+                    .properties
+                    .magnitude
+                    .or(f.properties.brightness.map(|b| b / 100.0))
+                    .unwrap_or(1.0);
+                let name = f
+                    .properties
+                    .title
+                    .as_deref()
+                    .or(f.properties.place.as_deref())
+                    .or(f.properties.name.as_deref())
+                    .unwrap_or("Unknown")
+                    .to_string();
+                Some(NaturalEvent {
+                    lat,
+                    lon,
+                    event_type,
+                    magnitude,
+                    name,
+                })
+            })
+            .collect()
     }
 
     events.extend(parse_geojson(earthquakes, NaturalEventType::Earthquake));
@@ -360,7 +397,11 @@ mod infra_tests {
     #[test]
     fn layer_count() {
         let all = Layer::all();
-        assert!(all.len() >= 18, "Expected at least 18 layers, got {}", all.len());
+        assert!(
+            all.len() >= 18,
+            "Expected at least 18 layers, got {}",
+            all.len()
+        );
         assert!(all.contains(&Layer::Infrastructure));
         assert!(all.contains(&Layer::Chokepoints));
     }
@@ -368,11 +409,24 @@ mod infra_tests {
     #[test]
     fn all_layers_have_labels() {
         for layer in Layer::all() {
-            assert!(!layer.label().is_empty(), "Layer {:?} has empty label", layer);
-            assert!(!layer.css_color().is_empty(), "Layer {:?} has empty css_color", layer);
+            assert!(
+                !layer.label().is_empty(),
+                "Layer {:?} has empty label",
+                layer
+            );
+            assert!(
+                !layer.css_color().is_empty(),
+                "Layer {:?} has empty css_color",
+                layer
+            );
             let rgb = layer.rgb();
             for c in rgb {
-                assert!(c >= 0.0 && c <= 1.0, "Layer {:?} RGB out of range: {:?}", layer, rgb);
+                assert!(
+                    c >= 0.0 && c <= 1.0,
+                    "Layer {:?} RGB out of range: {:?}",
+                    layer,
+                    rgb
+                );
             }
         }
     }
@@ -386,9 +440,9 @@ mod e2e_tests {
     fn loaded_data_has_all_fields() {
         // Test with minimal valid data for each type
         let data = load_all(
-            "[]", // sites
-            r#"{"geothermal_nodes":[],"maglev_corridors":[]}"#, // maglev
-            "[]", // vaults
+            "[]",                                                                         // sites
+            r#"{"geothermal_nodes":[],"maglev_corridors":[]}"#,                           // maglev
+            "[]",                                                                         // vaults
             "[]", // terra lumina
             "[]", // regions
             "[]", // supply routes
@@ -414,8 +468,8 @@ mod e2e_tests {
     #[test]
     fn loaded_data_handles_invalid_json() {
         let data = load_all(
-            "not json", "bad", "{}", "null", "[]", "", "[]", "[]",
-            "[]", "[]", "[]", "[]", "[]", "[]", "[]", "[]", "[]",
+            "not json", "bad", "{}", "null", "[]", "", "[]", "[]", "[]", "[]", "[]", "[]", "[]",
+            "[]", "[]", "[]", "[]",
         );
         // Should not panic, just return empty vecs
         assert!(data.sites.is_empty());

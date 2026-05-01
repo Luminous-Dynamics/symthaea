@@ -6,10 +6,10 @@
 //! Trains 3 quadrotors in line formation, each with independent HDC-LTC controllers
 //! and a shared `FormationController` for setpoint coordination.
 //!
-//! Run: `cargo run --features flight --example quadrotor_formation --release`
+//! Run: `cargo run --features multirotor --example quadrotor_formation --release`
 
-use symthaea::flight::formation::{FormationController, FormationShape, FormationState};
-use symthaea::flight::{
+use symthaea::multirotor::formation::{FormationController, FormationShape, FormationState};
+use symthaea::multirotor::{
     pd_baseline, FlightConfig, FlightController, FlightSetpoint, PdGains, PhysicsSimulator,
     QuadrotorHdcEncoder, SimplePhysicsSimulator,
 };

@@ -43,7 +43,9 @@ pub fn unruh_temperature(acceleration: f64) -> f64 {
 ///
 /// There's an optimal noise level D* where SNR is maximized.
 pub fn stochastic_resonance_snr(barrier: f64, noise: f64, signal_amplitude: f64) -> f64 {
-    if noise < 1e-20 { return 0.0; }
+    if noise < 1e-20 {
+        return 0.0;
+    }
     let kramers_rate = (-2.0 * barrier / noise).exp();
     kramers_rate * signal_amplitude * signal_amplitude / (noise * noise)
 }
@@ -112,7 +114,8 @@ mod tests {
         assert!(
             snr_opt > snr_high,
             "Optimal ({:.6}) should beat high noise ({:.6})",
-            snr_opt, snr_high
+            snr_opt,
+            snr_high
         );
     }
 
@@ -120,6 +123,11 @@ mod tests {
     fn test_zpf_dominates_at_low_t() {
         let e_low_t = planck_spectrum_with_zpf(1.0, 0.01); // Low T
         let zpe = zero_point_energy(1.0);
-        assert!((e_low_t - zpe).abs() < 0.1, "Low T should be ~ZPE: {:.4} vs {:.4}", e_low_t, zpe);
+        assert!(
+            (e_low_t - zpe).abs() < 0.1,
+            "Low T should be ~ZPE: {:.4} vs {:.4}",
+            e_low_t,
+            zpe
+        );
     }
 }

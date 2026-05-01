@@ -30,9 +30,7 @@ use super::cfc::types::CfCConfig;
 
 /// Get home directory without depending on `dirs` crate
 fn dirs_next_or_home() -> Option<std::path::PathBuf> {
-    std::env::var("HOME")
-        .ok()
-        .map(std::path::PathBuf::from)
+    std::env::var("HOME").ok().map(std::path::PathBuf::from)
 }
 
 /// Maximum number of planning steps before forcing completion
@@ -306,48 +304,110 @@ impl AlgorithmPattern {
             (
                 AlgorithmPattern::Sorting,
                 &[
-                    "sort", "order", "compare", "swap", "bubble", "merge", "quick",
-                    "insertion", "ascending", "descending", "partition", "pivot",
-                    "arrange", "rank",
+                    "sort",
+                    "order",
+                    "compare",
+                    "swap",
+                    "bubble",
+                    "merge",
+                    "quick",
+                    "insertion",
+                    "ascending",
+                    "descending",
+                    "partition",
+                    "pivot",
+                    "arrange",
+                    "rank",
                 ],
             ),
             (
                 AlgorithmPattern::Search,
                 &[
-                    "search", "find", "binary search", "linear search", "lookup",
-                    "index of", "bfs", "dfs", "breadth", "depth", "visited", "queue",
+                    "search",
+                    "find",
+                    "binary search",
+                    "linear search",
+                    "lookup",
+                    "index of",
+                    "bfs",
+                    "dfs",
+                    "breadth",
+                    "depth",
+                    "visited",
+                    "queue",
                     "locate",
                 ],
             ),
             (
                 AlgorithmPattern::DynamicProgramming,
                 &[
-                    "dynamic programming", "memoize", "tabulate", "subproblem",
-                    "optimal", "recurrence", "knapsack", "subsequence", "memo",
-                    "dp", "edit distance", "coin change",
+                    "dynamic programming",
+                    "memoize",
+                    "tabulate",
+                    "subproblem",
+                    "optimal",
+                    "recurrence",
+                    "knapsack",
+                    "subsequence",
+                    "memo",
+                    "dp",
+                    "edit distance",
+                    "coin change",
                 ],
             ),
             (
                 AlgorithmPattern::Graph,
                 &[
-                    "graph", "node", "edge", "vertex", "adjacent", "dijkstra",
-                    "shortest path", "traverse", "neighbor", "connected", "bfs",
-                    "dfs", "topological",
+                    "graph",
+                    "node",
+                    "edge",
+                    "vertex",
+                    "adjacent",
+                    "dijkstra",
+                    "shortest path",
+                    "traverse",
+                    "neighbor",
+                    "connected",
+                    "bfs",
+                    "dfs",
+                    "topological",
                 ],
             ),
             (
                 AlgorithmPattern::Accumulation,
                 &[
-                    "sum", "count", "total", "accumulate", "fold", "reduce",
-                    "aggregate", "average", "mean", "filter", "collect", "tally",
+                    "sum",
+                    "count",
+                    "total",
+                    "accumulate",
+                    "fold",
+                    "reduce",
+                    "aggregate",
+                    "average",
+                    "mean",
+                    "filter",
+                    "collect",
+                    "tally",
                 ],
             ),
             (
                 AlgorithmPattern::StringProcessing,
                 &[
-                    "string", "char", "parse", "format", "split", "join", "replace",
-                    "trim", "uppercase", "lowercase", "substring", "regex", "reverse string",
-                    "palindrome", "capitalize",
+                    "string",
+                    "char",
+                    "parse",
+                    "format",
+                    "split",
+                    "join",
+                    "replace",
+                    "trim",
+                    "uppercase",
+                    "lowercase",
+                    "substring",
+                    "regex",
+                    "reverse string",
+                    "palindrome",
+                    "capitalize",
                 ],
             ),
         ];
@@ -418,12 +478,17 @@ impl AlgorithmPatternDetector {
     fn encode_ngram_prototype(dim: usize, text: &str) -> ContinuousHV {
         let mut values = vec![0.0f32; dim];
         for (i, byte) in text.to_lowercase().bytes().enumerate() {
-            let idx = ((byte as usize).wrapping_mul(31).wrapping_add(i.wrapping_mul(7))) % dim;
+            let idx = ((byte as usize)
+                .wrapping_mul(31)
+                .wrapping_add(i.wrapping_mul(7)))
+                % dim;
             values[idx] += 1.0;
         }
         let magnitude: f32 = values.iter().map(|v| v * v).sum::<f32>().sqrt();
         if magnitude > 0.0 {
-            for v in &mut values { *v /= magnitude; }
+            for v in &mut values {
+                *v /= magnitude;
+            }
         }
         ContinuousHV::from_values(values)
     }
@@ -795,14 +860,8 @@ impl CfCCodeSequencer {
 
         // Compute softmax confidence for the winning action
         let max_val = best_val;
-        let exp_sum: f32 = (0..scan_len)
-            .map(|i| (output[i] - max_val).exp())
-            .sum();
-        let confidence = if exp_sum > 0.0 {
-            1.0 / exp_sum
-        } else {
-            0.0
-        };
+        let exp_sum: f32 = (0..scan_len).map(|i| (output[i] - max_val).exp()).sum();
+        let confidence = if exp_sum > 0.0 { 1.0 / exp_sum } else { 0.0 };
 
         (self.action_index[best_idx].clone(), confidence)
     }
@@ -1309,7 +1368,10 @@ mod tests {
         // Export and reimport weights
         let weights = sequencer.export_weights();
         assert!(!weights.is_empty());
-        assert_eq!(weights.len(), sequencer.network.lock().unwrap().num_parameters());
+        assert_eq!(
+            weights.len(),
+            sequencer.network.lock().unwrap().num_parameters()
+        );
 
         let sequencer2 = CfCCodeSequencer::default();
         sequencer2.import_weights(&weights).unwrap();
@@ -1347,11 +1409,18 @@ mod tests {
             let text = keywords.join(" ").to_lowercase();
             let mut values = vec![0.0f32; dim];
             for (i, byte) in text.bytes().enumerate() {
-                let idx = ((byte as usize).wrapping_mul(31).wrapping_add(i.wrapping_mul(7))) % dim;
+                let idx = ((byte as usize)
+                    .wrapping_mul(31)
+                    .wrapping_add(i.wrapping_mul(7)))
+                    % dim;
                 values[idx] += 1.0;
             }
             let magnitude: f32 = values.iter().map(|v| v * v).sum::<f32>().sqrt();
-            if magnitude > 0.0 { for v in &mut values { *v /= magnitude; } }
+            if magnitude > 0.0 {
+                for v in &mut values {
+                    *v /= magnitude;
+                }
+            }
             ContinuousHV::from_values(values)
         }
     }

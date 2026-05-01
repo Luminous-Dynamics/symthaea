@@ -14,7 +14,7 @@
 //! - Cache performance
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::primitive_system::{
     CompositionAlgebra, CompositionCache, PrimitiveSystem, PrimitiveTier,
 };
@@ -101,7 +101,7 @@ fn bench_composition_ops(c: &mut Criterion) {
             energy.encoding.clone(),
             force.encoding.clone(),
         ];
-        b.iter(|| black_box(HV16::bundle(&encodings)));
+        b.iter(|| black_box(BinaryHV::bundle(&encodings)));
     });
 
     // Sequence (bind chain)
@@ -133,7 +133,7 @@ fn bench_similarity(c: &mut Criterion) {
     let mut group = c.benchmark_group("Similarity");
 
     // Single similarity computation
-    group.bench_function("hv16_similarity", |b| {
+    group.bench_function("binary_hv_similarity", |b| {
         b.iter(|| black_box(cause.encoding.similarity(&effect.encoding)));
     });
 

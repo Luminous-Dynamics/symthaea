@@ -3,7 +3,7 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Cosine similarity search engine.
 
-use crate::catalog::{CatalogEntry, Domain, PhysicsCatalog};
+use crate::catalog::{Domain, PhysicsCatalog};
 use crate::hv::HV;
 use serde::{Deserialize, Serialize};
 

@@ -14,7 +14,7 @@ Committed fixes:
 | `d22016222d` | mycelix-civic integrity | Added `RoboticCredential` match arm |
 | `dc69f6b716` | mycelix-energy projects | Initialized 4 consciousness-scoring fields as `None` |
 | `2330e52d89` | mycelix-conductor-bridge | Pass `None` for new `origin` arg in `AppWebsocket::connect` |
-| `a6ba298d9d` | mycelix-domain-template | Sync trait/enum/struct to current `portal_domain_trait` |
+| `a6ba298d9d` | mycelix-domain-template | Sync trait/enum/struct to current `sensorium_domain_trait` |
 | `d747944f48` | mycelix-civic coordinator | HDK 0.6 migration: `agent_initial_pubkey` + `LinkQuery` |
 
 Net compile-check delta: **12 PASS → 18 PASS** (of 26 Rust clusters).
@@ -44,7 +44,7 @@ atlas, attribution, climate, commons, core, health, hearth, manufacturing, porta
 |---|---|---|
 | **civic** | `E0004: non-exhaustive patterns: EntryTypes::RoboticCredential(_) not covered` | Add match arm in `robotics_dispatch_integrity` |
 | **desci** | `E0583: file not found for module 'reproducibility_engine'` | Create file or remove `mod` decl |
-| **domain-template** | Trait method `default_activity` missing + `EntryTypeInfo.entry_type` + `DataSensitivity::Internal` | Sync template to current `portal_domain_trait` API |
+| **domain-template** | Trait method `default_activity` missing + `EntryTypeInfo.entry_type` + `DataSensitivity::Internal` | Sync template to current `sensorium_domain_trait` API |
 | **finance** | `payments` (12 errors) + `finance_bridge` (9 errors) — wire-types stub drift | Fill `finance-wire-types` stub |
 | **governance** | `feldman-dkg`: `validate_with_freshness`, `verifying_key`, `CastAttestedVoteInput.consciousness_attestation_json` missing | API alignment with `ConsciousnessAttestation` + `SigningKey` |
 | **multiworld-sim** | `ExecutiveSummary` missing `critical_events`, `final_cvs`, `final_population`, `worlds_surviving` | Consumer out of sync with type def |

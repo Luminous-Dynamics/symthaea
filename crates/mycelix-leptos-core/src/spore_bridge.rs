@@ -41,8 +41,12 @@ pub fn provide_spore_bridge() {
     let (cycle_count, set_cycle_count) = signal(0_u64);
 
     let state = SporeState {
-        loaded, phi, cycle_count,
-        set_loaded, set_phi, set_cycle_count,
+        loaded,
+        phi,
+        cycle_count,
+        set_loaded,
+        set_phi,
+        set_cycle_count,
     };
     provide_context(state.clone());
 

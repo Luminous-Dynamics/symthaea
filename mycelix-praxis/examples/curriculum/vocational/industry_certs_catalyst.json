@@ -1,0 +1,130 @@
+{
+  "metadata": {
+    "title": "Workforce Catalyst Seed: Specialized Industry Standards",
+    "framework": "Global Catalyst Mesh",
+    "source": "https://mycelix.org/certs-catalyst",
+    "grade_level": "Professional/Expert",
+    "subject_area": "Multi-Sector",
+    "domain": "Professional Certification",
+    "version": "1.0",
+    "total_standards": 8,
+    "domains": [
+      "Enterprise Operations",
+      "Automation & RPA",
+      "Spatial Computing",
+      "ESG & Sustainability",
+      "FinTech"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Highly specialized certifications for modern digital and sustainable industries."
+  },
+  "nodes": [
+    {
+      "id": "CERT-OPS-SERVICENOW",
+      "title": "ServiceNow Certified System Administrator",
+      "description": "Configuration, implementation, and maintenance of the ServiceNow platform. Managing users, groups, and roles; configuring alerts and notifications. Mapping enterprise workflow to mesh-based coordination.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Enterprise Operations",
+      "subdomain": "Certification Bridge",
+      "tags": ["servicenow", "ops", "workflow", "standard"],
+      "estimated_hours": 120,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "CERT-AUTO-BLUEPRISM",
+      "title": "Blue Prism RPA Professional Developer",
+      "description": "Designing and developing Robotic Process Automation (RPA) solutions. Managing object and process layers; implementing exception handling. Linked to the Swarm Coordination track.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Automation & RPA",
+      "subdomain": "Certification Bridge",
+      "tags": ["rpa", "automation", "blueprism", "standard"],
+      "estimated_hours": 150,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "CERT-DIG-SPARK-AR",
+      "title": "Meta Certified Spark AR Creator",
+      "description": "Designing and building augmented reality (AR) effects for mobile. Mapping 4D cross-section visualization to consumer AR standards.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Spatial Computing",
+      "subdomain": "Certification Bridge",
+      "tags": ["ar", "spark-ar", "design", "standard"],
+      "estimated_hours": 60,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Arts"
+    },
+    {
+      "id": "CERT-SUST-SASB-FSA",
+      "title": "SASB Fundamentals of Sustainability Accounting (FSA)",
+      "description": "The global standard for ESG reporting. Identifying and managing material sustainability information. Mapping the Mycelial Oracle and J/Φ metrics to SASB standards.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "ESG & Sustainability",
+      "subdomain": "Certification Bridge",
+      "tags": ["esg", "sasb", "accounting", "standard"],
+      "estimated_hours": 90,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Analyze",
+      "subject_area": "Social Studies"
+    },
+    {
+      "id": "CERT-FIN-BC-BLOCKCHAIN",
+      "title": "Certified Blockchain Professional (Blockchain Council)",
+      "description": "Deep understanding of blockchain and DLT. Smart contracts, P2P networks, and cryptographic security. Mapping Holochain/Mycelix to the broader FinTech mesh.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "FinTech",
+      "subdomain": "Certification Bridge",
+      "tags": ["blockchain", "dlt", "fintech", "standard"],
+      "estimated_hours": 90,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Understand",
+      "subject_area": "Computer Science"
+    }
+  ],
+  "edges": [
+    {
+      "from": "CIV-GEN-050",
+      "to": "CERT-OPS-SERVICENOW",
+      "edge_type": "Recommended",
+      "strength_permille": 700,
+      "rationale": "Foundational collective decision-making provides the intuition for enterprise workflow configuration."
+    },
+    {
+      "from": "ROB-CAP-SWARM",
+      "to": "CERT-AUTO-BLUEPRISM",
+      "edge_type": "Recommended",
+      "strength_permille": 850,
+      "rationale": "Mastery of multi-platform swarm coordination is an advanced application of RPA design principles."
+    },
+    {
+      "from": "SYM-ADV-201",
+      "to": "CERT-DIG-SPARK-AR",
+      "edge_type": "Recommended",
+      "strength_permille": 600,
+      "rationale": "HDC semantic mapping provides the conceptual foundation for designing interactive spatial AR nodes."
+    },
+    {
+      "from": "CIV-501",
+      "to": "CERT-SUST-SASB-FSA",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Thermodynamic governance and J/Φ metrics are the technical prerequisites for advanced SASB sustainability accounting."
+    },
+    {
+      "from": "DIG-ADV-201",
+      "to": "CERT-FIN-BC-BLOCKCHAIN",
+      "edge_type": "Recommended",
+      "strength_permille": 950,
+      "rationale": "Deep-dive training in Holochain source chains covers 95% of the core DLT competency for blockchain professionals."
+    }
+  ]
+}

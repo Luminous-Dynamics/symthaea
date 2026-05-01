@@ -1,0 +1,116 @@
+{
+  "metadata": {
+    "title": "Infrastructure & Trades: Physical World Standards",
+    "framework": "Global Trades Mesh",
+    "source": "https://mycelix.org/certs-trades",
+    "grade_level": "Vocational/Professional",
+    "subject_area": "Industrial Trades",
+    "domain": "Professional Certification",
+    "version": "1.0",
+    "total_standards": 6,
+    "domains": [
+      "Welding",
+      "HVAC",
+      "Plumbing",
+      "Heavy Equipment",
+      "Industrial Safety"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Essential certifications for building and maintaining physical infrastructure."
+  },
+  "nodes": [
+    {
+      "id": "CERT-WELD-AWS-BASIC",
+      "title": "AWS Certified Welder (Structural)",
+      "description": "Fundamental welding techniques: Shielded Metal Arc Welding (SMAW). Safety, equipment setup, and weld quality. Linked to the Foundry track.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Welding",
+      "subdomain": "Certification Bridge",
+      "tags": ["welding", "construction", "mfg", "standard"],
+      "estimated_hours": 120,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "CERT-HVAC-EPA-608",
+      "title": "EPA Section 608 Technician Certification",
+      "description": "Safe handling and recovery of refrigerants. High-pressure and low-pressure system maintenance. Essential for building climate stewardship.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "HVAC",
+      "subdomain": "Certification Bridge",
+      "tags": ["hvac", "epa", "cooling", "standard"],
+      "estimated_hours": 30,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "CERT-PLUMB-NCCER",
+      "title": "NCCER Plumbing Level 1",
+      "description": "Plumbing tools, math, drawings, and plastic/copper/steel pipe installation. Linked to the Water Sovereignty and Greywater tracks.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Plumbing",
+      "subdomain": "Certification Bridge",
+      "tags": ["plumbing", "water", "construction", "standard"],
+      "estimated_hours": 80,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "CERT-HEAVY-OPERATOR",
+      "title": "NCCER Heavy Equipment Operations Level 1",
+      "description": "Equipment safety, identification, and basic operation for loaders, backhoes, and dozers. Linked to the Subterranean and Terra tracks.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Heavy Equipment",
+      "subdomain": "Certification Bridge",
+      "tags": ["heavy-equipment", "machinery", "civil-work", "standard"],
+      "estimated_hours": 100,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "CERT-SAFETY-OSHA30",
+      "title": "OSHA 30-Hour Construction Safety",
+      "description": "Comprehensive safety for construction workers and supervisors. Hazard recognition, avoidance, and prevention.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Industrial Safety",
+      "subdomain": "Certification Bridge",
+      "tags": ["osha", "safety", "construction", "standard"],
+      "estimated_hours": 30,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Evaluate",
+      "subject_area": "Engineering"
+    }
+  ],
+  "edges": [
+    {
+      "from": "CON-VOC-101",
+      "to": "CERT-WELD-AWS-BASIC",
+      "edge_type": "Recommended",
+      "strength_permille": 600,
+      "rationale": "Bio-materials and structural knowledge provide the context for industrial welding."
+    },
+    {
+      "from": "VOC-H2O-101",
+      "to": "CERT-PLUMB-NCCER",
+      "edge_type": "Recommended",
+      "strength_permille": 850,
+      "rationale": "Greywater loop mastery covers the majority of foundational plumbing competencies."
+    },
+    {
+      "from": "CON-VOC-301",
+      "to": "CERT-HVAC-EPA-608",
+      "edge_type": "Recommended",
+      "strength_permille": 700,
+      "rationale": "Passive atmospheric management training provides the theoretical basis for professional HVAC safety."
+    }
+  ]
+}

@@ -20,6 +20,8 @@ use std::fmt;
 
 use tree_sitter::Tree;
 
+use super::config_parser::ConfiguredCode;
+
 /// Span in source text (byte offsets + line/col positions)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Span {
@@ -489,11 +491,7 @@ mod tests {
         };
 
         let entity = Entity::new(EntityKind::Struct, "MyStruct", span)
-            .with_child(Entity::new(
-                EntityKind::Method,
-                "new",
-                child_span.clone(),
-            ))
+            .with_child(Entity::new(EntityKind::Method, "new", child_span.clone()))
             .with_child(Entity::new(EntityKind::Method, "run", child_span));
 
         assert_eq!(entity.total_count(), 3);
@@ -511,9 +509,15 @@ mod tests {
         };
 
         let mut parsed = ParsedCode::new("fn a() {} fn b() {} struct C {}", "rust");
-        parsed.entities.push(Entity::new(EntityKind::Function, "a", span.clone()));
-        parsed.entities.push(Entity::new(EntityKind::Function, "b", span.clone()));
-        parsed.entities.push(Entity::new(EntityKind::Struct, "C", span));
+        parsed
+            .entities
+            .push(Entity::new(EntityKind::Function, "a", span.clone()));
+        parsed
+            .entities
+            .push(Entity::new(EntityKind::Function, "b", span.clone()));
+        parsed
+            .entities
+            .push(Entity::new(EntityKind::Struct, "C", span));
 
         assert_eq!(parsed.entities_of_kind(EntityKind::Function).len(), 2);
         assert_eq!(parsed.entities_of_kind(EntityKind::Struct).len(), 1);

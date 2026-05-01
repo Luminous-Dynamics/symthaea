@@ -94,6 +94,7 @@ mail-leptos-types = { path = "../../crates/mail-leptos-types" }
 # Mycelix shared Leptos infrastructure
 mycelix-leptos-core = { path = "../../../../crates/mycelix-leptos-core" }
 mycelix-leptos-client = { path = "../../../../crates/mycelix-leptos-client", features = ["browser"] }
+domain-mail = { path = "../../../../mycelix-sensorium/crates/domain-mail" }
 
 # Symthaea HDC engine (optional — 16,384D semantic intelligence)
 symthaea-core = { path = "../../../../symthaea/symthaea-core", default-features = false, optional = true }

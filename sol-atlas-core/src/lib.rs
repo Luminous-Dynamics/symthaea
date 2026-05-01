@@ -9,7 +9,7 @@
 //! between rendering backends (web-sys, glam/nalgebra).
 
 pub mod aesthetics;
-pub mod cluster_layers;
+// pub mod cluster_layers;
 pub mod conductor_bridge;
 pub mod constants;
 pub mod data;
@@ -18,14 +18,14 @@ pub mod energy_trading;
 pub mod geo;
 pub mod lod;
 pub mod mycelix_flows;
-pub mod relativity_viz;
-pub mod solar_system;
+// pub mod relativity_viz;
 pub mod geometry;
 pub mod math;
 pub mod picking;
 pub mod simulation;
+pub mod solar_system;
 pub mod timeline;
-pub mod visual_validation;
 pub mod types;
+pub mod visual_validation;
 
 pub use types::*;

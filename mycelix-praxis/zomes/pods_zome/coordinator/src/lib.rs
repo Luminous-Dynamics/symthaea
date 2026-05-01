@@ -1,3 +1,4 @@
+use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -596,6 +597,56 @@ pub struct PodProgressStats {
     pub avg_streak: u32,
     pub total_courses_completed: u32,
     pub last_updated: i64,
+}
+
+// ============== Pod Attestation & Peer Endorsement ==============
+
+/// Create a peer endorsement for a node.
+#[hdk_extern]
+pub fn create_endorsement(input: Endorsement) -> ExternResult<ActionHash> {
+    let action_hash = create_entry(EntryTypes::Endorsement(input.clone()))?;
+
+    // Link from endorsee to endorsement
+    create_link(
+        input.endorsee.clone(),
+        action_hash.clone(),
+        LinkTypes::AgentToEndorsements,
+        input.node_id.as_bytes().to_vec(),
+    )?;
+
+    // Link from node_id to endorsement
+    let path = Path::from(format!("node_endorsements.{}", input.node_id));
+    let path_hash = ensure_path(path, LinkTypes::NodeToEndorsements)?;
+    create_link(path_hash, action_hash.clone(), LinkTypes::NodeToEndorsements, ())?;
+
+    Ok(action_hash)
+}
+
+/// Get all endorsements for an agent on a specific node.
+#[hdk_extern]
+pub fn get_endorsements_for_agent_node(input: GetEndorsementsInput) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(input.agent, LinkTypes::AgentToEndorsements)?,
+        GetStrategy::Local,
+    )?;
+
+    let mut records = Vec::new();
+    for link in links {
+        let node_id_bytes = link.tag.into_inner();
+        let node_id = String::from_utf8_lossy(&node_id_bytes);
+        if node_id == input.node_id {
+            if let Some(record) = get(link.target, GetOptions::default())? {
+                records.push(record);
+            }
+        }
+    }
+    Ok(records)
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GetEndorsementsInput {
+    pub agent: AgentPubKey,
+    pub node_id: String,
 }
 
 // ============== Peer Tutoring ==============

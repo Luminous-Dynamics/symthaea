@@ -307,9 +307,19 @@ mod tests {
         let mods = compute_modifiers(&config, &mut state, 0);
 
         // With equal 0.25 emphasis, recovery modifier = blend(0.25, 6.0) = 1 + 0.25*5 = 2.25
-        assert!(mods.recovery_mult > 1.0, "Stillness should boost recovery: {}", mods.recovery_mult);
-        assert!(mods.innovation_mult > 1.0, "Creation should boost innovation");
-        assert!(mods.governance_mult > 1.0, "Integration should boost governance");
+        assert!(
+            mods.recovery_mult > 1.0,
+            "Stillness should boost recovery: {}",
+            mods.recovery_mult
+        );
+        assert!(
+            mods.innovation_mult > 1.0,
+            "Creation should boost innovation"
+        );
+        assert!(
+            mods.governance_mult > 1.0,
+            "Integration should boost governance"
+        );
         assert!(mods.healing_mult > 1.0, "Release should boost healing");
     }
 
@@ -358,8 +368,14 @@ mod tests {
             compute_modifiers(&config, &mut state, t);
         }
 
-        assert_eq!(state.cycles_completed, 2, "Should complete 2 full cycles in 8 ticks");
-        assert_eq!(state.cycle_position, 0, "Should reset to 0 after completing cycle");
+        assert_eq!(
+            state.cycles_completed, 2,
+            "Should complete 2 full cycles in 8 ticks"
+        );
+        assert_eq!(
+            state.cycle_position, 0,
+            "Should reset to 0 after completing cycle"
+        );
     }
 
     #[test]
@@ -406,22 +422,37 @@ mod tests {
     #[test]
     fn regenerative_preset_heavy_stillness() {
         let config = MetabolismConfig::regenerative();
-        assert!(config.phase_emphasis[1] > 0.3, "Regenerative should emphasize Stillness");
-        assert!(config.stillness_recovery_mult > 6.0, "Regenerative should have high recovery");
+        assert!(
+            config.phase_emphasis[1] > 0.3,
+            "Regenerative should emphasize Stillness"
+        );
+        assert!(
+            config.stillness_recovery_mult > 6.0,
+            "Regenerative should have high recovery"
+        );
     }
 
     #[test]
     fn emergency_preset_heavy_integration() {
         let config = MetabolismConfig::emergency();
-        assert!(config.phase_emphasis[3] > 0.4, "Emergency should emphasize Integration");
-        assert!(config.phase_emphasis[1] < 0.15, "Emergency should minimize Stillness");
+        assert!(
+            config.phase_emphasis[3] > 0.4,
+            "Emergency should emphasize Integration"
+        );
+        assert!(
+            config.phase_emphasis[1] < 0.15,
+            "Emergency should minimize Stillness"
+        );
     }
 
     #[test]
     fn blend_function_correctness() {
         assert_eq!(blend(0.0, 6.0), 1.0, "Zero emphasis = no effect");
         assert_eq!(blend(1.0, 6.0), 6.0, "Full emphasis = full multiplier");
-        assert!((blend(0.5, 6.0) - 3.5).abs() < 1e-10, "Half emphasis = halfway");
+        assert!(
+            (blend(0.5, 6.0) - 3.5).abs() < 1e-10,
+            "Half emphasis = halfway"
+        );
         assert!((blend(0.25, 6.0) - 2.25).abs() < 1e-10, "Quarter emphasis");
     }
 
@@ -462,6 +493,9 @@ mod tests {
             compute_modifiers(&config, &mut state, t);
         }
 
-        assert_eq!(state.cycles_completed, 1, "12 ticks should complete 1 annual cycle");
+        assert_eq!(
+            state.cycles_completed, 1,
+            "12 ticks should complete 1 annual cycle"
+        );
     }
 }

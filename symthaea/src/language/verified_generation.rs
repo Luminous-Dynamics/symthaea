@@ -28,6 +28,10 @@ use super::code_executor::{try_auto_fix, CodeExecutor, ExecutionResult};
 use super::code_generator::{CodeContext, CodeGenerator};
 use super::code_intent::{CodeIntent, CodeSpec, CodeTarget};
 use super::code_parser::EntityKind;
+use super::repo_map::RepoMap;
+use super::rust_lsp::{LspPosition, RustAnalyzerClient};
+use crate::coding_experience::CodingExperienceStore;
+use crate::hdc::diagnostic_encoder::DiagnosticHDEncoder;
 use crate::mind::structured_thought::EpistemicStatus;
 
 /// Maximum number of compile-fix-retry iterations
@@ -88,12 +92,14 @@ impl VerifiedCode {
                 },
             )
         } else if self.compiled {
-            format!(
-                "COMPILED but {} tests failed",
-                self.test_count_failed
-            )
+            format!("COMPILED but {} tests failed", self.test_count_failed)
         } else {
-            format!("FAILED to compile: {}", self.compile_errors.first().unwrap_or(&"unknown".to_string()))
+            format!(
+                "FAILED to compile: {}",
+                self.compile_errors
+                    .first()
+                    .unwrap_or(&"unknown".to_string())
+            )
         }
     }
 }
@@ -114,7 +120,12 @@ pub struct VerificationConfidence {
 }
 
 impl VerificationConfidence {
-    fn compute(compiled: bool, tests_passed: bool, formally_verified: bool, category_rate: f32) -> Self {
+    fn compute(
+        compiled: bool,
+        tests_passed: bool,
+        formally_verified: bool,
+        category_rate: f32,
+    ) -> Self {
         let mut confidence = 0.0f32;
 
         if compiled {
@@ -159,6 +170,71 @@ pub fn generate_verified(
     spec: &CodeSpec,
     context: &CodeContext,
 ) -> VerifiedCode {
+    generate_verified_inner(generator, executor, spec, context, None, None, None)
+}
+
+/// Generate and verify code with AST/HDC repository context available for
+/// compile-error repair retries.
+pub fn generate_verified_with_repo_map<'a>(
+    generator: &CodeGenerator,
+    executor: &mut CodeExecutor,
+    spec: &CodeSpec,
+    context: &CodeContext<'a>,
+    repo_map: &'a RepoMap,
+) -> VerifiedCode {
+    generate_verified_inner(generator, executor, spec, context, Some(repo_map), None, None)
+}
+
+/// Generate and verify code with both RepoMap and LSP client available for
+/// high-precision repair.
+pub fn generate_verified_full<'a>(
+    generator: &CodeGenerator,
+    executor: &mut CodeExecutor,
+    spec: &CodeSpec,
+    context: &CodeContext<'a>,
+    repo_map: Option<&'a RepoMap>,
+    mut lsp_client: Option<&mut RustAnalyzerClient>,
+    experience_store: Option<&mut CodingExperienceStore>,
+) -> VerifiedCode {
+    generate_verified_inner(
+        generator,
+        executor,
+        spec,
+        context,
+        repo_map,
+        lsp_client.as_deref_mut(),
+        experience_store,
+    )
+}
+
+fn generate_verified_inner<'a>(
+    generator: &CodeGenerator,
+    executor: &mut CodeExecutor,
+    spec: &CodeSpec,
+    context: &CodeContext<'a>,
+    repo_map: Option<&'a RepoMap>,
+    mut lsp_client: Option<&mut RustAnalyzerClient>,
+    experience_store: Option<&mut CodingExperienceStore>,
+) -> VerifiedCode {
+    if !executor.supports_real_execution() {
+        let reason =
+            "Verified generation requires real execution; simulation mode cannot claim compilation or test verification"
+                .to_string();
+        return VerifiedCode {
+            source: String::new(),
+            compiled: false,
+            tests_passed: false,
+            test_count_passed: 0,
+            test_count_failed: 0,
+            compile_retries: 0,
+            test_retries: 0,
+            formally_verified: None,
+            confidence: VerificationConfidence::compute(false, false, false, 0.0),
+            compile_errors: vec![reason],
+            test_failures: Vec::new(),
+        };
+    }
+
     // Step 1: Generate the function body (which may include inline tests)
     let intent = CodeIntent::Create {
         target: CodeTarget {
@@ -193,7 +269,12 @@ pub fn generate_verified(
             format!("{}\n\n{}", source, test_source)
         };
 
-        let result = executor.execute_rust_with_inline_tests(&full_source);
+        let mut result = executor.execute_rust_with_inline_tests(&full_source);
+        result.parse_test_failures();
+
+        if result.simulated {
+            return simulated_verification_failure(source, compile_retries, 0);
+        }
 
         if result.compiled {
             // Compiled! Check tests
@@ -229,26 +310,109 @@ pub fn generate_verified(
 
                 // Try test-fix retries
                 let mut test_retries = 0;
+                let mut latest_result = result.clone();
+                let mut latest_test_failures = if test_failures.is_empty() {
+                    vec![result.test_output.clone()]
+                } else {
+                    test_failures.clone()
+                };
+                let mut last_compile_errors = Vec::new();
                 while test_retries < MAX_TEST_RETRIES {
                     test_retries += 1;
-                    // Re-generate with error hints
-                    // For now, return with test failure info — body correction
-                    // requires deeper integration with the emitter
-                    break;
+
+                    let retry_spec =
+                        augment_spec_with_test_failures(spec, &latest_test_failures, test_retries);
+                    let retry_context =
+                        build_test_retry_context(context, &latest_test_failures, test_retries);
+                    let retry_intent = CodeIntent::Create {
+                        target: CodeTarget {
+                            kind: EntityKind::Function,
+                            name: retry_spec.name.clone(),
+                            path: None,
+                            language: Some(retry_spec.language.clone()),
+                            hv: None,
+                        },
+                        spec: retry_spec,
+                    };
+
+                    source = generator.generate(&retry_intent, &retry_context).source;
+
+                    let retry_full_source = if test_source.is_empty() {
+                        source.clone()
+                    } else {
+                        format!("{}\n\n{}", source, test_source)
+                    };
+
+                    let mut retry_result =
+                        executor.execute_rust_with_inline_tests(&retry_full_source);
+                    retry_result.parse_test_failures();
+
+                    if retry_result.simulated {
+                        return simulated_verification_failure(
+                            source,
+                            compile_retries,
+                            test_retries,
+                        );
+                    }
+
+                    if retry_result.compiled && retry_result.tests_failed == 0 {
+                        return VerifiedCode {
+                            source,
+                            compiled: true,
+                            tests_passed: true,
+                            test_count_passed: retry_result.tests_passed,
+                            test_count_failed: 0,
+                            compile_retries,
+                            test_retries,
+                            formally_verified: None,
+                            confidence: VerificationConfidence::compute(true, true, false, 1.0),
+                            compile_errors: Vec::new(),
+                            test_failures: Vec::new(),
+                        };
+                    }
+
+                    if !retry_result.compiled {
+                        last_compile_errors = retry_result.compile_errors.clone();
+                        if let Some(fixed) = try_auto_fix(&source, &retry_result.compile_errors) {
+                            source = fixed;
+                        }
+                    }
+
+                    latest_test_failures = retry_result
+                        .test_failures
+                        .iter()
+                        .map(|f| {
+                            format!(
+                                "{}: expected={}, actual={}",
+                                f.test_name,
+                                f.expected.as_deref().unwrap_or("?"),
+                                f.actual.as_deref().unwrap_or("?")
+                            )
+                        })
+                        .collect();
+                    if latest_test_failures.is_empty() && !retry_result.test_output.is_empty() {
+                        latest_test_failures.push(retry_result.test_output.clone());
+                    }
+                    latest_result = retry_result;
                 }
 
                 return VerifiedCode {
                     source,
-                    compiled: true,
+                    compiled: latest_result.compiled,
                     tests_passed: false,
-                    test_count_passed: result.tests_passed,
-                    test_count_failed: result.tests_failed,
+                    test_count_passed: latest_result.tests_passed,
+                    test_count_failed: latest_result.tests_failed,
                     compile_retries,
                     test_retries,
                     formally_verified: None,
-                    confidence: VerificationConfidence::compute(true, false, false, 0.5),
-                    compile_errors: Vec::new(),
-                    test_failures,
+                    confidence: VerificationConfidence::compute(
+                        latest_result.compiled,
+                        false,
+                        false,
+                        0.5,
+                    ),
+                    compile_errors: last_compile_errors,
+                    test_failures: latest_test_failures,
                 };
             }
         }
@@ -261,11 +425,42 @@ pub fn generate_verified(
             break;
         }
 
+        // Notify LSP about the failing file so it can provide context
+        if let Some(lsp) = lsp_client.as_mut() {
+            let path = executor.work_dir().join("generated_test.rs");
+            let _ = lsp.did_open(&path, "rust", &full_source);
+        }
+
         // Apply auto-fix
         if let Some(fixed) = try_auto_fix(&source, &result.compile_errors) {
             source = fixed;
         } else {
-            break; // No fix available
+            if repo_map.is_none() {
+                break; // No fix available
+            }
+
+            let retry_spec =
+                augment_spec_with_compile_errors(spec, &result.compile_errors, compile_retries);
+            let retry_context = build_compile_retry_context(
+                context,
+                repo_map,
+                lsp_client.as_deref_mut(),
+                experience_store.as_deref_mut(),
+                &result.compile_errors,
+                compile_retries,
+            );
+            let retry_intent = CodeIntent::Create {
+                target: CodeTarget {
+                    kind: EntityKind::Function,
+                    name: retry_spec.name.clone(),
+                    path: None,
+                    language: Some(retry_spec.language.clone()),
+                    hv: None,
+                },
+                spec: retry_spec,
+            };
+
+            source = generator.generate(&retry_intent, &retry_context).source;
         }
     }
 
@@ -282,6 +477,197 @@ pub fn generate_verified(
         confidence: VerificationConfidence::compute(false, false, false, 0.0),
         compile_errors: last_compile_errors,
         test_failures: Vec::new(),
+    }
+}
+
+fn simulated_verification_failure(
+    source: String,
+    compile_retries: usize,
+    test_retries: usize,
+) -> VerifiedCode {
+    VerifiedCode {
+        source,
+        compiled: false,
+        tests_passed: false,
+        test_count_passed: 0,
+        test_count_failed: 0,
+        compile_retries,
+        test_retries,
+        formally_verified: None,
+        confidence: VerificationConfidence::compute(false, false, false, 0.0),
+        compile_errors: vec![
+            "Verification aborted because execution was simulated; real compilation and test results are required"
+                .to_string(),
+        ],
+        test_failures: Vec::new(),
+    }
+}
+
+fn augment_spec_with_test_failures(
+    spec: &CodeSpec,
+    test_failures: &[String],
+    retry_number: usize,
+) -> CodeSpec {
+    let mut retry_spec = spec.clone();
+    retry_spec
+        .constraints
+        .extend(test_failures.iter().map(|failure| {
+            format!(
+                "Retry {} must satisfy this failing test feedback: {}",
+                retry_number, failure
+            )
+        }));
+    retry_spec
+}
+
+fn augment_spec_with_compile_errors(
+    spec: &CodeSpec,
+    compile_errors: &[String],
+    retry_number: usize,
+) -> CodeSpec {
+    let mut retry_spec = spec.clone();
+    retry_spec
+        .constraints
+        .extend(compile_errors.iter().map(|error| {
+            format!(
+                "Retry {} must resolve this compiler diagnostic: {}",
+                retry_number, error
+            )
+        }));
+    retry_spec
+}
+
+fn build_compile_retry_context<'a>(
+    context: &CodeContext<'a>,
+    repo_map: Option<&'a RepoMap>,
+    mut lsp_client: Option<&mut RustAnalyzerClient>,
+    mut experience_store: Option<&mut CodingExperienceStore>,
+    compile_errors: &[String],
+    retry_number: usize,
+) -> CodeContext<'a> {
+    let diagnostic_context =
+        repo_map.map(|map| map.code_context_for_compile_errors(compile_errors, 5));
+
+    let mut source_files = context.source_files.clone();
+    let mut error_hints = context.error_hints.clone();
+    let mut diagnostic_hvs = context.diagnostic_hvs.clone();
+    let mut learned_template = context.learned_template.clone();
+
+    // Neuro-symbolic encoding: translate diagnostics into HDC geometry
+    let encoder = DiagnosticHDEncoder::default_dim();
+    let structured_errors =
+        crate::language::code_executor::parse_structured_errors(&compile_errors.join("\n"));
+    for error in &structured_errors {
+        let hv = encoder.encode_diagnostic(error);
+        diagnostic_hvs.push(hv.clone());
+
+        // EXPERIENTIAL RECALL: If we have an experience store, query for past fixes for this failure geometry.
+        // This closes the loop: "I've felt this error before, and this code fixed it."
+        if let Some(ref mut store) = experience_store {
+            let rt = tokio::runtime::Handle::current();
+            // We use block_on here because the verified loop is currently synchronous
+            // but the experience store (SQLite) is async.
+            if let Some(template) = rt.block_on(store.learned_template_for_diagnostic(&hv)) {
+                if learned_template.is_none() {
+                    learned_template = Some(template);
+                }
+            }
+        }
+    }
+
+    if let Some(repo_context) = diagnostic_context {
+        for (label, snippet) in repo_context.source_files {
+            if !source_files
+                .iter()
+                .any(|(existing_label, _)| existing_label == &label)
+            {
+                source_files.push((label, snippet));
+            }
+        }
+        error_hints.extend(repo_context.error_hints);
+    }
+
+    // Enrich with LSP if available
+    if let (Some(lsp), Some(map)) = (lsp_client.as_mut(), repo_map) {
+        let diagnostics = map.attach_compile_errors(compile_errors);
+        for diag in diagnostics {
+            if let (Some(file), Some(line), Some(col)) =
+                (&diag.error.file, diag.error.line, diag.error.column)
+            {
+                let pos = LspPosition::new(line as u32 - 1, col as u32 - 1);
+
+                // 1. Get hover information (enrich error hints)
+                if let Ok(Some(hover)) = lsp.hover(file, pos) {
+                    error_hints.push((
+                        format!(
+                            "lsp_hover_{}",
+                            diag.error.code.as_deref().unwrap_or("error")
+                        ),
+                        format!("LSP analysis at {file}:{line}:{col}: {}", hover.contents),
+                    ));
+                }
+
+                // 2. Get definitions (enrich source snippets)
+                if let Ok(locations) = lsp.goto_definition(file, pos) {
+                    let lsp_context = map.code_context_for_lsp_locations(&locations);
+                    for (label, snippet) in lsp_context.source_files {
+                        if !source_files
+                            .iter()
+                            .any(|(existing_label, _)| existing_label == &label)
+                        {
+                            source_files.push((label, snippet));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if repo_map.is_none() {
+        error_hints.extend(compile_errors.iter().map(|error| {
+            (
+                format!("compile_error_retry_{retry_number}"),
+                format!(
+                    "Fix the generated function so this compiler diagnostic is resolved: {error}"
+                ),
+            )
+        }));
+    }
+
+    CodeContext {
+        memory: repo_map.map(|map| map.memory()).or(context.memory),
+        context_hvs: context.context_hvs.clone(),
+        source_files,
+        past_examples: context.past_examples.clone(),
+        mcts_plan_confidence: context.mcts_plan_confidence,
+        error_hints,
+        diagnostic_hvs,
+        learned_template,
+    }
+}
+
+fn build_test_retry_context<'a>(
+    context: &CodeContext<'a>,
+    test_failures: &[String],
+    retry_number: usize,
+) -> CodeContext<'a> {
+    let mut error_hints = context.error_hints.clone();
+    error_hints.extend(test_failures.iter().map(|failure| {
+        (
+            format!("test_failure_retry_{retry_number}"),
+            format!("Fix the generated function so this failure no longer occurs: {failure}"),
+        )
+    }));
+
+    CodeContext {
+        memory: context.memory,
+        context_hvs: context.context_hvs.clone(),
+        source_files: context.source_files.clone(),
+        past_examples: context.past_examples.clone(),
+        mcts_plan_confidence: context.mcts_plan_confidence,
+        error_hints,
+        diagnostic_hvs: context.diagnostic_hvs.clone(),
+        learned_template: context.learned_template.clone(),
     }
 }
 
@@ -328,6 +714,7 @@ pub fn generate_verified_function(
 mod tests {
     use super::*;
     use crate::hdc::code_encoder::CodeHDEncoder;
+    use crate::language::repo_map::RepoMap;
 
     fn make_generator() -> CodeGenerator {
         CodeGenerator::new(CodeHDEncoder::new(512))
@@ -347,7 +734,11 @@ mod tests {
             &[("add(2, 3)", "5")],
         );
 
-        assert!(result.compiled, "add() should compile: {:?}", result.compile_errors);
+        assert!(
+            result.compiled,
+            "add() should compile: {:?}",
+            result.compile_errors
+        );
     }
 
     #[test]
@@ -364,7 +755,11 @@ mod tests {
             &[],
         );
 
-        assert!(result.compiled, "reverse_string() should compile: {:?}", result.compile_errors);
+        assert!(
+            result.compiled,
+            "reverse_string() should compile: {:?}",
+            result.compile_errors
+        );
     }
 
     #[test]
@@ -390,6 +785,38 @@ mod tests {
     }
 
     #[test]
+    fn test_compile_retry_context_uses_repo_map_diagnostics() {
+        let mut repo = RepoMap::new(".");
+        repo.index_source(
+            "src/config.rs",
+            "pub struct EngineConfig {\n    pub enabled: bool,\n}\n",
+        )
+        .unwrap();
+        let compile_errors =
+            vec!["error[E0412]: cannot find type `EngineConfig` in this scope".to_string()];
+
+        let context = build_compile_retry_context(
+            &CodeContext::default(),
+            Some(&repo),
+            None,
+            None,
+            &compile_errors,
+            1,
+        );
+
+        assert!(context.memory.is_some());
+        assert!(context
+            .source_files
+            .iter()
+            .any(|(_, snippet)| snippet.contains("pub struct EngineConfig")));
+        assert!(context
+            .error_hints
+            .iter()
+            .any(|(pattern, hint)| pattern == "compile_error_E0412"
+                && hint.contains("cannot find type")));
+    }
+
+    #[test]
     fn test_confidence_computation() {
         // Full verification
         let full = VerificationConfidence::compute(true, true, true, 1.0);
@@ -403,5 +830,31 @@ mod tests {
         // Nothing works
         let fail = VerificationConfidence::compute(false, false, false, 0.0);
         assert!(fail.confidence < 0.1);
+    }
+
+    #[test]
+    fn test_verified_generation_rejects_simulated_execution() {
+        let generator = make_generator();
+        let mut executor = CodeExecutor::new();
+
+        let result = generate_verified_function(
+            &generator,
+            &mut executor,
+            "add",
+            "Add two integers",
+            "fn add(a: i32, b: i32) -> i32",
+            &[("add(2, 3)", "5")],
+        );
+
+        assert!(!result.compiled);
+        assert!(!result.tests_passed);
+        assert!(
+            result
+                .compile_errors
+                .iter()
+                .any(|err| err.contains("requires real execution")),
+            "expected real-execution failure, got {:?}",
+            result.compile_errors
+        );
     }
 }

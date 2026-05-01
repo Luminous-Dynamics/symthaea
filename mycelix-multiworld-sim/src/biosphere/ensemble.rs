@@ -18,9 +18,7 @@
 use super::bridge::biosphere_energy_adjustment;
 use super::deep_time_data::{DeepTimeData, TaphonomicRegime};
 use super::dimensions::{compute_bt, compute_raw_dimensions, BiosphereMaxima};
-use super::mass_extinctions::{
-    canonical_mass_extinctions, ShockRecoveryModel,
-};
+use super::mass_extinctions::{canonical_mass_extinctions, ShockRecoveryModel};
 use super::temporal_bins::{build_deep_time_bins, MaAge};
 
 /// Parameters that vary across ensemble members.
@@ -55,7 +53,9 @@ impl Default for EnsembleParams {
 
 /// Simple LCG for deterministic sampling.
 fn lcg_next(state: &mut u64) -> f64 {
-    *state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+    *state = state
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
     // Map to [0, 1)
     (*state >> 11) as f64 / (1u64 << 53) as f64
 }
@@ -92,7 +92,8 @@ fn compute_bt_with_params(params: &EnsembleParams) -> Vec<f64> {
             // Compute raw dimensions (with parameterized taphonomic correction)
             let _raw_diversity = {
                 let base = super::deep_time_data::DeepTimeData::interpolate_proxy(
-                    &data.genus_diversity, age,
+                    &data.genus_diversity,
+                    age,
                 );
                 let regime = TaphonomicRegime::for_age(age);
                 let mult = match regime {
@@ -323,7 +324,10 @@ mod tests {
             .iter()
             .zip(r2.median.iter())
             .any(|(a, b)| (a - b).abs() > 0.001);
-        assert!(any_different, "Different seeds should produce different results");
+        assert!(
+            any_different,
+            "Different seeds should produce different results"
+        );
     }
 
     #[test]

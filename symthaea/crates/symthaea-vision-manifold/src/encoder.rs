@@ -434,8 +434,7 @@ impl PatchHdcEncoder {
         // Values in [0, 1]: 0 = near, 1 = far.
         if self.config.enable_depth {
             let texture_depth = (1.0 - variance).clamp(0.0, 1.0);
-            let frame_height = (width as f32 / self.config.patch_size as f32)
-                .max(1.0)
+            let frame_height = (width as f32 / self.config.patch_size as f32).max(1.0)
                 * self.config.patch_size as f32;
             let position_depth = 1.0 - (patch_y as f32 / frame_height.max(1.0)).clamp(0.0, 1.0);
             let depth = (0.6 * texture_depth + 0.4 * position_depth).clamp(0.0, 1.0);
@@ -613,7 +612,11 @@ impl PatchHdcEncoder {
                 }
             }
         }
-        if count > 0.0 { sum / count } else { 0.0 }
+        if count > 0.0 {
+            sum / count
+        } else {
+            0.0
+        }
     }
 
     pub fn max_rows(&self) -> usize {

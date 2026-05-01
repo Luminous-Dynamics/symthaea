@@ -15,8 +15,8 @@
 use mycelix_multiworld_sim::{
     earth_population::EarthPopulationModel,
     earth_regions::build_earth_regions,
-    validation::{self, ObservedData},
     stochastic::StochasticEngine,
+    validation::{self, ObservedData},
     viability::ScalingFactors,
 };
 
@@ -29,11 +29,21 @@ fn evaluate(params: &[f64; 5]) -> f64 {
     let ocean_lag = params[4];
 
     // Bounds check — reject obviously bad parameters
-    if birth_scale < 0.5 || birth_scale > 2.0 { return 1000.0; }
-    if edu_threshold < 0.2 || edu_threshold > 0.8 { return 1000.0; }
-    if edu_strength < 0.0 || edu_strength > 3.0 { return 1000.0; }
-    if decarb_rate < 0.005 || decarb_rate > 0.04 { return 1000.0; }
-    if ocean_lag < 5.0 || ocean_lag > 50.0 { return 1000.0; }
+    if birth_scale < 0.5 || birth_scale > 2.0 {
+        return 1000.0;
+    }
+    if edu_threshold < 0.2 || edu_threshold > 0.8 {
+        return 1000.0;
+    }
+    if edu_strength < 0.0 || edu_strength > 3.0 {
+        return 1000.0;
+    }
+    if decarb_rate < 0.005 || decarb_rate > 0.04 {
+        return 1000.0;
+    }
+    if ocean_lag < 5.0 || ocean_lag > 50.0 {
+        return 1000.0;
+    }
 
     // Build Earth model with 1970 initial conditions
     let mut regions = build_earth_regions();
@@ -56,8 +66,8 @@ fn evaluate(params: &[f64; 5]) -> f64 {
 
     // Override climate parameters
     model.climate.carbon_intensity = 0.55; // 1970 starting value
-    // We can't directly set decarb_rate and ocean_lag on the model struct,
-    // so we'll track them externally and compute manually
+                                           // We can't directly set decarb_rate and ocean_lag on the model struct,
+                                           // so we'll track them externally and compute manually
 
     let mut regions_mut = regions.clone();
     let mut rng = StochasticEngine::new(42);
@@ -72,7 +82,8 @@ fn evaluate(params: &[f64; 5]) -> f64 {
     let mut carbon_intensity = 0.55_f64;
 
     for tick in 0..648 {
-        let scaling: Vec<_> = regions_mut.iter()
+        let scaling: Vec<_> = regions_mut
+            .iter()
             .map(|r| ScalingFactors::compute(r.population * 1_000_000.0))
             .collect();
         model.tick(&regions_mut, &scaling, tick, &mut rng);
@@ -93,7 +104,8 @@ fn evaluate(params: &[f64; 5]) -> f64 {
         carbon_intensity = 0.55 * (1.0 - decarb_rate).powf(years_elapsed);
 
         // Emissions from GDP
-        let global_gdp: f64 = regions_mut.iter()
+        let global_gdp: f64 = regions_mut
+            .iter()
             .map(|r| r.gdp_per_capita * r.population * 1_000_000.0)
             .sum();
         let annual_emissions = global_gdp * carbon_intensity / 1e12;
@@ -114,9 +126,24 @@ fn evaluate(params: &[f64; 5]) -> f64 {
     }
 
     // Compute MAPEs
-    let pop_v = validation::validate_metric("pop", &pop_trajectory, &ObservedData::world_population(), "");
-    let temp_v = validation::validate_metric("temp", &temp_trajectory, &ObservedData::temperature_anomaly(), "");
-    let emit_v = validation::validate_metric("emit", &emission_trajectory, &ObservedData::co2_emissions(), "");
+    let pop_v = validation::validate_metric(
+        "pop",
+        &pop_trajectory,
+        &ObservedData::world_population(),
+        "",
+    );
+    let temp_v = validation::validate_metric(
+        "temp",
+        &temp_trajectory,
+        &ObservedData::temperature_anomaly(),
+        "",
+    );
+    let emit_v = validation::validate_metric(
+        "emit",
+        &emission_trajectory,
+        &ObservedData::co2_emissions(),
+        "",
+    );
 
     // Combined objective: weighted sum of MAPEs
     // Weight temperature less because early years have natural variability
@@ -132,8 +159,10 @@ fn main() {
     // Initial simplex: current best + perturbations
     let x0 = [1.0, 0.5, 1.0, 0.015, 20.0]; // current defaults
     let initial_cost = evaluate(&x0);
-    println!("Initial params: birth={:.2}, edu_thresh={:.2}, edu_str={:.2}, decarb={:.4}, lag={:.1}",
-        x0[0], x0[1], x0[2], x0[3], x0[4]);
+    println!(
+        "Initial params: birth={:.2}, edu_thresh={:.2}, edu_str={:.2}, decarb={:.4}, lag={:.1}",
+        x0[0], x0[1], x0[2], x0[3], x0[4]
+    );
     println!("Initial cost: {:.2}\n", initial_cost);
 
     // Nelder-Mead simplex optimization
@@ -160,8 +189,8 @@ fn main() {
     let max_iter = 100;
     let alpha = 1.0; // reflection
     let gamma = 2.0; // expansion
-    let rho = 0.5;   // contraction
-    let sigma = 0.5;  // shrink
+    let rho = 0.5; // contraction
+    let sigma = 0.5; // shrink
 
     for iter in 0..max_iter {
         // Sort by cost
@@ -171,10 +200,17 @@ fn main() {
         let worst_cost = simplex[n].1;
 
         if iter % 10 == 0 {
-            println!("Iter {:>3}: best={:.2} worst={:.2} params=[{:.3}, {:.3}, {:.3}, {:.4}, {:.1}]",
-                iter, best_cost, worst_cost,
-                simplex[0].0[0], simplex[0].0[1], simplex[0].0[2],
-                simplex[0].0[3], simplex[0].0[4]);
+            println!(
+                "Iter {:>3}: best={:.2} worst={:.2} params=[{:.3}, {:.3}, {:.3}, {:.4}, {:.1}]",
+                iter,
+                best_cost,
+                worst_cost,
+                simplex[0].0[0],
+                simplex[0].0[1],
+                simplex[0].0[2],
+                simplex[0].0[3],
+                simplex[0].0[4]
+            );
         }
 
         // Convergence check
@@ -186,16 +222,22 @@ fn main() {
         // Centroid (excluding worst)
         let mut centroid = [0.0; 5];
         for i in 0..n {
-            for j in 0..5 { centroid[j] += simplex[i].0[j]; }
+            for j in 0..5 {
+                centroid[j] += simplex[i].0[j];
+            }
         }
-        for j in 0..5 { centroid[j] /= n as f64; }
+        for j in 0..5 {
+            centroid[j] /= n as f64;
+        }
 
         // Reflection
         let mut reflected = [0.0; 5];
-        for j in 0..5 { reflected[j] = centroid[j] + alpha * (centroid[j] - simplex[n].0[j]); }
+        for j in 0..5 {
+            reflected[j] = centroid[j] + alpha * (centroid[j] - simplex[n].0[j]);
+        }
         let reflected_cost = evaluate(&reflected);
 
-        if reflected_cost < simplex[n-1].1 && reflected_cost >= simplex[0].1 {
+        if reflected_cost < simplex[n - 1].1 && reflected_cost >= simplex[0].1 {
             simplex[n] = (reflected, reflected_cost);
             continue;
         }
@@ -203,7 +245,9 @@ fn main() {
         if reflected_cost < simplex[0].1 {
             // Expansion
             let mut expanded = [0.0; 5];
-            for j in 0..5 { expanded[j] = centroid[j] + gamma * (reflected[j] - centroid[j]); }
+            for j in 0..5 {
+                expanded[j] = centroid[j] + gamma * (reflected[j] - centroid[j]);
+            }
             let expanded_cost = evaluate(&expanded);
             if expanded_cost < reflected_cost {
                 simplex[n] = (expanded, expanded_cost);
@@ -215,7 +259,9 @@ fn main() {
 
         // Contraction
         let mut contracted = [0.0; 5];
-        for j in 0..5 { contracted[j] = centroid[j] + rho * (simplex[n].0[j] - centroid[j]); }
+        for j in 0..5 {
+            contracted[j] = centroid[j] + rho * (simplex[n].0[j] - centroid[j]);
+        }
         let contracted_cost = evaluate(&contracted);
         if contracted_cost < simplex[n].1 {
             simplex[n] = (contracted, contracted_cost);

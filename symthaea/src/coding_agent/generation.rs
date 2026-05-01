@@ -6,6 +6,18 @@
 use super::*;
 
 impl CodingAgent {
+    fn code_signals(&self) -> super::consciousness_bridge::CodeSignals {
+        super::consciousness_bridge::CodeSignals::from_agent_state(
+            &self.failure_patterns,
+            self.iteration,
+            self.phase_failures,
+            self.generated_code.as_deref(),
+            self.energy_budget,
+            100.0,
+            self.native_exhausted,
+        )
+    }
+
     /// Generate code via the IntelligentDispatcher and write to disk.
     pub(super) fn do_generation(&mut self) {
         // Consciousness gate: defer generation if Phi is below plan requirement
@@ -55,6 +67,8 @@ impl CodingAgent {
         let prompt = self.build_generation_prompt();
         let sys_prompt = self.codegen_system_prompt();
 
+        let code_signals = self.code_signals();
+
         // Call the dispatcher (async -> sync bridge)
         let dispatch_result = if let Some(ref mut dispatcher) = self.dispatcher {
             // Consciousness-informed temperature: higher prediction error -> more exploration
@@ -70,14 +84,10 @@ impl CodingAgent {
             let consciousness_ctx = crate::language::llm_backend::ConsciousnessContext {
                 epistemic_status: format!("{:?}", epistemic),
                 phi: current_phi,
-                type_confidence: 0.0, // TODO: feed from CodeReasoningContext when available
-                algorithm_pattern: 0.0,
-                error_likelihood: if self.failure_patterns.is_empty() {
-                    0.2
-                } else {
-                    (self.failure_patterns.len() as f32 / 5.0).min(0.9)
-                },
-                syntax_complexity: 0.0,
+                type_confidence: code_signals.type_confidence as f32,
+                algorithm_pattern: code_signals.algorithm_pattern,
+                error_likelihood: code_signals.error_likelihood,
+                syntax_complexity: code_signals.syntax_complexity,
             };
 
             let params = GenerationParams {
@@ -142,7 +152,9 @@ impl CodingAgent {
                 // LLM-generated code — write to disk
                 let target = self.resolve_target_file();
                 self.write_code_to_disk(&target, &result.output);
-                self.generated_code = Some(Self::strip_code_fences(&result.output));
+                self.generated_code = Some(Self::sanitize_generated_code(
+                    &Self::strip_code_fences(&result.output),
+                ));
                 // LLM succeeded — clear native_exhausted (task was handled)
                 self.native_exhausted = false;
 
@@ -158,13 +170,19 @@ impl CodingAgent {
                 if let Some(code) = self.native_code_template() {
                     let target = self.resolve_target_file();
                     self.write_code_to_disk(&target, &code);
-                    self.generated_code = Some(Self::strip_code_fences(&code));
+                    self.generated_code = Some(Self::sanitize_generated_code(
+                        &Self::strip_code_fences(&code),
+                    ));
                 } else {
                     // Native can't handle this — immediately escalate to LLM
                     // within the SAME iteration (don't wait for next cycle).
                     self.native_exhausted = true;
                     if let Some(ref mut dispatcher) = self.dispatcher {
-                        dispatcher.record_outcome_with_category(BackendTier::Native, false, &self.task);
+                        dispatcher.record_outcome_with_category(
+                            BackendTier::Native,
+                            false,
+                            &self.task,
+                        );
 
                         // Re-dispatch with overridden state to force LLM tier
                         let params = GenerationParams {
@@ -192,7 +210,9 @@ impl CodingAgent {
                         if llm_result.success && llm_result.tier != BackendTier::Native {
                             let target = self.resolve_target_file();
                             self.write_code_to_disk(&target, &llm_result.output);
-                            self.generated_code = Some(Self::strip_code_fences(&llm_result.output));
+                            self.generated_code = Some(Self::sanitize_generated_code(
+                                &Self::strip_code_fences(&llm_result.output),
+                            ));
                             self.native_exhausted = false;
                         } else {
                             self.observations

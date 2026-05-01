@@ -1,0 +1,123 @@
+{
+  "metadata": {
+    "title": "Apex Professional Seed: Global Expert Standards",
+    "framework": "Global Apex Mesh",
+    "source": "https://mycelix.org/certs-apex",
+    "grade_level": "Professional/Expert",
+    "subject_area": "Multi-Sector",
+    "domain": "Professional Certification",
+    "version": "1.0",
+    "total_standards": 8,
+    "domains": [
+      "Nursing & Clinical",
+      "Maritime Command",
+      "Culinary Arts",
+      "Legal Practice",
+      "Audio Engineering"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "The absolute peak of professional industry standard mapping."
+  },
+  "nodes": [
+    {
+      "id": "CERT-RN-NCLEX",
+      "title": "NCLEX-RN (Nursing Standard Mapping)",
+      "description": "Professional Registered Nurse competencies. Management of care, safety and infection control, health promotion, psychosocial integrity, and physiological adaptation.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Nursing & Clinical",
+      "subdomain": "Certification Bridge",
+      "tags": ["nursing", "medical", "healthcare", "standard"],
+      "estimated_hours": 300,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Analyze",
+      "subject_area": "Health Sciences"
+    },
+    {
+      "id": "CERT-MAR-YACHTMASTER",
+      "title": "RYA/MCA Yachtmaster Offshore",
+      "description": "Mastery of vessel command. Navigation, tides, collision regulations, and heavy-weather handling. Directly linked to the Blue Commons maritime track.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Maritime Command",
+      "subdomain": "Certification Bridge",
+      "tags": ["maritime", "navigation", "sailing", "standard"],
+      "estimated_hours": 200,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Create",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "CERT-CUL-SERVSAFE",
+      "title": "ServSafe Food Protection Manager",
+      "description": "The industry standard for food safety. Preventing cross-contamination, time and temperature control, and regulatory compliance. Essential for community food hubs.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Culinary Arts",
+      "subdomain": "Certification Bridge",
+      "tags": ["culinary", "food-safety", "stewardship", "standard"],
+      "estimated_hours": 40,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Health Sciences"
+    },
+    {
+      "id": "CERT-LAW-PARALEGAL",
+      "title": "NALA Certified Paralegal (CP Mapping)",
+      "description": "Legal knowledge and skills. Substantive law, research, and ethics. Mapping boundary contracts and poly-centric law to professional paralegal duties.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Legal Practice",
+      "subdomain": "Certification Bridge",
+      "tags": ["law", "legal", "paralegal", "standard"],
+      "estimated_hours": 120,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Analyze",
+      "subject_area": "Humanities"
+    },
+    {
+      "id": "CERT-AUDIO-PROTOOLS",
+      "title": "Avid Pro Tools User Certification",
+      "description": "Standard for professional audio production. Multi-track recording, MIDI, editing, and mixing. Linked to the Sonic Mesh-Weaving track.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Audio Engineering",
+      "subdomain": "Certification Bridge",
+      "tags": ["audio", "music", "production", "standard"],
+      "estimated_hours": 80,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Arts"
+    }
+  ],
+  "edges": [
+    {
+      "from": "VITA-CAP-01",
+      "to": "CERT-RN-NCLEX",
+      "edge_type": "Recommended",
+      "strength_permille": 700,
+      "rationale": "Community vitality stewardship provides the practical field-experience for clinical nursing domains."
+    },
+    {
+      "from": "HUM-MAR-101",
+      "to": "CERT-MAR-YACHTMASTER",
+      "edge_type": "Recommended",
+      "strength_permille": 850,
+      "rationale": "The Blue Commons track provides the ethical and ecological foundation for maritime command."
+    },
+    {
+      "from": "VOC-AG-CAP",
+      "to": "CERT-CUL-SERVSAFE",
+      "edge_type": "Recommended",
+      "strength_permille": 600,
+      "rationale": "Agricultural plot stewardship is the prerequisite for safe food-chain management."
+    },
+    {
+      "from": "HUM-LAW-101",
+      "to": "CERT-LAW-PARALEGAL",
+      "edge_type": "Recommended",
+      "strength_permille": 900,
+      "rationale": "Boundary contract mastery covers the majority of the NALA substantive law requirements."
+    }
+  ]
+}

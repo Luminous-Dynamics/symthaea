@@ -1,0 +1,13 @@
+[package]
+name = "domain-finance"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Finance domain module for Mycelix Sensorium — payments, treasury, staking, recognition"
+
+[dependencies]
+sensorium-domain-trait = { path = "../sensorium-domain-trait" }
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+rmp-serde = "1"

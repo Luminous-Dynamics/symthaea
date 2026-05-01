@@ -1,0 +1,116 @@
+{
+  "metadata": {
+    "title": "Modern Momentum Seed: 2026 Growth Standards",
+    "framework": "Global Momentum Mesh",
+    "source": "https://mycelix.org/certs-momentum",
+    "grade_level": "Professional",
+    "subject_area": "Multi-Sector",
+    "domain": "Professional Certification",
+    "version": "1.0",
+    "total_standards": 6,
+    "domains": [
+      "AI Operations",
+      "EV Technology",
+      "Frontend Engineering",
+      "Community Care",
+      "Remote Work"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Focusing on the high-growth sectors defining the current job market."
+  },
+  "nodes": [
+    {
+      "id": "CERT-AI-AZURE-900",
+      "title": "Microsoft Azure AI Fundamentals (AI-900)",
+      "description": "Foundational AI concepts and Azure AI services. Machine learning, computer vision, and natural language processing. Mapping Active Inference to modern LLM ops.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "AI Operations",
+      "subdomain": "Certification Bridge",
+      "tags": ["ai", "azure", "ml-ops", "standard"],
+      "estimated_hours": 40,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Understand",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "CERT-EV-ASE-L3",
+      "title": "ASE L3: Hybrid/Electric Vehicle Specialist",
+      "description": "Diagnosis and repair of hybrid and electric vehicle systems. High-voltage safety and battery management. Bridging Scrap-stack electrical to the EV revolution.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "EV Technology",
+      "subdomain": "Certification Bridge",
+      "tags": ["ev", "electric-vehicle", "battery", "standard"],
+      "estimated_hours": 120,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Analyze",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "CERT-WEB-META-FRONTEND",
+      "title": "Meta Front-End Developer Professional",
+      "description": "HTML, CSS, JavaScript, React, and UI/UX design. Linking Leptos/Rust frontend skills to industry-standard React/Web frameworks.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Frontend Engineering",
+      "subdomain": "Certification Bridge",
+      "tags": ["meta", "frontend", "react", "uiux", "standard"],
+      "estimated_hours": 180,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Create",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "CERT-CARE-MHFA",
+      "title": "Mental Health First Aid (National Council)",
+      "description": "Identifying, understanding, and responding to signs of mental illnesses and substance use disorders. The universal standard for community peer support.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Community Care",
+      "subdomain": "Certification Bridge",
+      "tags": ["mental-health", "care", "support", "standard"],
+      "estimated_hours": 8,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Health Sciences"
+    },
+    {
+      "id": "CERT-WORK-REMOTE",
+      "title": "Certified Remote Work Professional",
+      "description": "Mastering the digital commons: asynchronous communication, remote toolsets, and digital well-being. Mapping mesh-coordination to remote workforce standards.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Remote Work",
+      "subdomain": "Certification Bridge",
+      "tags": ["remote-work", "digital-nomad", "ops", "standard"],
+      "estimated_hours": 20,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Social Studies"
+    }
+  ],
+  "edges": [
+    {
+      "from": "SYM-101",
+      "to": "CERT-AI-AZURE-900",
+      "edge_type": "Recommended",
+      "strength_permille": 700,
+      "rationale": "Active inference theory provides the conceptual framework for understanding modern Azure AI services."
+    },
+    {
+      "from": "VOC-SOL-101",
+      "to": "CERT-EV-ASE-L3",
+      "edge_type": "Recommended",
+      "strength_permille": 850,
+      "rationale": "Solar PV and DC microgrid mastery provide the high-voltage safety intuition for EV battery systems."
+    },
+    {
+      "from": "HUM-EPI-101",
+      "to": "CERT-CARE-MHFA",
+      "edge_type": "Recommended",
+      "strength_permille": 900,
+      "rationale": "Epistemic humility and deep listening are the core prerequisites for effective mental health first aid."
+    }
+  ]
+}

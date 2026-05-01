@@ -1,0 +1,138 @@
+{
+  "metadata": {
+    "title": "Horizon Professional Seed: High-Utility Future Standards",
+    "framework": "Global Horizon Mesh",
+    "source": "https://mycelix.org/certs-horizon",
+    "grade_level": "Professional",
+    "subject_area": "Multi-Sector",
+    "domain": "Professional Certification",
+    "version": "1.0",
+    "total_standards": 8,
+    "domains": [
+      "Security Operations",
+      "Pharmacy Support",
+      "Process Excellence",
+      "Electrical Trades",
+      "Digital Advertising",
+      "Data Analytics"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Ensuring immediate job-readiness in the fastest-growing modern sectors."
+  },
+  "nodes": [
+    {
+      "id": "CERT-IT-SPLUNK-POWER",
+      "title": "Splunk Core Certified Power User",
+      "description": "Searching and reporting, creating knowledge objects, and basic data models in Splunk. The industry standard for modern SIEM and security monitoring. Linked to Mesh Immunity.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Security Operations",
+      "subdomain": "Certification Bridge",
+      "tags": ["splunk", "siem", "cybersecurity", "monitoring", "standard"],
+      "estimated_hours": 80,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "CERT-HLTH-PTCB-CPHT",
+      "title": "PTCB Certified Pharmacy Technician (CPhT)",
+      "description": "Medication safety, pharmacy law, pharmacology, and sterile/non-sterile compounding. Essential clinical support role for medicine security and supply chain.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Pharmacy Support",
+      "subdomain": "Certification Bridge",
+      "tags": ["pharmacy", "healthcare", "medical", "standard"],
+      "estimated_hours": 150,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Health Sciences"
+    },
+    {
+      "id": "CERT-QUAL-LSSGB",
+      "title": "Lean Six Sigma Green Belt",
+      "description": "Advanced process improvement: DMAIC, Lean principles, and statistical analysis. Managing complex quality improvement projects. Linked to Systems Dynamics.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Process Excellence",
+      "subdomain": "Certification Bridge",
+      "tags": ["lean", "six-sigma", "quality", "stats", "standard"],
+      "estimated_hours": 120,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Analyze",
+      "subject_area": "Mathematics"
+    },
+    {
+      "id": "CERT-ENG-ELEC-L1",
+      "title": "NCCER Electrical Level 1",
+      "description": "Electrical safety, circuits, theory, and residential/commercial wiring. The foundational standard for professional electricians. Linked to Scrap-stack Electrical.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Electrical Trades",
+      "subdomain": "Certification Bridge",
+      "tags": ["electrical", "electrician", "trades", "safety", "standard"],
+      "estimated_hours": 80,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "CERT-MKT-GOOG-ADS",
+      "title": "Google Ads Search Certification",
+      "description": "Building and optimizing Google Search campaigns. Mastering keyword research, bidding, and reporting. Essential digital literacy for modern local business.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Digital Advertising",
+      "subdomain": "Certification Bridge",
+      "tags": ["google", "ads", "marketing", "standard"],
+      "estimated_hours": 30,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Apply",
+      "subject_area": "Social Studies"
+    },
+    {
+      "id": "CERT-DATA-DATA-PLUS",
+      "title": "CompTIA Data+",
+      "description": "Data concepts, data mining, data analysis, visualization, and data governance. Professional standard for analyzing data to drive community business decisions.",
+      "node_type": "Course",
+      "difficulty": "Intermediate",
+      "domain": "Data Analytics",
+      "subdomain": "Certification Bridge",
+      "tags": ["comptia", "data+", "analytics", "standard"],
+      "estimated_hours": 120,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Analyze",
+      "subject_area": "Computer Science"
+    }
+  ],
+  "edges": [
+    {
+      "from": "IT-SEC-201",
+      "to": "CERT-IT-SPLUNK-POWER",
+      "edge_type": "Recommended",
+      "strength_permille": 750,
+      "rationale": "Mesh immunity monitoring provides the perfect conceptual playground for professional Splunk SIEM usage."
+    },
+    {
+      "from": "VITA-201",
+      "to": "CERT-HLTH-PTCB-CPHT",
+      "edge_type": "Recommended",
+      "strength_permille": 850,
+      "rationale": "Mastery of biochemical homeostasis provides the pharmacological foundation for pharmacy technician standards."
+    },
+    {
+      "from": "CERT-QUAL-SIXSIGMA-YELLOW",
+      "to": "CERT-QUAL-LSSGB",
+      "edge_type": "Requires",
+      "strength_permille": 1000,
+      "rationale": "Green Belt assumes the foundational DMAIC knowledge established in the Yellow Belt standard."
+    },
+    {
+      "from": "SCI-UNI-101",
+      "to": "CERT-ENG-ELEC-L1",
+      "edge_type": "Recommended",
+      "strength_permille": 700,
+      "rationale": "Foundational physics and circuit theory provide the necessary intuition for professional electrical wiring."
+    }
+  ]
+}

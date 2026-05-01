@@ -1,0 +1,136 @@
+{
+  "metadata": {
+    "title": "Collective Flourishing & Deep Time",
+    "framework": "Mycelix Flourishing",
+    "source": "https://mycelix.org",
+    "grade_level": "Lifelong/Graduate",
+    "subject_area": "Humanities",
+    "domain": "Humanities",
+    "version": "1.0",
+    "total_standards": 6,
+    "domains": [
+      "Deep Ecology",
+      "Anthropology",
+      "Aesthetics",
+      "Ethics"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "The high-level humanistic layer for long-term civilizational stability."
+  },
+  "nodes": [
+    {
+      "id": "HUM-BIO-301",
+      "title": "Bio-Regional Citizenship",
+      "description": "Moving from human-centric to bio-centric governance. Understanding the local watershed and flora as citizens with rights. Implementing the 'Council of All Beings' in local DAOs.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Deep Ecology",
+      "subdomain": "Collective Flourishing",
+      "tags": ["ecology", "governance", "inter-being", "watershed"],
+      "estimated_hours": 90,
+      "grade_levels": ["Graduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Humanities"
+    },
+    {
+      "id": "HUM-ANT-301",
+      "title": "The Anthropology of Gifts",
+      "description": "Study of non-extractive economic systems: Potlatch, Kula Ring, and the role of 'Debt' as a social tether. Philosophical grounding for the TEND mutual credit system.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Anthropology",
+      "subdomain": "Collective Flourishing",
+      "tags": ["economics", "gift-economy", "reciprocity", "anthropology"],
+      "estimated_hours": 90,
+      "grade_levels": ["Graduate"],
+      "bloom_level": "Analyze",
+      "subject_area": "Humanities"
+    },
+    {
+      "id": "HUM-ART-301",
+      "title": "Collective Aesthetics",
+      "description": "How beauty creates social coherence. Public art, shared rituals, and the role of 'Cultural Mycelium' in binding a decentralized network together.",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Aesthetics",
+      "subdomain": "Collective Flourishing",
+      "tags": ["art", "ritual", "coherence", "culture"],
+      "estimated_hours": 60,
+      "grade_levels": ["Graduate"],
+      "bloom_level": "Evaluate",
+      "subject_area": "Humanities"
+    },
+    {
+      "id": "HUM-TIME-601",
+      "title": "The 7th Generation Principle",
+      "description": "Deep Time Ethics: decision-making across centuries. Long-term stewardship of soil, knowledge, and cryptographic keys. The philosophy of 'Being a Good Ancestor'.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Ethics",
+      "subdomain": "Collective Flourishing",
+      "tags": ["deep-time", "ethics", "sustainability", "legacy"],
+      "estimated_hours": 120,
+      "grade_levels": ["Doctoral"],
+      "bloom_level": "Create",
+      "subject_area": "Humanities"
+    },
+    {
+      "id": "HUM-CAP-02",
+      "title": "The Flourishing Masterpiece",
+      "description": "Design and execute a project that satisfies the needs of both the human community and the local ecosystem. Must prove long-term viability (Deep Time) and social reciprocity.",
+      "node_type": "Capstone",
+      "difficulty": "Expert",
+      "domain": "Universal",
+      "subdomain": "Collective Flourishing",
+      "tags": ["capstone", "flourishing", "integrated", "ancestor"],
+      "estimated_hours": 270,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Create",
+      "subject_area": "Humanities",
+      "holonic_capstone": {
+        "required_node_ids": ["HUM-BIO-301", "HUM-ANT-301", "HUM-TIME-601"],
+        "deliverable": "A multi-decade stewardship plan and a physical intervention (e.g., habitat restoration or community foundation) with a 50-year maintenance commitment.",
+        "min_peer_endorsements": 7
+      },
+      "alignment_vector": {
+        "ahimsa": 990,
+        "reciprocity": 990,
+        "ecological_stewardship": 980,
+        "resilience": 950,
+        "collective_flourishing": 990,
+        "aesthetic_harmony": 900,
+        "thermodynamic_efficiency": 850
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "HUM-BIO-301",
+      "to": "HUM-CAP-02",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Flourishing requires the inclusion of non-human biological actors."
+    },
+    {
+      "from": "HUM-ANT-301",
+      "to": "HUM-CAP-02",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Real-world projects must be grounded in non-extractive gift dynamics."
+    },
+    {
+      "from": "HUM-TIME-601",
+      "to": "HUM-CAP-02",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "The masterwork of a Type 1 Civilization must withstand Deep Time."
+    },
+    {
+      "from": "HUM-IKS-101",
+      "to": "HUM-BIO-301",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Deep ecology is a natural progression from Indigenous Knowledge Systems."
+    }
+  ]
+}

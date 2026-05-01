@@ -8,16 +8,15 @@
 //! until a compatibility migration is designed and executed.
 
 use leptos::prelude::*;
+use send_wrapper::SendWrapper;
 use serde::{de::DeserializeOwned, Serialize};
 use std::cell::RefCell;
 use std::rc::Rc;
-use send_wrapper::SendWrapper;
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::spawn_local;
 
 use mycelix_leptos_client::{
-    BrowserWsTransport, ConnectConfig, HolochainTransport,
-    encode, decode,
+    decode, encode, BrowserWsTransport, ConnectConfig, HolochainTransport,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -80,7 +79,6 @@ impl HolochainCtx {
             .map_err(|e| format!("Zome call {zome}.{fn_name} failed: {e}"))?;
         decode(&response).map_err(|e| format!("Decode error for {zome}.{fn_name}: {e}"))
     }
-
 }
 
 const LOCAL_CONDUCTOR_URL: &str = "ws://localhost:8888";

@@ -203,7 +203,10 @@ mod tests {
         let task = Task::parse("open YouTube and search NixOS");
         assert_eq!(task.steps.len(), 4);
         assert!(matches!(task.steps[0].action, StepAction::Tap));
-        assert!(matches!(task.steps[1].action, StepAction::WaitForTransition));
+        assert!(matches!(
+            task.steps[1].action,
+            StepAction::WaitForTransition
+        ));
         assert!(matches!(task.steps[2].action, StepAction::Tap));
         assert!(matches!(task.steps[3].action, StepAction::Type(ref s) if s == "nixos"));
     }

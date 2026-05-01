@@ -187,14 +187,23 @@ impl BoundedOperator {
         let components = self
             .matrix
             .iter()
-            .map(|row| row.iter().zip(x.components.iter()).map(|(&a, &b)| a * b).sum())
+            .map(|row| {
+                row.iter()
+                    .zip(x.components.iter())
+                    .map(|(&a, &b)| a * b)
+                    .sum()
+            })
             .collect();
         L2Vec { components }
     }
 
     /// Compose operators: (self ∘ other)(x) = self(other(x)).
     pub fn compose(&self, other: &Self) -> Self {
-        assert_eq!(self.cols(), other.rows(), "incompatible dimensions for composition");
+        assert_eq!(
+            self.cols(),
+            other.rows(),
+            "incompatible dimensions for composition"
+        );
         let n = self.rows();
         let m = other.cols();
         let k = self.cols();
@@ -226,7 +235,11 @@ impl BoundedOperator {
 
     /// Estimate the operator norm (spectral radius for symmetric ops) via power iteration.
     pub fn operator_norm_estimate(&self, iterations: usize) -> f64 {
-        assert_eq!(self.rows(), self.cols(), "power iteration requires square operator");
+        assert_eq!(
+            self.rows(),
+            self.cols(),
+            "power iteration requires square operator"
+        );
         let n = self.cols();
         if n == 0 {
             return 0.0;
@@ -289,7 +302,8 @@ fn leading_minor_det(matrix: &[Vec<f64>], k: usize) -> f64 {
     let mut det = 1.0;
     for col in 0..k {
         // find pivot
-        let pivot_row = (col..k).max_by(|&a, &b| m[a][col].abs().partial_cmp(&m[b][col].abs()).unwrap());
+        let pivot_row =
+            (col..k).max_by(|&a, &b| m[a][col].abs().partial_cmp(&m[b][col].abs()).unwrap());
         if let Some(pr) = pivot_row {
             if m[pr][col].abs() < 1e-15 {
                 return 0.0;
@@ -339,7 +353,9 @@ pub fn spectral_decompose(op: &BoundedOperator) -> Result<SpectralDecomposition,
     // Work with a mutable copy
     let mut a: Vec<Vec<f64>> = op.matrix.clone();
     // Accumulate eigenvectors in identity matrix
-    let mut v: Vec<Vec<f64>> = (0..n).map(|i| (0..n).map(|j| if i == j { 1.0 } else { 0.0 }).collect()).collect();
+    let mut v: Vec<Vec<f64>> = (0..n)
+        .map(|i| (0..n).map(|j| if i == j { 1.0 } else { 0.0 }).collect())
+        .collect();
 
     let max_iter = 100 * n * n;
     for _ in 0..max_iter {
@@ -465,11 +481,19 @@ pub fn matrix_sqrt(op: &BoundedOperator) -> Result<BoundedOperator, String> {
         return Err("matrix_sqrt requires positive semi-definite operator".into());
     }
     let n = op.rows();
-    Ok(spectral_to_operator(&decomp, |lambda| lambda.max(0.0).sqrt(), n))
+    Ok(spectral_to_operator(
+        &decomp,
+        |lambda| lambda.max(0.0).sqrt(),
+        n,
+    ))
 }
 
 // Helper: reconstruct operator from spectral decomp using f(λ).
-fn spectral_to_operator(decomp: &SpectralDecomposition, f: impl Fn(f64) -> f64, n: usize) -> BoundedOperator {
+fn spectral_to_operator(
+    decomp: &SpectralDecomposition,
+    f: impl Fn(f64) -> f64,
+    n: usize,
+) -> BoundedOperator {
     let mut matrix = vec![vec![0.0; n]; n];
     for (lambda, ev) in decomp.eigenvalues.iter().zip(decomp.eigenvectors.iter()) {
         let fl = f(*lambda);
@@ -485,15 +509,22 @@ fn spectral_to_operator(decomp: &SpectralDecomposition, f: impl Fn(f64) -> f64, 
 // ─── matrix helpers ──────────────────────────────────────────────────────────
 
 fn identity_matrix(n: usize) -> Vec<Vec<f64>> {
-    (0..n).map(|i| (0..n).map(|j| if i == j { 1.0 } else { 0.0 }).collect()).collect()
+    (0..n)
+        .map(|i| (0..n).map(|j| if i == j { 1.0 } else { 0.0 }).collect())
+        .collect()
 }
 
 fn scale_matrix(m: &[Vec<f64>], s: f64) -> Vec<Vec<f64>> {
-    m.iter().map(|row| row.iter().map(|&x| x * s).collect()).collect()
+    m.iter()
+        .map(|row| row.iter().map(|&x| x * s).collect())
+        .collect()
 }
 
 fn mat_add(a: &[Vec<f64>], b: &[Vec<f64>]) -> Vec<Vec<f64>> {
-    a.iter().zip(b.iter()).map(|(ra, rb)| ra.iter().zip(rb.iter()).map(|(&x, &y)| x + y).collect()).collect()
+    a.iter()
+        .zip(b.iter())
+        .map(|(ra, rb)| ra.iter().zip(rb.iter()).map(|(&x, &y)| x + y).collect())
+        .collect()
 }
 
 fn mat_mul(a: &[Vec<f64>], b: &[Vec<f64>]) -> Vec<Vec<f64>> {
@@ -503,7 +534,9 @@ fn mat_mul(a: &[Vec<f64>], b: &[Vec<f64>]) -> Vec<Vec<f64>> {
     let mut c = vec![vec![0.0; m]; n];
     for i in 0..n {
         for l in 0..k {
-            if a[i][l].abs() < 1e-300 { continue; }
+            if a[i][l].abs() < 1e-300 {
+                continue;
+            }
             for j in 0..m {
                 c[i][j] += a[i][l] * b[l][j];
             }
@@ -536,8 +569,20 @@ impl FourierSeries {
         let mut coefficients = Vec::with_capacity(n_terms);
         for n in 0..n_terms {
             let n_f = n as f64;
-            let a_n: f64 = ys.iter().zip(xs.iter()).map(|(&y, &x)| y * (n_f * x).cos()).sum::<f64>() * dx / pi;
-            let b_n: f64 = ys.iter().zip(xs.iter()).map(|(&y, &x)| y * (n_f * x).sin()).sum::<f64>() * dx / pi;
+            let a_n: f64 = ys
+                .iter()
+                .zip(xs.iter())
+                .map(|(&y, &x)| y * (n_f * x).cos())
+                .sum::<f64>()
+                * dx
+                / pi;
+            let b_n: f64 = ys
+                .iter()
+                .zip(xs.iter())
+                .map(|(&y, &x)| y * (n_f * x).sin())
+                .sum::<f64>()
+                * dx
+                / pi;
             coefficients.push((a_n, b_n));
         }
         // Correct a_0 (should be (1/π)∫f dx, but b_0 is always 0)
@@ -651,7 +696,12 @@ pub fn fredholm_check_solvability(data: &FredholmData) -> bool {
         return true; // not actually singular
     }
     // Check y ⊥ z
-    let dot: f64 = data.rhs.iter().zip(smallest_ev_vec.iter()).map(|(&yi, &zi)| yi * zi).sum();
+    let dot: f64 = data
+        .rhs
+        .iter()
+        .zip(smallest_ev_vec.iter())
+        .map(|(&yi, &zi)| yi * zi)
+        .sum();
     dot.abs() < 1e-8
 }
 
@@ -661,7 +711,13 @@ pub fn fredholm_check_solvability(data: &FredholmData) -> bool {
 pub fn fredholm_solve(data: &FredholmData, tol: f64) -> Result<Vec<f64>, String> {
     let n = data.rhs.len();
     // Estimate ‖K‖ via Frobenius norm as upper bound on operator norm
-    let k_norm: f64 = data.kernel_matrix.iter().flat_map(|r| r.iter()).map(|&x| x * x).sum::<f64>().sqrt();
+    let k_norm: f64 = data
+        .kernel_matrix
+        .iter()
+        .flat_map(|r| r.iter())
+        .map(|&x| x * x)
+        .sum::<f64>()
+        .sqrt();
     if data.lambda.abs() * k_norm >= 1.0 {
         return Err(format!(
             "Neumann series does not converge: |λ|‖K‖ = {:.4} ≥ 1",
@@ -673,7 +729,14 @@ pub fn fredholm_solve(data: &FredholmData, tol: f64) -> Result<Vec<f64>, String>
     for _iter in 0..200 {
         // term ← λK * term
         let new_term: Vec<f64> = (0..n)
-            .map(|i| data.lambda * data.kernel_matrix[i].iter().zip(term.iter()).map(|(&k, &t)| k * t).sum::<f64>())
+            .map(|i| {
+                data.lambda
+                    * data.kernel_matrix[i]
+                        .iter()
+                        .zip(term.iter())
+                        .map(|(&k, &t)| k * t)
+                        .sum::<f64>()
+            })
             .collect();
         let norm: f64 = new_term.iter().map(|&x| x * x).sum::<f64>().sqrt();
         for i in 0..n {
@@ -690,7 +753,9 @@ pub fn fredholm_solve(data: &FredholmData, tol: f64) -> Result<Vec<f64>, String>
 // ─── matrix helpers for Fredholm ─────────────────────────────────────────────
 
 fn transpose(m: &[Vec<f64>]) -> Vec<Vec<f64>> {
-    if m.is_empty() { return vec![]; }
+    if m.is_empty() {
+        return vec![];
+    }
     let rows = m.len();
     let cols = m[0].len();
     let mut t = vec![vec![0.0; rows]; cols];
@@ -815,10 +880,7 @@ mod tests {
 
     #[test]
     fn test_gram_schmidt_two_same_vectors() {
-        let vecs = vec![
-            L2Vec::new(vec![1.0, 0.0]),
-            L2Vec::new(vec![1.0, 0.0]),
-        ];
+        let vecs = vec![L2Vec::new(vec![1.0, 0.0]), L2Vec::new(vec![1.0, 0.0])];
         let basis = gram_schmidt(&vecs);
         assert_eq!(basis.len(), 1, "dependent vector should be dropped");
     }
@@ -919,7 +981,11 @@ mod tests {
         let c = 3.0_f64;
         let series = FourierSeries::from_function(|_| c, 5, 1000);
         // a₀ = (1/π)∫_{-π}^{π} c dx = 2c
-        assert!(close(series.coefficients[0].0, 2.0 * c, 0.01), "a0 = {}", series.coefficients[0].0);
+        assert!(
+            close(series.coefficients[0].0, 2.0 * c, 0.01),
+            "a0 = {}",
+            series.coefficients[0].0
+        );
         for &(a, b) in series.coefficients.iter().skip(1) {
             assert!(close(a, 0.0, 0.02), "aₙ should be 0, got {}", a);
             assert!(close(b, 0.0, 0.02), "bₙ should be 0, got {}", b);
@@ -940,7 +1006,11 @@ mod tests {
         let series = FourierSeries::from_function(|x: f64| x.sin(), 20, 10000);
         let parseval = series.l2_norm_squared();
         // ∫_{-π}^{π} sin²(x) dx = π
-        assert!(close(parseval, std::f64::consts::PI, 0.05), "Parseval = {}", parseval);
+        assert!(
+            close(parseval, std::f64::consts::PI, 0.05),
+            "Parseval = {}",
+            parseval
+        );
     }
 
     // ─── Fredholm ─────────────────────────────────────────────────────────────
@@ -959,8 +1029,19 @@ mod tests {
         // Verify (I - λK)x ≈ rhs
         let n = x.len();
         for i in 0..n {
-            let lhs: f64 = x[i] - data.lambda * data.kernel_matrix[i].iter().zip(x.iter()).map(|(&k, &xi)| k * xi).sum::<f64>();
-            assert!(close(lhs, data.rhs[i], 1e-8), "residual at {}: {}", i, lhs - data.rhs[i]);
+            let lhs: f64 = x[i]
+                - data.lambda
+                    * data.kernel_matrix[i]
+                        .iter()
+                        .zip(x.iter())
+                        .map(|(&k, &xi)| k * xi)
+                        .sum::<f64>();
+            assert!(
+                close(lhs, data.rhs[i], 1e-8),
+                "residual at {}: {}",
+                i,
+                lhs - data.rhs[i]
+            );
         }
     }
 

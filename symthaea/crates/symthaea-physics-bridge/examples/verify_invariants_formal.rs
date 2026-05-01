@@ -335,7 +335,9 @@ fn build_obligation(problem: &Problem) -> Option<String> {
 
     let mut out = String::new();
     out.push_str("(set-logic QF_NRA)\n");
-    out.push_str(&format!("; Ramanujan Protocol formal-verification obligation\n"));
+    out.push_str(&format!(
+        "; Ramanujan Protocol formal-verification obligation\n"
+    ));
     out.push_str(&format!("; Problem: {}\n", problem.description));
     out.push_str(&format!("; Invariant (Lean-ready): {}\n", energy_smt));
     out.push_str(&format!("; Claim: dE/dt = 0 identically.\n"));
@@ -398,10 +400,7 @@ fn main() -> ExitCode {
         if !p.formally_verifiable {
             skipped_transcendental += 1;
             let note = "transcendental_out_of_QF_NRA";
-            println!(
-                "{},—,0,skipped,false,{}",
-                p.name, note
-            );
+            println!("{},—,0,skipped,false,{}", p.name, note);
             eprintln!("# {} — {}  [skipped: {}]", p.name, p.description, note);
             continue;
         }

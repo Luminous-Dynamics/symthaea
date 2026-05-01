@@ -452,7 +452,7 @@ mod proptests {
         fn filtered_torques_within_max(torques in arb_torques()) {
             let mut interlock = SafetyInterlock::new();
             let mut cmd = HumanoidCommand::zero();
-            cmd.torques = torques;
+            cmd.torques = torques.to_vec();
 
             if let Ok(safe) = interlock.filter_command(&cmd) {
                 for i in 0..NUM_ACTUATORS {
@@ -470,7 +470,7 @@ mod proptests {
         fn filtered_torques_always_finite(torques in arb_torques()) {
             let mut interlock = SafetyInterlock::new();
             let mut cmd = HumanoidCommand::zero();
-            cmd.torques = torques;
+            cmd.torques = torques.to_vec();
 
             if let Ok(safe) = interlock.filter_command(&cmd) {
                 for (i, &t) in safe.torques.iter().enumerate() {

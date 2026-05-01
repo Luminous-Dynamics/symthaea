@@ -128,7 +128,15 @@ pub fn bundle(hvs: &[Hdv]) -> Hdv {
         }
     }
     acc.into_iter()
-        .map(|s| if s > 0 { 1 } else if s < 0 { -1 } else { 1 })
+        .map(|s| {
+            if s > 0 {
+                1
+            } else if s < 0 {
+                -1
+            } else {
+                1
+            }
+        })
         .collect()
 }
 
@@ -208,7 +216,10 @@ mod tests {
         let a = encode(&ev("Foo", 42, "hello"));
         let b = encode(&ev("Bar", 99, "world"));
         let sim = cosine(&a, &b);
-        assert!(sim < 0.5, "unrelated events should not be near-duplicates, got {sim}");
+        assert!(
+            sim < 0.5,
+            "unrelated events should not be near-duplicates, got {sim}"
+        );
     }
 
     #[test]

@@ -26,10 +26,23 @@ fn main() {
     if let (Some(s), Some(m)) = (states.first(), mels.first()) {
         println!("\nFirst state:");
         let names = [
-            "consciousness", "arousal", "valence", "dopamine", "serotonin",
-            "noradrenaline", "pred_error", "harmony[0]", "harmony[1]",
-            "harmony[2]", "harmony[3]", "harmony[4]", "harmony[5]",
-            "harmony[6]", "harmony[7]", "time_secs", "mel_dim",
+            "consciousness",
+            "arousal",
+            "valence",
+            "dopamine",
+            "serotonin",
+            "noradrenaline",
+            "pred_error",
+            "harmony[0]",
+            "harmony[1]",
+            "harmony[2]",
+            "harmony[3]",
+            "harmony[4]",
+            "harmony[5]",
+            "harmony[6]",
+            "harmony[7]",
+            "time_secs",
+            "mel_dim",
         ];
         for (i, name) in names.iter().enumerate() {
             println!("  {:16} {:+.4}", name, s[i]);
@@ -37,7 +50,10 @@ fn main() {
         let min = m.iter().copied().fold(f32::INFINITY, f32::min);
         let max = m.iter().copied().fold(f32::NEG_INFINITY, f32::max);
         let mean: f32 = m.iter().sum::<f32>() / m.len() as f32;
-        println!("\nFirst mel: min={:.3} max={:.3} mean={:.3}", min, max, mean);
+        println!(
+            "\nFirst mel: min={:.3} max={:.3} mean={:.3}",
+            min, max, mean
+        );
     }
 
     // Sanity: scan a few more

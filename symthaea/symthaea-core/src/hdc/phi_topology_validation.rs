@@ -368,8 +368,8 @@ impl MinimalPhiValidation {
             n_star_samples: n_star,
             n_nodes,
             dim,
-            // Use Spectral tier for good accuracy/speed tradeoff
-            phi_calculator: TieredPhi::new(ApproximationTier::SpectralConnectivity),
+            // Use Exhaustive tier for topology validation fidelity on small systems.
+            phi_calculator: TieredPhi::new(ApproximationTier::ExhaustivePartition),
             seed: 42, // Default reproducible seed
         }
     }

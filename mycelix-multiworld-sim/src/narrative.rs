@@ -40,12 +40,32 @@ pub struct NarrativeEvent {
 /// Uses deterministic selection from agent pool characteristics.
 pub fn generate_character_name(world_name: &str, role: &str, generation: u16) -> String {
     // Deterministic name generation from world + role + generation
-    let first_names = ["Kenji", "Amara", "Chen", "Fatima", "Dmitri", "Yuki",
-        "Kofi", "Leila", "Ravi", "Ingrid", "Marcus", "Zara", "Tomás", "Aisha",
-        "Sven", "Priya", "Oleg", "Mei", "Hassan", "Luna"];
-    let last_names = ["Watanabe", "Okafor", "Zhang", "Al-Rashid", "Petrov", "Tanaka",
-        "Mensah", "Nazari", "Patel", "Lindqvist", "Santos", "Kim", "Reyes", "Mwangi",
-        "Johansson", "Sharma", "Volkov", "Liu", "Ibrahim", "Estrada"];
+    let first_names = [
+        "Kenji", "Amara", "Chen", "Fatima", "Dmitri", "Yuki", "Kofi", "Leila", "Ravi", "Ingrid",
+        "Marcus", "Zara", "Tomás", "Aisha", "Sven", "Priya", "Oleg", "Mei", "Hassan", "Luna",
+    ];
+    let last_names = [
+        "Watanabe",
+        "Okafor",
+        "Zhang",
+        "Al-Rashid",
+        "Petrov",
+        "Tanaka",
+        "Mensah",
+        "Nazari",
+        "Patel",
+        "Lindqvist",
+        "Santos",
+        "Kim",
+        "Reyes",
+        "Mwangi",
+        "Johansson",
+        "Sharma",
+        "Volkov",
+        "Liu",
+        "Ibrahim",
+        "Estrada",
+    ];
 
     let seed = world_name.len() + role.len() + generation as usize;
     let first = first_names[seed % first_names.len()];
@@ -105,9 +125,19 @@ impl NarrativeEngine {
     }
 
     /// Create a cultural memory from a major event.
-    pub fn remember(&mut self, name: String, world: Option<String>, tick: u32, lesson: CulturalLesson) {
+    pub fn remember(
+        &mut self,
+        name: String,
+        world: Option<String>,
+        tick: u32,
+        lesson: CulturalLesson,
+    ) {
         self.cultural_memories.push(CulturalMemory {
-            name, world, origin_tick: tick, lesson, strength: 1.0,
+            name,
+            world,
+            origin_tick: tick,
+            lesson,
+            strength: 1.0,
         });
     }
 
@@ -126,8 +156,8 @@ impl NarrativeEngine {
         let mut lesson = CulturalLesson::default();
         for mem in &self.cultural_memories {
             let applies = match (&mem.world, world) {
-                (None, _) => true,               // Civilization-wide memory
-                (Some(w), Some(q)) => w == q,    // World-specific
+                (None, _) => true,            // Civilization-wide memory
+                (Some(w), Some(q)) => w == q, // World-specific
                 _ => false,
             };
             if applies {
@@ -164,19 +194,37 @@ impl NarrativeEngine {
                     // Lower threshold for small colonies (5% for <100 pop, 10% for larger)
                     let threshold = if *prev_pop < 100 { 0.05 } else { 0.10 };
                     if drop_frac > threshold {
-                        let severity = if drop_frac > 0.30 { 4 } else if drop_frac > 0.20 { 3 } else { 2 };
+                        let severity = if drop_frac > 0.30 {
+                            4
+                        } else if drop_frac > 0.20 {
+                            3
+                        } else {
+                            2
+                        };
                         // P3: Response diversity — crisis count matters
-                        let prior_crises = self.events.iter()
+                        let prior_crises = self
+                            .events
+                            .iter()
                             .filter(|e| e.world.as_deref() == Some(name) && e.severity >= 2)
                             .count();
                         let response = if *care > 0.5 {
-                            format!("The survivors rallied with extraordinary mutual aid (care: {:.2})", care)
+                            format!(
+                                "The survivors rallied with extraordinary mutual aid (care: {:.2})",
+                                care
+                            )
                         } else if *desire > 0.6 && prior_crises < 5 {
-                            format!("Desperate striving gripped the colony (desire: {:.2})", desire)
+                            format!(
+                                "Desperate striving gripped the colony (desire: {:.2})",
+                                desire
+                            )
                         } else if *sadness > 0.5 && prior_crises < 3 {
-                            format!("A pall of grief settled over the colony (sadness: {:.2})", sadness)
+                            format!(
+                                "A pall of grief settled over the colony (sadness: {:.2})",
+                                sadness
+                            )
                         } else if prior_crises > 10 {
-                            "A grim, practiced efficiency took over — they had done this before".into()
+                            "A grim, practiced efficiency took over — they had done this before"
+                                .into()
                         } else if prior_crises > 5 {
                             "The colony absorbed the blow with the numbness of experience".into()
                         } else {
@@ -195,24 +243,41 @@ impl NarrativeEngine {
                         };
                         // Generate a named character for pivotal events
                         let character = if severity >= 3 {
-                            let role = if *care > 0.5 { "medic" } else if *desire > 0.6 { "engineer" } else { "leader" };
+                            let role = if *care > 0.5 {
+                                "medic"
+                            } else if *desire > 0.6 {
+                                "engineer"
+                            } else {
+                                "leader"
+                            };
                             Some(generate_character_name(name, role, (year / 30.0) as u16))
-                        } else { None };
+                        } else {
+                            None
+                        };
                         let crisis_text = if let Some(ref ch) = character {
                             format!("{} lost {:.0}% of its population ({} → {}). {} was among the casualties.",
                                 name, drop_frac * 100.0, prev_pop, pop, ch)
                         } else {
-                            format!("{} lost {:.0}% of its population ({} → {})",
-                                name, drop_frac * 100.0, prev_pop, pop)
+                            format!(
+                                "{} lost {:.0}% of its population ({} → {})",
+                                name,
+                                drop_frac * 100.0,
+                                prev_pop,
+                                pop
+                            )
                         };
                         self.events.push(NarrativeEvent {
-                            tick, year,
+                            tick,
+                            year,
                             world: Some(name.clone()),
                             crisis: crisis_text,
                             response,
                             outcome: outcome.into(),
                             severity,
-                            joy: 0.0, sadness: *sadness, desire: *desire, care: *care,
+                            joy: 0.0,
+                            sadness: *sadness,
+                            desire: *desire,
+                            care: *care,
                             character,
                         });
                     }
@@ -223,9 +288,13 @@ impl NarrativeEngine {
         // 2. CVS drops (civilization viability declining)
         if self.prev_cvs > 0.0 && cvs < self.prev_cvs - 0.03 {
             self.events.push(NarrativeEvent {
-                tick, year,
+                tick,
+                year,
                 world: None,
-                crisis: format!("Civilization viability dropped from {:.3} to {:.3}", self.prev_cvs, cvs),
+                crisis: format!(
+                    "Civilization viability dropped from {:.3} to {:.3}",
+                    self.prev_cvs, cvs
+                ),
                 response: "Inter-world councils convened emergency sessions".into(),
                 outcome: if cvs > 0.5 {
                     "Viability remained above critical threshold — reforms initiated".into()
@@ -233,7 +302,10 @@ impl NarrativeEngine {
                     "WARNING: Approaching collapse threshold".into()
                 },
                 severity: if cvs < 0.4 { 4 } else { 2 },
-                joy: 0.0, sadness: 0.0, desire: 0.0, care: 0.0,
+                joy: 0.0,
+                sadness: 0.0,
+                desire: 0.0,
+                care: 0.0,
                 character: None,
             });
         }
@@ -288,14 +360,18 @@ impl NarrativeEngine {
                     ),
                 };
                 self.events.push(NarrativeEvent {
-                    tick, year,
+                    tick,
+                    year,
                     world: None,
                     crisis: crisis.into(),
                     response: response.into(),
                     outcome: format!("MILESTONE: {}", milestone),
                     severity: 3,
-                    joy: 0.0, sadness: 0.0, desire: 0.0, care: 0.0,
-                character: None,
+                    joy: 0.0,
+                    sadness: 0.0,
+                    desire: 0.0,
+                    care: 0.0,
+                    character: None,
                 });
                 self.narrated_milestones.push(milestone.clone());
             }
@@ -337,11 +413,13 @@ impl NarrativeEngine {
                 let key = format!("pop_{}_{}", name, threshold);
                 if *pop >= threshold && !self.narrated_milestones.contains(&key) {
                     self.events.push(NarrativeEvent {
-                        tick, year,
+                        tick,
+                        year,
                         world: Some(name.clone()),
                         crisis: format!("{} reached {} population", name, threshold),
                         response: if *joy > 0.5 {
-                            "Celebration marked the milestone — the colony felt its own permanence".into()
+                            "Celebration marked the milestone — the colony felt its own permanence"
+                                .into()
                         } else {
                             "The milestone passed quietly — survival remained the focus".into()
                         },
@@ -351,8 +429,11 @@ impl NarrativeEngine {
                             "Growing pains tested institutional capacity".into()
                         },
                         severity: if threshold >= 5000 { 3 } else { 1 },
-                        joy: *joy, sadness: 0.0, desire: 0.0, care: *care,
-                            character: None,
+                        joy: *joy,
+                        sadness: 0.0,
+                        desire: 0.0,
+                        care: *care,
+                        character: None,
                     });
                     self.narrated_milestones.push(key);
                 }
@@ -380,15 +461,19 @@ impl NarrativeEngine {
         // 8. Refugee crisis detection
 
         // Update state for next tick
-        self.prev_populations = worlds.iter()
+        self.prev_populations = worlds
+            .iter()
             .map(|(name, _, pop, _, _, _, _, _)| (name.clone(), *pop))
             .collect();
         self.prev_cvs = cvs;
 
         // Trim to most significant 200 events (raised from 100 for richer chronicles)
         if self.events.len() > 250 {
-            self.events.sort_by(|a, b| b.severity.cmp(&a.severity)
-                .then_with(|| b.tick.cmp(&a.tick)));
+            self.events.sort_by(|a, b| {
+                b.severity
+                    .cmp(&a.severity)
+                    .then_with(|| b.tick.cmp(&a.tick))
+            });
             self.events.truncate(200);
         }
     }
@@ -433,50 +518,67 @@ impl NarrativeEngine {
                 };
                 (2, desc.clone(), response.to_string(), outcome.to_string())
             } else if desc.contains("INDEPENDENCE MOVEMENT") {
-                (3,
-                 desc.clone(),
-                 "Political assemblies debated sovereignty with unprecedented fervor".into(),
-                 "The relationship between colony and homeworld entered a new chapter".to_string())
+                (
+                    3,
+                    desc.clone(),
+                    "Political assemblies debated sovereignty with unprecedented fervor".into(),
+                    "The relationship between colony and homeworld entered a new chapter"
+                        .to_string(),
+                )
             } else if desc.contains("EXPLORATION SUCCESS") {
                 (2,
                  desc.clone(),
                  "Survey teams returned with samples and data that would reshape the colony's future".into(),
                  "New resources mapped — the frontier expanded".to_string())
             } else if desc.contains("DUNBAR TRANSITION") {
-                (2,
-                 desc.clone(),
-                 "The old ways of knowing everyone by name gave way to formal institutions".into(),
-                 "Governance adapted to scale — or tried to".to_string())
+                (
+                    2,
+                    desc.clone(),
+                    "The old ways of knowing everyone by name gave way to formal institutions"
+                        .into(),
+                    "Governance adapted to scale — or tried to".to_string(),
+                )
             } else if desc.contains("FISSION DELIVERY") {
-                (3,
-                 desc.clone(),
-                 "Nuclear reactors powered up for the first time on alien soil".into(),
-                 "The energy equation changed forever".to_string())
+                (
+                    3,
+                    desc.clone(),
+                    "Nuclear reactors powered up for the first time on alien soil".into(),
+                    "The energy equation changed forever".to_string(),
+                )
             } else if desc.contains("KESSLER CASCADE") {
-                (4,
-                 desc.clone(),
-                 "Debris clouds sealed orbit — every launch window became a gamble".into(),
-                 "Earth's connection to its colonies hung by a thread".to_string())
+                (
+                    4,
+                    desc.clone(),
+                    "Debris clouds sealed orbit — every launch window became a gamble".into(),
+                    "Earth's connection to its colonies hung by a thread".to_string(),
+                )
             } else if desc.contains("ROBOT COMMISSIONED") {
-                (1,
-                 desc.clone(),
-                 "The workshop hummed with new purpose as the machine powered up".into(),
-                 "Another pair of tireless hands joined the colony's workforce".to_string())
+                (
+                    1,
+                    desc.clone(),
+                    "The workshop hummed with new purpose as the machine powered up".into(),
+                    "Another pair of tireless hands joined the colony's workforce".to_string(),
+                )
             } else if desc.contains("BROWNOUT CASCADE") {
                 (3,
                  desc.clone(),
                  "Lights flickered. Robots froze mid-task. The colony held its breath".into(),
                  "Humans stepped into the hazardous modules their machines had protected them from".to_string())
             } else if desc.contains("MORAL DILEMMA") {
-                (3,
-                 desc.clone(),
-                 "The colony gathered in emergency session — two valid paths, one community".into(),
-                 "The weight of the choice would echo through generations".to_string())
+                (
+                    3,
+                    desc.clone(),
+                    "The colony gathered in emergency session — two valid paths, one community"
+                        .into(),
+                    "The weight of the choice would echo through generations".to_string(),
+                )
             } else if desc.contains("ETHICS SHIFT") {
-                (2,
-                 desc.clone(),
-                 "Old certainties gave way as the community's values quietly transformed".into(),
-                 "The colony that emerged was not the one that had been founded".to_string())
+                (
+                    2,
+                    desc.clone(),
+                    "Old certainties gave way as the community's values quietly transformed".into(),
+                    "The colony that emerged was not the one that had been founded".to_string(),
+                )
             } else if desc.contains("ETHICAL SYNTHESIS") {
                 (3,
                  desc.clone(),
@@ -502,7 +604,9 @@ impl NarrativeEngine {
             };
 
             // Deduplicate: don't narrate the same event description twice
-            if self.events.iter().any(|e| e.crisis == crisis) { continue; }
+            if self.events.iter().any(|e| e.crisis == crisis) {
+                continue;
+            }
 
             let world = event.world_id.map(|_| {
                 // Extract world name from description if present
@@ -511,21 +615,45 @@ impl NarrativeEngine {
 
             // Generate named characters for significant events
             let character = if severity >= 2 {
-                let world_name = event.world_id.map(|_|
-                    desc.split(':').next().unwrap_or("Colony")).unwrap_or("Colony");
-                let role = if desc.contains("PROJECT") { "engineer" }
-                    else if desc.contains("EXPLORATION") { "scientist" }
-                    else if desc.contains("INDEPENDENCE") { "leader" }
-                    else if desc.contains("MORAL DILEMMA") || desc.contains("ETHICAL") || desc.contains("MORAL REVIVAL") { "ethicist" }
-                    else { "citizen" };
-                Some(generate_character_name(world_name, role, (year / 25.0) as u16))
-            } else { None };
+                let world_name = event
+                    .world_id
+                    .map(|_| desc.split(':').next().unwrap_or("Colony"))
+                    .unwrap_or("Colony");
+                let role = if desc.contains("PROJECT") {
+                    "engineer"
+                } else if desc.contains("EXPLORATION") {
+                    "scientist"
+                } else if desc.contains("INDEPENDENCE") {
+                    "leader"
+                } else if desc.contains("MORAL DILEMMA")
+                    || desc.contains("ETHICAL")
+                    || desc.contains("MORAL REVIVAL")
+                {
+                    "ethicist"
+                } else {
+                    "citizen"
+                };
+                Some(generate_character_name(
+                    world_name,
+                    role,
+                    (year / 25.0) as u16,
+                ))
+            } else {
+                None
+            };
 
             self.events.push(NarrativeEvent {
-                tick, year, world,
-                crisis, response, outcome,
+                tick,
+                year,
+                world,
+                crisis,
+                response,
+                outcome,
                 severity,
-                joy: 0.0, sadness: 0.0, desire: 0.0, care: 0.0,
+                joy: 0.0,
+                sadness: 0.0,
+                desire: 0.0,
+                care: 0.0,
                 character,
             });
         }
@@ -547,8 +675,7 @@ impl NarrativeEngine {
             };
             out.push_str(&format!(
                 "{} Year {:.0} [{}]\n  {}\n  → {}\n  ⇒ {}\n\n",
-                severity_marker, event.year, world_str,
-                event.crisis, event.response, event.outcome
+                severity_marker, event.year, world_str, event.crisis, event.response, event.outcome
             ));
         }
         out
@@ -560,7 +687,9 @@ impl NarrativeEngine {
     pub fn format_chronicle(&self) -> String {
         let mut sorted = self.events.clone();
         sorted.sort_by_key(|e| e.tick);
-        if sorted.is_empty() { return String::from("No events recorded.\n"); }
+        if sorted.is_empty() {
+            return String::from("No events recorded.\n");
+        }
 
         let mut out = String::new();
         out.push_str("╔══════════════════════════════════════════════════════════╗\n");
@@ -569,19 +698,52 @@ impl NarrativeEngine {
 
         // Group events into eras (50-year periods)
         let eras = [
-            (0.0, 50.0, "THE FOUNDING (Years 1-50)", "The first generation. Everything was fragile."),
-            (50.0, 150.0, "THE ESTABLISHMENT (Years 50-150)", "Technology unlocked survival. Populations grew."),
-            (150.0, 300.0, "THE EXPANSION (Years 150-300)", "Outer system colonies found their footing."),
-            (300.0, 500.0, "THE TRIALS (Years 300-500)", "Distance bred divergence. Crises tested the bonds."),
-            (500.0, 750.0, "THE MATURATION (Years 500-750)", "Civilizations within the civilization."),
-            (750.0, 1001.0, "THE MILLENNIUM (Years 750-1000)", "A species spanning worlds."),
+            (
+                0.0,
+                50.0,
+                "THE FOUNDING (Years 1-50)",
+                "The first generation. Everything was fragile.",
+            ),
+            (
+                50.0,
+                150.0,
+                "THE ESTABLISHMENT (Years 50-150)",
+                "Technology unlocked survival. Populations grew.",
+            ),
+            (
+                150.0,
+                300.0,
+                "THE EXPANSION (Years 150-300)",
+                "Outer system colonies found their footing.",
+            ),
+            (
+                300.0,
+                500.0,
+                "THE TRIALS (Years 300-500)",
+                "Distance bred divergence. Crises tested the bonds.",
+            ),
+            (
+                500.0,
+                750.0,
+                "THE MATURATION (Years 500-750)",
+                "Civilizations within the civilization.",
+            ),
+            (
+                750.0,
+                1001.0,
+                "THE MILLENNIUM (Years 750-1000)",
+                "A species spanning worlds.",
+            ),
         ];
 
         for (start, end, title, intro) in &eras {
-            let era_events: Vec<&NarrativeEvent> = sorted.iter()
+            let era_events: Vec<&NarrativeEvent> = sorted
+                .iter()
                 .filter(|e| e.year >= *start && e.year < *end)
                 .collect();
-            if era_events.is_empty() { continue; }
+            if era_events.is_empty() {
+                continue;
+            }
 
             out.push_str(&format!("── {} ──\n\n", title));
             out.push_str(&format!("{}\n\n", intro));
@@ -614,25 +776,29 @@ impl NarrativeEngine {
                     4 => {
                         out.push_str(&format!(
                             "  In Year {:.0}, {}: {}. {} {}{}\n\n",
-                            event.year, world_str, event.crisis,
-                            event.response, tone, char_clause));
+                            event.year, world_str, event.crisis, event.response, tone, char_clause
+                        ));
                         out.push_str(&format!("  The consequences: {}\n\n", event.outcome));
                     }
                     3 => {
                         out.push_str(&format!(
                             "  Year {:.0} — {}: {}. {}{}\n  Result: {}\n\n",
-                            event.year, world_str, event.crisis,
-                            event.response, char_clause, event.outcome));
+                            event.year,
+                            world_str,
+                            event.crisis,
+                            event.response,
+                            char_clause,
+                            event.outcome
+                        ));
                     }
                     2 => {
                         out.push_str(&format!(
                             "  Year {:.0}: {}. {}\n\n",
-                            event.year, event.crisis, event.outcome));
+                            event.year, event.crisis, event.outcome
+                        ));
                     }
                     _ => {
-                        out.push_str(&format!(
-                            "  Year {:.0}: {}\n",
-                            event.year, event.crisis));
+                        out.push_str(&format!("  Year {:.0}: {}\n", event.year, event.crisis));
                     }
                 }
             }
@@ -672,8 +838,14 @@ mod tests {
     fn remember_stores_cultural_memory() {
         let mut engine = NarrativeEngine::new();
         engine.remember(
-            "Great Quake".into(), Some("Moon".into()), 100,
-            CulturalLesson { preparedness: 0.2, risk_shift: -0.1, cohesion: 0.15 },
+            "Great Quake".into(),
+            Some("Moon".into()),
+            100,
+            CulturalLesson {
+                preparedness: 0.2,
+                risk_shift: -0.1,
+                cohesion: 0.15,
+            },
         );
         assert_eq!(engine.cultural_memories.len(), 1);
         assert_eq!(engine.cultural_memories[0].name, "Great Quake");
@@ -683,18 +855,19 @@ mod tests {
     #[test]
     fn decay_memories_reduces_strength() {
         let mut engine = NarrativeEngine::new();
-        engine.remember(
-            "Event".into(), None, 0,
-            CulturalLesson::default(),
-        );
+        engine.remember("Event".into(), None, 0, CulturalLesson::default());
         let initial = engine.cultural_memories[0].strength;
         for _ in 0..100 {
             engine.decay_memories();
         }
-        assert!(engine.cultural_memories[0].strength < initial,
-            "Strength should decay over 100 ticks");
-        assert!(engine.cultural_memories[0].strength > 0.01,
-            "Should not be pruned after only 100 ticks");
+        assert!(
+            engine.cultural_memories[0].strength < initial,
+            "Strength should decay over 100 ticks"
+        );
+        assert!(
+            engine.cultural_memories[0].strength > 0.01,
+            "Should not be pruned after only 100 ticks"
+        );
     }
 
     #[test]
@@ -704,30 +877,55 @@ mod tests {
         // Force strength below threshold
         engine.cultural_memories[0].strength = 0.005;
         engine.decay_memories();
-        assert!(engine.cultural_memories.is_empty(),
-            "Memory below 0.01 threshold should be pruned");
+        assert!(
+            engine.cultural_memories.is_empty(),
+            "Memory below 0.01 threshold should be pruned"
+        );
     }
 
     #[test]
     fn cultural_lesson_for_filters_by_world() {
         let mut engine = NarrativeEngine::new();
         engine.remember(
-            "Mars Quake".into(), Some("Mars".into()), 10,
-            CulturalLesson { preparedness: 0.2, risk_shift: 0.0, cohesion: 0.0 },
+            "Mars Quake".into(),
+            Some("Mars".into()),
+            10,
+            CulturalLesson {
+                preparedness: 0.2,
+                risk_shift: 0.0,
+                cohesion: 0.0,
+            },
         );
         engine.remember(
-            "Global Pandemic".into(), None, 20,
-            CulturalLesson { preparedness: 0.0, risk_shift: -0.1, cohesion: 0.0 },
+            "Global Pandemic".into(),
+            None,
+            20,
+            CulturalLesson {
+                preparedness: 0.0,
+                risk_shift: -0.1,
+                cohesion: 0.0,
+            },
         );
 
         let mars_lesson = engine.cultural_lesson_for(Some("Mars"));
-        assert!(mars_lesson.preparedness > 0.0, "Mars should get its own memory");
-        assert!(mars_lesson.risk_shift < 0.0, "Mars should also get global memory");
+        assert!(
+            mars_lesson.preparedness > 0.0,
+            "Mars should get its own memory"
+        );
+        assert!(
+            mars_lesson.risk_shift < 0.0,
+            "Mars should also get global memory"
+        );
 
         let moon_lesson = engine.cultural_lesson_for(Some("Moon"));
-        assert!((moon_lesson.preparedness - 0.0).abs() < 1e-10,
-            "Moon should not get Mars-specific memory");
-        assert!(moon_lesson.risk_shift < 0.0, "Moon should get global memory");
+        assert!(
+            (moon_lesson.preparedness - 0.0).abs() < 1e-10,
+            "Moon should not get Mars-specific memory"
+        );
+        assert!(
+            moon_lesson.risk_shift < 0.0,
+            "Moon should get global memory"
+        );
     }
 
     #[test]
@@ -748,7 +946,13 @@ mod tests {
             character: None,
         });
         let history = engine.format_history();
-        assert!(!history.is_empty(), "History should produce non-empty output");
-        assert!(history.contains("Moonquake"), "History should contain crisis description");
+        assert!(
+            !history.is_empty(),
+            "History should produce non-empty output"
+        );
+        assert!(
+            history.contains("Moonquake"),
+            "History should contain crisis description"
+        );
     }
 }

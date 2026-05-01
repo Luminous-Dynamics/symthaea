@@ -686,7 +686,10 @@ mod tests {
     #[test]
     fn anchor_error_display() {
         let cases = vec![
-            (AnchorError::IoError("disk full".into()), "IO error: disk full"),
+            (
+                AnchorError::IoError("disk full".into()),
+                "IO error: disk full",
+            ),
             (
                 AnchorError::NetworkError("timeout".into()),
                 "Network error: timeout",

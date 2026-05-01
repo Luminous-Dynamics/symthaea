@@ -38,8 +38,15 @@ pub enum MigrationError {
 impl core::fmt::Display for MigrationError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::UnknownVersion { found, max_supported } => {
-                write!(f, "Unknown schema version {} (max supported: {})", found, max_supported)
+            Self::UnknownVersion {
+                found,
+                max_supported,
+            } => {
+                write!(
+                    f,
+                    "Unknown schema version {} (max supported: {})",
+                    found, max_supported
+                )
             }
             Self::DeserializationFailed(msg) => write!(f, "Deserialization failed: {}", msg),
             Self::MigrationStepFailed { from, to, reason } => {
@@ -80,7 +87,10 @@ mod tests {
 
     #[test]
     fn migration_error_display() {
-        let err = MigrationError::UnknownVersion { found: 5, max_supported: 3 };
+        let err = MigrationError::UnknownVersion {
+            found: 5,
+            max_supported: 3,
+        };
         assert!(err.to_string().contains("5"));
         assert!(err.to_string().contains("3"));
     }

@@ -89,7 +89,10 @@ mod validator_node_tests {
         let initial_rep = v.reputation();
         v.update_reputation(true);
 
-        assert!(v.reputation() > initial_rep, "Success should increase reputation");
+        assert!(
+            v.reputation() > initial_rep,
+            "Success should increase reputation"
+        );
         assert_eq!(v.successful_rounds, 1);
     }
 
@@ -101,7 +104,10 @@ mod validator_node_tests {
         let initial_rep = v.reputation();
         v.update_reputation(false);
 
-        assert!(v.reputation() < initial_rep, "Failure should decrease reputation");
+        assert!(
+            v.reputation() < initial_rep,
+            "Failure should decrease reputation"
+        );
         assert_eq!(v.failed_rounds, 1);
     }
 
@@ -138,7 +144,10 @@ mod slashing_tests {
         v.slash(SlashingSeverity::Minor);
 
         assert_eq!(v.slash_count, 1);
-        assert!((v.reputation() - 0.9).abs() < 0.01, "Minor slash: 10% penalty");
+        assert!(
+            (v.reputation() - 0.9).abs() < 0.01,
+            "Minor slash: 10% penalty"
+        );
     }
 
     #[test]
@@ -148,7 +157,10 @@ mod slashing_tests {
 
         v.slash(SlashingSeverity::Moderate);
 
-        assert!((v.reputation() - 0.7).abs() < 0.01, "Moderate slash: 30% penalty");
+        assert!(
+            (v.reputation() - 0.7).abs() < 0.01,
+            "Moderate slash: 30% penalty"
+        );
     }
 
     #[test]
@@ -158,7 +170,10 @@ mod slashing_tests {
 
         v.slash(SlashingSeverity::Severe);
 
-        assert!((v.reputation() - 0.5).abs() < 0.01, "Severe slash: 50% penalty");
+        assert!(
+            (v.reputation() - 0.5).abs() < 0.01,
+            "Severe slash: 50% penalty"
+        );
     }
 
     #[test]
@@ -169,7 +184,10 @@ mod slashing_tests {
         v.slash(SlashingSeverity::Critical); // 80% penalty
 
         // 0.1 * (1 - 0.8) = 0.02, which is < 0.05
-        assert!(!v.active, "Critical slash should deactivate low-rep validator");
+        assert!(
+            !v.active,
+            "Critical slash should deactivate low-rep validator"
+        );
     }
 
     #[test]
@@ -328,23 +346,29 @@ mod byzantine_tolerance_tests {
         }
 
         // Calculate weights
-        let honest_weight: f32 = 11.0 * (0.9 * 0.9);  // 11 * 0.81 = 8.91
+        let honest_weight: f32 = 11.0 * (0.9 * 0.9); // 11 * 0.81 = 8.91
         let byzantine_weight: f32 = 9.0 * (0.3 * 0.3); // 9 * 0.09 = 0.81
         let total_weight = honest_weight + byzantine_weight; // 9.72
 
         // Honest fraction
         let honest_fraction = honest_weight / total_weight; // ~0.916
 
-        assert!(honest_fraction > 0.55, "Honest nodes should have >55% of voting power");
+        assert!(
+            honest_fraction > 0.55,
+            "Honest nodes should have >55% of voting power"
+        );
 
         // Verify with actual set
         let threshold = set.consensus_threshold();
         let _actual_total = set.total_voting_weight();
 
         // Honest nodes should exceed threshold
-        assert!(honest_weight > threshold,
+        assert!(
+            honest_weight > threshold,
             "Honest weight {} should exceed threshold {}",
-            honest_weight, threshold);
+            honest_weight,
+            threshold
+        );
     }
 
     #[test]
@@ -356,22 +380,24 @@ mod byzantine_tolerance_tests {
         let _byzantine_count = 9;
 
         // With LINEAR weights (reputation, not reputation²)
-        let honest_linear_weight = 11.0 * 0.9;   // 9.9
+        let honest_linear_weight = 11.0 * 0.9; // 9.9
         let byzantine_linear_weight = 9.0 * 0.3; // 2.7
         let total_linear = honest_linear_weight + byzantine_linear_weight; // 12.6
 
         let honest_linear_fraction = honest_linear_weight / total_linear; // ~0.786
 
         // With SQUARED weights
-        let honest_squared_weight = 11.0 * 0.81;  // 8.91
+        let honest_squared_weight = 11.0 * 0.81; // 8.91
         let byzantine_squared_weight = 9.0 * 0.09; // 0.81
         let total_squared = honest_squared_weight + byzantine_squared_weight; // 9.72
 
         let honest_squared_fraction = honest_squared_weight / total_squared; // ~0.916
 
         // Squared weights give honest nodes MORE power
-        assert!(honest_squared_fraction > honest_linear_fraction,
-            "Rep² should give honest nodes more relative power");
+        assert!(
+            honest_squared_fraction > honest_linear_fraction,
+            "Rep² should give honest nodes more relative power"
+        );
     }
 
     #[test]
@@ -468,12 +494,7 @@ mod vote_tests {
 
     #[test]
     fn test_vote_approve() {
-        let vote = Vote::approve(
-            "proposal-1".to_string(),
-            1,
-            "validator-1".to_string(),
-            0.8,
-        );
+        let vote = Vote::approve("proposal-1".to_string(), 1, "validator-1".to_string(), 0.8);
 
         assert_eq!(vote.decision, VoteDecision::Approve);
         assert_eq!(vote.round, 1);
@@ -496,24 +517,14 @@ mod vote_tests {
 
     #[test]
     fn test_vote_abstain() {
-        let vote = Vote::abstain(
-            "proposal-1".to_string(),
-            1,
-            "validator-1".to_string(),
-            0.8,
-        );
+        let vote = Vote::abstain("proposal-1".to_string(), 1, "validator-1".to_string(), 0.8);
 
         assert_eq!(vote.decision, VoteDecision::Abstain);
     }
 
     #[test]
     fn test_vote_weighted_value() {
-        let vote = Vote::approve(
-            "proposal-1".to_string(),
-            1,
-            "validator-1".to_string(),
-            0.8,
-        );
+        let vote = Vote::approve("proposal-1".to_string(), 1, "validator-1".to_string(), 0.8);
 
         // Weight is reputation squared
         let expected_weight = 0.8 * 0.8;

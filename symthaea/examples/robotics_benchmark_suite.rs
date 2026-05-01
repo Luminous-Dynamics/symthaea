@@ -12,7 +12,7 @@
 //! Run with:
 //! ```
 //! cargo run --release --example robotics_benchmark_suite \
-//!   --features humanoid,helicopter,flight,vehicle,auv,manipulator,exoskeleton,surgical,orbital,quadruped
+//!   --features humanoid,helicopter,multirotor,vehicle,auv,manipulator,exoskeleton,surgical,orbital,quadruped
 //! ```
 
 #![allow(clippy::needless_late_init)]
@@ -49,7 +49,9 @@ fn main() {
     #[cfg(feature = "manipulator")]
     {
         let start = Instant::now();
-        use symthaea_manipulator::simulator::{ManipulatorPhysicsSimulator, SimpleManipulatorSimulator};
+        use symthaea_manipulator::simulator::{
+            ManipulatorPhysicsSimulator, SimpleManipulatorSimulator,
+        };
         use symthaea_manipulator::types::{ManipulatorCommand, NUM_JOINTS};
 
         let mut sim = SimpleManipulatorSimulator::new();
@@ -82,7 +84,9 @@ fn main() {
     #[cfg(feature = "helicopter")]
     {
         let start = Instant::now();
-        use symthaea_helicopter::simulator::{HelicopterPhysicsSimulator, SimpleHelicopterSimulator};
+        use symthaea_helicopter::simulator::{
+            HelicopterPhysicsSimulator, SimpleHelicopterSimulator,
+        };
         use symthaea_helicopter::types::HelicopterCommand;
 
         let mut sim = SimpleHelicopterSimulator::new();
@@ -112,8 +116,8 @@ fn main() {
     #[cfg(feature = "flight")]
     {
         let start = Instant::now();
-        use symthaea_flight::simulator::{PhysicsSimulator, SimplePhysicsSimulator};
-        use symthaea_flight::types::QuadrotorCommand;
+        use symthaea_multirotor::simulator::{PhysicsSimulator, SimplePhysicsSimulator};
+        use symthaea_multirotor::types::QuadrotorCommand;
 
         let mut sim = SimplePhysicsSimulator::new();
         let cmd = QuadrotorCommand::hover();
@@ -231,14 +235,20 @@ fn main() {
     println!("  Total steps:       {}", total_steps);
     println!("  Total elapsed:     {:.1}ms", total_time_ms);
     if total_time_ms > 0.0 {
-        println!("  Aggregate rate:    {:.0} steps/sec", total_steps as f64 / (total_time_ms / 1000.0));
+        println!(
+            "  Aggregate rate:    {:.0} steps/sec",
+            total_steps as f64 / (total_time_ms / 1000.0)
+        );
     }
-    println!("  All finite:        {}", if all_stable { "✓" } else { "✗" });
+    println!(
+        "  All finite:        {}",
+        if all_stable { "✓" } else { "✗" }
+    );
     println!();
 
     if active_platforms == 0 {
         println!("⚠️  No platforms enabled. Build with:");
-        println!("   cargo run --release --example robotics_benchmark_suite --features humanoid,helicopter,flight,vehicle,auv,manipulator");
+        println!("   cargo run --release --example robotics_benchmark_suite --features humanoid,helicopter,multirotor,vehicle,auv,manipulator");
         println!();
     }
 

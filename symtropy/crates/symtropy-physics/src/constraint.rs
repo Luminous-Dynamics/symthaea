@@ -1,5 +1,5 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Constraint trait for ND joints and connections.
 
@@ -62,14 +62,18 @@ impl<const D: usize> Constraint<D> for DistanceConstraint<D> {
     fn solve_velocity(&self, body_a: &mut RigidBody<D>, body_b: &mut RigidBody<D>, _dt: f64) {
         let delta = body_b.transform.translation.0 - body_a.transform.translation.0;
         let dist = delta.norm();
-        if dist < 1e-15 { return; }
+        if dist < 1e-15 {
+            return;
+        }
         let normal = delta / dist;
 
         let rel_vel = body_b.linear_velocity - body_a.linear_velocity;
         let vel_along = rel_vel.dot(&normal);
 
         let total_inv = body_a.inv_mass + body_b.inv_mass;
-        if total_inv < 1e-15 { return; }
+        if total_inv < 1e-15 {
+            return;
+        }
         let impulse = -vel_along / total_inv * self.stiffness;
 
         let impulse_vec = normal * impulse;
@@ -89,8 +93,10 @@ mod tests {
 
     #[test]
     fn distance_constraint_corrects() {
-        let mut a = RigidBody::<3>::dynamic_sphere(BodyHandle(0), Point::new([0.0, 0.0, 0.0]), 1.0, 1.0);
-        let mut b = RigidBody::<3>::dynamic_sphere(BodyHandle(1), Point::new([5.0, 0.0, 0.0]), 1.0, 1.0);
+        let mut a =
+            RigidBody::<3>::dynamic_sphere(BodyHandle(0), Point::new([0.0, 0.0, 0.0]), 1.0, 1.0);
+        let mut b =
+            RigidBody::<3>::dynamic_sphere(BodyHandle(1), Point::new([5.0, 0.0, 0.0]), 1.0, 1.0);
 
         let constraint = DistanceConstraint {
             body_a: BodyHandle(0),

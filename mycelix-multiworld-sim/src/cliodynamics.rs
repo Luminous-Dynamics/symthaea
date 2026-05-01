@@ -137,13 +137,9 @@ pub enum CycleEvent {
         infrastructure_damage: f64,
     },
     /// World declared independence (off-Earth only).
-    Secession {
-        world_name: String,
-    },
+    Secession { world_name: String },
     /// Elite purge — high-tier agents demoted.
-    ElitePurge {
-        agents_affected_fraction: f64,
-    },
+    ElitePurge { agents_affected_fraction: f64 },
     /// Recovery — stability climbing out of depression.
     Recovery,
 }
@@ -153,10 +149,10 @@ pub enum CycleEvent {
 // ============================================================================
 
 /// Turchin coupling constants.
-const ALPHA: f64 = 0.02;   // Ψ effect on stability (small — Ψ can be large)
-const BETA: f64 = 0.04;    // Immiseration effect on stability
-const GAMMA: f64 = 0.03;   // Governance quality stabilizing effect
-const PSI_THRESHOLD: f64 = 0.8;  // Ψ above which crisis is possible
+const ALPHA: f64 = 0.02; // Ψ effect on stability (small — Ψ can be large)
+const BETA: f64 = 0.04; // Immiseration effect on stability
+const GAMMA: f64 = 0.03; // Governance quality stabilizing effect
+const PSI_THRESHOLD: f64 = 0.8; // Ψ above which crisis is possible
 const STABILITY_CRISIS: f64 = 0.3; // S below which civil war becomes probable
 const STABILITY_DEPRESSION: f64 = 0.15; // S below which depression begins
 const CIVIL_WAR_PROB_PER_TICK: f64 = 0.05; // 5% per tick during crisis with low S
@@ -201,9 +197,10 @@ impl SecularCycleState {
 
         // FEP-coupled immiseration: prediction error is the thermodynamic ground truth
         self.immiseration = (0.4 * fep_pressure
-                          + 0.2 * inequality_pressure
-                          + 0.2 * scarcity_pressure
-                          + 0.2 * phi_collapse).clamp(0.0, 1.0);
+            + 0.2 * inequality_pressure
+            + 0.2 * scarcity_pressure
+            + 0.2 * phi_collapse)
+            .clamp(0.0, 1.0);
 
         // ================================================================
         // Step 3: Compute dS/dt (state stability dynamics)
@@ -211,12 +208,12 @@ impl SecularCycleState {
         // Use log(Ψ) for stability effect — Ψ of 2 is normal, Ψ of 5 is severe
         // This prevents low-level elite overproduction from crashing stability
         let psi_effect = (self.psi / 1.0).ln().max(0.0); // ln(1)=0, ln(2)=0.69, ln(5)=1.6
-        // Coordination-literate populations buffer stability decay:
-        // they recognize destabilizing dynamics (elite overproduction,
-        // rising immiseration) and de-escalate before crisis.
+                                                         // Coordination-literate populations buffer stability decay:
+                                                         // they recognize destabilizing dynamics (elite overproduction,
+                                                         // rising immiseration) and de-escalate before crisis.
         let coordination_buffer = 1.0 - inputs.mean_coordination_understanding * 0.3;
         let ds_dt = (-ALPHA * psi_effect - BETA * self.immiseration) * coordination_buffer
-                    + GAMMA * inputs.governance_quality;
+            + GAMMA * inputs.governance_quality;
 
         // Phase-dependent stability dynamics
         match self.phase {
@@ -260,10 +257,7 @@ impl SecularCycleState {
         }
 
         // Elite purge: during Depression
-        if self.phase == SecularCyclePhase::Depression
-            && self.phase_ticks < 24
-            && rng_val < 0.02
-        {
+        if self.phase == SecularCyclePhase::Depression && self.phase_ticks < 24 && rng_val < 0.02 {
             events.push(CycleEvent::ElitePurge {
                 agents_affected_fraction: 0.3,
             });
@@ -347,8 +341,13 @@ impl SecularCycleState {
     pub fn summary(&self) -> String {
         format!(
             "Phase: {:?} | Ψ={:.2} W={:.2} S={:.2} | Wars={} Secessions={} Cycles={}",
-            self.phase, self.psi, self.immiseration, self.state_stability,
-            self.civil_wars, self.secessions, self.cycles_completed,
+            self.phase,
+            self.psi,
+            self.immiseration,
+            self.state_stability,
+            self.civil_wars,
+            self.secessions,
+            self.cycles_completed,
         )
     }
 }
@@ -406,7 +405,8 @@ mod tests {
     fn growth_phase_stable() {
         let mut state = SecularCycleState::default();
         let inputs = growth_inputs();
-        for _ in 0..120 { // 10 years
+        for _ in 0..120 {
+            // 10 years
             state.tick(&inputs, 0.99); // No random events
         }
         assert_eq!(state.phase, SecularCyclePhase::Growth);
@@ -427,10 +427,16 @@ mod tests {
         for i in 0..600 {
             inputs.current_tick = i;
             state.tick(&inputs, 0.99);
-            if state.phase != SecularCyclePhase::Growth { break; }
+            if state.phase != SecularCyclePhase::Growth {
+                break;
+            }
         }
-        assert!(state.phase == SecularCyclePhase::Stagflation || state.phase == SecularCyclePhase::Crisis,
-            "Should transition from Growth with high inequality: {:?}", state.phase);
+        assert!(
+            state.phase == SecularCyclePhase::Stagflation
+                || state.phase == SecularCyclePhase::Crisis,
+            "Should transition from Growth with high inequality: {:?}",
+            state.phase
+        );
     }
 
     #[test]
@@ -442,8 +448,13 @@ mod tests {
 
         let inputs = crisis_inputs();
         let events = state.tick(&inputs, 0.01); // rng_val < CIVIL_WAR_PROB
-        let has_war = events.iter().any(|e| matches!(e, CycleEvent::CivilWar { .. }));
-        assert!(has_war, "Crisis + low stability + low rng should trigger civil war");
+        let has_war = events
+            .iter()
+            .any(|e| matches!(e, CycleEvent::CivilWar { .. }));
+        assert!(
+            has_war,
+            "Crisis + low stability + low rng should trigger civil war"
+        );
         assert_eq!(state.civil_wars, 1);
     }
 
@@ -453,7 +464,9 @@ mod tests {
         // In Growth phase, even with low rng, no civil war
         let inputs = growth_inputs();
         let events = state.tick(&inputs, 0.01);
-        let has_war = events.iter().any(|e| matches!(e, CycleEvent::CivilWar { .. }));
+        let has_war = events
+            .iter()
+            .any(|e| matches!(e, CycleEvent::CivilWar { .. }));
         assert!(!has_war, "No civil war in Growth phase");
     }
 
@@ -467,13 +480,20 @@ mod tests {
         let mut inputs = crisis_inputs();
         inputs.secession_capable = false;
         let events = state.tick(&inputs, 0.001);
-        let has_secession = events.iter().any(|e| matches!(e, CycleEvent::Secession { .. }));
+        let has_secession = events
+            .iter()
+            .any(|e| matches!(e, CycleEvent::Secession { .. }));
         assert!(!has_secession, "No secession without capability");
 
         inputs.secession_capable = true;
         let events = state.tick(&inputs, 0.001);
-        let has_secession = events.iter().any(|e| matches!(e, CycleEvent::Secession { .. }));
-        assert!(has_secession, "Secession should fire with capability + crisis + low rng");
+        let has_secession = events
+            .iter()
+            .any(|e| matches!(e, CycleEvent::Secession { .. }));
+        assert!(
+            has_secession,
+            "Secession should fire with capability + crisis + low rng"
+        );
     }
 
     #[test]
@@ -484,14 +504,20 @@ mod tests {
         state.psi = 0.5;
 
         // Run depression for many ticks with good inputs — stability should recover
-        for i in 0..1200 { // 100 years — depression is slow
+        for i in 0..1200 {
+            // 100 years — depression is slow
             let mut inp = growth_inputs();
             inp.current_tick = i;
             state.tick(&inp, 0.99);
-            if state.phase == SecularCyclePhase::Growth { break; }
+            if state.phase == SecularCyclePhase::Growth {
+                break;
+            }
         }
-        assert!(state.state_stability > 0.4,
-            "Stability should recover: S={}", state.state_stability);
+        assert!(
+            state.state_stability > 0.4,
+            "Stability should recover: S={}",
+            state.state_stability
+        );
         // May or may not have fully transitioned depending on Ψ decay
     }
 
@@ -505,7 +531,9 @@ mod tests {
 
         let inputs = crisis_inputs();
         let events = state.tick(&inputs, 0.005); // Very low rng → triggers purge (< 0.02)
-        let has_purge = events.iter().any(|e| matches!(e, CycleEvent::ElitePurge { .. }));
+        let has_purge = events
+            .iter()
+            .any(|e| matches!(e, CycleEvent::ElitePurge { .. }));
         assert!(has_purge, "Should trigger purge with low rng in depression");
         // Psi changes from both elite purge (×0.5) and recomputation from inputs
         // Just verify it's not stuck at initial value
@@ -526,8 +554,12 @@ mod tests {
         inputs_high.governance_positions = 10;
         state2.tick(&inputs_high, 0.99);
 
-        assert!(state2.psi > state1.psi,
-            "Higher elite fraction → higher Ψ: {} vs {}", state2.psi, state1.psi);
+        assert!(
+            state2.psi > state1.psi,
+            "Higher elite fraction → higher Ψ: {} vs {}",
+            state2.psi,
+            state1.psi
+        );
     }
 
     #[test]
@@ -536,7 +568,8 @@ mod tests {
         let mut tick = 0u32;
 
         // Growth → Stagflation → Crisis → Depression → Growth
-        for _ in 0..2400 { // 200 years
+        for _ in 0..2400 {
+            // 200 years
             tick += 1;
             let phase_inputs = match state.phase {
                 SecularCyclePhase::Growth => {
@@ -556,8 +589,12 @@ mod tests {
         }
 
         // Should have completed at least one cycle or be in crisis/depression
-        assert!(state.cycles_completed >= 1 || state.phase != SecularCyclePhase::Growth,
-            "Should have progressed through cycle: {:?}, completed={}", state.phase, state.cycles_completed);
+        assert!(
+            state.cycles_completed >= 1 || state.phase != SecularCyclePhase::Growth,
+            "Should have progressed through cycle: {:?}, completed={}",
+            state.phase,
+            state.cycles_completed
+        );
     }
 
     #[test]
@@ -576,7 +613,12 @@ mod tests {
         state.tick(&inputs_high, 0.99);
         let w_high = state.immiseration;
 
-        assert!(w_high > w_low, "Higher Gini → higher immiseration: {} vs {}", w_high, w_low);
+        assert!(
+            w_high > w_low,
+            "Higher Gini → higher immiseration: {} vs {}",
+            w_high,
+            w_low
+        );
     }
 
     #[test]
@@ -596,8 +638,12 @@ mod tests {
         state.tick(&inputs, 0.99);
         let w_high = state.immiseration;
 
-        assert!(w_high > w_low,
-            "Higher FEP prediction error should drive higher immiseration: {} vs {}", w_high, w_low);
+        assert!(
+            w_high > w_low,
+            "Higher FEP prediction error should drive higher immiseration: {} vs {}",
+            w_high,
+            w_low
+        );
     }
 
     #[test]
@@ -611,13 +657,21 @@ mod tests {
 
         let mut inputs = crisis_inputs();
         inputs.non_elite_prediction_error = 3.0; // Extreme suffering
-        inputs.non_elite_mean_phi = 0.05;        // Consciousness collapse
+        inputs.non_elite_mean_phi = 0.05; // Consciousness collapse
         let events = state.tick(&inputs, 0.01);
 
-        let has_war = events.iter().any(|e| matches!(e, CycleEvent::CivilWar { .. }));
-        assert!(has_war, "Thermodynamic phase transition should trigger civil war");
-        assert!(state.immiseration > 0.5,
-            "Immiseration should be high with extreme FEP error: {}", state.immiseration);
+        let has_war = events
+            .iter()
+            .any(|e| matches!(e, CycleEvent::CivilWar { .. }));
+        assert!(
+            has_war,
+            "Thermodynamic phase transition should trigger civil war"
+        );
+        assert!(
+            state.immiseration > 0.5,
+            "Immiseration should be high with extreme FEP error: {}",
+            state.immiseration
+        );
     }
 
     #[test]

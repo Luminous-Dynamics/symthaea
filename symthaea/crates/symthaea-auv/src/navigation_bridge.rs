@@ -5,8 +5,10 @@
 //! Simplified: produces measurements from DVL velocity + optional sonar fixes.
 //! A full DVL/USBL/INS sensor fusion is future work.
 
-use positioning::{Measurement, MeasurementModality, MeasurementProvenance, MeasurementValue, ReferenceFrame};
 use crate::types::AuvState;
+use positioning::{
+    Measurement, MeasurementModality, MeasurementProvenance, MeasurementValue, ReferenceFrame,
+};
 
 /// A single navigation sample (one tick of sensor data).
 #[derive(Debug, Clone, Copy, Default)]

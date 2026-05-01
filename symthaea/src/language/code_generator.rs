@@ -538,6 +538,9 @@ pub struct CodeContext<'a> {
     /// Populated by callers who have access to the experience store.
     /// Used during auto-fix retry and to inform native generation.
     pub error_hints: Vec<(String, String)>,
+    /// HDC-encoded diagnostics for high-precision neuro-symbolic repair.
+    /// These are produced by DiagnosticHDEncoder and capture the "geometry" of compiler errors.
+    pub diagnostic_hvs: Vec<ContinuousHV>,
     /// Learned code template from the CodingExperienceStore.
     /// If a similar task was previously completed via LLM, the template
     /// is injected here so native generation can use it directly.
@@ -553,6 +556,7 @@ impl<'a> Default for CodeContext<'a> {
             past_examples: Vec::new(),
             mcts_plan_confidence: 0.0,
             error_hints: Vec::new(),
+            diagnostic_hvs: Vec::new(),
             learned_template: None,
         }
     }
@@ -699,6 +703,18 @@ impl CodeGenerator {
         for note in &result.notes {
             if note.starts_with("ERROR_HINT") {
                 prompt.push_str(&format!("## Known Issue\n{}\n\n", note));
+            }
+        }
+        let repo_notes: Vec<&String> = result
+            .notes
+            .iter()
+            .filter(|note| note.starts_with("REPO_SNIPPET"))
+            .collect();
+        if !repo_notes.is_empty() {
+            prompt.push_str("## Repository Context\n");
+            for note in repo_notes {
+                prompt.push_str(note);
+                prompt.push_str("\n\n");
             }
         }
         prompt.push_str("## Code to Complete\n```rust\n");
@@ -936,7 +952,10 @@ impl CodeGenerator {
             }
 
             // Detect return of reference to local
-            if trimmed.starts_with("&") && !trimmed.contains("&self") && !trimmed.contains("&mut self") {
+            if trimmed.starts_with("&")
+                && !trimmed.contains("&self")
+                && !trimmed.contains("&mut self")
+            {
                 // Check if this looks like a return of a local ref
                 let is_last_expr = i == lines.len() - 2; // second to last (before closing brace)
                 if is_last_expr && !trimmed.contains("&str") && !trimmed.contains("&[") {
@@ -1157,8 +1176,17 @@ impl CodeGenerator {
             0.0
         };
 
-        // Include past successful examples as notes for LLM few-shot context
+        // Include AST/HDC-retrieved source snippets as notes for LLM context.
         let mut notes = Vec::new();
+        for (label, snippet) in &context.source_files {
+            notes.push(format!(
+                "REPO_SNIPPET({}):\n{}",
+                label,
+                snippet.chars().take(4_000).collect::<String>()
+            ));
+        }
+
+        // Include past successful examples as notes for LLM few-shot context
         for (purpose, code) in &context.past_examples {
             notes.push(format!("PAST_EXAMPLE({}):\n{}", purpose, code));
         }
@@ -1985,6 +2013,57 @@ mod tests {
         let result = gen.generate(&intent, &CodeContext::default());
         assert_eq!(result.language, "rust");
         assert!(!result.source.is_empty());
+    }
+
+    #[test]
+    fn test_generate_create_attaches_repo_snippets() {
+        let gen = CodeGenerator::with_default_dim();
+        let intent = CodeIntent::Create {
+            target: CodeTarget::new("normalize_user", EntityKind::Function),
+            spec: CodeSpec::new("rust", "normalize_user", "Normalize a user name")
+                .with_signature("fn normalize_user(name: &str) -> String"),
+        };
+        let context = CodeContext {
+            source_files: vec![(
+                "src/users.rs:4:normalize_name".to_string(),
+                "pub fn normalize_name(name: &str) -> String {\n    name.trim().to_lowercase()\n}"
+                    .to_string(),
+            )],
+            ..CodeContext::default()
+        };
+
+        let result = gen.generate(&intent, &context);
+
+        assert!(result.notes.iter().any(|note| {
+            note.starts_with("REPO_SNIPPET(src/users.rs:4:normalize_name)")
+                && note.contains("trim().to_lowercase()")
+        }));
+    }
+
+    #[test]
+    fn test_llm_completion_prompt_includes_repo_snippets() {
+        let spec = CodeSpec::new("rust", "normalize_user", "Normalize a user name")
+            .with_signature("fn normalize_user(name: &str) -> String");
+        let result = GeneratedCode {
+            source: "pub fn normalize_user(name: &str) -> String {\n    todo!()\n}".to_string(),
+            language: "rust".to_string(),
+            plan_steps: Vec::new(),
+            epistemic_status: EpistemicStatus::Uncertain,
+            intent_similarity: 0.1,
+            notes: vec![
+                "REPO_SNIPPET(src/users.rs:4:normalize_name):\npub fn normalize_name(name: &str) -> String {\n    name.trim().to_lowercase()\n}".to_string(),
+            ],
+            phi_score: 0.0,
+            primitives_used: Vec::new(),
+            dataflow: None,
+            plan_coverage: 0.0,
+        };
+
+        let prompt = CodeGenerator::build_llm_completion_prompt(&spec, &result);
+
+        assert!(prompt.contains("## Repository Context"));
+        assert!(prompt.contains("normalize_name"));
+        assert!(prompt.contains("trim().to_lowercase()"));
     }
 
     #[test]

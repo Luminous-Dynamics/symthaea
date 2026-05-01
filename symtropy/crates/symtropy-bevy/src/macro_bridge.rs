@@ -96,7 +96,9 @@ pub fn apply_macro_modifiers_system<const D: usize>(
     state: Option<Res<MacroWorldState>>,
     mut physics: ResMut<SymtropyPhysics<D>>,
 ) {
-    let Some(state) = state else { return; };
+    let Some(state) = state else {
+        return;
+    };
     apply_macro_modifiers(&mut physics.field, &state.modifiers, state.base_phi_gravity);
 }
 
@@ -107,9 +109,9 @@ pub fn apply_macro_modifiers_system<const D: usize>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use symtropy_physics::PhysicsWorld;
-    use symtropy_consciousness_physics::coupling::ConsciousnessField;
     use nalgebra::SVector;
+    use symtropy_consciousness_physics::coupling::ConsciousnessField;
+    use symtropy_physics::PhysicsWorld;
 
     fn make_physics() -> SymtropyPhysics<2> {
         SymtropyPhysics {
@@ -119,9 +121,9 @@ mod tests {
     }
 
     fn add_entity(p: &mut SymtropyPhysics<2>) -> symtropy_physics::BodyHandle {
-        let h = p.world.add_sphere(
-            symtropy_math::Point::new([0.0, 0.0]), 1.0, 1.0,
-        );
+        let h = p
+            .world
+            .add_sphere(symtropy_math::Point::new([0.0, 0.0]), 1.0, 1.0);
         p.field.register(h, 100.0, 5.0);
         h
     }
@@ -166,7 +168,10 @@ mod tests {
         let mut p = make_physics();
         let _h = add_entity(&mut p);
         let state = MacroWorldState {
-            modifiers: MacroWorldModifiers { stability: 1.0, ..Default::default() },
+            modifiers: MacroWorldModifiers {
+                stability: 1.0,
+                ..Default::default()
+            },
             base_phi_gravity: 0.1,
         };
         apply_macro_modifiers(&mut p.field, &state.modifiers, state.base_phi_gravity);

@@ -94,6 +94,10 @@ pub struct VerifiableCredential {
     /// Signature value (base64 encoded)
     pub proof_value: String,
 
+    // ========== Workforce & Industry (NEW) ==========
+    /// Industry mappings (e.g., ESCO, O*NET)
+    pub industry_mappings: Vec<IndustryMapping>,
+
     // ========== Epistemic Classification (Mycelix SDK) ==========
     /// Empirical level - how the credential can be verified
     /// E0=Null, E1=Testimonial, E2=PrivateVerify, E3=Cryptographic, E4=PublicRepro
@@ -120,6 +124,8 @@ pub struct Assessment {
     pub node_hash: ActionHash,
     /// Type of assessment
     pub assessment_type: AssessmentType,
+    /// Certification level
+    pub certification_level: CertificationLevel,
     /// Title
     pub title: String,
     /// Instructions
@@ -150,6 +156,78 @@ pub enum AssessmentType {
     Observation,
     Performance,
     SelfAssessment,
+}
+
+/// Level of professional certification
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CertificationLevel {
+    /// General skill/knowledge node completion
+    LearningNode,
+    /// Professional foundation level
+    ProfessionalFoundation,
+    /// Specialist certification
+    Specialist,
+    /// Expert/Lead level certification
+    Expert,
+}
+
+/// Audience for a selective disclosure
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DisclosureAudience {
+    /// Visible to any agent on the DHT
+    Public,
+    /// Visible only to members of the student's Learning Pods
+    PodOnly,
+    /// Visible only to a specific agent (e.g., a specific employer)
+    SpecificAgent(AgentPubKey),
+    /// Visible only to agents with a specific trust tier
+    TrustTier(u8),
+}
+
+/// A selective disclosure of a private credential (CLR 2.0 compliant)
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct CredentialDisclosure {
+    /// Hash of the private VerifiableCredential on the source chain
+    pub private_credential_hash: ActionHash,
+    /// Which fields are made visible in this disclosure
+    pub visible_fields: Vec<String>,
+    /// Who is allowed to see this disclosure
+    pub audience: DisclosureAudience,
+    /// Salt used for the blinded hash (to prevent correlation)
+    pub salt: [u8; 16],
+    /// Timestamp of disclosure
+    pub created_at: i64,
+}
+
+/// Comprehensive Learner Record (CLR 2.0) - A bundle of achievements
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct ComprehensiveLearnerRecord {
+    pub title: String,
+    pub description: String,
+    /// List of disclosures included in this record
+    pub disclosures: Vec<ActionHash>,
+    /// Aggregate MATL trust score (calculated at issuance)
+    pub aggregate_trust_score: u16,
+    /// ESCO/Industry codes this record targets
+    pub targeted_industries: Vec<IndustryMapping>,
+    pub created_at: i64,
+    /// Optional expiration
+    pub expires_at: Option<i64>,
+}
+
+/// Mapping to external workforce standards
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct IndustryMapping {
+    /// Framework name (e.g., "ESCO", "O*NET", "SFIA")
+    pub framework: String,
+    /// Framework version
+    pub version: String,
+    /// Skill/Occupation code in that framework
+    pub code: String,
+    /// Label for the mapping
+    pub label: String,
 }
 
 impl Default for AssessmentType {
@@ -186,7 +264,7 @@ pub struct StudentResult {
     pub rubric_scores: Vec<u32>,
     pub attempt_number: u32,
     pub reasoning_trace: Option<String>,
-    pub consciousness_level_permille: Option<u16>,
+    pub cognitive_readiness_permille: Option<u16>,
     pub feedback: Option<String>,
     pub graded_by: Option<AgentPubKey>,
     pub completed_at: i64,
@@ -270,6 +348,27 @@ pub enum EntryTypes {
     StudentResult(StudentResult),
     #[entry_type(required_validations = 1, visibility = "private")]
     ReportCard(ReportCard),
+    #[entry_type(required_validations = 1, visibility = "public")]
+    CredentialDisclosure(CredentialDisclosure),
+    #[entry_type(required_validations = 2, visibility = "public")]
+    ComprehensiveLearnerRecord(ComprehensiveLearnerRecord),
+    #[entry_type(required_validations = 1, visibility = "public")]
+    ZkClaim(ZkClaim),
+}
+
+/// A privacy-preserving claim using zero-knowledge proofs
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct ZkClaim {
+    /// Public commitment (hash of the hidden mastery state)
+    pub commitment: String,
+    /// The specific statement being proven (e.g., "Score > 80%")
+    pub statement: String,
+    /// Reference to the circuit/template used
+    pub circuit_id: String,
+    /// Proof data (Groth16/Plonk bytes)
+    pub proof: Vec<u8>,
+    pub created_at: i64,
 }
 
 /// All link types for this integrity zome
@@ -289,6 +388,14 @@ pub enum LinkTypes {
     StudentToReportCards,
     /// Assessment -> Student results
     AssessmentToResults,
+    /// Links from learner to their Comprehensive Learner Records
+    LearnerToClrs,
+    /// Links from a CLR to its constituent disclosures
+    ClrToDisclosures,
+    /// Links from a private credential to its public disclosures
+    PrivateToDisclosure,
+    /// Links from an ESCO skill code to public disclosures
+    EscoToDisclosures,
 }
 
 /// Validation function for VerifiableCredential entries
@@ -457,10 +564,10 @@ pub fn validate_student_result(result: &StudentResult) -> ExternResult<ValidateC
             "Attempt number must be at least 1".to_string(),
         ));
     }
-    if let Some(cl) = result.consciousness_level_permille {
+    if let Some(cl) = result.cognitive_readiness_permille {
         if cl > 1000 {
             return Ok(ValidateCallbackResult::Invalid(
-                "Consciousness level permille must be 0-1000".to_string(),
+                "Cognitive readiness permille must be 0-1000".to_string(),
             ));
         }
     }

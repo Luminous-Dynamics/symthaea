@@ -1,0 +1,126 @@
+{
+  "metadata": {
+    "title": "Planetary Repair & Carbon Engineering",
+    "framework": "Mycelix Repair",
+    "source": "https://mycelix.org",
+    "grade_level": "Graduate/Expert",
+    "subject_area": "Science",
+    "domain": "Repair",
+    "version": "1.0",
+    "total_standards": 5,
+    "domains": [
+      "Carbon Engineering",
+      "Precision Fermentation",
+      "Marine Remediation"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Closing the macro-cycles of the planet through technical intervention."
+  },
+  "nodes": [
+    {
+      "id": "REPAIR-SCI-101",
+      "title": "Atmospheric Carbon Scrubbing",
+      "description": "Direct Air Capture (DAC) fundamentals. Designing localized scrubbing arrays that convert CO2 into structural carbon using the Mycelix Foundry. (Ref. symthaea-clime).",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Carbon Engineering",
+      "subdomain": "Planetary Repair",
+      "tags": ["carbon-capture", "engineering", "chemistry", "clime"],
+      "estimated_hours": 90,
+      "grade_levels": ["Graduate"],
+      "bloom_level": "Create",
+      "subject_area": "Science"
+    },
+    {
+      "id": "REPAIR-BIO-201",
+      "title": "Precision Fermentation & Caloric Decoupling",
+      "description": "Brewing the future. Designing automated bio-reactors for microbial protein and fat synthesis. Decoupling human caloric needs from land-use constraints.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Precision Fermentation",
+      "subdomain": "Planetary Repair",
+      "tags": ["biotech", "food-security", "fermentation", "microbiology"],
+      "estimated_hours": 120,
+      "grade_levels": ["Graduate"],
+      "bloom_level": "Create",
+      "subject_area": "Science"
+    },
+    {
+      "id": "REPAIR-MAR-301",
+      "title": "Marine Remediation Swarms",
+      "description": "Coordinating autonomous fleets for oceanic healing. Micro-plastic recovery algorithms and reef-stewardship drones. (Ref. symthaea-abyssal).",
+      "node_type": "Course",
+      "difficulty": "Advanced",
+      "domain": "Marine Remediation",
+      "subdomain": "Planetary Repair",
+      "tags": ["ocean", "robotics", "remediation", "abyssal"],
+      "estimated_hours": 90,
+      "grade_levels": ["Graduate"],
+      "bloom_level": "Apply",
+      "subject_area": "Engineering"
+    },
+    {
+      "id": "REPAIR-CHEM-401",
+      "title": "Molecular Sieve Design",
+      "description": "Designing high-efficiency catalytic surfaces for pollutant sequestration. Using the EML backend to model thermodynamic efficiency of capture cycles.",
+      "node_type": "Course",
+      "difficulty": "Expert",
+      "domain": "Carbon Engineering",
+      "subdomain": "Planetary Repair",
+      "tags": ["chemistry", "catalysis", "thermodynamics", "eml"],
+      "estimated_hours": 90,
+      "grade_levels": ["Doctoral"],
+      "bloom_level": "Analyze",
+      "subject_area": "Science"
+    },
+    {
+      "id": "REPAIR-CAP-01",
+      "title": "The Planetary Repair Capstone",
+      "description": "Design and simulate a closed-loop 'Planetary Lung' node. Must achieve net-negative carbon and produce 100% pod-caloric needs without external inputs.",
+      "node_type": "Capstone",
+      "difficulty": "Expert",
+      "domain": "Universal",
+      "subdomain": "Planetary Repair",
+      "tags": ["capstone", "repair", "integration", "sustainability"],
+      "estimated_hours": 360,
+      "grade_levels": ["Professional"],
+      "bloom_level": "Create",
+      "subject_area": "Synthesis",
+      "holonic_capstone": {
+        "required_node_ids": ["REPAIR-SCI-101", "REPAIR-BIO-201", "REPAIR-CHEM-401"],
+        "deliverable": "A verified metabolic audit showing perfect material closure and positive ecological impact.",
+        "min_peer_endorsements": 12
+      },
+      "alignment_vector": {
+        "ahimsa": 995,
+        "reciprocity": 990,
+        "ecological_stewardship": 1000,
+        "thermodynamic_efficiency": 990,
+        "deep_time": 950
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "SCI-MAT-301",
+      "to": "REPAIR-SCI-101",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Advanced carbon materials are the building blocks of efficient scrubbing arrays."
+    },
+    {
+      "from": "SCI-BIO-301",
+      "to": "REPAIR-BIO-201",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Synthetic biology is the prerequisite for designing protein-brewing microbes."
+    },
+    {
+      "from": "REPAIR-SCI-101",
+      "to": "REPAIR-CAP-01",
+      "edge_type": "Requires",
+      "strength_permille": 1000,
+      "rationale": "Planetary repair requires active atmospheric carbon management."
+    }
+  ]
+}

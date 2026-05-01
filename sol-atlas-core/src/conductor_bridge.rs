@@ -94,12 +94,12 @@ pub fn energy_project_to_feature(
     capacity_mw: f64,
 ) -> GeoFeature {
     let color = match project_type {
-        "Solar" => [1.0, 0.9, 0.2, 1.0],      // Yellow
-        "Wind" => [0.4, 0.7, 1.0, 1.0],        // Blue
-        "Hydro" => [0.2, 0.8, 0.9, 1.0],       // Cyan
-        "Nuclear" => [0.8, 0.4, 1.0, 1.0],      // Purple
+        "Solar" => [1.0, 0.9, 0.2, 1.0],          // Yellow
+        "Wind" => [0.4, 0.7, 1.0, 1.0],           // Blue
+        "Hydro" => [0.2, 0.8, 0.9, 1.0],          // Cyan
+        "Nuclear" => [0.8, 0.4, 1.0, 1.0],        // Purple
         "BatteryStorage" => [0.3, 0.9, 0.5, 1.0], // Green
-        _ => [0.7, 0.7, 0.7, 1.0],              // Gray
+        _ => [0.7, 0.7, 0.7, 1.0],                // Gray
     };
 
     let size = (capacity_mw / 100.0).clamp(0.5, 5.0) as f32;

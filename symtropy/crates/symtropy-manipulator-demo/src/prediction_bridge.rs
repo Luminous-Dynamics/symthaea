@@ -117,7 +117,10 @@ mod tests {
         let mag_far = (f_far[0].powi(2) + f_far[1].powi(2) + f_far[2].powi(2)).sqrt();
         let mag_near = (f_near[0].powi(2) + f_near[1].powi(2) + f_near[2].powi(2)).sqrt();
 
-        assert!(mag_near > mag_far, "Closer = stronger force: near={mag_near}, far={mag_far}");
+        assert!(
+            mag_near > mag_far,
+            "Closer = stronger force: near={mag_near}, far={mag_far}"
+        );
     }
 
     #[test]

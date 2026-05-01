@@ -1,5 +1,5 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: Apache-2.0 OR MIT
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! # symtropy
 //!
 //! The Symtropy distribution: an opinionated Bevy bundle for consciousness-

@@ -20,7 +20,7 @@ use std::collections::HashMap;
 use symthaea_core::hdc::ContinuousHV;
 
 use crate::hdc::code_encoder::CodeHDEncoder;
-use crate::language::code_parser::{CodeEntity, ParsedCode};
+use crate::language::code_parser::{Entity, ParsedCode};
 
 /// Phi-inspired code quality score
 #[derive(Debug, Clone)]
@@ -176,7 +176,7 @@ impl PhiCodeAnalyzer {
     }
 
     /// Compute HDC-based cohesion: average pairwise entity similarity
-    fn compute_hdc_cohesion(&self, entities: &[&CodeEntity]) -> f32 {
+    fn compute_hdc_cohesion(&self, entities: &[&Entity]) -> f32 {
         if entities.len() < 2 {
             return 1.0;
         }
@@ -237,7 +237,7 @@ impl PhiCodeAnalyzer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::language::code_parser::{CodeRelation, CodeStructure, EntityKind, Relation, Span};
+    use crate::language::code_parser::{CodeStructure, EntityKind, EntityRelation, Relation, Span};
 
     fn test_span() -> Span {
         Span {
@@ -267,7 +267,7 @@ mod tests {
         let mut parsed = ParsedCode::new("fn main() {}", "rust");
         parsed
             .entities
-            .push(CodeEntity::new(EntityKind::Function, "main", test_span()));
+            .push(Entity::new(EntityKind::Function, "main", test_span()));
 
         let score = analyzer.measure_code_phi(&parsed);
         assert_eq!(score.entity_count, 1);
@@ -280,17 +280,13 @@ mod tests {
 
         // Connected code: A calls B
         let mut connected = ParsedCode::new("", "rust");
-        connected.entities.push(CodeEntity::new(
-            EntityKind::Function,
-            "process",
-            test_span(),
-        ));
-        connected.entities.push(CodeEntity::new(
-            EntityKind::Function,
-            "validate",
-            test_span(),
-        ));
-        connected.structure.relations.push(CodeRelation {
+        connected
+            .entities
+            .push(Entity::new(EntityKind::Function, "process", test_span()));
+        connected
+            .entities
+            .push(Entity::new(EntityKind::Function, "validate", test_span()));
+        connected.structure.relations.push(EntityRelation {
             source: "process".to_string(),
             relation: Relation::Calls,
             target: "validate".to_string(),
@@ -300,10 +296,10 @@ mod tests {
         let mut disconnected = ParsedCode::new("", "rust");
         disconnected
             .entities
-            .push(CodeEntity::new(EntityKind::Function, "foo", test_span()));
+            .push(Entity::new(EntityKind::Function, "foo", test_span()));
         disconnected
             .entities
-            .push(CodeEntity::new(EntityKind::Struct, "Bar", test_span()));
+            .push(Entity::new(EntityKind::Struct, "Bar", test_span()));
 
         let connected_phi = analyzer.measure_code_phi(&connected);
         let disconnected_phi = analyzer.measure_code_phi(&disconnected);
@@ -325,20 +321,20 @@ mod tests {
         let mut before = ParsedCode::new("", "rust");
         before
             .entities
-            .push(CodeEntity::new(EntityKind::Function, "a", test_span()));
+            .push(Entity::new(EntityKind::Function, "a", test_span()));
         before
             .entities
-            .push(CodeEntity::new(EntityKind::Function, "b", test_span()));
+            .push(Entity::new(EntityKind::Function, "b", test_span()));
 
         // After: connected (a calls b)
         let mut after = ParsedCode::new("", "rust");
         after
             .entities
-            .push(CodeEntity::new(EntityKind::Function, "a", test_span()));
+            .push(Entity::new(EntityKind::Function, "a", test_span()));
         after
             .entities
-            .push(CodeEntity::new(EntityKind::Function, "b", test_span()));
-        after.structure.relations.push(CodeRelation {
+            .push(Entity::new(EntityKind::Function, "b", test_span()));
+        after.structure.relations.push(EntityRelation {
             source: "a".to_string(),
             relation: Relation::Calls,
             target: "b".to_string(),

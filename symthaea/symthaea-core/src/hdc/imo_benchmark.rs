@@ -25,8 +25,7 @@
 
 use crate::hdc::barycentric::{centroid, circumcenter};
 use crate::hdc::combinatorial::{
-    find_linear_invariant, find_linear_monovariant, pigeonhole_apply,
-    pigeonhole_min_max_bucket,
+    find_linear_invariant, find_linear_monovariant, pigeonhole_apply, pigeonhole_min_max_bucket,
 };
 use crate::hdc::computational_geometry::Point2D;
 use crate::hdc::diophantine::pell_equation;
@@ -90,7 +89,10 @@ pub fn problem_01_pigeonhole_mod_6() -> (BenchProblem, BenchResult) {
             None => (p, BenchResult::Unsolved("witness check failed".into())),
         }
     } else {
-        (p, BenchResult::Unsolved(format!("min_max = {}, not 2", min_max)))
+        (
+            p,
+            BenchResult::Unsolved(format!("min_max = {}, not 2", min_max)),
+        )
     }
 }
 
@@ -111,7 +113,10 @@ pub fn problem_02_pell_d13() -> (BenchProblem, BenchResult) {
             if x == 649 && y == 180 && sol.verify(x, y) {
                 (p, BenchResult::Solved)
             } else {
-                (p, BenchResult::Unsolved(format!("unexpected fundamental ({}, {})", x, y)))
+                (
+                    p,
+                    BenchResult::Unsolved(format!("unexpected fundamental ({}, {})", x, y)),
+                )
             }
         }
         None => (p, BenchResult::Unsolved("Pell returned None".into())),
@@ -189,9 +194,7 @@ pub fn problem_04_inscribed_angle() -> (BenchProblem, BenchResult) {
     } else {
         (
             p,
-            BenchResult::Unsolved(
-                "saturation did not derive AngleEq(B,A,C,B,D,C)".into(),
-            ),
+            BenchResult::Unsolved("saturation did not derive AngleEq(B,A,C,B,D,C)".into()),
         )
     }
 }
@@ -209,7 +212,11 @@ pub fn problem_05_amgm_chain() -> (BenchProblem, BenchResult) {
     };
     let xs = [1.0, 2.0, 4.0];
     let hm = xs.len() as f64 / xs.iter().map(|x| 1.0 / x).sum::<f64>();
-    let gm = xs.iter().copied().product::<f64>().powf(1.0 / xs.len() as f64);
+    let gm = xs
+        .iter()
+        .copied()
+        .product::<f64>()
+        .powf(1.0 / xs.len() as f64);
     let am = xs.iter().sum::<f64>() / xs.len() as f64;
     if hm <= gm + 1e-9 && gm <= am + 1e-9 && amgm_holds(&xs) {
         (p, BenchResult::Solved)
@@ -231,7 +238,8 @@ pub fn problem_06_cauchy_schwarz_gap() -> (BenchProblem, BenchResult) {
         name: "Cauchy-Schwarz on (1,2,3), (4,5,6) with slack",
         difficulty: Difficulty::Easy,
         domain: "Inequalities",
-        description: "Verify C-S and quantify slack (non-zero because vectors aren't proportional).",
+        description:
+            "Verify C-S and quantify slack (non-zero because vectors aren't proportional).",
     };
     let a = [1.0, 2.0, 3.0];
     let b = [4.0, 5.0, 6.0];
@@ -246,7 +254,10 @@ pub fn problem_06_cauchy_schwarz_gap() -> (BenchProblem, BenchResult) {
     if (slack - 54.0).abs() < 1e-9 {
         (p, BenchResult::Solved)
     } else {
-        (p, BenchResult::Unsolved(format!("slack = {}, expected 54", slack)))
+        (
+            p,
+            BenchResult::Unsolved(format!("slack = {}, expected 54", slack)),
+        )
     }
 }
 
@@ -270,11 +281,17 @@ pub fn problem_07_crt_plus_qr() -> (BenchProblem, BenchResult) {
         None => return (p, BenchResult::Unsolved("CRT failed".into())),
     };
     if x != 17 || m != 20 {
-        return (p, BenchResult::Unsolved(format!("CRT got ({}, {}), expected (17, 20)", x, m)));
+        return (
+            p,
+            BenchResult::Unsolved(format!("CRT got ({}, {}), expected (17, 20)", x, m)),
+        );
     }
     let leg = engine.legendre_symbol(x, 11);
     if leg != -1 {
-        return (p, BenchResult::Unsolved(format!("(17/11) = {}, expected -1", leg)));
+        return (
+            p,
+            BenchResult::Unsolved(format!("(17/11) = {}, expected -1", leg)),
+        );
     }
     (p, BenchResult::Solved)
 }
@@ -332,7 +349,10 @@ pub fn problem_09_triangle_centers() -> (BenchProblem, BenchResult) {
     } else {
         (
             p,
-            BenchResult::Unsolved(format!("O = ({:.3}, {:.3}), G = ({:.3}, {:.3})", o.x, o.y, g.x, g.y)),
+            BenchResult::Unsolved(format!(
+                "O = ({:.3}, {:.3}), G = ({:.3}, {:.3})",
+                o.x, o.y, g.x, g.y
+            )),
         )
     }
 }
@@ -370,9 +390,7 @@ pub fn problem_10_schur_numerical() -> (BenchProblem, BenchResult) {
     if failed {
         (
             p,
-            BenchResult::Unsolved(
-                "Schur violated on grid — unexpected; primitive bug?".into(),
-            ),
+            BenchResult::Unsolved("Schur violated on grid — unexpected; primitive bug?".into()),
         )
     } else {
         // Numerical verification succeeded on 125 points. This is a
@@ -524,7 +542,10 @@ mod tests {
 
         eprintln!("\n════════════════════════════════════════════════════════════");
         eprintln!("  IMO BENCHMARK — WHAT CAN THE PRIMITIVE LIBRARY SOLVE?");
-        eprintln!("  {} problems across 4 difficulty tiers × 5 domains", results.len());
+        eprintln!(
+            "  {} problems across 4 difficulty tiers × 5 domains",
+            results.len()
+        );
         eprintln!("════════════════════════════════════════════════════════════");
 
         let mut by_difficulty: std::collections::HashMap<Difficulty, (usize, usize)> =
@@ -579,10 +600,12 @@ mod tests {
             let (s, t) = by_domain[*d];
             eprintln!("  {:20}: {}/{} solved", d, s, t);
         }
-        eprintln!("\n  OVERALL: {}/{} solved ({:.1}%)",
-                  total_solved,
-                  results.len(),
-                  total_solved as f64 / results.len() as f64 * 100.0);
+        eprintln!(
+            "\n  OVERALL: {}/{} solved ({:.1}%)",
+            total_solved,
+            results.len(),
+            total_solved as f64 / results.len() as f64 * 100.0
+        );
         eprintln!("════════════════════════════════════════════════════════════");
 
         // Require ≥ 80% solve rate — anything less would signal a real

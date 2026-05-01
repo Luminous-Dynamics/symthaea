@@ -15,13 +15,13 @@
 //! Run: cargo run --example information_asymmetry --release
 
 use nalgebra::SVector;
-use symtropy_consciousness_physics::convergence::{mann_whitney_u, cohens_d};
+use symthaea_consciousness_equation::ConsciousnessInputs;
+use symtropy_consciousness_physics::convergence::{cohens_d, mann_whitney_u};
 use symtropy_consciousness_physics::fep_gradient;
 use symtropy_consciousness_physics::harmony_field::HarmonyField;
 use symtropy_consciousness_physics::{ConsciousnessField, ThermodynamicConstants};
 use symtropy_math::Point;
 use symtropy_physics::PhysicsWorld;
-use symthaea_consciousness_equation::ConsciousnessInputs;
 
 const AGENTS: usize = 20;
 const SCOUTS: usize = 4;
@@ -39,13 +39,17 @@ const HARMONY_PROFILES: [[f64; 9]; 4] = [
 ];
 
 #[derive(Clone, Copy)]
-enum InfoCondition { Equal, Scouts, Blind }
+enum InfoCondition {
+    Equal,
+    Scouts,
+    Blind,
+}
 
 struct InfoResult {
     condition: &'static str,
     alive: f64,
-    special_alive: f64,   // scout/blind survival rate
-    normal_alive: f64,    // normal agents survival rate
+    special_alive: f64, // scout/blind survival rate
+    normal_alive: f64,  // normal agents survival rate
     energy: f64,
     clustering: f64,
 }
@@ -76,8 +80,14 @@ fn run_experiment(condition: InfoCondition, seed: u64) -> InfoResult {
         let x = (rng_f64(&mut rng) - 0.5) * 60.0; // start clustered near center
         let y = (rng_f64(&mut rng) - 0.5) * 60.0;
         let h = world.add_sphere(Point::new([x, y]), 1.0, 1.0);
-        if let Some(b) = world.body_mut(h) { b.linear_damping = 0.05; }
-        consciousness.register(h, consciousness.constants.initial_energy, consciousness.constants.harmony_range);
+        if let Some(b) = world.body_mut(h) {
+            b.linear_damping = 0.05;
+        }
+        consciousness.register(
+            h,
+            consciousness.constants.initial_energy,
+            consciousness.constants.harmony_range,
+        );
         if let Some(e) = consciousness.entities.get_mut(&h) {
             e.harmony_activations = HARMONY_PROFILES[i % 4];
         }
@@ -85,8 +95,20 @@ fn run_experiment(condition: InfoCondition, seed: u64) -> InfoResult {
 
         let sight = match condition {
             InfoCondition::Equal => NORMAL_WELL_RANGE,
-            InfoCondition::Scouts => if i < SCOUTS { SCOUT_WELL_RANGE } else { NORMAL_WELL_RANGE },
-            InfoCondition::Blind => if i < SCOUTS { 0.0 } else { NORMAL_WELL_RANGE },
+            InfoCondition::Scouts => {
+                if i < SCOUTS {
+                    SCOUT_WELL_RANGE
+                } else {
+                    NORMAL_WELL_RANGE
+                }
+            }
+            InfoCondition::Blind => {
+                if i < SCOUTS {
+                    0.0
+                } else {
+                    NORMAL_WELL_RANGE
+                }
+            }
         };
         well_sight.push(sight);
     }
@@ -105,56 +127,104 @@ fn run_experiment(condition: InfoCondition, seed: u64) -> InfoResult {
             let ht = e.map(|e| e.total_harmony_energy()).unwrap_or(0.0);
             let collapsed = e.map(|e| e.energy.is_collapsed()).unwrap_or(true);
             let inputs = if collapsed {
-                ConsciousnessInputs { phi: 0.0, broadcast: 0.0, working_memory: 0.0,
-                    attention: 0.0, recurrence: 0.0, embodiment: 0.0, knowledge: 0.0, synchrony: 0.0 }
+                ConsciousnessInputs {
+                    phi: 0.0,
+                    broadcast: 0.0,
+                    working_memory: 0.0,
+                    attention: 0.0,
+                    recurrence: 0.0,
+                    embodiment: 0.0,
+                    knowledge: 0.0,
+                    synchrony: 0.0,
+                }
             } else {
                 ConsciousnessInputs {
-                    phi: ef, broadcast: 0.5, working_memory: (1.0 - pe).max(0.0),
-                    attention: 0.5, recurrence: 1.0, embodiment: 0.7,
-                    knowledge: (ht / 8.0).min(1.0), synchrony: consciousness.collective_phi.max(0.5),
+                    phi: ef,
+                    broadcast: 0.5,
+                    working_memory: (1.0 - pe).max(0.0),
+                    attention: 0.5,
+                    recurrence: 1.0,
+                    embodiment: 0.7,
+                    knowledge: (ht / 8.0).min(1.0),
+                    synchrony: consciousness.collective_phi.max(0.5),
                 }
             };
             consciousness.update_entity(h, &inputs, Point::origin());
         }
 
-        let adata: Vec<_> = handles.iter().filter_map(|&h| {
-            Some((world.body(h)?.position().0, consciousness.entities.get(&h)?.harmony_activations))
-        }).collect();
+        let adata: Vec<_> = handles
+            .iter()
+            .filter_map(|&h| {
+                Some((
+                    world.body(h)?.position().0,
+                    consciousness.entities.get(&h)?.harmony_activations,
+                ))
+            })
+            .collect();
 
         // Each agent sees wells based on THEIR sight range
         for (idx, &h) in handles.iter().enumerate() {
             let Some(b) = world.body(h) else { continue };
-            let Some(e) = consciousness.entities.get(&h) else { continue };
-            if e.energy.is_collapsed() { continue; }
+            let Some(e) = consciousness.entities.get(&h) else {
+                continue;
+            };
+            if e.energy.is_collapsed() {
+                continue;
+            }
             let pos = b.position().0;
             let sight = well_sight[idx];
 
             // Filter wells by this agent's sight range
-            let wdata: Vec<_> = wells.iter().zip(well_remaining.iter())
+            let wdata: Vec<_> = wells
+                .iter()
+                .zip(well_remaining.iter())
                 .filter(|(w, &r)| r > 0.0 && (pos - *w).norm() < sight)
                 .map(|(&p, &r)| (p, (r / 2000.0).min(1.0)))
                 .collect();
 
-            let near: Vec<_> = adata.iter().filter(|(p, _)| {
-                let d = (p - pos).norm(); d > 2.0 && d < consciousness.constants.harmony_range
-            }).cloned().collect();
-            let dir = fep_gradient::free_energy_gradient(&pos, e.energy.fraction_remaining(),
-                &e.harmony_activations, &near, &wdata, None, 0.0);
-            if let Some(b) = world.body_mut(h) { b.linear_velocity = dir * 20.0; }
+            let near: Vec<_> = adata
+                .iter()
+                .filter(|(p, _)| {
+                    let d = (p - pos).norm();
+                    d > 2.0 && d < consciousness.constants.harmony_range
+                })
+                .cloned()
+                .collect();
+            let dir = fep_gradient::free_energy_gradient(
+                &pos,
+                e.energy.fraction_remaining(),
+                &e.harmony_activations,
+                &near,
+                &wdata,
+                None,
+                0.0,
+            );
+            if let Some(b) = world.body_mut(h) {
+                b.linear_velocity = dir * 20.0;
+            }
         }
 
         let rm = consciousness.resource_regeneration_multiplier();
         let mr = consciousness.constants.consciousness_maintenance_per_tick;
         let ar = consciousness.constants.ambient_regen_rate;
         let wr = consciousness.constants.energy_well_regen_rate;
-        let nw: Vec<Option<usize>> = handles.iter().map(|&h| {
-            world.body(h).and_then(|b| {
-                let pos = b.position().0;
-                wells.iter().enumerate().find(|(i, &w)| (pos - w).norm() < 35.0 && well_remaining[*i] > 0.0).map(|(i,_)| i)
+        let nw: Vec<Option<usize>> = handles
+            .iter()
+            .map(|&h| {
+                world.body(h).and_then(|b| {
+                    let pos = b.position().0;
+                    wells
+                        .iter()
+                        .enumerate()
+                        .find(|(i, &w)| (pos - w).norm() < 35.0 && well_remaining[*i] > 0.0)
+                        .map(|(i, _)| i)
+                })
             })
-        }).collect();
+            .collect();
         for (idx, &h) in handles.iter().enumerate() {
-            if let Some(e) = consciousness.entities.get_mut(&h) { e.energy.tick_reset(); }
+            if let Some(e) = consciousness.entities.get_mut(&h) {
+                e.energy.tick_reset();
+            }
             consciousness.consume_energy(h, mr * (1.0 + consciousness.phi(h) * 0.5));
             if let Some(e) = consciousness.entities.get_mut(&h) {
                 e.energy.regenerate(ar * rm);
@@ -167,21 +237,34 @@ fn run_experiment(condition: InfoCondition, seed: u64) -> InfoResult {
         }
 
         for i in 0..handles.len() {
-            for j in (i+1)..handles.len() {
+            for j in (i + 1)..handles.len() {
                 let (ha, hb) = (handles[i], handles[j]);
                 let in_range = match (world.body(ha), world.body(hb)) {
-                    (Some(a), Some(b)) => a.position().distance(b.position()) < consciousness.constants.harmony_range,
+                    (Some(a), Some(b)) => {
+                        a.position().distance(b.position()) < consciousness.constants.harmony_range
+                    }
                     _ => false,
                 };
-                if !in_range { continue; }
-                let (a, b) = match (consciousness.entities.get(&ha), consciousness.entities.get(&hb)) {
-                    (Some(a), Some(b)) => (a.harmony_activations, b.harmony_activations), _ => continue,
+                if !in_range {
+                    continue;
+                }
+                let (a, b) = match (
+                    consciousness.entities.get(&ha),
+                    consciousness.entities.get(&hb),
+                ) {
+                    (Some(a), Some(b)) => (a.harmony_activations, b.harmony_activations),
+                    _ => continue,
                 };
                 let res = HarmonyField::<2>::resonance(&a, &b);
                 if res > 0.5 {
-                    let rg = consciousness.constants.harmony_resonance_regen_rate * (res - 0.5) * 2.0;
-                    if let Some(e) = consciousness.entities.get_mut(&ha) { e.energy.regenerate(rg); }
-                    if let Some(e) = consciousness.entities.get_mut(&hb) { e.energy.regenerate(rg); }
+                    let rg =
+                        consciousness.constants.harmony_resonance_regen_rate * (res - 0.5) * 2.0;
+                    if let Some(e) = consciousness.entities.get_mut(&ha) {
+                        e.energy.regenerate(rg);
+                    }
+                    if let Some(e) = consciousness.entities.get_mut(&hb) {
+                        e.energy.regenerate(rg);
+                    }
                 }
             }
         }
@@ -191,20 +274,54 @@ fn run_experiment(condition: InfoCondition, seed: u64) -> InfoResult {
         consciousness.tick_thermodynamics();
     }
 
-    let alive = handles.iter().filter(|h| consciousness.entities.get(h).map(|e| !e.energy.is_collapsed()).unwrap_or(false)).count() as f64;
-    let energy = handles.iter().filter_map(|h| consciousness.entities.get(h).map(|e| e.energy.available)).sum::<f64>() / AGENTS as f64;
+    let alive = handles
+        .iter()
+        .filter(|h| {
+            consciousness
+                .entities
+                .get(h)
+                .map(|e| !e.energy.is_collapsed())
+                .unwrap_or(false)
+        })
+        .count() as f64;
+    let energy = handles
+        .iter()
+        .filter_map(|h| consciousness.entities.get(h).map(|e| e.energy.available))
+        .sum::<f64>()
+        / AGENTS as f64;
 
     // Special agents survival (first SCOUTS agents)
-    let special_alive = (0..SCOUTS).filter(|&i| {
-        consciousness.entities.get(&handles[i]).map(|e| !e.energy.is_collapsed()).unwrap_or(false)
-    }).count() as f64 / SCOUTS as f64;
-    let normal_alive = (SCOUTS..AGENTS).filter(|&i| {
-        consciousness.entities.get(&handles[i]).map(|e| !e.energy.is_collapsed()).unwrap_or(false)
-    }).count() as f64 / (AGENTS - SCOUTS) as f64;
+    let special_alive = (0..SCOUTS)
+        .filter(|&i| {
+            consciousness
+                .entities
+                .get(&handles[i])
+                .map(|e| !e.energy.is_collapsed())
+                .unwrap_or(false)
+        })
+        .count() as f64
+        / SCOUTS as f64;
+    let normal_alive = (SCOUTS..AGENTS)
+        .filter(|&i| {
+            consciousness
+                .entities
+                .get(&handles[i])
+                .map(|e| !e.energy.is_collapsed())
+                .unwrap_or(false)
+        })
+        .count() as f64
+        / (AGENTS - SCOUTS) as f64;
 
     let clustering = avg_nn(&world, &handles);
 
-    InfoResult { condition: cond_name, alive, special_alive, normal_alive, energy, clustering }
+    InfoResult {
+        condition: cond_name,
+        alive,
+        special_alive,
+        normal_alive,
+        energy,
+        clustering,
+    }
 }
 
 fn main() {
@@ -227,15 +344,19 @@ fn main() {
             let seed = 42 + s as u64 * 997;
             eprintln!("  {name} seed={seed}...");
             let r = run_experiment(cond, seed);
-            println!("{},{seed},{:.1},{:.3},{:.3},{:.1},{:.2}",
-                r.condition, r.alive, r.special_alive, r.normal_alive, r.energy, r.clustering);
+            println!(
+                "{},{seed},{:.1},{:.3},{:.3},{:.1},{:.2}",
+                r.condition, r.alive, r.special_alive, r.normal_alive, r.energy, r.clustering
+            );
             results.push(r);
         }
         let n = results.len() as f64;
-        eprintln!("  → {name}: alive={:.1}/{AGENTS}, special={:.0}%, normal={:.0}%",
+        eprintln!(
+            "  → {name}: alive={:.1}/{AGENTS}, special={:.0}%, normal={:.0}%",
             results.iter().map(|r| r.alive).sum::<f64>() / n,
             results.iter().map(|r| r.special_alive).sum::<f64>() / n * 100.0,
-            results.iter().map(|r| r.normal_alive).sum::<f64>() / n * 100.0);
+            results.iter().map(|r| r.normal_alive).sum::<f64>() / n * 100.0
+        );
         all_results.push((name, results));
     }
 
@@ -243,12 +364,14 @@ fn main() {
     eprintln!("  Condition      Total Alive  Special%  Normal%   Energy");
     for (name, results) in &all_results {
         let n = results.len() as f64;
-        eprintln!("  {:13} {:5.1}       {:5.0}%    {:5.0}%    {:5.1}J",
+        eprintln!(
+            "  {:13} {:5.1}       {:5.0}%    {:5.0}%    {:5.1}J",
             name,
             results.iter().map(|r| r.alive).sum::<f64>() / n,
             results.iter().map(|r| r.special_alive).sum::<f64>() / n * 100.0,
             results.iter().map(|r| r.normal_alive).sum::<f64>() / n * 100.0,
-            results.iter().map(|r| r.energy).sum::<f64>() / n);
+            results.iter().map(|r| r.energy).sum::<f64>() / n
+        );
     }
 
     // Key test: do scouts benefit the group?
@@ -261,18 +384,56 @@ fn main() {
         let (_, _, p2) = mann_whitney_u(&equal_alive, &blind_alive);
         let d2 = cohens_d(&equal_alive, &blind_alive);
         eprintln!("\n── EQUAL vs SCOUTS ──");
-        eprintln!("  p={p1:.4}, d={d1:.3} ({})", if d1.abs() > 0.8 { "large" } else if d1.abs() > 0.5 { "medium" } else { "small" });
+        eprintln!(
+            "  p={p1:.4}, d={d1:.3} ({})",
+            if d1.abs() > 0.8 {
+                "large"
+            } else if d1.abs() > 0.5 {
+                "medium"
+            } else {
+                "small"
+            }
+        );
         eprintln!("\n── EQUAL vs BLIND ──");
-        eprintln!("  p={p2:.4}, d={d2:.3} ({})", if d2.abs() > 0.8 { "large" } else if d2.abs() > 0.5 { "medium" } else { "small" });
+        eprintln!(
+            "  p={p2:.4}, d={d2:.3} ({})",
+            if d2.abs() > 0.8 {
+                "large"
+            } else if d2.abs() > 0.5 {
+                "medium"
+            } else {
+                "small"
+            }
+        );
     }
 
     eprintln!("\n=== Complete ===");
 }
 
 fn avg_nn(world: &PhysicsWorld<2>, handles: &[symtropy_physics::BodyHandle]) -> f64 {
-    let pos: Vec<SVector<f64, 2>> = handles.iter().filter_map(|h| world.body(*h).map(|b| b.position().0)).collect();
-    if pos.len() < 2 { return f64::MAX; }
-    pos.iter().enumerate().map(|(i, p)| pos.iter().enumerate().filter(|(j,_)| *j!=i).map(|(_,q)| (p-q).norm()).fold(f64::MAX, f64::min)).sum::<f64>() / pos.len() as f64
+    let pos: Vec<SVector<f64, 2>> = handles
+        .iter()
+        .filter_map(|h| world.body(*h).map(|b| b.position().0))
+        .collect();
+    if pos.len() < 2 {
+        return f64::MAX;
+    }
+    pos.iter()
+        .enumerate()
+        .map(|(i, p)| {
+            pos.iter()
+                .enumerate()
+                .filter(|(j, _)| *j != i)
+                .map(|(_, q)| (p - q).norm())
+                .fold(f64::MAX, f64::min)
+        })
+        .sum::<f64>()
+        / pos.len() as f64
 }
 
-fn rng_f64(s: &mut u64) -> f64 { *s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407); (*s >> 11) as f64 / (1u64 << 53) as f64 }
+fn rng_f64(s: &mut u64) -> f64 {
+    *s = s
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
+    (*s >> 11) as f64 / (1u64 << 53) as f64
+}

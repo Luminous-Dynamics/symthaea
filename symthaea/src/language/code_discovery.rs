@@ -68,6 +68,8 @@ pub struct DiscoveryResult {
     pub found: bool,
     /// The discovered source code (if found)
     pub source: Option<String>,
+    /// Whether evaluation was simulated instead of actually compiled/tested
+    pub simulated_execution: bool,
     /// Fitness of the best candidate
     pub best_fitness: f32,
     /// Number of generations evolved
@@ -128,6 +130,18 @@ impl CodeDiscovery {
         test_source: &str,
         executor: &mut CodeExecutor,
     ) -> DiscoveryResult {
+        if self.config.use_compilation_fitness && !executor.supports_real_execution() {
+            return DiscoveryResult {
+                found: false,
+                source: None,
+                simulated_execution: true,
+                best_fitness: 0.0,
+                generations: 0,
+                compiled_count: 0,
+                total_evaluated: 0,
+            };
+        }
+
         // Encode the intent
         let intent_hv = self.encoder.encode_name(purpose);
 
@@ -161,7 +175,20 @@ impl CodeDiscovery {
                 // Evaluate fitness
                 if self.config.use_compilation_fitness && !test_source.is_empty() {
                     let full_source = format!("{}\n\n{}", code, test_source);
-                    let result = executor.execute_rust_with_inline_tests(&full_source);
+                    let mut result = executor.execute_rust_with_inline_tests(&full_source);
+                    result.parse_test_failures();
+
+                    if result.simulated {
+                        return DiscoveryResult {
+                            found: false,
+                            source: None,
+                            simulated_execution: true,
+                            best_fitness: 0.0,
+                            generations: gen + 1,
+                            compiled_count,
+                            total_evaluated,
+                        };
+                    }
 
                     candidate.fitness = compute_rich_fitness(&result);
                     if result.compiled {
@@ -183,7 +210,10 @@ impl CodeDiscovery {
                     // Register discovery in decoder for future use
                     if let Some(ref code) = candidate.code {
                         self.decoder.register_discovery(
-                            &format!("discovered_{}", purpose.chars().take(20).collect::<String>()),
+                            &format!(
+                                "discovered_{}",
+                                purpose.chars().take(20).collect::<String>()
+                            ),
                             code,
                         );
                     }
@@ -191,6 +221,7 @@ impl CodeDiscovery {
                     return DiscoveryResult {
                         found: true,
                         source: candidate.code.clone(),
+                        simulated_execution: false,
                         best_fitness: 1.0,
                         generations: gen + 1,
                         compiled_count,
@@ -211,6 +242,7 @@ impl CodeDiscovery {
             } else {
                 None
             },
+            simulated_execution: false,
             best_fitness,
             generations: self.config.max_generations,
             compiled_count,
@@ -219,7 +251,12 @@ impl CodeDiscovery {
     }
 
     /// Seed the initial population from fragment compositions.
-    fn seed_population(&self, intent_hv: &ContinuousHV, param_type: &str, return_type: &str) -> Vec<Candidate> {
+    fn seed_population(
+        &self,
+        intent_hv: &ContinuousHV,
+        param_type: &str,
+        return_type: &str,
+    ) -> Vec<Candidate> {
         let mut pop = Vec::with_capacity(self.config.population_size);
 
         // Seed 1: The intent HV itself
@@ -240,9 +277,15 @@ impl CodeDiscovery {
         }
 
         // Seed 6+: Random compositions of fragments
-        let sources = self.decoder.top_in_category(intent_hv, FragmentCategory::IteratorSource, 3);
-        let adapters = self.decoder.top_in_category(intent_hv, FragmentCategory::IteratorAdapter, 5);
-        let terminals = self.decoder.top_in_category(intent_hv, FragmentCategory::IteratorTerminal, 3);
+        let sources = self
+            .decoder
+            .top_in_category(intent_hv, FragmentCategory::IteratorSource, 3);
+        let adapters =
+            self.decoder
+                .top_in_category(intent_hv, FragmentCategory::IteratorAdapter, 5);
+        let terminals =
+            self.decoder
+                .top_in_category(intent_hv, FragmentCategory::IteratorTerminal, 3);
 
         // Compose: each source × each adapter × each terminal
         for (_, src) in &sources {
@@ -252,11 +295,7 @@ impl CodeDiscovery {
                         break;
                     }
                     // Bundle the three fragments into a composite HV
-                    let composite = ContinuousHV::bundle(&[
-                        &src.hv,
-                        &adp.hv,
-                        &trm.hv,
-                    ]);
+                    let composite = ContinuousHV::bundle(&[&src.hv, &adp.hv, &trm.hv]);
                     pop.push(Candidate {
                         hv: composite,
                         code: None,
@@ -269,7 +308,9 @@ impl CodeDiscovery {
         // Fill remaining with random perturbations of intent
         while pop.len() < self.config.population_size {
             let seed = pop.len() as u64;
-            let perturbed = intent_hv.add(&ContinuousHV::random(intent_hv.dim(), seed).scale(0.2)).normalize();
+            let perturbed = intent_hv
+                .add(&ContinuousHV::random(intent_hv.dim(), seed).scale(0.2))
+                .normalize();
             pop.push(Candidate {
                 hv: perturbed,
                 code: None,
@@ -291,7 +332,10 @@ impl CodeDiscovery {
         purpose: &str,
     ) -> String {
         // Try iterator chain decoding first
-        if let Some(chain) = self.decoder.decode_iterator_chain(hv, param_type, return_type) {
+        if let Some(chain) = self
+            .decoder
+            .decode_iterator_chain(hv, param_type, return_type)
+        {
             // Replace generic "input" with actual param name
             let body = chain.replace("input", param_name).replace("v", param_name);
             return format!("{} {{\n    {}\n}}", signature, body);
@@ -320,7 +364,11 @@ impl CodeDiscovery {
     /// Evolve population: select, crossover, mutate.
     fn evolve_generation(&self, mut population: Vec<Candidate>) -> Vec<Candidate> {
         // Sort by fitness descending
-        population.sort_by(|a, b| b.fitness.partial_cmp(&a.fitness).unwrap_or(std::cmp::Ordering::Equal));
+        population.sort_by(|a, b| {
+            b.fitness
+                .partial_cmp(&a.fitness)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         let mut next_gen = Vec::with_capacity(self.config.population_size);
 
@@ -352,8 +400,12 @@ impl CodeDiscovery {
             let child_hv = if frac < self.config.crossover_rate {
                 // Blend parents
                 let alpha = 0.3 + frac * 0.4; // [0.3, 0.7]
-                // Weighted blend: alpha * parent1 + (1-alpha) * parent2
-                parent1.hv.scale(alpha).add(&parent2.hv.scale(1.0 - alpha)).normalize()
+                                              // Weighted blend: alpha * parent1 + (1-alpha) * parent2
+                parent1
+                    .hv
+                    .scale(alpha)
+                    .add(&parent2.hv.scale(1.0 - alpha))
+                    .normalize()
             } else {
                 parent1.hv.clone()
             };
@@ -363,7 +415,9 @@ impl CodeDiscovery {
             let mut_frac = (seed >> 33) as f32 / u32::MAX as f32;
             let child_hv = if mut_frac < self.config.mutation_rate {
                 // Perturb: add small random noise
-                    child_hv.add(&ContinuousHV::random(child_hv.dim(), seed).scale(0.15)).normalize()
+                child_hv
+                    .add(&ContinuousHV::random(child_hv.dim(), seed).scale(0.15))
+                    .normalize()
             } else {
                 child_hv
             };
@@ -407,13 +461,17 @@ fn compute_rich_fitness(result: &ExecutionResult) -> f32 {
         let compilation_closeness = 0.05 + 0.10 / (error_count as f32);
 
         // Bonus for fixable errors (type mismatches are easier than missing functions)
-        let fixable_count = result.compile_errors.iter().filter(|e| {
-            e.contains("E0308") // type mismatch
+        let fixable_count = result
+            .compile_errors
+            .iter()
+            .filter(|e| {
+                e.contains("E0308") // type mismatch
                 || e.contains("E0277") // trait bound
                 || e.contains("E0106") // lifetime
                 || e.contains("mismatched types")
                 || e.contains("expected")
-        }).count();
+            })
+            .count();
 
         let fixability_bonus = if error_count > 0 {
             (fixable_count as f32 / error_count as f32) * 0.05
@@ -442,17 +500,21 @@ fn compute_rich_fitness(result: &ExecutionResult) -> f32 {
     // Bonus for test failures that are CLOSE to correct
     // (e.g., expected=6, actual=5 is better than expected=6, actual=42)
     let closeness_bonus = if !result.test_failures.is_empty() {
-        let close_failures = result.test_failures.iter().filter(|f| {
-            // Check if expected and actual are numerically close
-            if let (Some(exp), Some(act)) = (&f.expected, &f.actual) {
-                if let (Ok(e), Ok(a)) = (exp.parse::<f64>(), act.parse::<f64>()) {
-                    let distance = (e - a).abs();
-                    let scale = e.abs().max(1.0);
-                    return distance / scale < 0.5; // Within 50% of expected
+        let close_failures = result
+            .test_failures
+            .iter()
+            .filter(|f| {
+                // Check if expected and actual are numerically close
+                if let (Some(exp), Some(act)) = (&f.expected, &f.actual) {
+                    if let (Ok(e), Ok(a)) = (exp.parse::<f64>(), act.parse::<f64>()) {
+                        let distance = (e - a).abs();
+                        let scale = e.abs().max(1.0);
+                        return distance / scale < 0.5; // Within 50% of expected
+                    }
                 }
-            }
-            false
-        }).count();
+                false
+            })
+            .count();
         (close_failures as f32 / result.test_failures.len().max(1) as f32) * 0.05
     } else {
         0.0
@@ -470,6 +532,27 @@ mod tests {
         let config = DiscoveryConfig::default();
         assert_eq!(config.population_size, 30);
         assert_eq!(config.max_generations, 20);
+    }
+
+    #[test]
+    fn test_discover_rejects_simulated_execution() {
+        let mut discovery = CodeDiscovery::new(512);
+        let mut executor = CodeExecutor::new();
+
+        let result = discovery.discover(
+            "sum numbers",
+            "fn sum_numbers(input: &[i32]) -> i32",
+            "input",
+            "&[i32]",
+            "i32",
+            "#[cfg(test)]\nmod tests {\n    use super::*;\n    #[test]\n    fn smoke() { assert_eq!(sum_numbers(&[1,2,3]), 6); }\n}",
+            &mut executor,
+        );
+
+        assert!(!result.found);
+        assert!(result.simulated_execution);
+        assert_eq!(result.best_fitness, 0.0);
+        assert_eq!(result.total_evaluated, 0);
     }
 
     #[test]

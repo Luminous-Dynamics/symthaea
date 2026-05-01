@@ -73,14 +73,20 @@ impl BlsKeypair {
         rand::RngCore::fill_bytes(&mut rand::rngs::OsRng, &mut ikm);
         let secret_key = SecretKey::key_gen(&ikm, &[]).expect("valid ikm");
         let public_key = secret_key.sk_to_pk();
-        Self { secret_key, public_key }
+        Self {
+            secret_key,
+            public_key,
+        }
     }
 
     /// Create keypair from seed bytes
     pub fn from_seed(seed: &[u8; 32]) -> Self {
         let secret_key = SecretKey::key_gen(seed, &[]).expect("valid seed");
         let public_key = secret_key.sk_to_pk();
-        Self { secret_key, public_key }
+        Self {
+            secret_key,
+            public_key,
+        }
     }
 
     /// Get the public key
@@ -149,14 +155,12 @@ impl BlsPublicKey {
     /// Verify proof of possession
     #[cfg(feature = "bls")]
     pub fn verify_pop(&self, pop: &BlsSignature) -> ConsensusResult<()> {
-        let pk = PublicKey::uncompress(&self.0)
-            .map_err(|e| ConsensusError::InvalidSignature {
-                reason: format!("invalid public key: {:?}", e),
-            })?;
-        let sig = Signature::uncompress(&pop.0)
-            .map_err(|e| ConsensusError::InvalidSignature {
-                reason: format!("invalid signature: {:?}", e),
-            })?;
+        let pk = PublicKey::uncompress(&self.0).map_err(|e| ConsensusError::InvalidSignature {
+            reason: format!("invalid public key: {:?}", e),
+        })?;
+        let sig = Signature::uncompress(&pop.0).map_err(|e| ConsensusError::InvalidSignature {
+            reason: format!("invalid signature: {:?}", e),
+        })?;
 
         let result = sig.verify(true, &self.0, DST_POP, &[], &pk, true);
         if result == BLST_ERROR::BLST_SUCCESS {
@@ -192,14 +196,13 @@ impl BlsSignature {
     /// Verify this signature against a message and public key
     #[cfg(feature = "bls")]
     pub fn verify(&self, message: &[u8], dst: &[u8], pubkey: &BlsPublicKey) -> ConsensusResult<()> {
-        let pk = PublicKey::uncompress(&pubkey.0)
-            .map_err(|e| ConsensusError::InvalidSignature {
+        let pk =
+            PublicKey::uncompress(&pubkey.0).map_err(|e| ConsensusError::InvalidSignature {
                 reason: format!("invalid public key: {:?}", e),
             })?;
-        let sig = Signature::uncompress(&self.0)
-            .map_err(|e| ConsensusError::InvalidSignature {
-                reason: format!("invalid signature: {:?}", e),
-            })?;
+        let sig = Signature::uncompress(&self.0).map_err(|e| ConsensusError::InvalidSignature {
+            reason: format!("invalid signature: {:?}", e),
+        })?;
 
         let result = sig.verify(true, message, dst, &[], &pk, true);
         if result == BLST_ERROR::BLST_SUCCESS {
@@ -261,10 +264,11 @@ pub fn aggregate_signatures(signatures: &[BlsSignature]) -> ConsensusResult<BlsA
         })?;
 
     let sig_refs: Vec<&Signature> = sigs.iter().collect();
-    let agg = AggregateSignature::aggregate(&sig_refs, true)
-        .map_err(|e| ConsensusError::InvalidSignature {
+    let agg = AggregateSignature::aggregate(&sig_refs, true).map_err(|e| {
+        ConsensusError::InvalidSignature {
             reason: format!("aggregation failed: {:?}", e),
-        })?;
+        }
+    })?;
 
     Ok(BlsAggregateSignature(agg.to_signature().compress()))
 }
@@ -295,8 +299,8 @@ pub fn verify_aggregate_same_message(
 
     let pk_refs: Vec<&PublicKey> = pks.iter().collect();
 
-    let sig = Signature::uncompress(&aggregate.0)
-        .map_err(|e| ConsensusError::InvalidSignature {
+    let sig =
+        Signature::uncompress(&aggregate.0).map_err(|e| ConsensusError::InvalidSignature {
             reason: format!("invalid aggregate signature: {:?}", e),
         })?;
 
@@ -338,9 +342,9 @@ mod hex_bytes {
         let s = String::deserialize(deserializer)?;
         let bytes = hex::decode(&s).map_err(serde::de::Error::custom)?;
         let len = bytes.len();
-        bytes.try_into().map_err(|_| {
-            serde::de::Error::custom(format!("expected {} bytes, got {}", N, len))
-        })
+        bytes
+            .try_into()
+            .map_err(|_| serde::de::Error::custom(format!("expected {} bytes, got {}", N, len)))
     }
 }
 
@@ -366,7 +370,11 @@ impl AggregationStats {
             signature_count: n,
             original_size_bytes: original,
             aggregated_size_bytes: aggregated,
-            compression_ratio: if n > 0 { original as f64 / aggregated as f64 } else { 0.0 },
+            compression_ratio: if n > 0 {
+                original as f64 / aggregated as f64
+            } else {
+                0.0
+            },
         }
     }
 }
@@ -475,22 +483,20 @@ mod tests {
         let keypairs: Vec<BlsKeypair> = (0..100).map(|_| BlsKeypair::generate()).collect();
         let message = b"proposal hash for round 1000";
 
-        let signatures: Vec<BlsSignature> = keypairs.iter()
-            .map(|kp| kp.sign_vote(message))
-            .collect();
+        let signatures: Vec<BlsSignature> =
+            keypairs.iter().map(|kp| kp.sign_vote(message)).collect();
 
         let agg = aggregate_signatures(&signatures).unwrap();
 
-        let pubkeys: Vec<BlsPublicKey> = keypairs.iter()
-            .map(|kp| kp.public_key())
-            .collect();
+        let pubkeys: Vec<BlsPublicKey> = keypairs.iter().map(|kp| kp.public_key()).collect();
 
         assert!(verify_aggregate_vote(&agg, message, &pubkeys).is_ok());
 
         // 100 signatures compressed to 1
         let stats = AggregationStats::for_count(100);
         assert_eq!(stats.compression_ratio, 100.0);
-        println!("Compressed {} signatures from {} bytes to {} bytes ({}x reduction)",
+        println!(
+            "Compressed {} signatures from {} bytes to {} bytes ({}x reduction)",
             stats.signature_count,
             stats.original_size_bytes,
             stats.aggregated_size_bytes,

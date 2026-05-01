@@ -21,7 +21,9 @@ pub fn PullToRefresh(
     let on_refresh2 = on_refresh.clone();
 
     let on_touch_start = move |ev: web_sys::TouchEvent| {
-        if refreshing.get() { return; }
+        if refreshing.get() {
+            return;
+        }
         if let Some(t) = ev.touches().get(0) {
             start_y.set(t.client_y() as f64);
             pulling.set(true);
@@ -29,7 +31,9 @@ pub fn PullToRefresh(
     };
 
     let on_touch_move = move |ev: web_sys::TouchEvent| {
-        if !pulling.get() || refreshing.get() { return; }
+        if !pulling.get() || refreshing.get() {
+            return;
+        }
         if let Some(t) = ev.touches().get(0) {
             let dy = (t.client_y() as f64 - start_y.get()).max(0.0).min(MAX_PULL);
             // Only activate if page is scrolled to top
@@ -45,7 +49,9 @@ pub fn PullToRefresh(
     };
 
     let on_touch_end = move |_: web_sys::TouchEvent| {
-        if !pulling.get() { return; }
+        if !pulling.get() {
+            return;
+        }
         pulling.set(false);
         if pull_y.get() >= THRESHOLD {
             refreshing.set(true);

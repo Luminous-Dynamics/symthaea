@@ -12,6 +12,10 @@ pub struct ExecutiveSummary {
     pub outcome: String,
     pub key_findings: Vec<String>,
     pub wall_time_seconds: f64,
+    pub final_cvs: f64,
+    pub final_population: u64,
+    pub worlds_surviving: usize,
+    pub critical_events: usize,
 }
 
 /// Outcome classification.
@@ -25,9 +29,15 @@ pub enum SimulationOutcome {
 impl std::fmt::Display for SimulationOutcome {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SimulationOutcome::Thrived { peak_cvs } => write!(f, "Thrived (peak CVS: {:.3})", peak_cvs),
-            SimulationOutcome::Survived { final_cvs } => write!(f, "Survived (final CVS: {:.3})", final_cvs),
-            SimulationOutcome::Collapsed { at_year } => write!(f, "Collapsed at year {:.0}", at_year),
+            SimulationOutcome::Thrived { peak_cvs } => {
+                write!(f, "Thrived (peak CVS: {:.3})", peak_cvs)
+            }
+            SimulationOutcome::Survived { final_cvs } => {
+                write!(f, "Survived (final CVS: {:.3})", final_cvs)
+            }
+            SimulationOutcome::Collapsed { at_year } => {
+                write!(f, "Collapsed at year {:.0}", at_year)
+            }
         }
     }
 }

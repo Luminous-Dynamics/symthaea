@@ -442,6 +442,7 @@ impl PhiOrchestrator {
         n: usize,
         converged: Option<bool>,
     ) -> f64 {
+        #[allow(deprecated)]
         let base_confidence = match calculator {
             CalculatorType::Real => 0.95, // Algebraic connectivity is well-understood
             CalculatorType::Resonant => {

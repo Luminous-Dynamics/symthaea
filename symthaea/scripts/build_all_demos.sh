@@ -57,7 +57,7 @@ if [[ -f "video_output/moral_drone.mp4" ]]; then
   echo "  SKIP: video_output/moral_drone.mp4 already exists"
   echo "  (delete it to regenerate)"
 else
-  cargo run --example moral_drone_video --features flight-mujoco-renderer --release
+  cargo run --example moral_drone_video --features multirotor-mujoco-renderer --release
 fi
 echo ""
 

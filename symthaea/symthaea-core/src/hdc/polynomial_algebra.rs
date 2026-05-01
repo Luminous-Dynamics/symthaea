@@ -67,20 +67,14 @@ impl Rat {
 impl Add for Rat {
     type Output = Self;
     fn add(self, rhs: Self) -> Self {
-        Rat::new(
-            self.num * rhs.den + rhs.num * self.den,
-            self.den * rhs.den,
-        )
+        Rat::new(self.num * rhs.den + rhs.num * self.den, self.den * rhs.den)
     }
 }
 
 impl Sub for Rat {
     type Output = Self;
     fn sub(self, rhs: Self) -> Self {
-        Rat::new(
-            self.num * rhs.den - rhs.num * self.den,
-            self.den * rhs.den,
-        )
+        Rat::new(self.num * rhs.den - rhs.num * self.den, self.den * rhs.den)
     }
 }
 
@@ -215,12 +209,10 @@ pub fn cmp_monomials(a: &Monomial, b: &Monomial, order: MonomialOrder) -> Orderi
             }
             Ordering::Equal
         }
-        MonomialOrder::Grlex => {
-            match a.degree().cmp(&b.degree()) {
-                Ordering::Equal => cmp_monomials(a, b, MonomialOrder::Lex),
-                other => other,
-            }
-        }
+        MonomialOrder::Grlex => match a.degree().cmp(&b.degree()) {
+            Ordering::Equal => cmp_monomials(a, b, MonomialOrder::Lex),
+            other => other,
+        },
         MonomialOrder::Grevlex => {
             match a.degree().cmp(&b.degree()) {
                 Ordering::Equal => {
@@ -283,9 +275,8 @@ impl Poly {
     fn normalize(&mut self) {
         let order = self.order;
         // Sort descending
-        self.terms.sort_by(|a, b| {
-            cmp_monomials(&b.mono, &a.mono, order)
-        });
+        self.terms
+            .sort_by(|a, b| cmp_monomials(&b.mono, &a.mono, order));
         // Combine like monomials
         let mut combined: Vec<Term> = Vec::new();
         for term in self.terms.drain(..) {
@@ -319,7 +310,11 @@ impl Poly {
     }
 
     pub fn degree(&self) -> u32 {
-        self.terms.iter().map(|t| t.mono.degree()).max().unwrap_or(0)
+        self.terms
+            .iter()
+            .map(|t| t.mono.degree())
+            .max()
+            .unwrap_or(0)
     }
 
     /// Evaluate the polynomial by substituting f64 values for each variable.
@@ -590,15 +585,13 @@ pub fn s_polynomial(f: &Poly, g: &Poly) -> Poly {
                 .collect(),
         }
     });
-    let div_g_mono = lm_g.div(&lcm).unwrap_or_else(|| {
-        Monomial {
-            exponents: lcm
-                .exponents
-                .iter()
-                .zip(&lm_g.exponents)
-                .map(|(&a, &b)| a - b)
-                .collect(),
-        }
+    let div_g_mono = lm_g.div(&lcm).unwrap_or_else(|| Monomial {
+        exponents: lcm
+            .exponents
+            .iter()
+            .zip(&lm_g.exponents)
+            .map(|(&a, &b)| a - b)
+            .collect(),
     });
 
     let coeff_f = Rat::one() / lc_f;
@@ -1080,38 +1073,65 @@ impl PolyFp {
         poly
     }
 
-    pub fn zero(p: u64) -> Self { Self { coeffs: vec![], p } }
-    pub fn one(p: u64) -> Self { Self { coeffs: vec![1], p } }
-    pub fn x(p: u64) -> Self { Self { coeffs: vec![0, 1], p } }
-
-    pub fn degree(&self) -> usize {
-        if self.coeffs.is_empty() { 0 } else { self.coeffs.len() - 1 }
+    pub fn zero(p: u64) -> Self {
+        Self { coeffs: vec![], p }
+    }
+    pub fn one(p: u64) -> Self {
+        Self { coeffs: vec![1], p }
+    }
+    pub fn x(p: u64) -> Self {
+        Self {
+            coeffs: vec![0, 1],
+            p,
+        }
     }
 
-    pub fn is_zero(&self) -> bool { self.coeffs.is_empty() || self.coeffs.iter().all(|&c| c == 0) }
+    pub fn degree(&self) -> usize {
+        if self.coeffs.is_empty() {
+            0
+        } else {
+            self.coeffs.len() - 1
+        }
+    }
+
+    pub fn is_zero(&self) -> bool {
+        self.coeffs.is_empty() || self.coeffs.iter().all(|&c| c == 0)
+    }
 
     fn normalize(&mut self) {
-        while self.coeffs.last() == Some(&0) { self.coeffs.pop(); }
+        while self.coeffs.last() == Some(&0) {
+            self.coeffs.pop();
+        }
     }
 
     fn coeff(&self, i: usize) -> u64 {
-        if i < self.coeffs.len() { self.coeffs[i] } else { 0 }
+        if i < self.coeffs.len() {
+            self.coeffs[i]
+        } else {
+            0
+        }
     }
 
     pub fn add(&self, other: &Self) -> Self {
         let len = self.coeffs.len().max(other.coeffs.len());
-        let coeffs: Vec<u64> = (0..len).map(|i| (self.coeff(i) + other.coeff(i)) % self.p).collect();
+        let coeffs: Vec<u64> = (0..len)
+            .map(|i| (self.coeff(i) + other.coeff(i)) % self.p)
+            .collect();
         Self::new(coeffs, self.p)
     }
 
     pub fn sub(&self, other: &Self) -> Self {
         let len = self.coeffs.len().max(other.coeffs.len());
-        let coeffs: Vec<u64> = (0..len).map(|i| (self.coeff(i) + self.p - other.coeff(i)) % self.p).collect();
+        let coeffs: Vec<u64> = (0..len)
+            .map(|i| (self.coeff(i) + self.p - other.coeff(i)) % self.p)
+            .collect();
         Self::new(coeffs, self.p)
     }
 
     pub fn mul(&self, other: &Self) -> Self {
-        if self.is_zero() || other.is_zero() { return Self::zero(self.p); }
+        if self.is_zero() || other.is_zero() {
+            return Self::zero(self.p);
+        }
         let len = self.coeffs.len() + other.coeffs.len() - 1;
         let mut coeffs = vec![0u64; len];
         for (i, &a) in self.coeffs.iter().enumerate() {
@@ -1129,7 +1149,9 @@ impl PolyFp {
 
     /// Polynomial division: self = quotient * divisor + remainder
     pub fn div_rem(&self, divisor: &Self) -> (Self, Self) {
-        if divisor.is_zero() { panic!("division by zero polynomial"); }
+        if divisor.is_zero() {
+            panic!("division by zero polynomial");
+        }
         if self.degree() < divisor.degree() {
             return (Self::zero(self.p), self.clone());
         }
@@ -1179,12 +1201,16 @@ impl PolyFp {
     /// For modular exponentiation, use pow_mod.
     pub fn pow_mod(&self, exp: u64, _modulus: &Self) -> Self {
         // Simple binary exponentiation (no polynomial modulus for now)
-        if exp == 0 { return Self::one(self.p); }
+        if exp == 0 {
+            return Self::one(self.p);
+        }
         let mut result = Self::one(self.p);
         let mut base = self.clone();
         let mut e = exp;
         while e > 0 {
-            if e & 1 == 1 { result = result.mul(&base); }
+            if e & 1 == 1 {
+                result = result.mul(&base);
+            }
             base = base.mul(&base);
             e >>= 1;
         }
@@ -1210,7 +1236,9 @@ fn mod_inv(a: u64, p: u64) -> u64 {
     let mut base = a % p;
     let mut exp = p - 2;
     while exp > 0 {
-        if exp & 1 == 1 { result = (result as u128 * base as u128 % p as u128) as u64; }
+        if exp & 1 == 1 {
+            result = (result as u128 * base as u128 % p as u128) as u64;
+        }
         base = (base as u128 * base as u128 % p as u128) as u64;
         exp >>= 1;
     }
@@ -1268,7 +1296,7 @@ mod tests {
         // In 1 variable: x is mono([1]), constant is mono([0])
         let x_minus_1 = Poly::from_terms(
             vec![
-                term(1, 1, vec![1]), // x
+                term(1, 1, vec![1]),  // x
                 term(-1, 1, vec![0]), // -1
             ],
             1,
@@ -1284,7 +1312,7 @@ mod tests {
         // Should equal x² - 1
         let x2_minus_1 = Poly::from_terms(
             vec![
-                term(1, 1, vec![2]), // x²
+                term(1, 1, vec![2]),  // x²
                 term(-1, 1, vec![0]), // -1
             ],
             1,
@@ -1303,7 +1331,7 @@ mod tests {
         // f = x² - y: x²y⁰ term and x⁰y¹ term
         let f = Poly::from_terms(
             vec![
-                term(1, 1, vec![2, 0]), // x²
+                term(1, 1, vec![2, 0]),  // x²
                 term(-1, 1, vec![0, 1]), // -y
             ],
             2,
@@ -1311,7 +1339,7 @@ mod tests {
         // g = xy² - x
         let g = Poly::from_terms(
             vec![
-                term(1, 1, vec![1, 2]), // xy²
+                term(1, 1, vec![1, 2]),  // xy²
                 term(-1, 1, vec![1, 0]), // -x
             ],
             2,
@@ -1336,8 +1364,8 @@ mod tests {
         // f = x² + y² - 1
         let f = Poly::from_terms(
             vec![
-                term(1, 1, vec![2, 0]), // x²
-                term(1, 1, vec![0, 2]), // y²
+                term(1, 1, vec![2, 0]),  // x²
+                term(1, 1, vec![0, 2]),  // y²
                 term(-1, 1, vec![0, 0]), // -1
             ],
             2,
@@ -1382,14 +1410,8 @@ mod tests {
         let x = Poly::from_terms(vec![term(1, 1, vec![1])], 1);
         let ideal = Ideal::new(vec![x]);
 
-        let x_plus_1 = Poly::from_terms(
-            vec![term(1, 1, vec![1]), term(1, 1, vec![0])],
-            1,
-        );
-        assert!(
-            !ideal.contains(&x_plus_1),
-            "x+1 should NOT be in ideal <x>"
-        );
+        let x_plus_1 = Poly::from_terms(vec![term(1, 1, vec![1]), term(1, 1, vec![0])], 1);
+        assert!(!ideal.contains(&x_plus_1), "x+1 should NOT be in ideal <x>");
     }
 
     // 7. UniPoly eval
@@ -1453,13 +1475,7 @@ mod tests {
     #[test]
     fn poly_evaluate() {
         // f = x + 2y at (3, 4) = 3 + 8 = 11
-        let f = Poly::from_terms(
-            vec![
-                term(1, 1, vec![1, 0]),
-                term(2, 1, vec![0, 1]),
-            ],
-            2,
-        );
+        let f = Poly::from_terms(vec![term(1, 1, vec![1, 0]), term(2, 1, vec![0, 1])], 2);
         let val = f.evaluate(&[3.0, 4.0]);
         assert!((val - 11.0).abs() < 1e-10);
     }
@@ -1507,7 +1523,7 @@ mod tests {
         // (x² + 1) / (x + 1) = x - 1 rem 2 over F_7
         // Actually: x² + 1 = (x + 1)(x - 1) + 2 = (x + 1)(x + 6) + 2 over F_7
         let a = super::PolyFp::new(vec![1, 0, 1], 7); // 1 + x²
-        let b = super::PolyFp::new(vec![1, 1], 7);     // 1 + x
+        let b = super::PolyFp::new(vec![1, 1], 7); // 1 + x
         let (q, r) = a.div_rem(&b);
         // Verify: a = b*q + r
         let bq = b.mul(&q);
@@ -1519,7 +1535,7 @@ mod tests {
     fn test_poly_fp_gcd() {
         // gcd(x² - 1, x - 1) = x - 1 over F_7
         let a = super::PolyFp::new(vec![6, 0, 1], 7); // -1 + x² = 6 + x² mod 7
-        let b = super::PolyFp::new(vec![6, 1], 7);     // -1 + x = 6 + x mod 7
+        let b = super::PolyFp::new(vec![6, 1], 7); // -1 + x = 6 + x mod 7
         let g = a.gcd(&b);
         assert_eq!(g.degree(), 1, "gcd should be degree 1: {:?}", g.coeffs);
     }
@@ -1536,7 +1552,11 @@ mod tests {
         // x^7 - x should evaluate to 0 for all a in F_7
         for a in 0..p {
             let val = diff.eval(a);
-            assert_eq!(val, 0, "x^7 - x should be 0 at x={} over F_7, got {}", a, val);
+            assert_eq!(
+                val, 0,
+                "x^7 - x should be 0 at x={} over F_7, got {}",
+                a, val
+            );
         }
     }
 }

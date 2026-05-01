@@ -58,54 +58,75 @@ fn main() {
     let seed = 42u64;
     let ticks = 1800u32;
 
-    eprintln!("=== POLICY VARIANT COMPARISON (seed: {}, {} ticks) ===\n", seed, ticks);
+    eprintln!(
+        "=== POLICY VARIANT COMPARISON (seed: {}, {} ticks) ===\n",
+        seed, ticks
+    );
 
     // Define policy variants that test the core thesis
     let scenarios: Vec<(&str, PolicyConfig)> = vec![
         ("baseline", PolicyConfig::default()),
-        ("no-care", PolicyConfig {
-            care_effectiveness: 0.0,
-            ..PolicyConfig::default()
-        }),
-        ("no-bonds", PolicyConfig {
-            pair_bond_rate: 0.0,
-            ..PolicyConfig::default()
-        }),
-        ("no-pharma", PolicyConfig {
-            pharma_boost: 0.0,
-            ..PolicyConfig::default()
-        }),
-        ("isolationist", PolicyConfig {
-            migration_enabled: false,
-            deep_space_isolation_mult: 2.5,
-            ..PolicyConfig::default()
-        }),
-        ("max-care", PolicyConfig {
-            care_effectiveness: 3.0,
-            pair_bond_rate: 0.05,
-            pharma_boost: 0.5,
-            ..PolicyConfig::default()
-        }),
-        ("1602-punitive", PolicyConfig {
-            // The 1602 model: no care economy, no bonding support,
-            // no astropharmacy, isolationist, high punishment, no education guild
-            care_effectiveness: 0.0,
-            pair_bond_rate: 0.005,
-            pharma_boost: 0.0,
-            migration_enabled: false,
-            deep_space_isolation_mult: 2.0,
-            migration_max_per_cycle: 0,
-            education_enabled: false,
-            trust_weighted_governance: false,
-            faction_enabled: true,
-            amendment_enabled: true,
-            outer_system_fission_enabled: true,
-            speciation_friction_enabled: true,
-            hostile_guardian: false,
-            disasters_enabled: true,
-            hybrid_earth: false,
-            ..PolicyConfig::default()
-        }),
+        (
+            "no-care",
+            PolicyConfig {
+                care_effectiveness: 0.0,
+                ..PolicyConfig::default()
+            },
+        ),
+        (
+            "no-bonds",
+            PolicyConfig {
+                pair_bond_rate: 0.0,
+                ..PolicyConfig::default()
+            },
+        ),
+        (
+            "no-pharma",
+            PolicyConfig {
+                pharma_boost: 0.0,
+                ..PolicyConfig::default()
+            },
+        ),
+        (
+            "isolationist",
+            PolicyConfig {
+                migration_enabled: false,
+                deep_space_isolation_mult: 2.5,
+                ..PolicyConfig::default()
+            },
+        ),
+        (
+            "max-care",
+            PolicyConfig {
+                care_effectiveness: 3.0,
+                pair_bond_rate: 0.05,
+                pharma_boost: 0.5,
+                ..PolicyConfig::default()
+            },
+        ),
+        (
+            "1602-punitive",
+            PolicyConfig {
+                // The 1602 model: no care economy, no bonding support,
+                // no astropharmacy, isolationist, high punishment, no education guild
+                care_effectiveness: 0.0,
+                pair_bond_rate: 0.005,
+                pharma_boost: 0.0,
+                migration_enabled: false,
+                deep_space_isolation_mult: 2.0,
+                migration_max_per_cycle: 0,
+                education_enabled: false,
+                trust_weighted_governance: false,
+                faction_enabled: true,
+                amendment_enabled: true,
+                outer_system_fission_enabled: true,
+                speciation_friction_enabled: true,
+                hostile_guardian: false,
+                disasters_enabled: true,
+                hybrid_earth: false,
+                ..PolicyConfig::default()
+            },
+        ),
     ];
 
     let mut results: Vec<ScenarioResult> = Vec::new();
@@ -115,7 +136,12 @@ fn main() {
         let r = run_scenario(name, seed, ticks, policy.clone());
         eprintln!(
             "pop={:>5}, CVS={:.3}, load={:.3}, eng={:.3}, love={:.3}, phi={:.3} {}",
-            r.population, r.cvs, r.allostatic_load, r.engagement, r.love_coherence, r.phi,
+            r.population,
+            r.cvs,
+            r.allostatic_load,
+            r.engagement,
+            r.love_coherence,
+            r.phi,
             if r.survived { "SURVIVED" } else { "COLLAPSED" }
         );
         results.push(r);
@@ -149,9 +175,14 @@ fn main() {
     // Harmony detail
     println!("\nHARMONY SCORES BY SCENARIO:");
     let harmony_names = [
-        "Resonant Coherence", "Pan-Sentient Flourishing", "Integral Wisdom",
-        "Infinite Play", "Sacred Reciprocity", "Sacred Stillness",
-        "Evolutionary Progression", "Sacred Stillness",
+        "Resonant Coherence",
+        "Pan-Sentient Flourishing",
+        "Integral Wisdom",
+        "Infinite Play",
+        "Sacred Reciprocity",
+        "Sacred Stillness",
+        "Evolutionary Progression",
+        "Sacred Stillness",
     ];
     println!(
         "{:<12} | {:>8} | {:>8} | {:>8} | {:>8} | {:>8} | {:>8} | {:>8} | {:>8}",
@@ -170,9 +201,8 @@ fn main() {
     // Summary statistics
     let n = results.len() as f64;
     let survived = results.iter().filter(|r| r.survived).count();
-    let mean = |f: &dyn Fn(&ScenarioResult) -> f64| -> f64 {
-        results.iter().map(f).sum::<f64>() / n
-    };
+    let mean =
+        |f: &dyn Fn(&ScenarioResult) -> f64| -> f64 { results.iter().map(f).sum::<f64>() / n };
     let std = |f: &dyn Fn(&ScenarioResult) -> f64| -> f64 {
         let m = mean(f);
         (results.iter().map(|r| (f(r) - m).powi(2)).sum::<f64>() / n).sqrt()
@@ -180,14 +210,46 @@ fn main() {
 
     println!("\nAGGREGATES ({} runs):", results.len());
     println!("  Survival rate:     {}/{}", survived, results.len());
-    println!("  CVS:               {:.3} +/- {:.3}", mean(&|r| r.cvs), std(&|r| r.cvs));
-    println!("  Population:        {:.0} +/- {:.0}", mean(&|r| r.population as f64), std(&|r| r.population as f64));
-    println!("  Collective Phi:    {:.3} +/- {:.3}", mean(&|r| r.phi), std(&|r| r.phi));
-    println!("  Love Coherence:    {:.3} +/- {:.3}", mean(&|r| r.love_coherence), std(&|r| r.love_coherence));
-    println!("  Allostatic Load:   {:.3} +/- {:.3}", mean(&|r| r.allostatic_load), std(&|r| r.allostatic_load));
-    println!("  Engagement:        {:.3} +/- {:.3}", mean(&|r| r.engagement), std(&|r| r.engagement));
-    println!("  Genetic Diversity: {:.3} +/- {:.3}", mean(&|r| r.genetics), std(&|r| r.genetics));
-    println!("  Thrill Incidents:  {:.0} +/- {:.0}", mean(&|r| r.thrill_incidents as f64), std(&|r| r.thrill_incidents as f64));
+    println!(
+        "  CVS:               {:.3} +/- {:.3}",
+        mean(&|r| r.cvs),
+        std(&|r| r.cvs)
+    );
+    println!(
+        "  Population:        {:.0} +/- {:.0}",
+        mean(&|r| r.population as f64),
+        std(&|r| r.population as f64)
+    );
+    println!(
+        "  Collective Phi:    {:.3} +/- {:.3}",
+        mean(&|r| r.phi),
+        std(&|r| r.phi)
+    );
+    println!(
+        "  Love Coherence:    {:.3} +/- {:.3}",
+        mean(&|r| r.love_coherence),
+        std(&|r| r.love_coherence)
+    );
+    println!(
+        "  Allostatic Load:   {:.3} +/- {:.3}",
+        mean(&|r| r.allostatic_load),
+        std(&|r| r.allostatic_load)
+    );
+    println!(
+        "  Engagement:        {:.3} +/- {:.3}",
+        mean(&|r| r.engagement),
+        std(&|r| r.engagement)
+    );
+    println!(
+        "  Genetic Diversity: {:.3} +/- {:.3}",
+        mean(&|r| r.genetics),
+        std(&|r| r.genetics)
+    );
+    println!(
+        "  Thrill Incidents:  {:.0} +/- {:.0}",
+        mean(&|r| r.thrill_incidents as f64),
+        std(&|r| r.thrill_incidents as f64)
+    );
 
     // Key diagnostic
     println!("\nDIAGNOSTICS:");
@@ -205,6 +267,9 @@ fn main() {
     }
     let mean_thrill = mean(&|r| r.thrill_incidents as f64);
     if mean_thrill > 1000.0 {
-        println!("  WARNING: {} mean thrill incidents — condition may be too loose.", mean_thrill as usize);
+        println!(
+            "  WARNING: {} mean thrill incidents — condition may be too loose.",
+            mean_thrill as usize
+        );
     }
 }

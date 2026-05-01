@@ -782,6 +782,12 @@ impl CognitiveLoopService {
                 feature = "surgical",
                 feature = "orbital",
                 feature = "quadruped",
+                feature = "subterranean",
+                feature = "infrastructure",
+                feature = "scavenger",
+                feature = "agribot",
+                feature = "biota",
+                feature = "clime",
                 feature = "phone"
             ))]
             let embodiment_bridge_init = {
@@ -835,7 +841,9 @@ impl CognitiveLoopService {
                                 symthaea_core::genesis::GenesisSeed::from_phrase("default")
                             });
                         Some(
-                            Box::new(crate::flight::embodiment::FlightEmbodiment::new(&genesis))
+                            Box::new(crate::multirotor::embodiment::FlightEmbodiment::new(
+                                &genesis,
+                            ))
                                 as Box<dyn super::motor_bridge::EmbodimentBridge>,
                         )
                     }
@@ -945,6 +953,98 @@ impl CognitiveLoopService {
                                 as Box<dyn super::motor_bridge::EmbodimentBridge>,
                         )
                     }
+                    #[cfg(feature = "subterranean")]
+                    EmbodimentPlatform::Subterranean => {
+                        let genesis = config
+                            .genesis_phrase
+                            .as_ref()
+                            .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p))
+                            .unwrap_or_else(|| {
+                                symthaea_core::genesis::GenesisSeed::from_phrase("default")
+                            });
+                        Some(Box::new(
+                            symthaea_subterranean::embodiment::SubterraneanEmbodiment::new(
+                                &genesis,
+                            ),
+                        )
+                            as Box<dyn super::motor_bridge::EmbodimentBridge>)
+                    }
+                    #[cfg(feature = "infrastructure")]
+                    EmbodimentPlatform::Infrastructure => {
+                        let genesis = config
+                            .genesis_phrase
+                            .as_ref()
+                            .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p))
+                            .unwrap_or_else(|| {
+                                symthaea_core::genesis::GenesisSeed::from_phrase("default")
+                            });
+                        Some(Box::new(
+                            symthaea_infrastructure::embodiment::InfrastructureEmbodiment::new(
+                                &genesis,
+                            ),
+                        )
+                            as Box<dyn super::motor_bridge::EmbodimentBridge>)
+                    }
+                    #[cfg(feature = "scavenger")]
+                    EmbodimentPlatform::Scavenger => {
+                        let genesis = config
+                            .genesis_phrase
+                            .as_ref()
+                            .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p))
+                            .unwrap_or_else(|| {
+                                symthaea_core::genesis::GenesisSeed::from_phrase("default")
+                            });
+                        Some(
+                            Box::new(symthaea_scavenger::embodiment::ScavengerEmbodiment::new(
+                                &genesis,
+                            ))
+                                as Box<dyn super::motor_bridge::EmbodimentBridge>,
+                        )
+                    }
+                    #[cfg(feature = "agribot")]
+                    EmbodimentPlatform::Agribot => {
+                        let genesis = config
+                            .genesis_phrase
+                            .as_ref()
+                            .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p))
+                            .unwrap_or_else(|| {
+                                symthaea_core::genesis::GenesisSeed::from_phrase("default")
+                            });
+                        Some(
+                            Box::new(symthaea_agribot::embodiment::AgribotEmbodiment::new(
+                                &genesis,
+                            ))
+                                as Box<dyn super::motor_bridge::EmbodimentBridge>,
+                        )
+                    }
+                    #[cfg(feature = "biota")]
+                    EmbodimentPlatform::Biota => {
+                        let genesis = config
+                            .genesis_phrase
+                            .as_ref()
+                            .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p))
+                            .unwrap_or_else(|| {
+                                symthaea_core::genesis::GenesisSeed::from_phrase("default")
+                            });
+                        Some(
+                            Box::new(symthaea_biota::embodiment::BiotaEmbodiment::new(&genesis))
+                                as Box<dyn super::motor_bridge::EmbodimentBridge>,
+                        )
+                    }
+                    #[cfg(feature = "clime")]
+                    EmbodimentPlatform::Clime => {
+                        let genesis = config
+                            .genesis_phrase
+                            .as_ref()
+                            .map(|p| symthaea_core::genesis::GenesisSeed::from_phrase(p))
+                            .unwrap_or_else(|| {
+                                symthaea_core::genesis::GenesisSeed::from_phrase("default")
+                            });
+                        Some(
+                            Box::new(symthaea_clime::embodiment::ClimeEmbodiment::new(&genesis))
+                                as Box<dyn super::motor_bridge::EmbodimentBridge>,
+                        )
+                    }
                     #[cfg(feature = "phone")]
                     EmbodimentPlatform::Phone => {
                         let _genesis = config
@@ -988,6 +1088,12 @@ impl CognitiveLoopService {
                     feature = "surgical",
                     feature = "orbital",
                     feature = "quadruped",
+                    feature = "subterranean",
+                    feature = "infrastructure",
+                    feature = "scavenger",
+                    feature = "agribot",
+                    feature = "biota",
+                    feature = "clime",
                     feature = "phone"
                 ))]
                 embodiment_bridge_init,
@@ -1002,6 +1108,12 @@ impl CognitiveLoopService {
                     feature = "surgical",
                     feature = "orbital",
                     feature = "quadruped",
+                    feature = "subterranean",
+                    feature = "infrastructure",
+                    feature = "scavenger",
+                    feature = "agribot",
+                    feature = "biota",
+                    feature = "clime",
                     feature = "phone"
                 ))]
                 None,
@@ -1016,6 +1128,12 @@ impl CognitiveLoopService {
                     feature = "surgical",
                     feature = "orbital",
                     feature = "quadruped",
+                    feature = "subterranean",
+                    feature = "infrastructure",
+                    feature = "scavenger",
+                    feature = "agribot",
+                    feature = "biota",
+                    feature = "clime",
                     feature = "phone"
                 ))]
                 super::motor_bridge::EmbodimentTelemetry::default(),

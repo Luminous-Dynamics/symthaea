@@ -3,7 +3,7 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Helicopter HDC encoder: 18D sensor state → 16,384D ContinuousHV.
 //!
-//! Follows the same bind-and-bundle pattern as symthaea-flight encoder:
+//! Follows the same bind-and-bundle pattern as symthaea-multirotor encoder:
 //! 1. Normalize each channel to [0, 1] using known ranges
 //! 2. Level-encode via thermometer coding (bundled levels 0..k)
 //! 3. Bind with genesis-seeded per-channel base vectors

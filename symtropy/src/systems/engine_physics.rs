@@ -30,7 +30,11 @@ pub fn physics_apply_inputs(
     players: Query<(&PhysicsBody, &Transform), With<Player>>,
 ) {
     for (body_comp, transform) in &players {
-        let speed = if input.sprinting { SPRINT_SPEED } else { WALK_SPEED };
+        let speed = if input.sprinting {
+            SPRINT_SPEED
+        } else {
+            WALK_SPEED
+        };
         let dir = input.direction;
 
         if dir.length_squared() < 1e-6 {
@@ -48,11 +52,18 @@ pub fn physics_apply_inputs(
         } else {
             1.0
         };
-        let move_cost = displacement * physics.consciousness.constants.movement_cost_per_unit * sprint_mult;
-        let energy_consumed = physics.consciousness.consume_energy(body_comp.handle, move_cost);
+        let move_cost =
+            displacement * physics.consciousness.constants.movement_cost_per_unit * sprint_mult;
+        let energy_consumed = physics
+            .consciousness
+            .consume_energy(body_comp.handle, move_cost);
 
         // Gradual slowdown: speed scales with energy fraction consumed
-        let energy_fraction = if move_cost > 1e-10 { energy_consumed / move_cost } else { 1.0 };
+        let energy_fraction = if move_cost > 1e-10 {
+            energy_consumed / move_cost
+        } else {
+            1.0
+        };
         if energy_fraction < 0.01 {
             if let Some(body) = physics.world.body_mut(body_comp.handle) {
                 body.linear_velocity = nalgebra::SVector::from([0.0, 0.0]);
@@ -127,14 +138,21 @@ pub fn consciousness_sync_system(
             attention: (biometrics_load * 0.3 + 0.5).min(1.0),
             recurrence: (harmony.total_energy as f64 / 8.0).min(1.0),
             embodiment: 0.7,
-            knowledge: (harmony.activations.iter().filter(|&&a| a > 0.3).count() as f64 / 8.0).min(1.0),
-            synchrony: if harmony.is_sanctuary { 0.9 } else { 0.4 + harmony.total_energy as f64 * 0.05 },
+            knowledge: (harmony.activations.iter().filter(|&&a| a > 0.3).count() as f64 / 8.0)
+                .min(1.0),
+            synchrony: if harmony.is_sanctuary {
+                0.9
+            } else {
+                0.4 + harmony.total_energy as f64 * 0.05
+            },
         };
         let pos = symtropy_math::Point::new([
             transform.translation.x as f64,
             transform.translation.y as f64,
         ]);
-        physics.consciousness.update_entity(body_comp.handle, &inputs, pos);
+        physics
+            .consciousness
+            .update_entity(body_comp.handle, &inputs, pos);
 
         // Sync harmony activations
         if let Some(entity) = physics.consciousness.entities.get_mut(&body_comp.handle) {
@@ -161,13 +179,19 @@ pub fn consciousness_sync_system(
             recurrence: (harmony.total_energy as f64 / 8.0).min(1.0),
             embodiment: (0.5 + npc_c.level * 0.3).min(1.0),
             knowledge: 0.4 + npc_c.stability * 0.2,
-            synchrony: if harmony.is_sanctuary { 0.8 } else { 0.3 + harmony.total_energy as f64 * 0.04 },
+            synchrony: if harmony.is_sanctuary {
+                0.8
+            } else {
+                0.3 + harmony.total_energy as f64 * 0.04
+            },
         };
         let pos = symtropy_math::Point::new([
             transform.translation.x as f64,
             transform.translation.y as f64,
         ]);
-        physics.consciousness.update_entity(body_comp.handle, &inputs, pos);
+        physics
+            .consciousness
+            .update_entity(body_comp.handle, &inputs, pos);
     }
 
     // Rebuild harmony field from all entity positions for Channel 4 (Harmony → Friction)

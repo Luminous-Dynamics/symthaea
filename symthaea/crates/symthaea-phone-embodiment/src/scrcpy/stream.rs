@@ -46,8 +46,8 @@ use std::time::Duration;
 use super::decoder::{DecodeError, DecodedFrame, HevcDecoder};
 use super::wire::{self, FrameHeader, WireCodec, WireError};
 use super::{
-    accept_from_server, bind_host_listener, start_scrcpy, ScrcpyError, ScrcpyHandle,
-    ScrcpyOptions, VideoCodec,
+    accept_from_server, bind_host_listener, start_scrcpy, ScrcpyError, ScrcpyHandle, ScrcpyOptions,
+    VideoCodec,
 };
 
 /// Default read timeout for [`ScrcpyCaptureStream::next_frame`].
@@ -283,9 +283,7 @@ impl ScrcpyCaptureStream {
             match self.read_one_packet()? {
                 None => return Ok(None),
                 Some((header, payload)) => {
-                    let decoded = self
-                        .decoder
-                        .decode_packet(&payload, header.pts_micros())?;
+                    let decoded = self.decoder.decode_packet(&payload, header.pts_micros())?;
                     for f in decoded {
                         self.pending.push_back(f);
                     }

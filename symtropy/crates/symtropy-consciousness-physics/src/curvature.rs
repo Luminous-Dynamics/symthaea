@@ -123,11 +123,7 @@ impl<const D: usize> ConformalMetric<D> {
     ///
     /// Negative R = positive curvature (space bends toward source).
     /// Zero R = flat space. Used for experiment validation, not dynamics.
-    pub fn ricci_scalar(
-        &self,
-        sigma_gradient: &SVector<f64, D>,
-        sigma_laplacian: f64,
-    ) -> f64 {
+    pub fn ricci_scalar(&self, sigma_gradient: &SVector<f64, D>, sigma_laplacian: f64) -> f64 {
         let d = D as f64;
         -2.0 * (d - 1.0) * (sigma_laplacian + (d - 1.0) * sigma_gradient.norm_squared())
     }
@@ -219,8 +215,15 @@ mod tests {
         let grad = SVector::from([0.0, 1.0]); // gradient perpendicular to motion
         let correction = metric.geodesic_correction(&v, &grad);
         // |v|² = 100, v·∇σ = 0 → a = |v|²∇σ = (0, 100) → clamped to (0, 50)
-        assert!(correction[1] > 10.0, "Should deflect in gradient direction: {:?}", correction);
-        assert!(correction.norm() <= MAX_GEODESIC_ACCEL + 1e-10, "Should be clamped");
+        assert!(
+            correction[1] > 10.0,
+            "Should deflect in gradient direction: {:?}",
+            correction
+        );
+        assert!(
+            correction.norm() <= MAX_GEODESIC_ACCEL + 1e-10,
+            "Should be clamped"
+        );
     }
 
     #[test]
@@ -229,7 +232,10 @@ mod tests {
         let f1 = metric.conformal_factor(1.0);
         let f2 = metric.conformal_factor(5.0);
         let f3 = metric.conformal_factor(10.0);
-        assert!(f1 < f2 && f2 < f3, "Higher energy = larger conformal factor");
+        assert!(
+            f1 < f2 && f2 < f3,
+            "Higher energy = larger conformal factor"
+        );
         assert!(f1 > 1.0, "Nonzero energy should produce factor > 1");
     }
 
@@ -237,7 +243,10 @@ mod tests {
     fn conformal_factor_identity_at_zero() {
         let metric = ConformalMetric::<2>::new();
         let f = metric.conformal_factor(0.0);
-        assert!((f - 1.0).abs() < 1e-12, "Zero energy = flat space (factor=1)");
+        assert!(
+            (f - 1.0).abs() < 1e-12,
+            "Zero energy = flat space (factor=1)"
+        );
     }
 
     #[test]
@@ -253,7 +262,10 @@ mod tests {
             "Correction magnitude {mag} should be clamped to {MAX_GEODESIC_ACCEL}"
         );
         // Direction should be preserved.
-        assert!(correction[1] > 0.0, "Direction should point in gradient direction");
+        assert!(
+            correction[1] > 0.0,
+            "Direction should point in gradient direction"
+        );
     }
 
     #[test]
@@ -291,7 +303,10 @@ mod tests {
         let v = SVector::from([10.0, 5.0]);
         let zero_grad = SVector::from([0.0, 0.0]);
         let v_new = metric.geodesic_rk4_step(&v, &zero_grad, 0.016);
-        assert!((v_new - v).norm() < 1e-12, "zero gradient = no velocity change");
+        assert!(
+            (v_new - v).norm() < 1e-12,
+            "zero gradient = no velocity change"
+        );
     }
 
     #[test]
@@ -301,7 +316,10 @@ mod tests {
         let grad = SVector::from([1.0, 0.5]);
         let v_new = metric.geodesic_rk4_step(&v, &grad, 0.016);
         // a(v=0) = |0|²∇σ - 2*(0·∇σ)*0 = 0 → no change
-        assert!((v_new - v).norm() < 1e-12, "zero velocity = no geodesic change");
+        assert!(
+            (v_new - v).norm() < 1e-12,
+            "zero velocity = no geodesic change"
+        );
     }
 
     #[test]
@@ -335,8 +353,14 @@ mod tests {
 
         let rk4_large = metric.geodesic_rk4_step(&v, &grad, dt_large);
         let delta = (rk4_large - v).norm();
-        assert!(delta > 1e-6, "rk4 should produce a nonzero correction for nonzero v and grad");
-        assert!(delta <= MAX_GEODESIC_ACCEL * dt_large + 1e-10, "rk4 delta should be clamped");
+        assert!(
+            delta > 1e-6,
+            "rk4 should produce a nonzero correction for nonzero v and grad"
+        );
+        assert!(
+            delta <= MAX_GEODESIC_ACCEL * dt_large + 1e-10,
+            "rk4 delta should be clamped"
+        );
     }
 
     #[test]
@@ -379,9 +403,15 @@ mod tests {
         let grad = SVector::from([0.0, 0.0, 1.0]);
         let v_new = metric.geodesic_rk4_step(&v, &grad, 0.016);
         // Should acquire +z component (gradient direction)
-        assert!(v_new[2] > 0.0, "3D: should acquire velocity in gradient direction");
+        assert!(
+            v_new[2] > 0.0,
+            "3D: should acquire velocity in gradient direction"
+        );
         // x component should be approximately preserved for small dt
-        assert!((v_new[0] - 5.0).abs() < 1.0, "x velocity should be approximately preserved");
+        assert!(
+            (v_new[0] - 5.0).abs() < 1.0,
+            "x velocity should be approximately preserved"
+        );
     }
 
     #[test]
@@ -390,6 +420,9 @@ mod tests {
         let v = SVector::from([3.0, 1.0, 0.0, 0.0]);
         let grad = SVector::from([0.0, 0.0, 1.0, 0.5]);
         let v_new = metric.geodesic_rk4_step(&v, &grad, 0.016);
-        assert!(v_new.norm().is_finite(), "4D rk4 step should produce finite velocity");
+        assert!(
+            v_new.norm().is_finite(),
+            "4D rk4 step should produce finite velocity"
+        );
     }
 }

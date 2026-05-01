@@ -3,20 +3,17 @@
 //! Bevy resources wrapping manipulator state for both arms.
 
 use bevy::prelude::*;
+use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
 use symthaea_manipulator::{
-    ManipulatorConfig,
-    kinematics::ManipulatorKinematics,
-    simulator::SimpleManipulatorSimulator,
-    workspace_safety::WorkspaceBoundary,
-    encoder::ManipulatorHdcEncoder,
-    controller::ManipulatorController,
+    controller::ManipulatorController, encoder::ManipulatorHdcEncoder,
+    kinematics::ManipulatorKinematics, simulator::SimpleManipulatorSimulator,
+    workspace_safety::WorkspaceBoundary, ManipulatorConfig,
 };
-use symthaea_core::genesis::GenesisSeed;
-use symtropy_robotics_bridge::agent::RoboticAgent;
-use symtropy_robotics_bridge::platform::PlatformType;
 use symtropy_consciousness_physics::safety::SafetyTier;
 use symtropy_physics::body::BodyHandle;
+use symtropy_robotics_bridge::agent::RoboticAgent;
+use symtropy_robotics_bridge::platform::PlatformType;
 
 use crate::assembly_task::AssemblyTask;
 use crate::grasp_object::GraspObject;
@@ -48,11 +45,7 @@ impl PhiArmState {
     pub fn new() -> Self {
         let genesis = GenesisSeed::from_phrase("symtropy-manipulator-demo-phi");
         let config = ManipulatorConfig::default();
-        let robot_agent = RoboticAgent::new(
-            BodyHandle(0),
-            PlatformType::Manipulator,
-            "Panda-Phi",
-        );
+        let robot_agent = RoboticAgent::new(BodyHandle(0), PlatformType::Manipulator, "Panda-Phi");
 
         Self {
             simulator: SimpleManipulatorSimulator::new(),

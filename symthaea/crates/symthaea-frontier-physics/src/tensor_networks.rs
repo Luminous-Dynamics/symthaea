@@ -40,7 +40,12 @@ impl MatrixProductState {
                 t
             })
             .collect();
-        Self { n_sites, d, chi, tensors }
+        Self {
+            n_sites,
+            d,
+            chi,
+            tensors,
+        }
     }
 
     /// Create a GHZ-like entangled state: (|00...0⟩ + |11...1⟩)/√2
@@ -72,7 +77,12 @@ impl MatrixProductState {
         t_last[1 * chi * chi + 1 * chi + 1] = 1.0;
         tensors.push(t_last);
 
-        Self { n_sites, d, chi, tensors }
+        Self {
+            n_sites,
+            d,
+            chi,
+            tensors,
+        }
     }
 
     /// Compute the norm ⟨ψ|ψ⟩ via transfer matrix contraction.
@@ -97,9 +107,12 @@ impl MatrixProductState {
                     for i in 0..chi {
                         for ip in 0..chi {
                             let t_ii: f64 = transfer[i * chi + ip];
-                            if t_ii.abs() < 1e-15 { continue; }
+                            if t_ii.abs() < 1e-15 {
+                                continue;
+                            }
                             for s in 0..d {
-                                val += t_ii * t[s * chi * chi + i * chi + j]
+                                val += t_ii
+                                    * t[s * chi * chi + i * chi + j]
                                     * t[s * chi * chi + ip * chi + jp];
                             }
                         }
@@ -142,7 +155,11 @@ mod tests {
     fn test_product_state_norm() {
         let mps = MatrixProductState::product_state(5, 2);
         let norm = mps.norm_squared();
-        assert!((norm - 1.0).abs() < 1e-10, "Product state norm = {:.6}", norm);
+        assert!(
+            (norm - 1.0).abs() < 1e-10,
+            "Product state norm = {:.6}",
+            norm
+        );
     }
 
     #[test]
@@ -157,14 +174,21 @@ mod tests {
         // 20-site spin chain: 2^20 = 1M states, but MPS with χ=4 has 20*2*16 = 640 params
         let mps = MatrixProductState::product_state(20, 2);
         let ratio = mps.compression_ratio();
-        assert!(ratio > 1000.0, "Compression ratio should be large: {:.0}", ratio);
+        assert!(
+            ratio > 1000.0,
+            "Compression ratio should be large: {:.0}",
+            ratio
+        );
     }
 
     #[test]
     fn test_entropy_bound() {
         let mps = MatrixProductState::ghz_state(4);
         let s_max = mps.bond_entropy_upper_bound();
-        assert!((s_max - 2.0_f64.ln()).abs() < 1e-14, "S_max = ln(2) for χ=2");
+        assert!(
+            (s_max - 2.0_f64.ln()).abs() < 1e-14,
+            "S_max = ln(2) for χ=2"
+        );
     }
 
     #[test]

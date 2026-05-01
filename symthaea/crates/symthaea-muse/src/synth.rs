@@ -147,15 +147,15 @@ pub fn render_arrangement(
         0.0
     };
     let fm_ratio = 2.0; // fixed ratio for all (original B-grade tense used 2.0)
-    // Filter envelope parameters: emotion-dependent spectral movement
+                        // Filter envelope parameters: emotion-dependent spectral movement
     let (filter_open, filter_close) = if state.valence > 0.2 && state.arousal > 0.5 {
-        (12.0, 8.0)  // Joyful: stay very bright
+        (12.0, 8.0) // Joyful: stay very bright
     } else if state.valence > 0.2 {
-        (4.0, 2.0)   // Contemplative: dark
+        (4.0, 2.0) // Contemplative: dark
     } else if state.arousal > 0.5 {
-        (8.0, 5.0)   // Tense: bright throughout (aggressive character)
+        (8.0, 5.0) // Tense: bright throughout (aggressive character)
     } else {
-        (3.0, 1.5)   // Sorrowful: always dark
+        (3.0, 1.5) // Sorrowful: always dark
     };
     let chord_intervals = compute_chord_intervals(state);
     let mut bl = vec![0.0f32; total_samples];
@@ -261,13 +261,11 @@ pub fn render_arrangement(
     // prevents clipping regardless of harmonic density.
     {
         const TARGET_RMS: f32 = 0.126; // -18 dB
-        const CEILING: f32 = 0.891;    // -1 dB
+        const CEILING: f32 = 0.891; // -1 dB
 
         // Measure current RMS (stereo)
         let rms = {
-            let sum: f32 = bl.iter().zip(br.iter())
-                .map(|(&l, &r)| l * l + r * r)
-                .sum();
+            let sum: f32 = bl.iter().zip(br.iter()).map(|(&l, &r)| l * l + r * r).sum();
             (sum / (2.0 * total_samples as f32)).sqrt()
         };
 
@@ -381,8 +379,7 @@ fn render_tone(
             // than fundamental. At t=1s, partial 8 is at 0.37× its initial
             // amplitude while fundamental is still near 1.0.
             let partial_decay = (-t * 0.8 * (h as f32).sqrt()).exp();
-            s += a * filter_atten * partial_decay
-                * (std::f32::consts::TAU * cf * t + fm).sin();
+            s += a * filter_atten * partial_decay * (std::f32::consts::TAU * cf * t + fm).sin();
         }
         let o = s * env * note.velocity * vol * 0.2;
         bl[si] += o * gl;
@@ -486,9 +483,17 @@ pub fn compute_timbre(state: &MusicalState, n: usize) -> Vec<f32> {
                     // CONTEMPLATIVE: Pure, minimal harmonics. Almost sine-like.
                     // CLAP "ambient meditation" expects simple, clean tones.
                     // Fundamental dominates; slight 5th (3rd harmonic) for warmth.
-                    if harmonic_idx == 3 { 0.3 } // perfect 5th overtone
-                    else if harmonic_idx == 5 { 0.1 } // subtle octave+3rd
-                    else { 0.05 / h.powf(2.5) } // everything else nearly silent
+                    if harmonic_idx == 3 {
+                        0.3
+                    }
+                    // perfect 5th overtone
+                    else if harmonic_idx == 5 {
+                        0.1
+                    }
+                    // subtle octave+3rd
+                    else {
+                        0.05 / h.powf(2.5)
+                    } // everything else nearly silent
                 } else if v < -0.2 && a > 0.5 {
                     // TENSE: Saw-like spectrum — dense harmonics, moderate rolloff.
                     // CLAP "dark dramatic electronic" matches standard sawtooth synth.
@@ -518,25 +523,25 @@ pub(crate) fn compute_adsr(state: &MusicalState) -> Adsr {
         // CLAP expects bright transients for "upbeat electronic music."
         // Think: arpeggiator, plucked synth, marimba-like.
         Adsr {
-            attack: 0.002,  // near-instant (pluck)
+            attack: 0.002, // near-instant (pluck)
             decay: 0.15 + (1.0 - a) * 0.1,
-            sustain: 0.25,  // low sustain = notes have clear end
-            release: 0.08,  // short release = rhythmic clarity
+            sustain: 0.25, // low sustain = notes have clear end
+            release: 0.08, // short release = rhythmic clarity
         }
     } else if v > 0.2 && a <= 0.5 {
         // CONTEMPLATIVE: Drone/pad — extremely slow, barely any transient.
         // CLAP expects "ambient meditation" = evolving texture, no rhythm.
         Adsr {
-            attack: 0.3 + (1.0 - a) * 0.5,  // 0.3-0.8s (glacial)
+            attack: 0.3 + (1.0 - a) * 0.5, // 0.3-0.8s (glacial)
             decay: 0.2,
-            sustain: 0.85,  // high sustain = continuous drone
+            sustain: 0.85, // high sustain = continuous drone
             release: 1.0 + state.harmony_activations[7] * 1.0, // 1-2s tail
         }
     } else if v < -0.2 && a > 0.5 {
         // TENSE: Aggressive stab — fast attack, moderate sustain, punchy.
         // CLAP expects "dark dramatic" = hard transients, bass-heavy.
         Adsr {
-            attack: 0.001,  // instant
+            attack: 0.001, // instant
             decay: 0.03,
             sustain: 0.6 + state.noradrenaline * 0.3,
             release: 0.1,
@@ -545,7 +550,7 @@ pub(crate) fn compute_adsr(state: &MusicalState) -> Adsr {
         // SORROWFUL: Slow swell — very long attack, endless release.
         // CLAP expects "sad melancholic" = barely audible onsets, long decay.
         Adsr {
-            attack: 0.4 + (1.0 - a) * 0.4,  // 0.4-0.8s
+            attack: 0.4 + (1.0 - a) * 0.4, // 0.4-0.8s
             decay: 0.3,
             sustain: 0.5,
             release: 1.5 + state.harmony_activations[7] * 1.0, // 1.5-2.5s
@@ -595,8 +600,8 @@ pub(crate) fn soft_clip(x: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{MuseConfig, MusicalState, Note, OutputFormat};
     use crate::voice::{Arrangement, Voice, VoiceRole};
+    use crate::{MuseConfig, MusicalState, Note, OutputFormat};
 
     fn one_note_arrangement(freq: f32) -> Arrangement {
         let note = Note {
@@ -621,7 +626,10 @@ mod tests {
     #[test]
     fn soft_clip_identity_in_range() {
         for x in [-0.9f32, -0.5, 0.0, 0.5, 0.9] {
-            assert!((soft_clip(x) - x).abs() < 1e-6, "soft_clip({x}) should be identity");
+            assert!(
+                (soft_clip(x) - x).abs() < 1e-6,
+                "soft_clip({x}) should be identity"
+            );
         }
     }
 
@@ -640,7 +648,10 @@ mod tests {
         for i in 1..=20 {
             let x = -1.0 + i as f32 * 0.1;
             let y = soft_clip(x);
-            assert!(y >= prev - 1e-6, "soft_clip not monotone at {x}: {y} < {prev}");
+            assert!(
+                y >= prev - 1e-6,
+                "soft_clip not monotone at {x}: {y} < {prev}"
+            );
             prev = y;
         }
     }
@@ -661,7 +672,10 @@ mod tests {
         let state = MusicalState::default();
         let adsr = compute_adsr(&state);
         let y = envelope(&adsr, adsr.attack * 0.5, 1.0);
-        assert!(y > 0.0 && y < 1.0, "mid-attack should be between 0 and 1: {y}");
+        assert!(
+            y > 0.0 && y < 1.0,
+            "mid-attack should be between 0 and 1: {y}"
+        );
     }
 
     #[test]
@@ -679,8 +693,14 @@ mod tests {
 
     #[test]
     fn high_arousal_faster_attack() {
-        let calm = MusicalState { arousal: 0.1, ..MusicalState::default() };
-        let excited = MusicalState { arousal: 0.9, ..MusicalState::default() };
+        let calm = MusicalState {
+            arousal: 0.1,
+            ..MusicalState::default()
+        };
+        let excited = MusicalState {
+            arousal: 0.9,
+            ..MusicalState::default()
+        };
         let adsr_calm = compute_adsr(&calm);
         let adsr_excited = compute_adsr(&excited);
         assert!(
@@ -696,7 +716,10 @@ mod tests {
     #[test]
     fn render_produces_samples() {
         let arr = one_note_arrangement(440.0);
-        let config = MuseConfig { duration_secs: 1.0, ..Default::default() };
+        let config = MuseConfig {
+            duration_secs: 1.0,
+            ..Default::default()
+        };
         let state = MusicalState::default();
         let audio = render_arrangement(&arr, 44100, 44100, &state, &config);
         assert!(!audio.is_empty());
@@ -712,7 +735,10 @@ mod tests {
         };
         let state = MusicalState::default();
         let audio = render_arrangement(&arr, 44100, 22050, &state, &config);
-        assert!(matches!(audio, AudioData::StereoF32(_)), "expected StereoF32");
+        assert!(
+            matches!(audio, AudioData::StereoF32(_)),
+            "expected StereoF32"
+        );
     }
 
     #[test]
@@ -789,7 +815,10 @@ mod tests {
         // FM-modulated output should differ from clean
         if let (AudioData::F32(c), AudioData::F32(f)) = (clean_audio, fm_audio) {
             let diff: f32 = c.iter().zip(f.iter()).map(|(a, b)| (a - b).abs()).sum();
-            assert!(diff > 0.1, "FM depth should change the output (diff = {diff})");
+            assert!(
+                diff > 0.1,
+                "FM depth should change the output (diff = {diff})"
+            );
         }
     }
 

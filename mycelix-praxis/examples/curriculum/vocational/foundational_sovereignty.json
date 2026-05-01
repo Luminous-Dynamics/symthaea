@@ -1,0 +1,107 @@
+{
+  "metadata": {
+    "title": "Foundational Sovereignty: Literacy for the Mesh",
+    "framework": "Mycelix Foundations",
+    "source": "https://mycelix.org",
+    "grade_level": "Secondary/Foundational",
+    "subject_area": "Multi-Subject",
+    "domain": "Foundations",
+    "version": "1.0",
+    "total_standards": 4,
+    "domains": [
+      "Physics",
+      "Digital Literacy",
+      "Social Science"
+    ],
+    "created_at": "2026-04-23",
+    "notes": "Bridging K-12 concepts to the Praxis professional lifecycle."
+  },
+  "nodes": [
+    {
+      "id": "SCI-GEN-050",
+      "title": "Energy & Circuits: Foundational Physics",
+      "description": "Moving beyond the lantern. Formal study of Ohm's Law, Joule heating, and circuit topology. Understanding how energy flows from the sun to the ledger.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Physics",
+      "subdomain": "Foundations",
+      "tags": ["physics", "electricity", "energy", "circuits"],
+      "estimated_hours": 45,
+      "grade_levels": ["Grade10", "Grade11", "Grade12"],
+      "bloom_level": "Understand",
+      "subject_area": "Physics"
+    },
+    {
+      "id": "DIG-GEN-050",
+      "title": "The Cryptographic Mind",
+      "description": "How to own your identity. The logic of asymmetric cryptography, hashing, and distributed ledgers. Understanding why keys are the foundation of modern freedom.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Digital Literacy",
+      "subdomain": "Foundations",
+      "tags": ["cryptography", "security", "privacy", "sovereignty"],
+      "estimated_hours": 30,
+      "grade_levels": ["Grade9", "Grade10", "Grade11", "Grade12"],
+      "bloom_level": "Understand",
+      "subject_area": "Computer Science"
+    },
+    {
+      "id": "CIV-GEN-050",
+      "title": "Collective Logic & Decision Making",
+      "description": "Introduction to consensus. Quorums, vetoes, and the tragedy of the commons. How small groups reach high-trust decisions without a leader.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Social Science",
+      "subdomain": "Foundations",
+      "tags": ["consensus", "governance", "cooperation", "civics"],
+      "estimated_hours": 30,
+      "grade_levels": ["Grade9", "Grade10", "Grade11", "Grade12"],
+      "bloom_level": "Understand",
+      "subject_area": "Social Studies"
+    },
+    {
+      "id": "SCI-BIO-050",
+      "title": "Cycles of the Living Substrate",
+      "description": "The Carbon, Nitrogen, and Phosphorus cycles. Understanding soil as a biological battery and the role of mycelium in planetary homeostasis.",
+      "node_type": "Course",
+      "difficulty": "Beginner",
+      "domain": "Biology",
+      "subdomain": "Foundations",
+      "tags": ["ecology", "biology", "homeostasis", "substrate"],
+      "estimated_hours": 45,
+      "grade_levels": ["Grade10", "Grade11", "Grade12"],
+      "bloom_level": "Understand",
+      "subject_area": "Science"
+    }
+  ],
+  "edges": [
+    {
+      "from": "VOC-000",
+      "to": "SCI-GEN-050",
+      "edge_type": "Recommended",
+      "strength_permille": 600,
+      "rationale": "Building a lantern provides the tactile intuition for formal circuit physics."
+    },
+    {
+      "from": "SCI-GEN-050",
+      "to": "VOC-RE-101",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Solar PV technician track requires foundational circuit physics."
+    },
+    {
+      "from": "DIG-GEN-050",
+      "to": "VOC-002",
+      "edge_type": "Recommended",
+      "strength_permille": 700,
+      "rationale": "Understanding cryptography provides the 'why' behind the mesh handshake."
+    },
+    {
+      "from": "SCI-BIO-050",
+      "to": "VOC-AG-101",
+      "edge_type": "Requires",
+      "strength_permille": 900,
+      "rationale": "Soil microbiology requires understanding general biological cycles."
+    }
+  ]
+}

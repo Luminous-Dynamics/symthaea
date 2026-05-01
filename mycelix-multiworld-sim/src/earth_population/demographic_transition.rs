@@ -39,8 +39,8 @@ impl Default for DemographicTransition {
         Self {
             tfr_ceiling: 7.0,
             tfr_floor: 1.2,
-            midpoint: 0.45,    // Lower midpoint: transition starts earlier in development
-            steepness: 10.0,   // Steeper: faster decline once started
+            midpoint: 0.45, // Lower midpoint: transition starts earlier in development
+            steepness: 10.0, // Steeper: faster decline once started
             max_annual_change: 0.08, // Faster max change (Iran dropped 1.5 TFR in a decade)
         }
     }
@@ -68,17 +68,24 @@ impl DemographicTransition {
     /// TFR(d) = floor + (ceiling - floor) / (1 + exp(steepness × (d - midpoint)))
     /// ```
     pub fn target_tfr(&self, development_index: f64) -> f64 {
-        self.tfr_floor + (self.tfr_ceiling - self.tfr_floor)
-            / (1.0 + (self.steepness * (development_index - self.midpoint)).exp())
+        self.tfr_floor
+            + (self.tfr_ceiling - self.tfr_floor)
+                / (1.0 + (self.steepness * (development_index - self.midpoint)).exp())
     }
 
     /// Current demographic transition stage based on TFR.
     pub fn stage(&self, tfr: f64) -> DemographicTransitionStage {
-        if tfr > 5.0 { DemographicTransitionStage::PreTransition }
-        else if tfr > 4.0 { DemographicTransitionStage::EarlyTransition }
-        else if tfr > 2.1 { DemographicTransitionStage::LateTransition }
-        else if tfr > 1.5 { DemographicTransitionStage::PostTransition }
-        else { DemographicTransitionStage::SecondTransition }
+        if tfr > 5.0 {
+            DemographicTransitionStage::PreTransition
+        } else if tfr > 4.0 {
+            DemographicTransitionStage::EarlyTransition
+        } else if tfr > 2.1 {
+            DemographicTransitionStage::LateTransition
+        } else if tfr > 1.5 {
+            DemographicTransitionStage::PostTransition
+        } else {
+            DemographicTransitionStage::SecondTransition
+        }
     }
 }
 
@@ -110,8 +117,14 @@ mod tests {
         let tfr_mid = dt.target_tfr(0.5);
         let tfr_high = dt.target_tfr(0.9);
 
-        assert!(tfr_low > tfr_mid, "TFR should decrease: {tfr_low} vs {tfr_mid}");
-        assert!(tfr_mid > tfr_high, "TFR should decrease: {tfr_mid} vs {tfr_high}");
+        assert!(
+            tfr_low > tfr_mid,
+            "TFR should decrease: {tfr_low} vs {tfr_mid}"
+        );
+        assert!(
+            tfr_mid > tfr_high,
+            "TFR should decrease: {tfr_mid} vs {tfr_high}"
+        );
         assert!(tfr_low > 4.0, "Low dev should have high TFR: {tfr_low}");
         assert!(tfr_high < 2.5, "High dev should have low TFR: {tfr_high}");
     }
@@ -142,14 +155,25 @@ mod tests {
 
         // Poorest region: South Asia ($3000, edu 0.55, infra 0.50)
         let poor = EarthRegion {
-            name: "test".into(), population: 100.0, growth_rate_annual: 0.01,
-            gdp_per_capita: 3000.0, education_index: 0.55, phi_distribution_mean: 0.2,
-            phi_distribution_sd: 0.1, economic_specialization: [0.125; 8],
-            infrastructure_level: 0.50, climate_vulnerability: 0.5,
+            name: "test".into(),
+            population: 100.0,
+            growth_rate_annual: 0.01,
+            gdp_per_capita: 3000.0,
+            education_index: 0.55,
+            phi_distribution_mean: 0.2,
+            phi_distribution_sd: 0.1,
+            economic_specialization: [0.125; 8],
+            infrastructure_level: 0.50,
+            climate_vulnerability: 0.5,
             cultural_profile: crate::world::CulturalProfile {
-                harmony_weights: [0.125; 8], individualism: 0.5, risk_tolerance: 0.5,
-                xenophilia: 0.5, traditionalism: 0.5, language_divergence: 0.0,
-                ritual_count: 0, founding_mythology: String::new(),
+                harmony_weights: [0.125; 8],
+                individualism: 0.5,
+                risk_tolerance: 0.5,
+                xenophilia: 0.5,
+                traditionalism: 0.5,
+                language_divergence: 0.0,
+                ritual_count: 0,
+                founding_mythology: String::new(),
             },
             spaceport_access: false,
             urbanization: 0.3,
@@ -157,7 +181,9 @@ mod tests {
 
         // Richest region: North America ($55000, edu 0.90, infra 0.95)
         let rich = EarthRegion {
-            gdp_per_capita: 55000.0, education_index: 0.90, infrastructure_level: 0.95,
+            gdp_per_capita: 55000.0,
+            education_index: 0.90,
+            infrastructure_level: 0.95,
             ..poor.clone()
         };
 
@@ -165,7 +191,10 @@ mod tests {
         let dev_rich = dt.development_index(&rich);
 
         assert!(dev_poor > 0.0 && dev_poor < 1.0, "Poor dev: {dev_poor}");
-        assert!(dev_rich > dev_poor, "Rich should have higher dev: {dev_rich} vs {dev_poor}");
+        assert!(
+            dev_rich > dev_poor,
+            "Rich should have higher dev: {dev_rich} vs {dev_poor}"
+        );
         assert!(dev_rich > 0.7, "Rich should be >0.7: {dev_rich}");
     }
 }

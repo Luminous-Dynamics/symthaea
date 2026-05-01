@@ -13,9 +13,9 @@
 
 use bevy::prelude::*;
 
-use crate::components::{ConsciousnessComp, CrewNpc, NpcTrust, TendBalance, Player};
-use crate::resources::GovernanceLog;
 use super::fl_simulation::FlPool;
+use crate::components::{ConsciousnessComp, CrewNpc, NpcTrust, Player, TendBalance};
+use crate::resources::GovernanceLog;
 
 /// Healing rates based on data sharing model.
 const HEALING_RATE_HOARDED: f32 = 0.60;
@@ -88,7 +88,8 @@ pub fn medical_commons_system(
     *timer = 0.0;
 
     let total = npcs.iter().count();
-    let consenting = npcs.iter()
+    let consenting = npcs
+        .iter()
         .filter(|(_, trust, _)| trust.trust >= 0.5) // Consent = trust threshold
         .count();
 
@@ -132,7 +133,15 @@ pub fn medical_commons_system(
             ),
         };
         eprintln!("[medical] {}", msg);
-        log.push(time.elapsed_secs(), msg, if medical.sharing_model == SharingModel::Coerced { 2 } else { 0 });
+        log.push(
+            time.elapsed_secs(),
+            msg,
+            if medical.sharing_model == SharingModel::Coerced {
+                2
+            } else {
+                0
+            },
+        );
     }
 }
 
@@ -175,7 +184,9 @@ pub fn data_dividend_system(
     if distributed > 0 {
         let msg = format!(
             "Data dividends: {} TEND distributed to {} contributors (round {})",
-            distributed * TEND_DIVIDEND_PER_ROUND, distributed, fl_pool.round,
+            distributed * TEND_DIVIDEND_PER_ROUND,
+            distributed,
+            fl_pool.round,
         );
         log.push(time.elapsed_secs(), msg, 0);
     }

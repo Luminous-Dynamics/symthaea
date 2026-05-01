@@ -617,7 +617,9 @@ pub fn get_consensus_price(input: GetConsensusInput) -> ExternResult<ConsensusRe
 
     // Fetch the previous consensus price BEFORE replacing the link, so we
     // compare against the prior value (not the one we just stored).
-    let previous_median = previous_consensus.as_ref().map(|consensus| consensus.median_price);
+    let previous_median = previous_consensus
+        .as_ref()
+        .map(|consensus| consensus.median_price);
 
     // Update latest consensus link (replace old if exists)
     let consensus_anchor = anchor_hash(&format!("{ITEM_REPORTS_ANCHOR_PREFIX}{item}:consensus"))?;

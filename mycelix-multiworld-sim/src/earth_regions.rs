@@ -135,7 +135,7 @@ pub fn build_earth_regions() -> Vec<EarthRegion> {
                 ritual_count: 50,
                 founding_mythology: String::new(),
             },
-            urbanization: 0.64, // UN DESA 2024: East Asia ~64%
+            urbanization: 0.64,     // UN DESA 2024: East Asia ~64%
             spaceport_access: true, // Hainan, Tanegashima
         },
         EarthRegion {
@@ -159,7 +159,7 @@ pub fn build_earth_regions() -> Vec<EarthRegion> {
                 ritual_count: 50,
                 founding_mythology: String::new(),
             },
-            urbanization: 0.36, // UN DESA 2024: South Asia ~36%
+            urbanization: 0.36,     // UN DESA 2024: South Asia ~36%
             spaceport_access: true, // Sriharikota, Thumba
         },
         EarthRegion {
@@ -255,7 +255,7 @@ pub fn build_earth_regions() -> Vec<EarthRegion> {
                 ritual_count: 50,
                 founding_mythology: String::new(),
             },
-            urbanization: 0.75, // UN DESA 2024: Europe ~75%
+            urbanization: 0.75,     // UN DESA 2024: Europe ~75%
             spaceport_access: true, // Kourou (ESA)
         },
         EarthRegion {
@@ -279,7 +279,7 @@ pub fn build_earth_regions() -> Vec<EarthRegion> {
                 ritual_count: 50,
                 founding_mythology: String::new(),
             },
-            urbanization: 0.83, // UN DESA 2024: North America ~83%
+            urbanization: 0.83,     // UN DESA 2024: North America ~83%
             spaceport_access: true, // KSC, Vandenberg, Boca Chica
         },
         EarthRegion {
@@ -303,7 +303,7 @@ pub fn build_earth_regions() -> Vec<EarthRegion> {
                 ritual_count: 50,
                 founding_mythology: String::new(),
             },
-            urbanization: 0.82, // UN DESA 2024: Latin America ~82%
+            urbanization: 0.82,     // UN DESA 2024: Latin America ~82%
             spaceport_access: true, // Alcantara (Brazil), Guiana Space Centre proximity
         },
         EarthRegion {
@@ -327,7 +327,7 @@ pub fn build_earth_regions() -> Vec<EarthRegion> {
                 ritual_count: 50,
                 founding_mythology: String::new(),
             },
-            urbanization: 0.48, // UN DESA 2024: Central Asia ~48%
+            urbanization: 0.48,     // UN DESA 2024: Central Asia ~48%
             spaceport_access: true, // Baikonur
         },
         EarthRegion {
@@ -375,7 +375,7 @@ pub fn build_earth_regions() -> Vec<EarthRegion> {
                 ritual_count: 50,
                 founding_mythology: String::new(),
             },
-            urbanization: 0.75, // UN DESA 2024: Russia/CIS ~75%
+            urbanization: 0.75,     // UN DESA 2024: Russia/CIS ~75%
             spaceport_access: true, // Vostochny, Plesetsk
         },
         EarthRegion {
@@ -417,7 +417,11 @@ pub fn build_earth_regions() -> Vec<EarthRegion> {
 /// - Education slowly improves (0.001/tick), capped at 0.98.
 /// - Climate vulnerability can trigger disasters that reduce pop and GDP.
 /// - Phi distribution drifts slowly upward with education.
-pub fn tick_region(region: &mut EarthRegion, tick: u32, rng: &mut StochasticEngine) -> RegionUpdate {
+pub fn tick_region(
+    region: &mut EarthRegion,
+    tick: u32,
+    rng: &mut StochasticEngine,
+) -> RegionUpdate {
     let mut update = RegionUpdate {
         region_name: region.name.clone(),
         population_delta: 0.0,
@@ -435,8 +439,8 @@ pub fn tick_region(region: &mut EarthRegion, tick: u32, rng: &mut StochasticEngi
     let edu_contribution = region.education_index * GDP_EDUCATION_GROWTH_FACTOR;
     let tech_contribution = region.infrastructure_level * GDP_TECH_GROWTH_FACTOR;
     let pop_growth_contribution = region.growth_rate_annual.max(0.0) / 12.0 * 0.5;
-    let gdp_growth = region.gdp_per_capita
-        * (edu_contribution + tech_contribution + pop_growth_contribution);
+    let gdp_growth =
+        region.gdp_per_capita * (edu_contribution + tech_contribution + pop_growth_contribution);
     region.gdp_per_capita += gdp_growth;
     update.gdp_delta = gdp_growth;
 
@@ -447,16 +451,16 @@ pub fn tick_region(region: &mut EarthRegion, tick: u32, rng: &mut StochasticEngi
     // 4. Infrastructure slowly improves with GDP (diminishing returns above 0.8).
     if region.infrastructure_level < 0.95 {
         let infra_growth = 0.0002 * (1.0 - region.infrastructure_level);
-        region.infrastructure_level =
-            (region.infrastructure_level + infra_growth).min(0.95);
+        region.infrastructure_level = (region.infrastructure_level + infra_growth).min(0.95);
     }
 
     // 5. Climate vulnerability can trigger disasters.
     let disaster_prob = region.climate_vulnerability * CLIMATE_DISASTER_PROB_SCALE;
     if rng.bernoulli(disaster_prob) {
-        let pop_loss = region.population * CLIMATE_DISASTER_POP_LOSS_FRACTION
-            * region.climate_vulnerability;
-        let gdp_loss = region.gdp_per_capita * CLIMATE_DISASTER_GDP_LOSS_FRACTION
+        let pop_loss =
+            region.population * CLIMATE_DISASTER_POP_LOSS_FRACTION * region.climate_vulnerability;
+        let gdp_loss = region.gdp_per_capita
+            * CLIMATE_DISASTER_GDP_LOSS_FRACTION
             * region.climate_vulnerability;
         region.population = (region.population - pop_loss).max(MIN_POPULATION_M);
         region.gdp_per_capita = (region.gdp_per_capita - gdp_loss).max(100.0);
@@ -470,8 +474,7 @@ pub fn tick_region(region: &mut EarthRegion, tick: u32, rng: &mut StochasticEngi
     // 6. Phi drifts slowly upward with education, bounded.
     let phi_target = 0.15 + region.education_index * 0.45;
     let phi_drift = (phi_target - region.phi_distribution_mean) * PHI_DRIFT_RATE;
-    region.phi_distribution_mean =
-        (region.phi_distribution_mean + phi_drift).clamp(0.05, 0.80);
+    region.phi_distribution_mean = (region.phi_distribution_mean + phi_drift).clamp(0.05, 0.80);
 
     // 7. Climate vulnerability slowly changes (improving with infrastructure,
     //    worsening with global trends — net small improvement).
@@ -531,7 +534,10 @@ pub fn region_contribution_to_space(region: &EarthRegion) -> f64 {
 
 /// Total space program contribution across all regions.
 pub fn total_space_contribution(regions: &[EarthRegion]) -> f64 {
-    regions.iter().map(|r| region_contribution_to_space(r)).sum()
+    regions
+        .iter()
+        .map(|r| region_contribution_to_space(r))
+        .sum()
 }
 
 // ---------------------------------------------------------------------------
@@ -596,7 +602,10 @@ mod tests {
     fn test_climate_vulnerability_affects_regions_differently() {
         let regions = build_earth_regions();
         // Caribbean/Islands (0.75) should be more vulnerable than Europe (0.25)
-        let caribbean = regions.iter().find(|r| r.name == "Caribbean/Islands").unwrap();
+        let caribbean = regions
+            .iter()
+            .find(|r| r.name == "Caribbean/Islands")
+            .unwrap();
         let europe = regions.iter().find(|r| r.name == "Europe").unwrap();
         assert!(
             caribbean.climate_vulnerability > europe.climate_vulnerability,

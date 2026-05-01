@@ -12,8 +12,8 @@
 //! The prediction error flows through the actual consciousness pipeline.
 //! Phi is never a clamped lerp of PE. Industrial partners can inspect this.
 
-use symtropy_robotics_bridge::agent::RoboticAgent;
 use symtropy_consciousness_physics::safety::SafetyTier;
+use symtropy_robotics_bridge::agent::RoboticAgent;
 
 /// Run one consciousness tick through the full pipeline.
 ///
@@ -54,24 +54,19 @@ mod tests {
 
     #[test]
     fn consciousness_tick_produces_valid_output() {
-        let mut agent = RoboticAgent::new(
-            BodyHandle(0),
-            PlatformType::Manipulator,
-            "test-panda",
-        );
+        let mut agent = RoboticAgent::new(BodyHandle(0), PlatformType::Manipulator, "test-panda");
 
         let (phi, _tier, gain) = consciousness_tick(&mut agent, 0.01, 0.0);
         assert!(phi >= 0.0 && phi <= 1.0, "Phi should be in [0,1]: {phi}");
-        assert!(gain >= 0.0 && gain <= 1.0, "Gain should be in [0,1]: {gain}");
+        assert!(
+            gain >= 0.0 && gain <= 1.0,
+            "Gain should be in [0,1]: {gain}"
+        );
     }
 
     #[test]
     fn high_danger_increases_caution() {
-        let mut agent = RoboticAgent::new(
-            BodyHandle(0),
-            PlatformType::Manipulator,
-            "test-panda",
-        );
+        let mut agent = RoboticAgent::new(BodyHandle(0), PlatformType::Manipulator, "test-panda");
 
         let initial_caution = agent.caution;
 
@@ -80,17 +75,16 @@ mod tests {
             consciousness_tick(&mut agent, 0.8, 0.95);
         }
 
-        assert!(agent.caution > initial_caution,
-            "High danger should increase caution: initial={initial_caution}, now={}", agent.caution);
+        assert!(
+            agent.caution > initial_caution,
+            "High danger should increase caution: initial={initial_caution}, now={}",
+            agent.caution
+        );
     }
 
     #[test]
     fn low_danger_decreases_caution() {
-        let mut agent = RoboticAgent::new(
-            BodyHandle(0),
-            PlatformType::Manipulator,
-            "test-panda",
-        );
+        let mut agent = RoboticAgent::new(BodyHandle(0), PlatformType::Manipulator, "test-panda");
 
         // First increase caution
         for _ in 0..10 {
@@ -103,7 +97,10 @@ mod tests {
             consciousness_tick(&mut agent, 0.01, 0.0);
         }
 
-        assert!(agent.caution < high_caution,
-            "Low danger should decrease caution: high={high_caution}, now={}", agent.caution);
+        assert!(
+            agent.caution < high_caution,
+            "Low danger should decrease caution: high={high_caution}, now={}",
+            agent.caution
+        );
     }
 }

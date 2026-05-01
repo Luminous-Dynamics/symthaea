@@ -65,7 +65,10 @@ fn main() {
 
         // Downmix to mono
         let mono: Vec<f32> = if spec.channels == 2 {
-            samples.chunks(2).map(|c| (c[0] + c.get(1).copied().unwrap_or(0.0)) * 0.5).collect()
+            samples
+                .chunks(2)
+                .map(|c| (c[0] + c.get(1).copied().unwrap_or(0.0)) * 0.5)
+                .collect()
         } else {
             samples
         };
@@ -113,7 +116,11 @@ fn main() {
         for (i, (name, max_2d, count, _, q)) in results.iter().rev().take(5).enumerate() {
             println!(
                 "  {}. {} — quality={:.3}, max_2d={:.3}, clicks={}",
-                i + 1, name, q, max_2d, count
+                i + 1,
+                name,
+                q,
+                max_2d,
+                count
             );
         }
     }

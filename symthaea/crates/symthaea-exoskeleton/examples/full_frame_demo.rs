@@ -41,10 +41,19 @@ fn main() {
     let mut sim = FullFrameSimulator::new();
 
     println!("  Topology:");
-    println!("    Spine:     {} joints (neck, lumbar)", sim.spine_chain.num_joints);
-    println!("    Left arm:  {} joints (shoulder×3, elbow, wrist×2)", sim.left_arm.num_joints);
+    println!(
+        "    Spine:     {} joints (neck, lumbar)",
+        sim.spine_chain.num_joints
+    );
+    println!(
+        "    Left arm:  {} joints (shoulder×3, elbow, wrist×2)",
+        sim.left_arm.num_joints
+    );
     println!("    Right arm: {} joints", sim.right_arm.num_joints);
-    println!("    Left leg:  {} joints (hip, knee, ankle)", sim.left_leg.num_joints);
+    println!(
+        "    Left leg:  {} joints (hip, knee, ankle)",
+        sim.left_leg.num_joints
+    );
     println!("    Right leg: {} joints", sim.right_leg.num_joints);
     println!("    Total:     {} DOF", NUM_FULL_FRAME_JOINTS);
     println!();
@@ -63,7 +72,10 @@ fn main() {
     for _ in 0..5 {
         human.update(0.05);
     }
-    println!("  Gait power:    {:.2} W (1 Hz cadence)", human.human_power());
+    println!(
+        "  Gait power:    {:.2} W (1 Hz cadence)",
+        human.human_power()
+    );
     println!();
 
     // ─────────────────────────────────────────────────────────────────
@@ -133,7 +145,9 @@ fn main() {
         sim.set_consciousness(phi);
         sim.step(0.001);
         let cmd = full_frame_to_humanoid_command(&sim);
-        let t: Vec<String> = cmd.torques.iter()
+        let t: Vec<String> = cmd
+            .torques
+            .iter()
             .take(3)
             .map(|t| format!("{:+.3}", t))
             .collect();

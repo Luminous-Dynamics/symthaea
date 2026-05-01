@@ -23,10 +23,7 @@ impl AdbDevice {
 
     /// Check if the device is connected and authorized.
     pub fn is_connected(&self) -> bool {
-        let output = Command::new("adb")
-            .args(["devices"])
-            .output()
-            .ok();
+        let output = Command::new("adb").args(["devices"]).output().ok();
         output.map_or(false, |o| {
             String::from_utf8_lossy(&o.stdout).contains(&self.serial)
         })
@@ -36,7 +33,14 @@ impl AdbDevice {
     pub fn screenshot(&self) -> Result<Vec<u8>, String> {
         // Capture to device
         let status = Command::new("adb")
-            .args(["-s", &self.serial, "shell", "screencap", "-p", "/sdcard/_symthaea_screen.png"])
+            .args([
+                "-s",
+                &self.serial,
+                "shell",
+                "screencap",
+                "-p",
+                "/sdcard/_symthaea_screen.png",
+            ])
             .status()
             .map_err(|e| format!("adb screencap failed: {e}"))?;
         if !status.success() {
@@ -46,7 +50,13 @@ impl AdbDevice {
         // Pull to temp file
         let tmp_path = "/tmp/_symthaea_phone_screen.png";
         let status = Command::new("adb")
-            .args(["-s", &self.serial, "pull", "/sdcard/_symthaea_screen.png", tmp_path])
+            .args([
+                "-s",
+                &self.serial,
+                "pull",
+                "/sdcard/_symthaea_screen.png",
+                tmp_path,
+            ])
             .status()
             .map_err(|e| format!("adb pull failed: {e}"))?;
         if !status.success() {
@@ -60,28 +70,52 @@ impl AdbDevice {
     pub fn tap(&self, x: u32, y: u32) -> Result<(), String> {
         let status = Command::new("adb")
             .args([
-                "-s", &self.serial,
-                "shell", "input", "tap",
-                &x.to_string(), &y.to_string(),
+                "-s",
+                &self.serial,
+                "shell",
+                "input",
+                "tap",
+                &x.to_string(),
+                &y.to_string(),
             ])
             .status()
             .map_err(|e| format!("adb tap failed: {e}"))?;
-        if status.success() { Ok(()) } else { Err("adb tap non-zero".into()) }
+        if status.success() {
+            Ok(())
+        } else {
+            Err("adb tap non-zero".into())
+        }
     }
 
     /// Swipe from (x1,y1) to (x2,y2) over duration_ms.
-    pub fn swipe(&self, x1: u32, y1: u32, x2: u32, y2: u32, duration_ms: u32) -> Result<(), String> {
+    pub fn swipe(
+        &self,
+        x1: u32,
+        y1: u32,
+        x2: u32,
+        y2: u32,
+        duration_ms: u32,
+    ) -> Result<(), String> {
         let status = Command::new("adb")
             .args([
-                "-s", &self.serial,
-                "shell", "input", "swipe",
-                &x1.to_string(), &y1.to_string(),
-                &x2.to_string(), &y2.to_string(),
+                "-s",
+                &self.serial,
+                "shell",
+                "input",
+                "swipe",
+                &x1.to_string(),
+                &y1.to_string(),
+                &x2.to_string(),
+                &y2.to_string(),
                 &duration_ms.to_string(),
             ])
             .status()
             .map_err(|e| format!("adb swipe failed: {e}"))?;
-        if status.success() { Ok(()) } else { Err("adb swipe non-zero".into()) }
+        if status.success() {
+            Ok(())
+        } else {
+            Err("adb swipe non-zero".into())
+        }
     }
 
     /// Type text.
@@ -92,7 +126,11 @@ impl AdbDevice {
             .args(["-s", &self.serial, "shell", "input", "text", &escaped])
             .status()
             .map_err(|e| format!("adb text failed: {e}"))?;
-        if status.success() { Ok(()) } else { Err("adb text non-zero".into()) }
+        if status.success() {
+            Ok(())
+        } else {
+            Err("adb text non-zero".into())
+        }
     }
 
     /// Press back button.
@@ -101,7 +139,11 @@ impl AdbDevice {
             .args(["-s", &self.serial, "shell", "input", "keyevent", "4"])
             .status()
             .map_err(|e| format!("adb back failed: {e}"))?;
-        if status.success() { Ok(()) } else { Err("adb back non-zero".into()) }
+        if status.success() {
+            Ok(())
+        } else {
+            Err("adb back non-zero".into())
+        }
     }
 
     /// Press home button.
@@ -110,21 +152,34 @@ impl AdbDevice {
             .args(["-s", &self.serial, "shell", "input", "keyevent", "3"])
             .status()
             .map_err(|e| format!("adb home failed: {e}"))?;
-        if status.success() { Ok(()) } else { Err("adb home non-zero".into()) }
+        if status.success() {
+            Ok(())
+        } else {
+            Err("adb home non-zero".into())
+        }
     }
 
     /// Open a URL in the default browser.
     pub fn open_url(&self, url: &str) -> Result<(), String> {
         let status = Command::new("adb")
             .args([
-                "-s", &self.serial,
-                "shell", "am", "start",
-                "-a", "android.intent.action.VIEW",
-                "-d", url,
+                "-s",
+                &self.serial,
+                "shell",
+                "am",
+                "start",
+                "-a",
+                "android.intent.action.VIEW",
+                "-d",
+                url,
             ])
             .status()
             .map_err(|e| format!("adb open_url failed: {e}"))?;
-        if status.success() { Ok(()) } else { Err("adb open_url non-zero".into()) }
+        if status.success() {
+            Ok(())
+        } else {
+            Err("adb open_url non-zero".into())
+        }
     }
 
     /// Search YouTube for a query — uses the YouTube deep link.
@@ -145,15 +200,23 @@ impl AdbDevice {
     pub fn launch_app(&self, package: &str) -> Result<(), String> {
         let status = Command::new("adb")
             .args([
-                "-s", &self.serial,
-                "shell", "monkey",
-                "-p", package,
-                "-c", "android.intent.category.LAUNCHER",
+                "-s",
+                &self.serial,
+                "shell",
+                "monkey",
+                "-p",
+                package,
+                "-c",
+                "android.intent.category.LAUNCHER",
                 "1",
             ])
             .status()
             .map_err(|e| format!("adb launch_app failed: {e}"))?;
-        if status.success() { Ok(()) } else { Err("adb launch_app non-zero".into()) }
+        if status.success() {
+            Ok(())
+        } else {
+            Err("adb launch_app non-zero".into())
+        }
     }
 }
 

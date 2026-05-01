@@ -1,0 +1,10 @@
+[profile.default]
+fail-fast = false
+status-level = "fail"
+final-status-level = "slow"
+
+[profile.ci]
+fail-fast = false
+retries = 1
+status-level = "fail"
+final-status-level = "slow"

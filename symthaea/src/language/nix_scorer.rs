@@ -255,8 +255,17 @@ fn extract_static_attrpath(key_node: &SyntaxNode) -> Option<Vec<String>> {
                 SyntaxKind::NODE_IDENT => {
                     segs.push(n.text().to_string());
                 }
-                SyntaxKind::NODE_DYNAMIC | SyntaxKind::NODE_STRING => {
-                    // Dynamic or quoted segment: bail.
+                SyntaxKind::NODE_STRING => {
+                    let text = n.text().to_string();
+                    if text == "\"\"" {
+                        segs.push("".to_string());
+                    } else {
+                        // Other quoted segments: bail.
+                        return None;
+                    }
+                }
+                SyntaxKind::NODE_DYNAMIC => {
+                    // Dynamic segment: bail.
                     return None;
                 }
                 _ => {

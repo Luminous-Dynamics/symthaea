@@ -168,7 +168,11 @@ impl ProjectManager {
 
     /// Start a new project with realistic variance.
     /// Duration varies ±30% (Flyvbjerg 2002: construction overruns average 20-50%).
-    pub fn start_project_with_variance(&mut self, blueprint: ProjectBlueprint, rng: &mut crate::stochastic::StochasticEngine) {
+    pub fn start_project_with_variance(
+        &mut self,
+        blueprint: ProjectBlueprint,
+        rng: &mut crate::stochastic::StochasticEngine,
+    ) {
         // Duration: base ± 30% gaussian
         let variance = rng.next_gaussian(1.0, 0.15).clamp(0.7, 1.5);
         let actual_duration = ((blueprint.duration() as f64 * variance) as u32).max(1);
@@ -210,19 +214,26 @@ impl ProjectManager {
         // Setbacks and failures for active projects
         let mut failed_indices = Vec::new();
         for (i, project) in self.active.iter_mut().enumerate() {
-            if project.stalled { continue; }
+            if project.stalled {
+                continue;
+            }
             // 3% chance of setback: adds 1-3 months
             if rng.bernoulli(0.03) {
                 let delay = (rng.next_f64() * 3.0).ceil() as u32;
                 project.ticks_remaining += delay;
                 project.total_ticks += delay;
-                events.push(format!("{} setback: +{} months delay",
-                    project.blueprint.name(), delay));
+                events.push(format!(
+                    "{} setback: +{} months delay",
+                    project.blueprint.name(),
+                    delay
+                ));
             }
             // 0.5% chance of critical failure: project abandoned
             if rng.bernoulli(0.005) {
-                events.push(format!("{} CRITICAL FAILURE: project abandoned, materials lost",
-                    project.blueprint.name()));
+                events.push(format!(
+                    "{} CRITICAL FAILURE: project abandoned, materials lost",
+                    project.blueprint.name()
+                ));
                 failed_indices.push(i);
             }
         }
@@ -315,10 +326,10 @@ impl ProjectManager {
 /// This is the AI governor's decision logic.
 pub fn prioritize_projects(
     population: usize,
-    power_deficit: f64,         // power_demand - power_generation (positive = need more)
-    food_fraction: f64,         // food stock / capacity
+    power_deficit: f64, // power_demand - power_generation (positive = need more)
+    food_fraction: f64, // food stock / capacity
     _max_population: usize,
-    pop_near_capacity: bool,    // population > 80% of max
+    pop_near_capacity: bool, // population > 80% of max
     has_medical: bool,
     has_fabrication: bool,
     location: &str,
@@ -407,9 +418,8 @@ mod tests {
 
     #[test]
     fn test_prioritization() {
-        let priorities = prioritize_projects(
-            200, 100.0, 0.2, 500, false, false, false, "Europa", &[],
-        );
+        let priorities =
+            prioritize_projects(200, 100.0, 0.2, 500, false, false, false, "Europa", &[]);
         // Power deficit → reactor first, food crisis → greenhouse
         assert!(priorities.contains(&ProjectBlueprint::FissionReactor));
         assert!(priorities.contains(&ProjectBlueprint::GreenhouseModule));

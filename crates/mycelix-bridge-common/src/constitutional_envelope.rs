@@ -76,15 +76,9 @@ pub const WEIGHT_SUM_TOLERANCE: f64 = 1e-6;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ConstitutionalViolation {
     /// Decay rate λ is below the constitutional minimum.
-    DecayTooLow {
-        lambda: f64,
-        minimum: f64,
-    },
+    DecayTooLow { lambda: f64, minimum: f64 },
     /// Decay rate λ exceeds the constitutional maximum.
-    DecayTooHigh {
-        lambda: f64,
-        maximum: f64,
-    },
+    DecayTooHigh { lambda: f64, maximum: f64 },
     /// A dimension weight exceeds the constitutional maximum.
     DimensionWeightExceeds {
         dimension_index: usize,
@@ -92,34 +86,17 @@ pub enum ConstitutionalViolation {
         maximum: f64,
     },
     /// Dimension weights do not sum to 1.0 (± tolerance).
-    WeightSumInvalid {
-        sum: f64,
-        expected: f64,
-    },
+    WeightSumInvalid { sum: f64, expected: f64 },
     /// Sybil maturation period is below the constitutional minimum.
-    MaturationTooShort {
-        hours: u64,
-        minimum: u64,
-    },
+    MaturationTooShort { hours: u64, minimum: u64 },
     /// Too few dimensions for meaningful governance.
-    TooFewDimensions {
-        count: usize,
-        minimum: usize,
-    },
+    TooFewDimensions { count: usize, minimum: usize },
     /// Too many dimensions (ZK circuit complexity bound).
-    TooManyDimensions {
-        count: usize,
-        maximum: usize,
-    },
+    TooManyDimensions { count: usize, maximum: usize },
     /// A dimension weight is negative or non-finite.
-    InvalidWeight {
-        dimension_index: usize,
-        weight: f64,
-    },
+    InvalidWeight { dimension_index: usize, weight: f64 },
     /// Lambda is NaN or infinite.
-    InvalidLambda {
-        lambda: f64,
-    },
+    InvalidLambda { lambda: f64 },
 }
 
 impl core::fmt::Display for ConstitutionalViolation {
@@ -238,10 +215,7 @@ pub fn validate_model(
     // Weights must sum to 1.0
     let sum: f64 = weights.iter().sum();
     if (sum - 1.0).abs() > WEIGHT_SUM_TOLERANCE {
-        return Err(ConstitutionalViolation::WeightSumInvalid {
-            sum,
-            expected: 1.0,
-        });
+        return Err(ConstitutionalViolation::WeightSumInvalid { sum, expected: 1.0 });
     }
 
     // Invariant 3: Sybil maturation floor

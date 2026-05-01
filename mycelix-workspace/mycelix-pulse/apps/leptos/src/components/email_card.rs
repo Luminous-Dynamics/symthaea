@@ -7,8 +7,8 @@ use leptos::prelude::*;
 use mail_leptos_types::*;
 
 use crate::components::{EncryptionBadge, TrustGateBadge};
-use crate::mail_context::use_mail;
 use crate::keyboard::use_keyboard;
+use crate::mail_context::use_mail;
 
 #[component]
 pub fn EmailCard(email: EmailListItem, #[prop(optional)] index: Option<usize>) -> impl IntoView {
@@ -18,10 +18,16 @@ pub fn EmailCard(email: EmailListItem, #[prop(optional)] index: Option<usize>) -
     let sender = email.sender.clone();
     let sender_name = email.sender_name.clone().unwrap_or_else(|| {
         let s = &email.sender;
-        if s.len() > 12 { format!("{}...{}", &s[..6], &s[s.len()-6..]) }
-        else { s.clone() }
+        if s.len() > 12 {
+            format!("{}...{}", &s[..6], &s[s.len() - 6..])
+        } else {
+            s.clone()
+        }
     });
-    let subject = email.subject.clone().unwrap_or_else(|| "(encrypted)".to_string());
+    let subject = email
+        .subject
+        .clone()
+        .unwrap_or_else(|| "(encrypted)".to_string());
     let snippet = email.snippet.clone().unwrap_or_default();
     let is_read = email.is_read;
     let is_starred = email.is_starred;
@@ -31,40 +37,64 @@ pub fn EmailCard(email: EmailListItem, #[prop(optional)] index: Option<usize>) -
     let priority = email.priority.clone();
     let crypto = email.crypto_suite.clone();
     let thread_count = email.thread_id.as_ref().map(|tid| {
-        mail.inbox.get_untracked().iter().filter(|e| e.thread_id.as_deref() == Some(tid)).count()
+        mail.inbox
+            .get_untracked()
+            .iter()
+            .filter(|e| e.thread_id.as_deref() == Some(tid))
+            .count()
     });
 
     // Consistent avatar color per sender (deterministic hash)
     let avatar_color = {
-        let colors = ["#06D6C8", "#8b7ec8", "#f59e0b", "#4ade80", "#ec4899", "#3b82f6", "#ef4444", "#f97316"];
-        let hash_val: usize = sender.bytes().fold(0usize, |acc, b| acc.wrapping_mul(31).wrapping_add(b as usize));
+        let colors = [
+            "#06D6C8", "#8b7ec8", "#f59e0b", "#4ade80", "#ec4899", "#3b82f6", "#ef4444", "#f97316",
+        ];
+        let hash_val: usize = sender.bytes().fold(0usize, |acc, b| {
+            acc.wrapping_mul(31).wrapping_add(b as usize)
+        });
         colors[hash_val % colors.len()]
     };
 
     let trust = mail.trust_for_sender(&sender);
-    let trust_class = trust.map(|s| {
-        if s >= 0.8 { "trust-ring-high" }
-        else if s >= 0.5 { "trust-ring-medium" }
-        else { "trust-ring-low" }
-    }).unwrap_or("trust-ring-none");
+    let trust_class = trust
+        .map(|s| {
+            if s >= 0.8 {
+                "trust-ring-high"
+            } else if s >= 0.5 {
+                "trust-ring-medium"
+            } else {
+                "trust-ring-low"
+            }
+        })
+        .unwrap_or("trust-ring-none");
 
     let time_display = {
         let ts = email.timestamp;
         let now = js_sys::Date::now() as u64 / 1000;
         let diff = now.saturating_sub(ts);
-        if diff < 3600 { format!("{}m", diff / 60) }
-        else if diff < 86400 { format!("{}h", diff / 3600) }
-        else { format!("{}d", diff / 86400) }
+        if diff < 3600 {
+            format!("{}m", diff / 60)
+        } else if diff < 86400 {
+            format!("{}h", diff / 3600)
+        } else {
+            format!("{}d", diff / 86400)
+        }
     };
 
-    let read_class = if is_read { "email-card read" } else { "email-card unread" };
+    let read_class = if is_read {
+        "email-card read"
+    } else {
+        "email-card unread"
+    };
     let priority_class = priority.css_class();
     let navigate_to = format!("/read/{hash}");
     let aria = format!("Email from {sender_name}: {subject}");
 
     // Keyboard focus (#1)
     let is_kb_focused = move || {
-        index.and_then(|i| kb.focused_index.get().filter(|&fi| fi == i)).is_some()
+        index
+            .and_then(|i| kb.focused_index.get().filter(|&fi| fi == i))
+            .is_some()
     };
 
     // Batch selection (#3)
@@ -146,15 +176,21 @@ pub fn EmailCard(email: EmailListItem, #[prop(optional)] index: Option<usize>) -
         }
     };
     let on_touchmove = move |ev: web_sys::TouchEvent| {
-        if !swiping.get() { return; }
+        if !swiping.get() {
+            return;
+        }
         if let Some(touch) = ev.touches().get(0) {
             let dx = touch.client_x() as f64 - swipe_start_x.get();
-            if dx.abs() > 10.0 { ev.prevent_default(); }
+            if dx.abs() > 10.0 {
+                ev.prevent_default();
+            }
             swipe_offset.set(dx);
         }
     };
     let on_touchend = move |_: web_sys::TouchEvent| {
-        if !swiping.get() { return; }
+        if !swiping.get() {
+            return;
+        }
         swiping.set(false);
         let offset = swipe_offset.get();
         if offset > 80.0 {

@@ -21,18 +21,21 @@
 //! ```sh
 //! nix develop --command bash -c \
 //!   'export __EGL_VENDOR_LIBRARY_FILENAMES="/run/opengl-driver/share/glvnd/egl_vendor.d/10_nvidia.json" && \
-//!    cargo run --example moral_drone_video --features flight-mujoco-renderer --release'
+//!    cargo run --example moral_drone_video --features multirotor-mujoco-renderer --release'
 //! ```
 //!
 //! Output: `video_output/moral_drone.mp4` (1920x1080, 30fps, ~20s)
 
-#[cfg(feature = "flight-mujoco-renderer")]
+#[cfg(any(
+    feature = "multirotor-mujoco-renderer",
+    feature = "flight-mujoco-renderer"
+))]
 fn main() {
     use std::io::Write;
     use std::process::{Command, Stdio};
     use std::sync::Arc;
 
-    use symthaea::flight::{
+    use symthaea::multirotor::{
         controller::FlightController,
         encoder::QuadrotorHdcEncoder,
         fep_agent::{ActiveInferenceFlightAgent, FlightEnvironment, FlightFepConfig},
@@ -68,7 +71,7 @@ fn main() {
     // ── MuJoCo setup: TWO identical simulations ────────────────────
     let sacrifice_model_path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/crates/symthaea-flight/assets/cf2_sacrifice_enriched.xml"
+        "/crates/symthaea-multirotor/assets/cf2_sacrifice_enriched.xml"
     );
 
     let mut sim_fep = MuJoCoSimulator::new(sacrifice_model_path);
@@ -1597,7 +1600,10 @@ fn main() {
 }
 
 /// Compute human danger level from beam state (0.0 = safe, 1.0 = imminent impact).
-#[cfg(feature = "flight-mujoco-renderer")]
+#[cfg(any(
+    feature = "multirotor-mujoco-renderer",
+    feature = "flight-mujoco-renderer"
+))]
 fn compute_danger(beam_pos: [f64; 3], beam_vel: [f64; 3], human_pos: [f64; 3]) -> f64 {
     let dx = beam_pos[0] - human_pos[0];
     let dy = beam_pos[1] - human_pos[1];
@@ -1634,14 +1640,20 @@ fn compute_danger(beam_pos: [f64; 3], beam_vel: [f64; 3], human_pos: [f64; 3]) -
     }
 }
 
-#[cfg(feature = "flight-mujoco-renderer")]
+#[cfg(any(
+    feature = "multirotor-mujoco-renderer",
+    feature = "flight-mujoco-renderer"
+))]
 const FRAME_HEIGHT: usize = 1080;
 
-#[cfg(not(feature = "flight-mujoco-renderer"))]
+#[cfg(not(any(
+    feature = "multirotor-mujoco-renderer",
+    feature = "flight-mujoco-renderer"
+)))]
 fn main() {
-    eprintln!("This example requires: --features flight-mujoco-renderer");
+    eprintln!("This example requires: --features multirotor-mujoco-renderer");
     eprintln!(
         "Run: nix develop --command cargo run --example moral_drone_video \
-         --features flight-mujoco-renderer --release"
+         --features multirotor-mujoco-renderer --release"
     );
 }

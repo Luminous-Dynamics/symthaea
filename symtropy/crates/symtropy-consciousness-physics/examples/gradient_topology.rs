@@ -19,13 +19,13 @@
 //! Run: cargo run --example gradient_topology --release
 
 use nalgebra::SVector;
-use symtropy_consciousness_physics::convergence::{mann_whitney_u, cohens_d, holm_bonferroni};
+use symthaea_consciousness_equation::ConsciousnessInputs;
+use symtropy_consciousness_physics::convergence::{cohens_d, holm_bonferroni, mann_whitney_u};
 use symtropy_consciousness_physics::fep_gradient;
 use symtropy_consciousness_physics::harmony_field::HarmonyField;
 use symtropy_consciousness_physics::{ConsciousnessField, ThermodynamicConstants};
 use symtropy_math::Point;
 use symtropy_physics::PhysicsWorld;
-use symthaea_consciousness_equation::ConsciousnessInputs;
 
 const AGENTS: usize = 20;
 const TICKS: usize = 10_000;
@@ -88,7 +88,9 @@ fn run_experiment(topo: Topology, seed: u64) -> TopoResult {
             SVector::from([20.0, -20.0]),
             SVector::from([-20.0, -20.0]),
         ]
-    } else { vec![] };
+    } else {
+        vec![]
+    };
 
     let mut rng = seed;
     let mut handles = Vec::new();
@@ -97,8 +99,14 @@ fn run_experiment(topo: Topology, seed: u64) -> TopoResult {
         let x = (rng_f64(&mut rng) - 0.5) * 120.0;
         let y = (rng_f64(&mut rng) - 0.5) * 120.0;
         let h = world.add_sphere(Point::new([x, y]), 1.0, 1.0);
-        if let Some(b) = world.body_mut(h) { b.linear_damping = 0.05; }
-        consciousness.register(h, consciousness.constants.initial_energy, consciousness.constants.harmony_range);
+        if let Some(b) = world.body_mut(h) {
+            b.linear_damping = 0.05;
+        }
+        consciousness.register(
+            h,
+            consciousness.constants.initial_energy,
+            consciousness.constants.harmony_range,
+        );
         if let Some(e) = consciousness.entities.get_mut(&h) {
             e.harmony_activations = HARMONY_PROFILES[i % 4];
         }
@@ -123,7 +131,9 @@ fn run_experiment(topo: Topology, seed: u64) -> TopoResult {
                 w[1] = (rng_f64(&mut rng) - 0.5) * 100.0;
             }
             // Refill wells partially on move
-            for r in &mut well_remaining { *r = (*r + 500.0).min(2500.0); }
+            for r in &mut well_remaining {
+                *r = (*r + 500.0).min(2500.0);
+            }
         }
 
         for &h in &handles {
@@ -133,56 +143,101 @@ fn run_experiment(topo: Topology, seed: u64) -> TopoResult {
             let ht = e.map(|e| e.total_harmony_energy()).unwrap_or(0.0);
             let collapsed = e.map(|e| e.energy.is_collapsed()).unwrap_or(true);
             let inputs = if collapsed {
-                ConsciousnessInputs { phi: 0.0, broadcast: 0.0, working_memory: 0.0,
-                    attention: 0.0, recurrence: 0.0, embodiment: 0.0, knowledge: 0.0, synchrony: 0.0 }
+                ConsciousnessInputs {
+                    phi: 0.0,
+                    broadcast: 0.0,
+                    working_memory: 0.0,
+                    attention: 0.0,
+                    recurrence: 0.0,
+                    embodiment: 0.0,
+                    knowledge: 0.0,
+                    synchrony: 0.0,
+                }
             } else {
                 ConsciousnessInputs {
-                    phi: ef, broadcast: 0.5, working_memory: (1.0 - pe).max(0.0),
-                    attention: 0.5, recurrence: 1.0, embodiment: 0.7,
-                    knowledge: (ht / 8.0).min(1.0), synchrony: consciousness.collective_phi.max(0.5),
+                    phi: ef,
+                    broadcast: 0.5,
+                    working_memory: (1.0 - pe).max(0.0),
+                    attention: 0.5,
+                    recurrence: 1.0,
+                    embodiment: 0.7,
+                    knowledge: (ht / 8.0).min(1.0),
+                    synchrony: consciousness.collective_phi.max(0.5),
                 }
             };
             consciousness.update_entity(h, &inputs, Point::origin());
         }
 
-        let adata: Vec<_> = handles.iter().filter_map(|&h| {
-            Some((world.body(h)?.position().0, consciousness.entities.get(&h)?.harmony_activations))
-        }).collect();
+        let adata: Vec<_> = handles
+            .iter()
+            .filter_map(|&h| {
+                Some((
+                    world.body(h)?.position().0,
+                    consciousness.entities.get(&h)?.harmony_activations,
+                ))
+            })
+            .collect();
 
         for &h in &handles {
             let Some(b) = world.body(h) else { continue };
-            let Some(e) = consciousness.entities.get(&h) else { continue };
-            if e.energy.is_collapsed() { continue; }
+            let Some(e) = consciousness.entities.get(&h) else {
+                continue;
+            };
+            if e.energy.is_collapsed() {
+                continue;
+            }
             let pos = b.position().0;
 
             // Well data limited by perception range
-            let wdata: Vec<_> = wells.iter().zip(well_remaining.iter())
+            let wdata: Vec<_> = wells
+                .iter()
+                .zip(well_remaining.iter())
                 .filter(|(w, &r)| r > 0.0 && (pos - *w).norm() < well_sight)
                 .map(|(&p, &r)| (p, (r / 2500.0).min(1.0)))
                 .collect();
 
-            let near: Vec<_> = adata.iter().filter(|(p, _)| {
-                let d = (p - pos).norm(); d > 2.0 && d < consciousness.constants.harmony_range
-            }).cloned().collect();
+            let near: Vec<_> = adata
+                .iter()
+                .filter(|(p, _)| {
+                    let d = (p - pos).norm();
+                    d > 2.0 && d < consciousness.constants.harmony_range
+                })
+                .cloned()
+                .collect();
 
             // Compute obstacle repulsion as danger source (strongest nearby obstacle)
             let danger = if !obstacles.is_empty() {
-                obstacles.iter()
+                obstacles
+                    .iter()
                     .filter(|o| (pos - *o).norm() < 30.0)
                     .min_by(|a, b| (pos - *a).norm().partial_cmp(&(pos - *b).norm()).unwrap())
-            } else { None };
+            } else {
+                None
+            };
 
-            let danger_level = danger.map(|d| {
-                let dist = (pos - d).norm();
-                if dist < 30.0 { (30.0 - dist) / 30.0 } else { 0.0 }
-            }).unwrap_or(0.0);
+            let danger_level = danger
+                .map(|d| {
+                    let dist = (pos - d).norm();
+                    if dist < 30.0 {
+                        (30.0 - dist) / 30.0
+                    } else {
+                        0.0
+                    }
+                })
+                .unwrap_or(0.0);
 
             let dir = fep_gradient::free_energy_gradient(
-                &pos, e.energy.fraction_remaining(),
-                &e.harmony_activations, &near, &wdata,
-                danger.map(|d| d as &SVector<f64, 2>), danger_level,
+                &pos,
+                e.energy.fraction_remaining(),
+                &e.harmony_activations,
+                &near,
+                &wdata,
+                danger.map(|d| d as &SVector<f64, 2>),
+                danger_level,
             );
-            if let Some(b) = world.body_mut(h) { b.linear_velocity = dir * 20.0; }
+            if let Some(b) = world.body_mut(h) {
+                b.linear_velocity = dir * 20.0;
+            }
         }
 
         let rm = consciousness.resource_regeneration_multiplier();
@@ -190,7 +245,9 @@ fn run_experiment(topo: Topology, seed: u64) -> TopoResult {
         let ar = consciousness.constants.ambient_regen_rate;
         let wr = consciousness.constants.energy_well_regen_rate;
         for &h in handles.iter() {
-            if let Some(e) = consciousness.entities.get_mut(&h) { e.energy.tick_reset(); }
+            if let Some(e) = consciousness.entities.get_mut(&h) {
+                e.energy.tick_reset();
+            }
             consciousness.consume_energy(h, mr * (1.0 + consciousness.phi(h) * 0.5));
             if let Some(e) = consciousness.entities.get_mut(&h) {
                 e.energy.regenerate(ar * rm);
@@ -209,21 +266,34 @@ fn run_experiment(topo: Topology, seed: u64) -> TopoResult {
         }
 
         for i in 0..handles.len() {
-            for j in (i+1)..handles.len() {
+            for j in (i + 1)..handles.len() {
                 let (ha, hb) = (handles[i], handles[j]);
                 let in_range = match (world.body(ha), world.body(hb)) {
-                    (Some(a), Some(b)) => a.position().distance(b.position()) < consciousness.constants.harmony_range,
+                    (Some(a), Some(b)) => {
+                        a.position().distance(b.position()) < consciousness.constants.harmony_range
+                    }
                     _ => false,
                 };
-                if !in_range { continue; }
-                let (a, b) = match (consciousness.entities.get(&ha), consciousness.entities.get(&hb)) {
-                    (Some(a), Some(b)) => (a.harmony_activations, b.harmony_activations), _ => continue,
+                if !in_range {
+                    continue;
+                }
+                let (a, b) = match (
+                    consciousness.entities.get(&ha),
+                    consciousness.entities.get(&hb),
+                ) {
+                    (Some(a), Some(b)) => (a.harmony_activations, b.harmony_activations),
+                    _ => continue,
                 };
                 let res = HarmonyField::<2>::resonance(&a, &b);
                 if res > 0.5 {
-                    let rg = consciousness.constants.harmony_resonance_regen_rate * (res - 0.5) * 2.0;
-                    if let Some(e) = consciousness.entities.get_mut(&ha) { e.energy.regenerate(rg); }
-                    if let Some(e) = consciousness.entities.get_mut(&hb) { e.energy.regenerate(rg); }
+                    let rg =
+                        consciousness.constants.harmony_resonance_regen_rate * (res - 0.5) * 2.0;
+                    if let Some(e) = consciousness.entities.get_mut(&ha) {
+                        e.energy.regenerate(rg);
+                    }
+                    if let Some(e) = consciousness.entities.get_mut(&hb) {
+                        e.energy.regenerate(rg);
+                    }
                     coop += 1;
                 }
             }
@@ -234,23 +304,46 @@ fn run_experiment(topo: Topology, seed: u64) -> TopoResult {
         consciousness.tick_thermodynamics();
     }
 
-    let alive_handles: Vec<_> = handles.iter().filter(|h| {
-        consciousness.entities.get(h).map(|e| !e.energy.is_collapsed()).unwrap_or(false)
-    }).cloned().collect();
+    let alive_handles: Vec<_> = handles
+        .iter()
+        .filter(|h| {
+            consciousness
+                .entities
+                .get(h)
+                .map(|e| !e.energy.is_collapsed())
+                .unwrap_or(false)
+        })
+        .cloned()
+        .collect();
     let alive = alive_handles.len() as f64;
 
-    let positions: Vec<(usize, SVector<f64, 2>)> = alive_handles.iter().enumerate()
-        .filter_map(|(i, h)| world.body(*h).map(|b| (i, b.position().0))).collect();
+    let positions: Vec<(usize, SVector<f64, 2>)> = alive_handles
+        .iter()
+        .enumerate()
+        .filter_map(|(i, h)| world.body(*h).map(|b| (i, b.position().0)))
+        .collect();
     let clusters = find_clusters(&positions, consciousness.constants.harmony_range);
 
     let clustering = if positions.len() >= 2 {
-        positions.iter().map(|(i, p)| positions.iter()
-            .filter(|(j, _)| j != i).map(|(_, q)| (p - q).norm())
-            .fold(f64::MAX, f64::min)).sum::<f64>() / positions.len() as f64
-    } else { f64::MAX };
+        positions
+            .iter()
+            .map(|(i, p)| {
+                positions
+                    .iter()
+                    .filter(|(j, _)| j != i)
+                    .map(|(_, q)| (p - q).norm())
+                    .fold(f64::MAX, f64::min)
+            })
+            .sum::<f64>()
+            / positions.len() as f64
+    } else {
+        f64::MAX
+    };
 
     TopoResult {
-        condition: cond_name, alive, clustering,
+        condition: cond_name,
+        alive,
+        clustering,
         cooperation: coop as f64,
         num_clusters: clusters.len() as f64,
     }
@@ -258,15 +351,35 @@ fn run_experiment(topo: Topology, seed: u64) -> TopoResult {
 
 fn find_clusters(positions: &[(usize, SVector<f64, 2>)], range: f64) -> Vec<Vec<usize>> {
     let n = positions.len();
-    if n == 0 { return vec![]; }
+    if n == 0 {
+        return vec![];
+    }
     let mut parent: Vec<usize> = (0..n).collect();
-    fn find(p: &mut [usize], i: usize) -> usize { if p[i] != i { p[i] = find(p, p[i]); } p[i] }
-    fn union(p: &mut [usize], a: usize, b: usize) { let (ra, rb) = (find(p, a), find(p, b)); if ra != rb { p[ra] = rb; } }
-    for i in 0..n { for j in (i+1)..n {
-        if (positions[i].1 - positions[j].1).norm() < range { union(&mut parent, i, j); }
-    }}
-    let mut clusters: std::collections::HashMap<usize, Vec<usize>> = std::collections::HashMap::new();
-    for i in 0..n { let root = find(&mut parent, i); clusters.entry(root).or_default().push(i); }
+    fn find(p: &mut [usize], i: usize) -> usize {
+        if p[i] != i {
+            p[i] = find(p, p[i]);
+        }
+        p[i]
+    }
+    fn union(p: &mut [usize], a: usize, b: usize) {
+        let (ra, rb) = (find(p, a), find(p, b));
+        if ra != rb {
+            p[ra] = rb;
+        }
+    }
+    for i in 0..n {
+        for j in (i + 1)..n {
+            if (positions[i].1 - positions[j].1).norm() < range {
+                union(&mut parent, i, j);
+            }
+        }
+    }
+    let mut clusters: std::collections::HashMap<usize, Vec<usize>> =
+        std::collections::HashMap::new();
+    for i in 0..n {
+        let root = find(&mut parent, i);
+        clusters.entry(root).or_default().push(i);
+    }
     clusters.into_values().collect()
 }
 
@@ -292,15 +405,19 @@ fn main() {
             let seed = 42 + s as u64 * 997;
             eprintln!("  {name} seed={seed}...");
             let r = run_experiment(topo, seed);
-            println!("{},{seed},{:.1},{:.2},{:.0},{:.0}",
-                r.condition, r.alive, r.clustering, r.cooperation, r.num_clusters);
+            println!(
+                "{},{seed},{:.1},{:.2},{:.0},{:.0}",
+                r.condition, r.alive, r.clustering, r.cooperation, r.num_clusters
+            );
             results.push(r);
         }
         let n = results.len() as f64;
-        eprintln!("  → {name}: alive={:.1}, clusters={:.1}, coop={:.0}",
+        eprintln!(
+            "  → {name}: alive={:.1}, clusters={:.1}, coop={:.0}",
             results.iter().map(|r| r.alive).sum::<f64>() / n,
             results.iter().map(|r| r.num_clusters).sum::<f64>() / n,
-            results.iter().map(|r| r.cooperation).sum::<f64>() / n);
+            results.iter().map(|r| r.cooperation).sum::<f64>() / n
+        );
         all.push((name, results));
     }
 
@@ -308,12 +425,14 @@ fn main() {
     eprintln!("  Condition      Alive  Clusters  Clustering  Cooperation");
     for (name, results) in &all {
         let n = results.len() as f64;
-        eprintln!("  {:13} {:5.1}    {:5.1}     {:6.2}      {:9.0}",
+        eprintln!(
+            "  {:13} {:5.1}    {:5.1}     {:6.2}      {:9.0}",
             name,
             results.iter().map(|r| r.alive).sum::<f64>() / n,
             results.iter().map(|r| r.num_clusters).sum::<f64>() / n,
             results.iter().map(|r| r.clustering).sum::<f64>() / n,
-            results.iter().map(|r| r.cooperation).sum::<f64>() / n);
+            results.iter().map(|r| r.cooperation).sum::<f64>() / n
+        );
     }
 
     // Statistical tests vs baseline
@@ -334,8 +453,18 @@ fn main() {
     eprintln!("\n── vs BASELINE (Holm-Bonferroni, k=4) ──");
     for (i, &(label, adj_p, sig)) in corrected.iter().enumerate() {
         let d = d_tests[i];
-        let size = if d.abs() > 0.8 { "LARGE" } else if d.abs() > 0.5 { "medium" } else { "small" };
-        eprintln!("  vs {:13}: p_adj={adj_p:.4}, d={d:.3} ({size}) {}", label, if sig { "← SIG" } else { "" });
+        let size = if d.abs() > 0.8 {
+            "LARGE"
+        } else if d.abs() > 0.5 {
+            "medium"
+        } else {
+            "small"
+        };
+        eprintln!(
+            "  vs {:13}: p_adj={adj_p:.4}, d={d:.3} ({size}) {}",
+            label,
+            if sig { "← SIG" } else { "" }
+        );
     }
 
     // Key question: did we break cooperation?
@@ -345,7 +474,9 @@ fn main() {
 
     eprintln!("\n── Verdict ──");
     if frag_alive < 5.0 && frag_coop < 50000.0 {
-        eprintln!("  TOPOLOGY BREAKS COOPERATION: Fragmented perception destroys social structure.");
+        eprintln!(
+            "  TOPOLOGY BREAKS COOPERATION: Fragmented perception destroys social structure."
+        );
         eprintln!("  Parameters couldn't do it (F38), but topology can.");
     } else {
         eprintln!("  Cooperation persists under structural modification.");
@@ -355,4 +486,9 @@ fn main() {
     eprintln!("\n=== Complete ===");
 }
 
-fn rng_f64(s: &mut u64) -> f64 { *s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407); (*s >> 11) as f64 / (1u64 << 53) as f64 }
+fn rng_f64(s: &mut u64) -> f64 {
+    *s = s
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
+    (*s >> 11) as f64 / (1u64 << 53) as f64
+}

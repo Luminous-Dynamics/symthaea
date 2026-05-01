@@ -56,8 +56,7 @@ pub const TEMP_CLARITY_FLOOR: f64 = 0.1;
 pub fn smooth_temperature_penalty(temperature_k: f64) -> f64 {
     let exponent = TEMP_SIGMOID_STEEPNESS * (temperature_k - TEMP_SIGMOID_MIDPOINT_K);
     let sigmoid = 1.0 / (1.0 + exponent.exp());
-    (TEMP_CLARITY_FLOOR + (1.0 - TEMP_CLARITY_FLOOR) * sigmoid)
-        .clamp(TEMP_CLARITY_FLOOR, 1.0)
+    (TEMP_CLARITY_FLOOR + (1.0 - TEMP_CLARITY_FLOOR) * sigmoid).clamp(TEMP_CLARITY_FLOOR, 1.0)
 }
 
 /// Default energy per cognitive operation (empirical estimate).
@@ -102,10 +101,14 @@ impl ThermodynamicConstants {
     /// Solo agent ~1000 ticks. Cooperation extends to 5000+. Wells sustain but don't trivialize.
     pub fn research() -> Self {
         Self {
-            initial_energy: 200.0, max_energy: 200.0,
-            movement_cost_per_unit: 0.008, sprint_cost_multiplier: 2.5,
-            consciousness_maintenance_per_tick: 0.20, collision_energy_drain: 0.05,
-            harmony_resonance_regen_rate: 0.06, energy_well_regen_rate: 0.12,
+            initial_energy: 200.0,
+            max_energy: 200.0,
+            movement_cost_per_unit: 0.008,
+            sprint_cost_multiplier: 2.5,
+            consciousness_maintenance_per_tick: 0.20,
+            collision_energy_drain: 0.05,
+            harmony_resonance_regen_rate: 0.06,
+            energy_well_regen_rate: 0.12,
             ambient_regen_rate: 0.005,
             collapse_recovery_harmony_threshold: 0.5,
             harmony_range: 40.0,
@@ -311,11 +314,7 @@ mod tests {
         let j_per_phi = ledger.joules_per_phi().unwrap();
         // phi_energy_integral = 100 * 0.8 = 80
         // joules_per_phi = 80 / 0.2 = 400
-        assert!(
-            (j_per_phi - 400.0).abs() < 1e-10,
-            "j/phi = {}",
-            j_per_phi
-        );
+        assert!((j_per_phi - 400.0).abs() < 1e-10, "j/phi = {}", j_per_phi);
     }
 
     #[test]
@@ -376,11 +375,7 @@ mod tests {
         ledger.tick_balance();
 
         let rate = ledger.lifetime_error_rate();
-        assert!(
-            (rate - 0.1).abs() < 1e-10,
-            "error rate = {}",
-            rate
-        );
+        assert!((rate - 0.1).abs() < 1e-10, "error rate = {}", rate);
     }
 
     #[test]
@@ -392,27 +387,48 @@ mod tests {
         // Idle survival: energy / maintenance_per_tick
         let idle_ticks = c.initial_energy / c.consciousness_maintenance_per_tick;
         let idle_seconds = idle_ticks / ticks_per_sec;
-        assert!(idle_seconds > 150.0, "idle survival {idle_seconds}s should be > 150s");
-        assert!(idle_seconds < 250.0, "idle survival {idle_seconds}s should be < 250s");
+        assert!(
+            idle_seconds > 150.0,
+            "idle survival {idle_seconds}s should be > 150s"
+        );
+        assert!(
+            idle_seconds < 250.0,
+            "idle survival {idle_seconds}s should be < 250s"
+        );
 
         // Walking survival: energy / (maintenance + movement_cost * speed/tick_rate)
         let walk_speed = 100.0; // physics units/sec
         let walk_displacement_per_tick = walk_speed / ticks_per_sec;
         let walk_cost_per_tick = c.movement_cost_per_unit * walk_displacement_per_tick;
-        let walk_ticks = c.initial_energy / (c.consciousness_maintenance_per_tick + walk_cost_per_tick);
+        let walk_ticks =
+            c.initial_energy / (c.consciousness_maintenance_per_tick + walk_cost_per_tick);
         let walk_seconds = walk_ticks / ticks_per_sec;
-        assert!(walk_seconds > 100.0, "walk survival {walk_seconds}s should be > 100s");
-        assert!(walk_seconds < 200.0, "walk survival {walk_seconds}s should be < 200s");
+        assert!(
+            walk_seconds > 100.0,
+            "walk survival {walk_seconds}s should be > 100s"
+        );
+        assert!(
+            walk_seconds < 200.0,
+            "walk survival {walk_seconds}s should be < 200s"
+        );
 
         // Sprinting: faster depletion
-        let sprint_cost_per_tick = c.movement_cost_per_unit * (200.0 / ticks_per_sec) * c.sprint_cost_multiplier;
-        let sprint_ticks = c.initial_energy / (c.consciousness_maintenance_per_tick + sprint_cost_per_tick);
+        let sprint_cost_per_tick =
+            c.movement_cost_per_unit * (200.0 / ticks_per_sec) * c.sprint_cost_multiplier;
+        let sprint_ticks =
+            c.initial_energy / (c.consciousness_maintenance_per_tick + sprint_cost_per_tick);
         let sprint_seconds = sprint_ticks / ticks_per_sec;
-        assert!(sprint_seconds < walk_seconds, "sprint should deplete faster than walk");
+        assert!(
+            sprint_seconds < walk_seconds,
+            "sprint should deplete faster than walk"
+        );
 
         // With harmony partner: should regenerate (net positive)
         let harmony_net = c.harmony_resonance_regen_rate - c.consciousness_maintenance_per_tick;
-        assert!(harmony_net > 0.0, "harmony regen should exceed maintenance: {harmony_net}");
+        assert!(
+            harmony_net > 0.0,
+            "harmony regen should exceed maintenance: {harmony_net}"
+        );
     }
 
     #[test]

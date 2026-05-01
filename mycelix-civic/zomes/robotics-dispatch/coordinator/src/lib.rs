@@ -1,3 +1,4 @@
+use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -60,7 +61,7 @@ pub fn register_asset(input: RegisterAssetInput) -> ExternResult<Record> {
         asset_id: input.asset_id,
         platform_type: input.platform_type,
         owner: agent.clone(),
-        consciousness_level: input.consciousness_level,
+        sovereign_profile: input.sovereign_profile,
         max_tier: input.max_tier,
         location_lat: input.location_lat,
         location_lon: input.location_lon,
@@ -167,7 +168,7 @@ pub struct SubmitTelemetryInput {
     pub lat: f64,
     pub lon: f64,
     pub alt: f64,
-    pub consciousness_level: f64,
+    pub sovereign_profile: SovereignProfile,
     pub safety_level: String,
     pub mission_progress: f64,
     pub fuel_level: f64,
@@ -188,7 +189,7 @@ pub fn submit_telemetry(input: SubmitTelemetryInput) -> ExternResult<Record> {
         lat: input.lat,
         lon: input.lon,
         alt: input.alt,
-        consciousness_level: input.consciousness_level,
+        sovereign_profile: input.sovereign_profile,
         safety_level: input.safety_level,
         mission_progress: input.mission_progress,
         fuel_level: input.fuel_level,
@@ -472,4 +473,6 @@ pub fn get_asset_credentials(asset_hash: ActionHash) -> ExternResult<Vec<Record>
         }
     }
     Ok(credentials)
+}
+)
 }

@@ -9,13 +9,10 @@
 //! sovereignty level, cognitive state, and active adaptations.
 
 use leptos::prelude::*;
-use mycelix_leptos_core::{SovereignRadar, SovereignRadarSize};
 
-use crate::adaptivity_provider::use_adaptivity;
-use crate::cognitive_adaptivity::*;
-use crate::components::suggestion_overlay::{SuggestionOverlay, CognitiveStateMirror};
 use crate::curriculum::{curriculum_graph, use_progress, ProgressStatus};
 use crate::holochain::use_holochain;
+use crate::ledger::StewardshipLedger;
 
 // ---------------------------------------------------------------------------
 // Data types
@@ -244,11 +241,215 @@ pub fn DashboardPage() -> impl IntoView {
             // Exam countdown + streak (real data)
             <crate::study_tracker::ExamCountdown />
 
+            // Stewardship Ledger (New: Economic & Reputation Loop)
+            <StewardshipLedger />
+
             // CAPS Progress Overview
             <ProgressCard />
 
+            // THE MINIMUM VIABLE PARASITE (MVP): Inrush Shock-Absorber
+            <div class="mvp-box" style="margin: 1.5rem 0; padding: 2rem; background: linear-gradient(135deg, var(--surface-high), var(--primary-low)); border: 3px solid var(--primary); border-radius: 16px; text-align: center">
+                <div style="font-size: 2.5rem; margin-bottom: 1rem">"\u{26A1}"</div>
+                <h3 style="margin: 0; color: var(--primary)">"Neighborhood Shock-Absorber"</h3>
+                <p style="font-size: 0.9rem; line-height: 1.6; margin: 1rem 0">
+                    "Your hardware is protecting 12 neighboring fridges from City Power inrush spikes. Trust earned: 100%."
+                </p>
+                <div style="font-size: 0.75rem; font-weight: 800; color: var(--success)">"STATUS: ACTIVE (Smoothing grid slam)"</div>
+            </div>
+
+            // ANALOG BOOTSTRAP: Indestructible Fallback
+            <div class="analog-box" style="margin: 1rem 0; padding: 1.5rem; background: var(--surface); border: 2px solid var(--border); border-radius: 12px; display: flex; align-items: center; gap: 1.5rem">
+                <div style="font-size: 2rem">"\u{1F4D6}"</div>
+                <div style="text-align: left">
+                    <h4 style="margin: 0">"Analog Seed"</h4>
+                    <p style="font-size: 0.7rem; color: var(--text-secondary)">"Indestructible 1-page survival PDF. Print and laminate."</p>
+                </div>
+                <button class="btn-sm btn-outline" style="margin-left: auto">"Export PDF"</button>
+            </div>
+
             // Pending TEND — economic value from learning
             <PendingTendCard />
+
+            // Mesh CDN: Zero-Bandwidth Onboarding (Offline P2P)
+            <div class="mesh-cdn-box" style="margin: 1rem 0; padding: 1.5rem; background: var(--surface-high); border: 2px dashed var(--accent); border-radius: 12px; text-align: center">
+                <div style="font-size: 1.5rem; margin-bottom: 0.5rem">"\u{1F310}"</div>
+                <h4 style="margin: 0">"Sow the Mesh"</h4>
+                <p style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 1rem">
+                    "Internet down? Beam the entire Praxis app to a nearby peer via Bluetooth/P2P."
+                </p>
+                <button 
+                    class="btn-primary" 
+                    style="background: var(--accent); border-color: var(--accent)"
+                    on:click=move |_| {
+                        // Trigger WebBluetooth / Wi-Fi Direct Gossip logic
+                    }
+                >
+                    "Activate Local Edge Server"
+                </button>
+            </div>
+
+            // Gravity Well: Ambient Utility & Local Dividends
+            <div class="gravity-well-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem">
+                <div class="gravity-card" style="padding: 1rem; background: linear-gradient(135deg, var(--surface), var(--primary-low)); border-radius: 12px; border: 1px solid var(--primary)">
+                    <h5 style="margin: 0; color: var(--primary)">"Oasis Services"</h5>
+                    <div style="font-size: 0.7rem; margin-top: 0.5rem">
+                        <div style="display: flex; justify-content: space-between">
+                            <span>"Mesh WiFi:"</span>
+                            <span style="color: var(--success)">"ULTRA"</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between">
+                            <span>"Gravity Tap:"</span>
+                            <span style="color: var(--info)">"ACTIVE"</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="gravity-card" style="padding: 1rem; background: linear-gradient(135deg, var(--surface), var(--success-low)); border-radius: 12px; border: 1px solid var(--success)">
+                    <h5 style="margin: 0; color: var(--success)">"Nearby Dividends"</h5>
+                    <div style="font-size: 0.7rem; margin-top: 0.5rem">
+                        <div style="display: flex; justify-content: space-between">
+                            <span>"DC Charge:"</span>
+                            <span style="color: var(--success)">"+1.5 TEND"</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between">
+                            <span>"Water Payout:"</span>
+                            <span style="color: var(--info)">"2.0 L"</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            // Threat-to-Equity: Scrap Conversion Track
+            <div class="scrap-track-box" style="margin: 1rem 0; padding: 1.25rem; background: var(--surface-high); border: 1px solid var(--warning); border-radius: 12px">
+                <div style="display: flex; justify-content: space-between; align-items: center">
+                    <h4 style="margin: 0; color: var(--warning)">"Scrap-to-Equity Track"</h4>
+                    <span class="badge" style="background: var(--warning); color: var(--text-on-primary)">"10x ROI"</span>
+                </div>
+                <p style="font-size: 0.75rem; margin-top: 0.5rem">
+                    "Have copper or batteries? Don't strip them for R50. Convert them to power banks for 500 TEND."
+                </p>
+                <button class="btn-sm btn-outline" style="width: 100%; margin-top: 0.5rem; border-color: var(--warning); color: var(--warning)">
+                    "Begin Conversion \u{2192}"
+                </button>
+            </div>
+
+            // Civic Sovereignty: Sentinel Mesh & Infrastructure Patching
+            <div class="civic-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem">
+                <div class="civic-card" style="padding: 1rem; background: var(--surface-high); border-radius: 12px; border: 1px solid var(--accent)">
+                    <h5 style="margin: 0; color: var(--accent)">"Sentinel Mesh"</h5>
+                    <p style="font-size: 0.65rem; color: var(--text-tertiary)">"24/7 human radar sweep."</p>
+                    <div style="font-size: 0.75rem; font-weight: 700; color: var(--success); margin-top: 0.5rem">
+                        "Active: Ridge Road Substation"
+                        <div style="font-weight: 400">"Bounty: 5 TEND"</div>
+                    </div>
+                </div>
+                <div class="civic-card" style="padding: 1rem; background: var(--surface-high); border-radius: 12px; border: 1px solid var(--primary)">
+                    <h5 style="margin: 0; color: var(--primary)">"Hydro-Patch Alert"</h5>
+                    <p style="font-size: 0.65rem; color: var(--text-tertiary)">"Asymmetric Municipal Patching."</p>
+                    <div style="font-size: 0.75rem; font-weight: 700; color: var(--error); margin-top: 0.5rem">
+                        "Burst: 6th Avenue Main"
+                        <div style="font-weight: 400">"Bounty: 250 TEND"</div>
+                    </div>
+                </div>
+            </div>
+
+            // Taxi Syndicate: Freight Node Integration
+            <div class="taxi-box" style="margin-bottom: 1.5rem; padding: 1.25rem; background: linear-gradient(to right, var(--surface), var(--accent-low)); border: 1px solid var(--accent); border-radius: 12px">
+                <div style="display: flex; justify-content: space-between; align-items: center">
+                    <h4 style="margin: 0; color: var(--accent)">"Taxi Freight Node"</h4>
+                    <span class="badge" style="background: var(--accent); color: var(--text-on-primary)">"Premium Bounties"</span>
+                </div>
+                <div style="font-size: 0.8rem; margin-top: 0.5rem">
+                    "Secure logistics via Minibus Taxi Association."
+                    <div style="color: var(--accent); font-size: 0.7rem">"Status: 3 Active Routes (Roodepoort-to-Soweto)"</div>
+                </div>
+            </div>
+
+            // Geoclimatic Bootloader: Protocol Adaptation
+            <div class="bootloader-box" style="margin-bottom: 1.5rem; padding: 1.25rem; background: var(--surface-high); border: 1px solid var(--primary-low); border-radius: 12px">
+                <div style="display: flex; justify-content: space-between; align-items: center">
+                    <h4 style="margin: 0; color: var(--primary)">"Geoclimatic Bootloader"</h4>
+                    <span class="badge" style="background: var(--primary); color: var(--text-on-primary)">"Hardened"</span>
+                </div>
+                <p style="font-size: 0.75rem; margin-top: 0.5rem">
+                    "Protocol branched for Biome: Sub-Tropical / Political State: Hostile."
+                </p>
+                <div style="font-size: 0.7rem; color: var(--success); font-weight: 700">"HDC Tree Pruning: COMPLETE (Solar Prioritized)"</div>
+            </div>
+
+            // Guild Protocol: Legacy Assimilation
+            <div class="guild-box" style="margin-bottom: 1.5rem; padding: 1.25rem; background: linear-gradient(to right, var(--surface), var(--primary-low)); border: 1px solid var(--primary); border-radius: 12px">
+                <div style="display: flex; justify-content: space-between; align-items: center">
+                    <h4 style="margin: 0; color: var(--primary)">"Active Guilds"</h4>
+                    <span class="badge" style="background: var(--primary); color: var(--text-on-primary)">"Onboarded: 4"</span>
+                </div>
+                <div style="font-size: 0.8rem; margin-top: 0.5rem">
+                    <strong>"Florida Block Watch"</strong>" is now a registered Guild."
+                    <div style="color: var(--success); font-size: 0.7rem">"+500 TEND injected for Visibility Brush-Clear"</div>
+                </div>
+            </div>
+
+            // Shield & Shelter: Guardian Routing and Micro-Housing
+            <div class="shield-shelter-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem">
+                <div class="shield-card" style="padding: 1rem; background: var(--error-low); border-radius: 12px; border: 1px solid var(--error)">
+                    <h5 style="margin: 0; color: var(--error)">"Dobsonville Shield"</h5>
+                    <p style="font-size: 0.65rem; color: var(--text-tertiary)">"ZK-Routing to Guardian Elders."</p>
+                    <button class="btn-sm btn-primary" style="width: 100%; background: var(--error); border-color: var(--error); margin-top: 0.5rem">
+                        "Panic \u{26A0}\u{FE0F}"
+                    </button>
+                </div>
+                <div class="shelter-card" style="padding: 1rem; background: var(--surface-high); border-radius: 12px; border: 1px solid var(--success)">
+                    <h5 style="margin: 0; color: var(--success)">"Shelter Sprout"</h5>
+                    <p style="font-size: 0.65rem; color: var(--text-tertiary)">"Parametric Housing Deploy."</p>
+                    <div style="font-size: 0.75rem; font-weight: 700; color: var(--success); margin-top: 0.5rem">
+                        "Active: Princess Unit-12"
+                        <div style="font-weight: 400">"Progress: 45% Built"</div>
+                    </div>
+                </div>
+            </div>
+
+            // Bureaucratic Sync: Automated Subsidy Capture
+            <div class="bureau-box" style="margin-bottom: 1.5rem; padding: 1.25rem; background: var(--surface-high); border: 1px solid var(--info); border-radius: 12px">
+                <div style="display: flex; justify-content: space-between; align-items: center">
+                    <h4 style="margin: 0; color: var(--info)">"Bureaucratic Relay"</h4>
+                    <span class="badge" style="background: var(--info); color: var(--text-on-primary)">"ESP Active"</span>
+                </div>
+                <div style="font-size: 0.8rem; margin-top: 0.5rem">
+                    "Algorithmic capture of CoJ Indigent Rebates."
+                    <div style="color: var(--info); font-size: 0.7rem">"Status: 142 Applications Signed & Queued"</div>
+                </div>
+            </div>
+
+            // Infrastructure Autonomy: Grid Ghosting & Aqueduct Routing
+            <div class="autonomy-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem">
+                <div class="autonomy-card" style="padding: 1rem; background: var(--surface-high); border-radius: 12px; border: 1px solid var(--primary)">
+                    <h5 style="margin: 0; color: var(--primary)">"Grid Ghosting"</h5>
+                    <p style="font-size: 0.65rem; color: var(--text-tertiary)">"Zero-Export Firmware Active."</p>
+                    <div style="font-size: 0.75rem; font-weight: 700; color: var(--success); margin-top: 0.5rem">
+                        "Status: LEGALLY INVISIBLE"
+                        <div style="font-weight: 400">"Backfeed: 0.00 W"</div>
+                    </div>
+                </div>
+                <div class="autonomy-card" style="padding: 1rem; background: var(--surface-high); border-radius: 12px; border: 1px solid var(--info)">
+                    <h5 style="margin: 0; color: var(--info)">"Gravity Aqueduct"</h5>
+                    <p style="font-size: 0.65rem; color: var(--text-tertiary)">"Topographic bypass routing."</p>
+                    <div style="font-size: 0.75rem; font-weight: 700; color: var(--info); margin-top: 0.5rem">
+                        "Active: Roodepoort Deep Bypass"
+                        <div style="font-weight: 400">"Pressure: GRAVITY-FED"</div>
+                    </div>
+                </div>
+            </div>
+
+            // Legal Shield: Automated Affidavit Ledger
+            <div class="legal-box" style="margin-bottom: 1.5rem; padding: 1.25rem; background: var(--surface-high); border: 1px solid var(--error); border-radius: 12px">
+                <div style="display: flex; justify-content: space-between; align-items: center">
+                    <h4 style="margin: 0; color: var(--error)">"Legal Shield (OUTA-Bridge)"</h4>
+                    <span class="badge" style="background: var(--error); color: var(--text-on-primary)">"Evidence: 540h Outage"</span>
+                </div>
+                <div style="font-size: 0.8rem; margin-top: 0.5rem">
+                    "Collective defense fund active. Every outage is a signed affidavit."
+                    <div style="color: var(--error); font-size: 0.7rem">"Status: Defense Pot [12,500 TARD Swap Pending]"</div>
+                </div>
+            </div>
 
             // Solo cooperation prompt
             <div class="cooperation-prompt">
@@ -256,12 +457,6 @@ pub fn DashboardPage() -> impl IntoView {
                 <br />
                 <strong>"Cooperation multiplier: 1.2x TEND for group study sessions."</strong>
             </div>
-
-            // Suggestion overlay
-            <SuggestionOverlay />
-
-            // Mirror mode cognitive state display
-            <CognitiveStateMirror />
 
             // Start Session — links to highest priority topic
             {move || {
@@ -347,14 +542,6 @@ pub fn DashboardPage() -> impl IntoView {
             // Subject mastery breakdown
             <SubjectMasteryBreakdown />
 
-            <div class="dashboard-grid">
-                <SovereigntyCard />
-                <LearningReadinessCard />
-                <div class="dash-card">
-                    <h3>"Civic Profile"</h3>
-                    <SovereignRadar size=SovereignRadarSize::Small />
-                </div>
-            </div>
             <CurriculumRecommendationsSection />
         </div>
     }
@@ -558,7 +745,7 @@ fn LearningReadinessCard() -> impl IntoView {
             <div class="readiness-display">
                 {move || {
                     let s = ctx.state.get();
-                    // Map consciousness state to kid-friendly readiness
+                    // Map cognitive state to kid-friendly readiness
                     let (indicator, status_text, hint, css_class) = if s.phi > 0.5 && s.neuromod_norepinephrine < 0.7 {
                         ("\u{1f7e2}", "Ready to learn!", "Your brain is warmed up and ready for new challenges", "readiness-green")
                     } else if s.phi > 0.3 {
@@ -1078,6 +1265,19 @@ fn ProgressCard() -> impl IntoView {
                         }
                     }}
                 </div>
+                // Mesh Certification
+                <div>
+                    <div style="font-size: 0.8rem; color: var(--info); margin-bottom: 0.25rem">"Mesh-Certified"</div>
+                    {move || {
+                        let count = crate::mesh::use_mesh().mesh_certified_count.get();
+                        view! {
+                            <div style="font-size: 1.5rem; font-weight: 700">{count}</div>
+                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem">
+                                "Verified via local Swarm Mesh"
+                            </div>
+                        }
+                    }}
+                </div>
             </div>
 
             // Priority topics
@@ -1397,6 +1597,9 @@ fn PendingTendCard() -> impl IntoView {
     let event_count = ledger.events.len();
     let should_prompt = ledger.should_prompt_connection();
 
+    // Calculate credit capacity based on top subject mastery (MATL)
+    let credit_limit = 40 + (total as i32 / 5); // Simple local mock of get_credit_capacity logic
+
     view! {
         <div class="dash-card tend-card">
             <h3>"Learning Economy"</h3>
@@ -1404,6 +1607,19 @@ fn PendingTendCard() -> impl IntoView {
                 <span style="font-size: 2rem; font-weight: 700; color: var(--primary)">{format!("{:.1}", total)}</span>
                 <span style="font-size: 0.9rem; color: var(--text-secondary)">"TEND earned"</span>
             </div>
+            
+            // Mutual Credit Capacity
+            <div style="margin-top: 1rem; padding: 0.75rem; background: var(--surface-low); border-radius: 6px; border: 1px solid var(--border)">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem">
+                    <span style="font-size: 0.75rem; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase">"Credit Capacity"</span>
+                    <span style="font-size: 0.85rem; font-weight: 700; color: var(--success)">"\u{00B1}"{credit_limit}" TEND"</span>
+                </div>
+                <div class="progress-bar" style="height: 4px; margin-bottom: 0.25rem">
+                    <div class="progress-bar-fill success" style=format!("width: {}%", (total as i32 * 100 / credit_limit).min(100))></div>
+                </div>
+                <p style="font-size: 0.65rem; color: var(--text-secondary); margin: 0">"Your credit limit grows as your MATL trust score increases."</p>
+            </div>
+
             {if pending > 0.0 {
                 view! {
                     <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem">

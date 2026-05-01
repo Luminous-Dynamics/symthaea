@@ -19,5 +19,45 @@ chrono = { workspace = true }
 symthaea-muse = { path = "../symthaea-muse" }
 symthaea-gallery = { path = "../symthaea-gallery" }
 
+[features]
+default = []
+showcase = []
+
+[[example]]
+name = "autopoietic_practice"
+required-features = ["showcase"]
+
+[[example]]
+name = "creative_demo"
+required-features = ["showcase"]
+
+[[example]]
+name = "creative_evolution"
+required-features = ["showcase"]
+
+[[example]]
+name = "living_art_demo"
+required-features = ["showcase"]
+
+[[example]]
+name = "neural_vs_procedural"
+required-features = ["showcase"]
+
+[[example]]
+name = "overnight_practice"
+required-features = ["showcase"]
+
+[[example]]
+name = "synesthetic_practice"
+required-features = ["showcase"]
+
+[[example]]
+name = "train_neural_canvas"
+required-features = ["showcase"]
+
+[[test]]
+name = "creative_loop_integration"
+required-features = ["showcase"]
+
 [lints]
 workspace = true

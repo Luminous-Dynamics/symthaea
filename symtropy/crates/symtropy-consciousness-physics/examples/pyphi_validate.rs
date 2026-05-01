@@ -20,13 +20,13 @@ fn main() {
 #[cfg(feature = "pyphi-validation")]
 fn main() {
     use nalgebra::SVector;
+    use symthaea_consciousness_equation::ConsciousnessInputs;
     use symtropy_consciousness_physics::coupling::ConsciousnessField;
     use symtropy_consciousness_physics::pyphi_validation::{
-        TpmCollector, validate_against_pyphi, PHI_BINARY_THRESHOLD,
+        validate_against_pyphi, TpmCollector, PHI_BINARY_THRESHOLD,
     };
     use symtropy_math::Point;
     use symtropy_physics::PhysicsWorld;
-    use symthaea_consciousness_equation::ConsciousnessInputs;
 
     const NUM_AGENTS: usize = 3; // Small enough for exact PyPhi (2^3 = 8 states)
     const TICKS: u64 = 2000;
@@ -34,7 +34,10 @@ fn main() {
 
     eprintln!("═══════════════════════════════════════════════════════════");
     eprintln!("  PyPhi Validation: Softmin Φ vs Exact IIT Φ");
-    eprintln!("  {} agents, {} ticks, threshold={}", NUM_AGENTS, TICKS, PHI_BINARY_THRESHOLD);
+    eprintln!(
+        "  {} agents, {} ticks, threshold={}",
+        NUM_AGENTS, TICKS, PHI_BINARY_THRESHOLD
+    );
     eprintln!("═══════════════════════════════════════════════════════════\n");
 
     // Create world
@@ -46,10 +49,7 @@ fn main() {
     for i in 0..NUM_AGENTS {
         let angle = std::f64::consts::TAU * i as f64 / NUM_AGENTS as f64;
         let r = 8.0;
-        let h = world.add_sphere(
-            Point::new([r * angle.cos(), r * angle.sin()]),
-            1.0, 1.0,
-        );
+        let h = world.add_sphere(Point::new([r * angle.cos(), r * angle.sin()]), 1.0, 1.0);
         field.register(h, 100.0, 2.0);
         handles.push(h);
     }
@@ -60,16 +60,34 @@ fn main() {
     // Vary inputs across ticks to explore state space
     let input_profiles = [
         ConsciousnessInputs {
-            phi: 0.8, broadcast: 0.7, working_memory: 0.6, attention: 0.9,
-            recurrence: 0.5, embodiment: 0.8, knowledge: 0.6, synchrony: 0.7,
+            phi: 0.8,
+            broadcast: 0.7,
+            working_memory: 0.6,
+            attention: 0.9,
+            recurrence: 0.5,
+            embodiment: 0.8,
+            knowledge: 0.6,
+            synchrony: 0.7,
         },
         ConsciousnessInputs {
-            phi: 0.2, broadcast: 0.3, working_memory: 0.4, attention: 0.2,
-            recurrence: 0.3, embodiment: 0.5, knowledge: 0.2, synchrony: 0.3,
+            phi: 0.2,
+            broadcast: 0.3,
+            working_memory: 0.4,
+            attention: 0.2,
+            recurrence: 0.3,
+            embodiment: 0.5,
+            knowledge: 0.2,
+            synchrony: 0.3,
         },
         ConsciousnessInputs {
-            phi: 0.5, broadcast: 0.5, working_memory: 0.5, attention: 0.5,
-            recurrence: 0.5, embodiment: 0.5, knowledge: 0.5, synchrony: 0.5,
+            phi: 0.5,
+            broadcast: 0.5,
+            working_memory: 0.5,
+            attention: 0.5,
+            recurrence: 0.5,
+            embodiment: 0.5,
+            knowledge: 0.5,
+            synchrony: 0.5,
         },
     ];
 
@@ -86,7 +104,8 @@ fn main() {
             agent_inputs.phi *= 1.0 - 0.2 * (i as f64 / NUM_AGENTS as f64);
             agent_inputs.attention *= 1.0 + 0.1 * (i as f64);
 
-            let pos = world.body(h)
+            let pos = world
+                .body(h)
                 .map(|b| {
                     let p = b.position();
                     Point::new([p.coord(0), p.coord(1)])
@@ -98,15 +117,19 @@ fn main() {
         field.tick_prediction_errors();
 
         // Emotional contagion
-        let positions: Vec<_> = handles.iter().map(|&h| {
-            let pos = world.body(h)
-                .map(|b| {
-                    let p = b.position();
-                    Point::new([p.coord(0), p.coord(1)])
-                })
-                .unwrap_or_else(Point::origin);
-            (h, pos)
-        }).collect();
+        let positions: Vec<_> = handles
+            .iter()
+            .map(|&h| {
+                let pos = world
+                    .body(h)
+                    .map(|b| {
+                        let p = b.position();
+                        Point::new([p.coord(0), p.coord(1)])
+                    })
+                    .unwrap_or_else(Point::origin);
+                (h, pos)
+            })
+            .collect();
         field.spread_emotional_contagion(&positions, DT);
 
         // Physics step
@@ -129,7 +152,8 @@ fn main() {
 
     eprintln!("\n  TPM collection complete:");
     eprintln!("    Ticks recorded: {}", collector.ticks_recorded());
-    eprintln!("    State coverage: {:.1}% ({}/{})",
+    eprintln!(
+        "    State coverage: {:.1}% ({}/{})",
         collector.coverage() * 100.0,
         collector.tpm().states_visited(),
         collector.tpm().num_states(),

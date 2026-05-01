@@ -88,11 +88,11 @@ pub mod error;
 mod export_bindings;
 pub mod finance;
 pub mod hyperfeel;
-pub mod space;
 pub mod identity;
 pub mod intentions;
 pub mod pagination;
 pub mod pog;
+pub mod space;
 pub mod storage;
 pub mod temporal;
 pub mod zkproof;
@@ -139,8 +139,8 @@ pub use zkproof::{GradientProof, GradientProofCircuit, PublicInputs};
 
 // Space cluster exports (SSA: conjunction screening, negotiation, debris bounties)
 pub use space::{
-    ConjunctionAssessment, CreateBountyRequest, CreateProposalRequest, ManeuverOption,
-    OptionTally, ProposalTally, ScreenConjunctionRequest, SpaceClient, VoteRequest,
+    ConjunctionAssessment, CreateBountyRequest, CreateProposalRequest, ManeuverOption, OptionTally,
+    ProposalTally, ScreenConjunctionRequest, SpaceClient, VoteRequest,
 };
 
 // Agentic Economy exports (MIP-E-004: Epistemic-Aware AI Agency)

@@ -3,8 +3,8 @@
 
 //! Notification center — bell icon dropdown with unified activity feed.
 
-use leptos::prelude::*;
 use crate::mail_context::use_mail;
+use leptos::prelude::*;
 
 #[derive(Clone, Debug)]
 pub struct NotifItem {
@@ -27,7 +27,10 @@ pub fn NotificationCenter() -> impl IntoView {
 
         // Unread emails
         for e in mail.inbox.get().iter().filter(|e| !e.is_read).take(5) {
-            let sender = e.sender_name.clone().unwrap_or_else(|| e.sender[..8.min(e.sender.len())].to_string());
+            let sender = e
+                .sender_name
+                .clone()
+                .unwrap_or_else(|| e.sender[..8.min(e.sender.len())].to_string());
             items.push(NotifItem {
                 icon: "\u{2709}",
                 title: format!("New mail from {sender}"),
@@ -44,9 +47,11 @@ pub fn NotificationCenter() -> impl IntoView {
                     items.push(NotifItem {
                         icon: "\u{1F6E1}",
                         title: "Trust review needed".into(),
-                        detail: format!("Email from {} (trust: {:.0}%)",
+                        detail: format!(
+                            "Email from {} (trust: {:.0}%)",
                             e.sender_name.clone().unwrap_or_else(|| "unknown".into()),
-                            score * 100.0),
+                            score * 100.0
+                        ),
                         category: "trust",
                         timestamp: e.timestamp,
                     });
@@ -77,9 +82,18 @@ pub fn NotificationCenter() -> impl IntoView {
 
     let total_count = move || {
         let unread = mail.inbox.get().iter().filter(|e| !e.is_read).count();
-        let trust_pending = mail.inbox.get().iter().filter(|e| {
-            mail.sender_trust.get().get(&e.sender).map(|s| *s < 0.5).unwrap_or(false)
-        }).count();
+        let trust_pending = mail
+            .inbox
+            .get()
+            .iter()
+            .filter(|e| {
+                mail.sender_trust
+                    .get()
+                    .get(&e.sender)
+                    .map(|s| *s < 0.5)
+                    .unwrap_or(false)
+            })
+            .count();
         unread + trust_pending
     };
 

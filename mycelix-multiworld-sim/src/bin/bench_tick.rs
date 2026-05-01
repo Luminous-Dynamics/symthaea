@@ -4,8 +4,8 @@
 //!
 //! Run: cargo run --release --bin bench_tick
 
-use mycelix_multiworld_sim::MultiWorldSimulator;
 use mycelix_multiworld_sim::config::SimulationConfig;
+use mycelix_multiworld_sim::MultiWorldSimulator;
 use std::time::Instant;
 
 fn main() {
@@ -50,8 +50,16 @@ fn main() {
     let est_300yr = run_time.as_secs_f64() * (300.0 / years as f64);
     let est_1000yr = run_time.as_secs_f64() * (1000.0 / years as f64);
     println!("=== ESTIMATES ===");
-    println!("300yr estimate:  {:.0}s ({:.1} min)", est_300yr, est_300yr / 60.0);
-    println!("1000yr estimate: {:.0}s ({:.1} min)", est_1000yr, est_1000yr / 60.0);
+    println!(
+        "300yr estimate:  {:.0}s ({:.1} min)",
+        est_300yr,
+        est_300yr / 60.0
+    );
+    println!(
+        "1000yr estimate: {:.0}s ({:.1} min)",
+        est_1000yr,
+        est_1000yr / 60.0
+    );
     println!();
 
     // Population scaling analysis

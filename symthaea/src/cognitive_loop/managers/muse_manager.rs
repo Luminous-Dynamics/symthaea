@@ -520,7 +520,7 @@ impl MuseManager {
         // fmt chunk — IEEE float PCM (format code 3)
         out.extend_from_slice(b"fmt ");
         out.extend_from_slice(&16u32.to_le_bytes()); // chunk size (no extension)
-        out.extend_from_slice(&3u16.to_le_bytes());  // IEEE float
+        out.extend_from_slice(&3u16.to_le_bytes()); // IEEE float
         out.extend_from_slice(&NUM_CHANNELS.to_le_bytes());
         out.extend_from_slice(&sample_rate.to_le_bytes());
         out.extend_from_slice(&byte_rate.to_le_bytes());
@@ -598,7 +598,9 @@ impl CognitiveSubsystem for MuseManager {
             self.pending_exports.push_back(export);
             self.export_count += 1;
             // Retain overflow samples so the next composition starts immediately
-            let excess = self.accumulated_samples.split_off(self.export_target_samples);
+            let excess = self
+                .accumulated_samples
+                .split_off(self.export_target_samples);
             self.accumulated_samples = excess;
         }
 

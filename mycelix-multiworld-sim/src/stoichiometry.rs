@@ -211,7 +211,11 @@ impl ElementalLedger {
         let cap_oxygen = (self.oxygen_kg / o2_per_person) as usize;
         let cap_water = (self.water_kg / (WATER_KG_DAY * days * 0.07)) as usize; // 7% net loss
 
-        cap_carbon.min(cap_nitrogen).min(cap_phosphorus).min(cap_oxygen).min(cap_water)
+        cap_carbon
+            .min(cap_nitrogen)
+            .min(cap_phosphorus)
+            .min(cap_oxygen)
+            .min(cap_water)
     }
 
     /// Which element is the current bottleneck?
@@ -223,16 +227,20 @@ impl ElementalLedger {
         let o = self.oxygen_kg / (O2_CONSUMPTION_KG_DAY * days);
 
         let min = c.min(n).min(p).min(o);
-        if (min - c).abs() < 0.01 { "Carbon" }
-        else if (min - n).abs() < 0.01 { "Nitrogen" }
-        else if (min - p).abs() < 0.01 { "Phosphorus" }
-        else { "Oxygen" }
+        if (min - c).abs() < 0.01 {
+            "Carbon"
+        } else if (min - n).abs() < 0.01 {
+            "Nitrogen"
+        } else if (min - p).abs() < 0.01 {
+            "Phosphorus"
+        } else {
+            "Oxygen"
+        }
     }
 
     /// Total tracked mass in the system (kg).
     pub fn total_mass(&self) -> f64 {
-        self.carbon_kg + self.hydrogen_kg + self.oxygen_kg
-            + self.nitrogen_kg + self.phosphorus_kg
+        self.carbon_kg + self.hydrogen_kg + self.oxygen_kg + self.nitrogen_kg + self.phosphorus_kg
     }
 }
 
@@ -261,8 +269,12 @@ mod tests {
         let mut ledger = ElementalLedger::for_ship(500, 85.0);
         let initial_carbon = ledger.carbon_kg;
         ledger.tick(500);
-        assert!(ledger.carbon_kg < initial_carbon,
-            "Carbon should decrease: {} → {}", initial_carbon, ledger.carbon_kg);
+        assert!(
+            ledger.carbon_kg < initial_carbon,
+            "Carbon should decrease: {} → {}",
+            initial_carbon,
+            ledger.carbon_kg
+        );
     }
 
     #[test]
@@ -270,8 +282,12 @@ mod tests {
         let mut ledger = ElementalLedger::for_ship(500, 85.0);
         let initial_o2 = ledger.oxygen_kg;
         ledger.hull_breach(0.01); // Significant breach
-        assert!(ledger.oxygen_kg < initial_o2,
-            "Breach should reduce oxygen: {} → {}", initial_o2, ledger.oxygen_kg);
+        assert!(
+            ledger.oxygen_kg < initial_o2,
+            "Breach should reduce oxygen: {} → {}",
+            initial_o2,
+            ledger.oxygen_kg
+        );
         assert!(ledger.mass_lost_kg > 0.0);
     }
 
@@ -280,7 +296,10 @@ mod tests {
         let mut ledger = ElementalLedger::for_ship(500, 85.0);
         let initial_mass = ledger.total_mass();
         ledger.hull_breach(0.005);
-        assert!(ledger.total_mass() < initial_mass, "Mass should be permanently lost");
+        assert!(
+            ledger.total_mass() < initial_mass,
+            "Mass should be permanently lost"
+        );
         assert!(ledger.mass_lost_kg > 0.0);
     }
 
@@ -289,16 +308,21 @@ mod tests {
         let mut ledger = ElementalLedger::for_ship(500, 85.0);
         let carbon_before = ledger.carbon_kg;
         ledger.recycle_body();
-        assert!(ledger.carbon_kg > carbon_before,
-            "Body recycling should return carbon");
+        assert!(
+            ledger.carbon_kg > carbon_before,
+            "Body recycling should return carbon"
+        );
     }
 
     #[test]
     fn limiting_element_is_valid() {
         let ledger = ElementalLedger::for_ship(500, 85.0);
         let limiting = ledger.limiting_element();
-        assert!(["Carbon", "Nitrogen", "Phosphorus", "Oxygen"].contains(&limiting),
-            "Limiting element should be one of CNPO: {}", limiting);
+        assert!(
+            ["Carbon", "Nitrogen", "Phosphorus", "Oxygen"].contains(&limiting),
+            "Limiting element should be one of CNPO: {}",
+            limiting
+        );
     }
 
     #[test]
@@ -312,8 +336,11 @@ mod tests {
         // Mass should decrease (recycling loss) but not catastrophically
         let final_total = ledger.total_mass();
         let loss_fraction = 1.0 - final_total / initial_total;
-        assert!(loss_fraction < 0.1,
-            "Should lose < 10% per year with 93% recycling: {:.1}% lost", loss_fraction * 100.0);
+        assert!(
+            loss_fraction < 0.1,
+            "Should lose < 10% per year with 93% recycling: {:.1}% lost",
+            loss_fraction * 100.0
+        );
         assert!(loss_fraction > 0.0, "Should lose something");
     }
 
@@ -324,8 +351,12 @@ mod tests {
         // Deplete nitrogen to near-zero
         ledger.nitrogen_kg = 1.0; // Almost gone
         let cap = ledger.carrying_capacity();
-        assert!(cap < initial_cap,
-            "Severe nitrogen depletion should reduce capacity: {} → {}", initial_cap, cap);
+        assert!(
+            cap < initial_cap,
+            "Severe nitrogen depletion should reduce capacity: {} → {}",
+            initial_cap,
+            cap
+        );
     }
 
     #[test]
@@ -333,7 +364,9 @@ mod tests {
         let mut ledger = ElementalLedger::for_ship(500, 85.0);
         let carbon_before = ledger.carbon_kg;
         ledger.tick(0); // No one alive
-        assert!((ledger.carbon_kg - carbon_before).abs() < 0.01,
-            "Zero pop should consume nothing");
+        assert!(
+            (ledger.carbon_kg - carbon_before).abs() < 0.01,
+            "Zero pop should consume nothing"
+        );
     }
 }

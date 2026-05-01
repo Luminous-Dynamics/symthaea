@@ -37,7 +37,9 @@ fn all_finite(result: &super::super::CycleResult) -> bool {
 #[test]
 fn radio_blend_does_not_panic() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-    service.spectrum_manager.inject_observation(test_observation());
+    service
+        .spectrum_manager
+        .inject_observation(test_observation());
 
     // Smoke: the cycle must complete without panicking when a sensor HV is
     // bundled into the perception encoding.
@@ -47,7 +49,9 @@ fn radio_blend_does_not_panic() {
 #[test]
 fn radio_blend_keeps_downstream_finite() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-    service.spectrum_manager.inject_observation(test_observation());
+    service
+        .spectrum_manager
+        .inject_observation(test_observation());
 
     let result = service.cycle("the fox jumps");
 
@@ -74,7 +78,9 @@ fn radio_blend_shifts_thought_vector_from_baseline() {
     let baseline_result = baseline.cycle(input);
 
     let mut with_radio = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-    with_radio.spectrum_manager.inject_observation(test_observation());
+    with_radio
+        .spectrum_manager
+        .inject_observation(test_observation());
 
     // Sanity-check: the injection actually queued, and perception_hv()
     // produces a distinct HV. If these fail, the delta assertion below can't

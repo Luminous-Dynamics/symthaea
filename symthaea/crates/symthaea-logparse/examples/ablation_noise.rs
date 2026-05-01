@@ -19,10 +19,10 @@
 //! Usage:
 //!   cargo run -p symthaea-logparse --example ablation_noise --release
 
+use std::collections::HashMap;
 use symthaea_logparse::cluster::{hdbscan_cluster, nearest_centroid, purity};
 use symthaea_logparse::encoder::{bundle, encode, Hdv};
 use symthaea_logparse::fixtures::generate_noisy_corpus;
-use std::collections::HashMap;
 
 fn main() {
     const N_PER_CLASS: usize = 40;
@@ -45,10 +45,7 @@ fn main() {
         let noise = step as f32 / (STEPS - 1) as f32;
         let corpus = generate_noisy_corpus(N_PER_CLASS, SEED, noise);
         let hvs: Vec<Hdv> = corpus.iter().map(encode).collect();
-        let labels: Vec<String> = corpus
-            .iter()
-            .map(|e| e.label.clone().unwrap())
-            .collect();
+        let labels: Vec<String> = corpus.iter().map(|e| e.label.clone().unwrap()).collect();
         let label_refs: Vec<&str> = labels.iter().map(|s| s.as_str()).collect();
 
         // Nearest-centroid baseline: knows the labels, so this is an upper
@@ -110,7 +107,9 @@ fn main() {
              this far and the encoder loses >=25% of its separation."
         );
     } else {
-        println!("\nNearest-centroid held >=75% purity across the entire sweep — encoder is robust.");
+        println!(
+            "\nNearest-centroid held >=75% purity across the entire sweep — encoder is robust."
+        );
     }
 
     let hd_halflife = results

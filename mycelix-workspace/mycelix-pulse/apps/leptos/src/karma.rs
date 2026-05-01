@@ -28,7 +28,12 @@ pub struct KarmaRecord {
 
 impl KarmaRecord {
     pub fn new() -> Self {
-        Self { raw_score: 0.5, last_interaction_ts: 0, positive_count: 0, negative_count: 0 }
+        Self {
+            raw_score: 0.5,
+            last_interaction_ts: 0,
+            positive_count: 0,
+            negative_count: 0,
+        }
     }
 
     /// Compute display karma with exponential decay applied.
@@ -51,15 +56,15 @@ pub fn composite_score(trust: f64, karma: f64) -> f64 {
 
 #[derive(Clone, Copy, Debug)]
 pub enum KarmaEvent {
-    Reply,          // +0.08
-    Star,           // +0.05
-    TrustAccept,    // +0.10
-    ReadFully,      // +0.02
-    Archive,        // +0.01
-    SpamReport,     // -0.30
-    DeleteUnread,   // -0.05
-    Quarantined,    // -0.10
-    MuteThread,     // -0.03
+    Reply,        // +0.08
+    Star,         // +0.05
+    TrustAccept,  // +0.10
+    ReadFully,    // +0.02
+    Archive,      // +0.01
+    SpamReport,   // -0.30
+    DeleteUnread, // -0.05
+    Quarantined,  // -0.10
+    MuteThread,   // -0.03
 }
 
 impl KarmaEvent {
@@ -86,11 +91,15 @@ pub struct KarmaCtx {
 impl KarmaCtx {
     pub fn record_event(&self, sender: &str, event: KarmaEvent) {
         // Anti-gaming: ignore self-sends
-        if sender.contains("self_mock") || sender.is_empty() { return; }
+        if sender.contains("self_mock") || sender.is_empty() {
+            return;
+        }
 
         let now = js_sys::Date::now() as u64 / 1000;
         self.records.update(|map| {
-            let record = map.entry(sender.to_string()).or_insert_with(KarmaRecord::new);
+            let record = map
+                .entry(sender.to_string())
+                .or_insert_with(KarmaRecord::new);
             record.raw_score = (record.raw_score + event.delta()).clamp(KARMA_FLOOR, KARMA_CEILING);
             record.last_interaction_ts = now;
             if event.delta() > 0.0 {
@@ -103,12 +112,16 @@ impl KarmaCtx {
         // Persist to localStorage
         let records = self.records.get_untracked();
         if let Some(s) = web_sys::window().and_then(|w| w.local_storage().ok().flatten()) {
-            let _ = s.set_item(STORAGE_KEY, &serde_json::to_string(&records).unwrap_or_default());
+            let _ = s.set_item(
+                STORAGE_KEY,
+                &serde_json::to_string(&records).unwrap_or_default(),
+            );
         }
     }
 
     pub fn get_karma(&self, sender: &str) -> f64 {
-        self.records.get_untracked()
+        self.records
+            .get_untracked()
             .get(sender)
             .map(|r| r.display_karma())
             .unwrap_or(0.5) // neutral default
@@ -147,12 +160,15 @@ fn mock_karma() -> HashMap<String, KarmaRecord> {
         ("uhCAk_eve_mock", 0.30, 1, 5),
     ];
     for (key, score, pos, neg) in senders {
-        map.insert(key.to_string(), KarmaRecord {
-            raw_score: score,
-            last_interaction_ts: now - 86400, // 1 day ago
-            positive_count: pos,
-            negative_count: neg,
-        });
+        map.insert(
+            key.to_string(),
+            KarmaRecord {
+                raw_score: score,
+                last_interaction_ts: now - 86400, // 1 day ago
+                positive_count: pos,
+                negative_count: neg,
+            },
+        );
     }
     map
 }

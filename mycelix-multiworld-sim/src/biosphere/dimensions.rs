@@ -76,11 +76,11 @@ pub struct BiosphereMaxima {
 impl Default for BiosphereMaxima {
     fn default() -> Self {
         Self {
-            max_biodiversity: 4500.0,   // Holocene corrected diversity
+            max_biodiversity: 4500.0, // Holocene corrected diversity
             max_complexity: 10.0,
-            max_extinction_rate: 0.35,  // End-Permian peak (Bambach 2006)
+            max_extinction_rate: 0.35, // End-Permian peak (Bambach 2006)
             max_network_integration: 1.0,
-            max_energy_throughput: 130.0, // TW, Bar-On 2018 estimate
+            max_energy_throughput: 130.0,  // TW, Bar-On 2018 estimate
             max_information_capacity: 1.0, // Normalized internally
         }
     }
@@ -91,20 +91,46 @@ impl Default for BiosphereMaxima {
 ///
 /// CITATION: Knoll & Bambach (2000), Erwin et al. (2011).
 fn complexity_grade_at(age_ma: MaAge) -> f64 {
-    if age_ma > 3500.0 { return 1.0; }      // Prokaryotes only
-    if age_ma > 2100.0 { return 1.5; }      // Cyanobacteria, complex prokaryotes
-    if age_ma > 1800.0 { return 2.0; }      // First eukaryotes (Grypania)
-    if age_ma > 800.0 { return 2.5; }       // Complex eukaryotes
-    if age_ma > 635.0 { return 3.0; }       // First multicellular (Ediacaran)
-    if age_ma > 541.0 { return 3.5; }       // Ediacaran biota (frond, disc)
-    if age_ma > 520.0 { return 4.0; }       // Bilateral (Cambrian Explosion)
-    if age_ma > 480.0 { return 5.0; }       // First vertebrates (Arandaspis)
-    if age_ma > 375.0 { return 6.0; }       // First tetrapods (Tiktaalik)
-    if age_ma > 312.0 { return 7.0; }       // First amniotes
-    if age_ma > 160.0 { return 7.5; }       // Early mammals (Juramaia)
-    if age_ma > 66.0 { return 8.0; }        // Diversified mammals
-    if age_ma > 7.0 { return 9.0; }         // Great apes, hominids
-    10.0                                      // Homo sapiens
+    if age_ma > 3500.0 {
+        return 1.0;
+    } // Prokaryotes only
+    if age_ma > 2100.0 {
+        return 1.5;
+    } // Cyanobacteria, complex prokaryotes
+    if age_ma > 1800.0 {
+        return 2.0;
+    } // First eukaryotes (Grypania)
+    if age_ma > 800.0 {
+        return 2.5;
+    } // Complex eukaryotes
+    if age_ma > 635.0 {
+        return 3.0;
+    } // First multicellular (Ediacaran)
+    if age_ma > 541.0 {
+        return 3.5;
+    } // Ediacaran biota (frond, disc)
+    if age_ma > 520.0 {
+        return 4.0;
+    } // Bilateral (Cambrian Explosion)
+    if age_ma > 480.0 {
+        return 5.0;
+    } // First vertebrates (Arandaspis)
+    if age_ma > 375.0 {
+        return 6.0;
+    } // First tetrapods (Tiktaalik)
+    if age_ma > 312.0 {
+        return 7.0;
+    } // First amniotes
+    if age_ma > 160.0 {
+        return 7.5;
+    } // Early mammals (Juramaia)
+    if age_ma > 66.0 {
+        return 8.0;
+    } // Diversified mammals
+    if age_ma > 7.0 {
+        return 9.0;
+    } // Great apes, hominids
+    10.0 // Homo sapiens
 }
 
 /// Compute network integration using Kleiber's Law and O2 levels.
@@ -117,7 +143,12 @@ fn complexity_grade_at(age_ma: MaAge) -> f64 {
 ///
 /// CITATION: West, Brown & Enquist (1997) "A general model for the origin of
 ///           allometric scaling laws in biology."
-fn network_integration_at(_age_ma: MaAge, o2_fraction: f64, complexity: f64, diversity_norm: f64) -> f64 {
+fn network_integration_at(
+    _age_ma: MaAge,
+    o2_fraction: f64,
+    complexity: f64,
+    diversity_norm: f64,
+) -> f64 {
     // O2 factor: aerobic trophic webs require O2 > 0.02
     let o2_factor = if o2_fraction < 0.02 {
         o2_fraction / 0.02 * 0.1 // Anaerobic: minimal trophic complexity
@@ -203,7 +234,8 @@ pub fn compute_raw_dimensions(
     // CITATION: Hayes et al. (1999), Freeman & Hayes (1992).
     let epsilon_p = data.interpolate_epsilon_p(age);
     let ep_factor = (epsilon_p / 27.0).clamp(0.5, 1.5); // Normalize to modern εp ≈ 27‰
-    let energy_throughput = energy_throughput_at(age, o2, complexity_grade, diversity_norm) * ep_factor;
+    let energy_throughput =
+        energy_throughput_at(age, o2, complexity_grade, diversity_norm) * ep_factor;
 
     // 6. Information capacity — weighted by functional group occupancy
     // Raw genus count suffers from functional redundancy: 1000 trilobite species
@@ -241,7 +273,8 @@ impl BiosphereDimensionsRaw {
             (self.complexity_grade / maxima.max_complexity).clamp(0.0, 1.0),
             // Resilience (inverted: low extinction rate = high resilience)
             // 0.35/Ma (End-Permian) → 0.0, 0.0/Ma (perfectly stable) → 1.0
-            (1.0 - (self.background_extinction_rate / maxima.max_extinction_rate).min(1.0)).clamp(0.0, 1.0),
+            (1.0 - (self.background_extinction_rate / maxima.max_extinction_rate).min(1.0))
+                .clamp(0.0, 1.0),
             // Network integration (already [0, 1])
             self.network_integration,
             // Energy throughput
@@ -386,16 +419,25 @@ mod tests {
             .unwrap();
 
         let raw = compute_raw_dimensions(permian_bin, &data, &extinctions);
-        let norm = raw.normalize(&maxima, permian_bin.resolution, permian_bin.midpoint_ma, None);
+        let norm = raw.normalize(
+            &maxima,
+            permian_bin.resolution,
+            permian_bin.midpoint_ma,
+            None,
+        );
         let bt = compute_bt(&norm);
         // Apply extinction multiplier at the nadir (252 Ma)
         let ext_mult = extinction_multiplier(252.0, &extinctions);
         let adjusted = bt * ext_mult;
         // End-Permian should show clear depression relative to pre-Permian
         let pre_permian_bt = {
-            let pre_bin = bins.iter().find(|b| b.midpoint_ma > 265.0 && b.midpoint_ma < 280.0).unwrap();
+            let pre_bin = bins
+                .iter()
+                .find(|b| b.midpoint_ma > 265.0 && b.midpoint_ma < 280.0)
+                .unwrap();
             let pre_raw = compute_raw_dimensions(pre_bin, &data, &extinctions);
-            let pre_norm = pre_raw.normalize(&maxima, pre_bin.resolution, pre_bin.midpoint_ma, None);
+            let pre_norm =
+                pre_raw.normalize(&maxima, pre_bin.resolution, pre_bin.midpoint_ma, None);
             compute_bt(&pre_norm) * extinction_multiplier(pre_bin.midpoint_ma, &extinctions)
         };
         assert!(

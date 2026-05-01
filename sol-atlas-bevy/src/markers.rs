@@ -37,8 +37,7 @@ pub fn spawn_site_markers(
         commands.spawn((
             Mesh3d(marker_mesh.clone()),
             MeshMaterial3d(material),
-            Transform::from_xyz(pos[0], pos[1], pos[2])
-                .with_scale(Vec3::splat(size)),
+            Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(size)),
             DataMarker {
                 layer: Layer::Energy,
                 name: site.name.clone(),
@@ -70,8 +69,7 @@ pub fn spawn_geothermal_markers(
         commands.spawn((
             Mesh3d(marker_mesh.clone()),
             MeshMaterial3d(material),
-            Transform::from_xyz(pos[0], pos[1], pos[2])
-                .with_scale(Vec3::splat(size)),
+            Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(size)),
             DataMarker {
                 layer: Layer::Geothermal,
                 name: node.name.clone(),
@@ -102,8 +100,7 @@ pub fn spawn_terra_lumina_markers(
         commands.spawn((
             Mesh3d(marker_mesh.clone()),
             MeshMaterial3d(material),
-            Transform::from_xyz(pos[0], pos[1], pos[2])
-                .with_scale(Vec3::splat(0.025)),
+            Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(0.025)),
             DataMarker {
                 layer: Layer::TerraLumina,
                 name: site.name.clone(),
@@ -134,8 +131,7 @@ pub fn spawn_vault_markers(
         commands.spawn((
             Mesh3d(marker_mesh.clone()),
             MeshMaterial3d(material),
-            Transform::from_xyz(pos[0], pos[1], pos[2])
-                .with_scale(Vec3::splat(0.018)),
+            Transform::from_xyz(pos[0], pos[1], pos[2]).with_scale(Vec3::splat(0.018)),
             DataMarker {
                 layer: Layer::ResontiaVaults,
                 name: vault.name.clone(),

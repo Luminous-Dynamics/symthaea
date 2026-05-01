@@ -12,8 +12,18 @@ const SEEDS: [u64; 5] = [42, 123, 789, 1337, 2718];
 fn main() {
     eprintln!("=== CONTROL EXPERIMENT: Consciousness Gating ON vs OFF ===\n");
 
-    println!("{:<6} | {:>10} {:>10} | {:>10} {:>10} | {:>10} {:>10} | {:>10} {:>10}",
-        "Seed", "CVS_ON", "CVS_OFF", "Phi_ON", "Phi_OFF", "Love_ON", "Love_OFF", "Pop_ON", "Pop_OFF");
+    println!(
+        "{:<6} | {:>10} {:>10} | {:>10} {:>10} | {:>10} {:>10} | {:>10} {:>10}",
+        "Seed",
+        "CVS_ON",
+        "CVS_OFF",
+        "Phi_ON",
+        "Phi_OFF",
+        "Love_ON",
+        "Love_OFF",
+        "Pop_ON",
+        "Pop_OFF"
+    );
     println!("{}", "-".repeat(110));
 
     let mut cvs_on_sum = 0.0f64;
@@ -39,10 +49,14 @@ fn main() {
         println!(
             "{:<6} | {:>10.3} {:>10.3} | {:>10.3} {:>10.3} | {:>10.3} {:>10.3} | {:>10} {:>10}",
             seed,
-            report_on.final_cvs, report_off.final_cvs,
-            report_on.final_collective_phi, report_off.final_collective_phi,
-            report_on.final_love_coherence, report_off.final_love_coherence,
-            report_on.final_population, report_off.final_population,
+            report_on.final_cvs,
+            report_off.final_cvs,
+            report_on.final_collective_phi,
+            report_off.final_collective_phi,
+            report_on.final_love_coherence,
+            report_off.final_love_coherence,
+            report_on.final_population,
+            report_off.final_population,
         );
 
         cvs_on_sum += report_on.final_cvs;
@@ -50,9 +64,12 @@ fn main() {
         phi_on_sum += report_on.final_collective_phi;
         phi_off_sum += report_off.final_collective_phi;
 
-        eprintln!("  Seed {seed}: ON={:.3} OFF={:.3} (delta={:+.3})",
-            report_on.final_cvs, report_off.final_cvs,
-            report_on.final_cvs - report_off.final_cvs);
+        eprintln!(
+            "  Seed {seed}: ON={:.3} OFF={:.3} (delta={:+.3})",
+            report_on.final_cvs,
+            report_off.final_cvs,
+            report_on.final_cvs - report_off.final_cvs
+        );
     }
 
     let n = SEEDS.len() as f64;
@@ -70,8 +87,14 @@ fn main() {
     println!("{}", "=".repeat(110));
 
     if mean_on > mean_off {
-        println!("\n  CONCLUSION: Consciousness gating IMPROVES civilization viability by {:.1}%", improvement);
+        println!(
+            "\n  CONCLUSION: Consciousness gating IMPROVES civilization viability by {:.1}%",
+            improvement
+        );
     } else {
-        println!("\n  CONCLUSION: Consciousness gating shows no improvement (delta: {:.3})", mean_on - mean_off);
+        println!(
+            "\n  CONCLUSION: Consciousness gating shows no improvement (delta: {:.3})",
+            mean_on - mean_off
+        );
     }
 }

@@ -46,13 +46,13 @@ impl CodingAgent {
                 }
 
                 if let Some(ref mut store) = self.experience_store {
-                    store.store_learned_template(&self.task, &code);
+                    store.store_learned_template(&self.task, &code, None);
                     tracing::info!(
                         target: "symthaea::coding_agent",
                         task = %self.task,
                         code_len = code.len(),
                         tier = ?tier,
-                        "Distilled generation into learned template"
+                        "Stored learned template in experience store"
                     );
                 }
             }

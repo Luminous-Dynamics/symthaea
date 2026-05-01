@@ -16,8 +16,8 @@
 //! - In practice: ~100-200 occupied (many combos are empty)
 //! - 12 regions × ~150 = ~1,800 total cohorts
 
-use crate::earth_regions::EarthRegion;
 use super::demographic_transition::DemographicTransition;
+use crate::earth_regions::EarthRegion;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -58,7 +58,10 @@ impl FineAgeBand {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum CohortSex { Male, Female }
+pub enum CohortSex {
+    Male,
+    Female,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum EducationBand {
@@ -71,10 +74,15 @@ pub enum EducationBand {
 impl EducationBand {
     /// Map education index [0,1] to band.
     pub fn from_index(idx: f64) -> Self {
-        if idx >= 0.75 { Self::Tertiary }
-        else if idx >= 0.50 { Self::Secondary }
-        else if idx >= 0.25 { Self::Primary }
-        else { Self::None }
+        if idx >= 0.75 {
+            Self::Tertiary
+        } else if idx >= 0.50 {
+            Self::Secondary
+        } else if idx >= 0.25 {
+            Self::Primary
+        } else {
+            Self::None
+        }
     }
 
     /// Midpoint education index for this band.
@@ -166,7 +174,7 @@ const STANDARD_AGE_PYRAMID: [f64; 20] = [
     0.058, 0.052, 0.046, // 45-59: ~15.6%
     0.040, 0.034, 0.028, // 60-74: ~10.2%
     0.022, 0.016, 0.012, // 75-89: ~5.0%
-    0.008, 0.005,         // 90-99: ~1.3%
+    0.008, 0.005, // 90-99: ~1.3%
 ];
 
 /// Gompertz-Makeham mortality parameters.
@@ -194,7 +202,9 @@ impl RegionDemographics {
 
                 for (edu, edu_frac) in edu_dist {
                     let count = pop * age_fraction * sex_fraction * edu_frac;
-                    if count < 0.0001 { continue; } // skip near-empty cohorts
+                    if count < 0.0001 {
+                        continue;
+                    } // skip near-empty cohorts
 
                     let key = RegionCohortKey {
                         region_idx,
@@ -222,7 +232,11 @@ impl RegionDemographics {
                         mean_education: edu.midpoint(),
                         fertility_rate: fertility,
                         mortality_rate: mortality,
-                        labor_participation: if age_band.can_work() { 0.6 + edu.midpoint() * 0.2 } else { 0.0 },
+                        labor_participation: if age_band.can_work() {
+                            0.6 + edu.midpoint() * 0.2
+                        } else {
+                            0.0
+                        },
                     };
 
                     cohorts.insert(key, cohort);
@@ -303,7 +317,9 @@ impl RegionDemographics {
         let mut promotions: Vec<(RegionCohortKey, f64)> = Vec::new();
 
         for (key, cohort) in &mut self.cohorts {
-            if cohort.count < 0.0001 { continue; }
+            if cohort.count < 0.0001 {
+                continue;
+            }
             let transfer = cohort.count * aging_rate;
             cohort.count -= transfer;
 
@@ -363,7 +379,8 @@ impl RegionDemographics {
 
         // TFR changes with demographic momentum
         let max_tick_change = 0.0067;
-        let delta = (adjusted_target - self.total_fertility_rate).clamp(-max_tick_change, max_tick_change);
+        let delta =
+            (adjusted_target - self.total_fertility_rate).clamp(-max_tick_change, max_tick_change);
         self.total_fertility_rate += delta;
 
         // Update fertility rates using TFR-indexed ASFR schedules
@@ -382,11 +399,7 @@ impl RegionDemographics {
     }
 
     /// Update demographic transition (without urbanization — backward compat).
-    pub fn tick_transition(
-        &mut self,
-        transition: &DemographicTransition,
-        development_index: f64,
-    ) {
+    pub fn tick_transition(&mut self, transition: &DemographicTransition, development_index: f64) {
         let target_tfr = transition.target_tfr(development_index);
 
         // Education-fertility coupling: female education is the strongest
@@ -401,7 +414,8 @@ impl RegionDemographics {
 
         // TFR changes with demographic momentum: max 0.08/year = ~0.0067/tick
         let max_tick_change = 0.0067;
-        let delta = (adjusted_target - self.total_fertility_rate).clamp(-max_tick_change, max_tick_change);
+        let delta =
+            (adjusted_target - self.total_fertility_rate).clamp(-max_tick_change, max_tick_change);
         self.total_fertility_rate += delta;
 
         // Update fertility rates using TFR-indexed ASFR schedules
@@ -427,21 +441,32 @@ impl RegionDemographics {
 
     /// Mean education index across all cohorts (population-weighted).
     pub fn mean_education(&self) -> f64 {
-        let (sum, count) = self.cohorts.values()
-            .fold((0.0, 0.0), |(s, n), c| (s + c.mean_education * c.count, n + c.count));
-        if count > 0.0 { sum / count } else { 0.0 }
+        let (sum, count) = self.cohorts.values().fold((0.0, 0.0), |(s, n), c| {
+            (s + c.mean_education * c.count, n + c.count)
+        });
+        if count > 0.0 {
+            sum / count
+        } else {
+            0.0
+        }
     }
 
     /// Mean phi across all cohorts (population-weighted).
     pub fn mean_phi(&self) -> f64 {
-        let (sum, count) = self.cohorts.values()
-            .fold((0.0, 0.0), |(s, n), c| (s + c.mean_phi * c.count, n + c.count));
-        if count > 0.0 { sum / count } else { 0.0 }
+        let (sum, count) = self.cohorts.values().fold((0.0, 0.0), |(s, n), c| {
+            (s + c.mean_phi * c.count, n + c.count)
+        });
+        if count > 0.0 {
+            sum / count
+        } else {
+            0.0
+        }
     }
 
     /// Working-age population in millions.
     pub fn working_population(&self) -> f64 {
-        self.cohorts.iter()
+        self.cohorts
+            .iter()
             .filter(|(k, _)| k.age_band.can_work())
             .map(|(_, c)| c.count)
             .sum()
@@ -490,9 +515,9 @@ fn fertility_by_age_and_tfr(band: FineAgeBand, tfr: f64) -> f64 {
     // ASFR schedules (births per woman per year in each 5-year band)
     // sum(schedule) × 5 = TFR for that schedule
     //                    15-19  20-24  25-29  30-34  35-39  40-44  45-49
-    let high:  [f64; 7] = [0.130, 0.260, 0.250, 0.200, 0.130, 0.050, 0.010]; // sum=1.03, ×5=5.15
-    let medium:[f64; 7] = [0.050, 0.130, 0.150, 0.120, 0.070, 0.025, 0.005]; // sum=0.55, ×5=2.75
-    let low:   [f64; 7] = [0.010, 0.040, 0.080, 0.090, 0.050, 0.015, 0.003]; // sum=0.288,×5=1.44
+    let high: [f64; 7] = [0.130, 0.260, 0.250, 0.200, 0.130, 0.050, 0.010]; // sum=1.03, ×5=5.15
+    let medium: [f64; 7] = [0.050, 0.130, 0.150, 0.120, 0.070, 0.025, 0.005]; // sum=0.55, ×5=2.75
+    let low: [f64; 7] = [0.010, 0.040, 0.080, 0.090, 0.050, 0.015, 0.003]; // sum=0.288,×5=1.44
 
     let age_idx = match band.0 {
         3 => 0, // 15-19
@@ -515,14 +540,22 @@ fn fertility_by_age_and_tfr(band: FineAgeBand, tfr: f64) -> f64 {
         let target_sum = tfr / 5.0; // what sum should be
         let interp = medium[age_idx] * (1.0 - t) + high[age_idx] * t;
         let interp_sum: f64 = (0..7).map(|i| medium[i] * (1.0 - t) + high[i] * t).sum();
-        if interp_sum > 0.0 { interp * target_sum / interp_sum } else { 0.0 }
+        if interp_sum > 0.0 {
+            interp * target_sum / interp_sum
+        } else {
+            0.0
+        }
     } else if tfr >= 1.2 {
         // Interpolate medium ↔ low
         let t = (tfr - 1.2) / (2.5 - 1.2);
         let target_sum = tfr / 5.0;
         let interp = low[age_idx] * (1.0 - t) + medium[age_idx] * t;
         let interp_sum: f64 = (0..7).map(|i| low[i] * (1.0 - t) + medium[i] * t).sum();
-        if interp_sum > 0.0 { interp * target_sum / interp_sum } else { 0.0 }
+        if interp_sum > 0.0 {
+            interp * target_sum / interp_sum
+        } else {
+            0.0
+        }
     } else {
         // Below floor: scale low schedule
         low[age_idx] * (tfr / 1.44).max(0.0)
@@ -566,22 +599,34 @@ fn next_education(current: EducationBand) -> EducationBand {
 
 /// Compute dependency ratio from cohorts.
 fn compute_dependency_ratio(cohorts: &HashMap<RegionCohortKey, RegionCohort>) -> f64 {
-    let children: f64 = cohorts.iter()
+    let children: f64 = cohorts
+        .iter()
         .filter(|(k, _)| k.age_band.is_child())
-        .map(|(_, c)| c.count).sum();
-    let elderly: f64 = cohorts.iter()
+        .map(|(_, c)| c.count)
+        .sum();
+    let elderly: f64 = cohorts
+        .iter()
         .filter(|(k, _)| k.age_band.is_elderly())
-        .map(|(_, c)| c.count).sum();
-    let working: f64 = cohorts.iter()
+        .map(|(_, c)| c.count)
+        .sum();
+    let working: f64 = cohorts
+        .iter()
         .filter(|(k, _)| k.age_band.can_work())
-        .map(|(_, c)| c.count).sum();
-    if working > 0.0 { (children + elderly) / working } else { 0.0 }
+        .map(|(_, c)| c.count)
+        .sum();
+    if working > 0.0 {
+        (children + elderly) / working
+    } else {
+        0.0
+    }
 }
 
 /// Estimate median age from cohort distribution.
 fn estimate_median_age(cohorts: &HashMap<RegionCohortKey, RegionCohort>) -> f64 {
     let total: f64 = cohorts.values().map(|c| c.count).sum();
-    if total <= 0.0 { return 30.0; }
+    if total <= 0.0 {
+        return 30.0;
+    }
 
     // Build cumulative distribution by age band
     let mut by_band = [0.0f64; FineAgeBand::COUNT];
@@ -636,31 +681,67 @@ mod tests {
         for edu_idx in [0.1, 0.3, 0.5, 0.7, 0.9] {
             let dist = education_distribution(FineAgeBand(6), edu_idx);
             let sum: f64 = dist.iter().map(|(_, f)| f).sum();
-            assert!((sum - 1.0).abs() < 0.001, "Sum should be 1.0, got {sum} for edu={edu_idx}");
+            assert!(
+                (sum - 1.0).abs() < 0.001,
+                "Sum should be 1.0, got {sum} for edu={edu_idx}"
+            );
         }
     }
 
     #[test]
     fn test_standard_pyramid_sums_to_one() {
         let sum: f64 = STANDARD_AGE_PYRAMID.iter().sum();
-        assert!((sum - 1.0).abs() < 0.001, "Pyramid should sum to 1.0, got {sum}");
+        assert!(
+            (sum - 1.0).abs() < 0.001,
+            "Pyramid should sum to 1.0, got {sum}"
+        );
     }
 
     #[test]
     fn test_dependency_ratio() {
         let mut cohorts = HashMap::new();
         // 100M children, 200M workers, 50M elderly
-        cohorts.insert(RegionCohortKey {
-            region_idx: 0, age_band: FineAgeBand(1), sex: CohortSex::Male, education: EducationBand::None,
-        }, RegionCohort { count: 100.0, ..Default::default() });
-        cohorts.insert(RegionCohortKey {
-            region_idx: 0, age_band: FineAgeBand(6), sex: CohortSex::Male, education: EducationBand::Secondary,
-        }, RegionCohort { count: 200.0, ..Default::default() });
-        cohorts.insert(RegionCohortKey {
-            region_idx: 0, age_band: FineAgeBand(15), sex: CohortSex::Female, education: EducationBand::Primary,
-        }, RegionCohort { count: 50.0, ..Default::default() });
+        cohorts.insert(
+            RegionCohortKey {
+                region_idx: 0,
+                age_band: FineAgeBand(1),
+                sex: CohortSex::Male,
+                education: EducationBand::None,
+            },
+            RegionCohort {
+                count: 100.0,
+                ..Default::default()
+            },
+        );
+        cohorts.insert(
+            RegionCohortKey {
+                region_idx: 0,
+                age_band: FineAgeBand(6),
+                sex: CohortSex::Male,
+                education: EducationBand::Secondary,
+            },
+            RegionCohort {
+                count: 200.0,
+                ..Default::default()
+            },
+        );
+        cohorts.insert(
+            RegionCohortKey {
+                region_idx: 0,
+                age_band: FineAgeBand(15),
+                sex: CohortSex::Female,
+                education: EducationBand::Primary,
+            },
+            RegionCohort {
+                count: 50.0,
+                ..Default::default()
+            },
+        );
 
         let ratio = compute_dependency_ratio(&cohorts);
-        assert!((ratio - 0.75).abs() < 0.01, "Expected 150/200=0.75, got {ratio}");
+        assert!(
+            (ratio - 0.75).abs() < 0.01,
+            "Expected 150/200=0.75, got {ratio}"
+        );
     }
 }

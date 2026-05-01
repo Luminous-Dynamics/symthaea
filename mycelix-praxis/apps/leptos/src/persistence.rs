@@ -7,12 +7,57 @@
 //! No conductor needed -- saves and loads JSON to/from the browser's
 //! localStorage API. Used to persist role selection, sovereignty level,
 //! and other lightweight state across page reloads.
-
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use web_sys::window;
+use leptos::prelude::*;
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub enum SyncState {
+    Synchronized,
+    LocalOrbit,
+    GossipSyncing,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct MutationQueue {
+    pub state: SyncState,
+    pub pending_actions: Vec<QueuedAction>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct QueuedAction {
+    pub zome_fn: String,
+    pub payload: serde_json::Value,
+    pub timestamp: u64,
+}
+
+impl Default for MutationQueue {
+    fn default() -> Self {
+        Self {
+            state: SyncState::Synchronized,
+            pending_actions: Vec::new(),
+        }
+    }
+}
+
+/// Provide Mutation Queue context to the application.
+pub fn provide_mutation_queue() {
+    let queue = signal(MutationQueue::default());
+    provide_context(queue.0); // ReadSignal
+    provide_context(queue.1); // WriteSignal
+}
+
+pub fn use_mutation_queue() -> ReadSignal<MutationQueue> {
+    expect_context::<ReadSignal<MutationQueue>>()
+}
+
+pub fn use_set_mutation_queue() -> WriteSignal<MutationQueue> {
+    expect_context::<WriteSignal<MutationQueue>>()
+}
 
 /// Save a value to localStorage.
 pub fn save<T: Serialize>(key: &str, value: &T) {
+...
     if let Some(storage) = window()
         .and_then(|w| w.local_storage().ok())
         .flatten()
