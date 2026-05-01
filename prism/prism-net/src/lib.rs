@@ -98,12 +98,13 @@ impl PrismClient {
 
         // Check content length before downloading
         if let Some(len) = response.content_length()
-            && len > self.max_body_size {
-                return Err(FetchError::TooLarge {
-                    size: len,
-                    max: self.max_body_size,
-                });
-            }
+            && len > self.max_body_size
+        {
+            return Err(FetchError::TooLarge {
+                size: len,
+                max: self.max_body_size,
+            });
+        }
 
         // Get final URL after redirects
         let final_url = response.url().clone();

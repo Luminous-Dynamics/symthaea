@@ -49,17 +49,28 @@ pub enum RenderMode {
 #[derive(Clone, Debug)]
 pub enum PageView {
     Welcome,
-    Search { query: String, results: Vec<SearchResult> },
-    Compare { query: String },
+    Search {
+        query: String,
+        results: Vec<SearchResult>,
+    },
+    Compare {
+        query: String,
+    },
     /// Reader mode: sanitized HTML rendered as innerHTML.
-    Page { html: String },
+    Page {
+        html: String,
+    },
     /// Full page mode: raw URL loaded in sandboxed iframe.
-    FullPageIframe { url: String },
+    FullPageIframe {
+        url: String,
+    },
     Settings,
     SubmitClaim,
     Bookmarks,
     Loading,
-    Error { message: String },
+    Error {
+        message: String,
+    },
 }
 
 /// A lightweight snapshot for the history stack — stores URL + title only.
@@ -177,8 +188,8 @@ impl BrowserState {
         let (epistemic_confidence, set_epistemic_confidence) = signal(0.0f32);
         let (prediction_error, set_prediction_error) = signal(0.0f32);
         let (spore_summary, set_spore_summary) = signal(String::new());
-        let saved_mode = crate::persistence::load::<RenderMode>("render-mode")
-            .unwrap_or(RenderMode::Reader);
+        let saved_mode =
+            crate::persistence::load::<RenderMode>("render-mode").unwrap_or(RenderMode::Reader);
         let (render_mode, set_render_mode) = signal(saved_mode);
 
         let initial_tab = Tab {
@@ -191,31 +202,50 @@ impl BrowserState {
         let (active_tab, set_active_tab) = signal(1u32);
         let next_tab_id = StoredValue::new(2u32);
 
-        let saved_bookmarks = crate::persistence::load::<Vec<Bookmark>>("bookmarks")
-            .unwrap_or_default();
+        let saved_bookmarks =
+            crate::persistence::load::<Vec<Bookmark>>("bookmarks").unwrap_or_default();
         let (bookmarks, set_bookmarks) = signal(saved_bookmarks);
 
         Self {
-            current_url, set_current_url,
-            page_title, set_page_title,
-            view, set_view,
-            zone, set_zone,
-            safety, set_safety,
-            threat_count, set_threat_count,
-            loading, set_loading,
-            search_mode, set_search_mode,
-            history, history_cursor, set_history_cursor,
+            current_url,
+            set_current_url,
+            page_title,
+            set_page_title,
+            view,
+            set_view,
+            zone,
+            set_zone,
+            safety,
+            set_safety,
+            threat_count,
+            set_threat_count,
+            loading,
+            set_loading,
+            search_mode,
+            set_search_mode,
+            history,
+            history_cursor,
+            set_history_cursor,
             navigating_history,
-            search_generation, set_search_generation,
-            consciousness, set_consciousness,
-            epistemic_confidence, set_epistemic_confidence,
-            prediction_error, set_prediction_error,
-            spore_summary, set_spore_summary,
-            render_mode, set_render_mode,
-            tabs, set_tabs,
-            active_tab, set_active_tab,
+            search_generation,
+            set_search_generation,
+            consciousness,
+            set_consciousness,
+            epistemic_confidence,
+            set_epistemic_confidence,
+            prediction_error,
+            set_prediction_error,
+            spore_summary,
+            set_spore_summary,
+            render_mode,
+            set_render_mode,
+            tabs,
+            set_tabs,
+            active_tab,
+            set_active_tab,
             next_tab_id,
-            bookmarks, set_bookmarks,
+            bookmarks,
+            set_bookmarks,
         }
     }
 
@@ -314,7 +344,9 @@ impl BrowserState {
     /// Close a tab by ID. If it's the active tab, switch to the previous one.
     pub fn close_tab(&self, id: u32) {
         let tabs = self.tabs.get_untracked();
-        if tabs.len() <= 1 { return; } // can't close the last tab
+        if tabs.len() <= 1 {
+            return;
+        } // can't close the last tab
         let was_active = self.active_tab.get_untracked() == id;
         self.set_tabs.update(|tabs| tabs.retain(|t| t.id != id));
         if was_active {
@@ -345,10 +377,14 @@ impl BrowserState {
         let url = self.current_url.get_untracked();
         let title = self.page_title.get_untracked();
         // Don't bookmark internal pages
-        if url.starts_with("prism://") { return; }
+        if url.starts_with("prism://") {
+            return;
+        }
         self.set_bookmarks.update(|bm| {
             // Avoid duplicates
-            if bm.iter().any(|b| b.url == url) { return; }
+            if bm.iter().any(|b| b.url == url) {
+                return;
+            }
             bm.push(Bookmark {
                 url,
                 title,
