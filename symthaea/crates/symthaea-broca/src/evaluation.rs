@@ -198,8 +198,15 @@ pub struct QualityRunMetadata {
     pub checkpoint_sha256: Option<String>,
     pub git_commit: Option<String>,
     pub feature_set: Vec<String>,
+    pub train_recipe: Option<String>,
     pub train_pair_count: Option<usize>,
     pub train_epochs: Option<usize>,
+    pub train_bptt_window: Option<usize>,
+    pub train_negative_samples: Option<usize>,
+    pub train_learning_rate: Option<f32>,
+    pub train_network_lr_scale: Option<f32>,
+    pub train_network_layers: Option<usize>,
+    pub train_neurons_per_layer: Option<usize>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -15,14 +15,77 @@ export SCCACHE_DISABLE="${SCCACHE_DISABLE:-1}"
 
 OUT_DIR="${BROCA_GATE_OUT_DIR:-/tmp/symthaea-broca-gate}"
 TARGET_DIR="${BROCA_GATE_TARGET_DIR:-/tmp/symthaea-broca-gpu-target}"
-PAIR_COUNT="${BROCA_GATE_PAIRS:-16}"
-EPOCHS="${BROCA_GATE_EPOCHS:-1}"
-EVAL_LIMIT="${BROCA_GATE_EVAL_LIMIT:-4}"
-MAX_GEN_TOKENS="${BROCA_GATE_MAX_GEN_TOKENS:-4}"
 USE_NIX="${BROCA_GATE_USE_NIX:-1}"
 BACKEND="${BROCA_GATE_BACKEND:-auto}"
 EVAL_LANE="${BROCA_GATE_EVAL_LANE:-fast}"
 GPU_COMPUTE_CAP="${BROCA_GATE_CUDA_COMPUTE_CAP:-75}"
+RECIPE="${BROCA_GATE_RECIPE:-smoke}"
+
+case "$RECIPE" in
+    smoke)
+        DEFAULT_PAIRS=16
+        DEFAULT_EPOCHS=1
+        DEFAULT_EVAL_LIMIT=4
+        DEFAULT_MAX_GEN_TOKENS=4
+        DEFAULT_BPTT_WINDOW=8
+        DEFAULT_NEGATIVE_SAMPLES=64
+        DEFAULT_LR=0.001
+        DEFAULT_NETWORK_LR_SCALE=0.2
+        DEFAULT_NETWORK_LAYERS=3
+        DEFAULT_NEURONS_PER_LAYER=8
+        ;;
+    baseline-v1-small)
+        DEFAULT_PAIRS=128
+        DEFAULT_EPOCHS=2
+        DEFAULT_EVAL_LIMIT=16
+        DEFAULT_MAX_GEN_TOKENS=8
+        DEFAULT_BPTT_WINDOW=12
+        DEFAULT_NEGATIVE_SAMPLES=96
+        DEFAULT_LR=0.001
+        DEFAULT_NETWORK_LR_SCALE=0.25
+        DEFAULT_NETWORK_LAYERS=3
+        DEFAULT_NEURONS_PER_LAYER=12
+        ;;
+    baseline-v1-medium)
+        DEFAULT_PAIRS=512
+        DEFAULT_EPOCHS=3
+        DEFAULT_EVAL_LIMIT=60
+        DEFAULT_MAX_GEN_TOKENS=16
+        DEFAULT_BPTT_WINDOW=16
+        DEFAULT_NEGATIVE_SAMPLES=128
+        DEFAULT_LR=0.0008
+        DEFAULT_NETWORK_LR_SCALE=0.3
+        DEFAULT_NETWORK_LAYERS=4
+        DEFAULT_NEURONS_PER_LAYER=16
+        ;;
+    custom)
+        DEFAULT_PAIRS=16
+        DEFAULT_EPOCHS=1
+        DEFAULT_EVAL_LIMIT=4
+        DEFAULT_MAX_GEN_TOKENS=4
+        DEFAULT_BPTT_WINDOW=8
+        DEFAULT_NEGATIVE_SAMPLES=64
+        DEFAULT_LR=0.001
+        DEFAULT_NETWORK_LR_SCALE=0.2
+        DEFAULT_NETWORK_LAYERS=3
+        DEFAULT_NEURONS_PER_LAYER=8
+        ;;
+    *)
+        echo "BROCA_GATE_RECIPE must be smoke, baseline-v1-small, baseline-v1-medium, or custom" >&2
+        exit 2
+        ;;
+esac
+
+PAIR_COUNT="${BROCA_GATE_PAIRS:-$DEFAULT_PAIRS}"
+EPOCHS="${BROCA_GATE_EPOCHS:-$DEFAULT_EPOCHS}"
+EVAL_LIMIT="${BROCA_GATE_EVAL_LIMIT:-$DEFAULT_EVAL_LIMIT}"
+MAX_GEN_TOKENS="${BROCA_GATE_MAX_GEN_TOKENS:-$DEFAULT_MAX_GEN_TOKENS}"
+BPTT_WINDOW="${BROCA_GATE_BPTT_WINDOW:-$DEFAULT_BPTT_WINDOW}"
+NEGATIVE_SAMPLES="${BROCA_GATE_NEGATIVE_SAMPLES:-$DEFAULT_NEGATIVE_SAMPLES}"
+LR="${BROCA_GATE_LR:-$DEFAULT_LR}"
+NETWORK_LR_SCALE="${BROCA_GATE_NETWORK_LR_SCALE:-$DEFAULT_NETWORK_LR_SCALE}"
+NETWORK_LAYERS="${BROCA_GATE_NETWORK_LAYERS:-$DEFAULT_NETWORK_LAYERS}"
+NEURONS_PER_LAYER="${BROCA_GATE_NEURONS_PER_LAYER:-$DEFAULT_NEURONS_PER_LAYER}"
 
 FULL_DATA="$OUT_DIR/curriculum-full.jsonl"
 TRAIN_DATA="$OUT_DIR/train-gate.jsonl"
@@ -123,6 +186,7 @@ add_threshold BROCA_GATE_MIN_CODE_SHEAF_FUNCTION_COHERENCE_RATE --min-code-sheaf
 echo "[broca-gate] output: $OUT_DIR"
 echo "[broca-gate] backend: $BACKEND"
 echo "[broca-gate] eval lane: $EVAL_LANE"
+echo "[broca-gate] recipe: $RECIPE"
 echo "[broca-gate] generating curriculum data"
 run cargo run -p symthaea-broca "${CARGO_FEATURE_ARGS[@]}" --bin broca-train -- --curriculum "$FULL_DATA"
 
@@ -131,10 +195,12 @@ echo "[broca-gate] training $PAIR_COUNT pairs for $EPOCHS epoch(s)"
 run cargo run -p symthaea-broca "${CARGO_FEATURE_ARGS[@]}" --bin broca-train -- \
     --data "$TRAIN_DATA" \
     --epochs "$EPOCHS" \
-    --bptt-window 8 \
-    --negative-samples 64 \
-    --lr 0.001 \
-    --network-lr-scale 0.2 \
+    --bptt-window "$BPTT_WINDOW" \
+    --negative-samples "$NEGATIVE_SAMPLES" \
+    --lr "$LR" \
+    --network-lr-scale "$NETWORK_LR_SCALE" \
+    --network-layers "$NETWORK_LAYERS" \
+    --neurons-per-layer "$NEURONS_PER_LAYER" \
     --diagnostics \
     --no-save-adam \
     --output "$CHECKPOINT" \
@@ -154,8 +220,15 @@ if run env \
     BROCA_EVAL_BACKEND="$BACKEND" \
     BROCA_EVAL_LANE="$EVAL_LANE" \
     BROCA_EVAL_FEATURES="$eval_feature_set" \
+    BROCA_TRAIN_RECIPE="$RECIPE" \
     BROCA_TRAIN_PAIR_COUNT="$PAIR_COUNT" \
     BROCA_TRAIN_EPOCHS="$EPOCHS" \
+    BROCA_TRAIN_BPTT_WINDOW="$BPTT_WINDOW" \
+    BROCA_TRAIN_NEGATIVE_SAMPLES="$NEGATIVE_SAMPLES" \
+    BROCA_TRAIN_LR="$LR" \
+    BROCA_TRAIN_NETWORK_LR_SCALE="$NETWORK_LR_SCALE" \
+    BROCA_TRAIN_NETWORK_LAYERS="$NETWORK_LAYERS" \
+    BROCA_TRAIN_NEURONS_PER_LAYER="$NEURONS_PER_LAYER" \
     cargo run -p symthaea-broca "${CARGO_FEATURE_ARGS[@]}" --bin broca-eval -- \
     --checkpoint "$CHECKPOINT" \
     --canonical-eval "$CANONICAL" \

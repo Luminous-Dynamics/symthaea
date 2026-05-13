@@ -287,8 +287,15 @@ fn build_quality_metadata(opts: &EvalOpts) -> evaluation::QualityRunMetadata {
                     .collect()
             })
             .unwrap_or_default(),
+        train_recipe: std::env::var("BROCA_TRAIN_RECIPE").ok(),
         train_pair_count: parse_env_usize("BROCA_TRAIN_PAIR_COUNT"),
         train_epochs: parse_env_usize("BROCA_TRAIN_EPOCHS"),
+        train_bptt_window: parse_env_usize("BROCA_TRAIN_BPTT_WINDOW"),
+        train_negative_samples: parse_env_usize("BROCA_TRAIN_NEGATIVE_SAMPLES"),
+        train_learning_rate: parse_env_f32("BROCA_TRAIN_LR"),
+        train_network_lr_scale: parse_env_f32("BROCA_TRAIN_NETWORK_LR_SCALE"),
+        train_network_layers: parse_env_usize("BROCA_TRAIN_NETWORK_LAYERS"),
+        train_neurons_per_layer: parse_env_usize("BROCA_TRAIN_NEURONS_PER_LAYER"),
     }
 }
 
@@ -312,6 +319,10 @@ fn git_commit() -> Option<String> {
 }
 
 fn parse_env_usize(name: &str) -> Option<usize> {
+    std::env::var(name).ok()?.parse().ok()
+}
+
+fn parse_env_f32(name: &str) -> Option<f32> {
     std::env::var(name).ok()?.parse().ok()
 }
 

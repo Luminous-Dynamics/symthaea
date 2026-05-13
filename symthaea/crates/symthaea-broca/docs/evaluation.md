@@ -33,7 +33,9 @@ The JSON report includes:
 - structured output validity for Rust, JSON, and action-shaped canonical cases
 - per-category raw/gated breakdowns
 - run metadata: backend, eval lane, checkpoint hash, git commit, feature set,
-  training pair count, and epochs when emitted by automation scripts
+  training recipe, pair count, epochs, BPTT window, negative samples, learning
+  rate, network LR scale, network layers, and neurons per layer when emitted by
+  automation scripts
 
 ## Evaluation Lanes
 
@@ -103,6 +105,34 @@ Set `BROCA_GATE_REPORT_ONLY=1` for calibration runs that should write the
 quality JSON without failing the process on current thresholds.
 GPU runs default `BROCA_GATE_TARGET_DIR` to `/tmp/symthaea-broca-gpu-target` so
 training does not wait behind unrelated workspace builds.
+
+Training is controlled by `BROCA_GATE_RECIPE`:
+
+- `smoke`: the default, a tiny correctness and wiring check.
+- `baseline-v1-small`: the first useful GPU baseline. It modestly increases
+  examples, BPTT length, negative samples, and CfC capacity.
+- `baseline-v1-medium`: a promotion-candidate recipe for full canonical eval
+  and benchmark snapshots.
+- `custom`: starts from smoke defaults but expects explicit overrides.
+
+Every recipe can be overridden with:
+
+- `BROCA_GATE_PAIRS`
+- `BROCA_GATE_EPOCHS`
+- `BROCA_GATE_EVAL_LIMIT`
+- `BROCA_GATE_MAX_GEN_TOKENS`
+- `BROCA_GATE_BPTT_WINDOW`
+- `BROCA_GATE_NEGATIVE_SAMPLES`
+- `BROCA_GATE_LR`
+- `BROCA_GATE_NETWORK_LR_SCALE`
+- `BROCA_GATE_NETWORK_LAYERS`
+- `BROCA_GATE_NEURONS_PER_LAYER`
+
+Prefer `baseline-v1-small` before increasing model size further. Only increase
+neurons or layers when train and validation curves show under-capacity rather
+than data or decoding limits. Widen neurons first, add layers second, and avoid
+changing HDC/channel dimensions until baseline reports are stable because that
+breaks checkpoint comparability and may require schema migrations.
 
 `BROCA_GATE_BACKEND=auto` is the default. On machines where `nvidia-smi` works,
 the script compiles with `--features gpu` and runs through `nix develop .#broca-gpu`;
