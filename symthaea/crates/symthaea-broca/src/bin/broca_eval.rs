@@ -12,13 +12,15 @@
 //! - Interactive: type intent/epistemic/valence, see generated text in real-time
 //! - Batch: run eval dataset + sample generation with configurable sampling
 
+use std::collections::HashMap;
 use std::process::{self, Command};
 
+use serde::Serialize;
 use sha2::{Digest, Sha256};
 use symthaea_broca::encoder::ThoughtChannels;
 use symthaea_broca::evaluation;
-use symthaea_broca::generator::{BrocaGenerator, SamplingStrategy};
-use symthaea_broca::training::TrainingDataset;
+use symthaea_broca::generator::{BrocaGenerator, GenerationResult, SamplingStrategy};
+use symthaea_broca::training::{TrainingDataset, TrainingPair};
 
 use symthaea_core::genesis::GenesisSeed;
 
@@ -120,6 +122,25 @@ fn main() {
                 serde_json::to_string_pretty(&result).expect("quality report serializes")
             );
         }
+        if let Some(ref dump_path) = opts.dump_generations_path {
+            if opts.teacher_forced_only {
+                eprintln!(
+                    "--dump-generations requested with --teacher-forced-only; writing generated diagnostics anyway"
+                );
+            }
+            if let Err(e) = dump_canonical_generations(
+                &mut generator,
+                &canonical,
+                &opts.checkpoint_path,
+                opts.eval_limit,
+                opts.max_gen_tokens,
+                dump_path,
+            ) {
+                eprintln!("Failed to write generation dump '{dump_path}': {e}");
+                process::exit(1);
+            }
+        }
+
         if !opts.report_only && !failures.is_empty() {
             eprintln!("Canonical quality gate failed:");
             for failure in &failures {
@@ -326,11 +347,192 @@ fn parse_env_f32(name: &str) -> Option<f32> {
     std::env::var(name).ok()?.parse().ok()
 }
 
+#[derive(Debug, Serialize)]
+struct CanonicalGenerationDumpRecord {
+    checkpoint_path: String,
+    case_index: usize,
+    case_id: String,
+    category: String,
+    tags: Vec<String>,
+    intent: String,
+    target_text: String,
+    raw: GenerationDump,
+    gated: GenerationDump,
+}
+
+#[derive(Debug, Serialize)]
+struct GenerationDump {
+    text: String,
+    token_ids: Vec<u32>,
+    token_count: usize,
+    eos_terminated: bool,
+    veto_triggered: bool,
+    final_coherence: f32,
+    long_coherence: f32,
+    coherence_dynamics: Vec<f32>,
+    hallucination_flag: bool,
+    nsm_prime_coverage: f32,
+    repeated_tokens: Vec<TokenFrequency>,
+}
+
+#[derive(Debug, Serialize)]
+struct TokenFrequency {
+    token_id: u32,
+    token: String,
+    count: usize,
+}
+
+fn dump_canonical_generations(
+    generator: &mut BrocaGenerator,
+    dataset: &evaluation::CanonicalEvalDataset,
+    checkpoint_path: &str,
+    eval_limit: usize,
+    max_gen_tokens: usize,
+    output_path: &str,
+) -> std::io::Result<()> {
+    let mut out = String::new();
+    let cases = limited_canonical_cases(dataset, eval_limit);
+    let original_bypass = generator.config().bypass_gating;
+
+    for (case_index, case) in cases.iter().enumerate() {
+        let channels = canonical_case_channels(case);
+
+        generator.config_mut().bypass_gating = true;
+        let raw = generate_for_dump(generator, &channels, max_gen_tokens);
+
+        generator.config_mut().bypass_gating = false;
+        let gated = generate_for_dump(generator, &channels, max_gen_tokens);
+
+        let record = CanonicalGenerationDumpRecord {
+            checkpoint_path: checkpoint_path.to_string(),
+            case_index,
+            case_id: case.id.clone(),
+            category: case.category.clone(),
+            tags: case.tags.clone(),
+            intent: active_intent_name(&case.channels).to_string(),
+            target_text: case.target_text.clone(),
+            raw: generation_dump(generator, raw),
+            gated: generation_dump(generator, gated),
+        };
+        out.push_str(&serde_json::to_string(&record).expect("generation dump record serializes"));
+        out.push('\n');
+    }
+
+    generator.config_mut().bypass_gating = original_bypass;
+    std::fs::write(output_path, out)
+}
+
+fn limited_canonical_cases(
+    dataset: &evaluation::CanonicalEvalDataset,
+    eval_limit: usize,
+) -> &[evaluation::CanonicalEvalCase] {
+    if eval_limit > 0 && eval_limit < dataset.cases.len() {
+        &dataset.cases[..eval_limit]
+    } else {
+        &dataset.cases
+    }
+}
+
+fn canonical_case_channels(case: &evaluation::CanonicalEvalCase) -> ThoughtChannels {
+    TrainingPair {
+        channels: case.channels.clone(),
+        target_text: case.target_text.clone(),
+        target_ids: vec![],
+        valence: 0.0,
+        arousal: 0.5,
+    }
+    .to_thought_channels()
+}
+
+fn generate_for_dump(
+    generator: &mut BrocaGenerator,
+    channels: &ThoughtChannels,
+    max_gen_tokens: usize,
+) -> GenerationResult {
+    let original_base_max_tokens = generator.config().gating.base_max_tokens;
+    let original_consciousness_gating = generator.config().enable_consciousness_gating;
+    {
+        let config = generator.config_mut();
+        config.gating.base_max_tokens = max_gen_tokens;
+        config.enable_consciousness_gating = false;
+    }
+    let result = generator.generate(channels);
+    {
+        let config = generator.config_mut();
+        config.gating.base_max_tokens = original_base_max_tokens;
+        config.enable_consciousness_gating = original_consciousness_gating;
+    }
+    result
+}
+
+fn generation_dump(generator: &BrocaGenerator, result: GenerationResult) -> GenerationDump {
+    GenerationDump {
+        repeated_tokens: repeated_tokens(generator, &result.token_ids, 8),
+        text: result.text,
+        token_ids: result.token_ids,
+        token_count: result.num_tokens,
+        eos_terminated: result.eos_terminated,
+        veto_triggered: result.veto_triggered,
+        final_coherence: result.final_coherence,
+        long_coherence: result.long_coherence,
+        coherence_dynamics: result.coherence_dynamics,
+        hallucination_flag: result.hallucination_flag,
+        nsm_prime_coverage: result.nsm_prime_coverage,
+    }
+}
+
+fn repeated_tokens(
+    generator: &BrocaGenerator,
+    token_ids: &[u32],
+    limit: usize,
+) -> Vec<TokenFrequency> {
+    let mut counts: HashMap<u32, usize> = HashMap::new();
+    for &token_id in token_ids {
+        *counts.entry(token_id).or_insert(0) += 1;
+    }
+    let mut counts: Vec<_> = counts.into_iter().filter(|(_, count)| *count > 1).collect();
+    counts.sort_by(|(left_id, left_count), (right_id, right_count)| {
+        right_count
+            .cmp(left_count)
+            .then_with(|| left_id.cmp(right_id))
+    });
+    counts
+        .into_iter()
+        .take(limit)
+        .map(|(token_id, count)| TokenFrequency {
+            token_id,
+            token: generator.tokenizer().token_str(token_id).to_string(),
+            count,
+        })
+        .collect()
+}
+
+fn active_intent_name(channels: &[f32]) -> &'static str {
+    const INTENT_NAMES: [&str; 8] = [
+        "Acknowledge",
+        "Answer",
+        "Clarify",
+        "Propose",
+        "Uncertainty",
+        "Reflect",
+        "Continue",
+        "Unknown",
+    ];
+    if channels.len() < INTENT_NAMES.len() {
+        return "Unknown";
+    }
+    let idx = (0..INTENT_NAMES.len())
+        .max_by(|&a, &b| channels[a].total_cmp(&channels[b]))
+        .unwrap_or(INTENT_NAMES.len() - 1);
+    INTENT_NAMES[idx]
+}
+
 struct EvalOpts {
     checkpoint_path: String,
     eval_path: Option<String>,
     canonical_eval_path: Option<String>,
     json_output_path: Option<String>,
+    dump_generations_path: Option<String>,
     genesis_phrase: String,
     sample_count: usize,
     samples_requested: bool,
@@ -352,6 +554,7 @@ fn parse_args(args: &[String]) -> Result<EvalOpts, String> {
         eval_path: None,
         canonical_eval_path: None,
         json_output_path: None,
+        dump_generations_path: None,
         genesis_phrase: "broca-training-default".to_string(),
         sample_count: 0,
         samples_requested: false,
@@ -391,6 +594,14 @@ fn parse_args(args: &[String]) -> Result<EvalOpts, String> {
                 i += 1;
                 opts.json_output_path =
                     Some(args.get(i).cloned().ok_or("--json-out requires a path")?);
+            }
+            "--dump-generations" => {
+                i += 1;
+                opts.dump_generations_path = Some(
+                    args.get(i)
+                        .cloned()
+                        .ok_or("--dump-generations requires a path")?,
+                );
             }
             "--genesis" => {
                 i += 1;
@@ -576,6 +787,9 @@ fn print_usage() {
     eprintln!("  --eval PATH            Evaluate on held-out JSONL dataset");
     eprintln!("  --canonical-eval PATH  Run raw-vs-gated canonical quality suite");
     eprintln!("  --json-out PATH        Write eval result JSON instead of human report");
+    eprintln!(
+        "  --dump-generations PATH  Write raw/gated canonical generation diagnostics as JSONL"
+    );
     eprintln!("  --eval-limit N         Limit eval pairs (default: all)");
     eprintln!("  --max-gen-tokens N     Max teacher-forced/generated tokens (default: 64)");
     eprintln!("  --report-only          Emit canonical quality JSON without applying thresholds");

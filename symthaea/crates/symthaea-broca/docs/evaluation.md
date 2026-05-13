@@ -22,6 +22,11 @@ cargo run -p symthaea-broca --bin broca-eval -- \
   --json-out /tmp/broca-quality.json
 ```
 
+Add `--dump-generations /tmp/broca-generations.jsonl` to write one JSONL
+record per evaluated canonical case with target text, raw output, gated output,
+token IDs, repeated-token counts, coherence dynamics, and hallucination flags.
+Use this before changing model size when quality metrics show low coherence.
+
 The JSON report includes:
 
 - raw generation metrics with `bypass_gating=true`
