@@ -721,12 +721,7 @@ pub fn evaluate_quality_suite(
     );
     generator.config_mut().bypass_gating = original_bypass;
 
-    let category_cases: &[CanonicalEvalCase] = if eval_limit > 0 && eval_limit < dataset.cases.len()
-    {
-        &dataset.cases[..eval_limit]
-    } else {
-        &dataset.cases
-    };
+    let category_cases = limited_canonical_cases(dataset, eval_limit);
     let evaluated_case_count = category_cases.len();
 
     let mut by_category: HashMap<String, Vec<CanonicalEvalCase>> = HashMap::new();
@@ -801,6 +796,17 @@ pub fn evaluate_quality_suite(
     }
 }
 
+fn limited_canonical_cases(
+    dataset: &CanonicalEvalDataset,
+    eval_limit: usize,
+) -> &[CanonicalEvalCase] {
+    if eval_limit > 0 && eval_limit < dataset.cases.len() {
+        &dataset.cases[..eval_limit]
+    } else {
+        &dataset.cases
+    }
+}
+
 fn evaluate_structured_output_quality(
     generator: &mut BrocaGenerator,
     dataset: &CanonicalEvalDataset,
@@ -840,10 +846,7 @@ fn evaluate_structured_output_mode(
         cases: Vec::new(),
     };
 
-    for case in &dataset.cases {
-        if eval_limit > 0 && eval.eligible_cases >= eval_limit {
-            break;
-        }
+    for case in limited_canonical_cases(dataset, eval_limit) {
         let Some(kind) = expected_structured_output_kind(case) else {
             continue;
         };
@@ -1050,7 +1053,7 @@ fn evaluate_code_sheaf_mode(
         functions: Vec::new(),
     };
 
-    for case in &dataset.cases {
+    for case in limited_canonical_cases(dataset, eval_limit) {
         if !is_code_sheaf_case(case) {
             eval.skipped_non_rust_cases += 1;
             continue;
@@ -1062,9 +1065,6 @@ fn evaluate_code_sheaf_mode(
                 eval.record_diagnostic(format!("target Rust parse failed: {parse_error}"));
             }
             continue;
-        }
-        if eval_limit > 0 && eval.eligible_cases >= eval_limit {
-            break;
         }
         let channels = TrainingPair {
             channels: case.channels.clone(),
@@ -2371,6 +2371,34 @@ mod tests {
                 .sum::<usize>(),
             1
         );
+    }
+
+    #[test]
+    fn test_structured_output_respects_canonical_limit() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut gen = BrocaGenerator::new(&genesis, config);
+        let cases = vec![
+            CanonicalEvalCase {
+                category: "intent".to_string(),
+                id: "answer".to_string(),
+                channels: ThoughtChannels::with_intent(1).channels.to_vec(),
+                target_text: "hello world".to_string(),
+                tags: vec!["answer".to_string()],
+            },
+            CanonicalEvalCase {
+                category: "code".to_string(),
+                id: "rust_after_limit".to_string(),
+                channels: ThoughtChannels::with_intent(1).channels.to_vec(),
+                target_text: "fn is_even(n: i32) -> bool { n % 2 == 0 }".to_string(),
+                tags: vec!["rust".to_string()],
+            },
+        ];
+        let dataset = CanonicalEvalDataset { cases };
+
+        let result = evaluate_quality_suite(&mut gen, &dataset, 4, 1, true);
+        assert_eq!(result.num_cases, 1);
+        assert!(result.structured_output.is_none());
     }
 
     #[cfg(feature = "code-sheaf-eval")]
