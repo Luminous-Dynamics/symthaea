@@ -207,6 +207,13 @@ pub struct QualityRunMetadata {
     pub train_network_lr_scale: Option<f32>,
     pub train_network_layers: Option<usize>,
     pub train_neurons_per_layer: Option<usize>,
+    pub train_coherence_alignment: Option<f32>,
+    pub train_alignment_start: Option<f32>,
+    pub train_contrastive: Option<f32>,
+    pub train_contrastive_margin: Option<f32>,
+    pub train_scheduled_sampling: Option<f32>,
+    pub train_label_smoothing: Option<f32>,
+    pub train_merge_bias: Option<f32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -210,6 +210,9 @@ pub struct GenerationResult {
     pub coherence_dynamics: Vec<f32>,
     /// Per-token gating audit trail (populated when coherence feedback is enabled).
     pub gating_trace: Vec<GatingTraceEntry>,
+    /// Per-token decoder distribution diagnostics captured after gating/repetition
+    /// penalties and before sampling.
+    pub logit_diagnostics: Vec<GenerationStepLogits>,
     /// Number of consecutive tokens with output-thought similarity < 0.05.
     /// When >= 3, suggests hallucination (output drifted far from thought intent).
     pub hallucination_flag: bool,
@@ -222,6 +225,23 @@ pub struct GenerationResult {
     /// Semantic prediction error: round-trip reconstruction loss (Liquid-Mamba only).
     #[cfg(feature = "mamba-cpu")]
     pub semantic_pe: f32,
+}
+
+#[derive(Debug, Clone)]
+pub struct GenerationStepLogits {
+    pub position: usize,
+    pub selected_token_id: u32,
+    pub entropy: f32,
+    pub max_probability: f32,
+    pub top_k: Vec<GenerationTopLogit>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GenerationTopLogit {
+    pub rank: usize,
+    pub token_id: u32,
+    pub logit: f32,
+    pub probability: f32,
 }
 
 /// Broca generator: autoregressive thought-to-text.
@@ -489,6 +509,7 @@ impl BrocaGenerator {
         let mut tokens_since_veto = veto_refractory; // Start past refractory
         let mut coherence_dynamics = Vec::new();
         let mut gating_trace = Vec::new();
+        let mut logit_diagnostics = Vec::new();
         let mut consecutive_low_coherence = 0usize;
         let mut hallucination_flag = false;
         // Phase 4: Soft veto snapshot — saved at each high-coherence step
@@ -740,6 +761,7 @@ impl BrocaGenerator {
                 coherence_dynamics.pop();
                 break;
             }
+            logit_diagnostics.push(logit_diagnostics_for_step(pos, &logits, next_token, 8));
 
             // Skip special tokens in output
             if !self.tokenizer.is_special(next_token) {
@@ -790,6 +812,7 @@ impl BrocaGenerator {
             long_coherence: 0.0, // CfC-HDC backend doesn't use long window
             coherence_dynamics,
             gating_trace,
+            logit_diagnostics,
             hallucination_flag,
             nsm_prime_coverage: nsm_tracker
                 .as_ref()
@@ -885,6 +908,82 @@ fn greedy_sample(logits: &[f32]) -> u32 {
         .max_by(|(_, a), (_, b)| a.total_cmp(b))
         .map(|(i, _)| i as u32)
         .unwrap_or(0)
+}
+
+fn logit_diagnostics_for_step(
+    position: usize,
+    logits: &[f32],
+    selected_token_id: u32,
+    k: usize,
+) -> GenerationStepLogits {
+    if logits.is_empty() {
+        return GenerationStepLogits {
+            position,
+            selected_token_id,
+            entropy: 0.0,
+            max_probability: 0.0,
+            top_k: Vec::new(),
+        };
+    }
+
+    let max_logit = logits
+        .iter()
+        .copied()
+        .filter(|value| value.is_finite())
+        .max_by(f32::total_cmp)
+        .unwrap_or(0.0);
+    let exp_values: Vec<f32> = logits
+        .iter()
+        .map(|&logit| {
+            if logit.is_finite() {
+                (logit - max_logit).exp()
+            } else {
+                0.0
+            }
+        })
+        .collect();
+    let sum: f32 = exp_values.iter().sum();
+    if sum <= 1e-20 {
+        return GenerationStepLogits {
+            position,
+            selected_token_id,
+            entropy: 0.0,
+            max_probability: 0.0,
+            top_k: Vec::new(),
+        };
+    }
+
+    let mut entropy = 0.0f32;
+    let mut max_probability = 0.0f32;
+    for &exp_value in &exp_values {
+        let probability = exp_value / sum;
+        if probability > 0.0 {
+            entropy -= probability * probability.ln();
+            max_probability = max_probability.max(probability);
+        }
+    }
+
+    let mut indexed: Vec<(usize, f32)> = logits.iter().copied().enumerate().collect();
+    indexed.sort_by(|(_, left), (_, right)| right.total_cmp(left));
+    indexed.truncate(k.min(indexed.len()));
+    let top_k = indexed
+        .into_iter()
+        .enumerate()
+        .map(|(rank, (token_id, logit))| GenerationTopLogit {
+            rank,
+            token_id: token_id as u32,
+            logit,
+            probability: exp_values[token_id] / sum,
+        })
+        .collect();
+
+    GenerationStepLogits {
+        position,
+        selected_token_id,
+        entropy,
+        max_probability,
+        top_k,
+    }
 }
 
 /// Top-k sampling with temperature.
@@ -1501,6 +1600,40 @@ mod tests {
 
         for &c in &result.coherence_dynamics {
             assert!(c.is_finite(), "Coherence should be finite");
+        }
+    }
+
+    #[test]
+    fn test_logit_diagnostics_populated() {
+        let genesis = test_genesis();
+        let mut config = test_config();
+        config.enable_coherence_feedback = true;
+        config.gating.base_max_tokens = 10;
+        config.enable_consciousness_gating = false;
+
+        let mut gen = BrocaGenerator::new(&genesis, config);
+        let channels = ThoughtChannels::default();
+        let result = gen.generate(&channels);
+
+        assert_eq!(
+            result.logit_diagnostics.len(),
+            result.num_tokens,
+            "Should have one logit diagnostic per generated token"
+        );
+        for step in &result.logit_diagnostics {
+            assert!(step.entropy.is_finite(), "Entropy should be finite");
+            assert!(
+                step.max_probability.is_finite(),
+                "Max probability should be finite"
+            );
+            assert!(
+                (0.0..=1.0).contains(&step.max_probability),
+                "Max probability should be in [0, 1]"
+            );
+            assert!(
+                !step.top_k.is_empty(),
+                "Top-k diagnostics should be present"
+            );
         }
     }
 

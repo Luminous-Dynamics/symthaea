@@ -19,7 +19,9 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use symthaea_broca::encoder::ThoughtChannels;
 use symthaea_broca::evaluation;
-use symthaea_broca::generator::{BrocaGenerator, GenerationResult, SamplingStrategy};
+use symthaea_broca::generator::{
+    BrocaGenerator, GenerationResult, GenerationStepLogits, SamplingStrategy,
+};
 use symthaea_broca::training::{TrainingDataset, TrainingPair};
 
 use symthaea_core::genesis::GenesisSeed;
@@ -317,6 +319,13 @@ fn build_quality_metadata(opts: &EvalOpts) -> evaluation::QualityRunMetadata {
         train_network_lr_scale: parse_env_f32("BROCA_TRAIN_NETWORK_LR_SCALE"),
         train_network_layers: parse_env_usize("BROCA_TRAIN_NETWORK_LAYERS"),
         train_neurons_per_layer: parse_env_usize("BROCA_TRAIN_NEURONS_PER_LAYER"),
+        train_coherence_alignment: parse_env_f32("BROCA_TRAIN_COHERENCE_ALIGNMENT"),
+        train_alignment_start: parse_env_f32("BROCA_TRAIN_ALIGNMENT_START"),
+        train_contrastive: parse_env_f32("BROCA_TRAIN_CONTRASTIVE"),
+        train_contrastive_margin: parse_env_f32("BROCA_TRAIN_CONTRASTIVE_MARGIN"),
+        train_scheduled_sampling: parse_env_f32("BROCA_TRAIN_SCHEDULED_SAMPLING"),
+        train_label_smoothing: parse_env_f32("BROCA_TRAIN_LABEL_SMOOTHING"),
+        train_merge_bias: parse_env_f32("BROCA_TRAIN_MERGE_BIAS"),
     }
 }
 
@@ -370,9 +379,29 @@ struct GenerationDump {
     final_coherence: f32,
     long_coherence: f32,
     coherence_dynamics: Vec<f32>,
+    logit_diagnostics: Vec<GenerationStepLogitDump>,
     hallucination_flag: bool,
     nsm_prime_coverage: f32,
     repeated_tokens: Vec<TokenFrequency>,
+}
+
+#[derive(Debug, Serialize)]
+struct GenerationStepLogitDump {
+    position: usize,
+    selected_token_id: u32,
+    selected_token: String,
+    entropy: f32,
+    max_probability: f32,
+    top_k: Vec<GenerationTopLogitDump>,
+}
+
+#[derive(Debug, Serialize)]
+struct GenerationTopLogitDump {
+    rank: usize,
+    token_id: u32,
+    token: String,
+    logit: f32,
+    probability: f32,
 }
 
 #[derive(Debug, Serialize)]
@@ -475,10 +504,41 @@ fn generation_dump(generator: &BrocaGenerator, result: GenerationResult) -> Gene
         veto_triggered: result.veto_triggered,
         final_coherence: result.final_coherence,
         long_coherence: result.long_coherence,
+        logit_diagnostics: logit_diagnostics_dump(generator, &result.logit_diagnostics),
         coherence_dynamics: result.coherence_dynamics,
         hallucination_flag: result.hallucination_flag,
         nsm_prime_coverage: result.nsm_prime_coverage,
     }
+}
+
+fn logit_diagnostics_dump(
+    generator: &BrocaGenerator,
+    diagnostics: &[GenerationStepLogits],
+) -> Vec<GenerationStepLogitDump> {
+    diagnostics
+        .iter()
+        .map(|step| GenerationStepLogitDump {
+            position: step.position,
+            selected_token_id: step.selected_token_id,
+            selected_token: generator
+                .tokenizer()
+                .token_str(step.selected_token_id)
+                .to_string(),
+            entropy: step.entropy,
+            max_probability: step.max_probability,
+            top_k: step
+                .top_k
+                .iter()
+                .map(|entry| GenerationTopLogitDump {
+                    rank: entry.rank,
+                    token_id: entry.token_id,
+                    token: generator.tokenizer().token_str(entry.token_id).to_string(),
+                    logit: entry.logit,
+                    probability: entry.probability,
+                })
+                .collect(),
+        })
+        .collect()
 }
 
 fn repeated_tokens(

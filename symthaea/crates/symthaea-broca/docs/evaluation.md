@@ -24,7 +24,8 @@ cargo run -p symthaea-broca --bin broca-eval -- \
 
 Add `--dump-generations /tmp/broca-generations.jsonl` to write one JSONL
 record per evaluated canonical case with target text, raw output, gated output,
-token IDs, repeated-token counts, coherence dynamics, and hallucination flags.
+token IDs, repeated-token counts, coherence dynamics, hallucination flags, and
+per-step decoder top-k logits/probabilities with entropy.
 Use this before changing model size when quality metrics show low coherence.
 
 The JSON report includes:
@@ -116,6 +117,10 @@ Training is controlled by `BROCA_GATE_RECIPE`:
 - `smoke`: the default, a tiny correctness and wiring check.
 - `baseline-v1-small`: the first useful GPU baseline. It modestly increases
   examples, BPTT length, negative samples, and CfC capacity.
+- `baseline-v1-binding`: a targeted experiment for flat-logit thought binding
+  collapse. It keeps small-model capacity but increases negative samples,
+  BPTT length, network LR scale, and enables light coherence alignment,
+  contrastive, and label-smoothing losses.
 - `baseline-v1-medium`: a promotion-candidate recipe for full canonical eval
   and benchmark snapshots.
 - `custom`: starts from smoke defaults but expects explicit overrides.
@@ -132,12 +137,21 @@ Every recipe can be overridden with:
 - `BROCA_GATE_NETWORK_LR_SCALE`
 - `BROCA_GATE_NETWORK_LAYERS`
 - `BROCA_GATE_NEURONS_PER_LAYER`
+- `BROCA_GATE_COHERENCE_ALIGNMENT`
+- `BROCA_GATE_ALIGNMENT_START`
+- `BROCA_GATE_CONTRASTIVE`
+- `BROCA_GATE_CONTRASTIVE_MARGIN`
+- `BROCA_GATE_SCHEDULED_SAMPLING`
+- `BROCA_GATE_LABEL_SMOOTHING`
+- `BROCA_GATE_MERGE_BIAS`
 
 Prefer `baseline-v1-small` before increasing model size further. Only increase
 neurons or layers when train and validation curves show under-capacity rather
 than data or decoding limits. Widen neurons first, add layers second, and avoid
 changing HDC/channel dimensions until baseline reports are stable because that
 breaks checkpoint comparability and may require schema migrations.
+If generation dumps show near-uniform logits with identical greedy outputs
+across intents, run `baseline-v1-binding` before `baseline-v1-medium`.
 
 `BROCA_GATE_BACKEND=auto` is the default. On machines where `nvidia-smi` works,
 the script compiles with `--features gpu` and runs through `nix develop .#broca-gpu`;
