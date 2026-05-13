@@ -200,6 +200,23 @@
           ]))
         ]);
 
+        brocaGpuBuildInputs = with pkgs; [
+          rustToolchain
+          pkg-config
+          cmake
+          openssl
+          openssl.dev
+          cacert
+          protobuf
+          tree-sitter
+
+          # Minimal CUDA/Rust shell for symthaea-broca train/eval automation.
+          stdenv.cc.cc.lib
+          openblas
+          cudaPackages.cudatoolkit
+          cudaPackages.cuda_nvcc
+        ];
+
         buildInputs = gpuBuildInputs;
 
         nativeBuildInputs = with pkgs; [
@@ -211,6 +228,7 @@
         # Library paths
         rustLibPath = pkgs.lib.makeLibraryPath rustBuildInputs;
         gpuLibPath = pkgs.lib.makeLibraryPath gpuBuildInputs;
+        brocaGpuLibPath = pkgs.lib.makeLibraryPath brocaGpuBuildInputs;
 
         # ONNX Runtime path for dynamic loading
         onnxPath = "${pkgs.onnxruntime}/lib";
@@ -480,6 +498,34 @@ EOF
           '';
 
           # Environment variables for build scripts
+          OPENSSL_DIR = "${pkgs.openssl.dev}";
+          OPENSSL_LIB_DIR = "${pkgs.openssl.out}/lib";
+          OPENSSL_INCLUDE_DIR = "${pkgs.openssl.dev}/include";
+        };
+
+        devShells."broca-gpu" = pkgs.mkShell {
+          buildInputs = brocaGpuBuildInputs;
+
+          shellHook = commonShellHook + ''
+            # /run/opengl-driver/lib MUST come first — contains real libcuda.so driver.
+            # Without this, cudarc finds CUDA stubs from nix store → CUDA_ERROR_STUB_LIBRARY.
+            ${hostCudaLibSetup}
+            export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:${brocaGpuLibPath}"
+
+            # CUDA for candle GPU training on the RTX 2070-class host.
+            export CUDA_PATH="${pkgs.cudaPackages.cudatoolkit}"
+            export CUDA_ROOT="${pkgs.cudaPackages.cudatoolkit}"
+            export CUDA_TOOLKIT_ROOT_DIR="${pkgs.cudaPackages.cudatoolkit}"
+            export CUDA_COMPUTE_CAP=75
+            export PATH="${pkgs.cudaPackages.cuda_nvcc}/bin:${pkgs.cudaPackages.cudatoolkit}/bin:$PATH"
+
+            echo ""
+            echo "Symthaea Broca GPU shell"
+            echo "  scripts/broca_train_and_gate.sh"
+            echo "  BROCA_GATE_BACKEND=gpu scripts/broca_train_and_gate.sh"
+            echo ""
+          '';
+
           OPENSSL_DIR = "${pkgs.openssl.dev}";
           OPENSSL_LIB_DIR = "${pkgs.openssl.out}/lib";
           OPENSSL_INCLUDE_DIR = "${pkgs.openssl.dev}/include";

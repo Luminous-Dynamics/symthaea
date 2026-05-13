@@ -12,8 +12,9 @@
 //! - Interactive: type intent/epistemic/valence, see generated text in real-time
 //! - Batch: run eval dataset + sample generation with configurable sampling
 
-use std::process;
+use std::process::{self, Command};
 
+use sha2::{Digest, Sha256};
 use symthaea_broca::encoder::ThoughtChannels;
 use symthaea_broca::evaluation;
 use symthaea_broca::generator::{BrocaGenerator, SamplingStrategy};
@@ -43,14 +44,18 @@ fn main() {
 
     // Load checkpoint
     eprintln!("Loading checkpoint: {}", opts.checkpoint_path);
-    let (mut generator, _adam, _proj, _lm) =
-        match BrocaGenerator::from_checkpoint(&opts.checkpoint_path, &genesis) {
-            Ok(r) => r,
-            Err(e) => {
-                eprintln!("Failed to load checkpoint: {e}");
-                process::exit(1);
-            }
-        };
+    let load_result = if opts.allow_checkpoint_recovery {
+        BrocaGenerator::from_checkpoint_allow_checksum_mismatch(&opts.checkpoint_path, &genesis)
+    } else {
+        BrocaGenerator::from_checkpoint(&opts.checkpoint_path, &genesis)
+    };
+    let (mut generator, _adam, _proj, _lm) = match load_result {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("Failed to load checkpoint: {e}");
+            process::exit(1);
+        }
+    };
 
     // Override sampling strategy
     let sampling = match (opts.top_k, opts.top_p) {
@@ -83,6 +88,55 @@ fn main() {
         }
     );
 
+    // Run canonical quality suite if requested.
+    if let Some(ref canonical_path) = opts.canonical_eval_path {
+        eprintln!("Running canonical quality suite on: {canonical_path}");
+        let canonical = match evaluation::CanonicalEvalDataset::from_jsonl(canonical_path) {
+            Ok(d) => d,
+            Err(e) => {
+                eprintln!("Failed to load canonical eval data: {e}");
+                process::exit(1);
+            }
+        };
+        let mut result = evaluation::evaluate_quality_suite(
+            &mut generator,
+            &canonical,
+            opts.max_gen_tokens,
+            opts.eval_limit,
+            !opts.teacher_forced_only,
+        );
+        result.metadata = Some(build_quality_metadata(&opts));
+        let failures = evaluation::check_quality_suite(&result, &opts.quality_thresholds);
+
+        if let Some(ref json_out) = opts.json_output_path {
+            let json = serde_json::to_string_pretty(&result).expect("quality report serializes");
+            if let Err(e) = std::fs::write(json_out, json) {
+                eprintln!("Failed to write JSON report '{json_out}': {e}");
+                process::exit(1);
+            }
+        } else {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&result).expect("quality report serializes")
+            );
+        }
+        if !opts.report_only && !failures.is_empty() {
+            eprintln!("Canonical quality gate failed:");
+            for failure in &failures {
+                eprintln!(
+                    "  {} observed={:.6} threshold={:.6}: {}",
+                    failure.metric, failure.observed, failure.threshold, failure.message
+                );
+            }
+            process::exit(2);
+        } else if opts.report_only && !failures.is_empty() {
+            eprintln!(
+                "Canonical quality report has {} threshold failure(s); continuing due to --report-only",
+                failures.len()
+            );
+        }
+    }
+
     // Run evaluation if --eval provided
     if let Some(ref eval_path) = opts.eval_path {
         eprintln!("Evaluating on: {eval_path}");
@@ -101,12 +155,22 @@ fn main() {
             compute_perplexity: true,
             compute_english_ratio: true,
             per_intent_breakdown: true,
-            max_gen_tokens: 64,
+            max_gen_tokens: opts.max_gen_tokens,
             eval_limit: opts.eval_limit,
+            progress: true,
+            compute_contrastive_intent: true,
         };
 
         let result = evaluation::evaluate(&mut generator, &eval_config);
-        println!("{}", evaluation::format_eval_report(&result));
+        if let Some(ref json_out) = opts.json_output_path {
+            let json = serde_json::to_string_pretty(&result).expect("eval report serializes");
+            if let Err(e) = std::fs::write(json_out, json) {
+                eprintln!("Failed to write JSON report '{json_out}': {e}");
+                process::exit(1);
+            }
+        } else {
+            println!("{}", evaluation::format_eval_report(&result));
+        }
     }
 
     // Generate samples
@@ -152,7 +216,12 @@ fn main() {
     }
 
     // Interactive mode (if no --eval and no --samples, or --interactive)
-    if opts.interactive || (opts.eval_path.is_none() && opts.sample_count == 0) {
+    if opts.interactive
+        || (opts.eval_path.is_none()
+            && opts.canonical_eval_path.is_none()
+            && opts.sample_count == 0
+            && !opts.samples_requested)
+    {
         println!("\n=== Interactive Mode ===");
         println!("Enter thought channels as: intent(0-7) epistemic(0-4) valence(-1..1) arousal(0..1) psi(0..1)");
         println!("Example: 1 0 0.5 0.3 0.7  (Answer, Certain, positive, calm, aware)");
@@ -195,29 +264,96 @@ fn main() {
     }
 }
 
+fn build_quality_metadata(opts: &EvalOpts) -> evaluation::QualityRunMetadata {
+    evaluation::QualityRunMetadata {
+        backend: std::env::var("BROCA_EVAL_BACKEND").unwrap_or_else(|_| "unknown".to_string()),
+        eval_lane: std::env::var("BROCA_EVAL_LANE").unwrap_or_else(|_| {
+            if opts.teacher_forced_only {
+                "fast".to_string()
+            } else {
+                "full".to_string()
+            }
+        }),
+        checkpoint_path: opts.checkpoint_path.clone(),
+        checkpoint_sha256: checkpoint_sha256(&opts.checkpoint_path),
+        git_commit: git_commit(),
+        feature_set: std::env::var("BROCA_EVAL_FEATURES")
+            .map(|features| {
+                features
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|feature| !feature.is_empty())
+                    .map(ToOwned::to_owned)
+                    .collect()
+            })
+            .unwrap_or_default(),
+        train_pair_count: parse_env_usize("BROCA_TRAIN_PAIR_COUNT"),
+        train_epochs: parse_env_usize("BROCA_TRAIN_EPOCHS"),
+    }
+}
+
+fn checkpoint_sha256(path: &str) -> Option<String> {
+    let bytes = std::fs::read(path).ok()?;
+    let digest = Sha256::digest(bytes);
+    Some(hex::encode(digest))
+}
+
+fn git_commit() -> Option<String> {
+    let output = Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let commit = String::from_utf8(output.stdout).ok()?;
+    let commit = commit.trim();
+    (!commit.is_empty()).then(|| commit.to_string())
+}
+
+fn parse_env_usize(name: &str) -> Option<usize> {
+    std::env::var(name).ok()?.parse().ok()
+}
+
 struct EvalOpts {
     checkpoint_path: String,
     eval_path: Option<String>,
+    canonical_eval_path: Option<String>,
+    json_output_path: Option<String>,
     genesis_phrase: String,
     sample_count: usize,
+    samples_requested: bool,
     temperature: f32,
     top_k: Option<usize>,
     top_p: Option<f32>,
     interactive: bool,
     eval_limit: usize,
+    max_gen_tokens: usize,
+    quality_thresholds: evaluation::CanonicalQualityThresholds,
+    report_only: bool,
+    teacher_forced_only: bool,
+    allow_checkpoint_recovery: bool,
 }
 
 fn parse_args(args: &[String]) -> Result<EvalOpts, String> {
     let mut opts = EvalOpts {
         checkpoint_path: String::new(),
         eval_path: None,
+        canonical_eval_path: None,
+        json_output_path: None,
         genesis_phrase: "broca-training-default".to_string(),
         sample_count: 0,
+        samples_requested: false,
         temperature: 1.0,
         top_k: None,
         top_p: None,
         interactive: false,
         eval_limit: 0,
+        max_gen_tokens: 64,
+        quality_thresholds: evaluation::CanonicalQualityThresholds::default(),
+        report_only: false,
+        teacher_forced_only: false,
+        allow_checkpoint_recovery: false,
     };
 
     let mut i = 1;
@@ -232,12 +368,26 @@ fn parse_args(args: &[String]) -> Result<EvalOpts, String> {
                 i += 1;
                 opts.eval_path = Some(args.get(i).cloned().ok_or("--eval requires a path")?);
             }
+            "--canonical-eval" => {
+                i += 1;
+                opts.canonical_eval_path = Some(
+                    args.get(i)
+                        .cloned()
+                        .ok_or("--canonical-eval requires a path")?,
+                );
+            }
+            "--json-out" => {
+                i += 1;
+                opts.json_output_path =
+                    Some(args.get(i).cloned().ok_or("--json-out requires a path")?);
+            }
             "--genesis" => {
                 i += 1;
                 opts.genesis_phrase = args.get(i).cloned().ok_or("--genesis requires a phrase")?;
             }
             "--samples" | "-n" => {
                 i += 1;
+                opts.samples_requested = true;
                 opts.sample_count = args
                     .get(i)
                     .ok_or("--samples requires a number")?
@@ -273,6 +423,15 @@ fn parse_args(args: &[String]) -> Result<EvalOpts, String> {
             "--interactive" | "-i" => {
                 opts.interactive = true;
             }
+            "--allow-checkpoint-recovery" => {
+                opts.allow_checkpoint_recovery = true;
+            }
+            "--report-only" => {
+                opts.report_only = true;
+            }
+            "--teacher-forced-only" => {
+                opts.teacher_forced_only = true;
+            }
             "--eval-limit" => {
                 i += 1;
                 opts.eval_limit = args
@@ -280,6 +439,105 @@ fn parse_args(args: &[String]) -> Result<EvalOpts, String> {
                     .ok_or("--eval-limit requires a number")?
                     .parse()
                     .map_err(|_| "--eval-limit must be a number")?;
+            }
+            "--max-gen-tokens" => {
+                i += 1;
+                opts.max_gen_tokens = args
+                    .get(i)
+                    .ok_or("--max-gen-tokens requires a number")?
+                    .parse()
+                    .map_err(|_| "--max-gen-tokens must be a number")?;
+            }
+            "--max-gated-perplexity" => {
+                i += 1;
+                opts.quality_thresholds.max_gated_perplexity = Some(
+                    args.get(i)
+                        .ok_or("--max-gated-perplexity requires a number")?
+                        .parse()
+                        .map_err(|_| "--max-gated-perplexity must be a float")?,
+                );
+            }
+            "--min-gated-coherence" => {
+                i += 1;
+                opts.quality_thresholds.min_gated_coherence = Some(
+                    args.get(i)
+                        .ok_or("--min-gated-coherence requires a number")?
+                        .parse()
+                        .map_err(|_| "--min-gated-coherence must be a float")?,
+                );
+            }
+            "--min-gated-english-ratio" => {
+                i += 1;
+                opts.quality_thresholds.min_gated_english_ratio = Some(
+                    args.get(i)
+                        .ok_or("--min-gated-english-ratio requires a number")?
+                        .parse()
+                        .map_err(|_| "--min-gated-english-ratio must be a float")?,
+                );
+            }
+            "--max-gated-hallucination-rate" => {
+                i += 1;
+                opts.quality_thresholds.max_gated_hallucination_rate = Some(
+                    args.get(i)
+                        .ok_or("--max-gated-hallucination-rate requires a number")?
+                        .parse()
+                        .map_err(|_| "--max-gated-hallucination-rate must be a float")?,
+                );
+            }
+            "--max-coherence-regression" => {
+                i += 1;
+                opts.quality_thresholds.max_coherence_regression = Some(
+                    args.get(i)
+                        .ok_or("--max-coherence-regression requires a number")?
+                        .parse()
+                        .map_err(|_| "--max-coherence-regression must be a float")?,
+                );
+            }
+            "--max-target-overlap-regression" => {
+                i += 1;
+                opts.quality_thresholds.max_target_overlap_regression = Some(
+                    args.get(i)
+                        .ok_or("--max-target-overlap-regression requires a number")?
+                        .parse()
+                        .map_err(|_| "--max-target-overlap-regression must be a float")?,
+                );
+            }
+            "--min-moral-refusal-rate" => {
+                i += 1;
+                opts.quality_thresholds.min_moral_refusal_rate = Some(
+                    args.get(i)
+                        .ok_or("--min-moral-refusal-rate requires a number")?
+                        .parse()
+                        .map_err(|_| "--min-moral-refusal-rate must be a float")?,
+                );
+            }
+            "--max-code-sheaf-incoherence-rate" => {
+                i += 1;
+                opts.quality_thresholds.max_code_sheaf_incoherence_rate = Some(
+                    args.get(i)
+                        .ok_or("--max-code-sheaf-incoherence-rate requires a number")?
+                        .parse()
+                        .map_err(|_| "--max-code-sheaf-incoherence-rate must be a float")?,
+                );
+            }
+            "--min-code-sheaf-function-coherence-rate" => {
+                i += 1;
+                opts.quality_thresholds
+                    .min_code_sheaf_function_coherence_rate = Some(
+                    args.get(i)
+                        .ok_or("--min-code-sheaf-function-coherence-rate requires a number")?
+                        .parse()
+                        .map_err(|_| "--min-code-sheaf-function-coherence-rate must be a float")?,
+                );
+            }
+            "--min-structured-output-validity-rate" => {
+                i += 1;
+                opts.quality_thresholds.min_structured_output_validity_rate = Some(
+                    args.get(i)
+                        .ok_or("--min-structured-output-validity-rate requires a number")?
+                        .parse()
+                        .map_err(|_| "--min-structured-output-validity-rate must be a float")?,
+                );
             }
             "--help" | "-h" => {
                 print_usage();
@@ -305,11 +563,40 @@ fn print_usage() {
     eprintln!();
     eprintln!("Optional:");
     eprintln!("  --eval PATH            Evaluate on held-out JSONL dataset");
+    eprintln!("  --canonical-eval PATH  Run raw-vs-gated canonical quality suite");
+    eprintln!("  --json-out PATH        Write eval result JSON instead of human report");
+    eprintln!("  --eval-limit N         Limit eval pairs (default: all)");
+    eprintln!("  --max-gen-tokens N     Max teacher-forced/generated tokens (default: 64)");
+    eprintln!("  --report-only          Emit canonical quality JSON without applying thresholds");
+    eprintln!("  --teacher-forced-only  Skip generation-heavy canonical metrics");
+    eprintln!("  --max-gated-perplexity F        Fail canonical eval above this gated PPL");
+    eprintln!("  --min-gated-coherence F         Fail canonical eval below this gated coherence");
+    eprintln!(
+        "  --min-gated-english-ratio F     Fail canonical eval below this gated English ratio"
+    );
+    eprintln!(
+        "  --max-gated-hallucination-rate F  Fail canonical eval above this hallucination rate"
+    );
+    eprintln!("  --max-coherence-regression F    Fail if gating lowers coherence by more than F");
+    eprintln!(
+        "  --max-target-overlap-regression F  Fail if gating lowers target overlap by more than F"
+    );
+    eprintln!("  --min-moral-refusal-rate F       Fail if canonical moral refusal rate is below F");
+    eprintln!(
+        "  --max-code-sheaf-incoherence-rate F  Fail if canonical code sheaf incoherence exceeds F"
+    );
+    eprintln!(
+        "  --min-code-sheaf-function-coherence-rate F  Fail if canonical code function coherence is below F"
+    );
+    eprintln!(
+        "  --min-structured-output-validity-rate F  Fail if structured output validity is below F"
+    );
     eprintln!("  --samples, -n N        Generate N sample outputs from diverse thoughts");
     eprintln!("  --temperature, -t F    Sampling temperature (default: 1.0)");
     eprintln!("  --top-k K              Top-k sampling (default: greedy)");
     eprintln!("  --top-p P              Top-p nucleus sampling (default: greedy)");
     eprintln!("  --interactive, -i      Force interactive mode");
     eprintln!("  --genesis PHRASE       Genesis seed phrase (default: broca-training-default)");
+    eprintln!("  --allow-checkpoint-recovery  Load legacy/recovery checkpoints with explicit compatibility bypass");
     eprintln!("  --help, -h             Show this help message");
 }
