@@ -120,7 +120,7 @@ Training is controlled by `BROCA_GATE_RECIPE`:
 - `baseline-v1-binding`: a targeted experiment for flat-logit thought binding
   collapse. It keeps small-model capacity but increases negative samples,
   BPTT length, network LR scale, and enables light coherence alignment,
-  contrastive, and label-smoothing losses.
+  contrastive, label-smoothing, and thought-to-logit auxiliary binding losses.
 - `baseline-v1-medium`: a promotion-candidate recipe for full canonical eval
   and benchmark snapshots.
 - `custom`: starts from smoke defaults but expects explicit overrides.
@@ -143,6 +143,7 @@ Every recipe can be overridden with:
 - `BROCA_GATE_CONTRASTIVE_MARGIN`
 - `BROCA_GATE_SCHEDULED_SAMPLING`
 - `BROCA_GATE_LABEL_SMOOTHING`
+- `BROCA_GATE_THOUGHT_LOGIT_AUX`
 - `BROCA_GATE_MERGE_BIAS`
 
 Prefer `baseline-v1-small` before increasing model size further. Only increase

@@ -19,12 +19,15 @@
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+use symthaea_core::hdc::ContinuousHV;
 
 use crate::checkpoint::AdamState;
 use crate::encoder::ThoughtChannels;
 use crate::generator::BrocaGenerator;
 use crate::tokenizer::BpeTokenizer;
-use symthaea_core::hdc::ContinuousHV;
+
+mod sequence;
+pub use sequence::{SequenceResult, TrainingBackend};
 
 /// A single training pair: thought channels + target text.
 ///
@@ -36,6 +39,12 @@ pub struct TrainingPair {
     pub target_text: String,
     #[serde(default)]
     pub target_ids: Vec<u32>,
+    /// **NEW**: Emotional valence at start of sequence (-1.0 to 1.0).
+    #[serde(default)]
+    pub valence: f32,
+    /// **NEW**: Emotional arousal at start of sequence (0.0 to 1.0).
+    #[serde(default)]
+    pub arousal: f32,
 }
 
 impl TrainingPair {
@@ -46,6 +55,8 @@ impl TrainingPair {
             channels: channels.channels.to_vec(),
             target_text,
             target_ids,
+            valence: 0.0,
+            arousal: 0.0,
         }
     }
 
@@ -169,6 +180,8 @@ pub struct TrainingConfig {
     pub grad_clip: f32,
     /// Report loss every N steps.
     pub report_interval: usize,
+    /// Emit unbuffered progress lines to stderr.
+    pub progress: bool,
     /// Use Adam optimizer (if false, uses SGD).
     pub use_adam: bool,
     /// Warmup fraction (0.0 to 1.0). First N% of steps use linear LR ramp.
@@ -322,6 +335,14 @@ pub struct TrainingConfig {
     /// Recommended: 0.1.
     pub label_smoothing: f32,
 
+    // ── Thought-Logit Auxiliary Binding ──
+    /// Auxiliary thought-to-logit loss weight (0.0 = disabled).
+    /// Trains token embeddings directly from the encoded thought HV in addition
+    /// to the recurrent CfC output HV. This is a targeted anti-collapse term:
+    /// different thought channels should create different token logit rankings
+    /// even before the decoder has learned strong temporal dynamics.
+    pub thought_logit_aux_weight: f32,
+
     // ── Adaptive Veto Warmup ──
     /// Target veto threshold to ramp toward during training (0.0 = disabled).
     /// When > 0, the generator's veto_threshold is linearly ramped from 0.0
@@ -374,6 +395,7 @@ impl Default for TrainingConfig {
             bptt_window: 16,
             grad_clip: 20.0,
             report_interval: 100,
+            progress: false,
             use_adam: true,
             warmup_fraction: 0.1,
             patience: 0,
@@ -402,6 +424,7 @@ impl Default for TrainingConfig {
             contrastive_margin: 0.0,
             scheduled_sampling_max: 0.0,
             label_smoothing: 0.0,
+            thought_logit_aux_weight: 0.0,
             best_checkpoint_path: String::new(),
             hidden_dropout: 0.0,
             adaptive_veto_target: 0.0, // disabled by default
@@ -1023,9 +1046,11 @@ pub fn train_with_adam(
                 epoch = epoch,
                 "Phase 2: enabling CfC network BPTT (embeddings warmed up)"
             );
-            use std::io::Write;
-            let _ = writeln!(std::io::stderr(), "[phase] epoch {epoch}: CfC BPTT enabled");
-            std::io::stderr().flush().ok();
+            if config.progress {
+                use std::io::Write;
+                let _ = writeln!(std::io::stderr(), "[phase] epoch {epoch}: CfC BPTT enabled");
+                std::io::stderr().flush().ok();
+            }
         }
 
         // LCG state for negative sampling (varies per epoch)
@@ -1033,7 +1058,7 @@ pub fn train_with_adam(
 
         let num_pairs = curriculum_order.len();
         let epoch_start = std::time::Instant::now();
-        {
+        if config.progress {
             use std::io::Write;
             let _ = writeln!(
                 std::io::stderr(),
@@ -1042,7 +1067,7 @@ pub fn train_with_adam(
             std::io::stderr().flush().ok();
         }
         for (pair_idx, &dataset_idx) in curriculum_order.iter().enumerate() {
-            if pair_idx % 200 == 0 {
+            if config.progress && pair_idx % 200 == 0 {
                 let _running_loss = if total_tokens > 0 {
                     total_loss / total_tokens as f32
                 } else {
@@ -1087,9 +1112,10 @@ pub fn train_with_adam(
             let mut prev_token = generator.tokenizer().thought_id;
 
             let window_end = pair.target_ids.len().min(config.bptt_window);
+            let mut sequence_result: Option<SequenceResult> = None;
 
             // Progress report (GPU or CPU — doesn't matter, report at pair level)
-            if pair_idx > 0 && pair_idx % config.report_interval == 0 {
+            if config.progress && pair_idx > 0 && pair_idx % config.report_interval == 0 {
                 let elapsed_s = epoch_start.elapsed().as_secs_f64();
                 let pairs_per_sec = pair_idx as f64 / elapsed_s.max(0.001);
                 use std::io::Write;
@@ -1107,6 +1133,7 @@ pub fn train_with_adam(
                 let train_network_this_epoch = (config.train_network
                     && epoch >= config.network_warmup_epochs)
                     || force_train_network;
+                let mut gpu_sequence = SequenceResult::new(TrainingBackend::Gpu);
                 let result: candle_core::Result<()> = (|| {
                     // Transfer thought HV to GPU once per pair
                     let thought_tensor = candle_core::Tensor::from_vec(
@@ -1141,6 +1168,7 @@ pub fn train_with_adam(
                         );
                         total_loss += loss;
                         total_tokens += 1;
+                        gpu_sequence.record_loss(loss);
 
                         // Backward on GPU (CfC BPTT)
                         if train_network_this_epoch {
@@ -1164,11 +1192,23 @@ pub fn train_with_adam(
                                 lr,
                                 effective_grad_clip,
                             )?;
+                            if config.thought_logit_aux_weight > 0.0 {
+                                let aux_loss = trainer.gpu_thought_logit_aux_gradient(
+                                    &thought_tensor,
+                                    target_id as usize,
+                                    lr,
+                                    effective_grad_clip,
+                                    config.thought_logit_aux_weight,
+                                )?;
+                                total_loss += aux_loss;
+                            }
                         }
 
                         gpu_prev_token = target_id;
                         global_step += 1;
                     }
+
+                    gpu_sequence.set_final_output_hv(trainer.current_output_hv()?);
 
                     // Periodic sync: CfC weights every 10 pairs, embeddings every 10 pairs
                     // (avoids 256MB embedding transfer per pair while keeping logits fresh)
@@ -1185,7 +1225,10 @@ pub fn train_with_adam(
                 })();
 
                 match result {
-                    Ok(()) => true,
+                    Ok(()) => {
+                        sequence_result = Some(gpu_sequence);
+                        true
+                    }
                     Err(e) => {
                         tracing::warn!(
                             "GPU training failed: {e}, falling back to CPU for this pair"
@@ -1199,183 +1242,208 @@ pub fn train_with_adam(
             #[cfg(not(feature = "gpu"))]
             let gpu_ran = false;
 
-            // Skip CPU loop if GPU handled the pair
-            if gpu_ran {
-                let _running_loss = total_loss / total_tokens.max(1) as f32;
-                continue; // skip to next pair (contrastive loss etc. handled below)
-            }
-
-            for (pos, &target_id) in pair.target_ids[..window_end].iter().enumerate() {
-                let lr = warmup_lr(
-                    config.learning_rate * lr_multiplier,
-                    global_step,
-                    total_steps,
-                    config.warmup_fraction,
-                );
-                generator.controller_mut().set_learning_rate(lr);
-
-                let logits = if use_sampled {
-                    neg_seed = neg_seed.wrapping_add(global_step as u64);
-                    let active = sample_negatives(
-                        target_id as usize,
-                        vocab_size,
-                        config.negative_samples,
-                        neg_seed,
+            if !gpu_ran {
+                let mut cpu_sequence = SequenceResult::new(TrainingBackend::Cpu);
+                for (pos, &target_id) in pair.target_ids[..window_end].iter().enumerate() {
+                    let lr = warmup_lr(
+                        config.learning_rate * lr_multiplier,
+                        global_step,
+                        total_steps,
+                        config.warmup_fraction,
                     );
-                    generator.controller_mut().forward_step_sampled(
-                        &thought_hv,
-                        prev_token,
-                        pos,
-                        &active,
-                    )
-                } else {
-                    generator
-                        .controller_mut()
-                        .forward_step(&thought_hv, prev_token, pos)
-                };
+                    generator.controller_mut().set_learning_rate(lr);
 
-                // Training-time dropout on CfC hidden states
-                if config.hidden_dropout > 0.0 {
-                    generator
-                        .controller_mut()
-                        .apply_hidden_dropout(config.hidden_dropout, global_step);
-                }
-
-                // Cross-entropy loss: -log(softmax[target])
-                // Merge-token bias: weight multi-byte BPE tokens higher to prefer
-                // proper word tokens over raw byte sequences
-                let merge_weight = if merge_token_ids.contains(&(target_id as usize)) {
-                    config.merge_token_loss_weight
-                } else {
-                    1.0
-                };
-                let raw_loss =
-                    cross_entropy_loss_smooth(&logits, target_id as usize, config.label_smoothing)
-                        * merge_weight;
-
-                // Coherence tracking + gated loss weighting
-                // (Bengio et al. 2009 — curriculum learning: focus on learnable examples)
-                let loss = if effective_coherence_weight > 0.0 || track_coherence {
-                    let output_hv = generator.controller().output_hv();
-                    let coherence = output_hv.similarity(&thought_hv);
-                    coherence_sum += coherence;
-                    coherence_count += 1;
-                    let mut adjusted_loss = if effective_coherence_weight > 0.0 {
-                        // weight = 1.0 when coherence=1.0, lower when coherence drops
-                        let weight =
-                            (1.0 - effective_coherence_weight * (1.0 - coherence)).max(0.05);
-                        raw_loss * weight
+                    let logits = if use_sampled {
+                        neg_seed = neg_seed.wrapping_add(global_step as u64);
+                        let active = sample_negatives(
+                            target_id as usize,
+                            vocab_size,
+                            config.negative_samples,
+                            neg_seed,
+                        );
+                        generator.controller_mut().forward_step_sampled(
+                            &thought_hv,
+                            prev_token,
+                            pos,
+                            &active,
+                        )
                     } else {
-                        raw_loss
+                        generator
+                            .controller_mut()
+                            .forward_step(&thought_hv, prev_token, pos)
                     };
-                    // Coherence alignment loss: penalizes output-thought divergence
-                    // Uses curriculum-annealed weight when start_weight > final weight
-                    if track_alignment && effective_alignment_weight > 0.0 {
-                        let alignment_penalty =
-                            effective_alignment_weight * (1.0 - coherence).max(0.0);
-                        adjusted_loss += alignment_penalty;
+
+                    // Training-time dropout on CfC hidden states
+                    if config.hidden_dropout > 0.0 {
+                        generator
+                            .controller_mut()
+                            .apply_hidden_dropout(config.hidden_dropout, global_step);
                     }
-                    adjusted_loss
-                } else {
-                    raw_loss
-                };
 
-                total_loss += loss;
-                total_tokens += 1;
-
-                // Phased training: only enable CfC BPTT after network_warmup_epochs
-                // (force_train_network overrides when plateau anomaly detected)
-                let train_network_this_epoch = (config.train_network
-                    && epoch >= config.network_warmup_epochs)
-                    || force_train_network;
-
-                // Compute gradient of CE loss w.r.t. output HV (for CfC BPTT)
-                #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
-                let d_output = if train_network_this_epoch {
-                    Some(compute_ce_gradient_wrt_output(
-                        &logits,
-                        target_id as usize,
-                        generator.controller(),
-                    ))
-                } else {
-                    None
-                };
-                #[cfg(not(any(feature = "mamba-cpu", feature = "gpu-logits")))]
-                let d_output: Option<ContinuousHV> = None;
-
-                // Apply embedding gradient update (skipped when freeze_embeddings is set)
-                let (grad_norm, was_clipped) = if config.freeze_embeddings {
-                    (0.0, false)
-                } else if config.use_adam {
-                    apply_weight_tied_gradient_adam(
-                        generator.controller_mut(),
-                        &logits,
-                        target_id as usize,
-                        lr,
-                        effective_grad_clip,
-                        adam_state
-                            .as_mut()
-                            .expect("invariant: adam_state is Some when config.use_adam"),
-                    )
-                } else {
-                    apply_weight_tied_gradient(
-                        generator.controller_mut(),
-                        &logits,
-                        target_id as usize,
-                        lr,
-                        effective_grad_clip,
-                    )
-                };
-
-                // CfC network BPTT: backpropagate CE gradient through the network
-                if let Some(ref d_out) = d_output {
-                    let network_lr = lr * config.network_lr_scale;
-                    let dt = generator.controller().config().dt_per_token;
-
-                    // CPU BPTT (GPU training uses the fast path above)
-                    generator.controller_mut().backward_step(
-                        d_out,
-                        &thought_hv,
-                        prev_token,
-                        pos,
-                        dt,
-                        network_lr,
-                    );
-                }
-
-                if let Some(ref mut diag) = diagnostics {
-                    diag.record_step(grad_norm, was_clipped);
-                }
-
-                // Scheduled sampling: with annealed probability, use model's own
-                // prediction as next input instead of teacher-forced ground truth.
-                // This bridges the train-test gap (Bengio et al. 2015).
-                if config.scheduled_sampling_max > 0.0 {
-                    let progress = if config.epochs > 1 {
-                        epoch as f32 / (config.epochs - 1) as f32
+                    // Cross-entropy loss: -log(softmax[target])
+                    // Merge-token bias: weight multi-byte BPE tokens higher to prefer
+                    // proper word tokens over raw byte sequences
+                    let merge_weight = if merge_token_ids.contains(&(target_id as usize)) {
+                        config.merge_token_loss_weight
                     } else {
                         1.0
                     };
-                    let sampling_prob = config.scheduled_sampling_max * progress;
-                    // Deterministic coin flip based on position/pair/epoch
-                    let coin =
-                        ((epoch * 10007 + pair_idx * 1009 + pos * 997) % 1000) as f32 / 1000.0;
-                    if coin < sampling_prob {
-                        // Use model's prediction (argmax of logits)
-                        let predicted = logits
-                            .iter()
-                            .enumerate()
-                            .max_by(|(_, a), (_, b)| a.total_cmp(b))
-                            .map(|(i, _)| i as u32)
-                            .unwrap_or(target_id);
-                        prev_token = predicted;
+                    let raw_loss = cross_entropy_loss_smooth(
+                        &logits,
+                        target_id as usize,
+                        config.label_smoothing,
+                    ) * merge_weight;
+
+                    // Coherence tracking + gated loss weighting
+                    // (Bengio et al. 2009 — curriculum learning: focus on learnable examples)
+                    let loss = if effective_coherence_weight > 0.0 || track_coherence {
+                        let output_hv = generator.controller().output_hv();
+                        let coherence = output_hv.similarity(&thought_hv);
+                        coherence_sum += coherence;
+                        coherence_count += 1;
+                        cpu_sequence.record_coherence(coherence);
+                        let mut adjusted_loss = if effective_coherence_weight > 0.0 {
+                            // weight = 1.0 when coherence=1.0, lower when coherence drops
+                            let weight =
+                                (1.0 - effective_coherence_weight * (1.0 - coherence)).max(0.05);
+                            raw_loss * weight
+                        } else {
+                            raw_loss
+                        };
+                        // Coherence alignment loss: penalizes output-thought divergence
+                        // Uses curriculum-annealed weight when start_weight > final weight
+                        if track_alignment && effective_alignment_weight > 0.0 {
+                            let alignment_penalty =
+                                effective_alignment_weight * (1.0 - coherence).max(0.0);
+                            adjusted_loss += alignment_penalty;
+                        }
+                        adjusted_loss
+                    } else {
+                        raw_loss
+                    };
+
+                    total_loss += loss;
+                    total_tokens += 1;
+                    cpu_sequence.record_loss(loss);
+
+                    // Phased training: only enable CfC BPTT after network_warmup_epochs
+                    // (force_train_network overrides when plateau anomaly detected)
+                    let train_network_this_epoch = (config.train_network
+                        && epoch >= config.network_warmup_epochs)
+                        || force_train_network;
+
+                    // Compute gradient of CE loss w.r.t. output HV (for CfC BPTT)
+                    let d_output = if train_network_this_epoch {
+                        Some(compute_ce_gradient_wrt_output(
+                            &logits,
+                            target_id as usize,
+                            generator.controller(),
+                        ))
+                    } else {
+                        None
+                    };
+
+                    // Apply embedding gradient update (skipped when freeze_embeddings is set)
+                    let (grad_norm, was_clipped) = if config.freeze_embeddings {
+                        (0.0, false)
+                    } else if config.use_adam {
+                        let result = apply_weight_tied_gradient_adam(
+                            generator.controller_mut(),
+                            &logits,
+                            target_id as usize,
+                            lr,
+                            effective_grad_clip,
+                            adam_state
+                                .as_mut()
+                                .expect("invariant: adam_state is Some when config.use_adam"),
+                        );
+                        if config.thought_logit_aux_weight > 0.0 {
+                            let aux_loss = apply_thought_logit_aux_gradient(
+                                generator.controller_mut(),
+                                &thought_hv,
+                                target_id as usize,
+                                lr,
+                                effective_grad_clip,
+                                config.thought_logit_aux_weight,
+                            );
+                            total_loss += aux_loss;
+                        }
+                        result
+                    } else {
+                        let result = apply_weight_tied_gradient(
+                            generator.controller_mut(),
+                            &logits,
+                            target_id as usize,
+                            lr,
+                            effective_grad_clip,
+                        );
+                        if config.thought_logit_aux_weight > 0.0 {
+                            let aux_loss = apply_thought_logit_aux_gradient(
+                                generator.controller_mut(),
+                                &thought_hv,
+                                target_id as usize,
+                                lr,
+                                effective_grad_clip,
+                                config.thought_logit_aux_weight,
+                            );
+                            total_loss += aux_loss;
+                        }
+                        result
+                    };
+
+                    // CfC network BPTT: backpropagate CE gradient through the network
+                    if let Some(ref d_out) = d_output {
+                        let network_lr = lr * config.network_lr_scale;
+                        let dt = generator.controller().config().dt_per_token;
+
+                        // CPU BPTT (GPU training uses the fast path above)
+                        generator.controller_mut().backward_step(
+                            d_out,
+                            &thought_hv,
+                            prev_token,
+                            pos,
+                            dt,
+                            network_lr,
+                        );
+                    }
+
+                    if let Some(ref mut diag) = diagnostics {
+                        diag.record_step(grad_norm, was_clipped);
+                    }
+                    cpu_sequence.record_gradient(grad_norm, was_clipped);
+
+                    // Scheduled sampling: with annealed probability, use model's own
+                    // prediction as next input instead of teacher-forced ground truth.
+                    // This bridges the train-test gap (Bengio et al. 2015).
+                    if config.scheduled_sampling_max > 0.0 {
+                        let progress = if config.epochs > 1 {
+                            epoch as f32 / (config.epochs - 1) as f32
+                        } else {
+                            1.0
+                        };
+                        let sampling_prob = config.scheduled_sampling_max * progress;
+                        // Deterministic coin flip based on position/pair/epoch
+                        let coin =
+                            ((epoch * 10007 + pair_idx * 1009 + pos * 997) % 1000) as f32 / 1000.0;
+                        if coin < sampling_prob {
+                            // Use model's prediction (argmax of logits)
+                            let predicted = logits
+                                .iter()
+                                .enumerate()
+                                .max_by(|(_, a), (_, b)| a.total_cmp(b))
+                                .map(|(i, _)| i as u32)
+                                .unwrap_or(target_id);
+                            prev_token = predicted;
+                        } else {
+                            prev_token = target_id;
+                        }
                     } else {
                         prev_token = target_id;
                     }
-                } else {
-                    prev_token = target_id;
+                    global_step += 1;
                 }
-                global_step += 1;
+                cpu_sequence.set_final_output_hv(generator.controller().output_hv().clone());
+                sequence_result = Some(cpu_sequence);
             }
 
             // Note: projected embeddings are refreshed once per epoch (after all sequences),
@@ -1386,6 +1454,20 @@ pub fn train_with_adam(
             // Contrastive intent loss: after processing the full token sequence,
             // compare final CfC output against a negative example's thought HV.
             // Different intents should produce different output representations.
+            let final_output_hv = sequence_result
+                .as_ref()
+                .and_then(|result| result.final_output_hv.as_ref());
+            if track_coherence
+                && sequence_result
+                    .as_ref()
+                    .is_some_and(|result| result.backend == TrainingBackend::Gpu)
+            {
+                if let Some(output_hv) = final_output_hv {
+                    let coherence = output_hv.similarity(&thought_hv);
+                    coherence_sum += coherence;
+                    coherence_count += 1;
+                }
+            }
             if contrastive_enabled {
                 let my_intent = pair_intents[dataset_idx];
                 // Deterministic negative sampling: find a pair with a different intent
@@ -1395,7 +1477,13 @@ pub fn train_with_adam(
                     .find(|&i| pair_intents[i] != my_intent)
                     .unwrap_or((neg_seed_val + 1) % dataset.pairs.len());
 
-                let output_hv = generator.controller().output_hv();
+                let fallback_output_hv;
+                let output_hv = if let Some(hv) = final_output_hv {
+                    hv
+                } else {
+                    fallback_output_hv = generator.controller().output_hv();
+                    &fallback_output_hv
+                };
                 let neg_thought = &contrastive_thought_hvs[neg_idx];
                 let neg_sim = output_hv.similarity(neg_thought);
 
@@ -1469,20 +1557,22 @@ pub fn train_with_adam(
                 tokens = total_tokens,
                 "Broca training epoch"
             );
-            // Unbuffered progress (tracing stderr is internally buffered when piped)
-            use std::io::Write;
-            let _ =
-                writeln!(
-                std::io::stderr(),
-                "[epoch] {epoch}/{} loss={avg_loss:.6}{val_str}{coh_str}{} tokens={total_tokens}",
-                config.epochs,
-                if contrastive_count > 0 {
-                    format!(" contra={:.4}", contrastive_loss_sum / contrastive_count as f32)
-                } else {
-                    String::new()
-                },
-            );
-            std::io::stderr().flush().ok();
+            if config.progress {
+                // Unbuffered progress (tracing stderr is internally buffered when piped)
+                use std::io::Write;
+                let _ =
+                    writeln!(
+                    std::io::stderr(),
+                    "[epoch] {epoch}/{} loss={avg_loss:.6}{val_str}{coh_str}{} tokens={total_tokens}",
+                    config.epochs,
+                    if contrastive_count > 0 {
+                        format!(" contra={:.4}", contrastive_loss_sum / contrastive_count as f32)
+                    } else {
+                        String::new()
+                    },
+                );
+                std::io::stderr().flush().ok();
+            }
         }
 
         // Record embedding norms at end of each epoch
@@ -1727,7 +1817,6 @@ fn cross_entropy_loss_smooth(logits: &[f32], target: usize, label_smoothing: f32
 /// Full chain: ∂L/∂o = scale × Σ_i (softmax[i] - 1_{i=target}) × (e_i/||e_i|| - cos_i × o)
 ///
 /// This gradient is used to backpropagate through the CfC network.
-#[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
 fn compute_ce_gradient_wrt_output(
     logits: &[f32],
     target: usize,
@@ -1759,13 +1848,16 @@ fn compute_ce_gradient_wrt_output(
     //   E_hat[i] = E[i] / ||E[i]|| (row-normalized embeddings, already in cache)
     //   cos[i] = logits[i] / scale
     // candle-core is always available (non-optional dep)
-    if let Some(cache) = controller.gpu_embedding_cache() {
-        if let Ok(grad) =
-            compute_ce_gradient_gpu(&exps, sum_exp, target, scale, logits, controller, cache)
-        {
-            return grad;
+    #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+    {
+        if let Some(cache) = controller.gpu_embedding_cache() {
+            if let Ok(grad) =
+                compute_ce_gradient_gpu(&exps, sum_exp, target, scale, logits, controller, cache)
+            {
+                return grad;
+            }
+            // Fall through to CPU on error
         }
-        // Fall through to CPU on error
     }
 
     // Full-dimension CPU path (no projection, no GPU)
@@ -2033,6 +2125,63 @@ fn apply_weight_tied_gradient_adam(
     (sum_sq.sqrt(), was_clipped)
 }
 
+/// Auxiliary thought-to-logit embedding update.
+///
+/// Optimizes CE(logits = thought_hv · token_embeddings, target) directly so
+/// the encoded thought carries token-discriminative signal even when recurrent
+/// decoder logits are still nearly flat.
+fn apply_thought_logit_aux_gradient(
+    controller: &mut crate::controller::LanguageController,
+    thought_hv: &ContinuousHV,
+    target: usize,
+    lr: f32,
+    grad_clip: f32,
+    weight: f32,
+) -> f32 {
+    if weight <= 0.0 {
+        return 0.0;
+    }
+
+    let logits = controller.compute_logits(thought_hv);
+    if target >= logits.len() {
+        return 0.0;
+    }
+
+    let max_logit = logits.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+    let exps: Vec<f32> = logits.iter().map(|&l| (l - max_logit).exp()).collect();
+    let sum_exp: f32 = exps.iter().sum();
+    if sum_exp < 1e-10 {
+        return 0.0;
+    }
+
+    let log_prob = logits[target] - max_logit - sum_exp.ln();
+    let loss = -log_prob;
+    let thought_slice = thought_hv.as_slice();
+    let scale = controller.config().logit_scale;
+    let scaled_lr = lr * weight;
+    let embeddings = controller.token_embeddings_mut();
+    let n = embeddings.len().min(logits.len());
+
+    for i in 0..n {
+        let prob = exps[i] / sum_exp;
+        let error = if i == target { prob - 1.0 } else { prob };
+        if error.abs() < 1e-4 {
+            continue;
+        }
+
+        let raw = -scaled_lr * scale * error;
+        let grad_scale = raw.clamp(-grad_clip, grad_clip);
+        let emb_values = &mut embeddings[i].values;
+        for (j, emb_val) in emb_values.iter_mut().enumerate() {
+            if j < thought_slice.len() {
+                *emb_val += grad_scale * thought_slice[j];
+            }
+        }
+    }
+
+    weight * loss
+}
+
 /// Generate a diverse set of ThoughtChannels for training data collection.
 ///
 /// 8 intents × 5 epistemic × 5 emotional clusters × 3 relationship stages
@@ -2165,6 +2314,8 @@ pub fn generate_curriculum(tokenizer: &BpeTokenizer) -> TrainingDataset {
             channels: thought.channels.to_vec(),
             target_text: prompt,
             target_ids: ids,
+            valence: 0.0,
+            arousal: 0.5,
         });
     }
 

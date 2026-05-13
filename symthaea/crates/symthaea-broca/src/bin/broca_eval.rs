@@ -325,6 +325,7 @@ fn build_quality_metadata(opts: &EvalOpts) -> evaluation::QualityRunMetadata {
         train_contrastive_margin: parse_env_f32("BROCA_TRAIN_CONTRASTIVE_MARGIN"),
         train_scheduled_sampling: parse_env_f32("BROCA_TRAIN_SCHEDULED_SAMPLING"),
         train_label_smoothing: parse_env_f32("BROCA_TRAIN_LABEL_SMOOTHING"),
+        train_thought_logit_aux: parse_env_f32("BROCA_TRAIN_THOUGHT_LOGIT_AUX"),
         train_merge_bias: parse_env_f32("BROCA_TRAIN_MERGE_BIAS"),
     }
 }

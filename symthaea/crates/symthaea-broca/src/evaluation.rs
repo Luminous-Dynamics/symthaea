@@ -213,6 +213,7 @@ pub struct QualityRunMetadata {
     pub train_contrastive_margin: Option<f32>,
     pub train_scheduled_sampling: Option<f32>,
     pub train_label_smoothing: Option<f32>,
+    pub train_thought_logit_aux: Option<f32>,
     pub train_merge_bias: Option<f32>,
 }
 

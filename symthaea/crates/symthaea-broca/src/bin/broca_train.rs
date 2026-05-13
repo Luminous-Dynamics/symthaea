@@ -78,7 +78,12 @@ fn main() {
     // Create or resume generator
     let (mut generator, mut adam_state) = if let Some(ref resume_path) = opts.resume_path {
         tracing::info!(path = %resume_path, "Resuming from checkpoint");
-        match BrocaGenerator::from_checkpoint(resume_path, &genesis) {
+        let load_result = if opts.allow_checksum_mismatch {
+            BrocaGenerator::from_checkpoint_allow_checksum_mismatch(resume_path, &genesis)
+        } else {
+            BrocaGenerator::from_checkpoint(resume_path, &genesis)
+        };
+        match load_result {
             Ok((gen, adam, _proj, _lm_config)) => (gen, adam),
             Err(e) => {
                 eprintln!("Failed to load checkpoint '{}': {e}", resume_path);
@@ -136,6 +141,7 @@ fn main() {
         bptt_window: opts.bptt_window,
         grad_clip: opts.grad_clip,
         report_interval: 1,
+        progress: true,
         use_adam: true,
         warmup_fraction: 0.1,
         patience: opts.patience,
@@ -158,6 +164,7 @@ fn main() {
         contrastive_margin: opts.contrastive_margin,
         scheduled_sampling_max: opts.scheduled_sampling,
         label_smoothing: opts.label_smoothing,
+        thought_logit_aux_weight: opts.thought_logit_aux_weight,
         best_checkpoint_path: best_path,
         hidden_dropout: opts.hidden_dropout,
         adaptive_veto_target: opts.adaptive_veto_target,
@@ -253,11 +260,12 @@ fn main() {
     let final_epoch = metrics.last().map(|m| m.epoch).unwrap_or(0);
 
     tracing::info!(path = %opts.output_path, "Saving checkpoint");
+    let checkpoint_adam = if opts.no_save_adam { None } else { final_adam };
     if let Err(e) = generator.save_checkpoint(
         &opts.output_path,
         final_epoch,
         final_loss,
-        final_adam,
+        checkpoint_adam,
         None, // No projection weights in standalone training
         None, // No L-SSM config in CfC-HDC training
     ) {
@@ -287,6 +295,8 @@ fn main() {
             per_intent_breakdown: true,
             max_gen_tokens: 64,
             eval_limit: 0,
+            progress: true,
+            compute_contrastive_intent: true,
         };
 
         let result = evaluation::evaluate(&mut generator, &eval_config);
@@ -383,8 +393,12 @@ struct TrainOpts {
     scheduled_sampling: f32,
     /// Label smoothing epsilon (default: 0.0 = disabled).
     label_smoothing: f32,
+    /// Thought-to-logit auxiliary loss weight (default: 0.0 = disabled).
+    thought_logit_aux_weight: f32,
     /// Save best checkpoint path (auto-generated from output if not specified).
     best_checkpoint_path: String,
+    /// Do not store Adam optimizer state in the final checkpoint.
+    no_save_adam: bool,
     /// Hidden state dropout rate (default: 0.0 = disabled).
     hidden_dropout: f32,
     /// CfC network layers (default: 3). Only used for fresh training (not --resume).
@@ -399,6 +413,8 @@ struct TrainOpts {
     veto_warmup_epochs: usize,
     /// Enable soft veto during training (default: false).
     enable_soft_veto_training: bool,
+    /// Allow loading a checkpoint with a checksum mismatch for explicit recovery.
+    allow_checksum_mismatch: bool,
 }
 
 fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
@@ -436,13 +452,16 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
         contrastive_margin: 0.0,
         scheduled_sampling: 0.0,
         label_smoothing: 0.0,
+        thought_logit_aux_weight: 0.0,
         best_checkpoint_path: String::new(),
+        no_save_adam: false,
         hidden_dropout: 0.0,
         network_layers: 3,
         neurons_per_layer: 8,
         adaptive_veto_target: 0.0,
         veto_warmup_epochs: 10,
         enable_soft_veto_training: false,
+        allow_checksum_mismatch: false,
     };
 
     let mut i = 1;
@@ -570,6 +589,9 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
             "--fresh-adam" => {
                 opts.fresh_adam = true;
             }
+            "--no-save-adam" => {
+                opts.no_save_adam = true;
+            }
             "--freeze-embeddings" => {
                 opts.freeze_embeddings = true;
             }
@@ -648,6 +670,14 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
                     .parse()
                     .map_err(|_| "--label-smoothing must be a float")?;
             }
+            "--thought-logit-aux" => {
+                i += 1;
+                opts.thought_logit_aux_weight = args
+                    .get(i)
+                    .ok_or("--thought-logit-aux requires a number")?
+                    .parse()
+                    .map_err(|_| "--thought-logit-aux must be a float")?;
+            }
             "--hidden-dropout" => {
                 i += 1;
                 opts.hidden_dropout = args
@@ -690,6 +720,9 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
             }
             "--soft-veto-training" => {
                 opts.enable_soft_veto_training = true;
+            }
+            "--allow-checksum-mismatch" => {
+                opts.allow_checksum_mismatch = true;
             }
             "--fusion" => {
                 opts.enable_fusion = true;
@@ -744,7 +777,11 @@ fn print_usage() {
     eprintln!("  --carry-state F      CfC state carry probability 0-1 (default: 0.0)");
     eprintln!("  --network-warmup N   Embedding-only epochs before CfC BPTT (default: 0)");
     eprintln!("  --fresh-adam          Discard checkpoint Adam state on resume");
+    eprintln!("  --no-save-adam        Save model weights without Adam optimizer state");
     eprintln!("  --freeze-embeddings   Only train CfC network, keep embeddings frozen");
+    eprintln!(
+        "  --allow-checksum-mismatch  Recovery only: resume despite checkpoint checksum mismatch"
+    );
     eprintln!("  --temperature F       Sampling temperature for --samples (default: 1.0)");
     eprintln!("  --top-k N             Top-k sampling for --samples (default: 0 = off)");
     eprintln!("  --coherence-alignment F  Coherence alignment loss weight (default: 0.0 = off)");
@@ -756,6 +793,9 @@ fn print_usage() {
     eprintln!("  --contrastive F      Contrastive intent loss weight (default: 0.0 = off)");
     eprintln!("  --contrastive-margin F  Margin for contrastive hinge (default: 0.0)");
     eprintln!("  --label-smoothing F  Label smoothing epsilon (default: 0.0 = off)");
+    eprintln!(
+        "  --thought-logit-aux F  Thought-to-logit auxiliary loss weight (default: 0.0 = off)"
+    );
     eprintln!("  --scheduled-sampling F  Max scheduled sampling probability (default: 0.0 = off)");
     eprintln!("  --hidden-dropout F   CfC hidden state dropout rate (default: 0.0 = off)");
     eprintln!("  --network-layers N   CfC network layers (default: 3, fresh train only)");

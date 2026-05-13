@@ -742,6 +742,16 @@ impl GpuTrainer {
         logits_tensor.squeeze(0)?.to_vec1()
     }
 
+    /// Return the current normalized CfC output as an HDC vector on CPU.
+    pub fn current_output_hv(&self) -> Result<symthaea_core::hdc::ContinuousHV> {
+        let raw_output = self.network.output()?;
+        let raw_norm = raw_output.sqr()?.sum(1)?.sqrt()?.clamp(1e-8, f32::MAX)?;
+        let norm_bc = raw_norm.unsqueeze(1)?.broadcast_as(raw_output.shape())?;
+        let output_hat = (&raw_output / &norm_bc)?;
+        let values: Vec<f32> = output_hat.squeeze(0)?.to_vec1()?;
+        Ok(symthaea_core::hdc::ContinuousHV::from_slice(&values))
+    }
+
     /// Backward step: CE gradient → BPTT on GPU.
     pub fn backward_step(
         &mut self,
@@ -934,5 +944,62 @@ impl GpuTrainer {
         self.embeddings = (&self.embeddings - &grad_matrix)?;
 
         Ok(())
+    }
+
+    /// Apply an auxiliary embedding update from the thought HV directly.
+    ///
+    /// This optimizes CE(logits = thought_hat @ embeddings^T * scale, target),
+    /// so the encoded thought itself becomes predictive of the next token. It is
+    /// intentionally separate from the recurrent output loss: when the decoder
+    /// logits are nearly flat, this gives the binding space a direct training
+    /// signal instead of waiting for CfC dynamics to discover it indirectly.
+    pub fn gpu_thought_logit_aux_gradient(
+        &mut self,
+        thought_gpu: &Tensor,
+        target: usize,
+        lr: f32,
+        grad_clip: f32,
+        weight: f32,
+    ) -> Result<f32> {
+        if weight <= 0.0 {
+            return Ok(0.0);
+        }
+
+        let thought_norm = thought_gpu.sqr()?.sum(1)?.sqrt()?.clamp(1e-8, f32::MAX)?;
+        let norm_bc = thought_norm
+            .unsqueeze(1)?
+            .broadcast_as(thought_gpu.shape())?;
+        let thought_hat = (thought_gpu / &norm_bc)?;
+
+        let logits_tensor = (thought_hat.matmul(&self.embeddings.t()?)? * self.logit_scale as f64)?;
+        let logits: Vec<f32> = logits_tensor.squeeze(0)?.to_vec1()?;
+        let n = logits.len();
+        if target >= n {
+            return Ok(0.0);
+        }
+
+        let max_logit = logits.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        let exps: Vec<f32> = logits.iter().map(|&l| (l - max_logit).exp()).collect();
+        let sum_exp: f32 = exps.iter().sum();
+        if sum_exp < 1e-10 {
+            return Ok(0.0);
+        }
+
+        let log_prob = logits[target] - max_logit - sum_exp.ln();
+        let loss = -log_prob;
+        let scaled_lr = lr * weight;
+        let errors: Vec<f32> = (0..n)
+            .map(|i| {
+                let prob = exps[i] / sum_exp;
+                let error = if i == target { prob - 1.0 } else { prob };
+                (self.logit_scale * error * scaled_lr).clamp(-grad_clip, grad_clip)
+            })
+            .collect();
+
+        let error_tensor = Tensor::from_vec(errors, (n, 1), &self.device)?;
+        let grad_matrix = error_tensor.matmul(&thought_hat)?;
+        self.embeddings = (&self.embeddings - &grad_matrix)?;
+
+        Ok(weight * loss)
     }
 }
