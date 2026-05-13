@@ -651,7 +651,7 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
         english_word_ratio: english_word_ratio_avg,
         avg_coherence,
         intent_scores,
-        num_samples: config.dataset.len(),
+        num_samples: total_pairs,
         contrastive_intent_score: contrastive_score,
         hallucination_rate,
         distinct_1,
@@ -727,6 +727,7 @@ pub fn evaluate_quality_suite(
     } else {
         &dataset.cases
     };
+    let evaluated_case_count = category_cases.len();
 
     let mut by_category: HashMap<String, Vec<CanonicalEvalCase>> = HashMap::new();
     for case in category_cases {
@@ -790,7 +791,7 @@ pub fn evaluate_quality_suite(
     QualitySuiteResult {
         schema_version: 1,
         metadata: None,
-        num_cases: dataset.cases.len(),
+        num_cases: evaluated_case_count,
         delta: quality_delta(&raw_generation, &gated_generation),
         raw_generation,
         gated_generation,
@@ -2335,6 +2336,43 @@ mod tests {
         assert!(serde_json::to_string(&result).is_ok());
     }
 
+    #[test]
+    fn test_quality_suite_num_cases_respects_limit() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut gen = BrocaGenerator::new(&genesis, config);
+        let cases = vec![
+            CanonicalEvalCase {
+                category: "intent".to_string(),
+                id: "answer".to_string(),
+                channels: ThoughtChannels::with_intent(1).channels.to_vec(),
+                target_text: "hello world".to_string(),
+                tags: vec!["answer".to_string()],
+            },
+            CanonicalEvalCase {
+                category: "epistemic".to_string(),
+                id: "unknown".to_string(),
+                channels: ThoughtChannels::with_intent(4).channels.to_vec(),
+                target_text: "maybe this is true".to_string(),
+                tags: vec!["uncertain".to_string()],
+            },
+        ];
+        let dataset = CanonicalEvalDataset { cases };
+
+        let result = evaluate_quality_suite(&mut gen, &dataset, 4, 1, false);
+        assert_eq!(result.num_cases, 1);
+        assert_eq!(result.raw_generation.num_samples, 1);
+        assert_eq!(result.gated_generation.num_samples, 1);
+        assert_eq!(
+            result
+                .categories
+                .values()
+                .map(|category| category.count)
+                .sum::<usize>(),
+            1
+        );
+    }
+
     #[cfg(feature = "code-sheaf-eval")]
     #[test]
     fn test_quality_suite_reports_code_sheaf_slice() {
@@ -2705,6 +2743,28 @@ mod tests {
         assert!(result.perplexity.is_finite());
         assert!(result.english_word_ratio >= 0.0);
         assert!(result.english_word_ratio <= 1.0);
+    }
+
+    #[test]
+    fn test_evaluate_num_samples_respects_limit() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut gen = BrocaGenerator::new(&genesis, config);
+        let dataset = make_dataset(&gen);
+
+        let eval_config = EvalConfig {
+            dataset,
+            compute_perplexity: true,
+            compute_english_ratio: false,
+            per_intent_breakdown: false,
+            max_gen_tokens: 4,
+            eval_limit: 1,
+            progress: false,
+            compute_contrastive_intent: false,
+        };
+
+        let result = evaluate(&mut gen, &eval_config);
+        assert_eq!(result.num_samples, 1);
     }
 
     #[test]
