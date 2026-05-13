@@ -601,20 +601,24 @@ impl BrocaGenerator {
             // Coherence feedback: scale thought HV to strengthen binding when coherence drifts
             let mut this_binding_weight = 1.0f32;
             let mut this_veto = false;
+            let mut this_coherence = self.coherence_feedback.coherence();
             let this_confidence_veto_threshold = confidence_adjusted_veto_threshold(
                 self.config.gating.veto_threshold,
                 channels.response_confidence(),
                 self.config.gating.confidence_veto_scale,
             );
-            if !self.config.bypass_gating && self.config.enable_coherence_feedback {
+            if self.config.enable_coherence_feedback {
                 let output_hv = self.controller.output_hv();
-                let binding_weight = self.coherence_feedback.update(&output_hv, &thought_hv);
-                this_binding_weight = binding_weight;
-                let coherence = self.coherence_feedback.coherence();
+                let measured_coherence = output_hv.similarity(&thought_hv);
+                let coherence = if self.config.bypass_gating {
+                    measured_coherence
+                } else {
+                    let binding_weight = self.coherence_feedback.update(&output_hv, &thought_hv);
+                    this_binding_weight = binding_weight;
+                    self.coherence_feedback.coherence()
+                };
+                this_coherence = coherence;
                 coherence_dynamics.push(coherence);
-
-                // Phase 3: Feed coherence to controller for adaptive dt
-                self.controller.set_coherence_feedback(coherence);
 
                 // Hallucination detection: track consecutive low-coherence tokens
                 if coherence < 0.05 {
@@ -626,57 +630,72 @@ impl BrocaGenerator {
                     consecutive_low_coherence = 0;
                 }
 
-                // Phase 2: Algebraic coherence correction vs scalar scaling
-                if self.coherence_feedback.is_algebraic() {
-                    thought_hv = self
-                        .coherence_feedback
-                        .algebraic_correct(&output_hv, &thought_hv);
-                } else if binding_weight > 1.0 + 1e-6 {
-                    thought_hv = thought_hv.scale(binding_weight);
-                }
+                if !self.config.bypass_gating {
+                    // Phase 3: Feed coherence to controller for adaptive dt.
+                    self.controller.set_coherence_feedback(coherence);
 
-                // Phase 4: Save snapshot at high-coherence steps for soft veto
-                if self.config.gating.enable_soft_veto
-                    && coherence >= self.config.gating.coherence_drift_threshold
-                {
-                    good_snapshot = Some(self.controller.save_state());
-                }
+                    // Phase 2: Algebraic coherence correction vs scalar scaling.
+                    if self.coherence_feedback.is_algebraic() {
+                        thought_hv = self
+                            .coherence_feedback
+                            .algebraic_correct(&output_hv, &thought_hv);
+                    } else if this_binding_weight > 1.0 + 1e-6 {
+                        thought_hv = thought_hv.scale(this_binding_weight);
+                    }
 
-                // Semantic veto: mid-sentence self-correction
-                // Gated by: min position, max vetoes, refractory period
-                // NSM coverage relaxes veto: high prime coverage means semantically on-track
-                // even if cosine coherence is low (different representation spaces).
-                let nsm_veto_relaxed = if let Some(ref tracker) = nsm_tracker {
-                    let coverage = tracker.prime_coverage();
-                    // High coverage relaxes: subtract from veto willingness
-                    coverage > 0.6 // Don't veto if >60% of primes expressed
-                } else {
-                    false
-                };
-                if self.config.enable_semantic_veto
-                    && !nsm_veto_relaxed
-                    && self.coherence_feedback.should_veto_with_confidence(
-                        channels.response_confidence(),
-                        self.config.gating.confidence_veto_scale,
-                    )
-                    && pos > min_veto_pos
-                    && veto_count < max_vetoes
-                    && tokens_since_veto >= veto_refractory
-                {
-                    veto_triggered = true;
-                    this_veto = true;
-                    veto_count += 1;
-                    tokens_since_veto = 0;
-                    text_bytes.extend_from_slice(self.config.veto_hesitation.as_bytes());
-                    on_token(&self.config.veto_hesitation);
+                    // Phase 4: Save snapshot at high-coherence steps for soft veto.
+                    if self.config.gating.enable_soft_veto
+                        && coherence >= self.config.gating.coherence_drift_threshold
+                    {
+                        good_snapshot = Some(self.controller.save_state());
+                    }
 
-                    // Phase 4: Soft veto — partial restore instead of hard reset
-                    if self.config.gating.enable_soft_veto {
-                        if let Some(ref snapshot) = good_snapshot {
-                            self.controller
-                                .restore_partial(snapshot, self.config.gating.veto_rewind_alpha);
+                    // Semantic veto: mid-sentence self-correction
+                    // Gated by: min position, max vetoes, refractory period
+                    // NSM coverage relaxes veto: high prime coverage means semantically on-track
+                    // even if cosine coherence is low (different representation spaces).
+                    let nsm_veto_relaxed = if let Some(ref tracker) = nsm_tracker {
+                        let coverage = tracker.prime_coverage();
+                        // High coverage relaxes: subtract from veto willingness
+                        coverage > 0.6 // Don't veto if >60% of primes expressed
+                    } else {
+                        false
+                    };
+                    if self.config.enable_semantic_veto
+                        && !nsm_veto_relaxed
+                        && self.coherence_feedback.should_veto_with_confidence(
+                            channels.response_confidence(),
+                            self.config.gating.confidence_veto_scale,
+                        )
+                        && pos > min_veto_pos
+                        && veto_count < max_vetoes
+                        && tokens_since_veto >= veto_refractory
+                    {
+                        veto_triggered = true;
+                        this_veto = true;
+                        veto_count += 1;
+                        tokens_since_veto = 0;
+                        text_bytes.extend_from_slice(self.config.veto_hesitation.as_bytes());
+                        on_token(&self.config.veto_hesitation);
+
+                        // Phase 4: Soft veto — partial restore instead of hard reset
+                        if self.config.gating.enable_soft_veto {
+                            if let Some(ref snapshot) = good_snapshot {
+                                self.controller.restore_partial(
+                                    snapshot,
+                                    self.config.gating.veto_rewind_alpha,
+                                );
+                            } else {
+                                // No snapshot saved yet — fall back to hard reset
+                                self.controller.reset();
+                                let _ = self.controller.forward_step(
+                                    &thought_hv_original,
+                                    self.tokenizer.thought_id,
+                                    0,
+                                );
+                            }
                         } else {
-                            // No snapshot saved yet — fall back to hard reset
+                            // Original hard veto: full reset + re-inject
                             self.controller.reset();
                             let _ = self.controller.forward_step(
                                 &thought_hv_original,
@@ -684,23 +703,15 @@ impl BrocaGenerator {
                                 0,
                             );
                         }
-                    } else {
-                        // Original hard veto: full reset + re-inject
-                        self.controller.reset();
-                        let _ = self.controller.forward_step(
-                            &thought_hv_original,
-                            self.tokenizer.thought_id,
-                            0,
-                        );
+                        // Restore thought_hv from original (undo any drift scaling)
+                        thought_hv = thought_hv_original.clone();
                     }
-                    // Restore thought_hv from original (undo any drift scaling)
-                    thought_hv = thought_hv_original.clone();
                 }
             }
 
             gating_trace.push(GatingTraceEntry {
                 position: pos,
-                coherence: self.coherence_feedback.coherence(),
+                coherence: this_coherence,
                 binding_weight: this_binding_weight,
                 veto_triggered: this_veto,
                 epistemic_boost: this_epistemic_boost,
@@ -762,7 +773,10 @@ impl BrocaGenerator {
             prev_token = next_token;
         }
 
-        let final_coherence = self.coherence_feedback.coherence();
+        let final_coherence = coherence_dynamics
+            .last()
+            .copied()
+            .unwrap_or_else(|| self.coherence_feedback.coherence());
         let text = String::from_utf8(text_bytes)
             .unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned());
 
@@ -1487,6 +1501,36 @@ mod tests {
 
         for &c in &result.coherence_dynamics {
             assert!(c.is_finite(), "Coherence should be finite");
+        }
+    }
+
+    #[test]
+    fn test_bypass_gating_still_measures_coherence() {
+        let genesis = test_genesis();
+        let mut config = test_config();
+        config.enable_coherence_feedback = true;
+        config.bypass_gating = true;
+        config.gating.base_max_tokens = 10;
+        config.enable_consciousness_gating = false;
+
+        let mut gen = BrocaGenerator::new(&genesis, config);
+        let channels = ThoughtChannels::default();
+        let result = gen.generate(&channels);
+
+        assert_eq!(
+            result.coherence_dynamics.len(),
+            result.num_tokens,
+            "Raw bypass generation should still report measured coherence"
+        );
+        assert!(
+            result.final_coherence.is_finite(),
+            "Raw bypass final coherence should be measured, not a stale default"
+        );
+        if result.num_tokens > 0 {
+            assert!(
+                (result.final_coherence - 1.0).abs() > 1e-6,
+                "Raw bypass coherence should not remain at the default perfect score"
+            );
         }
     }
 
