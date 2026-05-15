@@ -1,4 +1,4 @@
-use mycelix_zome_helpers as _;
+use mycelix_bridge_common;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -6,6 +6,7 @@ use hdk::prelude::*;
 use reciprocity_integrity::*;
 use serde::{Deserialize, Serialize};
 
+use mycelix_zome_helpers as _;
 // ── Signals ──────────────────────────────────────────────────────────
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -322,7 +323,11 @@ pub fn get_agent_stewardship_score(did: String) -> ExternResult<f64> {
     for record in &records {
         if let Some(Entry::App(bytes)) = record.entry().as_option() {
             if let Ok(value) = serde_json::from_slice::<serde_json::Value>(bytes.bytes()) {
-                if value.get("acknowledged").and_then(|v| v.as_bool()).unwrap_or(false) {
+                if value
+                    .get("acknowledged")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false)
+                {
                     acknowledged += 1;
                 }
             }
@@ -330,7 +335,11 @@ pub fn get_agent_stewardship_score(did: String) -> ExternResult<f64> {
     }
 
     let saturation = (count as f64 / 30.0).min(1.0);
-    let quality = if count > 0 { acknowledged as f64 / count as f64 } else { 0.0 };
+    let quality = if count > 0 {
+        acknowledged as f64 / count as f64
+    } else {
+        0.0
+    };
     Ok((saturation * quality.max(0.3)).clamp(0.0, 1.0)) // min 0.3 quality for any pledge
 }
 
@@ -593,9 +602,9 @@ fn compute_type_weight(pledge_type: &PledgeType) -> f64 {
         PledgeType::Bandwidth => 1.1,
         PledgeType::QA => 1.1,
         PledgeType::Documentation => 1.0,
-        PledgeType::TutoringTime => 1.4,       // High value: direct human impact
-        PledgeType::ContentTranslation => 1.3,  // High value: expands access
-        PledgeType::CurriculumReview => 1.2,    // Moderate: quality improvement
+        PledgeType::TutoringTime => 1.4, // High value: direct human impact
+        PledgeType::ContentTranslation => 1.3, // High value: expands access
+        PledgeType::CurriculumReview => 1.2, // Moderate: quality improvement
         PledgeType::Other => 0.8,
     }
 }

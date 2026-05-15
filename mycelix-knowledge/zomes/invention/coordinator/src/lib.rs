@@ -1,14 +1,15 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Invention Coordinator Zome
+
+//! Invention Registry Coordinator Zome
 //!
 //! Business logic for the decentralized prior art registry.
 //! Manages invention claims, challenges, and prior-art search.
 
 use hdk::prelude::*;
 use invention_integrity::*;
+use mycelix_zome_helpers as _;
 use serde::{Deserialize, Serialize};
 
 // ── Constants ──────────────────────────────────────────────────────────
@@ -343,12 +344,8 @@ pub fn register_invention(input: RegisterInventionInput) -> ExternResult<Record>
     enforce_rate_limit(MAX_INVENTIONS_PER_HOUR)?;
 
     let now = sys_time()?;
-    let witness = compute_witness_commitment(
-        &input.title,
-        &input.description,
-        &input.inventor_did,
-        &now,
-    );
+    let witness =
+        compute_witness_commitment(&input.title, &input.description, &input.inventor_did, &now);
 
     let status = if input.publish {
         InventionStatus::Published
@@ -422,10 +419,7 @@ pub fn register_invention(input: RegisterInventionInput) -> ExternResult<Record>
             // Find royalty rules for the referenced invention
             let ref_anchor = format!("invention:{}", ref_claim.id);
             if let Ok(rule_links) = get_links(
-                LinkQuery::try_new(
-                    anchor_hash(&ref_anchor)?,
-                    LinkTypes::InventionToRoyaltyRule,
-                )?,
+                LinkQuery::try_new(anchor_hash(&ref_anchor)?, LinkTypes::InventionToRoyaltyRule)?,
                 GetStrategy::default(),
             ) {
                 for rule_link in rule_links {
@@ -598,10 +592,7 @@ pub fn get_inventions_by_inventor(did: String) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn get_inventions_by_domain(domain: String) -> ExternResult<Vec<Record>> {
     let domain_anchor = format!("domain:{}", domain);
-    resolve_links(
-        anchor_hash(&domain_anchor)?,
-        LinkTypes::DomainToInvention,
-    )
+    resolve_links(anchor_hash(&domain_anchor)?, LinkTypes::DomainToInvention)
 }
 
 /// File a challenge against an invention claim.
@@ -711,9 +702,7 @@ pub fn resolve_challenge(input: ResolveChallengeInput) -> ExternResult<Record> {
     // If dismissed, return invention to Published; if upheld, it stays Challenged
     // (the inventor may then choose to Revoke or the community can Supersede)
     if input.resolution == ChallengeStatus::Dismissed {
-        if let Some(inv_record) =
-            get(challenge.invention_hash.clone(), GetOptions::default())?
-        {
+        if let Some(inv_record) = get(challenge.invention_hash.clone(), GetOptions::default())? {
             let mut inv_claim = extract_invention(&inv_record)?;
             if inv_claim.status == InventionStatus::Challenged {
                 inv_claim.status = InventionStatus::Published;
@@ -724,15 +713,14 @@ pub fn resolve_challenge(input: ResolveChallengeInput) -> ExternResult<Record> {
     }
 
     // Resolve the invention_id for the signal
-    let inv_id = if let Some(inv_record) =
-        get(challenge.invention_hash.clone(), GetOptions::default())?
-    {
-        extract_invention(&inv_record)
-            .map(|c| c.id)
-            .unwrap_or_default()
-    } else {
-        String::new()
-    };
+    let inv_id =
+        if let Some(inv_record) = get(challenge.invention_hash.clone(), GetOptions::default())? {
+            extract_invention(&inv_record)
+                .map(|c| c.id)
+                .unwrap_or_default()
+        } else {
+            String::new()
+        };
 
     let _ = emit_signal(&InventionSignal::ChallengeResolved {
         invention_id: inv_id,
@@ -748,16 +736,13 @@ pub fn resolve_challenge(input: ResolveChallengeInput) -> ExternResult<Record> {
 /// without successful challenge).
 #[hdk_extern]
 pub fn verify_invention(action_hash: ActionHash) -> ExternResult<Record> {
-    let record = get(action_hash.clone(), GetOptions::default())?.ok_or(
-        wasm_error!(WasmErrorInner::Guest("Invention not found".into())),
-    )?;
+    let record = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Invention not found".into())
+    ))?;
 
     let mut claim = extract_invention(&record)?;
 
-    if !claim
-        .status
-        .can_transition_to(&InventionStatus::Verified)
-    {
+    if !claim.status.can_transition_to(&InventionStatus::Verified) {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "Cannot verify invention in {:?} status",
             claim.status
@@ -783,9 +768,7 @@ pub fn verify_invention(action_hash: ActionHash) -> ExternResult<Record> {
                         e
                     )))
                 })?
-                .ok_or_else(|| {
-                    wasm_error!(WasmErrorInner::Guest("Record has no entry".into()))
-                })?;
+                .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Record has no entry".into())))?;
             match ch.status {
                 ChallengeStatus::Upheld | ChallengeStatus::Dismissed => {}
                 _ => {
@@ -821,10 +804,7 @@ pub fn search_prior_art(input: PriorArtSearchInput) -> ExternResult<Vec<Record>>
     // Start from domain anchor if specified, otherwise all_inventions
     let base_records = if let Some(ref domain) = input.domain {
         let domain_anchor = format!("domain:{}", domain);
-        resolve_links(
-            anchor_hash(&domain_anchor)?,
-            LinkTypes::DomainToInvention,
-        )?
+        resolve_links(anchor_hash(&domain_anchor)?, LinkTypes::DomainToInvention)?
     } else {
         resolve_links(anchor_hash("all_inventions")?, LinkTypes::AllInventions)?
     };
@@ -944,10 +924,7 @@ pub fn create_royalty_rule(input: CreateRoyaltyRuleInput) -> ExternResult<Record
 #[hdk_extern]
 pub fn get_royalty_rules(invention_id: String) -> ExternResult<Vec<Record>> {
     let inv_anchor = format!("invention:{}", invention_id);
-    resolve_links(
-        anchor_hash(&inv_anchor)?,
-        LinkTypes::InventionToRoyaltyRule,
-    )
+    resolve_links(anchor_hash(&inv_anchor)?, LinkTypes::InventionToRoyaltyRule)
 }
 
 /// Manually record a royalty event (e.g., commercial use, production deploy).
@@ -957,10 +934,7 @@ pub fn record_royalty_event(input: RecordRoyaltyInput) -> ExternResult<Record> {
     // Verify the rule exists
     let inv_anchor = format!("invention:{}", input.invention_id);
     let rule_links = get_links(
-        LinkQuery::try_new(
-            anchor_hash(&inv_anchor)?,
-            LinkTypes::InventionToRoyaltyRule,
-        )?,
+        LinkQuery::try_new(anchor_hash(&inv_anchor)?, LinkTypes::InventionToRoyaltyRule)?,
         GetStrategy::default(),
     )?;
 
@@ -1028,9 +1002,9 @@ pub fn record_royalty_event(input: RecordRoyaltyInput) -> ExternResult<Record> {
 /// Mark a royalty ledger entry as paid. Either the payer or receiver can mark it.
 #[hdk_extern]
 pub fn mark_royalty_paid(ledger_entry_hash: ActionHash) -> ExternResult<Record> {
-    let record = get(ledger_entry_hash.clone(), GetOptions::default())?.ok_or(
-        wasm_error!(WasmErrorInner::Guest("Ledger entry not found".into())),
-    )?;
+    let record = get(ledger_entry_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Ledger entry not found".into())
+    ))?;
 
     let mut entry = extract_ledger_entry(&record)?;
 
@@ -1059,10 +1033,7 @@ pub fn mark_royalty_paid(ledger_entry_hash: ActionHash) -> ExternResult<Record> 
 #[hdk_extern]
 pub fn get_royalties_owed(payer_did: String) -> ExternResult<Vec<Record>> {
     let payer_anchor = format!("royalty_owed:{}", payer_did);
-    let records = resolve_links(
-        anchor_hash(&payer_anchor)?,
-        LinkTypes::AgentToRoyaltyOwed,
-    )?;
+    let records = resolve_links(anchor_hash(&payer_anchor)?, LinkTypes::AgentToRoyaltyOwed)?;
 
     // Filter to only Pending entries
     let mut pending = Vec::new();
@@ -1104,9 +1075,9 @@ pub fn get_royalties_receivable(receiver_did: String) -> ExternResult<Vec<Record
 /// for DID-based authorization.
 #[hdk_extern]
 pub fn waive_royalty(ledger_entry_hash: ActionHash) -> ExternResult<Record> {
-    let record = get(ledger_entry_hash.clone(), GetOptions::default())?.ok_or(
-        wasm_error!(WasmErrorInner::Guest("Ledger entry not found".into())),
-    )?;
+    let record = get(ledger_entry_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Ledger entry not found".into())
+    ))?;
 
     let mut entry = extract_ledger_entry(&record)?;
 

@@ -19,25 +19,47 @@ pub use prismatic::PrismaticJoint;
 
 /// Motor drive for actuated joints (hinge + prismatic).
 ///
-/// Uses a PD controller to reach a target angle/position:
-/// `force = kp * (target - current) - kd * velocity`
+/// Uses a PD (Proportional-Derivative) controller to reach a target:
+/// `force = kp * (target - current_pos) + kd * (target_vel - current_vel)`
 #[derive(Clone, Debug)]
 pub struct MotorDrive {
-    /// Target angle (radians, for hinge) or position (units, for prismatic).
-    pub target: f64,
+    /// Target position (units) or angle (radians).
+    pub target_pos: f64,
+    /// Target velocity.
+    pub target_vel: f64,
+    /// Proportional gain (stiffness).
+    pub kp: f64,
+    /// Derivative gain (damping).
+    pub kd: f64,
     /// Maximum force/torque the motor can apply.
     pub max_force: f64,
-    /// Damping coefficient (velocity damping, prevents overshoot).
-    pub damping: f64,
 }
 
 impl MotorDrive {
-    /// Create a motor with the given target and max force.
-    pub fn new(target: f64, max_force: f64) -> Self {
+    /// Create a motor with default gains.
+    pub fn new(target_pos: f64, max_force: f64) -> Self {
         Self {
-            target,
+            target_pos,
+            target_vel: 0.0,
+            kp: max_force,
+            kd: max_force * 0.1,
             max_force,
-            damping: max_force * 0.1, // default 10% of max force
         }
+    }
+
+    /// Set PD gains.
+    pub fn with_gains(mut self, kp: f64, kd: f64) -> Self {
+        self.kp = kp;
+        self.kd = kd;
+        self
+    }
+
+    /// Calculate motor impulse.
+    pub fn calculate_impulse(&self, current_pos: f64, current_vel: f64, dt: f64) -> f64 {
+        let error_pos = self.target_pos - current_pos;
+        let error_vel = self.target_vel - current_vel;
+        let force =
+            (self.kp * error_pos + self.kd * error_vel).clamp(-self.max_force, self.max_force);
+        force * dt
     }
 }

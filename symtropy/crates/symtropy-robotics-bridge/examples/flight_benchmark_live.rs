@@ -38,6 +38,7 @@ use symtropy_consciousness_physics::safety::SafetyTier;
 use symtropy_physics::BodyHandle;
 use symtropy_robotics_bridge::agent::RoboticAgent;
 use symtropy_robotics_bridge::platform::PlatformType;
+use symtropy_robotics_bridge::RoboticAgentTrait;
 
 /// Inlined sprint-floor mapping (see
 /// `symtropy-consciousness-physics::safety::sprint_floor_gain`).

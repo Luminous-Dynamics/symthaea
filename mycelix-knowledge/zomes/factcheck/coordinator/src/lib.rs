@@ -1,7 +1,7 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+
 //! Fact-Check Coordinator Zome
 //!
 //! Provides a simple fact-checking API for external hApps (Media, Governance, Justice)
@@ -19,8 +19,9 @@ use mycelix_zome_helpers as _;
 //!
 //! Updated to use HDK 0.6 patterns (LinkQuery, GetStrategy, Anchor pattern)
 
-use hdk::prelude::*;
 use factcheck_integrity::*;
+use hdk::prelude::*;
+use mycelix_zome_helpers as _;
 
 /// Helper to get an anchor entry hash for link bases
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -141,20 +142,35 @@ pub fn fact_check(input: FactCheckInput) -> ExternResult<FactCheckResult> {
     // Index by source hApp using anchor pattern
     let happ_anchor = format!("happ:{}", input.source_happ);
     create_entry(&EntryTypes::Anchor(Anchor(happ_anchor.clone())))?;
-    create_link(anchor_hash(&happ_anchor)?, request_hash.clone(), LinkTypes::HappToFactCheck, ())?;
+    create_link(
+        anchor_hash(&happ_anchor)?,
+        request_hash.clone(),
+        LinkTypes::HappToFactCheck,
+        (),
+    )?;
 
     // Index by subject if provided
     if let Some(ref subject) = input.subject {
         let subject_anchor = format!("subject:{}", subject);
         create_entry(&EntryTypes::Anchor(Anchor(subject_anchor.clone())))?;
-        create_link(anchor_hash(&subject_anchor)?, request_hash.clone(), LinkTypes::SubjectToFactCheck, ())?;
+        create_link(
+            anchor_hash(&subject_anchor)?,
+            request_hash.clone(),
+            LinkTypes::SubjectToFactCheck,
+            (),
+        )?;
     }
 
     // Index by topics
     for topic in input.topics.clone().unwrap_or_default() {
         let topic_anchor = format!("topic:{}", topic);
         create_entry(&EntryTypes::Anchor(Anchor(topic_anchor.clone())))?;
-        create_link(anchor_hash(&topic_anchor)?, request_hash.clone(), LinkTypes::TopicToFactCheck, ())?;
+        create_link(
+            anchor_hash(&topic_anchor)?,
+            request_hash.clone(),
+            LinkTypes::TopicToFactCheck,
+            (),
+        )?;
     }
 
     // Perform the fact check
@@ -209,8 +225,13 @@ fn analyze_statement(
     statement: &str,
     subject: &Option<String>,
     topics: &Option<Vec<String>>,
-) -> ExternResult<(FactCheckVerdict, f64, Vec<ClaimSummary>, Vec<ClaimSummary>, Vec<ClaimSummary>)>
-{
+) -> ExternResult<(
+    FactCheckVerdict,
+    f64,
+    Vec<ClaimSummary>,
+    Vec<ClaimSummary>,
+    Vec<ClaimSummary>,
+)> {
     let mut all_claims: Vec<ClaimSummary> = Vec::new();
     let statement_lower = statement.to_lowercase();
 
@@ -274,10 +295,8 @@ fn analyze_statement(
         let content_lower = claim.content_snippet.to_lowercase();
 
         // Simple classification based on content analysis
-        let (relationship, _is_supporting) = classify_claim_relationship(
-            &statement_lower,
-            &content_lower,
-        );
+        let (relationship, _is_supporting) =
+            classify_claim_relationship(&statement_lower, &content_lower);
 
         claim.relationship = relationship.clone();
 
@@ -301,23 +320,38 @@ fn analyze_statement(
 }
 
 /// Classify the relationship between a claim and the statement being checked
-fn classify_claim_relationship(
-    statement: &str,
-    claim_content: &str,
-) -> (ClaimRelationship, bool) {
+fn classify_claim_relationship(statement: &str, claim_content: &str) -> (ClaimRelationship, bool) {
     // Check for negation patterns
-    let negation_words = ["not", "never", "false", "incorrect", "wrong", "untrue", "deny", "denies"];
+    let negation_words = [
+        "not",
+        "never",
+        "false",
+        "incorrect",
+        "wrong",
+        "untrue",
+        "deny",
+        "denies",
+    ];
     let statement_has_negation = negation_words.iter().any(|w| statement.contains(w));
     let claim_has_negation = negation_words.iter().any(|w| claim_content.contains(w));
 
     // Check for affirmation patterns
-    let affirmation_words = ["true", "correct", "verified", "confirmed", "proven", "shows", "demonstrates"];
+    let affirmation_words = [
+        "true",
+        "correct",
+        "verified",
+        "confirmed",
+        "proven",
+        "shows",
+        "demonstrates",
+    ];
     let claim_has_affirmation = affirmation_words.iter().any(|w| claim_content.contains(w));
 
     // Extract key concepts (simple word overlap)
     let statement_words: Vec<&str> = statement.split_whitespace().collect();
     let claim_words: Vec<&str> = claim_content.split_whitespace().collect();
-    let overlap: Vec<&str> = statement_words.iter()
+    let overlap: Vec<&str> = statement_words
+        .iter()
         .filter(|w| w.len() > 3 && claim_words.contains(w))
         .copied()
         .collect();
@@ -369,10 +403,12 @@ fn calculate_verdict(
     }
 
     // Calculate weighted support/contradiction scores
-    let support_score: f64 = supporting.iter()
+    let support_score: f64 = supporting
+        .iter()
         .map(|c| c.credibility * c.relevance_score * c.epistemic.empirical)
         .sum();
-    let contradict_score: f64 = contradicting.iter()
+    let contradict_score: f64 = contradicting
+        .iter()
         .map(|c| c.credibility * c.relevance_score * c.epistemic.empirical)
         .sum();
 
@@ -413,9 +449,7 @@ fn calculate_evidence_confidence(
     supporting: &[ClaimSummary],
     contradicting: &[ClaimSummary],
 ) -> f64 {
-    let all_claims: Vec<&ClaimSummary> = supporting.iter()
-        .chain(contradicting.iter())
-        .collect();
+    let all_claims: Vec<&ClaimSummary> = supporting.iter().chain(contradicting.iter()).collect();
 
     if all_claims.is_empty() {
         return 0.3;
@@ -427,14 +461,18 @@ fn calculate_evidence_confidence(
         return 0.4;
     }
 
-    let weighted_credibility: f64 = all_claims.iter()
+    let weighted_credibility: f64 = all_claims
+        .iter()
         .map(|c| c.credibility * c.relevance_score)
-        .sum::<f64>() / total_weight;
+        .sum::<f64>()
+        / total_weight;
 
     // Average empirical level
-    let avg_empirical: f64 = all_claims.iter()
+    let avg_empirical: f64 = all_claims
+        .iter()
         .map(|c| c.epistemic.empirical)
-        .sum::<f64>() / all_claims.len() as f64;
+        .sum::<f64>()
+        / all_claims.len() as f64;
 
     // Boost confidence for more evidence (diminishing returns)
     let evidence_bonus = (all_claims.len() as f64 / 10.0).min(0.2);
@@ -480,10 +518,7 @@ fn calculate_aggregate_epistemic(
 }
 
 /// Calculate overall credibility score
-fn calculate_credibility(
-    supporting: &[ClaimSummary],
-    contradicting: &[ClaimSummary],
-) -> f64 {
+fn calculate_credibility(supporting: &[ClaimSummary], contradicting: &[ClaimSummary]) -> f64 {
     let all_claims: Vec<&ClaimSummary> = supporting.iter().chain(contradicting.iter()).collect();
 
     if all_claims.is_empty() {
@@ -543,7 +578,8 @@ fn generate_suggestions(
         FactCheckVerdict::InsufficientEvidence => {
             suggestions.push(SuggestedAction {
                 action_type: SuggestedActionType::SubmitClaim,
-                description: "Submit a claim with evidence to help verify this statement".to_string(),
+                description: "Submit a claim with evidence to help verify this statement"
+                    .to_string(),
                 priority: 1,
             });
         }
@@ -565,7 +601,8 @@ fn generate_suggestions(
         FactCheckVerdict::Unverifiable => {
             suggestions.push(SuggestedAction {
                 action_type: SuggestedActionType::AddContext,
-                description: "This statement may be subjective - consider adding context".to_string(),
+                description: "This statement may be subjective - consider adding context"
+                    .to_string(),
                 priority: 2,
             });
         }
@@ -592,13 +629,15 @@ pub fn query_claims_by_subject(input: SubjectQueryInput) -> ExternResult<Vec<Cla
     )?;
 
     let claims: Vec<Record> = match response {
-        ZomeCallResponse::Ok(bytes) => bytes.decode()
+        ZomeCallResponse::Ok(bytes) => bytes
+            .decode()
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
         ZomeCallResponse::NetworkError(e) | ZomeCallResponse::CountersigningSession(e) => {
             debug!("Failed to query claims zome: {:?}", e);
             return Ok(vec![]);
         }
-        ZomeCallResponse::Unauthorized(_, _, _, _) | ZomeCallResponse::AuthenticationFailed(_, _) => {
+        ZomeCallResponse::Unauthorized(_, _, _, _)
+        | ZomeCallResponse::AuthenticationFailed(_, _) => {
             debug!("Unauthorized to query claims zome");
             return Ok(vec![]);
         }
@@ -614,16 +653,38 @@ pub fn query_claims_by_subject(input: SubjectQueryInput) -> ExternResult<Vec<Cla
             let entry_bytes = app_entry.bytes();
             if let Ok(claim_data) = serde_json::from_slice::<serde_json::Value>(&entry_bytes) {
                 // Extract epistemic values
-                let classification = claim_data.get("classification").cloned().unwrap_or_default();
-                let e = classification.get("empirical").and_then(|v| v.as_f64()).unwrap_or(0.5);
-                let n = classification.get("normative").and_then(|v| v.as_f64()).unwrap_or(0.5);
-                let m = classification.get("mythic").and_then(|v| v.as_f64()).unwrap_or(0.5);
+                let classification = claim_data
+                    .get("classification")
+                    .cloned()
+                    .unwrap_or_default();
+                let e = classification
+                    .get("empirical")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.5);
+                let n = classification
+                    .get("normative")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.5);
+                let m = classification
+                    .get("mythic")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.5);
 
                 // Filter by epistemic requirements
                 if e >= input.min_e && n >= input.min_n {
-                    let claim_id = claim_data.get("id").and_then(|v| v.as_str()).unwrap_or_default().to_string();
-                    let content = claim_data.get("content").and_then(|v| v.as_str()).unwrap_or_default();
-                    let confidence = claim_data.get("confidence").and_then(|v| v.as_f64()).unwrap_or(0.5);
+                    let claim_id = claim_data
+                        .get("id")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or_default()
+                        .to_string();
+                    let content = claim_data
+                        .get("content")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or_default();
+                    let confidence = claim_data
+                        .get("confidence")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(0.5);
 
                     // Create snippet from content (first 200 chars)
                     let snippet = if content.len() > 200 {
@@ -643,7 +704,10 @@ pub fn query_claims_by_subject(input: SubjectQueryInput) -> ExternResult<Vec<Cla
                         credibility: confidence,
                         relevance_score: calculate_relevance(&input.subject, content),
                         relationship: ClaimRelationship::Related,
-                        source: claim_data.get("author").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                        source: claim_data
+                            .get("author")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string()),
                         created_at: now,
                     });
                 }
@@ -657,7 +721,11 @@ pub fn query_claims_by_subject(input: SubjectQueryInput) -> ExternResult<Vec<Cla
     }
 
     // Sort by relevance
-    summaries.sort_by(|a, b| b.relevance_score.partial_cmp(&a.relevance_score).unwrap_or(std::cmp::Ordering::Equal));
+    summaries.sort_by(|a, b| {
+        b.relevance_score
+            .partial_cmp(&a.relevance_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     Ok(summaries)
 }
@@ -674,7 +742,10 @@ fn calculate_relevance(subject: &str, content: &str) -> f64 {
     } else {
         // Check for individual keywords
         let keywords: Vec<&str> = subject_lower.split_whitespace().collect();
-        let matched = keywords.iter().filter(|kw| content_lower.contains(*kw)).count();
+        let matched = keywords
+            .iter()
+            .filter(|kw| content_lower.contains(*kw))
+            .count();
         if keywords.is_empty() {
             0.5
         } else {
@@ -701,7 +772,8 @@ pub fn query_claims_by_topic(input: TopicQueryInput) -> ExternResult<Vec<ClaimSu
         );
 
         let claims: Vec<Record> = match response {
-            Ok(ZomeCallResponse::Ok(bytes)) => bytes.decode()
+            Ok(ZomeCallResponse::Ok(bytes)) => bytes
+                .decode()
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
             Ok(_) | Err(_) => {
                 debug!("Failed to query claims for topic {}", topic);
@@ -714,7 +786,11 @@ pub fn query_claims_by_topic(input: TopicQueryInput) -> ExternResult<Vec<ClaimSu
             if let Some(Entry::App(app_entry)) = record.entry().as_option() {
                 let entry_bytes = app_entry.bytes();
                 if let Ok(claim_data) = serde_json::from_slice::<serde_json::Value>(&entry_bytes) {
-                    let claim_id = claim_data.get("id").and_then(|v| v.as_str()).unwrap_or_default().to_string();
+                    let claim_id = claim_data
+                        .get("id")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or_default()
+                        .to_string();
 
                     // Deduplicate claims across topics
                     if seen_claim_ids.contains(&claim_id) {
@@ -723,15 +799,33 @@ pub fn query_claims_by_topic(input: TopicQueryInput) -> ExternResult<Vec<ClaimSu
                     seen_claim_ids.push(claim_id.clone());
 
                     // Extract epistemic values
-                    let classification = claim_data.get("classification").cloned().unwrap_or_default();
-                    let e = classification.get("empirical").and_then(|v| v.as_f64()).unwrap_or(0.5);
-                    let n = classification.get("normative").and_then(|v| v.as_f64()).unwrap_or(0.5);
-                    let m = classification.get("mythic").and_then(|v| v.as_f64()).unwrap_or(0.5);
+                    let classification = claim_data
+                        .get("classification")
+                        .cloned()
+                        .unwrap_or_default();
+                    let e = classification
+                        .get("empirical")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(0.5);
+                    let n = classification
+                        .get("normative")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(0.5);
+                    let m = classification
+                        .get("mythic")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(0.5);
 
                     // Filter by epistemic requirements
                     if e >= input.min_e && n >= input.min_n {
-                        let content = claim_data.get("content").and_then(|v| v.as_str()).unwrap_or_default();
-                        let confidence = claim_data.get("confidence").and_then(|v| v.as_f64()).unwrap_or(0.5);
+                        let content = claim_data
+                            .get("content")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or_default();
+                        let confidence = claim_data
+                            .get("confidence")
+                            .and_then(|v| v.as_f64())
+                            .unwrap_or(0.5);
 
                         // Create snippet from content (first 200 chars)
                         let snippet = if content.len() > 200 {
@@ -741,13 +835,23 @@ pub fn query_claims_by_topic(input: TopicQueryInput) -> ExternResult<Vec<ClaimSu
                         };
 
                         // Calculate relevance based on topic match count
-                        let tags: Vec<String> = claim_data.get("tags")
+                        let tags: Vec<String> = claim_data
+                            .get("tags")
                             .and_then(|v| v.as_array())
-                            .map(|arr| arr.iter().filter_map(|t| t.as_str().map(String::from)).collect())
+                            .map(|arr| {
+                                arr.iter()
+                                    .filter_map(|t| t.as_str().map(String::from))
+                                    .collect()
+                            })
                             .unwrap_or_default();
 
-                        let topic_match_count = input.topics.iter()
-                            .filter(|t| tags.iter().any(|tag| tag.to_lowercase() == t.to_lowercase()))
+                        let topic_match_count = input
+                            .topics
+                            .iter()
+                            .filter(|t| {
+                                tags.iter()
+                                    .any(|tag| tag.to_lowercase() == t.to_lowercase())
+                            })
                             .count();
 
                         let relevance = if input.topics.is_empty() {
@@ -767,7 +871,10 @@ pub fn query_claims_by_topic(input: TopicQueryInput) -> ExternResult<Vec<ClaimSu
                             credibility: confidence,
                             relevance_score: relevance,
                             relationship: ClaimRelationship::Related,
-                            source: claim_data.get("author").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                            source: claim_data
+                                .get("author")
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.to_string()),
                             created_at: now,
                         });
                     }
@@ -790,7 +897,11 @@ pub fn query_claims_by_topic(input: TopicQueryInput) -> ExternResult<Vec<ClaimSu
         b.relevance_score
             .partial_cmp(&a.relevance_score)
             .unwrap_or(std::cmp::Ordering::Equal)
-            .then_with(|| b.credibility.partial_cmp(&a.credibility).unwrap_or(std::cmp::Ordering::Equal))
+            .then_with(|| {
+                b.credibility
+                    .partial_cmp(&a.credibility)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
     });
 
     // Truncate to limit
@@ -819,7 +930,8 @@ pub fn get_claim_details(claim_id: String) -> ExternResult<Option<ClaimDetails>>
             debug!("Failed to get claim from claims zome: {:?}", e);
             return Ok(None);
         }
-        ZomeCallResponse::Unauthorized(_, _, _, _) | ZomeCallResponse::AuthenticationFailed(_, _) => {
+        ZomeCallResponse::Unauthorized(_, _, _, _)
+        | ZomeCallResponse::AuthenticationFailed(_, _) => {
             debug!("Unauthorized to get claim from claims zome");
             return Ok(None);
         }
@@ -840,9 +952,7 @@ pub fn get_claim_details(claim_id: String) -> ExternResult<Option<ClaimDetails>>
     )?;
 
     let evidence: Vec<Record> = match evidence_response {
-        ZomeCallResponse::Ok(bytes) => bytes
-            .decode()
-            .unwrap_or_default(),
+        ZomeCallResponse::Ok(bytes) => bytes.decode().unwrap_or_default(),
         _ => {
             debug!("Failed to get evidence from claims zome");
             vec![]
@@ -903,7 +1013,9 @@ pub fn get_claim_details(claim_id: String) -> ExternResult<Option<ClaimDetails>>
                 for record in market_records {
                     if let Some(Entry::App(app_entry)) = record.entry().as_option() {
                         let entry_bytes = app_entry.bytes();
-                        if let Ok(evidence) = serde_json::from_slice::<serde_json::Value>(&entry_bytes) {
+                        if let Ok(evidence) =
+                            serde_json::from_slice::<serde_json::Value>(&entry_bytes)
+                        {
                             if let Some(evidence_type) = evidence.get("evidence_type") {
                                 if evidence_type.get("PredictionResolved").is_some() {
                                     status = "verified".to_string();
@@ -937,7 +1049,10 @@ fn calculate_claim_credibility(claim_record: &Record, evidence: &[Record]) -> Ex
     let base_credibility = if let Some(Entry::App(app_entry)) = claim_record.entry().as_option() {
         let entry_bytes = app_entry.bytes();
         if let Ok(claim) = serde_json::from_slice::<serde_json::Value>(&entry_bytes) {
-            claim.get("confidence").and_then(|v| v.as_f64()).unwrap_or(0.5)
+            claim
+                .get("confidence")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.5)
         } else {
             0.5
         }

@@ -12,8 +12,8 @@
 //! 4. Verifiers can check credential validity and trust tier
 //! 5. Selective disclosure allows proving tier without revealing score
 
-use mycelix_zome_helpers as _;
 use hdk::prelude::*;
+use mycelix_zome_helpers as _;
 use trust_credential_integrity::*;
 
 /// API version for cross-zome compatibility detection.

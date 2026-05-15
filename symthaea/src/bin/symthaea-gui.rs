@@ -58,6 +58,7 @@ enum MainView {
     Generations,
     ConfigDiff,
     Services,
+    Imagination,
 }
 
 /// Application state
@@ -128,6 +129,28 @@ struct SymthaeaGui {
 
     /// C4: Service Status Dashboard
     service_dashboard: ServiceDashboard,
+
+    /// C5: Imagination / Mental Movie state
+    imagination_state: ImaginationUiState,
+}
+
+/// Imagination / Mental Movie UI state
+struct ImaginationUiState {
+    pub texture: Option<egui::TextureHandle>,
+    pub current_frame: usize,
+    pub last_frame_time: Instant,
+    pub play_speed: f32,
+}
+
+impl Default for ImaginationUiState {
+    fn default() -> Self {
+        Self {
+            texture: None,
+            current_frame: 0,
+            last_frame_time: Instant::now(),
+            play_speed: 15.0,
+        }
+    }
 }
 
 /// Consciousness metrics display
@@ -138,6 +161,8 @@ struct ConsciousnessMetrics {
     safety_level: SafetyLevel,
     is_conscious: bool,
     uptime_secs: u64,
+    /// Latest mental simulation
+    mental_movie: Option<symthaea::shell::ipc_client::MentalMovie>,
 }
 
 impl Default for ConsciousnessMetrics {
@@ -148,6 +173,7 @@ impl Default for ConsciousnessMetrics {
             safety_level: SafetyLevel::Unknown,
             is_conscious: false,
             uptime_secs: 0,
+            mental_movie: None,
         }
     }
 }
@@ -326,6 +352,7 @@ impl SymthaeaGui {
             generation_timeline: GenerationTimeline::new(),
             config_diff: LiveConfigDiff::new(),
             service_dashboard: ServiceDashboard::new(),
+            imagination_state: ImaginationUiState::default(),
         };
 
         // Initialize with demo bindings
@@ -630,6 +657,7 @@ impl SymthaeaGui {
                 self.metrics.coherence = snapshot.coherence;
                 self.metrics.is_conscious = snapshot.is_conscious;
                 self.metrics.uptime_secs = snapshot.timestamp_ms / 1000;
+                self.metrics.mental_movie = snapshot.mental_movie;
                 self.connection_state = ConnectionState::Connected;
             }
         } else if matches!(self.connection_state, ConnectionState::Connected) {
@@ -859,6 +887,73 @@ impl SymthaeaGui {
                 }
             });
         }
+    }
+
+    // ========== C5: Imagination / Mental Movie UI ==========
+    fn render_imagination(&mut self, ui: &mut egui::Ui) {
+        ui.heading("AI Imagination (Mental Movie)");
+        ui.separator();
+
+        let Some(movie) = self.metrics.mental_movie.as_ref() else {
+            ui.centered_and_justified(|ui| {
+                ui.label("Waiting for geodesic surprise / mental simulation...");
+            });
+            return;
+        };
+
+        ui.horizontal(|ui| {
+            ui.label(format!("Path Coherence: {:.3}", movie.semantic_coherence));
+            ui.separator();
+            ui.label(format!("Horizon: {} steps", movie.path_length));
+            ui.separator();
+            ui.label(format!("Resolution: {}x{} ({}ch)", movie.width, movie.height, movie.channels));
+        });
+
+        ui.add_space(10.0);
+
+        // Frame playback logic
+        let frame_duration = Duration::from_secs_f32(1.0 / self.imagination_state.play_speed);
+        if self.imagination_state.last_frame_time.elapsed() >= frame_duration {
+            self.imagination_state.current_frame = (self.imagination_state.current_frame + 1) % movie.frames.len();
+            self.imagination_state.last_frame_time = Instant::now();
+            
+            // Update texture
+            let frame_data = &movie.frames[self.imagination_state.current_frame];
+            let size = [movie.width as usize, movie.height as usize];
+            
+            let color_image = if movie.channels == 1 {
+                // Grayscale
+                egui::ColorImage::from_gray(size, frame_data)
+            } else {
+                // RGB
+                egui::ColorImage::from_rgb(size, frame_data)
+            };
+
+            if let Some(ref mut tex) = self.imagination_state.texture {
+                tex.set(color_image, egui::TextureOptions::LINEAR);
+            } else {
+                self.imagination_state.texture = Some(ui.ctx().load_texture(
+                    "imagination_frame",
+                    color_image,
+                    egui::TextureOptions::LINEAR,
+                ));
+            }
+        }
+
+        if let Some(ref tex) = self.imagination_state.texture {
+            ui.centered_and_justified(|ui| {
+                ui.image((tex.id(), ui.available_size().min(egui::vec2(512.0, 512.0))));
+            });
+        }
+
+        ui.add_space(10.0);
+        ui.horizontal(|ui| {
+            ui.label("Play Speed:");
+            ui.add(egui::Slider::new(&mut self.imagination_state.play_speed, 1.0..=60.0).suffix(" fps"));
+            if ui.button("Restart").clicked() {
+                self.imagination_state.current_frame = 0;
+            }
+        });
     }
 
     // ========== C2: Generation Timeline UI ==========
@@ -1209,12 +1304,13 @@ impl eframe::App for SymthaeaGui {
 
                 ui.separator();
 
-                // View tabs (C1-C4)
+                // View tabs (C1-C5)
                 ui.selectable_value(&mut self.current_view, MainView::Configuration, "Config");
                 ui.selectable_value(&mut self.current_view, MainView::ModuleBrowser, "Modules");
                 ui.selectable_value(&mut self.current_view, MainView::Generations, "Generations");
                 ui.selectable_value(&mut self.current_view, MainView::ConfigDiff, "Diff");
                 ui.selectable_value(&mut self.current_view, MainView::Services, "Services");
+                ui.selectable_value(&mut self.current_view, MainView::Imagination, "Imagination");
 
                 ui.separator();
 
@@ -1575,6 +1671,9 @@ impl eframe::App for SymthaeaGui {
                 }
                 MainView::Services => {
                     self.render_service_dashboard(ui);
+                }
+                MainView::Imagination => {
+                    self.render_imagination(ui);
                 }
             }
         });

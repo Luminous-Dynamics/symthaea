@@ -33,6 +33,7 @@ use std::io::Write;
 use symtropy_physics::BodyHandle;
 use symtropy_robotics_bridge::agent::RoboticAgent;
 use symtropy_robotics_bridge::platform::PlatformType;
+use symtropy_robotics_bridge::RoboticAgentTrait;
 
 #[derive(Debug, Clone, Copy)]
 struct Stats {
@@ -61,7 +62,7 @@ fn compute_stats(samples: &[f64]) -> Stats {
         };
     }
     let mut sorted: Vec<f64> = samples.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    sorted.sort_by(|a: &f64, b: &f64| a.partial_cmp(b).unwrap());
     let mean = samples.iter().sum::<f64>() / n as f64;
     let var = samples.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n as f64 - 1.0).max(1.0);
     let p = |q: f64| -> f64 {

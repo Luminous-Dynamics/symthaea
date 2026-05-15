@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -12,14 +11,18 @@ use justice_restorative_integrity::*;
 use mycelix_bridge_common::{
     civic_requirement_basic, civic_requirement_proposal, GovernanceEligibility,
 };
-use mycelix_zome_helpers::{get_latest_record};
-
+use mycelix_zome_helpers as _;
+use mycelix_zome_helpers::get_latest_record;
 
 /// Create a restorative circle
 
 #[hdk_extern]
 pub fn create_circle(circle: RestorativeCircle) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_basic(), "create_circle")?;
+    mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_basic(),
+        "create_circle",
+    )?;
     let action_hash = create_entry(&EntryTypes::RestorativeCircle(circle.clone()))?;
     let record = get_latest_record(action_hash.clone())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Could not get created circle".into())
@@ -79,7 +82,11 @@ pub fn get_case_circle(case_id: String) -> ExternResult<Option<Record>> {
 /// Record participant consent
 #[hdk_extern]
 pub fn record_consent(input: ConsentInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_basic(), "record_consent")?;
+    mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_basic(),
+        "record_consent",
+    )?;
     let record = get(input.circle_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Circle not found".into())
     ))?;
@@ -121,7 +128,11 @@ pub struct ConsentInput {
 /// Record a circle session
 #[hdk_extern]
 pub fn record_session(input: RecordSessionInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_basic(), "record_session")?;
+    mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_basic(),
+        "record_session",
+    )?;
     let record = get(input.circle_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Circle not found".into())
     ))?;
@@ -164,7 +175,11 @@ pub struct RecordSessionInput {
 /// Add an agreement to the circle
 #[hdk_extern]
 pub fn add_agreement(input: AddAgreementInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_basic(), "add_agreement")?;
+    mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_basic(),
+        "add_agreement",
+    )?;
     let record = get(input.circle_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Circle not found".into())
     ))?;
@@ -195,7 +210,11 @@ pub struct AddAgreementInput {
 /// Update circle status
 #[hdk_extern]
 pub fn update_circle_status(input: UpdateCircleStatusInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "update_circle_status")?;
+    mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_proposal(),
+        "update_circle_status",
+    )?;
     let record = get(input.circle_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Circle not found".into())
     ))?;
@@ -226,7 +245,11 @@ pub struct UpdateCircleStatusInput {
 /// Complete the circle
 #[hdk_extern]
 pub fn complete_circle(input: CompleteCircleInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "complete_circle")?;
+    mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_proposal(),
+        "complete_circle",
+    )?;
     let record = get(input.circle_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Circle not found".into())
     ))?;
@@ -348,7 +371,11 @@ pub struct RestitutionCompletionStatus {
 /// linked to the TEND mutual credit system.
 #[hdk_extern]
 pub fn create_restitution_agreement(input: CreateRestitutionInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "create_restitution_agreement")?;
+    mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_proposal(),
+        "create_restitution_agreement",
+    )?;
 
     // Verify circle exists and is in appropriate status
     let circle_record = get(input.circle_hash.clone(), GetOptions::default())?.ok_or(
@@ -417,13 +444,15 @@ pub fn create_restitution_agreement(input: CreateRestitutionInput) -> ExternResu
 /// the TEND exchange ID for cross-reference verification.
 #[hdk_extern]
 pub fn record_restitution_payment(input: RecordRestitutionPaymentInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_basic(), "record_restitution_payment")?;
-
-    let record = get(input.agreement_hash.clone(), GetOptions::default())?.ok_or(
-        wasm_error!(WasmErrorInner::Guest(
-            "Restitution agreement not found".into()
-        )),
+    mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_basic(),
+        "record_restitution_payment",
     )?;
+
+    let record = get(input.agreement_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Restitution agreement not found".into())
+    ))?;
     let mut agreement: RestitutionAgreement = record
         .entry()
         .to_app_option()
@@ -443,7 +472,9 @@ pub fn record_restitution_payment(input: RecordRestitutionPaymentInput) -> Exter
 
 /// Check the restitution completion status for all agreements in a circle.
 #[hdk_extern]
-pub fn check_restitution_completion(circle_hash: ActionHash) -> ExternResult<RestitutionCompletionStatus> {
+pub fn check_restitution_completion(
+    circle_hash: ActionHash,
+) -> ExternResult<RestitutionCompletionStatus> {
     let links = get_links(
         LinkQuery::try_new(circle_hash.clone(), LinkTypes::CircleToRestitution)?,
         GetStrategy::default(),

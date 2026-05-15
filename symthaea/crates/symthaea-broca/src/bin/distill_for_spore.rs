@@ -111,6 +111,7 @@ fn main() -> Result<()> {
         adam_state: None,
         projection_weights: None,
         liquid_mamba_config: None,
+        metadata: checkpoint.metadata,
         checksum: [0u8; 32],
     };
 

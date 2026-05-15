@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -9,10 +8,10 @@ use mycelix_zome_helpers as _;
 //! each a holon containing both individual wisdom and collective emergence.
 //! The HolonicMirror reflects the fractal health of the whole.
 
-#![allow(clippy::manual_is_multiple_of, clippy::manual_clamp)]
-
+#[allow(clippy::manual_is_multiple_of, clippy::manual_clamp)]
 use councils_integrity::*;
 use hdk::prelude::*;
+use mycelix_zome_helpers as _;
 
 // ============================================================================
 // REAL-TIME SIGNALS
@@ -255,7 +254,10 @@ pub fn create_council(input: CreateCouncilInput) -> ExternResult<Record> {
         }
 
         // Check for active cooldown
-        let cooldown_anchor = format!("emergency_cooldown:{}", input.parent_council_id.as_deref().unwrap_or("root"));
+        let cooldown_anchor = format!(
+            "emergency_cooldown:{}",
+            input.parent_council_id.as_deref().unwrap_or("root")
+        );
         if let Ok(eh) = anchor_hash(&cooldown_anchor) {
             if let Ok(links) = get_links(
                 LinkQuery::try_new(eh, LinkTypes::CouncilToCooldown)?,
@@ -273,7 +275,8 @@ pub fn create_council(input: CreateCouncilInput) -> ExternResult<Record> {
                                 let now_us = timestamp.as_micros() as i64;
                                 let cooldown_end = cooldown.cooldown_ends.as_micros() as i64;
                                 if now_us < cooldown_end && !cooldown.override_approved {
-                                    let days_remaining = (cooldown_end - now_us) / (24 * 3600 * 1_000_000);
+                                    let days_remaining =
+                                        (cooldown_end - now_us) / (24 * 3600 * 1_000_000);
                                     return Err(wasm_error!(WasmErrorInner::Guest(format!(
                                         "Emergency council cooldown in effect ({} days remaining). \
                                          Requires non-emergency council approval to override.",
@@ -288,7 +291,10 @@ pub fn create_council(input: CreateCouncilInput) -> ExternResult<Record> {
         }
 
         // Count consecutive emergency sessions
-        let session_anchor = format!("emergency_sessions:{}", input.parent_council_id.as_deref().unwrap_or("root"));
+        let session_anchor = format!(
+            "emergency_sessions:{}",
+            input.parent_council_id.as_deref().unwrap_or("root")
+        );
         let mut session_count: u32 = 0;
         if let Ok(eh) = anchor_hash(&session_anchor) {
             if let Ok(links) = get_links(
@@ -330,7 +336,10 @@ pub fn create_council(input: CreateCouncilInput) -> ExternResult<Record> {
         let next_session_number = session_count + 1;
         let preceding = if next_session_number > 1 {
             // Find the previous session ID
-            let prev_anchor = format!("emergency_sessions:{}", input.parent_council_id.as_deref().unwrap_or("root"));
+            let prev_anchor = format!(
+                "emergency_sessions:{}",
+                input.parent_council_id.as_deref().unwrap_or("root")
+            );
             let mut prev_id = None;
             if let Ok(eh) = anchor_hash(&prev_anchor) {
                 if let Ok(links) = get_links(
@@ -1693,9 +1702,7 @@ pub fn approve_emergency_renewal(input: ApproveEmergencyRenewalInput) -> ExternR
 
     // Verify the approving council is NOT an emergency council
     let approving_record = get_council_by_id(input.approving_council_id.clone())?.ok_or(
-        wasm_error!(WasmErrorInner::Guest(
-            "Approving council not found".into()
-        )),
+        wasm_error!(WasmErrorInner::Guest("Approving council not found".into())),
     )?;
     let approving_council: Council = approving_record
         .entry()
@@ -1705,7 +1712,10 @@ pub fn approve_emergency_renewal(input: ApproveEmergencyRenewalInput) -> ExternR
             "Invalid approving council".into()
         )))?;
 
-    if matches!(approving_council.council_type, CouncilType::Emergency { .. }) {
+    if matches!(
+        approving_council.council_type,
+        CouncilType::Emergency { .. }
+    ) {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Emergency council renewal must be approved by a non-emergency council".into()
         )));

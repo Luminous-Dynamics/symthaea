@@ -20,6 +20,7 @@ mod dream_pipeline;
 mod error_recovery;
 mod feedback;
 mod helpers;
+mod holographic_dilation_tests;
 #[allow(clippy::field_reassign_with_default)]
 mod integration;
 mod managers;

@@ -256,4 +256,14 @@ impl GenerativeModel {
             }
         }
     }
+
+    /// Inject explicit priors into the generative model (Passport Route).
+    pub fn inject_priors(&mut self, mean: Vec<f64>, precision: Vec<f64>) {
+        if mean.len() == self.state_dim {
+            self.prior_mean = mean;
+        }
+        if precision.len() == self.state_dim {
+            self.prior_precision = precision;
+        }
+    }
 }

@@ -17,7 +17,69 @@ pub fn my_custom_getrandom(buf: &mut [u8]) -> Result<(), getrandom::Error> {
     Ok(())
 }
 
+use mycelix_zkp_core::consciousness::{verify_consciousness_tier, CivicTier};
 use personal_leptos_types::{MasterKeyView, ProfileView};
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SubmitTierProofInput {
+    pub tier: String,
+    pub proof_bytes: Vec<u8>,
+    pub score_commitment: [u8; 32],
+    pub proof_epoch_secs: u64,
+}
+
+/// Submit a ZKP proof for tier membership.
+/// Verifies the STARK proof on-chain (using backend-winterfell).
+#[hdk_extern]
+pub fn submit_tier_proof(input: SubmitTierProofInput) -> ExternResult<ActionHash> {
+    let civic_tier = match input.tier.as_str() {
+        "Participant" => CivicTier::Participant,
+        "Citizen" => CivicTier::Citizen,
+        "Steward" => CivicTier::Steward,
+        "Guardian" => CivicTier::Guardian,
+        _ => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Unsupported tier".into()
+            )))
+        }
+    };
+
+    let current_time_secs = sys_time()?.as_micros() / 1_000_000;
+
+    // ON-CHAIN STARK VERIFICATION (Vector 3)
+    let is_valid = verify_consciousness_tier(
+        &input.proof_bytes,
+        &civic_tier,
+        &input.score_commitment,
+        input.proof_epoch_secs,
+        current_time_secs as u64,
+    )
+    .map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "ZKP Verification Error: {:?}",
+            e
+        )))
+    })?;
+
+    if !is_valid {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Invalid ZKP proof for tier".into()
+        )));
+    }
+
+    // Proof is valid, commit the membership record
+    let entry = TierMembershipProof {
+        tier: input.tier,
+        proof_bytes: input.proof_bytes,
+        committed_at: sys_time()?,
+    };
+
+    let action_hash = create_entry(&EntryTypes::TierMembershipProof(entry))?;
+    let agent = agent_info()?.agent_initial_pubkey;
+    create_link(agent, action_hash.clone(), LinkTypes::AgentToProof, ())?;
+
+    Ok(action_hash)
+}
 
 /// Create or update the agent's profile.
 ///

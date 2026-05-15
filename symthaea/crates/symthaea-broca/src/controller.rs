@@ -100,6 +100,15 @@ pub struct LanguageControllerConfig {
     #[serde(default = "default_parallel_threshold")]
     pub parallel_threshold: usize,
 
+    // ── Direct Thought-Logit Residual ──
+    /// Blend direct thought-token logits into the recurrent decoder logits.
+    ///
+    /// This is a lightweight thought-to-structure bridge: the CfC recurrent
+    /// output remains primary, but the encoded thought can directly bias token
+    /// selection when the recurrent state is still undertrained.
+    #[serde(default, skip)]
+    pub thought_logit_residual_weight: f32,
+
     // ── Phase 1: Compositional Logit Refinement ──
     /// Enable compositional logit refinement via HDC bind.
     /// When enabled, `output_hv` is blended with `output_hv.bind(thought_hv)`
@@ -155,7 +164,7 @@ pub struct LanguageControllerConfig {
 }
 
 fn default_logit_scale() -> f32 {
-    20.0
+    250.0
 }
 
 fn default_backbone_tau() -> f32 {
@@ -208,6 +217,7 @@ impl Default for LanguageControllerConfig {
             backbone_tau: default_backbone_tau(),
             gradient_attenuation: default_gradient_attenuation(),
             parallel_threshold: default_parallel_threshold(),
+            thought_logit_residual_weight: 0.0,
             // Benchmark-validated (Mar 20): -1.83 perplexity solo, -3.98 in combo.
             enable_compositional_logits: true,
             compositional_alpha: default_compositional_alpha(),
@@ -510,6 +520,14 @@ impl LanguageController {
 
         // 4. Weight-tied logits
         let mut logits = self.compute_logits(&logit_hv);
+        let thought_residual = self.config.thought_logit_residual_weight.clamp(0.0, 1.0);
+        if thought_residual > 1e-6 {
+            let thought_query = thought_hv.bind(&pos_emb);
+            let thought_logits = self.compute_logits(&thought_query);
+            for (logit, thought_logit) in logits.iter_mut().zip(thought_logits.iter()) {
+                *logit = (1.0 - thought_residual) * *logit + thought_residual * *thought_logit;
+            }
+        }
 
         // Apply temperature scaling
         if (self.config.logit_temperature - 1.0).abs() > 1e-6 {
@@ -864,6 +882,13 @@ impl LanguageController {
 
     /// Get mutable reference to token embeddings (for training).
     pub fn token_embeddings_mut(&mut self) -> &mut Vec<ContinuousHV> {
+        #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+        {
+            // The candle cache stores a pre-normalized snapshot of the embeddings.
+            // Mutable access can change any row, so fail closed to the direct CPU
+            // path until the caller explicitly rebuilds the cache.
+            self.gpu_embeddings = None;
+        }
         &mut self.token_embeddings
     }
 
@@ -960,59 +985,75 @@ impl LanguageController {
         // Get the input that was fed to each layer
         let layer_input = self.network.layer_input(last_layer_idx, &input_hv);
 
-        // Apply gradients to last layer neurons
+        // 1. Apply gradients to last layer and gather d_input for backprop
+        let mut d_prev = ContinuousHV::zero(HDC_DIMENSION);
         if let Some(layer) = self.network.layer_mut(last_layer_idx) {
             for neuron in layer.iter_mut() {
                 // Target = state - d_output (gradient descent direction)
                 let target = neuron.state().subtract(&d_per_neuron);
                 let grads = neuron.backward(&layer_input, &target, dt);
+
+                // Accumulate d_input for next layer backward
+                for (dp, &di) in d_prev.values.iter_mut().zip(grads.d_input.values.iter()) {
+                    *dp += di;
+                }
+
                 // Use no_decay variant: per-step weight decay of 0.0001 applied
                 // 67K times/epoch decays weights to ~0.1%, destroying the network.
                 neuron.apply_gradients_no_decay(&grads, network_lr);
             }
+
+            // Average the accumulated d_input
+            if !layer.is_empty() {
+                let inv = 1.0 / layer.len() as f32;
+                for v in d_prev.values.iter_mut() {
+                    *v *= inv;
+                }
+            }
         }
 
-        // Optionally backprop through earlier layers (1 layer of backprop is usually sufficient
-        // for shallow networks; deeper chains risk vanishing gradients in HDC)
-        if last_layer_idx > 0 {
-            // Gather d_input from last layer (average across neurons)
-            let mut d_prev = ContinuousHV::zero(HDC_DIMENSION);
-            if let Some(layer) = self.network.layer(last_layer_idx) {
-                for neuron in layer {
+        // 2. Backprop through all earlier layers (intermediate + input layer 0)
+        let mut d_prev_accum = d_prev;
+        for layer_idx in (0..last_layer_idx).rev() {
+            // Apply attenuation for this hop backward
+            d_prev_accum = d_prev_accum.scale(self.config.gradient_attenuation);
+
+            let layer_input = self.network.layer_input(layer_idx, &input_hv);
+            let mut d_next_accum = ContinuousHV::zero(HDC_DIMENSION);
+
+            if let Some(layer) = self.network.layer_mut(layer_idx) {
+                let inv_n = 1.0 / layer.len().max(1) as f32;
+                let d_per_neuron = d_prev_accum.scale(inv_n);
+
+                for neuron in layer.iter_mut() {
                     let target = neuron.state().subtract(&d_per_neuron);
                     let grads = neuron.backward(&layer_input, &target, dt);
-                    for (dp, &di) in d_prev.values.iter_mut().zip(grads.d_input.values.iter()) {
+
+                    // Accumulate d_input for next layer backward
+                    for (dp, &di) in d_next_accum
+                        .values
+                        .iter_mut()
+                        .zip(grads.d_input.values.iter())
+                    {
                         *dp += di;
                     }
+
+                    // Apply gradients to this layer
+                    neuron.apply_gradients_no_decay(
+                        &grads,
+                        network_lr * self.config.gradient_attenuation.powi((last_layer_idx - layer_idx) as i32),
+                    );
                 }
+
+                // Average the accumulated d_input
                 if !layer.is_empty() {
                     let inv = 1.0 / layer.len() as f32;
-                    for v in d_prev.values.iter_mut() {
+                    for v in d_next_accum.values.iter_mut() {
                         *v *= inv;
                     }
                 }
             }
-
-            // Apply to layer 0 with reduced LR (gradient attenuation for stability)
-            let layer0_input = self.network.layer_input(0, &input_hv);
-            let d_prev_scaled = d_prev.scale(self.config.gradient_attenuation);
-            if let Some(layer) = self.network.layer_mut(0) {
-                let inv_n0 = 1.0
-                    / if layer.is_empty() {
-                        1.0
-                    } else {
-                        layer.len() as f32
-                    };
-                let d_per_n0 = d_prev_scaled.scale(inv_n0);
-                for neuron in layer.iter_mut() {
-                    let target = neuron.state().subtract(&d_per_n0);
-                    let grads = neuron.backward(&layer0_input, &target, dt);
-                    neuron.apply_gradients_no_decay(
-                        &grads,
-                        network_lr * self.config.gradient_attenuation,
-                    );
-                }
-            }
+            d_prev_accum = d_next_accum;
         }
     }
 }
@@ -1042,6 +1083,32 @@ mod tests {
         let ctrl = LanguageController::new(&genesis, &config);
         assert_eq!(ctrl.vocab_size(), 32);
         assert_eq!(ctrl.current_pos(), 0);
+    }
+
+    #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+    #[test]
+    fn test_token_embedding_mutation_invalidates_candle_cache() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut ctrl = LanguageController::new(&genesis, &config);
+
+        ctrl.rebuild_gpu_cache();
+        assert!(
+            ctrl.gpu_embedding_cache().is_some(),
+            "cache should be available after explicit rebuild on CPU or CUDA candle device"
+        );
+
+        ctrl.token_embeddings_mut()[0].values[0] += 0.25;
+        assert!(
+            ctrl.gpu_embedding_cache().is_none(),
+            "mutable embedding access must invalidate stale candle logits cache"
+        );
+
+        ctrl.rebuild_gpu_cache();
+        assert!(
+            ctrl.gpu_embedding_cache().is_some(),
+            "explicit rebuild should restore cache after mutation"
+        );
     }
 
     #[test]

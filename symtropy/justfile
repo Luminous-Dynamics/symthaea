@@ -39,6 +39,10 @@ run-x11: build
 check:
     cargo check
 
+# Run headless governance integration tests (scenarios)
+verify-governance:
+    RUSTC_WRAPPER= SCCACHE_DISABLE=1 cargo run -p symtropy-sim-bridge --bin headless_test -- --ticks 100
+
 # Canonical core verification gate for Phase 0.1.
 # This intentionally avoids demo/runtime crates so it can run on headless CI.
 verify-core:
@@ -51,7 +55,8 @@ verify-core:
     RUSTC_WRAPPER= SCCACHE_DISABLE=1 cargo check -p symtropy-cli
     # 4. Core Tests
     RUSTC_WRAPPER= SCCACHE_DISABLE=1 cargo test -p symtropy-math -p symtropy-physics -p symtropy-consciousness-physics --lib
-    RUSTC_WRAPPER= SCCACHE_DISABLE=1 cargo test -p symtropy-physics --test replay_harness
+    RUSTC_WRAPPER= SCCACHE_DISABLE=1 cargo test -p symtropy-physics --test replay_harness --test callback_contract
+    RUSTC_WRAPPER= SCCACHE_DISABLE=1 cargo test -p symtropy-consciousness-physics --test accounting_verification
 
 # Run all symtropy workspace tests in release mode (required for perf guards)
 test:
@@ -82,6 +87,14 @@ run-pendulum-swarm-4d:
 # Run biometrics tests
 test-biometrics:
     cd ../symthaea && cargo test -p symthaea-biometrics --features muse-bridge
+
+# Build the 4D pendulum swarm for the browser
+build-wasm:
+    rustup target add wasm32-unknown-unknown
+    RUSTFLAGS="--cfg=web_sys_unstable_apis" cargo build -p symtropy-bevy --example pendulum_swarm_4d --target wasm32-unknown-unknown --release
+    mkdir -p out/wasm
+    # Note: Requires wasm-bindgen-cli installed on the host
+    wasm-bindgen --out-dir ./out/wasm --target web ./target/wasm32-unknown-unknown/release/examples/pendulum_swarm_4d.wasm
 
 # Clean build artifacts
 clean:

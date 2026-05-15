@@ -213,13 +213,22 @@ pub struct AlignmentVector {
 
 impl AlignmentVector {
     pub fn aggregate_score(&self) -> u16 {
-        let sum: u32 = 
-            self.ahimsa as u32 + self.reversibility as u32 + self.truthfulness as u32 + 
-            self.sovereignty_respect as u32 + self.reciprocity as u32 + self.thermodynamic_efficiency as u32 + 
-            self.accountability as u32 + self.proportionality as u32 + self.ecological_stewardship as u32 + 
-            self.collective_flourishing as u32 + self.knowledge_commoning as u32 + self.mentorship as u32 + 
-            self.aesthetic_harmony as u32 + self.civic_participation as u32 + self.innovation_for_good as u32 + 
-            self.resilience as u32;
+        let sum: u32 = self.ahimsa as u32
+            + self.reversibility as u32
+            + self.truthfulness as u32
+            + self.sovereignty_respect as u32
+            + self.reciprocity as u32
+            + self.thermodynamic_efficiency as u32
+            + self.accountability as u32
+            + self.proportionality as u32
+            + self.ecological_stewardship as u32
+            + self.collective_flourishing as u32
+            + self.knowledge_commoning as u32
+            + self.mentorship as u32
+            + self.aesthetic_harmony as u32
+            + self.civic_participation as u32
+            + self.innovation_for_good as u32
+            + self.resilience as u32;
         (sum / 16) as u16
     }
 }
@@ -286,18 +295,16 @@ pub fn validate_create_proposal(proposal: &Proposal) -> ExternResult<ValidateCal
     let voting_period_hours = (proposal.voting_deadline - proposal.created_at) / 3600;
 
     let (min_hours, max_hours, type_name) = match proposal.proposal_type {
-        ProposalType::Fast => (24, 72, "Fast"),        // 1-3 days
-        ProposalType::Normal => (72, 336, "Normal"),   // 3-14 days
-        ProposalType::Slow => (336, 720, "Slow"),      // 14-30 days
+        ProposalType::Fast => (24, 72, "Fast"),      // 1-3 days
+        ProposalType::Normal => (72, 336, "Normal"), // 3-14 days
+        ProposalType::Slow => (336, 720, "Slow"),    // 14-30 days
     };
 
     if voting_period_hours < min_hours || voting_period_hours > max_hours {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!(
-                "{} proposals must have voting period between {} and {} hours (got {} hours)",
-                type_name, min_hours, max_hours, voting_period_hours
-            ),
-        ));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "{} proposals must have voting period between {} and {} hours (got {} hours)",
+            type_name, min_hours, max_hours, voting_period_hours
+        )));
     }
 
     // Validate proposal ID is not empty
@@ -380,12 +387,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     app_entry_def.entry_index,
                     &entry,
                 )? {
-                    Some(EntryTypes::Proposal(proposal)) => {
-                        validate_create_proposal(&proposal)
-                    }
-                    Some(EntryTypes::Vote(vote)) => {
-                        validate_create_vote(&vote)
-                    }
+                    Some(EntryTypes::Proposal(proposal)) => validate_create_proposal(&proposal),
+                    Some(EntryTypes::Vote(vote)) => validate_create_vote(&vote),
+                    Some(EntryTypes::Reputation(_)) => Ok(ValidateCallbackResult::Valid),
                     None => Ok(ValidateCallbackResult::Valid),
                 }
             }
@@ -670,15 +674,24 @@ mod tests {
 
         let mut vote_for = base_vote.clone();
         vote_for.choice = VoteChoice::For;
-        assert_eq!(validate_create_vote(&vote_for).unwrap(), ValidateCallbackResult::Valid);
+        assert_eq!(
+            validate_create_vote(&vote_for).unwrap(),
+            ValidateCallbackResult::Valid
+        );
 
         let mut vote_against = base_vote.clone();
         vote_against.choice = VoteChoice::Against;
-        assert_eq!(validate_create_vote(&vote_against).unwrap(), ValidateCallbackResult::Valid);
+        assert_eq!(
+            validate_create_vote(&vote_against).unwrap(),
+            ValidateCallbackResult::Valid
+        );
 
         let mut vote_abstain = base_vote.clone();
         vote_abstain.choice = VoteChoice::Abstain;
-        assert_eq!(validate_create_vote(&vote_abstain).unwrap(), ValidateCallbackResult::Valid);
+        assert_eq!(
+            validate_create_vote(&vote_abstain).unwrap(),
+            ValidateCallbackResult::Valid
+        );
     }
 
     // =============================================================================
@@ -710,7 +723,8 @@ mod tests {
     #[test]
     fn test_proposal_complex_actions_json() {
         let mut proposal = create_valid_proposal();
-        proposal.actions_json = r#"[{"type":"update_param","param":"max_learners","value":100}]"#.to_string();
+        proposal.actions_json =
+            r#"[{"type":"update_param","param":"max_learners","value":100}]"#.to_string();
         let result = validate_create_proposal(&proposal).unwrap();
         assert_eq!(result, ValidateCallbackResult::Valid);
     }

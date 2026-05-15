@@ -8,8 +8,8 @@
 //! Run: cargo run -p symtropy-physics --example bouncing_spheres
 
 use nalgebra::SVector;
-use symtropy_math::{Point, Sphere};
-use symtropy_physics::{BodyHandle, PhysicsWorld, RigidBody};
+use symtropy_math::Point;
+use symtropy_physics::PhysicsWorld;
 
 fn main() {
     let mut world = PhysicsWorld::<3>::new(SVector::from([0.0, -9.81, 0.0]));

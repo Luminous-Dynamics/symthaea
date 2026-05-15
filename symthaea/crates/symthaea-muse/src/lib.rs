@@ -112,6 +112,7 @@ pub struct MusicalFrame {
 
 /// Melody generation mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "bevy", derive(bevy::prelude::Reflect))]
 pub enum MelodyMode {
     /// Original rand-based melody: fast, deterministic with seed.
     Classic,
@@ -127,6 +128,7 @@ impl Default for MelodyMode {
 
 /// Audio output format for compositions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "bevy", derive(bevy::prelude::Reflect))]
 pub enum OutputFormat {
     /// Mono 16-bit PCM (legacy, compact).
     Mono16,
@@ -144,6 +146,7 @@ impl Default for OutputFormat {
 
 /// Reverb configuration.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[cfg_attr(feature = "bevy", derive(bevy::prelude::Reflect))]
 pub struct ReverbConfig {
     /// Room size [0, 1] — controls feedback coefficient.
     pub room_size: f32,
@@ -165,6 +168,7 @@ impl Default for ReverbConfig {
 
 /// Configuration for music generation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "bevy", derive(bevy::prelude::Reflect))]
 pub struct MuseConfig {
     /// Sample rate in Hz.
     pub sample_rate: u32,

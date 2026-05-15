@@ -14,7 +14,8 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 proposals_integrity = { path = "../integrity" }
 governance-utils = { workspace = true }
-mycelix-bridge-proc = { path = "../../../../crates/mycelix-bridge-proc" }
-mycelix-zome-helpers = { path = "../../../../mycelix-workspace/crates/mycelix-zome-helpers" }
+mycelix-bridge-common = { workspace = true }
+mycelix-bridge-proc = { workspace = true }
+mycelix-zome-helpers = { workspace = true }
 # Enable wasm_js feature on getrandom 0.3 (transitive from holochain_nonce)
 getrandom_03 = { workspace = true }

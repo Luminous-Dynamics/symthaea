@@ -675,7 +675,7 @@ impl CodingAgent {
 
             // Store in flat experience store
             if let Some(ref mut store) = self.experience_store {
-                store.store_fix_strategy(&sig, &strategy_desc);
+                store.store_fix_strategy(&sig, &strategy_desc, None);
             }
 
             // Store in semantic error knowledge graph (richer: tracks success rates)

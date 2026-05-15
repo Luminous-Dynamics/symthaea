@@ -1,0 +1,1301 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Small coding-backend benchmark harness.
+//!
+//! Run:
+//!   cargo run --example benchmark_coding_backends --features code_generation
+//!   cargo run --example benchmark_coding_backends --features code_generation,geodesic_synthesis -- --json
+
+use std::collections::BTreeMap;
+use std::time::Instant;
+
+use serde::Serialize;
+use symthaea::language::code_orchestrator::CodeOrchestrator;
+use symthaea::language::repair_taxonomy::{
+    FORCE_REPAIR_BENCH_ENV, categorize_rejection, extract_embedded_category,
+    repair_lesson_for_rejection,
+};
+use symthaea_core::synthesis_trait::SynthesisRequest;
+
+#[derive(Debug, Clone)]
+struct BenchTask {
+    lane: &'static str,
+    id: &'static str,
+    category: &'static str,
+    name: &'static str,
+    purpose: &'static str,
+    signature: &'static str,
+    examples: &'static [(&'static str, &'static str)],
+    constraints: &'static [&'static str],
+}
+
+#[derive(Debug, Serialize)]
+struct TaskReport {
+    id: String,
+    lane: String,
+    category: String,
+    accepted: bool,
+    quality_gate_passed: bool,
+    confidence: f32,
+    backend_name: String,
+    elapsed_ms: u128,
+    attempts: BTreeMap<String, usize>,
+    rejection_categories: BTreeMap<String, usize>,
+    rejections: Vec<AttemptRejectionReport>,
+    repair_lessons: Vec<RepairLessonReport>,
+    repair_attempt_count: usize,
+    repair_successful: bool,
+    successful_backend_after_repair: Option<String>,
+    repair_priors_seen: BTreeMap<String, usize>,
+    repair_prior_labels_seen: Vec<String>,
+    attempt_count: usize,
+    certificate_backend: Option<String>,
+    certificate_source_provenance: Option<String>,
+    certificate_has_topology: bool,
+    certificate_has_oracle: bool,
+    certificate_has_sheaf: bool,
+    certificate_sheaf_coherent: Option<bool>,
+    topology_beta_1: Option<usize>,
+    oracle_convergence: Option<f32>,
+}
+
+#[derive(Debug, Serialize)]
+struct AttemptRejectionReport {
+    backend: String,
+    category: String,
+    reason: String,
+    source_preview: Option<String>,
+    repair_prior_count: usize,
+    repair_prior_labels: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct RepairLessonReport {
+    task_id: String,
+    task_name: String,
+    signature: String,
+    backend: String,
+    category: String,
+    diagnostic: String,
+    hint: String,
+    source_preview: Option<String>,
+    fixed_source_preview: Option<String>,
+    final_outcome: String,
+    broca_training_record: bool,
+    final_backend: String,
+}
+
+#[derive(Debug, Serialize)]
+struct BenchReport {
+    benchmark: String,
+    feature_geodesic: bool,
+    task_count: usize,
+    accepted_count: usize,
+    quality_pass_count: usize,
+    pass_rate: f32,
+    quality_pass_rate: f32,
+    elapsed_ms: u128,
+    backend_attempts: BTreeMap<String, usize>,
+    rejection_categories: BTreeMap<String, usize>,
+    repair_lesson_categories: BTreeMap<String, usize>,
+    repair_attempts: usize,
+    repair_successes: usize,
+    repair_success_rate: f32,
+    success_after_hint_by_category: BTreeMap<String, usize>,
+    first_successful_backend_after_repair: BTreeMap<String, usize>,
+    repair_prior_counts_by_backend: BTreeMap<String, usize>,
+    repair_prior_labels: BTreeMap<String, usize>,
+    repair_prior_uses: usize,
+    repair_prior_label_count: usize,
+    repair_memory_hits: usize,
+    repair_memory_successes: usize,
+    repair_memory_success_rate: f32,
+    repair_memory_categories_used: BTreeMap<String, usize>,
+    certificate_source_provenance_counts: BTreeMap<String, usize>,
+    broca_eval_gate_passed: bool,
+    broca_selection_score: f32,
+    category_pass_rates: BTreeMap<String, CategoryReport>,
+    certificates_with_topology: usize,
+    certificates_with_oracle: usize,
+    certificates_with_sheaf: usize,
+    certificates_sheaf_coherent: usize,
+    certificates_sheaf_incoherent: usize,
+    mean_attempts_per_task: f32,
+    tasks: Vec<TaskReport>,
+}
+
+#[derive(Debug, Default, Serialize)]
+struct CategoryReport {
+    task_count: usize,
+    accepted_count: usize,
+    pass_rate: f32,
+}
+
+fn main() {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("benchmark runtime");
+    let _guard = runtime.enter();
+    run_benchmark();
+}
+
+fn run_benchmark() {
+    let args = Args::parse();
+    if matches!(args.lane.as_str(), "repair" | "all")
+        && std::env::var_os(FORCE_REPAIR_BENCH_ENV).is_none()
+    {
+        eprintln!(
+            "warning: repair lane selected without {FORCE_REPAIR_BENCH_ENV}=1; forced repair probes will be disabled"
+        );
+    }
+    let start = Instant::now();
+    let mut orch = CodeOrchestrator::new();
+    if args.simulated_llm {
+        orch = orch.with_llm_backend(symthaea::language::llm_backend::simulated_backend());
+    }
+    if let Some(budget) = args.energy_budget {
+        orch = orch.with_energy_budget(budget);
+    }
+    let mut tasks = Vec::new();
+    let mut backend_attempts = BTreeMap::new();
+    let mut rejection_categories = BTreeMap::new();
+    let mut repair_lesson_categories = BTreeMap::new();
+    let mut success_after_hint_by_category = BTreeMap::new();
+    let mut first_successful_backend_after_repair = BTreeMap::new();
+    let mut repair_prior_counts_by_backend = BTreeMap::new();
+    let mut repair_prior_labels = BTreeMap::new();
+    let selected_tasks = tasks_for_lane(&args.lane);
+
+    for task in selected_tasks {
+        let before_attempts = orch.attempt_history().len();
+        let before_certs = orch.certificates().len();
+        let task_start = Instant::now();
+        let mut request =
+            SynthesisRequest::new("rust", task.name, task.purpose).with_signature(task.signature);
+        for (input, output) in task.examples {
+            request = request.with_example(*input, *output);
+        }
+        for constraint in task.constraints {
+            request = request.with_constraint(*constraint);
+        }
+
+        let response = orch.synthesize(&request);
+        let attempts = orch.attempt_history();
+        let new_attempts = &attempts[before_attempts..];
+        let mut task_attempts = BTreeMap::new();
+        let mut task_rejections = BTreeMap::new();
+        let mut detailed_rejections = Vec::new();
+        let mut repair_lessons = Vec::new();
+        let mut task_repair_priors_seen = BTreeMap::new();
+        let mut task_repair_prior_labels_seen = Vec::new();
+        for attempt in new_attempts {
+            *task_attempts.entry(attempt.backend.clone()).or_insert(0) += 1;
+            *backend_attempts.entry(attempt.backend.clone()).or_insert(0) += 1;
+            if attempt.repair_prior_count > 0 {
+                *task_repair_priors_seen
+                    .entry(attempt.backend.clone())
+                    .or_insert(0) += attempt.repair_prior_count;
+                *repair_prior_counts_by_backend
+                    .entry(attempt.backend.clone())
+                    .or_insert(0) += attempt.repair_prior_count;
+                for label in &attempt.repair_prior_labels {
+                    task_repair_prior_labels_seen.push(label.clone());
+                    *repair_prior_labels.entry(label.clone()).or_insert(0) += 1;
+                }
+            }
+            if let Some(reason) = &attempt.rejection_reason {
+                let category = extract_embedded_category(reason)
+                    .unwrap_or_else(|| categorize_rejection(reason))
+                    .to_string();
+                *task_rejections.entry(category.clone()).or_insert(0) += 1;
+                *rejection_categories.entry(category.clone()).or_insert(0) += 1;
+                detailed_rejections.push(AttemptRejectionReport {
+                    backend: attempt.backend.clone(),
+                    category: category.clone(),
+                    reason: reason.clone(),
+                    source_preview: attempt.source_preview.clone(),
+                    repair_prior_count: attempt.repair_prior_count,
+                    repair_prior_labels: attempt.repair_prior_labels.clone(),
+                });
+                let lesson = repair_lesson_for_rejection(reason);
+                *repair_lesson_categories
+                    .entry(category.clone())
+                    .or_insert(0) += 1;
+                repair_lessons.push(RepairLessonReport {
+                    task_id: task.id.to_string(),
+                    task_name: task.name.to_string(),
+                    signature: task.signature.to_string(),
+                    backend: attempt.backend.clone(),
+                    category,
+                    diagnostic: reason.clone(),
+                    hint: lesson,
+                    source_preview: attempt.source_preview.clone(),
+                    fixed_source_preview: if response.accepted {
+                        Some(preview_source(&response.source))
+                    } else {
+                        None
+                    },
+                    final_outcome: if response.accepted {
+                        "repaired_or_bypassed".to_string()
+                    } else {
+                        "unresolved".to_string()
+                    },
+                    broca_training_record: response.accepted,
+                    final_backend: response.backend_name.clone(),
+                });
+            }
+        }
+        let repair_attempt_count = detailed_rejections.len();
+        let repair_successful = response.accepted && repair_attempt_count > 0;
+        let successful_backend_after_repair =
+            repair_successful.then(|| response.backend_name.clone());
+        if repair_successful {
+            for category in task_rejections.keys() {
+                *success_after_hint_by_category
+                    .entry(category.clone())
+                    .or_insert(0) += 1;
+            }
+            *first_successful_backend_after_repair
+                .entry(response.backend_name.clone())
+                .or_insert(0) += 1;
+        }
+
+        let cert = orch.certificates().into_iter().nth(before_certs);
+        let topology_beta_1 = cert
+            .as_ref()
+            .and_then(|c| c.topology.as_ref())
+            .map(|t| t.beta_1);
+        let certificate_sheaf_coherent = cert.as_ref().and_then(|c| c.sheaf_coherent);
+        let quality_gate_passed = response.accepted && certificate_sheaf_coherent != Some(false);
+        tasks.push(TaskReport {
+            id: task.id.to_string(),
+            lane: task.lane.to_string(),
+            category: task.category.to_string(),
+            accepted: response.accepted,
+            quality_gate_passed,
+            confidence: response.confidence,
+            backend_name: response.backend_name,
+            elapsed_ms: task_start.elapsed().as_millis(),
+            attempts: task_attempts,
+            rejection_categories: task_rejections,
+            rejections: detailed_rejections,
+            repair_lessons,
+            repair_attempt_count,
+            repair_successful,
+            successful_backend_after_repair,
+            repair_priors_seen: task_repair_priors_seen,
+            repair_prior_labels_seen: task_repair_prior_labels_seen,
+            attempt_count: new_attempts.len(),
+            certificate_backend: cert.as_ref().map(|c| c.backend_used.clone()),
+            certificate_source_provenance: cert.as_ref().map(|c| c.source_provenance.clone()),
+            certificate_has_topology: cert.as_ref().and_then(|c| c.topology.as_ref()).is_some(),
+            certificate_has_oracle: cert.as_ref().and_then(|c| c.oracle_convergence).is_some(),
+            certificate_has_sheaf: cert.as_ref().and_then(|c| c.sheaf_coherent).is_some(),
+            certificate_sheaf_coherent,
+            topology_beta_1,
+            oracle_convergence: cert.as_ref().and_then(|c| c.oracle_convergence),
+        });
+    }
+
+    let accepted_count = tasks.iter().filter(|task| task.accepted).count();
+    let quality_pass_count = tasks.iter().filter(|task| task.quality_gate_passed).count();
+    let certificates_with_topology = tasks
+        .iter()
+        .filter(|task| task.certificate_has_topology)
+        .count();
+    let certificates_with_oracle = tasks
+        .iter()
+        .filter(|task| task.certificate_has_oracle)
+        .count();
+    let certificates_with_sheaf = tasks
+        .iter()
+        .filter(|task| task.certificate_has_sheaf)
+        .count();
+    let certificates_sheaf_coherent = tasks
+        .iter()
+        .filter(|task| task.certificate_sheaf_coherent == Some(true))
+        .count();
+    let certificates_sheaf_incoherent = tasks
+        .iter()
+        .filter(|task| task.certificate_sheaf_coherent == Some(false))
+        .count();
+    let mean_attempts_per_task = tasks
+        .iter()
+        .map(|task| task.attempt_count as f32)
+        .sum::<f32>()
+        / tasks.len().max(1) as f32;
+    let repair_attempts = tasks
+        .iter()
+        .map(|task| task.repair_attempt_count)
+        .sum::<usize>();
+    let repair_successes = tasks.iter().filter(|task| task.repair_successful).count();
+    let repair_success_rate = repair_successes as f32 / repair_attempts.max(1) as f32;
+    let category_pass_rates = category_reports(&tasks);
+    let broca_eval_gate_passed = accepted_count == tasks.len()
+        && quality_pass_count == tasks.len()
+        && certificates_sheaf_incoherent == 0
+        && mean_attempts_per_task <= 1.2;
+    let broca_selection_score = compute_broca_selection_score(
+        accepted_count as f32 / tasks.len().max(1) as f32,
+        quality_pass_count as f32 / tasks.len().max(1) as f32,
+        mean_attempts_per_task,
+        certificates_sheaf_incoherent,
+        repair_attempts,
+        repair_success_rate,
+    );
+    let mut certificate_source_provenance_counts = BTreeMap::new();
+    for task in &tasks {
+        if let Some(provenance) = &task.certificate_source_provenance {
+            *certificate_source_provenance_counts
+                .entry(provenance.clone())
+                .or_insert(0) += 1;
+        }
+    }
+    let repair_prior_uses = repair_prior_counts_by_backend.values().sum();
+    let repair_prior_label_count = repair_prior_labels.values().sum();
+    let repair_memory_hits = tasks
+        .iter()
+        .filter(|task| task_uses_repair_memory(task))
+        .count();
+    let repair_memory_successes = tasks
+        .iter()
+        .filter(|task| task_uses_repair_memory(task) && task.accepted)
+        .count();
+    let repair_memory_success_rate =
+        repair_memory_successes as f32 / repair_memory_hits.max(1) as f32;
+    let repair_memory_categories_used = repair_memory_categories(&repair_prior_labels);
+    let report = BenchReport {
+        benchmark: format!("coding_backends_{}", args.lane),
+        feature_geodesic: cfg!(feature = "geodesic_synthesis"),
+        task_count: tasks.len(),
+        accepted_count,
+        quality_pass_count,
+        pass_rate: accepted_count as f32 / tasks.len().max(1) as f32,
+        quality_pass_rate: quality_pass_count as f32 / tasks.len().max(1) as f32,
+        elapsed_ms: start.elapsed().as_millis(),
+        backend_attempts,
+        rejection_categories,
+        repair_lesson_categories,
+        repair_attempts,
+        repair_successes,
+        repair_success_rate,
+        success_after_hint_by_category,
+        first_successful_backend_after_repair,
+        repair_prior_counts_by_backend,
+        repair_prior_labels,
+        repair_prior_uses,
+        repair_prior_label_count,
+        repair_memory_hits,
+        repair_memory_successes,
+        repair_memory_success_rate,
+        repair_memory_categories_used,
+        certificate_source_provenance_counts,
+        broca_eval_gate_passed,
+        broca_selection_score,
+        category_pass_rates,
+        certificates_with_topology,
+        certificates_with_oracle,
+        certificates_with_sheaf,
+        certificates_sheaf_coherent,
+        certificates_sheaf_incoherent,
+        mean_attempts_per_task,
+        tasks,
+    };
+
+    if args.json {
+        println!("{}", serde_json::to_string_pretty(&report).unwrap());
+    } else {
+        println!(
+            "{}: {}/{} accepted in {}ms",
+            report.benchmark, report.accepted_count, report.task_count, report.elapsed_ms
+        );
+        println!(
+            "quality gate: {}/{} passed ({:.1}%)",
+            report.quality_pass_count,
+            report.task_count,
+            report.quality_pass_rate * 100.0
+        );
+        println!("backend attempts: {:?}", report.backend_attempts);
+        println!(
+            "certificate source provenance: {:?}",
+            report.certificate_source_provenance_counts
+        );
+        println!("rejection categories: {:?}", report.rejection_categories);
+        println!(
+            "repair lesson categories: {:?}",
+            report.repair_lesson_categories
+        );
+        println!(
+            "repair effectiveness: attempts={} successes={} rate={:.3} success_by_category={:?} backend_after_repair={:?}",
+            report.repair_attempts,
+            report.repair_successes,
+            report.repair_success_rate,
+            report.success_after_hint_by_category,
+            report.first_successful_backend_after_repair
+        );
+        println!(
+            "repair priors: uses={} labels={} by_backend={:?} labels={:?}",
+            report.repair_prior_uses,
+            report.repair_prior_label_count,
+            report.repair_prior_counts_by_backend,
+            report.repair_prior_labels
+        );
+        println!(
+            "repair memory: hits={} successes={} rate={:.3} categories={:?}",
+            report.repair_memory_hits,
+            report.repair_memory_successes,
+            report.repair_memory_success_rate,
+            report.repair_memory_categories_used
+        );
+        println!(
+            "Broca eval gate: passed={} selection_score={:.3}",
+            report.broca_eval_gate_passed, report.broca_selection_score
+        );
+        println!(
+            "certificates: topology={} oracle={} sheaf={} coherent={} incoherent={}",
+            report.certificates_with_topology,
+            report.certificates_with_oracle,
+            report.certificates_with_sheaf,
+            report.certificates_sheaf_coherent,
+            report.certificates_sheaf_incoherent
+        );
+        println!("mean attempts/task: {:.2}", report.mean_attempts_per_task);
+        println!("category pass rates: {:?}", report.category_pass_rates);
+        for task in &report.tasks {
+            println!(
+                "  {:<22} {:<11} accepted={} quality={} backend={} provenance={:?} confidence={:.3} attempts={:?} rejections={:?} sheaf={:?} beta1={:?}",
+                task.id,
+                task.category,
+                task.accepted,
+                task.quality_gate_passed,
+                task.backend_name,
+                task.certificate_source_provenance,
+                task.confidence,
+                task.attempts,
+                task.rejection_categories,
+                task.certificate_sheaf_coherent,
+                task.topology_beta_1
+            );
+            if !task.repair_priors_seen.is_empty() {
+                println!(
+                    "      repair priors seen: {:?} labels={:?}",
+                    task.repair_priors_seen, task.repair_prior_labels_seen
+                );
+            }
+            for rejection in &task.rejections {
+                println!(
+                    "    - {} [{}]: {}",
+                    rejection.backend, rejection.category, rejection.reason
+                );
+                if let Some(preview) = &rejection.source_preview {
+                    println!("      source: {}", preview.replace('\n', "\\n"));
+                }
+            }
+            for lesson in &task.repair_lessons {
+                println!(
+                    "      repair lesson {} [{}]: {}",
+                    lesson.backend, lesson.category, lesson.hint
+                );
+            }
+        }
+    }
+
+    if let Some(path) = &args.repair_lessons_jsonl {
+        if let Err(error) = write_repair_lessons_jsonl(path, &report) {
+            eprintln!("failed to write repair lessons JSONL to {path}: {error}");
+            std::process::exit(1);
+        }
+    }
+}
+
+fn compute_broca_selection_score(
+    pass_rate: f32,
+    quality_pass_rate: f32,
+    mean_attempts_per_task: f32,
+    sheaf_incoherent: usize,
+    repair_attempts: usize,
+    repair_success_rate: f32,
+) -> f32 {
+    let attempt_penalty = ((mean_attempts_per_task - 1.0).max(0.0) / 4.0).min(1.0);
+    let sheaf_penalty = (sheaf_incoherent as f32 * 0.05).min(0.5);
+    let repair_score = if repair_attempts == 0 {
+        1.0
+    } else {
+        repair_success_rate
+    };
+    (0.40 * pass_rate
+        + 0.40 * quality_pass_rate
+        + 0.10 * (1.0 - attempt_penalty)
+        + 0.10 * repair_score
+        - sheaf_penalty)
+        .clamp(0.0, 1.0)
+}
+
+#[derive(Debug, Default)]
+struct Args {
+    json: bool,
+    simulated_llm: bool,
+    energy_budget: Option<f32>,
+    lane: String,
+    repair_lessons_jsonl: Option<String>,
+}
+
+impl Args {
+    fn parse() -> Self {
+        let mut args = Args::default();
+        args.lane = "smoke".to_string();
+        let mut iter = std::env::args().skip(1);
+        while let Some(arg) = iter.next() {
+            match arg.as_str() {
+                "--json" => args.json = true,
+                "--simulated-llm" => args.simulated_llm = true,
+                "--energy-budget" => {
+                    let Some(raw) = iter.next() else {
+                        print_help_and_exit(2, "--energy-budget requires a number");
+                    };
+                    let Ok(budget) = raw.parse::<f32>() else {
+                        print_help_and_exit(2, "--energy-budget must be a number");
+                    };
+                    args.energy_budget = Some(budget);
+                }
+                "--lane" => {
+                    let Some(lane) = iter.next() else {
+                        print_help_and_exit(
+                            2,
+                            "--lane requires smoke, hard, repair, frontier, or all",
+                        );
+                    };
+                    if !matches!(
+                        lane.as_str(),
+                        "smoke" | "hard" | "repair" | "frontier" | "all"
+                    ) {
+                        print_help_and_exit(
+                            2,
+                            "--lane must be smoke, hard, repair, frontier, or all",
+                        );
+                    }
+                    args.lane = lane;
+                }
+                "--repair-lessons-jsonl" => {
+                    let Some(path) = iter.next() else {
+                        print_help_and_exit(2, "--repair-lessons-jsonl requires a path");
+                    };
+                    args.repair_lessons_jsonl = Some(path);
+                }
+                "--help" | "-h" => print_help_and_exit(0, ""),
+                other => print_help_and_exit(2, &format!("unknown argument: {other}")),
+            }
+        }
+        args
+    }
+}
+
+fn print_help_and_exit(code: i32, error: &str) -> ! {
+    if !error.is_empty() {
+        eprintln!("error: {error}");
+        eprintln!();
+    }
+    eprintln!("Usage:");
+    eprintln!(
+        "  cargo run --example benchmark_coding_backends --features code_generation,geodesic_synthesis -- --json"
+    );
+    eprintln!("Options:");
+    eprintln!("  --json              Print machine-readable JSON");
+    eprintln!("  --simulated-llm     Use deterministic offline LLM fallback");
+    eprintln!("  --energy-budget N   Override orchestrator energy budget");
+    eprintln!("  --lane NAME         Benchmark lane: smoke, hard, repair, frontier, or all");
+    eprintln!("  --repair-lessons-jsonl PATH");
+    eprintln!("                      Write one structured repair lesson per JSONL line");
+    std::process::exit(code);
+}
+
+fn write_repair_lessons_jsonl(path: &str, report: &BenchReport) -> std::io::Result<()> {
+    let mut lines = Vec::new();
+    for task in &report.tasks {
+        for lesson in &task.repair_lessons {
+            lines.push(serde_json::to_string(lesson).expect("repair lesson serializes"));
+        }
+    }
+    if let Some(parent) = std::path::Path::new(path).parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(path, lines.join("\n"))
+}
+
+fn preview_source(source: &str) -> String {
+    let trimmed = source.trim();
+    let mut preview = trimmed.lines().take(24).collect::<Vec<_>>().join("\n");
+    const MAX_CHARS: usize = 1200;
+    if preview.len() > MAX_CHARS {
+        preview.truncate(MAX_CHARS);
+        preview.push_str("\n...");
+    }
+    preview
+}
+
+fn category_reports(tasks: &[TaskReport]) -> BTreeMap<String, CategoryReport> {
+    let mut reports = BTreeMap::<String, CategoryReport>::new();
+    for task in tasks {
+        let report = reports.entry(task.category.clone()).or_default();
+        report.task_count += 1;
+        if task.accepted {
+            report.accepted_count += 1;
+        }
+    }
+    for report in reports.values_mut() {
+        report.pass_rate = report.accepted_count as f32 / report.task_count.max(1) as f32;
+    }
+    reports
+}
+
+fn task_uses_repair_memory(task: &TaskReport) -> bool {
+    task.repair_prior_labels_seen
+        .iter()
+        .any(|label| label.starts_with("repair_memory_"))
+}
+
+fn repair_memory_categories(labels: &BTreeMap<String, usize>) -> BTreeMap<String, usize> {
+    let mut categories = BTreeMap::new();
+    for (label, count) in labels {
+        let Some(rest) = label.strip_prefix("repair_memory_") else {
+            continue;
+        };
+        let category = rest
+            .split_once('_')
+            .map(|(_, category)| category)
+            .filter(|category| !category.is_empty())
+            .unwrap_or("unknown");
+        *categories.entry(category.to_string()).or_insert(0) += count;
+    }
+    categories
+}
+
+fn tasks_for_lane(lane: &str) -> Vec<BenchTask> {
+    match lane {
+        "smoke" => smoke_tasks(),
+        "hard" => hard_tasks(),
+        "repair" => repair_tasks(),
+        "frontier" => frontier_tasks(),
+        "all" => {
+            let mut tasks = smoke_tasks();
+            tasks.extend(hard_tasks());
+            tasks.extend(repair_tasks());
+            tasks
+        }
+        _ => smoke_tasks(),
+    }
+}
+
+fn smoke_tasks() -> Vec<BenchTask> {
+    vec![
+        BenchTask {
+            lane: "smoke",
+            id: "linear_add",
+            category: "linear",
+            name: "add",
+            purpose: "Add two integers",
+            signature: "fn add(a: i32, b: i32) -> i32",
+            examples: &[("add(2, 3)", "5")],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "smoke",
+            id: "linear_double",
+            category: "linear",
+            name: "double",
+            purpose: "Double an integer",
+            signature: "fn double(n: i32) -> i32",
+            examples: &[("double(4)", "8")],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "smoke",
+            id: "numeric_abs",
+            category: "branch",
+            name: "abs_i32",
+            purpose: "Return the absolute value of an integer",
+            signature: "fn abs_i32(n: i32) -> i32",
+            examples: &[("abs_i32(-3)", "3")],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "smoke",
+            id: "branch_even",
+            category: "branch",
+            name: "is_even",
+            purpose: "Return whether a number is even",
+            signature: "fn is_even(n: i32) -> bool",
+            examples: &[("is_even(4)", "true"), ("is_even(5)", "false")],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "smoke",
+            id: "branch_clamp",
+            category: "branch",
+            name: "clamp_0_100",
+            purpose: "Clamp an integer into the inclusive range 0 to 100",
+            signature: "fn clamp_0_100(n: i32) -> i32",
+            examples: &[("clamp_0_100(-5)", "0"), ("clamp_0_100(120)", "100")],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "smoke",
+            id: "branch_max",
+            category: "branch",
+            name: "max_i32",
+            purpose: "Return the maximum of two integers",
+            signature: "fn max_i32(a: i32, b: i32) -> i32",
+            examples: &[("max_i32(2, 7)", "7"), ("max_i32(-1, -3)", "-1")],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "smoke",
+            id: "branch_min",
+            category: "branch",
+            name: "min_i32",
+            purpose: "Return the minimum of two integers",
+            signature: "fn min_i32(a: i32, b: i32) -> i32",
+            examples: &[("min_i32(2, 7)", "2"), ("min_i32(-1, -3)", "-3")],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "smoke",
+            id: "branch_positive",
+            category: "branch",
+            name: "is_positive",
+            purpose: "Return whether an integer is positive",
+            signature: "fn is_positive(n: i32) -> bool",
+            examples: &[("is_positive(4)", "true"), ("is_positive(0)", "false")],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "smoke",
+            id: "reduce_sum",
+            category: "collection",
+            name: "sum",
+            purpose: "Sum each number in a slice",
+            signature: "fn sum(items: &[i32]) -> i32",
+            examples: &[("sum(&[1, 2, 3])", "6")],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "smoke",
+            id: "collection_count_positive",
+            category: "collection",
+            name: "count_positive",
+            purpose: "Count the positive integers in a slice",
+            signature: "fn count_positive(items: &[i32]) -> usize",
+            examples: &[("count_positive(&[-1, 0, 3, 4])", "2")],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "smoke",
+            id: "collection_any_even",
+            category: "collection",
+            name: "any_even",
+            purpose: "Return whether any integer in a slice is even",
+            signature: "fn any_even(items: &[i32]) -> bool",
+            examples: &[("any_even(&[1, 3, 4])", "true")],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "smoke",
+            id: "map_strings",
+            category: "string",
+            name: "normalize_all",
+            purpose: "Map each string to a normalized lowercase string",
+            signature: "fn normalize_all(items: &[String]) -> Vec<String>",
+            examples: &[],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "smoke",
+            id: "string_reverse",
+            category: "string",
+            name: "reverse",
+            purpose: "Reverse a string",
+            signature: "fn reverse(s: &str) -> String",
+            examples: &[("reverse(\"abc\")", "\"cba\"")],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "smoke",
+            id: "string_count_words",
+            category: "string",
+            name: "count_words",
+            purpose: "Count whitespace separated words in a string",
+            signature: "fn count_words(s: &str) -> usize",
+            examples: &[("count_words(\"one two three\")", "3")],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "smoke",
+            id: "string_trim",
+            category: "string",
+            name: "trim_owned",
+            purpose: "Trim surrounding whitespace from a string",
+            signature: "fn trim_owned(s: &str) -> String",
+            examples: &[("trim_owned(\"  hi  \")", "\"hi\"")],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "smoke",
+            id: "string_uppercase",
+            category: "string",
+            name: "uppercase",
+            purpose: "Convert a string to uppercase",
+            signature: "fn uppercase(s: &str) -> String",
+            examples: &[("uppercase(\"hi\")", "\"HI\"")],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "smoke",
+            id: "string_contains",
+            category: "string",
+            name: "contains_substr",
+            purpose: "Return whether a string contains a substring",
+            signature: "fn contains_substr(haystack: &str, needle: &str) -> bool",
+            examples: &[
+                ("contains_substr(\"hello\", \"ell\")", "true"),
+                ("contains_substr(\"hello\", \"xyz\")", "false"),
+            ],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "smoke",
+            id: "option_get_or",
+            category: "option",
+            name: "get_or",
+            purpose: "Return the option value or the fallback integer",
+            signature: "fn get_or(value: Option<i32>, fallback: i32) -> i32",
+            examples: &[("get_or(Some(7), 1)", "7"), ("get_or(None, 1)", "1")],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "smoke",
+            id: "option_map_increment",
+            category: "option",
+            name: "inc_option",
+            purpose: "Increment an optional integer with option map",
+            signature: "fn inc_option(value: Option<i32>) -> Option<i32>",
+            examples: &[
+                ("inc_option(Some(7))", "Some(8)"),
+                ("inc_option(None)", "None"),
+            ],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "smoke",
+            id: "option_ok_or",
+            category: "result",
+            name: "require_value",
+            purpose: "Require an option value and convert None with ok_or",
+            signature: "fn require_value(value: Option<i32>) -> Result<i32, &'static str>",
+            examples: &[("require_value(Some(7)).unwrap()", "7")],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "smoke",
+            id: "result_parse_i32",
+            category: "result",
+            name: "parse_i32",
+            purpose: "Parse a string as i32 and return the parse error on failure",
+            signature: "fn parse_i32(raw: &str) -> Result<i32, std::num::ParseIntError>",
+            examples: &[("parse_i32(\"42\").unwrap()", "42")],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "smoke",
+            id: "result_filter_map_parse",
+            category: "result",
+            name: "parse_numbers",
+            purpose: "Parse all valid numbers from string slices using filter_map",
+            signature: "fn parse_numbers(raw: &[&str]) -> Vec<i32>",
+            examples: &[],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "smoke",
+            id: "result_parse_u64",
+            category: "result",
+            name: "parse_u64",
+            purpose: "Parse a string as u64 and return the parse error on failure",
+            signature: "fn parse_u64(raw: &str) -> Result<u64, std::num::ParseIntError>",
+            examples: &[("parse_u64(\"42\").unwrap()", "42")],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "smoke",
+            id: "generic_first",
+            category: "generic",
+            name: "first",
+            purpose: "Return the first item from a slice by reference",
+            signature: "fn first<T>(items: &[T]) -> Option<&T>",
+            examples: &[],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "smoke",
+            id: "generic_clone_first",
+            category: "generic",
+            name: "clone_first",
+            purpose: "Return the first item from a slice as an owned clone",
+            signature: "fn clone_first<T: Clone>(items: &[T]) -> Option<T>",
+            examples: &[],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "smoke",
+            id: "generic_len",
+            category: "generic",
+            name: "slice_len",
+            purpose: "Return the length of a generic slice",
+            signature: "fn slice_len<T>(items: &[T]) -> usize",
+            examples: &[],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "smoke",
+            id: "async_ready",
+            category: "async",
+            name: "ready_value",
+            purpose: "Return an integer from an async function",
+            signature: "async fn ready_value(value: i32) -> i32",
+            examples: &[],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "smoke",
+            id: "conversion_to_vec",
+            category: "conversion",
+            name: "to_vec",
+            purpose: "Copy a slice of integers into a new vector",
+            signature: "fn to_vec(items: &[i32]) -> Vec<i32>",
+            examples: &[("to_vec(&[1, 2])", "vec![1, 2]")],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "smoke",
+            id: "conversion_string_len",
+            category: "conversion",
+            name: "string_len",
+            purpose: "Return the length of a string slice",
+            signature: "fn string_len(s: &str) -> usize",
+            examples: &[("string_len(\"abcd\")", "4")],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "smoke",
+            id: "map_word_counts",
+            category: "map",
+            name: "word_counts",
+            purpose: "Build word frequency counts from text",
+            signature: "fn word_counts(text: &str) -> std::collections::HashMap<String, usize>",
+            examples: &[],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "smoke",
+            id: "map_index_by_len",
+            category: "map",
+            name: "index_by_len",
+            purpose: "Index strings by length in a BTreeMap",
+            signature: "fn index_by_len(items: &[String]) -> std::collections::BTreeMap<usize, String>",
+            examples: &[],
+            constraints: &[],
+        },
+    ]
+}
+
+fn hard_tasks() -> Vec<BenchTask> {
+    vec![
+        BenchTask {
+            lane: "hard",
+            id: "hard_result_question_mark",
+            category: "result",
+            name: "parse_and_double",
+            purpose: "Parse a string as i32 with the question mark operator and double it",
+            signature: "fn parse_and_double(raw: &str) -> Result<i32, std::num::ParseIntError>",
+            examples: &[("parse_and_double(\"21\").unwrap()", "42")],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "hard",
+            id: "hard_trait_bound_sort",
+            category: "generic",
+            name: "sorted_clone",
+            purpose: "Return a sorted cloned vector from a generic slice using the Ord bound",
+            signature: "fn sorted_clone<T: Ord + Clone>(items: &[T]) -> Vec<T>",
+            examples: &[],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "hard",
+            id: "hard_lifetime_longer",
+            category: "lifetime",
+            name: "longer",
+            purpose: "Return the longer of two borrowed string slices",
+            signature: "fn longer<'a>(a: &'a str, b: &'a str) -> &'a str",
+            examples: &[("longer(\"abc\", \"d\")", "\"abc\"")],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "hard",
+            id: "hard_borrow_mutation",
+            category: "ownership",
+            name: "push_if_missing",
+            purpose: "Mutate a vector by pushing a value only when it is missing",
+            signature: "fn push_if_missing(items: &mut Vec<i32>, value: i32)",
+            examples: &[],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "hard",
+            id: "hard_result_option_bridge",
+            category: "result",
+            name: "first_positive",
+            purpose: "Find the first positive integer and return an error string if none exists",
+            signature: "fn first_positive(items: &[i32]) -> Result<i32, &'static str>",
+            examples: &[("first_positive(&[-1, 0, 5]).unwrap()", "5")],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "hard",
+            id: "hard_struct_constructor",
+            category: "struct",
+            name: "make_pair",
+            purpose: "Construct a tuple-like pair represented as a Rust tuple",
+            signature: "fn make_pair(a: i32, b: i32) -> (i32, i32)",
+            examples: &[("make_pair(1, 2)", "(1, 2)")],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "hard",
+            id: "hard_hashmap_group",
+            category: "map",
+            name: "group_by_len",
+            purpose: "Group strings by length in a HashMap accumulator",
+            signature: "fn group_by_len(items: &[String]) -> std::collections::HashMap<usize, Vec<String>>",
+            examples: &[],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "hard",
+            id: "hard_async_result",
+            category: "async",
+            name: "async_parse",
+            purpose: "Parse an integer inside an async Result-returning function",
+            signature: "async fn async_parse(raw: &str) -> Result<i32, std::num::ParseIntError>",
+            examples: &[],
+            constraints: &[],
+        },
+    ]
+}
+
+fn repair_tasks() -> Vec<BenchTask> {
+    vec![
+        BenchTask {
+            lane: "repair",
+            id: "repair_forced_type_mismatch",
+            category: "repair",
+            name: "add",
+            purpose: "Add two integers after a forced geodesic type-mismatch rejection",
+            signature: "fn add(a: i32, b: i32) -> i32",
+            examples: &[("add(2, 3)", "5")],
+            constraints: &[
+                "benchmark_force_geodesic_rejection:function `add` returns `()` but signature expects `i32`",
+            ],
+        },
+        BenchTask {
+            lane: "repair",
+            id: "repair_forced_parse_failure",
+            category: "repair",
+            name: "add",
+            purpose: "Add two integers after a forced parse failure in the previous backend",
+            signature: "fn add(a: i32, b: i32) -> i32",
+            examples: &[("add(2, 3)", "5")],
+            constraints: &[
+                "benchmark_force_geodesic_rejection:generated candidate does not parse as Rust: expected expression, found `}`",
+            ],
+        },
+        BenchTask {
+            lane: "repair",
+            id: "repair_forced_stub",
+            category: "repair",
+            name: "sum",
+            purpose: "Sum all integers in a slice after a forced stub rejection",
+            signature: "fn sum(items: &[i32]) -> i32",
+            examples: &[("sum(&[1, 2, 3])", "6")],
+            constraints: &[
+                "benchmark_force_geodesic_rejection:implementation stub `todo!()` remains in generated source",
+            ],
+        },
+        BenchTask {
+            lane: "repair",
+            id: "repair_forced_unresolved_identifier",
+            category: "repair",
+            name: "add",
+            purpose: "Add two integers after a forced unresolved identifier rejection",
+            signature: "fn add(a: i32, b: i32) -> i32",
+            examples: &[("add(2, 3)", "5")],
+            constraints: &[
+                "benchmark_force_geodesic_rejection:cannot find value `total` in this scope",
+            ],
+        },
+        BenchTask {
+            lane: "repair",
+            id: "repair_forced_ownership",
+            category: "repair",
+            name: "sum",
+            purpose: "Sum integers in a slice after a forced ownership rejection",
+            signature: "fn sum(items: &[i32]) -> i32",
+            examples: &[("sum(&[1, 2, 3])", "6")],
+            constraints: &[
+                "benchmark_force_geodesic_rejection:borrow of moved value `items` in generated candidate",
+            ],
+        },
+        BenchTask {
+            lane: "repair",
+            id: "repair_forced_test_failure",
+            category: "repair",
+            name: "add",
+            purpose: "Add two integers after a forced test failure rejection",
+            signature: "fn add(a: i32, b: i32) -> i32",
+            examples: &[("add(2, 3)", "5")],
+            constraints: &[
+                "benchmark_force_geodesic_rejection:generated candidate compiled but test_example_0 failed",
+            ],
+        },
+        BenchTask {
+            lane: "repair",
+            id: "repair_memory_sensitive_add",
+            category: "repair_memory",
+            name: "add",
+            purpose: "Add two integers after learning from a prior type-mismatch repair",
+            signature: "fn add(a: i32, b: i32) -> i32",
+            examples: &[("add(2, 3)", "5")],
+            constraints: &[
+                "benchmark_force_geodesic_rejection_unless_repair_memory:function `add` returns `()` but signature expects `i32`",
+            ],
+        },
+        BenchTask {
+            lane: "repair",
+            id: "repair_memory_sensitive_is_even",
+            category: "repair_memory",
+            name: "is_even",
+            purpose: "Return whether a number is even after learning from a prior test repair",
+            signature: "fn is_even(n: i32) -> bool",
+            examples: &[("is_even(4)", "true"), ("is_even(5)", "false")],
+            constraints: &[
+                "benchmark_force_geodesic_rejection_unless_repair_memory:generated candidate compiled but test_example_0 failed",
+            ],
+        },
+    ]
+}
+
+fn frontier_tasks() -> Vec<BenchTask> {
+    vec![
+        BenchTask {
+            lane: "frontier",
+            id: "frontier_result_collect",
+            category: "result",
+            name: "parse_all",
+            purpose: "Parse all string slices into integers and return the first parse error",
+            signature: "fn parse_all(raw: &[&str]) -> Result<Vec<i32>, std::num::ParseIntError>",
+            examples: &[("parse_all(&[\"1\", \"2\"]).unwrap()", "vec![1, 2]")],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "frontier",
+            id: "frontier_result_collect_u64",
+            category: "result",
+            name: "parse_all_u64",
+            purpose: "Parse all string slices into u64 integers and return the first parse error",
+            signature: "fn parse_all_u64(raw: &[&str]) -> Result<Vec<u64>, std::num::ParseIntError>",
+            examples: &[("parse_all_u64(&[\"1\", \"2\"]).unwrap()", "vec![1, 2]")],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "frontier",
+            id: "frontier_generic_contains",
+            category: "generic",
+            name: "contains_item",
+            purpose: "Return whether a generic slice contains a borrowed target value",
+            signature: "fn contains_item<T: PartialEq>(items: &[T], target: &T) -> bool",
+            examples: &[],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "frontier",
+            id: "frontier_generic_clone_first",
+            category: "generic",
+            name: "clone_first",
+            purpose: "Return the first item from a generic slice as an owned clone",
+            signature: "fn clone_first<T: Clone>(items: &[T]) -> Option<T>",
+            examples: &[],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "frontier",
+            id: "frontier_lifetime_prefix",
+            category: "lifetime",
+            name: "first_nonempty",
+            purpose: "Return the first nonempty borrowed string slice from a slice",
+            signature: "fn first_nonempty<'a>(items: &'a [&'a str]) -> Option<&'a str>",
+            examples: &[("first_nonempty(&[\"\", \"hi\"])", "Some(\"hi\")")],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "frontier",
+            id: "frontier_lifetime_owned_string_slice",
+            category: "lifetime",
+            name: "first_nonempty_owned",
+            purpose: "Return the first nonempty string slice from owned strings",
+            signature: "fn first_nonempty_owned(items: &[String]) -> Option<&str>",
+            examples: &[],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "frontier",
+            id: "frontier_mut_dedup",
+            category: "ownership",
+            name: "dedup_sorted",
+            purpose: "Sort a mutable vector of integers and remove duplicates in place",
+            signature: "fn dedup_sorted(items: &mut Vec<i32>)",
+            examples: &[],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "frontier",
+            id: "frontier_hashmap_group_by_len",
+            category: "map",
+            name: "group_by_len",
+            purpose: "Group strings by length in a HashMap accumulator",
+            signature: "fn group_by_len(items: &[String]) -> std::collections::HashMap<usize, Vec<String>>",
+            examples: &[],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "frontier",
+            id: "frontier_async_option",
+            category: "async",
+            name: "async_first",
+            purpose: "Return the first integer from a slice inside an async function",
+            signature: "async fn async_first(items: &[i32]) -> Option<i32>",
+            examples: &[],
+            constraints: &[],
+        },
+        BenchTask {
+            lane: "frontier",
+            id: "frontier_async_option_result",
+            category: "async",
+            name: "async_parse_optional",
+            purpose: "Parse an optional string inside an async function",
+            signature: "async fn async_parse_optional(raw: Option<&str>) -> Result<Option<i32>, std::num::ParseIntError>",
+            examples: &[],
+            constraints: &[],
+        },
+    ]
+}

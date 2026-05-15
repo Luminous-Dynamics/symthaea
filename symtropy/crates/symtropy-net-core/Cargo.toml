@@ -1,0 +1,15 @@
+[package]
+name = "symtropy-net-core"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+description = "Permissively-licensed core types and traits for symtropy-net."
+repository = "https://github.com/luminous-dynamics/symtropy"
+keywords = ["physics", "networking", "simulation", "bevy"]
+categories = ["science", "simulation", "game-engines"]
+
+[dependencies]
+symtropy-math = { path = "../symtropy-math" }
+symtropy-physics = { path = "../symtropy-physics" }
+nalgebra = "0.34"
+serde = { version = "1.0", features = ["derive"] }

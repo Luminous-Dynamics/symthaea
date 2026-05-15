@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -7,9 +6,9 @@ use mycelix_zome_helpers as _;
 
 use hdk::prelude::*;
 use mycelix_bridge_common::{civic_requirement_basic, civic_requirement_proposal};
+use mycelix_zome_helpers as _;
 use mycelix_zome_helpers::records_from_links;
 use water_flow_integrity::*;
-
 
 /// Helper to get an anchor entry hash
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -24,7 +23,11 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 /// Register a new water source
 #[hdk_extern]
 pub fn register_source(source: WaterSource) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "register_source")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "register_source",
+    )?;
     if source.id.trim().is_empty() || source.id.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Source ID must be 1-256 non-whitespace characters".into()
@@ -105,7 +108,11 @@ pub fn get_source_status(action_hash: ActionHash) -> ExternResult<SourceStatus> 
 /// Update source status (steward only)
 #[hdk_extern]
 pub fn update_source_status(input: UpdateSourceStatusInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "update_source_status")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "update_source_status",
+    )?;
     let agent_info = agent_info()?;
     let record = get(input.source_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Source not found".into())
@@ -148,7 +155,11 @@ pub struct UpdateSourceStatusInput {
 /// Allocate a water share from a source to a holder
 #[hdk_extern]
 pub fn allocate_shares(share: WaterShare) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "allocate_shares")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "allocate_shares",
+    )?;
     let agent_info = agent_info()?;
 
     // Verify caller is steward of the source
@@ -254,7 +265,11 @@ pub fn get_my_balance(_: ()) -> ExternResult<H2OCredit> {
 /// Transfer H2O credits to another agent
 #[hdk_extern]
 pub fn transfer_credits(input: TransferCreditsInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "transfer_credits")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "transfer_credits",
+    )?;
     let agent_info = agent_info()?;
     let from_agent = agent_info.agent_initial_pubkey.clone();
 
@@ -329,7 +344,11 @@ pub struct TransferCreditsInput {
 /// Record water usage against a source
 #[hdk_extern]
 pub fn record_usage(input: RecordUsageInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "record_usage")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "record_usage",
+    )?;
     let agent_info = agent_info()?;
     let agent_key = agent_info.agent_initial_pubkey.clone();
     let now = sys_time()?;

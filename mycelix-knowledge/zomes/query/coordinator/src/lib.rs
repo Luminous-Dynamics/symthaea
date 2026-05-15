@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -8,6 +7,7 @@ use mycelix_zome_helpers as _;
 //! Updated to use HDK 0.6 patterns (LinkQuery, GetStrategy, Anchor pattern)
 
 use hdk::prelude::*;
+use mycelix_zome_helpers as _;
 use query_integrity::*;
 
 /// Helper to get an anchor entry hash for link bases
@@ -87,7 +87,10 @@ fn parse_query(query: &str) -> ExternResult<QueryPlan> {
                     target: extract_value(conditions, "author"),
                     filters: Vec::new(),
                 });
-            } else if conditions.contains(" e ") || conditions.contains(" n ") || conditions.contains(" m ") {
+            } else if conditions.contains(" e ")
+                || conditions.contains(" n ")
+                || conditions.contains(" m ")
+            {
                 steps.push(QueryStep {
                     step_type: QueryStepType::EpistemicFilter,
                     target: String::new(),
@@ -122,7 +125,11 @@ fn extract_value(conditions: &str, field: &str) -> String {
     // Very basic extraction - would be more robust in production
     let parts: Vec<&str> = conditions.split('=').collect();
     if parts.len() > 1 {
-        parts[1].trim().trim_matches('\'').trim_matches('"').to_string()
+        parts[1]
+            .trim()
+            .trim_matches('\'')
+            .trim_matches('"')
+            .to_string()
     } else {
         String::new()
     }
@@ -194,20 +201,26 @@ fn execute_plan(plan: &QueryPlan, _parameters: &Option<String>) -> ExternResult<
 
                 match response {
                     ZomeCallResponse::Ok(bytes) => {
-                        let records: Vec<Record> = bytes.decode()
-                            .map_err(|e| wasm_error!(WasmErrorInner::Guest(
-                                format!("Failed to decode claims by tag '{}': {}", step.target, e)
-                            )))?;
+                        let records: Vec<Record> = bytes.decode().map_err(|e| {
+                            wasm_error!(WasmErrorInner::Guest(format!(
+                                "Failed to decode claims by tag '{}': {}",
+                                step.target, e
+                            )))
+                        })?;
                         for record in records {
                             results.push(record.action_address().to_string());
                         }
                     }
                     ZomeCallResponse::NetworkError(e) => {
-                        debug!("Cross-zome call to claims::get_claims_by_tag failed (network): {:?}", e);
+                        debug!(
+                            "Cross-zome call to claims::get_claims_by_tag failed (network): {:?}",
+                            e
+                        );
                     }
                     ZomeCallResponse::Unauthorized(_, _, _, _) => {
                         return Err(wasm_error!(WasmErrorInner::Guest(
-                            "Unauthorized to query claims zome - check zome call capabilities".into()
+                            "Unauthorized to query claims zome - check zome call capabilities"
+                                .into()
                         )));
                     }
                     other => {
@@ -226,10 +239,12 @@ fn execute_plan(plan: &QueryPlan, _parameters: &Option<String>) -> ExternResult<
 
                 match response {
                     ZomeCallResponse::Ok(bytes) => {
-                        let records: Vec<Record> = bytes.decode()
-                            .map_err(|e| wasm_error!(WasmErrorInner::Guest(
-                                format!("Failed to decode claims by author '{}': {}", step.target, e)
-                            )))?;
+                        let records: Vec<Record> = bytes.decode().map_err(|e| {
+                            wasm_error!(WasmErrorInner::Guest(format!(
+                                "Failed to decode claims by author '{}': {}",
+                                step.target, e
+                            )))
+                        })?;
                         for record in records {
                             results.push(record.action_address().to_string());
                         }
@@ -239,7 +254,8 @@ fn execute_plan(plan: &QueryPlan, _parameters: &Option<String>) -> ExternResult<
                     }
                     ZomeCallResponse::Unauthorized(_, _, _, _) => {
                         return Err(wasm_error!(WasmErrorInner::Guest(
-                            "Unauthorized to query claims zome - check zome call capabilities".into()
+                            "Unauthorized to query claims zome - check zome call capabilities"
+                                .into()
                         )));
                     }
                     other => {
@@ -249,7 +265,10 @@ fn execute_plan(plan: &QueryPlan, _parameters: &Option<String>) -> ExternResult<
             }
             _ => {
                 // Full scan and epistemic filter not yet implemented via cross-zome
-                debug!("Query step type {:?} not yet implemented for cross-zome execution", step.step_type);
+                debug!(
+                    "Query step type {:?} not yet implemented for cross-zome execution",
+                    step.step_type
+                );
             }
         }
     }
@@ -284,10 +303,9 @@ pub fn save_query(query: SavedQuery) -> ExternResult<Record> {
         )?;
     }
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find saved query".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find saved query".into()
+    )))
 }
 
 /// Get saved queries by creator

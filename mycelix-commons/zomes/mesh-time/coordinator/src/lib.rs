@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -6,6 +5,7 @@ use hdk::prelude::*;
 use mesh_time_integrity::*;
 use mycelix_bridge_common::civic_requirement_basic;
 
+use mycelix_zome_helpers as _;
 /// Helper to get an anchor entry hash
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     hash_entry(&EntryTypes::Anchor(Anchor(anchor_str.to_string())))
@@ -20,7 +20,11 @@ fn ensure_anchor(anchor_str: &str) -> ExternResult<EntryHash> {
 /// Record a time anchor on the DHT (Participant+).
 #[hdk_extern]
 pub fn record_time_anchor(anchor: TimeAnchor) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "record_time_anchor")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "record_time_anchor",
+    )?;
 
     let action_hash = create_entry(&EntryTypes::TimeAnchor(anchor.clone()))?;
 
@@ -35,15 +39,11 @@ pub fn record_time_anchor(anchor: TimeAnchor) -> ExternResult<Record> {
 
     // Link from agent
     let agent = agent_info()?.agent_initial_pubkey;
-    create_link(
-        agent,
-        action_hash.clone(),
-        LinkTypes::AgentToAnchors,
-        (),
-    )?;
+    create_link(agent, action_hash.clone(), LinkTypes::AgentToAnchors, ())?;
 
-    let record = get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Record not found".into())))?;
+    let record = get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Record not found".into())
+    ))?;
     Ok(record)
 }
 
@@ -104,7 +104,11 @@ pub fn get_agent_resilience_score(_: ()) -> ExternResult<f64> {
         }
     }
 
-    let avg_quality = if valid > 0 { total_quality / valid as f64 } else { 0.5 };
+    let avg_quality = if valid > 0 {
+        total_quality / valid as f64
+    } else {
+        0.5
+    };
     let saturation = (count as f64 / 720.0).min(1.0); // 720 anchors ≈ 30 days of hourly
     Ok((saturation * avg_quality).clamp(0.0, 1.0))
 }
@@ -112,7 +116,11 @@ pub fn get_agent_resilience_score(_: ()) -> ExternResult<f64> {
 /// Dispute a skewed time anchor (Participant+).
 #[hdk_extern]
 pub fn dispute_time_anchor(dispute: TimeDispute) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "dispute_time_anchor")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "dispute_time_anchor",
+    )?;
 
     let action_hash = create_entry(&EntryTypes::TimeDispute(dispute.clone()))?;
 
@@ -123,7 +131,8 @@ pub fn dispute_time_anchor(dispute: TimeDispute) -> ExternResult<Record> {
         (),
     )?;
 
-    let record = get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Record not found".into())))?;
+    let record = get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Record not found".into())
+    ))?;
     Ok(record)
 }

@@ -17,3 +17,4 @@ identity_vault_integrity = { path = "../integrity" }
 personal-types = { workspace = true }
 personal-leptos-types = { workspace = true }
 getrandom = { workspace = true, features = ["custom"] }
+mycelix-zkp-core = { path = "../../../../crates/mycelix-zkp-core", features = ["backend-winterfell"] }

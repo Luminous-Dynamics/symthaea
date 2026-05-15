@@ -110,7 +110,7 @@ pub struct BrowserState {
     pub set_page_title: WriteSignal<String>,
     pub view: ReadSignal<PageView>,
     pub set_view: WriteSignal<PageView>,
-    
+
     // Security/Context State
     pub zone: ReadSignal<ContentZone>,
     pub set_zone: WriteSignal<ContentZone>,
@@ -120,13 +120,13 @@ pub struct BrowserState {
     pub set_threat_count: WriteSignal<usize>,
     pub loading: ReadSignal<bool>,
     pub set_loading: WriteSignal<bool>,
-    
+
     // Search State
     pub search_mode: ReadSignal<SearchMode>,
     pub set_search_mode: WriteSignal<SearchMode>,
     pub search_generation: ReadSignal<u64>,
     pub set_search_generation: WriteSignal<u64>,
-    
+
     // Epistemic/Spore State
     pub consciousness: ReadSignal<f32>,
     pub set_consciousness: WriteSignal<f32>,
@@ -136,7 +136,7 @@ pub struct BrowserState {
     pub set_prediction_error: WriteSignal<f32>,
     pub spore_summary: ReadSignal<String>,
     pub set_spore_summary: WriteSignal<String>,
-    
+
     // Rendering/Tab State
     pub render_mode: ReadSignal<RenderMode>,
     pub set_render_mode: WriteSignal<RenderMode>,
@@ -145,24 +145,26 @@ pub struct BrowserState {
     pub active_tab: ReadSignal<u32>,
     pub set_active_tab: WriteSignal<u32>,
     next_tab_id: StoredValue<u32>,
-    
+
     // Persistence State
     pub bookmarks: ReadSignal<Vec<Bookmark>>,
     pub set_bookmarks: WriteSignal<Vec<Bookmark>>,
-    
+
     // History State
     history: StoredValue<Vec<HistoryEntry>>,
     history_cursor: ReadSignal<usize>,
     set_history_cursor: WriteSignal<usize>,
     navigating_history: StoredValue<bool>,
-    
+}
+
+impl BrowserState {
     // Helper function to initialize all signals
     fn initialize() -> Self {
         // 1. Core Navigation State
         let (current_url, set_current_url) = signal("prism://welcome".to_string());
         let (page_title, set_page_title) = signal("Prism".to_string());
         let (view, set_view) = signal(PageView::Welcome);
-        
+
         // 2. Security/Context State
         let (zone, set_zone) = signal(ContentZone::Local);
         let (safety, set_safety) = signal(SafetyLevel::Green);
@@ -259,7 +261,6 @@ pub struct BrowserState {
         }
     }
 
-impl BrowserState {
     pub fn new() -> Self {
         Self::initialize()
     }

@@ -60,6 +60,12 @@ fn main() {
             process::exit(1);
         }
     };
+    if opts.thought_logit_residual_weight > 0.0 {
+        generator
+            .controller_mut()
+            .config_mut()
+            .thought_logit_residual_weight = opts.thought_logit_residual_weight.clamp(0.0, 1.0);
+    }
 
     // Override sampling strategy
     let sampling = match (opts.top_k, opts.top_p) {
@@ -312,6 +318,7 @@ fn build_quality_metadata(opts: &EvalOpts) -> evaluation::QualityRunMetadata {
             .unwrap_or_default(),
         train_recipe: std::env::var("BROCA_TRAIN_RECIPE").ok(),
         train_pair_count: parse_env_usize("BROCA_TRAIN_PAIR_COUNT"),
+        train_pair_selection: std::env::var("BROCA_TRAIN_PAIR_SELECTION").ok(),
         train_epochs: parse_env_usize("BROCA_TRAIN_EPOCHS"),
         train_bptt_window: parse_env_usize("BROCA_TRAIN_BPTT_WINDOW"),
         train_negative_samples: parse_env_usize("BROCA_TRAIN_NEGATIVE_SAMPLES"),
@@ -326,6 +333,7 @@ fn build_quality_metadata(opts: &EvalOpts) -> evaluation::QualityRunMetadata {
         train_scheduled_sampling: parse_env_f32("BROCA_TRAIN_SCHEDULED_SAMPLING"),
         train_label_smoothing: parse_env_f32("BROCA_TRAIN_LABEL_SMOOTHING"),
         train_thought_logit_aux: parse_env_f32("BROCA_TRAIN_THOUGHT_LOGIT_AUX"),
+        train_thought_logit_residual: parse_env_f32("BROCA_TRAIN_THOUGHT_LOGIT_RESIDUAL"),
         train_merge_bias: parse_env_f32("BROCA_TRAIN_MERGE_BIAS"),
     }
 }
@@ -607,6 +615,7 @@ struct EvalOpts {
     report_only: bool,
     teacher_forced_only: bool,
     allow_checkpoint_recovery: bool,
+    thought_logit_residual_weight: f32,
 }
 
 fn parse_args(args: &[String]) -> Result<EvalOpts, String> {
@@ -629,6 +638,7 @@ fn parse_args(args: &[String]) -> Result<EvalOpts, String> {
         report_only: false,
         teacher_forced_only: false,
         allow_checkpoint_recovery: false,
+        thought_logit_residual_weight: 0.0,
     };
 
     let mut i = 1;
@@ -708,6 +718,14 @@ fn parse_args(args: &[String]) -> Result<EvalOpts, String> {
             }
             "--allow-checkpoint-recovery" => {
                 opts.allow_checkpoint_recovery = true;
+            }
+            "--thought-logit-residual" => {
+                i += 1;
+                opts.thought_logit_residual_weight = args
+                    .get(i)
+                    .ok_or("--thought-logit-residual requires a number")?
+                    .parse()
+                    .map_err(|_| "--thought-logit-residual must be a float")?;
             }
             "--report-only" => {
                 opts.report_only = true;
@@ -883,6 +901,9 @@ fn print_usage() {
     eprintln!("  --top-p P              Top-p nucleus sampling (default: greedy)");
     eprintln!("  --interactive, -i      Force interactive mode");
     eprintln!("  --genesis PHRASE       Genesis seed phrase (default: broca-training-default)");
+    eprintln!(
+        "  --thought-logit-residual F  Blend direct thought logits into decoder logits (default: 0.0)"
+    );
     eprintln!("  --allow-checkpoint-recovery  Load legacy/recovery checkpoints with explicit compatibility bypass");
     eprintln!("  --help, -h             Show this help message");
 }

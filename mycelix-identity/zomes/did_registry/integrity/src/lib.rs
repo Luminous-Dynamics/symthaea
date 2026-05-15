@@ -67,6 +67,9 @@ pub struct ServiceEndpoint {
     pub service_endpoint: String,
 }
 
+/// Canonical service type for Mycelix Substrate discovery
+pub const SUBSTRATE_SERVICE_TYPE: &str = "SubstrateMetadata";
+
 /// DID Deactivation record
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]

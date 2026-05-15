@@ -1,5 +1,5 @@
-use mycelix_zome_helpers as _;
-#![allow(deprecated)] // Uses legacy ConsciousnessCredential/Tier for fallback path
+#![allow(deprecated)]
+// Uses legacy ConsciousnessCredential/Tier for fallback path
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -31,14 +31,14 @@ use commons_bridge_integrity::*;
 use commons_types::{CommonsEvent, CommonsQuery};
 use hdk::prelude::*;
 use mycelix_bridge_common::{
-    self as bridge, check_rate_limit_count, needs_refresh, resolve_commons_zome,
-    routing_registry, AuditTrailEntry, AuditTrailQuery, AuditTrailResult, BridgeDomain,
-    BridgeHealth, CareAvailabilityQuery, CareAvailabilityResult, ConsciousnessCredential,
-    ConsciousnessProfile, ConsciousnessTier,
-    CrossClusterDispatchInput, CrossClusterRole, DispatchInput, DispatchResult,
+    self as bridge, check_rate_limit_count, needs_refresh, resolve_commons_zome, routing_registry,
+    AuditTrailEntry, AuditTrailQuery, AuditTrailResult, BridgeDomain, BridgeHealth,
+    CareAvailabilityQuery, CareAvailabilityResult, ConsciousnessCredential, ConsciousnessProfile,
+    ConsciousnessTier, CrossClusterDispatchInput, CrossClusterRole, DispatchInput, DispatchResult,
     EventTypeQuery, GateAuditInput, GovernanceAuditFilter, GovernanceAuditResult,
     PropertyOwnershipQuery, PropertyOwnershipResult, ResolveQueryInput, RATE_LIMIT_WINDOW_SECS,
 };
+use mycelix_zome_helpers as _;
 
 // ============================================================================
 // Sub-Cluster Membership — defines which zomes live in which DNA
@@ -441,10 +441,8 @@ pub fn broadcast_event(event: CommonsEvent) -> ExternResult<Record> {
         ];
 
         for (target_role, zome) in targets {
-            let allowed = routing_registry::get_allowed_zomes(
-                CrossClusterRole::Commons,
-                *target_role,
-            );
+            let allowed =
+                routing_registry::get_allowed_zomes(CrossClusterRole::Commons, *target_role);
             // Skip if the target zome isn't in the allowed list for this route
             if allowed.is_empty() || !allowed.iter().any(|z| *z == *zome) {
                 continue;
@@ -458,7 +456,11 @@ pub fn broadcast_event(event: CommonsEvent) -> ExternResult<Record> {
             // Best-effort: log errors but don't fail the broadcast
             if let Ok(result) = bridge::dispatch_call_cross_cluster(&dispatch, allowed) {
                 if !result.success {
-                    debug!("Notification fanout to {} failed: {:?}", target_role.as_str(), result.error);
+                    debug!(
+                        "Notification fanout to {} failed: {:?}",
+                        target_role.as_str(),
+                        result.error
+                    );
                 }
             }
         }
@@ -1279,14 +1281,12 @@ pub fn get_sovereign_credential(
     )?;
 
     match response {
-        ZomeCallResponse::Ok(extern_io) => {
-            extern_io.decode().map_err(|e| {
-                wasm_error!(WasmErrorInner::Guest(format!(
-                    "Failed to decode sovereign credential: {:?}",
-                    e
-                )))
-            })
-        }
+        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode sovereign credential: {:?}",
+                e
+            )))
+        }),
         other => Err(wasm_error!(WasmErrorInner::Guest(format!(
             "Sovereign credential call failed for {}: {:?}",
             did, other
@@ -1566,10 +1566,7 @@ pub fn register_property_as_collateral(
                 success: false,
                 property_id: input.property_id,
                 collateral_registered: false,
-                error: Some(format!(
-                    "Property not found in registry: {:?}",
-                    other
-                )),
+                error: Some(format!("Property not found in registry: {:?}", other)),
             });
         }
         Err(e) => {
@@ -1774,17 +1771,29 @@ pub fn get_bridge_metrics(_: ()) -> ExternResult<String> {
 ///
 /// Called by other bridges via `CallTargetCell::OtherRole("commons")`.
 #[hdk_extern]
-pub fn receive_notification(notification: mycelix_bridge_entry_types::CrossClusterNotification) -> ExternResult<ActionHash> {
+pub fn receive_notification(
+    notification: mycelix_bridge_entry_types::CrossClusterNotification,
+) -> ExternResult<ActionHash> {
     let action_hash = create_entry(&EntryTypes::Notification(notification.clone()))?;
 
     // Link to agent's notification inbox
     let agent = agent_info()?.agent_initial_pubkey;
     let inbox_anchor = ensure_anchor(&format!("notifications:{:?}", agent))?;
-    create_link(inbox_anchor, action_hash.clone(), LinkTypes::AgentToNotification, ())?;
+    create_link(
+        inbox_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentToNotification,
+        (),
+    )?;
 
     // Link to global notifications anchor
     let all_anchor = ensure_anchor("all_notifications")?;
-    create_link(all_anchor, action_hash.clone(), LinkTypes::AllNotifications, ())?;
+    create_link(
+        all_anchor,
+        action_hash.clone(),
+        LinkTypes::AllNotifications,
+        (),
+    )?;
 
     // Emit signal to connected UI clients
     let signal = mycelix_bridge_common::notifications::NotificationSignal {
@@ -1801,7 +1810,9 @@ pub fn receive_notification(notification: mycelix_bridge_entry_types::CrossClust
 
 /// Get notifications for the calling agent.
 #[hdk_extern]
-pub fn get_my_notifications(input: mycelix_bridge_common::notifications::NotificationQueryInput) -> ExternResult<Vec<Record>> {
+pub fn get_my_notifications(
+    input: mycelix_bridge_common::notifications::NotificationQueryInput,
+) -> ExternResult<Vec<Record>> {
     let agent = agent_info()?.agent_initial_pubkey;
     let inbox_anchor = ensure_anchor(&format!("notifications:{:?}", agent))?;
     let links = get_links(
@@ -1809,7 +1820,8 @@ pub fn get_my_notifications(input: mycelix_bridge_common::notifications::Notific
         GetStrategy::Local,
     )?;
 
-    let limit = input.limit
+    let limit = input
+        .limit
         .unwrap_or(mycelix_bridge_common::notifications::DEFAULT_NOTIFICATION_LIMIT)
         .min(mycelix_bridge_common::notifications::MAX_NOTIFICATIONS_PER_AGENT);
 
@@ -1838,7 +1850,9 @@ pub fn get_unread_count(_: ()) -> ExternResult<u32> {
 
 /// Subscribe to specific event types from specific clusters.
 #[hdk_extern]
-pub fn subscribe_events(input: mycelix_bridge_common::notifications::SubscribeInput) -> ExternResult<ActionHash> {
+pub fn subscribe_events(
+    input: mycelix_bridge_common::notifications::SubscribeInput,
+) -> ExternResult<ActionHash> {
     let agent = agent_info()?.agent_initial_pubkey;
     let sub_anchor = ensure_anchor(&format!("subscriptions:{:?}", agent))?;
 
@@ -1855,7 +1869,12 @@ pub fn subscribe_events(input: mycelix_bridge_common::notifications::SubscribeIn
         related_hashes: vec![],
     };
     let action_hash = create_entry(&EntryTypes::Event(event))?;
-    create_link(sub_anchor, action_hash.clone(), LinkTypes::NotificationSubscription, ())?;
+    create_link(
+        sub_anchor,
+        action_hash.clone(),
+        LinkTypes::NotificationSubscription,
+        (),
+    )?;
 
     Ok(action_hash)
 }
@@ -1911,11 +1930,15 @@ pub fn get_nearby(input: commons_types::geo::NearbyQuery) -> ExternResult<Vec<Re
             };
             let result = bridge::dispatch_call_cross_cluster(
                 &dispatch,
-                routing_registry::get_allowed_zomes(CrossClusterRole::Commons, CrossClusterRole::Civic),
+                routing_registry::get_allowed_zomes(
+                    CrossClusterRole::Commons,
+                    CrossClusterRole::Civic,
+                ),
             )?;
             if result.success {
                 if let Some(response) = result.response {
-                    return ExternIO(response).decode::<Vec<Record>>()
+                    return ExternIO(response)
+                        .decode::<Vec<Record>>()
                         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())));
                 }
             }
@@ -1929,9 +1952,12 @@ pub fn get_nearby(input: commons_types::geo::NearbyQuery) -> ExternResult<Vec<Re
     };
 
     // Local dispatch to the appropriate commons zome
-    let payload = ExternIO::encode(&input)
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
-    let fn_name = format!("get_nearby_{}", input.entry_type.as_deref().unwrap_or("properties"));
+    let payload =
+        ExternIO::encode(&input).map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
+    let fn_name = format!(
+        "get_nearby_{}",
+        input.entry_type.as_deref().unwrap_or("properties")
+    );
     let dispatch = DispatchInput {
         zome: zome.into(),
         fn_name,
@@ -1940,7 +1966,8 @@ pub fn get_nearby(input: commons_types::geo::NearbyQuery) -> ExternResult<Vec<Re
     let result = bridge::dispatch_call_checked(&dispatch, routing_registry::COMMONS_LOCAL_ZOMES)?;
     if result.success {
         if let Some(response) = result.response {
-            return ExternIO(response).decode::<Vec<Record>>()
+            return ExternIO(response)
+                .decode::<Vec<Record>>()
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())));
         }
     }

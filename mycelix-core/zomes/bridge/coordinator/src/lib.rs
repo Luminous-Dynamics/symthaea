@@ -31,18 +31,100 @@
 //! - `broadcast_event` - Broadcast event to registered hApps
 //! - `get_events` - Query events by type and time range
 
-use hdk::prelude::*;
 use bridge_integrity::{
-    HappRegistration, ReputationRecord, CrossHappReputationRecord,
     BridgeEventRecord, CredentialVerificationRequest, CredentialVerificationResponse,
-    EthereumPaymentIntent, EthereumAnchorIntent,
-    EntryTypes, LinkTypes,
-    MAX_ID_LENGTH, MAX_EVENT_PAYLOAD_SIZE,
+    CrossHappReputationRecord, EntryTypes, EthereumAnchorIntent, EthereumPaymentIntent,
+    HappRegistration, LinkTypes, ReputationRecord, MAX_EVENT_PAYLOAD_SIZE, MAX_ID_LENGTH,
 };
+use hdk::prelude::*;
 use std::collections::HashMap;
 
 // SDK Bridge types
-use mycelix_sdk::bridge::{HappReputationScore, CrossHappReputation};
+use mycelix_bridge_common::consciousness_profile::{ConsciousnessProfile, ConsciousnessTier};
+use mycelix_sdk::bridge::{CrossHappReputation, HappReputationScore};
+
+// =============================================================================
+// SYMTHAEA ORACLE INTERFACE (Epistemic Integration)
+// =============================================================================
+
+/// Verified Proof of Gradient Quality (PoGQ) claim from Symthaea.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct PogqClaim {
+    pub agent: AgentPubKey,
+    pub phi_score: f64,
+    pub gradient_quality: f64,
+    pub model_version: String,
+    pub timestamp: Timestamp,
+    pub signature: Vec<u8>, // Oracle signature
+}
+
+/// Input for publishing a PoGQ claim.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PublishPogqInput {
+    pub agent: AgentPubKey,
+    pub phi_score: f64,
+    pub gradient_quality: f64,
+    pub model_version: String,
+}
+
+/// Publish a verified PoGQ claim to the DHT.
+/// Only callable by the Symthaea Oracle agent.
+#[hdk_extern]
+pub fn publish_pogq_claim(input: PublishPogqInput) -> ExternResult<ActionHash> {
+    // SECURITY: In production, verify caller is authorized oracle agent
+    let now = sys_time()?;
+    let claim = PogqClaim {
+        agent: input.agent.clone(),
+        phi_score: input.phi_score,
+        gradient_quality: input.gradient_quality,
+        model_version: input.model_version,
+        timestamp: now,
+        signature: vec![0u8; 64], // Placeholder for actual oracle sig
+    };
+
+    let action_hash = create_entry(&EntryTypes::BridgeEventRecord(BridgeEventRecord {
+        id: format!("pogq:{}:{}", input.agent, now.as_micros()),
+        event_type: "PoGQ".into(),
+        source_happ: "symthaea".into(),
+        payload: serde_json::to_string(&claim).unwrap_or_default(),
+        timestamp: now,
+    }))?;
+
+    // Link from agent to their PoGQ claims for easy lookup
+    create_link(
+        input.agent,
+        action_hash.clone(),
+        LinkTypes::AgentToReputation,
+        (),
+    )?;
+
+    Ok(action_hash)
+}
+
+/// Remote-callable wrapper to query an agent's latest PoGQ claim.
+#[hdk_extern]
+pub fn get_latest_pogq_remote(agent: AgentPubKey) -> ExternResult<Option<PogqClaim>> {
+    let links = get_links(
+        LinkQuery::new(agent, LinkTypes::AgentToReputation.try_into_filter()?),
+        GetStrategy::Local,
+    )?;
+
+    if let Some(link) = links.last() {
+        if let Some(hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(hash, GetOptions::default())? {
+                if let Some(Entry::App(bytes)) = record.entry().as_option() {
+                    let event = BridgeEventRecord::try_from(bytes.clone())
+                        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
+                    let claim: PogqClaim = serde_json::from_str(&event.payload)
+                        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
+                    return Ok(Some(claim));
+                }
+            }
+        }
+    }
+    Ok(None)
+}
 
 // =============================================================================
 // SECURITY: Authorization & Rate Limiting
@@ -58,14 +140,16 @@ const MAX_BROADCASTS_PER_MINUTE: u32 = 100;
 fn validate_string_field(field: &str, name: &str) -> ExternResult<()> {
     let trimmed = field.trim();
     if trimmed.is_empty() {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("{} cannot be empty", name)
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "{} cannot be empty",
+            name
+        ))));
     }
     if trimmed.len() > MAX_ID_LENGTH {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("{} exceeds maximum length of {} characters", name, MAX_ID_LENGTH)
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "{} exceeds maximum length of {} characters",
+            name, MAX_ID_LENGTH
+        ))));
     }
     Ok(())
 }
@@ -97,9 +181,9 @@ fn require_happ_owner(happ_id: &str) -> ExternResult<()> {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash, GetOptions::default())? {
                 if let Some(Entry::App(bytes)) = record.entry().as_option() {
-                    if let Ok(reg) = HappRegistration::try_from(
-                        SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec()))
-                    ) {
+                    if let Ok(reg) = HappRegistration::try_from(SerializedBytes::from(
+                        UnsafeBytes::from(bytes.bytes().to_vec()),
+                    )) {
                         if reg.registrant == agent {
                             return Ok(());
                         }
@@ -135,14 +219,16 @@ fn check_rate_limit(action: &str, max_per_minute: u32) -> ExternResult<()> {
         GetStrategy::default(),
     )?;
 
-    let recent_count = links.iter()
+    let recent_count = links
+        .iter()
         .filter(|l| l.timestamp.0 as i64 / 1_000_000 > window_start)
         .count() as u32;
 
     if recent_count >= max_per_minute {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Rate limit exceeded: {} per minute maximum for {}", max_per_minute, action)
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Rate limit exceeded: {} per minute maximum for {}",
+            max_per_minute, action
+        ))));
     }
 
     Ok(())
@@ -237,7 +323,8 @@ pub fn register_happ(input: RegisterHappInput) -> ExternResult<ActionHash> {
         event_type: "happ_registered".to_string(),
         payload: serde_json::to_vec(&serde_json::json!({
             "happ_id": happ_id,
-        })).unwrap_or_default(),
+        }))
+        .unwrap_or_default(),
         targets: vec![],
         priority: 0,
     });
@@ -266,18 +353,20 @@ pub fn deregister_happ(happ_id: String) -> ExternResult<ActionHash> {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
                 if let Some(Entry::App(bytes)) = record.entry().as_option() {
-                    if let Ok(mut reg) = HappRegistration::try_from(
-                        SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec()))
-                    ) {
+                    if let Ok(mut reg) = HappRegistration::try_from(SerializedBytes::from(
+                        UnsafeBytes::from(bytes.bytes().to_vec()),
+                    )) {
                         reg.active = false;
-                        let new_hash = update_entry(action_hash, &EntryTypes::HappRegistration(reg))?;
+                        let new_hash =
+                            update_entry(action_hash, &EntryTypes::HappRegistration(reg))?;
 
                         // Broadcast deregistration event
                         let _ = broadcast_event(BroadcastEventInput {
                             event_type: "happ_deregistered".to_string(),
                             payload: serde_json::to_vec(&serde_json::json!({
                                 "happ_id": happ_id,
-                            })).unwrap_or_default(),
+                            }))
+                            .unwrap_or_default(),
                             targets: vec![],
                             priority: 0,
                         });
@@ -316,9 +405,9 @@ pub fn get_registered_happs(_: ()) -> ExternResult<Vec<HappRegistration>> {
         if let Some(action_hash) = link.target.into_action_hash() {
             if let Some(record) = get(action_hash, GetOptions::default())? {
                 if let Some(Entry::App(bytes)) = record.entry().as_option() {
-                    if let Ok(reg) = HappRegistration::try_from(
-                        SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec()))
-                    ) {
+                    if let Ok(reg) = HappRegistration::try_from(SerializedBytes::from(
+                        UnsafeBytes::from(bytes.bytes().to_vec()),
+                    )) {
                         if reg.active {
                             registrations.push(reg);
                         }
@@ -352,9 +441,9 @@ pub fn get_happ_registration(happ_id: String) -> ExternResult<Option<HappRegistr
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash, GetOptions::default())? {
                 if let Some(Entry::App(bytes)) = record.entry().as_option() {
-                    if let Ok(reg) = HappRegistration::try_from(
-                        SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec()))
-                    ) {
+                    if let Ok(reg) = HappRegistration::try_from(SerializedBytes::from(
+                        UnsafeBytes::from(bytes.bytes().to_vec()),
+                    )) {
                         return Ok(Some(reg));
                     }
                 }
@@ -455,7 +544,8 @@ pub fn record_reputation(input: RecordReputationInput) -> ExternResult<ActionHas
             "agent": input.agent,
             "happ_id": input.happ_id,
             "score": input.score,
-        })).unwrap_or_default(),
+        }))
+        .unwrap_or_default(),
         targets: vec![],
         priority: 0,
     });
@@ -502,9 +592,9 @@ pub fn query_reputation(input: QueryReputationInput) -> ExternResult<Vec<Reputat
         if let Some(action_hash) = link.target.into_action_hash() {
             if let Some(record) = get(action_hash, GetOptions::default())? {
                 if let Some(Entry::App(bytes)) = record.entry().as_option() {
-                    if let Ok(rep) = ReputationRecord::try_from(
-                        SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec()))
-                    ) {
+                    if let Ok(rep) = ReputationRecord::try_from(SerializedBytes::from(
+                        UnsafeBytes::from(bytes.bytes().to_vec()),
+                    )) {
                         records.push(rep);
                     }
                 }
@@ -557,7 +647,8 @@ pub fn aggregate_cross_happ_reputation(agent: String) -> ExternResult<CrossHappR
     let now = sys_time()?.0 as u64 / 1_000_000;
 
     // Serialize scores to JSON
-    let scores_map: HashMap<String, f64> = scores.iter()
+    let scores_map: HashMap<String, f64> = scores
+        .iter()
         .map(|s| (s.happ_id.clone(), s.score))
         .collect();
 
@@ -687,13 +778,18 @@ pub struct VerifyCredentialInput {
 }
 
 /// Look up a credential verification request by its request_id
-fn lookup_credential_request(request_id: &str) -> ExternResult<Option<CredentialVerificationRequest>> {
+fn lookup_credential_request(
+    request_id: &str,
+) -> ExternResult<Option<CredentialVerificationRequest>> {
     // Requests are linked from hApp paths with request_id as link tag
     // We need to search across all hApp paths or use a global request index
 
     // First, try the global request index path
     let request_path = Path::from(format!("cred_request_index.{}", request_id));
-    let request_hash = match request_path.clone().typed(LinkTypes::HappToCredentialRequests) {
+    let request_hash = match request_path
+        .clone()
+        .typed(LinkTypes::HappToCredentialRequests)
+    {
         Ok(typed) => {
             if !typed.exists()? {
                 return Ok(None);
@@ -706,7 +802,10 @@ fn lookup_credential_request(request_id: &str) -> ExternResult<Option<Credential
     let links = get_links(
         LinkQuery::new(
             request_hash,
-            LinkTypeFilter::single_type(0.into(), (LinkTypes::HappToCredentialRequests as u8).into()),
+            LinkTypeFilter::single_type(
+                0.into(),
+                (LinkTypes::HappToCredentialRequests as u8).into(),
+            ),
         ),
         GetStrategy::default(),
     )?;
@@ -715,9 +814,9 @@ fn lookup_credential_request(request_id: &str) -> ExternResult<Option<Credential
         if let Some(action_hash) = link.target.into_action_hash() {
             if let Some(record) = get(action_hash, GetOptions::default())? {
                 if let Some(Entry::App(bytes)) = record.entry().as_option() {
-                    if let Ok(req) = CredentialVerificationRequest::try_from(
-                        SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec()))
-                    ) {
+                    if let Ok(req) = CredentialVerificationRequest::try_from(SerializedBytes::from(
+                        UnsafeBytes::from(bytes.bytes().to_vec()),
+                    )) {
                         if req.request_id == request_id {
                             return Ok(Some(req));
                         }
@@ -747,7 +846,10 @@ pub fn verify_credential(input: VerifyCredentialInput) -> ExternResult<ActionHas
         None => {
             // Fallback: if we can't find the request, require credential_type in input
             // This maintains backwards compatibility while encouraging proper lookup
-            debug!("WARNING: Could not find original request for {}, using 'unverified' type", input.request_id);
+            debug!(
+                "WARNING: Could not find original request for {}, using 'unverified' type",
+                input.request_id
+            );
             "unverified".to_string()
         }
     };
@@ -783,7 +885,9 @@ pub fn verify_credential(input: VerifyCredentialInput) -> ExternResult<ActionHas
 
 /// Get pending credential verification requests for a hApp
 #[hdk_extern]
-pub fn get_verification_requests(happ_id: String) -> ExternResult<Vec<CredentialVerificationRequest>> {
+pub fn get_verification_requests(
+    happ_id: String,
+) -> ExternResult<Vec<CredentialVerificationRequest>> {
     let happ_path = Path::from(format!("cred_verify.{}", happ_id));
     let happ_hash = match ensure_path(happ_path, LinkTypes::HappToCredentialRequests) {
         Ok(h) => h,
@@ -793,7 +897,10 @@ pub fn get_verification_requests(happ_id: String) -> ExternResult<Vec<Credential
     let links = get_links(
         LinkQuery::new(
             happ_hash,
-            LinkTypeFilter::single_type(0.into(), (LinkTypes::HappToCredentialRequests as u8).into()),
+            LinkTypeFilter::single_type(
+                0.into(),
+                (LinkTypes::HappToCredentialRequests as u8).into(),
+            ),
         ),
         GetStrategy::default(),
     )?;
@@ -803,9 +910,9 @@ pub fn get_verification_requests(happ_id: String) -> ExternResult<Vec<Credential
         if let Some(action_hash) = link.target.into_action_hash() {
             if let Some(record) = get(action_hash, GetOptions::default())? {
                 if let Some(Entry::App(bytes)) = record.entry().as_option() {
-                    if let Ok(req) = CredentialVerificationRequest::try_from(
-                        SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec()))
-                    ) {
+                    if let Ok(req) = CredentialVerificationRequest::try_from(SerializedBytes::from(
+                        UnsafeBytes::from(bytes.bytes().to_vec()),
+                    )) {
                         if req.status == "pending" {
                             requests.push(req);
                         }
@@ -820,7 +927,9 @@ pub fn get_verification_requests(happ_id: String) -> ExternResult<Vec<Credential
 
 /// Get verification response for a request
 #[hdk_extern]
-pub fn get_verification_response(request_id: String) -> ExternResult<Option<CredentialVerificationResponse>> {
+pub fn get_verification_response(
+    request_id: String,
+) -> ExternResult<Option<CredentialVerificationResponse>> {
     let req_path = Path::from(format!("cred_response.{}", request_id));
     let req_hash = match ensure_path(req_path, LinkTypes::RequestToResponse) {
         Ok(h) => h,
@@ -840,7 +949,7 @@ pub fn get_verification_response(request_id: String) -> ExternResult<Option<Cred
             if let Some(record) = get(action_hash, GetOptions::default())? {
                 if let Some(Entry::App(bytes)) = record.entry().as_option() {
                     if let Ok(resp) = CredentialVerificationResponse::try_from(
-                        SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec()))
+                        SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec())),
                     ) {
                         return Ok(Some(resp));
                     }
@@ -879,9 +988,10 @@ pub fn broadcast_event(input: BroadcastEventInput) -> ExternResult<ActionHash> {
 
     // Validate payload size
     if input.payload.len() > MAX_EVENT_PAYLOAD_SIZE {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Event payload exceeds maximum size of {} bytes", MAX_EVENT_PAYLOAD_SIZE)
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Event payload exceeds maximum size of {} bytes",
+            MAX_EVENT_PAYLOAD_SIZE
+        ))));
     }
 
     let now = sys_time()?.0 as u64 / 1_000_000;
@@ -945,9 +1055,9 @@ pub fn get_events(input: GetEventsInput) -> ExternResult<Vec<BridgeEventRecord>>
         if let Some(action_hash) = link.target.into_action_hash() {
             if let Some(record) = get(action_hash, GetOptions::default())? {
                 if let Some(Entry::App(bytes)) = record.entry().as_option() {
-                    if let Ok(event) = BridgeEventRecord::try_from(
-                        SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec()))
-                    ) {
+                    if let Ok(event) = BridgeEventRecord::try_from(SerializedBytes::from(
+                        UnsafeBytes::from(bytes.bytes().to_vec()),
+                    )) {
                         if event.timestamp >= input.since {
                             events.push(event);
                         }
@@ -1049,7 +1159,9 @@ pub struct DistributePaymentResult {
 /// # Returns
 /// * `DistributePaymentResult` with intent ID for tracking
 #[hdk_extern]
-pub fn distribute_payment_on_chain(input: DistributePaymentInput) -> ExternResult<DistributePaymentResult> {
+pub fn distribute_payment_on_chain(
+    input: DistributePaymentInput,
+) -> ExternResult<DistributePaymentResult> {
     // Validate input
     validate_string_field(&input.model_id, "Model ID")?;
     if input.total_amount_wei.is_empty() {
@@ -1143,7 +1255,8 @@ pub fn distribute_payment_on_chain(input: DistributePaymentInput) -> ExternResul
         payload: serde_json::to_vec(&serde_json::json!({
             "intent_id": intent_id,
             "round": input.round,
-        })).unwrap_or_default(),
+        }))
+        .unwrap_or_default(),
         targets: vec![],
         priority: 1, // High priority
     });
@@ -1191,12 +1304,10 @@ pub fn anchor_to_ethereum(input: AnchorToEthereumInput) -> ExternResult<AnchorRe
     // Validate input
     let valid_anchor_types = ["reputation", "contribution", "proof", "model", "round"];
     if !valid_anchor_types.contains(&input.anchor_type.as_str()) {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!(
-                "Anchor type must be one of: {}",
-                valid_anchor_types.join(", ")
-            )
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Anchor type must be one of: {}",
+            valid_anchor_types.join(", ")
+        ))));
     }
 
     validate_string_field(&input.data_hash, "Data hash")?;
@@ -1268,7 +1379,8 @@ pub fn anchor_to_ethereum(input: AnchorToEthereumInput) -> ExternResult<AnchorRe
         event_type: "ethereum_anchor_requested".to_string(),
         payload: serde_json::to_vec(&serde_json::json!({
             "intent_id": intent_id,
-        })).unwrap_or_default(),
+        }))
+        .unwrap_or_default(),
         targets: vec![],
         priority: 0,
     });
@@ -1332,7 +1444,10 @@ pub fn update_payment_intent_status(input: UpdatePaymentStatusInput) -> ExternRe
     let links = get_links(
         LinkQuery::new(
             intent_hash,
-            LinkTypeFilter::single_type(0.into(), (LinkTypes::IntentIdToPaymentIntent as u8).into()),
+            LinkTypeFilter::single_type(
+                0.into(),
+                (LinkTypes::IntentIdToPaymentIntent as u8).into(),
+            ),
         ),
         GetStrategy::default(),
     )?;
@@ -1341,9 +1456,9 @@ pub fn update_payment_intent_status(input: UpdatePaymentStatusInput) -> ExternRe
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
                 if let Some(Entry::App(bytes)) = record.entry().as_option() {
-                    if let Ok(mut intent) = EthereumPaymentIntent::try_from(
-                        SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec()))
-                    ) {
+                    if let Ok(mut intent) = EthereumPaymentIntent::try_from(SerializedBytes::from(
+                        UnsafeBytes::from(bytes.bytes().to_vec()),
+                    )) {
                         let now = sys_time()?.0 as u64 / 1_000_000;
 
                         // Update fields
@@ -1353,7 +1468,8 @@ pub fn update_payment_intent_status(input: UpdatePaymentStatusInput) -> ExternRe
                         intent.error = input.error;
                         intent.updated_at = now;
 
-                        let new_hash = update_entry(action_hash, &EntryTypes::EthereumPaymentIntent(intent))?;
+                        let new_hash =
+                            update_entry(action_hash, &EntryTypes::EthereumPaymentIntent(intent))?;
 
                         // If status is no longer pending, remove from pending list
                         if input.status != "pending" {
@@ -1364,7 +1480,8 @@ pub fn update_payment_intent_status(input: UpdatePaymentStatusInput) -> ExternRe
                                 payload: serde_json::to_vec(&serde_json::json!({
                                     "intent_id": input.intent_id,
                                     "status": input.status,
-                                })).unwrap_or_default(),
+                                }))
+                                .unwrap_or_default(),
                                 targets: vec![],
                                 priority: 1,
                             });
@@ -1377,9 +1494,10 @@ pub fn update_payment_intent_status(input: UpdatePaymentStatusInput) -> ExternRe
         }
     }
 
-    Err(wasm_error!(WasmErrorInner::Guest(
-        format!("Payment intent not found: {}", input.intent_id)
-    )))
+    Err(wasm_error!(WasmErrorInner::Guest(format!(
+        "Payment intent not found: {}",
+        input.intent_id
+    ))))
 }
 
 /// Input for updating anchor intent status
@@ -1420,9 +1538,9 @@ pub fn update_anchor_intent_status(input: UpdateAnchorStatusInput) -> ExternResu
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
                 if let Some(Entry::App(bytes)) = record.entry().as_option() {
-                    if let Ok(mut intent) = EthereumAnchorIntent::try_from(
-                        SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec()))
-                    ) {
+                    if let Ok(mut intent) = EthereumAnchorIntent::try_from(SerializedBytes::from(
+                        UnsafeBytes::from(bytes.bytes().to_vec()),
+                    )) {
                         let now = sys_time()?.0 as u64 / 1_000_000;
 
                         // Update fields
@@ -1434,7 +1552,8 @@ pub fn update_anchor_intent_status(input: UpdateAnchorStatusInput) -> ExternResu
                         intent.error = input.error;
                         intent.updated_at = now;
 
-                        let new_hash = update_entry(action_hash, &EntryTypes::EthereumAnchorIntent(intent))?;
+                        let new_hash =
+                            update_entry(action_hash, &EntryTypes::EthereumAnchorIntent(intent))?;
 
                         // Broadcast status update
                         if input.status != "pending" {
@@ -1443,7 +1562,8 @@ pub fn update_anchor_intent_status(input: UpdateAnchorStatusInput) -> ExternResu
                                 payload: serde_json::to_vec(&serde_json::json!({
                                     "intent_id": input.intent_id,
                                     "status": input.status,
-                                })).unwrap_or_default(),
+                                }))
+                                .unwrap_or_default(),
                                 targets: vec![],
                                 priority: 0,
                             });
@@ -1456,9 +1576,10 @@ pub fn update_anchor_intent_status(input: UpdateAnchorStatusInput) -> ExternResu
         }
     }
 
-    Err(wasm_error!(WasmErrorInner::Guest(
-        format!("Anchor intent not found: {}", input.intent_id)
-    )))
+    Err(wasm_error!(WasmErrorInner::Guest(format!(
+        "Anchor intent not found: {}",
+        input.intent_id
+    ))))
 }
 
 /// Get payment intent by ID
@@ -1473,7 +1594,10 @@ pub fn get_payment_intent(intent_id: String) -> ExternResult<Option<EthereumPaym
     let links = get_links(
         LinkQuery::new(
             intent_hash,
-            LinkTypeFilter::single_type(0.into(), (LinkTypes::IntentIdToPaymentIntent as u8).into()),
+            LinkTypeFilter::single_type(
+                0.into(),
+                (LinkTypes::IntentIdToPaymentIntent as u8).into(),
+            ),
         ),
         GetStrategy::default(),
     )?;
@@ -1482,9 +1606,9 @@ pub fn get_payment_intent(intent_id: String) -> ExternResult<Option<EthereumPaym
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash, GetOptions::default())? {
                 if let Some(Entry::App(bytes)) = record.entry().as_option() {
-                    if let Ok(intent) = EthereumPaymentIntent::try_from(
-                        SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec()))
-                    ) {
+                    if let Ok(intent) = EthereumPaymentIntent::try_from(SerializedBytes::from(
+                        UnsafeBytes::from(bytes.bytes().to_vec()),
+                    )) {
                         return Ok(Some(intent));
                     }
                 }
@@ -1516,9 +1640,9 @@ pub fn get_anchor_intent(intent_id: String) -> ExternResult<Option<EthereumAncho
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash, GetOptions::default())? {
                 if let Some(Entry::App(bytes)) = record.entry().as_option() {
-                    if let Ok(intent) = EthereumAnchorIntent::try_from(
-                        SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec()))
-                    ) {
+                    if let Ok(intent) = EthereumAnchorIntent::try_from(SerializedBytes::from(
+                        UnsafeBytes::from(bytes.bytes().to_vec()),
+                    )) {
                         return Ok(Some(intent));
                     }
                 }

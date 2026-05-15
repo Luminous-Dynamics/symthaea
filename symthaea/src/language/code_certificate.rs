@@ -46,6 +46,8 @@ pub struct CodeCertificate {
     pub source_hash: [u8; 32],
     /// Which synthesis backend produced this code
     pub backend_used: String,
+    /// More precise source path inside the backend.
+    pub source_provenance: String,
     /// Cosine similarity between intent HV and generated code HV (0.0-1.0)
     pub semantic_similarity: f32,
     /// Verification layers that were applied, with pass/fail and scores
@@ -108,6 +110,7 @@ impl CodeCertificate {
             id,
             source_hash: *source_hash.as_bytes(),
             backend_used: backend.to_string(),
+            source_provenance: backend.to_string(),
             semantic_similarity: similarity,
             verification_layers: Vec::new(),
             epistemic_status: "Probable".to_string(),
@@ -122,6 +125,12 @@ impl CodeCertificate {
     /// Set the epistemic status.
     pub fn with_epistemic_status(mut self, status: EpistemicStatus) -> Self {
         self.epistemic_status = format!("{status}");
+        self
+    }
+
+    /// Set precise source provenance within the backend.
+    pub fn with_source_provenance(mut self, provenance: impl Into<String>) -> Self {
+        self.source_provenance = provenance.into();
         self
     }
 
@@ -213,7 +222,7 @@ impl CodeCertificate {
         };
 
         format!(
-            "[{}] {} via {} | sim: {:.3} | {}/{} checks passed | {}{}{}{}",
+            "[{}] {} via {} ({}) | sim: {:.3} | {}/{} checks passed | {}{}{}{}",
             self.id,
             if self.safety_critical {
                 "SAFETY"
@@ -221,6 +230,7 @@ impl CodeCertificate {
                 "std"
             },
             self.backend_used,
+            self.source_provenance,
             self.semantic_similarity,
             self.layers_passed(),
             self.layers_total(),

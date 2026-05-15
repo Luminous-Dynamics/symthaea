@@ -21,6 +21,7 @@ use mycelix_finance_types::{
 };
 use payments_integrity::*;
 
+use mycelix_zome_helpers as _;
 // ---------------------------------------------------------------------------
 // SAP Balance Management (on-chain balance with enforced demurrage)
 // ---------------------------------------------------------------------------

@@ -21,7 +21,7 @@
 
     # Holochain from holonix
     holonix = {
-      url = "github:holochain/holonix/main";
+      url = "github:holochain/holonix/d21b3543";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 

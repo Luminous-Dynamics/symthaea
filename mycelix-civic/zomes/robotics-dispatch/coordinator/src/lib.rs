@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -22,8 +21,10 @@ use mycelix_zome_helpers as _;
 //! permanent entrenchment of emergency authority.
 
 use hdk::prelude::*;
-use mycelix_bridge_common::{civic_requirement_basic, civic_requirement_proposal};
-
+use mycelix_bridge_common::{
+    civic_requirement_basic, civic_requirement_proposal, SovereignProfile,
+};
+use mycelix_zome_helpers as _;
 
 use robotics_dispatch_integrity::*;
 
@@ -40,7 +41,7 @@ const ASSETS_ANCHOR: &str = "robotic_assets";
 pub struct RegisterAssetInput {
     pub asset_id: String,
     pub platform_type: PlatformType,
-    pub consciousness_level: f64,
+    pub sovereign_profile: SovereignProfile,
     pub max_tier: TierCap,
     pub location_lat: f64,
     pub location_lon: f64,
@@ -53,7 +54,11 @@ pub struct RegisterAssetInput {
 /// The calling agent becomes the asset's sponsoring owner.
 #[hdk_extern]
 pub fn register_asset(input: RegisterAssetInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "register_asset")?;
+    mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_proposal(),
+        "register_asset",
+    )?;
 
     let agent = agent_info()?.agent_initial_pubkey;
 
@@ -75,20 +80,19 @@ pub fn register_asset(input: RegisterAssetInput) -> ExternResult<Record> {
     // Link from anchor
     let anchor = Anchor(ASSETS_ANCHOR.to_string());
     let anchor_hash = create_entry(EntryTypes::Anchor(anchor))?;
-    create_link(anchor_hash, action_hash.clone(), LinkTypes::AnchorToAsset, ())?;
-
-    // Link from owner
     create_link(
-        agent,
+        anchor_hash,
         action_hash.clone(),
-        LinkTypes::OwnerToAsset,
+        LinkTypes::AnchorToAsset,
         (),
     )?;
 
-    let record = get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created asset".to_string()
-        )))?;
+    // Link from owner
+    create_link(agent, action_hash.clone(), LinkTypes::OwnerToAsset, ())?;
+
+    let record = get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Could not find created asset".to_string())
+    ))?;
     Ok(record)
 }
 
@@ -116,9 +120,17 @@ pub struct DispatchMissionInput {
 pub fn dispatch_mission(input: DispatchMissionInput) -> ExternResult<Record> {
     // Emergency (Critical) requires only BASIC; others require PROPOSAL
     if input.priority == DispatchPriority::Critical {
-        mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_basic(), "dispatch_mission")?;
+        mycelix_zome_helpers::require_civic(
+            "civic_bridge",
+            &civic_requirement_basic(),
+            "dispatch_mission",
+        )?;
     } else {
-        mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "dispatch_mission")?;
+        mycelix_zome_helpers::require_civic(
+            "civic_bridge",
+            &civic_requirement_proposal(),
+            "dispatch_mission",
+        )?;
     }
 
     let agent = agent_info()?.agent_initial_pubkey;
@@ -151,10 +163,9 @@ pub fn dispatch_mission(input: DispatchMissionInput) -> ExternResult<Record> {
         (),
     )?;
 
-    let record = get(order_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created order".to_string()
-        )))?;
+    let record = get(order_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Could not find created order".to_string())
+    ))?;
     Ok(record)
 }
 
@@ -180,7 +191,11 @@ pub struct SubmitTelemetryInput {
 /// Requires BASIC consciousness level (score ≥ 0.3).
 #[hdk_extern]
 pub fn submit_telemetry(input: SubmitTelemetryInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_basic(), "submit_telemetry")?;
+    mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_basic(),
+        "submit_telemetry",
+    )?;
 
     let report = TelemetryReport {
         asset_hash: input.asset_hash,
@@ -189,7 +204,7 @@ pub fn submit_telemetry(input: SubmitTelemetryInput) -> ExternResult<Record> {
         lat: input.lat,
         lon: input.lon,
         alt: input.alt,
-        sovereign_profile: input.sovereign_profile,
+        consciousness_level: input.sovereign_profile.epistemic_integrity,
         safety_level: input.safety_level,
         mission_progress: input.mission_progress,
         fuel_level: input.fuel_level,
@@ -206,10 +221,9 @@ pub fn submit_telemetry(input: SubmitTelemetryInput) -> ExternResult<Record> {
         (),
     )?;
 
-    let record = get(report_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created report".to_string()
-        )))?;
+    let record = get(report_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Could not find created report".to_string())
+    ))?;
     Ok(record)
 }
 
@@ -227,12 +241,15 @@ pub struct CompleteMissionInput {
 /// Requires BASIC consciousness level.
 #[hdk_extern]
 pub fn complete_mission(input: CompleteMissionInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_basic(), "complete_mission")?;
+    mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_basic(),
+        "complete_mission",
+    )?;
 
-    let record = get(input.order_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Order not found".to_string()
-        )))?;
+    let record = get(input.order_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Order not found".to_string())
+    ))?;
 
     let mut order: DispatchOrder = record
         .entry()
@@ -250,10 +267,9 @@ pub fn complete_mission(input: CompleteMissionInput) -> ExternResult<Record> {
 
     let updated_hash = update_entry(input.order_hash, order)?;
 
-    let record = get(updated_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find updated order".to_string()
-        )))?;
+    let record = get(updated_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Could not find updated order".to_string())
+    ))?;
     Ok(record)
 }
 
@@ -264,12 +280,15 @@ pub fn complete_mission(input: CompleteMissionInput) -> ExternResult<Record> {
 /// Requires PROPOSAL consciousness level.
 #[hdk_extern]
 pub fn recall_asset(order_hash: ActionHash) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "recall_asset")?;
+    mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_proposal(),
+        "recall_asset",
+    )?;
 
-    let record = get(order_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Order not found".to_string()
-        )))?;
+    let record = get(order_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Order not found".to_string())
+    ))?;
 
     let mut order: DispatchOrder = record
         .entry()
@@ -283,10 +302,9 @@ pub fn recall_asset(order_hash: ActionHash) -> ExternResult<Record> {
 
     let updated_hash = update_entry(order_hash, order)?;
 
-    let record = get(updated_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find updated order".to_string()
-        )))?;
+    let record = get(updated_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Could not find updated order".to_string())
+    ))?;
     Ok(record)
 }
 
@@ -398,8 +416,9 @@ pub fn issue_credential(input: IssueCredentialInput) -> ExternResult<Record> {
         (),
     )?;
 
-    let record = get(credential_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get created credential".into())))?;
+    let record = get(credential_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Failed to get created credential".into())
+    ))?;
     Ok(record)
 }
 
@@ -415,14 +434,17 @@ pub struct RecordTestInput {
 
 #[hdk_extern]
 pub fn record_perturbation_test(input: RecordTestInput) -> ExternResult<Record> {
-    let record = get(input.credential_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Credential not found".into())))?;
+    let record = get(input.credential_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Credential not found".into())
+    ))?;
 
     let mut credential: RoboticCredential = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize failed: {e}"))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not a RoboticCredential".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Not a RoboticCredential".into()
+        )))?;
 
     let now = sys_time()?;
     let score = input.test_score_permille.min(1000);
@@ -435,22 +457,26 @@ pub fn record_perturbation_test(input: RecordTestInput) -> ExternResult<Record> 
     }
 
     let new_hash = update_entry(input.credential_hash, &credential)?;
-    let updated = get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get updated credential".into())))?;
+    let updated = get(new_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Failed to get updated credential".into())
+    ))?;
     Ok(updated)
 }
 
 /// Get current vitality for a credential (computed from Ebbinghaus decay).
 #[hdk_extern]
 pub fn get_credential_vitality(credential_hash: ActionHash) -> ExternResult<u16> {
-    let record = get(credential_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Credential not found".into())))?;
+    let record = get(credential_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Credential not found".into())
+    ))?;
 
     let credential: RoboticCredential = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize failed: {e}"))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not a RoboticCredential".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Not a RoboticCredential".into()
+        )))?;
 
     let now = sys_time()?;
     Ok(credential.compute_vitality(now))
@@ -473,6 +499,4 @@ pub fn get_asset_credentials(asset_hash: ActionHash) -> ExternResult<Vec<Record>
         }
     }
     Ok(credentials)
-}
-)
 }

@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -7,9 +6,9 @@ use mycelix_zome_helpers as _;
 
 use hdk::prelude::*;
 use mycelix_bridge_common::{civic_requirement_basic, civic_requirement_proposal};
+use mycelix_zome_helpers as _;
 use mycelix_zome_helpers::records_from_links;
 use transport_sharing_integrity::*;
-
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -22,7 +21,11 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 pub fn post_ride_offer(offer: RideOffer) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "post_ride_offer")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "post_ride_offer",
+    )?;
     let action_hash = create_entry(&EntryTypes::RideOffer(offer.clone()))?;
 
     create_entry(&EntryTypes::Anchor(Anchor("all_offers".to_string())))?;
@@ -59,7 +62,11 @@ pub fn get_available_rides(_: ()) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn request_ride(request: RideRequest) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "request_ride")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "request_ride",
+    )?;
     let action_hash = create_entry(&EntryTypes::RideRequest(request.clone()))?;
 
     create_entry(&EntryTypes::Anchor(Anchor("all_requests".to_string())))?;
@@ -98,7 +105,11 @@ pub fn request_ride(request: RideRequest) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn match_ride(ride_match: RideMatch) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "match_ride")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "match_ride",
+    )?;
     let _offer = get(ride_match.offer_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Offer not found".into())))?;
     let _request = get(ride_match.request_hash.clone(), GetOptions::default())?.ok_or(
@@ -132,7 +143,11 @@ pub struct UpdateMatchStatusInput {
 
 #[hdk_extern]
 pub fn confirm_match(input: UpdateMatchStatusInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "confirm_match")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "confirm_match",
+    )?;
     let now = sys_time()?.as_micros() / 1_000_000;
     let record = get(input.match_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Match not found".into())))?;
@@ -157,7 +172,11 @@ pub fn confirm_match(input: UpdateMatchStatusInput) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn complete_ride(match_hash: ActionHash) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "complete_ride")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "complete_ride",
+    )?;
     let record = get(match_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Match not found".into())))?;
     let mut ride_match: RideMatch = record
@@ -180,7 +199,11 @@ pub fn complete_ride(match_hash: ActionHash) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn cancel_ride(match_hash: ActionHash) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "cancel_ride")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "cancel_ride",
+    )?;
     let record = get(match_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Match not found".into())))?;
     let mut ride_match: RideMatch = record
@@ -207,7 +230,11 @@ pub fn cancel_ride(match_hash: ActionHash) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn post_cargo_offer(cargo: CargoOffer) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "post_cargo_offer")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "post_cargo_offer",
+    )?;
     let _vehicle = get(cargo.vehicle_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Vehicle not found".into())
     ))?;
@@ -246,7 +273,11 @@ pub fn post_cargo_offer(cargo: CargoOffer) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn review_ride(review: RideReview) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "review_ride")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "review_ride",
+    )?;
     let action_hash = create_entry(&EntryTypes::RideReview(review.clone()))?;
 
     create_link(

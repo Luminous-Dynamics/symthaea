@@ -122,6 +122,13 @@ impl CognitiveGoalSignal {
             .normalize();
         true
     }
+
+    /// Perform 'Holographic Dilation' - scale internal task HV.
+    pub fn dilate(&mut self, target_dim: usize) {
+        if let Some(ref mut hv) = self.task_hv {
+            *hv = hv.dilate(target_dim);
+        }
+    }
 }
 
 /// Bridge from vision manifold output to cognitive loop input.
@@ -425,7 +432,12 @@ impl VisionBridge {
                     if let Some(patch_hv) = patch_hvs.get(patch_idx) {
                         // Clamp to [0, 1]: only positive alignment earns boost.
                         // Negative similarity (anti-correlated) does not suppress.
-                        let sim = task_hv.similarity(patch_hv).max(0.0);
+                        // Dimension guard: if goal was set before dilation, skip boost until next sync.
+                        let sim = if task_hv.dim() == patch_hv.dim() {
+                            task_hv.similarity(patch_hv).max(0.0)
+                        } else {
+                            0.0
+                        };
                         self.goal_signal.task_gain * sim
                     } else {
                         0.0
@@ -480,6 +492,17 @@ impl VisionBridge {
     /// Mutable access to the underlying manifold.
     pub fn manifold_mut(&mut self) -> &mut VisionManifold {
         &mut self.manifold
+    }
+
+    /// Perform 'Holographic Dilation' - scale internal components.
+    pub fn dilate(&mut self, target: symthaea_core::hdc::HdcDimensionality) {
+        let dim = target.dimension();
+        self.goal_signal.dilate(dim);
+        self.manifold.dilate(target);
+
+        if let Some(ref mut ms) = self.multi_spectral {
+            ms.dilate(dim);
+        }
     }
 
     /// Current frame count.
@@ -585,6 +608,19 @@ impl CrossManifoldPredictor {
             learning_rate: 0.005,
             dim,
         }
+    }
+
+    /// Perform 'Holographic Dilation' - scale internal mapping weight.
+    pub fn dilate(&mut self, target_dim: usize) {
+        if self.dim == target_dim {
+            return;
+        }
+
+        self.mapping_weight = self.mapping_weight.dilate(target_dim);
+        if let Some(ref mut hv) = self.last_prediction {
+            *hv = hv.dilate(target_dim);
+        }
+        self.dim = target_dim;
     }
 
     /// Predict the cognitive state from a vision state.

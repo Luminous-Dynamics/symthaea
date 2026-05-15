@@ -40,7 +40,9 @@ case "$RECIPE" in
         DEFAULT_SCHEDULED_SAMPLING=0.0
         DEFAULT_LABEL_SMOOTHING=0.0
         DEFAULT_THOUGHT_LOGIT_AUX=0.0
+        DEFAULT_THOUGHT_LOGIT_RESIDUAL=0.0
         DEFAULT_MERGE_BIAS=1.5
+        DEFAULT_PAIR_SELECTION=head
         ;;
     baseline-v1-small)
         DEFAULT_PAIRS=128
@@ -60,7 +62,9 @@ case "$RECIPE" in
         DEFAULT_SCHEDULED_SAMPLING=0.0
         DEFAULT_LABEL_SMOOTHING=0.0
         DEFAULT_THOUGHT_LOGIT_AUX=0.0
+        DEFAULT_THOUGHT_LOGIT_RESIDUAL=0.0
         DEFAULT_MERGE_BIAS=1.5
+        DEFAULT_PAIR_SELECTION=head
         ;;
     baseline-v1-binding)
         DEFAULT_PAIRS=128
@@ -80,7 +84,9 @@ case "$RECIPE" in
         DEFAULT_SCHEDULED_SAMPLING=0.0
         DEFAULT_LABEL_SMOOTHING=0.02
         DEFAULT_THOUGHT_LOGIT_AUX=0.25
+        DEFAULT_THOUGHT_LOGIT_RESIDUAL=0.35
         DEFAULT_MERGE_BIAS=1.5
+        DEFAULT_PAIR_SELECTION=interleaved
         ;;
     baseline-v1-medium)
         DEFAULT_PAIRS=512
@@ -100,7 +106,9 @@ case "$RECIPE" in
         DEFAULT_SCHEDULED_SAMPLING=0.0
         DEFAULT_LABEL_SMOOTHING=0.0
         DEFAULT_THOUGHT_LOGIT_AUX=0.0
+        DEFAULT_THOUGHT_LOGIT_RESIDUAL=0.0
         DEFAULT_MERGE_BIAS=1.5
+        DEFAULT_PAIR_SELECTION=interleaved
         ;;
     custom)
         DEFAULT_PAIRS=16
@@ -120,7 +128,9 @@ case "$RECIPE" in
         DEFAULT_SCHEDULED_SAMPLING=0.0
         DEFAULT_LABEL_SMOOTHING=0.0
         DEFAULT_THOUGHT_LOGIT_AUX=0.0
+        DEFAULT_THOUGHT_LOGIT_RESIDUAL=0.0
         DEFAULT_MERGE_BIAS=1.5
+        DEFAULT_PAIR_SELECTION=head
         ;;
     *)
         echo "BROCA_GATE_RECIPE must be smoke, baseline-v1-small, baseline-v1-binding, baseline-v1-medium, or custom" >&2
@@ -145,7 +155,9 @@ CONTRASTIVE_MARGIN="${BROCA_GATE_CONTRASTIVE_MARGIN:-$DEFAULT_CONTRASTIVE_MARGIN
 SCHEDULED_SAMPLING="${BROCA_GATE_SCHEDULED_SAMPLING:-$DEFAULT_SCHEDULED_SAMPLING}"
 LABEL_SMOOTHING="${BROCA_GATE_LABEL_SMOOTHING:-$DEFAULT_LABEL_SMOOTHING}"
 THOUGHT_LOGIT_AUX="${BROCA_GATE_THOUGHT_LOGIT_AUX:-$DEFAULT_THOUGHT_LOGIT_AUX}"
+THOUGHT_LOGIT_RESIDUAL="${BROCA_GATE_THOUGHT_LOGIT_RESIDUAL:-$DEFAULT_THOUGHT_LOGIT_RESIDUAL}"
 MERGE_BIAS="${BROCA_GATE_MERGE_BIAS:-$DEFAULT_MERGE_BIAS}"
+PAIR_SELECTION="${BROCA_GATE_PAIR_SELECTION:-$DEFAULT_PAIR_SELECTION}"
 
 FULL_DATA="$OUT_DIR/curriculum-full.jsonl"
 TRAIN_DATA="$OUT_DIR/train-gate.jsonl"
@@ -247,10 +259,56 @@ echo "[broca-gate] output: $OUT_DIR"
 echo "[broca-gate] backend: $BACKEND"
 echo "[broca-gate] eval lane: $EVAL_LANE"
 echo "[broca-gate] recipe: $RECIPE"
+echo "[broca-gate] pair selection: $PAIR_SELECTION"
+echo "[broca-gate] thought-logit aux/residual: $THOUGHT_LOGIT_AUX / $THOUGHT_LOGIT_RESIDUAL"
 echo "[broca-gate] generating curriculum data"
 run cargo run -p symthaea-broca "${CARGO_FEATURE_ARGS[@]}" --bin broca-train -- --curriculum "$FULL_DATA"
 
-head -n "$PAIR_COUNT" "$FULL_DATA" > "$TRAIN_DATA"
+case "$PAIR_SELECTION" in
+    head)
+        head -n "$PAIR_COUNT" "$FULL_DATA" > "$TRAIN_DATA"
+        ;;
+    strided | interleaved)
+        awk -v n="$PAIR_COUNT" '
+            { lines[NR] = $0 }
+            END {
+                if (n <= 0 || NR == 0) {
+                    exit
+                }
+                if (n >= NR) {
+                    for (i = 1; i <= NR; i++) {
+                        print lines[i]
+                    }
+                    exit
+                }
+                if (n == 1) {
+                    print lines[1]
+                    exit
+                }
+                step = 997
+                while (gcd(step, NR) != 1) {
+                    step += 2
+                }
+                for (i = 0; i < n; i++) {
+                    idx = ((i * step) % NR) + 1
+                    print lines[idx]
+                }
+            }
+            function gcd(a, b, t) {
+                while (b != 0) {
+                    t = a % b
+                    a = b
+                    b = t
+                }
+                return a
+            }
+        ' "$FULL_DATA" > "$TRAIN_DATA"
+        ;;
+    *)
+        echo "BROCA_GATE_PAIR_SELECTION must be head, strided, or interleaved" >&2
+        exit 2
+        ;;
+esac
 echo "[broca-gate] training $PAIR_COUNT pairs for $EPOCHS epoch(s)"
 run cargo run -p symthaea-broca "${CARGO_FEATURE_ARGS[@]}" --bin broca-train -- \
     --data "$TRAIN_DATA" \
@@ -268,6 +326,7 @@ run cargo run -p symthaea-broca "${CARGO_FEATURE_ARGS[@]}" --bin broca-train -- 
     --scheduled-sampling "$SCHEDULED_SAMPLING" \
     --label-smoothing "$LABEL_SMOOTHING" \
     --thought-logit-aux "$THOUGHT_LOGIT_AUX" \
+    --thought-logit-residual "$THOUGHT_LOGIT_RESIDUAL" \
     --merge-bias "$MERGE_BIAS" \
     --diagnostics \
     --no-save-adam \
@@ -304,6 +363,8 @@ if run env \
     BROCA_TRAIN_SCHEDULED_SAMPLING="$SCHEDULED_SAMPLING" \
     BROCA_TRAIN_LABEL_SMOOTHING="$LABEL_SMOOTHING" \
     BROCA_TRAIN_THOUGHT_LOGIT_AUX="$THOUGHT_LOGIT_AUX" \
+    BROCA_TRAIN_THOUGHT_LOGIT_RESIDUAL="$THOUGHT_LOGIT_RESIDUAL" \
+    BROCA_TRAIN_PAIR_SELECTION="$PAIR_SELECTION" \
     BROCA_TRAIN_MERGE_BIAS="$MERGE_BIAS" \
     cargo run -p symthaea-broca "${CARGO_FEATURE_ARGS[@]}" --bin broca-eval -- \
     --checkpoint "$CHECKPOINT" \
@@ -311,6 +372,7 @@ if run env \
     --eval-limit "$EVAL_LIMIT" \
     --max-gen-tokens "$MAX_GEN_TOKENS" \
     --json-out "$REPORT" \
+    --thought-logit-residual "$THOUGHT_LOGIT_RESIDUAL" \
     "${threshold_args[@]}"; then
     echo "[broca-gate] PASS"
 else

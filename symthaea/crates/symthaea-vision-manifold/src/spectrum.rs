@@ -186,6 +186,19 @@ impl MultiSpectralEncoder {
         }
     }
 
+    /// Perform 'Holographic Dilation' - scale all internal encoders and band HVs.
+    pub fn dilate(&mut self, target_dim: usize) {
+        if self.hdc_dim == target_dim {
+            return;
+        }
+
+        self.encoder.dilate(target_dim);
+        for (_, hv) in &mut self.band_hvs {
+            *hv = hv.dilate(target_dim);
+        }
+        self.hdc_dim = target_dim;
+    }
+
     /// Encode a multi-spectral frame into a single holographic hypervector.
     ///
     /// Each band's pixel data is:

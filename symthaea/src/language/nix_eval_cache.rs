@@ -22,7 +22,7 @@
 //! with a version field; a mismatched version drops the whole file on
 //! load (same regenerative policy as `learned_idioms`).
 
-use crate::language::nix_codegen::{try_nix_module_eval, NixVerdict};
+use crate::language::nix_codegen::{NixVerdict, try_nix_module_eval};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};

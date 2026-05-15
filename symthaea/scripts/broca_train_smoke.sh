@@ -22,19 +22,23 @@ PAIR_COUNT="${BROCA_SMOKE_PAIRS:-8}"
 EVAL_LIMIT="${BROCA_SMOKE_EVAL_LIMIT:-8}"
 MAX_GEN_TOKENS="${BROCA_SMOKE_MAX_GEN_TOKENS:-8}"
 EPOCHS="${BROCA_SMOKE_EPOCHS:-1}"
+NEGATIVE_SAMPLES="${BROCA_SMOKE_NEGATIVE_SAMPLES:-64}"
 USE_NIX="${BROCA_SMOKE_USE_NIX:-1}"
 RUN_CANONICAL="${BROCA_SMOKE_CANONICAL:-0}"
 RUN_BASELINE="${BROCA_SMOKE_BASELINE:-0}"
+RUN_SELECTION="${BROCA_SMOKE_SELECT:-0}"
 BACKEND="${BROCA_SMOKE_BACKEND:-auto}"
 EVAL_LANE="${BROCA_SMOKE_EVAL_LANE:-fast}"
 GPU_COMPUTE_CAP="${BROCA_SMOKE_CUDA_COMPUTE_CAP:-75}"
 
 FULL_DATA="$OUT_DIR/curriculum-full.jsonl"
 TRAIN_DATA="$OUT_DIR/train-smoke.jsonl"
+EXTERNAL_TRAIN_DATA="${BROCA_SMOKE_TRAIN_DATA:-}"
 BASELINE_CKPT="$OUT_DIR/broca-baseline.bin"
 TRAINED_CKPT="$OUT_DIR/broca-trained.bin"
 BASELINE_JSON="$OUT_DIR/baseline-quality.json"
 TRAINED_JSON="$OUT_DIR/trained-quality.json"
+SELECTION_JSON="$OUT_DIR/selected-checkpoint.json"
 CANONICAL="crates/symthaea-broca/tests/fixtures/eval-canonical-v1.jsonl"
 
 mkdir -p "$OUT_DIR"
@@ -98,10 +102,16 @@ run() {
 echo "[broca-smoke] output: $OUT_DIR"
 echo "[broca-smoke] backend: $BACKEND"
 echo "[broca-smoke] eval lane: $EVAL_LANE"
-echo "[broca-smoke] generating curriculum data"
-run cargo run -p symthaea-broca "${CARGO_FEATURE_ARGS[@]}" --bin broca-train -- --curriculum "$FULL_DATA"
+if [[ -n "$EXTERNAL_TRAIN_DATA" ]]; then
+    TRAIN_DATA="$EXTERNAL_TRAIN_DATA"
+    PAIR_COUNT="$(wc -l < "$TRAIN_DATA" | tr -d ' ')"
+    echo "[broca-smoke] using external training data: $TRAIN_DATA"
+else
+    echo "[broca-smoke] generating curriculum data"
+    run cargo run -p symthaea-broca "${CARGO_FEATURE_ARGS[@]}" --bin broca-train -- --curriculum "$FULL_DATA"
 
-head -n "$PAIR_COUNT" "$FULL_DATA" > "$TRAIN_DATA"
+    head -n "$PAIR_COUNT" "$FULL_DATA" > "$TRAIN_DATA"
+fi
 echo "[broca-smoke] using $PAIR_COUNT training pairs"
 
 if [[ "$RUN_BASELINE" == "1" ]]; then
@@ -110,6 +120,7 @@ if [[ "$RUN_BASELINE" == "1" ]]; then
         --data "$TRAIN_DATA" \
         --epochs 0 \
         --output "$BASELINE_CKPT" \
+        --no-save-adam \
         --samples 0
 
     echo "[broca-smoke] checking baseline checkpoint reload"
@@ -123,7 +134,7 @@ run cargo run -p symthaea-broca "${CARGO_FEATURE_ARGS[@]}" --bin broca-train -- 
     --data "$TRAIN_DATA" \
     --epochs "$EPOCHS" \
     --bptt-window 8 \
-    --negative-samples 64 \
+    --negative-samples "$NEGATIVE_SAMPLES" \
     --lr 0.001 \
     --network-lr-scale 0.2 \
     --diagnostics \
@@ -187,6 +198,52 @@ if [[ "$RUN_CANONICAL" == "1" ]]; then
         --max-gen-tokens "$MAX_GEN_TOKENS" \
         --json-out "$TRAINED_JSON" \
         "${canonical_args[@]}"
+
+    if [[ "$RUN_SELECTION" == "1" ]]; then
+        selection_reports=("$TRAINED_JSON")
+        if [[ "$RUN_BASELINE" == "1" ]]; then
+            selection_reports=("$BASELINE_JSON" "$TRAINED_JSON")
+        fi
+        selection_args=()
+        if [[ -n "${BROCA_SMOKE_CODING_REPORT:-}" ]]; then
+            selection_args+=(--coding-report "$BROCA_SMOKE_CODING_REPORT")
+        fi
+        if [[ -n "${BROCA_SMOKE_REPAIR_MEMORY_AB_SUMMARY:-}" ]]; then
+            selection_args+=(--repair-memory-ab-summary "$BROCA_SMOKE_REPAIR_MEMORY_AB_SUMMARY")
+        fi
+        if [[ "${BROCA_SMOKE_REQUIRE_CODING_GATE:-0}" == "1" ]]; then
+            selection_args+=(--require-coding-gate)
+        fi
+        if [[ "${BROCA_SMOKE_REQUIRE_CODE_SIGNAL:-0}" == "1" ]]; then
+            selection_args+=(--require-code-signal)
+        fi
+        if [[ "${BROCA_SMOKE_REQUIRE_CODING_EVAL_GATE:-0}" == "1" ]]; then
+            selection_args+=(--require-coding-eval-gate)
+        fi
+        if [[ "${BROCA_SMOKE_REQUIRE_REPAIR_MEMORY_GATE:-0}" == "1" ]]; then
+            selection_args+=(--require-repair-memory-gate)
+        fi
+        if [[ "${BROCA_SMOKE_REQUIRE_TRAINED_IMPROVEMENT:-0}" == "1" ]]; then
+            selection_args+=(
+                --require-trained-improvement
+                --baseline-report "$BASELINE_JSON"
+                --trained-report "$TRAINED_JSON"
+            )
+        fi
+        selection_args+=(
+            --min-coding-score "${BROCA_SMOKE_MIN_CODING_SCORE:-0}"
+            --min-quality-pass-rate "${BROCA_SMOKE_MIN_CODING_QUALITY_PASS_RATE:-0}"
+            --min-memory-hits "${BROCA_SMOKE_MIN_REPAIR_MEMORY_HITS:-0}"
+            --min-memory-success-rate "${BROCA_SMOKE_MIN_REPAIR_MEMORY_SUCCESS_RATE:-0}"
+            --max-memory-hurt-tasks "${BROCA_SMOKE_MAX_REPAIR_MEMORY_HURT_TASKS:-0}"
+        )
+        echo "[broca-smoke] selecting checkpoint with coding quality signals"
+        python3 scripts/select_broca_checkpoint_by_quality.py \
+            --json \
+            "${selection_args[@]}" \
+            "${selection_reports[@]}" > "$SELECTION_JSON"
+        python3 -m json.tool "$SELECTION_JSON"
+    fi
 fi
 
 echo "[broca-smoke] complete"
@@ -200,4 +257,7 @@ if [[ "$RUN_CANONICAL" == "1" ]]; then
         echo "  baseline report:  $BASELINE_JSON"
     fi
     echo "  trained report:   $TRAINED_JSON"
+    if [[ "$RUN_SELECTION" == "1" ]]; then
+        echo "  selection report: $SELECTION_JSON"
+    fi
 fi

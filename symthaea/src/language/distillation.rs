@@ -9,8 +9,8 @@
 
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Write};
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use symthaea_broca::training::TrainingPair;
 

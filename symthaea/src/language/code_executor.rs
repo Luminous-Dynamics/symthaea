@@ -191,6 +191,92 @@ impl CodeExecutor {
         &self.work_dir
     }
 
+    /// Apply a Unified Diff (.patch) to a local repository
+    pub fn apply_patch(
+        &mut self,
+        repo_path: &std::path::Path,
+        patch_content: &str,
+    ) -> Result<(), String> {
+        let patch_file = self.work_dir.join("fix.patch");
+        std::fs::write(&patch_file, patch_content).map_err(|e| e.to_string())?;
+
+        // Use the sandbox to apply the patch securely
+        self.sandbox.allow_command("bash");
+        self.sandbox.allow_command("patch");
+
+        let cmd = format!(
+            "cd {} && patch -p1 < {}",
+            repo_path.display(),
+            patch_file.display()
+        );
+        let result = self
+            .sandbox
+            .run("bash", &["-c", &cmd])
+            .map_err(|e| e.to_string())?;
+
+        if result.success() {
+            Ok(())
+        } else {
+            Err(result.stderr)
+        }
+    }
+
+    /// Run a repository's full test suite
+    pub fn execute_workspace_tests(&mut self, repo_path: &std::path::Path) -> ExecutionResult {
+        let start = std::time::Instant::now();
+        self.sandbox.allow_command("bash");
+        self.sandbox.allow_command("cargo");
+
+        let cmd = format!("cd {} && cargo test", repo_path.display());
+
+        match self.sandbox.run("bash", &["-c", &cmd]) {
+            Ok(result) => {
+                if !result.success() {
+                    let errors = parse_compile_errors(&result.stderr);
+                    let (passed, failed) = parse_test_output(&result.stdout);
+
+                    let mut exec_result = ExecutionResult {
+                        compiled: failed > 0 || errors.is_empty(), // If tests ran and failed, it compiled
+                        compile_errors: errors.clone(),
+                        tests_passed: passed,
+                        tests_failed: failed,
+                        test_output: result.combined_output(),
+                        runtime_error: None,
+                        elapsed: start.elapsed(),
+                        simulated: result.simulated,
+                        test_failures: Vec::new(),
+                    };
+                    exec_result.parse_test_failures();
+                    return exec_result;
+                }
+
+                let (passed, failed) = parse_test_output(&result.stdout);
+                ExecutionResult {
+                    compiled: true,
+                    compile_errors: Vec::new(),
+                    tests_passed: passed,
+                    tests_failed: failed,
+                    test_output: result.combined_output(),
+                    runtime_error: None,
+                    elapsed: start.elapsed(),
+                    simulated: result.simulated,
+                    test_failures: Vec::new(),
+                }
+            }
+            Err(e) => ExecutionResult {
+                compiled: false,
+                compile_errors: vec![format!("Sandbox error executing workspace: {e}")],
+                tests_passed: 0,
+                tests_failed: 0,
+                test_output: String::new(),
+                runtime_error: None,
+                elapsed: start.elapsed(),
+                simulated: false,
+                test_failures: Vec::new(),
+            },
+        }
+    }
+
     /// Compile Rust source code and optionally run tests.
     ///
     /// Writes source to a temp file, invokes `rustc --edition 2021`,
@@ -661,7 +747,7 @@ pub struct CompileError {
 }
 
 /// Category of compilation error — determines recovery strategy.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ErrorCategory {
     /// Type mismatch (E0308, E0277) — may be fixable with conversions
     TypeMismatch,
@@ -669,8 +755,12 @@ pub enum ErrorCategory {
     MissingImport,
     /// Borrow checker (E0382, E0502, E0505, E0596) — may need mut/clone/ref
     BorrowError,
+    /// Value moved (E0382)
+    MovedValue,
     /// Lifetime error (E0106, E0621) — needs lifetime annotation
     LifetimeError,
+    /// Visibility error (E0603)
+    VisibilityError,
     /// Unused code (warnings treated as errors)
     UnusedCode,
     /// Missing trait impl (E0277 for Display/Debug/Clone)
@@ -685,6 +775,10 @@ pub enum ErrorCategory {
     SyntaxError,
     /// Timeout — execution took too long
     Timeout,
+    /// Linker error
+    LinkerError,
+    /// Sandbox or environment error
+    SandboxError,
     /// Other/unknown error
     Other,
 }
@@ -1180,11 +1274,7 @@ pub fn try_auto_fix(source: &str, errors: &[String]) -> Option<String> {
         }
     }
 
-    if any_fix {
-        Some(fixed)
-    } else {
-        None
-    }
+    if any_fix { Some(fixed) } else { None }
 }
 
 /// Enhanced auto-fix using structured errors with line numbers.

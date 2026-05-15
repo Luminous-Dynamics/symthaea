@@ -53,13 +53,6 @@ impl Rng {
     fn pick<'a>(&mut self, items: &'a [&str]) -> &'a str {
         items[self.range(0, items.len())]
     }
-    fn shuffle<T>(&mut self, v: &mut [T]) {
-        let n = v.len();
-        for i in (1..n).rev() {
-            let j = self.range(0, i + 1);
-            v.swap(i, j);
-        }
-    }
 }
 
 // ============================================================================
@@ -98,22 +91,6 @@ impl EpistemicStatus {
 
 // ============================================================================
 // NSM prime categories
-// ============================================================================
-
-const MENTAL_PRIMES: &[&str] = &["THINK", "KNOW", "WANT", "FEEL", "SEE", "HEAR"];
-const SPEECH_PRIMES: &[&str] = &["SAY", "WORDS", "TRUE"];
-const ACTION_PRIMES: &[&str] = &["DO", "HAPPEN", "MOVE"];
-const EVALUATOR_PRIMES: &[&str] = &["GOOD", "BAD"];
-const LOGICAL_PRIMES: &[&str] = &["NOT", "MAYBE", "CAN", "BECAUSE", "IF"];
-const TIME_PRIMES: &[&str] = &["NOW", "BEFORE", "AFTER", "WHEN"];
-const EXISTENCE_PRIMES: &[&str] = &["BE", "LIVE", "DIE", "HAVE"];
-const QUANTIFIER_PRIMES: &[&str] = &["ONE", "SOME", "ALL", "MUCH", "LITTLE"];
-const SUBSTANTIVE_PRIMES: &[&str] = &["I", "YOU", "SOMEONE", "SOMETHING", "PEOPLE", "BODY"];
-const SPACE_PRIMES: &[&str] = &["WHERE", "HERE", "INSIDE", "NEAR", "FAR"];
-const DESCRIPTOR_PRIMES: &[&str] = &["BIG", "SMALL", "VERY", "MORE", "LIKE"];
-
-// ============================================================================
-// Intent types (matching Broca's 8 intents)
 // ============================================================================
 
 const INTENTS: &[&str] = &[

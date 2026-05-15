@@ -127,7 +127,11 @@ impl SignalingClient {
             let send_task = async {
                 while let Some(cmd) = cmd_rx.recv().await {
                     let json = serde_json::to_string(&cmd).unwrap();
-                    if ws_tx.send(tokio_tungstenite::tungstenite::Message::Text(json.into())).await.is_err() {
+                    if ws_tx
+                        .send(tokio_tungstenite::tungstenite::Message::Text(json.into()))
+                        .await
+                        .is_err()
+                    {
                         break;
                     }
                 }
@@ -139,13 +143,16 @@ impl SignalingClient {
                     if let tokio_tungstenite::tungstenite::Message::Text(text) = msg {
                         match serde_json::from_str::<SignalIncoming>(&text) {
                             Ok(SignalIncoming::Welcome { peer_id }) => {
-                                let _ = evt_tx_clone.send(SignalingEvent::Connected(PeerId(peer_id)));
+                                let _ =
+                                    evt_tx_clone.send(SignalingEvent::Connected(PeerId(peer_id)));
                             }
                             Ok(SignalIncoming::PeerJoined { peer_id }) => {
-                                let _ = evt_tx_clone.send(SignalingEvent::PeerJoined(PeerId(peer_id)));
+                                let _ =
+                                    evt_tx_clone.send(SignalingEvent::PeerJoined(PeerId(peer_id)));
                             }
                             Ok(SignalIncoming::PeerLeft { peer_id }) => {
-                                let _ = evt_tx_clone.send(SignalingEvent::PeerLeft(PeerId(peer_id)));
+                                let _ =
+                                    evt_tx_clone.send(SignalingEvent::PeerLeft(PeerId(peer_id)));
                             }
                             Ok(SignalIncoming::Signal { from, data }) => {
                                 let _ = evt_tx_clone.send(SignalingEvent::Signal {
@@ -180,13 +187,17 @@ impl SignalingClient {
 
     /// Join a room.
     pub fn join(&self, room: &str) -> Result<(), String> {
-        self.tx.send(SignalOutgoing::Join { room: room.to_string() })
+        self.tx
+            .send(SignalOutgoing::Join {
+                room: room.to_string(),
+            })
             .map_err(|e| format!("Send failed: {e}"))
     }
 
     /// Send signaling data to a peer.
     pub fn signal(&self, to: PeerId, data: SignalData) -> Result<(), String> {
-        self.tx.send(SignalOutgoing::Signal { to: to.0, data })
+        self.tx
+            .send(SignalOutgoing::Signal { to: to.0, data })
             .map_err(|e| format!("Send failed: {e}"))
     }
 

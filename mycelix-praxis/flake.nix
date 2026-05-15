@@ -12,7 +12,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     holonix = {
-      url = "github:holochain/holonix?ref=main-0.6";
+      url = "github:holochain/holonix/d21b3543";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };

@@ -14,7 +14,6 @@
 use std::process;
 use std::time::Instant;
 
-use symthaea_broca::encoder::ThoughtChannels;
 use symthaea_broca::evaluation::{english_word_ratio, english_word_ratio_mamba};
 use symthaea_broca::generator::{BrocaConfig, BrocaGenerator};
 use symthaea_broca::liquid_mamba::{LiquidMambaConfig, LiquidMambaGenerator};

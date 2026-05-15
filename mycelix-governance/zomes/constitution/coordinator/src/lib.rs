@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -9,6 +8,7 @@ use mycelix_zome_helpers as _;
 
 use constitution_integrity::*;
 use hdk::prelude::*;
+use mycelix_zome_helpers as _;
 
 /// Helper to get or create an anchor entry hash
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {

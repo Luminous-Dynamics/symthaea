@@ -35,12 +35,22 @@ members = [
     "crates/symthaea-humanoid",
     "crates/symthaea-physics",
     "crates/symthaea-physics-bridge",
+    "crates/symthaea-sim-bridge",
+    "crates/symthaea-digital-twin",
+    "crates/symthaea-formal-safety",
+    "crates/symthaea-engineering",
+    "crates/symthaea-mujoco-bridge",
+    "crates/symthaea-opensees-bridge",
+    "crates/symthaea-ngspice-bridge",
+    "crates/symthaea-openfoam-bridge",
+    "crates/symthaea-ros-bridge",
     "crates/symthaea-vocal-tract",
     "crates/symthaea-voice",
     "crates/symthaea-vehicle",
     # New platforms (uncomment after creating crates):
     "crates/symthaea-exoskeleton",
     "crates/symthaea-surgical",
+    "crates/symthaea-swarm",
     "crates/symthaea-orbital",
     "crates/symthaea-quadruped",
     "crates/symthaea-subterranean",
@@ -91,6 +101,7 @@ members = [
     "crates/symthaea-aesthetic",
     "crates/symthaea-atelier",
     "crates/symthaea-muse",
+    "crates/symthaea-bevy-dash",
     "crates/symthaea-biometrics",
     "crates/symthaea-gallery",
     "crates/symthaea-circular",
@@ -132,6 +143,17 @@ core = ["symthaea", "symthaea-core", "symthaea-nix"]
 gpu = ["symthaea-broca", "symthaea-stt"]
 wasm = ["symthaea-spore", "symthaea-web"]
 robotics = ["symthaea-multirotor", "symthaea-helicopter", "symthaea-humanoid", "symthaea-auv"]
+engineering = [
+    "symthaea-sim-bridge",
+    "symthaea-digital-twin",
+    "symthaea-formal-safety",
+    "symthaea-engineering",
+    "symthaea-mujoco-bridge",
+    "symthaea-opensees-bridge",
+    "symthaea-ngspice-bridge",
+    "symthaea-openfoam-bridge",
+    "symthaea-ros-bridge",
+]
 
 # Workspace-wide lint configuration. Members opt in via [lints] workspace = true.
 # These lints apply on top of any crate-level #![deny/allow/warn] attributes.
@@ -180,6 +202,8 @@ regex = "1.10"
 strsim = "0.11"
 tree-sitter = "0.24"
 tree-sitter-nix = "0.3"
+hex = "0.4"
+syn = { version = "2.0", features = ["full", "visit", "visit-mut"] }
 rusqlite = { version = "0.37", features = ["bundled"] }
 dashmap = "5.5"
 lru = "0.16"
@@ -321,6 +345,16 @@ symthaea-physics = { path = "crates/symthaea-physics", optional = true }
 
 # Symthaea Physics Bridge - HDC semantic search for mathematical physics analogies
 symthaea-physics-bridge = { path = "crates/symthaea-physics-bridge", optional = true }
+
+# Symthaea Engineering - simulation dispatch, digital twins, and safety cases
+symthaea-sim-bridge = { path = "crates/symthaea-sim-bridge", optional = true }
+symthaea-digital-twin = { path = "crates/symthaea-digital-twin", optional = true }
+symthaea-formal-safety = { path = "crates/symthaea-formal-safety", optional = true }
+symthaea-engineering = { path = "crates/symthaea-engineering", optional = true }
+symthaea-mujoco-bridge = { path = "crates/symthaea-mujoco-bridge", optional = true }
+symthaea-opensees-bridge = { path = "crates/symthaea-opensees-bridge", optional = true }
+symthaea-ngspice-bridge = { path = "crates/symthaea-ngspice-bridge", optional = true }
+symthaea-openfoam-bridge = { path = "crates/symthaea-openfoam-bridge", optional = true }
 
 # Symthaea Broca - SSM Language Center: CfC-HDC autoregressive thought-to-text generation
 symthaea-broca = { path = "crates/symthaea-broca", optional = true }
@@ -496,7 +530,8 @@ strsim = { workspace = true }
 image = "0.24"       # Image loading and processing
 # imageproc removed: only image crate is used, imageproc never imported
 tree-sitter = { workspace = true }
-syn = { version = "2.0", features = ["full", "visit"] }  # Rust syntax parsing (self-analysis)
+syn = { version = "2.0", features = ["full", "visit", "visit-mut"] }  # Rust syntax parsing (self-analysis)
+quote = "1.0"        # Emitting AST-grafted Rust during analogy synthesis
 ignore = "0.4"       # .gitignore-aware file walking
 urlencoding = "2.1"
 shlex = "1.3"
@@ -661,6 +696,10 @@ swarm = ["iroh"]                            # Real-time P2P tensor streaming via
 pqc-handshake = ["identity", "mesh-key-exchange", "dep:mycelix-crypto"]  # Hybrid Ed25519 + ML-KEM-768 post-quantum handshake
 mycelix = ["mycelix-fl-core", "sha3", "dep:symthaea-mycelix-conductor"]       # Mycelix FL algorithms + hashing + conductor bridge
 mycelix_sdk = ["mycelix", "dep:mycelix-sdk"]                  # Enabled Mycelix SDK integration
+# Compile the legacy bridge-common integration test only from the isolated
+# Mycelix/Holochain workspace. This feature intentionally has no dependencies
+# in Symthaea's main graph, preserving the serde boundary.
+external-mycelix-bridge-tests = []
 epistemic = []                                                 # Epistemic integration: immune threats, thermodynamic cost, provenance tags, collective health
 neural_validation = ["symthaea-core/neural_validation"]        # TRIBE v2 fMRI comparison: cortical activation maps, Glasser parcellation, HRF
 
@@ -783,6 +822,29 @@ nuclear-forensics = ["dep:symthaea-nuclear-forensics", "safety-agents"]
 quantum-consciousness = ["dep:symthaea-quantum-chemistry"]  # Ground consciousness in Schrödinger equation (10 theories × molecular wavefunction)
 water-prediction = ["cell-foundry", "safety-agents"]
 physics-bridge = ["physics", "dep:symthaea-physics-bridge"]  # HDC semantic physics bridge + guided design exploration
+engineering = ["dep:symthaea-engineering"]  # Lightweight engineering facade: requirements, simulation requests, twins, safety cases
+engineering-foundations = [
+    "engineering",
+    "dep:symthaea-sim-bridge",
+    "dep:symthaea-digital-twin",
+    "dep:symthaea-formal-safety",
+]
+engineering-full = [
+    "engineering-foundations",
+    "engineering-adapters",
+    "geodesic_synthesis",
+    "physics-bridge",
+    "materials",
+    "advanced-manufacturing",
+    "infrastructure",
+]
+engineering-adapters = [
+    "engineering-foundations",
+    "dep:symthaea-mujoco-bridge",
+    "dep:symthaea-opensees-bridge",
+    "dep:symthaea-ngspice-bridge",
+    "dep:symthaea-openfoam-bridge",
+]
 analogy-engine = []   # Cross-domain analogy detection in cognitive loop (AnalogyEngine from symthaea-core)
 ucl-frames = []       # UCL cross-domain semantic frame detection in cognitive loop
 grid-scaling = ["physics", "safety-agents"]
@@ -895,12 +957,14 @@ criterion = "0.5"
 proptest = "1.4"
 serial_test = "3.2"
 symthaea-broca = { path = "crates/symthaea-broca", default-features = false }
+symthaea-engineering = { path = "crates/symthaea-engineering" }
+symthaea-sim-bridge = { path = "crates/symthaea-sim-bridge" }
+symthaea-mujoco-bridge = { path = "crates/symthaea-mujoco-bridge" }
 symthaea-crucible = { path = "crates/symthaea-crucible" }
 symthaea-psych-bench = { path = "crates/symthaea-psych-bench" }
 symthaea-humanoid = { path = "crates/symthaea-humanoid" }
 symthaea-mycelix-conductor = { path = "crates/symthaea-mycelix-conductor" }
 symthaea-epistemic-types = { path = "crates/symthaea-epistemic-types" }
-mycelix-bridge-common = { path = "../crates/mycelix-bridge-common" }
 tempfile = "3.8"  # For perception tests
 tower = { version = "0.5", features = ["util"] }  # Router oneshot helpers in integration tests
 
@@ -997,6 +1061,10 @@ required-features = ["multirotor"]
 [[example]]
 name = "mujoco_vs_simple_benchmark"
 required-features = ["multirotor-mujoco"]
+
+[[example]]
+name = "sovereign_design_loop"
+path = "examples/sovereign_design_loop.rs"
 
 [[example]]
 name = "mujoco_flight_viewer"
@@ -1844,13 +1912,21 @@ codegen-units = 1
 [profile.bench]
 inherits = "release"
 
-# Shim: bitflags >=2.10 switched from serde → serde_core, which pins
-# serde_derive =1.0.228. holochain_serialized_bytes pins serde =1.0.219
-# (→ serde_derive =1.0.219). This local crate re-exports serde, bridging
-# the gap until holochain releases a serde_core-compatible version.
 [[example]]
 name = "debug_exercism"
 required-features = ["code_generation"]
+
+[[example]]
+name = "benchmark_coding_backends"
+required-features = ["code_generation"]
+
+[[example]]
+name = "engineering_bridge_review"
+required-features = ["engineering-foundations"]
+
+[[example]]
+name = "engineering_mechanism_review"
+required-features = ["engineering-foundations"]
 
 [[example]]
 name = "consciousness_demo"
@@ -1868,9 +1944,6 @@ required-features = ["unstable-examples"]
 name = "benchmark_jepa_thermodynamic"
 required-features = ["unstable-examples"]
 
-[patch.crates-io]
-serde_core = { path = "crates/serde-core-shim" }
-
 # cudarc 0.13.9's hand-maintained CUDA-toolkit version table stops at
 # 12.8. On CUDA 12.9 (current dev toolkit), the un-patched build.rs
 # panics at compile time with "Unsupported cuda toolkit version: `12.9`".
@@ -1879,4 +1952,5 @@ serde_core = { path = "crates/serde-core-shim" }
 # resolution. Unblocks Broca's `gpu` feature (and therefore Phase 2 M7
 # distillation training) without waiting on upstream cudarc or candle-core.
 # Remove this patch once candle-core bumps to cudarc 0.18+.
+[patch.crates-io]
 cudarc = { path = "vendor/cudarc-0.13.9-cuda129" }

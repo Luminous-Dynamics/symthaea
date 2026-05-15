@@ -43,8 +43,8 @@ pub fn sync_physics_2d(
     for (body_comp, mut transform) in &mut query {
         if let Some(body) = physics.world.body(body_comp.handle) {
             let pos = body.position();
-            transform.translation.x = pos.coord(0) as f32;
-            transform.translation.y = pos.coord(1) as f32;
+            transform.translation.x = pos[0] as f32;
+            transform.translation.y = pos[1] as f32;
         }
     }
 }
@@ -57,9 +57,9 @@ pub fn sync_physics_3d(
     for (body_comp, mut transform) in &mut query {
         if let Some(body) = physics.world.body(body_comp.handle) {
             let pos = body.position();
-            transform.translation.x = pos.coord(0) as f32;
-            transform.translation.y = pos.coord(1) as f32;
-            transform.translation.z = pos.coord(2) as f32;
+            transform.translation.x = pos[0] as f32;
+            transform.translation.y = pos[1] as f32;
+            transform.translation.z = pos[2] as f32;
         }
     }
 }
@@ -77,9 +77,9 @@ pub fn sync_physics_4d(
     for (body_comp, mut transform) in &mut query {
         if let Some(body) = physics.world.body(body_comp.handle) {
             let pos = body.position();
-            transform.translation.x = pos.coord(0) as f32;
-            transform.translation.y = pos.coord(1) as f32;
-            transform.translation.z = pos.coord(2) as f32;
+            transform.translation.x = pos[0] as f32;
+            transform.translation.y = pos[1] as f32;
+            transform.translation.z = pos[2] as f32;
         }
     }
 }

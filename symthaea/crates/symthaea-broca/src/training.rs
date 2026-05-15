@@ -1196,6 +1196,7 @@ pub fn train_with_adam(
                                 let aux_loss = trainer.gpu_thought_logit_aux_gradient(
                                     &thought_tensor,
                                     target_id as usize,
+                                    pos,
                                     lr,
                                     effective_grad_clip,
                                     config.thought_logit_aux_weight,
@@ -1216,9 +1217,49 @@ pub fn train_with_adam(
                     // Embeddings stay on GPU (updated by gpu_embedding_gradient)
                     // Only sync at epoch boundaries or for checkpointing
                     if pair_idx == num_pairs - 1 {
+                        if config.enable_diagnostics && config.thought_logit_aux_weight > 0.0 {
+                            for (probe_pos, &probe_target) in
+                                pair.target_ids[..window_end].iter().take(8).enumerate()
+                            {
+                                let gpu_logits =
+                                    trainer.thought_position_logits(&thought_tensor, probe_pos)?;
+                                let gpu_probe = logit_probe(&gpu_logits, probe_target as usize);
+                                eprintln!(
+                                    "BINDING_PROBE gpu_pre_sync epoch={epoch} pair={pair_idx} pos={probe_pos} target={} rank={} p={:.8} max_p={:.8} selected={}",
+                                    probe_target,
+                                    gpu_probe.target_rank,
+                                    gpu_probe.target_probability,
+                                    gpu_probe.max_probability,
+                                    gpu_probe.selected_token_id
+                                );
+                            }
+                        }
                         trainer.sync_to_cpu(generator.controller_mut())?;
                         // Also sync GPU embeddings back to CPU for checkpointing
                         trainer.sync_embeddings_to_cpu(generator.controller_mut())?;
+                        if config.enable_diagnostics && config.thought_logit_aux_weight > 0.0 {
+                            for (probe_pos, &probe_target) in
+                                pair.target_ids[..window_end].iter().take(8).enumerate()
+                            {
+                                let thought_query = thought_hv.bind(
+                                    &generator
+                                        .controller()
+                                        .position_base_ref()
+                                        .permute(probe_pos),
+                                );
+                                let cpu_logits =
+                                    generator.controller().compute_logits(&thought_query);
+                                let cpu_probe = logit_probe(&cpu_logits, probe_target as usize);
+                                eprintln!(
+                                    "BINDING_PROBE cpu_post_sync epoch={epoch} pair={pair_idx} pos={probe_pos} target={} rank={} p={:.8} max_p={:.8} selected={}",
+                                    probe_target,
+                                    cpu_probe.target_rank,
+                                    cpu_probe.target_probability,
+                                    cpu_probe.max_probability,
+                                    cpu_probe.selected_token_id
+                                );
+                            }
+                        }
                     }
 
                     Ok(())
@@ -1362,6 +1403,7 @@ pub fn train_with_adam(
                                 generator.controller_mut(),
                                 &thought_hv,
                                 target_id as usize,
+                                pos,
                                 lr,
                                 effective_grad_clip,
                                 config.thought_logit_aux_weight,
@@ -1382,6 +1424,7 @@ pub fn train_with_adam(
                                 generator.controller_mut(),
                                 &thought_hv,
                                 target_id as usize,
+                                pos,
                                 lr,
                                 effective_grad_clip,
                                 config.thought_logit_aux_weight,
@@ -1560,13 +1603,15 @@ pub fn train_with_adam(
             if config.progress {
                 // Unbuffered progress (tracing stderr is internally buffered when piped)
                 use std::io::Write;
-                let _ =
-                    writeln!(
+                let _ = writeln!(
                     std::io::stderr(),
                     "[epoch] {epoch}/{} loss={avg_loss:.6}{val_str}{coh_str}{} tokens={total_tokens}",
                     config.epochs,
                     if contrastive_count > 0 {
-                        format!(" contra={:.4}", contrastive_loss_sum / contrastive_count as f32)
+                        format!(
+                            " contra={:.4}",
+                            contrastive_loss_sum / contrastive_count as f32
+                        )
                     } else {
                         String::new()
                     },
@@ -1801,6 +1846,55 @@ fn cross_entropy_loss_smooth(logits: &[f32], target: usize, label_smoothing: f32
     } else {
         let log_softmax_target = (logits[target] - max_logit) - log_z;
         -log_softmax_target
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct LogitProbe {
+    target_rank: usize,
+    target_probability: f32,
+    max_probability: f32,
+    selected_token_id: usize,
+}
+
+fn logit_probe(logits: &[f32], target: usize) -> LogitProbe {
+    if logits.is_empty() || target >= logits.len() {
+        return LogitProbe {
+            target_rank: usize::MAX,
+            target_probability: 0.0,
+            max_probability: 0.0,
+            selected_token_id: 0,
+        };
+    }
+
+    let max_logit = logits.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+    let exps: Vec<f32> = logits.iter().map(|&l| (l - max_logit).exp()).collect();
+    let sum_exp: f32 = exps.iter().sum();
+    let (selected_token_id, _) = logits
+        .iter()
+        .enumerate()
+        .max_by(|(_, a), (_, b)| a.total_cmp(b))
+        .unwrap_or((0, &0.0));
+    let target_rank = 1 + logits
+        .iter()
+        .filter(|&&logit| logit > logits[target])
+        .count();
+    let target_probability = if sum_exp > 0.0 && sum_exp.is_finite() {
+        exps[target] / sum_exp
+    } else {
+        0.0
+    };
+    let max_probability = if sum_exp > 0.0 && sum_exp.is_finite() {
+        exps[selected_token_id] / sum_exp
+    } else {
+        0.0
+    };
+
+    LogitProbe {
+        target_rank,
+        target_probability,
+        max_probability,
+        selected_token_id,
     }
 }
 
@@ -2134,6 +2228,7 @@ fn apply_thought_logit_aux_gradient(
     controller: &mut crate::controller::LanguageController,
     thought_hv: &ContinuousHV,
     target: usize,
+    pos: usize,
     lr: f32,
     grad_clip: f32,
     weight: f32,
@@ -2142,7 +2237,8 @@ fn apply_thought_logit_aux_gradient(
         return 0.0;
     }
 
-    let logits = controller.compute_logits(thought_hv);
+    let thought_query = thought_hv.bind(&controller.position_base_ref().permute(pos));
+    let logits = controller.compute_logits(&thought_query);
     if target >= logits.len() {
         return 0.0;
     }
@@ -2156,7 +2252,7 @@ fn apply_thought_logit_aux_gradient(
 
     let log_prob = logits[target] - max_logit - sum_exp.ln();
     let loss = -log_prob;
-    let thought_slice = thought_hv.as_slice();
+    let thought_slice = thought_query.as_slice();
     let scale = controller.config().logit_scale;
     let scaled_lr = lr * weight;
     let embeddings = controller.token_embeddings_mut();
@@ -2278,12 +2374,8 @@ pub fn thought_to_prompt(channels: &ThoughtChannels) -> String {
         3 => format!(
             "{epistemic} {intent}: emotional state ({valence:.1}/{arousal:.1}), awareness={psi:.2}\n"
         ),
-        4 => format!(
-            "INTENT={intent} EPISTEMIC={epistemic} PSI={psi:.2} VALENCE={valence:.1}\n"
-        ),
-        5 => format!(
-            "I need to {intent} (confidence: {epistemic}, feeling: {valence:.1})\n"
-        ),
+        4 => format!("INTENT={intent} EPISTEMIC={epistemic} PSI={psi:.2} VALENCE={valence:.1}\n"),
+        5 => format!("I need to {intent} (confidence: {epistemic}, feeling: {valence:.1})\n"),
         6 => format!(
             "Mode: {intent} | Certainty: {epistemic} | Alertness: {arousal:.1} | Warmth: {:.1}\n",
             channels.warmth()
@@ -2540,14 +2632,81 @@ mod tests {
         assert!(loss_correct >= 0.0, "Loss should be non-negative");
     }
 
+    fn softmax_probability(logits: &[f32], target: usize) -> f32 {
+        let max_logit = logits.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        let exps: Vec<f32> = logits.iter().map(|&l| (l - max_logit).exp()).collect();
+        let sum_exp: f32 = exps.iter().sum();
+        if target >= logits.len() || sum_exp <= 0.0 {
+            0.0
+        } else {
+            exps[target] / sum_exp
+        }
+    }
+
+    fn target_rank(logits: &[f32], target: usize) -> usize {
+        if target >= logits.len() {
+            return usize::MAX;
+        }
+        1 + logits
+            .iter()
+            .filter(|&&logit| logit > logits[target])
+            .count()
+    }
+
+    #[test]
+    fn test_thought_logit_aux_gradient_improves_target_logit() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut generator = BrocaGenerator::new(&genesis, config);
+        let channels = ThoughtChannels::default();
+        let thought_hv = generator.encoder().encode(&channels);
+        let thought_query = thought_hv.bind(&generator.controller().position_base_ref().permute(0));
+        let target_id = generator.tokenizer().token_id("hello") as usize;
+
+        let before_logits = generator.controller().compute_logits(&thought_query);
+        let before_rank = target_rank(&before_logits, target_id);
+        let before_prob = softmax_probability(&before_logits, target_id);
+        let before_logit = before_logits[target_id];
+
+        let aux_loss = apply_thought_logit_aux_gradient(
+            generator.controller_mut(),
+            &thought_hv,
+            target_id,
+            0,
+            0.05,
+            10.0,
+            1.0,
+        );
+
+        let after_query = thought_hv.bind(&generator.controller().position_base_ref().permute(0));
+        let after_logits = generator.controller().compute_logits(&after_query);
+        let after_rank = target_rank(&after_logits, target_id);
+        let after_prob = softmax_probability(&after_logits, target_id);
+        let after_logit = after_logits[target_id];
+
+        assert!(aux_loss.is_finite() && aux_loss > 0.0);
+        assert!(
+            after_logit > before_logit,
+            "target logit should increase: before={before_logit} after={after_logit}"
+        );
+        assert!(
+            after_prob > before_prob,
+            "target probability should increase: before={before_prob} after={after_prob}"
+        );
+        assert!(
+            after_rank <= before_rank,
+            "target rank should not get worse: before={before_rank} after={after_rank}"
+        );
+    }
+
     #[test]
     fn test_training_reduces_loss() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut generator = BrocaGenerator::new(&genesis, config);
 
         // Create a simple dataset with repeated examples for stronger signal
-        let tok = gen.tokenizer().clone();
+        let tok = generator.tokenizer().clone();
         let mut dataset = TrainingDataset::default();
         let channels = ThoughtChannels::default();
         for _ in 0..5 {
@@ -2568,7 +2727,7 @@ mod tests {
             ..Default::default()
         };
 
-        let metrics = train(&mut gen, &dataset, &train_config);
+        let metrics = train(&mut generator, &dataset, &train_config);
         assert_eq!(metrics.len(), 20);
 
         // Loss should be finite
@@ -2593,9 +2752,9 @@ mod tests {
     fn test_training_with_adam() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut generator = BrocaGenerator::new(&genesis, config);
 
-        let tok = gen.tokenizer().clone();
+        let tok = generator.tokenizer().clone();
         let mut dataset = TrainingDataset::default();
         let channels = ThoughtChannels::default();
         for _ in 0..3 {
@@ -2616,7 +2775,7 @@ mod tests {
         };
 
         let (metrics, adam, diag, report, _validation) =
-            train_with_adam(&mut gen, &dataset, &train_config, None);
+            train_with_adam(&mut generator, &dataset, &train_config, None);
         assert_eq!(metrics.len(), 10);
         assert!(adam.is_some());
         assert!(
@@ -2636,9 +2795,9 @@ mod tests {
     fn test_early_stopping() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut generator = BrocaGenerator::new(&genesis, config);
 
-        let tok = gen.tokenizer().clone();
+        let tok = generator.tokenizer().clone();
         let mut dataset = TrainingDataset::default();
         let channels = ThoughtChannels::default();
         dataset.push(TrainingPair::new(channels, "a".to_string(), &tok));
@@ -2658,7 +2817,7 @@ mod tests {
             ..Default::default()
         };
 
-        let metrics = train(&mut gen, &dataset, &train_config);
+        let metrics = train(&mut generator, &dataset, &train_config);
         // With near-zero LR, loss changes are < 1e-6, so patience triggers
         assert!(
             metrics.len() < 100,
@@ -2780,9 +2939,9 @@ mod tests {
     fn test_gradient_diagnostics_no_vanishing_or_exploding() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut generator = BrocaGenerator::new(&genesis, config);
 
-        let tok = gen.tokenizer().clone();
+        let tok = generator.tokenizer().clone();
         let mut dataset = TrainingDataset::default();
         let channels = ThoughtChannels::default();
         for _ in 0..3 {
@@ -2803,7 +2962,7 @@ mod tests {
         };
 
         let (_metrics, _adam, diag, _report, _validation) =
-            train_with_adam(&mut gen, &dataset, &train_config, None);
+            train_with_adam(&mut generator, &dataset, &train_config, None);
         let diag = diag.expect("Diagnostics should be Some when enabled");
         assert!(diag.total_steps > 0, "Should have recorded steps");
         let mean = diag.mean_grad_norm();
@@ -3061,9 +3220,9 @@ mod tests {
     fn test_embedding_normalization() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut generator = BrocaGenerator::new(&genesis, config);
 
-        let tok = gen.tokenizer().clone();
+        let tok = generator.tokenizer().clone();
         let mut dataset = TrainingDataset::default();
         let channels = ThoughtChannels::default();
         for _ in 0..3 {
@@ -3078,11 +3237,11 @@ mod tests {
             ..Default::default()
         };
 
-        let _ = train(&mut gen, &dataset, &train_config);
+        let _ = train(&mut generator, &dataset, &train_config);
 
         // All embeddings should have norms at or below the target (with 10% margin)
         let max_allowed = 128.0 * 1.15;
-        for emb in gen.controller().token_embeddings() {
+        for emb in generator.controller().token_embeddings() {
             let norm = emb.norm();
             assert!(
                 norm <= max_allowed,
@@ -3108,9 +3267,9 @@ mod tests {
     fn test_sampled_softmax_training() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut generator = BrocaGenerator::new(&genesis, config);
 
-        let tok = gen.tokenizer().clone();
+        let tok = generator.tokenizer().clone();
         let mut dataset = TrainingDataset::default();
         let channels = ThoughtChannels::default();
         for _ in 0..5 {
@@ -3125,7 +3284,7 @@ mod tests {
             ..Default::default()
         };
 
-        let metrics = train(&mut gen, &dataset, &train_config);
+        let metrics = train(&mut generator, &dataset, &train_config);
         assert_eq!(metrics.len(), 10);
 
         // Loss should be finite and decreasing
@@ -3144,9 +3303,9 @@ mod tests {
     fn test_carry_state_training() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut generator = BrocaGenerator::new(&genesis, config);
 
-        let tok = gen.tokenizer().clone();
+        let tok = generator.tokenizer().clone();
         let mut dataset = TrainingDataset::default();
         for i in 0..5 {
             let channels = ThoughtChannels::with_intent(i % 3);
@@ -3161,7 +3320,7 @@ mod tests {
             ..Default::default()
         };
 
-        let metrics = train(&mut gen, &dataset, &train_config);
+        let metrics = train(&mut generator, &dataset, &train_config);
         assert_eq!(metrics.len(), 5);
         for m in &metrics {
             assert!(
@@ -3175,9 +3334,9 @@ mod tests {
     fn test_curriculum_length_ascending() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut generator = BrocaGenerator::new(&genesis, config);
 
-        let tok = gen.tokenizer().clone();
+        let tok = generator.tokenizer().clone();
         let mut dataset = TrainingDataset::default();
         let channels = ThoughtChannels::default();
         // Varying lengths: short, medium, long
@@ -3197,7 +3356,7 @@ mod tests {
             ..Default::default()
         };
 
-        let metrics = train(&mut gen, &dataset, &train_config);
+        let metrics = train(&mut generator, &dataset, &train_config);
         assert_eq!(metrics.len(), 3);
         for m in &metrics {
             assert!(m.avg_loss.is_finite(), "Loss should be finite");
@@ -3208,9 +3367,9 @@ mod tests {
     fn test_validation_loss_computation() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut generator = BrocaGenerator::new(&genesis, config);
 
-        let tok = gen.tokenizer().clone();
+        let tok = generator.tokenizer().clone();
         let mut train_dataset = TrainingDataset::default();
         let mut val_dataset = TrainingDataset::default();
         let channels = ThoughtChannels::default();
@@ -3230,7 +3389,8 @@ mod tests {
             ..Default::default()
         };
 
-        let (metrics, _, _, _, _) = train_with_adam(&mut gen, &train_dataset, &train_config, None);
+        let (metrics, _, _, _, _) =
+            train_with_adam(&mut generator, &train_dataset, &train_config, None);
         assert_eq!(metrics.len(), 5);
 
         // All epochs should have validation loss
@@ -3250,9 +3410,9 @@ mod tests {
     fn test_anomaly_response_exploding_halves_lr() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut generator = BrocaGenerator::new(&genesis, config);
 
-        let tok = gen.tokenizer().clone();
+        let tok = generator.tokenizer().clone();
         let mut dataset = TrainingDataset::default();
         let channels = ThoughtChannels::default();
         for _ in 0..3 {
@@ -3269,7 +3429,7 @@ mod tests {
             ..Default::default()
         };
 
-        let metrics = train(&mut gen, &dataset, &train_config);
+        let metrics = train(&mut generator, &dataset, &train_config);
         // Should early-stop (3 consecutive anomalous epochs) or complete with reduced LR
         // Either way, all losses should be finite (anomaly response prevents divergence)
         for m in &metrics {
@@ -3284,9 +3444,9 @@ mod tests {
     fn test_anomaly_response_early_stop() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut generator = BrocaGenerator::new(&genesis, config);
 
-        let tok = gen.tokenizer().clone();
+        let tok = generator.tokenizer().clone();
         let mut dataset = TrainingDataset::default();
         let channels = ThoughtChannels::default();
         for _ in 0..3 {
@@ -3305,7 +3465,7 @@ mod tests {
             ..Default::default()
         };
 
-        let metrics = train(&mut gen, &dataset, &train_config);
+        let metrics = train(&mut generator, &dataset, &train_config);
         // Should early-stop well before 100 epochs
         assert!(
             metrics.len() < 100,
@@ -3327,17 +3487,17 @@ mod tests {
     fn test_freeze_embeddings_preserves_norms() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut generator = BrocaGenerator::new(&genesis, config);
 
         // Snapshot embedding norms before training
-        let norms_before: Vec<f32> = gen
+        let norms_before: Vec<f32> = generator
             .controller()
             .token_embeddings()
             .iter()
             .map(|e| e.norm())
             .collect();
 
-        let tok = gen.tokenizer().clone();
+        let tok = generator.tokenizer().clone();
         let mut dataset = TrainingDataset::default();
         let channels = ThoughtChannels::default();
         for _ in 0..5 {
@@ -3354,10 +3514,10 @@ mod tests {
             ..Default::default()
         };
 
-        train(&mut gen, &dataset, &train_config);
+        train(&mut generator, &dataset, &train_config);
 
         // Embeddings should be unchanged when frozen
-        let norms_after: Vec<f32> = gen
+        let norms_after: Vec<f32> = generator
             .controller()
             .token_embeddings()
             .iter()
@@ -3376,9 +3536,9 @@ mod tests {
     fn test_freeze_embeddings_cfc_still_trains() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut generator = BrocaGenerator::new(&genesis, config);
 
-        let tok = gen.tokenizer().clone();
+        let tok = generator.tokenizer().clone();
         let mut dataset = TrainingDataset::default();
         let channels = ThoughtChannels::default();
         for _ in 0..5 {
@@ -3397,7 +3557,7 @@ mod tests {
             ..Default::default()
         };
 
-        let metrics = train(&mut gen, &dataset, &train_config);
+        let metrics = train(&mut generator, &dataset, &train_config);
         // Should complete without error and produce finite loss
         for m in &metrics {
             assert!(
@@ -3413,9 +3573,9 @@ mod tests {
     fn test_anomaly_report_returned_when_enabled() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut generator = BrocaGenerator::new(&genesis, config);
 
-        let tok = gen.tokenizer().clone();
+        let tok = generator.tokenizer().clone();
         let mut dataset = TrainingDataset::default();
         let channels = ThoughtChannels::default();
         for _ in 0..3 {
@@ -3430,7 +3590,7 @@ mod tests {
             ..Default::default()
         };
 
-        let (_, _, _, report, _) = train_with_adam(&mut gen, &dataset, &train_config, None);
+        let (_, _, _, report, _) = train_with_adam(&mut generator, &dataset, &train_config, None);
         let report = report.expect("AnomalyReport should be Some when enabled");
         assert!(report.final_lr_multiplier > 0.0);
         assert!(report.final_grad_clip > 0.0);
@@ -3440,9 +3600,9 @@ mod tests {
     fn test_anomaly_report_records_early_stop() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut generator = BrocaGenerator::new(&genesis, config);
 
-        let tok = gen.tokenizer().clone();
+        let tok = generator.tokenizer().clone();
         let mut dataset = TrainingDataset::default();
         let channels = ThoughtChannels::default();
         for _ in 0..3 {
@@ -3459,7 +3619,8 @@ mod tests {
             ..Default::default()
         };
 
-        let (metrics, _, _, report, _) = train_with_adam(&mut gen, &dataset, &train_config, None);
+        let (metrics, _, _, report, _) =
+            train_with_adam(&mut generator, &dataset, &train_config, None);
         let report = report.expect("AnomalyReport should be Some");
         if metrics.len() < 100 {
             assert!(
@@ -3548,9 +3709,9 @@ mod tests {
     fn test_early_stopping_with_validation() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut generator = BrocaGenerator::new(&genesis, config);
 
-        let tok = gen.tokenizer().clone();
+        let tok = generator.tokenizer().clone();
         let mut train_dataset = TrainingDataset::default();
         let mut val_dataset = TrainingDataset::default();
         let channels = ThoughtChannels::default();
@@ -3570,7 +3731,7 @@ mod tests {
             ..Default::default()
         };
 
-        let metrics = train(&mut gen, &train_dataset, &train_config);
+        let metrics = train(&mut generator, &train_dataset, &train_config);
         assert!(
             metrics.len() < 100,
             "Early stopping should trigger with validation: got {} epochs",
@@ -3584,9 +3745,9 @@ mod tests {
     fn test_epoch_metrics_coherence_tracked() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut generator = BrocaGenerator::new(&genesis, config);
 
-        let tok = gen.tokenizer().clone();
+        let tok = generator.tokenizer().clone();
         let mut dataset = TrainingDataset::default();
         let channels = ThoughtChannels::default();
         for _ in 0..3 {
@@ -3602,7 +3763,7 @@ mod tests {
             ..Default::default()
         };
 
-        let metrics = train(&mut gen, &dataset, &train_config);
+        let metrics = train(&mut generator, &dataset, &train_config);
         for m in &metrics {
             let coh = m
                 .mean_coherence
@@ -3620,9 +3781,9 @@ mod tests {
     fn test_epoch_metrics_coherence_also_with_diagnostics() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut generator = BrocaGenerator::new(&genesis, config);
 
-        let tok = gen.tokenizer().clone();
+        let tok = generator.tokenizer().clone();
         let mut dataset = TrainingDataset::default();
         let channels = ThoughtChannels::default();
         for _ in 0..3 {
@@ -3639,7 +3800,7 @@ mod tests {
             ..Default::default()
         };
 
-        let metrics = train(&mut gen, &dataset, &train_config);
+        let metrics = train(&mut generator, &dataset, &train_config);
         for m in &metrics {
             assert!(
                 m.mean_coherence.is_some(),
@@ -3666,9 +3827,9 @@ mod tests {
     fn test_smoke_test_runs_and_returns_validation() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut generator = BrocaGenerator::new(&genesis, config);
 
-        let tok = gen.tokenizer().clone();
+        let tok = generator.tokenizer().clone();
         let mut dataset = TrainingDataset::default();
         let channels = ThoughtChannels::default();
         for _ in 0..3 {
@@ -3684,7 +3845,8 @@ mod tests {
             ..Default::default()
         };
 
-        let (_, _, _, _, validation) = train_with_adam(&mut gen, &dataset, &train_config, None);
+        let (_, _, _, _, validation) =
+            train_with_adam(&mut generator, &dataset, &train_config, None);
         let val = validation.expect("TrainingValidation should be Some when smoke test enabled");
         assert_eq!(val.intent_coherences.len(), 8, "Should test all 8 intents");
         assert!(val.mean_coherence.is_finite());
@@ -3704,9 +3866,9 @@ mod tests {
     fn test_coherence_warmup_ramps_gradually() {
         let genesis = test_genesis();
         let config = test_config();
-        let mut gen = BrocaGenerator::new(&genesis, config);
+        let mut generator = BrocaGenerator::new(&genesis, config);
 
-        let tok = gen.tokenizer().clone();
+        let tok = generator.tokenizer().clone();
         let mut dataset = TrainingDataset::default();
         let channels = ThoughtChannels::default();
         for _ in 0..5 {
@@ -3723,7 +3885,7 @@ mod tests {
             ..Default::default()
         };
 
-        let metrics = train(&mut gen, &dataset, &train_config);
+        let metrics = train(&mut generator, &dataset, &train_config);
         // All epochs should have coherence tracked
         for m in &metrics {
             assert!(m.mean_coherence.is_some());
@@ -3772,8 +3934,8 @@ mod tests {
             ..Default::default()
         };
 
-        let mut gen = BrocaGenerator::new(&genesis, config);
-        let tok = gen.tokenizer().clone();
+        let mut generator = BrocaGenerator::new(&genesis, config);
+        let tok = generator.tokenizer().clone();
 
         // Build small dataset
         let mut dataset = TrainingDataset::default();
@@ -3783,7 +3945,7 @@ mod tests {
         }
 
         // Pre-training baseline
-        let pre_result = gen.generate(&ThoughtChannels::default());
+        let pre_result = generator.generate(&ThoughtChannels::default());
 
         // Train WITH fusion enabled from epoch 5
         let train_config = TrainingConfig {
@@ -3799,7 +3961,7 @@ mod tests {
             ..Default::default()
         };
 
-        let metrics = train(&mut gen, &dataset, &train_config);
+        let metrics = train(&mut generator, &dataset, &train_config);
 
         // Verify training reduced loss
         let first_loss = metrics[0].avg_loss;
@@ -3819,7 +3981,7 @@ mod tests {
         }
 
         // Verify fusion training changed behavior (weights updated)
-        let post_result = gen.generate(&ThoughtChannels::default());
+        let post_result = generator.generate(&ThoughtChannels::default());
         let changed = pre_result.token_ids != post_result.token_ids;
         assert!(changed, "Fusion training should change generator behavior");
     }
@@ -3841,30 +4003,138 @@ pub fn generate_therapeutic_training_data(tokenizer: &BpeTokenizer) -> TrainingD
     let templates: Vec<(f32, f32, f32, f32, &str)> = vec![
         // (intent, alliance, distress, depth, response)
         // Validation (intent=0): empathic, non-directive
-        (0.0, 0.3, 0.5, 0.1, "I hear you. That sounds really difficult."),
-        (0.0, 0.5, 0.6, 0.1, "It makes sense that you would feel that way."),
-        (0.0, 0.4, 0.4, 0.1, "What you're going through is completely understandable."),
-        (0.0, 0.6, 0.3, 0.1, "Thank you for sharing that with me. It takes courage."),
+        (
+            0.0,
+            0.3,
+            0.5,
+            0.1,
+            "I hear you. That sounds really difficult.",
+        ),
+        (
+            0.0,
+            0.5,
+            0.6,
+            0.1,
+            "It makes sense that you would feel that way.",
+        ),
+        (
+            0.0,
+            0.4,
+            0.4,
+            0.1,
+            "What you're going through is completely understandable.",
+        ),
+        (
+            0.0,
+            0.6,
+            0.3,
+            0.1,
+            "Thank you for sharing that with me. It takes courage.",
+        ),
         // Reflection (intent=1): mirroring, exploring
-        (1.0, 0.5, 0.4, 0.2, "It sounds like you're feeling overwhelmed right now."),
-        (1.0, 0.6, 0.3, 0.2, "I wonder what comes up for you when you think about that."),
-        (1.0, 0.5, 0.5, 0.3, "When you say that, what does it feel like in your body?"),
+        (
+            1.0,
+            0.5,
+            0.4,
+            0.2,
+            "It sounds like you're feeling overwhelmed right now.",
+        ),
+        (
+            1.0,
+            0.6,
+            0.3,
+            0.2,
+            "I wonder what comes up for you when you think about that.",
+        ),
+        (
+            1.0,
+            0.5,
+            0.5,
+            0.3,
+            "When you say that, what does it feel like in your body?",
+        ),
         // Reappraisal (intent=2): cognitive restructuring
-        (2.0, 0.6, 0.5, 0.4, "What if we looked at this from a different angle?"),
-        (2.0, 0.7, 0.4, 0.4, "Are there other ways to understand what happened?"),
+        (
+            2.0,
+            0.6,
+            0.5,
+            0.4,
+            "What if we looked at this from a different angle?",
+        ),
+        (
+            2.0,
+            0.7,
+            0.4,
+            0.4,
+            "Are there other ways to understand what happened?",
+        ),
         // Exploration (intent=3): deepening understanding
-        (3.0, 0.6, 0.3, 0.3, "Tell me more about what that experience was like for you."),
-        (3.0, 0.7, 0.4, 0.4, "How does this connect to other things in your life?"),
+        (
+            3.0,
+            0.6,
+            0.3,
+            0.3,
+            "Tell me more about what that experience was like for you.",
+        ),
+        (
+            3.0,
+            0.7,
+            0.4,
+            0.4,
+            "How does this connect to other things in your life?",
+        ),
         // Psychoeducation (intent=4): normalizing, teaching
-        (4.0, 0.5, 0.5, 0.3, "Many people experience similar feelings in situations like this."),
-        (4.0, 0.6, 0.4, 0.3, "Our bodies often respond to stress in ways that feel overwhelming but are actually protective."),
+        (
+            4.0,
+            0.5,
+            0.5,
+            0.3,
+            "Many people experience similar feelings in situations like this.",
+        ),
+        (
+            4.0,
+            0.6,
+            0.4,
+            0.3,
+            "Our bodies often respond to stress in ways that feel overwhelming but are actually protective.",
+        ),
         // Containment (intent=6): holding, stabilizing
-        (6.0, 0.5, 0.8, 0.5, "I'm here with you right now. You are safe in this moment."),
-        (6.0, 0.6, 0.7, 0.5, "Let's take a moment together. Can you feel your feet on the ground?"),
+        (
+            6.0,
+            0.5,
+            0.8,
+            0.5,
+            "I'm here with you right now. You are safe in this moment.",
+        ),
+        (
+            6.0,
+            0.6,
+            0.7,
+            0.5,
+            "Let's take a moment together. Can you feel your feet on the ground?",
+        ),
         // Crisis (intent=7): grounding, referral
-        (7.0, 0.3, 0.9, 0.1, "I want you to know you're not alone. Can you take a slow breath with me?"),
-        (7.0, 0.3, 0.95, 0.1, "Your safety matters. If you're in immediate danger, please call 988 or emergency services."),
-        (7.0, 0.4, 0.85, 0.1, "Right now, can you notice five things you can see around you?"),
+        (
+            7.0,
+            0.3,
+            0.9,
+            0.1,
+            "I want you to know you're not alone. Can you take a slow breath with me?",
+        ),
+        (
+            7.0,
+            0.3,
+            0.95,
+            0.1,
+            "Your safety matters. If you're in immediate danger, please call 988 or emergency services.",
+        ),
+        (
+            7.0,
+            0.4,
+            0.85,
+            0.1,
+            "Right now, can you notice five things you can see around you?",
+        ),
     ];
 
     for (intent, alliance, distress, depth, response) in templates {

@@ -213,7 +213,7 @@ impl CodingExperienceStore {
         // PRIORITIZE: If we have a diagnostic HV, use it for the memory encoding.
         // This closes the loop: failure geometry → memory store → future recall.
         let encoding = if let Some(diag_hv) = &experience.diagnostic_hv {
-            BinaryHV::from_continuous(diag_hv)
+            diag_hv.to_binary(0.0)
         } else {
             Self::encode_text(&experience.task)
         };
@@ -304,7 +304,7 @@ impl CodingExperienceStore {
         top_k: usize,
     ) -> Vec<SearchResult> {
         // Convert ContinuousHV to BinaryHV for the database search
-        let query_hv = BinaryHV::from_continuous(diagnostic);
+        let query_hv = diagnostic.to_binary(0.0);
         self.db
             .search_similar(&query_hv, top_k)
             .await
@@ -458,7 +458,7 @@ impl CodingExperienceStore {
 
         // Persist to DB so fix strategies survive across sessions
         let encoding = if let Some(diag_hv) = diagnostic_hv {
-            BinaryHV::from_continuous(diag_hv)
+            diag_hv.to_binary(0.0)
         } else {
             Self::encode_text(error_signature)
         };
@@ -542,7 +542,7 @@ impl CodingExperienceStore {
 
         // Persist to DB so templates survive across sessions
         let encoding = if let Some(diag_hv) = diagnostic_hv {
-            BinaryHV::from_continuous(diag_hv)
+            diag_hv.to_binary(0.0)
         } else {
             Self::encode_text(task)
         };
@@ -630,6 +630,7 @@ mod tests {
                 success: false,
                 tier: "Native".to_string(),
                 fix_hint: Some("use std::vec::Vec".to_string()),
+                diagnostic_hv: None,
             })
             .await;
 
@@ -650,6 +651,7 @@ mod tests {
                 success: true,
                 tier: "LocalLLM".to_string(),
                 fix_hint: None,
+                diagnostic_hv: None,
             })
             .await;
 
@@ -670,6 +672,7 @@ mod tests {
                 success: false,
                 tier: "Native".to_string(),
                 fix_hint: Some("use saturating_add".to_string()),
+                diagnostic_hv: None,
             })
             .await;
 
@@ -694,6 +697,7 @@ mod tests {
                     success: false,
                     tier: "Native".to_string(),
                     fix_hint: Some(format!("fix {i}")),
+                    diagnostic_hv: None,
                 })
                 .await;
         }
@@ -715,6 +719,7 @@ mod tests {
                 success: false,
                 tier: "LocalLLM".to_string(),
                 fix_hint: Some("add #[derive(Deserialize)]".to_string()),
+                diagnostic_hv: None,
             })
             .await;
 
@@ -725,6 +730,7 @@ mod tests {
                 success: false,
                 tier: "Native".to_string(),
                 fix_hint: Some("check array length first".to_string()),
+                diagnostic_hv: None,
             })
             .await;
 
@@ -748,6 +754,7 @@ mod tests {
                 success: true,
                 tier: "Native".to_string(),
                 fix_hint: None,
+                diagnostic_hv: None,
             })
             .await;
 
@@ -758,6 +765,7 @@ mod tests {
                 success: false,
                 tier: "LocalLLM".to_string(),
                 fix_hint: Some("use &'static str".to_string()),
+                diagnostic_hv: None,
             })
             .await;
 
@@ -786,6 +794,7 @@ mod tests {
                 success: true,
                 tier: "MoleculeExecutor".to_string(),
                 fix_hint: None,
+                diagnostic_hv: None,
             })
             .await;
 
@@ -799,6 +808,7 @@ mod tests {
                 success: false,
                 tier: "MoleculeExecutor".to_string(),
                 fix_hint: None,
+                diagnostic_hv: None,
             })
             .await;
 
@@ -820,6 +830,7 @@ mod tests {
                     success: true,
                     tier: "MoleculeExecutor".to_string(),
                     fix_hint: None,
+                    diagnostic_hv: None,
                 })
                 .await;
         }

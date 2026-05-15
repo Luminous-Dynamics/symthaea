@@ -49,7 +49,7 @@
 //! let layer_22 = embedder.extract_layer("The redness of the sunset", 22)?;
 //! ```
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;

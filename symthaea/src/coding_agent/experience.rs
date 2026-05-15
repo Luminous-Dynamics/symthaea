@@ -18,6 +18,7 @@ impl CodingAgent {
                 .map(|t| t.to_string())
                 .unwrap_or_default(),
             fix_hint: None,
+            diagnostic_hv: None,
         };
 
         if let Some(ref mut store) = self.experience_store {
@@ -72,6 +73,7 @@ impl CodingAgent {
                 .map(|t| t.to_string())
                 .unwrap_or_default(),
             fix_hint: Some(fix_summary),
+            diagnostic_hv: None,
         };
 
         if let Some(ref mut store) = self.experience_store {
@@ -121,6 +123,7 @@ impl CodingAgent {
             success: last_success,
             tier: "MoleculeExecutor".to_string(),
             fix_hint: None,
+            diagnostic_hv: None,
         };
 
         if let Some(ref mut store) = self.experience_store {

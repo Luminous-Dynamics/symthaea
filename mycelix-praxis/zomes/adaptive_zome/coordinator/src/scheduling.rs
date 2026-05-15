@@ -111,9 +111,7 @@ pub enum BreakPolicy {
     /// Student controls their own breaks.
     StudentControlled,
     /// Force break when stress detected.
-    ConsciousnessTriggered {
-        cortisol_threshold_permille: u16,
-    },
+    ConsciousnessTriggered { cortisol_threshold_permille: u16 },
 }
 
 /// Notification approach.
@@ -363,14 +361,12 @@ pub fn preset_high_school() -> SchedulingProfile {
             weekday: Box::new(InitiationMode::TeacherScheduled),
             weekend: Box::new(InitiationMode::StudentInitiated),
         },
-        time_windows: vec![
-            TimeWindow {
-                day_of_week: None,
-                start_hour: 6,
-                end_hour: 22,
-                priority: 500,
-            },
-        ],
+        time_windows: vec![TimeWindow {
+            day_of_week: None,
+            start_hour: 6,
+            end_hour: 22,
+            priority: 500,
+        }],
         duration: DurationStrategy::ConsciousnessAdaptive {
             min_minutes: 25,
             max_minutes: 60,
@@ -539,8 +535,7 @@ pub fn evolve_profile(
                 let avg_eng = total_eng / total_count as u64;
                 // EMA blend toward engagement-derived priority.
                 let target = (avg_eng as f64 / 1000.0 * 1000.0).min(1000.0);
-                let blended =
-                    window.priority as f64 * (1.0 - alpha) + target * alpha;
+                let blended = window.priority as f64 * (1.0 - alpha) + target * alpha;
                 window.priority = (blended as u16).min(1000);
             }
         }
@@ -688,9 +683,7 @@ pub fn should_suggest_session(
             }
         }
         NotificationStyle::Scheduled { times } => {
-            let in_scheduled = times
-                .iter()
-                .any(|&(h, _m)| h == current_hour);
+            let in_scheduled = times.iter().any(|&(h, _m)| h == current_hour);
             if !in_scheduled {
                 return None;
             }
@@ -710,41 +703,40 @@ pub fn should_suggest_session(
 
     // --- 5. Determine urgency and content ---
     let (flow_min, flow_max) = profile.consciousness_gates.flow_state_range;
-    let in_flow = cognitive_readiness_permille >= flow_min
-        && cognitive_readiness_permille <= flow_max;
-    let above_new_material = cognitive_readiness_permille
-        >= profile.consciousness_gates.min_phi_new_material;
+    let in_flow =
+        cognitive_readiness_permille >= flow_min && cognitive_readiness_permille <= flow_max;
+    let above_new_material =
+        cognitive_readiness_permille >= profile.consciousness_gates.min_phi_new_material;
 
-    let (urgency, focus_area, reason) = if in_flow
-        && dopamine_permille >= profile.consciousness_gates.min_dopamine_challenge
-    {
-        (
-            SuggestionUrgency::Optimal,
-            "new_material".to_string(),
-            "Your brain is in an optimal learning state right now.".to_string(),
-        )
-    } else if above_new_material && !daily_goal_met {
-        (
-            SuggestionUrgency::Routine,
-            "review".to_string(),
-            "You have items to review today.".to_string(),
-        )
-    } else if !daily_goal_met && last_session_minutes_ago > 180 {
-        (
-            SuggestionUrgency::Reminder,
-            "review".to_string(),
-            "It's been a while since your last session.".to_string(),
-        )
-    } else if above_new_material {
-        (
-            SuggestionUrgency::Passive,
-            "practice".to_string(),
-            "Good focus detected -- a session could be productive.".to_string(),
-        )
-    } else {
-        // Consciousness too low for anything meaningful.
-        return None;
-    };
+    let (urgency, focus_area, reason) =
+        if in_flow && dopamine_permille >= profile.consciousness_gates.min_dopamine_challenge {
+            (
+                SuggestionUrgency::Optimal,
+                "new_material".to_string(),
+                "Your brain is in an optimal learning state right now.".to_string(),
+            )
+        } else if above_new_material && !daily_goal_met {
+            (
+                SuggestionUrgency::Routine,
+                "review".to_string(),
+                "You have items to review today.".to_string(),
+            )
+        } else if !daily_goal_met && last_session_minutes_ago > 180 {
+            (
+                SuggestionUrgency::Reminder,
+                "review".to_string(),
+                "It's been a while since your last session.".to_string(),
+            )
+        } else if above_new_material {
+            (
+                SuggestionUrgency::Passive,
+                "practice".to_string(),
+                "Good focus detected -- a session could be productive.".to_string(),
+            )
+        } else {
+            // Consciousness too low for anything meaningful.
+            return None;
+        };
 
     // --- 6. Determine recommended duration ---
     let recommended_duration = match &profile.duration {
@@ -780,9 +772,9 @@ pub fn assessment_duration(profile: &SchedulingProfile, base_minutes: u32) -> u3
         .accommodations
         .iter()
         .find_map(|a| match a {
-            Accommodation::ExtendedTime { multiplier_permille } => {
-                Some(*multiplier_permille)
-            }
+            Accommodation::ExtendedTime {
+                multiplier_permille,
+            } => Some(*multiplier_permille),
             _ => None,
         })
         .unwrap_or(1000); // 1000 permille = 1.0x
@@ -923,9 +915,9 @@ mod tests {
             priority: 500,
         };
         assert!(w.contains(10, 0)); // Monday 10am
-        assert!(w.contains(9, 3));  // Thursday 9am (start inclusive)
+        assert!(w.contains(9, 3)); // Thursday 9am (start inclusive)
         assert!(!w.contains(17, 0)); // 5pm (end exclusive)
-        assert!(!w.contains(8, 0));  // 8am (before start)
+        assert!(!w.contains(8, 0)); // 8am (before start)
     }
 
     #[test]
@@ -936,7 +928,7 @@ mod tests {
             end_hour: 12,
             priority: 500,
         };
-        assert!(w.contains(10, 2));  // Wednesday 10am
+        assert!(w.contains(10, 2)); // Wednesday 10am
         assert!(!w.contains(10, 3)); // Thursday 10am -- wrong day
     }
 
@@ -949,8 +941,8 @@ mod tests {
             priority: 500,
         };
         assert!(w.contains(23, 0)); // 11pm
-        assert!(w.contains(0, 0));  // midnight
-        assert!(w.contains(5, 0));  // 5am
+        assert!(w.contains(0, 0)); // midnight
+        assert!(w.contains(5, 0)); // 5am
         assert!(!w.contains(7, 0)); // 7am (outside)
         assert!(!w.contains(21, 0)); // 9pm (outside)
     }
@@ -969,15 +961,11 @@ mod tests {
         profile.initiation = InitiationMode::SystemDriven;
 
         // Inside window
-        let result = should_suggest_session(
-            &profile, 10, 0, 600, 500, 200, 0, 120, false,
-        );
+        let result = should_suggest_session(&profile, 10, 0, 600, 500, 200, 0, 120, false);
         assert!(result.is_some(), "Should suggest inside time window");
 
         // Outside window
-        let result = should_suggest_session(
-            &profile, 20, 0, 600, 500, 200, 0, 120, false,
-        );
+        let result = should_suggest_session(&profile, 20, 0, 600, 500, 200, 0, 120, false);
         assert!(result.is_none(), "Should not suggest outside time window");
     }
 
@@ -991,15 +979,11 @@ mod tests {
         };
 
         // Already had 3 sessions today
-        let result = should_suggest_session(
-            &profile, 10, 0, 600, 500, 200, 3, 120, false,
-        );
+        let result = should_suggest_session(&profile, 10, 0, 600, 500, 200, 3, 120, false);
         assert!(result.is_none(), "Should respect max_per_day");
 
         // Last session was only 30 minutes ago
-        let result = should_suggest_session(
-            &profile, 10, 0, 600, 500, 200, 1, 30, false,
-        );
+        let result = should_suggest_session(&profile, 10, 0, 600, 500, 200, 1, 30, false);
         assert!(result.is_none(), "Should respect min_interval");
     }
 
@@ -1008,9 +992,7 @@ mod tests {
         let mut profile = preset_middle_school();
         profile.initiation = InitiationMode::SystemDriven;
         // Default cortisol threshold is 650.
-        let result = should_suggest_session(
-            &profile, 10, 0, 600, 500, 700, 0, 120, false,
-        );
+        let result = should_suggest_session(&profile, 10, 0, 600, 500, 700, 0, 120, false);
         assert!(
             result.is_none(),
             "Should not suggest session when cortisol is above threshold"
@@ -1022,9 +1004,7 @@ mod tests {
         let mut profile = preset_middle_school();
         profile.initiation = InitiationMode::SystemDriven;
         // Default min_phi_new_material is 400. Set consciousness to 300.
-        let result = should_suggest_session(
-            &profile, 10, 0, 300, 500, 200, 0, 120, false,
-        );
+        let result = should_suggest_session(&profile, 10, 0, 300, 500, 200, 0, 120, false);
         assert!(
             result.is_none(),
             "Should not suggest session when Phi is below minimum threshold"
@@ -1037,9 +1017,7 @@ mod tests {
         profile.initiation = InitiationMode::SystemDriven;
         // Flow state range default: (550, 650).
         // Min dopamine for challenge: 400.
-        let result = should_suggest_session(
-            &profile, 10, 0, 600, 500, 200, 0, 120, false,
-        );
+        let result = should_suggest_session(&profile, 10, 0, 600, 500, 200, 0, 120, false);
         assert!(result.is_some());
         let suggestion = result.unwrap();
         assert_eq!(suggestion.urgency, SuggestionUrgency::Optimal);
@@ -1051,9 +1029,7 @@ mod tests {
         let mut profile = preset_middle_school();
         profile.initiation = InitiationMode::SystemDriven;
         // Phi above min (400) but not in flow range.
-        let result = should_suggest_session(
-            &profile, 10, 0, 450, 500, 200, 0, 120, false,
-        );
+        let result = should_suggest_session(&profile, 10, 0, 450, 500, 200, 0, 120, false);
         assert!(result.is_some());
         assert_eq!(result.unwrap().urgency, SuggestionUrgency::Routine);
     }
@@ -1102,9 +1078,7 @@ mod tests {
     fn test_student_initiated_never_suggests() {
         let profile = preset_adult();
         assert_eq!(profile.initiation, InitiationMode::StudentInitiated);
-        let result = should_suggest_session(
-            &profile, 10, 0, 600, 500, 200, 0, 120, false,
-        );
+        let result = should_suggest_session(&profile, 10, 0, 600, 500, 200, 0, 120, false);
         assert!(
             result.is_none(),
             "StudentInitiated mode should never produce system suggestions"
@@ -1115,9 +1089,7 @@ mod tests {
     fn test_guardian_guided_never_suggests() {
         let profile = preset_early_elementary();
         assert_eq!(profile.initiation, InitiationMode::GuardianGuided);
-        let result = should_suggest_session(
-            &profile, 10, 0, 600, 500, 200, 0, 120, false,
-        );
+        let result = should_suggest_session(&profile, 10, 0, 600, 500, 200, 0, 120, false);
         assert!(
             result.is_none(),
             "GuardianGuided mode should never produce system suggestions"
@@ -1203,9 +1175,7 @@ mod tests {
     #[test]
     fn test_reduced_new_items_caps_srs() {
         let mut profile = preset_middle_school();
-        profile.accommodations = vec![Accommodation::ReducedNewItems {
-            max_per_session: 5,
-        }];
+        profile.accommodations = vec![Accommodation::ReducedNewItems { max_per_session: 5 }];
         assert_eq!(max_new_items_per_session(&profile), Some(5));
     }
 
@@ -1243,8 +1213,7 @@ mod tests {
     fn test_scheduling_profile_serde_roundtrip() {
         let profile = preset_middle_school();
         let json = serde_json::to_string(&profile).expect("serialize");
-        let deserialized: SchedulingProfile =
-            serde_json::from_str(&json).expect("deserialize");
+        let deserialized: SchedulingProfile = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(profile, deserialized);
     }
 
@@ -1262,8 +1231,7 @@ mod tests {
             time_of_day_hour: 14,
         };
         let json = serde_json::to_string(&outcome).expect("serialize");
-        let deserialized: SessionOutcome =
-            serde_json::from_str(&json).expect("deserialize");
+        let deserialized: SessionOutcome = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(deserialized.duration_minutes, 30);
         assert_eq!(deserialized.accuracy_permille, 850);
     }
@@ -1280,8 +1248,7 @@ mod tests {
             Accommodation::Custom("Speech-to-text for written responses".to_string()),
         ];
         let json = serde_json::to_string(&profile).expect("serialize");
-        let deserialized: SchedulingProfile =
-            serde_json::from_str(&json).expect("deserialize");
+        let deserialized: SchedulingProfile = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(profile, deserialized);
         assert_eq!(deserialized.accommodations.len(), 4);
     }
@@ -1296,8 +1263,7 @@ mod tests {
             ..preset_middle_school()
         };
         let json = serde_json::to_string(&profile).expect("serialize");
-        let deserialized: SchedulingProfile =
-            serde_json::from_str(&json).expect("deserialize");
+        let deserialized: SchedulingProfile = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(profile, deserialized);
     }
 
@@ -1322,7 +1288,13 @@ mod tests {
 
         // Grade 8 -> middle school
         let p = preset_for_context(8, false, false);
-        assert!(matches!(p.duration, DurationStrategy::ConsciousnessAdaptive { max_minutes: 45, .. }));
+        assert!(matches!(
+            p.duration,
+            DurationStrategy::ConsciousnessAdaptive {
+                max_minutes: 45,
+                ..
+            }
+        ));
 
         // Grade 12 -> high school
         let p = preset_for_context(12, false, false);
@@ -1343,9 +1315,7 @@ mod tests {
             weekend: Box::new(InitiationMode::StudentInitiated),
         };
         // Monday (day=0), should use SystemDriven -> can suggest
-        let result = should_suggest_session(
-            &profile, 10, 0, 600, 500, 200, 0, 120, false,
-        );
+        let result = should_suggest_session(&profile, 10, 0, 600, 500, 200, 0, 120, false);
         assert!(result.is_some(), "Weekday should use SystemDriven");
     }
 
@@ -1357,10 +1327,11 @@ mod tests {
             weekend: Box::new(InitiationMode::StudentInitiated),
         };
         // Saturday (day=5), should use StudentInitiated -> no suggestion
-        let result = should_suggest_session(
-            &profile, 10, 5, 600, 500, 200, 0, 120, false,
+        let result = should_suggest_session(&profile, 10, 5, 600, 500, 200, 0, 120, false);
+        assert!(
+            result.is_none(),
+            "Weekend should use StudentInitiated (no suggestion)"
         );
-        assert!(result.is_none(), "Weekend should use StudentInitiated (no suggestion)");
     }
 
     // --- Duration recommendation ---
@@ -1374,9 +1345,7 @@ mod tests {
             max_minutes: 45,
         };
         // In flow state (600 is within 550-650 default range)
-        let result = should_suggest_session(
-            &profile, 10, 0, 600, 500, 200, 0, 120, false,
-        );
+        let result = should_suggest_session(&profile, 10, 0, 600, 500, 200, 0, 120, false);
         assert!(result.is_some());
         assert_eq!(result.unwrap().recommended_duration_minutes, 45);
     }

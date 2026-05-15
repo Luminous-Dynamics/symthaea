@@ -27,7 +27,11 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+use quote::ToTokens;
 use symthaea_core::hdc::ContinuousHV;
+use syn::visit::{self, Visit};
+use syn::visit_mut::{self, VisitMut};
+use syn::{FnArg, Ident, Item, ItemFn, Pat, PatIdent};
 
 use crate::hdc::code_encoder::CodeHDEncoder;
 
@@ -173,7 +177,10 @@ impl SolutionLibrary {
                 .find(|e| e.name == candidate.matched_name)?;
 
             let adapted_source =
-                adapt_solution(source, &entry.signature, target_fn_name, target_signature);
+                match adapt_solution(source, &entry.signature, target_fn_name, target_signature) {
+                    Some(source) => source,
+                    None => continue,
+                };
 
             // Sanity check: adapted source should have balanced braces
             let opens = adapted_source.matches('{').count();
@@ -256,51 +263,128 @@ impl SolutionLibrary {
     }
 }
 
-/// Adapt a solution from one problem to another.
+/// Adapt a solution from one problem to another using AST-level grafting.
 ///
-/// Performs minimal transformation:
-/// - Renames the primary function to match the target
-/// - Preserves the body logic
+/// The donor body is preserved, but the function visibility/signature are
+/// replaced by the target signature. Parameter identifiers are renamed through
+/// `syn` identifier nodes, never by substring replacement.
 fn adapt_solution(
     source: &str,
     _original_sig: &str,
     target_fn_name: &str,
     target_signature: &str,
-) -> String {
-    // Strategy: replace the function signature but keep the body
-    // Find the first `pub fn ...` and replace with target signature
+) -> Option<String> {
+    let mut donor_fn = parse_first_function(source)?;
+    let target_fn = parse_signature_as_function(target_signature, target_fn_name)?;
 
-    let mut result = String::new();
-    let mut found_fn = false;
-
-    for line in source.lines() {
-        let trimmed = line.trim();
-        if !found_fn && trimmed.starts_with("pub fn ") {
-            // Replace with target signature
-            if let Some(brace_pos) = trimmed.find('{') {
-                // Has opening brace on same line
-                let body_part = &trimmed[brace_pos..];
-                result.push_str(&format!("{} {}\n", target_signature, body_part));
-            } else {
-                result.push_str(&format!("{} {{\n", target_signature));
-            }
-            found_fn = true;
-        } else {
-            result.push_str(line);
-            result.push('\n');
+    let param_renames = parameter_renames(&donor_fn, &target_fn);
+    if !param_renames.is_empty() {
+        let shadowed = collect_body_bindings(&donor_fn);
+        if param_renames.keys().any(|name| shadowed.contains_key(name)) {
+            return None;
         }
+
+        ParamRenamer {
+            renames: &param_renames,
+        }
+        .visit_block_mut(&mut donor_fn.block);
     }
 
-    // If we never found a fn declaration, return the source with the target fn prepended
-    if !found_fn {
-        return format!(
-            "{} {{\n    // Adapted from analogy\n    {}\n}}",
-            target_signature,
-            source.trim()
-        );
+    donor_fn.vis = target_fn.vis;
+    donor_fn.sig = target_fn.sig;
+
+    Some(donor_fn.into_token_stream().to_string())
+}
+
+fn parse_first_function(source: &str) -> Option<ItemFn> {
+    if let Ok(item_fn) = syn::parse_str::<ItemFn>(source) {
+        return Some(item_fn);
     }
 
-    result
+    let file = syn::parse_file(source).ok()?;
+    file.items.into_iter().find_map(|item| match item {
+        Item::Fn(item_fn) => Some(item_fn),
+        _ => None,
+    })
+}
+
+fn parse_signature_as_function(signature: &str, fallback_name: &str) -> Option<ItemFn> {
+    let sig = signature.trim().trim_end_matches(';');
+    let mut item_fn = syn::parse_str::<ItemFn>(&format!("{sig} {{}}")).ok()?;
+
+    if item_fn.sig.ident.to_string().is_empty() {
+        item_fn.sig.ident = Ident::new(fallback_name, item_fn.sig.ident.span());
+    }
+
+    Some(item_fn)
+}
+
+fn parameter_renames(donor_fn: &ItemFn, target_fn: &ItemFn) -> HashMap<String, Ident> {
+    donor_fn
+        .sig
+        .inputs
+        .iter()
+        .filter_map(fn_arg_ident)
+        .zip(target_fn.sig.inputs.iter().filter_map(fn_arg_ident))
+        .filter_map(|(from, to)| {
+            let from_name = from.to_string();
+            if from_name == to.to_string() {
+                None
+            } else {
+                Some((from_name, to.clone()))
+            }
+        })
+        .collect()
+}
+
+fn fn_arg_ident(arg: &FnArg) -> Option<&Ident> {
+    match arg {
+        FnArg::Typed(pat_type) => pat_ident(&pat_type.pat),
+        FnArg::Receiver(_) => None,
+    }
+}
+
+fn pat_ident(pat: &Pat) -> Option<&Ident> {
+    match pat {
+        Pat::Ident(PatIdent { ident, .. }) => Some(ident),
+        _ => None,
+    }
+}
+
+fn collect_body_bindings(item_fn: &ItemFn) -> HashMap<String, ()> {
+    let mut collector = BodyBindingCollector {
+        bindings: HashMap::new(),
+    };
+    collector.visit_block(&item_fn.block);
+    collector.bindings
+}
+
+struct BodyBindingCollector {
+    bindings: HashMap<String, ()>,
+}
+
+impl<'ast> Visit<'ast> for BodyBindingCollector {
+    fn visit_pat_ident(&mut self, pat_ident: &'ast PatIdent) {
+        self.bindings.insert(pat_ident.ident.to_string(), ());
+        visit::visit_pat_ident(self, pat_ident);
+    }
+}
+
+struct ParamRenamer<'a> {
+    renames: &'a HashMap<String, Ident>,
+}
+
+impl VisitMut for ParamRenamer<'_> {
+    fn visit_expr_path_mut(&mut self, expr_path: &mut syn::ExprPath) {
+        if expr_path.qself.is_none() && expr_path.path.segments.len() == 1 {
+            let segment = &mut expr_path.path.segments[0];
+            if let Some(new_ident) = self.renames.get(&segment.ident.to_string()) {
+                segment.ident = new_ident.clone();
+            }
+        }
+
+        visit_mut::visit_expr_path_mut(self, expr_path);
+    }
 }
 
 #[cfg(test)]
@@ -384,8 +468,73 @@ mod tests {
             "pub fn reverse(input: &str) -> String",
             "my_reverse",
             "pub fn my_reverse(s: &str) -> String",
-        );
+        )
+        .expect("AST graft should succeed");
         assert!(adapted.contains("pub fn my_reverse"));
-        assert!(adapted.contains("chars().rev().collect()"));
+        assert!(adapted.contains("s . chars"));
+        syn::parse_str::<ItemFn>(&adapted).expect("adapted source should remain a Rust function");
+    }
+
+    #[test]
+    fn test_adapt_solution_preserves_literals_while_renaming_identifiers() {
+        let source = r#"pub fn label(input: &str) -> String {
+    format!("input={}", input)
+}"#;
+
+        let adapted = adapt_solution(
+            source,
+            "pub fn label(input: &str) -> String",
+            "tag",
+            "pub fn tag(value: &str) -> String",
+        )
+        .expect("AST graft should succeed");
+
+        assert!(adapted.contains("pub fn tag"));
+        assert!(adapted.contains("\"input={}\""));
+        assert!(adapted.contains("value"));
+        assert!(!adapted.contains("format ! (\"value={}\""));
+        syn::parse_str::<ItemFn>(&adapted).expect("adapted source should remain a Rust function");
+    }
+
+    #[test]
+    fn test_adapt_solution_handles_multiline_generic_signature() {
+        let source = r#"pub fn first<'a, T: Clone>(
+    items: &'a [T],
+) -> Option<T> {
+    items.first().cloned()
+}"#;
+
+        let adapted = adapt_solution(
+            source,
+            "pub fn first<'a, T: Clone>(items: &'a [T]) -> Option<T>",
+            "head",
+            "pub fn head<'b, U: Clone + Default>(values: &'b [U]) -> Option<U>",
+        )
+        .expect("AST graft should succeed");
+
+        assert!(adapted.contains("pub fn head"));
+        assert!(adapted.contains("U : Clone + Default"));
+        assert!(adapted.contains("values . first"));
+        syn::parse_str::<ItemFn>(&adapted).expect("adapted source should remain a Rust function");
+    }
+
+    #[test]
+    fn test_adapt_solution_rejects_shadowed_parameter_rename() {
+        let source = r#"pub fn donor(input: &str) -> usize {
+    let input = input.trim();
+    input.len()
+}"#;
+
+        let adapted = adapt_solution(
+            source,
+            "pub fn donor(input: &str) -> usize",
+            "target",
+            "pub fn target(value: &str) -> usize",
+        );
+
+        assert!(
+            adapted.is_none(),
+            "shadowed parameter grafts should be rejected rather than silently rewritten"
+        );
     }
 }

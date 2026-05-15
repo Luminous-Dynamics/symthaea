@@ -11,6 +11,9 @@ pub mod range_proof;
 #[cfg(feature = "backend-winterfell")]
 pub mod jurisdiction_proof;
 
+#[cfg(feature = "backend-winterfell")]
+pub mod review_integrity;
+
 pub mod merkle_membership;
 pub mod nullifier;
 

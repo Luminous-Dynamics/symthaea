@@ -27,9 +27,9 @@
 //!
 //! Feature-gated behind `code_generation` (matches scorer).
 
-use crate::language::nix_codegen::{classify_nix_intent, generate_nix, shared_nix_kg, NixIntent};
+use crate::language::nix_codegen::{NixIntent, classify_nix_intent, generate_nix, shared_nix_kg};
 use crate::language::nix_scorer::{
-    attrpath_set_of, score, CanonValue, StructuralVerdict, ValueMismatch,
+    CanonValue, StructuralVerdict, ValueMismatch, attrpath_set_of, score,
 };
 
 /// Result of a repair attempt.
@@ -366,6 +366,7 @@ fn expected_for_hardware(lower: &str) -> Vec<String> {
 pub fn generate_nix_with_self_repair(prompt: &str, max_iters: usize) -> ScorerRepairResult {
     let initial = generate_nix(prompt);
     let mut code = initial.code;
+    let mut channels = initial.channels;
     let mut all_steps: Vec<RepairStep> = Vec::new();
     let mut iterations = 0;
     let expected = expected_paths_for(prompt);
@@ -378,6 +379,7 @@ pub fn generate_nix_with_self_repair(prompt: &str, max_iters: usize) -> ScorerRe
             code,
             steps: all_steps,
             iterations,
+            channels,
         };
     }
 
@@ -399,8 +401,16 @@ pub fn generate_nix_with_self_repair(prompt: &str, max_iters: usize) -> ScorerRe
                 verdict: final_verdict,
                 steps: all_steps,
                 iterations,
+                channels,
             };
         }
+
+        // **NEW**: Frustration Trigger
+        if iterations > 2 {
+            channels.set_valence(-0.5);
+            channels.set_arousal(0.9);
+        }
+
         // Build a synthetic verdict from the missing set so the same
         // repair_structural code path handles both golden and
         // pseudo-golden callers.
@@ -420,6 +430,7 @@ pub fn generate_nix_with_self_repair(prompt: &str, max_iters: usize) -> ScorerRe
                     verdict: synthetic,
                     steps: all_steps,
                     iterations,
+                    channels,
                 };
             }
         }
@@ -427,6 +438,8 @@ pub fn generate_nix_with_self_repair(prompt: &str, max_iters: usize) -> ScorerRe
 }
 
 // ─── M2: Scorer-in-the-loop repair ─────────────────────────────────────
+
+use super::nix_codegen::ThoughtChannels;
 
 /// Outcome of running the generate → score → repair loop.
 #[derive(Debug, Clone)]
@@ -443,6 +456,8 @@ pub struct ScorerRepairResult {
     /// when the first generation already passed; `max_iters` when
     /// the loop exhausted its budget.
     pub iterations: usize,
+    /// **NEW**: Emotional and epistemic state after repair (for active inference).
+    pub channels: ThoughtChannels,
 }
 
 /// Generate code for `prompt`, score it against `golden`, and
@@ -465,6 +480,7 @@ pub fn generate_nix_with_scorer_repair(
 ) -> ScorerRepairResult {
     let initial = generate_nix(prompt);
     let mut code = initial.code;
+    let mut channels = initial.channels;
     let mut all_steps: Vec<RepairStep> = Vec::new();
     let mut iterations = 0;
 
@@ -476,6 +492,7 @@ pub fn generate_nix_with_scorer_repair(
                 verdict,
                 steps: all_steps,
                 iterations,
+                channels,
             };
         }
         if iterations >= max_iters {
@@ -484,8 +501,17 @@ pub fn generate_nix_with_scorer_repair(
                 verdict,
                 steps: all_steps,
                 iterations,
+                channels,
             };
         }
+
+        // **NEW**: Frustration Trigger — physically perturb the system
+        // state if we keep failing to converge.
+        if iterations > 2 {
+            channels.set_valence(-0.5); // "This feels bad"
+            channels.set_arousal(0.9); // "I need to focus harder/differently"
+        }
+
         match repair_structural(&code, &verdict) {
             Some(repaired) => {
                 code = repaired.code;
@@ -499,6 +525,7 @@ pub fn generate_nix_with_scorer_repair(
                     verdict,
                     steps: all_steps,
                     iterations,
+                    channels,
                 };
             }
         }
@@ -525,14 +552,14 @@ mod tests {
 
     #[test]
     fn appends_single_missing_path() {
-        let gen = wrap("services.nginx.enable = true;");
+        let generated = wrap("services.nginx.enable = true;");
         let golden = wrap(
             "services.nginx.enable = true;\n\
              services.postgresql.enable = true;",
         );
-        let verdict = score(&gen, &golden);
+        let verdict = score(&generated, &golden);
         assert!(!verdict.pass());
-        let repaired = repair_structural(&gen, &verdict).expect("should repair");
+        let repaired = repair_structural(&generated, &verdict).expect("should repair");
         assert_eq!(repaired.steps.len(), 1);
         match &repaired.steps[0] {
             RepairStep::AppendedPath { path, value } => {
@@ -555,11 +582,11 @@ mod tests {
         // Exact false-positive case from the scorer docs — the scorer
         // catches enable=false vs golden's enable=true, and the
         // repair loop flips it.
-        let gen = wrap("services.nginx.enable = false;");
+        let generated = wrap("services.nginx.enable = false;");
         let golden = wrap("services.nginx.enable = true;");
-        let verdict = score(&gen, &golden);
+        let verdict = score(&generated, &golden);
         assert!(!verdict.pass());
-        let repaired = repair_structural(&gen, &verdict).expect("should repair");
+        let repaired = repair_structural(&generated, &verdict).expect("should repair");
         assert_eq!(repaired.steps.len(), 1);
         match &repaired.steps[0] {
             RepairStep::ReplacedValue { path, from, to } => {
@@ -577,15 +604,17 @@ mod tests {
     fn swaps_tcp_to_udp_when_both_sides_mismatch() {
         // The exact UDP-regression case from this session: generator
         // emits TCP, golden wants UDP, scorer surfaces both sides.
-        let gen = wrap("networking.firewall.allowedTCPPorts = [ 51820 ];");
+        let generated = wrap("networking.firewall.allowedTCPPorts = [ 51820 ];");
         let golden = wrap("networking.firewall.allowedUDPPorts = [ 51820 ];");
-        let verdict = score(&gen, &golden);
+        let verdict = score(&generated, &golden);
         assert!(!verdict.pass());
-        let repaired = repair_structural(&gen, &verdict).expect("should repair");
-        assert!(repaired
-            .steps
-            .iter()
-            .any(|s| matches!(s, RepairStep::SwappedProtocol { .. })));
+        let repaired = repair_structural(&generated, &verdict).expect("should repair");
+        assert!(
+            repaired
+                .steps
+                .iter()
+                .any(|s| matches!(s, RepairStep::SwappedProtocol { .. }))
+        );
         let reverdict = score(&repaired.code, &golden);
         assert!(
             reverdict.pass(),
@@ -596,13 +625,13 @@ mod tests {
 
     #[test]
     fn repairs_both_missing_and_mismatch_in_one_pass() {
-        let gen = wrap("services.nginx.enable = false;");
+        let generated = wrap("services.nginx.enable = false;");
         let golden = wrap(
             "services.nginx.enable = true;\n\
              services.postgresql.enable = true;",
         );
-        let verdict = score(&gen, &golden);
-        let repaired = repair_structural(&gen, &verdict).expect("should repair");
+        let verdict = score(&generated, &golden);
+        let repaired = repair_structural(&generated, &verdict).expect("should repair");
         // Two steps: one value flip + one append.
         assert_eq!(repaired.steps.len(), 2);
         let reverdict = score(&repaired.code, &golden);
@@ -616,7 +645,7 @@ mod tests {
     #[test]
     fn does_not_touch_unrelated_bool_lines() {
         // Two `enable = false;` lines, only one should flip.
-        let gen = wrap(
+        let generated = wrap(
             "services.nginx.enable = false;\n\
              services.redis.servers.\"\".enable = false;",
         );
@@ -624,13 +653,15 @@ mod tests {
             "services.nginx.enable = true;\n\
              services.redis.servers.\"\".enable = false;",
         );
-        let verdict = score(&gen, &golden);
-        let repaired = repair_structural(&gen, &verdict).expect("should repair");
+        let verdict = score(&generated, &golden);
+        let repaired = repair_structural(&generated, &verdict).expect("should repair");
         // Only nginx should have been flipped.
         assert!(repaired.code.contains("services.nginx.enable = true;"));
-        assert!(repaired
-            .code
-            .contains("services.redis.servers.\"\".enable = false;"));
+        assert!(
+            repaired
+                .code
+                .contains("services.redis.servers.\"\".enable = false;")
+        );
     }
 
     #[test]
@@ -846,13 +877,13 @@ mod tests {
 
     #[test]
     fn append_places_before_final_brace() {
-        let gen = wrap("services.nginx.enable = true;");
+        let generated = wrap("services.nginx.enable = true;");
         let golden = wrap(
             "services.nginx.enable = true;\n\
              services.postgresql.enable = true;",
         );
-        let verdict = score(&gen, &golden);
-        let repaired = repair_structural(&gen, &verdict).expect("should repair");
+        let verdict = score(&generated, &golden);
+        let repaired = repair_structural(&generated, &verdict).expect("should repair");
         // New line must be BEFORE the final `}`, not after.
         let last_brace = repaired.code.rfind('}').unwrap();
         let inserted = repaired.code.find("services.postgresql.enable").unwrap();

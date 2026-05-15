@@ -13,7 +13,6 @@
 
 use bevy_app::prelude::*;
 
-
 use crate::iroh_io::IrohIoPlugin;
 use crate::protocol;
 
@@ -35,6 +34,15 @@ impl Plugin for SymtropyNetPlugin {
 
         // Add Iroh transport IO systems
         app.add_plugins(IrohIoPlugin);
+
+        // Spatial authority management (FixedUpdate)
+        app.add_systems(
+            FixedUpdate,
+            (
+                crate::components::update_spatial_authority::<2>,
+                crate::components::update_spatial_authority::<3>,
+            ),
+        );
 
         bevy_log::info!("Symtropy networking initialized (Lightyear + Iroh QUIC)");
     }

@@ -341,7 +341,7 @@ fn scenario_tyranny_resistance(seed: u64, ticks: u32) -> Result<(), String> {
 
     let run_ticks = ticks.max(300);
     for tick in 0..run_ticks {
-        let _events = gov.tick_governance_full(&world, tick, &mut rng, true, true);
+        let _events = gov.tick_governance_full(&world, tick, &mut rng, true, true, 0.0, true);
         assert_anti_tyranny_invariants(&gov)?;
     }
 

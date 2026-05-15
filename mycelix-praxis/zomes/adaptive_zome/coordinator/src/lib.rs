@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -12,33 +11,34 @@ use mycelix_zome_helpers as _;
 //! - **Analytics**: Session and aggregated learning analytics
 //! - **Adaptive Paths**: Personalized learning journeys
 
-use hdk::prelude::*;
 use adaptive_integrity::*;
+use hdk::prelude::*;
+use mycelix_zome_helpers as _;
 
-mod tutoring;
 mod analytics;
-mod gamification_social;
-mod retention;
 mod flow;
-mod mastery;
+mod gamification_social;
 pub mod grade_adaptation;
+mod mastery;
+mod retention;
 pub mod scheduling;
+mod tutoring;
 
-pub use tutoring::*;
 pub use analytics::*;
-pub use gamification_social::*;
-pub use retention::*;
 pub use flow::*;
-pub use mastery::*;
+pub use gamification_social::*;
 pub use grade_adaptation::*;
+pub use mastery::*;
+pub use retention::*;
 pub use scheduling::*;
+pub use tutoring::*;
 
 // ============== Constants ==============
 
 /// Default BKT parameters
 const DEFAULT_LEARN_RATE: u16 = 100; // 10%
 const DEFAULT_GUESS_RATE: u16 = 200; // 20%
-const DEFAULT_SLIP_RATE: u16 = 100;  // 10%
+const DEFAULT_SLIP_RATE: u16 = 100; // 10%
 
 /// Target retention for review scheduling
 const RETENTION_TARGET: u16 = 800; // 80%
@@ -109,29 +109,29 @@ impl RecommendationContext {
         match self.hour {
             // Morning (6-12): Best for analytical, new learning
             6..=11 => match content_type {
-                ContentType::Lesson => 150,           // New concepts best in morning
-                ContentType::Quiz | ContentType::Assessment => 100,  // Testing when fresh
+                ContentType::Lesson => 150, // New concepts best in morning
+                ContentType::Quiz | ContentType::Assessment => 100, // Testing when fresh
                 ContentType::Exercise => 75,
                 _ => 50,
             },
             // Afternoon (12-17): Good for practice and hands-on work
             12..=16 => match content_type {
-                ContentType::Exercise => 150,         // Practice in afternoon
+                ContentType::Exercise => 150, // Practice in afternoon
                 ContentType::Quiz | ContentType::Assessment => 100,
-                ContentType::Project => 100,          // Collaborative work
+                ContentType::Project => 100, // Collaborative work
                 _ => 50,
             },
             // Evening (17-21): Good for creative, synthesis, projects
             17..=20 => match content_type {
-                ContentType::Project => 150,          // Creative synthesis in evening
-                ContentType::Challenge => 100,        // Complex challenges
+                ContentType::Project => 150,   // Creative synthesis in evening
+                ContentType::Challenge => 100, // Complex challenges
                 ContentType::Exercise => 75,
                 _ => 50,
             },
             // Night (21-6): Good for light review
             _ => match content_type {
-                ContentType::Lesson => 100,           // Light reading
-                ContentType::Quiz => 50,              // Quick reviews only
+                ContentType::Lesson => 100, // Light reading
+                ContentType::Quiz => 50,    // Quick reviews only
                 _ => 25,
             },
         }
@@ -163,22 +163,16 @@ impl RecommendationContext {
                 (combined * 1000 / max_score as u32).min(1000) as u16
             }
             // Exercises are hands-on: K learners
-            ContentType::Exercise => {
-                (k as u32 * 1000 / max_score as u32).min(1000) as u16
-            }
+            ContentType::Exercise => (k as u32 * 1000 / max_score as u32).min(1000) as u16,
             // Projects combine visual output and hands-on: V + K
             ContentType::Project => {
                 let combined = (v as u32 + k as u32) / 2;
                 (combined * 1000 / max_score as u32).min(1000) as u16
             }
             // Assessments are written: R learners
-            ContentType::Assessment => {
-                (r as u32 * 1000 / max_score as u32).min(1000) as u16
-            }
+            ContentType::Assessment => (r as u32 * 1000 / max_score as u32).min(1000) as u16,
             // Challenges are complex hands-on: K learners primarily
-            ContentType::Challenge => {
-                (k as u32 * 1000 / max_score as u32).min(1000) as u16
-            }
+            ContentType::Challenge => (k as u32 * 1000 / max_score as u32).min(1000) as u16,
         }
     }
 
@@ -189,7 +183,8 @@ impl RecommendationContext {
         }
 
         // Count how many recent items are the same topic
-        let same_topic_count = self.recent_topic_hashes
+        let same_topic_count = self
+            .recent_topic_hashes
             .iter()
             .filter(|h| *h == topic_hash)
             .count();
@@ -265,30 +260,35 @@ fn generate_smart_recommendations(
     let mut recommendations = Vec::new();
 
     // Priority 1: Skills due for review (retention risk)
-    let due: Vec<&SkillMastery> = ctx.masteries
+    let due: Vec<&SkillMastery> = ctx
+        .masteries
         .iter()
         .filter(|m| m.next_optimal_review <= now && m.mastery_permille > 0)
         .collect();
 
     for mastery in due.iter().take(limit / 3) {
         let (diff_low, diff_high) = ctx.optimal_difficulty_range(mastery.mastery_permille);
-        let flow_score = if mastery.mastery_permille >= diff_low && mastery.mastery_permille <= diff_high {
-            900
-        } else {
-            600
-        };
+        let flow_score =
+            if mastery.mastery_permille >= diff_low && mastery.mastery_permille <= diff_high {
+                900
+            } else {
+                600
+            };
 
         let goal_score = ctx.goal_alignment_score(&mastery.skill_hash);
-        let interleave_score = if ctx.should_interleave(&mastery.skill_hash) { 400 } else { 800 };
+        let interleave_score = if ctx.should_interleave(&mastery.skill_hash) {
+            400
+        } else {
+            800
+        };
 
         // Smart score is weighted combination
-        let smart_score = (
-            flow_score as u32 * 25 +
+        let smart_score = (flow_score as u32 * 25 +
             500 * 20 + // Style neutral for reviews
             ctx.time_bonus(&ContentType::Exercise) as u32 * 15 +
             goal_score as u32 * 25 +
-            interleave_score as u32 * 15
-        ) / 100;
+            interleave_score as u32 * 15)
+            / 100;
 
         let base_rec = Recommendation {
             learner: agent.clone(),
@@ -320,28 +320,37 @@ fn generate_smart_recommendations(
             smart_score_permille: smart_score as u16,
             detailed_explanation: format!(
                 "Due for review • Flow: {}% • Goal aligned: {}%",
-                flow_score / 10, goal_score / 10
+                flow_score / 10,
+                goal_score / 10
             ),
         });
     }
 
     // Priority 2: Weak areas needing remediation
-    let weak: Vec<&SkillMastery> = ctx.masteries
+    let weak: Vec<&SkillMastery> = ctx
+        .masteries
         .iter()
-        .filter(|m| m.mastery_permille < 400 && m.total_attempts >= 3 && m.confidence_permille >= MIN_CONFIDENCE_PERMILLE)
+        .filter(|m| {
+            m.mastery_permille < 400
+                && m.total_attempts >= 3
+                && m.confidence_permille >= MIN_CONFIDENCE_PERMILLE
+        })
         .collect();
 
     for mastery in weak.iter().take(limit / 4) {
         let goal_score = ctx.goal_alignment_score(&mastery.skill_hash);
-        let interleave_score = if ctx.should_interleave(&mastery.skill_hash) { 400 } else { 700 };
+        let interleave_score = if ctx.should_interleave(&mastery.skill_hash) {
+            400
+        } else {
+            700
+        };
 
-        let smart_score = (
-            700 * 25 + // Flow score for remediation
+        let smart_score = (700 * 25 + // Flow score for remediation
             500 * 20 + // Style neutral
             ctx.time_bonus(&ContentType::Exercise) as u32 * 15 +
             goal_score as u32 * 25 +
-            interleave_score as u32 * 15
-        ) / 100;
+            interleave_score as u32 * 15)
+            / 100;
 
         let base_rec = Recommendation {
             learner: agent.clone(),
@@ -370,20 +379,26 @@ fn generate_smart_recommendations(
             smart_score_permille: smart_score as u16,
             detailed_explanation: format!(
                 "Needs practice • Mastery: {}% • {} attempts",
-                mastery.mastery_permille / 10, mastery.total_attempts
+                mastery.mastery_permille / 10,
+                mastery.total_attempts
             ),
         });
     }
 
     // Priority 3: Strengths ready for challenges
-    let strengths: Vec<&SkillMastery> = ctx.masteries
+    let strengths: Vec<&SkillMastery> = ctx
+        .masteries
         .iter()
         .filter(|m| m.mastery_permille >= 800)
         .collect();
 
     for mastery in strengths.iter().take(limit / 4) {
         let goal_score = ctx.goal_alignment_score(&mastery.skill_hash);
-        let interleave_score = if ctx.should_interleave(&mastery.skill_hash) { 500 } else { 600 };
+        let interleave_score = if ctx.should_interleave(&mastery.skill_hash) {
+            500
+        } else {
+            600
+        };
 
         // Challenges are better in morning when energy is high
         let timing_bonus = if ctx.energy_permille >= 700 {
@@ -392,13 +407,12 @@ fn generate_smart_recommendations(
             ctx.time_bonus(&ContentType::Challenge) / 2
         };
 
-        let smart_score = (
-            850 * 25 + // High flow for mastered skills
+        let smart_score = (850 * 25 + // High flow for mastered skills
             500 * 20 + // Style neutral
             timing_bonus as u32 * 15 +
             goal_score as u32 * 25 +
-            interleave_score as u32 * 15
-        ) / 100;
+            interleave_score as u32 * 15)
+            / 100;
 
         let base_rec = Recommendation {
             learner: agent.clone(),
@@ -609,7 +623,11 @@ pub fn get_learner_context(_: ()) -> ExternResult<LearnerContext> {
     let needs_work_count = weaknesses.len() as u32;
     let in_progress_count = total_skills.saturating_sub(mastered_count + needs_work_count);
     let avg_mastery_permille = if total_skills > 0 {
-        (masteries.iter().map(|m| m.mastery_permille as u32).sum::<u32>() / total_skills) as u16
+        (masteries
+            .iter()
+            .map(|m| m.mastery_permille as u32)
+            .sum::<u32>()
+            / total_skills) as u16
     } else {
         0
     };
@@ -617,18 +635,22 @@ pub fn get_learner_context(_: ()) -> ExternResult<LearnerContext> {
     let completed_goals_count = goals.iter().filter(|g| g.is_completed).count() as u32;
 
     // Determine dominant learning style from profile
-    let dominant_style = profile.as_ref().map(|p| {
-        let scores = [
-            (p.visual_score_permille, LearningStyle::Visual),
-            (p.auditory_score_permille, LearningStyle::Auditory),
-            (p.reading_score_permille, LearningStyle::ReadingWriting),
-            (p.kinesthetic_score_permille, LearningStyle::Kinesthetic),
-        ];
-        scores.iter()
-            .max_by_key(|(score, _)| *score)
-            .map(|(_, style)| style.clone())
-            .unwrap_or(LearningStyle::Multimodal)
-    }).unwrap_or(LearningStyle::Multimodal);
+    let dominant_style = profile
+        .as_ref()
+        .map(|p| {
+            let scores = [
+                (p.visual_score_permille, LearningStyle::Visual),
+                (p.auditory_score_permille, LearningStyle::Auditory),
+                (p.reading_score_permille, LearningStyle::ReadingWriting),
+                (p.kinesthetic_score_permille, LearningStyle::Kinesthetic),
+            ];
+            scores
+                .iter()
+                .max_by_key(|(score, _)| *score)
+                .map(|(_, style)| style.clone())
+                .unwrap_or(LearningStyle::Multimodal)
+        })
+        .unwrap_or(LearningStyle::Multimodal);
 
     let stats = LearnerStats {
         total_skills,
@@ -655,7 +677,9 @@ pub fn get_learner_context(_: ()) -> ExternResult<LearnerContext> {
 
 /// Get paginated masteries with filtering - optimized for UI lists
 #[hdk_extern]
-pub fn get_masteries_paginated(input: PaginatedMasteriesInput) -> ExternResult<PaginatedMasteriesResult> {
+pub fn get_masteries_paginated(
+    input: PaginatedMasteriesInput,
+) -> ExternResult<PaginatedMasteriesResult> {
     mastery::get_masteries_paginated_impl(input)
 }
 
@@ -717,12 +741,7 @@ pub fn create_profile(input: CreateProfileInput) -> ExternResult<ActionHash> {
     let action_hash = create_entry(EntryTypes::LearnerProfile(profile))?;
 
     // Link from anchor to profile
-    create_link(
-        anchor,
-        action_hash.clone(),
-        LinkTypes::LearnerToProfile,
-        (),
-    )?;
+    create_link(anchor, action_hash.clone(), LinkTypes::LearnerToProfile, ())?;
 
     Ok(action_hash)
 }
@@ -744,7 +763,9 @@ pub fn get_my_profile(_: ()) -> ExternResult<Option<LearnerProfile>> {
                     .entry()
                     .to_app_option()
                     .map_err(|e| wasm_error!(e))?
-                    .ok_or(wasm_error!(WasmErrorInner::Guest("No profile entry".into())))?;
+                    .ok_or(wasm_error!(WasmErrorInner::Guest(
+                        "No profile entry".into()
+                    )))?;
                 return Ok(Some(profile));
             }
         }
@@ -801,7 +822,9 @@ pub fn calculate_learning_style(_: ()) -> ExternResult<LearningStyleResult> {
                     .entry()
                     .to_app_option()
                     .map_err(|e| wasm_error!(e))?
-                    .ok_or(wasm_error!(WasmErrorInner::Guest("No assessment entry".into())))?;
+                    .ok_or(wasm_error!(WasmErrorInner::Guest(
+                        "No assessment entry".into()
+                    )))?;
 
                 let weight = assessment.confidence as u32;
                 match assessment.answer {
@@ -945,8 +968,10 @@ pub fn generate_recommendations(input: GenerateRecsInput) -> ExternResult<Vec<Re
             readiness_permille: 1000,
             freshness_permille: 500,
             reason: RecommendationReason::RetentionRisk,
-            explanation: format!("Review to maintain your {:?} mastery level",
-                MasteryLevel::from_permille(mastery.mastery_permille)),
+            explanation: format!(
+                "Review to maintain your {:?} mastery level",
+                MasteryLevel::from_permille(mastery.mastery_permille)
+            ),
             rank: rank as u32 + 1,
             is_valid: true,
             generated_at: now,
@@ -1062,7 +1087,9 @@ pub struct SmartRecsInput {
 /// - Goal alignment
 /// - Energy level estimation
 #[hdk_extern]
-pub fn generate_smart_recommendations_v2(input: SmartRecsInput) -> ExternResult<Vec<SmartRecommendation>> {
+pub fn generate_smart_recommendations_v2(
+    input: SmartRecsInput,
+) -> ExternResult<Vec<SmartRecommendation>> {
     let agent = agent_info()?.agent_initial_pubkey;
     let now = current_time()?;
     let limit = input.limit.unwrap_or(MAX_RECOMMENDATIONS);
@@ -1076,13 +1103,16 @@ pub fn generate_smart_recommendations_v2(input: SmartRecsInput) -> ExternResult<
 
     // Get learner's profile for VARK scores
     let profile = get_my_profile(())?;
-    let vark = profile.as_ref()
-        .map(|p| (
-            p.visual_score_permille,
-            p.auditory_score_permille,
-            p.reading_score_permille,
-            p.kinesthetic_score_permille
-        ))
+    let vark = profile
+        .as_ref()
+        .map(|p| {
+            (
+                p.visual_score_permille,
+                p.auditory_score_permille,
+                p.reading_score_permille,
+                p.kinesthetic_score_permille,
+            )
+        })
         .unwrap_or((500, 500, 500, 500));
     // Derive learning style from highest VARK score
     let learning_style = {
@@ -1158,12 +1188,7 @@ pub fn create_goal(input: CreateGoalInput) -> ExternResult<ActionHash> {
 
     let action_hash = create_entry(EntryTypes::LearningGoal(goal))?;
 
-    create_link(
-        anchor,
-        action_hash.clone(),
-        LinkTypes::LearnerToGoals,
-        (),
-    )?;
+    create_link(anchor, action_hash.clone(), LinkTypes::LearnerToGoals, ())?;
 
     Ok(action_hash)
 }
@@ -1272,7 +1297,9 @@ pub fn record_session(input: RecordSessionInput) -> ExternResult<ActionHash> {
     // Estimate flow state from metrics
     let accuracy = if input.items_attempted > 0 {
         (input.correct_count * 1000 / input.items_attempted) as u16
-    } else { 500 };
+    } else {
+        500
+    };
 
     // Flow balance: 500 = optimal, <300 = too easy, >700 = too hard
     let flow_balance = accuracy.saturating_sub(200).min(800);
@@ -1281,20 +1308,32 @@ pub fn record_session(input: RecordSessionInput) -> ExternResult<ActionHash> {
     let active_time = duration.saturating_sub(input.skips * 30);
     let focus = if duration > 0 {
         (active_time * 1000 / duration) as u16
-    } else { 500 };
+    } else {
+        500
+    };
 
     // Frustration: low accuracy + many hints + skips
-    let frustration_signals = if accuracy < 400 && input.hints_used > 3 { 2 }
-        else if accuracy < 500 || input.skips > 2 { 1 }
-        else { 0 };
+    let frustration_signals = if accuracy < 400 && input.hints_used > 3 {
+        2
+    } else if accuracy < 500 || input.skips > 2 {
+        1
+    } else {
+        0
+    };
 
     // Boredom: high accuracy + fast responses
-    let boredom_signals = if accuracy > 900 && input.avg_response_time_ms < 2000 { 2 }
-        else if accuracy > 850 || input.avg_response_time_ms < 3000 { 1 }
-        else { 0 };
+    let boredom_signals = if accuracy > 900 && input.avg_response_time_ms < 2000 {
+        2
+    } else if accuracy > 850 || input.avg_response_time_ms < 3000 {
+        1
+    } else {
+        0
+    };
 
     // Calculate mastery gained
-    let mastery_gained = ((input.correct_count as i32) - (input.items_attempted as i32 - input.correct_count as i32)) * 10;
+    let mastery_gained = ((input.correct_count as i32)
+        - (input.items_attempted as i32 - input.correct_count as i32))
+        * 10;
 
     let session = SessionAnalytics {
         learner: agent,
@@ -1348,7 +1387,9 @@ pub fn get_recent_sessions(limit: u32) -> ExternResult<Vec<SessionAnalytics>> {
                     .entry()
                     .to_app_option()
                     .map_err(|e| wasm_error!(e))?
-                    .ok_or(wasm_error!(WasmErrorInner::Guest("No session entry".into())))?;
+                    .ok_or(wasm_error!(WasmErrorInner::Guest(
+                        "No session entry".into()
+                    )))?;
                 sessions.push(session);
             }
         }
@@ -1395,7 +1436,8 @@ pub fn create_adaptive_path(input: CreatePathInput) -> ExternResult<ActionHash> 
     let anchor = path_anchor()?;
 
     // Estimate total time
-    let estimated_hours: u16 = input.initial_steps
+    let estimated_hours: u16 = input
+        .initial_steps
         .iter()
         .map(|s| s.duration_minutes / 60)
         .sum::<u16>()
@@ -1419,12 +1461,7 @@ pub fn create_adaptive_path(input: CreatePathInput) -> ExternResult<ActionHash> 
 
     let action_hash = create_entry(EntryTypes::AdaptivePath(path))?;
 
-    create_link(
-        anchor,
-        action_hash.clone(),
-        LinkTypes::LearnerToPaths,
-        (),
-    )?;
+    create_link(anchor, action_hash.clone(), LinkTypes::LearnerToPaths, ())?;
 
     Ok(action_hash)
 }
@@ -1498,7 +1535,9 @@ pub struct RecordCalibrationInput {
 
 /// Record an attempt and update content difficulty calibration
 #[hdk_extern]
-pub fn update_difficulty_calibration(input: RecordCalibrationInput) -> ExternResult<DifficultyCalibration> {
+pub fn update_difficulty_calibration(
+    input: RecordCalibrationInput,
+) -> ExternResult<DifficultyCalibration> {
     let now = current_time()?;
 
     // Try to get existing calibration
@@ -1514,7 +1553,9 @@ pub fn update_difficulty_calibration(input: RecordCalibrationInput) -> ExternRes
                     .entry()
                     .to_app_option()
                     .map_err(|e| wasm_error!(e))?
-                    .ok_or(wasm_error!(WasmErrorInner::Guest("No calibration entry".into())))?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest(
+                        "No calibration entry".into()
+                    )))?
             } else {
                 create_default_calibration(&input, now)
             }
@@ -1537,7 +1578,7 @@ pub fn update_difficulty_calibration(input: RecordCalibrationInput) -> ExternRes
         input.time_seconds
     } else {
         ((calibration.avg_time_seconds as u64 * old_total as u64 + input.time_seconds as u64)
-         / calibration.total_attempts as u64) as u32
+            / calibration.total_attempts as u64) as u32
     };
 
     // Recalibrate difficulty based on success rate
@@ -1557,7 +1598,9 @@ pub fn update_difficulty_calibration(input: RecordCalibrationInput) -> ExternRes
     };
 
     calibration.calibrated_difficulty_permille =
-        ((calibration.calibrated_difficulty_permille as i32 + adjustment).max(0).min(1000)) as u16;
+        ((calibration.calibrated_difficulty_permille as i32 + adjustment)
+            .max(0)
+            .min(1000)) as u16;
     calibration.calibrated_at = now;
 
     // Create or update entry
@@ -1625,10 +1668,19 @@ pub fn get_learner_summary(_: ()) -> ExternResult<LearnerSummary> {
 
     let mastery_count = masteries.len() as u32;
     let avg_mastery = if mastery_count > 0 {
-        (masteries.iter().map(|m| m.mastery_permille as u32).sum::<u32>() / mastery_count) as u16
-    } else { 0 };
+        (masteries
+            .iter()
+            .map(|m| m.mastery_permille as u32)
+            .sum::<u32>()
+            / mastery_count) as u16
+    } else {
+        0
+    };
 
-    let skills_mastered = masteries.iter().filter(|m| m.mastery_permille >= MASTERY_THRESHOLD).count() as u32;
+    let skills_mastered = masteries
+        .iter()
+        .filter(|m| m.mastery_permille >= MASTERY_THRESHOLD)
+        .count() as u32;
     let total_minutes: u32 = sessions.iter().map(|s| s.duration_seconds / 60).sum();
 
     Ok(LearnerSummary {
@@ -1641,7 +1693,10 @@ pub fn get_learner_summary(_: ()) -> ExternResult<LearnerSummary> {
         active_goals: goals.len() as u32,
         total_sessions: sessions.len() as u32,
         total_learning_minutes: total_minutes,
-        active_paths: paths.iter().filter(|p| p.current_step < p.steps.len() as u32).count() as u32,
+        active_paths: paths
+            .iter()
+            .filter(|p| p.current_step < p.steps.len() as u32)
+            .count() as u32,
         recommendations_count: 0, // Would need to fetch fresh recommendations
     })
 }
@@ -1669,7 +1724,9 @@ pub use adaptive_integrity::RetentionPrediction;
 
 /// Predict retention for a specific skill
 #[hdk_extern]
-pub fn predict_skill_retention(input: RetentionPredictionInput) -> ExternResult<RetentionPrediction> {
+pub fn predict_skill_retention(
+    input: RetentionPredictionInput,
+) -> ExternResult<RetentionPrediction> {
     retention::predict_skill_retention_impl(input)
 }
 
@@ -1681,7 +1738,9 @@ pub fn predict_retention_batch(input: BatchRetentionInput) -> ExternResult<Batch
 
 /// Generate optimal review schedule to maintain target retention
 #[hdk_extern]
-pub fn get_optimal_review_schedule(input: ReviewScheduleInput) -> ExternResult<ReviewScheduleResult> {
+pub fn get_optimal_review_schedule(
+    input: ReviewScheduleInput,
+) -> ExternResult<ReviewScheduleResult> {
     retention::get_optimal_review_schedule_impl(input)
 }
 
@@ -1743,7 +1802,9 @@ pub struct RecordJudgmentInput {
 
 /// Calculate calibration metrics from a set of judgments
 #[hdk_extern]
-pub fn calculate_calibration(judgments: Vec<ConfidenceJudgment>) -> ExternResult<CalibrationMetrics> {
+pub fn calculate_calibration(
+    judgments: Vec<ConfidenceJudgment>,
+) -> ExternResult<CalibrationMetrics> {
     if judgments.is_empty() {
         return Ok(CalibrationMetrics {
             calibration_score: 500, // Neutral when no data
@@ -1787,10 +1848,12 @@ pub fn calculate_calibration(judgments: Vec<ConfidenceJudgment>) -> ExternResult
     // Calculate trend from recent vs older judgments
     let calibration_trend = if judgments.len() >= 10 {
         let mid = judgments.len() / 2;
-        let recent_error: i64 = judgments[mid..].iter()
+        let recent_error: i64 = judgments[mid..]
+            .iter()
             .map(|j| (j.predicted_confidence as i64 - j.actual_performance as i64).abs())
             .sum();
-        let older_error: i64 = judgments[..mid].iter()
+        let older_error: i64 = judgments[..mid]
+            .iter()
             .map(|j| (j.predicted_confidence as i64 - j.actual_performance as i64).abs())
             .sum();
 
@@ -1946,7 +2009,7 @@ pub fn generate_learning_path(input: GeneratePathInput) -> ExternResult<Personal
         // Time-of-day optimization
         let priority: u16 = match input.current_hour {
             6..=11 => priority + 50, // Morning boost for new learning
-            14..=17 => priority, // Afternoon - neutral
+            14..=17 => priority,     // Afternoon - neutral
             19..=22 => priority.saturating_sub(50) + if mastery > 500 { 100 } else { 0 }, // Evening - review boost
             _ => priority,
         };
@@ -1980,12 +2043,19 @@ pub fn generate_learning_path(input: GeneratePathInput) -> ExternResult<Personal
         step.order = (i + 1) as u16;
     }
 
-    let skills_to_unlock = steps.iter()
+    let skills_to_unlock = steps
+        .iter()
         .filter(|s| s.reason == PathStepReason::UnlocksOthers)
         .count() as u32;
 
     // Confidence based on data quality
-    let confidence = if steps.len() >= 5 { 800 } else if steps.len() >= 3 { 600 } else { 400 };
+    let confidence = if steps.len() >= 5 {
+        800
+    } else if steps.len() >= 3 {
+        600
+    } else {
+        400
+    };
 
     Ok(PersonalizedLearningPath {
         steps,
@@ -2073,8 +2143,7 @@ pub fn calculate_peer_compatibility(
     peer_levels: &[(ActionHash, u16)],
     prefer_tutors: bool,
 ) -> (u16, PeerMatchReason) {
-    let my_map: std::collections::HashMap<ActionHash, u16> =
-        my_levels.iter().cloned().collect();
+    let my_map: std::collections::HashMap<ActionHash, u16> = my_levels.iter().cloned().collect();
     let peer_map: std::collections::HashMap<ActionHash, u16> =
         peer_levels.iter().cloned().collect();
 
@@ -2236,7 +2305,9 @@ pub struct UpdateCognitiveMasteryInput {
 
 /// Check if learner can advance to next cognitive level
 #[hdk_extern]
-pub fn check_cognitive_level_unlock(input: SkillMasteryByLevel) -> ExternResult<Option<CognitiveLevel>> {
+pub fn check_cognitive_level_unlock(
+    input: SkillMasteryByLevel,
+) -> ExternResult<Option<CognitiveLevel>> {
     let current_mastery = match input.current_level {
         CognitiveLevel::Remember => input.remember_mastery,
         CognitiveLevel::Understand => input.understand_mastery,
@@ -2258,13 +2329,12 @@ pub fn check_cognitive_level_unlock(input: SkillMasteryByLevel) -> ExternResult<
 pub fn calculate_composite_mastery(input: SkillMasteryByLevel) -> ExternResult<u16> {
     // Higher cognitive levels weighted more heavily
     // Weights: Remember=10%, Understand=15%, Apply=20%, Analyze=20%, Evaluate=17.5%, Create=17.5%
-    let weighted_sum: u32 =
-        (input.remember_mastery as u32 * 100) +
-        (input.understand_mastery as u32 * 150) +
-        (input.apply_mastery as u32 * 200) +
-        (input.analyze_mastery as u32 * 200) +
-        (input.evaluate_mastery as u32 * 175) +
-        (input.create_mastery as u32 * 175);
+    let weighted_sum: u32 = (input.remember_mastery as u32 * 100)
+        + (input.understand_mastery as u32 * 150)
+        + (input.apply_mastery as u32 * 200)
+        + (input.analyze_mastery as u32 * 200)
+        + (input.evaluate_mastery as u32 * 175)
+        + (input.create_mastery as u32 * 175);
 
     let composite = (weighted_sum / 1000).min(1000) as u16;
     Ok(composite)
@@ -2355,15 +2425,14 @@ pub struct RecordTransferInput {
 pub fn calculate_transfer_readiness(input: TransferMap) -> ExternResult<u16> {
     // Transfer readiness = weighted average of original mastery and transfer success
     let original_weight: u32 = 300; // 30%
-    let near_weight: u32 = 350;     // 35%
+    let near_weight: u32 = 350; // 35%
     let intermediate_weight: u32 = 200; // 20%
-    let far_weight: u32 = 150;      // 15%
+    let far_weight: u32 = 150; // 15%
 
-    let weighted_sum: u32 =
-        (input.original_mastery as u32 * original_weight) +
-        (input.near_transfer_success as u32 * near_weight) +
-        (input.intermediate_transfer_success as u32 * intermediate_weight) +
-        (input.far_transfer_success as u32 * far_weight);
+    let weighted_sum: u32 = (input.original_mastery as u32 * original_weight)
+        + (input.near_transfer_success as u32 * near_weight)
+        + (input.intermediate_transfer_success as u32 * intermediate_weight)
+        + (input.far_transfer_success as u32 * far_weight);
 
     let readiness = (weighted_sum / 1000).min(1000) as u16;
     Ok(readiness)
@@ -2372,9 +2441,9 @@ pub fn calculate_transfer_readiness(input: TransferMap) -> ExternResult<u16> {
 /// Check if learner has achieved deep mastery (real learning, not just retention)
 #[hdk_extern]
 pub fn check_deep_mastery(input: TransferMap) -> ExternResult<bool> {
-    let is_deep = input.original_mastery >= 800 &&
-                  input.near_transfer_success >= 700 &&
-                  input.far_transfer_success >= 500;
+    let is_deep = input.original_mastery >= 800
+        && input.near_transfer_success >= 700
+        && input.far_transfer_success >= 500;
     Ok(is_deep)
 }
 
@@ -2460,7 +2529,9 @@ pub struct GenerateElaborationInput {
 
 /// Generate appropriate elaboration prompt based on context
 #[hdk_extern]
-pub fn generate_elaboration_prompt(input: GenerateElaborationInput) -> ExternResult<ElaborationPrompt> {
+pub fn generate_elaboration_prompt(
+    input: GenerateElaborationInput,
+) -> ExternResult<ElaborationPrompt> {
     // Choose prompt type based on cognitive level and mastery
     let prompt_type = if input.current_mastery < 300 {
         ElaborationPromptType::ProcessSteps // Basic understanding
@@ -2483,14 +2554,28 @@ pub fn generate_elaboration_prompt(input: GenerateElaborationInput) -> ExternRes
     };
 
     let prompt_text = match prompt_type {
-        ElaborationPromptType::WhyWorks => "Why does this approach work? What makes it effective?".to_string(),
+        ElaborationPromptType::WhyWorks => {
+            "Why does this approach work? What makes it effective?".to_string()
+        }
         ElaborationPromptType::HowKnow => "How do you know this answer is correct?".to_string(),
-        ElaborationPromptType::ExplainSimply => "Explain this concept as if teaching a 10-year-old.".to_string(),
-        ElaborationPromptType::CounterExample => "Can you think of a situation where this would NOT work?".to_string(),
-        ElaborationPromptType::Connection => "How does this connect to other things you've learned?".to_string(),
-        ElaborationPromptType::RealWorldApplication => "When might you use this in real life?".to_string(),
-        ElaborationPromptType::ProcessSteps => "What are the key steps in this process?".to_string(),
-        ElaborationPromptType::UnderlyingPrinciple => "What's the fundamental principle behind this?".to_string(),
+        ElaborationPromptType::ExplainSimply => {
+            "Explain this concept as if teaching a 10-year-old.".to_string()
+        }
+        ElaborationPromptType::CounterExample => {
+            "Can you think of a situation where this would NOT work?".to_string()
+        }
+        ElaborationPromptType::Connection => {
+            "How does this connect to other things you've learned?".to_string()
+        }
+        ElaborationPromptType::RealWorldApplication => {
+            "When might you use this in real life?".to_string()
+        }
+        ElaborationPromptType::ProcessSteps => {
+            "What are the key steps in this process?".to_string()
+        }
+        ElaborationPromptType::UnderlyingPrinciple => {
+            "What's the fundamental principle behind this?".to_string()
+        }
     };
 
     Ok(ElaborationPrompt {
@@ -2608,7 +2693,9 @@ pub struct WorkedExampleInput {
 
 /// Get recommendation for content format based on mastery
 #[hdk_extern]
-pub fn recommend_content_format(input: WorkedExampleInput) -> ExternResult<WorkedExampleRecommendation> {
+pub fn recommend_content_format(
+    input: WorkedExampleInput,
+) -> ExternResult<WorkedExampleRecommendation> {
     let worked_ratio = calculate_worked_example_ratio(input.current_mastery);
 
     let (format, xp_value, reasoning) = if input.current_mastery < 200 {
@@ -2619,13 +2706,17 @@ pub fn recommend_content_format(input: WorkedExampleInput) -> ExternResult<Worke
         )
     } else if input.current_mastery < 400 {
         (
-            ContentFormat::PartialWorkedExample { steps_shown_permille: 600 },
+            ContentFormat::PartialWorkedExample {
+                steps_shown_permille: 600,
+            },
             8,
             "Transitioning to partial examples - complete the last steps".to_string(),
         )
     } else if input.current_mastery < 600 {
         (
-            ContentFormat::PartialWorkedExample { steps_shown_permille: 400 },
+            ContentFormat::PartialWorkedExample {
+                steps_shown_permille: 400,
+            },
             10,
             "Even split - half worked, half for you to solve".to_string(),
         )
@@ -2639,8 +2730,8 @@ pub fn recommend_content_format(input: WorkedExampleInput) -> ExternResult<Worke
         )
     } else {
         // Adjust difficulty based on cognitive level
-        let difficulty = input.current_mastery +
-            (input.cognitive_level.difficulty_multiplier() - 1000);
+        let difficulty =
+            input.current_mastery + (input.cognitive_level.difficulty_multiplier() - 1000);
         (
             ContentFormat::IndependentProblem {
                 difficulty: difficulty.min(1000),
@@ -2654,7 +2745,9 @@ pub fn recommend_content_format(input: WorkedExampleInput) -> ExternResult<Worke
     let (format, xp_value) = if input.recent_errors > 2 && input.current_mastery > 400 {
         // Step back to more scaffolding
         (
-            ContentFormat::PartialWorkedExample { steps_shown_permille: 500 },
+            ContentFormat::PartialWorkedExample {
+                steps_shown_permille: 500,
+            },
             8,
         )
     } else {
@@ -2739,24 +2832,26 @@ pub struct ExpertiseCheckInput {
 
 /// Detect expertise reversal effect
 #[hdk_extern]
-pub fn detect_expertise_reversal(input: ExpertiseCheckInput) -> ExternResult<ExpertiseReversalResult> {
+pub fn detect_expertise_reversal(
+    input: ExpertiseCheckInput,
+) -> ExternResult<ExpertiseReversalResult> {
     // Calculate mismatch
-    let mastery_vs_complexity = (input.learner_mastery as i32 - input.content_complexity as i32).abs();
+    let mastery_vs_complexity =
+        (input.learner_mastery as i32 - input.content_complexity as i32).abs();
     let mismatch = mastery_vs_complexity as u16;
 
     // Underserved: high mastery + low complexity + high explanation detail
-    let is_underserved = input.learner_mastery > 700 &&
-                         input.content_complexity < 400 &&
-                         input.explanation_detail > 600;
+    let is_underserved = input.learner_mastery > 700
+        && input.content_complexity < 400
+        && input.explanation_detail > 600;
 
     // Overwhelmed: low mastery + high complexity
-    let is_overwhelmed = input.learner_mastery < 300 &&
-                         input.content_complexity > 600;
+    let is_overwhelmed = input.learner_mastery < 300 && input.content_complexity > 600;
 
     // Expertise reversal: expert being given novice content
-    let is_expertise_reversal = input.learner_mastery > 800 &&
-                                 input.content_complexity < 500 &&
-                                 input.explanation_detail > 500;
+    let is_expertise_reversal = input.learner_mastery > 800
+        && input.content_complexity < 500
+        && input.explanation_detail > 500;
 
     let recommendation = if is_expertise_reversal {
         ExpertiseRecommendation::SwitchToExpertVersion
@@ -2878,12 +2973,14 @@ impl Default for RetentionGoal {
 
 /// Calculate optimal desirable difficulties session composition
 #[hdk_extern]
-pub fn calculate_desirable_difficulties(input: DesirableDifficultyInput) -> ExternResult<DesirableDifficultyProfile> {
+pub fn calculate_desirable_difficulties(
+    input: DesirableDifficultyInput,
+) -> ExternResult<DesirableDifficultyProfile> {
     // Base composition
-    let mut spaced = 400u16;      // 40% spaced items
+    let mut spaced = 400u16; // 40% spaced items
     let mut interleaved = 350u16; // 35% interleaved
     let mut variability = 150u16; // 15% variability
-    let mut transfer = 100u16;    // 10% transfer
+    let mut transfer = 100u16; // 10% transfer
 
     // Adjust based on retention goal
     match input.retention_goal {
@@ -2914,8 +3011,12 @@ pub fn calculate_desirable_difficulties(input: DesirableDifficultyInput) -> Exte
     match input.learning_style {
         LearningStyle::Kinesthetic => {
             variability += 100; // More real-world contexts
-            if spaced > 100 { spaced -= 50; }
-            if interleaved > 100 { interleaved -= 50; }
+            if spaced > 100 {
+                spaced -= 50;
+            }
+            if interleaved > 100 {
+                interleaved -= 50;
+            }
         }
         LearningStyle::Multimodal => {
             // Balanced across all modalities - no adjustment needed
@@ -2959,14 +3060,25 @@ pub fn calculate_desirable_difficulties(input: DesirableDifficultyInput) -> Exte
         (variability_score, DifficultyDimension::Variability),
         (transfer_score, DifficultyDimension::Transfer),
     ];
-    let weakest = scores.iter().min_by_key(|(s, _)| *s).map(|(_, d)| d.clone()).unwrap_or(DifficultyDimension::Spacing);
+    let weakest = scores
+        .iter()
+        .min_by_key(|(s, _)| *s)
+        .map(|(_, d)| d.clone())
+        .unwrap_or(DifficultyDimension::Spacing);
 
     // Calculate overall difficulty index
-    let difficulty_index = ((spacing_score as u32 + interleaving_score as u32 +
-                            variability_score as u32 + transfer_score as u32) / 4) as u16;
+    let difficulty_index = ((spacing_score as u32
+        + interleaving_score as u32
+        + variability_score as u32
+        + transfer_score as u32)
+        / 4) as u16;
 
     // Determine topics to mix
-    let topics_to_mix = if input.learner_mastery_avg > 600 { 4 } else { 2 };
+    let topics_to_mix = if input.learner_mastery_avg > 600 {
+        4
+    } else {
+        2
+    };
 
     Ok(DesirableDifficultyProfile {
         spacing_score,
@@ -3104,11 +3216,17 @@ pub fn recommend_dual_coding(input: DualCodingInput) -> ExternResult<DualCodingR
     // Check what's missing
     let has_visual = input.current_modalities.contains(&ContentModality::Visual);
     let has_verbal = input.current_modalities.contains(&ContentModality::Verbal);
-    let has_kinesthetic = input.current_modalities.contains(&ContentModality::Kinesthetic);
+    let has_kinesthetic = input
+        .current_modalities
+        .contains(&ContentModality::Kinesthetic);
 
-    let missing = if !has_visual && (primary == ContentModality::Visual || complementary == ContentModality::Visual) {
+    let missing = if !has_visual
+        && (primary == ContentModality::Visual || complementary == ContentModality::Visual)
+    {
         Some(ContentModality::Visual)
-    } else if !has_verbal && (primary == ContentModality::Verbal || complementary == ContentModality::Verbal) {
+    } else if !has_verbal
+        && (primary == ContentModality::Verbal || complementary == ContentModality::Verbal)
+    {
         Some(ContentModality::Verbal)
     } else if !has_kinesthetic && input.learning_style == LearningStyle::Kinesthetic {
         Some(ContentModality::Kinesthetic)
@@ -3194,7 +3312,7 @@ pub struct RetrievalAttempt {
     pub retrieval_type: RetrievalType,
     pub success: bool,
     pub response_time_ms: u32,
-    pub confidence_before: u16,  // 0-1000
+    pub confidence_before: u16, // 0-1000
     pub attempted_at: i64,
 }
 
@@ -3248,7 +3366,9 @@ pub struct RetrievalPracticeResult {
 /// Calculate optimal retrieval practice schedule
 /// Based on expanding retrieval practice research
 #[hdk_extern]
-pub fn calculate_retrieval_schedule(input: RetrievalPracticeInput) -> ExternResult<RetrievalPracticeResult> {
+pub fn calculate_retrieval_schedule(
+    input: RetrievalPracticeInput,
+) -> ExternResult<RetrievalPracticeResult> {
     // Testing effect is strongest when:
     // 1. Initial learning has occurred (mastery > 300)
     // 2. Some time has passed (spacing effect)
@@ -3270,7 +3390,11 @@ pub fn calculate_retrieval_schedule(input: RetrievalPracticeInput) -> ExternResu
     };
 
     // Calculate next interval using expanding schedule
-    let base_interval = if input.last_retrieval_success { 60u32 } else { 15u32 };
+    let base_interval = if input.last_retrieval_success {
+        60u32
+    } else {
+        15u32
+    };
     let expansion = 1.0 + (input.mastery_permille as f64 / 1000.0);
     let next_interval = (base_interval as f64 * expansion) as u32;
 
@@ -3279,16 +3403,26 @@ pub fn calculate_retrieval_schedule(input: RetrievalPracticeInput) -> ExternResu
         if input.mastery_permille < 300 {
             StudyRecommendation::Restudy
         } else {
-            StudyRecommendation::InterleavedTestStudy { test_ratio_permille: 300 }
+            StudyRecommendation::InterleavedTestStudy {
+                test_ratio_permille: 300,
+            }
         }
     } else if input.mastery_permille > 700 {
-        StudyRecommendation::RetrievalPractice { retrieval_type: optimal_type.clone() }
+        StudyRecommendation::RetrievalPractice {
+            retrieval_type: optimal_type.clone(),
+        }
     } else {
-        StudyRecommendation::InterleavedTestStudy { test_ratio_permille: 500 }
+        StudyRecommendation::InterleavedTestStudy {
+            test_ratio_permille: 500,
+        }
     };
 
     // Expected retention boost from testing effect (50-70% in research)
-    let retention_boost = if testing_effect_active { 600u16 } else { 200u16 };
+    let retention_boost = if testing_effect_active {
+        600u16
+    } else {
+        200u16
+    };
 
     Ok(RetrievalPracticeResult {
         recommendation,
@@ -3362,7 +3496,9 @@ pub struct HypercorrectionInput {
 
 /// Analyze error for hypercorrection potential
 #[hdk_extern]
-pub fn analyze_hypercorrection(input: HypercorrectionInput) -> ExternResult<HypercorrectionAnalysis> {
+pub fn analyze_hypercorrection(
+    input: HypercorrectionInput,
+) -> ExternResult<HypercorrectionAnalysis> {
     // High confidence errors (>700) are corrected at 86% vs 64% for low confidence
     let is_candidate = input.confidence_when_wrong >= 700;
 
@@ -3507,10 +3643,7 @@ pub fn analyze_pre_test_benefit(input: PreTestInput) -> ExternResult<PreTestAnal
     };
 
     // Recommend easier retrieval types for pre-tests (learner hasn't learned yet!)
-    let types = vec![
-        RetrievalType::Recognition,
-        RetrievalType::FillInBlank,
-    ];
+    let types = vec![RetrievalType::Recognition, RetrievalType::FillInBlank];
 
     Ok(PreTestAnalysis {
         should_pre_test,
@@ -3600,7 +3733,9 @@ pub struct ProductiveFailureInput {
 
 /// Analyze productive failure situation
 #[hdk_extern]
-pub fn analyze_productive_failure(input: ProductiveFailureInput) -> ExternResult<ProductiveFailureAnalysis> {
+pub fn analyze_productive_failure(
+    input: ProductiveFailureInput,
+) -> ExternResult<ProductiveFailureAnalysis> {
     // Productive failure works best for:
     // 1. Conceptual problems (not procedural)
     // 2. Learners with persistence
@@ -3748,7 +3883,8 @@ pub struct SDTInput {
 pub fn assess_sdt_needs(input: SDTInput) -> ExternResult<SDTAssessment> {
     // Calculate autonomy: based on choices made vs options given
     let autonomy = if input.options_presented > 0 {
-        ((input.choices_made as u32 * 1000) / input.options_presented.max(1) as u32).min(1000) as u16
+        ((input.choices_made as u32 * 1000) / input.options_presented.max(1) as u32).min(1000)
+            as u16
     } else {
         300u16 // Low autonomy if no choices offered
     };
@@ -4082,20 +4218,24 @@ pub fn assess_attention(input: AttentionInput) -> ExternResult<AttentionAssessme
     let avg: u32 = times.iter().sum::<u32>() / times.len() as u32;
 
     // Calculate variance
-    let variance: u64 = times.iter()
+    let variance: u64 = times
+        .iter()
         .map(|&t| {
             let diff = if t > avg { t - avg } else { avg - t };
             (diff as u64) * (diff as u64)
         })
-        .sum::<u64>() / times.len() as u64;
+        .sum::<u64>()
+        / times.len() as u64;
     let std_dev = (variance as f64).sqrt() as u32;
 
     // Coefficient of variation (higher = more variable = less focused)
     let cv = if avg > 0 { (std_dev * 1000) / avg } else { 0 };
 
     // Detect trend (is response time increasing?)
-    let first_half_avg: u32 = times[..times.len()/2].iter().sum::<u32>() / (times.len()/2) as u32;
-    let second_half_avg: u32 = times[times.len()/2..].iter().sum::<u32>() / (times.len() - times.len()/2) as u32;
+    let first_half_avg: u32 =
+        times[..times.len() / 2].iter().sum::<u32>() / (times.len() / 2) as u32;
+    let second_half_avg: u32 =
+        times[times.len() / 2..].iter().sum::<u32>() / (times.len() - times.len() / 2) as u32;
 
     let trend = if second_half_avg > first_half_avg.saturating_add(avg / 4) {
         TrendDirection::Increasing // Slowing down
@@ -4108,7 +4248,9 @@ pub fn assess_attention(input: AttentionInput) -> ExternResult<AttentionAssessme
     // Determine attention state
     let state = if avg < 500 && input.recent_accuracy_permille < 600 {
         AttentionState::Guessing // Too fast + inaccurate
-    } else if cv > 600 || (matches!(trend, TrendDirection::Increasing) && input.recent_accuracy_permille < 500) {
+    } else if cv > 600
+        || (matches!(trend, TrendDirection::Increasing) && input.recent_accuracy_permille < 500)
+    {
         AttentionState::MindWandering
     } else if cv > 400 || input.consecutive_errors >= 3 {
         AttentionState::Drifting
@@ -4228,18 +4370,18 @@ pub struct EvidenceStrength {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum LogicalFallacy {
     // Fallacies of Relevance
-    AdHominem,           // Attack the person, not the argument
-    AppealToAuthority,   // Inappropriate authority citation
-    AppealToEmotion,     // Emotional manipulation
-    AppealToTradition,   // "We've always done it this way"
-    AppealToNature,      // "Natural = good"
-    AppealToPopularity,  // Bandwagon
-    RedHerring,          // Irrelevant distraction
-    StrawMan,            // Misrepresenting opponent's argument
+    AdHominem,          // Attack the person, not the argument
+    AppealToAuthority,  // Inappropriate authority citation
+    AppealToEmotion,    // Emotional manipulation
+    AppealToTradition,  // "We've always done it this way"
+    AppealToNature,     // "Natural = good"
+    AppealToPopularity, // Bandwagon
+    RedHerring,         // Irrelevant distraction
+    StrawMan,           // Misrepresenting opponent's argument
 
     // Fallacies of Ambiguity
-    Equivocation,        // Shifting word meaning
-    Amphiboly,           // Grammatical ambiguity
+    Equivocation, // Shifting word meaning
+    Amphiboly,    // Grammatical ambiguity
 
     // Fallacies of Presumption
     FalseDialemma,       // Only 2 options when more exist
@@ -4249,19 +4391,19 @@ pub enum LogicalFallacy {
     FalseCause,          // Post hoc ergo propter hoc
 
     // Fallacies of Weak Induction
-    WeakAnalogy,         // Poor comparison
-    AppealToIgnorance,   // No evidence = false
+    WeakAnalogy,       // Poor comparison
+    AppealToIgnorance, // No evidence = false
 
     // Formal Fallacies
     AffirmingConsequent, // If P then Q; Q; therefore P
     DenyingAntecedent,   // If P then Q; not P; therefore not Q
 
     // Other Common Fallacies
-    NoTrueScotsman,      // Arbitrary redefinition
-    MovingGoalposts,     // Changing criteria after fact
-    TuQuoque,            // "You do it too"
-    GeneticFallacy,      // Origin determines value
-    Whataboutism,        // Deflection to other issues
+    NoTrueScotsman,  // Arbitrary redefinition
+    MovingGoalposts, // Changing criteria after fact
+    TuQuoque,        // "You do it too"
+    GeneticFallacy,  // Origin determines value
+    Whataboutism,    // Deflection to other issues
 }
 
 /// Argument component
@@ -4308,52 +4450,80 @@ pub fn analyze_argument(input: ArgumentInput) -> ExternResult<ArgumentAnalysis> 
     let text_lower = input.argument_text.to_lowercase();
 
     // Ad Hominem detection
-    if text_lower.contains("stupid") || text_lower.contains("idiot") ||
-       text_lower.contains("they're just") || text_lower.contains("typical of") {
-        fallacies.push((LogicalFallacy::AdHominem,
-            "Attacking the person rather than the argument".to_string()));
+    if text_lower.contains("stupid")
+        || text_lower.contains("idiot")
+        || text_lower.contains("they're just")
+        || text_lower.contains("typical of")
+    {
+        fallacies.push((
+            LogicalFallacy::AdHominem,
+            "Attacking the person rather than the argument".to_string(),
+        ));
     }
 
     // Appeal to Authority
-    if (text_lower.contains("expert says") || text_lower.contains("scientist says")) &&
-       input.provided_evidence.iter().all(|(t, _)| !matches!(t, EvidenceType::Empirical)) {
-        fallacies.push((LogicalFallacy::AppealToAuthority,
-            "Authority cited without supporting evidence".to_string()));
+    if (text_lower.contains("expert says") || text_lower.contains("scientist says"))
+        && input
+            .provided_evidence
+            .iter()
+            .all(|(t, _)| !matches!(t, EvidenceType::Empirical))
+    {
+        fallacies.push((
+            LogicalFallacy::AppealToAuthority,
+            "Authority cited without supporting evidence".to_string(),
+        ));
     }
 
     // False Dilemma
-    if text_lower.contains("either") && text_lower.contains("or") &&
-       !text_lower.contains("alternatively") && !text_lower.contains("also") {
-        fallacies.push((LogicalFallacy::FalseDialemma,
-            "Only two options presented when more may exist".to_string()));
-        suggestions.push("Consider whether there are additional options beyond the two presented".to_string());
+    if text_lower.contains("either")
+        && text_lower.contains("or")
+        && !text_lower.contains("alternatively")
+        && !text_lower.contains("also")
+    {
+        fallacies.push((
+            LogicalFallacy::FalseDialemma,
+            "Only two options presented when more may exist".to_string(),
+        ));
+        suggestions.push(
+            "Consider whether there are additional options beyond the two presented".to_string(),
+        );
     }
 
     // Slippery Slope
     if text_lower.contains("will lead to") && text_lower.contains("eventually") {
-        fallacies.push((LogicalFallacy::SlipperySlope,
-            "Assumes chain of consequences without justification".to_string()));
+        fallacies.push((
+            LogicalFallacy::SlipperySlope,
+            "Assumes chain of consequences without justification".to_string(),
+        ));
         suggestions.push("Provide evidence for each step in the causal chain".to_string());
     }
 
     // Appeal to Tradition
     if text_lower.contains("always been") || text_lower.contains("traditional") {
-        fallacies.push((LogicalFallacy::AppealToTradition,
-            "Tradition alone doesn't justify current practice".to_string()));
+        fallacies.push((
+            LogicalFallacy::AppealToTradition,
+            "Tradition alone doesn't justify current practice".to_string(),
+        ));
     }
 
     // Appeal to Nature
-    if text_lower.contains("natural") && text_lower.contains("good") ||
-       text_lower.contains("unnatural") && text_lower.contains("bad") {
-        fallacies.push((LogicalFallacy::AppealToNature,
-            "Natural doesn't necessarily mean good or better".to_string()));
+    if text_lower.contains("natural") && text_lower.contains("good")
+        || text_lower.contains("unnatural") && text_lower.contains("bad")
+    {
+        fallacies.push((
+            LogicalFallacy::AppealToNature,
+            "Natural doesn't necessarily mean good or better".to_string(),
+        ));
     }
 
     // Hasty Generalization
-    if (text_lower.contains("all") || text_lower.contains("every") || text_lower.contains("always")) &&
-       input.provided_evidence.len() <= 1 {
-        fallacies.push((LogicalFallacy::HastyGeneralization,
-            "Broad claim based on limited evidence".to_string()));
+    if (text_lower.contains("all") || text_lower.contains("every") || text_lower.contains("always"))
+        && input.provided_evidence.len() <= 1
+    {
+        fallacies.push((
+            LogicalFallacy::HastyGeneralization,
+            "Broad claim based on limited evidence".to_string(),
+        ));
         suggestions.push("Consider a larger sample or qualify the claim".to_string());
     }
 
@@ -4361,8 +4531,10 @@ pub fn analyze_argument(input: ArgumentInput) -> ExternResult<ArgumentAnalysis> 
     let evidence_quality = if input.provided_evidence.is_empty() {
         100u16
     } else {
-        let quality_sum: u32 = input.provided_evidence.iter().map(|(t, _)| {
-            match t {
+        let quality_sum: u32 = input
+            .provided_evidence
+            .iter()
+            .map(|(t, _)| match t {
                 EvidenceType::Empirical => 900u32,
                 EvidenceType::Statistical => 850,
                 EvidenceType::Expert => 700,
@@ -4371,8 +4543,8 @@ pub fn analyze_argument(input: ArgumentInput) -> ExternResult<ArgumentAnalysis> 
                 EvidenceType::Analogical => 500,
                 EvidenceType::Anecdotal => 300,
                 EvidenceType::None => 0,
-            }
-        }).sum();
+            })
+            .sum();
         (quality_sum / input.provided_evidence.len() as u32) as u16
     };
 
@@ -4404,7 +4576,8 @@ pub fn analyze_argument(input: ArgumentInput) -> ExternResult<ArgumentAnalysis> 
         suggestions.push("Strengthen evidence with empirical data or expert sources".to_string());
     }
     if input.learner_confidence_permille > 800 && fallacies.len() > 2 {
-        suggestions.push("High confidence but multiple fallacies detected - review reasoning".to_string());
+        suggestions
+            .push("High confidence but multiple fallacies detected - review reasoning".to_string());
     }
 
     Ok(ArgumentAnalysis {
@@ -4412,13 +4585,19 @@ pub fn analyze_argument(input: ArgumentInput) -> ExternResult<ArgumentAnalysis> 
         components: vec![ArgumentComponent {
             claim: input.argument_text.clone(),
             claim_type: input.claim_type,
-            evidence_type: input.provided_evidence.first()
+            evidence_type: input
+                .provided_evidence
+                .first()
                 .map(|(t, _)| t.clone())
                 .unwrap_or(EvidenceType::None),
             evidence_strength: EvidenceStrength {
                 relevance_permille: evidence_quality,
                 reliability_permille: evidence_quality,
-                sufficiency_permille: if input.provided_evidence.len() >= 2 { 700 } else { 400 },
+                sufficiency_permille: if input.provided_evidence.len() >= 2 {
+                    700
+                } else {
+                    400
+                },
                 overall_permille: evidence_quality,
             },
             assumptions: assumptions.clone(),
@@ -4513,9 +4692,17 @@ pub fn evaluate_source(input: SourceEvaluationInput) -> ExternResult<SourceCredi
     };
 
     // Modifiers
-    let credential_bonus = if input.author_credentials.is_some() { 100u16 } else { 0 };
+    let credential_bonus = if input.author_credentials.is_some() {
+        100u16
+    } else {
+        0
+    };
     let citation_bonus = (input.citation_count.min(100) as u16) * 2;
-    let conflict_penalty = if input.conflicts_of_interest { 200u16 } else { 0 };
+    let conflict_penalty = if input.conflicts_of_interest {
+        200u16
+    } else {
+        0
+    };
     let has_cites_bonus = if input.has_citations { 100u16 } else { 0 };
 
     let expertise = base.saturating_add(credential_bonus).min(1000);
@@ -4523,7 +4710,8 @@ pub fn evaluate_source(input: SourceEvaluationInput) -> ExternResult<SourceCredi
     let transparency = if input.has_citations { 700 } else { 400 };
     let independence = base.saturating_sub(conflict_penalty);
 
-    let overall = (expertise as u32 + track_record as u32 + transparency as u32 + independence as u32) / 4;
+    let overall =
+        (expertise as u32 + track_record as u32 + transparency as u32 + independence as u32) / 4;
 
     Ok(SourceCredibility {
         expertise_permille: expertise,
@@ -4548,7 +4736,7 @@ pub struct BiasAnalysis {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BiasDetectionInput {
     pub recent_decisions: Vec<(String, bool)>, // Decision + whether confirmed prior belief
-    pub information_sources_diversity: u16, // 0-1000
+    pub information_sources_diversity: u16,    // 0-1000
     pub times_changed_mind_recently: u8,
     pub considers_opposing_views_permille: u16,
 }
@@ -4560,7 +4748,11 @@ pub fn detect_biases(input: BiasDetectionInput) -> ExternResult<BiasAnalysis> {
     let mut strategies = Vec::new();
 
     // Confirmation bias detection
-    let confirming = input.recent_decisions.iter().filter(|(_, confirmed)| *confirmed).count();
+    let confirming = input
+        .recent_decisions
+        .iter()
+        .filter(|(_, confirmed)| *confirmed)
+        .count();
     let confirmation_rate = if input.recent_decisions.is_empty() {
         500u16
     } else {
@@ -4575,7 +4767,10 @@ pub fn detect_biases(input: BiasDetectionInput) -> ExternResult<BiasAnalysis> {
 
     // Source diversity bias
     if input.information_sources_diversity < 400 {
-        biases.push((CognitiveBias::BandwagonEffect, 800 - input.information_sources_diversity / 2));
+        biases.push((
+            CognitiveBias::BandwagonEffect,
+            800 - input.information_sources_diversity / 2,
+        ));
         strategies.push("Diversify information sources across viewpoints".to_string());
     }
 
@@ -4596,7 +4791,8 @@ pub fn detect_biases(input: BiasDetectionInput) -> ExternResult<BiasAnalysis> {
         + input.information_sources_diversity / 4
         + (input.times_changed_mind_recently as u16 * 50).min(250);
 
-    let most_vulnerable = biases.first()
+    let most_vulnerable = biases
+        .first()
         .map(|(b, _)| b.clone())
         .unwrap_or(CognitiveBias::ConfirmationBias);
 
@@ -4671,8 +4867,10 @@ pub fn generate_socratic_questions(input: SocraticInput) -> ExternResult<Vec<Soc
     if input.prior_questions_asked == 0 {
         questions.push(SocraticDialogue {
             question_type: SocraticQuestionType::Clarification,
-            question: format!("When you say '{}', what specifically do you mean?",
-                truncate_text(&input.learner_claim, 50)),
+            question: format!(
+                "When you say '{}', what specifically do you mean?",
+                truncate_text(&input.learner_claim, 50)
+            ),
             purpose: "Ensure clear understanding of the claim".to_string(),
             expected_insight_depth: 400,
             follow_up_questions: vec![
@@ -4760,33 +4958,33 @@ fn truncate_text(text: &str, max_len: usize) -> String {
 /// Metacognitive skills
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum MetacognitiveSkill {
-    Planning,            // Planning approach before starting
-    Monitoring,          // Checking comprehension during learning
-    Evaluating,          // Assessing learning after completion
-    StrategySelection,   // Choosing appropriate strategies
-    SelfExplanation,     // Explaining to oneself
-    Debugging,           // Identifying and fixing confusion
+    Planning,          // Planning approach before starting
+    Monitoring,        // Checking comprehension during learning
+    Evaluating,        // Assessing learning after completion
+    StrategySelection, // Choosing appropriate strategies
+    SelfExplanation,   // Explaining to oneself
+    Debugging,         // Identifying and fixing confusion
 }
 
 /// Metacognitive awareness levels
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum MetacognitiveLevel {
-    Tacit,       // Uses skills without awareness
-    Aware,       // Knows what skills are used
-    Strategic,   // Can select appropriate skills
-    Reflective,  // Can evaluate and improve skills
+    Tacit,      // Uses skills without awareness
+    Aware,      // Knows what skills are used
+    Strategic,  // Can select appropriate skills
+    Reflective, // Can evaluate and improve skills
 }
 
 /// Learning strategy types
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum LearningStrategy {
-    Rehearsal,           // Repetition
-    Elaboration,         // Connecting to prior knowledge
-    Organization,        // Creating structure
-    CriticalThinking,    // Evaluating information
-    Metacognition,       // Monitoring own thinking
-    ResourceManagement,  // Time and environment
-    HelpSeeking,         // Asking for assistance
+    Rehearsal,          // Repetition
+    Elaboration,        // Connecting to prior knowledge
+    Organization,       // Creating structure
+    CriticalThinking,   // Evaluating information
+    Metacognition,      // Monitoring own thinking
+    ResourceManagement, // Time and environment
+    HelpSeeking,        // Asking for assistance
 }
 
 /// Metacognitive assessment
@@ -4810,7 +5008,7 @@ pub struct MetacognitiveInput {
     pub explains_to_self: bool,
     pub recognizes_confusion: bool,
     pub estimates_time_accuracy_permille: u16, // How accurate are time estimates
-    pub performance_prediction_accuracy: u16,   // How well do they predict their performance
+    pub performance_prediction_accuracy: u16,  // How well do they predict their performance
 }
 
 /// Assess metacognitive abilities
@@ -4821,7 +5019,11 @@ pub fn assess_metacognition(input: MetacognitiveInput) -> ExternResult<Metacogni
     let mut prompts = Vec::new();
 
     // Planning skill
-    let planning_score = if input.plans_before_learning { 800u16 } else { 300 };
+    let planning_score = if input.plans_before_learning {
+        800u16
+    } else {
+        300
+    };
     skills.push((MetacognitiveSkill::Planning, planning_score));
     if planning_score < 500 {
         priorities.push(MetacognitiveSkill::Planning);
@@ -4829,19 +5031,29 @@ pub fn assess_metacognition(input: MetacognitiveInput) -> ExternResult<Metacogni
     }
 
     // Monitoring skill
-    let monitoring_score = if input.checks_understanding_during { 800 } else { 300 };
+    let monitoring_score = if input.checks_understanding_during {
+        800
+    } else {
+        300
+    };
     skills.push((MetacognitiveSkill::Monitoring, monitoring_score));
     if monitoring_score < 500 {
         priorities.push(MetacognitiveSkill::Monitoring);
-        prompts.push("Pause periodically to ask: Do I understand this? Can I explain it?".to_string());
+        prompts
+            .push("Pause periodically to ask: Do I understand this? Can I explain it?".to_string());
     }
 
     // Evaluating skill
-    let eval_score = if input.reviews_after_completion { 750 } else { 250 };
+    let eval_score = if input.reviews_after_completion {
+        750
+    } else {
+        250
+    };
     skills.push((MetacognitiveSkill::Evaluating, eval_score));
     if eval_score < 500 {
         priorities.push(MetacognitiveSkill::Evaluating);
-        prompts.push("After learning, reflect: What worked? What would I do differently?".to_string());
+        prompts
+            .push("After learning, reflect: What worked? What would I do differently?".to_string());
     }
 
     // Strategy selection
@@ -4872,13 +5084,17 @@ pub fn assess_metacognition(input: MetacognitiveInput) -> ExternResult<Metacogni
     };
 
     // Self-regulation score
-    let calibration = (input.estimates_time_accuracy_permille + input.performance_prediction_accuracy) / 2;
+    let calibration =
+        (input.estimates_time_accuracy_permille + input.performance_prediction_accuracy) / 2;
     let self_regulation = (avg_skill as u16 + calibration) / 2;
 
     // Strategy effectiveness
     let strategies = vec![
         (LearningStrategy::Rehearsal, 400u16),
-        (LearningStrategy::Elaboration, if input.explains_to_self { 800 } else { 500 }),
+        (
+            LearningStrategy::Elaboration,
+            if input.explains_to_self { 800 } else { 500 },
+        ),
         (LearningStrategy::CriticalThinking, strategy_score),
         (LearningStrategy::Metacognition, avg_skill as u16),
     ];
@@ -4901,25 +5117,25 @@ pub fn assess_metacognition(input: MetacognitiveInput) -> ExternResult<Metacogni
 /// Collaboration role
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum CollaborationRole {
-    Proposer,     // Introduces ideas
-    Questioner,   // Asks clarifying questions
-    Challenger,   // Provides counterarguments
-    Synthesizer,  // Combines ideas
-    Summarizer,   // Condenses discussion
-    Facilitator,  // Keeps discussion on track
+    Proposer,    // Introduces ideas
+    Questioner,  // Asks clarifying questions
+    Challenger,  // Provides counterarguments
+    Synthesizer, // Combines ideas
+    Summarizer,  // Condenses discussion
+    Facilitator, // Keeps discussion on track
 }
 
 /// Argumentation move types
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ArgumentationMove {
-    Claim,           // Make a claim
-    Support,         // Provide evidence
-    Challenge,       // Question a claim
-    Concede,         // Acknowledge valid point
-    Qualify,         // Add nuance
-    Synthesize,      // Combine viewpoints
-    Clarify,         // Explain meaning
-    Redirect,        // Change focus
+    Claim,      // Make a claim
+    Support,    // Provide evidence
+    Challenge,  // Question a claim
+    Concede,    // Acknowledge valid point
+    Qualify,    // Add nuance
+    Synthesize, // Combine viewpoints
+    Clarify,    // Explain meaning
+    Redirect,   // Change focus
 }
 
 /// Perspective-taking assessment
@@ -4971,8 +5187,16 @@ pub fn assess_collaboration(input: CollaborativeInput) -> ExternResult<Collabora
 
     // Perspective taking
     let perspective = PerspectiveTaking {
-        can_articulate_other_view_permille: if input.acknowledged_other_viewpoints { 700 } else { 300 },
-        finds_merit_in_opposition_permille: if input.modified_own_position { 800 } else { 400 },
+        can_articulate_other_view_permille: if input.acknowledged_other_viewpoints {
+            700
+        } else {
+            300
+        },
+        finds_merit_in_opposition_permille: if input.modified_own_position {
+            800
+        } else {
+            400
+        },
         integrates_perspectives_permille: (input.ideas_synthesized as u16 * 200).min(1000),
         empathy_level: (input.perspectives_considered as u16 * 200).min(1000),
     };
@@ -5023,27 +5247,27 @@ pub fn assess_collaboration(input: CollaborativeInput) -> ExternResult<Collabora
 /// Creative thinking types
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum CreativeThinkingType {
-    Divergent,      // Generate many ideas
-    Convergent,     // Evaluate and select
-    Lateral,        // Unconventional approaches
-    Analogical,     // Transfer from other domains
-    Combinatorial,  // Combine existing ideas
+    Divergent,     // Generate many ideas
+    Convergent,    // Evaluate and select
+    Lateral,       // Unconventional approaches
+    Analogical,    // Transfer from other domains
+    Combinatorial, // Combine existing ideas
 }
 
 /// Creativity dimensions (Torrance)
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CreativityDimensions {
-    pub fluency: u16,       // Number of ideas
-    pub flexibility: u16,   // Variety of categories
-    pub originality: u16,   // Uniqueness
-    pub elaboration: u16,   // Detail and development
+    pub fluency: u16,     // Number of ideas
+    pub flexibility: u16, // Variety of categories
+    pub originality: u16, // Uniqueness
+    pub elaboration: u16, // Detail and development
 }
 
 /// Creative technique
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum CreativeTechnique {
     Brainstorming,
-    SCAMPER,         // Substitute, Combine, Adapt, Modify, Put to other uses, Eliminate, Reverse
+    SCAMPER, // Substitute, Combine, Adapt, Modify, Put to other uses, Eliminate, Reverse
     SixThinkingHats,
     MindMapping,
     Analogies,
@@ -5084,7 +5308,8 @@ pub fn assess_creativity(input: CreativityInput) -> ExternResult<CreativityAsses
     let fluency = (input.ideas_generated as u16 * 100).min(1000);
     if fluency < 500 {
         techniques.push(CreativeTechnique::Brainstorming);
-        prompts.push("Set a timer for 5 minutes and list every idea, no matter how wild".to_string());
+        prompts
+            .push("Set a timer for 5 minutes and list every idea, no matter how wild".to_string());
     }
 
     // Flexibility (variety)
@@ -5152,22 +5377,22 @@ pub fn assess_creativity(input: CreativityInput) -> ExternResult<CreativityAsses
 /// Question quality types
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum QuestionQuality {
-    Factual,          // Who, what, when, where
-    Conceptual,       // How, why
-    Procedural,       // How to
-    Metacognitive,    // What if, what would happen
-    Generative,       // What else, what new
+    Factual,       // Who, what, when, where
+    Conceptual,    // How, why
+    Procedural,    // How to
+    Metacognitive, // What if, what would happen
+    Generative,    // What else, what new
 }
 
 /// Inquiry phase
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum InquiryPhase {
-    Questioning,      // Generating questions
-    Hypothesizing,    // Forming predictions
-    Investigating,    // Gathering evidence
-    Analyzing,        // Interpreting data
-    Concluding,       // Drawing conclusions
-    Reflecting,       // Evaluating the inquiry
+    Questioning,   // Generating questions
+    Hypothesizing, // Forming predictions
+    Investigating, // Gathering evidence
+    Analyzing,     // Interpreting data
+    Concluding,    // Drawing conclusions
+    Reflecting,    // Evaluating the inquiry
 }
 
 /// Hypothesis quality
@@ -5248,9 +5473,17 @@ pub fn assess_inquiry(input: InquiryInput) -> ExternResult<InquiryAssessment> {
     let hypothesis_quality = if let Some(ref h) = input.hypothesis_formed {
         let h_lower = h.to_lowercase();
         HypothesisQuality {
-            testable_permille: if h_lower.contains("if") && h_lower.contains("then") { 800 } else { 400 },
+            testable_permille: if h_lower.contains("if") && h_lower.contains("then") {
+                800
+            } else {
+                400
+            },
             specific_permille: if h.len() > 50 { 700 } else { 400 },
-            falsifiable_permille: if h_lower.contains("not") || h_lower.contains("unless") { 700 } else { 500 },
+            falsifiable_permille: if h_lower.contains("not") || h_lower.contains("unless") {
+                700
+            } else {
+                500
+            },
             grounded_in_theory_permille: 500, // Would need more context
         }
     } else {
@@ -5277,13 +5510,14 @@ pub fn assess_inquiry(input: InquiryInput) -> ExternResult<InquiryAssessment> {
     }
 
     // Conclusion validity
-    let conclusion_validity = if input.conclusion_matches_evidence && input.considered_alternative_explanations {
-        850u16
-    } else if input.conclusion_matches_evidence {
-        650
-    } else {
-        300
-    };
+    let conclusion_validity =
+        if input.conclusion_matches_evidence && input.considered_alternative_explanations {
+            850u16
+        } else if input.conclusion_matches_evidence {
+            650
+        } else {
+            300
+        };
 
     Ok(InquiryAssessment {
         current_phase: phase,
@@ -5306,22 +5540,22 @@ pub fn assess_inquiry(input: InquiryInput) -> ExternResult<InquiryAssessment> {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum AcademicEmotion {
     // Positive activating emotions (enhance learning)
-    Enjoyment,        // Intrinsic pleasure in learning
-    Hope,             // Positive expectation of success
-    Pride,            // Achievement satisfaction
+    Enjoyment, // Intrinsic pleasure in learning
+    Hope,      // Positive expectation of success
+    Pride,     // Achievement satisfaction
 
     // Positive deactivating emotions
-    Relief,           // After overcoming challenge
-    Contentment,      // Satisfaction with progress
+    Relief,      // After overcoming challenge
+    Contentment, // Satisfaction with progress
 
     // Negative activating emotions (can help or hurt)
-    Anxiety,          // Fear of failure
-    Anger,            // Frustration with obstacles
-    Shame,            // Self-criticism after failure
+    Anxiety, // Fear of failure
+    Anger,   // Frustration with obstacles
+    Shame,   // Self-criticism after failure
 
     // Negative deactivating emotions (usually harmful)
-    Hopelessness,     // Belief that success is impossible
-    Boredom,          // Lack of engagement or challenge
+    Hopelessness, // Belief that success is impossible
+    Boredom,      // Lack of engagement or challenge
 }
 
 /// Emotional valence (positive/negative) and activation (high/low energy)
@@ -5337,30 +5571,30 @@ pub enum EmotionalValence {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum EmotionalRegulationStrategy {
     // Antecedent-focused (before emotion peaks)
-    SituationSelection,     // Choose engaging activities
-    SituationModification,  // Adjust difficulty/context
-    AttentionalDeployment,  // Redirect focus
-    CognitiveReappraisal,   // Reframe the situation
+    SituationSelection,    // Choose engaging activities
+    SituationModification, // Adjust difficulty/context
+    AttentionalDeployment, // Redirect focus
+    CognitiveReappraisal,  // Reframe the situation
 
     // Response-focused (after emotion arises)
-    ExpressionSuppression,  // Control outward display
-    AcceptanceAndCommitment,// Acknowledge and proceed
-    MindfulnessAwareness,   // Observe without judgment
+    ExpressionSuppression,   // Control outward display
+    AcceptanceAndCommitment, // Acknowledge and proceed
+    MindfulnessAwareness,    // Observe without judgment
 
     // Social strategies
-    SocialSupport,          // Seek help from others
-    CollaborativeCoping,    // Work through with peers
+    SocialSupport,       // Seek help from others
+    CollaborativeCoping, // Work through with peers
 }
 
 /// Frustration state - distinguished from productive struggle
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum FrustrationState {
-    None,                // No frustration
-    Productive,          // "Good" frustration - motivating
-    Mounting,            // Building but manageable
-    Peak,                // High frustration - intervention needed
-    Destructive,         // Harmful - causing disengagement
-    Recovery,            // Coming down from peak
+    None,        // No frustration
+    Productive,  // "Good" frustration - motivating
+    Mounting,    // Building but manageable
+    Peak,        // High frustration - intervention needed
+    Destructive, // Harmful - causing disengagement
+    Recovery,    // Coming down from peak
 }
 
 /// Confusion as a learning signal (D'Mello & Graesser research)
@@ -5377,12 +5611,12 @@ pub enum ConfusionState {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EmotionalState {
     pub primary_emotion: AcademicEmotion,
-    pub intensity_permille: u16,              // 0-1000
+    pub intensity_permille: u16, // 0-1000
     pub valence: EmotionalValence,
     pub frustration: FrustrationState,
     pub confusion: ConfusionState,
-    pub emotional_stability_permille: u16,    // Variance in recent emotions
-    pub duration_minutes: u16,                // How long in this state
+    pub emotional_stability_permille: u16, // Variance in recent emotions
+    pub duration_minutes: u16,             // How long in this state
 }
 
 /// Emotional pattern over time
@@ -5390,9 +5624,9 @@ pub struct EmotionalState {
 pub struct EmotionalTrajectory {
     pub starting_emotion: AcademicEmotion,
     pub current_emotion: AcademicEmotion,
-    pub trajectory_direction: TrendDirection,  // Improving, stable, declining
+    pub trajectory_direction: TrendDirection, // Improving, stable, declining
     pub volatility_permille: u16,
-    pub resilience_score_permille: u16,        // Recovery from negative emotions
+    pub resilience_score_permille: u16, // Recovery from negative emotions
 }
 
 /// Input for emotion assessment
@@ -5414,7 +5648,7 @@ pub struct EmotionAssessment {
     pub confidence_permille: u16,
     pub recommended_strategies: Vec<EmotionalRegulationStrategy>,
     pub optimal_for_learning: bool,
-    pub intervention_urgency: u8,  // 0-10 scale
+    pub intervention_urgency: u8, // 0-10 scale
     pub suggested_activities: Vec<String>,
 }
 
@@ -5435,7 +5669,8 @@ pub fn assess_emotional_state(input: EmotionAssessmentInput) -> ExternResult<Emo
     } else if input.response_time_variance_permille > 500 {
         strategies.push(EmotionalRegulationStrategy::CognitiveReappraisal);
         (AcademicEmotion::Anger, 600)
-    } else if input.accuracy_trend == TrendDirection::Increasing && input.errors_last_5_minutes < 2 {
+    } else if input.accuracy_trend == TrendDirection::Increasing && input.errors_last_5_minutes < 2
+    {
         (AcademicEmotion::Enjoyment, 700)
     } else if let Some(ref reported) = input.self_reported_feeling {
         (reported.clone(), 800)
@@ -5445,14 +5680,18 @@ pub fn assess_emotional_state(input: EmotionAssessmentInput) -> ExternResult<Emo
 
     // Determine valence
     let valence = match emotion {
-        AcademicEmotion::Enjoyment | AcademicEmotion::Hope | AcademicEmotion::Pride =>
-            EmotionalValence::PositiveActivating,
-        AcademicEmotion::Relief | AcademicEmotion::Contentment =>
-            EmotionalValence::PositiveDeactivating,
-        AcademicEmotion::Anxiety | AcademicEmotion::Anger | AcademicEmotion::Shame =>
-            EmotionalValence::NegativeActivating,
-        AcademicEmotion::Hopelessness | AcademicEmotion::Boredom =>
-            EmotionalValence::NegativeDeactivating,
+        AcademicEmotion::Enjoyment | AcademicEmotion::Hope | AcademicEmotion::Pride => {
+            EmotionalValence::PositiveActivating
+        }
+        AcademicEmotion::Relief | AcademicEmotion::Contentment => {
+            EmotionalValence::PositiveDeactivating
+        }
+        AcademicEmotion::Anxiety | AcademicEmotion::Anger | AcademicEmotion::Shame => {
+            EmotionalValence::NegativeActivating
+        }
+        AcademicEmotion::Hopelessness | AcademicEmotion::Boredom => {
+            EmotionalValence::NegativeDeactivating
+        }
     };
 
     // Detect frustration state
@@ -5472,14 +5711,14 @@ pub fn assess_emotional_state(input: EmotionAssessmentInput) -> ExternResult<Emo
     } else if input.pause_frequency > 3 && input.accuracy_trend == TrendDirection::Decreasing {
         ConfusionState::Stuck
     } else if input.pause_frequency > 2 {
-        ConfusionState::ProductiveConfusion  // Best for learning!
+        ConfusionState::ProductiveConfusion // Best for learning!
     } else {
         ConfusionState::NoConfusion
     };
 
-    let optimal_for_learning = matches!(valence, EmotionalValence::PositiveActivating) ||
-        confusion == ConfusionState::ProductiveConfusion ||
-        frustration == FrustrationState::Productive;
+    let optimal_for_learning = matches!(valence, EmotionalValence::PositiveActivating)
+        || confusion == ConfusionState::ProductiveConfusion
+        || frustration == FrustrationState::Productive;
 
     let intervention_urgency = match (&frustration, &confusion) {
         (FrustrationState::Destructive, _) => 10,
@@ -5504,7 +5743,11 @@ pub fn assess_emotional_state(input: EmotionAssessmentInput) -> ExternResult<Emo
             emotional_stability_permille: 1000 - input.response_time_variance_permille,
             duration_minutes: input.session_duration_minutes,
         },
-        confidence_permille: if input.self_reported_feeling.is_some() { 850 } else { 650 },
+        confidence_permille: if input.self_reported_feeling.is_some() {
+            850
+        } else {
+            650
+        },
         recommended_strategies: strategies,
         optimal_for_learning,
         intervention_urgency,
@@ -5520,49 +5763,49 @@ pub fn assess_emotional_state(input: EmotionAssessmentInput) -> ExternResult<Emo
 /// Phases of deliberate practice
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum DeliberatePracticePhase {
-    SkillAnalysis,        // Break down the skill
-    StretchGoalSetting,   // Set just-beyond-current goals
-    FocusedRepetition,    // Concentrated practice
-    ImmediateFeedback,    // Rapid feedback loop
-    Refinement,           // Adjust based on feedback
-    Consolidation,        // Solidify improvements
+    SkillAnalysis,      // Break down the skill
+    StretchGoalSetting, // Set just-beyond-current goals
+    FocusedRepetition,  // Concentrated practice
+    ImmediateFeedback,  // Rapid feedback loop
+    Refinement,         // Adjust based on feedback
+    Consolidation,      // Solidify improvements
 }
 
 /// Feedback timing quality
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum FeedbackTiming {
-    Immediate,            // Within seconds (ideal)
-    NearImmediate,        // Within minutes
-    Delayed,              // Hours later
-    VeryDelayed,          // Days later (least effective)
+    Immediate,     // Within seconds (ideal)
+    NearImmediate, // Within minutes
+    Delayed,       // Hours later
+    VeryDelayed,   // Days later (least effective)
 }
 
 /// Feedback specificity
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum FeedbackSpecificity {
-    Precise,              // Exact what/why/how to improve
-    Targeted,             // Specific area identified
-    General,              // Overall direction
-    Vague,                // Unhelpful generalities
+    Precise,  // Exact what/why/how to improve
+    Targeted, // Specific area identified
+    General,  // Overall direction
+    Vague,    // Unhelpful generalities
 }
 
 /// Stretch zone assessment (just beyond current ability)
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum StretchZone {
-    TooEasy,              // Below current ability (comfort zone)
-    OptimalStretch,       // Just beyond ability (learning zone) - IDEAL
-    ModerateStretch,      // Challenging but achievable
-    OverStretch,          // Too far beyond (panic zone)
+    TooEasy,         // Below current ability (comfort zone)
+    OptimalStretch,  // Just beyond ability (learning zone) - IDEAL
+    ModerateStretch, // Challenging but achievable
+    OverStretch,     // Too far beyond (panic zone)
 }
 
 /// Mental representation quality (expert mental models)
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MentalRepresentationQuality {
-    pub pattern_recognition_permille: u16,   // Seeing patterns quickly
-    pub chunking_ability_permille: u16,      // Grouping related elements
+    pub pattern_recognition_permille: u16, // Seeing patterns quickly
+    pub chunking_ability_permille: u16,    // Grouping related elements
     pub anticipation_accuracy_permille: u16, // Predicting outcomes
-    pub error_detection_permille: u16,       // Spotting own mistakes
-    pub self_monitoring_permille: u16,       // Metacognitive awareness
+    pub error_detection_permille: u16,     // Spotting own mistakes
+    pub self_monitoring_permille: u16,     // Metacognitive awareness
 }
 
 /// Skill decomposition for deliberate practice
@@ -5578,7 +5821,7 @@ pub struct SkillDecomposition {
 /// Deliberate practice session quality
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DeliberatePracticeQuality {
-    pub focus_intensity_permille: u16,       // Mental engagement
+    pub focus_intensity_permille: u16, // Mental engagement
     pub stretch_zone: StretchZone,
     pub feedback_timing: FeedbackTiming,
     pub feedback_specificity: FeedbackSpecificity,
@@ -5593,7 +5836,7 @@ pub struct DeliberatePracticeInput {
     pub current_mastery_permille: u16,
     pub task_difficulty_permille: u16,
     pub time_to_feedback_seconds: u32,
-    pub feedback_detail_level: u8,           // 1-5 scale
+    pub feedback_detail_level: u8, // 1-5 scale
     pub practice_duration_minutes: u16,
     pub distractions_count: u8,
     pub variations_practiced: u8,
@@ -5613,7 +5856,9 @@ pub struct DeliberatePracticeAssessment {
 
 /// Assess deliberate practice quality
 #[hdk_extern]
-pub fn assess_deliberate_practice(input: DeliberatePracticeInput) -> ExternResult<DeliberatePracticeAssessment> {
+pub fn assess_deliberate_practice(
+    input: DeliberatePracticeInput,
+) -> ExternResult<DeliberatePracticeAssessment> {
     let mut recommendations = Vec::new();
 
     // Determine stretch zone
@@ -5743,10 +5988,10 @@ pub fn assess_deliberate_practice(input: DeliberatePracticeInput) -> ExternResul
 /// CASEL's 5 core SEL competencies
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SELCompetency {
-    SelfAwareness,          // Recognizing emotions, strengths, limitations
-    SelfManagement,         // Regulating emotions, setting goals
-    SocialAwareness,        // Empathy, appreciating diversity
-    RelationshipSkills,     // Communication, collaboration, conflict resolution
+    SelfAwareness,             // Recognizing emotions, strengths, limitations
+    SelfManagement,            // Regulating emotions, setting goals
+    SocialAwareness,           // Empathy, appreciating diversity
+    RelationshipSkills,        // Communication, collaboration, conflict resolution
     ResponsibleDecisionMaking, // Ethical reasoning, evaluating consequences
 }
 
@@ -5764,45 +6009,45 @@ pub enum SelfAwarenessSkill {
 /// Self-management sub-skills
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SelfManagementSkill {
-    ImpulseControl,           // Resisting immediate urges
-    StressManagement,         // Coping with pressure
-    SelfMotivation,           // Internal drive
-    GoalSetting,              // Creating meaningful goals
-    OrganizationalSkills,     // Planning and time management
-    SelfDiscipline,           // Sustained effort
+    ImpulseControl,       // Resisting immediate urges
+    StressManagement,     // Coping with pressure
+    SelfMotivation,       // Internal drive
+    GoalSetting,          // Creating meaningful goals
+    OrganizationalSkills, // Planning and time management
+    SelfDiscipline,       // Sustained effort
 }
 
 /// Social awareness sub-skills
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SocialAwarenessSkill {
-    PerspectiveTaking,        // Understanding others' viewpoints
-    Empathy,                  // Feeling with others
-    DiversityAppreciation,    // Valuing differences
-    RespectForOthers,         // Treating others with dignity
-    SocialCueReading,         // Interpreting nonverbal signals
-    ContextualAwareness,      // Understanding social norms
+    PerspectiveTaking,     // Understanding others' viewpoints
+    Empathy,               // Feeling with others
+    DiversityAppreciation, // Valuing differences
+    RespectForOthers,      // Treating others with dignity
+    SocialCueReading,      // Interpreting nonverbal signals
+    ContextualAwareness,   // Understanding social norms
 }
 
 /// Relationship skills sub-skills
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum RelationshipSkill {
-    Communication,            // Clear expression and listening
-    SocialEngagement,         // Building connections
-    CollaborativeTeamwork,    // Working effectively with others
-    ConflictResolution,       // Resolving disagreements constructively
-    SeekingHelp,              // Asking for support when needed
-    OfferingHelp,             // Providing support to others
+    Communication,         // Clear expression and listening
+    SocialEngagement,      // Building connections
+    CollaborativeTeamwork, // Working effectively with others
+    ConflictResolution,    // Resolving disagreements constructively
+    SeekingHelp,           // Asking for support when needed
+    OfferingHelp,          // Providing support to others
 }
 
 /// Responsible decision-making sub-skills
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum DecisionMakingSkill {
-    ProblemIdentification,    // Recognizing issues clearly
-    AlternativeGeneration,    // Creating multiple options
-    ConsequenceEvaluation,    // Predicting outcomes
-    EthicalReasoning,         // Considering right and wrong
-    ReflectiveAnalysis,       // Learning from decisions
-    CriticalThinking,         // Evaluating information
+    ProblemIdentification, // Recognizing issues clearly
+    AlternativeGeneration, // Creating multiple options
+    ConsequenceEvaluation, // Predicting outcomes
+    EthicalReasoning,      // Considering right and wrong
+    ReflectiveAnalysis,    // Learning from decisions
+    CriticalThinking,      // Evaluating information
 }
 
 /// SEL competency scores
@@ -5895,9 +6140,15 @@ pub fn assess_sel_competencies(input: SELInput) -> ExternResult<SELAssessment> {
     // Self-awareness score
     let self_awareness = {
         let mut score = 400u16;
-        if input.accurately_named_emotion { score += 200; }
-        if input.identified_learning_strengths { score += 200; }
-        if input.realistic_self_assessment { score += 200; }
+        if input.accurately_named_emotion {
+            score += 200;
+        }
+        if input.identified_learning_strengths {
+            score += 200;
+        }
+        if input.realistic_self_assessment {
+            score += 200;
+        }
         score.min(1000)
     };
 
@@ -5909,7 +6160,11 @@ pub fn assess_sel_competencies(input: SELInput) -> ExternResult<SELAssessment> {
     // Self-management score
     let self_management = {
         let goal_score = input.completed_goals_ratio_permille / 3;
-        let setback_score = if input.handled_setback_constructively { 300u16 } else { 0 };
+        let setback_score = if input.handled_setback_constructively {
+            300u16
+        } else {
+            0
+        };
         let focus_score = input.maintained_focus_permille / 3;
         goal_score + setback_score + focus_score
     };
@@ -5922,9 +6177,15 @@ pub fn assess_sel_competencies(input: SELInput) -> ExternResult<SELAssessment> {
     // Social awareness score
     let social_awareness = {
         let mut score = 400u16;
-        if input.considered_peer_perspective { score += 200; }
-        if input.showed_empathy_in_feedback { score += 200; }
-        if input.respected_diverse_approaches { score += 200; }
+        if input.considered_peer_perspective {
+            score += 200;
+        }
+        if input.showed_empathy_in_feedback {
+            score += 200;
+        }
+        if input.respected_diverse_approaches {
+            score += 200;
+        }
         score.min(1000)
     };
 
@@ -5936,8 +6197,16 @@ pub fn assess_sel_competencies(input: SELInput) -> ExternResult<SELAssessment> {
     // Relationship skills score
     let relationship_skills = {
         let collab_score = input.effective_collaboration_permille / 3;
-        let help_sought = if input.sought_help_appropriately { 200u16 } else { 0 };
-        let help_given = if input.offered_help_to_peers { 200u16 } else { 0 };
+        let help_sought = if input.sought_help_appropriately {
+            200u16
+        } else {
+            0
+        };
+        let help_given = if input.offered_help_to_peers {
+            200u16
+        } else {
+            0
+        };
         collab_score + help_sought + help_given + 200 // Base
     };
 
@@ -5949,9 +6218,15 @@ pub fn assess_sel_competencies(input: SELInput) -> ExternResult<SELAssessment> {
     // Decision-making score
     let decision_making = {
         let mut score = 400u16;
-        if input.considered_multiple_solutions { score += 200; }
-        if input.evaluated_consequences { score += 200; }
-        if input.made_ethical_choice { score += 200; }
+        if input.considered_multiple_solutions {
+            score += 200;
+        }
+        if input.evaluated_consequences {
+            score += 200;
+        }
+        if input.made_ethical_choice {
+            score += 200;
+        }
         score.min(1000)
     };
 
@@ -5961,8 +6236,12 @@ pub fn assess_sel_competencies(input: SELInput) -> ExternResult<SELAssessment> {
     }
 
     // Overall SEL
-    let overall = (self_awareness + self_management + social_awareness +
-                   relationship_skills + decision_making) / 5;
+    let overall = (self_awareness
+        + self_management
+        + social_awareness
+        + relationship_skills
+        + decision_making)
+        / 5;
 
     // Find strongest and weakest
     let scores = [
@@ -5973,8 +6252,16 @@ pub fn assess_sel_competencies(input: SELInput) -> ExternResult<SELAssessment> {
         (SELCompetency::ResponsibleDecisionMaking, decision_making),
     ];
 
-    let strongest = scores.iter().max_by_key(|x| x.1).map(|x| x.0.clone()).unwrap_or(SELCompetency::SelfAwareness);
-    let growth_area = scores.iter().min_by_key(|x| x.1).map(|x| x.0.clone()).unwrap_or(SELCompetency::SelfAwareness);
+    let strongest = scores
+        .iter()
+        .max_by_key(|x| x.1)
+        .map(|x| x.0.clone())
+        .unwrap_or(SELCompetency::SelfAwareness);
+    let growth_area = scores
+        .iter()
+        .min_by_key(|x| x.1)
+        .map(|x| x.0.clone())
+        .unwrap_or(SELCompetency::SelfAwareness);
 
     Ok(SELAssessment {
         profile: SELProfile {
@@ -5988,7 +6275,11 @@ pub fn assess_sel_competencies(input: SELInput) -> ExternResult<SELAssessment> {
             growth_area,
         },
         interventions,
-        growth_trajectory: if overall > 700 { TrendDirection::Increasing } else { TrendDirection::Stable },
+        growth_trajectory: if overall > 700 {
+            TrendDirection::Increasing
+        } else {
+            TrendDirection::Stable
+        },
         peer_comparison_percentile: (overall / 10) as u8,
         recommended_activities: activities,
     })
@@ -6003,45 +6294,45 @@ pub fn assess_sel_competencies(input: SELInput) -> ExternResult<SELAssessment> {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum StealthIndicator {
     // Time-based indicators
-    TimeToFirstAction,        // Hesitation suggests uncertainty
-    PausePatterns,            // Where learner pauses indicates difficulty
-    ResponseTimeVariance,     // Consistency indicates confidence
+    TimeToFirstAction,    // Hesitation suggests uncertainty
+    PausePatterns,        // Where learner pauses indicates difficulty
+    ResponseTimeVariance, // Consistency indicates confidence
 
     // Action-based indicators
-    ToolUsagePatterns,        // Which tools used suggests strategy
-    HintRequestTiming,        // When hints are sought
-    RevisionBehavior,         // Frequency and nature of changes
+    ToolUsagePatterns, // Which tools used suggests strategy
+    HintRequestTiming, // When hints are sought
+    RevisionBehavior,  // Frequency and nature of changes
 
     // Navigation indicators
-    PathThroughContent,       // Linear vs exploratory
-    RevisitPatterns,          // What's revisited and when
-    SkippingBehavior,         // What's skipped
+    PathThroughContent, // Linear vs exploratory
+    RevisitPatterns,    // What's revisited and when
+    SkippingBehavior,   // What's skipped
 
     // Social indicators
-    HelpSeekingPatterns,      // When and how help is sought
-    PeerInteractionQuality,   // Nature of peer interactions
-    ExplanationDepth,         // Quality when explaining to others
+    HelpSeekingPatterns,    // When and how help is sought
+    PeerInteractionQuality, // Nature of peer interactions
+    ExplanationDepth,       // Quality when explaining to others
 }
 
 /// Evidence type for assessment
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum AssessmentEvidence {
-    DirectPerformance,        // Actual task completion
-    ProcessEvidence,          // How task was approached
-    TransferEvidence,         // Application in new context
-    ExplanationEvidence,      // Verbal/written explanation
-    PeerTeachingEvidence,     // Teaching others
-    SelfAssessmentEvidence,   // Learner's own assessment
+    DirectPerformance,      // Actual task completion
+    ProcessEvidence,        // How task was approached
+    TransferEvidence,       // Application in new context
+    ExplanationEvidence,    // Verbal/written explanation
+    PeerTeachingEvidence,   // Teaching others
+    SelfAssessmentEvidence, // Learner's own assessment
 }
 
 /// Dynamic assessment scaffolding level (Vygotsky ZPD)
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ScaffoldingLevel {
-    NoSupport,                // Independent performance
-    Minimal,                  // Light hints
-    Moderate,                 // Guiding questions
-    Substantial,              // Step-by-step guidance
-    Maximal,                  // Complete modeling
+    NoSupport,   // Independent performance
+    Minimal,     // Light hints
+    Moderate,    // Guiding questions
+    Substantial, // Step-by-step guidance
+    Maximal,     // Complete modeling
 }
 
 /// Learning potential assessment (dynamic assessment outcome)
@@ -6049,10 +6340,10 @@ pub enum ScaffoldingLevel {
 pub struct LearningPotential {
     pub current_performance_permille: u16,
     pub supported_performance_permille: u16,
-    pub learning_potential_gap: u16,         // Difference = ZPD width
-    pub scaffolding_responsiveness: u16,     // How well learner uses support
-    pub transfer_potential_permille: u16,    // Ability to generalize
-    pub modifiability_score_permille: u16,   // How teachable
+    pub learning_potential_gap: u16,       // Difference = ZPD width
+    pub scaffolding_responsiveness: u16,   // How well learner uses support
+    pub transfer_potential_permille: u16,  // Ability to generalize
+    pub modifiability_score_permille: u16, // How teachable
 }
 
 /// Self-assessment accuracy
@@ -6060,8 +6351,8 @@ pub struct LearningPotential {
 pub struct SelfAssessmentAccuracy {
     pub predicted_score_permille: u16,
     pub actual_score_permille: u16,
-    pub accuracy_permille: u16,              // How close prediction was
-    pub bias_direction: i16,                 // Positive = overconfident
+    pub accuracy_permille: u16, // How close prediction was
+    pub bias_direction: i16,    // Positive = overconfident
     pub calibration_trend: CalibrationTrend,
 }
 
@@ -6102,7 +6393,9 @@ pub struct StealthAssessment {
 
 /// Perform stealth assessment from behavioral data
 #[hdk_extern]
-pub fn perform_stealth_assessment(input: StealthAssessmentInput) -> ExternResult<StealthAssessment> {
+pub fn perform_stealth_assessment(
+    input: StealthAssessmentInput,
+) -> ExternResult<StealthAssessment> {
     let data = &input.stealth_data;
     let mut indicators = Vec::new();
     let mut evidence = Vec::new();
@@ -6154,9 +6447,11 @@ pub fn perform_stealth_assessment(input: StealthAssessmentInput) -> ExternResult
     evidence.push(AssessmentEvidence::DirectPerformance);
 
     // Calculate inferred mastery (adjusting actual performance based on struggle signals)
-    let struggle_adjustment = pause_signal + (data.hints_requested as u16 * 50) +
-                              (data.revisions_made as u16 * 30);
-    let inferred_mastery = input.actual_performance_permille.saturating_sub(struggle_adjustment / 3);
+    let struggle_adjustment =
+        pause_signal + (data.hints_requested as u16 * 50) + (data.revisions_made as u16 * 30);
+    let inferred_mastery = input
+        .actual_performance_permille
+        .saturating_sub(struggle_adjustment / 3);
 
     // Confidence in inference
     let confidence = 600 + (indicators.len() as u16 * 50).min(300);
@@ -6176,7 +6471,11 @@ pub fn perform_stealth_assessment(input: StealthAssessmentInput) -> ExternResult
             actual_score_permille: input.actual_performance_permille,
             accuracy_permille: accuracy,
             bias_direction: bias / 10,
-            calibration_trend: if accuracy > 800 { CalibrationTrend::Improving } else { CalibrationTrend::Stable },
+            calibration_trend: if accuracy > 800 {
+                CalibrationTrend::Improving
+            } else {
+                CalibrationTrend::Stable
+            },
         }
     });
 
@@ -6207,7 +6506,7 @@ pub fn perform_stealth_assessment(input: StealthAssessmentInput) -> ExternResult
 pub struct DynamicAssessmentInput {
     pub initial_performance_permille: u16,
     pub scaffolding_levels_tried: Vec<ScaffoldingLevel>,
-    pub performance_at_each_level: Vec<u16>,  // Permille at each scaffolding level
+    pub performance_at_each_level: Vec<u16>, // Permille at each scaffolding level
     pub transfer_task_performance: Option<u16>,
 }
 
@@ -6223,11 +6522,18 @@ pub struct DynamicAssessmentResult {
 
 /// Perform dynamic assessment (Vygotsky ZPD-based)
 #[hdk_extern]
-pub fn perform_dynamic_assessment(input: DynamicAssessmentInput) -> ExternResult<DynamicAssessmentResult> {
+pub fn perform_dynamic_assessment(
+    input: DynamicAssessmentInput,
+) -> ExternResult<DynamicAssessmentResult> {
     let mut recommendations = Vec::new();
 
     // Find best supported performance
-    let best_supported = input.performance_at_each_level.iter().max().copied().unwrap_or(input.initial_performance_permille);
+    let best_supported = input
+        .performance_at_each_level
+        .iter()
+        .max()
+        .copied()
+        .unwrap_or(input.initial_performance_permille);
 
     // Calculate ZPD width (difference between independent and supported)
     let zpd_width = best_supported.saturating_sub(input.initial_performance_permille);
@@ -6241,18 +6547,23 @@ pub fn perform_dynamic_assessment(input: DynamicAssessmentInput) -> ExternResult
     };
 
     // Find optimal scaffolding level
-    let optimal_idx = input.performance_at_each_level.iter()
+    let optimal_idx = input
+        .performance_at_each_level
+        .iter()
         .enumerate()
         .max_by_key(|(_, &perf)| perf)
         .map(|(i, _)| i)
         .unwrap_or(0);
 
-    let optimal_scaffolding = input.scaffolding_levels_tried.get(optimal_idx)
+    let optimal_scaffolding = input
+        .scaffolding_levels_tried
+        .get(optimal_idx)
         .cloned()
         .unwrap_or(ScaffoldingLevel::Moderate);
 
     // Transfer potential
-    let transfer_potential = input.transfer_task_performance
+    let transfer_potential = input
+        .transfer_task_performance
         .map(|t| (t + best_supported) / 2)
         .unwrap_or(best_supported.saturating_sub(200));
 
@@ -6269,10 +6580,12 @@ pub fn perform_dynamic_assessment(input: DynamicAssessmentInput) -> ExternResult
 
     // Recommendations
     if zpd_width > 400 {
-        recommendations.push("High learning potential - provide challenging tasks with support".to_string());
+        recommendations
+            .push("High learning potential - provide challenging tasks with support".to_string());
     }
     if responsiveness > 100 {
-        recommendations.push("Highly responsive to instruction - structured teaching effective".to_string());
+        recommendations
+            .push("Highly responsive to instruction - structured teaching effective".to_string());
     }
     if modifiability < 500 {
         recommendations.push("Consider alternative instructional approaches".to_string());
@@ -6305,23 +6618,23 @@ pub fn perform_dynamic_assessment(input: DynamicAssessmentInput) -> ExternResult
 /// UDL principle categories
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum UDLPrinciple {
-    Engagement,              // The "why" of learning - motivation
-    Representation,          // The "what" of learning - perception
-    ActionExpression,        // The "how" of learning - interaction
+    Engagement,       // The "why" of learning - motivation
+    Representation,   // The "what" of learning - perception
+    ActionExpression, // The "how" of learning - interaction
 }
 
 /// Engagement options (recruiting interest & sustaining effort)
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum EngagementOption {
     // Recruiting interest
-    ChoiceAndAutonomy,        // Learner control
-    RelevanceAuthenticity,    // Real-world connection
-    ThreatsDistractionsMin,   // Safe learning environment
+    ChoiceAndAutonomy,      // Learner control
+    RelevanceAuthenticity,  // Real-world connection
+    ThreatsDistractionsMin, // Safe learning environment
 
     // Sustaining effort
-    GoalsSaliency,            // Clear objectives
-    ChallengeSupport,         // Optimal difficulty
-    CollaborationCommunity,   // Peer learning
+    GoalsSaliency,          // Clear objectives
+    ChallengeSupport,       // Optimal difficulty
+    CollaborationCommunity, // Peer learning
 
     // Self-regulation
     ExpectationsBeliefs,      // Growth mindset support
@@ -6333,56 +6646,56 @@ pub enum EngagementOption {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum RepresentationOption {
     // Perception
-    CustomizableDisplay,      // Font, size, color options
-    AlternativesAuditory,     // Audio alternatives
-    AlternativesVisual,       // Visual alternatives
+    CustomizableDisplay,  // Font, size, color options
+    AlternativesAuditory, // Audio alternatives
+    AlternativesVisual,   // Visual alternatives
 
     // Language & symbols
-    VocabularySupport,        // Glossaries, definitions
-    SymbolDecoding,           // Math, code clarification
-    MultipleLanguages,        // Translation support
+    VocabularySupport, // Glossaries, definitions
+    SymbolDecoding,    // Math, code clarification
+    MultipleLanguages, // Translation support
 
     // Comprehension
-    BackgroundKnowledge,      // Prior knowledge activation
-    PatternsRelationships,    // Highlighting structures
-    TransferGeneralization,   // Application support
+    BackgroundKnowledge,    // Prior knowledge activation
+    PatternsRelationships,  // Highlighting structures
+    TransferGeneralization, // Application support
 }
 
 /// Action & expression options (physical & strategic)
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ActionExpressionOption {
     // Physical action
-    ResponseMethods,          // Multiple input methods
-    NavigationAccess,         // Keyboard, voice, etc.
-    AssistiveTech,            // Screen readers, etc.
+    ResponseMethods,  // Multiple input methods
+    NavigationAccess, // Keyboard, voice, etc.
+    AssistiveTech,    // Screen readers, etc.
 
     // Expression & communication
-    MultipleMedia,            // Text, audio, video options
-    ToolsComposition,         // Writing, drawing tools
-    ScaffoldedPractice,       // Graduated support
+    MultipleMedia,      // Text, audio, video options
+    ToolsComposition,   // Writing, drawing tools
+    ScaffoldedPractice, // Graduated support
 
     // Executive function
-    GoalSettingSupport,       // Goal planning tools
-    ProgressMonitoring,       // Progress tracking
-    CapacityManagement,       // Working memory support
+    GoalSettingSupport, // Goal planning tools
+    ProgressMonitoring, // Progress tracking
+    CapacityManagement, // Working memory support
 }
 
 /// Accessibility need type
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum AccessibilityNeed {
-    Visual,                   // Blindness, low vision, color blindness
-    Auditory,                 // Deafness, hard of hearing
-    Motor,                    // Limited mobility, tremors
-    Cognitive,                // Attention, memory, processing
-    Linguistic,               // Language barriers
-    Emotional,                // Anxiety, trauma-informed needs
+    Visual,     // Blindness, low vision, color blindness
+    Auditory,   // Deafness, hard of hearing
+    Motor,      // Limited mobility, tremors
+    Cognitive,  // Attention, memory, processing
+    Linguistic, // Language barriers
+    Emotional,  // Anxiety, trauma-informed needs
 }
 
 /// Learner UDL preferences profile
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct UDLProfile {
     // Engagement preferences
-    pub preferred_choice_level: u8,           // 1-5 scale
+    pub preferred_choice_level: u8, // 1-5 scale
     pub collaboration_preference_permille: u16,
     pub self_regulation_support_needed: bool,
 
@@ -6394,8 +6707,8 @@ pub struct UDLProfile {
     pub preferred_language: String,
 
     // Action preferences
-    pub preferred_input_method: String,       // keyboard, voice, touch
-    pub preferred_output_format: String,      // text, audio, visual
+    pub preferred_input_method: String,  // keyboard, voice, touch
+    pub preferred_output_format: String, // text, audio, visual
     pub executive_function_support_needed: bool,
 
     // Accessibility
@@ -6527,30 +6840,30 @@ pub fn assess_udl_needs(input: UDLInput) -> ExternResult<UDLAssessment> {
                 representation_options.push(RepresentationOption::AlternativesAuditory);
                 action_options.push(ActionExpressionOption::AssistiveTech);
                 accommodations.push("Enable screen reader compatibility".to_string());
-            },
+            }
             AccessibilityNeed::Auditory => {
                 representation_options.push(RepresentationOption::AlternativesVisual);
                 accommodations.push("Provide captions and transcripts".to_string());
-            },
+            }
             AccessibilityNeed::Motor => {
                 action_options.push(ActionExpressionOption::NavigationAccess);
                 action_options.push(ActionExpressionOption::ResponseMethods);
                 accommodations.push("Enable keyboard-only navigation".to_string());
-            },
+            }
             AccessibilityNeed::Cognitive => {
                 representation_options.push(RepresentationOption::PatternsRelationships);
                 action_options.push(ActionExpressionOption::CapacityManagement);
                 accommodations.push("Reduce cognitive load with clear structure".to_string());
-            },
+            }
             AccessibilityNeed::Linguistic => {
                 representation_options.push(RepresentationOption::MultipleLanguages);
                 representation_options.push(RepresentationOption::VocabularySupport);
-            },
+            }
             AccessibilityNeed::Emotional => {
                 engagement_options.push(EngagementOption::ThreatsDistractionsMin);
                 engagement_options.push(EngagementOption::CopingSkills);
                 accommodations.push("Create safe, predictable learning environment".to_string());
-            },
+            }
         }
     }
 
@@ -6655,7 +6968,9 @@ pub fn request_hint(input: HintRequestInput) -> ExternResult<HintResponse> {
 
 /// Request personalized explanation
 #[hdk_extern]
-pub fn request_explanation(input: ExplanationRequestInput) -> ExternResult<PersonalizedExplanation> {
+pub fn request_explanation(
+    input: ExplanationRequestInput,
+) -> ExternResult<PersonalizedExplanation> {
     tutoring::request_explanation(input)
 }
 
@@ -6667,7 +6982,9 @@ pub fn generate_feedback(input: FeedbackInput) -> ExternResult<PersonalizedFeedb
 
 /// Detect misconceptions
 #[hdk_extern]
-pub fn detect_misconceptions(input: MisconceptionInput) -> ExternResult<Vec<DetectedMisconception>> {
+pub fn detect_misconceptions(
+    input: MisconceptionInput,
+) -> ExternResult<Vec<DetectedMisconception>> {
     tutoring::detect_misconceptions(input)
 }
 
@@ -6752,7 +7069,8 @@ mod tests {
         let old_total = 1u32;
         let old_avg = 100u32;
         let new_time = 50u32;
-        let new_avg = ((old_avg as u64 * old_total as u64 + new_time as u64) / (old_total + 1) as u64) as u32;
+        let new_avg =
+            ((old_avg as u64 * old_total as u64 + new_time as u64) / (old_total + 1) as u64) as u32;
         assert_eq!(new_avg, 75);
     }
 
@@ -6765,7 +7083,10 @@ mod tests {
 
         // Low mastery (400) - should target accessible difficulty
         let mastery: u16 = 400;
-        let (lower, upper) = ((mastery as f32 * 0.80) as u16, (mastery as f32 * 0.85) as u16 + 100);
+        let (lower, upper) = (
+            (mastery as f32 * 0.80) as u16,
+            (mastery as f32 * 0.85) as u16 + 100,
+        );
         assert!(lower <= 400); // Lower bound is achievable
         assert!(upper >= lower); // Valid range
 
@@ -6874,13 +7195,8 @@ mod tests {
         let goal: u32 = 900;
         let interleave: u32 = 600;
 
-        let smart_score = (
-            flow * 25 +
-            style * 20 +
-            timing * 15 +
-            goal * 25 +
-            interleave * 15
-        ) / 100;
+        let smart_score =
+            (flow * 25 + style * 20 + timing * 15 + goal * 25 + interleave * 15) / 100;
 
         // Expected: (800*25 + 700*20 + 150*15 + 900*25 + 600*15) / 100
         //         = (20000 + 14000 + 2250 + 22500 + 9000) / 100
@@ -6934,12 +7250,15 @@ mod tests {
         let masteries: Vec<u16> = vec![900, 850, 500, 300, 200];
 
         let mastered: Vec<_> = masteries.iter().filter(|m| **m >= 800).collect();
-        let in_progress: Vec<_> = masteries.iter().filter(|m| **m >= 400 && **m < 800).collect();
+        let in_progress: Vec<_> = masteries
+            .iter()
+            .filter(|m| **m >= 400 && **m < 800)
+            .collect();
         let needs_work: Vec<_> = masteries.iter().filter(|m| **m < 400).collect();
 
-        assert_eq!(mastered.len(), 2);      // 900, 850
-        assert_eq!(in_progress.len(), 1);   // 500
-        assert_eq!(needs_work.len(), 2);    // 300, 200
+        assert_eq!(mastered.len(), 2); // 900, 850
+        assert_eq!(in_progress.len(), 1); // 500
+        assert_eq!(needs_work.len(), 2); // 300, 200
     }
 
     #[test]
@@ -6952,7 +7271,8 @@ mod tests {
             (400u16, LearningStyle::Kinesthetic),
         ];
 
-        let dominant = scores.iter()
+        let dominant = scores
+            .iter()
             .max_by_key(|(score, _)| *score)
             .map(|(_, style)| style.clone())
             .unwrap();
@@ -7178,7 +7498,9 @@ mod tests {
 
         let flow_accuracy = if total_sessions > 0 {
             ((flow_sessions * 1000) / total_sessions) as u16
-        } else { 0 };
+        } else {
+            0
+        };
 
         assert_eq!(flow_accuracy, 700);
     }
@@ -7191,7 +7513,9 @@ mod tests {
 
         let retention_rate = if total_skills > 0 {
             ((retained_skills * 1000) / total_skills) as u16
-        } else { 0 };
+        } else {
+            0
+        };
 
         assert_eq!(retention_rate, 800);
     }
@@ -7204,7 +7528,9 @@ mod tests {
 
         let completion_rate = if total_goals > 0 {
             ((completed_goals * 1000) / total_goals) as u16
-        } else { 0 };
+        } else {
+            0
+        };
 
         assert_eq!(completion_rate, 600);
     }
@@ -7236,7 +7562,8 @@ mod tests {
             (500, 500), // predicted 50%, got 50%
         ];
 
-        let errors: Vec<i32> = judgments.iter()
+        let errors: Vec<i32> = judgments
+            .iter()
             .map(|(pred, actual)| (*pred as i32 - *actual as i32).abs())
             .collect();
 
@@ -7253,7 +7580,8 @@ mod tests {
             (700, 500), // predicted 70%, got 50%
         ];
 
-        let biases: Vec<i32> = judgments.iter()
+        let biases: Vec<i32> = judgments
+            .iter()
             .map(|(pred, actual)| *pred as i32 - *actual as i32)
             .collect();
 
@@ -7271,7 +7599,8 @@ mod tests {
             (300, 500), // predicted 30%, got 50%
         ];
 
-        let biases: Vec<i32> = judgments.iter()
+        let biases: Vec<i32> = judgments
+            .iter()
             .map(|(pred, actual)| *pred as i32 - *actual as i32)
             .collect();
 
@@ -7293,7 +7622,8 @@ mod tests {
             (200, 0),     // predicted 20%, actual 0%
         ];
 
-        let brier_sum: u64 = predictions.iter()
+        let brier_sum: u64 = predictions
+            .iter()
             .map(|(pred, actual)| {
                 let diff = *pred as i64 - *actual as i64;
                 (diff * diff) as u64
@@ -7479,7 +7809,8 @@ mod tests {
         let my_levels: Vec<u16> = vec![500, 600, 550];
         let peer_levels: Vec<u16> = vec![520, 580, 540];
 
-        let diff_sum: i32 = my_levels.iter()
+        let diff_sum: i32 = my_levels
+            .iter()
             .zip(peer_levels.iter())
             .map(|(m, p)| (*m as i32 - *p as i32).abs())
             .sum();
@@ -7551,11 +7882,10 @@ mod tests {
             (2, 800), // Strong in skill 2
         ];
 
-        let complementary_count: usize = my_skills.iter()
+        let complementary_count: usize = my_skills
+            .iter()
             .zip(peer_skills.iter())
-            .filter(|((_, my), (_, peer))| {
-                (*my > 600 && *peer < 400) || (*my < 400 && *peer > 600)
-            })
+            .filter(|((_, my), (_, peer))| (*my > 600 && *peer < 400) || (*my < 400 && *peer > 600))
             .count();
 
         assert_eq!(complementary_count, 2); // Both skills are complementary
@@ -7605,9 +7935,9 @@ mod tests {
     fn test_transfer_type_decay() {
         // Near transfer retains more than far transfer
         let original_mastery = 900u16;
-        let near_decay = 100u16;      // 10% decay for near transfer
+        let near_decay = 100u16; // 10% decay for near transfer
         let intermediate_decay = 300u16; // 30% decay
-        let far_decay = 500u16;       // 50% decay for far transfer
+        let far_decay = 500u16; // 50% decay for far transfer
 
         let near_success = original_mastery.saturating_sub(near_decay);
         let intermediate_success = original_mastery.saturating_sub(intermediate_decay);
@@ -7692,7 +8022,7 @@ mod tests {
         let very_low = calculate_worked_example_ratio(0);
         let very_high = calculate_worked_example_ratio(1000);
 
-        assert_eq!(very_low, 800);  // Max 80%
+        assert_eq!(very_low, 800); // Max 80%
         assert_eq!(very_high, 100); // Min 10%
     }
 
@@ -7700,16 +8030,27 @@ mod tests {
     fn test_content_format_progression() {
         // Content format should progress as mastery increases
         let beginner_format = ContentFormat::FullWorkedExample;
-        let intermediate_format = ContentFormat::PartialWorkedExample { steps_shown_permille: 500 };
+        let intermediate_format = ContentFormat::PartialWorkedExample {
+            steps_shown_permille: 500,
+        };
         let advanced_format = ContentFormat::GuidedProblem { difficulty: 600 };
         let expert_format = ContentFormat::IndependentProblem { difficulty: 800 };
 
         // These represent the learning progression
         assert!(matches!(beginner_format, ContentFormat::FullWorkedExample));
-        assert!(matches!(advanced_format, ContentFormat::GuidedProblem { .. }));
-        assert!(matches!(expert_format, ContentFormat::IndependentProblem { .. }));
+        assert!(matches!(
+            advanced_format,
+            ContentFormat::GuidedProblem { .. }
+        ));
+        assert!(matches!(
+            expert_format,
+            ContentFormat::IndependentProblem { .. }
+        ));
 
-        if let ContentFormat::PartialWorkedExample { steps_shown_permille } = intermediate_format {
+        if let ContentFormat::PartialWorkedExample {
+            steps_shown_permille,
+        } = intermediate_format
+        {
             assert_eq!(steps_shown_permille, 500);
         }
     }
@@ -7731,7 +8072,10 @@ mod tests {
         } else {
             ExpertiseRecommendation::ContentAppropriate
         };
-        assert!(matches!(recommendation, ExpertiseRecommendation::IncreaseChallenge));
+        assert!(matches!(
+            recommendation,
+            ExpertiseRecommendation::IncreaseChallenge
+        ));
     }
 
     #[test]
@@ -7748,7 +8092,10 @@ mod tests {
         } else {
             ExpertiseRecommendation::ContentAppropriate
         };
-        assert!(matches!(recommendation, ExpertiseRecommendation::SimplifyContent));
+        assert!(matches!(
+            recommendation,
+            ExpertiseRecommendation::SimplifyContent
+        ));
     }
 
     // ============ FEATURE 6: Desirable Difficulties Tests ============
@@ -7885,7 +8232,7 @@ mod tests {
         let visual_load = 150u16;
         let verbal_load = 150u16;
         let kinesthetic_load = 250u16; // More engaging but more load
-        let symbolic_load = 300u16;    // Abstract, higher load
+        let symbolic_load = 300u16; // Abstract, higher load
 
         // Combined modalities should not overload
         let dual_visual_verbal = visual_load + verbal_load;
@@ -7917,7 +8264,8 @@ mod tests {
         let restudy_retention = 400u16; // 40% after 1 week
         let retrieval_retention = 680u16; // 68% after 1 week (70% improvement)
 
-        let improvement_permille = ((retrieval_retention - restudy_retention) as u32 * 1000 / restudy_retention as u32) as u16;
+        let improvement_permille = ((retrieval_retention - restudy_retention) as u32 * 1000
+            / restudy_retention as u32) as u16;
         assert!(improvement_permille >= 500); // At least 50% improvement
         assert!(improvement_permille <= 750); // Up to 75% improvement
     }
@@ -7936,9 +8284,13 @@ mod tests {
     fn test_study_recommendation_types() {
         // Study recommendations should cover the main options
         let recommendations = vec![
-            StudyRecommendation::RetrievalPractice { retrieval_type: RetrievalType::FreeRecall },
+            StudyRecommendation::RetrievalPractice {
+                retrieval_type: RetrievalType::FreeRecall,
+            },
             StudyRecommendation::Restudy,
-            StudyRecommendation::InterleavedTestStudy { test_ratio_permille: 500 },
+            StudyRecommendation::InterleavedTestStudy {
+                test_ratio_permille: 500,
+            },
         ];
         assert_eq!(recommendations.len(), 3);
     }
@@ -7982,7 +8334,7 @@ mod tests {
     fn test_hypercorrection_retention_boost() {
         // Hypercorrection should give better retention (86% vs 64%)
         let normal_correction_rate = 640u16; // 64%
-        let hypercorrection_rate = 860u16;   // 86%
+        let hypercorrection_rate = 860u16; // 86%
 
         let improvement = hypercorrection_rate - normal_correction_rate;
         assert_eq!(improvement, 220); // 22 percentage point improvement
@@ -8062,7 +8414,8 @@ mod tests {
         let standard_transfer = 400u32;
         let productive_failure_transfer = 520u32; // 30% improvement
 
-        let improvement = (productive_failure_transfer - standard_transfer) * 1000 / standard_transfer;
+        let improvement =
+            (productive_failure_transfer - standard_transfer) * 1000 / standard_transfer;
         assert!(improvement >= 200); // At least 20% improvement
         assert!(improvement <= 350); // Up to 35% improvement
     }
@@ -8185,9 +8538,9 @@ mod tests {
     #[test]
     fn test_fixed_mindset_detection() {
         // Fixed mindset signals: avoid challenges, give up easily, ignore feedback
-        let avoids_challenges = 800u16;     // High avoidance
-        let gives_up_early = 750u16;        // Often quits
-        let ignores_feedback = 600u16;      // Dismisses criticism
+        let avoids_challenges = 800u16; // High avoidance
+        let gives_up_early = 750u16; // Often quits
+        let ignores_feedback = 600u16; // Dismisses criticism
 
         let fixed_score = (avoids_challenges + gives_up_early + ignores_feedback) / 3;
         assert!(fixed_score >= 700); // Strong fixed mindset signals
@@ -8196,11 +8549,12 @@ mod tests {
     #[test]
     fn test_growth_mindset_detection() {
         // Growth mindset signals: embrace challenges, persist, learn from feedback
-        let embraces_challenges = 850u16;   // High engagement
+        let embraces_challenges = 850u16; // High engagement
         let persists_through_difficulty = 800u16;
         let learns_from_feedback = 900u16;
 
-        let growth_score = (embraces_challenges + persists_through_difficulty + learns_from_feedback) / 3;
+        let growth_score =
+            (embraces_challenges + persists_through_difficulty + learns_from_feedback) / 3;
         assert!(growth_score >= 800); // Strong growth mindset signals
     }
 
@@ -8220,8 +8574,8 @@ mod tests {
     #[test]
     fn test_mixed_mindset_detection() {
         // Mixed mindset: growth in some areas, fixed in others
-        let math_mindset = 300u16;  // Fixed (avoids math challenges)
-        let art_mindset = 800u16;   // Growth (embraces art challenges)
+        let math_mindset = 300u16; // Fixed (avoids math challenges)
+        let art_mindset = 800u16; // Growth (embraces art challenges)
 
         let variance = if math_mindset > art_mindset {
             math_mindset - art_mindset
@@ -8255,7 +8609,8 @@ mod tests {
         let response_times = vec![2000u32, 2100, 8000, 1900, 9500, 2000]; // ms
 
         let mean = response_times.iter().sum::<u32>() / response_times.len() as u32;
-        let variance_sum: u32 = response_times.iter()
+        let variance_sum: u32 = response_times
+            .iter()
             .map(|&t| if t > mean { t - mean } else { mean - t })
             .sum();
         let avg_deviation = variance_sum / response_times.len() as u32;
@@ -8304,8 +8659,8 @@ mod tests {
     fn test_guessing_detection() {
         // Random/fast responses indicate guessing (not learning)
         let response_time_ms = 500u32; // Very fast
-        let accuracy = 250u16;         // ~25% (random on 4-choice)
-        let consistency = 200u16;      // Low consistency
+        let accuracy = 250u16; // ~25% (random on 4-choice)
+        let consistency = 200u16; // Low consistency
 
         let is_guessing = response_time_ms < 1000 && accuracy < 400 && consistency < 400;
         assert!(is_guessing);
@@ -8378,8 +8733,8 @@ mod tests {
     #[test]
     fn test_argument_strength_scoring() {
         // Argument strength based on evidence quality
-        let statistical_evidence = 900u16;  // High quality
-        let anecdotal_evidence = 400u16;    // Lower quality
+        let statistical_evidence = 900u16; // High quality
+        let anecdotal_evidence = 400u16; // Lower quality
         let no_evidence = 0u16;
 
         // Statistical > Anecdotal > None
@@ -8402,9 +8757,9 @@ mod tests {
     #[test]
     fn test_fallacy_detection_confidence() {
         // Confidence should range from 0-1000 (permille)
-        let high_confidence = 850u16;   // Clear fallacy
+        let high_confidence = 850u16; // Clear fallacy
         let medium_confidence = 500u16; // Possible fallacy
-        let low_confidence = 200u16;    // Unlikely fallacy
+        let low_confidence = 200u16; // Unlikely fallacy
 
         assert!(high_confidence > medium_confidence);
         assert!(medium_confidence > low_confidence);
@@ -8480,8 +8835,8 @@ mod tests {
     #[test]
     fn test_dunning_kruger_detection() {
         // Low skill + high confidence = Dunning-Kruger
-        let actual_skill = 200u16;      // Low
-        let self_assessment = 850u16;   // High confidence
+        let actual_skill = 200u16; // Low
+        let self_assessment = 850u16; // High confidence
 
         let overconfidence = if self_assessment > actual_skill {
             self_assessment - actual_skill
@@ -8561,10 +8916,10 @@ mod tests {
     fn test_metacognitive_levels() {
         // Progression of metacognitive awareness
         let levels = vec![
-            MetacognitiveLevel::Tacit,       // Unaware of thinking
-            MetacognitiveLevel::Aware,       // Basic awareness
-            MetacognitiveLevel::Strategic,   // Can choose strategies
-            MetacognitiveLevel::Reflective,  // Deep self-reflection
+            MetacognitiveLevel::Tacit,      // Unaware of thinking
+            MetacognitiveLevel::Aware,      // Basic awareness
+            MetacognitiveLevel::Strategic,  // Can choose strategies
+            MetacognitiveLevel::Reflective, // Deep self-reflection
         ];
         assert_eq!(levels.len(), 4);
     }
@@ -8575,11 +8930,12 @@ mod tests {
         let predicted_score = 700u16;
         let actual_score = 650u16;
 
-        let accuracy = 1000 - (if predicted_score > actual_score {
-            predicted_score - actual_score
-        } else {
-            actual_score - predicted_score
-        });
+        let accuracy = 1000
+            - (if predicted_score > actual_score {
+                predicted_score - actual_score
+            } else {
+                actual_score - predicted_score
+            });
 
         assert!(accuracy >= 900); // Good metacognitive accuracy
     }
@@ -8647,7 +9003,8 @@ mod tests {
         let introduces_new_ideas = 750u16;
         let supports_with_evidence = 700u16;
 
-        let contribution_quality = (builds_on_others + introduces_new_ideas + supports_with_evidence) / 3;
+        let contribution_quality =
+            (builds_on_others + introduces_new_ideas + supports_with_evidence) / 3;
         assert!(contribution_quality >= 700);
     }
 
@@ -8704,8 +9061,8 @@ mod tests {
     #[test]
     fn test_torrance_originality() {
         // Originality: uniqueness of ideas (compared to common responses)
-        let unique_ideas = 800u16;     // High originality
-        let common_ideas = 200u16;     // Low originality
+        let unique_ideas = 800u16; // High originality
+        let common_ideas = 200u16; // Low originality
 
         assert!(unique_ideas > common_ideas);
         assert!(unique_ideas >= 700); // Threshold for "original"
@@ -8791,7 +9148,8 @@ mod tests {
         let acknowledges_limitations = 750u16;
         let avoids_overgeneralization = 800u16;
 
-        let validity = (matches_evidence + acknowledges_limitations + avoids_overgeneralization) / 3;
+        let validity =
+            (matches_evidence + acknowledges_limitations + avoids_overgeneralization) / 3;
         assert!(validity >= 800);
     }
 
@@ -8814,7 +9172,7 @@ mod tests {
     #[test]
     fn test_inquiry_completeness() {
         // Complete inquiry cycle scores
-        let phases_completed = 6u8;  // All 6 phases
+        let phases_completed = 6u8; // All 6 phases
         let quality_per_phase = 750u16;
 
         let completeness = (phases_completed as u16 * 100) + (quality_per_phase / 10);
@@ -8833,24 +9191,20 @@ mod tests {
             AcademicEmotion::Hope,
             AcademicEmotion::Pride,
         ];
-        let positive_deactivating = vec![
-            AcademicEmotion::Relief,
-            AcademicEmotion::Contentment,
-        ];
+        let positive_deactivating = vec![AcademicEmotion::Relief, AcademicEmotion::Contentment];
         let negative_activating = vec![
             AcademicEmotion::Anxiety,
             AcademicEmotion::Anger,
             AcademicEmotion::Shame,
         ];
-        let negative_deactivating = vec![
-            AcademicEmotion::Hopelessness,
-            AcademicEmotion::Boredom,
-        ];
+        let negative_deactivating = vec![AcademicEmotion::Hopelessness, AcademicEmotion::Boredom];
 
         // Total 10 emotions as per Control-Value Theory
         assert_eq!(
-            positive_activating.len() + positive_deactivating.len() +
-            negative_activating.len() + negative_deactivating.len(),
+            positive_activating.len()
+                + positive_deactivating.len()
+                + negative_activating.len()
+                + negative_deactivating.len(),
             10
         );
     }
@@ -8946,7 +9300,10 @@ mod tests {
 
         // High intensity positive emotion
         assert!(state.intensity_permille > 700);
-        assert!(matches!(state.valence, EmotionalValence::PositiveActivating));
+        assert!(matches!(
+            state.valence,
+            EmotionalValence::PositiveActivating
+        ));
     }
 
     // ==========================================================================
@@ -9545,23 +9902,23 @@ mod tests {
             _ => 0,
         };
         let silver_mult = match silver {
-            AchievementTier::Silver => 1250u16,  // 1.25x
+            AchievementTier::Silver => 1250u16, // 1.25x
             _ => 0,
         };
         let gold_mult = match gold {
-            AchievementTier::Gold => 1500u16,  // 1.5x
+            AchievementTier::Gold => 1500u16, // 1.5x
             _ => 0,
         };
         let platinum_mult = match platinum {
-            AchievementTier::Platinum => 2000u16,  // 2x
+            AchievementTier::Platinum => 2000u16, // 2x
             _ => 0,
         };
         let diamond_mult = match diamond {
-            AchievementTier::Diamond => 2500u16,  // 2.5x
+            AchievementTier::Diamond => 2500u16, // 2.5x
             _ => 0,
         };
         let legendary_mult = match legendary {
-            AchievementTier::Legendary => 3000u16,  // 3x
+            AchievementTier::Legendary => 3000u16, // 3x
             _ => 0,
         };
 
@@ -9626,11 +9983,11 @@ mod tests {
     fn test_social_comparison_theory() {
         // Based on Festinger's Social Comparison Theory (1954)
         let types = [
-            SocialComparisonType::UpwardClose,      // Compare to slightly better
-            SocialComparisonType::UpwardFar,        // Compare to much better
-            SocialComparisonType::Lateral,          // Compare to similar
-            SocialComparisonType::DownwardClose,    // Compare to slightly worse
-            SocialComparisonType::SelfReferenced,   // Compare to past self
+            SocialComparisonType::UpwardClose,    // Compare to slightly better
+            SocialComparisonType::UpwardFar,      // Compare to much better
+            SocialComparisonType::Lateral,        // Compare to similar
+            SocialComparisonType::DownwardClose,  // Compare to slightly worse
+            SocialComparisonType::SelfReferenced, // Compare to past self
         ];
         assert_eq!(types.len(), 5);
 
@@ -9766,7 +10123,7 @@ mod tests {
             cohort_type: CohortType::SkillLevel,
             member_count: 150,
             avg_mastery_permille: 720,
-            avg_completion_rate_permille: 720,  // 72% completion
+            avg_completion_rate_permille: 720, // 72% completion
             avg_retention_rate_permille: 850,
             avg_session_minutes: 25,
             avg_days_to_mastery: 14,
@@ -9795,14 +10152,17 @@ mod tests {
             agent_id: "learner123".to_string(),
             trajectory_points: vec![point.clone()],
             trend: TrendDirection::Increasing,
-            velocity_permille: 150,  // 15% progress rate
+            velocity_permille: 150, // 15% progress rate
             predicted_mastery_30_days: 850,
             predicted_completion_date: Some(1706745600),
             trajectory_type: TrajectoryType::Accelerating,
         };
 
-        assert!(matches!(trajectory.trajectory_type, TrajectoryType::Accelerating));
-        assert!(trajectory.velocity_permille > 0);  // Positive velocity
+        assert!(matches!(
+            trajectory.trajectory_type,
+            TrajectoryType::Accelerating
+        ));
+        assert!(trajectory.velocity_permille > 0); // Positive velocity
         assert!(matches!(trajectory.trend, TrendDirection::Increasing));
     }
 
@@ -9811,16 +10171,14 @@ mod tests {
         // Predictions should have confidence levels
         let prediction = Prediction {
             prediction_type: PredictionType::Completion,
-            predicted_value: 850,  // 85% likely to complete
-            confidence_permille: 780,  // 78% confidence
-            factors: vec![
-                PredictionFactor {
-                    factor_name: "Current Progress".to_string(),
-                    impact_permille: 400,  // Positive impact
-                    current_value: "72%".to_string(),
-                    optimal_value: "100%".to_string(),
-                },
-            ],
+            predicted_value: 850,     // 85% likely to complete
+            confidence_permille: 780, // 78% confidence
+            factors: vec![PredictionFactor {
+                factor_name: "Current Progress".to_string(),
+                impact_permille: 400, // Positive impact
+                current_value: "72%".to_string(),
+                optimal_value: "100%".to_string(),
+            }],
             recommendation: "Keep up the consistent practice!".to_string(),
         };
 
@@ -9834,7 +10192,7 @@ mod tests {
         // At-risk detection for early intervention
         let indicator = AtRiskIndicator {
             risk_type: "Disengagement".to_string(),
-            risk_score_permille: 650,  // 65% risk level
+            risk_score_permille: 650, // 65% risk level
             contributing_factors: vec![
                 "Declining engagement".to_string(),
                 "Missed 3 sessions".to_string(),
@@ -9889,10 +10247,10 @@ mod tests {
         let bottom_out = HintLevel::BottomOut;
 
         // Test the xp_penalty_permille method
-        assert_eq!(meta.xp_penalty_permille(), 0);      // No penalty
-        assert_eq!(directional.xp_penalty_permille(), 100);  // 10% penalty
-        assert_eq!(specific.xp_penalty_permille(), 250);     // 25% penalty
-        assert_eq!(bottom_out.xp_penalty_permille(), 500);   // 50% penalty
+        assert_eq!(meta.xp_penalty_permille(), 0); // No penalty
+        assert_eq!(directional.xp_penalty_permille(), 100); // 10% penalty
+        assert_eq!(specific.xp_penalty_permille(), 250); // 25% penalty
+        assert_eq!(bottom_out.xp_penalty_permille(), 500); // 50% penalty
 
         // Penalties should increase progressively
         assert!(meta.xp_penalty_permille() < directional.xp_penalty_permille());
@@ -9947,7 +10305,7 @@ mod tests {
         let explanation = PersonalizedExplanation {
             explanation_type: ExplanationType::ExampleBased,
             content: "Let's look at 3/4 + 1/4 = 4/4 = 1".to_string(),
-            complexity_level: 500,  // Matched to learner (permille)
+            complexity_level: 500, // Matched to learner (permille)
             examples: vec!["3/4 + 1/4 = 1".to_string()],
             analogies: vec!["Like pieces of pie".to_string()],
             key_points: vec!["Same denominator, add numerators".to_string()],
@@ -9955,7 +10313,10 @@ mod tests {
             follow_up_questions: vec!["What if denominators differ?".to_string()],
         };
 
-        assert!(matches!(explanation.explanation_type, ExplanationType::ExampleBased));
+        assert!(matches!(
+            explanation.explanation_type,
+            ExplanationType::ExampleBased
+        ));
         assert!(explanation.complexity_level <= 1000);
         assert!(!explanation.examples.is_empty());
         assert!(!explanation.key_points.is_empty());
@@ -9990,13 +10351,18 @@ mod tests {
         let feedback = PersonalizedFeedback {
             feedback_type: FeedbackType::PartiallyCorrect,
             message: "Good thinking! You're on the right track.".to_string(),
-            specific_praise: Some("Your approach to breaking down the problem was excellent.".to_string()),
+            specific_praise: Some(
+                "Your approach to breaking down the problem was excellent.".to_string(),
+            ),
             growth_mindset_message: Some("Keep trying, mistakes help you learn!".to_string()),
             next_steps: vec!["Try checking your arithmetic in step 3.".to_string()],
             emotional_tone: "Encouraging".to_string(),
         };
 
-        assert!(matches!(feedback.feedback_type, FeedbackType::PartiallyCorrect));
+        assert!(matches!(
+            feedback.feedback_type,
+            FeedbackType::PartiallyCorrect
+        ));
         assert!(feedback.specific_praise.is_some());
         assert!(feedback.growth_mindset_message.is_some());
         assert!(!feedback.next_steps.is_empty());
@@ -10031,7 +10397,10 @@ mod tests {
             adaptive_triggers: vec!["If 3 errors, switch to remediation".to_string()],
         };
 
-        assert!(matches!(strategy.recommended_mode, TutoringMode::Scaffolded));
+        assert!(matches!(
+            strategy.recommended_mode,
+            TutoringMode::Scaffolded
+        ));
         assert!(strategy.estimated_time_minutes > 0);
         assert!(!strategy.key_concepts_to_cover.is_empty());
     }
@@ -10094,11 +10463,11 @@ mod tests {
         // XP reduced by hint penalties
         let hint1_penalty = HintLevel::Directional.xp_penalty_permille();
         let hint2_penalty = HintLevel::Specific.xp_penalty_permille();
-        let total_penalty_permille = hint1_penalty + hint2_penalty;  // 10% + 25% = 35%
+        let total_penalty_permille = hint1_penalty + hint2_penalty; // 10% + 25% = 35%
 
         let final_xp = base_xp * (1000 - total_penalty_permille as u32) / 1000;
 
-        assert_eq!(final_xp, 65);  // 100 * 0.65 = 65 XP after penalties
+        assert_eq!(final_xp, 65); // 100 * 0.65 = 65 XP after penalties
         assert!(final_xp < base_xp);
     }
 
@@ -10106,7 +10475,7 @@ mod tests {
     fn test_cross_tier_analytics_tutoring_integration() {
         // Analytics should inform tutoring decisions
         let trajectory = TrajectoryType::Declining;
-        let at_risk_level = 700u16;  // 70% risk
+        let at_risk_level = 700u16; // 70% risk
 
         // High-risk declining trajectory -> Remediation mode
         let mode = if at_risk_level > 600 && matches!(trajectory, TrajectoryType::Declining) {
@@ -10125,8 +10494,8 @@ mod tests {
         let weeks_consistent = 4u8;
 
         // Accelerating trajectory + consistency = achievement unlock
-        let unlock_achievement = matches!(trajectory, TrajectoryType::Accelerating)
-            && weeks_consistent >= 3;
+        let unlock_achievement =
+            matches!(trajectory, TrajectoryType::Accelerating) && weeks_consistent >= 3;
 
         assert!(unlock_achievement);
 

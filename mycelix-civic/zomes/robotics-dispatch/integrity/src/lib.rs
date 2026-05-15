@@ -10,8 +10,8 @@
 //! - `TelemetryReport`: periodic status updates from deployed assets
 
 use hdi::prelude::*;
-use mycelix_bridge_entry_types::check_author_match;
 use mycelix_bridge_common::SovereignProfile;
+use mycelix_bridge_entry_types::check_author_match;
 
 /// Anchor entry for deterministic link bases.
 #[hdk_entry_helper]
@@ -264,7 +264,9 @@ impl RoboticCredential {
     /// - t = minutes since last perturbation test
     /// - S = base × mastery_factor × review_multiplier
     pub fn compute_vitality(&self, now: Timestamp) -> u16 {
-        let elapsed_us = now.as_micros().saturating_sub(self.last_perturbation_test.as_micros());
+        let elapsed_us = now
+            .as_micros()
+            .saturating_sub(self.last_perturbation_test.as_micros());
         let elapsed_minutes = elapsed_us as f64 / 60_000_000.0;
 
         let stability = self.stability_minutes();
@@ -327,10 +329,16 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
         FlatOp::StoreEntry(store_entry) => match store_entry {
             OpEntry::CreateEntry { app_entry, action } => match app_entry {
-                EntryTypes::RoboticAsset(asset) => validate_robotic_asset(&asset, &EntryCreationAction::Create(action)),
-                EntryTypes::DispatchOrder(order) => validate_dispatch_order(&order, &EntryCreationAction::Create(action)),
+                EntryTypes::RoboticAsset(asset) => {
+                    validate_robotic_asset(&asset, &EntryCreationAction::Create(action))
+                }
+                EntryTypes::DispatchOrder(order) => {
+                    validate_dispatch_order(&order, &EntryCreationAction::Create(action))
+                }
                 EntryTypes::TelemetryReport(report) => validate_telemetry_report(&report),
-                EntryTypes::RoboticCredential(credential) => validate_robotic_credential(&credential),
+                EntryTypes::RoboticCredential(credential) => {
+                    validate_robotic_credential(&credential)
+                }
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
             },
             OpEntry::UpdateEntry {
@@ -348,7 +356,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     }
                     validate_robotic_asset(&asset, &eca)
                 }
-                EntryTypes::DispatchOrder(order) => validate_dispatch_order(&order, &EntryCreationAction::Update(action)),
+                EntryTypes::DispatchOrder(order) => {
+                    validate_dispatch_order(&order, &EntryCreationAction::Update(action))
+                }
                 _ => Ok(ValidateCallbackResult::Valid),
             },
             _ => Ok(ValidateCallbackResult::Valid),
@@ -366,30 +376,25 @@ fn validate_robotic_asset(
     asset: &RoboticAsset,
     _action: &EntryCreationAction,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Consciousness level must be in [0, 1]
-    if !asset.consciousness_level.is_finite()
-        || asset.consciousness_level < 0.0
-        || asset.consciousness_level > 1.0
+    // Consciousness level (Epistemic Integrity score) must be in [0, 1]
+    if !asset.sovereign_profile.epistemic_integrity.is_finite()
+        || asset.sovereign_profile.epistemic_integrity < 0.0
+        || asset.sovereign_profile.epistemic_integrity > 1.0
     {
         return Ok(ValidateCallbackResult::Invalid(
-            "Consciousness level must be in [0.0, 1.0]".to_string(),
+            "Consciousness Epistemic Integrity score must be in [0.0, 1.0]".to_string(),
         ));
     }
 
     // Latitude must be in [-90, 90]
-    if !asset.location_lat.is_finite()
-        || asset.location_lat < -90.0
-        || asset.location_lat > 90.0
-    {
+    if !asset.location_lat.is_finite() || asset.location_lat < -90.0 || asset.location_lat > 90.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Latitude must be in [-90, 90]".to_string(),
         ));
     }
 
     // Longitude must be in [-180, 180]
-    if !asset.location_lon.is_finite()
-        || asset.location_lon < -180.0
-        || asset.location_lon > 180.0
+    if !asset.location_lon.is_finite() || asset.location_lon < -180.0 || asset.location_lon > 180.0
     {
         return Ok(ValidateCallbackResult::Invalid(
             "Longitude must be in [-180, 180]".to_string(),
@@ -411,19 +416,13 @@ fn validate_dispatch_order(
     _action: &EntryCreationAction,
 ) -> ExternResult<ValidateCallbackResult> {
     // Target coordinates must be valid
-    if !order.target_lat.is_finite()
-        || order.target_lat < -90.0
-        || order.target_lat > 90.0
-    {
+    if !order.target_lat.is_finite() || order.target_lat < -90.0 || order.target_lat > 90.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Target latitude must be in [-90, 90]".to_string(),
         ));
     }
 
-    if !order.target_lon.is_finite()
-        || order.target_lon < -180.0
-        || order.target_lon > 180.0
-    {
+    if !order.target_lon.is_finite() || order.target_lon < -180.0 || order.target_lon > 180.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Target longitude must be in [-180, 180]".to_string(),
         ));
@@ -451,10 +450,7 @@ fn validate_telemetry_report(report: &TelemetryReport) -> ExternResult<ValidateC
         ));
     }
 
-    if !report.fuel_level.is_finite()
-        || report.fuel_level < 0.0
-        || report.fuel_level > 1.0
-    {
+    if !report.fuel_level.is_finite() || report.fuel_level < 0.0 || report.fuel_level > 1.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Fuel level must be in [0.0, 1.0]".to_string(),
         ));
@@ -463,7 +459,9 @@ fn validate_telemetry_report(report: &TelemetryReport) -> ExternResult<ValidateC
     Ok(ValidateCallbackResult::Valid)
 }
 
-fn validate_robotic_credential(credential: &RoboticCredential) -> ExternResult<ValidateCallbackResult> {
+fn validate_robotic_credential(
+    credential: &RoboticCredential,
+) -> ExternResult<ValidateCallbackResult> {
     if credential.vitality_permille > 1000 {
         return Ok(ValidateCallbackResult::Invalid(
             "Vitality must be in 0..=1000 permille".to_string(),
@@ -475,6 +473,4 @@ fn validate_robotic_credential(credential: &RoboticCredential) -> ExternResult<V
         ));
     }
     Ok(ValidateCallbackResult::Valid)
-}
-   Ok(ValidateCallbackResult::Valid)
 }

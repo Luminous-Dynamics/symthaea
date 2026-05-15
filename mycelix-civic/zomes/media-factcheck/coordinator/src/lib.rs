@@ -1,26 +1,30 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Fact-Check Coordinator Zome
 use hdk::prelude::*;
 use media_factcheck_integrity::*;
-use mycelix_bridge_common::{
-    civic_requirement_proposal, GovernanceEligibility,
-};
-use mycelix_zome_helpers::{get_latest_record};
+use mycelix_bridge_common::{civic_requirement_proposal, GovernanceEligibility};
+use mycelix_zome_helpers::get_latest_record;
 
+use mycelix_zome_helpers as _;
 
 /// Helper function to create an anchor entry and return its hash
 fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_string.to_string());
-    if let Err(e) = create_entry(&EntryTypes::Anchor(anchor.clone())) { debug!("Anchor creation warning: {:?}", e); }
+    if let Err(e) = create_entry(&EntryTypes::Anchor(anchor.clone())) {
+        debug!("Anchor creation warning: {:?}", e);
+    }
     hash_entry(&anchor)
 }
 
 #[hdk_extern]
 pub fn submit_fact_check(input: SubmitFactCheckInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "submit_fact_check")?;
+    mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_proposal(),
+        "submit_fact_check",
+    )?;
     let now = sys_time()?;
     let check = FactCheck {
         id: format!("factcheck:{}:{}", input.publication_id, now.as_micros()),
@@ -110,7 +114,11 @@ pub fn search_fact_checks_for_claim(claim_text: String) -> ExternResult<Vec<Reco
 
 #[hdk_extern]
 pub fn update_source_credibility(input: UpdateCredibilityInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "update_source_credibility")?;
+    mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_proposal(),
+        "update_source_credibility",
+    )?;
     let now = sys_time()?;
     let source = SourceCredibility {
         source_id: input.source_id,
@@ -198,7 +206,11 @@ pub fn get_fact_checks_by_verdict(verdict: FactCheckVerdict) -> ExternResult<Vec
 /// Dispute a fact check
 #[hdk_extern]
 pub fn dispute_fact_check(input: DisputeFactCheckInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "dispute_fact_check")?;
+    mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_proposal(),
+        "dispute_fact_check",
+    )?;
     let now = sys_time()?;
     let dispute = FactCheckDispute {
         id: format!("dispute:{}:{}", input.fact_check_id, now.as_micros()),
@@ -232,7 +244,11 @@ pub struct DisputeFactCheckInput {
 /// Resolve a fact check dispute
 #[hdk_extern]
 pub fn resolve_dispute(input: ResolveDisputeInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "resolve_dispute")?;
+    mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_proposal(),
+        "resolve_dispute",
+    )?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
             UnitEntryTypes::FactCheckDispute,
@@ -415,7 +431,11 @@ pub fn aggregate_checker_stats(checker_did: String, verdicts: &[FactCheckVerdict
 /// Add additional evidence to fact check
 #[hdk_extern]
 pub fn add_evidence(input: AddEvidenceInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "add_evidence")?;
+    mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_proposal(),
+        "add_evidence",
+    )?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
             UnitEntryTypes::FactCheck,
@@ -460,7 +480,11 @@ pub struct AddEvidenceInput {
 /// Update fact check verdict
 #[hdk_extern]
 pub fn update_verdict(input: UpdateVerdictInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "update_verdict")?;
+    mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_proposal(),
+        "update_verdict",
+    )?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
             UnitEntryTypes::FactCheck,

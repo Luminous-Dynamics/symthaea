@@ -14,7 +14,7 @@
     flake-utils.url = "github:numtide/flake-utils";
 
     holonix = {
-      url = "github:holochain/holonix/main-0.6";
+      url = "github:holochain/holonix/d21b3543";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 

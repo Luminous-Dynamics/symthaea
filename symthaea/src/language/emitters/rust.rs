@@ -8,8 +8,8 @@
 
 use super::super::code_intent::CodeSpec;
 use super::{
-    extract_fields_from_text, generate_auto_tests, infer_rust_body, infer_rust_imports,
-    parse_rust_signature, CodeEmitter,
+    CodeEmitter, extract_fields_from_text, generate_auto_tests, infer_rust_body,
+    infer_rust_imports, parse_rust_signature,
 };
 use crate::dynamics::cfc_code_sequencer::{CodePlanStep, PlanAction};
 

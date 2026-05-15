@@ -10,9 +10,9 @@
 //!
 //! Extracted from lib.rs as a pure structural refactor — no logic changes.
 
-use hdk::prelude::*;
-use adaptive_integrity::*;
 use crate::get_recent_sessions;
+use adaptive_integrity::*;
+use hdk::prelude::*;
 
 // ============== Types from lib.rs (flow state analysis) ==============
 
@@ -215,39 +215,57 @@ pub(crate) fn analyze_flow_state_impl(input: AnalyzeFlowInput) -> ExternResult<F
     // Estimate challenge from hints/skips/response time
     let hint_factor = (input.current_hints_used * 50).min(200) as u16;
     let skip_factor = (input.current_skips * 100).min(300) as u16;
-    let time_factor = if input.current_avg_response_time_ms > 5000 { 150 }
-        else if input.current_avg_response_time_ms > 3000 { 100 }
-        else { 0 };
+    let time_factor = if input.current_avg_response_time_ms > 5000 {
+        150
+    } else if input.current_avg_response_time_ms > 3000 {
+        100
+    } else {
+        0
+    };
     let challenge_permille = (500u16 + hint_factor + skip_factor + time_factor).min(1000);
 
     // Calculate focus from time on task vs interruptions
     let interruptions = input.current_hints_used + input.current_skips;
     let focus_permille = if input.current_items_attempted > 0 {
         let base_focus = 800u16;
-        base_focus.saturating_sub((interruptions * 100) as u16).max(200)
+        base_focus
+            .saturating_sub((interruptions * 100) as u16)
+            .max(200)
     } else {
         500
     };
 
     // Calculate engagement from response patterns
-    let engagement_permille = if input.session_elapsed_seconds > 0 && input.current_items_attempted > 0 {
-        let items_per_minute = (input.current_items_attempted * 60) / input.session_elapsed_seconds.max(1);
-        (items_per_minute * 100).min(1000) as u16
-    } else {
-        500
-    };
+    let engagement_permille =
+        if input.session_elapsed_seconds > 0 && input.current_items_attempted > 0 {
+            let items_per_minute =
+                (input.current_items_attempted * 60) / input.session_elapsed_seconds.max(1);
+            (items_per_minute * 100).min(1000) as u16
+        } else {
+            500
+        };
 
     // Streak factor (would need consecutive correct tracking - estimate from accuracy)
-    let streak_permille = if accuracy >= 900 { 900 }
-        else if accuracy >= 800 { 700 }
-        else if accuracy >= 700 { 500 }
-        else { 300 };
+    let streak_permille = if accuracy >= 900 {
+        900
+    } else if accuracy >= 800 {
+        700
+    } else if accuracy >= 700 {
+        500
+    } else {
+        300
+    };
 
     // Time pressure from response times
-    let time_pressure_permille = if input.current_avg_response_time_ms < 2000 { 200 }
-        else if input.current_avg_response_time_ms < 3000 { 400 }
-        else if input.current_avg_response_time_ms < 5000 { 600 }
-        else { 800 };
+    let time_pressure_permille = if input.current_avg_response_time_ms < 2000 {
+        200
+    } else if input.current_avg_response_time_ms < 3000 {
+        400
+    } else if input.current_avg_response_time_ms < 5000 {
+        600
+    } else {
+        800
+    };
 
     let metrics = FlowMetrics {
         challenge_permille,
@@ -263,10 +281,15 @@ pub(crate) fn analyze_flow_state_impl(input: AnalyzeFlowInput) -> ExternResult<F
     let state = determine_flow_state(balance, &metrics, &input);
 
     // Calculate confidence based on data available
-    let confidence_permille = if input.current_items_attempted >= 10 { 900 }
-        else if input.current_items_attempted >= 5 { 700 }
-        else if input.current_items_attempted >= 2 { 500 }
-        else { 300 };
+    let confidence_permille = if input.current_items_attempted >= 10 {
+        900
+    } else if input.current_items_attempted >= 5 {
+        700
+    } else if input.current_items_attempted >= 2 {
+        500
+    } else {
+        300
+    };
 
     // Generate adjustments
     let adjustments = generate_flow_adjustments(&state, &metrics, &input);
@@ -307,12 +330,12 @@ fn determine_flow_state(
 
     // Flow state based on challenge/skill balance
     match balance {
-        b if b > 200 => FlowState::Boredom,      // Skill >> Challenge
-        b if b > 100 => FlowState::Relaxation,   // Skill > Challenge
-        b if b >= -100 => FlowState::Flow,       // Balanced (±100)
-        b if b >= -200 => FlowState::Arousal,    // Challenge > Skill
-        b if b >= -400 => FlowState::Anxiety,    // Challenge >> Skill
-        _ => FlowState::Overwhelm,               // Challenge >>> Skill
+        b if b > 200 => FlowState::Boredom,    // Skill >> Challenge
+        b if b > 100 => FlowState::Relaxation, // Skill > Challenge
+        b if b >= -100 => FlowState::Flow,     // Balanced (±100)
+        b if b >= -200 => FlowState::Arousal,  // Challenge > Skill
+        b if b >= -400 => FlowState::Anxiety,  // Challenge >> Skill
+        _ => FlowState::Overwhelm,             // Challenge >>> Skill
     }
 }
 
@@ -380,7 +403,8 @@ fn generate_flow_adjustments(
         }
         FlowState::Fatigue => {
             adjustments.push(FlowAdjustment::SuggestBreak {
-                reason: "You've been working hard! A 5-10 minute break will help retention".to_string(),
+                reason: "You've been working hard! A 5-10 minute break will help retention"
+                    .to_string(),
             });
             adjustments.push(FlowAdjustment::DecreaseDifficulty {
                 amount_permille: 100,
@@ -401,8 +425,12 @@ fn determine_flow_trend(sessions: &[SessionAnalytics]) -> FlowTrend {
     }
 
     // Compare most recent to previous sessions
-    let recent_flow = sessions.first().map(|s| s.flow_balance_permille).unwrap_or(500);
-    let older_flow: u16 = sessions.iter()
+    let recent_flow = sessions
+        .first()
+        .map(|s| s.flow_balance_permille)
+        .unwrap_or(500);
+    let older_flow: u16 = sessions
+        .iter()
         .skip(1)
         .take(3)
         .map(|s| s.flow_balance_permille as u32)
@@ -429,20 +457,23 @@ pub(crate) fn get_optimal_learning_window_impl(_: ()) -> ExternResult<OptimalLea
             optimal_break_frequency_minutes: 25,
             recommended_content_types: vec![ContentType::Lesson, ContentType::Quiz],
             peak_hours: vec![10, 14, 16], // Common productive hours
-            confidence_permille: 200, // Low confidence without data
+            confidence_permille: 200,     // Low confidence without data
         });
     }
 
     // Find sessions with best flow balance
-    let flow_sessions: Vec<&SessionAnalytics> = sessions.iter()
+    let flow_sessions: Vec<&SessionAnalytics> = sessions
+        .iter()
         .filter(|s| s.flow_balance_permille >= 600 && s.flow_balance_permille <= 800)
         .collect();
 
     // Calculate optimal duration from high-flow sessions
     let optimal_duration = if !flow_sessions.is_empty() {
-        let avg_duration = flow_sessions.iter()
+        let avg_duration = flow_sessions
+            .iter()
             .map(|s| s.duration_seconds as u32)
-            .sum::<u32>() / flow_sessions.len() as u32;
+            .sum::<u32>()
+            / flow_sessions.len() as u32;
         (avg_duration / 60).max(15).min(60) as u16
     } else {
         25 // Default Pomodoro
@@ -450,9 +481,11 @@ pub(crate) fn get_optimal_learning_window_impl(_: ()) -> ExternResult<OptimalLea
 
     // Calculate optimal items
     let optimal_items = if !flow_sessions.is_empty() {
-        let avg_items = flow_sessions.iter()
+        let avg_items = flow_sessions
+            .iter()
             .map(|s| s.items_completed as u32)
-            .sum::<u32>() / flow_sessions.len() as u32;
+            .sum::<u32>()
+            / flow_sessions.len() as u32;
         avg_items.max(10).min(50) as u16
     } else {
         20
@@ -461,15 +494,23 @@ pub(crate) fn get_optimal_learning_window_impl(_: ()) -> ExternResult<OptimalLea
     // Find peak hours from flow sessions
     let _peak_hours: Vec<u8> = vec![10, 14, 16]; // Would need timestamp analysis
 
-    let confidence = if flow_sessions.len() >= 5 { 800 }
-        else if flow_sessions.len() >= 2 { 600 }
-        else { 400 };
+    let confidence = if flow_sessions.len() >= 5 {
+        800
+    } else if flow_sessions.len() >= 2 {
+        600
+    } else {
+        400
+    };
 
     Ok(OptimalLearningWindow {
         optimal_duration_minutes: optimal_duration,
         optimal_items_per_session: optimal_items,
         optimal_break_frequency_minutes: optimal_duration,
-        recommended_content_types: vec![ContentType::Lesson, ContentType::Exercise, ContentType::Quiz],
+        recommended_content_types: vec![
+            ContentType::Lesson,
+            ContentType::Exercise,
+            ContentType::Quiz,
+        ],
         peak_hours: vec![10, 14, 16],
         confidence_permille: confidence,
     })
@@ -508,11 +549,11 @@ pub(crate) fn assess_flow_state_impl(input: FlowAssessmentInput) -> ExternResult
     let difficulty_adjustment = match state {
         FlowState::Overwhelm => -400,
         FlowState::Anxiety => -200,
-        FlowState::Arousal => 0, // Perfect for learning
-        FlowState::Flow => 50, // Slight increase to maintain engagement
+        FlowState::Arousal => 0,      // Perfect for learning
+        FlowState::Flow => 50,        // Slight increase to maintain engagement
         FlowState::Relaxation => 100, // Slightly increase challenge
         FlowState::Boredom => 200,
-        FlowState::Warming => 0, // Don't adjust yet
+        FlowState::Warming => 0,    // Don't adjust yet
         FlowState::Fatigue => -100, // Reduce load
     };
 

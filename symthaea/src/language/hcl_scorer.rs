@@ -251,7 +251,7 @@ resource "aws_s3_bucket" "example" {
 
     #[test]
     fn bucket_name_mismatch_fails() {
-        let gen = r#"
+        let generated = r#"
 resource "aws_s3_bucket" "example" {
   bucket = "wrong-bucket"
   acl    = "private"
@@ -263,7 +263,7 @@ resource "aws_s3_bucket" "example" {
   acl    = "private"
 }
 "#;
-        let v = score(gen, gold);
+        let v = score(generated, gold);
         assert!(!v.pass());
         assert_eq!(v.value_mismatches.len(), 1);
         assert_eq!(
@@ -274,7 +274,7 @@ resource "aws_s3_bucket" "example" {
 
     #[test]
     fn missing_resource_fails() {
-        let gen = r#"
+        let generated = r#"
 resource "aws_s3_bucket" "a" {
   bucket = "only-one"
 }
@@ -287,31 +287,32 @@ resource "aws_instance" "server" {
   ami = "ami-12345"
 }
 "#;
-        let v = score(gen, gold);
+        let v = score(generated, gold);
         assert!(!v.pass());
-        assert!(v
-            .missing_required
-            .iter()
-            .any(|p| p.contains("aws_instance")));
+        assert!(
+            v.missing_required
+                .iter()
+                .any(|p| p.contains("aws_instance"))
+        );
     }
 
     #[test]
     fn extra_resource_is_warning_only() {
-        let gen = r#"
+        let generated = r#"
 resource "aws_s3_bucket" "a" { bucket = "one" }
 resource "aws_s3_bucket" "b" { bucket = "two" }
 "#;
         let gold = r#"
 resource "aws_s3_bucket" "a" { bucket = "one" }
 "#;
-        let v = score(gen, gold);
+        let v = score(generated, gold);
         assert!(v.pass(), "extra resource is warning; got {:?}", v);
         assert!(!v.extraneous.is_empty());
     }
 
     #[test]
     fn bool_vs_string_fails() {
-        let gen = r#"
+        let generated = r#"
 resource "aws_s3_bucket" "example" {
   versioning = "true"
 }
@@ -321,7 +322,7 @@ resource "aws_s3_bucket" "example" {
   versioning = true
 }
 "#;
-        let v = score(gen, gold);
+        let v = score(generated, gold);
         assert!(!v.pass(), "string vs bool must be flagged");
     }
 
@@ -329,7 +330,7 @@ resource "aws_s3_bucket" "example" {
     fn line_comments_do_not_create_paths() {
         // HCL supports `#` and `//` comments — hcl-rs parser drops
         // them, so commented-out blocks don't contribute paths.
-        let gen = r#"
+        let generated = r#"
 # resource "aws_s3_bucket" "fake" {
 #   bucket = "fake"
 # }
@@ -342,7 +343,7 @@ resource "aws_s3_bucket" "real" {
   bucket = "real"
 }
 "#;
-        let v = score(gen, gold);
+        let v = score(generated, gold);
         assert!(
             v.pass(),
             "comment-only differences must not fail; got {:?}",
@@ -394,7 +395,7 @@ resource "aws_security_group_rule" "http" {
 
     #[test]
     fn unterminated_string_parse_errors() {
-        let gen = r#"
+        let generated = r#"
 resource "aws_s3_bucket" "broken" {
   bucket = "no-close
 }
@@ -404,7 +405,7 @@ resource "aws_s3_bucket" "broken" {
   bucket = "fine"
 }
 "#;
-        let v = score(gen, gold);
+        let v = score(generated, gold);
         assert!(!v.pass());
         assert!(v.parse_error.is_some());
     }

@@ -169,10 +169,27 @@ pub struct CycleSnapshot {
     /// classification; gates factual assertions.
     pub epistemic_confidence: f32,
 
+    /// Moral score from the latest ethics evaluation (-1.0 to 1.0).
+    pub moral_score: f32,
+
+    /// Whether there are active external multimodal requests (e.g. video gen).
+    /// bool as u8 for repr(C) compatibility.
+    pub active_external_requests: u8,
+
+    /// Current vision manifold HDC dimension (16384 or 65536).
+    pub vision_hdc_dim: u32,
+
+    /// Last visual Variational Free Energy.
+    pub vision_free_energy: f32,
+    /// Last visual model complexity.
+    pub vision_complexity: f32,
+    /// Last visual prediction accuracy.
+    pub vision_accuracy: f32,
+
     // ── Padding for alignment ───────────────────────────────────────────
     /// Reserved for future fields. Ensures struct size is stable across
     /// versions for WASM ABI compatibility.
-    pub _reserved: [u8; 12],
+    pub _reserved: [u8; 3],
 }
 
 impl Default for CycleSnapshot {
@@ -199,7 +216,13 @@ impl Default for CycleSnapshot {
             holographic_unity: 0.0,
             gradient_magnitude: 0.0,
             epistemic_confidence: 0.5,
-            _reserved: [0; 12],
+            moral_score: 0.0,
+            active_external_requests: 0,
+            vision_hdc_dim: 16384,
+            vision_free_energy: 0.0,
+            vision_complexity: 0.0,
+            vision_accuracy: 1.0,
+            _reserved: [0; 3],
         }
     }
 }
@@ -280,6 +303,8 @@ pub mod output_flags {
     pub const REQUEST_BROADCAST: u32 = 1 << 6;
     /// Subsystem recommends urgency escalation.
     pub const ESCALATE_URGENCY: u32 = 1 << 7;
+    /// Subsystem requests geodesic mental simulation (pathfinding).
+    pub const REQUEST_GEODESIC: u32 = 1 << 8;
 }
 
 /// Proposed state changes from a single subsystem.
@@ -733,7 +758,13 @@ impl CycleSnapshot {
             holographic_unity: consciousness_cache.last_holographic_unity,
             gradient_magnitude: quality_metrics.last_gradient_magnitude,
             epistemic_confidence: quality_metrics.last_epistemic_confidence,
-            _reserved: [0; 12],
+            moral_score: quality_metrics.last_moral_score,
+            active_external_requests: 0, // TODO: Wire from multimodal coordinator
+            vision_hdc_dim: quality_metrics.last_vision_hdc_dim,
+            vision_free_energy: quality_metrics.last_vision_free_energy,
+            vision_complexity: quality_metrics.last_vision_complexity,
+            vision_accuracy: quality_metrics.last_vision_accuracy,
+            _reserved: [0; 3],
         }
     }
 }

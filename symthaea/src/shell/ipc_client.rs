@@ -98,6 +98,17 @@ impl ConnectionState {
 // METRICS SNAPSHOT
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/// Shared mental movie type for IPC transport
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct MentalMovie {
+    pub frames: Vec<Vec<u8>>,
+    pub width: u32,
+    pub height: u32,
+    pub channels: usize,
+    pub path_length: usize,
+    pub semantic_coherence: f32,
+}
+
 /// Snapshot of consciousness metrics from the service
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct MetricsSnapshot {
@@ -129,6 +140,9 @@ pub struct MetricsSnapshot {
     pub consciousness_level: f64,
     /// IPC latency in milliseconds
     pub latency_ms: u64,
+    /// The latest mental simulation result from the cognitive loop.
+    #[cfg(feature = "vision-manifold")]
+    pub mental_movie: Option<MentalMovie>,
 }
 
 impl Default for MetricsSnapshot {
@@ -148,6 +162,8 @@ impl Default for MetricsSnapshot {
             total_cycles: 0,
             consciousness_level: 0.5,
             latency_ms: 0,
+            #[cfg(feature = "vision-manifold")]
+            mental_movie: None,
         }
     }
 }

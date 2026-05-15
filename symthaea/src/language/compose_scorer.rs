@@ -273,7 +273,7 @@ services:
 
     #[test]
     fn missing_service_key_fails() {
-        let gen = r#"
+        let generated = r#"
 services:
   nginx:
     image: nginx:latest
@@ -285,14 +285,14 @@ services:
   redis:
     image: redis:latest
 "#;
-        let v = score(gen, gold);
+        let v = score(generated, gold);
         assert!(!v.pass());
         assert!(v.missing_required.iter().any(|p| p.contains("redis")));
     }
 
     #[test]
     fn different_image_version_fails() {
-        let gen = r#"
+        let generated = r#"
 services:
   nginx:
     image: nginx:1.25
@@ -302,7 +302,7 @@ services:
   nginx:
     image: nginx:latest
 "#;
-        let v = score(gen, gold);
+        let v = score(generated, gold);
         assert!(!v.pass(), "different image tags must be caught");
         assert_eq!(v.value_mismatches.len(), 1);
         assert_eq!(v.value_mismatches[0].path, "services.nginx.image");
@@ -310,7 +310,7 @@ services:
 
     #[test]
     fn extra_service_is_warning_not_fail() {
-        let gen = r#"
+        let generated = r#"
 services:
   nginx:
     image: nginx:latest
@@ -322,7 +322,7 @@ services:
   nginx:
     image: nginx:latest
 "#;
-        let v = score(gen, gold);
+        let v = score(generated, gold);
         assert!(
             v.pass(),
             "extra service should be warning only; got {:?}",
@@ -333,7 +333,7 @@ services:
 
     #[test]
     fn integer_port_values_match() {
-        let gen = r#"
+        let generated = r#"
 services:
   web:
     image: nginx
@@ -347,13 +347,13 @@ services:
     ports:
       - 8080
 "#;
-        let v = score(gen, gold);
+        let v = score(generated, gold);
         assert!(v.pass());
     }
 
     #[test]
     fn ports_list_mismatch_fails() {
-        let gen = r#"
+        let generated = r#"
 services:
   web:
     image: nginx
@@ -367,13 +367,13 @@ services:
     ports:
       - "8080:80"
 "#;
-        let v = score(gen, gold);
+        let v = score(generated, gold);
         assert!(!v.pass(), "different port mapping must be flagged");
     }
 
     #[test]
     fn invalid_yaml_reports_parse_error() {
-        let gen = r#"services:
+        let generated = r#"services:
   nginx:
     image: nginx:latest
     invalid: : : :
@@ -382,7 +382,7 @@ services:
   nginx:
     image: nginx:latest
 "#;
-        let v = score(gen, gold);
+        let v = score(generated, gold);
         assert!(!v.pass());
         assert!(v.parse_error.is_some());
     }
@@ -391,7 +391,7 @@ services:
     fn version_2_and_version_3_differ() {
         // Compose spec versions matter semantically — scorer should
         // flag them as mismatched top-level values.
-        let gen = r#"
+        let generated = r#"
 version: "2"
 services:
   nginx:
@@ -403,7 +403,7 @@ services:
   nginx:
     image: nginx
 "#;
-        let v = score(gen, gold);
+        let v = score(generated, gold);
         assert!(!v.pass());
         assert!(v.value_mismatches.iter().any(|m| m.path == "version"));
     }

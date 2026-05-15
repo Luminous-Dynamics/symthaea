@@ -84,7 +84,7 @@ pub fn fep_behavior_system(
         .collect();
 
     // Collect all agent positions+harmonies (player + other NPCs) for gradient
-    let mut all_agents: Vec<(nalgebra::SVector<f64, 2>, [f64; 8])> = Vec::new();
+    let mut all_agents: Vec<(nalgebra::SVector<f64, 2>, [f64; 9])> = Vec::new();
 
     // Add player
     if let Some(entity) = physics.consciousness.entities.get(&player_body.handle) {
@@ -120,7 +120,7 @@ pub fn fep_behavior_system(
                     e.phi(),
                 )
             })
-            .unwrap_or((1.0, [0.5; 8], 0.0, 0.5));
+            .unwrap_or((1.0, [0.5; 9], 0.0, 0.5));
 
         // FEP perception (still feeds the internal model)
         let obs = Observation::new(

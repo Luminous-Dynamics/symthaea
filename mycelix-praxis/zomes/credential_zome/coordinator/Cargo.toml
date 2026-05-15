@@ -33,6 +33,7 @@ blake3.workspace = true
 
 # Time handling
 chrono.workspace = true
+hex = "0.4"
 
 # Cross-cluster bridge (epistemic gating)
 mycelix-bridge-common = { path = "../../../../crates/mycelix-bridge-common" }

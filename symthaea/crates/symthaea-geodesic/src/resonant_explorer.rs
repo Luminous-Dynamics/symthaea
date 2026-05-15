@@ -30,6 +30,7 @@ use crate::program_memory::ProgramMemory;
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Configuration for the resonant exploration search.
+#[derive(Debug, Clone, Copy)]
 pub struct ExplorationConfig {
     /// Initial perturbation strength (default 0.15).
     pub initial_sigma: f32,
@@ -110,6 +111,10 @@ pub struct ResonantExplorer {
     convergence_threshold: f32,
     // Deterministic seed counter
     seed_counter: u64,
+    /// Optional hypervector to repel from (Semantic Repulsion).
+    pub repulsion_hv: Option<BinaryHV>,
+    /// Strength of the repulsion signal (0.0 to 1.0).
+    pub repulsion_weight: f32,
 }
 
 impl ResonantExplorer {
@@ -133,7 +138,16 @@ impl ResonantExplorer {
             cooling_rate: config.cooling_rate,
             convergence_threshold: config.convergence_threshold,
             seed_counter: 0xBEEF_CAFE_0000_0001u64.wrapping_add(42),
+            repulsion_hv: None,
+            repulsion_weight: 0.2,
         }
+    }
+
+    /// Attach a repulsion hypervector (e.g. from a compiler diagnostic).
+    pub fn with_repulsion(mut self, hv: BinaryHV, weight: f32) -> Self {
+        self.repulsion_hv = Some(hv);
+        self.repulsion_weight = weight.clamp(0.0, 1.0);
+        self
     }
 
     /// Run the full resonant search toward an expected output encoding.
@@ -173,7 +187,19 @@ impl ResonantExplorer {
     fn step(&mut self, expected_output: &BinaryHV) -> bool {
         // 1. Perturb the best encoding
         self.seed_counter = xorshift64(self.seed_counter);
-        let perturbed = perturb(&self.best_encoding, self.sigma, self.seed_counter);
+
+        let mut base_hv = self.best_encoding;
+
+        // Semantic Repulsion: If we have a failure geometry, we "push" the base
+        // encoding away from it before adding exploration noise.
+        if let Some(ref rhv) = self.repulsion_hv {
+            // XOR with a noisy version of the repulsion vector effectively
+            // pushes the search into a different region of the 16k-D manifold.
+            let push_noise = perturb(rhv, 1.0 - self.repulsion_weight, self.seed_counter);
+            base_hv = base_hv.bind(&push_noise);
+        }
+
+        let perturbed = perturb(&base_hv, self.sigma, self.seed_counter);
 
         // 2. Decode to nearest known ProgramNode
         let candidate_node = self.decode_nearest(&perturbed);
@@ -418,6 +444,34 @@ mod tests {
             sim > 0.7,
             "slightly perturbed ADD should decode back to something similar, got {}",
             sim
+        );
+    }
+
+    #[test]
+    fn test_explorer_with_repulsion() {
+        let expected = BinaryHV::random(5555);
+        let memory = ProgramMemory::basic();
+
+        let start = ProgramNode::apply(
+            ProgramNode::op("ADD"),
+            vec![ProgramNode::atom("a"), ProgramNode::atom("b")],
+        );
+
+        // Run without repulsion
+        let mut e1 =
+            ResonantExplorer::new(start.clone(), memory.clone(), ExplorationConfig::default());
+        let r1 = e1.explore(&expected);
+
+        // Run with strong repulsion from a specific vector
+        let rhv = BinaryHV::random(1234);
+        let mut e2 = ResonantExplorer::new(start, memory, ExplorationConfig::default())
+            .with_repulsion(rhv, 0.8);
+        let r2 = e2.explore(&expected);
+
+        // Results should differ due to repulsion
+        assert_ne!(
+            r1.best_score, r2.best_score,
+            "repulsion should change the search trajectory"
         );
     }
 }

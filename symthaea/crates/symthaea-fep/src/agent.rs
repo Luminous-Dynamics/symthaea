@@ -470,6 +470,11 @@ impl ActiveInferenceAgent {
         }
     }
 
+    /// Inject explicit priors into the generative model (Passport Route).
+    pub fn inject_priors(&mut self, mean: Vec<f64>, precision: Vec<f64>) {
+        self.model.inject_priors(mean, precision);
+    }
+
     /// Reset agent state
     pub fn reset(&mut self) {
         self.belief = HiddenState::new(self.config.state_dim);

@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -7,6 +6,7 @@ use mycelix_zome_helpers as _;
 
 use hdk::prelude::*;
 use mycelix_bridge_common::{civic_requirement_basic, civic_requirement_proposal};
+use mycelix_zome_helpers as _;
 use mycelix_zome_helpers::records_from_links;
 use water_purity_integrity::*;
 
@@ -15,7 +15,6 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     hash_entry(&EntryTypes::Anchor(anchor))
 }
 
-
 // ============================================================================
 // QUALITY READINGS
 // ============================================================================
@@ -23,7 +22,11 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 /// Submit a new water quality reading
 #[hdk_extern]
 pub fn submit_reading(reading: QualityReading) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "submit_reading")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "submit_reading",
+    )?;
 
     // Validate pH range (0-14) if provided
     if let Some(ph) = reading.ph {
@@ -220,7 +223,11 @@ pub struct PotabilityResult {
 /// Raise a contamination alert for a water source
 #[hdk_extern]
 pub fn raise_alert(alert: ContaminationAlert) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "raise_alert")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "raise_alert",
+    )?;
     if alert.contaminant.trim().is_empty() || alert.contaminant.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Contaminant name must be 1-256 non-whitespace characters".into()
@@ -289,7 +296,11 @@ pub fn get_active_alerts(_: ()) -> ExternResult<Vec<Record>> {
 /// Resolve an alert by marking it with a resolution timestamp
 #[hdk_extern]
 pub fn resolve_alert(input: ResolveAlertInput) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "resolve_alert")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "resolve_alert",
+    )?;
     let record = get(input.alert_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Alert not found".into())))?;
     let mut alert: ContaminationAlert = record
@@ -333,7 +344,11 @@ pub struct ResolveAlertInput {
 /// Start a remediation action for a contamination alert
 #[hdk_extern]
 pub fn start_remediation(remediation: Remediation) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "start_remediation")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "start_remediation",
+    )?;
     if remediation.method.trim().is_empty() || remediation.method.len() > 1024 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Remediation method must be 1-1024 non-whitespace characters".into()
@@ -358,7 +373,11 @@ pub fn start_remediation(remediation: Remediation) -> ExternResult<Record> {
 /// Complete a remediation with verification
 #[hdk_extern]
 pub fn complete_remediation(input: CompleteRemediationInput) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "complete_remediation")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "complete_remediation",
+    )?;
     let agent_info = agent_info()?;
     let record = get(input.remediation_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Remediation not found".into())

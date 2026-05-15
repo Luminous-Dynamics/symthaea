@@ -12,9 +12,9 @@
 //! Signatures are encoded in multibase format (base58btc with 'z' prefix) as per
 //! W3C Data Integrity EdDSA Cryptosuites v1.0 specification.
 
-use mycelix_zome_helpers as _;
 use hdk::prelude::*;
 use mycelix_crypto::{AlgorithmId, TaggedSignature};
+use mycelix_zome_helpers as _;
 use verifiable_credential_integrity::*;
 
 /// Mirror type for credential_schema deserialization (cross-zome)

@@ -6,6 +6,7 @@
 //! Provides CRUD operations for claim verification.
 
 use hdk::prelude::*;
+use mycelix_zome_helpers as _;
 use verification_integrity::*;
 
 // NOTE: We create links to claims using a cross-zome pattern
@@ -58,7 +59,12 @@ pub fn create_verification(input: CreateVerificationInput) -> ExternResult<Recor
 
     // Link to all verifications anchor
     let all_anchor = all_verifications_anchor()?;
-    create_link(all_anchor, action_hash.clone(), LinkTypes::AllVerifications, ())?;
+    create_link(
+        all_anchor,
+        action_hash.clone(),
+        LinkTypes::AllVerifications,
+        (),
+    )?;
 
     // Cross-zome: link this verification to the claim in the claims zome.
     let link_input = serde_json::json!({
@@ -205,16 +211,17 @@ pub fn submit_proof(input: (ActionHash, String)) -> ExternResult<ActionHash> {
 #[hdk_extern]
 pub fn verify_proof(verification_hash: ActionHash) -> ExternResult<bool> {
     let record = get(verification_hash, GetOptions::default())?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
-            "Verification not found".to_string()
-        )))?;
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Verification not found".to_string())))?;
 
-    let verification: ClaimVerification = record.entry()
+    let verification: ClaimVerification = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(e))?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
-            "Invalid verification entry".to_string()
-        )))?;
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid verification entry".to_string()
+            ))
+        })?;
 
     Ok(verification.status == VerificationStatus::Verified)
 }
@@ -228,9 +235,15 @@ pub fn get_verification_status(claim_hash: ActionHash) -> ExternResult<String> {
         return Ok("Unverified".to_string());
     }
 
-    let verified_count = verifications.iter()
+    let verified_count = verifications
+        .iter()
         .filter(|r| {
-            if let Some(v) = r.entry().to_app_option::<ClaimVerification>().ok().flatten() {
+            if let Some(v) = r
+                .entry()
+                .to_app_option::<ClaimVerification>()
+                .ok()
+                .flatten()
+            {
                 v.status == VerificationStatus::Verified
             } else {
                 false
@@ -238,9 +251,15 @@ pub fn get_verification_status(claim_hash: ActionHash) -> ExternResult<String> {
         })
         .count();
 
-    let rejected_count = verifications.iter()
+    let rejected_count = verifications
+        .iter()
         .filter(|r| {
-            if let Some(v) = r.entry().to_app_option::<ClaimVerification>().ok().flatten() {
+            if let Some(v) = r
+                .entry()
+                .to_app_option::<ClaimVerification>()
+                .ok()
+                .flatten()
+            {
                 v.status == VerificationStatus::Rejected
             } else {
                 false
@@ -264,7 +283,7 @@ pub fn get_verification_status(claim_hash: ActionHash) -> ExternResult<String> {
 /// Create a deterministic hash from a string identifier
 fn hash_identifier(identifier: &str) -> ExternResult<EntryHash> {
     let anchor_bytes = SerializedBytes::from(UnsafeBytes::from(
-        format!("anchor:{}", identifier).into_bytes()
+        format!("anchor:{}", identifier).into_bytes(),
     ));
     hash_entry(Entry::App(AppEntryBytes(anchor_bytes)))
 }

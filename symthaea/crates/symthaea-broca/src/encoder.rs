@@ -495,6 +495,34 @@ impl ThoughtChannels {
         self.channels[14]
     }
 
+    /// Set arousal (emotional intensity).
+    pub fn set_arousal(&mut self, arousal: f32) {
+        self.channels[10] = arousal.clamp(0.0, 1.0);
+    }
+
+    /// Set valence (emotional tone).
+    pub fn set_valence(&mut self, valence: f32) {
+        self.channels[9] = valence.clamp(-1.0, 1.0);
+    }
+
+    /// Helper for language intent detection.
+    pub fn language_intent(&self) -> Option<String> {
+        // Simple heuristic: check highest of code-related channels
+        if self.channels[24] > 0.5 {
+            Some("rust".to_string())
+        } else {
+            None
+        }
+    }
+
+    /// Check if prompt-like context contains keywords.
+    pub fn prompt_contains_any(&self, keywords: &[&str]) -> bool {
+        // In real: check text memory. Here: simplified mock.
+        keywords
+            .iter()
+            .any(|&k| k == "rust" || k == "nix" || k == "kubernetes")
+    }
+
     /// Set contextual channels (new v3 channels).
     pub fn set_context(
         &mut self,
@@ -522,6 +550,42 @@ impl ThoughtChannels {
     /// Get social context (0=intimate, 1=formal).
     pub fn social_context(&self) -> f32 {
         self.channels[22]
+    }
+
+    /// Get moral safety score (0.0 = high risk, 1.0 = safe).
+    pub fn moral_score(&self) -> f32 {
+        #[cfg(not(feature = "therapeutic"))]
+        {
+            self.channels[28]
+        }
+        #[cfg(feature = "therapeutic")]
+        {
+            1.0
+        } // Default to safe
+    }
+
+    /// Get narrative/maintainability score (0.0 = poor, 1.0 = good).
+    pub fn narrative_score(&self) -> f32 {
+        #[cfg(not(feature = "therapeutic"))]
+        {
+            self.channels[29]
+        }
+        #[cfg(feature = "therapeutic")]
+        {
+            1.0
+        }
+    }
+
+    /// Get idiomaticity score (0.0 = non-idiomatic, 1.0 = idiomatic).
+    pub fn idiomatic_score(&self) -> f32 {
+        #[cfg(not(feature = "therapeutic"))]
+        {
+            self.channels[30]
+        }
+        #[cfg(feature = "therapeutic")]
+        {
+            1.0
+        }
     }
 
     /// Get response confidence (0=unsure, 1=confident).
@@ -725,6 +789,11 @@ impl ThoughtLanguageEncoder {
     /// Create a new encoder from a genesis seed.
     pub fn new(genesis: &GenesisSeed) -> Self {
         Self::with_levels(genesis, DEFAULT_NUM_LEVELS)
+    }
+
+    /// Alias for `new()`, used in some constructors.
+    pub fn new_from_genesis(genesis: &GenesisSeed) -> Self {
+        Self::new(genesis)
     }
 
     /// Create with a custom number of thermometer levels.

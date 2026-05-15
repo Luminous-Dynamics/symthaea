@@ -399,6 +399,97 @@ pub fn dispatch_call_checked(
 // Cross-cluster dispatch (inter-DNA within the same hApp)
 // ============================================================================
 
+// =============================================================================
+// CONSTELLATION PROTOCOL (Cross-hApp Call Routing)
+// =============================================================================
+
+/// Target for a constellation dispatch.
+/// Can be internal (OtherRole) or external (RemoteAgent).
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum ConstellationTarget {
+    /// Internal to the current hApp (Unified mode).
+    Internal { role: String },
+    /// External to the current hApp (Standalone mode).
+    External {
+        agent: AgentPubKey,
+        cap_secret: Option<CapSecret>,
+    },
+}
+
+/// Dispatch a synchronous call across the constellation (local or remote).
+///
+/// If target is Internal, it uses `CallTargetCell::OtherRole`.
+/// If target is External, it uses `call_remote`.
+#[cfg(feature = "hdk")]
+pub fn dispatch_constellation_call(
+    target: &ConstellationTarget,
+    zome: &str,
+    fn_name: &str,
+    payload: Vec<u8>,
+) -> ExternResult<DispatchResult> {
+    let start_us = sys_time().ok().map(|t| t.as_micros() as u64);
+
+    let result = match target {
+        ConstellationTarget::Internal { role } => HDK.with(|h| {
+            h.borrow().call(vec![Call::new(
+                CallTarget::ConductorCell(CallTargetCell::OtherRole(role.clone())),
+                ZomeName::from(zome),
+                FunctionName::from(fn_name),
+                None,
+                ExternIO(payload),
+            )])
+        }),
+        ConstellationTarget::External { agent, cap_secret } => {
+            // Note: call_remote is asynchronous and returns a different type.
+            // For MVP, we bridge this into the synchronous DispatchResult pattern.
+            match call_remote(
+                agent.clone(),
+                zome,
+                fn_name.into(),
+                *cap_secret,
+                ExternIO(payload),
+            ) {
+                Ok(ZomeCallResponse::Ok(extern_io)) => Ok(vec![ZomeCallResponse::Ok(extern_io)]),
+                Ok(other) => Ok(vec![other]),
+                Err(e) => Err(e),
+            }
+        }
+    };
+
+    let elapsed_us = start_us.and_then(|start| {
+        sys_time()
+            .ok()
+            .map(|end| (end.as_micros() as u64).saturating_sub(start))
+    });
+
+    match result {
+        Ok(responses) => match responses.into_iter().next() {
+            Some(ZomeCallResponse::Ok(extern_io)) => {
+                if let Some(latency) = elapsed_us {
+                    metrics::record_success(zome, fn_name, latency);
+                }
+                Ok(DispatchResult::ok(extern_io.0))
+            }
+            Some(ZomeCallResponse::NetworkError(err)) => Ok(DispatchResult::err(
+                BridgeErrorCode::LocalNetworkError,
+                format!("Network error: {}", err),
+            )),
+            Some(other) => Ok(DispatchResult::err(
+                BridgeErrorCode::LocalCallRejected,
+                format!("Rejected: {:?}", other),
+            )),
+            None => Ok(DispatchResult::err(
+                BridgeErrorCode::LocalNoResponse,
+                "No response".into(),
+            )),
+        },
+        Err(e) => Ok(DispatchResult::err(
+            BridgeErrorCode::LocalCallFailed,
+            format!("Call failed: {:?}", e),
+        )),
+    }
+}
+
 /// Input for dispatching a call to a zome in another DNA within the same hApp.
 ///
 /// Used for commons↔civic cross-cluster communication.  The `role` field
@@ -469,6 +560,7 @@ pub fn dispatch_call_cross_cluster(
             ),
         ));
     }
+
     if !allowed_zomes.contains(&input.zome.as_str()) {
         metrics::record_error(
             &input.zome,
@@ -484,69 +576,14 @@ pub fn dispatch_call_cross_cluster(
         ));
     }
 
-    let payload = ExternIO(input.payload.clone());
-    let call_key = format!("{}::{}", input.role, input.zome);
-    let start_us = sys_time().ok().map(|t| t.as_micros() as u64);
     metrics::record_cross_cluster();
 
-    let result = HDK.with(|h| {
-        h.borrow().call(vec![Call::new(
-            CallTarget::ConductorCell(CallTargetCell::OtherRole(input.role.clone())),
-            ZomeName::from(input.zome.as_str()),
-            FunctionName::from(input.fn_name.as_str()),
-            None,
-            payload,
-        )])
-    });
+    // Default to Internal target for backward compatibility with unified hApp
+    let target = ConstellationTarget::Internal {
+        role: input.role.clone(),
+    };
 
-    let elapsed_us = start_us.and_then(|start| {
-        sys_time()
-            .ok()
-            .map(|end| (end.as_micros() as u64).saturating_sub(start))
-    });
-
-    match result {
-        Ok(responses) => match responses.into_iter().next() {
-            Some(ZomeCallResponse::Ok(extern_io)) => {
-                if let Some(latency) = elapsed_us {
-                    metrics::record_success(&call_key, &input.fn_name, latency);
-                }
-                Ok(DispatchResult::ok(extern_io.0))
-            }
-            Some(ZomeCallResponse::NetworkError(err)) => {
-                let code = BridgeErrorCode::CrossClusterNetworkError;
-                metrics::record_error(&call_key, &input.fn_name, code.as_str());
-                Ok(DispatchResult::err(
-                    code,
-                    format!("Cross-cluster network error: {}", err),
-                ))
-            }
-            Some(other) => {
-                let code = BridgeErrorCode::CrossClusterCallRejected;
-                metrics::record_error(&call_key, &input.fn_name, code.as_str());
-                Ok(DispatchResult::err(
-                    code,
-                    format!("Cross-cluster call rejected: {:?}", other),
-                ))
-            }
-            None => {
-                let code = BridgeErrorCode::CrossClusterNoResponse;
-                metrics::record_error(&call_key, &input.fn_name, code.as_str());
-                Ok(DispatchResult::err(
-                    code,
-                    "No response from cross-cluster call".into(),
-                ))
-            }
-        },
-        Err(e) => {
-            let code = BridgeErrorCode::CrossClusterCallFailed;
-            metrics::record_error(&call_key, &input.fn_name, code.as_str());
-            Ok(DispatchResult::err(
-                code,
-                format!("Cross-cluster call failed: {:?}", e),
-            ))
-        }
-    }
+    dispatch_constellation_call(&target, &input.zome, &input.fn_name, input.payload.clone())
 }
 
 /// Cross-cluster dispatch to commons with automatic sub-cluster role resolution.

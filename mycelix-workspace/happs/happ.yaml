@@ -1,1 +1,259 @@
-mycelix-unified-happ.yaml
+---
+# Mycelix Unified hApp Bundle
+# Combines Personal + Identity + Hearth + Commons + Civic + Attribution + Finance + Governance + Praxis + Craft DNAs for cross-cluster communication.
+#
+# When all DNAs are installed as separate roles within the same hApp,
+# zomes can call between clusters using:
+#   call(CallTargetCell::OtherRole("identity"/"hearth"/"commons_land"/"commons_care"/"civic"/"finance"/"governance"/"energy"/"core_fl"/...), zome, fn, None, payload)
+#
+# This is the deployment manifest for environments that need
+# cross-cluster integration (e.g., justice enforcement freezing
+# property transfers, emergency querying housing capacity,
+# hearth escalating emergencies to civic).
+#
+# For standalone deployments where only one cluster is needed,
+# use the individual happ.yaml files in happs/commons/ or happs/civic/.
+
+manifest_version: "0"
+name: mycelix-unified
+description: |
+  Unified Mycelix platform — Fractal CivOS 5-tier architecture:
+  - Personal (Sovereign): Private identity vault, health vault, credentials
+  - Identity (Authority): DID registry, verifiable credentials, MFA, recovery
+  - Hearth (FAMILY): Kinship bonds, gratitude, care, autonomy, stories, rhythms
+  - Civic (WE): Justice, emergency, media (permissioned)
+  - Commons Land (ALL): Property, housing, water, food (physical infrastructure)
+  - Commons Care (ALL): Care, mutualaid, transport, support, space (social/care)
+  - Attribution (OPEN): Dependency registry, usage receipts, reciprocity pledges
+  - Finance (ECONOMY): Payments (SAP/TEND/MYCEL), treasury, staking, recognition, currency-mint
+  - Governance (DEMOCRACY): Proposals, voting, DKG, councils, constitution, execution
+  - Health (SOVEREIGN): Patient, provider, records, prescriptions, consent (standalone DNA)
+  - Music (CULTURE): Zero-cost streaming, catalog, plays, balances, trust/CDN reputation
+  Enables cross-cluster calls between all tiers via OtherRole dispatch.
+  Commons split into two sub-cluster DNAs to fit under Holochain's 16MB limit.
+  Note: "HEARTH" in the finance hApp refers to commons pool governance;
+  the hearth DNA here is the family/kinship coordination layer.
+
+  Deliberately excluded from this unified bundle (status 2026-04-17):
+  - desci: REST-only service (Actix-web), not a Holochain hApp
+  - mail: standalone hApp at mycelix-workspace/mycelix-pulse/, PQC-encrypted,
+    no cross-cluster bridge wiring yet
+  - marketplace: beta stage, arbitration flows not stable enough for
+    cross-cluster calls
+  - space: production but standalone — orbital-mechanics domain is
+    self-contained, no bridge integration needed yet
+  Promote to unified bundle when bridge wiring exists and zomes are
+  stable (see MYCELIX_IMPROVEMENT_PLAN.md P4.1).
+
+roles:
+  - name: personal
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./personal/dna/mycelix_personal.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: identity
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./identity/dna/mycelix_identity_dna.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: hearth
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./hearth/dna/mycelix_hearth.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: commons_land
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./commons/dna/mycelix_commons_land.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: commons_care
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./commons/dna/mycelix_commons_care.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: civic
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./civic/dna/mycelix_civic.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: attribution
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./attribution/dna/mycelix_attribution_dna.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: finance
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./finance/dna/mycelix_finance.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: governance
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./governance/dna/mycelix_governance_dna.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: health
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./health/dna/health.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: supplychain
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./supplychain/holochain/dna/supplychain.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: manufacturing
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./manufacturing/dna/manufacturing.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: music
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ../../mycelix-music/dnas/mycelix-music/mycelix_music.dna
+      modifiers:
+        network_seed: ~
+        properties:
+          platform_fee_rate: 0.03
+          artist_share: 0.70
+          label_share: 0.20
+      clone_limit: 0
+
+  - name: energy
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ../../mycelix-energy/dna/mycelix_energy.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: knowledge
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ../../mycelix-knowledge/dna/mycelix_knowledge.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: climate
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ../../mycelix-climate/dnas/climate/workdir/climate.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: praxis
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ../../mycelix-praxis/dna/praxis.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: craft
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ../../mycelix-craft/dna/mycelix_craft.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: core_fl
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ../../mycelix-core/dna/mycelix_core.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0

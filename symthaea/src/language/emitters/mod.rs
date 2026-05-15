@@ -82,8 +82,14 @@ fn split_at_depth_zero(s: &str, delim: char) -> Vec<&str> {
 fn parse_rust_signature(sig: &str) -> Option<ParsedSignature> {
     let sig = sig.trim();
 
-    // Strip leading "pub fn " or "fn "
-    let after_fn = if sig.starts_with("pub fn ") {
+    // Strip leading visibility/async/fn markers. Keep this parser permissive:
+    // generated signatures often arrive without a body and may include generic
+    // bounds that are not valid in a call expression.
+    let after_fn = if sig.starts_with("pub async fn ") {
+        &sig[13..]
+    } else if sig.starts_with("async fn ") {
+        &sig[9..]
+    } else if sig.starts_with("pub fn ") {
         &sig[7..]
     } else if sig.starts_with("fn ") {
         &sig[3..]
@@ -93,7 +99,13 @@ fn parse_rust_signature(sig: &str) -> Option<ParsedSignature> {
 
     // Find name and params
     let paren_start = after_fn.find('(')?;
-    let name = after_fn[..paren_start].trim().to_string();
+    let name = after_fn[..paren_start]
+        .trim()
+        .split('<')
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_string();
 
     // Find the matching ')' for the parameter list by tracking nesting depth.
     // rfind(')') breaks on return types containing tuples like Vec<(i32, i32)>.
@@ -445,7 +457,10 @@ fn infer_rust_body(
     // Capitalize / title case
     if purpose_lower.contains("capitalize") || purpose_lower.contains("title") {
         if params.len() == 1 {
-            return format!("let mut c = {}.chars();\n    match c.next() {{\n        None => String::new(),\n        Some(f) => f.to_uppercase().to_string() + &c.as_str().to_lowercase(),\n    }}", params[0].0);
+            return format!(
+                "let mut c = {}.chars();\n    match c.next() {{\n        None => String::new(),\n        Some(f) => f.to_uppercase().to_string() + &c.as_str().to_lowercase(),\n    }}",
+                params[0].0
+            );
         }
     }
 
@@ -453,7 +468,10 @@ fn infer_rust_body(
     if purpose_lower.contains("sort") {
         if params.len() == 1 && is_collection(&params[0].1) {
             if purpose_lower.contains("descending") || purpose_lower.contains("reverse") {
-                return format!("let mut result = {}.to_vec();\n    result.sort();\n    result.reverse();\n    result", params[0].0);
+                return format!(
+                    "let mut result = {}.to_vec();\n    result.sort();\n    result.reverse();\n    result",
+                    params[0].0
+                );
             }
             return format!(
                 "let mut result = {}.to_vec();\n    result.sort();\n    result",
@@ -502,7 +520,10 @@ fn infer_rust_body(
         || purpose_lower.contains("dedup")
     {
         if params.len() == 1 {
-            return format!("let mut result = {}.to_vec();\n    result.sort();\n    result.dedup();\n    result", params[0].0);
+            return format!(
+                "let mut result = {}.to_vec();\n    result.sort();\n    result.dedup();\n    result",
+                params[0].0
+            );
         }
     }
     // Binary search
@@ -634,7 +655,10 @@ fn infer_rust_body(
     // GCD
     if purpose_lower.contains("gcd") || purpose_lower.contains("greatest common") {
         if params.len() == 2 {
-            return format!("let (mut a, mut b) = ({}, {});\n    while b != 0 {{\n        let t = b;\n        b = a % b;\n        a = t;\n    }}\n    a", params[0].0, params[1].0);
+            return format!(
+                "let (mut a, mut b) = ({}, {});\n    while b != 0 {{\n        let t = b;\n        b = a % b;\n        a = t;\n    }}\n    a",
+                params[0].0, params[1].0
+            );
         }
     }
     // Average / mean
@@ -757,7 +781,10 @@ fn infer_rust_body(
     // palindrome
     if purpose_lower.contains("palindrome") {
         if params.len() == 1 {
-            return format!("let s: String = {}.chars().collect();\n    let r: String = s.chars().rev().collect();\n    s == r", params[0].0);
+            return format!(
+                "let s: String = {}.chars().collect();\n    let r: String = s.chars().rev().collect();\n    s == r",
+                params[0].0
+            );
         }
     }
     // (two_sum moved to specific multi-word section above)
@@ -2010,6 +2037,11 @@ fn generate_auto_tests(
     let has_i32_params = sig.params.iter().any(|(_, t)| {
         t.contains("i32") || t.contains("i64") || t.contains("u32") || t.contains("u64")
     });
+    let has_scalar_i32_param = sig.params.iter().any(|(_, t)| {
+        (t.contains("i32") || t.contains("i64") || t.contains("u32") || t.contains("u64"))
+            && !t.contains("&[")
+            && !t.contains("Vec")
+    });
     let has_str_param = sig
         .params
         .iter()
@@ -2022,14 +2054,14 @@ fn generate_auto_tests(
         .return_type
         .as_ref()
         .map_or(false, |r| r.contains("bool"));
-    let returns_string = sig
-        .return_type
-        .as_ref()
-        .map_or(false, |r| r.contains("String"));
     let returns_vec = sig
         .return_type
         .as_ref()
         .map_or(false, |r| r.contains("Vec"));
+    let returns_string = sig
+        .return_type
+        .as_ref()
+        .map_or(false, |r| r.contains("String") && !r.contains("Vec"));
 
     // Arithmetic: two numeric params → test with small values
     if sig.params.len() == 2 && has_i32_params && !returns_bool && !returns_vec {
@@ -2059,7 +2091,7 @@ fn generate_auto_tests(
     }
 
     // Single numeric param
-    if sig.params.len() == 1 && has_i32_params {
+    if sig.params.len() == 1 && has_scalar_i32_param {
         if returns_bool {
             if purpose_lower.contains("is even") || purpose_lower.contains("even") {
                 tests.push(format!("assert!({}(4));", func_name));
@@ -2116,11 +2148,23 @@ fn generate_auto_tests(
     // Vec operations
     if has_vec_param && sig.params.len() == 1 {
         if returns_vec && (purpose_lower.contains("sort") || purpose_lower.contains("order")) {
-            tests.push(format!(
-                "assert_eq!({}(vec![3, 1, 2]), vec![1, 2, 3]);",
-                func_name
-            ));
-            tests.push(format!("assert_eq!({}(vec![]), vec![]);", func_name));
+            let first_param_type = sig.params.first().map(|(_, ty)| ty.as_str()).unwrap_or("");
+            if first_param_type.contains("&[") {
+                tests.push(format!(
+                    "let v = vec![3, 1, 2]; assert_eq!({}(&v), vec![1, 2, 3]);",
+                    func_name
+                ));
+                tests.push(format!(
+                    "let v: Vec<i32> = Vec::new(); assert_eq!({}(&v), Vec::<i32>::new());",
+                    func_name
+                ));
+            } else {
+                tests.push(format!(
+                    "assert_eq!({}(vec![3, 1, 2]), vec![1, 2, 3]);",
+                    func_name
+                ));
+                tests.push(format!("assert_eq!({}(vec![]), vec![]);", func_name));
+            }
         }
     }
 
@@ -2241,6 +2285,11 @@ fn generate_property_tests(
     let has_i32_params = sig.params.iter().any(|(_, t)| {
         t.contains("i32") || t.contains("i64") || t.contains("u32") || t.contains("u64")
     });
+    let has_scalar_i32_param = sig.params.iter().any(|(_, t)| {
+        (t.contains("i32") || t.contains("i64") || t.contains("u32") || t.contains("u64"))
+            && !t.contains("&[")
+            && !t.contains("Vec")
+    });
     let has_str_param = sig
         .params
         .iter()
@@ -2256,23 +2305,38 @@ fn generate_property_tests(
     let returns_string = sig
         .return_type
         .as_ref()
-        .map_or(false, |r| r.contains("String"));
+        .map_or(false, |r| r.contains("String") && !r.contains("Vec"));
 
     // ── Sorting: idempotency — sort(sort(v)) == sort(v) ──
     if has_vec_param
         && returns_vec
         && (purpose_lower.contains("sort") || purpose_lower.contains("order"))
     {
-        tests.push(format!(
-            "let v = vec![3, 1, 4, 1, 5, 9, 2, 6];\n        \
-             assert_eq!({f}(v.clone()), {f}({f}(v.clone())), \"sort must be idempotent\");",
-            f = func_name
-        ));
-        tests.push(format!(
-            "let v = vec![5, 3, 8, 1];\n        \
-             assert_eq!({f}(v.clone()).len(), v.len(), \"sort must preserve length\");",
-            f = func_name
-        ));
+        let first_param_type = sig.params.first().map(|(_, ty)| ty.as_str()).unwrap_or("");
+        if first_param_type.contains("&[") {
+            tests.push(format!(
+                "let v = vec![3, 1, 4, 1, 5, 9, 2, 6];\n        \
+                 let once = {f}(&v);\n        \
+                 assert_eq!(once.clone(), {f}(&once), \"sort must be idempotent\");",
+                f = func_name
+            ));
+            tests.push(format!(
+                "let v = vec![5, 3, 8, 1];\n        \
+                 assert_eq!({f}(&v).len(), v.len(), \"sort must preserve length\");",
+                f = func_name
+            ));
+        } else {
+            tests.push(format!(
+                "let v = vec![3, 1, 4, 1, 5, 9, 2, 6];\n        \
+                 assert_eq!({f}(v.clone()), {f}({f}(v.clone())), \"sort must be idempotent\");",
+                f = func_name
+            ));
+            tests.push(format!(
+                "let v = vec![5, 3, 8, 1];\n        \
+                 assert_eq!({f}(v.clone()).len(), v.len(), \"sort must preserve length\");",
+                f = func_name
+            ));
+        }
     }
 
     // ── Reverse: involution — reverse(reverse(x)) == x ──
@@ -2301,11 +2365,32 @@ fn generate_property_tests(
             || purpose_lower.contains("remove")
             || purpose_lower.contains("select"))
     {
-        tests.push(format!(
-            "let v = vec![1, 2, 3, 4, 5, 6, 7, 8];\n        \
-             assert!({f}(v.clone()).len() <= v.len(), \"filter must not increase length\");",
-            f = func_name
-        ));
+        let first_param_type = sig.params.first().map(|(_, t)| t.as_str()).unwrap_or("");
+        if first_param_type.contains("&[&str]") {
+            tests.push(format!(
+                "let v = vec![\"1\", \"x\", \"2\", \"3\"];\n        \
+                 assert!({f}(&v).len() <= v.len(), \"filter must not increase length\");",
+                f = func_name
+            ));
+        } else if first_param_type.contains("&[String]") {
+            tests.push(format!(
+                "let v = vec![\"a\".to_string(), \"bb\".to_string(), \"ccc\".to_string()];\n        \
+                 assert!({f}(&v).len() <= v.len(), \"filter must not increase length\");",
+                f = func_name
+            ));
+        } else if first_param_type.contains("&[") {
+            tests.push(format!(
+                "let v = vec![1, 2, 3, 4, 5, 6, 7, 8];\n        \
+                 assert!({f}(&v).len() <= v.len(), \"filter must not increase length\");",
+                f = func_name
+            ));
+        } else {
+            tests.push(format!(
+                "let v = vec![1, 2, 3, 4, 5, 6, 7, 8];\n        \
+                 assert!({f}(v.clone()).len() <= v.len(), \"filter must not increase length\");",
+                f = func_name
+            ));
+        }
     }
 
     // ── Arithmetic commutativity: f(a, b) == f(b, a) ──
@@ -2343,7 +2428,7 @@ fn generate_property_tests(
 
     // ── Absolute value: |x| >= 0, |x| == |-x| ──
     if sig.params.len() == 1
-        && has_i32_params
+        && has_scalar_i32_param
         && (purpose_lower.contains("absolute") || purpose_lower.contains("abs"))
     {
         tests.push(format!(
@@ -2387,10 +2472,23 @@ fn generate_property_tests(
             || purpose_lower.contains("negate"))
         && !purpose_lower.contains("filter")
     {
+        let first_param_type = sig.params.first().map(|(_, ty)| ty.as_str()).unwrap_or("");
+        let values = if first_param_type.contains("String") {
+            "vec![\"A\".to_string(), \"B\".to_string(), \"C\".to_string()]"
+        } else {
+            "vec![1, 2, 3, 4, 5]"
+        };
+        let arg = if first_param_type.contains("&[") {
+            "&v"
+        } else {
+            "v.clone()"
+        };
         tests.push(format!(
-            "let v = vec![1, 2, 3, 4, 5];\n        \
-             assert_eq!({f}(v.clone()).len(), v.len(), \"map must preserve length\");",
-            f = func_name
+            "let v = {values};\n        \
+             assert_eq!({f}({arg}).len(), v.len(), \"map must preserve length\");",
+            f = func_name,
+            arg = arg,
+            values = values
         ));
     }
 
@@ -2854,6 +2952,41 @@ mod tests {
         let tests = generate_auto_tests("sort", "Sort a vector", Some(&sig));
         assert!(!tests.is_empty(), "Should generate tests for sort");
         assert!(tests.iter().any(|t| t.contains("vec![1, 2, 3]")));
+    }
+
+    #[test]
+    fn test_parse_generic_signature_uses_callable_name() {
+        let sig = parse_rust_signature("fn sorted_clone<T: Ord + Clone>(items: &[T]) -> Vec<T>")
+            .expect("generic signature should parse");
+        assert_eq!(sig.name, "sorted_clone");
+        assert_eq!(sig.params[0].0, "items");
+        assert_eq!(sig.params[0].1, "&[T]");
+    }
+
+    #[test]
+    fn test_auto_tests_sort_borrowed_slice_use_valid_calls() {
+        let sig = ParsedSignature {
+            name: "sorted_clone".to_string(),
+            params: vec![("items".to_string(), "&[T]".to_string())],
+            return_type: Some("Vec<T>".to_string()),
+            _is_method: false,
+        };
+        let tests = generate_auto_tests(
+            "sorted_clone",
+            "Return a sorted cloned vector from a generic slice using the Ord bound",
+            Some(&sig),
+        );
+        assert!(!tests.is_empty(), "Should generate tests for borrowed sort");
+        assert!(
+            tests.iter().all(|test| !test.contains("<T:")),
+            "Generated calls must not include generic bounds: {:?}",
+            tests
+        );
+        assert!(
+            tests.iter().any(|test| test.contains("sorted_clone(&v)")),
+            "Borrowed slice tests should pass a borrowed vector: {:?}",
+            tests
+        );
     }
 
     #[test]

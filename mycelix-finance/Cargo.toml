@@ -35,7 +35,7 @@ holochain_integrity_types = "0.6.0"
 holochain_serialized_bytes = "0.0.56"
 
 # Serialization
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1.0.203", features = ["derive"] }
 serde_json = "1.0"
 
 # Bridge
@@ -50,7 +50,9 @@ derive_more = "0.99"
 # WASM compatibility - getrandom 0.3 with custom backend (HDK provides __getrandom_v03_custom)
 # NOTE: Do NOT use features = ["js"] or ["wasm_js"] - they pull in wasm-bindgen
 # which is incompatible with Holochain's WASM runtime.
+getrandom = { version = "0.2", features = ["custom"] }
 getrandom_03 = { package = "getrandom", version = "0.3" }
+mycelix-zome-helpers = { path = "../mycelix-workspace/crates/mycelix-zome-helpers" }
 
 # ZKP verification for transaction privacy
 mycelix-zkp-core = { path = "../crates/mycelix-zkp-core" }

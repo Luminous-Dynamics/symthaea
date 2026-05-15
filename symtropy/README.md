@@ -4,7 +4,27 @@ State-coupled N-dimensional physics engine. Any metric you define modulates forc
 
 Ships with Phi (integrated information) as the default metric and 63 research experiments. But the coupling framework is generic — plug in health, wealth, trust, skill, or any [0,1] value per body.
 
-**321 tests | 5 shapes | 5 joints | CCD | raycasting | warm-starting | island sleeping | 8 crates on crates.io**
+**423 tests | 5 shapes | 5 joints | CCD | raycasting | warm-starting | island sleeping | 12 crates on crates.io**
+
+## The Symtropy Adoption Story
+
+Symtropy is more than a physics engine; it is the physical substrate for a **Type 1 Civilization**.
+
+### 1. The Permissive Core (Track B)
+For game developers and industrial simulation, Symtropy provides a high-performance, N-dimensional rigid body engine on Bevy. Use it for standard games where you need deterministic replay, 4D physics, or custom per-body metrics (health, trust, wealth) without any copyleft obligations.
+- **Crates:** `symtropy-core`, `symtropy-physics`, `symtropy-bevy-core`.
+- **License:** Apache-2.0 OR MIT.
+
+### 2. The Research Hero (Track A)
+For researchers in AI, A-Life, and Integrated Information Theory (IIT), Symtropy integrates Φ (integrated information) as a first-class physical law. This enables simulations where an agent's internal complexity (consciousness) meaningfully modulates its motor authority and energy efficiency.
+- **Crates:** `symtropy-consciousness-physics`, `symtropy-bevy`.
+- **License:** GNU AGPL v3.
+
+### 3. The Civilizational Stack (Symthaea + Mycelix)
+When combined with **Symthaea** (cognitive loop) and **Mycelix** (decentralized governance), Symtropy becomes a test-bed for autonomous societies.
+- **Cognition:** FEP-driven agents (`symthaea-fep`) with multi-theory consciousness.
+- **Governance:** Real-time peer-to-peer voting and resource allocation via Holochain DHT.
+- **Metabolism:** Digital twins of physical bootstrap hardware (plastic shredders, solar grids).
 
 ## Architecture
 

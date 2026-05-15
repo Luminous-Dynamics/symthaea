@@ -814,10 +814,12 @@ mod tests {
         let parser = LLMIntentParser::new();
         let intent = parser.parse_to_struct("Create a Rust function that sorts a vector");
 
-        assert!(intent
-            .actions
-            .iter()
-            .any(|(a, _)| *a == IntentAction::Create));
+        assert!(
+            intent
+                .actions
+                .iter()
+                .any(|(a, _)| *a == IntentAction::Create)
+        );
         assert_eq!(intent.target.kind, TargetKind::Function);
         assert_eq!(intent.language, Some("rust".to_string()));
     }
@@ -827,10 +829,12 @@ mod tests {
         let parser = LLMIntentParser::new();
         let intent = parser.parse_to_struct("Fix the bug in the login function");
 
-        assert!(intent
-            .actions
-            .iter()
-            .any(|(a, _)| *a == IntentAction::Debug));
+        assert!(
+            intent
+                .actions
+                .iter()
+                .any(|(a, _)| *a == IntentAction::Debug)
+        );
     }
 
     #[test]
@@ -860,10 +864,12 @@ mod tests {
             IntentResult::Actionable {
                 intent, confidence, ..
             } => {
-                assert!(intent
-                    .actions
-                    .iter()
-                    .any(|(a, _)| *a == IntentAction::Create));
+                assert!(
+                    intent
+                        .actions
+                        .iter()
+                        .any(|(a, _)| *a == IntentAction::Create)
+                );
                 assert!(confidence > 0.0);
             }
             IntentResult::NeedsClarification {

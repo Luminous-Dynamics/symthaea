@@ -10,6 +10,7 @@ crate-type = ["cdylib", "rlib"]
 name = "finance_bridge"
 
 [dependencies]
+mycelix-zome-helpers = { workspace = true }
 holochain_serialized_bytes = { workspace = true }
 hdk = { workspace = true }
 serde = { workspace = true }

@@ -17,7 +17,7 @@
 
 use symthaea_core::hdc::ContinuousHV;
 
-use super::sequencer_benchmark::{benchmark_tasks, BenchmarkTask, TaskCategory};
+use super::sequencer_benchmark::{BenchmarkTask, TaskCategory, benchmark_tasks};
 use crate::dynamics::cfc_code_sequencer::{CfCCodeSequencer, CodePlanStep, PlanAction};
 use crate::hdc::code_encoder::CodeHDEncoder;
 

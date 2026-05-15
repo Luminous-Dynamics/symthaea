@@ -91,6 +91,7 @@ impl<const D: usize> PhysicsCallback<D> for NoCouplingResource {
     }
     fn on_collision(&mut self, _: &CollisionEvent<D>) {}
     fn record_dissipation(&mut self, _: f64) {}
+    fn apply_trauma(&mut self, _: &symtropy_physics::CollisionEvent<D>) {}
 }
 
 // --- Systems ---
@@ -123,13 +124,13 @@ pub fn sync_transforms<const D: usize>(
         if let Some(body) = physics.world.body(body_comp.handle) {
             let pos = body.position();
             if D >= 1 {
-                transform.translation.x = pos.coord(0) as f32;
+                transform.translation.x = pos[0] as f32;
             }
             if D >= 2 {
-                transform.translation.y = pos.coord(1) as f32;
+                transform.translation.y = pos[1] as f32;
             }
             if D >= 3 {
-                transform.translation.z = pos.coord(2) as f32;
+                transform.translation.z = pos[2] as f32;
             }
         }
     }

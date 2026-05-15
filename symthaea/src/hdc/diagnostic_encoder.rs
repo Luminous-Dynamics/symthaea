@@ -78,9 +78,12 @@ impl DiagnosticHDEncoder {
             ErrorCategory::MovedValue,
             ErrorCategory::LifetimeError,
             ErrorCategory::VisibilityError,
-            ErrorCategory::UndeclaredGeneric,
-            ErrorCategory::MissingImpl,
             ErrorCategory::UnusedCode,
+            ErrorCategory::MissingImpl,
+            ErrorCategory::UndeclaredGeneric,
+            ErrorCategory::UnwantedMain,
+            ErrorCategory::SyntaxError,
+            ErrorCategory::Timeout,
             ErrorCategory::LinkerError,
             ErrorCategory::SandboxError,
             ErrorCategory::Other,
@@ -135,7 +138,8 @@ impl DiagnosticHDEncoder {
             return ContinuousHV::random(self.dim, 999);
         }
 
-        ContinuousHV::bundle(&bundle)
+        let refs: Vec<&ContinuousHV> = bundle.iter().collect();
+        ContinuousHV::bundle(&refs)
     }
 
     /// Encode multiple diagnostics into a single "Surprise" hypervector
@@ -144,7 +148,8 @@ impl DiagnosticHDEncoder {
             return ContinuousHV::random(self.dim, 0);
         }
         let hvs: Vec<ContinuousHV> = errors.iter().map(|e| self.encode_diagnostic(e)).collect();
-        ContinuousHV::bundle(&hvs)
+        let refs: Vec<&ContinuousHV> = hvs.iter().collect();
+        ContinuousHV::bundle(&refs)
     }
 
     /// Deterministically map a string to a hypervector

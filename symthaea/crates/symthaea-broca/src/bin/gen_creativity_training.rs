@@ -57,9 +57,6 @@ impl Rng {
             lo + (self.next_u64() as usize % (hi - lo))
         }
     }
-    fn pick<'a>(&mut self, items: &'a [&str]) -> &'a str {
-        items[self.range(0, items.len())]
-    }
     fn shuffle<T>(&mut self, items: &mut [T]) {
         for i in (1..items.len()).rev() {
             let j = self.range(0, i + 1);

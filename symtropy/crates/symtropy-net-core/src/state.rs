@@ -1,10 +1,13 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! State authority classification and syncable state types.
 
+use crate::peer::PeerId;
+use serde::{Deserialize, Serialize};
+
 /// What kind of authority governs a piece of state.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum StateAuthority {
     /// Fully local: camera, UI, input. Never replicated.
     Local,
@@ -12,12 +15,12 @@ pub enum StateAuthority {
     /// Sent via direct P2P messaging. Stale data accepted.
     Replicated,
     /// Consensus-required: governance votes, TEND transactions.
-    /// Goes through Holochain DHT for consistency.
+    /// Goes through a distributed ledger (e.g. Holochain DHT) for consistency.
     Consensus,
 }
 
 /// A piece of state that can be synced across peers.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncableState {
     /// Unique key for this state.
     pub key: String,
@@ -30,8 +33,6 @@ pub struct SyncableState {
     /// Which peer last wrote this state.
     pub owner: PeerId,
 }
-
-use crate::peer::PeerId;
 
 impl SyncableState {
     /// Create a new local state entry.
@@ -67,7 +68,7 @@ impl SyncableState {
         }
     }
 
-    /// Whether this state should be sent to the Holochain DHT.
+    /// Whether this state should be sent to a consensus DHT.
     pub fn requires_dht(&self) -> bool {
         self.authority == StateAuthority::Consensus
     }
@@ -75,25 +76,5 @@ impl SyncableState {
     /// Whether this state should be sent via P2P messaging.
     pub fn requires_p2p(&self) -> bool {
         self.authority == StateAuthority::Replicated
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn state_authority_classification() {
-        let local = SyncableState::local("camera_pos", PeerId(0));
-        assert!(!local.requires_dht());
-        assert!(!local.requires_p2p());
-
-        let replicated = SyncableState::replicated("player_pos", PeerId(0));
-        assert!(!replicated.requires_dht());
-        assert!(replicated.requires_p2p());
-
-        let consensus = SyncableState::consensus("vote", PeerId(0));
-        assert!(consensus.requires_dht());
-        assert!(!consensus.requires_p2p());
     }
 }

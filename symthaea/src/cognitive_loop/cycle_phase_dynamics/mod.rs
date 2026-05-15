@@ -454,6 +454,10 @@ impl CognitiveLoopService {
                     run_subsystem!(self.learning_manager, "learning_manager", snapshot);
                 }
 
+                if self.multimodal_manager.should_run(cycle_num, urgency_u8) {
+                    run_subsystem!(self.multimodal_manager, "multimodal_manager", snapshot);
+                }
+
                 if self.perception_manager.should_run(cycle_num, urgency_u8) {
                     run_subsystem!(self.perception_manager, "perception_manager", snapshot);
                 }

@@ -6,8 +6,8 @@
 //!
 //! Updated to use HDK 0.6 patterns
 
-use mycelix_zome_helpers as _;
 use hdk::prelude::*;
+use mycelix_zome_helpers as _;
 use revocation_integrity::*;
 
 /// Maximum entries per revocation list before rotation is required

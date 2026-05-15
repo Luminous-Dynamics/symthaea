@@ -9,6 +9,7 @@ crate-type = ["cdylib", "rlib"]
 name = "grid"
 
 [dependencies]
+mycelix-bridge-common = { workspace = true }
 holochain_serialized_bytes = { workspace = true }
 hdk = { workspace = true }
 serde = { workspace = true }

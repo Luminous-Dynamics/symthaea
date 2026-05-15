@@ -1,0 +1,30 @@
+[package]
+name = "symtropy-mycelix-village"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+publish = false
+
+[dependencies]
+bevy = { version = "0.18", default-features = false, features = [
+    "bevy_log",
+    "bevy_state",
+    "bevy_asset",
+    "bevy_render",
+    "bevy_core_pipeline",
+    "multi_threaded",
+    "x11"
+] }
+symtropy-bevy-core = { path = "../symtropy-bevy-core" }
+symthaea-bevy-brain = { path = "../symthaea-bevy-brain" }
+symtropy-physics = { path = "../symtropy-physics" }
+nalgebra = "0.34"
+rand = "0.8"
+
+[[bin]]
+name = "mycelix-village-visual"
+path = "src/main.rs"
+
+[[bin]]
+name = "mycelix-scenario-harness"
+path = "src/headless.rs"

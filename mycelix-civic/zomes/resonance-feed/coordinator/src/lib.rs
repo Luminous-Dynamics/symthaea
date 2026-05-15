@@ -1,14 +1,11 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 use hdk::prelude::*;
+use mycelix_bridge_common::{civic_requirement_basic, GovernanceEligibility};
 use resonance_feed_integrity::*;
-use mycelix_bridge_common::{
-    civic_requirement_basic,
-    GovernanceEligibility,
-};
 
+use mycelix_zome_helpers as _;
 
 /// Helper to get an anchor entry hash
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -24,7 +21,11 @@ fn ensure_anchor(anchor_str: &str) -> ExternResult<EntryHash> {
 /// Publish content to the resonance feed (Participant+).
 #[hdk_extern]
 pub fn publish_content(entry: ContentEntry) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_basic(), "publish_content")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_basic(),
+        "publish_content",
+    )?;
 
     let action_hash = create_entry(&EntryTypes::ContentEntry(entry.clone()))?;
     let agent = agent_info()?.agent_initial_pubkey;
@@ -35,13 +36,19 @@ pub fn publish_content(entry: ContentEntry) -> ExternResult<Record> {
 
     // Link from domain
     let domain_anchor = ensure_anchor(&format!("domain/{}", entry.domain))?;
-    create_link(domain_anchor, action_hash.clone(), LinkTypes::DomainContent, ())?;
+    create_link(
+        domain_anchor,
+        action_hash.clone(),
+        LinkTypes::DomainContent,
+        (),
+    )?;
 
     // Link from agent
     create_link(agent, action_hash.clone(), LinkTypes::AgentToContent, ())?;
 
-    let record = get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Record not found".into())))?;
+    let record = get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Record not found".into())
+    ))?;
     Ok(record)
 }
 
@@ -86,11 +93,17 @@ pub fn vote_resonance(vote: ResonanceVote) -> ExternResult<Record> {
 
     let action_hash = create_entry(&EntryTypes::ResonanceVote(vote.clone()))?;
 
-    create_link(vote.content_hash, action_hash.clone(), LinkTypes::ContentToVotes, ())?;
+    create_link(
+        vote.content_hash,
+        action_hash.clone(),
+        LinkTypes::ContentToVotes,
+        (),
+    )?;
     create_link(agent, action_hash.clone(), LinkTypes::AgentToVotes, ())?;
 
-    let record = get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Record not found".into())))?;
+    let record = get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Record not found".into())
+    ))?;
     Ok(record)
 }
 
@@ -115,16 +128,18 @@ pub fn get_feed(input: FeedInput) -> ExternResult<Vec<ContentEntry>> {
         LinkTypes::AllContent
     };
 
-    let links = get_links(
-        LinkQuery::try_new(base, link_type)?,
-        GetStrategy::default(),
-    )?;
+    let links = get_links(LinkQuery::try_new(base, link_type)?, GetStrategy::default())?;
 
     let mut entries = Vec::new();
     for link in links.into_iter().rev().take(input.limit.min(100)) {
         if let Some(target) = link.target.into_action_hash() {
             if let Some(record) = get(target, GetOptions::default())? {
-                if let Some(entry) = record.entry().to_app_option::<ContentEntry>().ok().flatten() {
+                if let Some(entry) = record
+                    .entry()
+                    .to_app_option::<ContentEntry>()
+                    .ok()
+                    .flatten()
+                {
                     entries.push(entry);
                 }
             }
@@ -149,7 +164,8 @@ pub fn get_trending(input: TrendingInput) -> ExternResult<Vec<(ContentEntry, f64
 
     // For each content, sum resonance votes
     // (simplified — in production would aggregate vote records)
-    let mut scored: Vec<(ContentEntry, f64)> = feed.into_iter()
+    let mut scored: Vec<(ContentEntry, f64)> = feed
+        .into_iter()
         .map(|entry| (entry, 0.5)) // Default score
         .collect();
 

@@ -18,6 +18,40 @@ use personal_leptos_types::{
 };
 
 use crate::mock_data;
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SymbolRegistry {
+    pub hearth_alias: String,  // e.g. "Campfire", "Well", "Plaza"
+    pub mycel_alias: String,   // e.g. "Spark", "Ember", "Leaf"
+    pub genesis_alias: String, // e.g. "The Ignition", "Sun-Rise"
+    pub orientation: String,   // Cultural context description
+}
+
+impl Default for SymbolRegistry {
+    fn default() -> Self {
+        Self {
+            hearth_alias: "HEARTH".into(),
+            mycel_alias: "MYCEL".into(),
+            genesis_alias: "Thermodynamic Genesis".into(),
+            orientation: "Canonical Mycelix terminology".into(),
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct CulturalContext {
+    pub symbols: RwSignal<SymbolRegistry>,
+}
+
+pub fn provide_cultural_context() {
+    let symbols = RwSignal::new(SymbolRegistry::default());
+    provide_context(CulturalContext { symbols });
+}
+
+pub fn use_cultural() -> CulturalContext {
+    use_context::<CulturalContext>().expect("CulturalContext not provided")
+}
 
 #[derive(Clone)]
 pub struct PersonalCtx {

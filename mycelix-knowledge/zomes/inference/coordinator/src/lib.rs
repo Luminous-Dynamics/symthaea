@@ -1,7 +1,7 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+
 //! Inference Coordinator Zome
 //! Business logic for ML-powered knowledge inference
 //!
@@ -9,6 +9,7 @@ use mycelix_zome_helpers as _;
 
 use hdk::prelude::*;
 use inference_integrity::*;
+use mycelix_zome_helpers as _;
 
 /// Helper to get an anchor entry hash for link bases
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -43,10 +44,9 @@ pub fn create_inference(inference: Inference) -> ExternResult<Record> {
         )?;
     }
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find inference".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find inference".into()
+    )))
 }
 
 /// Get inferences for a claim
@@ -111,10 +111,9 @@ pub fn assess_credibility(input: AssessCredibilityInput) -> ExternResult<Record>
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find credibility score".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find credibility score".into()
+    )))
 }
 
 /// Input for credibility assessment
@@ -152,7 +151,10 @@ fn calculate_credibility_components(
 pub fn get_credibility(subject: String) -> ExternResult<Option<Record>> {
     let subject_anchor = format!("subject:{}", subject);
     let links = get_links(
-        LinkQuery::try_new(anchor_hash(&subject_anchor)?, LinkTypes::SubjectToCredibility)?,
+        LinkQuery::try_new(
+            anchor_hash(&subject_anchor)?,
+            LinkTypes::SubjectToCredibility,
+        )?,
         GetStrategy::default(),
     )?;
 
@@ -319,10 +321,9 @@ pub fn verify_inference(input: VerifyInferenceInput) -> ExternResult<Record> {
         &EntryTypes::Inference(verified_inference),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find verified inference".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find verified inference".into()
+    )))
 }
 
 /// Input for verifying an inference
@@ -436,20 +437,15 @@ pub fn calculate_enhanced_credibility(input: EnhancedCredibilityInput) -> Extern
         .clamp(0.0, 1.0);
 
     // Evidence bonus
-    let evidence_bonus = (evidence_strength.total_evidence_count as f64 * 0.02)
-        .min(0.1);
+    let evidence_bonus = (evidence_strength.total_evidence_count as f64 * 0.02).min(0.1);
 
-    let overall_score = (basic_score * basic_weight
-        + matl.matl_composite * matl_weight
-        + evidence_bonus)
-        .clamp(0.0, 1.0);
+    let overall_score =
+        (basic_score * basic_weight + matl.matl_composite * matl_weight + evidence_bonus)
+            .clamp(0.0, 1.0);
 
     // Calculate assessment confidence based on data availability
-    let assessment_confidence = calculate_assessment_confidence(
-        &matl,
-        &evidence_strength,
-        author_reputation.is_some(),
-    );
+    let assessment_confidence =
+        calculate_assessment_confidence(&matl, &evidence_strength, author_reputation.is_some());
 
     let enhanced_score = EnhancedCredibilityScore {
         id: score_id,
@@ -479,10 +475,9 @@ pub fn calculate_enhanced_credibility(input: EnhancedCredibilityInput) -> Extern
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find enhanced credibility score".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find enhanced credibility score".into()
+    )))
 }
 
 /// Calculate assessment confidence
@@ -574,12 +569,16 @@ pub fn get_author_reputation(author_did: String) -> ExternResult<Record> {
 
     let action_hash = create_entry(EntryTypes::AuthorReputation(reputation))?;
     create_entry(&EntryTypes::Anchor(Anchor(author_anchor.clone())))?;
-    create_link(anchor_hash(&author_anchor)?, action_hash.clone(), LinkTypes::AuthorToReputation, ())?;
+    create_link(
+        anchor_hash(&author_anchor)?,
+        action_hash.clone(),
+        LinkTypes::AuthorToReputation,
+        (),
+    )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find author reputation".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find author reputation".into()
+    )))
 }
 
 /// Update author reputation based on claim verification
@@ -608,7 +607,9 @@ pub fn update_author_reputation(input: UpdateAuthorReputationInput) -> ExternRes
             .entry()
             .to_app_option()
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-            .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid reputation".into())))?;
+            .ok_or(wasm_error!(WasmErrorInner::Guest(
+                "Invalid reputation".into()
+            )))?;
 
         // Update statistics
         rep.claims_authored += input.claims_added.unwrap_or(0);
@@ -629,7 +630,8 @@ pub fn update_author_reputation(input: UpdateAuthorReputationInput) -> ExternRes
         // Recalculate overall score
         rep.overall_score = (rep.historical_accuracy * 0.4
             + rep.matl_trust * 0.4
-            + (1.0 - (rep.claims_verified_false as f64 / (rep.claims_authored as f64 + 1.0))) * 0.2)
+            + (1.0 - (rep.claims_verified_false as f64 / (rep.claims_authored as f64 + 1.0)))
+                * 0.2)
             .clamp(0.0, 1.0);
 
         rep.updated_at = now;
@@ -659,14 +661,18 @@ pub fn update_author_reputation(input: UpdateAuthorReputationInput) -> ExternRes
 
         let hash = create_entry(EntryTypes::AuthorReputation(rep.clone()))?;
         create_entry(&EntryTypes::Anchor(Anchor(author_anchor.clone())))?;
-        create_link(anchor_hash(&author_anchor)?, hash.clone(), LinkTypes::AuthorToReputation, ())?;
+        create_link(
+            anchor_hash(&author_anchor)?,
+            hash.clone(),
+            LinkTypes::AuthorToReputation,
+            (),
+        )?;
         (hash, rep)
     };
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find updated reputation".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated reputation".into()
+    )))
 }
 
 /// Input for updating author reputation
@@ -681,7 +687,9 @@ pub struct UpdateAuthorReputationInput {
 
 /// Batch credibility assessment for multiple claims
 #[hdk_extern]
-pub fn batch_credibility_assessment(claim_ids: Vec<String>) -> ExternResult<BatchCredibilityResult> {
+pub fn batch_credibility_assessment(
+    claim_ids: Vec<String>,
+) -> ExternResult<BatchCredibilityResult> {
     let start_time = sys_time()?;
 
     let mut results: Vec<EnhancedCredibilitySummary> = vec![];
@@ -750,7 +758,10 @@ pub fn batch_credibility_assessment(claim_ids: Vec<String>) -> ExternResult<Batc
 pub fn get_enhanced_credibility(subject: String) -> ExternResult<Option<Record>> {
     let subject_anchor = format!("subject:{}", subject);
     let links = get_links(
-        LinkQuery::try_new(anchor_hash(&subject_anchor)?, LinkTypes::SubjectToEnhancedCredibility)?,
+        LinkQuery::try_new(
+            anchor_hash(&subject_anchor)?,
+            LinkTypes::SubjectToEnhancedCredibility,
+        )?,
         GetStrategy::default(),
     )?;
 

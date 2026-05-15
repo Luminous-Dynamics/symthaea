@@ -23,16 +23,20 @@
 //! Symthaea returns code that is **proven to compile and pass its own tests**.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
-use super::code_executor::{try_auto_fix, CodeExecutor, ExecutionResult};
+use super::code_executor::{CodeExecutor, ExecutionResult, try_auto_fix};
 use super::code_generator::{CodeContext, CodeGenerator};
 use super::code_intent::{CodeIntent, CodeSpec, CodeTarget};
 use super::code_parser::EntityKind;
+use super::llm_backend::{GenerationParams, LLMBackend};
 use super::repo_map::RepoMap;
 use super::rust_lsp::{LspPosition, RustAnalyzerClient};
 use crate::coding_experience::CodingExperienceStore;
 use crate::hdc::diagnostic_encoder::DiagnosticHDEncoder;
 use crate::mind::structured_thought::EpistemicStatus;
+use symthaea_core::core::ContinuousHV;
+use tracing::{error, info, warn};
 
 /// Maximum number of compile-fix-retry iterations
 const MAX_COMPILE_RETRIES: usize = 3;
@@ -65,6 +69,8 @@ pub struct VerifiedCode {
     pub compile_errors: Vec<String>,
     /// Test failures encountered (empty if all passed)
     pub test_failures: Vec<String>,
+    /// Diagnostic geometries captured during repair.
+    pub diagnostic_hvs: Vec<ContinuousHV>,
 }
 
 impl VerifiedCode {
@@ -167,10 +173,10 @@ impl VerificationConfidence {
 pub fn generate_verified(
     generator: &CodeGenerator,
     executor: &mut CodeExecutor,
-    spec: &CodeSpec,
+    intent: &CodeIntent,
     context: &CodeContext,
 ) -> VerifiedCode {
-    generate_verified_inner(generator, executor, spec, context, None, None, None)
+    generate_verified_inner(generator, executor, intent, context, None, None, None, None)
 }
 
 /// Generate and verify code with AST/HDC repository context available for
@@ -178,11 +184,20 @@ pub fn generate_verified(
 pub fn generate_verified_with_repo_map<'a>(
     generator: &CodeGenerator,
     executor: &mut CodeExecutor,
-    spec: &CodeSpec,
+    intent: &CodeIntent,
     context: &CodeContext<'a>,
     repo_map: &'a RepoMap,
 ) -> VerifiedCode {
-    generate_verified_inner(generator, executor, spec, context, Some(repo_map), None, None)
+    generate_verified_inner(
+        generator,
+        executor,
+        intent,
+        context,
+        Some(repo_map),
+        None,
+        None,
+        None,
+    )
 }
 
 /// Generate and verify code with both RepoMap and LSP client available for
@@ -190,32 +205,47 @@ pub fn generate_verified_with_repo_map<'a>(
 pub fn generate_verified_full<'a>(
     generator: &CodeGenerator,
     executor: &mut CodeExecutor,
-    spec: &CodeSpec,
+    intent: &CodeIntent,
     context: &CodeContext<'a>,
     repo_map: Option<&'a RepoMap>,
     mut lsp_client: Option<&mut RustAnalyzerClient>,
     experience_store: Option<&mut CodingExperienceStore>,
+    llm_backend: Option<Arc<dyn LLMBackend>>,
 ) -> VerifiedCode {
     generate_verified_inner(
         generator,
         executor,
-        spec,
+        intent,
         context,
         repo_map,
         lsp_client.as_deref_mut(),
         experience_store,
+        llm_backend,
     )
 }
 
 fn generate_verified_inner<'a>(
     generator: &CodeGenerator,
     executor: &mut CodeExecutor,
-    spec: &CodeSpec,
+    intent: &CodeIntent,
     context: &CodeContext<'a>,
     repo_map: Option<&'a RepoMap>,
     mut lsp_client: Option<&mut RustAnalyzerClient>,
-    experience_store: Option<&mut CodingExperienceStore>,
+    mut experience_store: Option<&mut CodingExperienceStore>,
+    llm_backend: Option<Arc<dyn LLMBackend>>,
 ) -> VerifiedCode {
+    let temp_spec;
+    let spec = match intent {
+        CodeIntent::Create { spec, .. } => spec,
+        CodeIntent::Solve { spec, .. } => {
+            temp_spec = CodeSpec::new(&spec.language, "swe-bench-fix", &spec.description);
+            &temp_spec
+        }
+        _ => {
+            return simulated_verification_failure(String::new(), 0, 0);
+        }
+    };
+
     if !executor.supports_real_execution() {
         let reason =
             "Verified generation requires real execution; simulation mode cannot claim compilation or test verification"
@@ -232,22 +262,36 @@ fn generate_verified_inner<'a>(
             confidence: VerificationConfidence::compute(false, false, false, 0.0),
             compile_errors: vec![reason],
             test_failures: Vec::new(),
+            diagnostic_hvs: Vec::new(),
         };
     }
 
     // Step 1: Generate the function body (which may include inline tests)
-    let intent = CodeIntent::Create {
-        target: CodeTarget {
-            kind: EntityKind::Function,
-            name: spec.name.clone(),
-            path: None,
-            language: Some(spec.language.clone()),
-            hv: None,
-        },
-        spec: spec.clone(),
+    let generated_source = if let Some(llm) = llm_backend.as_ref() {
+        let rt = tokio::runtime::Handle::current();
+        let prompt = build_llm_repair_prompt(intent, context, &[]);
+        let params = GenerationParams::default();
+        let res = tokio::task::block_in_place(|| rt.block_on(llm.generate(&prompt, &params)));
+        match res {
+            Ok(src) => {
+                let stripped = strip_markdown(&src);
+                info!(
+                    "LLM generated source ({} chars):\n{}",
+                    stripped.len(),
+                    stripped
+                );
+                stripped
+            }
+            Err(e) => {
+                error!("LLM generation failed: {}, falling back to native", e);
+                generator.generate(intent, context).source
+            }
+        }
+    } else {
+        generator.generate(intent, context).source
     };
-    let generated = generator.generate(&intent, context);
-    let mut source = generated.source.clone();
+
+    let mut source = generated_source;
 
     // Step 2: Generate additional tests ONLY if source doesn't already have them
     let test_source = if source.contains("#[cfg(test)]") || source.contains("mod tests") {
@@ -260,16 +304,43 @@ fn generate_verified_inner<'a>(
     // Step 3: Compile-fix loop
     let mut compile_retries = 0;
     let mut last_compile_errors = Vec::new();
+    let mut all_diagnostic_hvs = Vec::new();
 
     loop {
-        // Combine source + tests (only if test_source is non-empty and not already present)
-        let full_source = if test_source.is_empty() {
-            source.clone()
-        } else {
-            format!("{}\n\n{}", source, test_source)
+        let full_source = match intent {
+            CodeIntent::Solve { .. } => source.clone(), // For solve, full_source is the patch
+            _ => {
+                if test_source.is_empty() {
+                    source.clone()
+                } else {
+                    format!("{}\n\n{}", source, test_source)
+                }
+            }
         };
 
-        let mut result = executor.execute_rust_with_inline_tests(&full_source);
+        let mut result = match intent {
+            CodeIntent::Solve {
+                target: ref repo_target,
+                ..
+            } => {
+                if let Err(e) = executor.apply_patch(&repo_target.root, &source) {
+                    ExecutionResult {
+                        compiled: false,
+                        compile_errors: vec![format!("Patch Error: {}", e)],
+                        tests_passed: 0,
+                        tests_failed: 0,
+                        test_output: String::new(),
+                        runtime_error: None,
+                        elapsed: std::time::Duration::from_millis(0),
+                        simulated: false,
+                        test_failures: Vec::new(),
+                    }
+                } else {
+                    executor.execute_workspace_tests(&repo_target.root)
+                }
+            }
+            _ => executor.execute_rust_with_inline_tests(&full_source),
+        };
         result.parse_test_failures();
 
         if result.simulated {
@@ -279,7 +350,6 @@ fn generate_verified_inner<'a>(
         if result.compiled {
             // Compiled! Check tests
             if result.tests_failed == 0 {
-                // All tests pass — success!
                 return VerifiedCode {
                     source,
                     compiled: true,
@@ -292,6 +362,7 @@ fn generate_verified_inner<'a>(
                     confidence: VerificationConfidence::compute(true, true, false, 1.0),
                     compile_errors: Vec::new(),
                     test_failures: Vec::new(),
+                    diagnostic_hvs: all_diagnostic_hvs.clone(),
                 };
             } else {
                 // Tests failed — try to fix based on test output
@@ -335,16 +406,59 @@ fn generate_verified_inner<'a>(
                         spec: retry_spec,
                     };
 
-                    source = generator.generate(&retry_intent, &retry_context).source;
-
-                    let retry_full_source = if test_source.is_empty() {
-                        source.clone()
+                    let generated_retry = if let Some(llm) = llm_backend.as_ref() {
+                        let rt = tokio::runtime::Handle::current();
+                        // retry_context.error_hints contains the test failures
+                        let prompt = build_llm_repair_prompt(&retry_intent, &retry_context, &[]);
+                        let params = GenerationParams::default();
+                        let res = tokio::task::block_in_place(|| {
+                            rt.block_on(llm.generate(&prompt, &params))
+                        });
+                        match res {
+                            Ok(src) => strip_markdown(&src),
+                            Err(e) => {
+                                error!(
+                                    "LLM test-fix generation failed: {}, falling back to native",
+                                    e
+                                );
+                                generator.generate(&retry_intent, &retry_context).source
+                            }
+                        }
                     } else {
-                        format!("{}\n\n{}", source, test_source)
+                        generator.generate(&retry_intent, &retry_context).source
                     };
+                    source = generated_retry;
 
-                    let mut retry_result =
-                        executor.execute_rust_with_inline_tests(&retry_full_source);
+                    let mut retry_result = match intent {
+                        CodeIntent::Solve {
+                            target: ref repo_target,
+                            ..
+                        } => {
+                            if let Err(e) = executor.apply_patch(&repo_target.root, &source) {
+                                ExecutionResult {
+                                    compiled: false,
+                                    compile_errors: vec![format!("Patch Error: {}", e)],
+                                    tests_passed: 0,
+                                    tests_failed: 0,
+                                    test_output: String::new(),
+                                    runtime_error: None,
+                                    elapsed: std::time::Duration::from_millis(0),
+                                    simulated: false,
+                                    test_failures: Vec::new(),
+                                }
+                            } else {
+                                executor.execute_workspace_tests(&repo_target.root)
+                            }
+                        }
+                        _ => {
+                            let retry_full_source = if test_source.is_empty() {
+                                source.clone()
+                            } else {
+                                format!("{}\n\n{}", source, test_source)
+                            };
+                            executor.execute_rust_with_inline_tests(&retry_full_source)
+                        }
+                    };
                     retry_result.parse_test_failures();
 
                     if retry_result.simulated {
@@ -360,20 +474,26 @@ fn generate_verified_inner<'a>(
                             source,
                             compiled: true,
                             tests_passed: true,
-                            test_count_passed: retry_result.tests_passed,
+                            test_count_passed: result.tests_passed,
                             test_count_failed: 0,
                             compile_retries,
-                            test_retries,
+                            test_retries: 0,
                             formally_verified: None,
                             confidence: VerificationConfidence::compute(true, true, false, 1.0),
                             compile_errors: Vec::new(),
                             test_failures: Vec::new(),
+                            diagnostic_hvs: all_diagnostic_hvs.clone(),
                         };
                     }
 
                     if !retry_result.compiled {
                         last_compile_errors = retry_result.compile_errors.clone();
-                        if let Some(fixed) = try_auto_fix(&source, &retry_result.compile_errors) {
+                        let stderr = retry_result.compile_errors.join("\n");
+                        if let Some(fixed) = generator.try_auto_fix_with_hints(
+                            &source,
+                            &stderr,
+                            &retry_context.error_hints,
+                        ) {
                             source = fixed;
                         }
                     }
@@ -413,6 +533,7 @@ fn generate_verified_inner<'a>(
                     ),
                     compile_errors: last_compile_errors,
                     test_failures: latest_test_failures,
+                    diagnostic_hvs: all_diagnostic_hvs.clone(),
                 };
             }
         }
@@ -432,7 +553,11 @@ fn generate_verified_inner<'a>(
         }
 
         // Apply auto-fix
-        if let Some(fixed) = try_auto_fix(&source, &result.compile_errors) {
+        let stderr = result.compile_errors.join("\n");
+        if let Some(fixed) = generator
+            .try_auto_fix_with_hints(&source, &stderr, &context.error_hints)
+            .or_else(|| try_auto_fix(&source, &result.compile_errors))
+        {
             source = fixed;
         } else {
             if repo_map.is_none() {
@@ -446,6 +571,7 @@ fn generate_verified_inner<'a>(
                 repo_map,
                 lsp_client.as_deref_mut(),
                 experience_store.as_deref_mut(),
+                &mut all_diagnostic_hvs,
                 &result.compile_errors,
                 compile_retries,
             );
@@ -460,7 +586,25 @@ fn generate_verified_inner<'a>(
                 spec: retry_spec,
             };
 
-            source = generator.generate(&retry_intent, &retry_context).source;
+            let generated = if let Some(llm) = llm_backend.as_ref() {
+                // If LLM is available, use it to solve the problem if it's complex
+                let rt = tokio::runtime::Handle::current();
+                let prompt =
+                    build_llm_repair_prompt(&retry_intent, &retry_context, &result.compile_errors);
+                let params = GenerationParams::default();
+
+                let res =
+                    tokio::task::block_in_place(|| rt.block_on(llm.generate(&prompt, &params)));
+
+                match res {
+                    Ok(src) => strip_markdown(&src),
+                    Err(_) => generator.generate(&retry_intent, &retry_context).source,
+                }
+            } else {
+                generator.generate(&retry_intent, &retry_context).source
+            };
+
+            source = generated;
         }
     }
 
@@ -477,6 +621,7 @@ fn generate_verified_inner<'a>(
         confidence: VerificationConfidence::compute(false, false, false, 0.0),
         compile_errors: last_compile_errors,
         test_failures: Vec::new(),
+        diagnostic_hvs: all_diagnostic_hvs,
     }
 }
 
@@ -485,6 +630,8 @@ fn simulated_verification_failure(
     compile_retries: usize,
     test_retries: usize,
 ) -> VerifiedCode {
+    let reason = "Verification aborted because execution was simulated; real compilation and test results are required"
+        .to_string();
     VerifiedCode {
         source,
         compiled: false,
@@ -495,11 +642,9 @@ fn simulated_verification_failure(
         test_retries,
         formally_verified: None,
         confidence: VerificationConfidence::compute(false, false, false, 0.0),
-        compile_errors: vec![
-            "Verification aborted because execution was simulated; real compilation and test results are required"
-                .to_string(),
-        ],
+        compile_errors: vec![reason],
         test_failures: Vec::new(),
+        diagnostic_hvs: Vec::new(),
     }
 }
 
@@ -542,6 +687,7 @@ fn build_compile_retry_context<'a>(
     repo_map: Option<&'a RepoMap>,
     mut lsp_client: Option<&mut RustAnalyzerClient>,
     mut experience_store: Option<&mut CodingExperienceStore>,
+    all_diagnostic_hvs: &mut Vec<ContinuousHV>,
     compile_errors: &[String],
     retry_number: usize,
 ) -> CodeContext<'a> {
@@ -560,15 +706,23 @@ fn build_compile_retry_context<'a>(
     for error in &structured_errors {
         let hv = encoder.encode_diagnostic(error);
         diagnostic_hvs.push(hv.clone());
+        all_diagnostic_hvs.push(hv.clone());
 
         // EXPERIENTIAL RECALL: If we have an experience store, query for past fixes for this failure geometry.
         // This closes the loop: "I've felt this error before, and this code fixed it."
         if let Some(ref mut store) = experience_store {
-            let rt = tokio::runtime::Handle::current();
-            // We use block_on here because the verified loop is currently synchronous
-            // but the experience store (SQLite) is async.
-            if let Some(template) = rt.block_on(store.learned_template_for_diagnostic(&hv)) {
-                if learned_template.is_none() {
+            let diagnostic_query = hv.clone();
+
+            if learned_template.is_none() {
+                // Since we are already on a potentially multi-threaded runtime,
+                // and the store uses async database calls, we use block_in_place
+                // to safely wait for the result without deadlocking the executor.
+                let recalled = tokio::task::block_in_place(|| {
+                    let rt = tokio::runtime::Handle::current();
+                    rt.block_on(store.learned_template_for_diagnostic(&diagnostic_query))
+                });
+
+                if let Some(template) = recalled {
                     learned_template = Some(template);
                 }
             }
@@ -625,10 +779,12 @@ fn build_compile_retry_context<'a>(
 
     if repo_map.is_none() {
         error_hints.extend(compile_errors.iter().map(|error| {
+            let category = categorize_rustc_diagnostic(error);
+            let hint = repair_hint_for_rustc_category(category);
             (
-                format!("compile_error_retry_{retry_number}"),
+                format!("compile_error_retry_{retry_number}_{category}"),
                 format!(
-                    "Fix the generated function so this compiler diagnostic is resolved: {error}"
+                    "Fix the generated function so this compiler diagnostic is resolved: {error}. Repair hint: {hint}"
                 ),
             )
         }));
@@ -642,7 +798,74 @@ fn build_compile_retry_context<'a>(
         mcts_plan_confidence: context.mcts_plan_confidence,
         error_hints,
         diagnostic_hvs,
+        issue_text: context.issue_text.clone(),
         learned_template,
+    }
+}
+
+fn categorize_rustc_diagnostic(error: &str) -> &'static str {
+    let lower = error.to_ascii_lowercase();
+    if lower.contains("e0308") || lower.contains("mismatched types") {
+        "type_mismatch"
+    } else if lower.contains("e0425") || lower.contains("not found in this scope") {
+        "unresolved_identifier"
+    } else if lower.contains("e0599") || lower.contains("no method named") {
+        "missing_method"
+    } else if lower.contains("e0369") || lower.contains("cannot calculate") {
+        "invalid_operator"
+    } else if lower.contains("e0507") || lower.contains("cannot move out") {
+        "move_out_of_borrow"
+    } else if lower.contains("e0382") || lower.contains("use of moved value") {
+        "use_after_move"
+    } else if lower.contains("e0596") || lower.contains("cannot borrow") {
+        "borrow_mutability"
+    } else if lower.contains("expected one of")
+        || lower.contains("unknown start of token")
+        || lower.contains("expected expression")
+    {
+        "parse_failure"
+    } else if lower.contains("lifetime") {
+        "lifetime_error"
+    } else if lower.contains("trait bound") {
+        "trait_bound"
+    } else {
+        "rustc_error"
+    }
+}
+
+fn repair_hint_for_rustc_category(category: &str) -> &'static str {
+    match category {
+        "type_mismatch" => {
+            "align the returned expression and function-call arguments with the declared signature"
+        }
+        "unresolved_identifier" => {
+            "use an in-scope parameter/local binding or introduce the missing binding before use"
+        }
+        "missing_method" => {
+            "call the method on the element type, not the whole collection, or choose a method available for the receiver type"
+        }
+        "invalid_operator" => {
+            "apply the operator to scalar elements rather than collection/reference values"
+        }
+        "move_out_of_borrow" => {
+            "borrow, clone, copy, or iterate by reference instead of moving from a borrowed value"
+        }
+        "use_after_move" => {
+            "avoid using a value after move; borrow, clone, copy, or reorder the operations"
+        }
+        "borrow_mutability" => "mark the binding mutable or switch to an immutable operation",
+        "parse_failure" => {
+            "emit only Rust source code with balanced braces, complete signatures, and valid statement separators"
+        }
+        "lifetime_error" => {
+            "return references derived from inputs or return owned values instead of local temporaries"
+        }
+        "trait_bound" => {
+            "add the required trait bound or choose an implementation that does not require the missing trait"
+        }
+        _ => {
+            "use the rustc diagnostic to repair the smallest local type, syntax, or ownership inconsistency"
+        }
     }
 }
 
@@ -667,6 +890,7 @@ fn build_test_retry_context<'a>(
         mcts_plan_confidence: context.mcts_plan_confidence,
         error_hints,
         diagnostic_hvs: context.diagnostic_hvs.clone(),
+        issue_text: context.issue_text.clone(),
         learned_template: context.learned_template.clone(),
     }
 }
@@ -707,7 +931,11 @@ pub fn generate_verified_function(
     };
 
     let context = CodeContext::default();
-    generate_verified(generator, executor, &spec, &context)
+    let target =
+        CodeTarget::new(spec.name.clone(), EntityKind::Function).with_language(&spec.language);
+    let intent = CodeIntent::Create { target, spec };
+
+    generate_verified(generator, executor, &intent, &context)
 }
 
 #[cfg(test)]
@@ -776,6 +1004,7 @@ mod tests {
             confidence: VerificationConfidence::compute(true, true, true, 1.0),
             compile_errors: Vec::new(),
             test_failures: Vec::new(),
+            diagnostic_hvs: Vec::new(),
         };
 
         assert!(verified.is_guaranteed());
@@ -800,20 +1029,25 @@ mod tests {
             Some(&repo),
             None,
             None,
+            &mut Vec::new(),
             &compile_errors,
             1,
         );
 
         assert!(context.memory.is_some());
-        assert!(context
-            .source_files
-            .iter()
-            .any(|(_, snippet)| snippet.contains("pub struct EngineConfig")));
-        assert!(context
-            .error_hints
-            .iter()
-            .any(|(pattern, hint)| pattern == "compile_error_E0412"
-                && hint.contains("cannot find type")));
+        assert!(
+            context
+                .source_files
+                .iter()
+                .any(|(_, snippet)| snippet.contains("pub struct EngineConfig"))
+        );
+        assert!(
+            context
+                .error_hints
+                .iter()
+                .any(|(pattern, hint)| pattern == "compile_error_E0412"
+                    && hint.contains("cannot find type"))
+        );
     }
 
     #[test]
@@ -857,4 +1091,85 @@ mod tests {
             result.compile_errors
         );
     }
+}
+
+/// Build a comprehensive prompt for the LLM to perform a surgical code fix.
+pub fn build_llm_repair_prompt(
+    intent: &CodeIntent,
+    context: &CodeContext,
+    errors: &[String],
+) -> String {
+    let mut prompt = String::new();
+    prompt.push_str("# Engineering Task: Repair Failing Code\n\n");
+
+    match intent {
+        CodeIntent::Create { spec, .. } => {
+            prompt.push_str(&format!("## Objective: {}\n", spec.purpose));
+            prompt.push_str(&format!(
+                "## Target Signature: `{}`\n",
+                spec.signature.as_deref().unwrap_or("unknown")
+            ));
+
+            if !spec.constraints.is_empty() {
+                prompt.push_str("\n## Constraints:\n");
+                for c in &spec.constraints {
+                    prompt.push_str(&format!("- {}\n", c));
+                }
+            }
+
+            if !spec.examples.is_empty() {
+                prompt.push_str("\n## Required Test Cases:\n");
+                for (input, output) in &spec.examples {
+                    prompt.push_str(&format!("- Input: `{}` -> Expected: `{}`\n", input, output));
+                }
+            }
+        }
+        _ => prompt.push_str("## Objective: Repair existing code to pass compilation and tests.\n"),
+    }
+
+    prompt.push_str("\n## Compilation Errors Encountered:\n");
+    for err in errors {
+        prompt.push_str(&format!("```text\n{}\n```\n", err));
+    }
+
+    if !context.error_hints.is_empty() {
+        prompt.push_str("\n## Analysis Hints:\n");
+        for (_, hint) in &context.error_hints {
+            prompt.push_str(&format!("- {}\n", hint));
+        }
+    }
+
+    if !context.source_files.is_empty() {
+        prompt.push_str("\n## Relevant Context (RepoMap/LSP):\n");
+        for (label, snippet) in &context.source_files {
+            prompt.push_str(&format!("### {}\n```rust\n{}\n```\n", label, snippet));
+        }
+    }
+
+    prompt.push_str("\n## Instructions:\n");
+    prompt.push_str("1. Analyze the errors and the provided context.\n");
+    prompt.push_str("2. Fix the code so it compiles successfully.\n");
+    prompt.push_str(
+        "3. DO NOT include any explanatory text, only the raw source code of the implementation.\n",
+    );
+    prompt.push_str("4. Return ONLY the code, no markdown blocks if possible, or just the content within blocks.\n");
+
+    prompt
+}
+
+/// Helper to strip markdown code blocks from an LLM response.
+fn strip_markdown(s: &str) -> String {
+    let s = s.trim();
+    if s.starts_with("```") {
+        // Find the first newline after the opening triple-backticks
+        if let Some(newline_pos) = s.find('\n') {
+            // Find the last triple-backticks
+            if let Some(end_pos) = s.rfind("```") {
+                if end_pos > newline_pos {
+                    return s[newline_pos + 1..end_pos].trim().to_string();
+                }
+            }
+        }
+    }
+    s.to_string()
 }

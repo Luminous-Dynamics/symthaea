@@ -56,6 +56,7 @@ let
     just
     jq
     yq-go
+    cargo-tauri
 
     # === Tauri 2.0 Desktop Dependencies (Linux) ===
     # GTK3 for native UI

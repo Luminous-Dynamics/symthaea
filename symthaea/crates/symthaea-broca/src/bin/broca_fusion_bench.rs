@@ -127,6 +127,8 @@ fn run_eval(genesis: &GenesisSeed, bench: &BenchRun, dataset: &TrainingDataset) 
         per_intent_breakdown: false,
         max_gen_tokens: 20,
         eval_limit: 0,
+        progress: false,
+        compute_contrastive_intent: true,
     };
     evaluation::evaluate(&mut gen, &eval_cfg)
 }
@@ -272,6 +274,8 @@ fn main() {
             per_intent_breakdown: false,
             max_gen_tokens: 20,
             eval_limit: 0,
+            progress: false,
+            compute_contrastive_intent: true,
         };
         let r = evaluation::evaluate(&mut gen, &eval_cfg);
         eprintln!(

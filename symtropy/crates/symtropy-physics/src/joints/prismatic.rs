@@ -6,6 +6,7 @@
 //! Removes D-1 translational DOF and all rotational DOF, leaving 1 translational DOF.
 //! Uses: suspension springs, elevator platforms, sliding doors, linear actuators.
 
+#[cfg(test)]
 use nalgebra::SVector;
 
 use crate::body::{BodyHandle, RigidBody};
@@ -140,11 +141,8 @@ impl<const D: usize> Constraint<D> for PrismaticJoint<D> {
                 - body_a.transform.translation.0[self.axis];
             let rel_vel = body_b.linear_velocity[self.axis] - body_a.linear_velocity[self.axis];
 
-            // PD controller: force = kp * (target - pos) + kd * (target_vel - vel)
-            let error = motor.target - displacement;
-            let force = (error * motor.max_force - rel_vel * motor.damping)
-                .clamp(-motor.max_force, motor.max_force);
-            let impulse = force * dt;
+            // PD controller: impulse = (kp * (target - pos) + kd * (target_vel - vel)) * dt
+            let impulse = motor.calculate_impulse(displacement, rel_vel, dt);
 
             if body_a.is_dynamic() {
                 body_a.linear_velocity[self.axis] -= impulse * body_a.inv_mass;

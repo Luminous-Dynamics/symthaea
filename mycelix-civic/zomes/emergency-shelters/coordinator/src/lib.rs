@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -10,7 +9,8 @@ use hdk::prelude::*;
 use mycelix_bridge_common::{
     civic_requirement_basic, civic_requirement_proposal, GovernanceEligibility,
 };
-use mycelix_zome_helpers::{get_latest_record};
+use mycelix_zome_helpers as _;
+use mycelix_zome_helpers::get_latest_record;
 
 /// Helper to get an anchor entry hash
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -22,7 +22,11 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 pub fn register_shelter(input: RegisterShelterInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_basic(), "register_shelter")?;
+    mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_basic(),
+        "register_shelter",
+    )?;
     if input.name.is_empty() || input.name.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Name must be 1-256 characters".into()
@@ -121,7 +125,11 @@ pub struct RegisterShelterInput {
 /// Update shelter status
 #[hdk_extern]
 pub fn update_shelter_status(input: UpdateShelterStatusInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "update_shelter_status")?;
+    mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_proposal(),
+        "update_shelter_status",
+    )?;
     let current_record = get(input.shelter_hash.clone(), GetOptions::default())?.ok_or(
         wasm_error!(WasmErrorInner::Guest("Shelter not found".into())),
     )?;
@@ -178,7 +186,11 @@ pub struct UpdateShelterStatusInput {
 /// Update a shelter entry (general update)
 #[hdk_extern]
 pub fn update_shelter(input: UpdateShelterInput) -> ExternResult<ActionHash> {
-    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "update_shelter")?;
+    mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_proposal(),
+        "update_shelter",
+    )?;
     update_entry(
         input.original_action_hash,
         &EntryTypes::Shelter(input.updated_entry),
@@ -195,7 +207,11 @@ pub struct UpdateShelterInput {
 /// Check in a person or party to a shelter
 #[hdk_extern]
 pub fn check_in_person(input: CheckInPersonInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_basic(), "check_in_person")?;
+    mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_basic(),
+        "check_in_person",
+    )?;
     if input.person_name.is_empty() || input.person_name.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Person name must be 1-256 characters".into()
@@ -313,7 +329,11 @@ pub struct CheckInPersonInput {
 /// Check out a person from a shelter
 #[hdk_extern]
 pub fn check_out_person(input: CheckOutPersonInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_basic(), "check_out_person")?;
+    mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_basic(),
+        "check_out_person",
+    )?;
     let current_record = get(input.registration_hash.clone(), GetOptions::default())?.ok_or(
         wasm_error!(WasmErrorInner::Guest("Registration not found".into())),
     )?;

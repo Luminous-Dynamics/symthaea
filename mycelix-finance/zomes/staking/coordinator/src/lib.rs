@@ -15,6 +15,7 @@ use mycelix_finance_shared::{
     anchor_hash, follow_update_chain, links_to_records, verify_caller_is_did,
     verify_governance_or_bootstrap_from_links, GOVERNANCE_AGENTS_ANCHOR,
 };
+use mycelix_zome_helpers as _;
 use staking_integrity::*;
 
 /// Anchor for active stakes

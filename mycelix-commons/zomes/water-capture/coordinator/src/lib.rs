@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -7,6 +6,7 @@ use mycelix_zome_helpers as _;
 
 use hdk::prelude::*;
 use mycelix_bridge_common::{civic_requirement_basic, civic_requirement_proposal};
+use mycelix_zome_helpers as _;
 use mycelix_zome_helpers::records_from_links;
 use water_capture_integrity::*;
 
@@ -15,7 +15,6 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     hash_entry(&EntryTypes::Anchor(anchor))
 }
 
-
 // ============================================================================
 // HARVEST SYSTEMS
 // ============================================================================
@@ -23,7 +22,11 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 /// Register a new water harvesting system
 #[hdk_extern]
 pub fn register_harvest_system(system: HarvestSystem) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "register_harvest_system")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "register_harvest_system",
+    )?;
     if system.id.trim().is_empty() || system.id.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "System ID must be 1-256 non-whitespace characters".into()
@@ -71,10 +74,16 @@ pub fn register_harvest_system(system: HarvestSystem) -> ExternResult<Record> {
 
     // Geohash spatial index
     {
-        let geo_hash = commons_types::geo::geohash_encode(system.location_lat, system.location_lon, 6);
+        let geo_hash =
+            commons_types::geo::geohash_encode(system.location_lat, system.location_lon, 6);
         let geo_anchor_str = format!("geo:{}", geo_hash);
         create_entry(&EntryTypes::Anchor(Anchor(geo_anchor_str.clone())))?;
-        create_link(anchor_hash(&geo_anchor_str)?, action_hash.clone(), LinkTypes::GeoIndex, geo_hash.as_bytes().to_vec())?;
+        create_link(
+            anchor_hash(&geo_anchor_str)?,
+            action_hash.clone(),
+            LinkTypes::GeoIndex,
+            geo_hash.as_bytes().to_vec(),
+        )?;
     }
 
     get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
@@ -110,7 +119,11 @@ pub fn get_all_systems(_: ()) -> ExternResult<Vec<Record>> {
 /// Register a new storage tank
 #[hdk_extern]
 pub fn register_tank(tank: StorageTank) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "register_tank")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "register_tank",
+    )?;
     if tank.id.trim().is_empty() || tank.id.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Tank ID must be 1-256 non-whitespace characters".into()
@@ -164,7 +177,11 @@ pub fn register_tank(tank: StorageTank) -> ExternResult<Record> {
 /// Update the current water level in a tank
 #[hdk_extern]
 pub fn update_tank_level(input: UpdateTankLevelInput) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "update_tank_level")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "update_tank_level",
+    )?;
     let agent_info = agent_info()?;
     let record = get(input.tank_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Tank not found".into())))?;
@@ -213,7 +230,11 @@ pub struct UpdateTankLevelInput {
 /// Record a water harvest from a system
 #[hdk_extern]
 pub fn record_harvest(harvest: HarvestRecord) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "record_harvest")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "record_harvest",
+    )?;
     if harvest.liters_collected == 0 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Harvest amount must be greater than zero".into()
@@ -262,8 +283,11 @@ pub fn get_harvest_history(system_hash: ActionHash) -> ExternResult<Vec<Record>>
 /// Register a new aquifer recharge project
 #[hdk_extern]
 pub fn register_recharge_project(project: RechargeProject) -> ExternResult<Record> {
-    let _eligibility =
-        mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "register_recharge_project")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "register_recharge_project",
+    )?;
     if project.id.trim().is_empty() || project.id.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Project ID must be 1-256 non-whitespace characters".into()

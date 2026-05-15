@@ -527,7 +527,9 @@ impl LLMOrgan {
 
     /// Simulate QA response
     fn simulate_qa(&self, question: &str) -> String {
-        format!("Based on my understanding, here is the answer to '{question}': This would require connection to an actual LLM for accurate responses.")
+        format!(
+            "Based on my understanding, here is the answer to '{question}': This would require connection to an actual LLM for accurate responses."
+        )
     }
 
     /// Simulate summarization
@@ -538,18 +540,28 @@ impl LLMOrgan {
 
     /// Simulate analysis
     fn simulate_analysis(&self, content: &str) -> String {
-        format!("Analysis of the provided content: The text discusses topics related to {}. Further analysis would require an actual LLM.",
-            content.split_whitespace().take(5).collect::<Vec<_>>().join(" "))
+        format!(
+            "Analysis of the provided content: The text discusses topics related to {}. Further analysis would require an actual LLM.",
+            content
+                .split_whitespace()
+                .take(5)
+                .collect::<Vec<_>>()
+                .join(" ")
+        )
     }
 
     /// Simulate code generation
     fn simulate_code(&self, prompt: &str) -> String {
-        format!("// Generated code for: {prompt}\n// Note: Actual code generation requires LLM connection\nfn example() {{\n    // Implementation here\n}}")
+        format!(
+            "// Generated code for: {prompt}\n// Note: Actual code generation requires LLM connection\nfn example() {{\n    // Implementation here\n}}"
+        )
     }
 
     /// Simulate general generation
     fn simulate_generation(&self, prompt: &str) -> String {
-        format!("Continuing from '{prompt}': This is a simulated response. Connect to an actual LLM for real generation capabilities.")
+        format!(
+            "Continuing from '{prompt}': This is a simulated response. Connect to an actual LLM for real generation capabilities."
+        )
     }
 
     /// Convert text to embedding

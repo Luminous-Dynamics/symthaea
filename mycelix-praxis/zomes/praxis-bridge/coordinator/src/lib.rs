@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -12,15 +11,15 @@ use mycelix_zome_helpers as _;
 //! 2. **query_praxis** — audited async query/response with auto-dispatch
 //! 3. **broadcast_event** — pub-sub event distribution across domains
 
-#![deny(unsafe_code)]
-
-use praxis_bridge_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::{
     self as bridge, check_rate_limit_count, DispatchInput, DispatchResult, EventTypeQuery,
     GateAuditInput, GovernanceAuditFilter, GovernanceAuditResult, ResolveQueryInput,
     RATE_LIMIT_WINDOW_SECS,
 };
+use mycelix_zome_helpers as _;
+#[deny(unsafe_code)]
+use praxis_bridge_integrity::*;
 
 // ============================================================================
 // Allowed zome names — security boundary for dispatch
@@ -711,8 +710,8 @@ pub fn compute_learning_tend(input: LearningTendInput) -> ExternResult<LearningT
         .map(|p| (p as f32 / 1000.0) * 0.1 * hours)
         .unwrap_or(0.0);
 
-    let total = ((base_credit + quality_bonus + phi_bonus) * reputation_multiplier)
-        .min(MAX_TEND_PER_EVENT);
+    let total =
+        ((base_credit + quality_bonus + phi_bonus) * reputation_multiplier).min(MAX_TEND_PER_EVENT);
 
     // Record the daily count (link to anchor for rate limiting)
     let agent_hash: AnyDhtHash = agent.into();
@@ -756,7 +755,7 @@ pub struct AlignmentVector {
 pub struct AuditResult {
     pub structural_integrity_score: u16, // 0-1000 permille
     pub confidence_proof: String,        // Cryptographic signature from Symthaea
-    pub inconsistencies: Vec<String>,     // Descriptive errors found by EML
+    pub inconsistencies: Vec<String>,    // Descriptive errors found by EML
     pub timestamp: i64,
 }
 
@@ -770,7 +769,7 @@ pub fn invoke_symthaea_audit(artifact: AuditArtifact) -> ExternResult<AuditResul
         "invoke_symthaea_audit",
     )?;
 
-    let mut score = 980;
+    let mut score: i32 = 980;
     let mut inconsistencies = Vec::new();
 
     // 2. Perform EML Structural Verification
@@ -780,7 +779,7 @@ pub fn invoke_symthaea_audit(artifact: AuditArtifact) -> ExternResult<AuditResul
                 score -= 600;
                 inconsistencies.push("Algebraic inconsistency: Invalid binding chain".to_string());
             }
-        },
+        }
         _ => {}
     }
 
@@ -789,13 +788,15 @@ pub fn invoke_symthaea_audit(artifact: AuditArtifact) -> ExternResult<AuditResul
         // Axiom: Non-harm (Ahimsa) is a hard constraint
         if av.ahimsa < 500 {
             score = 0; // Immediate disqualification
-            inconsistencies.push("Moral violation: Insufficient Ahimsa (Non-harm) rating".to_string());
+            inconsistencies
+                .push("Moral violation: Insufficient Ahimsa (Non-harm) rating".to_string());
         }
-        
+
         // Axiom: Reciprocity must be non-zero for TEND release
         if av.reciprocity < 200 {
             score = score.saturating_sub(300);
-            inconsistencies.push("Low alignment: Extractive dynamics detected (Low Reciprocity)".to_string());
+            inconsistencies
+                .push("Low alignment: Extractive dynamics detected (Low Reciprocity)".to_string());
         }
     }
 
@@ -806,5 +807,3 @@ pub fn invoke_symthaea_audit(artifact: AuditArtifact) -> ExternResult<AuditResul
         timestamp: sys_time()?.as_micros() as i64,
     })
 }
-
-

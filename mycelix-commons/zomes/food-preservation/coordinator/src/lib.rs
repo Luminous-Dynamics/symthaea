@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -8,8 +7,8 @@ use mycelix_zome_helpers as _;
 use food_preservation_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::{civic_requirement_basic, civic_requirement_proposal};
+use mycelix_zome_helpers as _;
 use mycelix_zome_helpers::records_from_links;
-
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -22,7 +21,11 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 pub fn start_batch(batch: PreservationBatch) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "start_batch")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "start_batch",
+    )?;
     let agent = agent_info()?.agent_initial_pubkey;
     let action_hash = create_entry(&EntryTypes::PreservationBatch(batch.clone()))?;
 
@@ -42,7 +45,11 @@ pub fn start_batch(batch: PreservationBatch) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn complete_batch(batch_hash: ActionHash) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "complete_batch")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "complete_batch",
+    )?;
     let record = get(batch_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Batch not found".into())))?;
     let mut batch: PreservationBatch = record
@@ -84,7 +91,11 @@ pub fn get_agent_batches(_: ()) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn register_method(method: PreservationMethod) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "register_method")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "register_method",
+    )?;
     let action_hash = create_entry(&EntryTypes::PreservationMethod(method))?;
 
     create_entry(&EntryTypes::Anchor(Anchor("all_methods".to_string())))?;
@@ -115,7 +126,11 @@ pub fn get_all_methods(_: ()) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn register_storage(storage: StorageUnit) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "register_storage")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "register_storage",
+    )?;
     let action_hash = create_entry(&EntryTypes::StorageUnit(storage))?;
 
     create_entry(&EntryTypes::Anchor(Anchor("all_storage".to_string())))?;

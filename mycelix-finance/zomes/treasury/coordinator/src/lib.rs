@@ -10,6 +10,7 @@ use mycelix_finance_shared::{
 };
 use treasury_integrity::*;
 
+use mycelix_zome_helpers as _;
 const DEFAULT_LIST_LIMIT: usize = 100;
 
 /// Maximum retries for optimistic-locking read-modify-write loops (RC-6 through RC-8).

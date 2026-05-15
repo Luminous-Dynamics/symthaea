@@ -7,8 +7,9 @@
 //! procurement settlement helpers that coordinate local supplychain zomes
 //! with the finance cluster.
 
-use hdk::prelude::*;
 use bridge_integrity::*;
+use hdk::prelude::*;
+use mycelix_zome_helpers as _;
 
 /// Input for creating a bridge record
 #[derive(Serialize, Deserialize, Debug)]
@@ -235,7 +236,9 @@ pub fn query_supply_chain(input: SupplyChainQueryInput) -> ExternResult<SupplyCh
                 }
             }
             _ => {
-                result.claims.push(format!("Provider claims: {}", provider_did));
+                result
+                    .claims
+                    .push(format!("Provider claims: {}", provider_did));
             }
         }
     }
@@ -243,8 +246,12 @@ pub fn query_supply_chain(input: SupplyChainQueryInput) -> ExternResult<SupplyCh
     // For PO-related data, add placeholder entries (logistics/payments zomes
     // index by ActionHash, not by string, so we surface the po_hash for callers)
     if let Some(ref po_hash) = input.po_hash {
-        result.shipments.push(format!("Shipments for PO: {}", po_hash));
-        result.payments.push(format!("Payments for PO: {}", po_hash));
+        result
+            .shipments
+            .push(format!("Shipments for PO: {}", po_hash));
+        result
+            .payments
+            .push(format!("Payments for PO: {}", po_hash));
     }
 
     Ok(result)
@@ -456,56 +463,56 @@ pub fn settle_procurement_payment(po_hash: ActionHash) -> ExternResult<serde_jso
     // Decode the payment_hash if present (it is an ActionHash serialized as bytes)
     let payment_hash: Option<ActionHash> = fulfillment_value
         .get("payment_hash")
-        .and_then(|v| {
-            serde_json::from_value::<ActionHash>(v.clone()).ok()
-        });
+        .and_then(|v| serde_json::from_value::<ActionHash>(v.clone()).ok());
 
     // Step 2: If a payment was created, settle in finance
-    let (finance_settled, finance_reference, finance_error) =
-        if local_action == "payment_created" {
-            if let Some(ref ph) = payment_hash {
-                let settle_payload =
-                    ExternIO::encode(ph.clone())
-                        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
+    let (finance_settled, finance_reference, finance_error) = if local_action == "payment_created" {
+        if let Some(ref ph) = payment_hash {
+            let settle_payload = ExternIO::encode(ph.clone())
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
 
-                match call(
-                    CallTargetCell::Local,
-                    ZomeName::from("payments_coordinator"),
-                    FunctionName::from("settle_in_finance"),
-                    None,
-                    settle_payload,
-                ) {
-                    Ok(ZomeCallResponse::Ok(data)) => {
-                        let settlement: serde_json::Value =
-                            data.decode().unwrap_or(serde_json::Value::Null);
-                        let settled = settlement
-                            .get("settled")
-                            .and_then(|v| v.as_bool())
-                            .unwrap_or(false);
-                        let reference = settlement
-                            .get("finance_reference")
-                            .and_then(|v| v.as_str())
-                            .map(|s| s.to_string());
-                        let error = settlement
-                            .get("error")
-                            .and_then(|v| v.as_str())
-                            .map(|s| s.to_string());
-                        (settled, reference, error)
-                    }
-                    Ok(other) => (
-                        false,
-                        None,
-                        Some(format!("settle_in_finance returned: {:?}", other)),
-                    ),
-                    Err(e) => (false, None, Some(format!("settle_in_finance error: {:?}", e))),
+            match call(
+                CallTargetCell::Local,
+                ZomeName::from("payments_coordinator"),
+                FunctionName::from("settle_in_finance"),
+                None,
+                settle_payload,
+            ) {
+                Ok(ZomeCallResponse::Ok(data)) => {
+                    let settlement: serde_json::Value =
+                        data.decode().unwrap_or(serde_json::Value::Null);
+                    let settled = settlement
+                        .get("settled")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+                    let reference = settlement
+                        .get("finance_reference")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+                    let error = settlement
+                        .get("error")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+                    (settled, reference, error)
                 }
-            } else {
-                (false, None, Some("No payment hash to settle".to_string()))
+                Ok(other) => (
+                    false,
+                    None,
+                    Some(format!("settle_in_finance returned: {:?}", other)),
+                ),
+                Err(e) => (
+                    false,
+                    None,
+                    Some(format!("settle_in_finance error: {:?}", e)),
+                ),
             }
         } else {
-            // escrow_released, already_paid, po_not_received — no new payment to settle
-            (false, None, None)
-        };
+            (false, None, Some("No payment hash to settle".to_string()))
+        }
+    } else {
+        // escrow_released, already_paid, po_not_received — no new payment to settle
+        (false, None, None)
+    };
 
     let result = ProcurementSettlementResult {
         local_action,
@@ -517,8 +524,7 @@ pub fn settle_procurement_payment(po_hash: ActionHash) -> ExternResult<serde_jso
         finance_error,
     };
 
-    serde_json::to_value(&result)
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))
+    serde_json::to_value(&result).map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))
 }
 
 /// Get bridge connections for a specific hApp
@@ -543,7 +549,7 @@ pub fn get_happ_connections(happ_name: String) -> ExternResult<(Vec<Record>, Vec
 /// Create a deterministic hash from a string identifier
 fn hash_identifier(identifier: &str) -> ExternResult<EntryHash> {
     let anchor_bytes = SerializedBytes::from(UnsafeBytes::from(
-        format!("anchor:{}", identifier).into_bytes()
+        format!("anchor:{}", identifier).into_bytes(),
     ));
     hash_entry(Entry::App(AppEntryBytes(anchor_bytes)))
 }

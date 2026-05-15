@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -9,17 +8,19 @@ use mycelix_zome_helpers as _;
 
 use hdk::prelude::*;
 use justice_cases_integrity::*;
-use mycelix_bridge_common::{
-    civic_requirement_proposal, GovernanceEligibility,
-};
-use mycelix_zome_helpers::{get_latest_record};
-
+use mycelix_bridge_common::{civic_requirement_proposal, GovernanceEligibility};
+use mycelix_zome_helpers as _;
+use mycelix_zome_helpers::get_latest_record;
 
 /// File a new case
 
 #[hdk_extern]
 pub fn file_case(case: Case) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "file_case")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_proposal(),
+        "file_case",
+    )?;
 
     let action_hash = create_entry(&EntryTypes::Case(case.clone()))?;
     let record = get_latest_record(action_hash.clone())?.ok_or(wasm_error!(
@@ -164,7 +165,11 @@ pub struct AddPartyInput {
 /// Submit evidence for a case
 #[hdk_extern]
 pub fn submit_evidence(evidence: Evidence) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "submit_evidence")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_proposal(),
+        "submit_evidence",
+    )?;
 
     let action_hash = create_entry(&EntryTypes::Evidence(evidence.clone()))?;
     let record = get_latest_record(action_hash.clone())?.ok_or(wasm_error!(

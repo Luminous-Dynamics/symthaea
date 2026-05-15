@@ -9,6 +9,8 @@ crate-type = ["cdylib", "rlib"]
 name = "regenerative"
 
 [dependencies]
+mycelix-bridge-common = { workspace = true }
+mycelix-zome-helpers = { workspace = true }
 holochain_serialized_bytes = { workspace = true }
 hdk = { workspace = true }
 serde = { workspace = true }

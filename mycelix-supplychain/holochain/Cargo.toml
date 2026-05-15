@@ -31,8 +31,12 @@ serde_json = "1.0"
 mycelix-bridge-common = { path = "../../crates/mycelix-bridge-common" }
 thiserror = "1"
 
-# WASM Compatibility - getrandom 0.3 with wasm_js feature for WASM
-getrandom = { version = "0.3", features = ["wasm_js"] }
+# WASM Compatibility
+getrandom = { version = "0.2", features = ["custom"] }
+getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
+
+# Shared helpers
+mycelix-zome-helpers = { path = "../../mycelix-workspace/crates/mycelix-zome-helpers" }
 
 # ZKP verification for provenance chain proofs
 mycelix-zkp-core = { path = "../../crates/mycelix-zkp-core" }

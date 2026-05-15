@@ -358,6 +358,7 @@ impl ActiveInferenceAgent {
     }
 
     /// Compute scalar EFE (for backward-compatible callers).
+    #[allow(dead_code)]
     fn expected_free_energy(
         &self,
         candidate_pos: &SVector<f64, 2>,

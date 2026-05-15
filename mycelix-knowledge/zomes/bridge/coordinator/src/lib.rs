@@ -1,7 +1,7 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+
 //! Knowledge Bridge Coordinator Zome
 //!
 //! Cross-hApp communication for knowledge queries, claim verification,
@@ -20,6 +20,26 @@ use mycelix_zome_helpers as _;
 
 use hdk::prelude::*;
 use knowledge_bridge_integrity::*;
+use mycelix_bridge_common::{dispatch_constellation_call, ConstellationTarget};
+use mycelix_zome_helpers as _;
+
+// ============================================================================
+// CONSTELLATION TARGETS (Substrate Registry)
+// ============================================================================
+
+/// Resolve the target for the Identity substrate.
+fn get_identity_target() -> ConstellationTarget {
+    ConstellationTarget::Internal {
+        role: "identity".into(),
+    }
+}
+
+/// Resolve the target for the Finance substrate.
+fn get_finance_target() -> ConstellationTarget {
+    ConstellationTarget::Internal {
+        role: "finance".into(),
+    }
+}
 
 const KNOWLEDGE_HAPP_ID: &str = "mycelix-knowledge";
 const MIN_EIG_FOR_DARK_SPOT: f64 = 0.3; // Minimum EIG to publish to Dark Spot DHT
@@ -49,19 +69,25 @@ pub fn query_knowledge(input: QueryKnowledgeInput) -> ExternResult<QueryKnowledg
     // Execute query based on type
     match input.query_type {
         KnowledgeQueryType::VerifyClaim => {
-            let claim_id = input.parameters.get("claim_id")
+            let claim_id = input
+                .parameters
+                .get("claim_id")
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
             verify_claim_internal(claim_id)
         }
         KnowledgeQueryType::EpistemicScore => {
-            let claim_id = input.parameters.get("claim_id")
+            let claim_id = input
+                .parameters
+                .get("claim_id")
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
             get_epistemic_score_internal(claim_id)
         }
         KnowledgeQueryType::ClaimsBySubject => {
-            let subject = input.parameters.get("subject")
+            let subject = input
+                .parameters
+                .get("subject")
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
             get_claims_by_subject_internal(subject)
@@ -99,7 +125,8 @@ fn verify_claim_internal(claim_id: &str) -> ExternResult<QueryKnowledgeResult> {
 
     match response {
         ZomeCallResponse::Ok(bytes) => {
-            let record: Option<Record> = bytes.decode()
+            let record: Option<Record> = bytes
+                .decode()
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {}", e))))?;
             match record {
                 Some(_) => Ok(QueryKnowledgeResult {
@@ -146,7 +173,8 @@ fn get_epistemic_score_internal(claim_id: &str) -> ExternResult<QueryKnowledgeRe
 
     match response {
         ZomeCallResponse::Ok(bytes) => {
-            let record: Option<Record> = bytes.decode()
+            let record: Option<Record> = bytes
+                .decode()
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {}", e))))?;
             match record {
                 Some(record) => {
@@ -155,11 +183,22 @@ fn get_epistemic_score_internal(claim_id: &str) -> ExternResult<QueryKnowledgeRe
                     let mut n = 0.5;
                     let mut m = 0.5;
                     if let Some(Entry::App(app_entry)) = record.entry().as_option() {
-                        if let Ok(claim_data) = serde_json::from_slice::<serde_json::Value>(app_entry.bytes()) {
+                        if let Ok(claim_data) =
+                            serde_json::from_slice::<serde_json::Value>(app_entry.bytes())
+                        {
                             if let Some(classification) = claim_data.get("classification") {
-                                e = classification.get("empirical").and_then(|v| v.as_f64()).unwrap_or(0.5);
-                                n = classification.get("normative").and_then(|v| v.as_f64()).unwrap_or(0.5);
-                                m = classification.get("mythic").and_then(|v| v.as_f64()).unwrap_or(0.5);
+                                e = classification
+                                    .get("empirical")
+                                    .and_then(|v| v.as_f64())
+                                    .unwrap_or(0.5);
+                                n = classification
+                                    .get("normative")
+                                    .and_then(|v| v.as_f64())
+                                    .unwrap_or(0.5);
+                                m = classification
+                                    .get("mythic")
+                                    .and_then(|v| v.as_f64())
+                                    .unwrap_or(0.5);
                             }
                         }
                     }
@@ -207,7 +246,8 @@ fn get_claims_by_subject_internal(subject: &str) -> ExternResult<QueryKnowledgeR
     match response {
         ZomeCallResponse::Ok(bytes) => {
             let records: Vec<Record> = bytes.decode().unwrap_or_default();
-            let claim_ids: Vec<String> = records.iter()
+            let claim_ids: Vec<String> = records
+                .iter()
                 .map(|r| r.action_address().to_string())
                 .collect();
             Ok(QueryKnowledgeResult {
@@ -291,7 +331,12 @@ pub fn register_external_claim(input: RegisterClaimInput) -> ExternResult<Record
     let now = sys_time()?;
 
     let claim_ref = ClaimReference {
-        claim_id: format!("ext:{}:{}:{}", input.source_happ, input.subject, now.as_micros()),
+        claim_id: format!(
+            "ext:{}:{}:{}",
+            input.source_happ,
+            input.subject,
+            now.as_micros()
+        ),
         source_happ: input.source_happ.clone(),
         subject: input.subject.clone(),
         predicate: input.predicate.clone(),
@@ -577,8 +622,9 @@ pub fn classify_with_gis(input: GisClassifyInput) -> ExternResult<Record> {
     };
     create_entry(&EntryTypes::KnowledgeBridgeEvent(event))?;
 
-    get(hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Classification not found".into())))
+    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Classification not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -660,8 +706,9 @@ pub fn analyze_with_rashomon(input: RashomonAnalyzeInput) -> ExternResult<Record
     };
     create_entry(&EntryTypes::KnowledgeBridgeEvent(event))?;
 
-    get(hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Analysis not found".into())))
+    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Analysis not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -742,8 +789,9 @@ pub fn publish_dark_spot(input: PublishDarkSpotInput) -> ExternResult<Record> {
     };
     create_entry(&EntryTypes::KnowledgeBridgeEvent(event))?;
 
-    get(hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Dark spot not found".into())))
+    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Dark spot not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -766,14 +814,17 @@ pub fn resolve_dark_spot(input: ResolveDarkSpotInput) -> ExternResult<Record> {
     let original_hash = ActionHash::try_from(input.dark_spot_hash.clone())
         .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid dark spot hash".into())))?;
 
-    let original_record = get(original_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Dark spot not found".into())))?;
+    let original_record = get(original_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Dark spot not found".into())
+    ))?;
 
     let original = original_record
         .entry()
         .to_app_option::<DarkSpot>()
         .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid dark spot entry".into())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Dark spot entry missing".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Dark spot entry missing".into()
+        )))?;
 
     // Create updated dark spot
     let updated = DarkSpot {
@@ -808,8 +859,9 @@ pub fn resolve_dark_spot(input: ResolveDarkSpotInput) -> ExternResult<Record> {
     };
     create_entry(&EntryTypes::KnowledgeBridgeEvent(event))?;
 
-    get(hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Updated dark spot not found".into())))
+    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Updated dark spot not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -874,8 +926,9 @@ pub fn assess_harmonic_alignment(input: AssessAlignmentInput) -> ExternResult<Re
     };
     create_entry(&EntryTypes::KnowledgeBridgeEvent(event))?;
 
-    get(hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Alignment not found".into())))
+    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Alignment not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -965,12 +1018,7 @@ pub fn get_active_dark_spots(domain: Option<QueryDomain>) -> ExternResult<Vec<Re
         if let Some(record) = get(hash, GetOptions::default())? {
             // Filter by active status if querying by domain
             if domain.is_some() {
-                if let Some(ds) = record
-                    .entry()
-                    .to_app_option::<DarkSpot>()
-                    .ok()
-                    .flatten()
-                {
+                if let Some(ds) = record.entry().to_app_option::<DarkSpot>().ok().flatten() {
                     if ds.status == DarkSpotStatus::Active {
                         dark_spots.push(record);
                     }
@@ -1019,25 +1067,55 @@ pub fn get_harmonic_alignment(subject: String) -> ExternResult<Option<Record>> {
 fn classify_domain(query: &str) -> QueryDomain {
     let query_lower = query.to_lowercase();
 
-    if query_lower.contains("math") || query_lower.contains("calculate") || query_lower.contains("equation") {
+    if query_lower.contains("math")
+        || query_lower.contains("calculate")
+        || query_lower.contains("equation")
+    {
         QueryDomain::Mathematics
-    } else if query_lower.contains("physics") || query_lower.contains("gravity") || query_lower.contains("quantum") {
+    } else if query_lower.contains("physics")
+        || query_lower.contains("gravity")
+        || query_lower.contains("quantum")
+    {
         QueryDomain::Physics
-    } else if query_lower.contains("history") || query_lower.contains("when did") || query_lower.contains("century") {
+    } else if query_lower.contains("history")
+        || query_lower.contains("when did")
+        || query_lower.contains("century")
+    {
         QueryDomain::History
-    } else if query_lower.contains("feel") || query_lower.contains("opinion") || query_lower.contains("prefer") {
+    } else if query_lower.contains("feel")
+        || query_lower.contains("opinion")
+        || query_lower.contains("prefer")
+    {
         QueryDomain::Subjective
-    } else if query_lower.contains("technology") || query_lower.contains("software") || query_lower.contains("ai") {
+    } else if query_lower.contains("technology")
+        || query_lower.contains("software")
+        || query_lower.contains("ai")
+    {
         QueryDomain::Technology
-    } else if query_lower.contains("environment") || query_lower.contains("climate") || query_lower.contains("ecology") {
+    } else if query_lower.contains("environment")
+        || query_lower.contains("climate")
+        || query_lower.contains("ecology")
+    {
         QueryDomain::Environmental
-    } else if query_lower.contains("economic") || query_lower.contains("market") || query_lower.contains("price") {
+    } else if query_lower.contains("economic")
+        || query_lower.contains("market")
+        || query_lower.contains("price")
+    {
         QueryDomain::Economic
-    } else if query_lower.contains("social") || query_lower.contains("community") || query_lower.contains("people") {
+    } else if query_lower.contains("social")
+        || query_lower.contains("community")
+        || query_lower.contains("people")
+    {
         QueryDomain::Social
-    } else if query_lower.contains("medical") || query_lower.contains("health") || query_lower.contains("disease") {
+    } else if query_lower.contains("medical")
+        || query_lower.contains("health")
+        || query_lower.contains("disease")
+    {
         QueryDomain::Medical
-    } else if query_lower.contains("political") || query_lower.contains("government") || query_lower.contains("policy") {
+    } else if query_lower.contains("political")
+        || query_lower.contains("government")
+        || query_lower.contains("policy")
+    {
         QueryDomain::Political
     } else if query_lower.contains("impossible") || query_lower.contains("capital of mars") {
         QueryDomain::Undefined
@@ -1123,7 +1201,10 @@ fn generate_zk_signature(query: &str, domain: &str, eig: f64) -> String {
 }
 
 /// Generate harmonic perspectives for a situation
-fn generate_harmonic_perspectives(situation: &str, domain: &QueryDomain) -> Vec<HarmonicPerspective> {
+fn generate_harmonic_perspectives(
+    situation: &str,
+    domain: &QueryDomain,
+) -> Vec<HarmonicPerspective> {
     let primary_harmonies = get_primary_harmonies(domain);
 
     Harmony::all()
@@ -1228,10 +1309,7 @@ fn identify_dissents(perspectives: &[HarmonicPerspective]) -> Vec<PreservedDisse
         .map(|p| PreservedDissent {
             harmony: p.harmony,
             content: p.content.clone(),
-            reason: format!(
-                "{} raises concerns with low confidence",
-                p.harmony
-            ),
+            reason: format!("{} raises concerns with low confidence", p.harmony),
             divergence: 1.0 - p.confidence,
         })
         .collect()
@@ -1239,10 +1317,7 @@ fn identify_dissents(perspectives: &[HarmonicPerspective]) -> Vec<PreservedDisse
 
 /// Build unified view from perspectives
 fn build_unified_view(perspectives: &[HarmonicPerspective], agreements: &[String]) -> String {
-    let harmony_names: Vec<String> = perspectives
-        .iter()
-        .map(|p| p.harmony.to_string())
-        .collect();
+    let harmony_names: Vec<String> = perspectives.iter().map(|p| p.harmony.to_string()).collect();
 
     let agreement_summary = if agreements.is_empty() {
         "No clear agreements identified".to_string()
@@ -1264,11 +1339,11 @@ fn calculate_synthesis_confidence(perspectives: &[HarmonicPerspective]) -> f64 {
         return 0.0;
     }
 
-    let avg_confidence: f64 = perspectives.iter().map(|p| p.confidence).sum::<f64>()
-        / perspectives.len() as f64;
+    let avg_confidence: f64 =
+        perspectives.iter().map(|p| p.confidence).sum::<f64>() / perspectives.len() as f64;
 
-    let avg_relevance: f64 = perspectives.iter().map(|p| p.relevance).sum::<f64>()
-        / perspectives.len() as f64;
+    let avg_relevance: f64 =
+        perspectives.iter().map(|p| p.relevance).sum::<f64>() / perspectives.len() as f64;
 
     (avg_confidence * 0.6 + avg_relevance * 0.4).min(1.0)
 }

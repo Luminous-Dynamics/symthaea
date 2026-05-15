@@ -16,6 +16,7 @@ flacenc = { workspace = true }
 rustfft = { workspace = true }
 midly = "0.5"
 serde_json = { workspace = true }
+bevy = { version = "0.18", default-features = false, optional = true }
 symthaea-voice = { path = "../symthaea-voice", optional = true }
 symthaea-broca = { path = "../symthaea-broca", optional = true }
 
@@ -27,6 +28,7 @@ ringbuf = { version = "0.4", optional = true }
 
 [features]
 default = []
+bevy = ["dep:bevy"]
 muse-live = ["cpal", "ringbuf"]
 voice = ["symthaea-voice"]
 voice-kokoro = ["voice", "symthaea-voice/kokoro"]

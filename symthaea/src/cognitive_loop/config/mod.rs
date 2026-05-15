@@ -141,6 +141,9 @@ pub struct CognitiveLoopConfig {
     /// modulates the curiosity drive's boredom threshold to seek novel states.
     pub enable_surprise_exploration: bool,
 
+    /// Enable metabolic conductor for Mk0 hardware coordination.
+    pub enable_metabolic_conductor: bool,
+
     /// Enable prefrontal cortex executive control.
     /// When true, the cognitive loop maintains a working memory of recent inputs
     /// and uses prefrontal gating to modulate learning and exploration.
@@ -850,6 +853,7 @@ impl Default for CognitiveLoopConfig {
             epistemic_auditor_db_path: None,
             episodic_replay_config: crate::memory::episodic_replay::EpisodicReplayConfig::default(),
             enable_surprise_exploration: true,
+            enable_metabolic_conductor: false,
             enable_prefrontal: true,
             enable_meta_cognition: true,
             enable_narrative_self: true,
@@ -1105,7 +1109,7 @@ impl CognitiveLoopConfig {
     /// Create configuration for a platform's preferred operating domain.
     pub fn for_platform(platform: symthaea_core::embodiment::EmbodimentPlatform) -> Self {
         let capability = crate::domain::PlatformCapabilityProfile::for_platform(platform);
-        let mut config = Self {
+        let config = Self {
             domain_profile: capability.preferred_domain_profile(),
             ..Default::default()
         };
@@ -1147,7 +1151,7 @@ impl CognitiveLoopConfig {
         } else {
             capability.preferred_domain_profile()
         };
-        let mut config = Self {
+        let config = Self {
             domain_profile: resolved_domain,
             ..Default::default()
         };

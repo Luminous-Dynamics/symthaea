@@ -15,7 +15,7 @@ pub fn mastery_threshold_for_grade(grade_ordinal: u8) -> u16 {
         5..=7 => 800,   // Grade 4-6: 80%
         8..=10 => 800,  // Grade 7-9: 80%
         11..=13 => 750, // Grade 10-12: 75%
-        _ => 800,        // Default
+        _ => 800,       // Default
     }
 }
 

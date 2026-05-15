@@ -74,6 +74,54 @@ impl PredictiveCodingHierarchy {
         }
     }
 
+    /// Perform 'Holographic Dilation' - scale internal components.
+    pub fn dilate(&mut self, target_dim: usize) {
+        if self.dim == target_dim {
+            return;
+        }
+
+        self.encoder.dilate(target_dim);
+        self.prediction_weight = self.prediction_weight.dilate(target_dim);
+
+        if let Some(ref mut hv) = self.last_coarse_hv {
+            *hv = hv.dilate(target_dim);
+        }
+
+        self.dim = target_dim;
+    }
+
+    /// Perform multi-scale 'Dreaming' - predict future coarse and fine states.
+    ///
+    /// Science: Friston (2010). Hierarchical active inference allows the system
+    /// to Zoom Out (abstract simulation) and Zoom In (detailed simulation) across
+    /// multiple levels of the world model hierarchy.
+    ///
+    /// Returns `(coarse_predictions, fine_predictions)`.
+    pub fn dream_ahead(&self, steps: usize, _dt: f32) -> (Vec<ContinuousHV>, Vec<ContinuousHV>) {
+        let mut coarse_preds = Vec::with_capacity(steps);
+        let mut fine_preds = Vec::with_capacity(steps);
+
+        let mut current_coarse = self
+            .last_coarse_hv
+            .clone()
+            .unwrap_or_else(|| ContinuousHV::zero(self.dim));
+
+        for _ in 0..steps {
+            // 1. Evolve coarse state (assume abstract scene-level dynamics)
+            // For now we use the identity as a neutral dynamic (static scene dream)
+            // but rotate it slightly to simulate abstract "thought drift".
+            current_coarse = current_coarse.permute(1);
+
+            // 2. Predict fine scale from coarse scale (top-down inference)
+            let predicted_fine = self.predict_fine(&current_coarse);
+
+            coarse_preds.push(current_coarse.clone());
+            fine_preds.push(predicted_fine);
+        }
+
+        (coarse_preds, fine_preds)
+    }
+
     /// Process a frame through the predictive hierarchy.
     ///
     /// Returns `(fine_hv, coarse_hv, prediction_error)` where:

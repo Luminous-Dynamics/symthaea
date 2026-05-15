@@ -138,11 +138,7 @@ fn jaccard(a: &[String], b: &[String]) -> f32 {
     let bset: HashSet<&String> = b.iter().collect();
     let inter = aset.intersection(&bset).count() as f32;
     let union = aset.union(&bset).count() as f32;
-    if union == 0.0 {
-        0.0
-    } else {
-        inter / union
-    }
+    if union == 0.0 { 0.0 } else { inter / union }
 }
 
 /// Disk-backed cache of learned idioms.

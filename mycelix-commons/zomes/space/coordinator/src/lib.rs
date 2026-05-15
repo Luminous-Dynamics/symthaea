@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -13,9 +12,9 @@ use mycelix_zome_helpers as _;
 
 use hdk::prelude::*;
 use mycelix_bridge_common::{civic_requirement_basic, civic_requirement_proposal};
+use mycelix_zome_helpers as _;
 use mycelix_zome_helpers::get_latest_record;
 use space_integrity::*;
-
 
 /// Helper to get an anchor entry hash
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -29,7 +28,11 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 pub fn create_space(input: CreateSpaceInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "create_space")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "create_space",
+    )?;
     let now = sys_time()?;
     let caller = agent_info()?.agent_initial_pubkey;
 
@@ -125,7 +128,11 @@ pub struct CreateSpaceInput {
 /// invitation is automatically approved and membership is created.
 #[hdk_extern]
 pub fn invite_member(input: InviteMemberInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "invite_member")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "invite_member",
+    )?;
     let now = sys_time()?;
     let caller = agent_info()?.agent_initial_pubkey;
 
@@ -197,7 +204,11 @@ pub struct InviteMemberInput {
 /// to call specific functions within the space context.
 #[hdk_extern]
 pub fn grant_access(input: GrantAccessInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "grant_access")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "grant_access",
+    )?;
     let now = sys_time()?;
     let caller = agent_info()?.agent_initial_pubkey;
 
@@ -241,7 +252,11 @@ pub struct GrantAccessInput {
 /// Deactivates the membership and marks any capabilities as revoked.
 #[hdk_extern]
 pub fn revoke_access(input: RevokeAccessInput) -> ExternResult<bool> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "revoke_access")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "revoke_access",
+    )?;
     let caller = agent_info()?.agent_initial_pubkey;
 
     // Only admins can revoke access
@@ -407,7 +422,11 @@ pub fn get_space(space_id: String) -> ExternResult<Option<Record>> {
 /// Increments the approval count. If threshold is met, auto-creates membership.
 #[hdk_extern]
 pub fn approve_invitation(input: ApproveInvitationInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "approve_invitation")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "approve_invitation",
+    )?;
     let now = sys_time()?;
     let caller = agent_info()?.agent_initial_pubkey;
 
@@ -480,7 +499,11 @@ pub struct ApproveInvitationInput {
 /// Reject a pending invitation
 #[hdk_extern]
 pub fn reject_invitation(invitation_hash: ActionHash) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "reject_invitation")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "reject_invitation",
+    )?;
     let caller = agent_info()?.agent_initial_pubkey;
 
     let record = get_latest_record(invitation_hash.clone())?.ok_or(wasm_error!(
@@ -514,7 +537,11 @@ pub fn reject_invitation(invitation_hash: ActionHash) -> ExternResult<Record> {
 /// Book a shared resource within a space
 #[hdk_extern]
 pub fn book_resource(input: BookResourceInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "book_resource")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "book_resource",
+    )?;
     let now = sys_time()?;
     let caller = agent_info()?.agent_initial_pubkey;
 
@@ -575,7 +602,11 @@ pub struct BookResourceInput {
 /// Cancel a resource booking
 #[hdk_extern]
 pub fn cancel_booking(booking_hash: ActionHash) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "cancel_booking")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "cancel_booking",
+    )?;
     let caller = agent_info()?.agent_initial_pubkey;
 
     let record = get_latest_record(booking_hash.clone())?.ok_or(wasm_error!(
@@ -636,7 +667,11 @@ pub fn get_space_bookings(space_id: String) -> ExternResult<Vec<Record>> {
 /// Create a recurring schedule/event for a space
 #[hdk_extern]
 pub fn create_schedule(input: CreateScheduleInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "create_schedule")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "create_schedule",
+    )?;
     let now = sys_time()?;
     let caller = agent_info()?.agent_initial_pubkey;
 

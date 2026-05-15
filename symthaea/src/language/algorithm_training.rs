@@ -9,7 +9,7 @@
 //! algorithm class from the HDC representation.
 
 use super::algorithm_encoder::{
-    extract_features, AlgorithmChannels, AlgorithmClass, AlgorithmEncoder, AlgorithmTrainingPair,
+    AlgorithmChannels, AlgorithmClass, AlgorithmEncoder, AlgorithmTrainingPair, extract_features,
 };
 use crate::dynamics::cfc_code_sequencer::{CfCCodeSequencer, PlanAction};
 use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
@@ -1371,11 +1371,7 @@ impl LearnedProjection {
     pub fn variance_captured(&self) -> f32 {
         let total: f32 = self.scales.iter().map(|s| s * s).sum();
         let top: f32 = self.scales.iter().take(64).map(|s| s * s).sum();
-        if total > 0.0 {
-            top / total
-        } else {
-            0.0
-        }
+        if total > 0.0 { top / total } else { 0.0 }
     }
 }
 
@@ -2290,31 +2286,47 @@ pub fn class_idiom_body(class: AlgorithmClass, purpose: &str, signature: &str) -
         AlgorithmClass::Sorting if param_vec_i32 => {
             Some(format!("    let mut v = {param};\n    v.sort();\n    v"))
         }
-        AlgorithmClass::Mathematical if lower.contains("prime") && ret_bool && param_u64 => Some(format!(
-            "    if {param} < 2 {{ return false; }}\n    let mut i = 2u64;\n    while i * i <= {param} {{\n        if {param} % i == 0 {{ return false; }}\n        i += 1;\n    }}\n    true"
-        )),
-        AlgorithmClass::Mathematical if (lower.contains("fibonacci") || lower.contains("fib")) && param_u64 => Some(format!(
-            "    if {param} < 2 {{ return {param}; }}\n    let mut a = 0u64;\n    let mut b = 1u64;\n    for _ in 2..={param} {{\n        let c = a + b;\n        a = b;\n        b = c;\n    }}\n    b"
-        )),
+        AlgorithmClass::Mathematical if lower.contains("prime") && ret_bool && param_u64 => {
+            Some(format!(
+                "    if {param} < 2 {{ return false; }}\n    let mut i = 2u64;\n    while i * i <= {param} {{\n        if {param} % i == 0 {{ return false; }}\n        i += 1;\n    }}\n    true"
+            ))
+        }
+        AlgorithmClass::Mathematical
+            if (lower.contains("fibonacci") || lower.contains("fib")) && param_u64 =>
+        {
+            Some(format!(
+                "    if {param} < 2 {{ return {param}; }}\n    let mut a = 0u64;\n    let mut b = 1u64;\n    for _ in 2..={param} {{\n        let c = a + b;\n        a = b;\n        b = c;\n    }}\n    b"
+            ))
+        }
         AlgorithmClass::Mathematical if lower.contains("factorial") && param_u64 => {
             Some(format!("    (1..={param}).product()"))
         }
         AlgorithmClass::Mathematical if lower.contains("even") && ret_bool && param_u64 => {
             Some(format!("    {param} % 2 == 0"))
         }
-        AlgorithmClass::Mathematical if (lower.contains("sum") || lower.contains("total")) && param_vec_i32 && ret_i32 => {
+        AlgorithmClass::Mathematical
+            if (lower.contains("sum") || lower.contains("total")) && param_vec_i32 && ret_i32 =>
+        {
             Some(format!("    {param}.iter().copied().sum()"))
         }
-        AlgorithmClass::Mathematical if lower.contains("factor") && ret_vec && param_u64 => Some(format!(
-            "    let mut n = {param};\n    let mut factors = Vec::new();\n    let mut d = 2u64;\n    while d * d <= n {{\n        while n % d == 0 {{ factors.push(d); n /= d; }}\n        d += 1;\n    }}\n    if n > 1 {{ factors.push(n); }}\n    factors"
-        )),
+        AlgorithmClass::Mathematical if lower.contains("factor") && ret_vec && param_u64 => {
+            Some(format!(
+                "    let mut n = {param};\n    let mut factors = Vec::new();\n    let mut d = 2u64;\n    while d * d <= n {{\n        while n % d == 0 {{ factors.push(d); n /= d; }}\n        d += 1;\n    }}\n    if n > 1 {{ factors.push(n); }}\n    factors"
+            ))
+        }
         AlgorithmClass::StringProcessing if lower.contains("reverse") && param_str && ret_str => {
             Some(format!("    {param}.chars().rev().collect()"))
         }
-        AlgorithmClass::StringProcessing if (lower.contains("vowel") || lower.contains("vowels")) && ret_usize => Some(format!(
-            "    {param}.chars().filter(|c| matches!(c.to_ascii_lowercase(), 'a' | 'e' | 'i' | 'o' | 'u')).count()"
-        )),
-        AlgorithmClass::StringProcessing if lower.contains("word") && (lower.contains("count") || ret_usize) => {
+        AlgorithmClass::StringProcessing
+            if (lower.contains("vowel") || lower.contains("vowels")) && ret_usize =>
+        {
+            Some(format!(
+                "    {param}.chars().filter(|c| matches!(c.to_ascii_lowercase(), 'a' | 'e' | 'i' | 'o' | 'u')).count()"
+            ))
+        }
+        AlgorithmClass::StringProcessing
+            if lower.contains("word") && (lower.contains("count") || ret_usize) =>
+        {
             Some(format!("    {param}.split_whitespace().count()"))
         }
         AlgorithmClass::StringProcessing if lower.contains("uppercase") && ret_str => {
@@ -2323,9 +2335,11 @@ pub fn class_idiom_body(class: AlgorithmClass, purpose: &str, signature: &str) -
         AlgorithmClass::StringProcessing if lower.contains("lowercase") && ret_str => {
             Some(format!("    {param}.to_lowercase()"))
         }
-        AlgorithmClass::StringProcessing if lower.contains("palindrome") && ret_bool => Some(format!(
-            "    let s: String = {param}.chars().filter(|c| c.is_alphanumeric()).map(|c| c.to_ascii_lowercase()).collect();\n    s == s.chars().rev().collect::<String>()"
-        )),
+        AlgorithmClass::StringProcessing if lower.contains("palindrome") && ret_bool => {
+            Some(format!(
+                "    let s: String = {param}.chars().filter(|c| c.is_alphanumeric()).map(|c| c.to_ascii_lowercase()).collect();\n    s == s.chars().rev().collect::<String>()"
+            ))
+        }
         AlgorithmClass::Search if lower.contains("prime") && ret_vec && param_u64 => Some(format!(
             "    if {param} < 2 {{ return Vec::new(); }}\n    let n = {param} as usize;\n    let mut is_prime = vec![true; n + 1];\n    is_prime[0] = false; is_prime[1] = false;\n    let mut i = 2;\n    while i * i <= n {{\n        if is_prime[i] {{ for j in (i*i..=n).step_by(i) {{ is_prime[j] = false; }} }}\n        i += 1;\n    }}\n    (2..=n).filter(|&i| is_prime[i]).map(|i| i as u64).collect()"
         )),

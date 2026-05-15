@@ -19,5 +19,6 @@ symtropy-physics = { version = "0.2.0", path = "../symtropy-physics" }
 nalgebra = "0.34"
 bevy = { version = "0.18", default-features = false, features = [
     "bevy_render", "bevy_core_pipeline", "bevy_sprite", "bevy_sprite_render",
+    "bevy_pbr",
     "bevy_color", "bevy_state",
 ] }

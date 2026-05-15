@@ -649,6 +649,24 @@ impl HdcSsmProjection {
         ContinuousHV::from_vec(values)
     }
 
+    /// Backpropagate gradients and update weights.
+    pub fn backward(&mut self, input_hv: &ContinuousHV, d_hdc: &ContinuousHV, lr: f32) {
+        // Simplified backward for distillation: update w_down to align input_hv -> d_hdc
+        // In a real implementation, this would be a full backprop through the bottleneck.
+        // For now, we perform a direct delta update on the input-to-bottleneck projection.
+        let rows = self.bottleneck;
+        let cols = self.hdc_dim;
+        let d_values = &d_hdc.values;
+        let x_values = &input_hv.values;
+
+        for i in 0..rows {
+            let gi = d_values[i % d_values.len()]; // Map bottleneck grad to projection
+            for j in 0..cols {
+                self.w_down[i * cols + j] -= lr * gi * x_values[j];
+            }
+        }
+    }
+
     /// Compute gradients from semantic prediction error.
     ///
     /// The error signal is the difference between the original thought HV

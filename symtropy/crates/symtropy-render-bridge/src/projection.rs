@@ -3,6 +3,7 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Projection from ND physics space to screen/render coordinates.
 
+use bevy::prelude::{Reflect, Resource};
 use nalgebra::SVector;
 use symtropy_math::{Hyperplane, Point};
 
@@ -88,6 +89,7 @@ impl Projector<3> for Projector3D {
 /// Slices the 4D world with a 3D hyperplane perpendicular to the W axis.
 /// Objects that intersect the slice appear as their 3D cross-sections.
 /// Moving the slice position along W reveals hidden geometry.
+#[derive(Resource, Reflect, Debug, Clone, Copy)]
 pub struct Projector4D {
     /// Position of the slicing hyperplane along the W axis.
     pub w_slice: f64,

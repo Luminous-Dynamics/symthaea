@@ -51,6 +51,10 @@ impl<const D: usize> Shape<D> for Sphere<D> {
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
+
+    fn clone_box(&self) -> Box<dyn Shape<D>> {
+        Box::new(*self)
+    }
 }
 
 #[cfg(test)]

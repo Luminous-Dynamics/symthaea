@@ -169,7 +169,7 @@ impl<const D: usize> ContactCache<D> {
         } else {
             (body_b, body_a)
         };
-        let entry = self.entries.entry(key).or_insert_with(Vec::new);
+        let entry = self.entries.entry(key).or_default();
         entry.push(CachedImpulse {
             normal_impulse,
             tangent_impulse,

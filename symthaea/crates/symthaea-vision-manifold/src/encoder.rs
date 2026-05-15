@@ -76,6 +76,28 @@ impl PatchHdcEncoder {
         }
     }
 
+    /// Perform 'Holographic Dilation' - scale internal basis vectors.
+    pub fn dilate(&mut self, target_dim: usize) {
+        if self.config.hdc_dim == target_dim {
+            return;
+        }
+
+        for hv in &mut self.row_hvs {
+            *hv = hv.dilate(target_dim);
+        }
+        for hv in &mut self.col_hvs {
+            *hv = hv.dilate(target_dim);
+        }
+        for hv in &mut self.feature_hvs {
+            *hv = hv.dilate(target_dim);
+        }
+        for hv in &mut self.level_hvs {
+            *hv = hv.dilate(target_dim);
+        }
+
+        self.config.hdc_dim = target_dim;
+    }
+
     /// Generate level HVs with ordinal similarity preservation.
     ///
     /// Adjacent levels share most dimensions; distant levels are nearly orthogonal.
@@ -676,6 +698,13 @@ impl MultiScaleEncoder {
         }
     }
 
+    /// Perform 'Holographic Dilation' - scale all internal encoders.
+    pub fn dilate(&mut self, target_dim: usize) {
+        for encoder in &mut self.encoders {
+            encoder.dilate(target_dim);
+        }
+    }
+
     /// Encode a frame at all scales and return a blended HV.
     ///
     /// Returns `(blended_hv, per_scale_hvs, per_scale_patches)`.
@@ -864,6 +893,19 @@ impl MotionField {
             .map(|d| ContinuousHV::random(dim, seed + 900_000 + d as u64))
             .collect();
         Self { direction_hvs, dim }
+    }
+
+    /// Perform 'Holographic Dilation' - scale internal basis vectors.
+    pub fn dilate(&mut self, target_dim: usize) {
+        if self.dim == target_dim {
+            return;
+        }
+
+        for hv in &mut self.direction_hvs {
+            *hv = hv.dilate(target_dim);
+        }
+
+        self.dim = target_dim;
     }
 
     /// Compute the motion field from current and previous per-patch luminances.

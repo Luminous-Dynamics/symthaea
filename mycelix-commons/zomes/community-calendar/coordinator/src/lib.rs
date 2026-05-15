@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -8,8 +7,8 @@ use mycelix_zome_helpers as _;
 use community_calendar_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::{civic_requirement_basic, civic_requirement_proposal};
+use mycelix_zome_helpers as _;
 use mycelix_zome_helpers::records_from_links;
-
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -49,7 +48,11 @@ fn date_from_timestamp(ts: &Timestamp) -> String {
 /// Create a new calendar event with anchored indices.
 #[hdk_extern]
 pub fn create_event(event: CalendarEvent) -> ExternResult<ActionHash> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "create_event")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "create_event",
+    )?;
 
     // Validate inputs that go beyond integrity checks
     if event.title.trim().is_empty() {
@@ -62,12 +65,7 @@ pub fn create_event(event: CalendarEvent) -> ExternResult<ActionHash> {
 
     // Index: all events
     let all_anchor = ensure_anchor("all_events")?;
-    create_link(
-        all_anchor,
-        action_hash.clone(),
-        LinkTypes::AllEvents,
-        (),
-    )?;
+    create_link(all_anchor, action_hash.clone(), LinkTypes::AllEvents, ())?;
 
     // Index: by date (start date)
     let date_str = date_from_timestamp(&event.start_time);
@@ -103,12 +101,7 @@ pub fn create_event(event: CalendarEvent) -> ExternResult<ActionHash> {
     if let Some(ref loc) = event.location {
         let geohash = commons_types::geo::geohash_encode(loc.latitude, loc.longitude, 6);
         let geo_anchor = ensure_anchor(&format!("geo:{}", geohash))?;
-        create_link(
-            geo_anchor,
-            action_hash.clone(),
-            LinkTypes::GeoIndex,
-            (),
-        )?;
+        create_link(geo_anchor, action_hash.clone(), LinkTypes::GeoIndex, ())?;
     }
 
     Ok(action_hash)
@@ -125,7 +118,11 @@ pub fn get_event(hash: ActionHash) -> ExternResult<Record> {
 /// Get all events on a given date (format: "YYYY-MM-DD").
 #[hdk_extern]
 pub fn get_events_by_date(date_str: String) -> ExternResult<Vec<Record>> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "get_events_by_date")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "get_events_by_date",
+    )?;
     if date_str.len() != 10 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Date must be in YYYY-MM-DD format".into()
@@ -142,7 +139,11 @@ pub fn get_events_by_date(date_str: String) -> ExternResult<Vec<Record>> {
 /// Get all events in a given category.
 #[hdk_extern]
 pub fn get_events_by_category(category: String) -> ExternResult<Vec<Record>> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "get_events_by_category")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "get_events_by_category",
+    )?;
     let cat_key = category.to_lowercase().replace(' ', "_");
     let anchor = anchor_hash(&format!("events_cat:{}", cat_key))?;
     let links = get_links(
@@ -158,7 +159,11 @@ pub fn get_events_by_category(category: String) -> ExternResult<Vec<Record>> {
 /// use, a time-bucketed index would be more efficient.
 #[hdk_extern]
 pub fn get_upcoming_events(limit: u32) -> ExternResult<Vec<Record>> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "get_upcoming_events")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "get_upcoming_events",
+    )?;
     let anchor = anchor_hash("all_events")?;
     let links = get_links(
         LinkQuery::try_new(anchor, LinkTypes::AllEvents)?,
@@ -194,12 +199,15 @@ pub fn get_upcoming_events(limit: u32) -> ExternResult<Vec<Record>> {
 /// RSVP to a calendar event.
 #[hdk_extern]
 pub fn rsvp_to_event(rsvp: Rsvp) -> ExternResult<ActionHash> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "rsvp_to_event")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "rsvp_to_event",
+    )?;
 
     // Verify the event exists
-    let _event_record = get(rsvp.event_id.clone(), GetOptions::default())?.ok_or(
-        wasm_error!(WasmErrorInner::Guest("Event not found".into())),
-    )?;
+    let _event_record = get(rsvp.event_id.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Event not found".into())))?;
 
     let action_hash = create_entry(&EntryTypes::Rsvp(rsvp.clone()))?;
 
@@ -227,7 +235,11 @@ pub fn rsvp_to_event(rsvp: Rsvp) -> ExternResult<ActionHash> {
 /// Get all RSVPs for an event.
 #[hdk_extern]
 pub fn get_event_rsvps(event_id: ActionHash) -> ExternResult<Vec<Record>> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "get_event_rsvps")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "get_event_rsvps",
+    )?;
     let links = get_links(
         LinkQuery::try_new(event_id, LinkTypes::EventToRsvp)?,
         GetStrategy::default(),
@@ -238,7 +250,11 @@ pub fn get_event_rsvps(event_id: ActionHash) -> ExternResult<Vec<Record>> {
 /// Get all RSVPs for the calling agent.
 #[hdk_extern]
 pub fn get_my_rsvps(_: ()) -> ExternResult<Vec<Record>> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "get_my_rsvps")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "get_my_rsvps",
+    )?;
     let caller = agent_info()?.agent_initial_pubkey;
     let agent_anchor = anchor_hash(&format!("agent_rsvps:{}", caller))?;
     let links = get_links(
@@ -255,7 +271,11 @@ pub fn get_my_rsvps(_: ()) -> ExternResult<Vec<Record>> {
 /// Cancel an event by deleting its entry. Returns the delete action hash.
 #[hdk_extern]
 pub fn cancel_event(hash: ActionHash) -> ExternResult<ActionHash> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "cancel_event")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "cancel_event",
+    )?;
     // Verify the event exists and was authored by the caller
     let record = get(hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Event not found".into())))?;
@@ -275,7 +295,11 @@ pub fn cancel_event(hash: ActionHash) -> ExternResult<ActionHash> {
 /// Get events near a geographic location using geohash-based indexing.
 #[hdk_extern]
 pub fn get_nearby_events(input: commons_types::geo::NearbyQuery) -> ExternResult<Vec<Record>> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "get_nearby_events")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "get_nearby_events",
+    )?;
     let geohash = commons_types::geo::geohash_encode(input.latitude, input.longitude, 6);
     let geo_anchor = anchor_hash(&format!("geo:{}", geohash))?;
     let links = get_links(
@@ -332,11 +356,7 @@ mod tests {
     #[test]
     fn test_rsvp_status_variants() {
         use community_calendar_integrity::RsvpStatus;
-        let variants = vec![
-            RsvpStatus::Going,
-            RsvpStatus::Maybe,
-            RsvpStatus::NotGoing,
-        ];
+        let variants = vec![RsvpStatus::Going, RsvpStatus::Maybe, RsvpStatus::NotGoing];
         for v in variants {
             let json = serde_json::to_string(&v).unwrap();
             let back: RsvpStatus = serde_json::from_str(&json).unwrap();

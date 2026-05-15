@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -8,6 +7,7 @@ use mycelix_zome_helpers as _;
 use food_distribution_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::{civic_requirement_basic, civic_requirement_proposal};
+use mycelix_zome_helpers as _;
 use mycelix_zome_helpers::records_from_links;
 
 // ============================================================================
@@ -21,7 +21,6 @@ pub struct BridgeEventSignal {
     pub payload: String,
 }
 
-
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
     hash_entry(&EntryTypes::Anchor(anchor))
@@ -33,7 +32,11 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 pub fn create_market(market: Market) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "create_market")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "create_market",
+    )?;
     let action_hash = create_entry(&EntryTypes::Market(market.clone()))?;
 
     create_entry(&EntryTypes::Anchor(Anchor("all_markets".to_string())))?;
@@ -46,10 +49,16 @@ pub fn create_market(market: Market) -> ExternResult<Record> {
 
     // Geohash spatial index
     {
-        let geo_hash = commons_types::geo::geohash_encode(market.location_lat, market.location_lon, 6);
+        let geo_hash =
+            commons_types::geo::geohash_encode(market.location_lat, market.location_lon, 6);
         let geo_anchor_str = format!("geo:{}", geo_hash);
         create_entry(&EntryTypes::Anchor(Anchor(geo_anchor_str.clone())))?;
-        create_link(anchor_hash(&geo_anchor_str)?, action_hash.clone(), LinkTypes::GeoIndex, geo_hash.as_bytes().to_vec())?;
+        create_link(
+            anchor_hash(&geo_anchor_str)?,
+            action_hash.clone(),
+            LinkTypes::GeoIndex,
+            geo_hash.as_bytes().to_vec(),
+        )?;
     }
 
     get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
@@ -72,7 +81,11 @@ pub fn get_all_markets(_: ()) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn list_product(listing: Listing) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "list_product")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "list_product",
+    )?;
     let _market = get(listing.market_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Market not found".into())
     ))?;
@@ -121,7 +134,11 @@ pub fn get_producer_listings(_: ()) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn place_order(order: Order) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "place_order")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "place_order",
+    )?;
     let listing_record = get(order.listing_hash.clone(), GetOptions::default())?.ok_or(
         wasm_error!(WasmErrorInner::Guest("Listing not found".into())),
     )?;
@@ -208,7 +225,11 @@ pub struct UpdateOrderStatusInput {
 
 #[hdk_extern]
 pub fn fulfill_order(input: UpdateOrderStatusInput) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "fulfill_order")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "fulfill_order",
+    )?;
     let record = get(input.order_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Order not found".into())))?;
     let mut order: Order = record
@@ -228,7 +249,11 @@ pub fn fulfill_order(input: UpdateOrderStatusInput) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn cancel_order(order_hash: ActionHash) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "cancel_order")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "cancel_order",
+    )?;
     let record = get(order_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Order not found".into())))?;
     let mut order: Order = record
@@ -293,7 +318,9 @@ pub fn search_allergen_safe(input: AllergenSearchInput) -> ExternResult<Vec<Reco
 
 /// Get food distribution points near a geographic location using geohash-based indexing.
 #[hdk_extern]
-pub fn get_nearby_distribution(input: commons_types::geo::NearbyQuery) -> ExternResult<Vec<Record>> {
+pub fn get_nearby_distribution(
+    input: commons_types::geo::NearbyQuery,
+) -> ExternResult<Vec<Record>> {
     let center_hash = commons_types::geo::geohash_encode(input.latitude, input.longitude, 6);
     let mut all_cells = vec![center_hash.clone()];
     all_cells.extend(commons_types::geo::geohash_neighbors(&center_hash));

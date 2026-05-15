@@ -25,6 +25,7 @@
   import ConnectionNotice from '$lib/components/ConnectionNotice.svelte';
   import TrustGraph from '$lib/components/TrustGraph.svelte';
   import ProofTrail from '$lib/components/ProofTrail.svelte';
+  import ThermodynamicHUD from '$lib/components/ThermodynamicHUD.svelte';
   import { loadReputationBundle, requestReputationProof } from '$lib/reputation';
   import { getProofStatus, markProofFulfilled } from '$lib/stores';
   import RiskChip from '$lib/components/RiskChip.svelte';
@@ -76,6 +77,11 @@
   let knowledgeError = '';
   let knowledgeEpistemic: ReturnType<typeof toDiscreteEpistemic> | null = null;
   let verificationMarketLoading = false;
+
+  // Thermodynamic state
+  $: totalEntropy = (knowledgeSnapshot?.thermodynamic?.production_joules ?? 0) + 
+                    (knowledgeSnapshot?.thermodynamic?.logistics_joules ?? 0);
+  $: isEntropyVerified = knowledgeSnapshot?.thermodynamic?.verified ?? false;
 
   // Purchase state
   let quantity = 1;
@@ -443,6 +449,14 @@
           </div>
 
           <div class="category-tag">{listing.category}</div>
+          
+          <ThermodynamicHUD 
+            total_joules={totalEntropy} 
+            production_joules={knowledgeSnapshot?.thermodynamic?.production_joules ?? 0}
+            logistics_joules={knowledgeSnapshot?.thermodynamic?.logistics_joules ?? 0}
+            verified={isEntropyVerified}
+          />
+
           <div class="risk-row">
             <RiskChip risk={listingRisk} expanded={true} />
             {#if listingRisk && listingRisk.score > 0.5}

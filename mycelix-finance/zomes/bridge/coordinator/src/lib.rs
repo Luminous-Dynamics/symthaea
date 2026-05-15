@@ -14,11 +14,13 @@ use finance_wire_types::{
     UpdateCollateralHealthInput,
 };
 use hdk::prelude::*;
+use mycelix_bridge_common::SovereignProfile;
 use mycelix_finance_shared::{
     anchor_hash, follow_update_chain, verify_caller_is_did, verify_citizen_tier,
     verify_participant_tier,
 };
 use mycelix_finance_types::{FeeTier, TendLimitTier};
+use mycelix_zome_helpers as _;
 
 const FINANCE_HAPP_ID: &str = "mycelix-finance";
 
@@ -44,6 +46,52 @@ const STRICT_GOVERNANCE_MODE: bool = true;
 
 /// 24 hours in microseconds
 const DAY_MICROS: i64 = 24 * 60 * 60 * 1_000_000;
+
+// =============================================================================
+// EXTERNAL SUBSTRATE INTERFACE (Constellation Protocol)
+// =============================================================================
+
+/// Input for granting substrate access to an external satellite cluster.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GrantFinanceAccessInput {
+    pub satellite_agent: AgentPubKey,
+    pub cluster_name: String,
+}
+
+/// Create an Assigned capability grant allowing a satellite hApp to call
+/// this Finance substrate. This is the foundation of the Constellation architecture.
+#[hdk_extern]
+pub fn grant_external_finance_access(input: GrantFinanceAccessInput) -> ExternResult<ActionHash> {
+    let mut functions: HashSet<(ZomeName, FunctionName)> = HashSet::new();
+    functions.insert((zome_info()?.name, "query_sap_balance_remote".into()));
+    functions.insert((zome_info()?.name, "process_payment_remote".into()));
+    functions.insert((zome_info()?.name, "verify_payment_status_remote".into()));
+
+    let access = CapAccess::Assigned {
+        secret: CapSecret::try_from(random_bytes(64)?.into_vec())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Secret generation failed".into())))?,
+        assignees: BTreeSet::from([input.satellite_agent]),
+    };
+
+    create_cap_grant(CapGrantEntry {
+        tag: format!("finance_access:{}", input.cluster_name),
+        access,
+        functions: GrantedFunctions::Listed(functions),
+    })
+}
+
+/// Remote-callable wrapper to query an agent's SAP balance.
+/// Targeted by satellite hApps via call_remote.
+#[hdk_extern]
+pub fn query_sap_balance_remote(member_did: String) -> ExternResult<BalanceResponse> {
+    query_sap_balance(member_did)
+}
+
+/// Remote-callable wrapper to process a payment.
+#[hdk_extern]
+pub fn process_payment_remote(input: ProcessPaymentInput) -> ExternResult<Record> {
+    process_payment(input)
+}
 
 /// Process a cross-hApp payment
 #[hdk_extern]
@@ -597,8 +645,22 @@ pub fn redeem_collateral(deposit_id: String) -> ExternResult<Record> {
 pub fn get_member_fee_tier(member_did: String) -> ExternResult<FeeTierResponse> {
     let mycel_score = fetch_mycel_score(&member_did);
     let tier = FeeTier::from_mycel(mycel_score);
+
+    // Create a sovereign profile placeholder for the response
+    let sovereign_profile = SovereignProfile {
+        epistemic_integrity: mycel_score,
+        thermodynamic_yield: 1.0,
+        network_resilience: 1.0,
+        economic_velocity: mycel_score,
+        civic_participation: 1.0,
+        stewardship_care: 1.0,
+        semantic_resonance: 1.0,
+        domain_competence: 1.0,
+    };
+
     Ok(FeeTierResponse {
         member_did,
+        sovereign_profile,
         mycel_score,
         tier_name: format!("{:?}", tier),
         base_fee_rate: tier.base_fee_rate(),
@@ -2026,16 +2088,34 @@ pub fn deposit_fiat(input: DepositFiatInput) -> ExternResult<Record> {
     )))
 }
 
+/// External resource audit for the Fiat Airbridge (Vector 3).
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ExternalResourceAudit {
+    pub source_institution: String,
+    pub compliance_ref: String,
+    pub is_speculative: bool, // Must be false to pass
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct VerifyFiatDepositInput {
     pub deposit_id: String,
     pub verifier_did: String,
+    pub audit: ExternalResourceAudit, // Vector 3: Membrane Audit
 }
 
 /// Verify a pending fiat deposit and mint SAP. Requires Citizen+ tier.
 #[hdk_extern]
 pub fn verify_fiat_deposit(input: VerifyFiatDepositInput) -> ExternResult<Record> {
     verify_citizen_tier()?;
+
+    // --- CELLULAR MEMBRANE AUDIT (Vector 3) ---
+    // Strictly prevent speculative contagion from the old world.
+    if input.audit.is_speculative {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Airbridge Rejected: Speculative characteristics detected. Resources must be non-rent-seeking.".into()
+        )));
+    }
+
     verify_caller_is_did(&input.verifier_did)?;
 
     let links = get_links(

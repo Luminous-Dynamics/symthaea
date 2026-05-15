@@ -1,6 +1,6 @@
 # Symthaea Workspace Dependency Map
 
-55 workspace members. Dependency graph is a strict DAG (zero circular dependencies).
+63 workspace members. Dependency graph is a strict DAG (zero circular dependencies).
 
 ## Dependency Tiers
 
@@ -48,6 +48,13 @@ Genesis crates (all depend on core + fep):
 Physics & embodiment (all depend on core):
   symthaea-physics       — tokamak plasma encoding
   symthaea-physics-bridge — HDC semantic physics
+  symthaea-sim-bridge    — simulator-agnostic FEA/CFD/multibody/circuit/process bridge traits
+  symthaea-digital-twin  — engineered asset state, telemetry, health, and FEP surprise tracking
+  symthaea-formal-safety — safety cases, proof obligations, and evidence status
+  symthaea-mujoco-bridge — generic MuJoCo SimulationBackend boundary
+  symthaea-opensees-bridge — OpenSees structural SimulationBackend boundary
+  symthaea-ngspice-bridge — ngspice circuit SimulationBackend boundary
+  symthaea-openfoam-bridge — OpenFOAM CFD SimulationBackend boundary
   symthaea-multirotor    — multirotor FEP control
   symthaea-humanoid      — bipedal DMC benchmark
   symthaea-hal           — hardware abstraction
@@ -71,6 +78,7 @@ Consciousness:
   symthaea-hodge                     (core)
 
 Other:
+  symthaea-engineering    (core, sim-bridge, digital-twin, formal-safety)
   symthaea-observability   (core)
   symthaea-sentinel        (core)
   symthaea-crucible        (core)

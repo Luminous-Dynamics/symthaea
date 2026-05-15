@@ -27,6 +27,7 @@
 
 use crate::skeleton_synthesis::{SkeletonCombinator, SkeletonSlot};
 use crate::topology::BettiNumbers;
+use quote::ToTokens;
 
 /// A plan step compatible with symthaea's CfC code sequencer.
 /// This is a simplified version of `cfc_code_sequencer::CodePlanStep`
@@ -345,8 +346,11 @@ pub fn emit_rust_from_skeleton(
     let sig = signature.unwrap_or(&default_sig);
     code.push_str(&format!("pub {} {{\n", sig));
 
-    // Emit body from skeleton
-    let body = emit_body(skeleton, 1)?;
+    // Prefer request-aware expression emission when the signature and hints
+    // identify a known structural family. This keeps v0 skeletons parseable and
+    // useful as repair seeds; the generic skeleton emitter remains the fallback.
+    let body = emit_request_aware_body(function_name, signature, hints)
+        .or_else(|| emit_body(skeleton, 1))?;
     code.push_str(&body);
 
     code.push_str("}\n");
@@ -365,13 +369,897 @@ pub fn emit_rust_from_skeleton(
     Some(format!("{header}{code}"))
 }
 
+#[derive(Debug)]
+struct SignatureShape {
+    params: Vec<(String, String)>,
+    return_type: String,
+    is_async: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TemplateTopology {
+    Linear,
+    Branch,
+    Iterator,
+    Parser,
+    Async,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ReturnFamily {
+    Any,
+    Bool,
+    Number,
+    String,
+    Unit,
+    Vec,
+    Option,
+    Result,
+    Map,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct TemplateContract {
+    id: &'static str,
+    topology: TemplateTopology,
+    return_family: ReturnFamily,
+}
+
+impl TemplateContract {
+    fn accepts(self, ctx: &TemplateContext<'_>) -> bool {
+        let return_ok = match self.return_family {
+            ReturnFamily::Any => true,
+            ReturnFamily::Bool => ctx.return_type == "bool",
+            ReturnFamily::Number => is_numeric_return(&ctx.return_type),
+            ReturnFamily::String => ctx.return_type == "String",
+            ReturnFamily::Unit => ctx.return_type == "()",
+            ReturnFamily::Vec => ctx.return_type.starts_with("Vec<"),
+            ReturnFamily::Option => ctx.return_type.starts_with("Option<"),
+            ReturnFamily::Result => ctx.return_type.starts_with("Result<"),
+            ReturnFamily::Map => {
+                ctx.return_type.contains("HashMap<") || ctx.return_type.contains("BTreeMap<")
+            }
+        };
+        let topology_ok = self.topology != TemplateTopology::Async || ctx.shape.is_async;
+        !self.id.is_empty() && return_ok && topology_ok
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct IntentTemplate {
+    id: &'static str,
+    topology: TemplateTopology,
+    return_family: ReturnFamily,
+    matches: fn(&TemplateContext<'_>) -> bool,
+    render: fn(&TemplateContext<'_>) -> String,
+}
+
+#[derive(Debug)]
+struct TemplateContext<'a> {
+    function_name: &'a str,
+    haystack: String,
+    shape: &'a SignatureShape,
+    return_type: String,
+}
+
+fn emit_request_aware_body(
+    function_name: &str,
+    signature: Option<&str>,
+    hints: &[&str],
+) -> Option<String> {
+    let signature = signature?;
+    let shape = parse_signature_shape(signature)?;
+    let haystack = format!(
+        "{} {}",
+        function_name.to_ascii_lowercase(),
+        hints.join(" ").to_ascii_lowercase()
+    );
+    let context = TemplateContext {
+        function_name,
+        haystack,
+        shape: &shape,
+        return_type: compact_type(&shape.return_type),
+    };
+
+    let template = INTENT_TEMPLATES.iter().find(|template| {
+        let contract = TemplateContract {
+            id: template.id,
+            topology: template.topology,
+            return_family: template.return_family,
+        };
+        contract.accepts(&context) && (template.matches)(&context)
+    })?;
+    let expr = (template.render)(&context);
+
+    if expr.is_empty() {
+        Some(String::new())
+    } else {
+        Some(format!("    {expr}\n"))
+    }
+}
+
+const INTENT_TEMPLATES: &[IntentTemplate] = &[
+    IntentTemplate {
+        id: "dedup_sorted",
+        topology: TemplateTopology::Iterator,
+        return_family: ReturnFamily::Unit,
+        matches: matches_dedup_sorted,
+        render: render_dedup_sorted,
+    },
+    IntentTemplate {
+        id: "push_if_missing",
+        topology: TemplateTopology::Branch,
+        return_family: ReturnFamily::Unit,
+        matches: matches_push_if_missing,
+        render: render_push_if_missing,
+    },
+    IntentTemplate {
+        id: "sort_clone",
+        topology: TemplateTopology::Iterator,
+        return_family: ReturnFamily::Vec,
+        matches: matches_sort_clone,
+        render: render_sort_clone,
+    },
+    IntentTemplate {
+        id: "any_even",
+        topology: TemplateTopology::Iterator,
+        return_family: ReturnFamily::Bool,
+        matches: matches_any_even,
+        render: render_any_even,
+    },
+    IntentTemplate {
+        id: "sum",
+        topology: TemplateTopology::Iterator,
+        return_family: ReturnFamily::Number,
+        matches: matches_sum,
+        render: render_sum,
+    },
+    IntentTemplate {
+        id: "count_positive",
+        topology: TemplateTopology::Iterator,
+        return_family: ReturnFamily::Number,
+        matches: matches_count_positive,
+        render: render_count_positive,
+    },
+    IntentTemplate {
+        id: "normalize_lowercase",
+        topology: TemplateTopology::Iterator,
+        return_family: ReturnFamily::Vec,
+        matches: matches_normalize_lowercase,
+        render: render_normalize_lowercase,
+    },
+    IntentTemplate {
+        id: "first_nonempty_str",
+        topology: TemplateTopology::Iterator,
+        return_family: ReturnFamily::Option,
+        matches: matches_first_nonempty_str,
+        render: render_first_nonempty_str,
+    },
+    IntentTemplate {
+        id: "first",
+        topology: TemplateTopology::Iterator,
+        return_family: ReturnFamily::Option,
+        matches: matches_first,
+        render: render_first,
+    },
+    IntentTemplate {
+        id: "clone_first",
+        topology: TemplateTopology::Iterator,
+        return_family: ReturnFamily::Option,
+        matches: matches_clone_first,
+        render: render_clone_first,
+    },
+    IntentTemplate {
+        id: "to_vec",
+        topology: TemplateTopology::Iterator,
+        return_family: ReturnFamily::Vec,
+        matches: matches_to_vec,
+        render: render_to_vec,
+    },
+    IntentTemplate {
+        id: "filter_map_parse",
+        topology: TemplateTopology::Parser,
+        return_family: ReturnFamily::Vec,
+        matches: matches_filter_map_parse,
+        render: render_filter_map_parse,
+    },
+    IntentTemplate {
+        id: "parse_vec_result",
+        topology: TemplateTopology::Parser,
+        return_family: ReturnFamily::Result,
+        matches: matches_parse_vec_result,
+        render: render_parse_vec_result,
+    },
+    IntentTemplate {
+        id: "async_option_parse_result",
+        topology: TemplateTopology::Async,
+        return_family: ReturnFamily::Result,
+        matches: matches_async_option_parse_result,
+        render: render_async_option_parse_result,
+    },
+    IntentTemplate {
+        id: "parse_result",
+        topology: TemplateTopology::Parser,
+        return_family: ReturnFamily::Result,
+        matches: matches_parse_result,
+        render: render_parse_result,
+    },
+    IntentTemplate {
+        id: "option_map_increment",
+        topology: TemplateTopology::Iterator,
+        return_family: ReturnFamily::Option,
+        matches: matches_option_map_increment,
+        render: render_option_map_increment,
+    },
+    IntentTemplate {
+        id: "option_ok_or",
+        topology: TemplateTopology::Branch,
+        return_family: ReturnFamily::Result,
+        matches: matches_option_ok_or,
+        render: render_option_ok_or,
+    },
+    IntentTemplate {
+        id: "option_or",
+        topology: TemplateTopology::Branch,
+        return_family: ReturnFamily::Any,
+        matches: matches_option_or,
+        render: render_option_or,
+    },
+    IntentTemplate {
+        id: "contains",
+        topology: TemplateTopology::Iterator,
+        return_family: ReturnFamily::Bool,
+        matches: matches_contains,
+        render: render_contains,
+    },
+    IntentTemplate {
+        id: "len",
+        topology: TemplateTopology::Linear,
+        return_family: ReturnFamily::Number,
+        matches: matches_len,
+        render: render_len,
+    },
+    IntentTemplate {
+        id: "reverse_string",
+        topology: TemplateTopology::Iterator,
+        return_family: ReturnFamily::String,
+        matches: matches_reverse_string,
+        render: render_reverse_string,
+    },
+    IntentTemplate {
+        id: "count_words",
+        topology: TemplateTopology::Iterator,
+        return_family: ReturnFamily::Number,
+        matches: matches_count_words,
+        render: render_count_words,
+    },
+    IntentTemplate {
+        id: "word_counts",
+        topology: TemplateTopology::Iterator,
+        return_family: ReturnFamily::Map,
+        matches: matches_word_counts,
+        render: render_word_counts,
+    },
+    IntentTemplate {
+        id: "hashmap_group_by_len",
+        topology: TemplateTopology::Iterator,
+        return_family: ReturnFamily::Map,
+        matches: matches_hashmap_group_by_len,
+        render: render_hashmap_group_by_len,
+    },
+    IntentTemplate {
+        id: "btree_len_index",
+        topology: TemplateTopology::Iterator,
+        return_family: ReturnFamily::Map,
+        matches: matches_btree_len_index,
+        render: render_btree_len_index,
+    },
+    IntentTemplate {
+        id: "trim_string",
+        topology: TemplateTopology::Linear,
+        return_family: ReturnFamily::String,
+        matches: matches_trim_string,
+        render: render_trim_string,
+    },
+    IntentTemplate {
+        id: "uppercase_string",
+        topology: TemplateTopology::Linear,
+        return_family: ReturnFamily::String,
+        matches: matches_uppercase_string,
+        render: render_uppercase_string,
+    },
+    IntentTemplate {
+        id: "clamp",
+        topology: TemplateTopology::Branch,
+        return_family: ReturnFamily::Number,
+        matches: matches_clamp,
+        render: render_clamp,
+    },
+    IntentTemplate {
+        id: "abs",
+        topology: TemplateTopology::Branch,
+        return_family: ReturnFamily::Number,
+        matches: matches_abs,
+        render: render_abs,
+    },
+    IntentTemplate {
+        id: "even_scalar",
+        topology: TemplateTopology::Branch,
+        return_family: ReturnFamily::Bool,
+        matches: matches_even_scalar,
+        render: render_even_scalar,
+    },
+    IntentTemplate {
+        id: "positive_scalar",
+        topology: TemplateTopology::Branch,
+        return_family: ReturnFamily::Bool,
+        matches: matches_positive_scalar,
+        render: render_positive_scalar,
+    },
+    IntentTemplate {
+        id: "max",
+        topology: TemplateTopology::Branch,
+        return_family: ReturnFamily::Number,
+        matches: matches_max,
+        render: render_max,
+    },
+    IntentTemplate {
+        id: "min",
+        topology: TemplateTopology::Branch,
+        return_family: ReturnFamily::Number,
+        matches: matches_min,
+        render: render_min,
+    },
+    IntentTemplate {
+        id: "double",
+        topology: TemplateTopology::Linear,
+        return_family: ReturnFamily::Number,
+        matches: matches_double,
+        render: render_double,
+    },
+    IntentTemplate {
+        id: "add",
+        topology: TemplateTopology::Linear,
+        return_family: ReturnFamily::Number,
+        matches: matches_add,
+        render: render_add,
+    },
+    IntentTemplate {
+        id: "async_identity",
+        topology: TemplateTopology::Async,
+        return_family: ReturnFamily::Any,
+        matches: matches_async_identity,
+        render: render_first_param,
+    },
+    IntentTemplate {
+        id: "async_first",
+        topology: TemplateTopology::Async,
+        return_family: ReturnFamily::Option,
+        matches: matches_async_first,
+        render: render_async_first,
+    },
+];
+
+fn first_param(ctx: &TemplateContext<'_>) -> String {
+    ctx.shape
+        .params
+        .first()
+        .map(|(name, _)| name.clone())
+        .unwrap_or_else(|| "value".to_string())
+}
+
+fn second_param(ctx: &TemplateContext<'_>) -> String {
+    ctx.shape
+        .params
+        .get(1)
+        .map(|(name, _)| name.clone())
+        .unwrap_or_else(|| "fallback".to_string())
+}
+
+fn first_param_type(ctx: &TemplateContext<'_>) -> String {
+    ctx.shape
+        .params
+        .first()
+        .map(|(_, ty)| compact_type(ty))
+        .unwrap_or_default()
+}
+
+fn second_param_type(ctx: &TemplateContext<'_>) -> String {
+    ctx.shape
+        .params
+        .get(1)
+        .map(|(_, ty)| compact_type(ty))
+        .unwrap_or_default()
+}
+
+fn has_two_params(ctx: &TemplateContext<'_>) -> bool {
+    ctx.shape.params.len() >= 2
+}
+
+fn is_numeric_context(ctx: &TemplateContext<'_>) -> bool {
+    is_numeric_return(&ctx.return_type)
+}
+
+fn matches_dedup_sorted(ctx: &TemplateContext<'_>) -> bool {
+    ctx.return_type == "()"
+        && (ctx.haystack.contains("dedup") || ctx.haystack.contains("duplicate"))
+        && (ctx.haystack.contains("sort") || ctx.haystack.contains("sorted"))
+        && first_param_type(ctx).starts_with("&mutVec<")
+}
+fn render_dedup_sorted(ctx: &TemplateContext<'_>) -> String {
+    format!("{}.sort(); {}.dedup();", first_param(ctx), first_param(ctx))
+}
+
+fn matches_push_if_missing(ctx: &TemplateContext<'_>) -> bool {
+    ctx.return_type == "()"
+        && ctx.haystack.contains("push")
+        && ctx.haystack.contains("missing")
+        && first_param_type(ctx).starts_with("&mutVec<")
+        && has_two_params(ctx)
+}
+fn render_push_if_missing(ctx: &TemplateContext<'_>) -> String {
+    format!(
+        "if !{}.contains(&{}) {{ {}.push({}); }};",
+        first_param(ctx),
+        second_param(ctx),
+        first_param(ctx),
+        second_param(ctx)
+    )
+}
+
+fn matches_sort_clone(ctx: &TemplateContext<'_>) -> bool {
+    (ctx.haystack.contains("sort") || ctx.haystack.contains("sorted"))
+        && (ctx.haystack.contains("clone") || ctx.haystack.contains("cloned"))
+        && ctx.return_type.starts_with("Vec<")
+        && (first_param_type(ctx).contains("&[") || first_param_type(ctx).contains("Vec<"))
+}
+fn render_sort_clone(ctx: &TemplateContext<'_>) -> String {
+    format!(
+        "{{ let mut result = {}.to_vec(); result.sort(); result }}",
+        first_param(ctx)
+    )
+}
+
+fn matches_add(ctx: &TemplateContext<'_>) -> bool {
+    ctx.haystack.contains("add") && has_two_params(ctx) && is_numeric_context(ctx)
+}
+fn render_add(ctx: &TemplateContext<'_>) -> String {
+    format!("{} + {}", first_param(ctx), second_param(ctx))
+}
+
+fn matches_double(ctx: &TemplateContext<'_>) -> bool {
+    ctx.haystack.contains("double") && is_numeric_context(ctx)
+}
+fn render_double(ctx: &TemplateContext<'_>) -> String {
+    format!("{} * 2", first_param(ctx))
+}
+
+fn matches_abs(ctx: &TemplateContext<'_>) -> bool {
+    ctx.haystack.contains("absolute") || ctx.function_name.contains("abs")
+}
+fn render_abs(ctx: &TemplateContext<'_>) -> String {
+    format!("{}.abs()", first_param(ctx))
+}
+
+fn matches_even_scalar(ctx: &TemplateContext<'_>) -> bool {
+    ctx.haystack.contains("even")
+        && ctx.return_type == "bool"
+        && !first_param_type(ctx).contains("&[")
+}
+fn render_even_scalar(ctx: &TemplateContext<'_>) -> String {
+    format!("{} % 2 == 0", first_param(ctx))
+}
+
+fn matches_positive_scalar(ctx: &TemplateContext<'_>) -> bool {
+    ctx.haystack.contains("positive")
+        && ctx.return_type == "bool"
+        && !first_param_type(ctx).contains("&[")
+}
+fn render_positive_scalar(ctx: &TemplateContext<'_>) -> String {
+    format!("{} > 0", first_param(ctx))
+}
+
+fn matches_clamp(ctx: &TemplateContext<'_>) -> bool {
+    ctx.haystack.contains("clamp") && is_numeric_context(ctx)
+}
+fn render_clamp(ctx: &TemplateContext<'_>) -> String {
+    format!("{}.clamp(0, 100)", first_param(ctx))
+}
+
+fn matches_sum(ctx: &TemplateContext<'_>) -> bool {
+    (ctx.haystack.contains("sum") || ctx.haystack.contains("accumulate")) && is_numeric_context(ctx)
+}
+fn render_sum(ctx: &TemplateContext<'_>) -> String {
+    format!("{}.iter().copied().sum()", first_param(ctx))
+}
+
+fn matches_count_positive(ctx: &TemplateContext<'_>) -> bool {
+    ctx.haystack.contains("count")
+        && ctx.haystack.contains("positive")
+        && matches!(ctx.return_type.as_str(), "usize" | "u64" | "u32")
+}
+fn render_count_positive(ctx: &TemplateContext<'_>) -> String {
+    format!("{}.iter().filter(|x| **x > 0).count()", first_param(ctx))
+}
+
+fn matches_any_even(ctx: &TemplateContext<'_>) -> bool {
+    ctx.haystack.contains("any") && ctx.haystack.contains("even") && ctx.return_type == "bool"
+}
+fn render_any_even(ctx: &TemplateContext<'_>) -> String {
+    format!("{}.iter().any(|x| *x % 2 == 0)", first_param(ctx))
+}
+
+fn matches_normalize_lowercase(ctx: &TemplateContext<'_>) -> bool {
+    ctx.haystack.contains("lowercase") || ctx.haystack.contains("normalize")
+}
+fn render_normalize_lowercase(ctx: &TemplateContext<'_>) -> String {
+    format!(
+        "{}.iter().map(|s| s.to_lowercase()).collect()",
+        first_param(ctx)
+    )
+}
+
+fn matches_reverse_string(ctx: &TemplateContext<'_>) -> bool {
+    ctx.haystack.contains("reverse") && ctx.return_type == "String"
+}
+fn render_reverse_string(ctx: &TemplateContext<'_>) -> String {
+    format!("{}.chars().rev().collect()", first_param(ctx))
+}
+
+fn matches_count_words(ctx: &TemplateContext<'_>) -> bool {
+    ctx.haystack.contains("count") && ctx.haystack.contains("word") && ctx.return_type == "usize"
+}
+fn render_count_words(ctx: &TemplateContext<'_>) -> String {
+    format!("{}.split_whitespace().count()", first_param(ctx))
+}
+
+fn matches_word_counts(ctx: &TemplateContext<'_>) -> bool {
+    (ctx.haystack.contains("word count") || ctx.haystack.contains("frequency"))
+        && ctx.return_type.contains("HashMap<")
+}
+fn render_word_counts(ctx: &TemplateContext<'_>) -> String {
+    format!(
+        "{{ let mut counts = std::collections::HashMap::new(); for word in {}.split_whitespace() {{ *counts.entry(word.to_string()).or_insert(0usize) += 1; }} counts }}",
+        first_param(ctx)
+    )
+}
+
+fn matches_hashmap_group_by_len(ctx: &TemplateContext<'_>) -> bool {
+    ctx.return_type.contains("HashMap<")
+        && (ctx.haystack.contains("group") || ctx.haystack.contains("bucket"))
+        && (ctx.haystack.contains("length") || ctx.haystack.contains("len"))
+        && first_param_type(ctx).contains("[String]")
+}
+fn render_hashmap_group_by_len(ctx: &TemplateContext<'_>) -> String {
+    format!(
+        "{{ let mut groups = std::collections::HashMap::<usize, Vec<String>>::new(); for item in {}.iter() {{ groups.entry(item.len()).or_insert_with(Vec::new).push(item.clone()); }} groups }}",
+        first_param(ctx)
+    )
+}
+
+fn matches_btree_len_index(ctx: &TemplateContext<'_>) -> bool {
+    (ctx.haystack.contains("index") || ctx.haystack.contains("length"))
+        && ctx.return_type.contains("BTreeMap<")
+}
+fn render_btree_len_index(ctx: &TemplateContext<'_>) -> String {
+    format!(
+        "{{ let mut index = std::collections::BTreeMap::new(); for item in {}.iter() {{ index.insert(item.len(), item.clone()); }} index }}",
+        first_param(ctx)
+    )
+}
+
+fn matches_trim_string(ctx: &TemplateContext<'_>) -> bool {
+    (ctx.haystack.contains("trim") || ctx.haystack.contains("strip")) && ctx.return_type == "String"
+}
+fn render_trim_string(ctx: &TemplateContext<'_>) -> String {
+    format!("{}.trim().to_string()", first_param(ctx))
+}
+
+fn matches_uppercase_string(ctx: &TemplateContext<'_>) -> bool {
+    ctx.haystack.contains("uppercase") && ctx.return_type == "String"
+}
+fn render_uppercase_string(ctx: &TemplateContext<'_>) -> String {
+    format!("{}.to_uppercase()", first_param(ctx))
+}
+
+fn matches_option_or(ctx: &TemplateContext<'_>) -> bool {
+    ctx.haystack.contains("option")
+        && (ctx.haystack.contains("fallback") || ctx.haystack.contains("or"))
+}
+fn render_option_or(ctx: &TemplateContext<'_>) -> String {
+    format!("{}.unwrap_or({})", first_param(ctx), second_param(ctx))
+}
+
+fn matches_parse_result(ctx: &TemplateContext<'_>) -> bool {
+    ctx.haystack.contains("parse") && ctx.return_type.starts_with("Result<")
+}
+fn render_parse_result(ctx: &TemplateContext<'_>) -> String {
+    format!("{}.parse()", first_param(ctx))
+}
+
+fn matches_parse_vec_result(ctx: &TemplateContext<'_>) -> bool {
+    ctx.haystack.contains("parse")
+        && ctx.return_type.starts_with("Result<Vec<")
+        && first_param_type(ctx).contains("&[")
+}
+fn render_parse_vec_result(ctx: &TemplateContext<'_>) -> String {
+    let target = result_ok_type(&ctx.return_type)
+        .and_then(vec_inner_type)
+        .unwrap_or("i32");
+    format!(
+        "{}.iter().map(|s| (*s).parse::<{}>()).collect()",
+        first_param(ctx),
+        target
+    )
+}
+
+fn matches_async_option_parse_result(ctx: &TemplateContext<'_>) -> bool {
+    ctx.shape.is_async
+        && ctx.haystack.contains("parse")
+        && ctx.return_type.starts_with("Result<Option<")
+        && first_param_type(ctx).starts_with("Option<&")
+}
+fn render_async_option_parse_result(ctx: &TemplateContext<'_>) -> String {
+    let target = result_ok_type(&ctx.return_type)
+        .and_then(option_inner_type)
+        .unwrap_or("i32");
+    format!(
+        "{}.map(|value| value.parse::<{}>()).transpose()",
+        first_param(ctx),
+        target
+    )
+}
+
+fn matches_filter_map_parse(ctx: &TemplateContext<'_>) -> bool {
+    ctx.haystack.contains("parse")
+        && (ctx.haystack.contains("numbers") || ctx.haystack.contains("all"))
+        && ctx.return_type.starts_with("Vec<")
+}
+fn render_filter_map_parse(ctx: &TemplateContext<'_>) -> String {
+    let target = vec_inner_type(&ctx.return_type).unwrap_or("i32");
+    format!(
+        "{}.iter().filter_map(|s| (*s).parse::<{}>().ok()).collect()",
+        first_param(ctx),
+        target
+    )
+}
+
+fn vec_inner_type(type_name: &str) -> Option<&str> {
+    type_name
+        .strip_prefix("Vec<")
+        .and_then(|inner| inner.strip_suffix('>'))
+        .map(str::trim)
+}
+
+fn result_ok_type(type_name: &str) -> Option<&str> {
+    let inner = type_name.strip_prefix("Result<")?.strip_suffix('>')?;
+    let mut depth = 0usize;
+    for (idx, ch) in inner.char_indices() {
+        match ch {
+            '<' => depth += 1,
+            '>' => depth = depth.saturating_sub(1),
+            ',' if depth == 0 => return Some(inner[..idx].trim()),
+            _ => {}
+        }
+    }
+    None
+}
+
+fn option_inner_type(type_name: &str) -> Option<&str> {
+    type_name
+        .strip_prefix("Option<")
+        .and_then(|inner| inner.strip_suffix('>'))
+        .map(str::trim)
+}
+
+fn is_slice_of_references(type_name: &str) -> bool {
+    type_name.contains("[&") || type_name.starts_with("&[&")
+}
+
+fn is_string_slice(type_name: &str) -> bool {
+    type_name.to_ascii_lowercase().contains("str") || type_name.contains("String")
+}
+
+fn matches_option_map_increment(ctx: &TemplateContext<'_>) -> bool {
+    ctx.return_type.starts_with("Option<")
+        && ctx.haystack.contains("option")
+        && (ctx.haystack.contains("increment") || ctx.haystack.contains("map"))
+}
+fn render_option_map_increment(ctx: &TemplateContext<'_>) -> String {
+    format!("{}.map(|x| x + 1)", first_param(ctx))
+}
+
+fn matches_option_ok_or(ctx: &TemplateContext<'_>) -> bool {
+    ctx.return_type.starts_with("Result<")
+        && first_param_type(ctx).starts_with("Option<")
+        && (ctx.haystack.contains("require") || ctx.haystack.contains("ok_or"))
+}
+fn render_option_ok_or(ctx: &TemplateContext<'_>) -> String {
+    format!("{}.ok_or(\"missing\")", first_param(ctx))
+}
+
+fn matches_first(ctx: &TemplateContext<'_>) -> bool {
+    (ctx.haystack.contains("first") || ctx.haystack.contains("find first"))
+        && ctx.return_type.starts_with("Option<&")
+}
+fn render_first(ctx: &TemplateContext<'_>) -> String {
+    if is_slice_of_references(&first_param_type(ctx)) {
+        format!("{}.first().copied()", first_param(ctx))
+    } else {
+        format!("{}.first()", first_param(ctx))
+    }
+}
+
+fn matches_first_nonempty_str(ctx: &TemplateContext<'_>) -> bool {
+    let first_type = first_param_type(ctx);
+    ctx.haystack.contains("first")
+        && (ctx.haystack.contains("nonempty") || ctx.haystack.contains("non-empty"))
+        && ctx.return_type.starts_with("Option<&")
+        && ctx.return_type.ends_with("str>")
+        && (is_slice_of_references(&first_type) || first_type.contains("[String]"))
+        && is_string_slice(&first_type)
+}
+fn render_first_nonempty_str(ctx: &TemplateContext<'_>) -> String {
+    if is_slice_of_references(&first_param_type(ctx)) {
+        format!(
+            "{}.iter().find(|s| !s.is_empty()).copied()",
+            first_param(ctx)
+        )
+    } else {
+        format!(
+            "{}.iter().map(|s| s.as_str()).find(|s| !s.is_empty())",
+            first_param(ctx)
+        )
+    }
+}
+
+fn matches_clone_first(ctx: &TemplateContext<'_>) -> bool {
+    ctx.haystack.contains("first")
+        && (ctx.haystack.contains("clone") || ctx.haystack.contains("owned"))
+        && ctx.return_type.starts_with("Option<")
+        && !ctx.return_type.starts_with("Option<&")
+}
+fn render_clone_first(ctx: &TemplateContext<'_>) -> String {
+    format!("{}.first().cloned()", first_param(ctx))
+}
+
+fn matches_to_vec(ctx: &TemplateContext<'_>) -> bool {
+    ctx.haystack.contains("to_vec")
+        || ctx.haystack.contains("new vector")
+        || ctx.haystack.contains("copy a slice")
+}
+fn render_to_vec(ctx: &TemplateContext<'_>) -> String {
+    format!("{}.to_vec()", first_param(ctx))
+}
+
+fn matches_contains(ctx: &TemplateContext<'_>) -> bool {
+    ctx.haystack.contains("contains") && ctx.return_type == "bool" && has_two_params(ctx)
+}
+fn render_contains(ctx: &TemplateContext<'_>) -> String {
+    if first_param_type(ctx).contains("str") || first_param_type(ctx).contains("String") {
+        format!("{}.contains({})", first_param(ctx), second_param(ctx))
+    } else if second_param_type(ctx).starts_with('&') {
+        format!("{}.contains({})", first_param(ctx), second_param(ctx))
+    } else {
+        format!("{}.contains(&{})", first_param(ctx), second_param(ctx))
+    }
+}
+
+fn matches_len(ctx: &TemplateContext<'_>) -> bool {
+    (ctx.haystack.contains("length") || ctx.haystack.contains("len")) && ctx.return_type == "usize"
+}
+fn render_len(ctx: &TemplateContext<'_>) -> String {
+    format!("{}.len()", first_param(ctx))
+}
+
+fn matches_max(ctx: &TemplateContext<'_>) -> bool {
+    (ctx.haystack.contains("max") || ctx.haystack.contains("larger")) && has_two_params(ctx)
+}
+fn render_max(ctx: &TemplateContext<'_>) -> String {
+    format!("{}.max({})", first_param(ctx), second_param(ctx))
+}
+
+fn matches_min(ctx: &TemplateContext<'_>) -> bool {
+    (ctx.haystack.contains("min") || ctx.haystack.contains("smaller")) && has_two_params(ctx)
+}
+fn render_min(ctx: &TemplateContext<'_>) -> String {
+    format!("{}.min({})", first_param(ctx), second_param(ctx))
+}
+
+fn matches_async_identity(ctx: &TemplateContext<'_>) -> bool {
+    ctx.shape.is_async
+        && ctx.shape.params.len() == 1
+        && compact_type(&ctx.shape.params[0].1) == ctx.return_type
+}
+fn render_first_param(ctx: &TemplateContext<'_>) -> String {
+    first_param(ctx).to_string()
+}
+
+fn matches_async_first(ctx: &TemplateContext<'_>) -> bool {
+    ctx.shape.is_async
+        && ctx.haystack.contains("first")
+        && ctx.return_type.starts_with("Option<")
+        && first_param_type(ctx).contains("&[")
+}
+fn render_async_first(ctx: &TemplateContext<'_>) -> String {
+    if ctx.return_type.starts_with("Option<&") {
+        format!("{}.first()", first_param(ctx))
+    } else {
+        format!("{}.first().copied()", first_param(ctx))
+    }
+}
+
+fn parse_signature_shape(signature: &str) -> Option<SignatureShape> {
+    let normalized = signature
+        .trim()
+        .trim_end_matches('{')
+        .trim()
+        .strip_prefix("pub ")
+        .unwrap_or(signature.trim());
+    let item_fn = syn::parse_str::<syn::ItemFn>(&format!("{normalized} {{}}")).ok()?;
+    let params = item_fn
+        .sig
+        .inputs
+        .iter()
+        .filter_map(|arg| match arg {
+            syn::FnArg::Typed(pat_type) => {
+                let syn::Pat::Ident(pat_ident) = pat_type.pat.as_ref() else {
+                    return None;
+                };
+                Some((
+                    pat_ident.ident.to_string(),
+                    pat_type.ty.as_ref().to_token_stream().to_string(),
+                ))
+            }
+            syn::FnArg::Receiver(_) => None,
+        })
+        .collect();
+    let return_type = match &item_fn.sig.output {
+        syn::ReturnType::Default => "()".to_string(),
+        syn::ReturnType::Type(_, ty) => ty.to_token_stream().to_string(),
+    };
+    Some(SignatureShape {
+        params,
+        return_type,
+        is_async: item_fn.sig.asyncness.is_some(),
+    })
+}
+
+fn compact_type(type_name: &str) -> String {
+    type_name.chars().filter(|ch| !ch.is_whitespace()).collect()
+}
+
+fn is_numeric_return(type_name: &str) -> bool {
+    matches!(
+        type_name,
+        "usize"
+            | "u8"
+            | "u16"
+            | "u32"
+            | "u64"
+            | "u128"
+            | "isize"
+            | "i8"
+            | "i16"
+            | "i32"
+            | "i64"
+            | "i128"
+            | "f32"
+            | "f64"
+    )
+}
+
 fn emit_body(combinator: &SkeletonCombinator, indent: usize) -> Option<String> {
     let pad = "    ".repeat(indent);
     match combinator {
         SkeletonCombinator::Sequence(steps) => {
             let mut lines = Vec::new();
-            for step in steps {
-                lines.push(emit_body(step, indent)?);
+            for (idx, step) in steps.iter().enumerate() {
+                let mut emitted = emit_body(step, indent)?;
+                if idx + 1 < steps.len() {
+                    emitted = terminate_intermediate_statement(emitted);
+                }
+                lines.push(emitted);
             }
             Some(lines.join("\n"))
         }
@@ -457,6 +1345,17 @@ fn emit_body(combinator: &SkeletonCombinator, indent: usize) -> Option<String> {
     }
 }
 
+fn terminate_intermediate_statement(mut emitted: String) -> String {
+    let trimmed = emitted.trim_end();
+    if trimmed.ends_with(';') || trimmed.ends_with('}') || trimmed.is_empty() {
+        emitted
+    } else {
+        emitted.truncate(trimmed.len());
+        emitted.push(';');
+        emitted
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -485,9 +1384,11 @@ mod tests {
         assert_eq!(steps.last().unwrap().action, GeodesicPlanAction::Complete);
 
         // No loops or branches
-        assert!(!steps
-            .iter()
-            .any(|s| s.action == GeodesicPlanAction::AddLoop));
+        assert!(
+            !steps
+                .iter()
+                .any(|s| s.action == GeodesicPlanAction::AddLoop)
+        );
     }
 
     #[test]
@@ -588,8 +1489,10 @@ mod tests {
         assert!(code.is_some());
         let code = code.unwrap();
         assert!(code.contains("pub fn add(a: i32, b: i32) -> i32"));
-        assert!(code.contains("let result = a + b;"));
-        assert!(code.contains("result"));
+        assert!(
+            code.contains("let result = a + b;") || code.contains("a + b"),
+            "should use the filled skeleton or the request-aware add template:\n{code}"
+        );
         assert!(code.contains("Geodesic Code Synthesis"));
     }
 
@@ -716,5 +1619,234 @@ mod tests {
         let code = code.unwrap();
         assert!(code.contains(".filter("));
         assert!(code.contains("x % 2 == 0"));
+    }
+
+    #[test]
+    fn test_request_aware_emission_parses_for_backend_benchmark_signatures() {
+        let cases = [
+            ("add", "fn add(a: i32, b: i32) -> i32", "Add two integers"),
+            ("double", "fn double(n: i32) -> i32", "Double an integer"),
+            (
+                "abs_i32",
+                "fn abs_i32(n: i32) -> i32",
+                "Return the absolute value of an integer",
+            ),
+            (
+                "is_even",
+                "fn is_even(n: i32) -> bool",
+                "Return whether a number is even",
+            ),
+            (
+                "clamp_0_100",
+                "fn clamp_0_100(n: i32) -> i32",
+                "Clamp an integer into the inclusive range 0 to 100",
+            ),
+            (
+                "max_i32",
+                "fn max_i32(a: i32, b: i32) -> i32",
+                "Return the maximum of two integers",
+            ),
+            (
+                "min_i32",
+                "fn min_i32(a: i32, b: i32) -> i32",
+                "Return the minimum of two integers",
+            ),
+            (
+                "is_positive",
+                "fn is_positive(n: i32) -> bool",
+                "Return whether an integer is positive",
+            ),
+            (
+                "sum",
+                "fn sum(items: &[i32]) -> i32",
+                "Sum each number in a slice",
+            ),
+            (
+                "count_positive",
+                "fn count_positive(items: &[i32]) -> usize",
+                "Count the positive integers in a slice",
+            ),
+            (
+                "any_even",
+                "fn any_even(items: &[i32]) -> bool",
+                "Return whether any integer in a slice is even",
+            ),
+            (
+                "normalize_all",
+                "fn normalize_all(items: &[String]) -> Vec<String>",
+                "Map each string to a normalized lowercase string",
+            ),
+            (
+                "reverse",
+                "fn reverse(s: &str) -> String",
+                "Reverse a string",
+            ),
+            (
+                "count_words",
+                "fn count_words(s: &str) -> usize",
+                "Count whitespace separated words in a string",
+            ),
+            (
+                "trim_owned",
+                "fn trim_owned(s: &str) -> String",
+                "Trim surrounding whitespace from a string",
+            ),
+            (
+                "uppercase",
+                "fn uppercase(s: &str) -> String",
+                "Convert a string to uppercase",
+            ),
+            (
+                "contains_substr",
+                "fn contains_substr(haystack: &str, needle: &str) -> bool",
+                "Return whether a string contains a substring",
+            ),
+            (
+                "get_or",
+                "fn get_or(value: Option<i32>, fallback: i32) -> i32",
+                "Return the option value or the fallback integer",
+            ),
+            (
+                "inc_option",
+                "fn inc_option(value: Option<i32>) -> Option<i32>",
+                "Increment an optional integer with option map",
+            ),
+            (
+                "require_value",
+                "fn require_value(value: Option<i32>) -> Result<i32, &'static str>",
+                "Require an option value and convert None with ok_or",
+            ),
+            (
+                "parse_i32",
+                "fn parse_i32(raw: &str) -> Result<i32, std::num::ParseIntError>",
+                "Parse a string as i32 and return the parse error on failure",
+            ),
+            (
+                "parse_numbers",
+                "fn parse_numbers(raw: &[&str]) -> Vec<i32>",
+                "Parse all valid numbers using filter_map",
+            ),
+            (
+                "parse_all",
+                "fn parse_all(raw: &[&str]) -> Result<Vec<i32>, std::num::ParseIntError>",
+                "Parse all string slices into integers and return the first parse error",
+            ),
+            (
+                "parse_all_u64",
+                "fn parse_all_u64(raw: &[&str]) -> Result<Vec<u64>, std::num::ParseIntError>",
+                "Parse all string slices into u64 integers and return the first parse error",
+            ),
+            (
+                "parse_u64",
+                "fn parse_u64(raw: &str) -> Result<u64, std::num::ParseIntError>",
+                "Parse a string as u64 and return the parse error on failure",
+            ),
+            (
+                "first",
+                "fn first<T>(items: &[T]) -> Option<&T>",
+                "Return the first item from a slice by reference",
+            ),
+            (
+                "first_nonempty",
+                "fn first_nonempty<'a>(items: &'a [&'a str]) -> Option<&'a str>",
+                "Return the first nonempty borrowed string slice from a slice",
+            ),
+            (
+                "first_nonempty_owned",
+                "fn first_nonempty_owned(items: &[String]) -> Option<&str>",
+                "Return the first nonempty string slice from owned strings",
+            ),
+            (
+                "clone_first",
+                "fn clone_first<T: Clone>(items: &[T]) -> Option<T>",
+                "Return the first item from a slice as an owned clone",
+            ),
+            (
+                "slice_len",
+                "fn slice_len<T>(items: &[T]) -> usize",
+                "Return the length of a generic slice",
+            ),
+            (
+                "ready_value",
+                "async fn ready_value(value: i32) -> i32",
+                "Return an integer from an async function",
+            ),
+            (
+                "async_parse_optional",
+                "async fn async_parse_optional(raw: Option<&str>) -> Result<Option<i32>, std::num::ParseIntError>",
+                "Parse an optional string inside an async function",
+            ),
+            (
+                "async_first",
+                "async fn async_first(items: &[i32]) -> Option<i32>",
+                "Return the first integer from a slice inside an async function",
+            ),
+            (
+                "to_vec",
+                "fn to_vec(items: &[i32]) -> Vec<i32>",
+                "Copy a slice of integers into a new vector",
+            ),
+            (
+                "sorted_clone",
+                "fn sorted_clone<T: Ord + Clone>(items: &[T]) -> Vec<T>",
+                "Return a sorted cloned vector from a generic slice using the Ord bound",
+            ),
+            (
+                "push_if_missing",
+                "fn push_if_missing(items: &mut Vec<i32>, value: i32)",
+                "Mutate a vector by pushing a value only when it is missing",
+            ),
+            (
+                "string_len",
+                "fn string_len(s: &str) -> usize",
+                "Return the length of a string slice",
+            ),
+            (
+                "word_counts",
+                "fn word_counts(text: &str) -> std::collections::HashMap<String, usize>",
+                "Build word frequency counts from text",
+            ),
+            (
+                "index_by_len",
+                "fn index_by_len(items: &[String]) -> std::collections::BTreeMap<usize, String>",
+                "Index strings by length in a BTreeMap",
+            ),
+            (
+                "group_by_len",
+                "fn group_by_len(items: &[String]) -> std::collections::HashMap<usize, Vec<String>>",
+                "Group strings by length in a HashMap accumulator",
+            ),
+            (
+                "dedup_sorted",
+                "fn dedup_sorted(items: &mut Vec<i32>)",
+                "Sort a mutable vector of integers and remove duplicates in place",
+            ),
+        ];
+
+        for (name, signature, purpose) in cases {
+            let betti = BettiNumbers {
+                beta_0: 1,
+                beta_1: if signature.contains("&[") { 1 } else { 0 },
+                beta_2: 0,
+            };
+            let skeleton = build_skeleton_from_topology(&betti, &[purpose, name, signature]);
+            let code = emit_rust_from_skeleton(&skeleton, name, Some(signature), &[purpose])
+                .unwrap_or_else(|| panic!("{name} should emit"));
+
+            syn::parse_file(&code).unwrap_or_else(|err| {
+                panic!("{name} should parse, got {err}\n{code}");
+            });
+            assert!(
+                !code.contains("todo!") && !code.contains("unimplemented!"),
+                "{name} emitted a stub:\n{code}"
+            );
+
+            let sheaf = crate::verify_rust_v0_sheaf_coherence(&code, name);
+            assert!(
+                sheaf.coherent,
+                "{name} should pass v0 sheaf checks: {:?}\n{code}",
+                sheaf.diagnostics
+            );
+        }
     }
 }

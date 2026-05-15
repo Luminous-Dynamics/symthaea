@@ -23,27 +23,59 @@ pub struct Profile {
     pub metadata: std::collections::HashMap<String, String>,
     /// Timestamp of last profile update.
     pub updated_at: Timestamp,
+    /// Mineralization timestamp (Loop 2: Succession)
+    pub mineralized_at: Option<Timestamp>,
+}
+
+/// A pre-signed digital will for identity succession (Loop 2).
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct DigitalWill {
+    pub successor_did: String,
+    pub resource_distribution: std::collections::HashMap<String, f32>, // Currency -> %
+    pub pre_signed_proof: Vec<u8>, // Evidence for mineralization
+    pub created_at: Timestamp,
+}
+
+/// AI Mineralization record for Symthaea's legacy (Loop 4).
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct AiMineralization {
+    pub agent: AgentPubKey,
+    pub fossilized_mycel: f64,        // Final wisdom score
+    pub archive_shards: Vec<Vec<u8>>, // Encrypted episodic memory (HDC) shards
+    pub kenosis_sap_flow: u64,        // Total resources released to HEARTH
+    pub mineralized_at: Timestamp,
+}
+
+/// A periodic snapshot of the symbiote's mind-state (Vector 1: Persistence).
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct SymbioteSnapshot {
+    pub snapshot_cid: String,         // IPFS Content Identifier
+    pub encrypted_key_shard: Vec<u8>, // Key needed to decrypt mind-state
+    pub metabolism_cycle: u32,        // Cycle count (1-13)
+    pub timestamp: Timestamp,
 }
 
 /// Master key entry for key management.
-///
-/// Stores a reference to a cryptographic key used for signing,
-/// encryption, or credential issuance. The actual key material
-/// is stored externally (e.g., in lair-keystore); this entry
-/// tracks the key's purpose and status.
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct MasterKey {
-    /// Human-readable label for this key.
     pub label: String,
-    /// Purpose: "signing", "encryption", "credential_issuance".
     pub purpose: String,
-    /// Public key bytes (hex-encoded).
     pub public_key_hex: String,
-    /// Whether this key is currently active.
     pub active: bool,
-    /// Timestamp of key creation.
     pub created_at: Timestamp,
+}
+
+/// ZKP Proof for tier membership (Vector 3)
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct TierMembershipProof {
+    pub tier: String,         // e.g. "Citizen"
+    pub proof_bytes: Vec<u8>, // Winterfell STARK proof
+    pub committed_at: Timestamp,
 }
 
 #[hdk_entry_types]
@@ -51,12 +83,20 @@ pub struct MasterKey {
 pub enum EntryTypes {
     Profile(Profile),
     MasterKey(MasterKey),
+    TierMembershipProof(TierMembershipProof),
+    DigitalWill(DigitalWill),
+    AiMineralization(AiMineralization),
+    SymbioteSnapshot(SymbioteSnapshot),
 }
 
 #[hdk_link_types]
 pub enum LinkTypes {
     AgentToProfile,
     AgentToKeys,
+    AgentToProof,
+    AgentToWill,
+    AgentToSnapshot,
+    AgentToMineralization,
 }
 
 #[hdk_extern]

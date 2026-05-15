@@ -1,13 +1,11 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 use hdk::prelude::*;
+use mycelix_bridge_common::{civic_requirement_basic, civic_requirement_voting};
 use resource_mesh_integrity::*;
-use mycelix_bridge_common::{
-    civic_requirement_basic, civic_requirement_voting,
-};
 
+use mycelix_zome_helpers as _;
 /// Helper to get an anchor entry hash
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     hash_entry(&EntryTypes::Anchor(Anchor(anchor_str.to_string())))
@@ -31,35 +29,56 @@ pub fn record_sensor_reading(reading: SensorReading) -> ExternResult<Record> {
 
     // Link from resource type
     let type_anchor = ensure_anchor(&format!("resource/{}", reading.resource_type))?;
-    create_link(type_anchor, action_hash.clone(), LinkTypes::ResourceTypeReadings, ())?;
+    create_link(
+        type_anchor,
+        action_hash.clone(),
+        LinkTypes::ResourceTypeReadings,
+        (),
+    )?;
 
     // Link from location
     if !reading.location.is_empty() {
         let loc_anchor = ensure_anchor(&format!("location/{}", reading.location))?;
-        create_link(loc_anchor, action_hash.clone(), LinkTypes::LocationReadings, ())?;
+        create_link(
+            loc_anchor,
+            action_hash.clone(),
+            LinkTypes::LocationReadings,
+            (),
+        )?;
     }
 
     // Link from sensor
     let sensor_anchor = ensure_anchor(&format!("sensor/{}", reading.sensor_id))?;
-    create_link(sensor_anchor, action_hash.clone(), LinkTypes::SensorToReadings, ())?;
+    create_link(
+        sensor_anchor,
+        action_hash.clone(),
+        LinkTypes::SensorToReadings,
+        (),
+    )?;
 
-    let record = get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Record not found".into())))?;
+    let record = get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Record not found".into())
+    ))?;
     Ok(record)
 }
 
 /// Create a resource alert (Participant+).
 #[hdk_extern]
 pub fn create_resource_alert(alert: ResourceAlert) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "create_resource_alert")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "create_resource_alert",
+    )?;
 
     let action_hash = create_entry(&EntryTypes::ResourceAlert(alert))?;
 
     let alerts_anchor = ensure_anchor("all_alerts")?;
     create_link(alerts_anchor, action_hash.clone(), LinkTypes::AllAlerts, ())?;
 
-    let record = get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Record not found".into())))?;
+    let record = get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Record not found".into())
+    ))?;
     Ok(record)
 }
 
@@ -85,16 +104,18 @@ pub fn get_resource_status(input: ResourceStatusInput) -> ExternResult<Vec<Senso
         LinkTypes::ResourceTypeReadings
     };
 
-    let links = get_links(
-        LinkQuery::try_new(base, link_type)?,
-        GetStrategy::default(),
-    )?;
+    let links = get_links(LinkQuery::try_new(base, link_type)?, GetStrategy::default())?;
 
     let mut readings = Vec::new();
     for link in links.into_iter().rev().take(input.limit.min(100)) {
         if let Some(target) = link.target.into_action_hash() {
             if let Some(record) = get(target, GetOptions::default())? {
-                if let Some(reading) = record.entry().to_app_option::<SensorReading>().ok().flatten() {
+                if let Some(reading) = record
+                    .entry()
+                    .to_app_option::<SensorReading>()
+                    .ok()
+                    .flatten()
+                {
                     readings.push(reading);
                 }
             }
@@ -105,8 +126,14 @@ pub fn get_resource_status(input: ResourceStatusInput) -> ExternResult<Vec<Senso
 
 /// Match emergency to available resources (cross-domain).
 #[hdk_extern]
-pub fn match_emergency_to_resources(emergency_description: String) -> ExternResult<Vec<SensorReading>> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "match_emergency")?;
+pub fn match_emergency_to_resources(
+    emergency_description: String,
+) -> ExternResult<Vec<SensorReading>> {
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "match_emergency",
+    )?;
 
     // Aggregate recent readings across all resource types
     let mut all_resources = Vec::new();
@@ -124,14 +151,24 @@ pub fn match_emergency_to_resources(emergency_description: String) -> ExternResu
 /// Publish a demand forecast (Citizen+).
 #[hdk_extern]
 pub fn publish_forecast(forecast: DemandForecast) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_voting(), "publish_forecast")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_voting(),
+        "publish_forecast",
+    )?;
 
     let action_hash = create_entry(&EntryTypes::DemandForecast(forecast))?;
 
     let forecasts_anchor = ensure_anchor("all_forecasts")?;
-    create_link(forecasts_anchor, action_hash.clone(), LinkTypes::AllForecasts, ())?;
+    create_link(
+        forecasts_anchor,
+        action_hash.clone(),
+        LinkTypes::AllForecasts,
+        (),
+    )?;
 
-    let record = get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Record not found".into())))?;
+    let record = get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Record not found".into())
+    ))?;
     Ok(record)
 }

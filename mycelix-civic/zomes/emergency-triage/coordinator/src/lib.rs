@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -10,7 +9,8 @@ use hdk::prelude::*;
 use mycelix_bridge_common::{
     civic_requirement_basic, civic_requirement_proposal, GovernanceEligibility,
 };
-use mycelix_zome_helpers::{get_latest_record};
+use mycelix_zome_helpers as _;
+use mycelix_zome_helpers::get_latest_record;
 
 /// Helper to get an anchor entry hash
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -18,12 +18,15 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     hash_entry(&EntryTypes::Anchor(anchor))
 }
 
-
 /// Triage a patient
 
 #[hdk_extern]
 pub fn triage_patient(input: TriagePatientInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_basic(), "triage_patient")?;
+    mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_basic(),
+        "triage_patient",
+    )?;
     if input.patient_id.is_empty() || input.patient_id.len() > 128 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Patient ID must be 1-128 characters".into()
@@ -115,7 +118,11 @@ pub struct TriagePatientInput {
 /// Update a triage assessment (re-triage)
 #[hdk_extern]
 pub fn update_triage(input: UpdateTriageInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "update_triage")?;
+    mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_proposal(),
+        "update_triage",
+    )?;
     let current_record = get(input.original_triage_hash.clone(), GetOptions::default())?.ok_or(
         wasm_error!(WasmErrorInner::Guest("Triage record not found".into())),
     )?;

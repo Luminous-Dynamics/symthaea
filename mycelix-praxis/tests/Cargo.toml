@@ -7,75 +7,61 @@ license = "AGPL-3.0-or-later"
 
 [dependencies]
 praxis-core = { path = "../crates/praxis-core" }
-# edunet-agg excluded — has workspace inheritance issues when outside workspace
 
-# Learning zome dependencies (for integration tests)
+# Learning zome dependencies
 learning_integrity = { path = "../zomes/learning_zome/integrity" }
 learning_coordinator = { path = "../zomes/learning_zome/coordinator" }
 
-# FL zome dependencies (for integration tests)
+# FL zome dependencies
 fl_integrity = { path = "../zomes/fl_zome/integrity" }
 fl_coordinator = { path = "../zomes/fl_zome/coordinator" }
 
-# Credential zome dependencies (for integration tests)
+# Credential zome dependencies
 credential_integrity = { path = "../zomes/credential_zome/integrity" }
 credential_coordinator = { path = "../zomes/credential_zome/coordinator" }
 
-# DAO zome dependencies (for integration tests)
+# DAO zome dependencies
 dao_integrity = { path = "../zomes/dao_zome/integrity" }
 dao_coordinator = { path = "../zomes/dao_zome/coordinator" }
 
-# Learning Pods zome dependencies (for integration tests)
+# Learning Pods zome dependencies
 pods_integrity = { path = "../zomes/pods_zome/integrity" }
 pods_coordinator = { path = "../zomes/pods_zome/coordinator" }
 
-# Knowledge Roots zome dependencies (for integration tests)
+# Knowledge Roots zome dependencies
 knowledge_integrity = { path = "../zomes/knowledge_zome/integrity" }
 knowledge_coordinator = { path = "../zomes/knowledge_zome/coordinator" }
 
-# SRS zome dependencies (for differentiation tests)
+# SRS zome dependencies
 srs_integrity = { path = "../zomes/srs_zome/integrity" }
 srs_coordinator = { path = "../zomes/srs_zome/coordinator" }
 
-# Gamification zome dependencies (for differentiation tests)
+# Gamification zome dependencies
 gamification_integrity = { path = "../zomes/gamification_zome/integrity" }
 gamification_coordinator = { path = "../zomes/gamification_zome/coordinator" }
 
-# Adaptive Learning zome dependencies (for differentiation tests)
+# Adaptive Learning zome dependencies
 adaptive_integrity = { path = "../zomes/adaptive_zome/integrity" }
 adaptive_coordinator = { path = "../zomes/adaptive_zome/coordinator" }
 
-# Integration Layer zome dependencies (for differentiation tests)
+# Integration Layer zome dependencies
 integration_integrity = { path = "../zomes/integration_zome/integrity" }
 integration_coordinator = { path = "../zomes/integration_zome/coordinator" }
 
-# Holochain dependencies (for integration testing)
 hdk = "0.6.0"
 hdi = "0.7.0"
-
-# Holochain testing dependencies
-holochain = { version = "0.6", features = ["test_utils", "sweettest"] }
-holochain_types = "0.6"
-
-# Async runtime for tests
-tokio = { version = "1.35", features = ["full", "test-util"] }
-
-# Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-
-# Utilities
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
-uuid = { version = "1.6", features = ["v4"] }
 
-# Random generation
+[dev-dependencies]
+holochain = { version = "0.6", features = ["test_utils", "sweettest"] }
+holochain_types = "0.6"
+tokio = { version = "1", features = ["full", "test-util"] }
+uuid = { version = "1.6", features = ["v4"] }
 rand = "0.8"
 rand_chacha = "0.3"
 rand_distr = "0.4"
-
-# WASM compatibility: Force getrandom 0.2.x to enable "js" feature
-# This ensures that the transitive dependency (via rand_core) has WASM support
-getrandom = { version = "0.2", features = ["js"] }
 
 [lib]
 name = "fixtures"

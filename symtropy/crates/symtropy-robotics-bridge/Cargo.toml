@@ -3,23 +3,12 @@ name = "symtropy-robotics-bridge"
 version = "0.1.0"
 edition = "2021"
 license = "AGPL-3.0-or-later"
-description = "Bridge Symthaea robotics platforms into the Symtropy game engine"
 
 [dependencies]
+bevy = { version = "0.18", default-features = false, features = ["bevy_core_pipeline", "bevy_render", "bevy_pbr", "bevy_asset", "bevy_winit", "x11", "bevy_log", "bevy_color", "bevy_state"] }
+symtropy-bevy-core = { path = "../symtropy-bevy-core" }
+symthaea-bevy-brain = { path = "../symthaea-bevy-brain" }
 symtropy-math = { path = "../symtropy-math" }
 symtropy-physics = { path = "../symtropy-physics" }
-symtropy-consciousness-physics = { path = "../symtropy-consciousness-physics" }
-symthaea-fep = { path = "../../../symthaea/crates/symthaea-fep" }
-symthaea-consciousness-equation = { path = "../../../symthaea/crates/symthaea-consciousness-equation" }
+serde = { version = "1.0", features = ["derive"] }
 nalgebra = "0.34"
-
-# Used only by the `phi_trace_sim_driven_*` examples for platform-
-# truth observation streams. Example-only; not part of the library API.
-[dev-dependencies]
-symthaea-core = { path = "../../../symthaea/symthaea-core" }
-symthaea-multirotor = { path = "../../../symthaea/crates/symthaea-multirotor" }
-symthaea-manipulator = { path = "../../../symthaea/crates/symthaea-manipulator" }
-symthaea-helicopter = { path = "../../../symthaea/crates/symthaea-helicopter" }
-symthaea-auv = { path = "../../../symthaea/crates/symthaea-auv" }
-symthaea-vehicle = { path = "../../../symthaea/crates/symthaea-vehicle" }
-symthaea-humanoid = { path = "../../../symthaea/crates/symthaea-humanoid" }

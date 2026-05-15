@@ -174,11 +174,25 @@ pub struct TickPacket<const D: usize> {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Command<const D: usize> {
-    ApplyForce { net_id: u64, force_bits: BitsVec<D> },
-    ApplyImpulse { net_id: u64, impulse_bits: BitsVec<D> },
-    SetLinearVelocity { net_id: u64, velocity_bits: BitsVec<D> },
-    SetAngularVelocity { net_id: u64, matrix_bits: BitsMat<D> },
-    Wake { net_id: u64 },
+    ApplyForce {
+        net_id: u64,
+        force_bits: BitsVec<D>,
+    },
+    ApplyImpulse {
+        net_id: u64,
+        impulse_bits: BitsVec<D>,
+    },
+    SetLinearVelocity {
+        net_id: u64,
+        velocity_bits: BitsVec<D>,
+    },
+    SetAngularVelocity {
+        net_id: u64,
+        matrix_bits: BitsMat<D>,
+    },
+    Wake {
+        net_id: u64,
+    },
 }
 
 impl<const D: usize> Command<D> {
@@ -285,10 +299,16 @@ pub fn capture_world_snapshot<const D: usize>(
                 BodyType::Static => 1,
                 BodyType::Kinematic => 2,
             },
-            translation: BitsVec(std::array::from_fn(|i| body.transform.translation.0[i].to_bits())),
-            rotation: BitsMat(std::array::from_fn(|r| std::array::from_fn(|c| rot[(r, c)].to_bits()))),
+            translation: BitsVec(std::array::from_fn(|i| {
+                body.transform.translation.0[i].to_bits()
+            })),
+            rotation: BitsMat(std::array::from_fn(|r| {
+                std::array::from_fn(|c| rot[(r, c)].to_bits())
+            })),
             linear_velocity: BitsVec(std::array::from_fn(|i| body.linear_velocity[i].to_bits())),
-            angular_velocity: BitsMat(std::array::from_fn(|r| std::array::from_fn(|c| ang[(r, c)].to_bits()))),
+            angular_velocity: BitsMat(std::array::from_fn(|r| {
+                std::array::from_fn(|c| ang[(r, c)].to_bits())
+            })),
             sleeping: body.sleeping,
             sleep_counter: body.sleep_counter,
         });
@@ -320,18 +340,19 @@ pub fn apply_world_snapshot<const D: usize>(
             return Err(SnapshotError::BodyTypeMismatch { net_id: b.net_id });
         }
 
-        let t = SVector::<f64, D>::from(std::array::from_fn(|i| f64::from_bits(b.translation.0[i])));
+        let t =
+            SVector::<f64, D>::from(std::array::from_fn(|i| f64::from_bits(b.translation.0[i])));
         body.transform.translation = Point(t);
 
         let rot = SMatrix::<f64, D, D>::from_fn(|r, c| f64::from_bits(b.rotation.0[r][c]));
         body.transform.rotation = Rotor::from_matrix(rot);
 
-        let v =
-            SVector::<f64, D>::from(std::array::from_fn(|i| f64::from_bits(b.linear_velocity.0[i])));
+        let v = SVector::<f64, D>::from(std::array::from_fn(|i| {
+            f64::from_bits(b.linear_velocity.0[i])
+        }));
         body.linear_velocity = v;
 
-        let ang =
-            SMatrix::<f64, D, D>::from_fn(|r, c| f64::from_bits(b.angular_velocity.0[r][c]));
+        let ang = SMatrix::<f64, D, D>::from_fn(|r, c| f64::from_bits(b.angular_velocity.0[r][c]));
         body.angular_velocity = Bivector::from_matrix(&ang);
 
         body.sleeping = b.sleeping;
@@ -487,7 +508,11 @@ impl<T: Transport, const D: usize> LockstepSession<T, D> {
                             };
                             let msg = LockstepMessage::ResyncResponse(resp);
                             if let Ok(data) = rmp_serde::to_vec(&msg) {
-                                let _ = self.transport.send(PeerId(req.requester), Channel::Reliable, &data);
+                                let _ = self.transport.send(
+                                    PeerId(req.requester),
+                                    Channel::Reliable,
+                                    &data,
+                                );
                             }
                         }
                         LockstepMessage::ResyncResponse(resp) => {
@@ -572,36 +597,48 @@ impl<T: Transport, const D: usize> LockstepSession<T, D> {
                     let Some(handle) = world.handle_for_net_id(NetId(*net_id)) else {
                         return Err(format!("unknown net_id {net_id}"));
                     };
-                    let force =
-                        SVector::<f64, D>::from(std::array::from_fn(|i| f64::from_bits(force_bits.0[i])));
+                    let force = SVector::<f64, D>::from(std::array::from_fn(|i| {
+                        f64::from_bits(force_bits.0[i])
+                    }));
                     let Some(body) = world.body_mut(handle) else {
                         return Err(format!("missing body for net_id {net_id}"));
                     };
                     body.apply_force(force);
                 }
-                Command::ApplyImpulse { net_id, impulse_bits } => {
+                Command::ApplyImpulse {
+                    net_id,
+                    impulse_bits,
+                } => {
                     let Some(handle) = world.handle_for_net_id(NetId(*net_id)) else {
                         return Err(format!("unknown net_id {net_id}"));
                     };
-                    let impulse =
-                        SVector::<f64, D>::from(std::array::from_fn(|i| f64::from_bits(impulse_bits.0[i])));
+                    let impulse = SVector::<f64, D>::from(std::array::from_fn(|i| {
+                        f64::from_bits(impulse_bits.0[i])
+                    }));
                     let Some(body) = world.body_mut(handle) else {
                         return Err(format!("missing body for net_id {net_id}"));
                     };
                     integrator::apply_impulse(body, &impulse);
                 }
-                Command::SetLinearVelocity { net_id, velocity_bits } => {
+                Command::SetLinearVelocity {
+                    net_id,
+                    velocity_bits,
+                } => {
                     let Some(handle) = world.handle_for_net_id(NetId(*net_id)) else {
                         return Err(format!("unknown net_id {net_id}"));
                     };
-                    let vel =
-                        SVector::<f64, D>::from(std::array::from_fn(|i| f64::from_bits(velocity_bits.0[i])));
+                    let vel = SVector::<f64, D>::from(std::array::from_fn(|i| {
+                        f64::from_bits(velocity_bits.0[i])
+                    }));
                     let Some(body) = world.body_mut(handle) else {
                         return Err(format!("missing body for net_id {net_id}"));
                     };
                     body.linear_velocity = vel;
                 }
-                Command::SetAngularVelocity { net_id, matrix_bits } => {
+                Command::SetAngularVelocity {
+                    net_id,
+                    matrix_bits,
+                } => {
                     let Some(handle) = world.handle_for_net_id(NetId(*net_id)) else {
                         return Err(format!("unknown net_id {net_id}"));
                     };
@@ -656,9 +693,9 @@ impl<T: Transport, const D: usize> LockstepSession<T, D> {
         if self.peers.len() < expected_members {
             // Still broadcast our tick packet (so others can learn us), but don't step.
             if self.sent_tick_packet_for_tick != Some(self.tick) {
-                let packet =
-                    self.build_local_tick_packet(world, local_commands)
-                        .map_err(|e| format!("build tick packet failed: {e:?}"))?;
+                let packet = self
+                    .build_local_tick_packet(world, local_commands)
+                    .map_err(|e| format!("build tick packet failed: {e:?}"))?;
                 self.broadcast_tick_packet(&packet);
                 self.packets_by_tick
                     .entry(self.tick)
@@ -670,9 +707,9 @@ impl<T: Transport, const D: usize> LockstepSession<T, D> {
         }
 
         if self.sent_tick_packet_for_tick != Some(self.tick) {
-            let packet =
-                self.build_local_tick_packet(world, local_commands)
-                    .map_err(|e| format!("build tick packet failed: {e:?}"))?;
+            let packet = self
+                .build_local_tick_packet(world, local_commands)
+                .map_err(|e| format!("build tick packet failed: {e:?}"))?;
             self.broadcast_tick_packet(&packet);
             self.packets_by_tick
                 .entry(self.tick)
@@ -827,10 +864,16 @@ mod tests {
             let mut stepped_b = false;
             for _ in 0..8 {
                 if !stepped_a {
-                    stepped_a = matches!(a.pump(&mut wa, dt, ca.clone()).unwrap(), LockstepProgress::Stepped);
+                    stepped_a = matches!(
+                        a.pump(&mut wa, dt, ca.clone()).unwrap(),
+                        LockstepProgress::Stepped
+                    );
                 }
                 if !stepped_b {
-                    stepped_b = matches!(b.pump(&mut wb, dt, cb.clone()).unwrap(), LockstepProgress::Stepped);
+                    stepped_b = matches!(
+                        b.pump(&mut wb, dt, cb.clone()).unwrap(),
+                        LockstepProgress::Stepped
+                    );
                 }
                 if stepped_a && stepped_b {
                     break;
@@ -855,10 +898,16 @@ mod tests {
         let mut stepped_b = false;
         for _ in 0..16 {
             if !stepped_a {
-                stepped_a = matches!(a.pump(&mut wa, dt, ca.clone()).unwrap(), LockstepProgress::Stepped);
+                stepped_a = matches!(
+                    a.pump(&mut wa, dt, ca.clone()).unwrap(),
+                    LockstepProgress::Stepped
+                );
             }
             if !stepped_b {
-                stepped_b = matches!(b.pump(&mut wb, dt, cb.clone()).unwrap(), LockstepProgress::Stepped);
+                stepped_b = matches!(
+                    b.pump(&mut wb, dt, cb.clone()).unwrap(),
+                    LockstepProgress::Stepped
+                );
             }
             if stepped_a && stepped_b {
                 break;

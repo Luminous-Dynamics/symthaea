@@ -11,6 +11,8 @@
 //! - `Dyn*` + `DynamicsPhaseResult` — dynamics phase output
 //! - `Fb*` + `FeedbackPhaseResult` — feedback phase output
 
+#[cfg(feature = "vision-manifold")]
+use super::types::MentalMovie;
 use super::types::MoralJudgmentSummary;
 use super::{CycleUrgency, ResponseStrategy};
 use symthaea_core::hdc::binary_hv::BinaryHV;
@@ -493,4 +495,7 @@ pub(super) struct FeedbackPhaseResult {
     pub(super) grid_encoding_norm: f32,
     pub(super) grid_spatial_complexity: f32,
     pub(super) social_learning_rate_factor: f32,
+    /// Mental movie generated from mental simulation.
+    #[cfg(feature = "vision-manifold")]
+    pub(super) mental_movie: Option<MentalMovie>,
 }

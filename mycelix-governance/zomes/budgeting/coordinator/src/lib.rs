@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -22,6 +21,7 @@ use mycelix_zome_helpers as _;
 
 use budgeting_integrity::*;
 use hdk::prelude::*;
+use mycelix_zome_helpers as _;
 use serde::{Deserialize, Serialize};
 
 // ============================================================================
@@ -55,10 +55,14 @@ pub fn create_cycle(input: BudgetCycle) -> ExternResult<ActionHash> {
     require_consciousness_tier(3)?;
 
     if input.total_budget == 0 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Budget must be > 0".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Budget must be > 0".into()
+        )));
     }
     if input.voice_credits_per_voter == 0 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Voice credits must be > 0".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Voice credits must be > 0".into()
+        )));
     }
 
     let action_hash = create_entry(&EntryTypes::BudgetCycle(input.clone()))?;
@@ -67,7 +71,12 @@ pub fn create_cycle(input: BudgetCycle) -> ExternResult<ActionHash> {
     create_link(all_anchor, action_hash.clone(), LinkTypes::AllCycles, ())?;
 
     let phase_anchor = ensure_anchor(&format!("cycles:{:?}", input.phase))?;
-    create_link(phase_anchor, action_hash.clone(), LinkTypes::CyclePhaseIndex, ())?;
+    create_link(
+        phase_anchor,
+        action_hash.clone(),
+        LinkTypes::CyclePhaseIndex,
+        (),
+    )?;
 
     Ok(action_hash)
 }
@@ -105,18 +114,25 @@ pub fn advance_cycle_phase(input: AdvanceCycleInput) -> ExternResult<ActionHash>
 
     let record = get(input.cycle_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Cycle not found".into())))?;
-    let mut cycle: BudgetCycle = record.entry().to_app_option()
+    let mut cycle: BudgetCycle = record
+        .entry()
+        .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not a BudgetCycle".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Not a BudgetCycle".into()
+        )))?;
 
     cycle.phase = match cycle.phase {
         BudgetPhase::Proposal => BudgetPhase::Deliberation,
         BudgetPhase::Deliberation => BudgetPhase::Voting,
         BudgetPhase::Voting => BudgetPhase::Execution,
         BudgetPhase::Execution => BudgetPhase::Complete,
-        other => return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Cannot advance from phase {:?}", other)
-        ))),
+        other => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Cannot advance from phase {:?}",
+                other
+            ))))
+        }
     };
 
     // If entering Execution phase, compute allocations
@@ -142,27 +158,42 @@ pub fn submit_project(input: BudgetProject) -> ExternResult<ActionHash> {
     require_consciousness_tier(input.status as u8)?; // Uses the cycle's min tier
 
     if input.requested_amount == 0 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Requested amount must be > 0".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Requested amount must be > 0".into()
+        )));
     }
     if input.minimum_amount > input.requested_amount {
-        return Err(wasm_error!(WasmErrorInner::Guest("Minimum cannot exceed requested amount".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Minimum cannot exceed requested amount".into()
+        )));
     }
     let milestone_total: u8 = input.milestones.iter().map(|m| m.percentage).sum();
     if !input.milestones.is_empty() && milestone_total != 100 {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Milestone percentages must sum to 100, got {}", milestone_total)
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Milestone percentages must sum to 100, got {}",
+            milestone_total
+        ))));
     }
 
     let action_hash = create_entry(&EntryTypes::BudgetProject(input.clone()))?;
 
     // Link cycle → project
     let cycle_anchor = ensure_anchor(&format!("cycle_projects:{}", input.cycle_id))?;
-    create_link(cycle_anchor, action_hash.clone(), LinkTypes::CycleToProject, ())?;
+    create_link(
+        cycle_anchor,
+        action_hash.clone(),
+        LinkTypes::CycleToProject,
+        (),
+    )?;
 
     // Link agent → project
     let agent_anchor = ensure_anchor(&format!("agent_projects:{}", input.proposer_did))?;
-    create_link(agent_anchor, action_hash.clone(), LinkTypes::AgentToProject, ())?;
+    create_link(
+        agent_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentToProject,
+        (),
+    )?;
 
     Ok(action_hash)
 }
@@ -189,18 +220,24 @@ pub fn get_cycle_projects(cycle_id: String) -> ExternResult<Vec<Record>> {
 /// Get a specific project by hash.
 #[hdk_extern]
 pub fn get_project(hash: ActionHash) -> ExternResult<Record> {
-    get(hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Project not found".into())))
+    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Project not found".into()
+    )))
 }
 
 /// Withdraw a project (proposer only).
 #[hdk_extern]
 pub fn withdraw_project(project_hash: ActionHash) -> ExternResult<ActionHash> {
-    let record = get(project_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Project not found".into())))?;
-    let mut project: BudgetProject = record.entry().to_app_option()
+    let record = get(project_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Project not found".into())
+    ))?;
+    let mut project: BudgetProject = record
+        .entry()
+        .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not a BudgetProject".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Not a BudgetProject".into()
+        )))?;
 
     project.status = ProjectStatus::Withdrawn;
     update_entry(project_hash, &EntryTypes::BudgetProject(project))
@@ -220,18 +257,33 @@ pub fn cast_budget_vote(input: BudgetVote) -> ExternResult<ActionHash> {
     require_consciousness_tier(input.voter_tier)?;
 
     if input.credits_spent == 0 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Must spend at least 1 credit".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Must spend at least 1 credit".into()
+        )));
     }
 
     let action_hash = create_entry(&EntryTypes::BudgetVote(input.clone()))?;
 
     // Link project → vote
     let project_anchor = ensure_anchor(&format!("project_votes:{}", input.project_id))?;
-    create_link(project_anchor, action_hash.clone(), LinkTypes::ProjectToVote, ())?;
+    create_link(
+        project_anchor,
+        action_hash.clone(),
+        LinkTypes::ProjectToVote,
+        (),
+    )?;
 
     // Link agent → vote
-    let agent_anchor = ensure_anchor(&format!("agent_votes:{}:{}", input.voter_did, input.cycle_id))?;
-    create_link(agent_anchor, action_hash.clone(), LinkTypes::AgentToVote, ())?;
+    let agent_anchor = ensure_anchor(&format!(
+        "agent_votes:{}:{}",
+        input.voter_did, input.cycle_id
+    ))?;
+    create_link(
+        agent_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentToVote,
+        (),
+    )?;
 
     Ok(action_hash)
 }
@@ -258,7 +310,10 @@ pub fn get_project_votes(project_id: String) -> ExternResult<Vec<Record>> {
 /// Get votes cast by a specific agent in a cycle.
 #[hdk_extern]
 pub fn get_my_votes(input: MyVotesInput) -> ExternResult<Vec<Record>> {
-    let anchor = ensure_anchor(&format!("agent_votes:{}:{}", input.voter_did, input.cycle_id))?;
+    let anchor = ensure_anchor(&format!(
+        "agent_votes:{}:{}",
+        input.voter_did, input.cycle_id
+    ))?;
     let links = get_links(
         LinkQuery::try_new(anchor, LinkTypes::AgentToVote)?,
         GetStrategy::Local,
@@ -294,9 +349,13 @@ pub fn tally_cycle_votes(cycle_id: String) -> ExternResult<Vec<ProjectTally>> {
     let mut tallies: Vec<ProjectTally> = Vec::new();
 
     for project_record in &projects {
-        let project: BudgetProject = project_record.entry().to_app_option()
+        let project: BudgetProject = project_record
+            .entry()
+            .to_app_option()
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-            .ok_or(wasm_error!(WasmErrorInner::Guest("Not a BudgetProject".into())))?;
+            .ok_or(wasm_error!(WasmErrorInner::Guest(
+                "Not a BudgetProject".into()
+            )))?;
 
         if project.status == ProjectStatus::Withdrawn {
             continue;
@@ -332,8 +391,11 @@ pub fn tally_cycle_votes(cycle_id: String) -> ExternResult<Vec<ProjectTally>> {
     }
 
     // Sort by effective_weight descending
-    tallies.sort_by(|a, b| b.effective_weight.partial_cmp(&a.effective_weight)
-        .unwrap_or(core::cmp::Ordering::Equal));
+    tallies.sort_by(|a, b| {
+        b.effective_weight
+            .partial_cmp(&a.effective_weight)
+            .unwrap_or(core::cmp::Ordering::Equal)
+    });
 
     Ok(tallies)
 }
@@ -417,8 +479,16 @@ pub fn complete_milestone(input: CompleteMilestoneInput) -> ExternResult<ActionH
 
     let action_hash = create_entry(&EntryTypes::Disbursement(disbursement.clone()))?;
 
-    let project_anchor = ensure_anchor(&format!("project_disbursements:{}", disbursement.project_id))?;
-    create_link(project_anchor, action_hash.clone(), LinkTypes::ProjectToDisbursement, ())?;
+    let project_anchor = ensure_anchor(&format!(
+        "project_disbursements:{}",
+        disbursement.project_id
+    ))?;
+    create_link(
+        project_anchor,
+        action_hash.clone(),
+        LinkTypes::ProjectToDisbursement,
+        (),
+    )?;
 
     Ok(action_hash)
 }
@@ -463,21 +533,33 @@ mod tests {
     fn project_tally_sorts_by_weight() {
         let mut tallies = vec![
             ProjectTally {
-                project_id: "low".into(), title: "Low".into(),
-                requested_amount: 1000, minimum_amount: 500,
-                effective_weight: 2.5, total_credits_spent: 10, voter_count: 3,
+                project_id: "low".into(),
+                title: "Low".into(),
+                requested_amount: 1000,
+                minimum_amount: 500,
+                effective_weight: 2.5,
+                total_credits_spent: 10,
+                voter_count: 3,
                 beneficiary_domain: "commons:housing".into(),
             },
             ProjectTally {
-                project_id: "high".into(), title: "High".into(),
-                requested_amount: 2000, minimum_amount: 1000,
-                effective_weight: 8.3, total_credits_spent: 80, voter_count: 15,
+                project_id: "high".into(),
+                title: "High".into(),
+                requested_amount: 2000,
+                minimum_amount: 1000,
+                effective_weight: 8.3,
+                total_credits_spent: 80,
+                voter_count: 15,
                 beneficiary_domain: "civic:emergency".into(),
             },
             ProjectTally {
-                project_id: "mid".into(), title: "Mid".into(),
-                requested_amount: 500, minimum_amount: 200,
-                effective_weight: 5.0, total_credits_spent: 30, voter_count: 7,
+                project_id: "mid".into(),
+                title: "Mid".into(),
+                requested_amount: 500,
+                minimum_amount: 200,
+                effective_weight: 5.0,
+                total_credits_spent: 30,
+                voter_count: 7,
                 beneficiary_domain: "commons:food".into(),
             },
         ];
@@ -505,9 +587,24 @@ mod tests {
     #[test]
     fn milestone_percentages_validation() {
         let milestones = vec![
-            ProjectMilestone { description: "Phase 1".into(), percentage: 30, verified: false, verifier_did: None },
-            ProjectMilestone { description: "Phase 2".into(), percentage: 40, verified: false, verifier_did: None },
-            ProjectMilestone { description: "Phase 3".into(), percentage: 30, verified: false, verifier_did: None },
+            ProjectMilestone {
+                description: "Phase 1".into(),
+                percentage: 30,
+                verified: false,
+                verifier_did: None,
+            },
+            ProjectMilestone {
+                description: "Phase 2".into(),
+                percentage: 40,
+                verified: false,
+                verifier_did: None,
+            },
+            ProjectMilestone {
+                description: "Phase 3".into(),
+                percentage: 30,
+                verified: false,
+                verifier_did: None,
+            },
         ];
         let total: u8 = milestones.iter().map(|m| m.percentage).sum();
         assert_eq!(total, 100);

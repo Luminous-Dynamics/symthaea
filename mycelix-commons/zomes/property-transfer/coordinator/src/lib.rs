@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -8,17 +7,24 @@ use mycelix_bridge_common::{civic_requirement_proposal, civic_requirement_voting
 use mycelix_zome_helpers::get_latest_record;
 use property_transfer_integrity::*;
 
+use mycelix_zome_helpers as _;
 
 /// Get or create an anchor entry and return its EntryHash for use as link base
 fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_string.to_string());
-    if let Err(e) = create_entry(&EntryTypes::Anchor(anchor.clone())) { debug!("Anchor creation warning: {:?}", e); }
+    if let Err(e) = create_entry(&EntryTypes::Anchor(anchor.clone())) {
+        debug!("Anchor creation warning: {:?}", e);
+    }
     hash_entry(&anchor)
 }
 
 #[hdk_extern]
 pub fn initiate_transfer(input: InitiateTransferInput) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "initiate_transfer")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "initiate_transfer",
+    )?;
 
     let now = sys_time()?;
     let transfer = Transfer {
@@ -141,7 +147,11 @@ fn update_transfer_status(transfer_id: &str, new_status: TransferStatus) -> Exte
 /// 4. Broadcasts ownership change event via bridge
 #[hdk_extern]
 pub fn complete_transfer(transfer_id: String) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_voting(), "complete_transfer")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_voting(),
+        "complete_transfer",
+    )?;
 
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(

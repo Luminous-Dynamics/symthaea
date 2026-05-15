@@ -1,0 +1,77 @@
+name: Symtropy CI
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'symtropy/**'
+      - 'symthaea/crates/symthaea-consciousness-equation/**'
+      - 'symthaea/crates/symthaea-fep/**'
+      - '.github/workflows/symtropy-ci.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'symtropy/**'
+      - 'symthaea/crates/symthaea-consciousness-equation/**'
+      - 'symthaea/crates/symthaea-fep/**'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  verify-core-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libx11-dev libxcursor-dev libxi-dev libxrandr-dev libxkbcommon-dev libwayland-dev libgl1-mesa-dev
+          
+      - name: Install mold linker
+        run: sudo apt-get install -y mold
+          
+      - name: Install just
+        uses: extractions/setup-just@v2
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: symtropy -> target
+
+      - name: Verify core (Linux)
+        run: cd symtropy && just verify-core
+
+  verify-governance-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y mold
+      - name: Install just
+        uses: extractions/setup-just@v2
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: symtropy -> target
+      - name: Verify governance (Headless)
+        run: cd symtropy && just verify-governance
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build core crates (macOS)
+        run: |
+          cd symtropy
+          cargo check -p symtropy-math -p symtropy-physics -p symtropy-render-bridge -p symtropy-bevy-core -p symtropy-net-core -p symtropy-robotics-bridge-core -p symtropy-rapier3d-bridge -p symtropy-core
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build core crates (Windows)
+        run: |
+          cd symtropy
+          cargo check -p symtropy-math -p symtropy-physics -p symtropy-render-bridge -p symtropy-bevy-core -p symtropy-net-core -p symtropy-robotics-bridge-core -p symtropy-rapier3d-bridge -p symtropy-core

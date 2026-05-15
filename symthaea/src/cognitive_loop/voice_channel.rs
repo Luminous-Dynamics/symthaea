@@ -133,6 +133,8 @@ impl VoiceSynthesisChannel {
                 signed_output: None,
                 #[cfg(feature = "identity")]
                 assurance_level: Default::default(),
+                #[cfg(feature = "vision-manifold")]
+                mental_movie: None,
             };
 
             let audio = orchestrator.synthesize_from_cycle_result(&latest.text, &cycle_result);

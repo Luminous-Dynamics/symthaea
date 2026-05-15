@@ -2,16 +2,23 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Energy Investments Coordinator Zome
+
 use hdk::prelude::*;
 use investments_integrity::*;
-use mycelix_energy_shared::batch::links_to_records;
 use mycelix_energy_shared::anchors::anchor_hash;
+use mycelix_energy_shared::batch::links_to_records;
+use mycelix_zome_helpers as _;
 
 #[hdk_extern]
 pub fn pledge_investment(input: PledgeInput) -> ExternResult<Record> {
     let now = sys_time()?;
     let investment = Investment {
-        id: format!("investment:{}:{}:{}", input.project_id, input.investor_did, now.as_micros()),
+        id: format!(
+            "investment:{}:{}:{}",
+            input.project_id,
+            input.investor_did,
+            now.as_micros()
+        ),
         project_id: input.project_id.clone(),
         investor_did: input.investor_did.clone(),
         amount: input.amount,
@@ -25,9 +32,20 @@ pub fn pledge_investment(input: PledgeInput) -> ExternResult<Record> {
     };
 
     let action_hash = create_entry(&EntryTypes::Investment(investment))?;
-    create_link(anchor_hash(&input.project_id)?, action_hash.clone(), LinkTypes::ProjectToInvestments, ())?;
-    create_link(anchor_hash(&input.investor_did)?, action_hash.clone(), LinkTypes::InvestorToInvestments, ())?;
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    create_link(
+        anchor_hash(&input.project_id)?,
+        action_hash.clone(),
+        LinkTypes::ProjectToInvestments,
+        (),
+    )?;
+    create_link(
+        anchor_hash(&input.investor_did)?,
+        action_hash.clone(),
+        LinkTypes::InvestorToInvestments,
+        (),
+    )?;
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -43,25 +61,44 @@ pub struct PledgeInput {
 
 #[hdk_extern]
 pub fn confirm_investment(investment_id: String) -> ExternResult<Record> {
-    let filter = ChainQueryFilter::new().entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Investment)?)).include_entries(true);
+    let filter = ChainQueryFilter::new()
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Investment,
+        )?))
+        .include_entries(true);
     for record in query(filter)? {
         if let Some(investment) = record.entry().to_app_option::<Investment>().ok().flatten() {
             if investment.id == investment_id {
                 let now = sys_time()?;
-                let confirmed = Investment { status: InvestmentStatus::Confirmed, confirmed: Some(now), ..investment };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Investment(confirmed))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let confirmed = Investment {
+                    status: InvestmentStatus::Confirmed,
+                    confirmed: Some(now),
+                    ..investment
+                };
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::Investment(confirmed),
+                )?;
+                return get(action_hash, GetOptions::default())?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Investment not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Investment not found".into()
+    )))
 }
 
 #[hdk_extern]
 pub fn distribute_dividend(input: DividendInput) -> ExternResult<Record> {
     let now = sys_time()?;
     let dividend = Dividend {
-        id: format!("dividend:{}:{}:{}", input.project_id, input.investor_did, now.as_micros()),
+        id: format!(
+            "dividend:{}:{}:{}",
+            input.project_id,
+            input.investor_did,
+            now.as_micros()
+        ),
         project_id: input.project_id,
         investor_did: input.investor_did.clone(),
         amount: input.amount,
@@ -73,8 +110,14 @@ pub fn distribute_dividend(input: DividendInput) -> ExternResult<Record> {
     };
 
     let action_hash = create_entry(&EntryTypes::Dividend(dividend))?;
-    create_link(anchor_hash(&input.investor_did)?, action_hash.clone(), LinkTypes::InvestorToDividends, ())?;
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    create_link(
+        anchor_hash(&input.investor_did)?,
+        action_hash.clone(),
+        LinkTypes::InvestorToDividends,
+        (),
+    )?;
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -93,7 +136,10 @@ pub struct DividendInput {
 /// OPTIMIZED: Uses batch query to avoid N+1 pattern
 #[hdk_extern]
 pub fn get_investor_portfolio(did: String) -> ExternResult<Vec<Record>> {
-    let links = get_links(LinkQuery::try_new(anchor_hash(&did)?, LinkTypes::InvestorToInvestments)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&did)?, LinkTypes::InvestorToInvestments)?,
+        GetStrategy::default(),
+    )?;
     // FIXED N+1: Use batch fetch instead of individual get() calls
     links_to_records(links)
 }
@@ -103,7 +149,10 @@ pub fn get_investor_portfolio(did: String) -> ExternResult<Vec<Record>> {
 /// OPTIMIZED: Uses batch query to avoid N+1 pattern
 #[hdk_extern]
 pub fn get_project_investments(project_id: String) -> ExternResult<Vec<Record>> {
-    let links = get_links(LinkQuery::try_new(anchor_hash(&project_id)?, LinkTypes::ProjectToInvestments)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&project_id)?, LinkTypes::ProjectToInvestments)?,
+        GetStrategy::default(),
+    )?;
     // FIXED N+1: Use batch fetch instead of individual get() calls
     links_to_records(links)
 }
@@ -112,7 +161,9 @@ pub fn get_project_investments(project_id: String) -> ExternResult<Vec<Record>> 
 #[hdk_extern]
 pub fn get_investment(investment_id: String) -> ExternResult<Option<Record>> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Investment)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Investment,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
@@ -129,7 +180,9 @@ pub fn get_investment(investment_id: String) -> ExternResult<Option<Record>> {
 #[hdk_extern]
 pub fn cancel_investment(input: CancelInvestmentInput) -> ExternResult<Record> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Investment)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Investment,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
@@ -137,24 +190,34 @@ pub fn cancel_investment(input: CancelInvestmentInput) -> ExternResult<Record> {
             if investment.id == input.investment_id {
                 // Only investor can cancel
                 if investment.investor_did != input.requester_did {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Only investor can cancel".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only investor can cancel".into()
+                    )));
                 }
 
                 // Can only cancel pledged investments
                 if investment.status != InvestmentStatus::Pledged {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Can only cancel pledged investments".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Can only cancel pledged investments".into()
+                    )));
                 }
 
                 let cancelled = Investment {
                     status: InvestmentStatus::Cancelled,
                     ..investment
                 };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Investment(cancelled))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::Investment(cancelled),
+                )?;
+                return get(action_hash, GetOptions::default())?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Investment not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Investment not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -168,7 +231,10 @@ pub struct CancelInvestmentInput {
 /// OPTIMIZED: Uses batch query to avoid N+1 pattern
 #[hdk_extern]
 pub fn get_investor_dividends(did: String) -> ExternResult<Vec<Record>> {
-    let links = get_links(LinkQuery::try_new(anchor_hash(&did)?, LinkTypes::InvestorToDividends)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&did)?, LinkTypes::InvestorToDividends)?,
+        GetStrategy::default(),
+    )?;
     // FIXED N+1: Use batch fetch instead of individual get() calls
     links_to_records(links)
 }
@@ -177,7 +243,9 @@ pub fn get_investor_dividends(did: String) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn get_investments_by_status(status: InvestmentStatus) -> ExternResult<Vec<Record>> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Investment)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Investment,
+        )?))
         .include_entries(true);
 
     let mut results = Vec::new();
@@ -195,7 +263,9 @@ pub fn get_investments_by_status(status: InvestmentStatus) -> ExternResult<Vec<R
 #[hdk_extern]
 pub fn get_investments_by_type(investment_type: InvestmentType) -> ExternResult<Vec<Record>> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Investment)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Investment,
+        )?))
         .include_entries(true);
 
     let mut results = Vec::new();
@@ -213,7 +283,9 @@ pub fn get_investments_by_type(investment_type: InvestmentType) -> ExternResult<
 #[hdk_extern]
 pub fn get_project_total_investment(project_id: String) -> ExternResult<ProjectTotalInvestment> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Investment)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Investment,
+        )?))
         .include_entries(true);
 
     let mut total_amount = 0.0;
@@ -222,7 +294,9 @@ pub fn get_project_total_investment(project_id: String) -> ExternResult<ProjectT
 
     for record in query(filter)? {
         if let Some(investment) = record.entry().to_app_option::<Investment>().ok().flatten() {
-            if investment.project_id == project_id && investment.status == InvestmentStatus::Confirmed {
+            if investment.project_id == project_id
+                && investment.status == InvestmentStatus::Confirmed
+            {
                 total_amount += investment.amount;
                 total_shares += investment.shares;
                 investor_count += 1;
@@ -248,9 +322,13 @@ pub struct ProjectTotalInvestment {
 
 /// Distribute dividends to all project investors
 #[hdk_extern]
-pub fn distribute_project_dividends(input: DistributeProjectDividendsInput) -> ExternResult<Vec<Record>> {
+pub fn distribute_project_dividends(
+    input: DistributeProjectDividendsInput,
+) -> ExternResult<Vec<Record>> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Investment)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Investment,
+        )?))
         .include_entries(true);
 
     let now = sys_time()?;
@@ -260,7 +338,9 @@ pub fn distribute_project_dividends(input: DistributeProjectDividendsInput) -> E
     let mut project_investments = Vec::new();
     for record in query(filter)? {
         if let Some(investment) = record.entry().to_app_option::<Investment>().ok().flatten() {
-            if investment.project_id == input.project_id && investment.status == InvestmentStatus::Confirmed {
+            if investment.project_id == input.project_id
+                && investment.status == InvestmentStatus::Confirmed
+            {
                 project_investments.push(investment);
             }
         }
@@ -270,7 +350,9 @@ pub fn distribute_project_dividends(input: DistributeProjectDividendsInput) -> E
     let total_shares: f64 = project_investments.iter().map(|i| i.shares).sum();
 
     if total_shares == 0.0 {
-        return Err(wasm_error!(WasmErrorInner::Guest("No confirmed investments for project".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "No confirmed investments for project".into()
+        )));
     }
 
     // Distribute proportionally
@@ -279,7 +361,12 @@ pub fn distribute_project_dividends(input: DistributeProjectDividendsInput) -> E
         let dividend_amount = input.total_amount * share_ratio;
 
         let dividend = Dividend {
-            id: format!("dividend:{}:{}:{}", input.project_id, investment.investor_did, now.as_micros()),
+            id: format!(
+                "dividend:{}:{}:{}",
+                input.project_id,
+                investment.investor_did,
+                now.as_micros()
+            ),
             project_id: input.project_id.clone(),
             investor_did: investment.investor_did.clone(),
             amount: dividend_amount,
@@ -291,7 +378,12 @@ pub fn distribute_project_dividends(input: DistributeProjectDividendsInput) -> E
         };
 
         let action_hash = create_entry(&EntryTypes::Dividend(dividend))?;
-        create_link(anchor_hash(&investment.investor_did)?, action_hash.clone(), LinkTypes::InvestorToDividends, ())?;
+        create_link(
+            anchor_hash(&investment.investor_did)?,
+            action_hash.clone(),
+            LinkTypes::InvestorToDividends,
+            (),
+        )?;
 
         if let Some(record) = get(action_hash, GetOptions::default())? {
             dividends.push(record);
@@ -315,7 +407,9 @@ pub struct DistributeProjectDividendsInput {
 #[hdk_extern]
 pub fn update_investment_amount(input: UpdateInvestmentAmountInput) -> ExternResult<Record> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Investment)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Investment,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
@@ -323,12 +417,16 @@ pub fn update_investment_amount(input: UpdateInvestmentAmountInput) -> ExternRes
             if investment.id == input.investment_id {
                 // Only investor can update
                 if investment.investor_did != input.requester_did {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Only investor can update".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only investor can update".into()
+                    )));
                 }
 
                 // Can only update pledged investments
                 if investment.status != InvestmentStatus::Pledged {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Can only update pledged investments".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Can only update pledged investments".into()
+                    )));
                 }
 
                 let updated = Investment {
@@ -337,12 +435,18 @@ pub fn update_investment_amount(input: UpdateInvestmentAmountInput) -> ExternRes
                     share_percentage: input.new_share_percentage,
                     ..investment
                 };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Investment(updated))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::Investment(updated),
+                )?;
+                return get(action_hash, GetOptions::default())?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Investment not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Investment not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -358,7 +462,9 @@ pub struct UpdateInvestmentAmountInput {
 #[hdk_extern]
 pub fn get_portfolio_summary(did: String) -> ExternResult<PortfolioSummary> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Investment)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Investment,
+        )?))
         .include_entries(true);
 
     let mut total_invested = 0.0;
@@ -381,7 +487,9 @@ pub fn get_portfolio_summary(did: String) -> ExternResult<PortfolioSummary> {
 
     // Get total dividends received
     let dividend_filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Dividend)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Dividend,
+        )?))
         .include_entries(true);
 
     let mut total_dividends = 0.0;
@@ -758,7 +866,7 @@ mod tests {
             investor_did: "did:mycelix:investor1".to_string(),
             total_invested: 100000.0,
             total_shares: 2000.0,
-            project_count: 15, // Multiple investments
+            project_count: 15,  // Multiple investments
             unique_projects: 8, // In 8 different projects
             total_dividends_received: 5000.0,
         };

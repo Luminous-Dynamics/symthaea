@@ -30,6 +30,7 @@ use symtropy_consciousness_physics::safety::SafetyTier;
 use symtropy_physics::BodyHandle;
 use symtropy_robotics_bridge::agent::RoboticAgent;
 use symtropy_robotics_bridge::platform::PlatformType;
+use symtropy_robotics_bridge::RoboticAgentTrait;
 
 #[inline]
 fn sprint_floor_gain(signal: f64, sprint_threshold: f64, floor: f64) -> f64 {

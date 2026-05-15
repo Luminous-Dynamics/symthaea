@@ -95,13 +95,15 @@ pub struct ProofMetadata {
 pub struct AuthenticatedProof {
     /// The ZK proof bytes (RISC0 receipt or Winterfell STARK).
     pub proof: ProofBytes,
-    /// CRYSTALS-Dilithium5 signature over (domain_tag || metadata || proof_hash).
+    /// CRYSTALS-Dilithium5 signature over (domain_tag || metadata || proof_hash || joules).
     /// Empty if Dilithium is not enabled.
     pub signature: Vec<u8>,
     /// Proof metadata (domain, timestamp, nonce, client_id, backend).
     pub metadata: ProofMetadata,
     /// SHA-256 of any application-specific public inputs.
     pub public_inputs_hash: [u8; 32],
+    /// Energy consumed during proof generation (Joules), verified by hardware.
+    pub joules_consumed: f64,
 }
 
 impl AuthenticatedProof {

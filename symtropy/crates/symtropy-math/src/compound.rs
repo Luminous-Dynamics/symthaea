@@ -43,6 +43,21 @@ pub struct CompoundShape<const D: usize> {
     cached_radius: f64,
 }
 
+impl<const D: usize> Clone for CompoundShape<D> {
+    fn clone(&self) -> Self {
+        let children = self
+            .children
+            .iter()
+            .map(|(tf, child)| (tf.clone(), child.clone_box()))
+            .collect();
+        Self {
+            children,
+            cached_center: self.cached_center,
+            cached_radius: self.cached_radius,
+        }
+    }
+}
+
 impl<const D: usize> CompoundShape<D> {
     /// Create an empty compound shape.
     pub fn new() -> Self {
@@ -53,12 +68,24 @@ impl<const D: usize> CompoundShape<D> {
         }
     }
 
+    /// Create a compound shape from a single shape.
+    pub fn from_shape(shape: Box<dyn Shape<D>>) -> Self {
+        let mut s = Self::new();
+        s.add_child(Transform::identity(), shape);
+        s
+    }
+
     /// Add a child shape at the given local-frame transform.
     ///
     /// Recomputes the cached bounding sphere after each addition.
     pub fn add_child(&mut self, transform: Transform<D>, shape: Box<dyn Shape<D>>) {
         self.children.push((transform, shape));
         self.recompute_bounding();
+    }
+
+    /// Access the child shapes and their local transforms.
+    pub fn children(&self) -> &[(Transform<D>, Box<dyn Shape<D>>)] {
+        &self.children
     }
 
     /// Number of child shapes.
@@ -142,6 +169,10 @@ impl<const D: usize> Shape<D> for CompoundShape<D> {
 
     fn as_any(&self) -> &dyn std::any::Any {
         self
+    }
+
+    fn clone_box(&self) -> Box<dyn Shape<D>> {
+        Box::new(self.clone())
     }
 }
 

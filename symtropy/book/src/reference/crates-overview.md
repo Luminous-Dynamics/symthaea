@@ -10,6 +10,8 @@ Symtropy is a Cargo workspace with 29 crate manifests. The crates fall into thre
 | `symtropy-physics` | `PhysicsWorld<D>`, GJK+EPA, CCD, joints, replay | [link](https://crates.io/crates/symtropy-physics) |
 | `symtropy-render-bridge` | ND->Bevy projection, 4D cross-section slicing | [link](https://crates.io/crates/symtropy-render-bridge) |
 | `symtropy-bevy-core` | Generic Bevy physics plugin over `PhysicsCallback` | [link](https://crates.io/crates/symtropy-bevy-core) |
+| `symtropy-net-core` | Spatial authority and lockstep protocol (permissive part) | private / planned |
+| `symtropy-robotics-bridge-core` | `PlatformType` and `RoboticAgent` trait (permissive part) | private / planned |
 | `symtropy-bevy-scene` | Opinionated scene/camera scaffolding for examples | private / planned |
 | `symtropy-devconsole` | Debug console and inspector scaffolding | private / planned |
 | `symtropy-cli` | Project/demo generation and calibration helpers | private / planned |
@@ -54,6 +56,8 @@ symtropy-math                                   (no deps)
   └→ symtropy-physics                           (permissive)
         ├→ symtropy-render-bridge               (permissive)
         ├→ symtropy-bevy-core                   (permissive)
+        ├→ symtropy-net-core                    (permissive)
+        ├→ symtropy-robotics-bridge-core        (permissive)
         └→ symtropy-consciousness-physics       (AGPL)
               ├→ symtropy-bevy                  (AGPL)
               ├→ symtropy-robotics-bridge       (AGPL)

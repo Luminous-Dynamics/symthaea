@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -9,8 +8,8 @@ use mycelix_zome_helpers as _;
 use hdk::prelude::*;
 use housing_clt_integrity::*;
 use mycelix_bridge_common::{civic_requirement_basic, civic_requirement_proposal};
+use mycelix_zome_helpers as _;
 use mycelix_zome_helpers::get_latest_record;
-
 
 /// Input for verifying a property before creating a CLT lease
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -37,7 +36,11 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 pub fn create_land_trust(trust: LandTrust) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "create_land_trust")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "create_land_trust",
+    )?;
     if trust.name.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Trust name must be at most 256 characters".into()
@@ -62,7 +65,12 @@ pub fn create_land_trust(trust: LandTrust) -> ExternResult<Record> {
         let geo_hash = commons_types::geo::geohash_encode(centroid_lat, centroid_lon, 6);
         let geo_anchor_str = format!("geo:{}", geo_hash);
         create_entry(&EntryTypes::Anchor(Anchor(geo_anchor_str.clone())))?;
-        create_link(anchor_hash(&geo_anchor_str)?, action_hash.clone(), LinkTypes::GeoIndex, geo_hash.as_bytes().to_vec())?;
+        create_link(
+            anchor_hash(&geo_anchor_str)?,
+            action_hash.clone(),
+            LinkTypes::GeoIndex,
+            geo_hash.as_bytes().to_vec(),
+        )?;
     }
 
     get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
@@ -83,7 +91,11 @@ pub struct UpdateLandTrustInput {
 /// Update a land trust entry (general-purpose update replacing the whole entry)
 #[hdk_extern]
 pub fn update_land_trust(input: UpdateLandTrustInput) -> ExternResult<ActionHash> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "update_land_trust")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "update_land_trust",
+    )?;
     update_entry(
         input.original_action_hash,
         &EntryTypes::LandTrust(input.updated_entry),
@@ -99,7 +111,11 @@ pub struct UpdateGroundLeaseInput {
 /// Update a ground lease entry (general-purpose update replacing the whole entry)
 #[hdk_extern]
 pub fn update_ground_lease(input: UpdateGroundLeaseInput) -> ExternResult<ActionHash> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "update_ground_lease")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "update_ground_lease",
+    )?;
     update_entry(
         input.original_action_hash,
         &EntryTypes::GroundLease(input.updated_entry),
@@ -213,7 +229,11 @@ pub fn verify_property_for_lease(
 /// Issue a ground lease for a unit under the trust
 #[hdk_extern]
 pub fn issue_ground_lease(lease: GroundLease) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "issue_ground_lease")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "issue_ground_lease",
+    )?;
     let action_hash = create_entry(&EntryTypes::GroundLease(lease.clone()))?;
 
     // Link trust to lease
@@ -264,8 +284,11 @@ pub struct CalculateResaleInput {
 /// - Hybrid: min(appreciation_cap_result, ami_result)
 #[hdk_extern]
 pub fn calculate_max_resale_price(input: CalculateResaleInput) -> ExternResult<Record> {
-    let _eligibility =
-        mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "calculate_max_resale_price")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "calculate_max_resale_price",
+    )?;
     let lease_record = get(input.lease_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Lease not found".into())))?;
 
@@ -359,7 +382,11 @@ pub struct TransferLeaseInput {
 /// Transfer a ground lease to a new leaseholder
 #[hdk_extern]
 pub fn transfer_lease(input: TransferLeaseInput) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "transfer_lease")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "transfer_lease",
+    )?;
     let record = get(input.lease_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Lease not found".into())))?;
 
@@ -415,8 +442,11 @@ pub struct GenerateAffordabilityInput {
 /// Generate an affordability report for a trust
 #[hdk_extern]
 pub fn generate_affordability_report(input: GenerateAffordabilityInput) -> ExternResult<Record> {
-    let _eligibility =
-        mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "generate_affordability_report")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "generate_affordability_report",
+    )?;
     let now = sys_time()?;
 
     // Affordability ratio = (average monthly cost * 12) / median annual income
@@ -481,7 +511,11 @@ pub struct UpdateTrustBoardInput {
 /// Update the stewardship board of a land trust
 #[hdk_extern]
 pub fn update_trust_board(input: UpdateTrustBoardInput) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "update_trust_board")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "update_trust_board",
+    )?;
     if input.new_board.is_empty() {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Board must have at least one member".into()

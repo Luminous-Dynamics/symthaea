@@ -1,0 +1,17 @@
+[package]
+name = "symtropy-rapier3d-bridge"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+description = "Bridge between Rapier3D and Symtropy's state-coupling framework."
+repository = "https://github.com/luminous-dynamics/symtropy"
+keywords = ["physics", "rapier3d", "simulation", "bevy"]
+categories = ["science", "simulation", "game-engines"]
+
+[dependencies]
+symtropy-math = { path = "../symtropy-math" }
+symtropy-physics = { path = "../symtropy-physics" }
+symtropy-robotics-bridge-core = { path = "../symtropy-robotics-bridge-core" }
+rapier3d = "0.22"
+nalgebra = "0.34"
+bevy = { version = "0.18", default-features = false }

@@ -379,6 +379,8 @@ pub struct DisputeCase {
 pub struct OracleState {
     /// Network vitality score (0-100)
     pub vitality: u32,
+    /// Total thermodynamic yield in the constellation (Loop 3)
+    pub total_yield_kwh: f32,
     /// Current TEND limit tier (derived from vitality)
     pub tier: TendLimitTier,
     /// When this state was last updated

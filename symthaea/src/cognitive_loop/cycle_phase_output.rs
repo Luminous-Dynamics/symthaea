@@ -1395,22 +1395,7 @@ impl CognitiveLoopService {
         // Vision manifold telemetry
         #[cfg(feature = "vision-manifold")]
         if let Some(ref tel) = perception.vision_telemetry {
-            metadata.vision = Some(super::VisionManifoldTelemetry {
-                vision_active: true,
-                prediction_error: tel.prediction_error,
-                manifold_coherence: tel.manifold_coherence,
-                attention_entropy: tel.attention_entropy,
-                num_salient_patches: tel.num_salient_patches,
-                frame_sequence: tel.frame_sequence,
-                training_triggered: tel.training_triggered,
-                scene_recognition_similarity: tel.scene_recognition_similarity,
-                cross_manifold_prediction_error: perception.cross_manifold_prediction_error,
-                encode_time_us: tel.encode_time_us,
-                evolve_time_us: tel.evolve_time_us,
-                vision_mean_surprise: perception.vision_mean_surprise,
-                vision_horizon_errors: mem::take(&mut perception.vision_horizon_errors),
-                scene_recognized: perception.scene_recognized,
-            });
+            metadata.vision = Some(tel.clone());
         }
 
         // Foveation bridge telemetry
@@ -1687,6 +1672,13 @@ impl CognitiveLoopService {
                 self.carryover.quality.safety_motor_halt || self.carryover.quality.subsystem_veto;
         }
 
+        // ── Multimodal and Vision telemetry ──
+        metadata.multimodal = self.multimodal_manager.telemetry();
+        #[cfg(feature = "vision-manifold")]
+        {
+            metadata.vision = perception.vision_telemetry.clone();
+        }
+
         // ── End-of-cycle stats ──
         self.run_end_of_cycle_stats(
             &mut metadata,
@@ -1708,6 +1700,9 @@ impl CognitiveLoopService {
             dynamics.neuromod.sht_crash_dip,
             dynamics.neuromod.exploration_sht_drain,
         );
+
+        // Final defensive sync: ensure perception-phase costs (dilation, geodesics) are captured.
+        metadata.temporal.thermodynamic_load = self.thermodynamic_load;
 
         // Cross-manifold predictor: observe actual cognitive state for Hebbian learning
         #[cfg(feature = "vision-manifold")]
@@ -1990,6 +1985,61 @@ impl CognitiveLoopService {
                 );
             }
 
+            // REQUEST_GEODESIC: Subsystem wants to resolve uncertainty via mental simulation.
+            // Trigger geodesic pathfinding on the vision manifold (Active Inference).
+            #[cfg(feature = "vision-manifold")]
+            if integrated.has_flag(output_flags::REQUEST_GEODESIC) {
+                self.carryover.quality.last_request_geodesic = true;
+                if let Some(ref mut bridge) = self.sensorimotor.vision_sensory.vision_bridge {
+                    let manifold = bridge.manifold_mut();
+                    let current_state = manifold.state().clone();
+
+                    // Goal: transition toward a known scene or random exploration target
+                    let goal = if let Some(match_res) = manifold.last_scene_match() {
+                        manifold
+                            .get_scene_encoding(match_res.scene_id)
+                            .unwrap_or_else(|| {
+                                symthaea_core::core::ContinuousHV::random(manifold.hdc_dim(), 777)
+                            })
+                    } else {
+                        symthaea_core::core::ContinuousHV::random(
+                            manifold.hdc_dim(),
+                            self.stats.total_cycles as u64,
+                        )
+                    };
+
+                    // Compute best geodesic guided by Expected Free Energy
+                    let path = manifold.select_best_geodesic(&current_state, &goal, 8, 3);
+
+                    // Sync the new path into the perception telemetry AND metadata so it appears in the SAME cycle result
+                    let latest_telemetry = manifold.telemetry().clone();
+                    perception.vision_telemetry = Some(latest_telemetry.clone());
+                    metadata.vision = Some(latest_telemetry);
+
+                    // Immediate decoding so the result has the movie IN THIS CYCLE
+                    if !path.is_empty() {
+                        let frames = manifold.decode_geodesic_to_frames_improved(&path);
+                        if !frames.is_empty() {
+                             feedback.mental_movie = Some(crate::cognitive_loop::types::MentalMovie {
+                                frames,
+                                width: self.config.vision_frame_width,
+                                height: self.config.vision_frame_height,
+                                channels: manifold.last_frame_channels(),
+                                path_length: path.len(),
+                                semantic_coherence: 0.0,
+                            });
+                        }
+                    }
+
+                    tracing::info!(
+                        cycle = self.stats.total_cycles,
+                        "Subsystem REQUEST_GEODESIC: FEP-guided mental simulation triggered"
+                    );
+                }
+            } else {
+                self.carryover.quality.last_request_geodesic = false;
+            }
+
             metadata.subsystem_veto_active = self.carryover.quality.subsystem_veto;
 
             tracing::trace!("Phase C integration: {}", integrated);
@@ -2108,6 +2158,12 @@ impl CognitiveLoopService {
             signed_output,
             #[cfg(feature = "identity")]
             assurance_level,
+            #[cfg(feature = "vision-manifold")]
+            mental_movie: {
+                let movie = mem::take(&mut feedback.mental_movie);
+                self.last_mental_movie = movie.clone();
+                movie
+            },
         }
     }
 }

@@ -1445,6 +1445,47 @@ pub fn try_nix_parse(expr: &str) -> NixVerdict {
     }
 }
 
+#[cfg(feature = "ssm_language")]
+use symthaea_broca::encoder::ThoughtChannels;
+
+#[cfg(not(feature = "ssm_language"))]
+#[derive(Debug, Clone)]
+pub struct ThoughtChannels {
+    pub channels: [f32; 43],
+}
+
+#[cfg(not(feature = "ssm_language"))]
+impl Default for ThoughtChannels {
+    fn default() -> Self {
+        let mut channels = [0.0; 43];
+        channels[7] = 1.0;
+        channels[8] = 1.0;
+        channels[10] = 0.5;
+        channels[11] = 0.5;
+        channels[12] = 0.5;
+        channels[13] = 0.5;
+        channels[14] = 0.5;
+        channels[16] = 0.5;
+        channels[17] = 1.0;
+        channels[21] = 0.5;
+        channels[22] = 0.5;
+        channels[23] = 0.5;
+        channels[41] = 0.25;
+        Self { channels }
+    }
+}
+
+#[cfg(not(feature = "ssm_language"))]
+impl ThoughtChannels {
+    pub fn set_arousal(&mut self, arousal: f32) {
+        self.channels[10] = arousal.clamp(0.0, 1.0);
+    }
+
+    pub fn set_valence(&mut self, valence: f32) {
+        self.channels[9] = valence.clamp(-1.0, 1.0);
+    }
+}
+
 // ─── Generation Pipeline ───────────────────────────────────────────────────
 
 /// Result of attempting to generate Nix from a prompt.
@@ -1457,6 +1498,8 @@ pub struct NixGenResult {
     pub parses: bool,
     pub last_error: Option<String>,
     pub source: NixGenSource,
+    /// **NEW**: Emotional and epistemic state for the repair loop.
+    pub channels: ThoughtChannels,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1497,6 +1540,7 @@ pub fn generate_nix(prompt: &str) -> NixGenResult {
             parses,
             last_error,
             source: NixGenSource::Idiom,
+            channels: ThoughtChannels::default(),
         };
     }
 
@@ -1512,7 +1556,9 @@ pub fn generate_nix(prompt: &str) -> NixGenResult {
         NixIntent::Networking => "{\n  networking = { };\n}\n",
         NixIntent::HomeManager => "{ pkgs, ... }: {\n  home.packages = [ ];\n}\n",
         NixIntent::Secrets => "{\n  # secrets config — see sops-nix or agenix\n}\n",
-        NixIntent::FlakeTemplate => "{\n  description = \"flake\";\n  inputs.nixpkgs.url = \"github:NixOS/nixpkgs/nixos-unstable\";\n  outputs = { self, nixpkgs }: { };\n}\n",
+        NixIntent::FlakeTemplate => {
+            "{\n  description = \"flake\";\n  inputs.nixpkgs.url = \"github:NixOS/nixpkgs/nixos-unstable\";\n  outputs = { self, nixpkgs }: { };\n}\n"
+        }
         NixIntent::Generic => "{ }\n",
     };
     let verdict = try_nix_parse(skeleton);
@@ -1533,6 +1579,7 @@ pub fn generate_nix(prompt: &str) -> NixGenResult {
         parses,
         last_error,
         source: NixGenSource::Skeleton,
+        channels: ThoughtChannels::default(),
     }
 }
 
@@ -1701,6 +1748,7 @@ pub fn generate_nix_with_repair(prompt: &str, max_iterations: usize) -> NixGenRe
                 parses: true,
                 last_error: None,
                 source: last_source,
+                channels: ThoughtChannels::default(),
             };
         }
         let msg = eval_verdict.message();
@@ -1719,6 +1767,7 @@ pub fn generate_nix_with_repair(prompt: &str, max_iterations: usize) -> NixGenRe
         parses: parses_at_minimum,
         last_error: error_history.last().cloned(),
         source: last_source,
+        channels: ThoughtChannels::default(),
     }
 }
 
@@ -1993,6 +2042,7 @@ pub fn generate_nix_with_cache(
                     parses: true,
                     last_error: None,
                     source: NixGenSource::Idiom,
+                    channels: ThoughtChannels::default(),
                 },
                 unknown_options: Vec::new(),
             };
@@ -2226,6 +2276,7 @@ pub fn generate_nix_with_rag(
                     parses: true,
                     last_error: None,
                     source: NixGenSource::Idiom,
+                    channels: ThoughtChannels::default(),
                 },
                 unknown_options: Vec::new(),
             };
@@ -2258,6 +2309,7 @@ pub fn generate_nix_with_rag(
                     parses: true,
                     last_error: None,
                     source: NixGenSource::RagDraft,
+                    channels: ThoughtChannels::default(),
                 },
                 unknown_options: Vec::new(),
             };
@@ -2319,6 +2371,7 @@ pub fn generate_nix_with_rag_fast_using(
                     parses: true,
                     last_error: None,
                     source: NixGenSource::Idiom,
+                    channels: ThoughtChannels::default(),
                 },
                 unknown_options: Vec::new(),
             };
@@ -2355,6 +2408,7 @@ pub fn generate_nix_with_rag_fast_using(
                 parses: true,
                 last_error: None,
                 source: NixGenSource::RagDraft,
+                channels: ThoughtChannels::default(),
             };
             unknown_options = Vec::new();
         }
@@ -2742,12 +2796,16 @@ pkgs.mkShell {
 
     #[test]
     fn rag_prefixes_for_intent_matches_class() {
-        assert!(rag_prefixes_for_intent(NixIntent::Service)
-            .iter()
-            .any(|p| *p == "services."));
-        assert!(rag_prefixes_for_intent(NixIntent::Hardware)
-            .iter()
-            .any(|p| *p == "hardware."));
+        assert!(
+            rag_prefixes_for_intent(NixIntent::Service)
+                .iter()
+                .any(|p| *p == "services.")
+        );
+        assert!(
+            rag_prefixes_for_intent(NixIntent::Hardware)
+                .iter()
+                .any(|p| *p == "hardware.")
+        );
         assert!(rag_prefixes_for_intent(NixIntent::DevShell).is_empty());
     }
 

@@ -188,7 +188,9 @@ pub fn verify_consciousness_gate(input: VerifyGateInput) -> ExternResult<GateVer
                 consciousness_at_verification: 0.0,
                 required_consciousness: dynamic_threshold,
                 passed: false,
-                failure_reason: Some("No consciousness snapshot or attestation available".to_string()),
+                failure_reason: Some(
+                    "No consciousness snapshot or attestation available".to_string(),
+                ),
                 action_id: input.action_id.clone(),
                 verified_at: now,
             };
@@ -210,7 +212,9 @@ pub fn verify_consciousness_gate(input: VerifyGateInput) -> ExternResult<GateVer
                 consciousness_level: 0.0,
                 required_consciousness: dynamic_threshold,
                 action_type: input.action_type,
-                failure_reason: Some("No consciousness snapshot or attestation available".to_string()),
+                failure_reason: Some(
+                    "No consciousness snapshot or attestation available".to_string(),
+                ),
                 gate_id: gate.id,
             });
         }

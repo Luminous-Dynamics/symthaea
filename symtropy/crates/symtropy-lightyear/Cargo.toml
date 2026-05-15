@@ -18,6 +18,9 @@ bevy_log = "0.18"
 symtropy-net = { path = "../symtropy-net" }
 symtropy-physics = { path = "../symtropy-physics" }
 
+# nalgebra
+nalgebra = "0.34"
+
 # Serialization
 serde = { version = "1", features = ["derive"] }
 

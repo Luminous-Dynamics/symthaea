@@ -272,8 +272,15 @@ impl CognitiveLoopService {
         self.sensorimotor.somatic_bridge.update();
         let somatic_signals = self.sensorimotor.somatic_bridge.to_interoceptive_signals();
         // Apply somatic stress to thermodynamic load (additive)
+        let old_thermo = self.thermodynamic_load;
         self.thermodynamic_load =
             (self.thermodynamic_load + somatic_signals.thermodynamic_load_delta).min(1.0);
+        if self.thermodynamic_load != old_thermo {
+            eprintln!(
+                "DEBUG: run_cycle_init thermo change: {} -> {}",
+                old_thermo, self.thermodynamic_load
+            );
+        }
         // Apply arousal spike from severe infrastructure damage
         if somatic_signals.arousal_spike > 0.0 {
             self.behavior.emotion_contagion.arousal =

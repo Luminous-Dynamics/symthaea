@@ -5,6 +5,7 @@
 use hdk::prelude::*;
 use trust_integrity::*;
 
+use mycelix_zome_helpers as _;
 fn ensure_path(path: Path, link_type: LinkTypes) -> ExternResult<EntryHash> {
     let typed = path.typed(link_type)?;
     typed.ensure()?;
@@ -63,11 +64,21 @@ pub fn submit_review(input: SubmitReviewInput) -> ExternResult<ActionHash> {
 
     let subject_path = Path::from(format!("reviews/{}", review.subject));
     let subject_hash = ensure_path(subject_path, LinkTypes::AgentToReviews)?;
-    create_link(subject_hash, action_hash.clone(), LinkTypes::AgentToReviews, ())?;
+    create_link(
+        subject_hash,
+        action_hash.clone(),
+        LinkTypes::AgentToReviews,
+        (),
+    )?;
 
     let reviewer_path = Path::from(format!("reviewer/{}", reviewer));
     let reviewer_hash = ensure_path(reviewer_path, LinkTypes::ReviewerToReviews)?;
-    create_link(reviewer_hash, action_hash.clone(), LinkTypes::ReviewerToReviews, ())?;
+    create_link(
+        reviewer_hash,
+        action_hash.clone(),
+        LinkTypes::ReviewerToReviews,
+        (),
+    )?;
 
     // Update reputation score
     update_reputation_for_review(review)?;
@@ -76,18 +87,28 @@ pub fn submit_review(input: SubmitReviewInput) -> ExternResult<ActionHash> {
 }
 
 fn update_reputation_for_review(review: Review) -> ExternResult<()> {
-    let rep_path = Path::from(format!("reputation/{}/{:?}", review.subject, review.category));
+    let rep_path = Path::from(format!(
+        "reputation/{}/{:?}",
+        review.subject, review.category
+    ));
     let typed = rep_path.typed(LinkTypes::AgentToReputation)?;
     typed.ensure()?;
     let rep_hash = typed.path_entry_hash()?;
 
     let filter = LinkTypeFilter::try_from(LinkTypes::AgentToReputation)?;
-    let links = get_links(LinkQuery::new(rep_hash.clone(), filter), GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::new(rep_hash.clone(), filter),
+        GetStrategy::default(),
+    )?;
 
     if let Some(link) = links.first() {
         if let Some(hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(hash.clone(), GetOptions::default())? {
-                if let Some(mut score) = record.entry().to_app_option::<ReputationScore>().map_err(|e| wasm_error!(e))? {
+                if let Some(mut score) = record
+                    .entry()
+                    .to_app_option::<ReputationScore>()
+                    .map_err(|e| wasm_error!(e))?
+                {
                     let total = score.score as u64 * score.total_reviews + review.rating as u64;
                     score.total_reviews += 1;
                     score.score = (total / score.total_reviews) as u32;
@@ -113,17 +134,25 @@ fn update_reputation_for_review(review: Review) -> ExternResult<()> {
 }
 
 #[hdk_extern]
-pub fn get_reputation(input: (AgentPubKey, ReputationCategory)) -> ExternResult<Option<ReputationScore>> {
+pub fn get_reputation(
+    input: (AgentPubKey, ReputationCategory),
+) -> ExternResult<Option<ReputationScore>> {
     let (agent, category) = input;
     let rep_path = Path::from(format!("reputation/{}/{:?}", agent, category));
     let typed = rep_path.typed(LinkTypes::AgentToReputation)?;
     let filter = LinkTypeFilter::try_from(LinkTypes::AgentToReputation)?;
-    let links = get_links(LinkQuery::new(typed.path_entry_hash()?, filter), GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::new(typed.path_entry_hash()?, filter),
+        GetStrategy::default(),
+    )?;
 
     if let Some(link) = links.first() {
         if let Some(hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(hash, GetOptions::default())? {
-                return Ok(record.entry().to_app_option::<ReputationScore>().map_err(|e| wasm_error!(e))?);
+                return Ok(record
+                    .entry()
+                    .to_app_option::<ReputationScore>()
+                    .map_err(|e| wasm_error!(e))?);
             }
         }
     }
@@ -135,13 +164,20 @@ pub fn get_agent_reviews(agent: AgentPubKey) -> ExternResult<Vec<Review>> {
     let path = Path::from(format!("reviews/{}", agent));
     let typed = path.typed(LinkTypes::AgentToReviews)?;
     let filter = LinkTypeFilter::try_from(LinkTypes::AgentToReviews)?;
-    let links = get_links(LinkQuery::new(typed.path_entry_hash()?, filter), GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::new(typed.path_entry_hash()?, filter),
+        GetStrategy::default(),
+    )?;
 
     let mut reviews = Vec::new();
     for link in links {
         if let Some(hash) = link.target.into_action_hash() {
             if let Some(record) = get(hash, GetOptions::default())? {
-                if let Some(review) = record.entry().to_app_option::<Review>().map_err(|e| wasm_error!(e))? {
+                if let Some(review) = record
+                    .entry()
+                    .to_app_option::<Review>()
+                    .map_err(|e| wasm_error!(e))?
+                {
                     reviews.push(review);
                 }
             }
@@ -155,7 +191,12 @@ pub fn add_certification(cert: Certification) -> ExternResult<ActionHash> {
     let action_hash = create_entry(EntryTypes::Certification(cert.clone()))?;
     let path = Path::from(format!("certs/{}", cert.holder));
     let path_hash = ensure_path(path, LinkTypes::AgentToCertifications)?;
-    create_link(path_hash, action_hash.clone(), LinkTypes::AgentToCertifications, ())?;
+    create_link(
+        path_hash,
+        action_hash.clone(),
+        LinkTypes::AgentToCertifications,
+        (),
+    )?;
     Ok(action_hash)
 }
 
@@ -163,13 +204,19 @@ pub fn add_certification(cert: Certification) -> ExternResult<ActionHash> {
 pub fn verify_certification(hash: ActionHash) -> ExternResult<ActionHash> {
     let agent = agent_info()?.agent_initial_pubkey;
     if let Some(record) = get(hash.clone(), GetOptions::default())? {
-        if let Some(mut cert) = record.entry().to_app_option::<Certification>().map_err(|e| wasm_error!(e))? {
+        if let Some(mut cert) = record
+            .entry()
+            .to_app_option::<Certification>()
+            .map_err(|e| wasm_error!(e))?
+        {
             cert.verified_by = Some(agent);
             cert.verified_at = Some(sys_time()?);
             return update_entry(hash, EntryTypes::Certification(cert));
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Certification not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Certification not found".into()
+    )))
 }
 
 #[hdk_extern]
@@ -177,13 +224,20 @@ pub fn get_certifications(agent: AgentPubKey) -> ExternResult<Vec<Certification>
     let path = Path::from(format!("certs/{}", agent));
     let typed = path.typed(LinkTypes::AgentToCertifications)?;
     let filter = LinkTypeFilter::try_from(LinkTypes::AgentToCertifications)?;
-    let links = get_links(LinkQuery::new(typed.path_entry_hash()?, filter), GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::new(typed.path_entry_hash()?, filter),
+        GetStrategy::default(),
+    )?;
 
     let mut certs = Vec::new();
     for link in links {
         if let Some(hash) = link.target.into_action_hash() {
             if let Some(record) = get(hash, GetOptions::default())? {
-                if let Some(cert) = record.entry().to_app_option::<Certification>().map_err(|e| wasm_error!(e))? {
+                if let Some(cert) = record
+                    .entry()
+                    .to_app_option::<Certification>()
+                    .map_err(|e| wasm_error!(e))?
+                {
                     certs.push(cert);
                 }
             }
@@ -195,7 +249,12 @@ pub fn get_certifications(agent: AgentPubKey) -> ExternResult<Vec<Certification>
 #[hdk_extern]
 pub fn file_dispute(dispute: Dispute) -> ExternResult<ActionHash> {
     let action_hash = create_entry(EntryTypes::Dispute(dispute.clone()))?;
-    create_link(dispute.po_hash, action_hash.clone(), LinkTypes::PoToDisputes, ())?;
+    create_link(
+        dispute.po_hash,
+        action_hash.clone(),
+        LinkTypes::PoToDisputes,
+        (),
+    )?;
     Ok(action_hash)
 }
 
@@ -210,13 +269,19 @@ pub fn resolve_dispute(input: (ActionHash, String)) -> ExternResult<ActionHash> 
     }
 
     if let Some(record) = get(hash.clone(), GetOptions::default())? {
-        if let Some(mut dispute) = record.entry().to_app_option::<Dispute>().map_err(|e| wasm_error!(e))? {
+        if let Some(mut dispute) = record
+            .entry()
+            .to_app_option::<Dispute>()
+            .map_err(|e| wasm_error!(e))?
+        {
             dispute.resolution = Some(resolution);
             dispute.resolved_at = Some(sys_time()?);
             return update_entry(hash, EntryTypes::Dispute(dispute));
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Dispute not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Dispute not found".into()
+    )))
 }
 
 #[hdk_extern]
@@ -261,7 +326,12 @@ pub fn flag_provider(input: (AgentPubKey, String)) -> ExternResult<ActionHash> {
 
     let subject_path = Path::from(format!("reviews/{}", review.subject));
     let subject_hash = ensure_path(subject_path, LinkTypes::AgentToReviews)?;
-    create_link(subject_hash, action_hash.clone(), LinkTypes::AgentToReviews, ())?;
+    create_link(
+        subject_hash,
+        action_hash.clone(),
+        LinkTypes::AgentToReviews,
+        (),
+    )?;
 
     update_reputation_for_review(review)?;
 
@@ -269,7 +339,9 @@ pub fn flag_provider(input: (AgentPubKey, String)) -> ExternResult<ActionHash> {
 }
 
 #[hdk_extern]
-pub fn get_all_reputation_categories(agent: AgentPubKey) -> ExternResult<Vec<(ReputationCategory, u32)>> {
+pub fn get_all_reputation_categories(
+    agent: AgentPubKey,
+) -> ExternResult<Vec<(ReputationCategory, u32)>> {
     let categories = vec![
         ReputationCategory::Reliability,
         ReputationCategory::Quality,
@@ -548,7 +620,11 @@ mod tests {
             ("Compliance".to_string(), 4u32),
         ];
         let composite = compute_composite_reliability(&scores);
-        assert!((composite - 0.84).abs() < 0.001, "Expected ~0.84, got {}", composite);
+        assert!(
+            (composite - 0.84).abs() < 0.001,
+            "Expected ~0.84, got {}",
+            composite
+        );
     }
 
     #[test]

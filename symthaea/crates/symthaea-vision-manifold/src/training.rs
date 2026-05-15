@@ -66,6 +66,21 @@ impl AdamState {
 
         delta
     }
+
+    /// Perform 'Holographic Dilation' - scale internal momentum buffers.
+    pub fn dilate(&mut self, target_dim: usize) {
+        if self.m.len() == target_dim {
+            return;
+        }
+
+        // We use the same segment-based bundling for momentum buffers
+        // to maintain semantic alignment of the learned gradients.
+        let m_hv = ContinuousHV::from_values(self.m.clone()).dilate(target_dim);
+        let v_hv = ContinuousHV::from_values(self.v.clone()).dilate(target_dim);
+
+        self.m = m_hv.values;
+        self.v = v_hv.values;
+    }
 }
 
 /// Training state for the vision manifold's CfC parameters.
@@ -86,6 +101,12 @@ impl ManifoldTrainer {
             rng_state: 0xCAFE_BABE_1337_DEAD,
             total_steps: 0,
         }
+    }
+
+    /// Perform 'Holographic Dilation' - scale internal components.
+    pub fn dilate(&mut self, target_dim: usize) {
+        self.weight_adam.dilate(target_dim);
+        // tau_adam is scalar (dim 1), no dilation needed
     }
 
     /// Compute BPTT gradient for weight_hv and tau through the CfC closed-form.
@@ -333,6 +354,10 @@ impl ManifoldTrainer {
 
     pub fn config(&self) -> &TrainingConfig {
         &self.config
+    }
+
+    pub fn config_mut(&mut self) -> &mut TrainingConfig {
+        &mut self.config
     }
 }
 

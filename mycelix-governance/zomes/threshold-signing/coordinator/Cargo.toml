@@ -9,6 +9,7 @@ description = "Threshold signing coordinator zome for DKG-based collective signa
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+mycelix-bridge-common = { workspace = true }
 hdk = { workspace = true }
 threshold_signing_integrity = { path = "../integrity" }
 governance-utils = { workspace = true }

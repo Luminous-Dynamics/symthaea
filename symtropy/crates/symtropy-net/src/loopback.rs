@@ -91,7 +91,11 @@ impl Transport for LoopbackTransport {
     }
 
     fn peer_count(&self) -> usize {
-        if self.connected { 1 } else { 0 }
+        if self.connected {
+            1
+        } else {
+            0
+        }
     }
 
     fn is_signaling_connected(&self) -> bool {

@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -14,11 +13,11 @@ use hearth_types::*;
 use mycelix_bridge_common::{
     civic_requirement_basic, civic_requirement_proposal, GovernanceEligibility,
 };
+use mycelix_zome_helpers as _;
 
 // ============================================================================
 // Consciousness Gating
 // ============================================================================
-
 
 // ============================================================================
 // Input Types
@@ -53,7 +52,11 @@ pub struct BeginTransitionInput {
 /// Creates the Milestone entry and links it to both the hearth and the member.
 #[hdk_extern]
 pub fn record_milestone(input: RecordMilestoneInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("hearth_bridge", &civic_requirement_basic(), "record_milestone")?;
+    mycelix_zome_helpers::require_civic(
+        "hearth_bridge",
+        &civic_requirement_basic(),
+        "record_milestone",
+    )?;
     require_membership(&input.hearth_hash)?;
     let now = sys_time()?;
 
@@ -102,7 +105,11 @@ pub fn record_milestone(input: RecordMilestoneInput) -> ExternResult<Record> {
 /// Starts in the PreLiminal phase with recategorization blocked.
 #[hdk_extern]
 pub fn begin_transition(input: BeginTransitionInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("hearth_bridge", &civic_requirement_basic(), "begin_transition")?;
+    mycelix_zome_helpers::require_civic(
+        "hearth_bridge",
+        &civic_requirement_basic(),
+        "begin_transition",
+    )?;
     require_membership(&input.hearth_hash)?;
     let now = sys_time()?;
 
@@ -148,7 +155,11 @@ pub fn begin_transition(input: BeginTransitionInput) -> ExternResult<Record> {
 /// Only guardians (Founder, Elder, Adult) can advance transitions.
 #[hdk_extern]
 pub fn advance_transition(transition_hash: ActionHash) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("hearth_bridge", &civic_requirement_proposal(), "advance_transition")?;
+    mycelix_zome_helpers::require_civic(
+        "hearth_bridge",
+        &civic_requirement_proposal(),
+        "advance_transition",
+    )?;
     let record = get(transition_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Transition not found".into())
     ))?;
@@ -194,7 +205,11 @@ pub fn advance_transition(transition_hash: ActionHash) -> ExternResult<Record> {
 /// completed first). Only guardians can complete transitions.
 #[hdk_extern]
 pub fn complete_transition(transition_hash: ActionHash) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("hearth_bridge", &civic_requirement_proposal(), "complete_transition")?;
+    mycelix_zome_helpers::require_civic(
+        "hearth_bridge",
+        &civic_requirement_proposal(),
+        "complete_transition",
+    )?;
     let now = sys_time()?;
 
     let record = get(transition_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(

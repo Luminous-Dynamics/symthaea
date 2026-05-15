@@ -13,7 +13,7 @@ Symthaea is a **760K-line Rust codebase** implementing consciousness-first AI vi
 **Top 8 Critical Findings (Updated):**
 1. **Partition sampling bug** in `src/hdc/tiered_phi/core.rs` — incorrect modular indexing for n >= 64
 2. **4 undefined feature flags** referenced in code (`voice`, `cli`, `live-audio`, `tui`) — compile errors on use
-3. **`neural-bridge-cuda` compilation failure** — missing imports when combined with `neural-bridge`
+3. **`neural-bridge-cuda` compilation failure** — **FIXED** (added missing `anyhow::Context` import in `modern_embeddings.rs`)
 4. **2 broken crates** — `symthaea-consciousness` and `symthaea-perception` reference archived `symthaea-math`
 5. ~20K lines of diverged duplicate code between `src/` and `symthaea-core/src/`
 6. `Cargo.lock` is gitignored despite producing binaries
@@ -461,6 +461,14 @@ Others: `perception`, `consciousness_code`, `pyphi`, `systemd`, `desktop`, `audi
 ---
 
 ## Prioritized Action Plan
+
+### Phase 0: Research Implementation (Completed May 2026)
+
+| # | Action | Impact | Effort |
+|---|--------|--------|--------|
+| A | **Implement Holographic Dilation** — dynamic $2^{14} \leftrightarrow 2^{16}$ scaling in vision stack | Semantic focus + thermo awareness | 4 hrs |
+| B | **Implement Multimodal Manager** — moral/epistemic gating for external gen | Ethical alignment for AI agency | 3 hrs |
+| C | **Full FEP Integration** — rigorous KL-divergence FEP and multi-step dreaming | Mathematical grounding of agency | 6 hrs |
 
 ### Phase 1: Critical Bugs & Build Hygiene (This Week)
 

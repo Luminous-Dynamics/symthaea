@@ -22,7 +22,9 @@ use bevy_ecs::prelude::*;
 use bytes::Bytes;
 use std::collections::VecDeque;
 
-use symtropy_net::{IrohTransport, Transport, Channel, PeerId};
+use symtropy_net::iroh_transport::IrohTransport;
+use symtropy_net::transport::{Channel, Transport, TransportEvent};
+use symtropy_net::PeerId;
 
 /// IO component that bridges Iroh transport to Lightyear's Link buffers.
 ///
@@ -61,7 +63,7 @@ pub fn iroh_io_recv(mut query: Query<&mut IrohIo>) {
     for mut io in query.iter_mut() {
         let events = io.transport.poll();
         for event in events {
-            if let symtropy_net::TransportEvent::Message(msg) = event {
+            if let TransportEvent::Message(msg) = event {
                 io.recv_buffer.push_back(Bytes::from(msg.data));
             }
         }

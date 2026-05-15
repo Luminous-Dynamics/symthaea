@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -17,10 +16,10 @@ use mycelix_zome_helpers as _;
 //!
 //! Updated to use HDK 0.6 patterns
 
-#![allow(clippy::unnecessary_sort_by)]
-
+#[allow(clippy::unnecessary_sort_by)]
 use governance_bridge_integrity::*;
 use hdk::prelude::*;
+use mycelix_zome_helpers as _;
 // Explicit re-imports for WASM compilation (glob import doesn't re-export proc macros
 // in some dependency graph configurations — see Rust edition 2021 proc-macro scoping)
 use hdk::prelude::{hdk_extern, wasm_error, WasmErrorInner};
@@ -472,13 +471,25 @@ pub fn get_bridge_metrics(_: ()) -> ExternResult<String> {
 
 /// Receive a cross-cluster notification and store it locally.
 #[hdk_extern]
-pub fn receive_notification(notification: mycelix_bridge_entry_types::CrossClusterNotification) -> ExternResult<ActionHash> {
+pub fn receive_notification(
+    notification: mycelix_bridge_entry_types::CrossClusterNotification,
+) -> ExternResult<ActionHash> {
     let action_hash = create_entry(&EntryTypes::Notification(notification.clone()))?;
     let agent = agent_info()?.agent_initial_pubkey;
     let inbox_anchor = ensure_anchor(&format!("notifications:{:?}", agent))?;
-    create_link(inbox_anchor, action_hash.clone(), LinkTypes::AgentToNotification, ())?;
+    create_link(
+        inbox_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentToNotification,
+        (),
+    )?;
     let all_anchor = ensure_anchor("all_notifications")?;
-    create_link(all_anchor, action_hash.clone(), LinkTypes::AllNotifications, ())?;
+    create_link(
+        all_anchor,
+        action_hash.clone(),
+        LinkTypes::AllNotifications,
+        (),
+    )?;
     let signal = mycelix_bridge_common::notifications::NotificationSignal {
         signal_type: "cross_cluster_notification".into(),
         source_cluster: notification.source_cluster,
@@ -492,14 +503,17 @@ pub fn receive_notification(notification: mycelix_bridge_entry_types::CrossClust
 
 /// Get notifications for the calling agent.
 #[hdk_extern]
-pub fn get_my_notifications(input: mycelix_bridge_common::notifications::NotificationQueryInput) -> ExternResult<Vec<Record>> {
+pub fn get_my_notifications(
+    input: mycelix_bridge_common::notifications::NotificationQueryInput,
+) -> ExternResult<Vec<Record>> {
     let agent = agent_info()?.agent_initial_pubkey;
     let inbox_anchor = ensure_anchor(&format!("notifications:{:?}", agent))?;
     let links = get_links(
         LinkQuery::try_new(inbox_anchor, LinkTypes::AgentToNotification)?,
         GetStrategy::default(),
     )?;
-    let limit = input.limit
+    let limit = input
+        .limit
         .unwrap_or(mycelix_bridge_common::notifications::DEFAULT_NOTIFICATION_LIMIT)
         .min(mycelix_bridge_common::notifications::MAX_NOTIFICATIONS_PER_AGENT);
     let mut records = Vec::new();

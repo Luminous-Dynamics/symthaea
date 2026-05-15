@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -13,8 +12,9 @@ use mutualaid_requests_integrity::{
     RequestStatus, RequestType, Urgency,
 };
 use mycelix_bridge_common::{
-    gate_civic, civic_requirement_basic, civic_requirement_proposal, GovernanceEligibility,
+    civic_requirement_basic, civic_requirement_proposal, gate_civic, GovernanceEligibility,
 };
+use mycelix_zome_helpers as _;
 
 /// Input for creating a new aid request
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -163,7 +163,11 @@ fn get_offerer_anchor(did: &str) -> ExternResult<EntryHash> {
 /// Create a new aid request
 #[hdk_extern]
 pub fn create_request(input: CreateRequestInput) -> ExternResult<RequestWithHash> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "create_request")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "create_request",
+    )?;
 
     // Validate description is not empty or whitespace-only
     if input.description.trim().is_empty() {
@@ -283,7 +287,11 @@ pub fn get_request(action_hash: ActionHash) -> ExternResult<Option<RequestWithHa
 /// Update a request's status
 #[hdk_extern]
 pub fn update_request_status(input: UpdateRequestStatusInput) -> ExternResult<RequestWithHash> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "update_request_status")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "update_request_status",
+    )?;
     // Get the current request
     let record = get(input.request_hash.clone(), GetOptions::default())?
         .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Request not found".to_string())))?;
@@ -426,7 +434,11 @@ pub fn get_requests_by_requester(requester_did: String) -> ExternResult<Vec<Requ
 /// Create a new aid offer
 #[hdk_extern]
 pub fn create_offer(input: CreateOfferInput) -> ExternResult<OfferWithHash> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "create_offer")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "create_offer",
+    )?;
 
     // Validate message is not empty or whitespace-only
     if input.message.trim().is_empty() {
@@ -515,7 +527,11 @@ pub fn get_offer(action_hash: ActionHash) -> ExternResult<Option<OfferWithHash>>
 /// Update an offer's status
 #[hdk_extern]
 pub fn update_offer_status(input: UpdateOfferStatusInput) -> ExternResult<OfferWithHash> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "update_offer_status")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "update_offer_status",
+    )?;
     // Get the current offer
     let record = get(input.offer_hash.clone(), GetOptions::default())?
         .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Offer not found".to_string())))?;
@@ -583,7 +599,11 @@ pub fn get_offers_by_offerer(offerer_did: String) -> ExternResult<Vec<OfferWithH
 /// Cancel an aid request (only by the requester)
 #[hdk_extern]
 pub fn cancel_request(request_hash: ActionHash) -> ExternResult<RequestWithHash> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "cancel_request")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "cancel_request",
+    )?;
     update_request_status(UpdateRequestStatusInput {
         request_hash,
         status: RequestStatus::Cancelled,
@@ -594,7 +614,11 @@ pub fn cancel_request(request_hash: ActionHash) -> ExternResult<RequestWithHash>
 /// Withdraw an aid offer (only by the offerer)
 #[hdk_extern]
 pub fn withdraw_offer(offer_hash: ActionHash) -> ExternResult<OfferWithHash> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "withdraw_offer")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "withdraw_offer",
+    )?;
     update_offer_status(UpdateOfferStatusInput {
         offer_hash,
         status: OfferStatus::Withdrawn,

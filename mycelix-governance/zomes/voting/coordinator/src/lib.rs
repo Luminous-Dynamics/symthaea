@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -8,15 +7,15 @@ use mycelix_zome_helpers as _;
 //! Enhanced with Φ-weighted voting, quadratic voting, and delegation decay
 //! Per GIS v4.0 integration plan
 
-#![allow(
+#[allow(
     clippy::manual_clamp,
     clippy::manual_range_contains,
     clippy::unnecessary_cast,
     clippy::assertions_on_constants,
     clippy::neg_cmp_op_on_partial_ord
 )]
-
 use hdk::prelude::*;
+use mycelix_zome_helpers as _;
 use mycelix_zome_helpers::get_latest_record;
 use voting_integrity::*;
 

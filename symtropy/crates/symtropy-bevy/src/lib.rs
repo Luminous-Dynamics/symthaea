@@ -30,15 +30,26 @@
 //! from bevy-core so users can drop down to no-coupling physics without
 //! switching crates.
 
+pub mod animation;
+pub mod audio;
 pub mod biometrics;
 #[cfg(feature = "debug-gizmos")]
 pub mod debug;
 pub mod macro_bridge;
 pub mod plugin;
+pub mod robot;
+pub mod scripting;
+pub mod toolbus;
 
+pub use animation::{AnimationState, RoboticAnimationPlugin};
+pub use audio::{AudioEmitter, RoboticAudioPlugin};
 pub use biometrics::{biometric_to_phi_system, PlayerBiometrics};
 pub use macro_bridge::{apply_macro_modifiers_system, MacroWorldState};
 pub use plugin::{SymtropyPhysics, SymtropyPhysicsPlugin};
+pub use robot::spawn_robot_native;
+#[cfg(feature = "rapier3d")]
+pub use robot::spawn_robot_rapier3d;
+pub use scripting::{RoboticScriptingPlugin, ScriptComponent};
 
 /// Re-exported from [`symtropy-bevy-core`]. Identical type used by both
 /// crates, so an entity with `PhysicsBody` works with either the permissive

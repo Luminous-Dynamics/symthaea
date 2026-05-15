@@ -1125,9 +1125,11 @@ mod tests {
         let plugin = MathPlugin::new();
         let actions = plugin.suggest_actions("prove the theorem");
         assert!(!actions.is_empty());
-        assert!(actions
-            .iter()
-            .any(|a| a.contains("hypothesis") || a.contains("induction")));
+        assert!(
+            actions
+                .iter()
+                .any(|a| a.contains("hypothesis") || a.contains("induction"))
+        );
     }
 
     #[test]
@@ -1142,9 +1144,11 @@ mod tests {
         let plugin = MathPlugin::new();
         let actions = plugin.suggest_actions("plot this function");
         assert!(!actions.is_empty());
-        assert!(actions
-            .iter()
-            .any(|a| a.contains("domain") || a.contains("range")));
+        assert!(
+            actions
+                .iter()
+                .any(|a| a.contains("domain") || a.contains("range"))
+        );
     }
 
     // =========================================================================

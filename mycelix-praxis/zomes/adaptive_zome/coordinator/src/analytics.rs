@@ -10,11 +10,11 @@
 //!
 //! Extracted from lib.rs as a pure structural refactor — no logic changes.
 
-use hdk::prelude::*;
-use adaptive_integrity::*;
 use crate::current_time;
 use crate::TrendDirection;
 use crate::MASTERY_THRESHOLD;
+use adaptive_integrity::*;
+use hdk::prelude::*;
 
 // ============== Performance Metrics Types ==============
 
@@ -345,7 +345,9 @@ pub struct AtRiskInput {
 // ============== Performance Metrics Functions ==============
 
 /// Collect performance metrics for the current learner
-pub(crate) fn collect_performance_metrics(input: CollectMetricsInput) -> ExternResult<PerformanceMetrics> {
+pub(crate) fn collect_performance_metrics(
+    input: CollectMetricsInput,
+) -> ExternResult<PerformanceMetrics> {
     let now = current_time()?;
     let period_hours = input.period_hours.unwrap_or(24);
     let period_start = now - (period_hours as i64 * 60 * 60 * 1_000_000);
@@ -367,7 +369,8 @@ pub(crate) fn collect_performance_metrics(input: CollectMetricsInput) -> ExternR
     let algorithm_metrics = calculate_algorithm_metrics(&masteries, &recent_sessions);
 
     // Calculate effectiveness metrics
-    let effectiveness_metrics = calculate_effectiveness_metrics(&masteries, &recent_sessions, &goals);
+    let effectiveness_metrics =
+        calculate_effectiveness_metrics(&masteries, &recent_sessions, &goals);
 
     // Query metrics would need actual instrumentation, return estimates
     let query_metrics = QueryMetrics::default();
@@ -387,28 +390,40 @@ fn calculate_algorithm_metrics(
     sessions: &[&SessionAnalytics],
 ) -> AlgorithmMetrics {
     // BKT accuracy: compare predicted vs actual performance
-    let bkt_predictions = masteries.iter()
-        .map(|m| m.total_attempts)
-        .sum::<u32>();
+    let bkt_predictions = masteries.iter().map(|m| m.total_attempts).sum::<u32>();
 
     // Estimate accuracy from mastery velocity
     let avg_mastery = if !masteries.is_empty() {
-        masteries.iter().map(|m| m.mastery_permille as u32).sum::<u32>() / masteries.len() as u32
-    } else { 0 };
+        masteries
+            .iter()
+            .map(|m| m.mastery_permille as u32)
+            .sum::<u32>()
+            / masteries.len() as u32
+    } else {
+        0
+    };
 
     // Flow prediction: check how many sessions achieved flow (balance near 500 = optimal)
-    let flow_sessions = sessions.iter()
+    let flow_sessions = sessions
+        .iter()
         .filter(|s| s.flow_balance_permille >= 400 && s.flow_balance_permille <= 600)
         .count();
     let flow_accuracy = if !sessions.is_empty() {
         ((flow_sessions * 1000) / sessions.len()) as u16
-    } else { 0 };
+    } else {
+        0
+    };
 
     // Average session focus as proxy for recommendation quality
     let avg_focus = if !sessions.is_empty() {
-        (sessions.iter().map(|s| s.focus_estimate_permille as u32).sum::<u32>()
+        (sessions
+            .iter()
+            .map(|s| s.focus_estimate_permille as u32)
+            .sum::<u32>()
             / sessions.len() as u32) as u16
-    } else { 0 };
+    } else {
+        0
+    };
 
     AlgorithmMetrics {
         bkt_accuracy_permille: avg_mastery.min(1000) as u16,
@@ -432,7 +447,8 @@ fn calculate_effectiveness_metrics(
     let avg_gain = (total_mastery / session_count).min(1000) as u16;
 
     // Time to proficiency (estimate from mastery levels)
-    let proficient_count = masteries.iter()
+    let proficient_count = masteries
+        .iter()
         .filter(|m| m.mastery_permille >= 600)
         .count();
     let total_minutes: u32 = sessions.iter().map(|s| s.duration_seconds / 60).sum();
@@ -444,21 +460,33 @@ fn calculate_effectiveness_metrics(
 
     // Retention rate (skills above threshold)
     let retention = if !masteries.is_empty() {
-        let retained = masteries.iter().filter(|m| m.mastery_permille >= MASTERY_THRESHOLD).count();
+        let retained = masteries
+            .iter()
+            .filter(|m| m.mastery_permille >= MASTERY_THRESHOLD)
+            .count();
         ((retained * 1000) / masteries.len()) as u16
-    } else { 0 };
+    } else {
+        0
+    };
 
     // Goal completion rate
     let goal_completion = if !goals.is_empty() {
         let completed = goals.iter().filter(|g| g.progress_permille >= 1000).count();
         ((completed * 1000) / goals.len()) as u16
-    } else { 0 };
+    } else {
+        0
+    };
 
     // Average flow balance score (500 = optimal)
     let avg_flow = if !sessions.is_empty() {
-        (sessions.iter().map(|s| s.flow_balance_permille as u32).sum::<u32>()
+        (sessions
+            .iter()
+            .map(|s| s.flow_balance_permille as u32)
+            .sum::<u32>()
             / sessions.len() as u32) as u16
-    } else { 0 };
+    } else {
+        0
+    };
 
     EffectivenessMetrics {
         avg_mastery_gain_per_session: avg_gain,
@@ -494,7 +522,10 @@ pub(crate) fn run_benchmarks(_: ()) -> ExternResult<BenchmarkSummary> {
 
     // Benchmark: calculate_learning_style
     let style_times = benchmark_operation(|| crate::calculate_learning_style(()), 5)?;
-    benchmarks.push(calculate_benchmark_stats("calculate_learning_style", &style_times));
+    benchmarks.push(calculate_benchmark_stats(
+        "calculate_learning_style",
+        &style_times,
+    ));
 
     let end = current_time()?;
 
@@ -531,7 +562,11 @@ pub(crate) fn calculate_benchmark_stats(operation: &str, times: &[u64]) -> Bench
     let samples = sorted.len() as u32;
     let min_us = *sorted.first().unwrap_or(&0);
     let max_us = *sorted.last().unwrap_or(&0);
-    let avg_us = if samples > 0 { sorted.iter().sum::<u64>() / samples as u64 } else { 0 };
+    let avg_us = if samples > 0 {
+        sorted.iter().sum::<u64>() / samples as u64
+    } else {
+        0
+    };
 
     let p50_idx = (samples as usize * 50 / 100).min(sorted.len().saturating_sub(1));
     let p95_idx = (samples as usize * 95 / 100).min(sorted.len().saturating_sub(1));
@@ -601,12 +636,20 @@ pub(crate) fn analyze_trajectory(input: TrajectoryInput) -> ExternResult<Learnin
 
     // Determine trajectory type based on velocity pattern
     let early_velocity = if points.len() > 10 {
-        points[10].mastery_permille.saturating_sub(points[0].mastery_permille)
-    } else { 100 };
+        points[10]
+            .mastery_permille
+            .saturating_sub(points[0].mastery_permille)
+    } else {
+        100
+    };
 
     let late_velocity = if points.len() > 20 {
-        points[points.len() - 1].mastery_permille.saturating_sub(points[points.len() - 11].mastery_permille)
-    } else { 100 };
+        points[points.len() - 1]
+            .mastery_permille
+            .saturating_sub(points[points.len() - 11].mastery_permille)
+    } else {
+        100
+    };
 
     let trajectory_type = if late_velocity > early_velocity + 100 {
         TrajectoryType::Accelerating
@@ -624,10 +667,20 @@ pub(crate) fn analyze_trajectory(input: TrajectoryInput) -> ExternResult<Learnin
     Ok(LearningTrajectory {
         agent_id: input.agent_id,
         trajectory_points: points,
-        trend: if late_velocity > 50 { TrendDirection::Increasing } else if late_velocity < 20 { TrendDirection::Decreasing } else { TrendDirection::Stable },
+        trend: if late_velocity > 50 {
+            TrendDirection::Increasing
+        } else if late_velocity < 20 {
+            TrendDirection::Decreasing
+        } else {
+            TrendDirection::Stable
+        },
         velocity_permille: late_velocity.min(1000),
         predicted_mastery_30_days: predicted_30,
-        predicted_completion_date: if current_mastery > 800 { Some(now + 86400 * 14) } else { None },
+        predicted_completion_date: if current_mastery > 800 {
+            Some(now + 86400 * 14)
+        } else {
+            None
+        },
         trajectory_type,
     })
 }
@@ -727,21 +780,23 @@ pub(crate) fn detect_anomalies(input: AnomalyDetectionInput) -> ExternResult<Vec
 /// Assess at-risk status
 pub(crate) fn assess_at_risk(input: AtRiskInput) -> ExternResult<Vec<AtRiskIndicator>> {
     // Return risk indicators (in production, analyze actual behavior patterns)
-    let indicators = vec![
-        AtRiskIndicator {
-            risk_type: "Engagement Decline".to_string(),
-            risk_score_permille: 250,
-            contributing_factors: vec![
-                "Session frequency decreased".to_string(),
-                "Shorter average sessions".to_string(),
-            ],
-            early_warning_days: 5,
-            intervention_suggestions: vec![
-                "Send personalized encouragement".to_string(),
-                "Suggest easier content to rebuild momentum".to_string(),
-            ],
-        },
-    ];
+    let indicators = vec![AtRiskIndicator {
+        risk_type: "Engagement Decline".to_string(),
+        risk_score_permille: 250,
+        contributing_factors: vec![
+            "Session frequency decreased".to_string(),
+            "Shorter average sessions".to_string(),
+        ],
+        early_warning_days: 5,
+        intervention_suggestions: vec![
+            "Send personalized encouragement".to_string(),
+            "Suggest easier content to rebuild momentum".to_string(),
+        ],
+    }];
 
-    Ok(if input.goal_hash.is_some() { indicators } else { Vec::new() })
+    Ok(if input.goal_hash.is_some() {
+        indicators
+    } else {
+        Vec::new()
+    })
 }

@@ -1,5 +1,3 @@
-use mycelix_zome_helpers as _;
-#![deny(unsafe_code)]
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -8,20 +6,23 @@ use mycelix_zome_helpers as _;
 //! Business logic for job application lifecycle management.
 //! State transitions are validated at the integrity layer.
 
+#![deny(unsafe_code)]
+
+use applications_integrity::{ApplicationStatus, EntryTypes, JobApplication, LinkTypes};
 use hdk::prelude::*;
-use applications_integrity::{
-    ApplicationStatus, EntryTypes, JobApplication, LinkTypes,
-};
+use mycelix_zome_helpers as _;
 
 // ============== Helpers ==============
 
 fn deserialize_application(record: &Record) -> ExternResult<JobApplication> {
     match record.entry().as_option() {
-        Some(Entry::App(bytes)) => JobApplication::try_from(
-            SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec())),
-        )
+        Some(Entry::App(bytes)) => JobApplication::try_from(SerializedBytes::from(
+            UnsafeBytes::from(bytes.bytes().to_vec()),
+        ))
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize: {:?}", e)))),
-        _ => Err(wasm_error!(WasmErrorInner::Guest("Not an app entry".into()))),
+        _ => Err(wasm_error!(WasmErrorInner::Guest(
+            "Not an app entry".into()
+        ))),
     }
 }
 
@@ -76,7 +77,12 @@ pub fn create_application(input: CreateApplicationInput) -> ExternResult<ActionH
 
     // Link: applicant -> application
     let agent_hash: AnyDhtHash = agent.into();
-    create_link(agent_hash, action_hash.clone(), LinkTypes::AgentToApplication, vec![])?;
+    create_link(
+        agent_hash,
+        action_hash.clone(),
+        LinkTypes::AgentToApplication,
+        vec![],
+    )?;
 
     // Link: job posting -> application
     create_link(
@@ -92,8 +98,9 @@ pub fn create_application(input: CreateApplicationInput) -> ExternResult<ActionH
 /// Submit a draft application (Draft -> Submitted).
 #[hdk_extern]
 pub fn submit_application(application_hash: ActionHash) -> ExternResult<ActionHash> {
-    let record = get(application_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Application not found".into())))?;
+    let record = get(application_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Application not found".into())
+    ))?;
 
     let mut app = deserialize_application(&record)?;
 
@@ -114,8 +121,9 @@ pub fn submit_application(application_hash: ActionHash) -> ExternResult<ActionHa
 /// State machine transitions are validated at the integrity layer.
 #[hdk_extern]
 pub fn advance_application(input: AdvanceApplicationInput) -> ExternResult<ActionHash> {
-    let record = get(input.application_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Application not found".into())))?;
+    let record = get(input.application_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Application not found".into())
+    ))?;
 
     let mut app = deserialize_application(&record)?;
 
@@ -140,8 +148,9 @@ pub fn advance_application(input: AdvanceApplicationInput) -> ExternResult<Actio
 pub fn withdraw_application(application_hash: ActionHash) -> ExternResult<ActionHash> {
     let agent = agent_info()?.agent_initial_pubkey;
 
-    let record = get(application_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Application not found".into())))?;
+    let record = get(application_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Application not found".into())
+    ))?;
 
     let mut app = deserialize_application(&record)?;
 
@@ -182,7 +191,9 @@ pub fn list_my_applications(_: ()) -> ExternResult<Vec<(ActionHash, JobApplicati
 /// List all applications for a specific job posting (employer view).
 /// Only the posting author should call this — access control is at the app layer.
 #[hdk_extern]
-pub fn list_applications_for_posting(posting_hash: ActionHash) -> ExternResult<Vec<(ActionHash, JobApplication)>> {
+pub fn list_applications_for_posting(
+    posting_hash: ActionHash,
+) -> ExternResult<Vec<(ActionHash, JobApplication)>> {
     let links = get_links(
         LinkQuery::try_new(posting_hash, LinkTypes::JobPostingToApplication)?,
         GetStrategy::Local,

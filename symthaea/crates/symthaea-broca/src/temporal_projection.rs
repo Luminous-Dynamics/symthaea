@@ -793,6 +793,29 @@ impl TemporalProjection {
         ContinuousHV::from_vec(values)
     }
 
+    /// Backpropagate gradients and update weights.
+    pub fn backward(&mut self, input_hv: &ContinuousHV, d_hdc: &ContinuousHV, lr: f32) -> Result<()> {
+        // Map HDC gradient back to chunk-level weights
+        for chunk_idx in 0..self.num_chunks {
+            let start = chunk_idx * self.stride;
+            let g = self.group_for_chunk(chunk_idx);
+            let w_up = &mut self.group_w_up[g];
+
+            // Simplified update: align input_hv chunk -> d_hdc chunk
+            for k in 0..self.chunk_size {
+                let idx = start + k;
+                if idx < self.hdc_dim {
+                    let gi = d_hdc.values[idx];
+                    let xi = input_hv.values[idx];
+                    for j in 0..self.ssm_dim {
+                        w_up[j * self.chunk_size + k] -= lr * gi * xi;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Back-project a full sequence of SSM hidden states to a 16384D HDC vector.
     ///
     /// Each SSM vector in the sequence corresponds to one chunk position. Subtracts

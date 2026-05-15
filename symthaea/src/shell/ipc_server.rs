@@ -607,6 +607,8 @@ impl MetricsProvider for StubMetricsProvider {
             total_cycles: 0,
             consciousness_level: (self.phi + self.coherence) / 2.0,
             latency_ms: 0,
+            #[cfg(feature = "vision-manifold")]
+            mental_movie: None,
         }
     }
 

@@ -21,7 +21,8 @@ deterministic-net = []
 
 [dependencies]
 symtropy-math = { version = "0.2.0", path = "../symtropy-math" }
-nalgebra = "0.34"
+nalgebra = { version = "0.34", features = ["serde-serialize"] }
+serde = { version = "1.0", features = ["derive"] }
 arrayvec = "0.7"
 
 [dev-dependencies]

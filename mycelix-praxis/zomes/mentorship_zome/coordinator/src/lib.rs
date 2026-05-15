@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -13,10 +12,10 @@ use mycelix_zome_helpers as _;
 //! Participant tier. Completing mentorships (which writes ratings) requires
 //! Citizen tier.
 
-#![deny(unsafe_code)]
-
+#[deny(unsafe_code)]
 use hdk::prelude::*;
 use mentorship_integrity::*;
+use mycelix_zome_helpers as _;
 
 // ============== Helper Functions ==============
 
@@ -41,10 +40,11 @@ fn get_record(hash: ActionHash) -> ExternResult<Record> {
 fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
     let mut records = Vec::with_capacity(links.len());
     for link in links {
-        let target = link
-            .target
-            .into_action_hash()
-            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Link target is not an ActionHash".to_string())))?;
+        let target = link.target.into_action_hash().ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Link target is not an ActionHash".to_string()
+            ))
+        })?;
         if let Some(record) = get(target, GetOptions::default())? {
             records.push(record);
         }
@@ -80,28 +80,66 @@ pub struct CompleteMentorshipInput {
 
 /// Register the calling agent as a mentor.
 ///
-/// Requires at least Participant consciousness tier.
+/// Requires at least Participant consciousness tier and a minimum
+/// moral resonance score of 0.5 (Vector 1: Resonant Wisdom).
 #[hdk_extern]
 pub fn register_as_mentor(input: MentorProfile) -> ExternResult<ActionHash> {
-    // Consciousness gate: must be at least Participant
+    // 1. Basic Consciousness gate
     mycelix_bridge_common::gate_civic(
         "mentorship_zome",
         &mycelix_bridge_common::civic_requirement_basic(),
         "register_as_mentor",
     )?;
 
+    // 2. MORAL RESONANCE CHECK (HUD of Truth Integration)
+    // Mentors must be resonant to guide others.
+    let my_did = format!("did:mycelix:{}", agent_info()?.agent_initial_pubkey);
+    let moral_resonance: f64 = call(
+        CallTargetCell::OtherRole("identity".into()),
+        "identity_bridge".into(),
+        "get_reputation_score".into(),
+        None,
+        serde_json::json!({
+            "did": my_did,
+            "required_resonance": 0.5
+        }),
+    )?
+    .decode()
+    .map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Resonance check failed: {:?}",
+            e
+        )))
+    })?;
+
+    if moral_resonance < 0.5 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Mentor Registration Rejected: Moral resonance too low. Mentors must maintain a resonance of 0.5+.".into()
+        )));
+    }
+
     let action_hash = create_entry(EntryTypes::MentorProfile(input.clone()))?;
 
     // Link to "all_mentors" anchor
     let mentors_path = Path::from("all_mentors");
     let mentors_anchor = ensure_path(mentors_path, LinkTypes::AllMentors)?;
-    create_link(mentors_anchor, action_hash.clone(), LinkTypes::AllMentors, ())?;
+    create_link(
+        mentors_anchor,
+        action_hash.clone(),
+        LinkTypes::AllMentors,
+        (),
+    )?;
 
     // Link each skill to this mentor for skill-based lookup
     for skill in &input.skills {
         let skill_path = Path::from(format!("skill.{}", skill.to_lowercase()));
         let skill_anchor = ensure_path(skill_path, LinkTypes::SkillToMentor)?;
-        create_link(skill_anchor, action_hash.clone(), LinkTypes::SkillToMentor, ())?;
+        create_link(
+            skill_anchor,
+            action_hash.clone(),
+            LinkTypes::SkillToMentor,
+            (),
+        )?;
     }
 
     Ok(action_hash)
@@ -126,7 +164,12 @@ pub fn register_as_mentee(input: MenteeProfile) -> ExternResult<ActionHash> {
     // Link to "all_mentees" anchor
     let mentees_path = Path::from("all_mentees");
     let mentees_anchor = ensure_path(mentees_path, LinkTypes::AllMentees)?;
-    create_link(mentees_anchor, action_hash.clone(), LinkTypes::AllMentees, ())?;
+    create_link(
+        mentees_anchor,
+        action_hash.clone(),
+        LinkTypes::AllMentees,
+        (),
+    )?;
 
     Ok(action_hash)
 }
@@ -193,15 +236,33 @@ pub fn propose_mentorship(input: ProposeMentorshipInput) -> ExternResult<ActionH
     let mentor_profile: MentorProfile = mentor_record
         .entry()
         .to_app_option()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to deserialize mentor profile: {}", e))))?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Mentor profile entry not found".to_string())))?;
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize mentor profile: {}",
+                e
+            )))
+        })?
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Mentor profile entry not found".to_string()
+            ))
+        })?;
 
     let mentee_record = get_record(input.mentee_profile_hash.clone())?;
     let mentee_profile: MenteeProfile = mentee_record
         .entry()
         .to_app_option()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to deserialize mentee profile: {}", e))))?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Mentee profile entry not found".to_string())))?;
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize mentee profile: {}",
+                e
+            )))
+        })?
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Mentee profile entry not found".to_string()
+            ))
+        })?;
 
     // Check mentor capacity
     if mentor_profile.availability != MentorAvailability::Available {
@@ -264,8 +325,17 @@ pub fn accept_mentorship(mentorship_hash: ActionHash) -> ExternResult<ActionHash
     let mut mentorship: Mentorship = record
         .entry()
         .to_app_option()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to deserialize mentorship: {}", e))))?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Mentorship entry not found".to_string())))?;
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize mentorship: {}",
+                e
+            )))
+        })?
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Mentorship entry not found".to_string()
+            ))
+        })?;
 
     if mentorship.status != MentorshipStatus::Proposed {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -297,8 +367,17 @@ pub fn record_session(input: MentorshipSession) -> ExternResult<ActionHash> {
     let mentorship: Mentorship = mentorship_record
         .entry()
         .to_app_option()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to deserialize mentorship: {}", e))))?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Mentorship entry not found".to_string())))?;
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize mentorship: {}",
+                e
+            )))
+        })?
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Mentorship entry not found".to_string()
+            ))
+        })?;
 
     if mentorship.status != MentorshipStatus::Active {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -347,13 +426,38 @@ pub fn complete_mentorship(input: CompleteMentorshipInput) -> ExternResult<Actio
     let mut mentorship: Mentorship = record
         .entry()
         .to_app_option()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to deserialize mentorship: {}", e))))?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Mentorship entry not found".to_string())))?;
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize mentorship: {}",
+                e
+            )))
+        })?
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Mentorship entry not found".to_string()
+            ))
+        })?;
 
     if mentorship.status != MentorshipStatus::Active {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Only active mentorships can be completed".to_string()
         )));
+    }
+
+    // --- LIQUID LEARNING FEEDBACK (Vector 2) ---
+    // If the mentor provided a rating, we report it to the global reputation system.
+    if let Some(rating) = input.mentor_rating {
+        call(
+            CallTargetCell::OtherRole("identity".into()),
+            "reputation_aggregator".into(),
+            "report_domain_score".into(),
+            None,
+            serde_json::json!({
+                "agent_pubkey_b64": mentorship.mentee_did.replace("did:mycelix:", ""),
+                "cluster": "mentorship",
+                "score": rating / 5.0 // Normalize to 0.0 - 1.0
+            }),
+        )?;
     }
 
     // Validate ratings if provided
@@ -374,7 +478,10 @@ pub fn complete_mentorship(input: CompleteMentorshipInput) -> ExternResult<Actio
 
     // Count sessions
     let sessions = get_links(
-        LinkQuery::try_new(input.mentorship_hash.clone(), LinkTypes::MentorshipToSession)?,
+        LinkQuery::try_new(
+            input.mentorship_hash.clone(),
+            LinkTypes::MentorshipToSession,
+        )?,
         GetStrategy::Local,
     )?;
 

@@ -163,6 +163,8 @@ use super::thresholds::{
     UNIFIED_QUALITY_HIGH_THRESHOLD,
     UNIFIED_QUALITY_PREDICTION_WEIGHT,
 };
+#[cfg(feature = "vision-manifold")]
+use super::types::MentalMovie;
 use super::{CognitiveLoopService, CycleState};
 
 impl CognitiveLoopService {
@@ -1790,6 +1792,39 @@ impl CognitiveLoopService {
             }
         }
 
+        // ═══════════════════════════════════════════════════════════════════════
+        // GEO-SYNTH: Decode geodesic path into mental movie (if requested)
+        // ═══════════════════════════════════════════════════════════════════════
+        #[cfg(feature = "vision-manifold")]
+        let mental_movie = if self.carryover.quality.last_request_geodesic {
+            if let Some(ref bridge) = self.sensorimotor.vision_sensory.vision_bridge {
+                let manifold = bridge.manifold();
+                let path = manifold.last_geodesic();
+
+                if !path.is_empty() {
+                    let frames = manifold.decode_geodesic_to_frames_improved(path);
+                    if !frames.is_empty() {
+                        Some(crate::cognitive_loop::types::MentalMovie {
+                            frames,
+                            width: self.config.vision_frame_width,
+                            height: self.config.vision_frame_height,
+                            channels: bridge.manifold().last_frame_channels(),
+                            path_length: path.len(),
+                            semantic_coherence: 0.0, // can be enhanced later
+                        })
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
         FeedbackPhaseResult {
             quality: FbQuality {
                 cross_module_agreement,
@@ -1959,6 +1994,8 @@ impl CognitiveLoopService {
             grid_encoding_norm,
             grid_spatial_complexity,
             social_learning_rate_factor,
+            #[cfg(feature = "vision-manifold")]
+            mental_movie,
         }
     }
 }

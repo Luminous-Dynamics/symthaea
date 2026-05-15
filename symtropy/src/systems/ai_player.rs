@@ -171,7 +171,7 @@ pub fn ai_player_system(
         .entities
         .get(&player_body.handle)
         .map(|e| e.harmony_activations)
-        .unwrap_or([0.5; 8]);
+        .unwrap_or([0.5; 9]);
 
     // Build nearby agents list from NPCs
     let nearby: Vec<_> = npc_query
@@ -180,7 +180,7 @@ pub fn ai_player_system(
             let npc_pos =
                 nalgebra::SVector::from([tf.translation.x as f64, tf.translation.y as f64]);
             // Try to find harmony data (use default if not available)
-            Some((npc_pos, [0.5f64; 8]))
+            Some((npc_pos, [0.5f64; 9]))
         })
         .collect();
 

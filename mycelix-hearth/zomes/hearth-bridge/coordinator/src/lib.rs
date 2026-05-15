@@ -1,5 +1,5 @@
-use mycelix_zome_helpers as _;
-#![allow(deprecated)] // Uses legacy ConsciousnessCredential/Tier for fallback path
+#![allow(deprecated)]
+// Uses legacy ConsciousnessCredential/Tier for fallback path
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -24,11 +24,11 @@ use hearth_types::{
 };
 use mycelix_bridge_common::{
     self as bridge, check_rate_limit_count, needs_refresh, routing_registry, BridgeHealth,
-    ConsciousnessCredential, ConsciousnessProfile, ConsciousnessTier,
-    CrossClusterDispatchInput, CrossClusterRole,
-    DispatchInput, DispatchResult, EventTypeQuery, GateAuditInput, GovernanceAuditFilter,
-    GovernanceAuditResult, ResolveQueryInput, RATE_LIMIT_WINDOW_SECS,
+    ConsciousnessCredential, ConsciousnessProfile, ConsciousnessTier, CrossClusterDispatchInput,
+    CrossClusterRole, DispatchInput, DispatchResult, EventTypeQuery, GateAuditInput,
+    GovernanceAuditFilter, GovernanceAuditResult, ResolveQueryInput, RATE_LIMIT_WINDOW_SECS,
 };
+use mycelix_zome_helpers as _;
 
 // ============================================================================
 // Allowed zome names -- security boundary for dispatch
@@ -916,11 +916,13 @@ pub fn get_sovereign_credential(
     match response {
         ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
             wasm_error!(WasmErrorInner::Guest(format!(
-                "Failed to decode sovereign credential: {:?}", e
+                "Failed to decode sovereign credential: {:?}",
+                e
             )))
         }),
         other => Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Sovereign credential call failed for {}: {:?}", did, other
+            "Sovereign credential call failed for {}: {:?}",
+            did, other
         )))),
     }
 }
@@ -1113,13 +1115,25 @@ pub fn get_bridge_metrics(_: ()) -> ExternResult<String> {
 
 /// Receive a cross-cluster notification and store it locally.
 #[hdk_extern]
-pub fn receive_notification(notification: mycelix_bridge_entry_types::CrossClusterNotification) -> ExternResult<ActionHash> {
+pub fn receive_notification(
+    notification: mycelix_bridge_entry_types::CrossClusterNotification,
+) -> ExternResult<ActionHash> {
     let action_hash = create_entry(&EntryTypes::Notification(notification.clone()))?;
     let agent = agent_info()?.agent_initial_pubkey;
     let inbox_anchor = ensure_anchor(&format!("notifications:{:?}", agent))?;
-    create_link(inbox_anchor, action_hash.clone(), LinkTypes::AgentToNotification, ())?;
+    create_link(
+        inbox_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentToNotification,
+        (),
+    )?;
     let all_anchor = ensure_anchor("all_notifications")?;
-    create_link(all_anchor, action_hash.clone(), LinkTypes::AllNotifications, ())?;
+    create_link(
+        all_anchor,
+        action_hash.clone(),
+        LinkTypes::AllNotifications,
+        (),
+    )?;
     let signal = mycelix_bridge_common::notifications::NotificationSignal {
         signal_type: "cross_cluster_notification".into(),
         source_cluster: notification.source_cluster,
@@ -1133,14 +1147,17 @@ pub fn receive_notification(notification: mycelix_bridge_entry_types::CrossClust
 
 /// Get notifications for the calling agent.
 #[hdk_extern]
-pub fn get_my_notifications(input: mycelix_bridge_common::notifications::NotificationQueryInput) -> ExternResult<Vec<Record>> {
+pub fn get_my_notifications(
+    input: mycelix_bridge_common::notifications::NotificationQueryInput,
+) -> ExternResult<Vec<Record>> {
     let agent = agent_info()?.agent_initial_pubkey;
     let inbox_anchor = ensure_anchor(&format!("notifications:{:?}", agent))?;
     let links = get_links(
         LinkQuery::try_new(inbox_anchor, LinkTypes::AgentToNotification)?,
         GetStrategy::default(),
     )?;
-    let limit = input.limit
+    let limit = input
+        .limit
         .unwrap_or(mycelix_bridge_common::notifications::DEFAULT_NOTIFICATION_LIMIT)
         .min(mycelix_bridge_common::notifications::MAX_NOTIFICATIONS_PER_AGENT);
     let mut records = Vec::new();

@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -15,6 +14,7 @@ use mycelix_zome_helpers as _;
 
 use hdk::prelude::*;
 use integration_integrity::*;
+use mycelix_zome_helpers as _;
 
 // Explicit imports for types used in create_default_progress
 use integration_integrity::LearningStyle;
@@ -72,31 +72,28 @@ where
         ZomeCallResponse::Ok(result) => {
             let decoded: O = result.decode().map_err(|e| {
                 wasm_error!(WasmErrorInner::Guest(format!(
-                    "Failed to decode SRS response for {}: {:?}", fn_name, e
+                    "Failed to decode SRS response for {}: {:?}",
+                    fn_name, e
                 )))
             })?;
             Ok(decoded)
         }
-        ZomeCallResponse::Unauthorized(_, _, _, _) => {
-            Err(wasm_error!(WasmErrorInner::Guest(
-                format!("Unauthorized call to srs_coordinator::{}", fn_name)
-            )))
-        }
-        ZomeCallResponse::NetworkError(err) => {
-            Err(wasm_error!(WasmErrorInner::Guest(
-                format!("Network error calling srs_coordinator::{}: {}", fn_name, err)
-            )))
-        }
+        ZomeCallResponse::Unauthorized(_, _, _, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Unauthorized call to srs_coordinator::{}", fn_name)
+        ))),
+        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network error calling srs_coordinator::{}: {}",
+            fn_name, err
+        )))),
         ZomeCallResponse::CountersigningSession(err) => {
-            Err(wasm_error!(WasmErrorInner::Guest(
-                format!("Countersigning error calling srs_coordinator::{}: {}", fn_name, err)
-            )))
+            Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Countersigning error calling srs_coordinator::{}: {}",
+                fn_name, err
+            ))))
         }
-        ZomeCallResponse::AuthenticationFailed(_, _) => {
-            Err(wasm_error!(WasmErrorInner::Guest(
-                format!("Authentication failed calling srs_coordinator::{}", fn_name)
-            )))
-        }
+        ZomeCallResponse::AuthenticationFailed(_, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Authentication failed calling srs_coordinator::{}", fn_name)
+        ))),
     }
 }
 
@@ -118,30 +115,30 @@ where
         ZomeCallResponse::Ok(result) => {
             let decoded: O = result.decode().map_err(|e| {
                 wasm_error!(WasmErrorInner::Guest(format!(
-                    "Failed to decode Gamification response for {}: {:?}", fn_name, e
+                    "Failed to decode Gamification response for {}: {:?}",
+                    fn_name, e
                 )))
             })?;
             Ok(decoded)
         }
-        ZomeCallResponse::Unauthorized(_, _, _, _) => {
-            Err(wasm_error!(WasmErrorInner::Guest(
-                format!("Unauthorized call to gamification_coordinator::{}", fn_name)
-            )))
-        }
-        ZomeCallResponse::NetworkError(err) => {
-            Err(wasm_error!(WasmErrorInner::Guest(
-                format!("Network error calling gamification_coordinator::{}: {}", fn_name, err)
-            )))
-        }
+        ZomeCallResponse::Unauthorized(_, _, _, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Unauthorized call to gamification_coordinator::{}", fn_name)
+        ))),
+        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network error calling gamification_coordinator::{}: {}",
+            fn_name, err
+        )))),
         ZomeCallResponse::CountersigningSession(err) => {
-            Err(wasm_error!(WasmErrorInner::Guest(
-                format!("Countersigning error calling gamification_coordinator::{}: {}", fn_name, err)
-            )))
+            Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Countersigning error calling gamification_coordinator::{}: {}",
+                fn_name, err
+            ))))
         }
         ZomeCallResponse::AuthenticationFailed(_, _) => {
-            Err(wasm_error!(WasmErrorInner::Guest(
-                format!("Authentication failed calling gamification_coordinator::{}", fn_name)
-            )))
+            Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Authentication failed calling gamification_coordinator::{}",
+                fn_name
+            ))))
         }
     }
 }
@@ -164,30 +161,30 @@ where
         ZomeCallResponse::Ok(result) => {
             let decoded: O = result.decode().map_err(|e| {
                 wasm_error!(WasmErrorInner::Guest(format!(
-                    "Failed to decode Adaptive response for {}: {:?}", fn_name, e
+                    "Failed to decode Adaptive response for {}: {:?}",
+                    fn_name, e
                 )))
             })?;
             Ok(decoded)
         }
-        ZomeCallResponse::Unauthorized(_, _, _, _) => {
-            Err(wasm_error!(WasmErrorInner::Guest(
-                format!("Unauthorized call to adaptive_coordinator::{}", fn_name)
-            )))
-        }
-        ZomeCallResponse::NetworkError(err) => {
-            Err(wasm_error!(WasmErrorInner::Guest(
-                format!("Network error calling adaptive_coordinator::{}: {}", fn_name, err)
-            )))
-        }
+        ZomeCallResponse::Unauthorized(_, _, _, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Unauthorized call to adaptive_coordinator::{}", fn_name)
+        ))),
+        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network error calling adaptive_coordinator::{}: {}",
+            fn_name, err
+        )))),
         ZomeCallResponse::CountersigningSession(err) => {
-            Err(wasm_error!(WasmErrorInner::Guest(
-                format!("Countersigning error calling adaptive_coordinator::{}: {}", fn_name, err)
-            )))
+            Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Countersigning error calling adaptive_coordinator::{}: {}",
+                fn_name, err
+            ))))
         }
         ZomeCallResponse::AuthenticationFailed(_, _) => {
-            Err(wasm_error!(WasmErrorInner::Guest(
-                format!("Authentication failed calling adaptive_coordinator::{}", fn_name)
-            )))
+            Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Authentication failed calling adaptive_coordinator::{}",
+                fn_name
+            ))))
         }
     }
 }
@@ -279,7 +276,10 @@ pub fn record_learning_event(input: RecordEventInput) -> ExternResult<LearningEv
     let anchor = event_anchor()?;
 
     // Calculate XP (assuming 100 base XP, 1000 streak bonus = no bonus)
-    let streak_bonus = input.streak_day.map(|d| streak_bonus_for_day(d)).unwrap_or(1000);
+    let streak_bonus = input
+        .streak_day
+        .map(|d| streak_bonus_for_day(d))
+        .unwrap_or(1000);
     let xp = calculate_xp(100, input.quality_permille, streak_bonus, &input.event_type);
 
     // Calculate mastery change based on quality
@@ -309,12 +309,7 @@ pub fn record_learning_event(input: RecordEventInput) -> ExternResult<LearningEv
 
     let action_hash = create_entry(EntryTypes::LearningEvent(event))?;
 
-    create_link(
-        anchor,
-        action_hash.clone(),
-        LinkTypes::LearnerToEvents,
-        (),
-    )?;
+    create_link(anchor, action_hash.clone(), LinkTypes::LearnerToEvents, ())?;
 
     // Check for triggered achievements
     let triggered = check_achievement_triggers(&agent, &input.event_type, xp)?;
@@ -355,10 +350,10 @@ pub struct LearningEventResult {
 fn streak_bonus_for_day(day: u32) -> u16 {
     match day {
         0..=6 => 1000,     // No bonus first week
-        7..=13 => 1100,   // 10% bonus
-        14..=29 => 1150,  // 15% bonus
-        30..=59 => 1250,  // 25% bonus
-        60..=99 => 1350,  // 35% bonus
+        7..=13 => 1100,    // 10% bonus
+        14..=29 => 1150,   // 15% bonus
+        30..=59 => 1250,   // 25% bonus
+        60..=99 => 1350,   // 35% bonus
         100..=179 => 1500, // 50% bonus
         180..=364 => 1750, // 75% bonus
         _ => 2000,         // 100% bonus after a year
@@ -560,7 +555,9 @@ pub fn get_progress_aggregate(_: ()) -> ExternResult<Option<LearnerProgressAggre
                     .entry()
                     .to_app_option()
                     .map_err(|e| wasm_error!(e))?
-                    .ok_or(wasm_error!(WasmErrorInner::Guest("No aggregate entry".into())))?;
+                    .ok_or(wasm_error!(WasmErrorInner::Guest(
+                        "No aggregate entry".into()
+                    )))?;
                 return Ok(Some(aggregate));
             }
         }
@@ -599,26 +596,24 @@ pub fn refresh_progress_from_zomes(_: ()) -> ExternResult<CrossZomeProgressResul
     let mut errors = Vec::new();
 
     // === Fetch from Gamification ===
-    let gamification: Option<GamificationSummary> = match call_gamification::<(), GamificationSummary>(
-        "get_gamification_summary", ()
-    ) {
-        Ok(summary) => Some(summary),
-        Err(e) => {
-            errors.push(format!("Gamification fetch failed: {:?}", e));
-            None
-        }
-    };
+    let gamification: Option<GamificationSummary> =
+        match call_gamification::<(), GamificationSummary>("get_gamification_summary", ()) {
+            Ok(summary) => Some(summary),
+            Err(e) => {
+                errors.push(format!("Gamification fetch failed: {:?}", e));
+                None
+            }
+        };
 
     // === Fetch from Adaptive ===
-    let adaptive_summary: Option<AdaptiveLearnerSummary> = match call_adaptive::<(), AdaptiveLearnerSummary>(
-        "get_learner_summary", ()
-    ) {
-        Ok(summary) => Some(summary),
-        Err(e) => {
-            errors.push(format!("Adaptive fetch failed: {:?}", e));
-            None
-        }
-    };
+    let adaptive_summary: Option<AdaptiveLearnerSummary> =
+        match call_adaptive::<(), AdaptiveLearnerSummary>("get_learner_summary", ()) {
+            Ok(summary) => Some(summary),
+            Err(e) => {
+                errors.push(format!("Adaptive fetch failed: {:?}", e));
+                None
+            }
+        };
 
     // === Fetch SRS card counts ===
     let srs_cards: Vec<Record> = match call_srs::<(), Vec<Record>>("get_my_cards", ()) {
@@ -655,22 +650,29 @@ pub fn refresh_progress_from_zomes(_: ()) -> ExternResult<CrossZomeProgressResul
         };
 
     // Adaptive values (with defaults)
-    let (skills_tracked, skills_mastered, avg_mastery, skills_due_review,
-         active_goals, completed_goals, total_sessions, total_minutes) =
-        if let Some(ref adp) = adaptive_summary {
-            (
-                adp.mastery_count,
-                adp.skills_mastered,
-                adp.avg_mastery_permille,
-                adp.due_for_review,
-                adp.active_goals,
-                0u32, // completed_goals not in summary
-                adp.total_sessions,
-                adp.total_learning_minutes,
-            )
-        } else {
-            (0, 0, 0, 0, 0, 0, 0, 0)
-        };
+    let (
+        skills_tracked,
+        skills_mastered,
+        avg_mastery,
+        skills_due_review,
+        active_goals,
+        completed_goals,
+        total_sessions,
+        total_minutes,
+    ) = if let Some(ref adp) = adaptive_summary {
+        (
+            adp.mastery_count,
+            adp.skills_mastered,
+            adp.avg_mastery_permille,
+            adp.due_for_review,
+            adp.active_goals,
+            0u32, // completed_goals not in summary
+            adp.total_sessions,
+            adp.total_learning_minutes,
+        )
+    } else {
+        (0, 0, 0, 0, 0, 0, 0, 0)
+    };
 
     // SRS values
     let srs_cards_total = srs_cards.len() as u32;
@@ -725,7 +727,7 @@ pub fn refresh_progress_from_zomes(_: ()) -> ExternResult<CrossZomeProgressResul
         srs_cards_total,
         srs_cards_mature: srs_mature,
         srs_cards_learning: srs_learning,
-        srs_reviews_today: 0, // Would need daily tracking
+        srs_reviews_today: 0,       // Would need daily tracking
         srs_accuracy_permille: 800, // Default, would need stats
         skills_tracked,
         skills_mastered,
@@ -801,7 +803,8 @@ pub fn get_unified_dashboard(_: ()) -> ExternResult<UnifiedDashboard> {
     let active_session = get_active_session(())?;
 
     // Fetch cross-zome data
-    let gamification: Option<GamificationSummary> = call_gamification("get_gamification_summary", ()).ok();
+    let gamification: Option<GamificationSummary> =
+        call_gamification("get_gamification_summary", ()).ok();
     let adaptive: Option<AdaptiveLearnerSummary> = call_adaptive("get_learner_summary", ()).ok();
     let srs_due: Vec<Record> = call_srs("get_due_cards", 1000u32).unwrap_or_default();
 
@@ -871,17 +874,22 @@ pub struct CompleteActivityInput {
 
 /// Complete an activity in an orchestrated session
 #[hdk_extern]
-pub fn complete_session_activity(input: CompleteActivityInput) -> ExternResult<OrchestratedSession> {
+pub fn complete_session_activity(
+    input: CompleteActivityInput,
+) -> ExternResult<OrchestratedSession> {
     let _now = current_time()?;
 
-    let record = get(input.session_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Session not found".into())))?;
+    let record = get(input.session_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Session not found".into())
+    ))?;
 
     let mut session: OrchestratedSession = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(e))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("No session entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "No session entry".into()
+        )))?;
 
     // Add completed activity
     session.completed_activities.push(input.activity.clone());
@@ -889,7 +897,8 @@ pub fn complete_session_activity(input: CompleteActivityInput) -> ExternResult<O
     session.actual_seconds += input.activity.duration_seconds;
 
     // Update flow score based on quality
-    session.flow_score_permille = (session.flow_score_permille + input.activity.quality_permille) / 2;
+    session.flow_score_permille =
+        (session.flow_score_permille + input.activity.quality_permille) / 2;
 
     update_entry(input.session_hash, session.clone())?;
 
@@ -901,14 +910,17 @@ pub fn complete_session_activity(input: CompleteActivityInput) -> ExternResult<O
 pub fn end_orchestrated_session(session_hash: ActionHash) -> ExternResult<OrchestratedSession> {
     let now = current_time()?;
 
-    let record = get(session_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Session not found".into())))?;
+    let record = get(session_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Session not found".into())
+    ))?;
 
     let mut session: OrchestratedSession = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(e))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("No session entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "No session entry".into()
+        )))?;
 
     session.state = SessionState::Completed;
     session.ended_at = Some(now);
@@ -936,7 +948,9 @@ pub fn get_active_session(_: ()) -> ExternResult<Option<OrchestratedSession>> {
                     .entry()
                     .to_app_option()
                     .map_err(|e| wasm_error!(e))?
-                    .ok_or(wasm_error!(WasmErrorInner::Guest("No session entry".into())))?;
+                    .ok_or(wasm_error!(WasmErrorInner::Guest(
+                        "No session entry".into()
+                    )))?;
 
                 if session.state == SessionState::Active || session.state == SessionState::Paused {
                     return Ok(Some(session));
@@ -967,11 +981,11 @@ pub struct SmartSessionPlanInput {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
 pub enum SessionType {
     #[default]
-    Balanced,      // Mix of review, learning, practice
-    ReviewFocus,   // Prioritize retention (SRS/review)
-    NewLearning,   // Prioritize new content
-    Practice,      // Prioritize skill practice
-    DeepWork,      // Long focus sessions with fewer breaks
+    Balanced, // Mix of review, learning, practice
+    ReviewFocus, // Prioritize retention (SRS/review)
+    NewLearning, // Prioritize new content
+    Practice,    // Prioritize skill practice
+    DeepWork,    // Long focus sessions with fewer breaks
 }
 
 /// Smart session plan with detailed activities
@@ -1036,10 +1050,10 @@ pub struct PlannedBreak {
 /// Type of break
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum BreakType {
-    Micro,      // 1-2 min stretch
-    Short,      // 5 min break
-    Pomodoro,   // 5-10 min break
-    Long,       // 15-20 min break
+    Micro,    // 1-2 min stretch
+    Short,    // 5 min break
+    Pomodoro, // 5-10 min break
+    Long,     // 15-20 min break
 }
 
 /// Generate a smart session plan based on learner state
@@ -1050,7 +1064,8 @@ pub fn plan_smart_session(input: SmartSessionPlanInput) -> ExternResult<SmartSes
 
     // Get learner context from adaptive zome
     let learner_context: serde_json::Value = call_adaptive("get_learner_context", ())?;
-    let due_for_review: u32 = learner_context.get("due_for_review")
+    let due_for_review: u32 = learner_context
+        .get("due_for_review")
         .and_then(|v| v.as_u64())
         .unwrap_or(0) as u32;
 
@@ -1061,8 +1076,9 @@ pub fn plan_smart_session(input: SmartSessionPlanInput) -> ExternResult<SmartSes
             "limit": 20,
             "include_new": input.session_type != SessionType::ReviewFocus,
             "include_review": input.session_type != SessionType::NewLearning,
-        })
-    ).unwrap_or_else(|_| vec![]);
+        }),
+    )
+    .unwrap_or_else(|_| vec![]);
 
     // Build activity list based on session type and recommendations
     let mut activities: Vec<SmartPlannedActivity> = Vec::new();
@@ -1115,7 +1131,8 @@ pub fn plan_smart_session(input: SmartSessionPlanInput) -> ExternResult<SmartSes
         let activity_minutes = (remaining / 3).max(5).min(20);
 
         // Parse recommendation type
-        let rec_type = rec.get("rec_type")
+        let rec_type = rec
+            .get("rec_type")
             .and_then(|v| v.as_str())
             .unwrap_or("Practice");
 
@@ -1126,7 +1143,8 @@ pub fn plan_smart_session(input: SmartSessionPlanInput) -> ExternResult<SmartSes
             _ => PlannedActivityType::SkillPractice,
         };
 
-        let smart_score = rec.get("smart_score_permille")
+        let smart_score = rec
+            .get("smart_score_permille")
             .and_then(|v| v.as_u64())
             .unwrap_or(500) as u16;
 
@@ -1138,13 +1156,13 @@ pub fn plan_smart_session(input: SmartSessionPlanInput) -> ExternResult<SmartSes
             target_hash: skill_hash.clone(),
             estimated_minutes: activity_minutes,
             priority: ((smart_score / 100) as u8).min(10).max(1),
-            reasoning: vec![
-                rec.get("explanation")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("AI-recommended activity")
-                    .to_string(),
-            ],
-            difficulty_match_permille: rec.get("difficulty_match_permille")
+            reasoning: vec![rec
+                .get("explanation")
+                .and_then(|v| v.as_str())
+                .unwrap_or("AI-recommended activity")
+                .to_string()],
+            difficulty_match_permille: rec
+                .get("difficulty_match_permille")
                 .and_then(|v| v.as_u64())
                 .unwrap_or(700) as u16,
             estimated_xp: (activity_minutes as u32 * 15),
@@ -1159,15 +1177,27 @@ pub fn plan_smart_session(input: SmartSessionPlanInput) -> ExternResult<SmartSes
     }
 
     // Plan breaks based on session length and type
-    let breaks = plan_breaks(input.target_minutes, input.include_breaks, &input.session_type);
+    let breaks = plan_breaks(
+        input.target_minutes,
+        input.include_breaks,
+        &input.session_type,
+    );
 
     // Flow state optimization notes
     let flow_notes = match input.session_type {
-        SessionType::DeepWork => "Deep work session: minimize interruptions, focus for extended periods".into(),
+        SessionType::DeepWork => {
+            "Deep work session: minimize interruptions, focus for extended periods".into()
+        }
         SessionType::Balanced => "Balanced session: variety to maintain engagement and flow".into(),
-        SessionType::ReviewFocus => "Review-focused: spaced repetition optimized for retention".into(),
-        SessionType::NewLearning => "Learning-focused: new concepts with progressive difficulty".into(),
-        SessionType::Practice => "Practice-focused: skill reinforcement through active application".into(),
+        SessionType::ReviewFocus => {
+            "Review-focused: spaced repetition optimized for retention".into()
+        }
+        SessionType::NewLearning => {
+            "Learning-focused: new concepts with progressive difficulty".into()
+        }
+        SessionType::Practice => {
+            "Practice-focused: skill reinforcement through active application".into()
+        }
     };
 
     // Calculate confidence based on data availability
@@ -1180,7 +1210,11 @@ pub fn plan_smart_session(input: SmartSessionPlanInput) -> ExternResult<SmartSes
     };
 
     Ok(SmartSessionPlan {
-        plan_id: format!("plan-{}-{}", now, agent.to_string().chars().take(8).collect::<String>()),
+        plan_id: format!(
+            "plan-{}-{}",
+            now,
+            agent.to_string().chars().take(8).collect::<String>()
+        ),
         total_minutes,
         activities,
         estimated_xp,
@@ -1194,7 +1228,11 @@ pub fn plan_smart_session(input: SmartSessionPlanInput) -> ExternResult<SmartSes
 }
 
 /// Helper to plan breaks based on session type
-fn plan_breaks(target_minutes: u16, include_breaks: bool, session_type: &SessionType) -> Vec<PlannedBreak> {
+fn plan_breaks(
+    target_minutes: u16,
+    include_breaks: bool,
+    session_type: &SessionType,
+) -> Vec<PlannedBreak> {
     if !include_breaks {
         return vec![];
     }
@@ -1257,15 +1295,17 @@ fn plan_breaks(target_minutes: u16, include_breaks: bool, session_type: &Session
 #[hdk_extern]
 pub fn start_session_from_plan(plan: SmartSessionPlan) -> ExternResult<ActionHash> {
     // Convert smart activities to standard planned activities
-    let planned_activities: Vec<PlannedActivity> = plan.activities.iter().map(|a| {
-        PlannedActivity {
+    let planned_activities: Vec<PlannedActivity> = plan
+        .activities
+        .iter()
+        .map(|a| PlannedActivity {
             activity_type: a.activity_type.clone(),
             target_hash: a.target_hash.to_string(),
             estimated_minutes: a.estimated_minutes,
             priority: a.priority,
             reason: a.reasoning.first().cloned().unwrap_or_default(),
-        }
-    }).collect();
+        })
+        .collect();
 
     start_orchestrated_session(StartSessionInput {
         target_minutes: plan.total_minutes,
@@ -1285,7 +1325,8 @@ pub fn generate_daily_report(_: ()) -> ExternResult<ActionHash> {
 
     // Get today's events
     let events = get_recent_events(1000)?;
-    let today_events: Vec<_> = events.into_iter()
+    let today_events: Vec<_> = events
+        .into_iter()
         .filter(|e| {
             let event_date = (e.occurred_at / (24 * 60 * 60 * 1_000_000)) as u32 + 19700101;
             event_date == date
@@ -1298,42 +1339,46 @@ pub fn generate_daily_report(_: ()) -> ExternResult<ActionHash> {
     let total_minutes: u32 = today_events.iter().map(|e| e.duration_seconds).sum::<u32>() / 60;
 
     // SRS stats
-    let srs_events: Vec<_> = today_events.iter()
+    let srs_events: Vec<_> = today_events
+        .iter()
         .filter(|e| matches!(e.source_zome, SourceZome::Srs))
         .collect();
     let srs_reviews = srs_events.len() as u32;
-    let srs_new = srs_events.iter()
+    let srs_new = srs_events
+        .iter()
         .filter(|e| matches!(e.event_type, LearningEventType::SrsReview))
         .count() as u32;
     let srs_total_quality: u32 = srs_events.iter().map(|e| e.quality_permille as u32).sum();
     let srs_accuracy = if !srs_events.is_empty() {
         (srs_total_quality / srs_events.len() as u32) as u16
-    } else { 0 };
+    } else {
+        0
+    };
 
     // Mastery stats
-    let skills_practiced = today_events.iter()
+    let skills_practiced = today_events
+        .iter()
         .flat_map(|e| e.skills_affected.iter())
         .count() as u32;
-    let skills_improved = today_events.iter()
+    let skills_improved = today_events
+        .iter()
         .filter(|e| e.mastery_change > 0)
         .flat_map(|e| e.skills_affected.iter())
         .count() as u32;
-    let mastery_gained: i16 = today_events.iter()
-        .map(|e| e.mastery_change)
-        .sum();
+    let mastery_gained: i16 = today_events.iter().map(|e| e.mastery_change).sum();
 
     // Streak (get from latest event)
-    let streak_day = today_events.first()
-        .and_then(|e| e.streak_day)
-        .unwrap_or(0);
+    let streak_day = today_events.first().and_then(|e| e.streak_day).unwrap_or(0);
 
     // Goals
-    let goals_completed = today_events.iter()
+    let goals_completed = today_events
+        .iter()
         .filter(|e| matches!(e.event_type, LearningEventType::GoalAchieved))
         .count() as u8;
 
     // Badges
-    let badges: Vec<String> = today_events.iter()
+    let badges: Vec<String> = today_events
+        .iter()
         .filter(|e| matches!(e.event_type, LearningEventType::BadgeEarned))
         .map(|e| format!("badge-{}", e.occurred_at))
         .collect();
@@ -1341,7 +1386,8 @@ pub fn generate_daily_report(_: ()) -> ExternResult<ActionHash> {
     let report = DailyLearningReport {
         learner: agent,
         date,
-        sessions_count: today_events.iter()
+        sessions_count: today_events
+            .iter()
             .filter(|e| e.duration_seconds > 60)
             .count() as u32,
         total_minutes,
@@ -1536,27 +1582,46 @@ pub fn get_learning_analytics(input: AnalyticsInput) -> ExternResult<LearningAna
     let prev_xp: u32 = previous_reports.iter().map(|r| r.xp_earned).sum();
     let prev_skills: u32 = previous_reports.iter().map(|r| r.skills_practiced).sum();
     let prev_reviews: u32 = previous_reports.iter().map(|r| r.srs_reviews).sum();
-    let prev_badges: u32 = previous_reports.iter().map(|r| r.badges_earned.len() as u32).sum();
-    let prev_goals: u32 = previous_reports.iter().map(|r| r.goals_completed as u32).sum();
+    let prev_badges: u32 = previous_reports
+        .iter()
+        .map(|r| r.badges_earned.len() as u32)
+        .sum();
+    let prev_goals: u32 = previous_reports
+        .iter()
+        .map(|r| r.goals_completed as u32)
+        .sum();
     let prev_streak = previous_reports.first().map(|r| r.streak_day).unwrap_or(0);
 
     let active_days = reports.len() as u32;
     let prev_active_days = previous_reports.len() as u32;
 
     // SRS accuracy
-    let total_accuracy: u32 = reports.iter()
+    let total_accuracy: u32 = reports
+        .iter()
         .filter(|r| r.srs_reviews > 0)
         .map(|r| r.srs_accuracy_permille as u32)
         .sum();
     let accuracy_count = reports.iter().filter(|r| r.srs_reviews > 0).count() as u32;
-    let current_accuracy = if accuracy_count > 0 { total_accuracy / accuracy_count } else { 0 };
+    let current_accuracy = if accuracy_count > 0 {
+        total_accuracy / accuracy_count
+    } else {
+        0
+    };
 
-    let prev_accuracy: u32 = previous_reports.iter()
+    let prev_accuracy: u32 = previous_reports
+        .iter()
         .filter(|r| r.srs_reviews > 0)
         .map(|r| r.srs_accuracy_permille as u32)
         .sum();
-    let prev_accuracy_count = previous_reports.iter().filter(|r| r.srs_reviews > 0).count() as u32;
-    let prev_accuracy_val = if prev_accuracy_count > 0 { prev_accuracy / prev_accuracy_count } else { 0 };
+    let prev_accuracy_count = previous_reports
+        .iter()
+        .filter(|r| r.srs_reviews > 0)
+        .count() as u32;
+    let prev_accuracy_val = if prev_accuracy_count > 0 {
+        prev_accuracy / prev_accuracy_count
+    } else {
+        0
+    };
 
     // Build daily breakdown
     let daily_xp: Vec<i64> = reports.iter().map(|r| r.xp_earned as i64).collect();
@@ -1574,18 +1639,20 @@ pub fn get_learning_analytics(input: AnalyticsInput) -> ExternResult<LearningAna
         total_minutes: create_metric(current_minutes as i64, prev_minutes as i64),
         avg_session_minutes: if current_sessions > 0 {
             (current_minutes / current_sessions) as u16
-        } else { 0 },
+        } else {
+            0
+        },
         active_days: create_metric(active_days as i64, prev_active_days as i64),
 
         xp_earned: create_metric(current_xp as i64, prev_xp as i64),
         skills_practiced: create_metric(current_skills as i64, prev_skills as i64),
         skills_mastered: create_metric(
             progress.skills_mastered as i64,
-            progress.skills_mastered.saturating_sub(1) as i64
+            progress.skills_mastered.saturating_sub(1) as i64,
         ),
         avg_mastery_permille: create_metric(
             progress.avg_mastery_permille as i64,
-            progress.avg_mastery_permille.saturating_sub(50) as i64
+            progress.avg_mastery_permille.saturating_sub(50) as i64,
         ),
 
         srs_reviews: create_metric(current_reviews as i64, prev_reviews as i64),
@@ -1599,7 +1666,7 @@ pub fn get_learning_analytics(input: AnalyticsInput) -> ExternResult<LearningAna
         badges_earned: create_metric(current_badges as i64, prev_badges as i64),
         goals_completed: create_metric(current_goals as i64, prev_goals as i64),
 
-        top_skills: vec![], // Would need to call adaptive zome
+        top_skills: vec![],     // Would need to call adaptive zome
         weakest_skills: vec![], // Would need to call adaptive zome
 
         daily_xp,
@@ -1637,7 +1704,8 @@ fn create_metric(current: i64, previous: i64) -> MetricWithTrend {
 
 /// Helper to create default progress
 fn create_default_progress() -> LearnerProgressAggregate {
-    let agent = agent_info().map(|a| a.agent_initial_pubkey)
+    let agent = agent_info()
+        .map(|a| a.agent_initial_pubkey)
         .unwrap_or_else(|_| AgentPubKey::from_raw_36(vec![0u8; 36]));
 
     LearnerProgressAggregate {
@@ -1724,7 +1792,7 @@ pub fn get_learning_trends(weeks: u32) -> ExternResult<LearningTrends> {
     Ok(LearningTrends {
         weekly_xp,
         weekly_minutes,
-        mastery_trend: vec![], // Would need historical mastery data
+        mastery_trend: vec![],  // Would need historical mastery data
         streak_history: vec![], // Would need historical streak data
     })
 }
@@ -1742,12 +1810,7 @@ pub fn create_achievement_trigger(trigger: AchievementTrigger) -> ExternResult<A
 
     let action_hash = create_entry(EntryTypes::AchievementTrigger(trigger))?;
 
-    create_link(
-        anchor,
-        action_hash.clone(),
-        LinkTypes::GlobalTriggers,
-        (),
-    )?;
+    create_link(anchor, action_hash.clone(), LinkTypes::GlobalTriggers, ())?;
 
     Ok(action_hash)
 }
@@ -1770,7 +1833,9 @@ pub fn get_achievement_triggers(_: ()) -> ExternResult<Vec<AchievementTrigger>> 
                     .entry()
                     .to_app_option()
                     .map_err(|e| wasm_error!(e))?
-                    .ok_or(wasm_error!(WasmErrorInner::Guest("No trigger entry".into())))?;
+                    .ok_or(wasm_error!(WasmErrorInner::Guest(
+                        "No trigger entry".into()
+                    )))?;
                 if trigger.is_active {
                     triggers.push(trigger);
                 }
@@ -1871,12 +1936,15 @@ pub struct InterleavedPracticeSequence {
 /// Generate an optimally interleaved practice sequence
 /// Based on research showing interleaved practice improves long-term retention
 #[hdk_extern]
-pub fn generate_interleaved_sequence(input: InterleavedPracticeInput) -> ExternResult<InterleavedPracticeSequence> {
+pub fn generate_interleaved_sequence(
+    input: InterleavedPracticeInput,
+) -> ExternResult<InterleavedPracticeSequence> {
     let mut skills = input.skills.clone();
 
     // Sort by urgency first (due items first), then by category for distribution
     skills.sort_by(|a, b| {
-        b.urgency_permille.cmp(&a.urgency_permille)
+        b.urgency_permille
+            .cmp(&a.urgency_permille)
             .then_with(|| (a.category.clone() as u8).cmp(&(b.category.clone() as u8)))
     });
 
@@ -1892,7 +1960,8 @@ pub fn generate_interleaved_sequence(input: InterleavedPracticeInput) -> ExternR
     // Build interleaved sequence using round-robin with jitter
     let mut sequence: Vec<PracticeSequenceItem> = Vec::new();
     let mut last_by_category: std::collections::HashMap<u8, u8> = std::collections::HashMap::new();
-    let mut category_indices: std::collections::HashMap<u8, usize> = std::collections::HashMap::new();
+    let mut category_indices: std::collections::HashMap<u8, usize> =
+        std::collections::HashMap::new();
     let mut total_minutes: u16 = 0;
     let mut position: u8 = 0;
 
@@ -1920,7 +1989,8 @@ pub fn generate_interleaved_sequence(input: InterleavedPracticeInput) -> ExternR
 
                     // Determine if this is a "desirable difficulty" item
                     // (slightly above current mastery, creating productive struggle)
-                    let is_desirable_difficulty = skill.difficulty_permille > skill.mastery_permille
+                    let is_desirable_difficulty = skill.difficulty_permille
+                        > skill.mastery_permille
                         && skill.difficulty_permille < skill.mastery_permille + 200;
 
                     sequence.push(PracticeSequenceItem {
@@ -1953,7 +2023,7 @@ pub fn generate_interleaved_sequence(input: InterleavedPracticeInput) -> ExternR
     let mut total_transitions = 0u32;
 
     for i in 1..sequence.len() {
-        if sequence[i].category == sequence[i-1].category {
+        if sequence[i].category == sequence[i - 1].category {
             same_category_consecutive += 1;
         }
         total_transitions += 1;
@@ -1982,9 +2052,9 @@ pub fn generate_interleaved_sequence(input: InterleavedPracticeInput) -> ExternR
     }
 
     // Confidence based on sequence quality
-    let confidence_permille = (interleaving_score / 2) +
-        (if categories_used.len() >= 3 { 250 } else { 100 }) +
-        (if avg_spacing >= 2 { 250 } else { 100 });
+    let confidence_permille = (interleaving_score / 2)
+        + (if categories_used.len() >= 3 { 250 } else { 100 })
+        + (if avg_spacing >= 2 { 250 } else { 100 });
 
     Ok(InterleavedPracticeSequence {
         sequence,
@@ -2056,7 +2126,10 @@ pub fn check_skill_readiness(input: ReadinessCheckInput) -> ExternResult<Knowled
     let mut all_hard_met = true;
 
     for prereq in &input.prerequisites {
-        let mastery = mastery_map.get(&prereq.prerequisite_hash).copied().unwrap_or(0);
+        let mastery = mastery_map
+            .get(&prereq.prerequisite_hash)
+            .copied()
+            .unwrap_or(0);
         let met = mastery >= prereq.min_mastery_permille;
 
         total_weight += prereq.weight_permille as u32;
@@ -2068,7 +2141,8 @@ pub fn check_skill_readiness(input: ReadinessCheckInput) -> ExternResult<Knowled
                 blocking_skills.push(prereq.prerequisite_hash.clone());
             }
             // Partial credit for partial mastery
-            let partial = (mastery as u32 * prereq.weight_permille as u32) / prereq.min_mastery_permille as u32;
+            let partial = (mastery as u32 * prereq.weight_permille as u32)
+                / prereq.min_mastery_permille as u32;
             weighted_readiness += partial.min(prereq.weight_permille as u32);
         }
     }
@@ -2173,7 +2247,8 @@ pub fn assess_cognitive_load(input: CognitiveLoadInput) -> ExternResult<Cognitiv
 
     // Calculate current load
     // Formula: (intrinsic + extraneous) with fatigue and time pressure multipliers
-    let base_load = (input.factors.intrinsic_load as u32 + input.factors.extraneous_load as u32) / 2;
+    let base_load =
+        (input.factors.intrinsic_load as u32 + input.factors.extraneous_load as u32) / 2;
 
     // Fatigue increases with time
     let time_fatigue = (input.session_minutes as u32 * 10).min(300); // Max 300 from time
@@ -2188,8 +2263,12 @@ pub fn assess_cognitive_load(input: CognitiveLoadInput) -> ExternResult<Cognitiv
         0
     };
 
-    let total_load = (base_load + time_fatigue + error_factor + response_factor +
-        input.factors.fatigue_estimate as u32 / 3).min(1000) as u16;
+    let total_load = (base_load
+        + time_fatigue
+        + error_factor
+        + response_factor
+        + input.factors.fatigue_estimate as u32 / 3)
+        .min(1000) as u16;
 
     let remaining_capacity = capacity.saturating_sub(total_load);
     let is_overloaded = total_load > capacity;
@@ -2423,7 +2502,12 @@ pub fn check_graduation(input: GraduationCheckInput) -> ExternResult<GraduationR
 
     // Link: agent -> graduation
     let agent_hash: AnyDhtHash = agent.into();
-    create_link(agent_hash, hash.clone(), LinkTypes::LearnerToGraduation, vec![])?;
+    create_link(
+        agent_hash,
+        hash.clone(),
+        LinkTypes::LearnerToGraduation,
+        vec![],
+    )?;
 
     Ok(GraduationResult {
         eligible: true,
@@ -2486,53 +2570,66 @@ pub fn publish_to_craft(input: PublishToCraftInput) -> ExternResult<()> {
     )?;
 
     // Fetch the credential from local credential_zome
-    let record = get(input.credential_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
+    let record = get(input.credential_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest(
             "Credential not found — issue it first via credential_coordinator".into()
-        )))?;
+        )
+    ))?;
 
     // Parse the credential entry (using serde_json for flexibility)
     let credential_json = match record.entry().as_option() {
-        Some(Entry::App(bytes)) => {
-            serde_json::from_slice::<serde_json::Value>(bytes.bytes())
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
+        Some(Entry::App(bytes)) => serde_json::from_slice::<serde_json::Value>(bytes.bytes())
+            .map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
                     "Failed to parse credential: {e}"
-                ))))?
+                )))
+            })?,
+        _ => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Credential record has no app entry".into()
+            )))
         }
-        _ => return Err(wasm_error!(WasmErrorInner::Guest(
-            "Credential record has no app entry".into()
-        ))),
     };
 
     // Extract fields for Craft's PublishedCredentialInput
-    let credential_id = credential_json.get("id")
+    let credential_id = credential_json
+        .get("id")
         .or_else(|| credential_json.get("credential_id"))
         .and_then(|v| v.as_str())
         .unwrap_or("unknown")
         .to_string();
 
-    let title = credential_json.get("title")
-        .or_else(|| credential_json.get("credential_subject").and_then(|s| s.get("name")))
+    let title = credential_json
+        .get("title")
+        .or_else(|| {
+            credential_json
+                .get("credential_subject")
+                .and_then(|s| s.get("name"))
+        })
         .and_then(|v| v.as_str())
         .unwrap_or("Praxis Credential")
         .to_string();
 
-    let issuer = credential_json.get("issuer")
+    let issuer = credential_json
+        .get("issuer")
         .and_then(|v| v.as_str())
         .unwrap_or("praxis")
         .to_string();
 
-    let issued_on = credential_json.get("issuance_date")
+    let issued_on = credential_json
+        .get("issuance_date")
         .or_else(|| credential_json.get("issued_on"))
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_string();
 
-    let mastery = credential_json.get("mastery_permille")
+    let mastery = credential_json
+        .get("mastery_permille")
         .and_then(|v| v.as_u64())
         .map(|v| v as u16);
 
-    let epistemic_code = credential_json.get("epistemic_code")
+    let epistemic_code = credential_json
+        .get("epistemic_code")
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
 
@@ -2563,18 +2660,18 @@ pub fn publish_to_craft(input: PublishToCraftInput) -> ExternResult<()> {
 
     match response {
         ZomeCallResponse::Ok(_) => Ok(()),
-        ZomeCallResponse::Unauthorized(_, _, _, _) => Err(wasm_error!(
-            WasmErrorInner::Guest("Unauthorized cross-cluster call to Craft".into())
-        )),
-        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(
-            WasmErrorInner::Guest(format!("Network error publishing to Craft: {err}"))
-        )),
-        ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(
-            WasmErrorInner::Guest(format!("Countersigning error: {err}"))
-        )),
-        ZomeCallResponse::AuthenticationFailed(_, _) => Err(wasm_error!(
-            WasmErrorInner::Guest("Authentication failed calling Craft".into())
-        )),
+        ZomeCallResponse::Unauthorized(_, _, _, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Unauthorized cross-cluster call to Craft".into()
+        ))),
+        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network error publishing to Craft: {err}"
+        )))),
+        ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Countersigning error: {err}")
+        ))),
+        ZomeCallResponse::AuthenticationFailed(_, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Authentication failed calling Craft".into()
+        ))),
     }
 }
 
@@ -2890,7 +2987,10 @@ mod tests {
 
     #[test]
     fn test_cognitive_recommendation_default() {
-        assert_eq!(CognitiveRecommendation::default(), CognitiveRecommendation::Continue);
+        assert_eq!(
+            CognitiveRecommendation::default(),
+            CognitiveRecommendation::Continue
+        );
     }
 
     #[test]
@@ -2925,7 +3025,10 @@ mod tests {
 
         assert!(state.is_overloaded);
         assert_eq!(state.remaining_capacity, 0);
-        assert_eq!(state.recommendation, CognitiveRecommendation::EndSessionSoon);
+        assert_eq!(
+            state.recommendation,
+            CognitiveRecommendation::EndSessionSoon
+        );
     }
 
     #[test]
@@ -2954,7 +3057,7 @@ mod tests {
             xp_per_hour: 500,
             avg_time_to_mastery_mins: 60,
             retention_7d_permille: 850,
-            velocity_trend_permille: 200, // 20% faster than before
+            velocity_trend_permille: 200,     // 20% faster than before
             cohort_comparison_permille: 1500, // 50% faster than cohort
             days_to_next_level: 7,
         };
@@ -2971,7 +3074,7 @@ mod tests {
             xp_per_hour: 100,
             avg_time_to_mastery_mins: 180,
             retention_7d_permille: 500,
-            velocity_trend_permille: -100, // Slowing down
+            velocity_trend_permille: -100,   // Slowing down
             cohort_comparison_permille: 500, // Half the cohort speed
             days_to_next_level: 30,
         };
@@ -2999,7 +3102,8 @@ mod tests {
         assert!(expected_spw > 2.0); // ~2.3 skills/week
 
         // Calculate trend
-        let trend = ((input.skills_mastered_30d as i32 - input.skills_mastered_prev_30d as i32) * 1000)
+        let trend = ((input.skills_mastered_30d as i32 - input.skills_mastered_prev_30d as i32)
+            * 1000)
             / input.skills_mastered_prev_30d as i32;
         assert_eq!(trend, 250); // 25% improvement
     }

@@ -1144,6 +1144,34 @@ impl CognitiveLoopService {
         let jepa_input_dim = config.cfc_config.input_dim;
         #[cfg(feature = "mesh")]
         let mesh_domain_profile = config.domain_profile.clone();
+
+        // Initialize Metabolic Conductor for Mk0 hardware
+        let metabolic_conductor = if config.enable_metabolic_conductor {
+            #[cfg(feature = "digital_metabolism")]
+            {
+                use crate::embodiment::detritivore_bridge::DetritivoreEmbodiment;
+                use crate::embodiment::helios_bridge::HeliosEmbodiment;
+                use symthaea_core::genesis::GenesisSeed;
+
+                let genesis = config
+                    .genesis_phrase
+                    .as_ref()
+                    .map(|p| GenesisSeed::from_phrase(p))
+                    .unwrap_or_else(|| GenesisSeed::from_phrase("mk0-bootstrapper"));
+
+                Some(crate::embodiment::MetabolicConductor::new(
+                    HeliosEmbodiment::new(&genesis),
+                    DetritivoreEmbodiment::new(&genesis),
+                ))
+            }
+            #[cfg(not(feature = "digital_metabolism"))]
+            {
+                None
+            }
+        } else {
+            None
+        };
+
         let mut service = Self {
             config,
             encoder,
@@ -1558,6 +1586,7 @@ impl CognitiveLoopService {
                 MasterConsciousnessEquation::default(),
             ),
             substrate_manager,
+            metabolic_conductor,
             threshold_overrides: super::threshold_overrides::ThresholdOverrides::default(),
             #[cfg(feature = "jepa")]
             jepa_engine: {
@@ -1637,6 +1666,7 @@ impl CognitiveLoopService {
             drive_manager: super::managers::DriveManager::default(),
             memory_manager: super::managers::MemoryManager::default(),
             learning_manager: super::managers::LearningManager::default(),
+            multimodal_manager: super::managers::MultimodalManager::default(),
             perception_manager: super::managers::PerceptionManager::default(),
             soul_manager: if enable_soul_alignment {
                 Some(super::managers::SoulManager::new())
@@ -1847,6 +1877,8 @@ impl CognitiveLoopService {
             language_manager: super::managers::LanguageManager::default(),
             #[cfg(feature = "vision-manifold")]
             vision_manager: super::managers::VisionManager::default(),
+            #[cfg(feature = "vision-manifold")]
+            last_mental_movie: None,
             security_telemetry: crate::swarm::SecurityTelemetry::default(),
             #[cfg(feature = "scientific_method")]
             scientific_method_engine: {

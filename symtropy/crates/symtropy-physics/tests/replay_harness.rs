@@ -45,11 +45,11 @@ fn build_tape(handles: [BodyHandle; 3]) -> ReplayTape<3> {
         let mut commands = vec![
             WorldCommand::ApplyForce {
                 body: a,
-                force: SVector::from([fx, 0.0, fz]),
+                force: Box::new(SVector::from([fx, 0.0, fz])),
             },
             WorldCommand::ApplyForce {
                 body: b,
-                force: SVector::from([-fx, 0.0, -fz]),
+                force: Box::new(SVector::from([-fx, 0.0, -fz])),
             },
         ];
 
@@ -57,7 +57,7 @@ fn build_tape(handles: [BodyHandle; 3]) -> ReplayTape<3> {
         if tick % 24 == 0 {
             commands.push(WorldCommand::ApplyImpulse {
                 body: c,
-                impulse: SVector::from([0.25, 0.0, 0.0]),
+                impulse: Box::new(SVector::from([0.25, 0.0, 0.0])),
             });
         }
 

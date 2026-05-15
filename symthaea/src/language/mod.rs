@@ -121,6 +121,10 @@ pub mod program_node_translator;
 #[cfg(feature = "code_generation")]
 pub mod python_parser;
 #[cfg(feature = "code_generation")]
+pub mod repair_memory;
+#[cfg(feature = "code_generation")]
+pub mod repair_taxonomy;
+#[cfg(feature = "code_generation")]
 pub mod repo_map;
 #[cfg(feature = "code_generation")]
 pub mod rust_lsp;
@@ -173,12 +177,12 @@ pub use anthropic_backend::AnthropicBackend;
 pub use code_assistant_plugin::CodeAssistantPlugin;
 pub use general_assistant_plugin::GeneralAssistantPlugin;
 pub use llm_backend::{
-    create_backend_from_env, default_backend, simulated_backend, GenerationParams, LLMBackend,
-    OllamaBackend, SimulatedBackend,
+    GenerationParams, LLMBackend, OllamaBackend, SimulatedBackend, create_backend_from_env,
+    default_backend, simulated_backend,
 };
 pub use narrative_compiler::{
-    generate_narrative, NarrativeCompiler, NarrativeOutput, NarrativeThought,
-    NARRATIVE_SYSTEM_PROMPT,
+    NARRATIVE_SYSTEM_PROMPT, NarrativeCompiler, NarrativeOutput, NarrativeThought,
+    generate_narrative,
 };
 pub use openai_backend::OpenAiBackend;
 pub use research_plugin::ResearchPlugin;

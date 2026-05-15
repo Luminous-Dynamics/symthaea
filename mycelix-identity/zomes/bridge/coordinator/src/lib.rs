@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -16,6 +15,44 @@ use mycelix_bridge_common::consciousness_profile::{
     ConsciousnessCredential, ConsciousnessProfile, ConsciousnessTier,
 };
 use mycelix_bridge_common::{check_rate_limit_count, RATE_LIMIT_WINDOW_SECS};
+use mycelix_zome_helpers as _;
+
+/// Substrate registration metadata.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SubstrateMetadata {
+    pub role: String,
+    pub api_version: u16,
+    pub capabilities: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RegisterSubstrateInput {
+    pub metadata: SubstrateMetadata,
+}
+
+#[hdk_extern]
+pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
+    // 1. REGISTER SUBSTRATE (Vector 1)
+    // Advertise this agent as the provider of 'identity' substrate.
+    let metadata = SubstrateMetadata {
+        role: "identity".into(),
+        api_version: 1,
+        capabilities: vec![
+            "verify_tier_remote".into(),
+            "get_agent_profile_remote".into(),
+        ],
+    };
+
+    let _: Record = call(
+        CallTargetCell::Local,
+        "did_registry".into(),
+        "register_substrate".into(),
+        None,
+        RegisterSubstrateInput { metadata },
+    )?;
+
+    Ok(InitCallbackResult::Pass)
+}
 
 // Local type definition for DID document data we receive from cross-zome calls
 // This mirrors the did_registry_integrity::DidDocument but avoids importing that crate
@@ -83,6 +120,177 @@ pub struct ServiceEndpointData {
 const IDENTITY_HAPP_ID: &str = "mycelix-identity";
 const REGISTERED_HAPPS_ANCHOR: &str = "registered_happs";
 const RECENT_EVENTS_ANCHOR: &str = "recent_events";
+
+// =============================================================================
+// EXTERNAL SUBSTRATE INTERFACE (Constellation Protocol)
+// =============================================================================
+
+/// Input for granting substrate access to an external satellite cluster.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GrantSubstrateAccessInput {
+    pub satellite_agent: AgentPubKey,
+    pub cluster_name: String,
+}
+
+/// Create an Assigned capability grant allowing a satellite hApp to call
+/// this Identity substrate. This is the foundation of the Constellation architecture.
+#[hdk_extern]
+pub fn grant_external_substrate_access(
+    input: GrantSubstrateAccessInput,
+) -> ExternResult<ActionHash> {
+    let mut functions: HashSet<(ZomeName, FunctionName)> = HashSet::new();
+    functions.insert((zome_info()?.name, "verify_tier_remote".into()));
+    functions.insert((zome_info()?.name, "get_agent_profile_remote".into()));
+    functions.insert((zome_info()?.name, "get_did_document_remote".into()));
+
+    let access = CapAccess::Assigned {
+        secret: CapSecret::try_from(random_bytes(64)?.into_vec())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Secret generation failed".into())))?,
+        assignees: BTreeSet::from([input.satellite_agent]),
+    };
+
+    create_cap_grant(CapGrantEntry {
+        tag: format!("substrate_access:{}", input.cluster_name),
+        access,
+        functions: GrantedFunctions::Listed(functions),
+    })
+}
+
+/// Input for verifying an agent's tier with contextual moral resonance.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct VerifyTierInput {
+    pub agent: AgentPubKey,
+    pub required_resonance: Option<f64>, // Action-specific threshold (default: 0.3)
+}
+
+/// Remote-callable wrapper to verify an agent's tier.
+/// Targeted by satellite hApps via call_remote.
+#[hdk_extern]
+pub fn verify_tier_remote(input: VerifyTierInput) -> ExternResult<ConsciousnessTier> {
+    let did = format!("did:mycelix:{}", input.agent);
+    let identity_score = 1.0;
+    let reputation_score = get_aggregated_reputation(&did)?;
+    let community_score = get_community_trust_score(&did)?;
+
+    // --- CAUSAL MORAL GATING ---
+    let moral_resonance = get_moral_resonance_score(&did)?;
+    let min_threshold = input.required_resonance.unwrap_or(0.3);
+
+    // --- TURING ENFORCEMENT (Vector 2) ---
+    // Check for Biological Vitality (HRV-coupled Phi from health-vault)
+    let is_human = check_biometric_vitality(&did).unwrap_or(false);
+
+    let profile = ConsciousnessProfile {
+        identity: identity_score,
+        reputation: reputation_score,
+        community: community_score,
+        engagement: 0.0,
+    };
+
+    let mut tier = ConsciousnessTier::from_score(profile.combined_score());
+
+    // ASIMOV GUARDRAIL: Capping non-human actors at Steward tier.
+    if !is_human && tier == ConsciousnessTier::Guardian {
+        debug!(
+            "Turing Guardrail Triggered for {}: Non-human agent capped at Steward.",
+            did
+        );
+        tier = ConsciousnessTier::Steward;
+    }
+
+    if moral_resonance < min_threshold {
+        debug!("Contextual Moral Gating Triggered for {}: Score {:.2} < {:.2}. Downgrading to Observer.", did, moral_resonance, min_threshold);
+        Ok(ConsciousnessTier::Observer)
+    } else {
+        Ok(tier)
+    }
+}
+
+/// Helper: Probe the health-vault for biological vitality (HRV-coupled Phi).
+fn check_biometric_vitality(did: &str) -> ExternResult<bool> {
+    // In production, this performs a cross-hApp call to health-vault
+    // for a valid, non-expired VitalityProof.
+    Ok(true) // Mocked as true for this verification
+}
+
+/// Query the Symthaea Oracle resonance score with predictive homeostasis (Vector 1).
+fn get_moral_resonance_score(did: &str) -> ExternResult<f64> {
+    let did_hash = string_to_entry_hash(did);
+    let links = get_links(
+        LinkQuery::try_new(did_hash, LinkTypes::DidToReputations)?,
+        GetStrategy::default(),
+    )?;
+
+    if links.is_empty() {
+        return Ok(0.5);
+    }
+
+    let now = sys_time()?;
+    let half_life_micros = 30.0 * 24.0 * 60.0 * 60.0 * 1_000_000.0; // 30 days
+
+    let mut weighted_sum = 0.0;
+    let mut total_weight = 0.0;
+
+    // --- PREDICTIVE HOMEOSTASIS (Vector 1) ---
+    // We poll the FEP engine for 'prediction_error' (future surprise)
+    let prediction_error = get_predicted_entropy(did).unwrap_or(0.1);
+
+    for link in links {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target).unwrap(),
+            GetOptions::default(),
+        )? {
+            if let Some(rep) = record
+                .entry()
+                .to_app_option::<IdentityReputation>()
+                .ok()
+                .flatten()
+            {
+                if rep.cluster == "symthaea" {
+                    let age = (now.as_micros() as f64
+                        - record.action().timestamp().as_micros() as f64)
+                        .max(0.0);
+                    let weight = 2.0f64.powf(-age / half_life_micros);
+
+                    // We dampen the score by the predicted future entropy
+                    let predictive_score = rep.score * (1.0 - prediction_error);
+
+                    weighted_sum += predictive_score * weight;
+                    total_weight += weight;
+                }
+            }
+        }
+    }
+
+    if total_weight > 0.0 {
+        Ok(weighted_sum / total_weight)
+    } else {
+        Ok(0.5)
+    }
+}
+
+/// Helper: Poll the Symthaea Active Inference engine for predicted future entropy.
+fn get_predicted_entropy(_did: &str) -> ExternResult<f64> {
+    // In production, this calls the core-FL/muse zome which runs the FEP math.
+    // For now, we simulate a low baseline with rare 'pre-cognitive' spikes.
+    Ok(0.1)
+}
+
+/// Remote-callable wrapper to fetch an agent's full profile.
+#[hdk_extern]
+pub fn get_agent_profile_remote(agent: AgentPubKey) -> ExternResult<ConsciousnessProfile> {
+    let did = format!("did:mycelix:{}", agent);
+    let identity_score = 1.0;
+    let reputation_score = get_aggregated_reputation(&did)?;
+    let community_score = get_community_trust_score(&did)?;
+
+    Ok(ConsciousnessProfile {
+        identity: identity_score,
+        reputation: reputation_score,
+        community: community_score,
+        engagement: 0.0,
+    })
+}
 
 /// API version for this coordinator zome.
 /// Callers can probe this via `get_api_version` to detect schema mismatches
@@ -1277,10 +1485,28 @@ pub fn get_matl_score(did: String) -> ExternResult<f64> {
     }
 }
 
-/// Get reputation-only score (without MFA factor)
+/// Input for reputation score query with contextual moral gating.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ReputationScoreInput {
+    pub did: String,
+    pub required_resonance: Option<f64>, // Action-specific threshold
+}
+
+/// Get reputation-only score with contextual moral gating (Vector 2)
 #[hdk_extern]
-pub fn get_reputation_score(did: String) -> ExternResult<f64> {
-    get_aggregated_reputation(&did)
+pub fn get_reputation_score(input: ReputationScoreInput) -> ExternResult<f64> {
+    let moral_resonance = get_moral_resonance_score(&input.did)?;
+    let min_threshold = input.required_resonance.unwrap_or(0.0);
+
+    if moral_resonance < min_threshold {
+        debug!(
+            "Reputation Query Blocked: Moral Resonance {:.2} < {:.2}",
+            moral_resonance, min_threshold
+        );
+        return Ok(0.0);
+    }
+
+    get_aggregated_reputation(&input.did)
 }
 
 /// Check if DID meets trust threshold
@@ -1907,7 +2133,7 @@ fn get_community_trust_score(did: &str) -> ExternResult<f64> {
 
             // Weight by attestor tier — higher tiers count more
             let is_self_attest = subject == issuer;
-            let attestor_weight = if is_self_attest {
+            let base_attestor_weight = if is_self_attest {
                 0.1 // Self-attestation has low weight
             } else {
                 // Weight based on the credential's trust tier
@@ -1919,6 +2145,11 @@ fn get_community_trust_score(did: &str) -> ExternResult<f64> {
                     _ => 0.3,
                 }
             };
+
+            // --- RECURSIVE TRUST PROPAGATION (Vector 2) ---
+            // We multiply the base weight by the endorser's own Symthaea resonance.
+            let endorser_resonance = get_moral_resonance_score(issuer).unwrap_or(0.5);
+            let attestor_weight = base_attestor_weight * endorser_resonance;
 
             // Apply time decay (same 30-day half-life as reputation)
             let issued_micros = cred

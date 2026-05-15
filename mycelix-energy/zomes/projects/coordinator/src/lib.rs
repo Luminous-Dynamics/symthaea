@@ -2,13 +2,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Energy Projects Coordinator Zome
+
 use hdk::prelude::*;
+use mycelix_zome_helpers as _;
 use projects_integrity::*;
 
 /// Create or retrieve an anchor entry hash for deterministic link bases
 fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_string.to_string());
-    if let Err(e) = create_entry(&EntryTypes::Anchor(anchor.clone())) { debug!("Anchor creation warning: {:?}", e); }
+    if let Err(e) = create_entry(&EntryTypes::Anchor(anchor.clone())) {
+        debug!("Anchor creation warning: {:?}", e);
+    }
     hash_entry(&anchor)
 }
 
@@ -16,7 +20,11 @@ fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
 pub fn register_project(input: RegisterProjectInput) -> ExternResult<Record> {
     let now = sys_time()?;
     let project = EnergyProject {
-        id: format!("project:{}:{}", input.name.replace(' ', "_"), now.as_micros()),
+        id: format!(
+            "project:{}:{}",
+            input.name.replace(' ', "_"),
+            now.as_micros()
+        ),
         terra_atlas_id: input.terra_atlas_id,
         name: input.name,
         description: input.description,
@@ -36,17 +44,37 @@ pub fn register_project(input: RegisterProjectInput) -> ExternResult<Record> {
     };
 
     let action_hash = create_entry(&EntryTypes::EnergyProject(project.clone()))?;
-    create_link(anchor_hash(&input.developer_did)?, action_hash.clone(), LinkTypes::DeveloperToProjects, ())?;
+    create_link(
+        anchor_hash(&input.developer_did)?,
+        action_hash.clone(),
+        LinkTypes::DeveloperToProjects,
+        (),
+    )?;
 
     if let Some(ref community) = input.community_did {
-        create_link(anchor_hash(community)?, action_hash.clone(), LinkTypes::CommunityToProjects, ())?;
+        create_link(
+            anchor_hash(community)?,
+            action_hash.clone(),
+            LinkTypes::CommunityToProjects,
+            (),
+        )?;
     }
 
     // Index by location
-    let geo_key = format!("energy:{}:{}", (input.location.latitude * 100.0) as i64, (input.location.longitude * 100.0) as i64);
-    create_link(anchor_hash(&geo_key)?, action_hash.clone(), LinkTypes::LocationToProjects, ())?;
+    let geo_key = format!(
+        "energy:{}:{}",
+        (input.location.latitude * 100.0) as i64,
+        (input.location.longitude * 100.0) as i64
+    );
+    create_link(
+        anchor_hash(&geo_key)?,
+        action_hash.clone(),
+        LinkTypes::LocationToProjects,
+        (),
+    )?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -64,18 +92,37 @@ pub struct RegisterProjectInput {
 
 #[hdk_extern]
 pub fn update_project_status(input: UpdateStatusInput) -> ExternResult<Record> {
-    let filter = ChainQueryFilter::new().entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::EnergyProject)?)).include_entries(true);
+    let filter = ChainQueryFilter::new()
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::EnergyProject,
+        )?))
+        .include_entries(true);
     for record in query(filter)? {
-        if let Some(project) = record.entry().to_app_option::<EnergyProject>().ok().flatten() {
+        if let Some(project) = record
+            .entry()
+            .to_app_option::<EnergyProject>()
+            .ok()
+            .flatten()
+        {
             if project.id == input.project_id {
                 let now = sys_time()?;
-                let updated = EnergyProject { status: input.new_status, updated: now, ..project };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::EnergyProject(updated))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let updated = EnergyProject {
+                    status: input.new_status,
+                    updated: now,
+                    ..project
+                };
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::EnergyProject(updated),
+                )?;
+                return get(action_hash, GetOptions::default())?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Project not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Project not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -98,8 +145,14 @@ pub fn add_milestone(input: AddMilestoneInput) -> ExternResult<Record> {
     };
 
     let action_hash = create_entry(&EntryTypes::ProjectMilestone(milestone))?;
-    create_link(anchor_hash(&input.project_id)?, action_hash.clone(), LinkTypes::ProjectToMilestones, ())?;
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    create_link(
+        anchor_hash(&input.project_id)?,
+        action_hash.clone(),
+        LinkTypes::ProjectToMilestones,
+        (),
+    )?;
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -112,10 +165,21 @@ pub struct AddMilestoneInput {
 
 #[hdk_extern]
 pub fn search_projects_by_location(input: LocationSearchInput) -> ExternResult<Vec<Record>> {
-    let geo_key = format!("energy:{}:{}", (input.latitude * 100.0) as i64, (input.longitude * 100.0) as i64);
+    let geo_key = format!(
+        "energy:{}:{}",
+        (input.latitude * 100.0) as i64,
+        (input.longitude * 100.0) as i64
+    );
     let mut projects = Vec::new();
-    for link in get_links(LinkQuery::try_new(anchor_hash(&geo_key)?, LinkTypes::LocationToProjects)?, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+    for link in get_links(
+        LinkQuery::try_new(anchor_hash(&geo_key)?, LinkTypes::LocationToProjects)?,
+        GetStrategy::default(),
+    )? {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
+            GetOptions::default(),
+        )? {
             projects.push(record);
         }
     }
@@ -131,9 +195,18 @@ pub struct LocationSearchInput {
 
 #[hdk_extern]
 pub fn get_project(project_id: String) -> ExternResult<Option<Record>> {
-    let filter = ChainQueryFilter::new().entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::EnergyProject)?)).include_entries(true);
+    let filter = ChainQueryFilter::new()
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::EnergyProject,
+        )?))
+        .include_entries(true);
     for record in query(filter)? {
-        if let Some(project) = record.entry().to_app_option::<EnergyProject>().ok().flatten() {
+        if let Some(project) = record
+            .entry()
+            .to_app_option::<EnergyProject>()
+            .ok()
+            .flatten()
+        {
             if project.id == project_id {
                 return Ok(Some(record));
             }
@@ -146,8 +219,15 @@ pub fn get_project(project_id: String) -> ExternResult<Option<Record>> {
 #[hdk_extern]
 pub fn get_developer_projects(developer_did: String) -> ExternResult<Vec<Record>> {
     let mut projects = Vec::new();
-    for link in get_links(LinkQuery::try_new(anchor_hash(&developer_did)?, LinkTypes::DeveloperToProjects)?, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+    for link in get_links(
+        LinkQuery::try_new(anchor_hash(&developer_did)?, LinkTypes::DeveloperToProjects)?,
+        GetStrategy::default(),
+    )? {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
+            GetOptions::default(),
+        )? {
             projects.push(record);
         }
     }
@@ -158,8 +238,15 @@ pub fn get_developer_projects(developer_did: String) -> ExternResult<Vec<Record>
 #[hdk_extern]
 pub fn get_community_projects(community_did: String) -> ExternResult<Vec<Record>> {
     let mut projects = Vec::new();
-    for link in get_links(LinkQuery::try_new(anchor_hash(&community_did)?, LinkTypes::CommunityToProjects)?, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+    for link in get_links(
+        LinkQuery::try_new(anchor_hash(&community_did)?, LinkTypes::CommunityToProjects)?,
+        GetStrategy::default(),
+    )? {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
+            GetOptions::default(),
+        )? {
             projects.push(record);
         }
     }
@@ -170,8 +257,15 @@ pub fn get_community_projects(community_did: String) -> ExternResult<Vec<Record>
 #[hdk_extern]
 pub fn get_project_milestones(project_id: String) -> ExternResult<Vec<Record>> {
     let mut milestones = Vec::new();
-    for link in get_links(LinkQuery::try_new(anchor_hash(&project_id)?, LinkTypes::ProjectToMilestones)?, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+    for link in get_links(
+        LinkQuery::try_new(anchor_hash(&project_id)?, LinkTypes::ProjectToMilestones)?,
+        GetStrategy::default(),
+    )? {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
+            GetOptions::default(),
+        )? {
             milestones.push(record);
         }
     }
@@ -182,11 +276,18 @@ pub fn get_project_milestones(project_id: String) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn complete_milestone(input: CompleteMilestoneInput) -> ExternResult<Record> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::ProjectMilestone)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::ProjectMilestone,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(milestone) = record.entry().to_app_option::<ProjectMilestone>().ok().flatten() {
+        if let Some(milestone) = record
+            .entry()
+            .to_app_option::<ProjectMilestone>()
+            .ok()
+            .flatten()
+        {
             if milestone.id == input.milestone_id {
                 let now = sys_time()?;
                 let updated = ProjectMilestone {
@@ -194,12 +295,18 @@ pub fn complete_milestone(input: CompleteMilestoneInput) -> ExternResult<Record>
                     verification_evidence: Some(input.evidence),
                     ..milestone
                 };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::ProjectMilestone(updated))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::ProjectMilestone(updated),
+                )?;
+                return get(action_hash, GetOptions::default())?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Milestone not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Milestone not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -212,15 +319,24 @@ pub struct CompleteMilestoneInput {
 #[hdk_extern]
 pub fn update_project_financials(input: UpdateFinancialsInput) -> ExternResult<Record> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::EnergyProject)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::EnergyProject,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(project) = record.entry().to_app_option::<EnergyProject>().ok().flatten() {
+        if let Some(project) = record
+            .entry()
+            .to_app_option::<EnergyProject>()
+            .ok()
+            .flatten()
+        {
             if project.id == input.project_id {
                 // Only developer can update financials
                 if project.developer_did != input.requester_did {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Only developer can update financials".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only developer can update financials".into()
+                    )));
                 }
 
                 let now = sys_time()?;
@@ -229,12 +345,18 @@ pub fn update_project_financials(input: UpdateFinancialsInput) -> ExternResult<R
                     updated: now,
                     ..project
                 };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::EnergyProject(updated))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::EnergyProject(updated),
+                )?;
+                return get(action_hash, GetOptions::default())?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Project not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Project not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -248,12 +370,19 @@ pub struct UpdateFinancialsInput {
 #[hdk_extern]
 pub fn get_projects_by_status(status: ProjectStatus) -> ExternResult<Vec<Record>> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::EnergyProject)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::EnergyProject,
+        )?))
         .include_entries(true);
 
     let mut results = Vec::new();
     for record in query(filter)? {
-        if let Some(project) = record.entry().to_app_option::<EnergyProject>().ok().flatten() {
+        if let Some(project) = record
+            .entry()
+            .to_app_option::<EnergyProject>()
+            .ok()
+            .flatten()
+        {
             if project.status == status {
                 results.push(record);
             }
@@ -266,12 +395,19 @@ pub fn get_projects_by_status(status: ProjectStatus) -> ExternResult<Vec<Record>
 #[hdk_extern]
 pub fn get_projects_by_type(project_type: ProjectType) -> ExternResult<Vec<Record>> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::EnergyProject)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::EnergyProject,
+        )?))
         .include_entries(true);
 
     let mut results = Vec::new();
     for record in query(filter)? {
-        if let Some(project) = record.entry().to_app_option::<EnergyProject>().ok().flatten() {
+        if let Some(project) = record
+            .entry()
+            .to_app_option::<EnergyProject>()
+            .ok()
+            .flatten()
+        {
             if project.project_type == project_type {
                 results.push(record);
             }
@@ -284,22 +420,36 @@ pub fn get_projects_by_type(project_type: ProjectType) -> ExternResult<Vec<Recor
 #[hdk_extern]
 pub fn assign_community(input: AssignCommunityInput) -> ExternResult<Record> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::EnergyProject)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::EnergyProject,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(project) = record.entry().to_app_option::<EnergyProject>().ok().flatten() {
+        if let Some(project) = record
+            .entry()
+            .to_app_option::<EnergyProject>()
+            .ok()
+            .flatten()
+        {
             if project.id == input.project_id {
                 // Only developer can assign community
                 if project.developer_did != input.requester_did {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Only developer can assign community".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only developer can assign community".into()
+                    )));
                 }
 
                 let now = sys_time()?;
                 let action_hash = record.action_address().clone();
 
                 // Create link to new community
-                create_link(anchor_hash(&input.community_did)?, action_hash.clone(), LinkTypes::CommunityToProjects, ())?;
+                create_link(
+                    anchor_hash(&input.community_did)?,
+                    action_hash.clone(),
+                    LinkTypes::CommunityToProjects,
+                    (),
+                )?;
 
                 let updated = EnergyProject {
                     community_did: Some(input.community_did),
@@ -307,11 +457,14 @@ pub fn assign_community(input: AssignCommunityInput) -> ExternResult<Record> {
                     ..project
                 };
                 let new_hash = update_entry(action_hash, &EntryTypes::EnergyProject(updated))?;
-                return get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get(new_hash, GetOptions::default())?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Project not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Project not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -325,11 +478,18 @@ pub struct AssignCommunityInput {
 #[hdk_extern]
 pub fn link_to_terra_atlas(input: LinkTerraAtlasInput) -> ExternResult<Record> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::EnergyProject)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::EnergyProject,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(project) = record.entry().to_app_option::<EnergyProject>().ok().flatten() {
+        if let Some(project) = record
+            .entry()
+            .to_app_option::<EnergyProject>()
+            .ok()
+            .flatten()
+        {
             if project.id == input.project_id {
                 let now = sys_time()?;
                 let updated = EnergyProject {
@@ -337,12 +497,18 @@ pub fn link_to_terra_atlas(input: LinkTerraAtlasInput) -> ExternResult<Record> {
                     updated: now,
                     ..project
                 };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::EnergyProject(updated))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::EnergyProject(updated),
+                )?;
+                return get(action_hash, GetOptions::default())?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Project not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Project not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -355,14 +521,23 @@ pub struct LinkTerraAtlasInput {
 #[hdk_extern]
 pub fn update_capacity(input: UpdateCapacityInput) -> ExternResult<Record> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::EnergyProject)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::EnergyProject,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(project) = record.entry().to_app_option::<EnergyProject>().ok().flatten() {
+        if let Some(project) = record
+            .entry()
+            .to_app_option::<EnergyProject>()
+            .ok()
+            .flatten()
+        {
             if project.id == input.project_id {
                 if project.developer_did != input.requester_did {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Only developer can update capacity".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only developer can update capacity".into()
+                    )));
                 }
 
                 let now = sys_time()?;
@@ -371,12 +546,18 @@ pub fn update_capacity(input: UpdateCapacityInput) -> ExternResult<Record> {
                     updated: now,
                     ..project
                 };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::EnergyProject(updated))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::EnergyProject(updated),
+                )?;
+                return get(action_hash, GetOptions::default())?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Project not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Project not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -563,7 +744,8 @@ mod tests {
         AddMilestoneInput {
             project_id: "project:solar_farm_alpha:123456".to_string(),
             name: "Site Preparation Complete".to_string(),
-            description: "All site preparation work including grading and access roads completed".to_string(),
+            description: "All site preparation work including grading and access roads completed"
+                .to_string(),
             target_date: Timestamp::from_micros(1714521600000000),
         }
     }
@@ -760,11 +942,7 @@ mod tests {
 
     #[test]
     fn test_link_terra_atlas_input_various_formats() {
-        let ids = vec![
-            "TA-2024-001",
-            "TERRA-ATLAS-PROJECT-12345",
-            "ta_project_001",
-        ];
+        let ids = vec!["TA-2024-001", "TERRA-ATLAS-PROJECT-12345", "ta_project_001"];
         for id in ids {
             let input = LinkTerraAtlasInput {
                 terra_atlas_id: id.to_string(),

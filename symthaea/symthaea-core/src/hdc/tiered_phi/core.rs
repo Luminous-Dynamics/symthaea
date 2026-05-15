@@ -1324,6 +1324,12 @@ impl TieredPhi {
         // Find MIP by exhaustive search
         let mut min_partition_info = f64::MAX;
 
+        // Safety: exhaustive search is impossible for n >= 64 (u64 mask overflow)
+        // and impractical for n > 20.
+        if n >= 64 {
+            return 0.0;
+        }
+
         // Iterate through all bipartitions
         for mask in 1..(1u64 << n) - 1 {
             let mut part_a = Vec::new();

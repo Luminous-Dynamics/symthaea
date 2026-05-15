@@ -180,6 +180,12 @@ fn main() {
             .config_mut()
             .enable_thought_seeding = false;
     }
+    if opts.thought_logit_residual_weight > 0.0 {
+        generator
+            .controller_mut()
+            .config_mut()
+            .thought_logit_residual_weight = opts.thought_logit_residual_weight.clamp(0.0, 1.0);
+    }
 
     tracing::info!(
         epochs = opts.epochs,
@@ -395,6 +401,8 @@ struct TrainOpts {
     label_smoothing: f32,
     /// Thought-to-logit auxiliary loss weight (default: 0.0 = disabled).
     thought_logit_aux_weight: f32,
+    /// Direct thought-logit residual blend during decoding (default: 0.0).
+    thought_logit_residual_weight: f32,
     /// Save best checkpoint path (auto-generated from output if not specified).
     best_checkpoint_path: String,
     /// Do not store Adam optimizer state in the final checkpoint.
@@ -453,6 +461,7 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
         scheduled_sampling: 0.0,
         label_smoothing: 0.0,
         thought_logit_aux_weight: 0.0,
+        thought_logit_residual_weight: 0.0,
         best_checkpoint_path: String::new(),
         no_save_adam: false,
         hidden_dropout: 0.0,
@@ -678,6 +687,14 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
                     .parse()
                     .map_err(|_| "--thought-logit-aux must be a float")?;
             }
+            "--thought-logit-residual" => {
+                i += 1;
+                opts.thought_logit_residual_weight = args
+                    .get(i)
+                    .ok_or("--thought-logit-residual requires a number")?
+                    .parse()
+                    .map_err(|_| "--thought-logit-residual must be a float")?;
+            }
             "--hidden-dropout" => {
                 i += 1;
                 opts.hidden_dropout = args
@@ -795,6 +812,9 @@ fn print_usage() {
     eprintln!("  --label-smoothing F  Label smoothing epsilon (default: 0.0 = off)");
     eprintln!(
         "  --thought-logit-aux F  Thought-to-logit auxiliary loss weight (default: 0.0 = off)"
+    );
+    eprintln!(
+        "  --thought-logit-residual F  Blend direct thought logits into decoder logits (default: 0.0 = off)"
     );
     eprintln!("  --scheduled-sampling F  Max scheduled sampling probability (default: 0.0 = off)");
     eprintln!("  --hidden-dropout F   CfC hidden state dropout rate (default: 0.0 = off)");

@@ -7,13 +7,10 @@ autotests = false
 
 [dependencies]
 # Holochain testing (NO zome crate imports — use mirror types to avoid symbol collisions)
-holochain = { version = "0.6", features = ["test_utils", "sweettest"] }
-holochain_types = "0.6"
 hdk = "0.6"
 hdi = "0.7"
 
 # Async runtime
-tokio = { version = "1.35", features = ["full", "test-util"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
@@ -28,3 +25,8 @@ name = "sweettest_integration"
 path = "sweettest_integration.rs"
 
 [workspace]
+
+[dev-dependencies]
+holochain = { version = "0.6", features = ["test_utils", "sweettest"] }
+holochain_types = "0.6"
+tokio = { version = "1", features = ["full", "test-util"] }

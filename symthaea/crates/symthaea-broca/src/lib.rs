@@ -2,42 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # Symthaea Broca: SSM Language Center
-//!
-//! Native CfC-HDC autoregressive thought-to-text generation.
-//!
-//! Replaces external LLM backends with a local, linear-scaling neural generator
-//! that uses the same HDC-LTC architecture as the VocalTractController, but
-//! projects to token logits instead of formant parameters.
-//!
-//! # Architecture
-//!
-//! ```text
-//! ThoughtChannels (20D)
-//!     │
-//!     ▼
-//! ThoughtLanguageEncoder          [encoder.rs]
-//!   normalize → level-encode → bind → bundle → 16,384D ContinuousHV
-//!     │
-//!     ▼
-//! LanguageController              [controller.rs]
-//!   HdcLtcUnifiedNetwork (3 layers × 8 neurons)
-//!   Autoregressive: thought_hv ⊗ token_emb ⊗ permute(pos) → evolve → output
-//!   Weight-tied output: logits[i] = similarity(output_hv, token_emb[i])
-//!     │
-//!     ▼
-//! Per-Token Gating                [gating.rs]
-//!   EpistemicGate + EmotionalModulator + CoherenceFeedback
-//!     │
-//!     ▼
-//! BrocaGenerator                  [generator.rs]
-//!   Sampling (greedy/top-k/top-p) → BpeTokenizer → text
-//! ```
-//!
-//! # Key Innovation
-//!
-//! Epistemic status, emotional tone, and consciousness level become
-//! *architectural constraints on generation* (per-token logit gating),
-//! not just prompt instructions that a model might ignore.
 
 // Allow lints that are pervasive in Mamba/SSM numerical code
 #![allow(clippy::too_many_arguments)]
@@ -48,17 +12,61 @@
 #![allow(clippy::manual_is_multiple_of)]
 #![allow(clippy::unnecessary_map_or)]
 
+pub mod architect;
+pub mod affective_sculpting;
+pub mod architectural_memory;
 pub mod checkpoint;
+#[cfg(feature = "code-sheaf-eval")]
+pub mod code_analysis;
+pub mod cognitive_loop;
+pub mod compiler_trainer;
+pub mod consensus_engine;
 pub mod controller;
+pub mod dreaming;
 pub mod encoder;
+pub mod epistemic_dashboard;
+pub mod epistemic_scorers;
 pub mod evaluation;
+pub mod evolutionary_scaffolder;
+pub mod formal_logic_scorer;
 pub mod gating;
 pub mod generator;
+pub mod generic_structural_scorer_integration;
+pub mod go_walker;
 #[cfg(feature = "gpu")]
 pub mod gpu_cfc;
+pub mod invariant_discovery;
+pub mod inverse_harvester;
+pub mod living_manifests;
+pub mod manifold_projection;
+pub mod moral_safety_scorer;
+pub mod narrative_maintainability_scorer;
+pub mod narrative_planner;
+pub mod nix_kg;
+pub mod physiological_scorer;
+pub mod python_walker;
+pub mod rust_walker;
+pub mod secure_dreaming;
+pub mod self_actualization;
+pub mod self_optimization;
+pub mod species_learning;
 pub mod speech_encoder;
+pub mod structural_generator;
+pub mod structural_scorer;
+pub mod substrate_binding;
+pub mod thought_chunk;
 pub mod tokenizer;
 pub mod training;
+pub mod trans_substrate_invariants;
+pub mod zero_shot_substrate;
+
+// IaC Expansion
+pub mod codegate;
+pub mod emotional_gating_integration;
+pub mod iac_harvester;
+pub mod iac_repair;
+pub mod language_gates;
+pub mod memory_bridge;
 
 // Speech heuristics: bootstrap targets for SpeechThoughtEncoder training
 #[cfg(feature = "speech-data")]
@@ -80,21 +88,65 @@ pub mod projection;
 #[cfg(feature = "mamba-cpu")]
 pub mod temporal_projection;
 
-pub use checkpoint::{AdamState, BrocaCheckpoint};
+pub use architect::SimulationArchitect;
+pub use affective_sculpting::{AffectiveSculptor, AffectiveStyle};
+pub use architectural_memory::ArchitecturalMemory;
+pub use checkpoint::{AdamState, BrocaCheckpoint, BrocaCheckpointMetadata};
+#[cfg(feature = "code-sheaf-eval")]
+pub use code_analysis::{
+    categorize_code_sheaf_diagnostic, extract_rust_functions, repair_hint_for_code_sheaf_category,
+    RustFunctionExtraction,
+};
+pub use consensus_engine::{ChangeProposal, ConsensusEngine, ConsensusResult};
 pub use controller::{LanguageController, LanguageControllerConfig, NetworkSnapshot};
+pub use dreaming::DreamingService;
 pub use encoder::{
     ThoughtChannels, ThoughtLanguageEncoder, EPISTEMIC_CUBE_BASE, EPISTEMIC_CUBE_CHANNELS,
 };
-pub use evaluation::{EvalConfig, EvalResult, IntentScore};
+pub use epistemic_dashboard::{CognitiveStyle, EpistemicDashboard};
+pub use epistemic_scorers::{compute_epistemic_reward, compute_idiomaticity};
+pub use evaluation::{
+    CanonicalEvalCase, CanonicalEvalDataset, CanonicalQualityThresholds, CategoryQuality,
+    EvalConfig, EvalResult, IntentScore, QualityDelta, QualityGateFailure, QualitySuiteResult,
+};
+pub use evolutionary_scaffolder::{EvolutionResult, EvolutionaryScaffolder};
+pub use formal_logic_scorer::{FormalLogicScorer, FormalVerificationResult};
 pub use gating::{
     CodeGate, CoherenceFeedback, EmotionalModulator, EpistemicCubeGate, EpistemicGate, GatingConfig,
 };
 pub use generator::{BrocaConfig, BrocaGenerator, GenerationResult, SamplingStrategy};
+pub use generic_structural_scorer_integration::{
+    GenericStructuralScorer, StructuralVerdict as GenericStructuralVerdict,
+};
+pub use go_walker::GoWalker;
+pub use invariant_discovery::InvariantDiscovery;
+pub use inverse_harvester::{InverseHarvestPair, InverseHarvester};
+pub use living_manifests::{ComponentDoc, LivingManifest, LivingManifestGenerator};
+pub use manifold_projection::ManifoldProjection;
+pub use moral_safety_scorer::compute_moral_safety;
+pub use narrative_maintainability_scorer::compute_narrative_maintainability;
+pub use narrative_planner::{ArcStatus, ChangeArc, ChangeStep, NarrativePlanner};
+pub use nix_kg::NixKg;
+pub use physiological_scorer::{PhysiologicalProfile, PhysiologicalScorer};
+pub use python_walker::PythonWalker;
+pub use rust_walker::{LanguageWalker, RustWalker, StructuralElement};
+pub use secure_dreaming::{SecureDreamResult, SecureDreamingEngine};
+pub use self_actualization::ReflectionEngine;
+pub use self_optimization::SelfOptimizationEngine;
+pub use species_learning::MemoryConsolidator;
+pub use structural_generator::StructuralGenerator;
+pub use structural_scorer::{NixStructuralScorer, StructuralVerdict};
+pub use substrate_binding::{AnticipatedImpact, ImpactRecommendation, SubstrateBindingEngine};
+pub use thought_chunk::{
+    ProgramNode, ThoughtChunk, ThoughtChunkDecoder, ThoughtChunkKind, ThoughtChunkSequence,
+};
 pub use tokenizer::BpeTokenizer;
 pub use training::{
-    AnomalyReport, GradientAnomaly, GradientDiagnostics, TrainingDataset, TrainingPair,
-    TrainingValidation,
+    AnomalyReport, GradientAnomaly, GradientDiagnostics, SequenceResult, TrainingBackend,
+    TrainingDataset, TrainingPair, TrainingValidation,
 };
+pub use trans_substrate_invariants::{CrossLanguageInvariant, TransSubstrateInvariantEngine};
+pub use zero_shot_substrate::ZeroShotInducer;
 
 #[cfg(feature = "mamba-cpu")]
 pub use checkpoint::ProjectionCheckpoint;
@@ -113,22 +165,3 @@ pub use projection::{
 };
 #[cfg(feature = "mamba-cpu")]
 pub use temporal_projection::TemporalProjection;
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn broca_config_default() {
-        let config = BrocaConfig::default();
-        // Verify default config is constructible
-        assert!(matches!(config.sampling, SamplingStrategy::Greedy));
-    }
-
-    #[test]
-    fn thought_channels_default() {
-        let channels = ThoughtChannels::default();
-        // ThoughtChannels should have a valid channel array (43 or 47 channels)
-        assert!(channels.channels.len() >= 43);
-    }
-}

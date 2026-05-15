@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -7,7 +6,10 @@ use mycelix_zome_helpers as _;
 
 use hdk::prelude::*;
 use housing_governance_integrity::*;
-use mycelix_bridge_common::{civic_requirement_constitutional, civic_requirement_proposal, civic_requirement_voting};
+use mycelix_bridge_common::{
+    civic_requirement_constitutional, civic_requirement_proposal, civic_requirement_voting,
+};
+use mycelix_zome_helpers as _;
 use mycelix_zome_helpers::get_latest_record;
 use std::collections::HashMap;
 
@@ -15,7 +17,6 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
     hash_entry(&EntryTypes::Anchor(anchor))
 }
-
 
 /// Schedule a board meeting
 
@@ -78,7 +79,11 @@ pub fn record_minutes(input: RecordMinutesInput) -> ExternResult<Record> {
 #[hdk_extern]
 pub fn propose_resolution(resolution: Resolution) -> ExternResult<Record> {
     // Consciousness gate: Participant tier + identity >= 0.25
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "propose_resolution")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "propose_resolution",
+    )?;
 
     let action_hash = create_entry(&EntryTypes::Resolution(resolution.clone()))?;
 
@@ -118,7 +123,11 @@ pub struct VoteOnResolutionInput {
 #[hdk_extern]
 pub fn vote_on_resolution(input: VoteOnResolutionInput) -> ExternResult<Record> {
     // Consciousness gate: Citizen tier + identity >= 0.25
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_voting(), "vote_on_resolution")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_voting(),
+        "vote_on_resolution",
+    )?;
 
     let record = get(input.resolution_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Resolution not found".into())
@@ -156,7 +165,11 @@ pub fn vote_on_resolution(input: VoteOnResolutionInput) -> ExternResult<Record> 
 #[hdk_extern]
 pub fn adopt_bylaw(bylaw: ByLaw) -> ExternResult<Record> {
     // Consciousness gate: Steward tier + identity >= 0.5 + community >= 0.3
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_constitutional(), "adopt_bylaw")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_constitutional(),
+        "adopt_bylaw",
+    )?;
 
     let action_hash = create_entry(&EntryTypes::ByLaw(bylaw.clone()))?;
 
@@ -194,7 +207,11 @@ pub struct AmendByLawInput {
 #[hdk_extern]
 pub fn amend_bylaw(input: AmendByLawInput) -> ExternResult<Record> {
     // Consciousness gate: Steward tier + identity >= 0.5 + community >= 0.3
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_constitutional(), "amend_bylaw")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_constitutional(),
+        "amend_bylaw",
+    )?;
 
     if input.new_content.is_empty() {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -271,7 +288,11 @@ pub fn create_election(election: Election) -> ExternResult<Record> {
 #[hdk_extern]
 pub fn cast_ballot(ballot: Ballot) -> ExternResult<Record> {
     // Consciousness gate: Citizen tier + identity >= 0.25
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_voting(), "cast_ballot")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_voting(),
+        "cast_ballot",
+    )?;
 
     // Verify the election exists and is open
     let election_record = get(ballot.election_hash.clone(), GetOptions::default())?.ok_or(

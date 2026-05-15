@@ -1,11 +1,11 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use candle_core::{Device, Tensor};
 use candle_transformers::generation::{LogitsProcessor, Sampling};
 use candle_transformers::models::quantized_llama as qlm;
-use hf_hub::{api::sync::Api, Repo};
+use hf_hub::{Repo, api::sync::Api};
 use std::sync::Arc;
 use tokenizers::Tokenizer;
 use tokio::sync::Mutex;

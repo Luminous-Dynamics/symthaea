@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-formal-safety"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Formal safety case and proof-obligation primitives for engineering workflows"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["formal-methods", "safety", "engineering", "verification"]
+categories = ["science", "development-tools"]
+
+[dependencies]
+symthaea-core = { path = "../../symthaea-core" }
+serde = { workspace = true }
+uuid = { workspace = true }
+

@@ -519,6 +519,23 @@ pub struct GeneratedCode {
     pub plan_coverage: f32,
 }
 
+impl Default for GeneratedCode {
+    fn default() -> Self {
+        Self {
+            source: String::new(),
+            language: String::new(),
+            plan_steps: Vec::new(),
+            epistemic_status: EpistemicStatus::Unknown,
+            intent_similarity: 0.0,
+            notes: Vec::new(),
+            phi_score: 0.0,
+            primitives_used: Vec::new(),
+            dataflow: None,
+            plan_coverage: 0.0,
+        }
+    }
+}
+
 /// Context provided to the code generator
 pub struct CodeContext<'a> {
     /// The codebase memory for pattern retrieval
@@ -541,6 +558,8 @@ pub struct CodeContext<'a> {
     /// HDC-encoded diagnostics for high-precision neuro-symbolic repair.
     /// These are produced by DiagnosticHDEncoder and capture the "geometry" of compiler errors.
     pub diagnostic_hvs: Vec<ContinuousHV>,
+    /// Optional GitHub-style issue description for repo-scale navigation and fix.
+    pub issue_text: Option<String>,
     /// Learned code template from the CodingExperienceStore.
     /// If a similar task was previously completed via LLM, the template
     /// is injected here so native generation can use it directly.
@@ -557,6 +576,7 @@ impl<'a> Default for CodeContext<'a> {
             mcts_plan_confidence: 0.0,
             error_hints: Vec::new(),
             diagnostic_hvs: Vec::new(),
+            issue_text: None,
             learned_template: None,
         }
     }
@@ -605,7 +625,7 @@ impl CodeGenerator {
             CodeIntent::Modify { .. } => CodeOperation::Modify,
             CodeIntent::Explain { .. } => CodeOperation::Explain,
             CodeIntent::Find { .. } => CodeOperation::FindSimilar,
-            CodeIntent::Refactor { .. } => CodeOperation::Refactor,
+            CodeIntent::Refactor { .. } | CodeIntent::Solve { .. } => CodeOperation::Refactor,
             CodeIntent::Debug { .. } => CodeOperation::Debug,
         }
     }
@@ -659,12 +679,89 @@ impl CodeGenerator {
             CodeIntent::Debug { target, symptoms } => {
                 self.generate_debug(target, symptoms, context, &primitive_result)
             }
+            CodeIntent::Solve { target, spec } => {
+                self.generate_solve(target, spec, context, &primitive_result)
+            }
+        }
+    }
+
+    /// Generate a fix for a repository-scale issue (SWE-bench style).
+    pub fn generate_solve(
+        &self,
+        _target: &super::code_intent::RepoTarget,
+        spec: &super::code_intent::IssueSpec,
+        context: &CodeContext,
+        _primitives: &CodeExecutionResult,
+    ) -> GeneratedCode {
+        // Implementation:
+        // 1. If context doesn't have enough snippets, use RepoMap (if in context)
+        //    to pull in more relevant code based on the issue description.
+        // 2. Build the engineering prompt for Broca/LLM.
+        // 3. Emit the multi-file fix plan.
+
+        let mut source = format!("// SWE-bench Fix Plan for: {}\n\n", spec.description);
+        source.push_str("/*\n");
+        source.push_str("Based on the repository analysis and active sensing via LSP,\n");
+        source.push_str("the following files need modification to resolve the issue:\n\n");
+        for file in &spec.relevant_files {
+            source.push_str(&format!("- {}\n", file));
+        }
+        source.push_str("\n*/\n\ntodo!(\"Implement multi-file repository fix\");\n");
+
+        GeneratedCode {
+            source,
+            epistemic_status: EpistemicStatus::Uncertain,
+            ..Default::default()
         }
     }
 
     /// Get the primitive executor for direct access
     pub fn primitive_executor(&self) -> &CodePrimitiveExecutor {
         &self.primitive_executor
+    }
+
+    /// Generate property-based tests for a given code intent.
+    ///
+    /// This uses the cognitive core to reason about boundary conditions
+    /// and invariants, producing a `proptest!` block to stress-test the implementation.
+    pub fn generate_proptests(&self, intent: &CodeIntent, context: &CodeContext) -> GeneratedCode {
+        let spec = match intent {
+            CodeIntent::Create { spec, .. } => spec,
+            _ => {
+                return GeneratedCode {
+                    source: "// Proptest generation only supported for Create intents".to_string(),
+                    ..Default::default()
+                };
+            }
+        };
+
+        // For now, we generate a scaffold that an LLM can complete with real proptests.
+        // If an issue description is present, we inject it into the scaffold comments.
+        let mut source = String::new();
+        source.push_str(
+            "#[cfg(test)]\nmod proptests {\n    use super::*;\n    use proptest::prelude::*;\n\n",
+        );
+        if let Some(ref issue) = context.issue_text {
+            source.push_str("    // Test invariants derived from GitHub issue:\n");
+            for line in issue.lines() {
+                source.push_str(&format!("    // {}\n", line));
+            }
+            source.push_str("\n");
+        }
+        source.push_str(&format!("    // Property-based tests for {}\n", spec.name));
+        source.push_str("    proptest! {\n        #[test]\n");
+        source.push_str(&format!(
+            "        fn test_{}_properties(ref _input in \".*\") {{\n",
+            spec.name
+        ));
+        source.push_str("            // TODO: Implement property invariants for this function\n");
+        source.push_str("            unimplemented!();\n        }\n    }\n}\n");
+
+        GeneratedCode {
+            source,
+            epistemic_status: EpistemicStatus::Uncertain,
+            ..Default::default()
+        }
     }
 
     /// Check if a generated result needs LLM completion (contains `todo!()` or `unimplemented!()`).
@@ -1170,7 +1267,7 @@ impl CodeGenerator {
         let intent_similarity = if !source.is_empty() {
             let coverage = plan.len() as f32 / 5.0;
             let mcts_bonus = context.mcts_plan_confidence * 0.1; // up to 0.1 bonus
-                                                                 // Weight: 60% plan coverage, 30% primitive phi, 10% MCTS confidence
+            // Weight: 60% plan coverage, 30% primitive phi, 10% MCTS confidence
             (coverage * 0.6 + primitive_result.phi * 0.3 + mcts_bonus).min(1.0)
         } else {
             0.0
@@ -1962,11 +2059,7 @@ impl CodeGenerator {
             }
         }
 
-        if applied {
-            Some(fixed)
-        } else {
-            None
-        }
+        if applied { Some(fixed) } else { None }
     }
 
     /// Extract return type from generated Rust source by scanning for `-> Type {`.
@@ -1996,13 +2089,13 @@ mod tests {
 
     #[test]
     fn test_create_generator() {
-        let gen = CodeGenerator::with_default_dim();
-        assert_eq!(gen.encoder().dim(), 512);
+        let generator = CodeGenerator::with_default_dim();
+        assert_eq!(generator.encoder().dim(), 512);
     }
 
     #[test]
     fn test_generate_create_rust() {
-        let gen = CodeGenerator::with_default_dim();
+        let generator = CodeGenerator::with_default_dim();
         let intent = CodeIntent::Create {
             target: CodeTarget::new("sort_numbers", EntityKind::Function),
             spec: CodeSpec::new("rust", "sort_numbers", "Sort a vector of numbers")
@@ -2010,14 +2103,14 @@ mod tests {
                 .with_epistemic(EpistemicStatus::Certain),
         };
 
-        let result = gen.generate(&intent, &CodeContext::default());
+        let result = generator.generate(&intent, &CodeContext::default());
         assert_eq!(result.language, "rust");
         assert!(!result.source.is_empty());
     }
 
     #[test]
     fn test_generate_create_attaches_repo_snippets() {
-        let gen = CodeGenerator::with_default_dim();
+        let generator = CodeGenerator::with_default_dim();
         let intent = CodeIntent::Create {
             target: CodeTarget::new("normalize_user", EntityKind::Function),
             spec: CodeSpec::new("rust", "normalize_user", "Normalize a user name")
@@ -2032,7 +2125,7 @@ mod tests {
             ..CodeContext::default()
         };
 
-        let result = gen.generate(&intent, &context);
+        let result = generator.generate(&intent, &context);
 
         assert!(result.notes.iter().any(|note| {
             note.starts_with("REPO_SNIPPET(src/users.rs:4:normalize_name)")
@@ -2068,20 +2161,20 @@ mod tests {
 
     #[test]
     fn test_generate_create_python() {
-        let gen = CodeGenerator::with_default_dim();
+        let generator = CodeGenerator::with_default_dim();
         let intent = CodeIntent::Create {
             target: CodeTarget::new("hello", EntityKind::Function),
             spec: CodeSpec::new("python", "hello", "Print hello world"),
         };
 
-        let result = gen.generate(&intent, &CodeContext::default());
+        let result = generator.generate(&intent, &CodeContext::default());
         assert_eq!(result.language, "python");
         assert!(!result.source.is_empty());
     }
 
     #[test]
     fn test_generate_explanation() {
-        let gen = CodeGenerator::with_default_dim();
+        let generator = CodeGenerator::with_default_dim();
         let intent = CodeIntent::Explain {
             target: CodeTarget::new("parse", EntityKind::Function)
                 .with_language("rust")
@@ -2089,13 +2182,13 @@ mod tests {
             depth: crate::language::code_intent::ExplanationDepth::Standard,
         };
 
-        let result = gen.generate(&intent, &CodeContext::default());
+        let result = generator.generate(&intent, &CodeContext::default());
         assert!(result.source.contains("parse"));
     }
 
     #[test]
     fn test_generate_modify() {
-        let gen = CodeGenerator::with_default_dim();
+        let generator = CodeGenerator::with_default_dim();
         let intent = CodeIntent::Modify {
             target: CodeTarget::new("process", EntityKind::Function).with_language("rust"),
             changes: vec![
@@ -2109,7 +2202,7 @@ mod tests {
             ],
         };
 
-        let result = gen.generate(&intent, &CodeContext::default());
+        let result = generator.generate(&intent, &CodeContext::default());
         assert!(result.source.contains("timeout"));
         assert!(result.source.contains("Result<()>"));
     }
@@ -2203,10 +2296,10 @@ mod tests {
 
     #[test]
     fn test_auto_fix_type_inference() {
-        let gen = CodeGenerator::with_default_dim();
+        let generator = CodeGenerator::with_default_dim();
         let source = "pub fn parse_int(s: &str) -> i32 {\n    s.parse().unwrap_or_default()\n}";
         let stderr = "error[E0282]: type annotations needed";
-        let fixed = gen.try_auto_fix(source, stderr);
+        let fixed = generator.try_auto_fix(source, stderr);
         assert!(fixed.is_some(), "Should auto-fix type inference");
         let fixed = fixed.unwrap();
         assert!(
@@ -2218,10 +2311,10 @@ mod tests {
 
     #[test]
     fn test_auto_fix_type_mismatch_iter() {
-        let gen = CodeGenerator::with_default_dim();
+        let generator = CodeGenerator::with_default_dim();
         let source = "a.iter().zip(b.iter()).collect()";
         let stderr = "error[E0308]: mismatched types\nexpected (i32, i32), found (&i32, &i32)";
-        let fixed = gen.try_auto_fix(source, stderr);
+        let fixed = generator.try_auto_fix(source, stderr);
         assert!(fixed.is_some(), "Should auto-fix iter to into_iter");
         let fixed = fixed.unwrap();
         assert!(
@@ -2233,15 +2326,15 @@ mod tests {
 
     #[test]
     fn test_auto_fix_no_fix_needed() {
-        let gen = CodeGenerator::with_default_dim();
-        let result = gen.try_auto_fix("fn good() { }", "all good");
+        let generator = CodeGenerator::with_default_dim();
+        let result = generator.try_auto_fix("fn good() { }", "all good");
         assert!(result.is_none(), "Should return None when no fix needed");
     }
 
     #[test]
     fn test_e2e_generate_and_validate() {
         // End-to-end: text intent → generation → validation → distillation
-        let gen = CodeGenerator::with_default_dim();
+        let generator = CodeGenerator::with_default_dim();
         let spec = CodeSpec::new("rust", "add", "Add two numbers")
             .with_signature("fn add(a: i32, b: i32) -> i32");
         let intent = CodeIntent::Create {
@@ -2249,7 +2342,7 @@ mod tests {
             spec: spec.clone(),
         };
 
-        let result = gen.generate(&intent, &CodeContext::default());
+        let result = generator.generate(&intent, &CodeContext::default());
 
         // Generation should produce valid code
         assert!(!result.source.is_empty(), "Should generate source");
@@ -2282,7 +2375,7 @@ mod tests {
         }
 
         // Distillation target should be available
-        let target = gen.distillation_target(&spec, &result);
+        let target = generator.distillation_target(&spec, &result);
         assert!(
             target.is_some(),
             "Should produce distillation target for clean native code"

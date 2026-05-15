@@ -34,7 +34,7 @@ holochain_integrity_types = "0.6.0"
 holochain_serialized_bytes = "0.0.56"
 
 # Serialization
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1.0.203", features = ["derive"] }
 serde_json = "1.0"
 
 # Bridge
@@ -49,6 +49,7 @@ derive_more = "0.99"
 # which is incompatible with Holochain's WASM runtime.
 getrandom = { version = "0.2", features = ["custom"] }
 getrandom_03 = { package = "getrandom", version = "0.3" }
+mycelix-zome-helpers = { path = "../mycelix-workspace/crates/mycelix-zome-helpers" }
 
 # ZKP verification for source attestation
 mycelix-zkp-core = { path = "../crates/mycelix-zkp-core" }

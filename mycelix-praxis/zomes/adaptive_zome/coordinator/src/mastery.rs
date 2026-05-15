@@ -10,13 +10,12 @@
 //!
 //! Extracted from lib.rs as a pure structural refactor — no logic changes.
 
-use hdk::prelude::*;
-use adaptive_integrity::*;
 use crate::{
-    current_time, mastery_anchor,
-    DEFAULT_LEARN_RATE, DEFAULT_GUESS_RATE, DEFAULT_SLIP_RATE,
-    RETENTION_TARGET, MASTERY_THRESHOLD,
+    current_time, mastery_anchor, DEFAULT_GUESS_RATE, DEFAULT_LEARN_RATE, DEFAULT_SLIP_RATE,
+    MASTERY_THRESHOLD, RETENTION_TARGET,
 };
+use adaptive_integrity::*;
+use hdk::prelude::*;
 
 // ============== Types ==============
 
@@ -111,7 +110,9 @@ pub(crate) fn get_or_create_mastery_impl(input: CreateMasteryInput) -> ExternRes
                     .entry()
                     .to_app_option()
                     .map_err(|e| wasm_error!(e))?
-                    .ok_or(wasm_error!(WasmErrorInner::Guest("No mastery entry".into())))?;
+                    .ok_or(wasm_error!(WasmErrorInner::Guest(
+                        "No mastery entry".into()
+                    )))?;
 
                 if mastery.skill_hash == input.skill_hash {
                     return Ok(action_hash);
@@ -166,14 +167,17 @@ pub(crate) fn record_attempt_impl(input: RecordAttemptInput) -> ExternResult<Mas
     let now = current_time()?;
 
     // Get current mastery
-    let record = get(input.mastery_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Mastery not found".into())))?;
+    let record = get(input.mastery_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Mastery not found".into())
+    ))?;
 
     let mut mastery: SkillMastery = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(e))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("No mastery entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "No mastery entry".into()
+        )))?;
 
     let old_mastery = mastery.mastery_permille;
 
@@ -194,16 +198,14 @@ pub(crate) fn record_attempt_impl(input: RecordAttemptInput) -> ExternResult<Mas
     }
 
     // Update recent attempts bitfield
-    mastery.recent_attempts_bits = (mastery.recent_attempts_bits << 1) | (if input.correct { 1 } else { 0 });
+    mastery.recent_attempts_bits =
+        (mastery.recent_attempts_bits << 1) | (if input.correct { 1 } else { 0 });
     mastery.recent_count = (mastery.recent_count + 1).min(10);
 
     // Calculate next optimal review time
     let minutes_since = ((now - mastery.modified_at) / 60_000_000) as u32; // micros to minutes
-    mastery.next_optimal_review = now + (optimal_review_time(
-        new_mastery,
-        minutes_since,
-        RETENTION_TARGET,
-    ) as i64 * 60_000_000); // minutes to micros
+    mastery.next_optimal_review = now
+        + (optimal_review_time(new_mastery, minutes_since, RETENTION_TARGET) as i64 * 60_000_000); // minutes to micros
 
     // Update confidence based on attempt count
     mastery.confidence_permille = ((mastery.total_attempts * 50).min(1000)) as u16;
@@ -251,7 +253,9 @@ pub(crate) fn get_my_masteries_impl(_: ()) -> ExternResult<Vec<SkillMastery>> {
                     .entry()
                     .to_app_option()
                     .map_err(|e| wasm_error!(e))?
-                    .ok_or(wasm_error!(WasmErrorInner::Guest("No mastery entry".into())))?;
+                    .ok_or(wasm_error!(WasmErrorInner::Guest(
+                        "No mastery entry".into()
+                    )))?;
                 masteries.push(mastery);
             }
         }
@@ -261,11 +265,15 @@ pub(crate) fn get_my_masteries_impl(_: ()) -> ExternResult<Vec<SkillMastery>> {
 }
 
 /// Get mastery record for a specific skill
-pub(crate) fn get_skill_mastery_impl(input: GetSkillMasteryInput) -> ExternResult<Option<SkillMastery>> {
+pub(crate) fn get_skill_mastery_impl(
+    input: GetSkillMasteryInput,
+) -> ExternResult<Option<SkillMastery>> {
     // Get all masteries and find the one matching the skill hash
     let masteries = get_my_masteries_impl(())?;
 
-    Ok(masteries.into_iter().find(|m| m.skill_hash == input.skill_hash))
+    Ok(masteries
+        .into_iter()
+        .find(|m| m.skill_hash == input.skill_hash))
 }
 
 /// Get skills due for review
@@ -285,22 +293,35 @@ pub(crate) fn get_due_for_review_impl(_: ()) -> ExternResult<Vec<SkillMastery>> 
 }
 
 /// Get paginated masteries with filtering - optimized for UI lists
-pub(crate) fn get_masteries_paginated_impl(input: PaginatedMasteriesInput) -> ExternResult<PaginatedMasteriesResult> {
+pub(crate) fn get_masteries_paginated_impl(
+    input: PaginatedMasteriesInput,
+) -> ExternResult<PaginatedMasteriesResult> {
     let now = current_time()?;
     let all_masteries = get_my_masteries_impl(())?;
 
     // Apply filters
-    let filtered: Vec<&SkillMastery> = all_masteries.iter()
+    let filtered: Vec<&SkillMastery> = all_masteries
+        .iter()
         .filter(|m| {
-            let min_ok = input.min_mastery.map(|min| m.mastery_permille >= min).unwrap_or(true);
-            let max_ok = input.max_mastery.map(|max| m.mastery_permille <= max).unwrap_or(true);
-            let due_ok = input.due_only.map(|due| !due || m.next_optimal_review <= now).unwrap_or(true);
+            let min_ok = input
+                .min_mastery
+                .map(|min| m.mastery_permille >= min)
+                .unwrap_or(true);
+            let max_ok = input
+                .max_mastery
+                .map(|max| m.mastery_permille <= max)
+                .unwrap_or(true);
+            let due_ok = input
+                .due_only
+                .map(|due| !due || m.next_optimal_review <= now)
+                .unwrap_or(true);
             min_ok && max_ok && due_ok
         })
         .collect();
 
     let total = filtered.len();
-    let items: Vec<SkillMastery> = filtered.into_iter()
+    let items: Vec<SkillMastery> = filtered
+        .into_iter()
         .skip(input.offset)
         .take(input.limit)
         .cloned()
@@ -308,9 +329,15 @@ pub(crate) fn get_masteries_paginated_impl(input: PaginatedMasteriesInput) -> Ex
     let has_more = input.offset + items.len() < total;
 
     // Compute quick stats from full list (not just page)
-    let due_count = all_masteries.iter().filter(|m| m.next_optimal_review <= now).count();
+    let due_count = all_masteries
+        .iter()
+        .filter(|m| m.next_optimal_review <= now)
+        .count();
     let avg_mastery = if !all_masteries.is_empty() {
-        (all_masteries.iter().map(|m| m.mastery_permille as u32).sum::<u32>()
+        (all_masteries
+            .iter()
+            .map(|m| m.mastery_permille as u32)
+            .sum::<u32>()
             / all_masteries.len() as u32) as u16
     } else {
         0

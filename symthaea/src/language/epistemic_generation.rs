@@ -151,6 +151,16 @@ impl EpistemicCodeGenerator {
             CodeIntent::Refactor { .. } => {
                 uncertainties.push("Refactoring may change behavior — run tests".to_string());
             }
+            CodeIntent::Solve { spec, .. } => {
+                if spec.relevant_files.is_empty() {
+                    uncertainties.push(
+                        "No relevant files specified — navigation will be purely discovery-based"
+                            .to_string(),
+                    );
+                }
+                uncertainties
+                    .push("Repository-scale fix requires cross-file verification".to_string());
+            }
             _ => {}
         }
 
@@ -183,6 +193,13 @@ impl EpistemicCodeGenerator {
                     target.name
                 ));
             }
+            CodeIntent::Solve { spec, .. } => {
+                if spec.relevant_files.is_empty() {
+                    questions
+                        .push("Which files do you think are related to this issue?".to_string());
+                }
+                questions.push("Are there existing tests that reproduce this issue?".to_string());
+            }
             _ => {
                 questions.push("Can you provide more context for this request?".to_string());
             }
@@ -208,6 +225,13 @@ impl EpistemicCodeGenerator {
                     target.name
                 )
             }
+            CodeIntent::Solve { spec, .. } => {
+                format!(
+                    "Cannot autonomously solve issue without repository context. \
+                     Description: {}. Need: repository access and clearly defined issue.",
+                    spec.description
+                )
+            }
             _ => "Insufficient information to proceed. Please provide more context.".to_string(),
         }
     }
@@ -221,13 +245,13 @@ mod tests {
     use crate::language::code_parser::EntityKind;
 
     fn make_generator() -> EpistemicCodeGenerator {
-        let gen = CodeGenerator::with_default_dim();
-        EpistemicCodeGenerator::new(gen, 512)
+        let generated = CodeGenerator::with_default_dim();
+        EpistemicCodeGenerator::new(generated, 512)
     }
 
     #[test]
     fn test_confident_generation() {
-        let gen = make_generator();
+        let generated = make_generator();
         let intent = CodeIntent::Create {
             target: CodeTarget::new("add", EntityKind::Function),
             spec: CodeSpec::new("rust", "add", "Add two numbers")
@@ -236,7 +260,7 @@ mod tests {
                 .with_epistemic(EpistemicStatus::Certain),
         };
 
-        let result = gen.generate_with_confidence(&intent, &CodeContext::default());
+        let result = generated.generate_with_confidence(&intent, &CodeContext::default());
         assert!(result.is_ready());
         assert!(result.source().is_some());
         assert_eq!(result.epistemic_status(), EpistemicStatus::Certain);
@@ -244,14 +268,14 @@ mod tests {
 
     #[test]
     fn test_probable_generation() {
-        let gen = make_generator();
+        let generated = make_generator();
         let intent = CodeIntent::Create {
             target: CodeTarget::new("process", EntityKind::Function),
             spec: CodeSpec::new("rust", "process", "Process data")
                 .with_epistemic(EpistemicStatus::Probable),
         };
 
-        let result = gen.generate_with_confidence(&intent, &CodeContext::default());
+        let result = generated.generate_with_confidence(&intent, &CodeContext::default());
         assert!(!result.is_ready());
         assert!(result.source().is_some());
         assert!(!result.notes().is_empty());
@@ -259,14 +283,14 @@ mod tests {
 
     #[test]
     fn test_unknown_generation() {
-        let gen = make_generator();
+        let generated = make_generator();
         let intent = CodeIntent::Create {
             target: CodeTarget::new("mystery", EntityKind::Function),
             spec: CodeSpec::new("rust", "mystery", "Do something")
                 .with_epistemic(EpistemicStatus::Unknown),
         };
 
-        let result = gen.generate_with_confidence(&intent, &CodeContext::default());
+        let result = generated.generate_with_confidence(&intent, &CodeContext::default());
         assert!(!result.is_ready());
         assert!(result.source().is_none());
         assert_eq!(result.epistemic_status(), EpistemicStatus::Unknown);
@@ -274,14 +298,14 @@ mod tests {
 
     #[test]
     fn test_uncertain_asks_questions() {
-        let gen = make_generator();
+        let generated = make_generator();
         let intent = CodeIntent::Create {
             target: CodeTarget::new("transform", EntityKind::Function),
             spec: CodeSpec::new("rust", "transform", "Transform data")
                 .with_epistemic(EpistemicStatus::Uncertain),
         };
 
-        let result = gen.generate_with_confidence(&intent, &CodeContext::default());
+        let result = generated.generate_with_confidence(&intent, &CodeContext::default());
         assert!(!result.is_ready());
         assert!(!result.notes().is_empty()); // Should have questions
     }

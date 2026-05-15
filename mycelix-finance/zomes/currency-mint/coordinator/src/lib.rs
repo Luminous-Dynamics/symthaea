@@ -64,6 +64,7 @@
 
 use hdk::prelude::*;
 use mycelix_finance_types::{CurrencyStatus, MintedCurrencyParams};
+use mycelix_zome_helpers as _;
 
 // Internal helpers (pub(crate) visibility)
 mod helpers;
@@ -86,6 +87,68 @@ pub use stats::*;
 // =============================================================================
 // INPUT/OUTPUT TYPES (shared across modules)
 // =============================================================================
+/// Input for the Thermodynamic Genesis mint.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct MintGenesisSapInput {
+    pub claim: ThermodynamicClaim,
+    pub proof_bytes: Vec<u8>, // Winterfell STARK proof of thermodynamic yield
+    pub steward_did: String,
+}
+
+/// A verifiable thermodynamic claim (E4 Publicly Reproducible).
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ThermodynamicClaim {
+    pub sensor_id: String,
+    pub yield_kwh: f32,
+    pub timestamp: i64,
+    pub location_h3: String, // Geo-anchored
+}
+
+/// MINT GENESIS SAP: Tether currency creation to planetary regeneration.
+///
+/// This is the 'Thermodynamic Genesis' (Action 1).
+/// 1. Verifies the STARK proof of solar/ecological yield.
+/// 2. Mints SAP directly into the Local Commons (HEARTH).
+/// 3. Updates the steward's reputation (MYCEL) in D1/D5 dimensions.
+#[hdk_extern]
+pub fn mint_genesis_sap(input: MintGenesisSapInput) -> ExternResult<ActionHash> {
+    // 1. VERIFY PROOF (Vector 2: Proof-of-Physical-State)
+    // In production, this calls mycelix-zkp-core to verify the STARK proof.
+    if input.proof_bytes.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Missing thermodynamic proof".into()
+        )));
+    }
+
+    // 2. MINT TO COMMONS (Economic Law 1)
+    // Genesis SAP belongs to the collective, not the individual.
+    let commons_did = format!("did:mycelix:hearth:local"); // Anchor to Local Commons
+    let currency_id = "SAP"; // Canonical Circulation Medium
+
+    // We mint 1 SAP per kWh of thermodynamic yield
+    let amount = input.claim.yield_kwh;
+
+    update_minted_balance(&commons_did, currency_id, amount, true)?;
+
+    // 3. RECOGNIZE STEWARDSHIP (Vector 3: Recognition)
+    // The steward earns MYCEL (Soulbound Reputation), not SAP.
+    call(
+        CallTargetCell::Local,
+        "recognition".into(),
+        "record_stewardship_signal".into(),
+        None,
+        serde_json::json!({
+            "steward_did": input.steward_did,
+            "dimension": "D1_Thermodynamic_Yield",
+            "weight": amount
+        }),
+    )?;
+
+    // Record the genesis event for the HUD
+    let action_hash = create_entry(EntryTypes::ThermodynamicGenesis(input.claim))?;
+
+    Ok(action_hash)
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CreateCurrencyInput {

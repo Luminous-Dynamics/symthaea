@@ -10,11 +10,8 @@ autotests = false
 path = "lib.rs"
 
 [dependencies]
-holochain = { version = "0.6", features = ["test_utils", "sweettest"] }
-holochain_types = "0.6"
 hdk = "0.6"
 hdi = "0.7"
-tokio = { version = "1", features = ["full", "test-util"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rmp-serde = "1"
@@ -54,3 +51,8 @@ path = "sweettest_circular_economy.rs"
 [features]
 identity_cluster = []
 civic_cluster = []
+
+[dev-dependencies]
+holochain = { version = "0.6", features = ["test_utils", "sweettest"] }
+holochain_types = "0.6"
+tokio = { version = "1", features = ["full", "test-util"] }

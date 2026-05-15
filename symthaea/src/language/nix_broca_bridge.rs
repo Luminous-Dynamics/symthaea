@@ -28,7 +28,7 @@
 //! The count of 17 is the `NIX_CHANNEL_COUNT` constant — bump if
 //! `NixChannels` grows new fields.
 
-use crate::language::nix_codegen::{build_nix_channels, NixChannels, NixIntent};
+use crate::language::nix_codegen::{NixChannels, NixIntent, build_nix_channels};
 
 /// Broca's default `NUM_CHANNELS`. Intentionally duplicated rather than
 /// imported from symthaea-broca — this main-crate module deliberately

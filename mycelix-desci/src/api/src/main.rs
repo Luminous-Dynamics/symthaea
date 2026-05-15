@@ -53,11 +53,14 @@ async fn main() -> Result<()> {
     info!("✅ Configuration loaded");
 
     // Initialize application state
-    let state = AppState::new().await?;
+    let state = Arc::new(AppState::new().await?);
     info!("✅ Application state initialized");
 
+    // Start background workers
+    start_quantum_anchor(Arc::clone(&state));
+
     // Build application
-    let app = create_app(state);
+    let app = create_app(Arc::clone(&state));
 
     // Create server address
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));

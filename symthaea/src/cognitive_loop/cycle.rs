@@ -743,20 +743,19 @@ impl CognitiveLoopService {
         // PHASE 4: OUTPUT
         // Metadata assembly, telemetry, CycleResult construction
         // ═══════════════════════════════════════════════════════════════════
-        self.phase_output(
+        let result = self.phase_output(
             input,
             cycle_start,
             &mut perception,
             &mut dynamics,
             &mut feedback,
             module_timings,
-        )
-    }
-
-    // Extracted cycle phases moved to helpers/cycle_phases.rs:
-    // - run_resonator_codebook_phase()
-    // - run_episodic_replay_and_memory_phase()
-    // - run_dream_phase()
+        );
+        result
+    } // Extracted cycle phases moved to helpers/cycle_phases.rs:
+      // - run_resonator_codebook_phase()
+      // - run_episodic_replay_and_memory_phase()
+      // - run_dream_phase()
 
     /// Safe wrapper around `cycle()` that catches panics from unexpected subsystem failures.
     ///

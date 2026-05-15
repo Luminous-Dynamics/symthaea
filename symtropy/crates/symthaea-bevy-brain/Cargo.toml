@@ -9,8 +9,6 @@ keywords = ["bevy", "ai", "npc", "consciousness", "neural"]
 categories = ["game-engines", "simulation", "science"]
 readme = "README.md"
 
-[workspace]
-
 [dependencies]
 bevy = { version = "0.18", default-features = false, features = [
     "bevy_log", "bevy_state",

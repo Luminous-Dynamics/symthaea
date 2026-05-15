@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -8,6 +7,7 @@ use mycelix_zome_helpers as _;
 use care_timebank_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::{civic_requirement_basic, civic_requirement_proposal};
+use mycelix_zome_helpers as _;
 use mycelix_zome_helpers::records_from_links;
 
 /// Helper to get an anchor entry hash
@@ -23,7 +23,6 @@ fn ensure_anchor(anchor_str: &str) -> ExternResult<EntryHash> {
     anchor_hash(anchor_str)
 }
 
-
 // ============================================================================
 // SERVICE OFFERS
 // ============================================================================
@@ -31,7 +30,11 @@ fn ensure_anchor(anchor_str: &str) -> ExternResult<EntryHash> {
 /// Create a new service offer
 #[hdk_extern]
 pub fn create_service_offer(offer: ServiceOffer) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "create_service_offer")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "create_service_offer",
+    )?;
     let action_hash = create_entry(&EntryTypes::ServiceOffer(offer.clone()))?;
 
     // Link agent to offer
@@ -137,7 +140,11 @@ pub fn search_offers(query: String) -> ExternResult<Vec<Record>> {
 /// Create a new service request
 #[hdk_extern]
 pub fn create_service_request(request: ServiceRequest) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "create_service_request")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "create_service_request",
+    )?;
     let action_hash = create_entry(&EntryTypes::ServiceRequest(request.clone()))?;
 
     // Link agent to request
@@ -227,7 +234,11 @@ pub struct CompleteExchangeInput {
 /// Complete a service exchange, creating a TimeExchange record and updating credits
 #[hdk_extern]
 pub fn complete_exchange(input: CompleteExchangeInput) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "complete_exchange")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "complete_exchange",
+    )?;
     let now = sys_time()?;
 
     let exchange = TimeExchange {
@@ -303,7 +314,11 @@ pub struct RateExchangeInput {
 /// Rate a completed exchange
 #[hdk_extern]
 pub fn rate_exchange(input: RateExchangeInput) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "rate_exchange")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "rate_exchange",
+    )?;
     if input.rating < 1 || input.rating > 5 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Rating must be between 1 and 5".into()

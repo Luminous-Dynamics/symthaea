@@ -252,6 +252,15 @@ pub const CROSS_MANIFOLD_CONFIDENCE_DAMPEN: f32 = 0.97;
 #[cfg(feature = "vision-manifold")]
 pub const CROSS_MANIFOLD_LR_BOOST: f32 = 1.03;
 
+/// Vision mean surprise threshold for trigger Holographic Dilation to Ultra resolution.
+/// Science: High surprise = complex scene → increase semantic resolution.
+#[cfg(feature = "vision-manifold")]
+pub const VISION_SURPRISE_DILATION_THRESHOLD: f32 = 0.28;
+
+/// Minimum cycles between Holographic Dilation transitions to prevent oscillation.
+#[cfg(feature = "vision-manifold")]
+pub const VISION_DILATION_COOLDOWN: u64 = 7;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // VISION SURPRISE → EXPLORATION (vision-manifold feature)
 // ═══════════════════════════════════════════════════════════════════════════════

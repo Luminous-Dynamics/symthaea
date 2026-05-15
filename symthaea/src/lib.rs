@@ -341,6 +341,9 @@ pub mod exploration;
 // Attention: Phi-guided attention mechanisms
 pub mod attention;
 
+// Embodiment: Physical world interaction and robotics bridges
+pub mod embodiment;
+
 // Visualization: Attention debugging and interpretation tools
 // Provides ASCII heatmaps, JSON export, and attention flow graphs
 pub mod visualization;
@@ -478,6 +481,18 @@ pub mod gui_bridge;
 #[cfg(feature = "physics")]
 pub use symthaea_physics as physics;
 
+// Engineering: requirements, simulator dispatch, digital twins, and safety cases
+#[cfg(feature = "engineering")]
+pub use symthaea_engineering as engineering;
+#[cfg(feature = "engineering-adapters")]
+pub use symthaea_mujoco_bridge as mujoco_bridge;
+#[cfg(feature = "engineering-adapters")]
+pub use symthaea_ngspice_bridge as ngspice_bridge;
+#[cfg(feature = "engineering-adapters")]
+pub use symthaea_openfoam_bridge as openfoam_bridge;
+#[cfg(feature = "engineering-adapters")]
+pub use symthaea_opensees_bridge as opensees_bridge;
+
 // Cell Foundry: iPSC, IVG, SCNT, multi-scale prediction, lab controller, hydrology
 #[cfg(feature = "cell-foundry")]
 pub use symthaea_cell_foundry;
@@ -592,6 +607,10 @@ pub use symthaea_nix;
 
 // Re-export phi_engine for consciousness calculations
 pub use symthaea_core::phi_engine;
+
+// Re-export mycelix-conductor bridge
+#[cfg(feature = "mycelix")]
+pub use symthaea_mycelix_conductor as mycelix_conductor;
 
 // Re-export core module for primitives like ContinuousHV, HDC_DIMENSION
 pub use symthaea_core::core;

@@ -22,8 +22,8 @@
 //! | MYCEL Score | 0.25 | Ecosystem participation |
 //! | Domain Average | 0.40 | Cross-cluster activity |
 
-use mycelix_zome_helpers as _;
 use hdk::prelude::*;
+use mycelix_zome_helpers as _;
 use reputation_aggregator_integrity::*;
 use serde::{Deserialize, Serialize};
 

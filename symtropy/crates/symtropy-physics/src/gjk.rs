@@ -184,7 +184,7 @@ fn do_simplex_triangle<const D: usize>(
     // negate → points away from C
     let ab_sq = ab.dot(&ab);
     let ab_perp = if ab_sq > 1e-20 {
-        let proj = &ab * (ac.dot(&ab) / ab_sq);
+        let proj = ab * (ac.dot(&ab) / ab_sq);
         -(ac - proj)
     } else {
         SVector::zeros()
@@ -200,7 +200,7 @@ fn do_simplex_triangle<const D: usize>(
     // Edge AC perpendicular: perpendicular to AC, pointing away from B
     let ac_sq = ac.dot(&ac);
     let ac_perp = if ac_sq > 1e-20 {
-        let proj = &ac * (ab.dot(&ac) / ac_sq);
+        let proj = ac * (ab.dot(&ac) / ac_sq);
         -(ab - proj)
     } else {
         SVector::zeros()
@@ -236,8 +236,8 @@ fn do_simplex_triangle<const D: usize>(
     let ao_e1 = ao.dot(&ab);
     let ao_e2 = ao.dot(&ac);
     let proj =
-        &ab * ((ao_e1 * e2e2 - ao_e2 * e1e2) / det) + &ac * ((ao_e2 * e1e1 - ao_e1 * e1e2) / det);
-    let face_normal = &ao - &proj;
+        ab * ((ao_e1 * e2e2 - ao_e2 * e1e2) / det) + ac * ((ao_e2 * e1e1 - ao_e1 * e1e2) / det);
+    let face_normal = ao - proj;
 
     if face_normal.norm_squared() < 1e-20 {
         return true; // Origin is on the triangle plane
@@ -362,7 +362,7 @@ fn do_simplex_general<const D: usize>(
 
         // Gram-Schmidt normal: project toward-removed onto face span, take perpendicular.
         // Exact for any D (Fix 9: replaces approximate triple cross product).
-        if face_vecs.len() >= 1 {
+        if !face_vecs.is_empty() {
             let to_removed = simplex[i] - a;
             let mut normal = to_removed;
             for edge in &face_vecs {

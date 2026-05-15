@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -10,7 +9,8 @@ use hdk::prelude::*;
 use mycelix_bridge_common::{
     civic_requirement_basic, civic_requirement_proposal, GovernanceEligibility,
 };
-use mycelix_zome_helpers::{get_latest_record};
+use mycelix_zome_helpers as _;
+use mycelix_zome_helpers::get_latest_record;
 
 /// Summary of a single active disaster
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
@@ -35,7 +35,6 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
     hash_entry(&EntryTypes::Anchor(anchor))
 }
-
 
 /// Form a new response team
 
@@ -121,7 +120,11 @@ pub struct FormTeamInput {
 /// Assign a team to an operational zone
 #[hdk_extern]
 pub fn assign_to_zone(input: AssignToZoneInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "assign_to_zone")?;
+    mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_proposal(),
+        "assign_to_zone",
+    )?;
     if input.objective.trim().is_empty() || input.objective.len() > 1024 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Objective must be 1-1024 non-whitespace characters".into()
@@ -213,7 +216,11 @@ pub struct AssignToZoneInput {
 /// Submit a situation report from the field
 #[hdk_extern]
 pub fn submit_sitrep(input: SubmitSitrepInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_basic(), "submit_sitrep")?;
+    mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_basic(),
+        "submit_sitrep",
+    )?;
     if input.conditions.trim().is_empty() || input.conditions.len() > 4096 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Conditions must be 1-4096 non-whitespace characters".into()

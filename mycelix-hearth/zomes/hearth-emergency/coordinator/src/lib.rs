@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -13,11 +12,11 @@ use hearth_types::*;
 use mycelix_bridge_common::{
     civic_requirement_basic, civic_requirement_proposal, GovernanceEligibility,
 };
+use mycelix_zome_helpers as _;
 
 // ============================================================================
 // Consciousness Gating
 // ============================================================================
-
 
 // ============================================================================
 // Input Types
@@ -82,7 +81,11 @@ fn is_alert_type_life_threatening(alert_type: &AlertType) -> bool {
 /// Links the plan from the hearth via HearthToPlans.
 #[hdk_extern]
 pub fn create_emergency_plan(input: CreateEmergencyPlanInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("hearth_bridge", &civic_requirement_proposal(), "create_emergency_plan")?;
+    mycelix_zome_helpers::require_civic(
+        "hearth_bridge",
+        &civic_requirement_proposal(),
+        "create_emergency_plan",
+    )?;
     require_membership(&input.hearth_hash)?;
     let now = sys_time()?;
     let plan = EmergencyPlan {
@@ -112,7 +115,11 @@ pub fn create_emergency_plan(input: CreateEmergencyPlanInput) -> ExternResult<Re
 /// Update an existing emergency plan.
 #[hdk_extern]
 pub fn update_emergency_plan(input: UpdatePlanInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("hearth_bridge", &civic_requirement_proposal(), "update_emergency_plan")?;
+    mycelix_zome_helpers::require_civic(
+        "hearth_bridge",
+        &civic_requirement_proposal(),
+        "update_emergency_plan",
+    )?;
     require_membership(&input.input.hearth_hash)?;
     let now = sys_time()?;
     let plan = EmergencyPlan {
@@ -136,7 +143,11 @@ pub fn update_emergency_plan(input: UpdatePlanInput) -> ExternResult<Record> {
 /// Links the alert from the hearth and emits a HearthSignal::EmergencyAlert.
 #[hdk_extern]
 pub fn raise_alert(input: RaiseAlertInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("hearth_bridge", &civic_requirement_basic(), "raise_alert")?;
+    mycelix_zome_helpers::require_civic(
+        "hearth_bridge",
+        &civic_requirement_basic(),
+        "raise_alert",
+    )?;
     require_membership(&input.hearth_hash)?;
     let now = sys_time()?;
     let agent = agent_info()?.agent_initial_pubkey;
@@ -234,7 +245,11 @@ pub fn check_in(input: CheckInInput) -> ExternResult<Record> {
 /// Status: only unresolved alerts (resolved_at is None) can be resolved.
 #[hdk_extern]
 pub fn resolve_alert(alert_hash: ActionHash) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("hearth_bridge", &civic_requirement_proposal(), "resolve_alert")?;
+    mycelix_zome_helpers::require_civic(
+        "hearth_bridge",
+        &civic_requirement_proposal(),
+        "resolve_alert",
+    )?;
     let now = sys_time()?;
 
     let existing = get(alert_hash.clone(), GetOptions::default())?

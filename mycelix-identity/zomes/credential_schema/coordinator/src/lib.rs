@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -9,6 +8,7 @@ use mycelix_zome_helpers as _;
 
 use credential_schema_integrity::*;
 use hdk::prelude::*;
+use mycelix_zome_helpers as _;
 
 /// Create a deterministic entry hash from a string identifier
 /// This is used for link bases when we need to link from string IDs

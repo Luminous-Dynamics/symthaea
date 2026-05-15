@@ -12,8 +12,10 @@
 //! - **4D** (D=4): Cross-section slicing — slice 4D world with 3D hyperplane,
 //!   render the intersection
 
+pub mod material;
 pub mod projection;
 pub mod sync;
 
+pub use material::{NdSlicingMaterial, NdSlicingPlugin, NdSlicingSettings};
 pub use projection::{Projector, Projector2D, Projector3D, Projector4D};
 pub use sync::{sync_physics_2d, sync_physics_3d, sync_physics_4d, PhysicsBody};

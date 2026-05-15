@@ -1,6 +1,3 @@
-use mycelix_zome_helpers as _;
-#![deny(unsafe_code)]
-#![allow(deprecated)] // Uses legacy ConsciousnessCredential/Tier for fallback path
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -16,9 +13,13 @@ use mycelix_zome_helpers as _;
 //! - query_craft: Participant+ (basic, 0.25+)
 //! - broadcast_event: Citizen+ (voting, 0.45+)
 
+#![deny(unsafe_code)]
+#![allow(deprecated)] // Uses legacy ConsciousnessCredential/Tier for fallback path
+
 use craft_bridge_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common as bridge;
+use mycelix_zome_helpers as _;
 
 /// All coordinator zome names in the Craft cluster.
 const ALLOWED_ZOMES: &[&str] = &[
@@ -89,8 +90,9 @@ pub fn query_craft(query: CraftQueryEntry) -> ExternResult<Record> {
     let all_anchor = ensure_anchor("all_craft_queries")?;
     create_link(all_anchor, query_hash.clone(), LinkTypes::AllQueries, ())?;
 
-    get(query_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to store query".into())))
+    get(query_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to store query".into()
+    )))
 }
 
 /// Broadcast an event to the Craft cluster.
@@ -109,8 +111,9 @@ pub fn broadcast_event(event: CraftEventEntry) -> ExternResult<Record> {
     let all_anchor = ensure_anchor("all_craft_events")?;
     create_link(all_anchor, event_hash.clone(), LinkTypes::AllEvents, ())?;
 
-    get(event_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to store event".into())))
+    get(event_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to store event".into()
+    )))
 }
 
 // ---------------------------------------------------------------------------
@@ -122,9 +125,7 @@ pub fn broadcast_event(event: CraftEventEntry) -> ExternResult<Record> {
 /// Required by `gate_civic()` which calls `get_consciousness_credential`
 /// Legacy 4D credential — delegates to sovereign bootstrap path.
 #[hdk_extern]
-pub fn get_consciousness_credential(
-    did: String,
-) -> ExternResult<bridge::ConsciousnessCredential> {
+pub fn get_consciousness_credential(did: String) -> ExternResult<bridge::ConsciousnessCredential> {
     let sovereign = get_sovereign_credential(did)?;
     let lp = bridge::sovereign_gate::LegacyProfile::from(sovereign.profile.clone());
     let profile = bridge::ConsciousnessProfile {

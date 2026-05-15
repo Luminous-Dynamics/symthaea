@@ -1,0 +1,16 @@
+[package]
+name = "stress-tester"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+luminous-sim-core = { path = "../../../crates/luminous-sim-core" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+rand = "0.8"
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.11", features = ["json"] }
+
+[[bin]]
+name = "stress-tester"
+path = "src/main.rs"

@@ -1,20 +1,19 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Circular Marketplace Coordinator Zome
 //! Secondary material listings, demand matching, and order management
 
+use circular_marketplace_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::civic_requirement_basic;
+use mycelix_zome_helpers as _;
 use mycelix_zome_helpers::records_from_links;
-use circular_marketplace_integrity::*;
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
     hash_entry(&EntryTypes::Anchor(anchor))
 }
-
 
 // ============================================================================
 // LISTINGS
@@ -23,8 +22,11 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 /// List a secondary material for sale or distribution
 #[hdk_extern]
 pub fn list_secondary_material(listing: SecondaryMaterialListing) -> ExternResult<Record> {
-    let _eligibility =
-        mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "list_secondary_material")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "list_secondary_material",
+    )?;
 
     if !listing.quantity_kg.is_finite() || listing.quantity_kg <= 0.0 {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -78,8 +80,9 @@ pub fn list_secondary_material(listing: SecondaryMaterialListing) -> ExternResul
         }
     }));
 
-    let record = get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get created record".into())))?;
+    let record = get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Failed to get created record".into())
+    ))?;
     Ok(record)
 }
 
@@ -213,9 +216,8 @@ pub fn find_matching_listings(input: DemandMatchInput) -> ExternResult<Vec<Listi
         };
 
         // 50% proximity + 30% quality + 20% quantity surplus
-        let quantity_surplus = ((listing.quantity_kg - input.min_quantity_kg)
-            / input.min_quantity_kg)
-            .min(1.0) as f32;
+        let quantity_surplus =
+            ((listing.quantity_kg - input.min_quantity_kg) / input.min_quantity_kg).min(1.0) as f32;
         let match_score = 0.50 * proximity_score + 0.30 * quality_score + 0.20 * quantity_surplus;
 
         matches.push(ListingMatch {
@@ -230,7 +232,11 @@ pub fn find_matching_listings(input: DemandMatchInput) -> ExternResult<Vec<Listi
     }
 
     // Sort by score descending
-    matches.sort_by(|a, b| b.match_score.partial_cmp(&a.match_score).unwrap_or(std::cmp::Ordering::Equal));
+    matches.sort_by(|a, b| {
+        b.match_score
+            .partial_cmp(&a.match_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     Ok(matches)
 }
@@ -265,7 +271,11 @@ fn haversine_km(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
 /// Place an order for secondary material
 #[hdk_extern]
 pub fn place_order(order: SecondaryMaterialOrder) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "place_order")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "place_order",
+    )?;
 
     if !order.quantity_kg.is_finite() || order.quantity_kg <= 0.0 {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -301,8 +311,9 @@ pub fn place_order(order: SecondaryMaterialOrder) -> ExternResult<Record> {
         }
     }));
 
-    let record = get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get created record".into())))?;
+    let record = get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Failed to get created record".into())
+    ))?;
     Ok(record)
 }
 
@@ -346,8 +357,11 @@ pub struct CompostDemandMatch {
 /// This enables the "back to farm" closed loop.
 #[hdk_extern]
 pub fn find_plots_needing_compost(_: ()) -> ExternResult<Vec<CompostDemandMatch>> {
-    let _eligibility =
-        mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "find_plots_needing_compost")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "find_plots_needing_compost",
+    )?;
 
     // Query food-production for all plots via cross-zome call
     let plots_response = call(
@@ -362,9 +376,7 @@ pub fn find_plots_needing_compost(_: ()) -> ExternResult<Vec<CompostDemandMatch>
     let plot_hashes: Vec<String> = match plots_response {
         Ok(ZomeCallResponse::Ok(extern_io)) => {
             // Decode as Vec<Record> and extract action hashes
-            let records: Vec<serde_json::Value> = extern_io
-                .decode()
-                .unwrap_or_default();
+            let records: Vec<serde_json::Value> = extern_io.decode().unwrap_or_default();
             records
                 .iter()
                 .filter_map(|r| {

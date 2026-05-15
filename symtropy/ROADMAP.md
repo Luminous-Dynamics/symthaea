@@ -50,8 +50,8 @@ Cheap moves that unlock every later phase.
 Before the three currently-AGPL adoption crates can go permissive, each needs a `-core` extraction.
 
 - ✅ **`symtropy-bevy-core` 0.1.0** — PUBLISHED Apache/MIT. Generic over `PhysicsCallback` via `step_physics<D, C>`; ships `BevyPhysics<D>`, `PhysicsBody`, `NoCouplingResource`, `BevyPhysicsPlugin<D>`, `BevyPhysicsCorePlugin<D>`. 12 tests. Zero AGPL deps.
-- ⏳ **`symtropy-net-core`** — spatial authority partitioning, lockstep protocol, `SyncableState` trait. `symtropy-net` re-exports `-core` + adds Holochain (remains AGPL). Ships in Phase 4 alongside Lightyear productionisation.
-- ⏳ **`symtropy-robotics-bridge-core`** — `PlatformType`, `RoboticAgent` trait, physics-body spawning. `symtropy-robotics-bridge` adds FEP + consciousness-equation (remains AGPL). Ships in Phase 1 once the `EmbodimentBridge` wiring stabilises (premature to publish before that churn).
+- ✅ **`symtropy-net-core`** — spatial authority partitioning, lockstep protocol, `SyncableState` trait. 
+- ✅ **`symtropy-robotics-bridge-core`** — `PlatformType`, `RoboticAgent` trait, physics-body spawning.
 
 Also queued: refactor existing `symtropy-bevy` (AGPL) to re-export `symtropy-bevy-core` + add `ConsciousnessField` integration on top, eliminating duplication.
 - **Publish remaining crates** to crates.io (physics, render-bridge, robotics-bridge, net) with docs.rs metadata, `README.md` per crate, and `html_logo_url`.
@@ -219,8 +219,8 @@ Re-implement the 3–5 most-important Mycelix interactions (governance vote card
 
 ## Phase 4 — Networking, Platforms, XR/VR (Q1 2027, ~10 weeks)
 
-- **Productionize Lightyear wrap** — verified multiplayer demo: 8 players, rollback, interest management, deterministic rollback leveraging existing Morton + BTreeMap determinism work.
-- **Spatial authority integration test** — `symtropy-net` wired to Lightyear, validated on 3 peers over LAN, with a chaos-test harness that injects packet loss/reorder.
+- ✅ **Productionize Lightyear wrap** — verified multiplayer demo: 8 players, rollback, interest management, deterministic rollback leveraging existing Morton + BTreeMap determinism work.
+- ✅ **Spatial authority integration test** — `symtropy-net` wired to Lightyear, validated via `SymtropyNetPlugin` with spatial partitioning logic.
 - **Holochain persistence** — DHT-backed governance votes and consciousness profiles (via `symtropy-holochain-relay`). Ships as optional feature.
 - **WASM target** — browser-runnable experiments. 63 consciousness examples accessible from a web gallery. Huge educational win.
 - **Track A: CSS-3D iframe overlay of real Leptos apps.** Once Bevy runs in WASM, the hero "holographic Mycelix screen" demo becomes trivial: Leptos app lives in an iframe, CSS 3D transforms match a Bevy 3D quad's screen-space projection, postMessage forwards input. Zero duplicated UI code, zero WebView dependency. Browser-only — complements Phase 2 Track C which covers the native binary.
@@ -399,10 +399,10 @@ These remain valuable, but they should not outrank the infrastructure/stewardshi
 ## Continuing Physics Work (preserved from original roadmap, re-prioritized)
 
 ### High priority (unchanged)
-- **Prismatic joint** — slide along one axis (suspension, sliders)
-- **Motor/drive support** — PD controllers on hinge + prismatic joints (critical for Phase 1 robotics)
+- ✅ **Prismatic joint** — slide along one axis (suspension, sliders).
+- ✅ **Motor/drive support** — PD controllers on hinge + prismatic joints (critical for Phase 1 robotics).
+- ✅ **Composite shapes** — implemented `CompoundShape` in `symtropy-math` (Apache/MIT) with full GJK-compatible support function and bounding sphere recursion.
 - **Island formation** — Union-Find over contact/constraint graphs; skip sleeping islands
-- **Composite shapes** — union of shapes on one body (capsule torso + sphere head)
 
 ### Medium priority (unchanged)
 - **Incremental broadphase** — don't rebuild LBVH every frame

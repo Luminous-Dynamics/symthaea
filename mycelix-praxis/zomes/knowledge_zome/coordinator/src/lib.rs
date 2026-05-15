@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -14,14 +13,14 @@ use mycelix_zome_helpers as _;
 //! - **Progress Tracking**: Track learner progress on nodes (private)
 //! - **AI Recommendations**: Generate personalized learning paths
 
-use hdk::prelude::*;
 use hdk::prelude::HdkPathExt;
+use hdk::prelude::*;
 use knowledge_integrity::{
-    EntryTypes, LinkTypes, KnowledgeNode, LearningEdge, LearningPath,
-    SkillTree, NodeProgress, EdgeVote, PathRecommendation,
-    DifficultyLevel, EdgeType, EdgeStatus, NodeStatus,
-    ProgressStatus, VoteDirection, GradeLevel, SubjectArea,
+    DifficultyLevel, EdgeStatus, EdgeType, EdgeVote, EntryTypes, GradeLevel, KnowledgeNode,
+    LearningEdge, LearningPath, LinkTypes, NodeProgress, NodeStatus, PathRecommendation,
+    ProgressStatus, SkillTree, SubjectArea, VoteDirection,
 };
+use mycelix_zome_helpers as _;
 
 // Helper function to ensure a path exists and return its entry hash
 fn ensure_path(path: Path, link_type: LinkTypes) -> ExternResult<EntryHash> {
@@ -50,7 +49,12 @@ pub fn create_node(node: KnowledgeNode) -> ExternResult<ActionHash> {
     // Link by domain
     let domain_path = Path::from(format!("domain/{}", node.domain));
     let domain_hash = ensure_path(domain_path, LinkTypes::DomainToNodes)?;
-    create_link(domain_hash, action_hash.clone(), LinkTypes::DomainToNodes, ())?;
+    create_link(
+        domain_hash,
+        action_hash.clone(),
+        LinkTypes::DomainToNodes,
+        (),
+    )?;
 
     // Link to related courses
     for course_hash in &node.related_courses {
@@ -84,7 +88,12 @@ pub fn create_node(node: KnowledgeNode) -> ExternResult<ActionHash> {
         };
         let subject_path = Path::from(format!("subject.{}", subject_key));
         let subject_hash = ensure_path(subject_path, LinkTypes::SubjectToNodes)?;
-        create_link(subject_hash, action_hash.clone(), LinkTypes::SubjectToNodes, ())?;
+        create_link(
+            subject_hash,
+            action_hash.clone(),
+            LinkTypes::SubjectToNodes,
+            (),
+        )?;
     }
 
     Ok(action_hash)
@@ -104,7 +113,7 @@ pub fn list_nodes(_: ()) -> ExternResult<Vec<Record>> {
 
     let links = get_links(
         LinkQuery::try_new(path_hash, LinkTypes::AllNodes)?,
-        GetStrategy::Local
+        GetStrategy::Local,
     )?;
 
     let mut nodes = Vec::new();
@@ -127,7 +136,7 @@ pub fn get_nodes_by_domain(domain: String) -> ExternResult<Vec<Record>> {
 
     let links = get_links(
         LinkQuery::try_new(domain_hash, LinkTypes::DomainToNodes)?,
-        GetStrategy::Local
+        GetStrategy::Local,
     )?;
 
     let mut nodes = Vec::new();
@@ -152,10 +161,19 @@ pub fn search_nodes(query: SearchNodesInput) -> ExternResult<Vec<Record>> {
     let filtered: Vec<Record> = all_nodes
         .into_iter()
         .filter(|record| {
-            if let Some(node) = record.entry().to_app_option::<KnowledgeNode>().ok().flatten() {
+            if let Some(node) = record
+                .entry()
+                .to_app_option::<KnowledgeNode>()
+                .ok()
+                .flatten()
+            {
                 // Match by tag
                 if let Some(ref tag) = query.tag {
-                    if !node.tags.iter().any(|t| t.to_lowercase().contains(&tag.to_lowercase())) {
+                    if !node
+                        .tags
+                        .iter()
+                        .any(|t| t.to_lowercase().contains(&tag.to_lowercase()))
+                    {
                         return false;
                     }
                 }
@@ -182,14 +200,24 @@ pub fn search_nodes(query: SearchNodesInput) -> ExternResult<Vec<Record>> {
                     let subject_lower = subject.to_lowercase();
                     let matches = match &node.subject_area {
                         Some(SubjectArea::Mathematics) => "mathematics".contains(&subject_lower),
-                        Some(SubjectArea::EnglishLanguageArts) => "english_language_arts".contains(&subject_lower),
+                        Some(SubjectArea::EnglishLanguageArts) => {
+                            "english_language_arts".contains(&subject_lower)
+                        }
                         Some(SubjectArea::Science) => "science".contains(&subject_lower),
-                        Some(SubjectArea::SocialStudies) => "social_studies".contains(&subject_lower),
-                        Some(SubjectArea::ForeignLanguage) => "foreign_language".contains(&subject_lower),
+                        Some(SubjectArea::SocialStudies) => {
+                            "social_studies".contains(&subject_lower)
+                        }
+                        Some(SubjectArea::ForeignLanguage) => {
+                            "foreign_language".contains(&subject_lower)
+                        }
                         Some(SubjectArea::Arts) => "arts".contains(&subject_lower),
-                        Some(SubjectArea::PhysicalEducation) => "physical_education".contains(&subject_lower),
+                        Some(SubjectArea::PhysicalEducation) => {
+                            "physical_education".contains(&subject_lower)
+                        }
                         Some(SubjectArea::Technology) => "technology".contains(&subject_lower),
-                        Some(SubjectArea::Custom(name)) => name.to_lowercase().contains(&subject_lower),
+                        Some(SubjectArea::Custom(name)) => {
+                            name.to_lowercase().contains(&subject_lower)
+                        }
                         None => false,
                     };
                     if !matches {
@@ -256,7 +284,7 @@ pub fn propose_edge(edge: LearningEdge) -> ExternResult<ActionHash> {
 pub fn get_node_edges(node_hash: ActionHash) -> ExternResult<Vec<Record>> {
     let links = get_links(
         LinkQuery::try_new(node_hash, LinkTypes::NodeToEdges)?,
-        GetStrategy::Local
+        GetStrategy::Local,
     )?;
 
     let mut edges = Vec::new();
@@ -276,7 +304,7 @@ pub fn get_node_edges(node_hash: ActionHash) -> ExternResult<Vec<Record>> {
 pub fn get_node_prerequisites(node_hash: ActionHash) -> ExternResult<Vec<Record>> {
     let links = get_links(
         LinkQuery::try_new(node_hash, LinkTypes::NodeToPrerequisites)?,
-        GetStrategy::Local
+        GetStrategy::Local,
     )?;
 
     let mut prereqs = Vec::new();
@@ -309,8 +337,8 @@ pub fn vote_on_edge(vote: EdgeVote) -> ExternResult<ActionHash> {
     let action_hash = create_entry(EntryTypes::EdgeVote(vote.clone()))?;
 
     // Update edge vote counts
-    let edge_record = get(vote.edge_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!("Edge not found"))?;
+    let edge_record =
+        get(vote.edge_hash.clone(), GetOptions::default())?.ok_or(wasm_error!("Edge not found"))?;
 
     let mut edge: LearningEdge = edge_record
         .entry()
@@ -334,7 +362,7 @@ pub fn vote_on_edge(vote: EdgeVote) -> ExternResult<ActionHash> {
 
 // ============== Pure Business Logic (HDK-free, unit-testable) ==============
 
-use std::collections::{HashMap, VecDeque, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 /// Find shortest path via BFS on a pre-built adjacency list.
 ///
@@ -437,7 +465,7 @@ pub fn list_paths(_: ()) -> ExternResult<Vec<Record>> {
 
     let links = get_links(
         LinkQuery::try_new(anchor_hash, LinkTypes::AllPaths)?,
-        GetStrategy::Local
+        GetStrategy::Local,
     )?;
 
     let mut paths = Vec::new();
@@ -460,7 +488,8 @@ pub fn find_path(input: FindPathInput) -> ExternResult<Vec<ActionHash>> {
     // considering edge strength, learner progress, etc.
 
     let mut visited: Vec<ActionHash> = vec![];
-    let mut queue: Vec<(ActionHash, Vec<ActionHash>)> = vec![(input.start_node.clone(), vec![input.start_node.clone()])];
+    let mut queue: Vec<(ActionHash, Vec<ActionHash>)> =
+        vec![(input.start_node.clone(), vec![input.start_node.clone()])];
 
     while let Some((current, path)) = queue.pop() {
         if current == input.end_node {
@@ -530,7 +559,7 @@ pub fn get_my_progress(_: ()) -> ExternResult<Vec<Record>> {
 
     let links = get_links(
         LinkQuery::try_new(caller, LinkTypes::LearnerToProgress)?,
-        GetStrategy::Local
+        GetStrategy::Local,
     )?;
 
     let mut progress = Vec::new();
@@ -553,7 +582,7 @@ pub fn check_prerequisites(node_hash: ActionHash) -> ExternResult<PrerequisiteCh
     // Get prerequisites for the node
     let prereq_edges = get_links(
         LinkQuery::try_new(node_hash.clone(), LinkTypes::NodeToPrerequisites)?,
-        GetStrategy::Local
+        GetStrategy::Local,
     )?;
 
     let mut required: Vec<ActionHash> = vec![];
@@ -599,8 +628,9 @@ pub fn generate_recommendation(input: RecommendationInput) -> ExternResult<Actio
         .iter()
         .filter_map(|r| {
             if let Some(p) = r.entry().to_app_option::<NodeProgress>().ok().flatten() {
-                if p.progress_status == ProgressStatus::Completed ||
-                   p.progress_status == ProgressStatus::Mastered {
+                if p.progress_status == ProgressStatus::Completed
+                    || p.progress_status == ProgressStatus::Mastered
+                {
                     Some(p.node_hash)
                 } else {
                     None
@@ -618,8 +648,15 @@ pub fn generate_recommendation(input: RecommendationInput) -> ExternResult<Actio
         .iter()
         .filter_map(|r| {
             if let Some(node) = r.entry().to_app_option::<KnowledgeNode>().ok().flatten() {
-                if node.domain.to_lowercase().contains(&input.target_skill.to_lowercase()) ||
-                   node.tags.iter().any(|t| t.to_lowercase().contains(&input.target_skill.to_lowercase())) {
+                if node
+                    .domain
+                    .to_lowercase()
+                    .contains(&input.target_skill.to_lowercase())
+                    || node.tags.iter().any(|t| {
+                        t.to_lowercase()
+                            .contains(&input.target_skill.to_lowercase())
+                    })
+                {
                     // Get the action hash from the record
                     r.action_hashed().hash.clone().into()
                 } else {
@@ -657,7 +694,12 @@ pub fn create_skill_tree(tree: SkillTree) -> ExternResult<ActionHash> {
     // Create anchor
     let anchor = Path::from("all_skill_trees");
     let anchor_hash = ensure_path(anchor, LinkTypes::AllSkillTrees)?;
-    create_link(anchor_hash, action_hash.clone(), LinkTypes::AllSkillTrees, ())?;
+    create_link(
+        anchor_hash,
+        action_hash.clone(),
+        LinkTypes::AllSkillTrees,
+        (),
+    )?;
 
     // Link to all nodes in the tree
     for tier in &tree.structure.tiers {
@@ -688,7 +730,7 @@ pub fn list_skill_trees(_: ()) -> ExternResult<Vec<Record>> {
 
     let links = get_links(
         LinkQuery::try_new(anchor_hash, LinkTypes::AllSkillTrees)?,
-        GetStrategy::Local
+        GetStrategy::Local,
     )?;
 
     let mut trees = Vec::new();

@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -7,14 +6,42 @@ use mycelix_zome_helpers as _;
 //! Implements business logic for learning courses and progress tracking.
 //! This zome is upgradeable - business logic can change without breaking data.
 
-use hdk::prelude::*;
 use hdk::prelude::HdkPathExt;
-use learning_integrity::{Course, LearnerProgress, LearningActivity, EntryTypes, LinkTypes};
+use hdk::prelude::*;
+use learning_integrity::{Course, EntryTypes, LearnerProgress, LearningActivity, LinkTypes};
+use mycelix_zome_helpers as _;
 
 /// Create a new course
 #[hdk_extern]
 pub fn create_course(course: Course) -> ExternResult<ActionHash> {
-    // Trust tier gate: requires Steward tier to create courses
+    // 1. TRUST GATING (Vector 1: Resonant Authorship)
+    let agent = agent_info()?.agent_initial_pubkey;
+    let my_did = format!("did:mycelix:{}", agent);
+    let moral_resonance: f64 = call(
+        CallTargetCell::OtherRole("identity".into()),
+        "identity_bridge".into(),
+        "get_reputation_score".into(),
+        None,
+        serde_json::json!({
+            "did": my_did,
+            "required_resonance": 0.7
+        }),
+    )?
+    .decode()
+    .map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Resonance check failed: {:?}",
+            e
+        )))
+    })?;
+
+    if moral_resonance < 0.7 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Course Authorship Rejected: Moral resonance too low. Authors must maintain 0.7+ resonance.".into()
+        )));
+    }
+
+    // 2. Basic tier gate (Legacy fallback)
     mycelix_bridge_common::gate_civic(
         "edunet_bridge",
         &mycelix_bridge_common::civic_requirement_constitutional(),
@@ -47,7 +74,7 @@ pub fn list_courses(_: ()) -> ExternResult<Vec<Record>> {
     // Get all links from the anchor
     let links = get_links(
         LinkQuery::try_new(path_hash, LinkTypes::AllCourses)?,
-        GetStrategy::Local
+        GetStrategy::Local,
     )?;
 
     // Fetch each course record
@@ -114,12 +141,7 @@ pub fn enroll(course_action_hash: ActionHash) -> ExternResult<()> {
     )?;
 
     // Agent -> Course
-    create_link(
-        agent,
-        course_action_hash,
-        LinkTypes::EnrolledCourses,
-        (),
-    )?;
+    create_link(agent, course_action_hash, LinkTypes::EnrolledCourses, ())?;
 
     Ok(())
 }
@@ -132,7 +154,7 @@ pub fn get_enrolled_courses(_: ()) -> ExternResult<Vec<Record>> {
     // Get all links from agent to courses
     let links = get_links(
         LinkQuery::try_new(agent, LinkTypes::EnrolledCourses)?,
-        GetStrategy::Local
+        GetStrategy::Local,
     )?;
 
     // Fetch each course record
@@ -153,7 +175,7 @@ pub fn get_enrolled_courses(_: ()) -> ExternResult<Vec<Record>> {
 pub fn get_course_enrollments(course_action_hash: ActionHash) -> ExternResult<Vec<AgentPubKey>> {
     let links = get_links(
         LinkQuery::try_new(course_action_hash, LinkTypes::CourseToEnrolled)?,
-        GetStrategy::Local
+        GetStrategy::Local,
     )?;
 
     let agents = links

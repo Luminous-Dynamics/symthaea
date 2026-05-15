@@ -45,6 +45,7 @@ tree-sitter-python = "0.23"
 tree-sitter-go = "0.23"
 mycelix-zkp-core = { path = "../mycelix-zkp-core" }
 symthaea-lean-bridge = { path = "../symthaea-lean-bridge" }
+symthaea-sim-bridge = { path = "../symthaea-sim-bridge" }
 
 # Distillation collection (optional)
 ureq = { version = "2.9", optional = true }

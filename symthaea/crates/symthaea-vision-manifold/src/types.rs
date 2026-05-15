@@ -382,6 +382,28 @@ pub struct VisionTelemetry {
     /// Number of spatial relations in the scene graph.
     #[serde(default)]
     pub scene_graph_edges: usize,
+    /// Variational Free Energy (F = Complexity - Accuracy).
+    #[serde(default)]
+    pub free_energy: f32,
+    /// Model complexity (posterior-prior distance).
+    #[serde(default)]
+    pub complexity: f32,
+    /// Prediction accuracy (1 - error).
+    #[serde(default)]
+    pub accuracy: f32,
+    /// Latest geodesic path on the manifold (mental simulation path).
+    /// Stores a sequence of state hypervector values.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub last_geodesic_path: Vec<Vec<f32>>,
+    /// Thermodynamic cost of the last geodesic computation.
+    #[serde(default)]
+    pub last_geodesic_cost: f32,
+    /// Number of steps in the last geodesic path.
+    #[serde(default)]
+    pub last_geodesic_length: usize,
+    /// Latest cognitive action selected by the FEP agent.
+    #[serde(default)]
+    pub last_fep_action: String,
 }
 
 /// Per-patch spatial attention/surprise map.
@@ -636,6 +658,21 @@ pub struct ScaleHealth {
     pub weight_entropy: f32,
     /// This scale's blend weight in the multi-scale fusion.
     pub blend_weight: f32,
+}
+
+/// Variational Free Energy (FEP) metrics for the visual manifold.
+///
+/// Science: Friston (2010). Free energy (F) = Complexity - Accuracy.
+/// Minimizing F is equivalent to maximizing the evidence for the system's world model.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+pub struct FepMetrics {
+    /// Variational Free Energy (surprise).
+    pub free_energy: f32,
+    /// Model complexity (KL divergence between posterior and prior).
+    /// High complexity = overfitting or over-responsive state.
+    pub complexity: f32,
+    /// Prediction accuracy (log-likelihood of sensory input given state).
+    pub accuracy: f32,
 }
 
 #[cfg(test)]

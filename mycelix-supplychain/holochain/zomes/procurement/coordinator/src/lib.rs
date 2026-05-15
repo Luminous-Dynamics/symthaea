@@ -7,6 +7,7 @@
 //! Holochain 0.6 compatible (hdk 0.6)
 
 use hdk::prelude::*;
+use mycelix_zome_helpers as _;
 use procurement_integrity::*;
 
 /// Helper to ensure a path exists and return its entry hash
@@ -52,7 +53,9 @@ pub fn create_purchase_order(input: CreatePurchaseOrderInput) -> ExternResult<Ac
     let buyer = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
 
-    let total_amount: u64 = input.items.iter()
+    let total_amount: u64 = input
+        .items
+        .iter()
         .map(|item| item.quantity * item.unit_price)
         .sum();
 
@@ -81,12 +84,22 @@ pub fn create_purchase_order(input: CreatePurchaseOrderInput) -> ExternResult<Ac
     // Link from buyer
     let buyer_path = Path::from(format!("buyer_pos/{}", buyer));
     let buyer_hash = ensure_path(buyer_path, LinkTypes::BuyerToPurchaseOrders)?;
-    create_link(buyer_hash, action_hash.clone(), LinkTypes::BuyerToPurchaseOrders, ())?;
+    create_link(
+        buyer_hash,
+        action_hash.clone(),
+        LinkTypes::BuyerToPurchaseOrders,
+        (),
+    )?;
 
     // Link from supplier
     let supplier_path = Path::from(format!("supplier_pos/{}", input.supplier));
     let supplier_hash = ensure_path(supplier_path, LinkTypes::SupplierToPurchaseOrders)?;
-    create_link(supplier_hash, action_hash.clone(), LinkTypes::SupplierToPurchaseOrders, ())?;
+    create_link(
+        supplier_hash,
+        action_hash.clone(),
+        LinkTypes::SupplierToPurchaseOrders,
+        (),
+    )?;
 
     Ok(action_hash)
 }
@@ -129,7 +142,8 @@ pub fn update_po_status(input: (ActionHash, PurchaseOrderStatus)) -> ExternResul
     let record = get(action_hash.clone(), GetOptions::default())?
         .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("PO not found".to_string())))?;
 
-    let mut po: PurchaseOrder = record.entry()
+    let mut po: PurchaseOrder = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(e))?
         .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid PO".to_string())))?;
@@ -180,18 +194,33 @@ pub fn create_supplier_profile(input: CreateSupplierProfileInput) -> ExternResul
     // Link from agent
     let agent_path = Path::from(format!("supplier_profile/{}", my_agent));
     let agent_hash = ensure_path(agent_path, LinkTypes::AgentToSupplierProfile)?;
-    create_link(agent_hash, action_hash.clone(), LinkTypes::AgentToSupplierProfile, ())?;
+    create_link(
+        agent_hash,
+        action_hash.clone(),
+        LinkTypes::AgentToSupplierProfile,
+        (),
+    )?;
 
     // Link to all suppliers
     let all_suppliers_path = Path::from("all_suppliers");
     let all_suppliers_hash = ensure_path(all_suppliers_path, LinkTypes::AllSuppliers)?;
-    create_link(all_suppliers_hash, action_hash.clone(), LinkTypes::AllSuppliers, ())?;
+    create_link(
+        all_suppliers_hash,
+        action_hash.clone(),
+        LinkTypes::AllSuppliers,
+        (),
+    )?;
 
     // Link to categories
     for category in &input.categories {
         let cat_path = Path::from(format!("category/{}", category.to_lowercase()));
         let cat_hash = ensure_path(cat_path, LinkTypes::CategoryToSuppliers)?;
-        create_link(cat_hash, action_hash.clone(), LinkTypes::CategoryToSuppliers, ())?;
+        create_link(
+            cat_hash,
+            action_hash.clone(),
+            LinkTypes::CategoryToSuppliers,
+            (),
+        )?;
     }
 
     Ok(action_hash)
@@ -233,7 +262,11 @@ pub fn get_all_suppliers(_: ()) -> ExternResult<Vec<SupplierProfile>> {
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
             if let Some(record) = get(action_hash, GetOptions::default())? {
-                if let Some(profile) = record.entry().to_app_option::<SupplierProfile>().map_err(|e| wasm_error!(e))? {
+                if let Some(profile) = record
+                    .entry()
+                    .to_app_option::<SupplierProfile>()
+                    .map_err(|e| wasm_error!(e))?
+                {
                     suppliers.push(profile);
                 }
             }
@@ -256,7 +289,11 @@ pub fn get_suppliers_by_category(category: String) -> ExternResult<Vec<SupplierP
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
             if let Some(record) = get(action_hash, GetOptions::default())? {
-                if let Some(profile) = record.entry().to_app_option::<SupplierProfile>().map_err(|e| wasm_error!(e))? {
+                if let Some(profile) = record
+                    .entry()
+                    .to_app_option::<SupplierProfile>()
+                    .map_err(|e| wasm_error!(e))?
+                {
                     suppliers.push(profile);
                 }
             }
@@ -313,12 +350,22 @@ pub fn submit_quotation(input: Quotation) -> ExternResult<ActionHash> {
     let action_hash = create_entry(EntryTypes::Quotation(quote.clone()))?;
 
     // Link from RFQ
-    create_link(quote.rfq_hash.clone(), action_hash.clone(), LinkTypes::RfqToQuotations, ())?;
+    create_link(
+        quote.rfq_hash.clone(),
+        action_hash.clone(),
+        LinkTypes::RfqToQuotations,
+        (),
+    )?;
 
     // Link from supplier
     let supplier_path = Path::from(format!("supplier_quotes/{}", supplier));
     let supplier_hash = ensure_path(supplier_path, LinkTypes::SupplierToQuotations)?;
-    create_link(supplier_hash, action_hash.clone(), LinkTypes::SupplierToQuotations, ())?;
+    create_link(
+        supplier_hash,
+        action_hash.clone(),
+        LinkTypes::SupplierToQuotations,
+        (),
+    )?;
 
     Ok(action_hash)
 }
@@ -326,16 +373,17 @@ pub fn submit_quotation(input: Quotation) -> ExternResult<ActionHash> {
 #[hdk_extern]
 pub fn get_quotations_for_rfq(rfq_hash: ActionHash) -> ExternResult<Vec<Quotation>> {
     let filter = LinkTypeFilter::try_from(LinkTypes::RfqToQuotations)?;
-    let links = get_links(
-        LinkQuery::new(rfq_hash, filter),
-        GetStrategy::default(),
-    )?;
+    let links = get_links(LinkQuery::new(rfq_hash, filter), GetStrategy::default())?;
 
     let mut quotes = Vec::new();
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
             if let Some(record) = get(action_hash, GetOptions::default())? {
-                if let Some(quote) = record.entry().to_app_option::<Quotation>().map_err(|e| wasm_error!(e))? {
+                if let Some(quote) = record
+                    .entry()
+                    .to_app_option::<Quotation>()
+                    .map_err(|e| wasm_error!(e))?
+                {
                     quotes.push(quote);
                 }
             }
@@ -369,7 +417,11 @@ mod tests {
         let score = score_supplier(5.0, 1, 30, 1, 1000);
         // rep_norm=1.0, lead_score=1-(1/30)≈0.9667, order_fit=(1-1/1000)≈0.999
         // 1.0*0.4 + 0.9667*0.3 + 0.999*0.3 ≈ 0.4 + 0.290 + 0.300 = 0.990
-        assert!(score > 0.9, "Perfect supplier should score > 0.9, got {}", score);
+        assert!(
+            score > 0.9,
+            "Perfect supplier should score > 0.9, got {}",
+            score
+        );
     }
 
     #[test]
@@ -386,7 +438,11 @@ mod tests {
         let score = score_supplier(2.5, 15, 30, 500, 1000);
         // rep_norm=0.5, lead_score=0.5, order_fit=0.5
         // 0.5*0.4 + 0.5*0.3 + 0.5*0.3 = 0.2 + 0.15 + 0.15 = 0.5
-        assert!((score - 0.5).abs() < 0.001, "Balanced supplier should score ~0.5, got {}", score);
+        assert!(
+            (score - 0.5).abs() < 0.001,
+            "Balanced supplier should score ~0.5, got {}",
+            score
+        );
     }
 
     #[test]
@@ -394,7 +450,10 @@ mod tests {
         // max_lead_time=0 should not panic (guarded by .max(1))
         let score = score_supplier(3.0, 0, 0, 100, 500);
         // max_lt=1, lead_score=1-(0/1)=1.0
-        assert!(score.is_finite(), "Score must be finite even when max_lead=0");
+        assert!(
+            score.is_finite(),
+            "Score must be finite even when max_lead=0"
+        );
     }
 
     #[test]
@@ -573,7 +632,11 @@ pub fn select_best_supplier(input: SupplierSelectionInput) -> ExternResult<Vec<R
     }
 
     // Find max lead time for normalization
-    let max_lead_time = suppliers.iter().map(|s| s.lead_time_days).max().unwrap_or(1);
+    let max_lead_time = suppliers
+        .iter()
+        .map(|s| s.lead_time_days)
+        .max()
+        .unwrap_or(1);
 
     let mut ranked: Vec<RankedSupplier> = Vec::new();
 
@@ -588,9 +651,7 @@ pub fn select_best_supplier(input: SupplierSelectionInput) -> ExternResult<Vec<R
         );
 
         let reputation_score = match rating_result {
-            Ok(ZomeCallResponse::Ok(result)) => {
-                result.decode::<f64>().unwrap_or(0.0)
-            }
+            Ok(ZomeCallResponse::Ok(result)) => result.decode::<f64>().unwrap_or(0.0),
             _ => 0.0,
         };
 
@@ -613,7 +674,11 @@ pub fn select_best_supplier(input: SupplierSelectionInput) -> ExternResult<Vec<R
     }
 
     // Sort descending by score
-    ranked.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    ranked.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     Ok(ranked)
 }

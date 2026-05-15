@@ -149,7 +149,8 @@ pub fn update_consciousness_config(input: UpdateConsciousnessConfigInput) -> Ext
         Ok(ZomeCallResponse::Ok(extern_io)) => {
             let maybe_record: Option<Record> = extern_io.decode().map_err(|e| {
                 wasm_error!(WasmErrorInner::Guest(format!(
-                    "Failed to decode proposal response: {}", e
+                    "Failed to decode proposal response: {}",
+                    e
                 )))
             })?;
             match maybe_record {
@@ -182,7 +183,8 @@ pub fn update_consciousness_config(input: UpdateConsciousnessConfigInput) -> Ext
             // Proposals zome not installed — fail-closed
             return Err(wasm_error!(WasmErrorInner::Guest(
                 "Cannot verify proposal authorization: proposals zome unavailable. \
-                 Config changes fail-closed without proposal verification.".into()
+                 Config changes fail-closed without proposal verification."
+                    .into()
             )));
         }
     }

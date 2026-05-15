@@ -49,11 +49,8 @@ hdk = "0.6"
 hdi = "0.7"
 
 # Holochain testing dependencies
-holochain = { version = "0.6", features = ["test_utils", "sweettest"] }
-holochain_types = "0.6"
 
 # Async runtime for tests
-tokio = { version = "1.35", features = ["full", "test-util"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
@@ -146,3 +143,8 @@ path = "sweettest_day_in_the_life.rs"
 # NOTE: economics_stress_test has been moved to types/tests/ where it compiles
 # without the heavy Holochain dependency. Run with:
 #   cargo test -p mycelix_finance_types --test economics_stress_test
+
+[dev-dependencies]
+holochain = { version = "0.6", features = ["test_utils", "sweettest"] }
+holochain_types = "0.6"
+tokio = { version = "1", features = ["full", "test-util"] }

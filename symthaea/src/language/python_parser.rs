@@ -451,11 +451,13 @@ class Dog(Animal):
         assert_eq!(classes.len(), 1);
         assert!(classes[0].annotations.contains_key("bases"));
 
-        assert!(result
-            .structure
-            .relations
-            .iter()
-            .any(|r| { r.source == "Dog" && r.relation == Relation::Extends }));
+        assert!(
+            result
+                .structure
+                .relations
+                .iter()
+                .any(|r| { r.source == "Dog" && r.relation == Relation::Extends })
+        );
     }
 
     #[test]

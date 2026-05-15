@@ -10,9 +10,9 @@
 //!
 //! Extracted from lib.rs as a pure structural refactor — no logic changes.
 
-use hdk::prelude::*;
 #[allow(unused_imports)]
 use adaptive_integrity::*;
+use hdk::prelude::*;
 
 // ============== Types ==============
 
@@ -49,14 +49,14 @@ pub struct LeaderboardEntry {
 /// Achievement category
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum AchievementCategory {
-    Learning,      // Complete lessons, master skills
-    Consistency,   // Streaks, daily goals
-    Social,        // Help others, collaborate
-    Mastery,       // Deep expertise achievements
-    Exploration,   // Try new areas
-    Speed,         // Fast completion
-    Accuracy,      // High precision
-    Creative,      // Unique solutions
+    Learning,    // Complete lessons, master skills
+    Consistency, // Streaks, daily goals
+    Social,      // Help others, collaborate
+    Mastery,     // Deep expertise achievements
+    Exploration, // Try new areas
+    Speed,       // Fast completion
+    Accuracy,    // High precision
+    Creative,    // Unique solutions
 }
 
 /// Achievement tier
@@ -94,7 +94,7 @@ pub struct Achievement {
     pub xp_reward: u32,
     pub badge_icon: String,
     pub requirements: Vec<AchievementRequirement>,
-    pub is_hidden: bool, // Secret achievements
+    pub is_hidden: bool,    // Secret achievements
     pub is_stackable: bool, // Can earn multiple times
 }
 
@@ -349,7 +349,9 @@ pub(crate) fn check_achievements(_input: AchievementCheckInput) -> ExternResult<
 }
 
 /// Get social comparison
-pub(crate) fn get_social_comparison(input: SocialComparisonInput) -> ExternResult<SocialComparison> {
+pub(crate) fn get_social_comparison(
+    input: SocialComparisonInput,
+) -> ExternResult<SocialComparison> {
     // Simulate percentile calculation (in production, compare against DHT data)
     let percentile = ((input.current_value as f64 / 100000.0) * 1000.0).min(990.0) as u16;
 
@@ -377,7 +379,10 @@ pub(crate) fn get_social_comparison(input: SocialComparisonInput) -> ExternResul
         _ => (
             SocialComparisonType::SelfReferenced,
             "Outstanding! You're among the top performers.".to_string(),
-            vec!["Consider mentoring others".to_string(), "Explore new skill areas".to_string()],
+            vec![
+                "Consider mentoring others".to_string(),
+                "Explore new skill areas".to_string(),
+            ],
         ),
     };
 
@@ -392,7 +397,9 @@ pub(crate) fn get_social_comparison(input: SocialComparisonInput) -> ExternResul
 }
 
 /// Get active challenges
-pub(crate) fn get_active_challenges(_input: ActiveChallengesInput) -> ExternResult<Vec<ActiveChallenge>> {
+pub(crate) fn get_active_challenges(
+    _input: ActiveChallengesInput,
+) -> ExternResult<Vec<ActiveChallenge>> {
     // Return sample challenges
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

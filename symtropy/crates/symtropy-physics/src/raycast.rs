@@ -70,7 +70,7 @@ pub fn raycast<const D: usize>(
                 let hit_point = origin + dir * t;
                 let normal = (hit_point - world_center).normalize();
 
-                let is_closer = closest.as_ref().map_or(true, |c| t < c.distance);
+                let is_closer = closest.as_ref().is_none_or(|c| t < c.distance);
                 if is_closer {
                     closest = Some(RayHit {
                         body: body.handle,

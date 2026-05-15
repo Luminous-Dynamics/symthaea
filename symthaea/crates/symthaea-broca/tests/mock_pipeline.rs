@@ -6,7 +6,7 @@
 //! These tests exercise the full generate → distill → PE pipeline without
 //! network access, using the mock Mamba backend.
 
-#![cfg(feature = "mamba")]
+#![cfg(feature = "test-helpers")]
 
 use symthaea_broca::encoder::ThoughtChannels;
 use symthaea_broca::liquid_mamba::{LiquidMambaConfig, LiquidMambaGenerator};
@@ -361,7 +361,7 @@ fn test_eval_only_workflow() {
     for intent in 0..3 {
         let ch = ThoughtChannels::with_intent(intent);
         dataset.pairs.push(TrainingPair {
-            channels: ch.channels,
+            channels: ch.channels.to_vec(),
             target_text: "test evaluation".to_string(),
             target_ids: vec![],
         });
@@ -648,7 +648,7 @@ fn test_full_training_pipeline_smoke() {
     for intent in 0..5 {
         let ch = ThoughtChannels::with_intent(intent % 4);
         dataset.pairs.push(TrainingPair {
-            channels: ch.channels,
+            channels: ch.channels.to_vec(),
             target_text: format!("training sample {intent}"),
             target_ids: vec![],
         });
@@ -666,9 +666,7 @@ fn test_full_training_pipeline_smoke() {
     // 3. Run 2 epochs over the dataset
     for _epoch in 0..2 {
         for pair in &dataset.pairs {
-            let ch = ThoughtChannels {
-                channels: pair.channels,
-            };
+            let ch = pair.to_thought_channels();
             let result = gen.generate(&ch);
             gen.distill_step(&ch, &result);
         }

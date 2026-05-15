@@ -75,3 +75,19 @@ pub async fn create_claim(req: &CreateClaimRequest) -> Result<ClaimResponse, Str
         .await
         .map_err(|e| format!("Parse error: {e}"))
 }
+
+/// Request a ZK proof for a review from the local native daemon (RPC).
+/// STARK math is heavy, so we offload it to the Hearth-OS native binary
+/// rather than running it in the browser's WASM runtime.
+pub async fn request_review_proof(req: &ZkReviewRequest) -> Result<ZkReviewResponse, String> {
+    Request::post(&format!("{API_BASE}/reviews/generate-proof"))
+        .header("Content-Type", "application/json")
+        .body(serde_json::to_string(req).map_err(|e| format!("Serialize error: {e}"))?)
+        .map_err(|e| format!("Request build error: {e}"))?
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {e}"))?
+        .json::<ZkReviewResponse>()
+        .await
+        .map_err(|e| format!("Parse error: {e}"))
+}

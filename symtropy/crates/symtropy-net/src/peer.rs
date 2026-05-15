@@ -4,61 +4,52 @@
 //! Peer identification and state tracking.
 
 use symtropy_holochain_relay::ConnectionState;
-
-/// Unique peer identifier.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct PeerId(pub u64);
+pub use symtropy_net_core::peer::{PeerId, PeerStateCore};
 
 /// State of a remote peer.
 #[derive(Debug, Clone)]
 pub struct PeerState {
-    /// Peer identifier.
-    pub id: PeerId,
-    /// Display name.
-    pub name: String,
+    /// Core peer fields.
+    pub core: PeerStateCore,
     /// Holochain connection state.
     pub connection: ConnectionState,
-    /// Last tick we received from this peer.
-    pub last_seen_tick: u64,
-    /// Whether this peer is the local player.
-    pub is_local: bool,
-    /// Shared RNG seed for deterministic lockstep.
-    pub shared_seed: u64,
 }
 
 impl PeerState {
     /// Create a local peer.
     pub fn local(id: PeerId, name: impl Into<String>, seed: u64) -> Self {
         Self {
-            id,
-            name: name.into(),
+            core: PeerStateCore::local(id, name, seed),
             connection: ConnectionState::Disconnected,
-            last_seen_tick: 0,
-            is_local: true,
-            shared_seed: seed,
         }
     }
 
     /// Create a remote peer.
     pub fn remote(id: PeerId, name: impl Into<String>, seed: u64) -> Self {
         Self {
-            id,
-            name: name.into(),
+            core: PeerStateCore::remote(id, name, seed),
             connection: ConnectionState::Disconnected,
-            last_seen_tick: 0,
-            is_local: false,
-            shared_seed: seed,
         }
+    }
+
+    /// Peer identifier.
+    pub fn id(&self) -> PeerId {
+        self.core.id
+    }
+
+    /// Display name.
+    pub fn name(&self) -> &str {
+        &self.core.name
     }
 
     /// Whether we've heard from this peer recently (within N ticks).
     pub fn is_alive(&self, current_tick: u64, timeout_ticks: u64) -> bool {
-        self.is_local || current_tick.saturating_sub(self.last_seen_tick) < timeout_ticks
+        self.core.is_alive(current_tick, timeout_ticks)
     }
 
     /// Update last seen tick.
     pub fn mark_seen(&mut self, tick: u64) {
-        self.last_seen_tick = tick;
+        self.core.mark_seen(tick);
     }
 }
 
@@ -83,8 +74,8 @@ mod tests {
     #[test]
     fn mark_seen_updates() {
         let mut peer = PeerState::remote(PeerId(1), "Remote", 42);
-        assert_eq!(peer.last_seen_tick, 0);
+        assert_eq!(peer.core.last_seen_tick, 0);
         peer.mark_seen(50);
-        assert_eq!(peer.last_seen_tick, 50);
+        assert_eq!(peer.core.last_seen_tick, 50);
     }
 }

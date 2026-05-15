@@ -50,25 +50,31 @@ pub mod understanding;
 pub mod verification;
 
 // Re-export key types for convenience.
-pub use codebase_bridge::{index_directory, index_file, IndexResult};
+pub use codebase_bridge::{IndexResult, index_directory, index_file};
 pub use emitter_bridge::{
-    emit_rust_from_skeleton, skeleton_to_code_spec, skeleton_to_plan_steps, GeodesicCodeSpec,
-    GeodesicPlanAction, GeodesicPlanStep,
+    GeodesicCodeSpec, GeodesicPlanAction, GeodesicPlanStep, emit_rust_from_skeleton,
+    skeleton_to_code_spec, skeleton_to_plan_steps,
 };
 pub use execution_oracle::{ComplexityClass, ExecutionOracle, PredictionResult};
 pub use manifold::{Fiber, FiberPoint, ProgramManifold};
-pub use manifold_bootstrap::{bootstrap_from_encodings, bootstrap_with_topology, BootstrapResult};
+pub use manifold_bootstrap::{BootstrapResult, bootstrap_from_encodings, bootstrap_with_topology};
 pub use pdg::ProgramDependenceGraph;
 pub use program_emitter::{emit_expression, emit_rust};
 pub use program_memory::{ProgramMemory, ProgramMemoryEntry};
 pub use resonant_explorer::{ExplorationConfig, ExplorationResult, ResonantExplorer};
-pub use sheaf::{CodeSheaf, LocalSection, SheafDiagnostic};
+pub use sheaf::{
+    CodeSheaf, LocalSection, RustSheafCoherence, SheafDiagnostic,
+    categorize_rust_v0_sheaf_diagnostic, repair_hint_for_rust_v0_sheaf_category,
+    verify_rust_v0_sheaf_coherence,
+};
 pub use skeleton_synthesis::{
-    active_inference_synthesize, build_skeleton_from_topology, fill_from_manifold,
-    ActiveInferenceResult, SkeletonCombinator, SkeletonSlot, TopologicalSignature,
+    ActiveInferenceResult, GeodesicIntentClass, GeodesicRequestProfile, SkeletonCombinator,
+    SkeletonSlot, TopologicalSignature, active_inference_synthesize, build_skeleton_from_topology,
+    classify_geodesic_request, default_expression_for_type, fill_from_manifold,
+    fill_skeleton_defaults_for_signature, geodesic_hints, normalize_signature_for_geodesic_emitter,
 };
 pub use synthesis::{CodeSpec, GeodesicSynthesizer, SynthesisConfig, SynthesisResult};
 pub use token_codebook::TokenCodebook;
 pub use topology::{BettiNumbers, TopologicalConstraint, TopologicalFingerprint};
 pub use tri_oracle::{TriOracle, TriOracleConfig, TriOracleScore};
-pub use verification::{verify_generated_code, VerificationResult};
+pub use verification::{VerificationResult, verify_generated_code};

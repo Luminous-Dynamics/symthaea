@@ -289,7 +289,7 @@ impl CodePrimitiveRouter {
             CodeIntent::Modify { .. } => CodeOperation::Modify,
             CodeIntent::Explain { .. } => CodeOperation::Explain,
             CodeIntent::Find { .. } => CodeOperation::FindSimilar,
-            CodeIntent::Refactor { .. } => CodeOperation::Refactor,
+            CodeIntent::Refactor { .. } | CodeIntent::Solve { .. } => CodeOperation::Refactor,
             CodeIntent::Debug { .. } => CodeOperation::Debug,
         }
     }

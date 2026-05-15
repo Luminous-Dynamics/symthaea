@@ -215,9 +215,12 @@ build-commons:
         cd ../mycelix-commons && \
         cargo build --release --target wasm32-unknown-unknown && \
         echo "  Packing commons-land DNA..." && \
-        hc dna pack dna -o dna/mycelix_commons_land.dna --manifest-path dna/commons-land.yaml && \
+        mv dna/dna.yaml dna/dna.yaml.bak && cp dna/commons-land.yaml dna/dna.yaml && \
+        hc dna pack dna -o dna/mycelix_commons_land.dna && \
         echo "  Packing commons-care DNA..." && \
-        hc dna pack dna -o dna/mycelix_commons_care.dna --manifest-path dna/commons-care.yaml && \
+        cp dna/commons-care.yaml dna/dna.yaml && \
+        hc dna pack dna -o dna/mycelix_commons_care.dna && \
+        mv dna/dna.yaml.bak dna/dna.yaml && \
         echo "  Packing unified commons hApp..." && \
         hc app pack .; \
     else \
@@ -257,6 +260,17 @@ build-personal:
         echo "⚠️  mycelix-personal not found"; \
     fi
 
+# Build Supplychain DNA (3 zomes)
+build-supplychain:
+    @echo "📦 Building mycelix-supplychain..."
+    @if [ -d "happs/supplychain" ]; then \
+        cd happs/supplychain && \
+        cargo build --release --target wasm32-unknown-unknown && \
+        hc dna pack dna -o dna/supplychain.dna && hc app pack .; \
+    else \
+        echo "⚠️  happs/supplychain not found"; \
+    fi
+
 # Build Attribution DNA (dependency registry + usage receipts + reciprocity pledges — 3 zomes)
 build-attribution:
     @echo "🏷️ Building mycelix-attribution..."
@@ -268,8 +282,8 @@ build-attribution:
         echo "⚠️  mycelix-attribution not found"; \
     fi
 
-# Build all 7 cluster/role DNAs needed for the unified hApp bundle
-build-all-dnas: build-personal build-identity-dna build-hearth build-commons build-civic build-attribution
+# Build all cluster/role DNAs needed for the unified hApp bundle
+build-all-dnas: build-personal build-identity-dna build-hearth build-commons build-civic build-attribution build-finance build-governance build-knowledge build-supplychain build-energy build-praxis build-craft build-manufacturing build-health build-climate build-core
     @echo "✅ All unified hApp DNAs built!"
 
 # Internal: build identity DNA from the mycelix-identity repo (not happs/identity)
@@ -294,7 +308,7 @@ build-unified-happ: build-all-dnas
     # Verify symlinks exist in happs/
     HAPPS_DIR="/srv/luminous-dynamics/mycelix-workspace/happs"
     missing=0
-    for role in personal identity hearth commons civic attribution; do
+    for role in personal identity hearth commons civic attribution finance governance health supplychain manufacturing music energy knowledge climate praxis craft core_fl; do
         if [ ! -L "$HAPPS_DIR/$role" ] && [ ! -d "$HAPPS_DIR/$role" ]; then
             echo "  ERROR: happs/$role symlink missing"
             echo "         Run: ln -sfn /srv/luminous-dynamics/mycelix-$role $HAPPS_DIR/$role"
@@ -306,7 +320,7 @@ build-unified-happ: build-all-dnas
         exit 1
     fi
 
-    # Verify all 7 DNA files exist
+    # Verify all DNA files exist
     DNAS=(
         "personal/dna/mycelix_personal.dna"
         "identity/dna/mycelix_identity_dna.dna"
@@ -315,6 +329,17 @@ build-unified-happ: build-all-dnas
         "commons/dna/mycelix_commons_care.dna"
         "civic/dna/mycelix_civic.dna"
         "attribution/dna/mycelix_attribution_dna.dna"
+        "finance/dna/mycelix_finance.dna"
+        "governance/dna/mycelix_governance_dna.dna"
+        "health/dna/health.dna"
+        "supplychain/holochain/dna/supplychain.dna"
+        "manufacturing/dna/manufacturing.dna"
+        "energy/dna/mycelix_energy.dna"
+        "knowledge/dna/mycelix_knowledge.dna"
+        "climate/dna/climate.dna"
+        "praxis/dna/praxis.dna"
+        "craft/dna/mycelix_craft.dna"
+        "core_fl/dna/mycelix_core.dna"
     )
     missing=0
     for dna in "${DNAS[@]}"; do
@@ -333,25 +358,31 @@ build-unified-happ: build-all-dnas
 
     # Pack the unified hApp
     cd "$HAPPS_DIR"
-    hc app pack . -o mycelix-unified.happ --manifest-path mycelix-unified-happ.yaml
+    mv happ.yaml happ.yaml.bak 2>/dev/null || true
+    cp mycelix-unified-happ.yaml happ.yaml
+    hc app pack . -o mycelix-unified.happ
+    mv happ.yaml.bak happ.yaml 2>/dev/null || true
+    echo "  SUCCESS: Unified hApp packed: happs/mycelix-unified.happ"
     echo ""
     echo "✅ Unified hApp packed: happs/mycelix-unified.happ"
 
 # Build all hApps (clusters + standalone)
-build-happs: build-commons build-civic build-hearth build-personal build-attribution build-core build-epistemic-markets build-fabrication build-mail build-marketplace build-edunet build-supplychain build-identity build-knowledge build-governance build-finance build-energy build-desci build-music
+build-happs: build-commons build-civic build-hearth build-personal build-attribution build-core build-epistemic-markets build-fabrication build-mail build-marketplace build-edunet build-supplychain build-identity build-knowledge build-governance build-finance build-energy
     @echo "✅ All hApps built!"
 
 # Build production-ready hApps only
 build-production: build-core build-epistemic-markets build-fabrication build-edunet build-marketplace
     @echo "✅ Production hApps built!"
 
-# Build mycelix-core
+# Build Core (FL) DNA
 build-core:
-    @echo "🧠 Building mycelix-core..."
-    @if [ -d "happs/core/dna" ]; then \
-        cd happs/core && hc dna pack dna && hc app pack .; \
+    @echo "🧠 Building mycelix-core (FL)..."
+    @if [ -d "happs/core_fl" ]; then \
+        cd happs/core_fl/0TML/holochain && \
+        cargo build --release --target wasm32-unknown-unknown && \
+        hc dna pack dna -o dna/mycelix_core.dna && hc app pack .; \
     else \
-        echo "⚠️  happs/core not found, skipping"; \
+        echo "⚠️  happs/core_fl not found, skipping"; \
     fi
 
 # Build mycelix-mail
@@ -383,22 +414,42 @@ build-edunet:
         echo "⚠️  happs/edunet not found, skipping"; \
     fi
 
-# Build Mycelix-SupplyChain
-build-supplychain:
-    @echo "📦 Building Mycelix-SupplyChain..."
-    @if [ -d "happs/supplychain/holochain" ]; then \
-        cd happs/supplychain/holochain && hc dna pack . && hc app pack .; \
+# Build Manufacturing DNA
+build-manufacturing:
+    @echo "🏭 Building mycelix-manufacturing..."
+    @if [ -d "../mycelix-manufacturing" ]; then \
+        cd ../mycelix-manufacturing && \
+        cargo build --release --target wasm32-unknown-unknown && \
+        hc dna pack dna -o dna/manufacturing.dna && \
+        cp mycelix-manufacturing-happ.yaml happ.yaml && \
+        hc app pack . && \
+        rm happ.yaml; \
     else \
-        echo "⚠️  happs/supplychain not found, skipping"; \
+        echo "⚠️  mycelix-manufacturing not found"; \
     fi
 
-# Build Mycelix-Music
-build-music:
-    @echo "🎵 Building Mycelix-Music..."
-    @if [ -d "happs/music/dnas" ]; then \
-        cd happs/music && hc dna pack dnas && hc app pack .; \
+# Build Health DNA
+build-health:
+    @echo "🏥 Building mycelix-health..."
+    @if [ -d "happs/health" ]; then \
+        cd happs/health && \
+        cargo build --release --target wasm32-unknown-unknown && \
+        hc dna pack dna -o dna/health.dna && hc app pack .; \
     else \
-        echo "⚠️  happs/music not found or not ready, skipping"; \
+        echo "⚠️  happs/health not found"; \
+    fi
+
+# Build Climate DNA
+build-climate:
+    @echo "🌡️ Building mycelix-climate..."
+    @if [ -d "../mycelix-climate" ]; then \
+        cd ../mycelix-climate && \
+        cargo build --release --target wasm32-unknown-unknown && \
+        mkdir -p dnas/climate/workdir && \
+        hc dna pack dnas/climate -o dnas/climate/workdir/climate.dna && \
+        hc app pack .; \
+    else \
+        echo "⚠️  mycelix-climate not found"; \
     fi
 
 # Build Epistemic Markets (Native hApp)
@@ -437,12 +488,12 @@ build-identity:
 # Build Mycelix-Knowledge
 build-knowledge:
     @echo "📚 Building Mycelix-Knowledge..."
-    @if [ -d "happs/knowledge" ] && [ -f "happs/knowledge/Cargo.toml" ]; then \
-        cd happs/knowledge && \
+    @if [ -d "../mycelix-knowledge" ] && [ -f "../mycelix-knowledge/Cargo.toml" ]; then \
+        cd ../mycelix-knowledge && \
         cargo build --release --target wasm32-unknown-unknown && \
-        hc dna pack . 2>/dev/null || true && hc app pack . 2>/dev/null || true; \
+        hc dna pack dna -o dna/mycelix_knowledge.dna && hc app pack .; \
     else \
-        echo "⚠️  happs/knowledge not ready, skipping"; \
+        echo "⚠️  mycelix-knowledge not found, skipping"; \
     fi
 
 # Build Mycelix-Governance
@@ -451,7 +502,7 @@ build-governance:
     @if [ -d "happs/governance" ] && [ -f "happs/governance/Cargo.toml" ]; then \
         cd happs/governance && \
         cargo build --release --target wasm32-unknown-unknown && \
-        hc dna pack . 2>/dev/null || true && hc app pack . 2>/dev/null || true; \
+        hc dna pack dna -o dna/mycelix_governance_dna.dna && hc app pack .; \
     else \
         echo "⚠️  happs/governance not ready, skipping"; \
     fi
@@ -465,11 +516,33 @@ build-finance:
     @if [ -d "happs/finance/dna" ]; then \
         cd happs/finance && \
         cargo build --release --target wasm32-unknown-unknown && \
-        hc dna pack dna && hc app pack .; \
+        hc dna pack dna -o dna/mycelix_finance.dna && hc app pack .; \
     else \
         echo "⚠️  happs/finance not ready, skipping"; \
     fi
 
+
+# Build Praxis DNA (14 zomes)
+build-praxis:
+    @echo "🎓 Building mycelix-praxis..."
+    @if [ -d "../mycelix-praxis" ]; then \
+        cd ../mycelix-praxis && \
+        cargo build --release --target wasm32-unknown-unknown && \
+        hc dna pack dna -o dna/praxis.dna && hc app pack happ; \
+    else \
+        echo "⚠️  mycelix-praxis not found"; \
+    fi
+
+# Build Craft DNA (8 zomes)
+build-craft:
+    @echo "🛠️ Building mycelix-craft..."
+    @if [ -d "../mycelix-craft" ]; then \
+        cd ../mycelix-craft && \
+        cargo build --release --target wasm32-unknown-unknown && \
+        hc dna pack dna -o dna/mycelix_craft.dna && hc app pack .; \
+    else \
+        echo "⚠️  mycelix-craft not found"; \
+    fi
 
 # Build Mycelix-Energy
 build-energy:
@@ -477,7 +550,7 @@ build-energy:
     @if [ -d "happs/energy/dna" ]; then \
         cd happs/energy && \
         cargo build --release --target wasm32-unknown-unknown && \
-        hc dna pack dna && hc app pack .; \
+        hc dna pack dna -o dna/mycelix_energy.dna && hc app pack .; \
     else \
         echo "⚠️  happs/energy not ready, skipping"; \
     fi

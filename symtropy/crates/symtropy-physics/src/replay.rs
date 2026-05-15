@@ -23,19 +23,19 @@ use crate::world::PhysicsWorld;
 pub enum WorldCommand<const D: usize> {
     ApplyForce {
         body: BodyHandle,
-        force: SVector<f64, D>,
+        force: Box<SVector<f64, D>>,
     },
     ApplyImpulse {
         body: BodyHandle,
-        impulse: SVector<f64, D>,
+        impulse: Box<SVector<f64, D>>,
     },
     SetLinearVelocity {
         body: BodyHandle,
-        velocity: SVector<f64, D>,
+        velocity: Box<SVector<f64, D>>,
     },
     SetAngularVelocity {
         body: BodyHandle,
-        velocity: Bivector<D>,
+        velocity: Box<Bivector<D>>,
     },
     Wake {
         body: BodyHandle,
@@ -77,25 +77,25 @@ pub fn apply_commands<const D: usize>(
                 let Some(b) = world.body_mut(*body) else {
                     return Err(ApplyCommandError::MissingBody(*body));
                 };
-                b.apply_force(force.clone());
+                b.apply_force(**force);
             }
             WorldCommand::ApplyImpulse { body, impulse } => {
                 let Some(b) = world.body_mut(*body) else {
                     return Err(ApplyCommandError::MissingBody(*body));
                 };
-                integrator::apply_impulse(b, impulse);
+                integrator::apply_impulse(b, &**impulse);
             }
             WorldCommand::SetLinearVelocity { body, velocity } => {
                 let Some(b) = world.body_mut(*body) else {
                     return Err(ApplyCommandError::MissingBody(*body));
                 };
-                b.linear_velocity = velocity.clone();
+                b.linear_velocity = **velocity;
             }
             WorldCommand::SetAngularVelocity { body, velocity } => {
                 let Some(b) = world.body_mut(*body) else {
                     return Err(ApplyCommandError::MissingBody(*body));
                 };
-                b.angular_velocity = *velocity;
+                b.angular_velocity = **velocity;
             }
             WorldCommand::Wake { body } => {
                 let Some(b) = world.body_mut(*body) else {

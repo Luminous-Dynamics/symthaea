@@ -9,24 +9,17 @@ autotests = false
 
 [dependencies]
 # Holochain testing dependencies (NO zome crate imports to avoid duplicate symbols)
-holochain = { version = "0.6", features = ["test_utils", "sweettest"] }
-holochain_types = "0.6"
-hdk = "0.6"
-hdi = "0.7"
+hdk = "0.6.0"
+hdi = "0.7.0"
 
 # Async runtime for tests
-tokio = { version = "1.35", features = ["full", "test-util"] }
 
 # Serialization
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0"
-
-# Serialization (msgpack for Holochain entry deserialization)
-rmp-serde = "1.1"
 
 # Utilities
 chrono = "0.4"
-uuid = { version = "1.6", features = ["v4"] }
 
 # Crypto for DKG ceremony E2E tests
 feldman-dkg = { path = "../../mycelix-core/libs/feldman-dkg", features = ["ml-kem-768", "ml-dsa-65"] }
@@ -42,4 +35,13 @@ path = "sweettest_integration.rs"
 name = "sweettest_adversarial"
 path = "sweettest_adversarial.rs"
 
+[[test]]
+name = "sweettest_constellation_sim"
+path = "sweettest_constellation_sim.rs"
+
 [workspace]
+
+[dev-dependencies]
+holochain = { version = "0.6.0", features = ["test_utils", "sweettest"] }
+holochain_types = "0.6.0"
+tokio = { version = "1.52.2", features = ["full", "test-util"] }

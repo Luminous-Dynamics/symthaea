@@ -20,20 +20,6 @@
 //!   libraries (ed25519-dalek, pqcrypto-dilithium, pqcrypto-kyber, etc.).
 //!   Used by the CLI and tests.
 
-// ============================================================================
-// WASM Randomness (getrandom v0.2 custom backend)
-// ============================================================================
-
-#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
-getrandom::register_custom_getrandom!(my_custom_getrandom);
-
-#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
-pub fn my_custom_getrandom(buf: &mut [u8]) -> Result<(), getrandom::Error> {
-    // Note: This crate doesn't depend on HDK to keep it lightweight.
-    // We provide this symbol to satisfy the linker for zomes depending on this crate.
-    Ok(())
-}
-
 pub mod algorithm;
 pub mod envelope;
 pub mod error;

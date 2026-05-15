@@ -317,6 +317,16 @@ pub struct QualityMetrics {
     pub(crate) last_cube_h_value: f32,
     /// Last computed cube quality composite.
     pub(crate) last_cube_quality: f32,
+    /// Last vision manifold HDC dimension (16384 or 65536).
+    pub(crate) last_vision_hdc_dim: u32,
+    /// Last visual Variational Free Energy.
+    pub(crate) last_vision_free_energy: f32,
+    /// Last visual model complexity.
+    pub(crate) last_vision_complexity: f32,
+    /// Last visual prediction accuracy.
+    pub(crate) last_vision_accuracy: f32,
+    /// Whether a geodesic mental simulation was requested last cycle.
+    pub(crate) last_request_geodesic: bool,
 }
 
 impl Default for QualityMetrics {
@@ -385,6 +395,11 @@ impl Default for QualityMetrics {
             last_cube_m_tier: None,
             last_cube_h_value: 0.0,
             last_cube_quality: 0.0,
+            last_vision_hdc_dim: 16384,
+            last_vision_free_energy: 0.0,
+            last_vision_complexity: 0.0,
+            last_vision_accuracy: 1.0,
+            last_request_geodesic: false,
         }
     }
 }

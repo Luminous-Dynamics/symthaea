@@ -16,6 +16,7 @@
 //! - **Debug**: Diagnose and fix issues
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 use symthaea_core::hdc::ContinuousHV;
 
@@ -52,6 +53,8 @@ pub enum CodeIntent {
         target: CodeTarget,
         symptoms: Vec<String>,
     },
+    /// Solve: repository-scale engineering task (SWE-bench style)
+    Solve { target: RepoTarget, spec: IssueSpec },
 }
 
 impl CodeIntent {
@@ -63,6 +66,7 @@ impl CodeIntent {
             | CodeIntent::Explain { target, .. }
             | CodeIntent::Refactor { target, .. }
             | CodeIntent::Debug { target, .. } => target.language.as_deref(),
+            CodeIntent::Solve { spec, .. } => Some(&spec.language),
             CodeIntent::Find { .. } => None,
         }
     }
@@ -71,9 +75,34 @@ impl CodeIntent {
     pub fn epistemic_status(&self) -> EpistemicStatus {
         match self {
             CodeIntent::Create { spec, .. } => spec.epistemic_status,
+            CodeIntent::Solve { spec, .. } => spec.epistemic_status,
             _ => EpistemicStatus::Probable,
         }
     }
+}
+
+/// A whole repository target
+#[derive(Debug, Clone)]
+pub struct RepoTarget {
+    /// Name of the repository
+    pub name: String,
+    /// Local path to the repository
+    pub root: PathBuf,
+    /// Remote URL (optional)
+    pub url: Option<String>,
+}
+
+/// Specification for a repository-scale issue to solve
+#[derive(Debug, Clone)]
+pub struct IssueSpec {
+    /// Primary language of the issue
+    pub language: String,
+    /// Raw GitHub issue text (description)
+    pub description: String,
+    /// List of file paths explicitly mentioned in the issue
+    pub relevant_files: Vec<String>,
+    /// Epistemic status of this specification
+    pub epistemic_status: EpistemicStatus,
 }
 
 /// What code entity is being targeted

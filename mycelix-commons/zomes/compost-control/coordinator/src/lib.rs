@@ -1,20 +1,19 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Compost Control Coordinator Zome
 //! Sensor-driven composting automation: batch management, threshold evaluation, action recommendations
 
+use compost_control_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::civic_requirement_basic;
+use mycelix_zome_helpers as _;
 use mycelix_zome_helpers::records_from_links;
-use compost_control_integrity::*;
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
     hash_entry(&EntryTypes::Anchor(anchor))
 }
-
 
 // ============================================================================
 // COMPOST BATCHES
@@ -23,7 +22,11 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 /// Create a new compost batch
 #[hdk_extern]
 pub fn create_compost_batch(batch: CompostBatch) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "create_compost_batch")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "create_compost_batch",
+    )?;
 
     // Validate inputs
     if batch.inputs.is_empty() {
@@ -40,7 +43,9 @@ pub fn create_compost_batch(batch: CompostBatch) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::CompostBatch(batch.clone()))?;
 
     // Link to all batches anchor
-    create_entry(&EntryTypes::Anchor(Anchor("all_compost_batches".to_string())))?;
+    create_entry(&EntryTypes::Anchor(Anchor(
+        "all_compost_batches".to_string(),
+    )))?;
     create_link(
         anchor_hash("all_compost_batches")?,
         action_hash.clone(),
@@ -78,8 +83,9 @@ pub fn create_compost_batch(batch: CompostBatch) -> ExternResult<Record> {
         }
     }));
 
-    let record = get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get created record".into())))?;
+    let record = get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Failed to get created record".into())
+    ))?;
     Ok(record)
 }
 
@@ -116,8 +122,11 @@ pub fn get_batches_by_facility(facility_hash: ActionHash) -> ExternResult<Vec<Re
 /// Record a sensor reading from a compost batch
 #[hdk_extern]
 pub fn record_compost_reading(reading: CompostReading) -> ExternResult<Record> {
-    let _eligibility =
-        mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "record_compost_reading")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "record_compost_reading",
+    )?;
 
     // Validate ranges
     if !reading.temperature_c.is_finite()
@@ -136,10 +145,7 @@ pub fn record_compost_reading(reading: CompostReading) -> ExternResult<Record> {
             "Moisture must be between 0 and 100 percent".into()
         )));
     }
-    if !reading.oxygen_pct.is_finite()
-        || reading.oxygen_pct < 0.0
-        || reading.oxygen_pct > 100.0
-    {
+    if !reading.oxygen_pct.is_finite() || reading.oxygen_pct < 0.0 || reading.oxygen_pct > 100.0 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Oxygen must be between 0 and 100 percent".into()
         )));
@@ -160,8 +166,9 @@ pub fn record_compost_reading(reading: CompostReading) -> ExternResult<Record> {
         (),
     )?;
 
-    let record = get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get created record".into())))?;
+    let record = get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Failed to get created record".into())
+    ))?;
     Ok(record)
 }
 
@@ -212,8 +219,15 @@ pub fn evaluate_batch_status(batch_hash: ActionHash) -> ExternResult<BatchEvalua
     let batch: CompostBatch = batch_record
         .entry()
         .to_app_option()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to decode batch: {}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Batch entry not found".into())))?;
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode batch: {}",
+                e
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Batch entry not found".into()
+        )))?;
 
     // Get latest readings
     let reading_links = get_links(
@@ -353,16 +367,25 @@ fn evaluate_temperature(temp_c: f64, status: &CompostBatchStatus) -> String {
         }
         CompostBatchStatus::ActiveComposting => {
             if temp_c < THERMOPHILIC_MIN_C {
-                format!("Below thermophilic range ({:.1}C < {:.0}C)", temp_c, THERMOPHILIC_MIN_C)
+                format!(
+                    "Below thermophilic range ({:.1}C < {:.0}C)",
+                    temp_c, THERMOPHILIC_MIN_C
+                )
             } else if temp_c > THERMOPHILIC_MAX_C {
-                format!("Above thermophilic range ({:.1}C > {:.0}C) — risk of microbe die-off", temp_c, THERMOPHILIC_MAX_C)
+                format!(
+                    "Above thermophilic range ({:.1}C > {:.0}C) — risk of microbe die-off",
+                    temp_c, THERMOPHILIC_MAX_C
+                )
             } else {
                 format!("Thermophilic OK ({:.1}C)", temp_c)
             }
         }
         CompostBatchStatus::Curing => {
             if temp_c > MESOPHILIC_MAX_C {
-                format!("Still too hot for curing ({:.1}C > {:.0}C)", temp_c, MESOPHILIC_MAX_C)
+                format!(
+                    "Still too hot for curing ({:.1}C > {:.0}C)",
+                    temp_c, MESOPHILIC_MAX_C
+                )
             } else if temp_c < CURING_COMPLETE_C {
                 format!("Curing near complete ({:.1}C)", temp_c)
             } else {
@@ -381,7 +404,10 @@ fn evaluate_phase_transition(
     match current {
         CompostBatchStatus::Mixing => {
             if reading.temperature_c >= THERMOPHILIC_MIN_C {
-                Some("Transition to ActiveComposting: temperature reached thermophilic range".to_string())
+                Some(
+                    "Transition to ActiveComposting: temperature reached thermophilic range"
+                        .to_string(),
+                )
             } else {
                 None
             }
@@ -389,14 +415,20 @@ fn evaluate_phase_transition(
         CompostBatchStatus::ActiveComposting => {
             // After sustained thermophilic phase, if temp drops below mesophilic max → curing
             if reading.temperature_c < MESOPHILIC_MAX_C {
-                Some("Transition to Curing: temperature dropped below thermophilic range".to_string())
+                Some(
+                    "Transition to Curing: temperature dropped below thermophilic range"
+                        .to_string(),
+                )
             } else {
                 None
             }
         }
         CompostBatchStatus::Curing => {
             if reading.temperature_c < CURING_COMPLETE_C {
-                Some("Transition to Screening: curing complete, ambient temperature reached".to_string())
+                Some(
+                    "Transition to Screening: curing complete, ambient temperature reached"
+                        .to_string(),
+                )
             } else {
                 None
             }
@@ -412,8 +444,11 @@ fn evaluate_phase_transition(
 /// Record a compost action (recommended or manually created)
 #[hdk_extern]
 pub fn record_compost_action(action: CompostAction) -> ExternResult<Record> {
-    let _eligibility =
-        mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "record_compost_action")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "record_compost_action",
+    )?;
 
     let action_hash = create_entry(&EntryTypes::CompostAction(action.clone()))?;
 
@@ -435,8 +470,9 @@ pub fn record_compost_action(action: CompostAction) -> ExternResult<Record> {
         }
     }));
 
-    let record = get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get created record".into())))?;
+    let record = get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Failed to get created record".into())
+    ))?;
     Ok(record)
 }
 
@@ -475,8 +511,15 @@ pub fn get_batch_nutrient_estimate(batch_hash: ActionHash) -> ExternResult<Nutri
     let batch: CompostBatch = batch_record
         .entry()
         .to_app_option()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to decode batch: {}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Batch entry not found".into())))?;
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode batch: {}",
+                e
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Batch entry not found".into()
+        )))?;
 
     let mut total_kg: f64 = 0.0;
     let mut total_n: f64 = 0.0;
@@ -530,21 +573,21 @@ fn estimate_npk(resource_type: &str) -> (f64, f64, f64) {
 /// Sources: Cornell Waste Management Institute, USCC guidelines.
 fn estimate_cn_ratio(resource_type: &str) -> f64 {
     match resource_type {
-        "KitchenWaste" => 15.0,   // Nitrogen-rich
-        "GreenWaste" => 20.0,     // Moderate nitrogen
-        "Biochar" => 200.0,       // Very high carbon
-        "Vermicompost" => 15.0,   // Pre-processed, balanced
-        "Digestate" => 10.0,      // Very nitrogen-rich
-        "Manure" => 18.0,         // Nitrogen-rich
-        "Mulch" => 50.0,          // Carbon-rich
-        "CoverCrop" => 20.0,      // Moderate
-        "Inoculant" => 10.0,      // Nitrogen-dominant
-        "Woodchips" => 400.0,     // Very high carbon
-        "Straw" => 80.0,          // High carbon
-        "Cardboard" => 350.0,     // Very high carbon
-        "Sawdust" => 500.0,       // Extremely high carbon
-        "Leaves" => 60.0,         // Moderate-high carbon
-        _ => 30.0,                // Default fallback
+        "KitchenWaste" => 15.0, // Nitrogen-rich
+        "GreenWaste" => 20.0,   // Moderate nitrogen
+        "Biochar" => 200.0,     // Very high carbon
+        "Vermicompost" => 15.0, // Pre-processed, balanced
+        "Digestate" => 10.0,    // Very nitrogen-rich
+        "Manure" => 18.0,       // Nitrogen-rich
+        "Mulch" => 50.0,        // Carbon-rich
+        "CoverCrop" => 20.0,    // Moderate
+        "Inoculant" => 10.0,    // Nitrogen-dominant
+        "Woodchips" => 400.0,   // Very high carbon
+        "Straw" => 80.0,        // High carbon
+        "Cardboard" => 350.0,   // Very high carbon
+        "Sawdust" => 500.0,     // Extremely high carbon
+        "Leaves" => 60.0,       // Moderate-high carbon
+        _ => 30.0,              // Default fallback
     }
 }
 
@@ -596,7 +639,9 @@ pub fn optimize_recipe(input: OptimizeRecipeInput) -> ExternResult<RecipeOptimiz
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Batch entry not found".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Batch entry not found".into()
+        )))?;
 
     let target = if input.target_cn_ratio > 0.0 {
         input.target_cn_ratio
@@ -727,8 +772,7 @@ fn query_resource_mesh_sensor(resource_type: &str, sensor_id: Option<&str>) -> O
         Ok(ZomeCallResponse::Ok(extern_io)) => {
             // Decode response as Vec of SensorReading-like objects
             // resource-mesh returns Vec<SensorReading> where each has a `value: f64`
-            let readings: Vec<serde_json::Value> =
-                extern_io.decode().ok()?;
+            let readings: Vec<serde_json::Value> = extern_io.decode().ok()?;
             readings
                 .first()
                 .and_then(|r| r.get("value"))
@@ -785,8 +829,11 @@ pub struct SensorBridgeResult {
 /// 4. Running evaluate_batch_status() to get recommendations
 #[hdk_extern]
 pub fn record_sensor_bridge_reading(input: SensorBridgeInput) -> ExternResult<SensorBridgeResult> {
-    let _eligibility =
-        mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "record_sensor_bridge_reading")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "record_sensor_bridge_reading",
+    )?;
 
     // Verify the batch exists
     let _batch_record = get(input.batch_hash.clone(), GetOptions::default())?
@@ -888,8 +935,15 @@ pub fn calculate_carbon_attribution(batch_hash: ActionHash) -> ExternResult<Carb
     let batch: CompostBatch = batch_record
         .entry()
         .to_app_option()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to decode batch: {}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Batch entry not found".into())))?;
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode batch: {}",
+                e
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Batch entry not found".into()
+        )))?;
 
     // Sum all input weights
     let waste_diverted_kg: f64 = batch.inputs.iter().map(|i| i.quantity_kg).sum();
@@ -958,8 +1012,7 @@ pub fn get_facility_diversion_summary(
         }
     }
 
-    let total_co2e_avoided_tonnes =
-        (total_composted_kg / 1000.0) * COMPOST_CO2E_AVOIDED_PER_TONNE;
+    let total_co2e_avoided_tonnes = (total_composted_kg / 1000.0) * COMPOST_CO2E_AVOIDED_PER_TONNE;
 
     Ok(FacilityDiversionSummary {
         total_batches,
@@ -980,25 +1033,41 @@ mod tests {
     #[test]
     fn test_evaluate_temperature_thermophilic_ok() {
         let status = evaluate_temperature(60.0, &CompostBatchStatus::ActiveComposting);
-        assert!(status.contains("OK"), "60C should be OK during active composting: {}", status);
+        assert!(
+            status.contains("OK"),
+            "60C should be OK during active composting: {}",
+            status
+        );
     }
 
     #[test]
     fn test_evaluate_temperature_too_cold_for_thermophilic() {
         let status = evaluate_temperature(45.0, &CompostBatchStatus::ActiveComposting);
-        assert!(status.contains("Below"), "45C should be below thermophilic: {}", status);
+        assert!(
+            status.contains("Below"),
+            "45C should be below thermophilic: {}",
+            status
+        );
     }
 
     #[test]
     fn test_evaluate_temperature_too_hot() {
         let status = evaluate_temperature(70.0, &CompostBatchStatus::ActiveComposting);
-        assert!(status.contains("Above"), "70C should be above thermophilic: {}", status);
+        assert!(
+            status.contains("Above"),
+            "70C should be above thermophilic: {}",
+            status
+        );
     }
 
     #[test]
     fn test_evaluate_temperature_curing_complete() {
         let status = evaluate_temperature(22.0, &CompostBatchStatus::Curing);
-        assert!(status.contains("near complete"), "22C during curing should be near complete: {}", status);
+        assert!(
+            status.contains("near complete"),
+            "22C during curing should be near complete: {}",
+            status
+        );
     }
 
     #[test]
@@ -1013,7 +1082,10 @@ mod tests {
             timestamp_us: 100,
         };
         let result = evaluate_phase_transition(&CompostBatchStatus::Mixing, &reading);
-        assert!(result.is_some(), "56C should trigger transition from Mixing");
+        assert!(
+            result.is_some(),
+            "56C should trigger transition from Mixing"
+        );
         assert!(result.unwrap().contains("ActiveComposting"));
     }
 
@@ -1029,7 +1101,10 @@ mod tests {
             timestamp_us: 100,
         };
         let result = evaluate_phase_transition(&CompostBatchStatus::ActiveComposting, &reading);
-        assert!(result.is_some(), "35C should trigger transition from ActiveComposting");
+        assert!(
+            result.is_some(),
+            "35C should trigger transition from ActiveComposting"
+        );
         assert!(result.unwrap().contains("Curing"));
     }
 
@@ -1045,7 +1120,10 @@ mod tests {
             timestamp_us: 100,
         };
         let result = evaluate_phase_transition(&CompostBatchStatus::Curing, &reading);
-        assert!(result.is_some(), "22C should trigger transition from Curing");
+        assert!(
+            result.is_some(),
+            "22C should trigger transition from Curing"
+        );
         assert!(result.unwrap().contains("Screening"));
     }
 
@@ -1061,7 +1139,10 @@ mod tests {
             timestamp_us: 100,
         };
         let result = evaluate_phase_transition(&CompostBatchStatus::ActiveComposting, &reading);
-        assert!(result.is_none(), "60C should not trigger transition during ActiveComposting");
+        assert!(
+            result.is_none(),
+            "60C should not trigger transition during ActiveComposting"
+        );
     }
 
     #[test]
@@ -1083,7 +1164,10 @@ mod tests {
     #[test]
     fn test_npk_unknown_fallback() {
         let (n, p, k) = estimate_npk("UnknownMaterial");
-        assert!(n > 0.0 && p > 0.0 && k > 0.0, "Unknown material should use fallback");
+        assert!(
+            n > 0.0 && p > 0.0 && k > 0.0,
+            "Unknown material should use fallback"
+        );
     }
 
     #[test]
@@ -1104,8 +1188,15 @@ mod tests {
     #[test]
     fn test_all_resource_types_have_npk() {
         let types = [
-            "KitchenWaste", "GreenWaste", "Biochar", "Vermicompost",
-            "Digestate", "Manure", "Mulch", "CoverCrop", "Inoculant",
+            "KitchenWaste",
+            "GreenWaste",
+            "Biochar",
+            "Vermicompost",
+            "Digestate",
+            "Manure",
+            "Mulch",
+            "CoverCrop",
+            "Inoculant",
         ];
         for rt in types {
             let (n, p, k) = estimate_npk(rt);
@@ -1127,7 +1218,11 @@ mod tests {
         let waste_kg: f64 = 1000.0;
         let waste_tonnes = waste_kg / 1000.0;
         let co2e = waste_tonnes * COMPOST_CO2E_AVOIDED_PER_TONNE;
-        assert!((co2e - 0.06).abs() < 0.001, "1 tonne should avoid 0.06 tCO2e, got {}", co2e);
+        assert!(
+            (co2e - 0.06).abs() < 0.001,
+            "1 tonne should avoid 0.06 tCO2e, got {}",
+            co2e
+        );
     }
 
     #[test]
@@ -1142,7 +1237,10 @@ mod tests {
     fn test_carbon_scales_linearly() {
         let co2e_1t: f64 = (1000.0 / 1000.0) * COMPOST_CO2E_AVOIDED_PER_TONNE;
         let co2e_10t: f64 = (10000.0 / 1000.0) * COMPOST_CO2E_AVOIDED_PER_TONNE;
-        assert!((co2e_10t / co2e_1t - 10.0).abs() < 0.001, "Carbon should scale linearly");
+        assert!(
+            (co2e_10t / co2e_1t - 10.0).abs() < 0.001,
+            "Carbon should scale linearly"
+        );
     }
 
     #[test]
@@ -1348,12 +1446,21 @@ mod recipe_tests {
         let carbon_types = ["Woodchips", "Straw", "Cardboard", "Sawdust"];
         let nitrogen_types = ["KitchenWaste", "GreenWaste", "Manure", "Digestate"];
 
-        let min_carbon: f64 = carbon_types.iter().map(|t| estimate_cn_ratio(t)).fold(f64::MAX, f64::min);
-        let max_nitrogen: f64 = nitrogen_types.iter().map(|t| estimate_cn_ratio(t)).fold(f64::MIN, f64::max);
+        let min_carbon: f64 = carbon_types
+            .iter()
+            .map(|t| estimate_cn_ratio(t))
+            .fold(f64::MAX, f64::min);
+        let max_nitrogen: f64 = nitrogen_types
+            .iter()
+            .map(|t| estimate_cn_ratio(t))
+            .fold(f64::MIN, f64::max);
 
-        assert!(min_carbon > max_nitrogen,
+        assert!(
+            min_carbon > max_nitrogen,
             "All carbon materials ({}) should have higher C:N than nitrogen materials ({})",
-            min_carbon, max_nitrogen);
+            min_carbon,
+            max_nitrogen
+        );
     }
 
     #[test]

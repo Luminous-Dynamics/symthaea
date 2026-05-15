@@ -1070,6 +1070,8 @@ impl ReplSession {
             total_cycles: self.stats.total_cycles,
             consciousness_level: snapshot.consciousness_level as f64,
             latency_ms: 0,
+            #[cfg(feature = "vision-manifold")]
+            mental_movie: None,
         }
     }
 

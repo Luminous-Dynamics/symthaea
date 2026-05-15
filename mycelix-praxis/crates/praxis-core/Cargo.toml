@@ -13,6 +13,8 @@ serde_json.workspace = true
 blake3.workspace = true
 thiserror.workspace = true
 chrono.workspace = true
+holochain_serialized_bytes.workspace = true
+holo_hash.workspace = true
 
 [dev-dependencies]
 anyhow.workspace = true

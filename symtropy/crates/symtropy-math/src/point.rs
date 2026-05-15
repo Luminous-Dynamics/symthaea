@@ -56,6 +56,22 @@ impl<const D: usize> Point<D> {
     }
 }
 
+impl<const D: usize> std::ops::Index<usize> for Point<D> {
+    type Output = f64;
+
+    #[inline]
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.0[index]
+    }
+}
+
+impl<const D: usize> std::ops::IndexMut<usize> for Point<D> {
+    #[inline]
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.0[index]
+    }
+}
+
 impl<const D: usize> Add<SVector<f64, D>> for Point<D> {
     type Output = Point<D>;
     #[inline]

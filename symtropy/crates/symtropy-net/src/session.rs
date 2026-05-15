@@ -14,8 +14,7 @@ use crate::authority::SpatialAuthority;
 use crate::config::NetworkConfig;
 use crate::peer::{PeerId, PeerState};
 use crate::transport::{
-    AuthorityMessage, BodyStateUpdate, Channel, PhysicsSync,
-    Transport, TransportEvent,
+    AuthorityMessage, BodyStateUpdate, Channel, PhysicsSync, Transport, TransportEvent,
 };
 
 /// A multiplayer network session.
@@ -117,8 +116,11 @@ impl<T: Transport> NetworkSession<T> {
         }
 
         // Expire stale peers
-        let timeout = self.config.authority_timeout_ms / (1000 / self.config.send_rate_hz as u64).max(1);
-        let stale: Vec<PeerId> = self.peers.iter()
+        let timeout =
+            self.config.authority_timeout_ms / (1000 / self.config.send_rate_hz as u64).max(1);
+        let stale: Vec<PeerId> = self
+            .peers
+            .iter()
             .filter(|(_, p)| !p.is_alive(self.tick, timeout))
             .map(|(id, _)| *id)
             .collect();
@@ -192,15 +194,13 @@ mod tests {
         session_b.join("test").unwrap();
 
         // A sends physics
-        session_a.send_physics(vec![
-            BodyStateUpdate {
-                body_id: 1,
-                position: [10.0, 20.0, 0.0],
-                velocity: [1.0, 0.0, 0.0],
-                rotation: [1.0, 0.0, 0.0, 0.0],
-                angular_velocity: [0.0, 0.0, 0.0],
-            },
-        ]);
+        session_a.send_physics(vec![BodyStateUpdate {
+            body_id: 1,
+            position: [10.0, 20.0, 0.0],
+            velocity: [1.0, 0.0, 0.0],
+            rotation: [1.0, 0.0, 0.0, 0.0],
+            angular_velocity: [0.0, 0.0, 0.0],
+        }]);
 
         // B receives on next tick
         session_b.tick();

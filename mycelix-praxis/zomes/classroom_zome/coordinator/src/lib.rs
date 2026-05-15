@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -14,14 +13,14 @@ use mycelix_zome_helpers as _;
 //! - **Guardian Links**: Privacy-controlled parent/guardian access to student progress
 //! - **Curriculum**: Link learning paths to classrooms
 
-#![deny(unsafe_code)]
-
-use hdk::prelude::*;
-use hdk::prelude::HdkPathExt;
 use classroom_integrity::{
-    EntryTypes, LinkTypes, Classroom, ClassroomMember, GuardianLink, JoinCode,
-    ClassroomRole, MemberStatus,
+    Classroom, ClassroomMember, ClassroomRole, EntryTypes, GuardianLink, JoinCode, LinkTypes,
+    MemberStatus,
 };
+use hdk::prelude::HdkPathExt;
+#[deny(unsafe_code)]
+use hdk::prelude::*;
+use mycelix_zome_helpers as _;
 
 // ============== Helper Functions ==============
 
@@ -92,9 +91,38 @@ pub struct UpdateMemberRoleInput {
 // ============== Classroom Lifecycle ==============
 
 /// Create a new classroom. The calling agent becomes the teacher.
+///
+/// Requires Steward tier and 0.7+ moral resonance (HUD of Truth).
 #[hdk_extern]
 pub fn create_classroom(input: CreateClassroomInput) -> ExternResult<Record> {
     let agent = agent_info()?.agent_initial_pubkey;
+
+    // 1. TRUST GATING (Vector 1: Resonant Stewardship)
+    let my_did = format!("did:mycelix:{}", agent);
+    let moral_resonance: f64 = call(
+        CallTargetCell::OtherRole("identity".into()),
+        "identity_bridge".into(),
+        "get_reputation_score".into(),
+        None,
+        serde_json::json!({
+            "did": my_did,
+            "required_resonance": 0.7
+        }),
+    )?
+    .decode()
+    .map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Resonance check failed: {:?}",
+            e
+        )))
+    })?;
+
+    if moral_resonance < 0.7 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Classroom Creation Rejected: Moral resonance too low. Teachers must maintain 0.7+ resonance.".into()
+        )));
+    }
+
     let now = timestamp_to_i64(sys_time()?);
 
     let classroom = Classroom {
@@ -203,7 +231,9 @@ pub fn generate_join_code(input: GenerateJoinCodeInput) -> ExternResult<Record> 
         .ok_or(wasm_error!("Could not deserialize Classroom"))?;
 
     if classroom.teacher != agent {
-        return Err(wasm_error!("Only the classroom teacher can generate join codes"));
+        return Err(wasm_error!(
+            "Only the classroom teacher can generate join codes"
+        ));
     }
 
     // Generate a 6-character alphanumeric code from entropy
@@ -212,7 +242,10 @@ pub fn generate_join_code(input: GenerateJoinCodeInput) -> ExternResult<Record> 
         .iter()
         .flat_map(|b| {
             let chars = b"ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-            vec![chars[(b >> 4) as usize % chars.len()] as char, chars[(b & 0x0F) as usize % chars.len()] as char]
+            vec![
+                chars[(b >> 4) as usize % chars.len()] as char,
+                chars[(b & 0x0F) as usize % chars.len()] as char,
+            ]
         })
         .take(6)
         .collect();
@@ -284,8 +317,7 @@ pub fn join_classroom(input: JoinClassroomInput) -> ExternResult<Record> {
         }
     }
 
-    let (join_code, code_action_hash) = found_code
-        .ok_or(wasm_error!("Invalid join code"))?;
+    let (join_code, code_action_hash) = found_code.ok_or(wasm_error!("Invalid join code"))?;
 
     // Check code hasn't expired
     if let Some(expires_at) = join_code.expires_at {
@@ -334,8 +366,9 @@ pub fn join_classroom(input: JoinClassroomInput) -> ExternResult<Record> {
         (),
     )?;
 
-    let record = get(member_hash, GetOptions::default())?
-        .ok_or(wasm_error!("Could not find the newly created ClassroomMember"))?;
+    let record = get(member_hash, GetOptions::default())?.ok_or(wasm_error!(
+        "Could not find the newly created ClassroomMember"
+    ))?;
     Ok(record)
 }
 
@@ -437,12 +470,19 @@ pub fn assign_curriculum(input: AssignCurriculumInput) -> ExternResult<Record> {
         .ok_or(wasm_error!("Could not deserialize Classroom"))?;
 
     if classroom.teacher != agent {
-        return Err(wasm_error!("Only the classroom teacher can assign curriculum"));
+        return Err(wasm_error!(
+            "Only the classroom teacher can assign curriculum"
+        ));
     }
 
     // Add the curriculum path if not already present
-    if !classroom.curriculum_path_hashes.contains(&input.curriculum_path_hash) {
-        classroom.curriculum_path_hashes.push(input.curriculum_path_hash);
+    if !classroom
+        .curriculum_path_hashes
+        .contains(&input.curriculum_path_hash)
+    {
+        classroom
+            .curriculum_path_hashes
+            .push(input.curriculum_path_hash);
     }
     classroom.modified_at = now;
 

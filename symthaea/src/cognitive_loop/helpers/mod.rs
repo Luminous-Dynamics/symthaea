@@ -250,6 +250,8 @@ impl CognitiveLoopService {
             signed_output,
             #[cfg(feature = "identity")]
             assurance_level,
+            #[cfg(feature = "vision-manifold")]
+            mental_movie: None,
         })
     }
 
@@ -462,6 +464,8 @@ impl CognitiveLoopService {
             signed_output: None,
             #[cfg(feature = "identity")]
             assurance_level: self.mfdi_bridge.assurance_level(),
+            #[cfg(feature = "vision-manifold")]
+            mental_movie: None,
         }
     }
 

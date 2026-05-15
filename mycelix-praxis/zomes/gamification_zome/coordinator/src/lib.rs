@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -11,8 +10,9 @@ use mycelix_zome_helpers as _;
 //! - Streak management
 //! - Leaderboard updates
 
-use hdk::prelude::*;
 use gamification_integrity::*;
+use hdk::prelude::*;
+use mycelix_zome_helpers as _;
 
 // ============== Helper Functions ==============
 
@@ -80,15 +80,11 @@ pub fn get_or_create_xp(_: ()) -> ExternResult<Record> {
 
     let action_hash = create_entry(EntryTypes::LearnerXp(xp))?;
 
-    create_link(
-        anchor_hash,
-        action_hash.clone(),
-        LinkTypes::LearnerToXp,
-        (),
-    )?;
+    create_link(anchor_hash, action_hash.clone(), LinkTypes::LearnerToXp, ())?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get created XP record".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to get created XP record".into()
+    )))
 }
 
 /// Award XP to the current learner
@@ -101,16 +97,20 @@ pub fn award_xp(input: AwardXpInput) -> ExternResult<Record> {
     let xp_record = get_or_create_xp(())?;
     let xp_hash = xp_record.action_hashed().hash.clone();
 
-    let mut xp: LearnerXp = xp_record.entry()
+    let mut xp: LearnerXp = xp_record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(e))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid XP entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid XP entry".into()
+        )))?;
 
     // Get current streak for bonus multiplier
     let streak_bonus = get_streak_bonus()?;
 
     // Apply streak bonus to base XP
-    let bonus_xp_u64 = input.base_xp as u64 * streak_bonus as u64 / 1000; let bonus_xp = bonus_xp_u64.min(u32::MAX as u64) as u32;
+    let bonus_xp_u64 = input.base_xp as u64 * streak_bonus as u64 / 1000;
+    let bonus_xp = bonus_xp_u64.min(u32::MAX as u64) as u32;
 
     // Update XP
     xp.total_xp = xp.total_xp.saturating_add(bonus_xp as u64);
@@ -135,12 +135,7 @@ pub fn award_xp(input: AwardXpInput) -> ExternResult<Record> {
 
     // Link transaction to learner
     let anchor_hash = learner_anchor()?;
-    create_link(
-        anchor_hash,
-        tx_hash,
-        LinkTypes::LearnerToXpTransactions,
-        (),
-    )?;
+    create_link(anchor_hash, tx_hash, LinkTypes::LearnerToXpTransactions, ())?;
 
     // Update XP record
     let new_hash = update_entry(xp_hash, xp)?;
@@ -148,8 +143,9 @@ pub fn award_xp(input: AwardXpInput) -> ExternResult<Record> {
     // Update streak (activity counts)
     update_daily_activity(bonus_xp)?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get updated XP record".into())))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to get updated XP record".into()
+    )))
 }
 
 /// Input for awarding XP
@@ -175,7 +171,12 @@ pub fn get_xp_transactions(limit: u32) -> ExternResult<Vec<Record>> {
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
             if let Some(record) = get(action_hash, GetOptions::default())? {
-                if let Some(tx) = record.entry().to_app_option::<XpTransaction>().ok().flatten() {
+                if let Some(tx) = record
+                    .entry()
+                    .to_app_option::<XpTransaction>()
+                    .ok()
+                    .flatten()
+                {
                     transactions.push((record, tx.occurred_at));
                 }
             }
@@ -185,7 +186,11 @@ pub fn get_xp_transactions(limit: u32) -> ExternResult<Vec<Record>> {
     // Sort by time (newest first)
     transactions.sort_by(|a, b| b.1.cmp(&a.1));
 
-    Ok(transactions.into_iter().take(limit as usize).map(|(r, _)| r).collect())
+    Ok(transactions
+        .into_iter()
+        .take(limit as usize)
+        .map(|(r, _)| r)
+        .collect())
 }
 
 // ============== Streak Management ==============
@@ -236,17 +241,21 @@ pub fn get_or_create_streak(_: ()) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get created streak record".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to get created streak record".into()
+    )))
 }
 
 /// Get current streak bonus multiplier (as permille)
 fn get_streak_bonus() -> ExternResult<u16> {
     let streak_record = get_or_create_streak(())?;
-    let streak: LearnerStreak = streak_record.entry()
+    let streak: LearnerStreak = streak_record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(e))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid streak entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid streak entry".into()
+        )))?;
 
     Ok(streak_bonus_permille(streak.current_streak))
 }
@@ -268,7 +277,12 @@ fn update_daily_activity(xp_earned: u32) -> ExternResult<()> {
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(mut activity) = record.entry().to_app_option::<DailyActivity>().ok().flatten() {
+                if let Some(mut activity) = record
+                    .entry()
+                    .to_app_option::<DailyActivity>()
+                    .ok()
+                    .flatten()
+                {
                     if activity.date == today {
                         // Update existing activity
                         activity.xp_earned += xp_earned;
@@ -321,10 +335,13 @@ fn update_streak(today: u32) -> ExternResult<()> {
     let streak_record = get_or_create_streak(())?;
     let streak_hash = streak_record.action_hashed().hash.clone();
 
-    let mut streak: LearnerStreak = streak_record.entry()
+    let mut streak: LearnerStreak = streak_record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(e))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid streak entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid streak entry".into()
+        )))?;
 
     // Check if this is a new day of activity
     if streak.last_active_date == today {
@@ -368,13 +385,18 @@ pub fn freeze_streak(_: ()) -> ExternResult<Record> {
     let streak_record = get_or_create_streak(())?;
     let streak_hash = streak_record.action_hashed().hash.clone();
 
-    let mut streak: LearnerStreak = streak_record.entry()
+    let mut streak: LearnerStreak = streak_record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(e))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid streak entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid streak entry".into()
+        )))?;
 
     if streak.freezes_remaining == 0 {
-        return Err(wasm_error!(WasmErrorInner::Guest("No streak freezes remaining".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "No streak freezes remaining".into()
+        )));
     }
 
     streak.is_frozen = true;
@@ -382,8 +404,9 @@ pub fn freeze_streak(_: ()) -> ExternResult<Record> {
 
     let new_hash = update_entry(streak_hash, streak)?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get updated streak".into())))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to get updated streak".into()
+    )))
 }
 
 // ============== Badge Management ==============
@@ -428,8 +451,9 @@ pub fn create_badge_definition(input: CreateBadgeInput) -> ExternResult<Record> 
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get created badge".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to get created badge".into()
+    )))
 }
 
 /// Input for creating a badge
@@ -483,7 +507,12 @@ pub fn award_badge(input: AwardBadgeInput) -> ExternResult<Record> {
 
     // Award XP for the badge
     if let Some(record) = get(input.badge_definition_hash, GetOptions::default())? {
-        if let Some(badge) = record.entry().to_app_option::<BadgeDefinition>().ok().flatten() {
+        if let Some(badge) = record
+            .entry()
+            .to_app_option::<BadgeDefinition>()
+            .ok()
+            .flatten()
+        {
             award_xp(AwardXpInput {
                 base_xp: badge.xp_reward,
                 activity_type: XpActivityType::BadgeEarned,
@@ -493,8 +522,9 @@ pub fn award_badge(input: AwardBadgeInput) -> ExternResult<Record> {
         }
     }
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get earned badge".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to get earned badge".into()
+    )))
 }
 
 /// Input for awarding a badge
@@ -586,8 +616,9 @@ pub fn create_leaderboard(input: CreateLeaderboardInput) -> ExternResult<Record>
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get created leaderboard".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to get created leaderboard".into()
+    )))
 }
 
 /// Input for creating a leaderboard
@@ -640,7 +671,12 @@ pub fn get_leaderboard_entries(leaderboard_hash: ActionHash) -> ExternResult<Vec
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
             if let Some(record) = get(action_hash, GetOptions::default())? {
-                if let Some(entry) = record.entry().to_app_option::<LeaderboardEntry>().ok().flatten() {
+                if let Some(entry) = record
+                    .entry()
+                    .to_app_option::<LeaderboardEntry>()
+                    .ok()
+                    .flatten()
+                {
                     entries.push((record, entry.rank));
                 }
             }
@@ -688,8 +724,9 @@ pub fn create_reward(input: CreateRewardInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get created reward".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to get created reward".into()
+    )))
 }
 
 /// Input for creating a reward
@@ -712,30 +749,41 @@ pub fn claim_reward(reward_hash: ActionHash) -> ExternResult<Record> {
     let learner = agent_info()?.agent_initial_pubkey;
 
     // Get reward and check eligibility
-    let reward_record = get(reward_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Reward not found".into())))?;
+    let reward_record = get(reward_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Reward not found".into())
+    ))?;
 
-    let reward: Reward = reward_record.entry()
+    let reward: Reward = reward_record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(e))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid reward entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid reward entry".into()
+        )))?;
 
     // Check if still available
     if !reward.is_available {
-        return Err(wasm_error!(WasmErrorInner::Guest("Reward is no longer available".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Reward is no longer available".into()
+        )));
     }
 
     // Check quantity
     if reward.quantity_limit > 0 && reward.quantity_claimed >= reward.quantity_limit {
-        return Err(wasm_error!(WasmErrorInner::Guest("Reward is sold out".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Reward is sold out".into()
+        )));
     }
 
     // Check XP
     let xp_record = get_or_create_xp(())?;
-    let xp: LearnerXp = xp_record.entry()
+    let xp: LearnerXp = xp_record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(e))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid XP entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid XP entry".into()
+        )))?;
 
     if xp.total_xp < reward.cost_xp as u64 {
         return Err(wasm_error!(WasmErrorInner::Guest("Not enough XP".into())));
@@ -779,8 +827,9 @@ pub fn claim_reward(reward_hash: ActionHash) -> ExternResult<Record> {
 
     create_entry(EntryTypes::XpTransaction(deduct_tx))?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get claimed reward".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to get claimed reward".into()
+    )))
 }
 
 /// Get my claimed rewards
@@ -836,16 +885,22 @@ pub fn get_all_rewards(_: ()) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn get_gamification_summary(_: ()) -> ExternResult<GamificationSummary> {
     let xp_record = get_or_create_xp(())?;
-    let xp: LearnerXp = xp_record.entry()
+    let xp: LearnerXp = xp_record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(e))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid XP entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid XP entry".into()
+        )))?;
 
     let streak_record = get_or_create_streak(())?;
-    let streak: LearnerStreak = streak_record.entry()
+    let streak: LearnerStreak = streak_record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(e))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid streak entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid streak entry".into()
+        )))?;
 
     let badges = get_my_badges(())?;
 

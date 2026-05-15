@@ -4,61 +4,48 @@
 //! # symthaea-bevy-brain
 //!
 //! Drop-in Bevy plugin that gives any entity a cognitive architecture.
-//! Not a behavior tree — a real neural system with HDC perception,
-//! CfC temporal dynamics, predictive processing, and Phi metrics.
-//!
-//! ```ignore
-//! use symthaea_bevy_brain::{SymthaeaBrainPlugin, CognitiveBrain};
-//!
-//! fn main() {
-//!     App::new()
-//!         .add_plugins(DefaultPlugins)
-//!         .add_plugins(SymthaeaBrainPlugin::default())
-//!         .add_systems(Startup, spawn_npc)
-//!         .run();
-//! }
-//!
-//! fn spawn_npc(mut commands: Commands) {
-//!     commands.spawn((
-//!         Transform::default(),
-//!         CognitiveBrain::new(64, "npc_guard"),
-//!     ));
-//! }
-//! ```
+//! Upgraded to canonical 8D Sovereign Profile and Passport-based prior injection.
 
 use bevy::prelude::*;
-use symthaea::cognitive_loop::{
-    CognitiveLoopBuilder,
-    CognitiveLoopService,
-    CycleResult,
+use std::sync::{Arc, RwLock};
+pub use symthaea::cognitive_loop::{
+    CognitiveLoopBuilder, CognitiveLoopService, CycleMetadata, CycleResult,
 };
 
+/// Thread-safe wrapper for the cognitive loop.
+#[derive(Clone)]
+pub struct BrainHandle(pub Arc<RwLock<CognitiveLoopService>>);
+
+/// The canonical 8D Sovereign Profile (Mycelix standard).
+#[derive(Debug, Clone, Default, Reflect)]
+pub struct SovereignProfile8D {
+    pub epistemic_integrity: f64,
+    pub thermodynamic_yield: f64,
+    pub network_resilience: f64,
+    pub economic_velocity: f64,
+    pub civic_participation: f64,
+    pub stewardship_care: f64,
+    pub semantic_resonance: f64,
+    pub domain_competence: f64,
+}
+
 /// Bevy component: attach to any entity to give it a cognitive loop.
-///
-/// Each brain has its own HDC state (16,384D), CfC neural network,
-/// episodic memory, prediction history, and Phi computation.
-///
-/// Feed perception via `brain.perception_input` each frame.
-/// Read outputs from `brain.last_result`.
 #[derive(Component)]
 pub struct CognitiveBrain {
-    /// The cognitive loop (perception → dynamics → feedback → output).
-    loop_service: CognitiveLoopService,
+    pub handle: BrainHandle,
     /// Result from the last cognitive cycle.
     pub last_result: Option<CycleResult>,
-    /// What this brain perceives this tick. Set by your perception system.
+    /// The 8D profile extracted from the last cycle metadata.
+    pub profile: SovereignProfile8D,
+    /// Raw motor commands for joint actuation.
+    pub motor_output: Vec<f32>,
+    /// Perception input for the next cycle.
     pub perception_input: String,
-    /// Ticks since last cognitive cycle (for amortized scheduling).
     ticks_since_cycle: u32,
-    /// How many physics ticks between cognitive cycles.
     pub cycle_interval: u32,
 }
 
 impl CognitiveBrain {
-    /// Create a brain with the given CfC network size and a deterministic seed.
-    ///
-    /// `cfc_neurons`: network capacity (32 = lightweight, 128 = full cognition)
-    /// `genesis_phrase`: deterministic seed for reproducible behavior
     pub fn new(cfc_neurons: usize, genesis_phrase: &str) -> Self {
         let service = CognitiveLoopBuilder::new()
             .with_cfc_neurons(cfc_neurons)
@@ -67,65 +54,53 @@ impl CognitiveBrain {
             .expect("failed to build cognitive loop");
 
         Self {
-            loop_service: service,
+            handle: BrainHandle(Arc::new(RwLock::new(service))),
             last_result: None,
-            perception_input: String::new(),
-            ticks_since_cycle: 0,
-            cycle_interval: 3, // cognitive cycle every 3 physics ticks (~20Hz at 64Hz physics)
-        }
-    }
-
-    /// Create from a pre-built CognitiveLoopService.
-    pub fn from_service(service: CognitiveLoopService) -> Self {
-        Self {
-            loop_service: service,
-            last_result: None,
+            profile: SovereignProfile8D::default(),
+            motor_output: Vec::new(),
             perception_input: String::new(),
             ticks_since_cycle: 0,
             cycle_interval: 3,
         }
     }
 
-    /// Current Phi (integrated information) estimate. 0.0 if not yet computed.
+    /// Current scalar Phi estimate (epistemic integrity proxy).
     pub fn phi(&self) -> f64 {
-        self.loop_service.consciousness_level() as f64
+        self.profile.epistemic_integrity
     }
 
-    /// Prediction error from the last cycle. Higher = more surprise.
-    pub fn prediction_error(&self) -> f32 {
-        self.last_result
-            .as_ref()
-            .map(|r| r.prediction_error)
-            .unwrap_or(0.0)
+    /// Inject explicit FEP priors (Passport Route).
+    pub fn inject_priors(&self, mean: Vec<f64>, precision: Vec<f64>) {
+        if let Ok(mut service) = self.handle.0.write() {
+            service.inject_priors(mean, precision);
+        }
     }
 
-    /// Language output from the last cycle (if Broca generated text).
-    pub fn language(&self) -> Option<&str> {
-        self.last_result
-            .as_ref()
-            .and_then(|r| r.language_output.as_deref())
-    }
-
-    /// Whether learning occurred in the last cycle.
-    pub fn learned(&self) -> bool {
-        self.last_result
-            .as_ref()
-            .map(|r| r.learning_occurred)
-            .unwrap_or(false)
-    }
-
-    /// Run one cognitive cycle with the current perception input.
     fn cycle(&mut self) {
-        let result = self.loop_service.cycle(&self.perception_input);
-        self.last_result = Some(result);
+        if let Ok(mut service) = self.handle.0.write() {
+            let result = service.cycle(&self.perception_input);
+            self.motor_output = result.output.clone();
+
+            // Extract 8D profile from MCE metadata using canonical mapping
+            let mce = &result.metadata;
+            self.profile = SovereignProfile8D {
+                epistemic_integrity: service.consciousness_level() as f64,
+                thermodynamic_yield: mce.mce_softmin, // mapped to efficiency
+                network_resilience: mce.mce_weighted_sum, // mapped to redundancy
+                economic_velocity: mce.perception_attention_sensitivity as f64,
+                civic_participation: mce.mce_social,
+                stewardship_care: mce.embodied.body_phi_modulation,
+                semantic_resonance: mce.mce_narrative,
+                domain_competence: mce.memory_recall_quality as f64,
+            };
+
+            self.last_result = Some(result);
+        }
     }
 }
 
-/// Plugin configuration.
 pub struct SymthaeaBrainPlugin {
-    /// Default CfC neurons for brains created without explicit size.
     pub default_neurons: usize,
-    /// Whether to log consciousness telemetry.
     pub telemetry: bool,
 }
 
@@ -147,10 +122,6 @@ impl Plugin for SymthaeaBrainPlugin {
     }
 }
 
-/// Core system: runs the cognitive cycle for every entity with a CognitiveBrain.
-///
-/// Uses amortized scheduling: each brain cycles every `cycle_interval` ticks,
-/// not every frame. At cycle_interval=3 and 64Hz physics, cognition runs at ~21Hz.
 fn cognitive_cycle_system(mut brains: Query<&mut CognitiveBrain>) {
     for mut brain in &mut brains {
         brain.ticks_since_cycle += 1;
@@ -161,36 +132,14 @@ fn cognitive_cycle_system(mut brains: Query<&mut CognitiveBrain>) {
     }
 }
 
-/// Optional telemetry: logs Phi and prediction error for each brain.
 fn telemetry_system(brains: Query<(Entity, &CognitiveBrain)>) {
     for (entity, brain) in &brains {
-        if let Some(ref result) = brain.last_result {
-            debug!(
-                "Brain {:?}: Phi={:.4}, PE={:.4}, learned={}, cycle_time={}us",
-                entity,
-                brain.phi(),
-                result.prediction_error,
-                result.learning_occurred,
-                result.cycle_time_us,
-            );
-            if let Some(ref text) = result.language_output {
-                info!("Brain {:?} says: {}", entity, text);
-            }
-        }
+        debug!(
+            "Brain {:?}: Phi={:.4}, Competence={:.4}, Resonance={:.4}",
+            entity,
+            brain.phi(),
+            brain.profile.domain_competence,
+            brain.profile.semantic_resonance,
+        );
     }
 }
-
-// Physics coupling: users wire brain.phi() into their own physics system.
-// See the symtropy-bevy crate for SymtropyPhysics<D> and PhysicsBody.
-//
-// Example:
-// ```ignore
-// fn sync_brain_to_physics(
-//     brains: Query<(&CognitiveBrain, &PhysicsBody)>,
-//     mut physics: ResMut<SymtropyPhysics<2>>,
-// ) {
-//     for (brain, body) in &brains {
-//         physics.field.set_metric(body.handle, brain.phi());
-//     }
-// }
-// ```

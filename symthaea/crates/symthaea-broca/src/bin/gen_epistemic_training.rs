@@ -302,7 +302,7 @@ fn generate_pairs(rng: &mut Rng, count: usize) -> Vec<TrainingPair> {
                         (e as f32 / 4.0) * 0.40 + (n as f32 / 3.0) * 0.35 + (m as f32 / 3.0) * 0.25;
 
                     // Pick a topic and derive emotional state
-                    let (topic, base_valence, base_arousal) =
+                    let (_topic, base_valence, base_arousal) =
                         TOPIC_SEEDS[rng.range(0, TOPIC_SEEDS.len())];
 
                     // Vary consciousness level with H

@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -12,15 +11,19 @@ use justice_arbitration_integrity::*;
 use mycelix_bridge_common::{
     civic_requirement_proposal, civic_requirement_voting, GovernanceEligibility,
 };
-use mycelix_zome_helpers::{get_latest_record};
-
+use mycelix_zome_helpers as _;
+use mycelix_zome_helpers::get_latest_record;
 
 /// Create an arbitration panel for a case
 
 #[hdk_extern]
 pub fn create_arbitration(arbitration: Arbitration) -> ExternResult<Record> {
     // Consciousness gate: Participant tier + identity >= 0.25
-    let _eligibility = mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "create_arbitration")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_proposal(),
+        "create_arbitration",
+    )?;
 
     let action_hash = create_entry(&EntryTypes::Arbitration(arbitration.clone()))?;
     let record = get_latest_record(action_hash.clone())?.ok_or(wasm_error!(
@@ -142,7 +145,11 @@ pub struct ArbitratorResponseInput {
 #[hdk_extern]
 pub fn render_decision(decision: Decision) -> ExternResult<Record> {
     // Consciousness gate: Citizen tier + identity >= 0.25
-    let _eligibility = mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_voting(), "render_decision")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_voting(),
+        "render_decision",
+    )?;
 
     let action_hash = create_entry(&EntryTypes::Decision(decision.clone()))?;
     let record = get_latest_record(action_hash.clone())?.ok_or(wasm_error!(
@@ -186,7 +193,11 @@ pub fn get_case_decisions(case_id: String) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn file_appeal(appeal: Appeal) -> ExternResult<Record> {
     // Consciousness gate: Participant tier + identity >= 0.25
-    let _eligibility = mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "file_appeal")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_proposal(),
+        "file_appeal",
+    )?;
 
     let action_hash = create_entry(&EntryTypes::Appeal(appeal.clone()))?;
     let record = get_latest_record(action_hash.clone())?.ok_or(wasm_error!(
@@ -263,7 +274,11 @@ pub struct UpdateAppealStatusInput {
 #[hdk_extern]
 pub fn finalize_decision(input: FinalizeDecisionInput) -> ExternResult<Record> {
     // Consciousness gate: Citizen tier + identity >= 0.25
-    let _eligibility = mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_voting(), "finalize_decision")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_voting(),
+        "finalize_decision",
+    )?;
 
     let record = get(input.decision_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Decision not found".into())

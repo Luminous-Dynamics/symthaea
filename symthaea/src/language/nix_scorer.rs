@@ -279,11 +279,7 @@ fn extract_static_attrpath(key_node: &SyntaxNode) -> Option<Vec<String>> {
             }
         }
     }
-    if segs.is_empty() {
-        None
-    } else {
-        Some(segs)
-    }
+    if segs.is_empty() { None } else { Some(segs) }
 }
 
 /// Canonicalize a value node to one of the supported CanonValue variants.
@@ -360,11 +356,7 @@ fn try_parse_package_list(src: &str) -> Option<std::collections::BTreeSet<String
         }
         pkgs.insert(token.to_string());
     }
-    if pkgs.is_empty() {
-        None
-    } else {
-        Some(pkgs)
-    }
+    if pkgs.is_empty() { None } else { Some(pkgs) }
 }
 
 /// Identifier shape: `[A-Za-z_][\w.-]*`. Rejects anything that could be
@@ -529,14 +521,15 @@ mod tests {
         let golden = wrap("services.postgresql.enable = true;");
         let v = score(&generated, &golden);
         assert!(!v.pass(), "commented-out option must not satisfy golden");
-        assert!(v
-            .missing_required
-            .contains(&"services.postgresql.enable".to_string()));
+        assert!(
+            v.missing_required
+                .contains(&"services.postgresql.enable".to_string())
+        );
     }
 
     #[test]
     fn reordered_attrsets_pass() {
-        let gen = wrap(
+        let generated = wrap(
             "services.nginx.enable = true;\n\
              networking.firewall.enable = true;",
         );
@@ -544,34 +537,35 @@ mod tests {
             "networking.firewall.enable = true;\n\
              services.nginx.enable = true;",
         );
-        let v = score(&gen, &gold);
+        let v = score(&generated, &gold);
         assert!(v.pass(), "reordering should not fail; got {:?}", v);
     }
 
     #[test]
     fn missing_required_fails() {
-        let gen = wrap("services.nginx.enable = true;");
+        let generated = wrap("services.nginx.enable = true;");
         let gold = wrap(
             "services.nginx.enable = true;\n\
              services.postgresql.enable = true;",
         );
-        let v = score(&gen, &gold);
+        let v = score(&generated, &gold);
         assert!(!v.pass());
-        assert!(v
-            .missing_required
-            .contains(&"services.postgresql.enable".to_string()));
+        assert!(
+            v.missing_required
+                .contains(&"services.postgresql.enable".to_string())
+        );
     }
 
     #[test]
     fn extraneous_is_warning_not_fail() {
         // Generated adds firewall ports that golden doesn't specify.
         // This must still pass (warning only).
-        let gen = wrap(
+        let generated = wrap(
             "services.nginx.enable = true;\n\
              networking.firewall.allowedTCPPorts = [ 80 443 ];",
         );
         let gold = wrap("services.nginx.enable = true;");
-        let v = score(&gen, &gold);
+        let v = score(&generated, &gold);
         assert!(v.pass(), "extraneous should not fail; got {:?}", v);
         assert!(!v.extraneous.is_empty(), "must record extraneous paths");
     }
@@ -579,18 +573,18 @@ mod tests {
     #[test]
     fn value_type_mismatch_fails() {
         // Golden uses int, generated uses string — real mistake.
-        let gen = wrap("services.postgresql.port = \"5432\";");
+        let generated = wrap("services.postgresql.port = \"5432\";");
         let gold = wrap("services.postgresql.port = 5432;");
-        let v = score(&gen, &gold);
+        let v = score(&generated, &gold);
         assert!(!v.pass());
         assert_eq!(v.value_mismatches.len(), 1);
     }
 
     #[test]
     fn parse_error_is_reported() {
-        let gen = wrap("services.nginx.enable =;"); // syntax error
+        let generated = wrap("services.nginx.enable =;"); // syntax error
         let gold = wrap("services.nginx.enable = true;");
-        let v = score(&gen, &gold);
+        let v = score(&generated, &gold);
         assert!(!v.pass());
         assert!(v.parse_error.is_some());
     }
@@ -621,10 +615,10 @@ mod tests {
         // A dev-shell generator might emit a more complete package set
         // than the hand-written golden. As long as every required pkg
         // is present, extras (rustfmt, clippy) should NOT fail the check.
-        let gen =
+        let generated =
             wrap("buildInputs = with pkgs; [ rustc cargo rustfmt clippy rust-analyzer mold ];");
         let gold = wrap("buildInputs = with pkgs; [ rustc cargo rust-analyzer mold ];");
-        let v = score(&gen, &gold);
+        let v = score(&generated, &gold);
         assert!(
             v.pass(),
             "generator superset must satisfy golden; got {:?}",
@@ -637,9 +631,9 @@ mod tests {
         // Conversely: if a required package is absent, the structural
         // scorer must report a mismatch — this is the legitimate
         // generator-bug case that matters to catch.
-        let gen = wrap("buildInputs = with pkgs; [ rustc cargo ];");
+        let generated = wrap("buildInputs = with pkgs; [ rustc cargo ];");
         let gold = wrap("buildInputs = with pkgs; [ rustc cargo rust-analyzer ];");
-        let v = score(&gen, &gold);
+        let v = score(&generated, &gold);
         assert!(!v.pass(), "missing required package must fail");
         assert_eq!(v.value_mismatches.len(), 1);
     }
@@ -647,9 +641,9 @@ mod tests {
     #[test]
     fn package_list_order_independent() {
         // BTreeSet canonicalization means [ b a c ] == [ a b c ].
-        let gen = wrap("buildInputs = with pkgs; [ cargo rustc rust-analyzer ];");
+        let generated = wrap("buildInputs = with pkgs; [ cargo rustc rust-analyzer ];");
         let gold = wrap("buildInputs = with pkgs; [ rustc cargo rust-analyzer ];");
-        let v = score(&gen, &gold);
+        let v = score(&generated, &gold);
         assert!(v.pass(), "list order should not matter; got {:?}", v);
     }
 
@@ -658,9 +652,9 @@ mod tests {
         // Lists containing non-identifier expressions (strings, numbers)
         // must NOT become PackageList — subset semantics don't make sense
         // for config values.
-        let gen = wrap("networking.firewall.allowedTCPPorts = [ 80 443 ];");
+        let generated = wrap("networking.firewall.allowedTCPPorts = [ 80 443 ];");
         let gold = wrap("networking.firewall.allowedTCPPorts = [ 80 443 ];");
-        let v = score(&gen, &gold);
+        let v = score(&generated, &gold);
         assert!(v.pass(), "integer list should still match; got {:?}", v);
         // Confirm it canonicalized as Opaque (not PackageList) by adding
         // an extra port that SHOULD fail — if it became PackageList, the
@@ -677,9 +671,9 @@ mod tests {
     #[test]
     fn whitespace_collapse_in_opaque_values() {
         // `[ 80  443 ]` and `[80 443]` should canonicalize identically.
-        let gen = wrap("networking.firewall.allowedTCPPorts = [ 80  443 ];");
+        let generated = wrap("networking.firewall.allowedTCPPorts = [ 80  443 ];");
         let gold = wrap("networking.firewall.allowedTCPPorts = [80 443];");
-        let v = score(&gen, &gold);
+        let v = score(&generated, &gold);
         assert!(
             v.pass(),
             "whitespace differences should not fail; got {:?}",

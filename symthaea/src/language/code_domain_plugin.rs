@@ -368,7 +368,7 @@ impl DomainPlugin for CodeDomainPlugin {
         let backtick_count = input.matches("```").count();
         if backtick_count % 2 != 0 {
             return ValidationResult::invalid(vec![
-                "Unclosed code block (missing closing ```)".to_string()
+                "Unclosed code block (missing closing ```)".to_string(),
             ]);
         }
 

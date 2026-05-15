@@ -174,6 +174,68 @@ impl NixKg {
             .map(|v| v.as_slice())
             .unwrap_or(&[])
     }
+
+    /// **NEW**: Synthesize a natural language prompt from a code fragment.
+    /// Used by the Inverse Harvester (Phase 2 M7) to generate training pairs.
+    pub fn reverse_prompt(&self, fragment: &str) -> Option<String> {
+        let lower = fragment.to_lowercase();
+
+        // 1. Service prompt
+        let keywords = self.matching_service_keywords(&lower);
+        if !keywords.is_empty() {
+            // Pick the most specific keyword (longest)
+            let mut kw = keywords[0];
+            for k in &keywords {
+                if k.len() > kw.len() {
+                    kw = k;
+                }
+            }
+
+            if lower.contains("enable = true") {
+                return Some(format!("enable {} service", kw));
+            } else if lower.contains("enable = false") {
+                return Some(format!("disable {} service", kw));
+            } else {
+                return Some(format!("configure {} service", kw));
+            }
+        }
+
+        // 2. Hardware prompt
+        if lower.contains("hardware.") {
+            if lower.contains("nvidia") {
+                return Some("configure nvidia gpu drivers".to_string());
+            }
+            if lower.contains("intel") {
+                return Some("configure intel hardware acceleration".to_string());
+            }
+            if lower.contains("amd") {
+                return Some("configure amd hardware acceleration".to_string());
+            }
+        }
+
+        // 3. Networking prompt
+        if lower.contains("networking.firewall") {
+            if lower.contains("allowedtcpports") {
+                return Some("open firewall ports".to_string());
+            }
+            if lower.contains("allowedudpports") {
+                return Some("open udp ports in firewall".to_string());
+            }
+        }
+
+        None
+    }
+
+    /// **NEW**: Generate the 17D intent vector for a prompt.
+    /// In production: this would call a real encoder; for now it returns
+    /// a one-hot-like vector based on NixIntent classification.
+    pub fn channels_for_prompt(&self, prompt: &str) -> Vec<f32> {
+        use crate::language::nix_broca_bridge::broca_channels_for_nix_prompt;
+        // The broca_channels_for_nix_prompt returns the full 43D Broca vector.
+        // We only want the intent/context part if we're following the skeleton,
+        // but it's safer to just return the whole thing for the trainer.
+        broca_channels_for_nix_prompt(prompt).to_vec()
+    }
 }
 
 // ─── Bundled defaults ──────────────────────────────────────────────────────
@@ -382,9 +444,10 @@ mod tests {
         let json = serde_json::to_string(&kg.conflicts).unwrap();
         let back: Vec<ConflictClaim> = serde_json::from_str(&json).unwrap();
         assert_eq!(kg.conflicts.len(), back.len());
-        assert!(back
-            .iter()
-            .any(|c| c.reason.contains("two boot loaders enabled simultaneously")));
+        assert!(
+            back.iter()
+                .any(|c| c.reason.contains("two boot loaders enabled simultaneously"))
+        );
     }
 
     #[test]
@@ -410,23 +473,27 @@ mod tests {
         let kg = NixKg::from_file(user_file);
         assert!(kg.is_known_option_root("myCustomRoot"));
         assert!(kg.is_known_option_root("services")); // bundled default still present
-        assert!(kg
-            .conflicts
-            .iter()
-            .any(|c| c.reason == "user-defined conflict"));
-        assert!(kg
-            .conflicts
-            .iter()
-            .any(|c| c.reason.contains("two boot loaders"))); // default kept
+        assert!(
+            kg.conflicts
+                .iter()
+                .any(|c| c.reason == "user-defined conflict")
+        );
+        assert!(
+            kg.conflicts
+                .iter()
+                .any(|c| c.reason.contains("two boot loaders"))
+        ); // default kept
         assert!(kg.service_keywords.iter().any(|k| k == "myservice"));
-        assert!(kg
-            .rag_prefixes_for(NixIntent::Service)
-            .iter()
-            .any(|p| p == "services.custom."));
-        assert!(kg
-            .rag_prefixes_for(NixIntent::Service)
-            .iter()
-            .any(|p| p == "services.")); // default kept
+        assert!(
+            kg.rag_prefixes_for(NixIntent::Service)
+                .iter()
+                .any(|p| p == "services.custom.")
+        );
+        assert!(
+            kg.rag_prefixes_for(NixIntent::Service)
+                .iter()
+                .any(|p| p == "services.")
+        ); // default kept
     }
 
     #[test]

@@ -1,0 +1,11 @@
+---
+manifest_version: "0"
+name: mycelix-manufacturing
+description: Mycelix Manufacturing Cluster (BOM, Workorders, Operations)
+roles:
+  - name: manufacturing
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./dna/manufacturing.dna

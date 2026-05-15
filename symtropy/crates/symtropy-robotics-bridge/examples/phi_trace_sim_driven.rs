@@ -36,6 +36,7 @@ use symthaea_multirotor::types::{pd_baseline, FlightSetpoint, PdGains, Quadrotor
 use symtropy_physics::BodyHandle;
 use symtropy_robotics_bridge::agent::RoboticAgent;
 use symtropy_robotics_bridge::platform::PlatformType;
+use symtropy_robotics_bridge::RoboticAgentTrait;
 
 fn percentile(sorted: &[f64], q: f64) -> f64 {
     if sorted.is_empty() {
@@ -144,7 +145,8 @@ fn main() {
     }
 
     let mut sorted = phi_samples.clone();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    sorted.sort_by(|a: &f64, b: &f64| a.partial_cmp(b).unwrap());
+
     let n = phi_samples.len() as f64;
     let mean = phi_samples.iter().sum::<f64>() / n;
     let var = phi_samples.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n - 1.0).max(1.0);

@@ -43,6 +43,7 @@ use symthaea_core::hdc::binary_hv::BinaryHV;
 use crate::execution_oracle::{ExecutionOracle, OperationType, PredictionResult};
 use crate::manifold::ProgramManifold;
 use crate::topology::BettiNumbers;
+use quote::ToTokens;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TOPOLOGICAL SIGNATURES OF COMBINATORS
@@ -61,6 +62,36 @@ pub struct TopologicalSignature {
     pub node_count: usize,
     /// Number of edges this combinator adds
     pub edge_count: usize,
+}
+
+/// Coarse structural family inferred from a synthesis request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum GeodesicIntentClass {
+    Linear,
+    Branch,
+    Iterator,
+    Reducer,
+    Filter,
+    Mapper,
+    Search,
+    Sort,
+    Recursion,
+    NestedIteration,
+    Parser,
+}
+
+/// Request-derived structural prior used before skeleton construction.
+#[derive(Debug, Clone)]
+pub struct GeodesicRequestProfile {
+    pub betti: BettiNumbers,
+    pub classes: Vec<GeodesicIntentClass>,
+    pub hints: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+struct RustSignatureInfo {
+    params: Vec<(String, String)>,
+    return_type: Option<String>,
 }
 
 /// A skeleton combinator with its topological signature.
@@ -508,6 +539,325 @@ pub fn build_skeleton_from_topology(
     }
 }
 
+/// Infer a conservative topology and structure family from request text and Rust signature.
+///
+/// This is intentionally a structural prior, not a proof. It uses `syn` for
+/// signature facts and plain request text for semantic hints, then the emitted
+/// candidate still has to pass compiler/test verification.
+pub fn classify_geodesic_request(
+    name: &str,
+    purpose: &str,
+    signature: Option<&str>,
+    constraints: &[String],
+) -> GeodesicRequestProfile {
+    let hints = geodesic_hints(name, purpose, signature, constraints);
+    let text = hints.join(" ").to_lowercase();
+    let sig = signature.and_then(parse_rust_signature_info);
+    let mut classes = Vec::new();
+
+    let has_collection_param = sig
+        .as_ref()
+        .map(|s| {
+            s.params.iter().any(|(_, ty)| {
+                let ty = ty.to_lowercase();
+                ty.contains("vec")
+                    || ty.contains('&')
+                    || ty.contains('[')
+                    || ty.contains("slice")
+                    || ty.contains("iterator")
+            })
+        })
+        .unwrap_or(false);
+    let has_nested_collection = sig
+        .as_ref()
+        .map(|s| {
+            s.params.iter().any(|(_, ty)| {
+                let ty = ty.to_lowercase();
+                ty.matches("vec").count() >= 2
+                    || ty.contains("[[")
+                    || ty.contains("matrix")
+                    || ty.contains("grid")
+            })
+        })
+        .unwrap_or(false);
+
+    if text.contains("recursive") || text.contains("recursion") || text.contains("recurse") {
+        classes.push(GeodesicIntentClass::Recursion);
+    }
+    if text.contains("nested")
+        || text.contains("matrix")
+        || text.contains("grid")
+        || text.contains("dynamic programming")
+        || has_nested_collection
+    {
+        classes.push(GeodesicIntentClass::NestedIteration);
+    }
+    if text.contains("filter") || text.contains("keep") || text.contains("select") {
+        classes.push(GeodesicIntentClass::Filter);
+    }
+    if text.contains("map") || text.contains("transform") || text.contains("convert each") {
+        classes.push(GeodesicIntentClass::Mapper);
+    }
+    if text.contains("fold")
+        || text.contains("reduce")
+        || text.contains("sum")
+        || text.contains("count")
+        || text.contains("accumulate")
+        || text.contains("aggregate")
+    {
+        classes.push(GeodesicIntentClass::Reducer);
+    }
+    if text.contains("search") || text.contains("find") || text.contains("contains") {
+        classes.push(GeodesicIntentClass::Search);
+    }
+    if text.contains("sort") || text.contains("order") {
+        classes.push(GeodesicIntentClass::Sort);
+    }
+    if text.contains("parse") || text.contains("token") || text.contains("scan") {
+        classes.push(GeodesicIntentClass::Parser);
+    }
+    if text.contains("if")
+        || text.contains("branch")
+        || text.contains("condition")
+        || text.contains("match")
+        || sig
+            .as_ref()
+            .and_then(|s| s.return_type.as_deref())
+            .map(|ret| ret == "bool")
+            .unwrap_or(false)
+    {
+        classes.push(GeodesicIntentClass::Branch);
+    }
+    if has_collection_param
+        || text.contains("loop")
+        || text.contains("iterate")
+        || text.contains("each")
+        || text.contains("&[")
+        || text.contains("array")
+        || text.contains("slice")
+        || text.contains("vec")
+    {
+        classes.push(GeodesicIntentClass::Iterator);
+    }
+    if classes.is_empty() {
+        classes.push(GeodesicIntentClass::Linear);
+    }
+
+    let beta_1 = if classes.contains(&GeodesicIntentClass::NestedIteration) {
+        2
+    } else if classes.iter().any(|class| {
+        matches!(
+            class,
+            GeodesicIntentClass::Iterator
+                | GeodesicIntentClass::Reducer
+                | GeodesicIntentClass::Filter
+                | GeodesicIntentClass::Mapper
+                | GeodesicIntentClass::Search
+                | GeodesicIntentClass::Sort
+                | GeodesicIntentClass::Recursion
+                | GeodesicIntentClass::Parser
+        )
+    }) {
+        1
+    } else {
+        0
+    };
+
+    GeodesicRequestProfile {
+        betti: BettiNumbers {
+            beta_0: 1,
+            beta_1,
+            beta_2: 0,
+        },
+        classes,
+        hints,
+    }
+}
+
+pub fn geodesic_hints(
+    name: &str,
+    purpose: &str,
+    signature: Option<&str>,
+    constraints: &[String],
+) -> Vec<String> {
+    let mut hints = vec![purpose.to_string(), name.to_string()];
+    if let Some(signature) = signature {
+        hints.push(signature.to_string());
+    }
+    hints.extend(constraints.iter().cloned());
+    hints
+}
+
+pub fn normalize_signature_for_geodesic_emitter(signature: &str) -> String {
+    signature
+        .trim()
+        .trim_end_matches('{')
+        .trim()
+        .strip_prefix("pub ")
+        .unwrap_or(signature.trim())
+        .to_string()
+}
+
+/// Fill all generic slots with type-aware safe defaults.
+pub fn fill_skeleton_defaults_for_signature(
+    skeleton: &mut SkeletonCombinator,
+    signature: Option<&str>,
+) {
+    let sig = signature.and_then(parse_rust_signature_info);
+    let return_type = sig
+        .as_ref()
+        .and_then(|s| s.return_type.as_deref())
+        .unwrap_or("()");
+    let first_param = sig
+        .as_ref()
+        .and_then(|s| s.params.first())
+        .map(|(name, _)| name.as_str())
+        .unwrap_or("items");
+
+    fill_skeleton_defaults_recursive(skeleton, return_type, first_param);
+}
+
+fn fill_skeleton_defaults_recursive(
+    skeleton: &mut SkeletonCombinator,
+    return_type: &str,
+    first_param: &str,
+) {
+    match skeleton {
+        SkeletonCombinator::Sequence(steps) => {
+            for step in steps {
+                fill_skeleton_defaults_recursive(step, return_type, first_param);
+            }
+        }
+        SkeletonCombinator::Branch {
+            condition,
+            then_branch,
+            else_branch,
+        } => {
+            condition.fill("false");
+            fill_skeleton_defaults_recursive(then_branch, return_type, first_param);
+            fill_skeleton_defaults_recursive(else_branch, return_type, first_param);
+        }
+        SkeletonCombinator::Iterate {
+            init,
+            condition,
+            body,
+        } => {
+            init.fill("let mut __gcs_done = false;");
+            condition.fill("!__gcs_done");
+            fill_skeleton_defaults_recursive(body, return_type, first_param);
+        }
+        SkeletonCombinator::Recurse {
+            base_case,
+            recursive_case,
+        } => {
+            fill_skeleton_defaults_recursive(base_case, return_type, first_param);
+            fill_skeleton_defaults_recursive(recursive_case, return_type, first_param);
+        }
+        SkeletonCombinator::MapOver {
+            transform,
+            collection,
+        } => {
+            transform.fill("|x| x");
+            collection.fill(first_param);
+        }
+        SkeletonCombinator::FilterBy {
+            predicate,
+            collection,
+        } => {
+            predicate.fill("|_| true");
+            collection.fill(first_param);
+        }
+        SkeletonCombinator::Reduce {
+            operation,
+            initial,
+            collection,
+        } => {
+            operation.fill("|acc, _| acc");
+            initial.fill(default_expression_for_type(return_type));
+            collection.fill(first_param);
+        }
+        SkeletonCombinator::Leaf(slot) => {
+            let desc = slot.description.to_lowercase();
+            if desc.contains("initialization") {
+                slot.fill(&format!(
+                    "let mut result: {} = {};",
+                    return_type,
+                    default_expression_for_type(return_type)
+                ));
+            } else if desc.contains("return") {
+                if return_type == "()" {
+                    slot.fill("return;");
+                } else {
+                    slot.fill("result");
+                }
+            } else if desc.contains("condition") || desc.contains("comparison") {
+                slot.fill("false");
+            } else if desc.contains("loop") {
+                slot.fill("__gcs_done = true;");
+            } else if desc.contains("early return") || desc.contains("alternative") {
+                if return_type == "()" {
+                    slot.fill("return;");
+                } else {
+                    slot.fill(&format!(
+                        "return {};",
+                        default_expression_for_type(return_type)
+                    ));
+                }
+            } else {
+                slot.fill("()");
+            }
+        }
+    }
+}
+
+pub fn default_expression_for_type(type_name: &str) -> &'static str {
+    let compact: String = type_name.chars().filter(|ch| !ch.is_whitespace()).collect();
+    match compact.as_str() {
+        "()" => "()",
+        "bool" => "false",
+        "String" => "String::new()",
+        "usize" | "u8" | "u16" | "u32" | "u64" | "u128" | "isize" | "i8" | "i16" | "i32"
+        | "i64" | "i128" => "0",
+        "f32" => "0.0",
+        "f64" => "0.0",
+        type_name if type_name.starts_with("Option<") => "None",
+        type_name if type_name.starts_with("Vec<") => "Vec::new()",
+        type_name if type_name.starts_with("Result<") => "Ok(Default::default())",
+        _ => "Default::default()",
+    }
+}
+
+fn parse_rust_signature_info(signature: &str) -> Option<RustSignatureInfo> {
+    let normalized = normalize_signature_for_geodesic_emitter(signature);
+    let item_fn = syn::parse_str::<syn::ItemFn>(&format!("{normalized} {{}}")).ok()?;
+
+    let params = item_fn
+        .sig
+        .inputs
+        .iter()
+        .filter_map(|arg| match arg {
+            syn::FnArg::Typed(pat_type) => match pat_type.pat.as_ref() {
+                syn::Pat::Ident(pat_ident) => Some((
+                    pat_ident.ident.to_string(),
+                    pat_type.ty.as_ref().into_token_stream().to_string(),
+                )),
+                _ => None,
+            },
+            syn::FnArg::Receiver(_) => None,
+        })
+        .collect();
+
+    let return_type = match item_fn.sig.output {
+        syn::ReturnType::Default => None,
+        syn::ReturnType::Type(_, ty) => Some(ty.into_token_stream().to_string()),
+    };
+
+    Some(RustSignatureInfo {
+        params,
+        return_type,
+    })
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // MANIFOLD-GUIDED SLOT FILLING
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -859,9 +1209,11 @@ mod tests {
         // Verify it chose recursion, not iteration
         match &skeleton {
             SkeletonCombinator::Sequence(steps) => {
-                assert!(steps
-                    .iter()
-                    .any(|s| matches!(s, SkeletonCombinator::Recurse { .. })));
+                assert!(
+                    steps
+                        .iter()
+                        .any(|s| matches!(s, SkeletonCombinator::Recurse { .. }))
+                );
             }
             _ => panic!("expected sequence with recursion"),
         }
@@ -892,9 +1244,11 @@ mod tests {
         // Verify it has a branch
         match &skeleton {
             SkeletonCombinator::Sequence(steps) => {
-                assert!(steps
-                    .iter()
-                    .any(|s| matches!(s, SkeletonCombinator::Branch { .. })));
+                assert!(
+                    steps
+                        .iter()
+                        .any(|s| matches!(s, SkeletonCombinator::Branch { .. }))
+                );
             }
             _ => panic!("expected sequence with branch"),
         }
@@ -1036,5 +1390,38 @@ mod tests {
             has_nested_branch(&skeleton),
             "binary search should have a branch inside the loop"
         );
+    }
+
+    #[test]
+    fn test_classify_geodesic_request_uses_signature_collections() {
+        let profile = classify_geodesic_request(
+            "sum",
+            "Sum values",
+            Some("fn sum(items: &[i32]) -> i32"),
+            &[],
+        );
+
+        assert_eq!(profile.betti.beta_1, 1);
+        assert!(profile.classes.contains(&GeodesicIntentClass::Iterator));
+        assert!(profile.classes.contains(&GeodesicIntentClass::Reducer));
+    }
+
+    #[test]
+    fn test_fill_skeleton_defaults_for_signature() {
+        let profile = classify_geodesic_request(
+            "sum",
+            "Sum values",
+            Some("fn sum(items: &[i32]) -> i32"),
+            &[],
+        );
+        let hint_refs: Vec<&str> = profile.hints.iter().map(String::as_str).collect();
+        let mut skeleton = build_skeleton_from_topology(&profile.betti, &hint_refs);
+
+        fill_skeleton_defaults_for_signature(&mut skeleton, Some("fn sum(items: &[i32]) -> i32"));
+
+        assert_eq!(skeleton.unfilled_count(), 0);
+        let source = skeleton.emit_rust(1).expect("filled skeleton should emit");
+        assert!(source.contains("items"));
+        assert!(!source.contains("todo!"));
     }
 }

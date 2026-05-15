@@ -152,6 +152,8 @@ pub struct EntityConsciousness {
     pub prediction_decay: f64,
     /// Persistent agent memory (well locations, partner history, energy window).
     pub memory: AgentMemory,
+    /// Constant power drain in Watts (e.g. from attached toolheads).
+    pub power_drain_watts: f64,
 }
 
 impl EntityConsciousness {
@@ -167,6 +169,7 @@ impl EntityConsciousness {
             motor_precision: 1.0,
             prediction_decay: 0.05, // ~20 ticks to recover
             memory: AgentMemory::default(),
+            power_drain_watts: 0.0,
         }
     }
 
@@ -449,6 +452,7 @@ impl<const D: usize> ConsciousnessField<D> {
 
     /// Finalize this tick's energy balance. Returns the balance report.
     pub fn tick_thermodynamics(&mut self) -> crate::thermodynamics::TickBalance {
+        self.drain_sanctuary_absorption();
         self.ledger.tick_balance()
     }
 
@@ -721,6 +725,11 @@ impl<const D: usize> PhysicsCallback<D> for ConsciousnessField<D> {
                 entity.energy.dissipate_heat(per_entity);
             }
         }
+    }
+
+    fn apply_trauma(&mut self, _: &symtropy_physics::CollisionEvent<D>) {
+        // Trauma is already handled via entity.on_collision() called inside on_collision().
+        // In a more complex model, this would compute specific structural damage.
     }
 }
 

@@ -10,19 +10,19 @@ use wasm_bindgen_futures::spawn_local;
 
 use mycelix_leptos_core::consciousness::refresh_consciousness_from_conductor;
 use mycelix_leptos_core::{
-    ActivityFeed, ActivityFeedItem, AvailabilityState, AvailabilityStateKind, FreshnessBadge,
-    FreshnessLevel,
     init_consciousness_ui, provide_consciousness_context, provide_homeostasis_context,
     provide_local_identity, provide_theme_context, provide_thermodynamic_context,
-    provide_toast_context, use_toasts, AppShell, ConnectStrategy, EmptyState,
+    provide_toast_context, use_toasts, ActivityFeed, ActivityFeedItem, AppShell, AvailabilityState,
+    AvailabilityStateKind, ConnectStrategy, EmptyState, FreshnessBadge, FreshnessLevel,
     HolochainProviderAuto, HolochainProviderConfig, NavLink, NavTab, ToastContainer, ToastKind,
 };
 use personal_leptos_types::{ConsentGrantView, CredentialType, StoredCredentialView};
 
 use crate::context::{
-    provide_personal_context, refresh_health_state, refresh_identity_state,
-    refresh_preferences_state, use_personal,
+    provide_cultural_context, provide_personal_context, refresh_health_state,
+    refresh_identity_state, refresh_preferences_state, use_cultural, use_personal,
 };
+use crate::telemetry::ConstellationTelemetry;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum PersonalTheme {
@@ -80,6 +80,7 @@ fn AppInner() -> impl IntoView {
     provide_homeostasis_context(1, "--personal-homeostasis");
     provide_local_identity();
     provide_personal_context();
+    provide_cultural_context();
     init_consciousness_ui();
 
     let hc = mycelix_leptos_core::holochain_provider::use_holochain();
@@ -120,6 +121,22 @@ fn AppInner() -> impl IntoView {
             href: "/profile",
             label: "Profile",
             icon: Some("ME"),
+        },
+        // Constellation Group (Satellite hApps)
+        NavLink {
+            href: "/civic",
+            label: "Civic",
+            icon: Some("⚔"),
+        },
+        NavLink {
+            href: "/knowledge",
+            label: "Knowledge",
+            icon: Some("📖"),
+        },
+        NavLink {
+            href: "/finance",
+            label: "Finance",
+            icon: Some("💰"),
         },
     ];
 
@@ -165,6 +182,10 @@ fn AppInner() -> impl IntoView {
                     <Route path=path!("/activity") view=ActivityPage />
                     <Route path=path!("/profile") view=IdentityPage />
                     <Route path=path!("/unlock") view=UnlockPage />
+                    // Constellation Satellite Routes
+                    <Route path=path!("/civic") view=|| view! { <EmbeddedSatellite name="Civic" port=5174 /> } />
+                    <Route path=path!("/knowledge") view=|| view! { <EmbeddedSatellite name="Knowledge" port=5175 /> } />
+                    <Route path=path!("/finance") view=|| view! { <EmbeddedSatellite name="Finance" port=5176 /> } />
                 </Routes>
             </AppShell>
             <ToastContainer />
@@ -173,8 +194,47 @@ fn AppInner() -> impl IntoView {
 }
 
 #[component]
+fn CulturalReskinSelector() -> impl IntoView {
+    let cultural = use_cultural();
+    let symbols = cultural.symbols;
+
+    let set_context = move |id: &str| {
+        let new_symbols = match id {
+            "indigenous" => SymbolRegistry {
+                hearth_alias: "WELL".into(),
+                mycel_alias: "SPARK".into(),
+                genesis_alias: "The Sun-Rise".into(),
+                orientation: "Indigenous Stewardship metaphors".into(),
+            },
+            "community" => SymbolRegistry {
+                hearth_alias: "CAMPFIRE".into(),
+                mycel_alias: "EMBER".into(),
+                genesis_alias: "The Ignition".into(),
+                orientation: "Urban Mutual-Aid metaphors".into(),
+            },
+            _ => SymbolRegistry::default(),
+        };
+        symbols.set(new_symbols);
+    };
+
+    view! {
+        <div style="display: flex; gap: 0.8rem; margin-bottom: 2rem; padding: 0.8rem; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid var(--md-divider);">
+            <span style="font-size: 0.75rem; color: var(--md-fg-muted); align-self: center; margin-right: 0.5rem;">
+                "CULTURAL HUD:"
+            </span>
+            <button class="btn-vault" on:click=move |_| set_context("canonical")> "Canonical" </button>
+            <button class="btn-vault" on:click=move |_| set_context("indigenous")> "Indigenous" </button>
+            <button class="btn-vault" on:click=move |_| set_context("community")> "Community" </button>
+        </div>
+    }
+}
+
+#[component]
 fn VaultPage() -> impl IntoView {
     let ctx = use_personal();
+    let cultural = use_cultural();
+    let symbols = cultural.symbols;
+
     let hc = mycelix_leptos_core::holochain_provider::use_holochain();
     let active_consents = Memo::new(move |_| {
         ctx.consents
@@ -220,9 +280,11 @@ fn VaultPage() -> impl IntoView {
         <div class="vault-page">
             <PageHeader
                 eyebrow="Sovereign Vault"
-                title="Private posture, proof posture, and disclosure posture in one place."
-                summary=ctx.status_note.get_untracked()
+                title=move || format!("Private posture, proof posture, and {} posture in one place.", symbols.get().hearth_alias.to_lowercase())
+                summary=move || format!("{}. {}", ctx.status_note.get(), symbols.get().orientation)
             />
+
+            <CulturalReskinSelector />
 
             <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-bottom: 1rem;">
                 {move || {
@@ -292,11 +354,13 @@ fn VaultPage() -> impl IntoView {
                 </div>
             </div>
 
+            <ConstellationTelemetry />
+
             <div class="stats-grid">
                 <VaultStat label="Credentials" value=move || ctx.credentials.get().len().to_string() />
-                <VaultStat label="Active consents" value=move || active_consents.get().to_string() />
+                <VaultStat label=move || format!("Active {} consents", symbols.get().hearth_alias.to_lowercase()) value=move || active_consents.get().to_string() />
                 <VaultStat label="Health records" value=move || ctx.health_record_count.get().to_string() />
-                <VaultStat label="Revoked credentials" value=move || revoked_credentials.get().to_string() />
+                <VaultStat label=move || format!("{} status", symbols.get().mycel_alias) value=move || "Resonant".to_string() />
             </div>
 
             <div class="vault-columns">
@@ -332,7 +396,9 @@ fn freshness_from_micros(timestamp_micros: i64) -> FreshnessLevel {
 }
 
 fn format_relative_micros(timestamp_micros: i64) -> String {
-    let date = js_sys::Date::new(&wasm_bindgen::JsValue::from_f64((timestamp_micros / 1000) as f64));
+    let date = js_sys::Date::new(&wasm_bindgen::JsValue::from_f64(
+        (timestamp_micros / 1000) as f64,
+    ));
     date.to_locale_string("en-US", &wasm_bindgen::JsValue::UNDEFINED)
         .as_string()
         .unwrap_or_else(|| "recently".into())
@@ -904,6 +970,26 @@ fn PreferenceCard(pref: personal_leptos_types::DataSharingPreferenceView) -> imp
                 </button>
             </div>
         </article>
+    }
+}
+
+#[component]
+fn EmbeddedSatellite(name: &'static str, port: u16) -> impl IntoView {
+    let url = format!("http://localhost:{}", port);
+
+    view! {
+        <div class="embedded-satellite-container">
+            <div class="embedded-header">
+                <span class="embedded-title">{format!("{} Satellite", name)}</span>
+                <span class="telemetry-badge">"STANDALONE"</span>
+            </div>
+            <iframe
+                src=url
+                title=name
+                class="embedded-satellite-frame"
+                style="width: 100%; height: calc(100vh - 120px); border: none; background: var(--bg-surface);"
+            ></iframe>
+        </div>
     }
 }
 

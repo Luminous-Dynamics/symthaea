@@ -1,5 +1,3 @@
-use mycelix_zome_helpers as _;
-#![deny(unsafe_code)]
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -8,10 +6,11 @@ use mycelix_zome_helpers as _;
 //! Manages work experience entries with peer verification.
 //! Verification uses link-based attestation (existence of link = verified).
 
+#![deny(unsafe_code)]
+
 use hdk::prelude::*;
-use work_history_integrity::{
-    EntryTypes, LinkTypes, OrgAnchor, WorkExperience, WorkVerification,
-};
+use mycelix_zome_helpers as _;
+use work_history_integrity::{EntryTypes, LinkTypes, OrgAnchor, WorkExperience, WorkVerification};
 
 // ============== Helpers ==============
 
@@ -27,9 +26,9 @@ fn load_experiences(links: Vec<Link>) -> ExternResult<Vec<WorkExperience>> {
         if let Some(hash) = link.target.into_action_hash() {
             if let Some(record) = get(hash, GetOptions::default())? {
                 if let Some(Entry::App(bytes)) = record.entry().as_option() {
-                    if let Ok(exp) = WorkExperience::try_from(
-                        SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec())),
-                    ) {
+                    if let Ok(exp) = WorkExperience::try_from(SerializedBytes::from(
+                        UnsafeBytes::from(bytes.bytes().to_vec()),
+                    )) {
                         items.push(exp);
                     }
                 }
@@ -80,18 +79,30 @@ pub fn add_work_experience(input: AddWorkExperienceInput) -> ExternResult<Action
 
     // Link: agent -> experience
     let agent_hash: AnyDhtHash = agent.into();
-    create_link(agent_hash, action_hash.clone(), LinkTypes::AgentToWorkExperience, vec![])?;
+    create_link(
+        agent_hash,
+        action_hash.clone(),
+        LinkTypes::AgentToWorkExperience,
+        vec![],
+    )?;
 
     // Link: org anchor -> experience
     let org_hash = org_anchor(&input.organization)?;
-    create_link(org_hash, action_hash.clone(), LinkTypes::OrgAnchorToWorkExperience, vec![])?;
+    create_link(
+        org_hash,
+        action_hash.clone(),
+        LinkTypes::OrgAnchorToWorkExperience,
+        vec![],
+    )?;
 
     Ok(action_hash)
 }
 
 /// Update an existing work experience (author-only at integrity layer).
 #[hdk_extern]
-pub fn update_work_experience(input: (ActionHash, AddWorkExperienceInput)) -> ExternResult<ActionHash> {
+pub fn update_work_experience(
+    input: (ActionHash, AddWorkExperienceInput),
+) -> ExternResult<ActionHash> {
     let (original_hash, update) = input;
     let now = sys_time()?;
 
@@ -101,7 +112,11 @@ pub fn update_work_experience(input: (ActionHash, AddWorkExperienceInput)) -> Ex
         start_date: update.start_date,
         end_date: update.end_date,
         description: update.description,
-        skills_used: update.skills_used.iter().map(|s| s.to_lowercase()).collect(),
+        skills_used: update
+            .skills_used
+            .iter()
+            .map(|s| s.to_lowercase())
+            .collect(),
         created_at: now,
     };
 
@@ -134,9 +149,10 @@ pub fn get_work_experience(action_hash: ActionHash) -> ExternResult<Option<WorkE
     };
     match record.entry().as_option() {
         Some(Entry::App(bytes)) => {
-            let exp = WorkExperience::try_from(
-                SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec())),
-            ).map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize: {:?}", e))))?;
+            let exp = WorkExperience::try_from(SerializedBytes::from(UnsafeBytes::from(
+                bytes.bytes().to_vec(),
+            )))
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize: {:?}", e))))?;
             Ok(Some(exp))
         }
         _ => Ok(None),

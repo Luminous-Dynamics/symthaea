@@ -30,6 +30,9 @@ license = "AGPL-3.0-or-later"
 # Holochain 0.6 compatible (per official compatibility table)
 hdk = "0.6.0"
 hdi = "0.7.0"
+holochain_integrity_types = "0.6.0"
+holochain_serialized_bytes = "0.0.56"
+
 # Mycelix Core Types for collective sensing integration
 mycelix-core-types = { path = "../mycelix-core/libs/mycelix-core-types", features = ["serde"] }
 
@@ -39,19 +42,19 @@ serde_json = "1.0"
 
 # Bridge
 mycelix-bridge-common = { path = "../crates/mycelix-bridge-common" }
+mycelix-bridge-proc = { path = "../crates/mycelix-bridge-proc" }
 mycelix-bridge-entry-types = { path = "../crates/mycelix-bridge-entry-types" }
 
 # Utilities
 thiserror = "1.0"
 
-# Holochain serialized bytes for entry serialization
-holochain_serialized_bytes = "0.0.56"
 
 # WASM compatibility - getrandom 0.3 with custom backend (HDK provides __getrandom_v03_custom)
 # NOTE: Do NOT use features = ["js"] or ["wasm_js"] - they pull in wasm-bindgen
 # which is incompatible with Holochain's WASM runtime.
 getrandom = { version = "0.2", features = ["custom"] }
 getrandom_03 = { package = "getrandom", version = "0.3" }
+mycelix-zome-helpers = { path = "../mycelix-workspace/crates/mycelix-zome-helpers" }
 
 # Feldman DKG for threshold signing (WASM-compatible, no getrandom 0.2)
 feldman-dkg = { path = "../mycelix-core/libs/feldman-dkg", features = ["ml-kem-768", "ml-dsa-65"] }
@@ -61,7 +64,6 @@ k256 = { version = "0.13", default-features = false, features = ["arithmetic", "
 
 # Shared governance utilities
 governance-utils = { path = "crates/governance-utils" }
-mycelix-zome-helpers = { path = "../mycelix-workspace/crates/mycelix-zome-helpers" }
 
 # ZKP verification for anonymous voting
 mycelix-zkp-core = { path = "../crates/mycelix-zkp-core" }

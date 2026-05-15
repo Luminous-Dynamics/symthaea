@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -7,10 +6,10 @@ use mycelix_zome_helpers as _;
 
 use hdk::prelude::*;
 use mycelix_bridge_common::{civic_requirement_basic, civic_requirement_proposal};
+use mycelix_zome_helpers as _;
 use mycelix_zome_helpers::records_from_links;
 use support_knowledge_integrity::*;
 use support_types::*;
-
 
 // ============================================================================
 // BRIDGE SIGNAL (for cross-domain UI notification)
@@ -77,7 +76,11 @@ fn extract_article(record: &Record) -> ExternResult<KnowledgeArticle> {
 
 #[hdk_extern]
 pub fn create_article(article: KnowledgeArticle) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "create_article")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "create_article",
+    )?;
     let action_hash = create_entry(&EntryTypes::KnowledgeArticle(article.clone()))?;
 
     // Hash-sharded anchor for all_articles
@@ -138,7 +141,11 @@ pub fn create_article(article: KnowledgeArticle) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn update_article(input: UpdateArticleInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "update_article")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "update_article",
+    )?;
     let _original = get(input.original_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Original article not found".into())
     ))?;
@@ -155,7 +162,11 @@ pub fn update_article(input: UpdateArticleInput) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn deprecate_article(input: DeprecateInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "deprecate_article")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "deprecate_article",
+    )?;
     let original = get(input.article_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Article not found".into())
     ))?;
@@ -214,7 +225,11 @@ pub fn list_recent_articles(_: ()) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn upvote_article(action_hash: ActionHash) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "upvote_article")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "upvote_article",
+    )?;
     let original = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Article not found".into())
     ))?;
@@ -231,7 +246,11 @@ pub fn upvote_article(action_hash: ActionHash) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn verify_article(action_hash: ActionHash) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "verify_article")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "verify_article",
+    )?;
     let original = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Article not found".into())
     ))?;
@@ -252,7 +271,11 @@ pub fn verify_article(action_hash: ActionHash) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn create_resolution(resolution: Resolution) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "create_resolution")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "create_resolution",
+    )?;
     let action_hash = create_entry(&EntryTypes::Resolution(resolution.clone()))?;
     create_link(
         resolution.ticket_hash,
@@ -272,7 +295,11 @@ pub fn create_resolution(resolution: Resolution) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn flag_article(flag: ArticleFlag) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "flag_article")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "flag_article",
+    )?;
     let action_hash = create_entry(&EntryTypes::ArticleFlag(flag.clone()))?;
     create_link(
         flag.article_hash,
@@ -314,7 +341,11 @@ pub fn get_agent_reputation(agent: AgentPubKey) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn link_article_to_ticket(input: LinkArticleInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "link_article_to_ticket")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "link_article_to_ticket",
+    )?;
     let agent = agent_info()?.agent_initial_pubkey;
     let link = ArticleTicketLink {
         article_hash: input.article_hash.clone(),

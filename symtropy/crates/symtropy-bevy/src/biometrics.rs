@@ -127,13 +127,7 @@ pub fn biometric_to_phi_system<const D: usize>(
     let position = physics
         .world
         .body(handle)
-        .map(|b| {
-            let pos = b.position();
-            let coords: Vec<f64> = (0..D).map(|i| pos.coord(i)).collect();
-            let mut arr = [0.0f64; D];
-            arr.copy_from_slice(&coords[..D]);
-            Point::new(arr)
-        })
+        .map(|b| b.transform.translation.clone())
         .unwrap_or_else(Point::origin);
 
     physics.field.update_entity(handle, &inputs, position);

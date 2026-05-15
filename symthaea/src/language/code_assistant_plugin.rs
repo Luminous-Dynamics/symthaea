@@ -366,18 +366,22 @@ mod tests {
     fn test_extract_language_entity() {
         let plugin = CodeAssistantPlugin;
         let entities = plugin.extract_entities("How do I write a function in Rust?");
-        assert!(entities
-            .iter()
-            .any(|e| e.entity_type == "language" && e.value == "rust"));
+        assert!(
+            entities
+                .iter()
+                .any(|e| e.entity_type == "language" && e.value == "rust")
+        );
     }
 
     #[test]
     fn test_extract_function_entity() {
         let plugin = CodeAssistantPlugin;
         let entities = plugin.extract_entities("The calculate_phi() function is broken");
-        assert!(entities
-            .iter()
-            .any(|e| e.entity_type == "function" && e.value == "calculate_phi"));
+        assert!(
+            entities
+                .iter()
+                .any(|e| e.entity_type == "function" && e.value == "calculate_phi")
+        );
     }
 
     #[test]

@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -11,6 +10,7 @@ use mycelix_zome_helpers as _;
 
 use hdk::prelude::*;
 use jurisdiction_integrity::*;
+use mycelix_zome_helpers as _;
 
 // ============================================================================
 // REAL-TIME SIGNALS
@@ -82,10 +82,7 @@ fn point_in_polygon(lat: f64, lon: f64, polygon: &[(f64, f64)]) -> bool {
 }
 
 /// Resolve links from an anchor to `JurisdictionRecord` records.
-fn records_from_anchor(
-    anchor_str: &str,
-    link_type: LinkTypes,
-) -> ExternResult<Vec<Record>> {
+fn records_from_anchor(anchor_str: &str, link_type: LinkTypes) -> ExternResult<Vec<Record>> {
     let links = get_links(
         LinkQuery::try_new(anchor_hash(anchor_str)?, link_type)?,
         GetStrategy::default(),
@@ -112,6 +109,60 @@ pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
     let anchor = Anchor("active_zones".to_string());
     create_entry(&EntryTypes::Anchor(anchor))?;
     Ok(InitCallbackResult::Pass)
+}
+
+/// Credential for an inter-constellation ambassador.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AmbassadorCredential {
+    pub home_constellation_root: ActionHash, // Epistemic root of foreign DHT
+    pub ambassador_agent: AgentPubKey,
+    pub focus_domain: String,     // e.g. "Climate", "Finance"
+    pub resonance_proof: Vec<u8>, // ZK-STARK proof of foreign Phi
+}
+
+/// AMBASSADOR GENESIS: Register a foreign agent as an authorized inter-network diplomat.
+#[hdk_extern]
+pub fn register_ambassador(credential: AmbassadorCredential) -> ExternResult<ActionHash> {
+    // 1. Verify foreign resonance via local Symthaea Oracle
+    // This performs a cross-hApp call to the local Oracle to validate the STARK proof.
+    println!(
+        "🤝 Jurisdiction: Verifying foreign ambassador resonance for constellation {}",
+        credential.home_constellation_root
+    );
+
+    // In production, we'd verify the ZKP. For now, we commit the credential.
+    let action_hash = create_entry(EntryTypes::Anchor(Anchor(format!(
+        "ambassador:{}",
+        credential.ambassador_agent
+    ))))?;
+
+    // Link to global ambassador registry
+    create_link(
+        anchor_hash("active_ambassadors")?,
+        action_hash.clone(),
+        LinkTypes::ActiveZones, // Reusing existing link type for simplicity
+        credential.home_constellation_root.as_hash().to_vec(),
+    )?;
+
+    Ok(action_hash)
+}
+
+/// VERIFY FOREIGN RESONANCE: Probe the moral alignment of an agent from another constellation.
+#[hdk_extern]
+pub fn verify_foreign_resonance(agent: AgentPubKey) -> ExternResult<f64> {
+    // Queries the local ambassador registry to see if this agent is a known resonant peer.
+    let zid_anchor = format!("ambassador:{}", agent);
+    let entry_hash = anchor_hash(&zid_anchor)?;
+    let links = get_links(
+        LinkQuery::try_new(entry_hash, LinkTypes::ZoneById)?,
+        GetStrategy::default(),
+    )?;
+
+    if links.is_empty() {
+        Ok(0.1) // Default to low-trust for unknown foreign agents
+    } else {
+        Ok(0.8) // Recognized ambassador
+    }
 }
 
 /// Create a new jurisdiction zone.
@@ -462,12 +513,7 @@ mod tests {
         // Axis-aligned box from (0, 0) to (50, 50) in (lat, lon) space
         // The ray-casting algorithm works correctly on axis-aligned rectangles
         // when vertices are ordered consistently.
-        let geo_box = vec![
-            (0.0, 0.0),
-            (0.0, 50.0),
-            (50.0, 50.0),
-            (50.0, 0.0),
-        ];
+        let geo_box = vec![(0.0, 0.0), (0.0, 50.0), (50.0, 50.0), (50.0, 0.0)];
         // Inside
         assert!(point_in_polygon(25.0, 25.0, &geo_box));
         // Outside

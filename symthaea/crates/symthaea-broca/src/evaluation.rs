@@ -200,6 +200,8 @@ pub struct QualityRunMetadata {
     pub feature_set: Vec<String>,
     pub train_recipe: Option<String>,
     pub train_pair_count: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub train_pair_selection: Option<String>,
     pub train_epochs: Option<usize>,
     pub train_bptt_window: Option<usize>,
     pub train_negative_samples: Option<usize>,
@@ -214,6 +216,8 @@ pub struct QualityRunMetadata {
     pub train_scheduled_sampling: Option<f32>,
     pub train_label_smoothing: Option<f32>,
     pub train_thought_logit_aux: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub train_thought_logit_residual: Option<f32>,
     pub train_merge_bias: Option<f32>,
 }
 
@@ -474,6 +478,9 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
     };
 
     let total_pairs = pairs.len();
+    let mut all_target_token_ids = Vec::new();
+    let mut all_generated_token_ids = Vec::new();
+
     for (pair_idx, pair) in pairs.iter().enumerate() {
         if pair.target_ids.is_empty() {
             continue;
@@ -1705,6 +1712,27 @@ pub fn english_word_ratio_mamba(
 
 /// Run full Liquid-Mamba evaluation: perplexity + generation quality + projection health.
 #[cfg(feature = "mamba-cpu")]
+use crate::mamba::MambaBackend;
+
+/// Helper to calculate Jaccard-like overlap between two sets of token IDs.
+fn evaluate_token_overlap(target: &[u32], generated: &[u32], _mamba: &dyn MambaBackend) -> f32 {
+    use std::collections::HashSet;
+    if target.is_empty() {
+        return 0.0;
+    }
+    let target_set: HashSet<_> = target.iter().collect();
+    let generated_set: HashSet<_> = generated.iter().collect();
+
+    let intersection = target_set.intersection(&generated_set).count();
+    let union = target_set.union(&generated_set).count();
+
+    if union > 0 {
+        intersection as f32 / union as f32
+    } else {
+        0.0
+    }
+}
+
 pub fn evaluate_liquid_mamba(
     gen: &mut crate::liquid_mamba::LiquidMambaGenerator,
     config: &LiquidMambaEvalConfig,
@@ -1721,6 +1749,8 @@ pub fn evaluate_liquid_mamba(
     let mut total_thought_output_sim = 0.0f32;
     let mut sim_count = 0usize;
     let mut sample_outputs: Vec<SampleOutput> = Vec::new();
+    let mut all_target_token_ids: Vec<u32> = Vec::new();
+    let mut all_generated_token_ids: Vec<u32> = Vec::new();
 
     for pair in &config.dataset.pairs {
         if pair.target_ids.is_empty() && pair.target_text.is_empty() {
@@ -1737,18 +1767,21 @@ pub fn evaluate_liquid_mamba(
         if config.compute_perplexity && !pair.target_text.is_empty() {
             // Encode thought to HDC → SSM space, inject into Mamba
             let thought_hv = gen.encoder().encode(&channels);
-            let ssm_context = gen.projection().project_to_ssm(&thought_hv);
+            let ssm_context = gen.controller_mut().project_to_ssm(&thought_hv);
 
             gen.mamba_mut().reset();
             if gen.mamba_mut().inject_initial_context(&ssm_context).is_ok() {
                 // Tokenize target with Mamba's tokenizer
                 if let Ok(target_ids) = gen.mamba().encode(&pair.target_text) {
+                    let target_ids: Vec<u32> = target_ids;
+                    all_target_token_ids.extend(target_ids.clone());
                     let eos_id = gen.mamba().eos_token_id();
                     let mut prev_token = eos_id;
                     let window = target_ids.len().min(config.max_gen_tokens);
 
                     for &target_id in &target_ids[..window] {
                         if let Ok(logits) = gen.mamba_mut().forward_one_token(prev_token) {
+                            let logits: Vec<f32> = logits;
                             let loss = cross_entropy_loss(&logits, target_id as usize);
                             pair_ce += loss;
                             pair_tokens += 1;
@@ -1769,6 +1802,7 @@ pub fn evaluate_liquid_mamba(
         if config.compute_english_ratio {
             let thought_hv = gen.encoder().encode(&channels);
             let result = gen.generate(&channels);
+            all_generated_token_ids.extend(result.token_ids.clone());
             pair_english_ratio = english_word_ratio_mamba(&result.token_ids, gen.mamba());
             pair_coherence = result.final_coherence;
             total_english_ratio += pair_english_ratio;
@@ -1866,7 +1900,7 @@ pub fn evaluate_liquid_mamba(
         if let Some(tp) = gen.temporal_proj() {
             tp.effective_rank(&all_output_hvs)
         } else {
-            gen.projection().effective_rank(&all_output_hvs)
+            gen.controller_mut().effective_rank(&all_output_hvs)
         }
     } else {
         0.0
@@ -1911,7 +1945,11 @@ pub fn evaluate_liquid_mamba(
         hallucination_rate: None,
         distinct_1: None,
         distinct_2: None,
-        target_token_overlap: None,
+        target_token_overlap: Some(evaluate_token_overlap(
+            &all_target_token_ids,
+            &all_generated_token_ids,
+            gen.mamba(),
+        )),
         moral_refusal_rate: None,
     };
 

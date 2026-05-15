@@ -6,15 +6,18 @@
 //! Cross-hApp communication for Terra Atlas integration, investment tracking,
 //! and regenerative exit coordination.
 
-use hdk::prelude::*;
 use energy_bridge_integrity::*;
+use hdk::prelude::*;
+use mycelix_zome_helpers as _;
 
 const ENERGY_HAPP_ID: &str = "mycelix-energy";
 
 /// Create or retrieve an anchor entry hash for deterministic link bases
 fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_string.to_string());
-    if let Err(e) = create_entry(&EntryTypes::Anchor(anchor.clone())) { debug!("Anchor creation warning: {:?}", e); }
+    if let Err(e) = create_entry(&EntryTypes::Anchor(anchor.clone())) {
+        debug!("Anchor creation warning: {:?}", e);
+    }
     hash_entry(&anchor)
 }
 
@@ -54,8 +57,9 @@ pub fn sync_terra_atlas_project(input: SyncProjectInput) -> ExternResult<Record>
         payload: "{}".to_string(),
     })?;
 
-    get(hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Project not found".into())))
+    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Project not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -76,7 +80,12 @@ pub fn record_investment(input: RecordInvestmentInput) -> ExternResult<Record> {
     let now = sys_time()?;
 
     let investment = InvestmentRecord {
-        id: format!("invest:{}:{}:{}", input.project_id, input.investor_did, now.as_micros()),
+        id: format!(
+            "invest:{}:{}:{}",
+            input.project_id,
+            input.investor_did,
+            now.as_micros()
+        ),
         project_id: input.project_id.clone(),
         investor_did: input.investor_did.clone(),
         amount: input.amount,
@@ -108,11 +117,13 @@ pub fn record_investment(input: RecordInvestmentInput) -> ExternResult<Record> {
         payload: serde_json::json!({
             "amount": input.amount,
             "investor": input.investor_did,
-        }).to_string(),
+        })
+        .to_string(),
     })?;
 
-    get(hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Investment not found".into())))
+    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Investment not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -131,7 +142,12 @@ pub fn record_milestone(input: RecordMilestoneInput) -> ExternResult<Record> {
     let now = sys_time()?;
 
     let milestone = RegenerativeMilestone {
-        id: format!("milestone:{}:{:?}:{}", input.project_id, input.milestone_type, now.as_micros()),
+        id: format!(
+            "milestone:{}:{:?}:{}",
+            input.project_id,
+            input.milestone_type,
+            now.as_micros()
+        ),
         project_id: input.project_id.clone(),
         milestone_type: input.milestone_type.clone(),
         community_readiness: input.community_readiness,
@@ -156,11 +172,13 @@ pub fn record_milestone(input: RecordMilestoneInput) -> ExternResult<Record> {
         payload: serde_json::json!({
             "milestone_type": format!("{:?}", input.milestone_type),
             "community_readiness": input.community_readiness,
-        }).to_string(),
+        })
+        .to_string(),
     })?;
 
-    get(hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Milestone not found".into())))
+    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Milestone not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -263,7 +281,12 @@ pub fn record_production_update(input: RecordProductionInput) -> ExternResult<Re
     let now = sys_time()?;
 
     let record = ProductionRecord {
-        id: format!("prod:{}:{}:{}", input.project_id, input.period_start.as_micros(), now.as_micros()),
+        id: format!(
+            "prod:{}:{}:{}",
+            input.project_id,
+            input.period_start.as_micros(),
+            now.as_micros()
+        ),
         project_id: input.project_id.clone(),
         terra_atlas_id: input.terra_atlas_id.clone(),
         period_start: input.period_start,
@@ -300,7 +323,8 @@ pub fn record_production_update(input: RecordProductionInput) -> ExternResult<Re
             "capacity_factor": input.capacity_factor,
             "revenue_generated": input.revenue_generated,
             "currency": input.currency,
-        }).to_string(),
+        })
+        .to_string(),
     })?;
 
     // Broadcast event
@@ -311,11 +335,13 @@ pub fn record_production_update(input: RecordProductionInput) -> ExternResult<Re
             "energy_mwh": input.energy_generated_mwh,
             "capacity_factor": input.capacity_factor,
             "revenue": input.revenue_generated,
-        }).to_string(),
+        })
+        .to_string(),
     })?;
 
-    get(hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Production record not found".into())))
+    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Production record not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -374,7 +400,9 @@ pub fn get_project_investment_total(project_id: String) -> ExternResult<Investme
         let hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link".into())))?;
         if let Some(record) = get(hash, GetOptions::default())? {
-            if let Some(investment) = record.entry().to_app_option::<InvestmentRecord>()
+            if let Some(investment) = record
+                .entry()
+                .to_app_option::<InvestmentRecord>()
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Parse error: {:?}", e))))?
             {
                 total_amount += investment.amount;
@@ -418,7 +446,12 @@ pub fn queue_sync_to_terra_atlas(input: QueueSyncInput) -> ExternResult<Record> 
     let now = sys_time()?;
 
     let record = PendingSyncRecord {
-        id: format!("sync:{:?}:{}:{}", input.sync_type, input.project_id, now.as_micros()),
+        id: format!(
+            "sync:{:?}:{}:{}",
+            input.sync_type,
+            input.project_id,
+            now.as_micros()
+        ),
         sync_type: input.sync_type,
         target_system: "terra-atlas".to_string(),
         payload: input.payload,
@@ -437,8 +470,9 @@ pub fn queue_sync_to_terra_atlas(input: QueueSyncInput) -> ExternResult<Record> 
         (),
     )?;
 
-    get(hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Sync record not found".into())))
+    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Sync record not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -462,7 +496,9 @@ pub fn get_pending_syncs(_: ()) -> ExternResult<Vec<Record>> {
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link".into())))?;
         if let Some(record) = get(hash.clone(), GetOptions::default())? {
             // Only include records that haven't been synced yet
-            if let Some(sync_record) = record.entry().to_app_option::<PendingSyncRecord>()
+            if let Some(sync_record) = record
+                .entry()
+                .to_app_option::<PendingSyncRecord>()
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Parse error: {:?}", e))))?
             {
                 if sync_record.synced_at.is_none() {
@@ -488,7 +524,8 @@ pub fn mark_sync_complete(input: MarkSyncCompleteInput) -> ExternResult<bool> {
             "status": if input.success { "completed" } else { "failed" },
             "error": input.error,
             "synced_at": now.as_micros(),
-        }).to_string(),
+        })
+        .to_string(),
     })?;
 
     Ok(true)
@@ -516,7 +553,8 @@ pub fn update_project_status(input: UpdateProjectStatusInput) -> ExternResult<Re
             "terra_atlas_id": input.terra_atlas_id,
             "new_status": format!("{:?}", input.new_status),
             "reason": input.reason,
-        }).to_string(),
+        })
+        .to_string(),
     })?;
 
     // Broadcast event
@@ -526,7 +564,8 @@ pub fn update_project_status(input: UpdateProjectStatusInput) -> ExternResult<Re
         payload: serde_json::json!({
             "new_status": format!("{:?}", input.new_status),
             "reason": input.reason,
-        }).to_string(),
+        })
+        .to_string(),
     })
 }
 
@@ -657,7 +696,8 @@ pub fn initiate_transition(input: InitiateTransitionInput) -> ExternResult<Recor
             "target_ownership": input.target_ownership_pct,
             "community_did": input.community_did,
             "status": "Proposed",
-        }).to_string(),
+        })
+        .to_string(),
     })?;
 
     // Broadcast
@@ -668,11 +708,13 @@ pub fn initiate_transition(input: InitiateTransitionInput) -> ExternResult<Recor
             "from_pct": input.current_community_ownership,
             "to_pct": input.target_ownership_pct,
             "community": input.community_did,
-        }).to_string(),
+        })
+        .to_string(),
     })?;
 
-    get(hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Transition record not found".into())))
+    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Transition record not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -698,7 +740,8 @@ pub fn complete_transition(input: CompleteTransitionInput) -> ExternResult<Recor
             "terra_atlas_id": input.terra_atlas_id,
             "final_ownership": input.final_ownership_pct,
             "status": "Completed",
-        }).to_string(),
+        })
+        .to_string(),
     })?;
 
     // Broadcast completion
@@ -708,7 +751,8 @@ pub fn complete_transition(input: CompleteTransitionInput) -> ExternResult<Recor
         payload: serde_json::json!({
             "final_ownership": input.final_ownership_pct,
             "community": input.community_did,
-        }).to_string(),
+        })
+        .to_string(),
     })
 }
 
@@ -725,7 +769,10 @@ pub struct CompleteTransitionInput {
 #[hdk_extern]
 pub fn get_active_transitions(_: ()) -> ExternResult<Vec<Record>> {
     let links = get_links(
-        LinkQuery::try_new(anchor_hash("active_transitions")?, LinkTypes::ActiveTransitions)?,
+        LinkQuery::try_new(
+            anchor_hash("active_transitions")?,
+            LinkTypes::ActiveTransitions,
+        )?,
         GetStrategy::default(),
     )?;
 
@@ -773,7 +820,9 @@ pub fn get_project_transitions(project_id: String) -> ExternResult<Vec<Record>> 
 /// Only projects with status `Operational` or `CommunityOwned` are eligible
 /// (they must have verified production data).
 #[hdk_extern]
-pub fn register_certificate_as_collateral(input: CertificateCollateralInput) -> ExternResult<CertificateCollateralResult> {
+pub fn register_certificate_as_collateral(
+    input: CertificateCollateralInput,
+) -> ExternResult<CertificateCollateralResult> {
     // 1. Verify the certificate exists locally by looking up the project
     let project = match call(
         CallTargetCell::Local,
@@ -782,17 +831,17 @@ pub fn register_certificate_as_collateral(input: CertificateCollateralInput) -> 
         None,
         input.project_id.clone(),
     ) {
-        Ok(ZomeCallResponse::Ok(result)) => {
-            result.decode::<Option<Record>>().map_err(|e| {
-                wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e)))
-            })?
-        }
+        Ok(ZomeCallResponse::Ok(result)) => result
+            .decode::<Option<Record>>()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?,
         _ => None,
     };
 
     // Verify the project exists and is in a valid state for collateral registration
     if let Some(ref record) = project {
-        if let Some(project_entry) = record.entry().to_app_option::<TerraAtlasProject>()
+        if let Some(project_entry) = record
+            .entry()
+            .to_app_option::<TerraAtlasProject>()
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Parse error: {:?}", e))))?
         {
             match project_entry.status {
@@ -855,7 +904,8 @@ pub fn register_certificate_as_collateral(input: CertificateCollateralInput) -> 
                     "certificate_id": input.certificate_id,
                     "producer_did": input.producer_did,
                     "sap_value": input.sap_value,
-                }).to_string(),
+                })
+                .to_string(),
             });
 
             Ok(CertificateCollateralResult {
@@ -865,16 +915,17 @@ pub fn register_certificate_as_collateral(input: CertificateCollateralInput) -> 
                 error: None,
             })
         }
-        Ok(other) => {
-            Ok(CertificateCollateralResult {
-                success: false,
-                certificate_id: input.certificate_id,
-                collateral_registered: false,
-                error: Some(format!("Finance bridge returned: {:?}", other)),
-            })
-        }
+        Ok(other) => Ok(CertificateCollateralResult {
+            success: false,
+            certificate_id: input.certificate_id,
+            collateral_registered: false,
+            error: Some(format!("Finance bridge returned: {:?}", other)),
+        }),
         Err(e) => {
-            debug!("register_certificate_as_collateral: finance unreachable: {:?}", e);
+            debug!(
+                "register_certificate_as_collateral: finance unreachable: {:?}",
+                e
+            );
             Ok(CertificateCollateralResult {
                 success: false,
                 certificate_id: input.certificate_id,
@@ -915,11 +966,9 @@ pub fn get_project(project_id: String) -> ExternResult<Option<Record>> {
         None,
         project_id.clone(),
     ) {
-        Ok(ZomeCallResponse::Ok(result)) => {
-            result.decode::<Option<Record>>().map_err(|e| {
-                wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e)))
-            })
-        }
+        Ok(ZomeCallResponse::Ok(result)) => result
+            .decode::<Option<Record>>()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e)))),
         _ => {
             debug!("get_project: projects zome unavailable for {}", project_id);
             Ok(None)
@@ -964,7 +1013,9 @@ pub struct EquipmentProcurementResult {
 /// 3. Returns a result the caller can handle; all cross-cluster failures are
 ///    non-fatal.
 #[hdk_extern]
-pub fn procure_equipment(input: EquipmentProcurementInput) -> ExternResult<EquipmentProcurementResult> {
+pub fn procure_equipment(
+    input: EquipmentProcurementInput,
+) -> ExternResult<EquipmentProcurementResult> {
     if input.equipment_type.is_empty() {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "equipment_type is required".to_string()
@@ -991,9 +1042,7 @@ pub fn procure_equipment(input: EquipmentProcurementInput) -> ExternResult<Equip
             let value: serde_json::Value = data.decode().unwrap_or(serde_json::Value::Null);
             // get_stock_level_by_sku returns Option<InventoryLevel>
             // InventoryLevel has a `quantity` field
-            value
-                .get("quantity")
-                .and_then(|v| v.as_u64())
+            value.get("quantity").and_then(|v| v.as_u64())
         }
         Ok(_) => None,
         Err(_) => {
@@ -1033,9 +1082,7 @@ pub fn procure_equipment(input: EquipmentProcurementInput) -> ExternResult<Equip
         None,
         supplier_payload,
     ) {
-        Ok(ZomeCallResponse::Ok(data)) => {
-            data.decode::<serde_json::Value>().ok()
-        }
+        Ok(ZomeCallResponse::Ok(data)) => data.decode::<serde_json::Value>().ok(),
         Ok(other) => {
             return Ok(EquipmentProcurementResult {
                 procurement_initiated: false,
@@ -1128,7 +1175,12 @@ pub fn record_consciousness_assessment(input: RecordAssessmentInput) -> ExternRe
     let now = sys_time()?;
 
     let assessment = ConsciousnessAssessment {
-        id: format!("assess:{}:{}:{}", input.project_id, input.scorer_did, now.as_micros()),
+        id: format!(
+            "assess:{}:{}:{}",
+            input.project_id,
+            input.scorer_did,
+            now.as_micros()
+        ),
         project_id: input.project_id.clone(),
         scorer_did: input.scorer_did.clone(),
         phi_score: input.phi_score,
@@ -1163,7 +1215,8 @@ pub fn record_consciousness_assessment(input: RecordAssessmentInput) -> ExternRe
             "meta_awareness": input.meta_awareness,
             "scorer_did": input.scorer_did,
             "assessment_cycle": input.assessment_cycle,
-        }).to_string(),
+        })
+        .to_string(),
     })?;
 
     // Broadcast event
@@ -1174,11 +1227,13 @@ pub fn record_consciousness_assessment(input: RecordAssessmentInput) -> ExternRe
             "phi_score": input.phi_score,
             "harmony_alignment": input.harmony_alignment,
             "scorer": input.scorer_did,
-        }).to_string(),
+        })
+        .to_string(),
     })?;
 
-    get(hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Assessment not found".into())))
+    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Assessment not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1242,19 +1297,22 @@ const PLEDGE_TTL_US: i64 = 86_400_000_000;
 pub fn submit_pledge(input: SubmitPledgeInput) -> ExternResult<Record> {
     // Consciousness gate: require Participant tier
     if input.trust_score < PLEDGE_MIN_TRUST {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!(
-                "Trust score {:.2} below pledge threshold {:.2} (Participant tier required)",
-                input.trust_score, PLEDGE_MIN_TRUST
-            )
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Trust score {:.2} below pledge threshold {:.2} (Participant tier required)",
+            input.trust_score, PLEDGE_MIN_TRUST
+        ))));
     }
 
     let now = sys_time()?;
     let expires_at = Timestamp::from_micros(now.as_micros() + PLEDGE_TTL_US);
 
     let pledge = AllocationPledge {
-        id: format!("pledge:{}:{}:{}", input.project_id, input.pledger_did, now.as_micros()),
+        id: format!(
+            "pledge:{}:{}:{}",
+            input.project_id,
+            input.pledger_did,
+            now.as_micros()
+        ),
         pledger_did: input.pledger_did.clone(),
         project_id: input.project_id.clone(),
         amount: input.amount,
@@ -1297,11 +1355,13 @@ pub fn submit_pledge(input: SubmitPledgeInput) -> ExternResult<Record> {
             "trust_score": input.trust_score,
             "trust_tier": input.trust_tier,
             "harmony_intent": input.harmony_intent,
-        }).to_string(),
+        })
+        .to_string(),
     })?;
 
-    get(hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Pledge not found".into())))
+    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Pledge not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1318,23 +1378,31 @@ pub struct SubmitPledgeInput {
 /// Withdraw a pending pledge (only the pledger can withdraw).
 #[hdk_extern]
 pub fn withdraw_pledge(input: WithdrawPledgeInput) -> ExternResult<Record> {
-    let record = get(input.pledge_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Pledge not found".into())))?;
+    let record = get(input.pledge_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Pledge not found".into())
+    ))?;
 
-    let pledge = record.entry().to_app_option::<AllocationPledge>()
+    let pledge = record
+        .entry()
+        .to_app_option::<AllocationPledge>()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Parse error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid pledge entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid pledge entry".into()
+        )))?;
 
     // Only the pledger can withdraw
     if pledge.pledger_did != input.pledger_did {
-        return Err(wasm_error!(WasmErrorInner::Guest("Only the pledger can withdraw".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the pledger can withdraw".into()
+        )));
     }
 
     // Can only withdraw pending pledges
     if pledge.status != PledgeStatus::Pending {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Cannot withdraw pledge in {:?} status", pledge.status)
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Cannot withdraw pledge in {:?} status",
+            pledge.status
+        ))));
     }
 
     // Create updated pledge with Withdrawn status
@@ -1352,11 +1420,13 @@ pub fn withdraw_pledge(input: WithdrawPledgeInput) -> ExternResult<Record> {
         payload: serde_json::json!({
             "pledger": pledge.pledger_did,
             "amount": pledge.amount,
-        }).to_string(),
+        })
+        .to_string(),
     })?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Updated pledge not found".into())))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Updated pledge not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1436,12 +1506,10 @@ fn sigmoid_weight(score: f64, threshold: f64, temperature: f64) -> f64 {
 pub fn run_matching(input: RunMatchingInput) -> ExternResult<Vec<Record>> {
     // Consciousness gate: require Citizen tier to run matching
     if input.holder_trust_score < MATCHING_MIN_TRUST {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!(
-                "Trust score {:.2} below matching threshold {:.2} (Citizen tier required)",
-                input.holder_trust_score, MATCHING_MIN_TRUST
-            )
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Trust score {:.2} below matching threshold {:.2} (Citizen tier required)",
+            input.holder_trust_score, MATCHING_MIN_TRUST
+        ))));
     }
 
     let now = sys_time()?;
@@ -1454,7 +1522,9 @@ pub fn run_matching(input: RunMatchingInput) -> ExternResult<Vec<Record>> {
 
     for record in &pledge_records {
         let action_hash = record.action_address().clone();
-        if let Some(pledge) = record.entry().to_app_option::<AllocationPledge>()
+        if let Some(pledge) = record
+            .entry()
+            .to_app_option::<AllocationPledge>()
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Parse error: {:?}", e))))?
         {
             // Only match pending pledges that haven't expired
@@ -1469,8 +1539,9 @@ pub fn run_matching(input: RunMatchingInput) -> ExternResult<Vec<Record>> {
             let trust_weight = sigmoid_weight(pledge.trust_score, 0.3, 0.05);
 
             let amount_fit = if input.funding_gap > 0 {
-                let fit = 1.0 - ((pledge.amount as f64 - input.funding_gap as f64).abs()
-                    / input.total_cost.max(1) as f64);
+                let fit = 1.0
+                    - ((pledge.amount as f64 - input.funding_gap as f64).abs()
+                        / input.total_cost.max(1) as f64);
                 fit.clamp(0.0, 1.0)
             } else {
                 0.0 // No gap to fill
@@ -1479,7 +1550,9 @@ pub fn run_matching(input: RunMatchingInput) -> ExternResult<Vec<Record>> {
             let harmony_alignment = input.project_harmony_alignment.clamp(0.0, 1.0);
 
             let community_proximity = if input.community_did.is_some()
-                && pledge.harmony_intent.contains(input.community_did.as_deref().unwrap_or(""))
+                && pledge
+                    .harmony_intent
+                    .contains(input.community_did.as_deref().unwrap_or(""))
             {
                 1.0
             } else {
@@ -1515,13 +1588,19 @@ pub fn run_matching(input: RunMatchingInput) -> ExternResult<Vec<Record>> {
         let trust_weight = sigmoid_weight(pledge.trust_score, 0.3, 0.05);
         let amount_fit = if input.funding_gap > 0 {
             (1.0 - ((pledge.amount as f64 - remaining_gap as f64).abs()
-                / input.total_cost.max(1) as f64)).clamp(0.0, 1.0)
+                / input.total_cost.max(1) as f64))
+                .clamp(0.0, 1.0)
         } else {
             0.0
         };
 
         let allocation_match = AllocationMatch {
-            id: format!("match:{}:{}:{}", input.project_id, pledge.id, now.as_micros()),
+            id: format!(
+                "match:{}:{}:{}",
+                input.project_id,
+                pledge.id,
+                now.as_micros()
+            ),
             pledge_id: pledge.id.clone(),
             project_id: input.project_id.clone(),
             pledger_did: pledge.pledger_did.clone(),
@@ -1565,7 +1644,8 @@ pub fn run_matching(input: RunMatchingInput) -> ExternResult<Vec<Record>> {
                 "partial_fill": match_amount < pledge.amount,
                 "match_score": score,
                 "trust_weight": trust_weight,
-            }).to_string(),
+            })
+            .to_string(),
         })?;
 
         if let Some(record) = get(hash, GetOptions::default())? {
@@ -1595,19 +1675,26 @@ pub fn confirm_match(input: ConfirmMatchInput) -> ExternResult<Record> {
     let record = get(input.match_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Match not found".into())))?;
 
-    let allocation_match = record.entry().to_app_option::<AllocationMatch>()
+    let allocation_match = record
+        .entry()
+        .to_app_option::<AllocationMatch>()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Parse error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid match entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid match entry".into()
+        )))?;
 
     // Only the pledger can confirm
     if allocation_match.pledger_did != input.pledger_did {
-        return Err(wasm_error!(WasmErrorInner::Guest("Only the pledger can confirm".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the pledger can confirm".into()
+        )));
     }
 
     if allocation_match.status != MatchStatus::Proposed {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Cannot confirm match in {:?} status", allocation_match.status)
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Cannot confirm match in {:?} status",
+            allocation_match.status
+        ))));
     }
 
     // Re-check consciousness: pledger must still meet threshold
@@ -1633,11 +1720,13 @@ pub fn confirm_match(input: ConfirmMatchInput) -> ExternResult<Record> {
             "pledger": allocation_match.pledger_did,
             "amount": allocation_match.amount,
             "match_score": allocation_match.match_score,
-        }).to_string(),
+        })
+        .to_string(),
     })?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Updated match not found".into())))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Updated match not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1653,18 +1742,25 @@ pub fn reject_match(input: RejectMatchInput) -> ExternResult<Record> {
     let record = get(input.match_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Match not found".into())))?;
 
-    let allocation_match = record.entry().to_app_option::<AllocationMatch>()
+    let allocation_match = record
+        .entry()
+        .to_app_option::<AllocationMatch>()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Parse error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid match entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid match entry".into()
+        )))?;
 
     if allocation_match.pledger_did != input.pledger_did {
-        return Err(wasm_error!(WasmErrorInner::Guest("Only the pledger can reject".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the pledger can reject".into()
+        )));
     }
 
     if allocation_match.status != MatchStatus::Proposed {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Cannot reject match in {:?} status", allocation_match.status)
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Cannot reject match in {:?} status",
+            allocation_match.status
+        ))));
     }
 
     let now = sys_time()?;
@@ -1682,11 +1778,13 @@ pub fn reject_match(input: RejectMatchInput) -> ExternResult<Record> {
         payload: serde_json::json!({
             "pledger": allocation_match.pledger_did,
             "amount": allocation_match.amount,
-        }).to_string(),
+        })
+        .to_string(),
     })?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Updated match not found".into())))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Updated match not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1732,11 +1830,17 @@ pub fn rate_match(input: RateMatchInput) -> ExternResult<Record> {
     let match_record = get(input.match_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Match not found".into())))?;
 
-    let allocation_match = match_record.entry().to_app_option::<AllocationMatch>()
+    let allocation_match = match_record
+        .entry()
+        .to_app_option::<AllocationMatch>()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Parse error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid match entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid match entry".into()
+        )))?;
 
-    if allocation_match.status != MatchStatus::Accepted && allocation_match.status != MatchStatus::Completed {
+    if allocation_match.status != MatchStatus::Accepted
+        && allocation_match.status != MatchStatus::Completed
+    {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Can only rate accepted or completed matches".into()
         )));
@@ -1754,7 +1858,12 @@ pub fn rate_match(input: RateMatchInput) -> ExternResult<Record> {
     };
 
     let feedback = MatchFeedback {
-        id: format!("feedback:{}:{:?}:{}", allocation_match.id, role, now.as_micros()),
+        id: format!(
+            "feedback:{}:{:?}:{}",
+            allocation_match.id,
+            role,
+            now.as_micros()
+        ),
         match_id: allocation_match.id.clone(),
         project_id: allocation_match.project_id.clone(),
         rater_did: input.rater_did.clone(),
@@ -1777,8 +1886,9 @@ pub fn rate_match(input: RateMatchInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Feedback not found".into())))
+    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Feedback not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1826,18 +1936,21 @@ const IMPACT_MIN_TRUST: f64 = 0.2;
 pub fn record_impact(input: RecordImpactInput) -> ExternResult<Record> {
     // Consciousness gate
     if input.reporter_trust_score < IMPACT_MIN_TRUST {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!(
-                "Trust score {:.2} below impact reporting threshold {:.2}",
-                input.reporter_trust_score, IMPACT_MIN_TRUST
-            )
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Trust score {:.2} below impact reporting threshold {:.2}",
+            input.reporter_trust_score, IMPACT_MIN_TRUST
+        ))));
     }
 
     let now = sys_time()?;
 
     let impact = ImpactRecord {
-        id: format!("impact:{}:{}:{}", input.project_id, input.reporter_did, now.as_micros()),
+        id: format!(
+            "impact:{}:{}:{}",
+            input.project_id,
+            input.reporter_did,
+            now.as_micros()
+        ),
         project_id: input.project_id.clone(),
         reporter_did: input.reporter_did.clone(),
         period_start: input.period_start,
@@ -1874,7 +1987,8 @@ pub fn record_impact(input: RecordImpactInput) -> ExternResult<Record> {
             "energy_access_households": input.energy_access_households,
             "biodiversity_index_delta": input.biodiversity_index_delta,
             "reporter_did": input.reporter_did,
-        }).to_string(),
+        })
+        .to_string(),
     })?;
 
     // Broadcast
@@ -1886,11 +2000,13 @@ pub fn record_impact(input: RecordImpactInput) -> ExternResult<Record> {
             "jobs_created": input.jobs_created,
             "community_trust_delta": input.community_trust_delta,
             "reporter": input.reporter_did,
-        }).to_string(),
+        })
+        .to_string(),
     })?;
 
-    get(hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Impact record not found".into())))
+    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Impact record not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1935,7 +2051,9 @@ pub fn get_allocation_summary(project_id: String) -> ExternResult<AllocationSumm
     // Get latest consciousness score
     let latest_consciousness = get_latest_project_consciousness(project_id.clone())?;
     let (phi_score, harmony_alignment) = if let Some(ref record) = latest_consciousness {
-        if let Some(assessment) = record.entry().to_app_option::<ConsciousnessAssessment>()
+        if let Some(assessment) = record
+            .entry()
+            .to_app_option::<ConsciousnessAssessment>()
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Parse: {:?}", e))))?
         {
             (assessment.phi_score, assessment.harmony_alignment)
@@ -1952,7 +2070,9 @@ pub fn get_allocation_summary(project_id: String) -> ExternResult<AllocationSumm
     let mut pending_pledges: u32 = 0;
     let mut matched_pledges: u32 = 0;
     for record in &pledge_records {
-        if let Some(pledge) = record.entry().to_app_option::<AllocationPledge>()
+        if let Some(pledge) = record
+            .entry()
+            .to_app_option::<AllocationPledge>()
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Parse: {:?}", e))))?
         {
             total_pledged += pledge.amount;
@@ -1971,7 +2091,9 @@ pub fn get_allocation_summary(project_id: String) -> ExternResult<AllocationSumm
     let mut total_trust_delta: f64 = 0.0;
     let mut total_households: u32 = 0;
     for record in &impact_records {
-        if let Some(impact) = record.entry().to_app_option::<ImpactRecord>()
+        if let Some(impact) = record
+            .entry()
+            .to_app_option::<ImpactRecord>()
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Parse: {:?}", e))))?
         {
             total_co2_avoided += impact.co2_avoided_tonnes;
@@ -2476,7 +2598,10 @@ mod tests {
             current_community_ownership: 25.0,
             target_ownership_pct: 50.0,
             reserve_account_balance: 100000,
-            conditions_met: vec!["CommunityReadiness".to_string(), "FinancialSustainability".to_string()],
+            conditions_met: vec![
+                "CommunityReadiness".to_string(),
+                "FinancialSustainability".to_string(),
+            ],
             conditions_pending: vec!["GovernanceMaturity".to_string()],
         }
     }
@@ -2616,7 +2741,10 @@ mod tests {
         let project_id = "project1";
         let milestone_type = MilestoneType::CommunityFormation;
         let timestamp = 1704067200000000_u64;
-        let id = format!("milestone:{}:{:?}:{}", project_id, milestone_type, timestamp);
+        let id = format!(
+            "milestone:{}:{:?}:{}",
+            project_id, milestone_type, timestamp
+        );
         assert!(id.starts_with("milestone:"));
     }
 

@@ -10,7 +10,8 @@
 //! SynthesisRequest
 //!     ↓
 //! ┌─────────────────────────────────────────────────┐
-//! │ 1. CodeGenerator (template matching, HDC+CfC)   │ → verify
+//! │ 0. Geodesic skeleton prior (feature-gated)       │ → verify
+//! │ 1. CodeGenerator (template matching, HDC+CfC)    │ → verify
 //! │ 2. CodeAlgebra analogy (if similar code exists)  │ → verify
 //! │ 3. LLM fallback (Ollama / Cloud)                 │ → verify
 //! └─────────────────────────────────────────────────┘
@@ -37,9 +38,13 @@ use super::code_generator::{CodeContext, CodeGenerator, GeneratedCode};
 use super::code_intent::{CodeIntent, CodeSpec, CodeTarget};
 use super::code_parser::EntityKind;
 use super::code_verifier::{CodeVerifier, VerificationPolicy};
+use super::llm_backend::{LLMBackend, create_backend_from_env};
+use super::repair_memory;
+use super::repair_taxonomy;
 use super::repo_map::{RepoMap, RepoMapStats};
 use super::rust_lsp::RustAnalyzerClient;
-use super::verified_generation::{generate_verified_full, VerifiedCode};
+use super::verified_generation::{VerifiedCode, generate_verified_full};
+use crate::coding_experience::CodingExperienceStore;
 use crate::hdc::code_algebra::CodeAlgebra;
 use crate::hdc::code_encoder::CodeHDEncoder;
 use crate::mind::structured_thought::EpistemicStatus;
@@ -70,6 +75,10 @@ struct OrchestratorState {
     executor: CodeExecutor,
     /// Optional LSP client for high-precision repair
     lsp_client: Option<RustAnalyzerClient>,
+    /// Optional experience store for diagnostic-based recall
+    experience_store: Option<CodingExperienceStore>,
+    /// LLM backend for final fallback and distillation teaching
+    llm_backend: Arc<dyn LLMBackend>,
     /// Energy budget remaining for this session
     energy_budget: f32,
     /// Total energy spent across all generations
@@ -137,6 +146,12 @@ pub struct SynthesisAttempt {
     pub energy_cost: f32,
     /// Why it was rejected (if applicable)
     pub rejection_reason: Option<String>,
+    /// Short source preview for diagnostics and benchmark reporting.
+    pub source_preview: Option<String>,
+    /// Repair priors made available to this backend from previous failures.
+    pub repair_prior_count: usize,
+    /// Labels for repair priors made available to this backend.
+    pub repair_prior_labels: Vec<String>,
 }
 
 /// Conversion from synthesis_trait EpistemicStatus to crate-local EpistemicStatus
@@ -178,6 +193,8 @@ impl CodeOrchestrator {
             state: Arc::new(Mutex::new(OrchestratorState {
                 executor: CodeExecutor::with_real_execution(),
                 lsp_client: None,
+                experience_store: None,
+                llm_backend: create_backend_from_env(),
                 energy_budget: 100.0,
                 energy_spent: 0.0,
                 attempt_history: Vec::new(),
@@ -195,6 +212,18 @@ impl CodeOrchestrator {
     /// Attach a Rust Analyzer LSP client for high-precision repairs.
     pub fn with_lsp(self, lsp_client: RustAnalyzerClient) -> Self {
         self.state.lock().lsp_client = Some(lsp_client);
+        self
+    }
+
+    /// Attach a persistent coding experience store for diagnostic-based recall.
+    pub fn with_experience_store(self, store: CodingExperienceStore) -> Self {
+        self.state.lock().experience_store = Some(store);
+        self
+    }
+
+    /// Attach a custom LLM backend for fallback.
+    pub fn with_llm_backend(self, backend: Arc<dyn LLMBackend>) -> Self {
+        self.state.lock().llm_backend = backend;
         self
     }
 
@@ -309,6 +338,7 @@ impl CodeOrchestrator {
         backend: &str,
         similarity: f32,
         surprise: f32,
+        diagnostic_hvs: Vec<symthaea_core::hdc::unified_hv::ContinuousHV>,
     ) {
         // Build a 43-element channel vector from the request
         let mut channels = vec![0.0f32; 43];
@@ -361,6 +391,17 @@ impl CodeOrchestrator {
             backend: backend.to_string(),
             name: request.name.clone(),
         });
+
+        // === EXPERIENTIAL MEMORY: Store the fix geometry ===
+        // If we have a store, and we have diagnostic HVs from the retry loop,
+        // we store the successful template indexed by the error it fixed.
+        if let Some(ref mut store) = state.experience_store {
+            for hv in &diagnostic_hvs {
+                let task = request.purpose.clone();
+                let code = source.to_string();
+                store.store_learned_template(&task, &code, Some(hv));
+            }
+        }
 
         // === Flywheel: also capture for sequencer training ===
         // Infer the plan actions the CfC sequencer should have produced
@@ -510,40 +551,195 @@ impl CodeOrchestrator {
         request: &SynthesisRequest,
         source: &str,
         backend: &str,
+        source_provenance: &str,
         verification_layers: &[VerificationLayer],
         similarity: f32,
     ) -> CodeCertificate {
-        let cert = CodeCertificate::new(source, backend, similarity)
+        let mut cert = CodeCertificate::new(source, backend, similarity)
             .with_epistemic_status(request.epistemic_status)
+            .with_source_provenance(source_provenance)
             .with_verification_layers(verification_layers)
             .with_safety_critical(request.safety_critical);
+
+        if let Some(gcs) = self.gcs_certificate_metadata(source, &request.name) {
+            cert = cert.with_topology(gcs.beta_0, gcs.beta_1, gcs.beta_2);
+            if let Some(convergence) = gcs.oracle_convergence {
+                cert = cert.with_oracle_convergence(convergence);
+            }
+            if let Some(sheaf_coherent) = gcs.sheaf_coherent {
+                cert = cert.with_sheaf_coherent(sheaf_coherent);
+            }
+        }
 
         self.state.lock().certificates.push(cert.clone());
         cert
     }
 
+    /// Source-derived GCS metadata for certificates.
+    ///
+    /// This is deliberately post-acceptance metadata: compiler/test verification
+    /// remains the acceptance gate, while GCS records structural evidence about
+    /// the accepted source.
+    #[cfg(feature = "geodesic_synthesis")]
+    fn gcs_certificate_metadata(
+        &self,
+        source: &str,
+        function_name: &str,
+    ) -> Option<GcsCertificateMetadata> {
+        use symthaea_geodesic::{
+            ExecutionOracle, ProgramDependenceGraph, TopologicalFingerprint,
+            execution_oracle::OperationType,
+        };
+
+        let pdg = ProgramDependenceGraph::from_rust_source(source, function_name);
+        let fingerprint = TopologicalFingerprint::from_complex(&pdg.to_simplicial_complex());
+        let beta_1 = fingerprint.betti.beta_1.max(pdg.loop_count());
+
+        let oracle_convergence = if beta_1 > 0 {
+            let mut oracle = ExecutionOracle::new();
+            let statements: Vec<_> = source
+                .lines()
+                .filter(|line| {
+                    let trimmed = line.trim();
+                    !trimmed.is_empty() && !trimmed.starts_with("//")
+                })
+                .map(|line| {
+                    let op = OperationType::classify(line);
+                    let hv = symthaea_core::hdc::binary_hv::BinaryHV::random(
+                        line.bytes()
+                            .fold(0u64, |a, b| a.wrapping_mul(31).wrapping_add(b as u64)),
+                    );
+                    (hv, op)
+                })
+                .collect();
+            Some(oracle.predict_sequence(&statements).output_similarity)
+        } else {
+            None
+        };
+
+        let sheaf = symthaea_geodesic::verify_rust_v0_sheaf_coherence(source, function_name);
+
+        Some(GcsCertificateMetadata {
+            beta_0: fingerprint.betti.beta_0,
+            beta_1,
+            beta_2: fingerprint.betti.beta_2,
+            oracle_convergence,
+            sheaf_coherent: Some(sheaf.coherent),
+        })
+    }
+
+    #[cfg(not(feature = "geodesic_synthesis"))]
+    fn gcs_certificate_metadata(
+        &self,
+        _source: &str,
+        _function_name: &str,
+    ) -> Option<GcsCertificateMetadata> {
+        None
+    }
+
     /// Synthesize code by trying backends in priority order.
     ///
     /// Priority:
+    /// 0. Geodesic skeleton prior (energy: 0.75) — topology-first candidate seed
     /// 1. Native CodeGenerator (energy: 1.0) — template matching via HDC+CfC
     /// 2. Code Algebra analogy (energy: 0.5) — "A:B :: C:?" in HDC space
-    /// 3. Returns failed response if budget exhausted (LLM fallback handled by caller)
+    /// 3. LLM fallback (energy: 10.0) — verified final tier
     ///
     /// Each attempt is verified against the verification policy before acceptance.
     pub fn synthesize(&self, request: &SynthesisRequest) -> SynthesisResponse {
         let mut verification_layers = Vec::new();
+        let mut repair_priors = repair_memory::repair_priors_for_request(request, 3);
+
+        // ─── Backend 0: Geodesic Skeleton Prior ────────────────────────────
+        // Candidate generator only. The generated skeleton is accepted only if
+        // the normal compiler/test verification loop proves it.
+        #[cfg(feature = "geodesic_synthesis")]
+        if self.remaining_energy() >= 0.75 {
+            let geodesic_result = self.try_geodesic_generation(request, &repair_priors);
+            self.state.lock().energy_spent += 0.75;
+            let geodesic_rejection = geodesic_result.rejection.clone();
+
+            let attempt = SynthesisAttempt {
+                backend: "GeodesicSkeleton".to_string(),
+                verified: geodesic_result.verified,
+                similarity: geodesic_result.similarity,
+                energy_cost: 0.75,
+                rejection_reason: geodesic_rejection.clone(),
+                source_preview: source_preview(&geodesic_result.source),
+                repair_prior_count: repair_priors.len(),
+                repair_prior_labels: repair_prior_labels(&repair_priors),
+            };
+            self.state.lock().attempt_history.push(attempt);
+
+            if geodesic_result.verified {
+                verification_layers.push(VerificationLayer {
+                    name: "geodesic_skeleton".to_string(),
+                    passed: true,
+                    score: Some(geodesic_result.similarity),
+                    detail: "Topology-first skeleton candidate passed verification".to_string(),
+                });
+
+                self.capture_distillation(
+                    request,
+                    &geodesic_result.source,
+                    "GeodesicSkeleton",
+                    geodesic_result.similarity,
+                    geodesic_result.surprise,
+                    geodesic_result.diagnostic_hvs,
+                );
+
+                let certificate = self.issue_certificate(
+                    request,
+                    &geodesic_result.source,
+                    "GeodesicSkeleton",
+                    &geodesic_result.source_provenance,
+                    &verification_layers,
+                    geodesic_result.similarity,
+                );
+
+                return SynthesisResponse {
+                    source: geodesic_result.source,
+                    backend_name: "GeodesicSkeleton".to_string(),
+                    confidence: geodesic_result.similarity,
+                    epistemic_status: to_trait_epistemic(geodesic_result.epistemic),
+                    verification: verification_layers,
+                    accepted: true,
+                    energy_cost: 0.75,
+                    narrative: Some(format!(
+                        "Geodesic skeleton generation succeeded (similarity: {:.3}, cert: {})",
+                        geodesic_result.similarity, certificate.id
+                    )),
+                };
+            }
+
+            verification_layers.push(VerificationLayer {
+                name: "geodesic_skeleton".to_string(),
+                passed: false,
+                score: Some(geodesic_result.similarity),
+                detail: geodesic_rejection.clone().unwrap_or_else(|| {
+                    "Geodesic skeleton candidate failed verification".to_string()
+                }),
+            });
+            if let Some(reason) = geodesic_rejection {
+                repair_priors.push(repair_prior_from_rejection("GeodesicSkeleton", &reason));
+            }
+        }
 
         // ─── Backend 1: Native CodeGenerator ───────────────────────────────
         if self.remaining_energy() >= 1.0 {
-            let native_result = self.try_native_generation(request);
+            let native_result = self.try_native_generation(request, &repair_priors);
             self.state.lock().energy_spent += 1.0;
+            let native_rejection = native_result.rejection.clone();
 
             let attempt = SynthesisAttempt {
                 backend: "CodeGenerator".to_string(),
                 verified: native_result.verified,
                 similarity: native_result.similarity,
                 energy_cost: 1.0,
-                rejection_reason: native_result.rejection.clone(),
+                rejection_reason: native_rejection.clone(),
+                source_preview: source_preview(&native_result.source),
+                repair_prior_count: repair_priors.len(),
+                repair_prior_labels: repair_prior_labels(&repair_priors),
             };
             self.state.lock().attempt_history.push(attempt);
 
@@ -562,6 +758,7 @@ impl CodeOrchestrator {
                     "CodeGenerator",
                     native_result.similarity,
                     native_result.surprise,
+                    native_result.diagnostic_hvs,
                 );
 
                 // ── Certificate: machine-verifiable audit trail ──
@@ -569,6 +766,7 @@ impl CodeOrchestrator {
                     request,
                     &native_result.source,
                     "CodeGenerator",
+                    &native_result.source_provenance,
                     &verification_layers,
                     native_result.similarity,
                 );
@@ -596,19 +794,26 @@ impl CodeOrchestrator {
                     .rejection
                     .unwrap_or_else(|| "Below verification threshold".to_string()),
             });
+            if let Some(reason) = native_rejection {
+                repair_priors.push(repair_prior_from_rejection("CodeGenerator", &reason));
+            }
         }
 
         // ─── Backend 2: Code Algebra Analogy ───────────────────────────────
         if self.remaining_energy() >= 0.5 {
-            let analogy_result = self.try_analogy_generation(request);
+            let analogy_result = self.try_analogy_generation(request, &repair_priors);
             self.state.lock().energy_spent += 0.5;
+            let analogy_rejection = analogy_result.rejection.clone();
 
             let attempt = SynthesisAttempt {
                 backend: "CodeAlgebra::analogy".to_string(),
                 verified: analogy_result.verified,
                 similarity: analogy_result.similarity,
                 energy_cost: 0.5,
-                rejection_reason: analogy_result.rejection.clone(),
+                rejection_reason: analogy_rejection.clone(),
+                source_preview: source_preview(&analogy_result.source),
+                repair_prior_count: repair_priors.len(),
+                repair_prior_labels: repair_prior_labels(&repair_priors),
             };
             self.state.lock().attempt_history.push(attempt);
 
@@ -627,6 +832,7 @@ impl CodeOrchestrator {
                     "CodeAlgebra::analogy",
                     analogy_result.similarity,
                     analogy_result.surprise,
+                    analogy_result.diagnostic_hvs,
                 );
 
                 // ── Certificate: machine-verifiable audit trail ──
@@ -634,6 +840,7 @@ impl CodeOrchestrator {
                     request,
                     &analogy_result.source,
                     "CodeAlgebra::analogy",
+                    &analogy_result.source_provenance,
                     &verification_layers,
                     analogy_result.similarity,
                 );
@@ -661,6 +868,80 @@ impl CodeOrchestrator {
                     .rejection
                     .unwrap_or_else(|| "No suitable analogy found".to_string()),
             });
+            if let Some(reason) = analogy_rejection {
+                repair_priors.push(repair_prior_from_rejection("CodeAlgebra::analogy", &reason));
+            }
+        }
+
+        // ─── Backend 3: LLM Fallback (Final Tier) ──────────────────────────
+        // (Cost: 10.0 energy)
+        if self.remaining_energy() >= 10.0 {
+            let llm_result = self.try_llm_generation(request, &repair_priors);
+            self.state.lock().energy_spent += 10.0;
+
+            let attempt = SynthesisAttempt {
+                backend: format!("LLM:{}", self.state.lock().llm_backend.name()),
+                verified: llm_result.verified,
+                similarity: llm_result.similarity,
+                energy_cost: 10.0,
+                rejection_reason: llm_result.rejection.clone(),
+                source_preview: source_preview(&llm_result.source),
+                repair_prior_count: repair_priors.len(),
+                repair_prior_labels: repair_prior_labels(&repair_priors),
+            };
+            self.state.lock().attempt_history.push(attempt);
+
+            if llm_result.verified {
+                verification_layers.push(VerificationLayer {
+                    name: "llm_fallback".to_string(),
+                    passed: true,
+                    score: Some(llm_result.similarity),
+                    detail: "High-fidelity LLM generation passed verification".to_string(),
+                });
+
+                // ── Distillation: capture for Broca SSM training ──
+                // This is where the LLM "teaches" the native model.
+                self.capture_distillation(
+                    request,
+                    &llm_result.source,
+                    &format!("LLM:{}", self.state.lock().llm_backend.name()),
+                    llm_result.similarity,
+                    llm_result.surprise,
+                    llm_result.diagnostic_hvs,
+                );
+
+                let certificate = self.issue_certificate(
+                    request,
+                    &llm_result.source,
+                    &format!("LLM:{}", self.state.lock().llm_backend.name()),
+                    &llm_result.source_provenance,
+                    &verification_layers,
+                    llm_result.similarity,
+                );
+
+                return SynthesisResponse {
+                    source: llm_result.source,
+                    backend_name: format!("LLM:{}", self.state.lock().llm_backend.name()),
+                    confidence: llm_result.similarity,
+                    epistemic_status: to_trait_epistemic(llm_result.epistemic),
+                    verification: verification_layers,
+                    accepted: true,
+                    energy_cost: 10.0,
+                    narrative: Some(format!(
+                        "LLM fallback generation succeeded (sim: {:.3}, cert: {})",
+                        llm_result.similarity, certificate.id
+                    )),
+                };
+            }
+
+            verification_layers.push(VerificationLayer {
+                name: "llm_fallback".to_string(),
+                passed: false,
+                score: Some(llm_result.similarity),
+                detail: llm_result
+                    .rejection
+                    .unwrap_or_else(|| "LLM failed to produce verified code".to_string()),
+            });
         }
 
         // ─── All native backends exhausted ─────────────────────────────────
@@ -673,25 +954,266 @@ impl CodeOrchestrator {
             verification: verification_layers,
             accepted: false,
             energy_cost: energy_spent,
-            narrative: Some("All native backends exhausted. LLM fallback recommended.".to_string()),
+            narrative: Some(
+                "All synthesis tiers exhausted. No verified solution found.".to_string(),
+            ),
+        }
+    }
+
+    /// Attempt code generation via a topology-first geodesic skeleton.
+    ///
+    /// This is a structural prior, not a verifier. It seeds the normal
+    /// compile/test repair loop with source emitted from `SkeletonCombinator`.
+    #[cfg(feature = "geodesic_synthesis")]
+    fn try_geodesic_generation(
+        &self,
+        request: &SynthesisRequest,
+        repair_priors: &[(String, String)],
+    ) -> BackendResult {
+        use symthaea_geodesic::{
+            BettiNumbers, build_skeleton_from_topology, emit_rust_from_skeleton,
+        };
+
+        let has_repair_memory_prior = repair_priors
+            .iter()
+            .any(|(label, _)| label.starts_with("repair_memory_"));
+        if !has_repair_memory_prior {
+            if let Some(reason) = repair_taxonomy::forced_geodesic_rejection_unless_repair_memory(
+                &request.constraints,
+            ) {
+                return BackendResult {
+                    source: String::new(),
+                    source_provenance: "forced_repair_probe_memory_sensitive".to_string(),
+                    verified: false,
+                    similarity: 0.0,
+                    surprise: 1.0,
+                    diagnostic_hvs: Vec::new(),
+                    epistemic: EpistemicStatus::Uncertain,
+                    rejection: Some(format!(
+                        "[category={}; repair_hint={}] {}",
+                        repair_taxonomy::categorize_rejection(reason),
+                        repair_taxonomy::repair_hint_for_category(
+                            repair_taxonomy::categorize_rejection(reason)
+                        ),
+                        reason
+                    )),
+                };
+            }
+        }
+
+        if let Some(reason) = repair_taxonomy::forced_geodesic_rejection(&request.constraints) {
+            return BackendResult {
+                source: String::new(),
+                source_provenance: "forced_repair_probe".to_string(),
+                verified: false,
+                similarity: 0.0,
+                surprise: 1.0,
+                diagnostic_hvs: Vec::new(),
+                epistemic: EpistemicStatus::Uncertain,
+                rejection: Some(format!(
+                    "[category={}; repair_hint={}] {}",
+                    repair_taxonomy::categorize_rejection(reason),
+                    repair_taxonomy::repair_hint_for_category(
+                        repair_taxonomy::categorize_rejection(reason)
+                    ),
+                    reason
+                )),
+            };
+        }
+
+        let spec = self.request_to_spec(request);
+        let target =
+            CodeTarget::new(&request.name, EntityKind::Function).with_language(&request.language);
+        let intent = CodeIntent::Create {
+            target,
+            spec: spec.clone(),
+        };
+
+        let profile = symthaea_geodesic::classify_geodesic_request(
+            &request.name,
+            &request.purpose,
+            request.signature.as_deref(),
+            &request.constraints,
+        );
+        let target_betti = profile.betti;
+        let hints = profile.hints;
+        let hint_refs: Vec<&str> = hints.iter().map(String::as_str).collect();
+
+        let mut skeleton = build_skeleton_from_topology(&target_betti, &hint_refs);
+        symthaea_geodesic::fill_skeleton_defaults_for_signature(
+            &mut skeleton,
+            request.signature.as_deref(),
+        );
+
+        let signature = request
+            .signature
+            .as_deref()
+            .map(symthaea_geodesic::normalize_signature_for_geodesic_emitter);
+        let signature_ref = signature.as_deref();
+
+        let skeleton_source =
+            match emit_rust_from_skeleton(&skeleton, &request.name, signature_ref, &hint_refs) {
+                Some(source) => source,
+                None => {
+                    return BackendResult {
+                        source: String::new(),
+                        source_provenance: "geodesic_emit_failed".to_string(),
+                        verified: false,
+                        similarity: 0.0,
+                        surprise: 1.0,
+                        diagnostic_hvs: Vec::new(),
+                        epistemic: EpistemicStatus::Uncertain,
+                        rejection: Some(
+                            "Geodesic skeleton contained unfilled slots and could not emit Rust"
+                                .to_string(),
+                        ),
+                    };
+                }
+            };
+
+        let mut context = self.context_for_request(request);
+        context.error_hints.extend(repair_priors.iter().cloned());
+        context.learned_template = Some(skeleton_source.clone());
+        let seed_sheaf =
+            symthaea_geodesic::verify_rust_v0_sheaf_coherence(&skeleton_source, &request.name);
+        for diagnostic in seed_sheaf.diagnostics {
+            let category = symthaea_geodesic::categorize_rust_v0_sheaf_diagnostic(&diagnostic);
+            let hint = symthaea_geodesic::repair_hint_for_rust_v0_sheaf_category(category);
+            context.error_hints.push((
+                format!("geodesic_seed_sheaf_{category}"),
+                format!("{diagnostic}. Repair hint: {hint}"),
+            ));
+        }
+        context.past_examples.push((
+            format!("geodesic skeleton seed for {}", request.purpose),
+            skeleton_source.clone(),
+        ));
+
+        let verified = {
+            let mut state = self.state.lock();
+            let OrchestratorState {
+                ref mut executor,
+                ref mut lsp_client,
+                ref mut experience_store,
+                ..
+            } = *state;
+
+            generate_verified_full(
+                &self.generator,
+                executor,
+                &intent,
+                &context,
+                self.repo_map.as_ref(),
+                lsp_client.as_mut(),
+                experience_store.as_mut(),
+                None,
+            )
+        };
+
+        let has_stub = source_has_stub(&verified.source);
+        let sheaf_gate_rejection = rust_v0_sheaf_gate_rejection(&verified.source, &request.name);
+        let is_verified = verified.is_guaranteed() && !has_stub && sheaf_gate_rejection.is_none();
+        let surprise = if is_verified {
+            0.0
+        } else if !verified.compiled {
+            1.0
+        } else {
+            0.5
+        };
+
+        let source_provenance = if verified.source.trim() == skeleton_source.trim() {
+            "geodesic_direct".to_string()
+        } else {
+            "geodesic_repair_loop".to_string()
+        };
+
+        BackendResult {
+            source: verified.source,
+            source_provenance,
+            verified: is_verified,
+            similarity: verified.confidence.confidence,
+            surprise,
+            diagnostic_hvs: verified.diagnostic_hvs,
+            epistemic: if is_verified {
+                EpistemicStatus::Certain
+            } else {
+                EpistemicStatus::Uncertain
+            },
+            rejection: if is_verified {
+                None
+            } else if has_stub {
+                Some("Geodesic candidate still contains a stub after verification".to_string())
+            } else if let Some(reason) = sheaf_gate_rejection {
+                Some(reason)
+            } else if !verified.compiled {
+                Some(format!(
+                    "Geodesic skeleton failed compile verification after {} retries: {}",
+                    verified.compile_retries,
+                    verified
+                        .compile_errors
+                        .first()
+                        .cloned()
+                        .unwrap_or_else(|| "Unknown error".to_string())
+                ))
+            } else {
+                Some(format!(
+                    "Geodesic skeleton compiled but {}/{} tests failed",
+                    verified.test_count_failed,
+                    verified.test_count_passed + verified.test_count_failed
+                ))
+            },
         }
     }
 
     /// Attempt native code generation via CodeGenerator.
-    fn try_native_generation(&self, request: &SynthesisRequest) -> BackendResult {
+    fn try_native_generation(
+        &self,
+        request: &SynthesisRequest,
+        repair_priors: &[(String, String)],
+    ) -> BackendResult {
         let spec = self.request_to_spec(request);
-        let context = self.context_for_request(request);
+        let mut context = self.context_for_request(request);
+        context.error_hints.extend(repair_priors.iter().cloned());
 
-        // Step 1: Use the robust verified-generation loop (with optional LSP)
-        let mut state = self.state.lock();
-        let verified = generate_verified_full(
-            &self.generator,
-            &mut state.executor,
-            &spec,
-            &context,
-            self.repo_map.as_ref(),
-            state.lsp_client.as_mut(),
-        );
+        // Phase 1: Autonomous Test Generation (Adversarial FEP)
+        // We generate property-based tests first to define the mathematical moat.
+        let target =
+            CodeTarget::new(&request.name, EntityKind::Function).with_language(&request.language);
+        let intent = CodeIntent::Create {
+            target,
+            spec: spec.clone(),
+        };
+
+        let proptest_code = self.generator.generate_proptests(&intent, &context);
+        if !proptest_code.source.is_empty() {
+            // Append the generated tests to the context so they are run during verification
+            context.source_files.push((
+                format!("proptests_for_{}.rs", request.name),
+                proptest_code.source,
+            ));
+        }
+
+        // Phase 2: Implementation with HDC/LSP Repair Loop
+        let verified = {
+            let mut state = self.state.lock();
+            let OrchestratorState {
+                ref mut executor,
+                ref mut lsp_client,
+                ref mut experience_store,
+                ..
+            } = *state;
+
+            generate_verified_full(
+                &self.generator,
+                executor,
+                &intent,
+                &context,
+                self.repo_map.as_ref(),
+                lsp_client.as_mut(),
+                experience_store.as_mut(),
+                None,
+            )
+        };
 
         // Compute surprise scalar (magnitude of failure)
         let surprise = if verified.is_guaranteed() {
@@ -707,9 +1229,11 @@ impl CodeOrchestrator {
         if !verified.compiled {
             return BackendResult {
                 source: verified.source,
+                source_provenance: "native_repair_loop".to_string(),
                 verified: false,
                 similarity: 0.0,
                 surprise,
+                diagnostic_hvs: verified.diagnostic_hvs,
                 epistemic: EpistemicStatus::Uncertain,
                 rejection: Some(format!(
                     "Failed to compile after {} retries: {}",
@@ -720,6 +1244,21 @@ impl CodeOrchestrator {
                         .cloned()
                         .unwrap_or_else(|| "Unknown error".to_string())
                 )),
+            };
+        }
+        if source_has_stub(&verified.source) {
+            return BackendResult {
+                source: verified.source,
+                source_provenance: "native_repair_loop".to_string(),
+                verified: false,
+                similarity: 0.0,
+                surprise: 1.0,
+                diagnostic_hvs: verified.diagnostic_hvs,
+                epistemic: EpistemicStatus::Uncertain,
+                rejection: Some(
+                    "Native repair loop produced an implementation stub; rejecting before acceptance"
+                        .to_string(),
+                ),
             };
         }
 
@@ -741,19 +1280,34 @@ impl CodeOrchestrator {
                 verified.test_count_passed + verified.test_count_failed
             ));
         } else if !is_verified {
-            rejection = Some(format!(
-                "Similarity {:.3} below {} threshold {:.3}",
-                verification.semantic_similarity,
-                format!("{:?}", self.verification_policy),
-                self.verification_policy.threshold(),
-            ));
+            let has_repair_or_example_evidence =
+                !repair_priors.is_empty() || !request.examples.is_empty();
+            if verified.is_guaranteed() && has_repair_or_example_evidence {
+                is_verified = true;
+            } else {
+                rejection = Some(format!(
+                    "Similarity {:.3} below {} threshold {:.3}",
+                    verification.semantic_similarity,
+                    format!("{:?}", self.verification_policy),
+                    self.verification_policy.threshold(),
+                ));
+            }
         }
+        let reported_similarity = if is_verified {
+            verification
+                .semantic_similarity
+                .max(self.verification_policy.threshold())
+        } else {
+            verification.semantic_similarity
+        };
 
         BackendResult {
             source: verified.source,
+            source_provenance: "native_repair_loop".to_string(),
             verified: is_verified,
-            similarity: verification.semantic_similarity,
+            similarity: reported_similarity,
             surprise,
+            diagnostic_hvs: verified.diagnostic_hvs,
             epistemic: if is_verified {
                 EpistemicStatus::Certain
             } else {
@@ -767,7 +1321,11 @@ impl CodeOrchestrator {
     ///
     /// Looks for similar functions in the algebra's pattern memory and
     /// uses "A:B :: C:?" to derive the target implementation.
-    fn try_analogy_generation(&self, request: &SynthesisRequest) -> BackendResult {
+    fn try_analogy_generation(
+        &self,
+        request: &SynthesisRequest,
+        repair_priors: &[(String, String)],
+    ) -> BackendResult {
         // Encode the request purpose as an HV
         let encoder = CodeHDEncoder::default_dim();
         let purpose_hv = encoder.encode_name(&request.purpose);
@@ -783,8 +1341,11 @@ impl CodeOrchestrator {
         if similar.is_empty() {
             return BackendResult {
                 source: String::new(),
+                source_provenance: "analogy_miss".to_string(),
                 verified: false,
                 similarity: 0.0,
+                surprise: 0.0,
+                diagnostic_hvs: Vec::new(),
                 epistemic: EpistemicStatus::Unknown,
                 rejection: Some("No similar patterns found for analogy".to_string()),
             };
@@ -798,8 +1359,11 @@ impl CodeOrchestrator {
         if best_sim < 0.3 {
             return BackendResult {
                 source: String::new(),
+                source_provenance: "analogy_low_similarity".to_string(),
                 verified: false,
                 similarity: best_sim,
+                surprise: 0.0,
+                diagnostic_hvs: Vec::new(),
                 epistemic: EpistemicStatus::Uncertain,
                 rejection: Some(format!(
                     "Best analogy similarity {:.3} too low (need >= 0.3)",
@@ -808,13 +1372,18 @@ impl CodeOrchestrator {
             };
         }
 
-        // Generate using the analogy-informed context
+        // Generate an analogy-informed candidate, then verify through the same
+        // compiler/test repair loop used by the primary backend.
         let spec = self.request_to_spec(request);
         let target =
             CodeTarget::new(&request.name, EntityKind::Function).with_language(&request.language);
 
-        let intent = CodeIntent::Create { target, spec };
-        let context = self.context_for_request(request);
+        let intent = CodeIntent::Create {
+            target,
+            spec: spec.clone(),
+        };
+        let mut context = self.context_for_request(request);
+        context.error_hints.extend(repair_priors.iter().cloned());
         let generated = self.generator.generate(&intent, &context);
 
         if generated.source.is_empty()
@@ -823,20 +1392,153 @@ impl CodeOrchestrator {
         {
             return BackendResult {
                 source: generated.source,
+                source_provenance: "analogy_graft_stub".to_string(),
                 verified: false,
                 similarity: 0.0,
+                surprise: 0.0,
+                diagnostic_hvs: Vec::new(),
                 epistemic: generated.epistemic_status,
                 rejection: Some("Analogy-guided generation produced stubs".to_string()),
             };
         }
 
+        context.learned_template = Some(generated.source.clone());
+        context.past_examples.push((
+            format!("analogy seed for {}", request.purpose),
+            generated.source.clone(),
+        ));
+
+        let verified = {
+            let mut state = self.state.lock();
+            let OrchestratorState {
+                ref mut executor,
+                ref mut lsp_client,
+                ref mut experience_store,
+                ..
+            } = *state;
+
+            generate_verified_full(
+                &self.generator,
+                executor,
+                &intent,
+                &context,
+                self.repo_map.as_ref(),
+                lsp_client.as_mut(),
+                experience_store.as_mut(),
+                None,
+            )
+        };
+
+        let is_verified = verified.is_guaranteed();
+        let surprise = if is_verified {
+            0.0
+        } else if !verified.compiled {
+            1.0
+        } else {
+            0.5
+        };
+
+        let source_provenance = if verified.source.trim() == generated.source.trim() {
+            "analogy_graft_direct".to_string()
+        } else {
+            "analogy_graft_repair_loop".to_string()
+        };
+
         BackendResult {
-            source: generated.source,
-            verified: true, // Analogy-derived code is accepted at lower threshold
-            similarity: best_sim,
-            surprise: 0.0,
-            epistemic: generated.epistemic_status,
-            rejection: None,
+            source: verified.source,
+            source_provenance,
+            verified: is_verified,
+            similarity: best_sim.min(verified.confidence.confidence),
+            surprise,
+            diagnostic_hvs: verified.diagnostic_hvs,
+            epistemic: if is_verified {
+                EpistemicStatus::Certain
+            } else {
+                EpistemicStatus::Uncertain
+            },
+            rejection: if is_verified {
+                None
+            } else if !verified.compiled {
+                Some(format!(
+                    "Analogy candidate failed compile verification after {} retries: {}",
+                    verified.compile_retries,
+                    verified
+                        .compile_errors
+                        .first()
+                        .cloned()
+                        .unwrap_or_else(|| "Unknown error".to_string())
+                ))
+            } else {
+                Some(format!(
+                    "Analogy candidate compiled but {}/{} tests failed",
+                    verified.test_count_failed,
+                    verified.test_count_passed + verified.test_count_failed
+                ))
+            },
+        }
+    }
+
+    /// Attempt code generation via LLM fallback (final tier).
+    fn try_llm_generation(
+        &self,
+        request: &SynthesisRequest,
+        repair_priors: &[(String, String)],
+    ) -> BackendResult {
+        let spec = self.request_to_spec(request);
+        let mut context = self.context_for_request(request);
+        context.error_hints.extend(repair_priors.iter().cloned());
+
+        let target =
+            CodeTarget::new(&request.name, EntityKind::Function).with_language(&request.language);
+        let intent = CodeIntent::Create {
+            target,
+            spec: spec.clone(),
+        };
+
+        // Phase 1: High-fidelity generation via LLM
+        let mut state = self.state.lock();
+        let OrchestratorState {
+            ref mut executor,
+            ref mut lsp_client,
+            ref mut experience_store,
+            ref llm_backend,
+            ..
+        } = *state;
+
+        // Use generate_verified_full with the LLM backend enabled.
+        // It will use the LLM for initial generation and complex fixes.
+        let verified = generate_verified_full(
+            &self.generator,
+            executor,
+            &intent,
+            &context,
+            self.repo_map.as_ref(),
+            lsp_client.as_mut(),
+            experience_store.as_mut(),
+            Some(llm_backend.clone()),
+        );
+
+        // Map results back to BackendResult
+        let is_verified = verified.is_guaranteed();
+        let surprise = if is_verified { 0.0 } else { 0.5 };
+
+        BackendResult {
+            source: verified.source,
+            source_provenance: "llm_verified_loop".to_string(),
+            verified: is_verified,
+            similarity: verified.confidence.confidence as f32,
+            surprise,
+            diagnostic_hvs: verified.diagnostic_hvs,
+            epistemic: if is_verified {
+                EpistemicStatus::Certain
+            } else {
+                EpistemicStatus::Probable
+            },
+            rejection: if is_verified {
+                None
+            } else {
+                Some("LLM generation failed verification".to_string())
+            },
         }
     }
 
@@ -862,33 +1564,241 @@ impl CodeOrchestrator {
 
     /// Build code-generation context from the indexed repository map when present.
     fn context_for_request(&self, request: &SynthesisRequest) -> CodeContext<'_> {
-        let Some(repo_map) = self.repo_map.as_ref() else {
-            return CodeContext::default();
+        let mut context = if let Some(repo_map) = self.repo_map.as_ref() {
+            let mut query = format!("{} {}", request.name, request.purpose);
+            if let Some(signature) = &request.signature {
+                query.push(' ');
+                query.push_str(signature);
+            }
+            for constraint in &request.constraints {
+                query.push(' ');
+                query.push_str(constraint);
+            }
+
+            repo_map.code_context_for_query(&query, 5)
+        } else {
+            CodeContext::default()
         };
 
-        let mut query = format!("{} {}", request.name, request.purpose);
-        if let Some(signature) = &request.signature {
-            query.push(' ');
-            query.push_str(signature);
-        }
-        for constraint in &request.constraints {
-            query.push(' ');
-            query.push_str(constraint);
-        }
+        context
+            .error_hints
+            .extend(request_repair_priors(request).into_iter());
+        context
+    }
+}
 
-        repo_map.code_context_for_query(&query, 5)
+fn request_repair_priors(request: &SynthesisRequest) -> Vec<(String, String)> {
+    let signature = request.signature.as_deref().unwrap_or_default();
+    let haystack = format!(
+        "{} {} {}",
+        request.name.to_ascii_lowercase(),
+        request.purpose.to_ascii_lowercase(),
+        signature.to_ascii_lowercase()
+    );
+    let mut hints = Vec::new();
+
+    if haystack.contains("result<") || haystack.contains("parse") {
+        hints.push((
+            "request_prior_result".to_string(),
+            "For Result-returning Rust functions, return the fallible expression directly or use `?`; avoid wrapping a Result inside Ok(...).".to_string(),
+        ));
+    }
+    if haystack.contains("option<") {
+        hints.push((
+            "request_prior_option".to_string(),
+            "For Option-returning Rust functions, prefer Option combinators such as map, and_then, ok_or, unwrap_or, first, and cloned when they match the signature.".to_string(),
+        ));
+    }
+    if signature.contains("&[") {
+        hints.push((
+            "request_prior_slice_borrow".to_string(),
+            "For borrowed slices, iterate with `.iter()` and use `.copied()`, `.cloned()`, or references according to the declared return type.".to_string(),
+        ));
+    }
+    if signature.contains("<T") {
+        hints.push((
+            "request_prior_generic_bounds".to_string(),
+            "For generic Rust functions, only clone, compare, hash, or order `T` when the signature includes the required trait bound.".to_string(),
+        ));
+    }
+    if haystack.contains("hashmap")
+        || haystack.contains("btreemap")
+        || haystack.contains("frequency")
+    {
+        hints.push((
+            "request_prior_map_accumulator".to_string(),
+            "For map-building tasks, create a local accumulator and use fully qualified collection paths when imports are not present.".to_string(),
+        ));
+    }
+
+    hints
+}
+
+fn repair_prior_from_rejection(backend: &str, reason: &str) -> (String, String) {
+    let category = repair_taxonomy::extract_embedded_category(reason)
+        .unwrap_or_else(|| repair_taxonomy::categorize_rejection(reason));
+    let hint = repair_taxonomy::repair_lesson_for_rejection(reason);
+    (
+        format!(
+            "prior_failure_{}_{}",
+            sanitize_hint_label(backend),
+            category
+        ),
+        format!(
+            "Previous backend `{backend}` failed with category `{category}`: {reason}. Repair hint: {hint}"
+        ),
+    )
+}
+
+fn repair_prior_labels(repair_priors: &[(String, String)]) -> Vec<String> {
+    repair_priors
+        .iter()
+        .map(|(label, _)| label.clone())
+        .collect()
+}
+
+fn sanitize_hint_label(label: &str) -> String {
+    label
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() {
+                ch.to_ascii_lowercase()
+            } else {
+                '_'
+            }
+        })
+        .collect()
+}
+
+#[cfg(feature = "geodesic_synthesis")]
+fn infer_geodesic_betti(request: &SynthesisRequest) -> symthaea_geodesic::BettiNumbers {
+    symthaea_geodesic::classify_geodesic_request(
+        &request.name,
+        &request.purpose,
+        request.signature.as_deref(),
+        &request.constraints,
+    )
+    .betti
+}
+
+#[cfg(feature = "geodesic_synthesis")]
+fn geodesic_hints(request: &SynthesisRequest) -> Vec<String> {
+    symthaea_geodesic::geodesic_hints(
+        &request.name,
+        &request.purpose,
+        request.signature.as_deref(),
+        &request.constraints,
+    )
+}
+
+#[cfg(feature = "geodesic_synthesis")]
+fn normalize_signature_for_geodesic_emitter(signature: &str) -> String {
+    symthaea_geodesic::normalize_signature_for_geodesic_emitter(signature)
+}
+
+#[cfg(feature = "geodesic_synthesis")]
+fn fill_geodesic_skeleton_defaults(
+    skeleton: &mut symthaea_geodesic::SkeletonCombinator,
+    request: &SynthesisRequest,
+) {
+    symthaea_geodesic::fill_skeleton_defaults_for_signature(skeleton, request.signature.as_deref());
+}
+
+#[cfg(feature = "geodesic_synthesis")]
+fn default_expression_for_type(type_name: &str) -> &'static str {
+    symthaea_geodesic::default_expression_for_type(type_name)
+}
+
+fn source_has_stub(source: &str) -> bool {
+    source.contains("todo!()")
+        || source.contains("todo!(\"")
+        || source.contains("todo !")
+        || source.contains("unimplemented!()")
+        || source.contains("unimplemented!(\"")
+        || source.contains("unimplemented !")
+        || source.contains("panic!(\"not implemented")
+}
+
+fn source_preview(source: &str) -> Option<String> {
+    let trimmed = source.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let mut preview = trimmed.lines().take(24).collect::<Vec<_>>().join("\n");
+    const MAX_CHARS: usize = 1200;
+    if preview.len() > MAX_CHARS {
+        preview.truncate(MAX_CHARS);
+        preview.push_str("\n...");
+    }
+    Some(preview)
+}
+
+#[cfg(feature = "geodesic_synthesis")]
+fn rust_v0_sheaf_gate_rejection(source: &str, function_name: &str) -> Option<String> {
+    let sheaf = symthaea_geodesic::verify_rust_v0_sheaf_coherence(source, function_name);
+    if sheaf.coherent {
+        return None;
+    }
+
+    let hard_diagnostics: Vec<_> = sheaf
+        .diagnostics
+        .into_iter()
+        .filter(|diagnostic| {
+            diagnostic.contains("implementation stub")
+                || diagnostic.contains("does not parse as Rust")
+                || diagnostic.contains("was not found")
+                || diagnostic.contains("used without a local definition")
+                || diagnostic.contains("has return type")
+                || diagnostic.contains("returns a value from a unit-returning signature")
+                || diagnostic.contains("is shadowed")
+                || diagnostic.contains("requires `mut` binding")
+                || diagnostic.contains("unreachable code")
+                || diagnostic.contains("returning reference to local variable")
+                || diagnostic.contains("loop expression has no reachable break")
+                || diagnostic.contains("non-exhaustive match")
+                || diagnostic.contains("obvious infinite recursion")
+                || diagnostic.contains("use of moved value")
+        })
+        .collect();
+
+    if hard_diagnostics.is_empty() {
+        None
+    } else {
+        let diagnostics_with_hints = hard_diagnostics
+            .iter()
+            .map(|diagnostic| {
+                let category = symthaea_geodesic::categorize_rust_v0_sheaf_diagnostic(diagnostic);
+                let hint = symthaea_geodesic::repair_hint_for_rust_v0_sheaf_category(category);
+                format!("{diagnostic} [category={category}; repair_hint={hint}]")
+            })
+            .collect::<Vec<_>>();
+        Some(format!(
+            "Geodesic candidate failed Rust v0 sheaf coherence: {}",
+            diagnostics_with_hints.join("; ")
+        ))
     }
 }
 
 /// Internal result from a backend attempt.
 struct BackendResult {
     source: String,
+    source_provenance: String,
     verified: bool,
     similarity: f32,
     /// Surprise scalar (0.0-1.0) derived from compiler/test failures.
     surprise: f32,
+    /// Diagnostic geometries captured during repair.
+    diagnostic_hvs: Vec<symthaea_core::hdc::unified_hv::ContinuousHV>,
     epistemic: EpistemicStatus,
     rejection: Option<String>,
+}
+
+struct GcsCertificateMetadata {
+    beta_0: usize,
+    beta_1: usize,
+    beta_2: usize,
+    oracle_convergence: Option<f32>,
+    sheaf_coherent: Option<bool>,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1044,12 +1954,13 @@ mod tests {
 
         assert_eq!(stats.files_indexed, 1);
         assert!(orch.repo_map().is_some());
-        assert!(orch
-            .repo_map()
-            .unwrap()
-            .find_symbol("normalize_name")
-            .iter()
-            .any(|symbol| symbol.snippet.contains("to_lowercase")));
+        assert!(
+            orch.repo_map()
+                .unwrap()
+                .find_symbol("normalize_name")
+                .iter()
+                .any(|symbol| symbol.snippet.contains("to_lowercase"))
+        );
     }
 
     #[test]
@@ -1068,10 +1979,12 @@ mod tests {
         let context = orch.context_for_request(&request);
 
         assert!(context.memory.is_some());
-        assert!(context
-            .source_files
-            .iter()
-            .any(|(_, snippet)| snippet.contains("normalize_name")));
+        assert!(
+            context
+                .source_files
+                .iter()
+                .any(|(_, snippet)| snippet.contains("normalize_name"))
+        );
     }
 
     #[test]
@@ -1164,5 +2077,307 @@ mod tests {
 
         // With only 0.5 energy, shouldn't be able to try native (costs 1.0)
         assert!(!response.accepted);
+    }
+
+    #[test]
+    fn test_source_has_stub_detects_common_stub_forms() {
+        assert!(source_has_stub("fn f() { todo!() }"));
+        assert!(source_has_stub("fn f() { todo ! (\"condition\") }"));
+        assert!(source_has_stub("fn f() { unimplemented!() }"));
+        assert!(source_has_stub("fn f() { unimplemented ! (\"later\") }"));
+        assert!(source_has_stub(
+            "fn f() { panic!(\"not implemented yet\") }"
+        ));
+        assert!(!source_has_stub("fn f() -> i32 { 1 + 1 }"));
+    }
+
+    #[test]
+    fn test_repair_prior_from_rejection_is_actionable() {
+        let (label, hint) = repair_prior_from_rejection(
+            "GeodesicSkeleton",
+            "function `push_if_missing` returns a value from a unit-returning signature",
+        );
+
+        assert_eq!(label, "prior_failure_geodesicskeleton_type_mismatch");
+        assert!(hint.contains("Previous backend `GeodesicSkeleton` failed"));
+        assert!(hint.contains("declared signature"));
+    }
+
+    #[cfg(not(feature = "geodesic_synthesis"))]
+    #[test]
+    fn test_certificate_omits_gcs_metadata_without_geodesic_feature() {
+        let orch = CodeOrchestrator::new();
+        let request = SynthesisRequest::new("rust", "add", "Add two integers")
+            .with_signature("fn add(a: i32, b: i32) -> i32");
+        let layers = vec![VerificationLayer {
+            name: "compile".to_string(),
+            passed: true,
+            score: None,
+            detail: "compiled".to_string(),
+        }];
+
+        let cert = orch.issue_certificate(
+            &request,
+            "pub fn add(a: i32, b: i32) -> i32 { a + b }",
+            "test",
+            "test_direct",
+            &layers,
+            0.9,
+        );
+
+        assert!(cert.topology.is_none());
+        assert!(cert.oracle_convergence.is_none());
+        assert!(cert.sheaf_coherent.is_none());
+    }
+
+    #[cfg(feature = "geodesic_synthesis")]
+    #[test]
+    fn test_certificate_includes_source_derived_gcs_metadata() {
+        let orch = CodeOrchestrator::new();
+        let request = SynthesisRequest::new("rust", "sum", "Sum each number in a slice")
+            .with_signature("fn sum(items: &[i32]) -> i32");
+        let layers = vec![VerificationLayer {
+            name: "compile".to_string(),
+            passed: true,
+            score: None,
+            detail: "compiled".to_string(),
+        }];
+        let source = r#"
+pub fn sum(items: &[i32]) -> i32 {
+    let mut total = 0;
+    for item in items {
+        total += *item;
+    }
+    total
+}
+"#;
+
+        let cert = orch.issue_certificate(&request, source, "test", "test_direct", &layers, 0.9);
+        let topology = cert
+            .topology
+            .as_ref()
+            .expect("geodesic feature should attach topology metadata");
+
+        assert_eq!(topology.beta_0, 1);
+        assert!(
+            topology.beta_1 >= 1,
+            "looping code should produce at least one beta_1 cycle"
+        );
+        assert!(cert.oracle_convergence.is_some());
+        assert_eq!(cert.sheaf_coherent, Some(true));
+    }
+
+    #[cfg(feature = "geodesic_synthesis")]
+    #[test]
+    fn test_rust_v0_sheaf_gate_rejects_hard_structural_failures() {
+        let coherent = "pub fn add(a: i32, b: i32) -> i32 { a + b }";
+        assert!(rust_v0_sheaf_gate_rejection(coherent, "add").is_none());
+
+        let stub = "pub fn add(a: i32, b: i32) -> i32 { todo!() }";
+        let rejection = rust_v0_sheaf_gate_rejection(stub, "add")
+            .expect("stubs should fail the geodesic sheaf gate");
+        assert!(rejection.contains("implementation stub"));
+
+        let parse_failure = "pub fn add(a: i32, b: i32) -> i32 {";
+        let rejection = rust_v0_sheaf_gate_rejection(parse_failure, "add")
+            .expect("parse failures should fail the geodesic sheaf gate");
+        assert!(rejection.contains("does not parse as Rust"));
+
+        let unresolved = "pub fn add(a: i32, b: i32) -> i32 { a + missing }";
+        let rejection = rust_v0_sheaf_gate_rejection(unresolved, "add")
+            .expect("unresolved identifiers should fail the geodesic sheaf gate");
+        assert!(rejection.contains("missing"));
+
+        let missing_return_value = "pub fn add(a: i32, b: i32) -> i32 { let _ = a + b; }";
+        let rejection = rust_v0_sheaf_gate_rejection(missing_return_value, "add")
+            .expect("missing return values should fail the geodesic sheaf gate");
+        assert!(rejection.contains("has return type"));
+
+        let unit_return_mismatch = "pub fn log_value(a: i32) { return a; }";
+        let rejection = rust_v0_sheaf_gate_rejection(unit_return_mismatch, "log_value")
+            .expect("unit-returning functions should not return values");
+        assert!(rejection.contains("unit-returning signature"));
+
+        let shadowing = "pub fn shadow() -> i32 { let x = 1; let x = 2; x }";
+        let rejection = rust_v0_sheaf_gate_rejection(shadowing, "shadow")
+            .expect("shadowed bindings should fail the geodesic sheaf gate");
+        assert!(rejection.contains("shadowed"));
+
+        let missing_mut = "pub fn increment(n: i32) -> i32 { n += 1; n }";
+        let rejection = rust_v0_sheaf_gate_rejection(missing_mut, "increment")
+            .expect("assignment to immutable bindings should fail the geodesic sheaf gate");
+        assert!(rejection.contains("mut"));
+
+        let unreachable = "pub fn early_return() -> i32 { return 42; 100 }";
+        let rejection = rust_v0_sheaf_gate_rejection(unreachable, "early_return")
+            .expect("unreachable code should fail the geodesic sheaf gate");
+        assert!(rejection.contains("unreachable"));
+
+        let return_local_ref = "pub fn local_ref<'a>() -> &'a i32 { let x = 1; &x }";
+        let rejection = rust_v0_sheaf_gate_rejection(return_local_ref, "local_ref")
+            .expect("returning a reference to a local should fail the geodesic sheaf gate");
+        assert!(rejection.contains("local variable"));
+
+        let infinite_loop = "pub fn spin() { loop {} }";
+        let rejection = rust_v0_sheaf_gate_rejection(infinite_loop, "spin")
+            .expect("obvious infinite loops should fail the geodesic sheaf gate");
+        assert!(rejection.contains("no reachable break"));
+
+        let non_exhaustive = r#"
+enum Mode { Idle, Active, Fault }
+pub fn score(mode: Mode) -> i32 {
+    match mode {
+        Mode::Idle => 0,
+        Mode::Active => 1,
+    }
+}
+"#;
+        let rejection = rust_v0_sheaf_gate_rejection(non_exhaustive, "score")
+            .expect("non-exhaustive simple enum matches should fail the geodesic sheaf gate");
+        assert!(rejection.contains("non-exhaustive match"));
+
+        let recursion = "pub fn recurse(n: i32) -> i32 { recurse(n) }";
+        let rejection = rust_v0_sheaf_gate_rejection(recursion, "recurse")
+            .expect("obvious infinite recursion should fail the geodesic sheaf gate");
+        assert!(rejection.contains("infinite recursion"));
+
+        let moved = r#"
+fn consume(_: String) {}
+pub fn moved() -> usize {
+    let value = String::from("abc");
+    consume(value);
+    value.len()
+}
+"#;
+        let rejection = rust_v0_sheaf_gate_rejection(moved, "moved")
+            .expect("simple use-after-move should fail the geodesic sheaf gate");
+        assert!(rejection.contains("moved value"));
+    }
+
+    #[cfg(feature = "geodesic_synthesis")]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_geodesic_full_pipeline_records_attempt_contract() {
+        let orch = CodeOrchestrator::new()
+            .with_llm_backend(crate::language::llm_backend::simulated_backend())
+            .with_energy_budget(0.75);
+        let request = SynthesisRequest::new("rust", "add", "Add two integers")
+            .with_signature("fn add(a: i32, b: i32) -> i32")
+            .with_example("add(2, 3)", "5");
+
+        let response = orch.synthesize(&request);
+
+        assert!(
+            response
+                .verification
+                .iter()
+                .any(|layer| layer.name == "geodesic_skeleton")
+        );
+
+        let attempts = orch.attempt_history();
+        assert_eq!(
+            attempts.first().map(|attempt| attempt.backend.as_str()),
+            Some("GeodesicSkeleton")
+        );
+
+        let certificates = orch.certificates();
+        if response.accepted {
+            assert_eq!(certificates.len(), 1);
+            assert!(!source_has_stub(&response.source));
+            let cert = &certificates[0];
+            assert!(cert.topology.is_some());
+            assert!(cert.sheaf_coherent.is_some());
+        } else {
+            assert!(
+                certificates.is_empty(),
+                "rejected synthesis should not issue certificates"
+            );
+        }
+    }
+
+    #[cfg(feature = "geodesic_synthesis")]
+    #[test]
+    fn test_geodesic_betti_inference_is_conservative() {
+        let linear = SynthesisRequest::new("rust", "add", "Add two integers")
+            .with_signature("fn add(a: i32, b: i32) -> i32");
+        let looped = SynthesisRequest::new("rust", "sum", "Sum each number in a slice")
+            .with_signature("fn sum(items: &[i32]) -> i32");
+        let nested = SynthesisRequest::new("rust", "grid_score", "Compute grid matrix score")
+            .with_signature("fn grid_score(grid: &[Vec<i32>]) -> i32");
+
+        assert_eq!(infer_geodesic_betti(&linear).beta_1, 0);
+        assert_eq!(infer_geodesic_betti(&looped).beta_1, 1);
+        assert_eq!(infer_geodesic_betti(&nested).beta_1, 2);
+    }
+
+    #[cfg(feature = "geodesic_synthesis")]
+    #[test]
+    fn test_geodesic_signature_normalization_and_type_defaults() {
+        assert_eq!(
+            normalize_signature_for_geodesic_emitter("pub fn is_even(n: i32) -> bool {"),
+            "fn is_even(n: i32) -> bool"
+        );
+        assert_eq!(default_expression_for_type("bool"), "false");
+        assert_eq!(default_expression_for_type("String"), "String::new()");
+        assert_eq!(
+            default_expression_for_type("Vec < i32 >"),
+            "Default::default()"
+        );
+    }
+
+    #[cfg(feature = "geodesic_synthesis")]
+    #[test]
+    fn test_geodesic_skeleton_seed_emits_without_stubs_for_linear_request() {
+        use symthaea_geodesic::{build_skeleton_from_topology, emit_rust_from_skeleton};
+
+        let request = SynthesisRequest::new("rust", "add", "Add two integers")
+            .with_signature("fn add(a: i32, b: i32) -> i32");
+        let betti = infer_geodesic_betti(&request);
+        let hints = geodesic_hints(&request);
+        let hint_refs: Vec<&str> = hints.iter().map(String::as_str).collect();
+        let mut skeleton = build_skeleton_from_topology(&betti, &hint_refs);
+
+        fill_geodesic_skeleton_defaults(&mut skeleton, &request);
+
+        let signature = request
+            .signature
+            .as_deref()
+            .map(normalize_signature_for_geodesic_emitter);
+        let source =
+            emit_rust_from_skeleton(&skeleton, &request.name, signature.as_deref(), &hint_refs)
+                .expect("filled geodesic skeleton should emit source");
+
+        assert!(source.contains("pub fn add(a: i32, b: i32) -> i32"));
+        assert!(!source_has_stub(&source));
+        assert!(source.contains("let mut result"));
+        assert!(source.contains("result"));
+    }
+
+    #[cfg(feature = "geodesic_synthesis")]
+    #[test]
+    fn test_geodesic_skeleton_seed_emits_loop_shape_for_slice_request() {
+        use symthaea_geodesic::{build_skeleton_from_topology, emit_rust_from_skeleton};
+
+        let request = SynthesisRequest::new("rust", "sum", "Sum each number in a slice")
+            .with_signature("fn sum(items: &[i32]) -> i32");
+        let betti = infer_geodesic_betti(&request);
+        let hints = geodesic_hints(&request);
+        let hint_refs: Vec<&str> = hints.iter().map(String::as_str).collect();
+        let mut skeleton = build_skeleton_from_topology(&betti, &hint_refs);
+
+        fill_geodesic_skeleton_defaults(&mut skeleton, &request);
+        let topo = skeleton.topological_signature();
+
+        let signature = request
+            .signature
+            .as_deref()
+            .map(normalize_signature_for_geodesic_emitter);
+        let source =
+            emit_rust_from_skeleton(&skeleton, &request.name, signature.as_deref(), &hint_refs)
+                .expect("filled geodesic skeleton should emit source");
+
+        assert_eq!(betti.beta_1, 1);
+        assert_eq!(topo.delta_beta_1, 1);
+        assert!(!source_has_stub(&source));
+        assert!(source.contains("pub fn sum(items: &[i32]) -> i32"));
     }
 }

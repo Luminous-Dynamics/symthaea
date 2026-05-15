@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -10,13 +9,13 @@ use mycelix_zome_helpers as _;
 
 use hdk::prelude::*;
 use mycelix_bridge_common::civic_requirement_basic;
+use mycelix_zome_helpers as _;
 use mycelix_zome_helpers::records_from_links;
 use wellbeing_integrity::*;
 
 // =============================================================================
 // Helpers
 // =============================================================================
-
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -49,13 +48,20 @@ const EXPECTED_CHECKINS_PER_MONTH: f32 = 15.0;
 /// After creation, evaluates trend detection for nudge generation.
 #[hdk_extern]
 pub fn create_checkin(input: WellbeingCheckIn) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "create_checkin")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "create_checkin",
+    )?;
 
     let action_hash = create_entry(&EntryTypes::WellbeingCheckIn(input))?;
 
     // Link agent -> check-in
     let agent_info = agent_info()?;
-    let agent_anchor = ensure_anchor(&format!("agent_checkins:{}", agent_info.agent_initial_pubkey))?;
+    let agent_anchor = ensure_anchor(&format!(
+        "agent_checkins:{}",
+        agent_info.agent_initial_pubkey
+    ))?;
     create_link(
         agent_anchor,
         action_hash.clone(),
@@ -66,8 +72,9 @@ pub fn create_checkin(input: WellbeingCheckIn) -> ExternResult<Record> {
     // Auto-evaluate trend detection
     let _ = evaluate_trend_internal();
 
-    let record = get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get created check-in".into())))?;
+    let record = get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Failed to get created check-in".into())
+    ))?;
     Ok(record)
 }
 
@@ -75,7 +82,10 @@ pub fn create_checkin(input: WellbeingCheckIn) -> ExternResult<Record> {
 #[hdk_extern]
 pub fn get_my_checkins(_: ()) -> ExternResult<Vec<Record>> {
     let agent_info = agent_info()?;
-    let agent_anchor = anchor_hash(&format!("agent_checkins:{}", agent_info.agent_initial_pubkey))?;
+    let agent_anchor = anchor_hash(&format!(
+        "agent_checkins:{}",
+        agent_info.agent_initial_pubkey
+    ))?;
     let links = get_links(
         LinkQuery::try_new(agent_anchor, LinkTypes::AgentToCheckIns)?,
         GetStrategy::default(),
@@ -88,9 +98,7 @@ pub fn get_my_checkins(_: ()) -> ExternResult<Vec<Record>> {
 pub fn get_recent_checkins(count: u32) -> ExternResult<Vec<Record>> {
     let mut checkins = get_my_checkins(())?;
     // Sort by timestamp descending (most recent first)
-    checkins.sort_by(|a, b| {
-        b.action().timestamp().cmp(&a.action().timestamp())
-    });
+    checkins.sort_by(|a, b| b.action().timestamp().cmp(&a.action().timestamp()));
     checkins.truncate(count as usize);
     Ok(checkins)
 }
@@ -130,8 +138,9 @@ pub fn opt_in_aggregate(_: ()) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get opt-in record".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to get opt-in record".into()
+    )))
 }
 
 /// Opt out of aggregate computation.
@@ -147,8 +156,9 @@ pub fn opt_out_aggregate(_: ()) -> ExternResult<Record> {
     };
     let action_hash = create_entry(&EntryTypes::AggregateOptIn(opt_in))?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get opt-out record".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to get opt-out record".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -186,8 +196,9 @@ pub fn share_checkin_with_circle(input: ShareCheckInInput) -> ExternResult<Recor
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get share record".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to get share record".into()
+    )))
 }
 
 /// Get check-ins shared with a specific circle.
@@ -195,7 +206,8 @@ pub fn share_checkin_with_circle(input: ShareCheckInInput) -> ExternResult<Recor
 pub fn get_circle_shared_checkins(circle_hash: ActionHash) -> ExternResult<Vec<Record>> {
     let circle_anchor = anchor_hash(&format!("circle_shared_checkins:{}", circle_hash))?;
     let links = get_links(
-        LinkQuery::try_new(circle_anchor, LinkTypes::CircleToSharedCheckIns)?, GetStrategy::default(),
+        LinkQuery::try_new(circle_anchor, LinkTypes::CircleToSharedCheckIns)?,
+        GetStrategy::default(),
     )?;
     records_from_links(links)
 }
@@ -209,7 +221,11 @@ pub fn get_circle_shared_checkins(circle_hash: ActionHash) -> ExternResult<Vec<R
 /// Does NOT reveal individual data — only aggregate statistics.
 #[hdk_extern]
 pub fn compute_aggregate(_: ()) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "compute_aggregate")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "compute_aggregate",
+    )?;
 
     let agent_info = agent_info()?;
     let now = sys_time()?;
@@ -217,7 +233,8 @@ pub fn compute_aggregate(_: ()) -> ExternResult<Record> {
     // Get opted-in agents
     let opt_in_anchor = anchor_hash("aggregate_opt_ins")?;
     let opt_in_links = get_links(
-        LinkQuery::try_new(opt_in_anchor, LinkTypes::OptInToAgent)?, GetStrategy::default(),
+        LinkQuery::try_new(opt_in_anchor, LinkTypes::OptInToAgent)?,
+        GetStrategy::default(),
     )?;
     let opt_in_records = records_from_links(opt_in_links)?;
 
@@ -239,10 +256,10 @@ pub fn compute_aggregate(_: ()) -> ExternResult<Record> {
             }
 
             // Get agent's most recent check-in
-            let agent_anchor =
-                anchor_hash(&format!("agent_checkins:{}", opt_in.agent))?;
+            let agent_anchor = anchor_hash(&format!("agent_checkins:{}", opt_in.agent))?;
             let checkin_links = get_links(
-                LinkQuery::try_new(agent_anchor, LinkTypes::AgentToCheckIns)?, GetStrategy::default(),
+                LinkQuery::try_new(agent_anchor, LinkTypes::AgentToCheckIns)?,
+                GetStrategy::default(),
             )?;
             let checkin_records = records_from_links(checkin_links)?;
 
@@ -291,8 +308,9 @@ pub fn compute_aggregate(_: ()) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get aggregate".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to get aggregate".into()
+    )))
 }
 
 /// Get the latest wellbeing aggregate.
@@ -300,13 +318,12 @@ pub fn compute_aggregate(_: ()) -> ExternResult<Record> {
 pub fn get_latest_aggregate(_: ()) -> ExternResult<Option<Record>> {
     let agg_anchor = anchor_hash("all_aggregates")?;
     let links = get_links(
-        LinkQuery::try_new(agg_anchor, LinkTypes::AllAggregates)?, GetStrategy::default(),
+        LinkQuery::try_new(agg_anchor, LinkTypes::AllAggregates)?,
+        GetStrategy::default(),
     )?;
     let records = records_from_links(links)?;
 
-    Ok(records
-        .into_iter()
-        .max_by_key(|r| r.action().timestamp()))
+    Ok(records.into_iter().max_by_key(|r| r.action().timestamp()))
 }
 
 /// Get aggregate history (for trend visualization).
@@ -314,7 +331,8 @@ pub fn get_latest_aggregate(_: ()) -> ExternResult<Option<Record>> {
 pub fn get_aggregate_history(limit: u32) -> ExternResult<Vec<Record>> {
     let agg_anchor = anchor_hash("all_aggregates")?;
     let links = get_links(
-        LinkQuery::try_new(agg_anchor, LinkTypes::AllAggregates)?, GetStrategy::default(),
+        LinkQuery::try_new(agg_anchor, LinkTypes::AllAggregates)?,
+        GetStrategy::default(),
     )?;
     let mut records = records_from_links(links)?;
     records.sort_by(|a, b| b.action().timestamp().cmp(&a.action().timestamp()));
@@ -335,7 +353,10 @@ pub fn evaluate_trend(_: ()) -> ExternResult<Option<Record>> {
 
 fn evaluate_trend_internal() -> ExternResult<Option<Record>> {
     let agent_info = agent_info()?;
-    let agent_anchor = anchor_hash(&format!("agent_checkins:{}", agent_info.agent_initial_pubkey))?;
+    let agent_anchor = anchor_hash(&format!(
+        "agent_checkins:{}",
+        agent_info.agent_initial_pubkey
+    ))?;
     let links = get_links(
         LinkQuery::try_new(agent_anchor, LinkTypes::AgentToCheckIns)?,
         GetStrategy::default(),
@@ -405,7 +426,8 @@ pub fn get_my_nudges(_: ()) -> ExternResult<Vec<Record>> {
     let agent_info = agent_info()?;
     let nudge_anchor = anchor_hash(&format!("agent_nudges:{}", agent_info.agent_initial_pubkey))?;
     let links = get_links(
-        LinkQuery::try_new(nudge_anchor, LinkTypes::AgentToNudges)?, GetStrategy::default(),
+        LinkQuery::try_new(nudge_anchor, LinkTypes::AgentToNudges)?,
+        GetStrategy::default(),
     )?;
     let records = records_from_links(links)?;
 
@@ -433,13 +455,16 @@ pub fn acknowledge_nudge(nudge_hash: ActionHash) -> ExternResult<Record> {
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {e}"))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not a nudge entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Not a nudge entry".into()
+        )))?;
 
     nudge.acknowledged = true;
     let new_hash = update_entry(nudge_hash, &EntryTypes::WellbeingNudge(nudge))?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get updated nudge".into())))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to get updated nudge".into()
+    )))
 }
 
 // =============================================================================
@@ -453,11 +478,12 @@ pub fn acknowledge_nudge(nudge_hash: ActionHash) -> ExternResult<Record> {
 pub fn get_checkin_consistency(_: ()) -> ExternResult<f32> {
     let agent_info = agent_info()?;
     let now = sys_time()?;
-    let window_start = Timestamp::from_micros(
-        now.as_micros() - CONSISTENCY_WINDOW_US,
-    );
+    let window_start = Timestamp::from_micros(now.as_micros() - CONSISTENCY_WINDOW_US);
 
-    let agent_anchor = anchor_hash(&format!("agent_checkins:{}", agent_info.agent_initial_pubkey))?;
+    let agent_anchor = anchor_hash(&format!(
+        "agent_checkins:{}",
+        agent_info.agent_initial_pubkey
+    ))?;
     let links = get_links(
         LinkQuery::try_new(agent_anchor, LinkTypes::AgentToCheckIns)?,
         GetStrategy::default(),

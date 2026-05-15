@@ -1,10 +1,10 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 //! Platform types for Symthaea robotics platforms.
 
 /// Robotic platform type — maps to symthaea's EmbodimentPlatform.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "bevy", derive(bevy::prelude::Reflect))]
 pub enum PlatformType {
     /// Quadrotor drone (4 actuators).
     Quadrotor,

@@ -36,6 +36,15 @@ impl MetricsProvider for CognitiveLoopService {
             total_cycles: self.stats.total_cycles as u64,
             consciousness_level: (phi + coherence) / 2.0,
             latency_ms: 0, // Updated by IPC layer
+            #[cfg(feature = "vision-manifold")]
+            mental_movie: self.last_mental_movie.as_ref().map(|m| crate::shell::ipc_client::MentalMovie {
+                frames: m.frames.clone(),
+                width: m.width,
+                height: m.height,
+                channels: m.channels,
+                path_length: m.path_length,
+                semantic_coherence: m.semantic_coherence,
+            }),
         }
     }
 

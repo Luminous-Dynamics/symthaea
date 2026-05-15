@@ -89,11 +89,11 @@ impl LLMBackend for SsmBackend {
         // otherwise use a default channel set derived from the prompt text.
         let channels = channels_from_prompt(prompt);
 
-        let mut gen = self
+        let mut generator = self
             .generator
             .lock()
             .map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))?;
-        let result = gen.generate(&channels);
+        let result = generator.generate(&channels);
         Ok(result.text)
     }
 
@@ -105,11 +105,11 @@ impl LLMBackend for SsmBackend {
     ) -> Result<String> {
         let channels = channels_from_prompt(prompt);
 
-        let mut gen = self
+        let mut generator = self
             .generator
             .lock()
             .map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))?;
-        let result = gen.generate_with_callback(&channels, on_token);
+        let result = generator.generate_with_callback(&channels, on_token);
         Ok(result.text)
     }
 
@@ -137,11 +137,11 @@ impl DirectThoughtBackend for SsmBackend {
         channels: &ThoughtChannels,
         _params: &GenerationParams,
     ) -> Result<String> {
-        let mut gen = self
+        let mut generator = self
             .generator
             .lock()
             .map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))?;
-        let result = gen.generate(channels);
+        let result = generator.generate(channels);
         Ok(result.text)
     }
 }
@@ -405,11 +405,11 @@ impl LiquidMambaBackend {
         &self,
         channels: &ThoughtChannels,
     ) -> anyhow::Result<symthaea_broca::GenerationResult> {
-        let mut gen = self
+        let mut generator = self
             .generator
             .lock()
             .map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))?;
-        Ok(gen.generate(channels))
+        Ok(generator.generate(channels))
     }
 
     /// Pass the FEP learning signal from the cognitive loop to modulate distillation LR.
@@ -418,8 +418,8 @@ impl LiquidMambaBackend {
     /// - `fep_signal < 0.3` → low surprise → dampen distillation by 0.7×
     /// - Otherwise → neutral (1.0×)
     pub fn set_fep_modulation(&self, fep_signal: f32) {
-        if let Ok(mut gen) = self.generator.lock() {
-            gen.set_fep_modulation(fep_signal);
+        if let Ok(mut generator) = self.generator.lock() {
+            generator.set_fep_modulation(fep_signal);
         }
     }
 }
@@ -438,15 +438,15 @@ impl std::fmt::Debug for LiquidMambaBackend {
 impl LLMBackend for LiquidMambaBackend {
     async fn generate(&self, prompt: &str, _params: &GenerationParams) -> Result<String> {
         let channels = channels_from_prompt(prompt);
-        let gen = self.generator.clone();
+        let generator_handle = self.generator.clone();
         // Offload Mamba's CPU-heavy inference to a blocking thread so the
         // async runtime (and the 50Hz cognitive loop) continues ticking.
         tokio::task::spawn_blocking(move || {
-            let mut gen = gen
+            let mut generator = generator_handle
                 .lock()
                 .map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))?;
-            let result = gen.generate(&channels);
-            gen.distill_step(&channels, &result);
+            let result = generator.generate(&channels);
+            generator.distill_step(&channels, &result);
             Ok(result.text)
         })
         .await
@@ -463,12 +463,12 @@ impl LLMBackend for LiquidMambaBackend {
         // that can't cross thread boundaries. The streaming path is typically
         // used for interactive display, not within the 50Hz loop.
         let channels = channels_from_prompt(prompt);
-        let mut gen = self
+        let mut generator = self
             .generator
             .lock()
             .map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))?;
-        let result = gen.generate_with_callback(&channels, on_token);
-        gen.distill_step(&channels, &result);
+        let result = generator.generate_with_callback(&channels, on_token);
+        generator.distill_step(&channels, &result);
         Ok(result.text)
     }
 
@@ -505,8 +505,8 @@ impl LLMBackend for LiquidMambaBackend {
 
     #[cfg(feature = "liquid-mamba")]
     fn apply_aggregated_gradient(&self, weights: &[f32]) -> bool {
-        if let Ok(mut gen) = self.generator.lock() {
-            gen.projection_mut().load_weights(weights);
+        if let Ok(mut generator) = self.generator.lock() {
+            generator.projection_mut().load_weights(weights);
             true
         } else {
             false
@@ -515,8 +515,8 @@ impl LLMBackend for LiquidMambaBackend {
 
     #[cfg(feature = "liquid-mamba")]
     fn set_fep_modulation(&self, fep_signal: f32) {
-        if let Ok(mut gen) = self.generator.lock() {
-            gen.set_fep_modulation(fep_signal);
+        if let Ok(mut generator) = self.generator.lock() {
+            generator.set_fep_modulation(fep_signal);
         }
     }
 
@@ -535,8 +535,8 @@ impl LLMBackend for LiquidMambaBackend {
         // Modulation factor: high precision + low load → boost; high load → suppress
         let modulation = fep_precision * fep_lr_boost * (1.0 - thermodynamic_load);
         let scaled = modulation.clamp(0.0, 2.0);
-        if let Ok(mut gen) = self.generator.lock() {
-            gen.set_fep_modulation(scaled);
+        if let Ok(mut generator) = self.generator.lock() {
+            generator.set_fep_modulation(scaled);
         }
     }
 
@@ -568,8 +568,8 @@ impl LLMBackend for LiquidMambaBackend {
     }
 
     fn update_affect(&self, load: f32, temp: f32) {
-        if let Ok(mut gen) = self.generator.lock() {
-            gen.update_affect(load, temp);
+        if let Ok(mut generator) = self.generator.lock() {
+            generator.update_affect(load, temp);
         }
     }
 
@@ -589,12 +589,12 @@ impl DirectThoughtBackend for LiquidMambaBackend {
         channels: &ThoughtChannels,
         _params: &GenerationParams,
     ) -> Result<String> {
-        let mut gen = self
+        let mut generator = self
             .generator
             .lock()
             .map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))?;
-        let result = gen.generate(channels);
-        gen.distill_step(channels, &result);
+        let result = generator.generate(channels);
+        generator.distill_step(channels, &result);
         Ok(result.text)
     }
 }
@@ -615,13 +615,13 @@ impl LiquidMambaBackend {
         &self,
         channels: ThoughtChannels,
     ) -> Result<symthaea_broca::GenerationResult> {
-        let gen = self.generator.clone();
+        let generator_handle = self.generator.clone();
         tokio::task::spawn_blocking(move || {
-            let mut gen = gen
+            let mut generator = generator_handle
                 .lock()
                 .map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))?;
-            let result = gen.generate(&channels);
-            gen.distill_step(&channels, &result);
+            let result = generator.generate(&channels);
+            generator.distill_step(&channels, &result);
             Ok(result)
         })
         .await

@@ -375,6 +375,8 @@ fn feedback_phase_result_field_count() {
         grid_encoding_norm: _,
         grid_spatial_complexity: _,
         social_learning_rate_factor: _,
+        #[cfg(feature = "vision-manifold")]
+            mental_movie: _,
     } = f;
     // Compile-time assertion: if fields change, destructure above won't compile
 }

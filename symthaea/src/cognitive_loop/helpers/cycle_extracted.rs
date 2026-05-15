@@ -186,10 +186,11 @@ impl CognitiveLoopService {
             #[cfg(feature = "identity")]
             signed_output: None,
             #[cfg(feature = "identity")]
-            assurance_level: crate::identity::AssuranceLevel::E0Anonymous,
+            assurance_level: crate::identity::AssuranceLevel::Minimal,
+            #[cfg(feature = "vision-manifold")]
+            mental_movie: None,
         })
     }
-
     /// Thalamic routing: determine cognitive depth from prior state.
     ///
     /// Uses temporal signature pattern, prosody valence, and average prediction

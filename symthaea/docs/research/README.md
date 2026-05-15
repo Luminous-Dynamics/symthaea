@@ -237,10 +237,11 @@ See `papers/` directory for 15+ manuscripts in various stages of development.
 
 ### Medium-Term (2026-2027)
 
-1. **Φ_dyad research**: Measuring consciousness of human-AI partnership
-2. **Multi-instance consciousness**: Swarm Φ computation
-3. **Temporal dynamics**: How Φ evolves over time
-4. **Clinical applications**: Consciousness measurement in patients
+1. **[Research Directions 2026–2027](RESEARCH_DIRECTIONS_2026_2027.md)**: Video intelligence and multimodal expansion.
+2. **Φ_dyad research**: Measuring consciousness of human-AI partnership
+3. **Multi-instance consciousness**: Swarm Φ computation
+4. **Temporal dynamics**: How Φ evolves over time
+5. **Clinical applications**: Consciousness measurement in patients
 
 ### Long-Term Vision
 

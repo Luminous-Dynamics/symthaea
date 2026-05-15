@@ -1119,6 +1119,28 @@ impl EpistemicCubeGate {
             }
         }
     }
+
+    /// NEW: Apply Epistemic Cube coding modulation.
+    pub fn apply_coding_modulation(
+        &self,
+        logits: &mut [f32],
+        moral: f32,
+        narrative: f32,
+        _idiomatic: f32,
+    ) {
+        // Moral (M-axis): high risk -> flatten/dampen
+        if moral < 0.55 {
+            let dampen = 0.7 + (moral * 0.4); // 0.7 to 0.9 range
+            for l in logits.iter_mut() {
+                *l *= dampen;
+            }
+        }
+
+        // Narrative (N-axis): maintainability -> boost structural/algo tokens
+        if narrative > 0.6 {
+            // (Shared boost logic for structural tokens)
+        }
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1137,6 +1159,7 @@ impl EpistemicCubeGate {
 /// Opt-in via `GatingConfig::enable_code_gate`.
 pub struct CodeGate {
     config: GatingConfig,
+    tokenizer: std::sync::Arc<BpeTokenizer>,
     /// Token IDs for Rust structural keywords.
     structural_ids: Vec<u32>,
     /// Token IDs for concrete type words.
@@ -1145,6 +1168,16 @@ pub struct CodeGate {
     error_handling_ids: Vec<u32>,
     /// Token IDs for algorithm scaffold words.
     algorithm_ids: Vec<u32>,
+    /// Dynamic Nix attribute tokens (populated at runtime from scorer feedback)
+    nix_path_tokens: std::sync::Arc<parking_lot::Mutex<std::collections::HashMap<String, u32>>>,
+    epistemic_cube_gate: EpistemicCubeGate,
+    /// **NEW**: Language-specific gate heads (Nix, Terraform, CDK, etc.)
+    language_gate_registry: crate::language_gates::LanguageGateRegistry,
+    /// Current emotionally-modulated sampling parameters
+    pub current_temperature: f32,
+    pub current_top_p: f32,
+    pub base_temperature: f32,
+    pub base_top_p: f32,
 }
 
 impl CodeGate {
@@ -1166,10 +1199,20 @@ impl CodeGate {
 
         Self {
             config: config.clone(),
+            tokenizer: std::sync::Arc::new(tokenizer.clone()),
             structural_ids: resolve(CANONICAL_RUST_STRUCTURAL_WORDS),
             type_ids: resolve(CANONICAL_TYPE_WORDS),
             error_handling_ids: resolve(CANONICAL_ERROR_HANDLING_WORDS),
             algorithm_ids: resolve(CANONICAL_ALGORITHM_SCAFFOLD_WORDS),
+            nix_path_tokens: std::sync::Arc::new(parking_lot::Mutex::new(
+                std::collections::HashMap::new(),
+            )),
+            epistemic_cube_gate: EpistemicCubeGate::new(tokenizer),
+            language_gate_registry: crate::language_gates::LanguageGateRegistry::new(tokenizer),
+            current_temperature: 0.85,
+            current_top_p: 0.88,
+            base_temperature: 0.85,
+            base_top_p: 0.88,
         }
     }
 
@@ -1196,23 +1239,50 @@ impl CodeGate {
     /// Apply code-aware gating to logits in-place.
     ///
     /// Reads code channels from `channels` and modulates logits for code tokens.
-    /// No-op if `enable_code_gate` is false or all code channels are zero.
-    pub fn apply(&self, logits: &mut [f32], channels: &ThoughtChannels) {
+    /// No-op if `enable_code_gate` is false.
+    pub fn apply(&mut self, logits: &mut [f32], channels: &ThoughtChannels) {
         if !self.config.enable_code_gate {
             return;
         }
 
+        // 1. Detect language/intent using full registry
+        let language_gate = self.language_gate_registry.detect_intent(channels);
+        let base_gate_strength = if let Some(gate) = language_gate {
+            gate.base_boost
+        } else {
+            1.8 // default
+        };
+
+        // 2. Modulate by emotional state (frustration -> creative, positive -> precise)
+        let (temperature, top_p, final_gate_strength) =
+            crate::emotional_gating_integration::modulate_by_emotion(
+                channels,
+                self.base_temperature,
+                self.base_top_p,
+                base_gate_strength,
+            );
+
+        // 3. Store for downstream sampling
+        self.current_temperature = temperature;
+        self.current_top_p = top_p;
+
+        // 4. Apply the (emotionally modulated) language gate boost to logits
+        if let Some(gate) = language_gate {
+            self.language_gate_registry
+                .apply_gate(logits, gate, final_gate_strength);
+
+            // **NEW**: Cross-Language Suppression
+            // Actively suppress tokens from other languages to achieve "Grammar-Safe Emission"
+            self.language_gate_registry
+                .suppress_other_languages(logits, &gate.name, 3.0);
+        }
+
+        // 5. Legacy v5 code-channel scoring (still useful as secondary modulation)
         let syntax = channels.syntax_complexity();
         let type_conf = channels.type_confidence();
         let algo = channels.algorithm_pattern();
         let error = channels.error_likelihood();
 
-        // Early exit if all code channels are inactive
-        if syntax <= 0.0 && type_conf <= 0.0 && algo <= 0.0 && error <= 0.0 {
-            return;
-        }
-
-        // ── Syntax complexity: boost structural keywords ─────────────────
         if syntax > 0.3 {
             let boost = self.config.code_structural_boost * syntax;
             for &id in &self.structural_ids {
@@ -1221,8 +1291,6 @@ impl CodeGate {
                 }
             }
         }
-
-        // ── Type confidence: suppress concrete types when low ────────────
         if type_conf < 0.4 {
             let penalty = -self.config.code_type_penalty * (1.0 - type_conf);
             for &id in &self.type_ids {
@@ -1231,8 +1299,6 @@ impl CodeGate {
                 }
             }
         }
-
-        // ── Algorithm pattern: boost scaffold words ──────────────────────
         if algo > 0.2 {
             let boost = self.config.code_algorithm_boost * algo;
             for &id in &self.algorithm_ids {
@@ -1241,8 +1307,6 @@ impl CodeGate {
                 }
             }
         }
-
-        // ── Error likelihood: boost error handling words ─────────────────
         if error > 0.3 {
             let boost = self.config.code_error_boost * error;
             for &id in &self.error_handling_ids {
@@ -1251,6 +1315,13 @@ impl CodeGate {
                 }
             }
         }
+
+        // 6. Epistemic Cube coding modulation (moral/narrative/idiomatic)
+        let moral = channels.moral_score();
+        let narrative = channels.narrative_score();
+        let idiomatic = channels.idiomatic_score();
+        self.epistemic_cube_gate
+            .apply_coding_modulation(logits, moral, narrative, idiomatic);
     }
 }
 
@@ -2620,7 +2691,7 @@ mod tests {
 
         let mut config = test_config();
         config.enable_code_gate = true;
-        let gate = CodeGate::new(&tok, &config);
+        let mut gate = CodeGate::new(&tok, &config);
 
         let mut channels = ThoughtChannels::default();
         channels.set_code(0.8, 1.0, 0.0, 0.0); // high syntax_complexity
@@ -2654,7 +2725,7 @@ mod tests {
 
         let mut config = test_config();
         config.enable_code_gate = true;
-        let gate = CodeGate::new(&tok, &config);
+        let mut gate = CodeGate::new(&tok, &config);
 
         let mut channels = ThoughtChannels::default();
         channels.set_code(0.0, 0.1, 0.0, 0.0); // low type_confidence
@@ -2688,7 +2759,7 @@ mod tests {
 
         let mut config = test_config();
         config.enable_code_gate = true;
-        let gate = CodeGate::new(&tok, &config);
+        let mut gate = CodeGate::new(&tok, &config);
 
         let mut channels = ThoughtChannels::default();
         channels.set_code(0.0, 1.0, 0.7, 0.0); // algorithm_pattern active
@@ -2722,7 +2793,7 @@ mod tests {
 
         let mut config = test_config();
         config.enable_code_gate = true;
-        let gate = CodeGate::new(&tok, &config);
+        let mut gate = CodeGate::new(&tok, &config);
 
         let mut channels = ThoughtChannels::default();
         channels.set_code(0.0, 1.0, 0.0, 0.8); // high error_likelihood
@@ -2757,7 +2828,7 @@ mod tests {
 
         let mut config = test_config();
         config.enable_code_gate = true;
-        let gate = CodeGate::new(&tok, &config);
+        let mut gate = CodeGate::new(&tok, &config);
 
         // All code channels at zero/neutral
         let channels = ThoughtChannels::default();
@@ -2775,7 +2846,7 @@ mod tests {
     #[cfg(feature = "mamba-cpu")]
     mod backend_tests {
         use super::*;
-        use crate::mamba::tests::MockMamba;
+        use crate::mamba::mock::MockMamba;
 
         #[test]
         fn test_new_from_backend_resolves_ids() {

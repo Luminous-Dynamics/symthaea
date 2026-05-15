@@ -517,12 +517,14 @@ pub fn run_mk0_bootstrapper_scenario(config: Mk0ScenarioConfig) -> Mk0ScenarioRe
         .filter(|event| event.record_kind == Mk0RecordKind::HandoffReceipt)
         .count() as u32;
 
+    let success = energy_window_open
+        && recycled_feedstock_grams >= config.subassembly.required_material_grams
+        && has_delivery_route
+        && handoff_receipts > 0;
+
     Mk0ScenarioReport {
         config,
-        success: energy_window_open
-            && recycled_feedstock_grams >= config.subassembly.required_material_grams
-            && has_delivery_route
-            && handoff_receipts > 0,
+        success,
         completed_work_orders: handoff_receipts.min(1),
         handoff_receipts,
         recycled_feedstock_grams,

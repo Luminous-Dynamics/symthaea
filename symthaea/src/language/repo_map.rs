@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 use crate::hdc::code_encoder::CodeHDEncoder;
 use crate::hdc::code_memory::{CodeMatch, CodebaseMemory};
 
-use super::code_executor::{parse_structured_errors, CompileError};
+use super::code_executor::{CompileError, parse_structured_errors};
 use super::code_generator::CodeContext;
 use super::code_parser::{CodeDiagnostic, Entity, EntityKind, ParsedCode, Span};
 use super::parser_registry::ParserRegistry;
@@ -353,6 +353,53 @@ impl RepoMap {
         }
     }
 
+    /// Build generation context for a repository-scale engineering task (SWE-bench style).
+    ///
+    /// Analyzes the issue description, ranks relevant symbols using HDC, and
+    /// uses the LSP (if provided) to expand the context to include definitions
+    /// and references related to the most relevant symbols.
+    pub fn code_context_for_issue(
+        &self,
+        issue_text: &str,
+        mut lsp: Option<&mut crate::language::rust_lsp::RustAnalyzerClient>,
+        top_k: usize,
+    ) -> CodeContext<'_> {
+        // 1. Initial semantic ranking via HDC
+        let mut context = self.code_context_for_query(issue_text, top_k);
+
+        // 2. LSP-driven context expansion (Active Sensing)
+        if let Some(lsp) = lsp.as_mut() {
+            let mut expanded_locations = Vec::new();
+
+            // Map our ranked symbols to LSP locations to find related code
+            for (label, _) in &context.source_files {
+                // Label format: "path:line:name"
+                if let Some((path_str, line_str)) =
+                    label.rsplit_once(':').and_then(|(p, _)| p.rsplit_once(':'))
+                {
+                    if let Ok(line) = line_str.parse::<u32>() {
+                        // Find references to the relevant symbols to understand the "blast radius"
+                        let pos = crate::language::rust_lsp::LspPosition::new(line - 1, 0);
+                        if let Ok(refs) = lsp.find_references(path_str, pos, true) {
+                            expanded_locations.extend(refs);
+                        }
+                    }
+                }
+            }
+
+            // 3. Merge expanded LSP context back into the RepoMap AST context
+            if !expanded_locations.is_empty() {
+                let lsp_context = self.code_context_for_lsp_locations(&expanded_locations);
+                for (label, snippet) in lsp_context.source_files {
+                    push_unique_source_file(&mut context.source_files, label, snippet);
+                }
+            }
+        }
+
+        context.issue_text = Some(issue_text.to_string());
+        context
+    }
+
     /// Parse and attach compiler diagnostics to repository symbols.
     pub fn attach_compile_errors(&self, compile_errors: &[String]) -> Vec<RepoDiagnostic> {
         parse_structured_errors(&compile_errors.join("\n"))
@@ -688,15 +735,19 @@ def normalize_name(value):
         let context = repo.code_context_for_compile_errors(&compile_errors, 2);
 
         assert!(context.memory.is_some());
-        assert!(context
-            .error_hints
-            .iter()
-            .any(|(pattern, hint)| pattern == "compile_error_E0412"
-                && hint.contains("cannot find type")));
-        assert!(context
-            .source_files
-            .iter()
-            .any(|(_, snippet)| snippet.contains("pub struct EngineConfig")));
+        assert!(
+            context
+                .error_hints
+                .iter()
+                .any(|(pattern, hint)| pattern == "compile_error_E0412"
+                    && hint.contains("cannot find type"))
+        );
+        assert!(
+            context
+                .source_files
+                .iter()
+                .any(|(_, snippet)| snippet.contains("pub struct EngineConfig"))
+        );
     }
 
     #[test]
@@ -718,10 +769,12 @@ def normalize_name(value):
         let context = repo.code_context_for_lsp_locations(&locations);
 
         assert!(context.memory.is_some());
-        assert!(context
-            .source_files
-            .iter()
-            .any(|(label, snippet)| label.contains("normalize_name")
-                && snippet.contains("to_lowercase")));
+        assert!(
+            context
+                .source_files
+                .iter()
+                .any(|(label, snippet)| label.contains("normalize_name")
+                    && snippet.contains("to_lowercase"))
+        );
     }
 }

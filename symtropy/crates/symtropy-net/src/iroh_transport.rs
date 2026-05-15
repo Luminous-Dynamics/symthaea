@@ -164,7 +164,9 @@ mod tests {
         assert_eq!(transport.peer_count(), 1);
 
         // Send a message
-        transport.send(PeerId(2), Channel::Unreliable, b"physics").unwrap();
+        transport
+            .send(PeerId(2), Channel::Unreliable, b"physics")
+            .unwrap();
         let outbox = transport.drain_outbox();
         assert_eq!(outbox.len(), 1);
         assert_eq!(outbox[0].0, PeerId(2));

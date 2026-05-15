@@ -1,0 +1,16 @@
+[package]
+name = "symtropy-mesh"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+description = "Triangle mesh collider and BVH-based narrowphase for Symtropy."
+repository = "https://github.com/luminous-dynamics/symtropy"
+keywords = ["physics", "mesh", "collision", "simulation"]
+categories = ["science", "simulation", "game-engines"]
+
+[dependencies]
+symtropy-math = { path = "../symtropy-math" }
+symtropy-physics = { path = "../symtropy-physics" }
+nalgebra = "0.34"
+serde = { version = "1.0", features = ["derive"] }
+arrayvec = "0.7"

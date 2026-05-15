@@ -170,7 +170,7 @@ fn find_closest_edge_2d<const D: usize>(
     ))
 }
 
-fn ensure_ccw_2d<const D: usize>(polytope: &mut Vec<SVector<f64, D>>) {
+fn ensure_ccw_2d<const D: usize>(polytope: &mut [SVector<f64, D>]) {
     if polytope.len() < 3 || D < 2 {
         return;
     }

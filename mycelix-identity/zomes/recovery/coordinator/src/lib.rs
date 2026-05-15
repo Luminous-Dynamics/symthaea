@@ -11,8 +11,8 @@
 //! - Enrolls SocialRecovery factor when setting up recovery
 //! - Updates MFA state when recovery is executed
 
-use mycelix_zome_helpers as _;
 use hdk::prelude::*;
+use mycelix_zome_helpers as _;
 use recovery_integrity::*;
 use subtle::ConstantTimeEq;
 

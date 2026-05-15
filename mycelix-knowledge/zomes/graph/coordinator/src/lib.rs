@@ -1,14 +1,15 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+
 //! Graph Coordinator Zome
 //! Business logic for knowledge graph relationships and traversal
 //!
 //! Updated to use HDK 0.6 patterns (LinkQuery, GetStrategy, Anchor pattern)
 
-use hdk::prelude::*;
 use graph_integrity::*;
+use hdk::prelude::*;
+use mycelix_zome_helpers as _;
 
 /// Helper to get an anchor entry hash for link bases
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -41,10 +42,9 @@ pub fn create_relationship(relationship: Relationship) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find relationship".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find relationship".into()
+    )))
 }
 
 /// Get outgoing relationships from a claim
@@ -100,7 +100,8 @@ pub fn get_incoming_relationships(claim_id: String) -> ExternResult<Vec<Record>>
 pub fn find_path(input: FindPathInput) -> ExternResult<Vec<String>> {
     // Simple BFS for path finding
     let mut visited: Vec<String> = Vec::new();
-    let mut queue: Vec<(String, Vec<String>)> = vec![(input.source.clone(), vec![input.source.clone()])];
+    let mut queue: Vec<(String, Vec<String>)> =
+        vec![(input.source.clone(), vec![input.source.clone()])];
 
     while let Some((current, path)) = queue.pop() {
         if current == input.target {
@@ -124,9 +125,8 @@ pub fn find_path(input: FindPathInput) -> ExternResult<Vec<String>> {
         )?;
 
         for link in links {
-            let action_hash = ActionHash::try_from(link.target).map_err(|_| {
-                wasm_error!(WasmErrorInner::Guest("Invalid link target".into()))
-            })?;
+            let action_hash = ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
 
             if let Some(record) = get(action_hash, GetOptions::default())? {
                 if let Some(rel) = record
@@ -161,10 +161,9 @@ pub struct FindPathInput {
 pub fn create_ontology(ontology: Ontology) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::Ontology(ontology))?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find ontology".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find ontology".into()
+    )))
 }
 
 /// Create a concept in an ontology
@@ -194,10 +193,9 @@ pub fn create_concept(concept: Concept) -> ExternResult<Record> {
         )?;
     }
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find concept".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find concept".into()
+    )))
 }
 
 /// Get concepts in an ontology
@@ -245,10 +243,9 @@ pub fn get_child_concepts(concept_id: String) -> ExternResult<Vec<Record>> {
 /// Get graph statistics
 #[hdk_extern]
 pub fn get_graph_stats(_: ()) -> ExternResult<GraphStats> {
-    let claim_filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(
-            UnitEntryTypes::Relationship,
-        )?));
+    let claim_filter = ChainQueryFilter::new().entry_type(EntryType::App(AppEntryDef::try_from(
+        UnitEntryTypes::Relationship,
+    )?));
 
     let relationships = query(claim_filter)?;
 
@@ -288,7 +285,8 @@ pub fn propagate_belief(claim_id: String) -> ExternResult<PropagationResult> {
     let mut to_process: Vec<String> = vec![claim_id.clone()];
     let mut processed: Vec<String> = vec![];
 
-    while !to_process.is_empty() && iterations < max_iterations && max_delta > convergence_threshold {
+    while !to_process.is_empty() && iterations < max_iterations && max_delta > convergence_threshold
+    {
         iterations += 1;
         max_delta = 0.0;
 
@@ -317,7 +315,8 @@ pub fn propagate_belief(claim_id: String) -> ExternResult<PropagationResult> {
 
                     // Calculate new belief based on relationship type and weight
                     let current_belief = get_belief_strength(&current_id)?;
-                    let influence = calculate_influence(&rel.relationship_type, rel.weight, current_belief);
+                    let influence =
+                        calculate_influence(&rel.relationship_type, rel.weight, current_belief);
 
                     // Update target belief
                     let new_belief = update_belief(target_belief.belief_strength, influence);
@@ -378,12 +377,7 @@ fn get_or_create_belief_node(claim_id: &str) -> ExternResult<BeliefNode> {
     if let Some(link) = links.first() {
         if let Some(target) = link.target.clone().into_action_hash() {
             if let Some(record) = get(target, GetOptions::default())? {
-                if let Some(node) = record
-                    .entry()
-                    .to_app_option::<BeliefNode>()
-                    .ok()
-                    .flatten()
-                {
+                if let Some(node) = record.entry().to_app_option::<BeliefNode>().ok().flatten() {
                     return Ok(node);
                 }
             }
@@ -410,7 +404,12 @@ fn get_or_create_belief_node(claim_id: &str) -> ExternResult<BeliefNode> {
 
     // Create anchor and link
     create_entry(&EntryTypes::Anchor(Anchor(claim_anchor.clone())))?;
-    create_link(anchor_hash(&claim_anchor)?, action_hash, LinkTypes::ClaimToBeliefNode, ())?;
+    create_link(
+        anchor_hash(&claim_anchor)?,
+        action_hash,
+        LinkTypes::ClaimToBeliefNode,
+        (),
+    )?;
 
     Ok(node)
 }
@@ -468,7 +467,12 @@ fn update_belief_node(node: &BeliefNode) -> ExternResult<ActionHash> {
     // Create if doesn't exist
     let action_hash = create_entry(EntryTypes::BeliefNode(node.clone()))?;
     create_entry(&EntryTypes::Anchor(Anchor(claim_anchor.clone())))?;
-    create_link(anchor_hash(&claim_anchor)?, action_hash.clone(), LinkTypes::ClaimToBeliefNode, ())?;
+    create_link(
+        anchor_hash(&claim_anchor)?,
+        action_hash.clone(),
+        LinkTypes::ClaimToBeliefNode,
+        (),
+    )?;
     Ok(action_hash)
 }
 
@@ -563,7 +567,9 @@ pub fn rank_by_information_value(limit: u32) -> ExternResult<Vec<Record>> {
             .flatten()
             .map(|v| v.expected_value)
             .unwrap_or(0.0);
-        b_val.partial_cmp(&a_val).unwrap_or(std::cmp::Ordering::Equal)
+        b_val
+            .partial_cmp(&a_val)
+            .unwrap_or(std::cmp::Ordering::Equal)
     });
 
     Ok(records.into_iter().take(limit as usize).collect())
@@ -624,12 +630,16 @@ pub fn calculate_information_value(claim_id: String) -> ExternResult<Record> {
     // Create anchor and link to claim
     let claim_anchor = format!("claim:{}", claim_id);
     create_entry(&EntryTypes::Anchor(Anchor(claim_anchor.clone())))?;
-    create_link(anchor_hash(&claim_anchor)?, action_hash.clone(), LinkTypes::ClaimToInformationValue, ())?;
+    create_link(
+        anchor_hash(&claim_anchor)?,
+        action_hash.clone(),
+        LinkTypes::ClaimToInformationValue,
+        (),
+    )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find information value".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find information value".into()
+    )))
 }
 
 /// Detect circular dependencies in the graph

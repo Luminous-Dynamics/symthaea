@@ -7,6 +7,7 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+mycelix-bridge-common = { workspace = true }
 mycelix-zome-helpers = { workspace = true }
 getrandom_03 = { workspace = true }
 holochain_serialized_bytes = { workspace = true }

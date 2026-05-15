@@ -119,6 +119,12 @@ pub struct PhysicsWorld<const D: usize> {
     static_tree_dirty: bool,
 }
 
+impl<const D: usize> Default for PhysicsWorld<D> {
+    fn default() -> Self {
+        Self::new(SVector::zeros())
+    }
+}
+
 impl<const D: usize> PhysicsWorld<D> {
     /// Create an empty physics world.
     pub fn new(gravity: SVector<f64, D>) -> Self {
@@ -143,6 +149,25 @@ impl<const D: usize> PhysicsWorld<D> {
             static_broadphase: broadphase::StaticBroadphase::new(),
             static_tree_dirty: false,
         }
+    }
+
+    /// Get the total number of bodies in the world.
+    pub fn body_count(&self) -> usize {
+        self.bodies.len()
+    }
+
+    /// Get the total kinetic energy of all dynamic bodies in the world.
+    pub fn total_kinetic_energy(&self) -> f64 {
+        self.bodies
+            .iter()
+            .filter(|b| b.body_type == crate::body::BodyType::Dynamic)
+            .map(|b| b.kinetic_energy())
+            .sum()
+    }
+
+    /// Count how many bodies are currently sleeping.
+    pub fn sleeping_count(&self) -> usize {
+        self.bodies.iter().filter(|b| b.sleeping).count()
     }
 
     /// Add a dynamic sphere body and return its handle.
@@ -199,6 +224,25 @@ impl<const D: usize> PhysicsWorld<D> {
     /// Resolve a stable `NetId` to its `BodyHandle`.
     pub fn handle_for_net_id(&self, net_id: NetId) -> Option<BodyHandle> {
         self.net_id_map.get(&net_id).copied()
+    }
+
+    /// Resolve a `BodyHandle` to its stable `NetId`.
+    pub fn net_id_for_handle(&self, handle: BodyHandle) -> Option<NetId> {
+        self.body(handle).and_then(|b| b.net_id)
+    }
+
+    /// Assign a stable network identifier to a body.
+    pub fn set_net_id(&mut self, handle: BodyHandle, net_id: NetId) {
+        let old_id = self.body(handle).and_then(|b| b.net_id);
+
+        if let Some(old) = old_id {
+            self.net_id_map.remove(&old);
+        }
+
+        if let Some(body) = self.body_mut(handle) {
+            body.net_id = Some(net_id);
+            self.net_id_map.insert(net_id, handle);
+        }
     }
 
     /// Add a constraint between two bodies.
@@ -301,6 +345,24 @@ impl<const D: usize> PhysicsWorld<D> {
                         continue;
                     }
                     self.contacts.push(manifold);
+                    continue;
+                }
+
+                // Special path: Mesh collisions (if implemented by the shape)
+                if let Some(manifolds) = self.try_mesh_contact(a, b, pair.0, pair.1) {
+                    for manifold in manifolds {
+                        if self.bodies[a].is_sensor || self.bodies[b].is_sensor {
+                            let (sensor, other) = if self.bodies[a].is_sensor {
+                                (pair.0, pair.1)
+                            } else {
+                                (pair.1, pair.0)
+                            };
+                            self.sensor_events
+                                .push(crate::contact::SensorEvent { sensor, other });
+                            continue;
+                        }
+                        self.contacts.push(manifold);
+                    }
                     continue;
                 }
 
@@ -448,7 +510,7 @@ impl<const D: usize> PhysicsWorld<D> {
         }
 
         // 8. State Decay: Apply natural recovery/decay to all conscious entities.
-        if let Some(cb) = callback.as_deref_mut() {
+        if let Some(cb) = callback {
             self.decay_state(cb, dt);
         }
     }
@@ -457,19 +519,14 @@ impl<const D: usize> PhysicsWorld<D> {
     ///
     /// This simulates natural recovery (Trauma fades, Fatigue dissipates)
     /// and stress dissipation.
-    fn decay_state(&mut self, callback: &mut dyn PhysicsCallback<D>, dt: f64) {
+    fn decay_state(&mut self, _callback: &mut dyn PhysicsCallback<D>, _dt: f64) {
         // Note: In a real system, we would iterate over all conscious bodies
         // and update their individual state. Here, we assume the callback
         // handles the global state update for simplicity.
 
-        // Decay rates (per second):
-        const TRAUMA_DECAY_RATE: f64 = 0.05; // 5% per second
-        const FATIGUE_DECAY_RATE: f64 = 0.02; // 2% per second
-        const STRESS_DECAY_RATE: f64 = 0.01; // 1% per second
-
         // The callback implementation must handle the actual state update.
         // We pass a dummy event since decay is time-based, not impact-based.
-        let dummy_event: CollisionEvent<D> = CollisionEvent {
+        let _dummy_event: CollisionEvent<D> = CollisionEvent {
             body_a: BodyHandle(0),
             body_b: BodyHandle(0),
             impulse: 0.0,
@@ -565,7 +622,7 @@ impl<const D: usize> PhysicsWorld<D> {
             let v_rel_n = {
                 let va = self.bodies[a].linear_velocity;
                 let vb = self.bodies[b].linear_velocity;
-                (va - vb).dot(&contact.normal)
+                (vb - va).dot(&contact.normal)
             };
 
             // Position-correction bias (replaces Baumgarte teleport)
@@ -681,6 +738,47 @@ impl<const D: usize> PhysicsWorld<D> {
         }
         if let Some(plane) = body_b.collider.as_any().downcast_ref::<HalfSpace<D>>() {
             return self.contact_against_halfspace(plane, body_a, handle_a, handle_b, false);
+        }
+
+        None
+    }
+
+    fn try_mesh_contact(
+        &self,
+        idx_a: usize,
+        idx_b: usize,
+        handle_a: BodyHandle,
+        handle_b: BodyHandle,
+    ) -> Option<Vec<ContactManifold<D>>> {
+        use crate::manifold_gen::MeshColliderMetadata;
+        let body_a = &self.bodies[idx_a];
+        let body_b = &self.bodies[idx_b];
+
+        if let Some(mesh) = body_a
+            .collider
+            .as_any()
+            .downcast_ref::<&dyn MeshColliderMetadata<D>>()
+        {
+            return Some(mesh.generate_mesh_contacts(
+                handle_a,
+                &body_a.transform.translation.0,
+                body_b.collider.as_ref(),
+                handle_b,
+                &body_b.transform.translation.0,
+            ));
+        }
+        if let Some(mesh) = body_b
+            .collider
+            .as_any()
+            .downcast_ref::<&dyn MeshColliderMetadata<D>>()
+        {
+            return Some(mesh.generate_mesh_contacts(
+                handle_b,
+                &body_b.transform.translation.0,
+                body_a.collider.as_ref(),
+                handle_a,
+                &body_a.transform.translation.0,
+            ));
         }
 
         None

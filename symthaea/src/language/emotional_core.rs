@@ -9,9 +9,9 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
+use symthaea_core::hdc::ContinuousHV;
 use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::primitive_system::PrimitiveSystem;
-use symthaea_core::hdc::ContinuousHV;
 
 /// Configuration for emotional core
 #[derive(Debug, Clone, Serialize, Deserialize)]

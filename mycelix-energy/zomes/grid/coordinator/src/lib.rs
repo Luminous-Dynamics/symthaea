@@ -2,14 +2,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! P2P Grid Trading Coordinator Zome
-use hdk::prelude::*;
+
 use grid_integrity::*;
-use mycelix_energy_shared::batch::{links_to_records, filter_records_by};
-use mycelix_energy_shared::anchors::anchor_hash;
+use hdk::prelude::*;
 use mycelix_bridge_proc::{mycelix_zome_fn, sovereign_gated};
+use mycelix_energy_shared::anchors::anchor_hash;
+use mycelix_energy_shared::batch::{filter_records_by, links_to_records};
+use mycelix_zome_helpers as _;
 
 #[hdk_extern]
-#[mycelix_zome_fn]
 #[sovereign_gated(basic)]
 pub fn record_production(input: RecordProductionInput) -> ExternResult<Record> {
     let now = sys_time()?;
@@ -25,8 +26,14 @@ pub fn record_production(input: RecordProductionInput) -> ExternResult<Record> {
     };
 
     let action_hash = create_entry(&EntryTypes::EnergyProduction(production))?;
-    create_link(anchor_hash(&input.producer_did)?, action_hash.clone(), LinkTypes::ProducerToProduction, ())?;
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    create_link(
+        anchor_hash(&input.producer_did)?,
+        action_hash.clone(),
+        LinkTypes::ProducerToProduction,
+        (),
+    )?;
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -55,10 +62,16 @@ pub fn create_trade_offer(input: CreateOfferInput) -> ExternResult<Record> {
     };
 
     let action_hash = create_entry(&EntryTypes::TradeOffer(offer))?;
-    create_link(anchor_hash(&input.seller_did)?, action_hash.clone(), LinkTypes::SellerToOffers, ())?;
+    create_link(
+        anchor_hash(&input.seller_did)?,
+        action_hash.clone(),
+        LinkTypes::SellerToOffers,
+        (),
+    )?;
     let anchor = anchor_hash("active_energy_offers")?;
     create_link(anchor, action_hash.clone(), LinkTypes::ActiveOffers, ())?;
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -74,7 +87,11 @@ pub struct CreateOfferInput {
 
 #[hdk_extern]
 pub fn execute_trade(input: ExecuteTradeInput) -> ExternResult<Record> {
-    let filter = ChainQueryFilter::new().entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::TradeOffer)?)).include_entries(true);
+    let filter = ChainQueryFilter::new()
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::TradeOffer,
+        )?))
+        .include_entries(true);
     for record in query(filter)? {
         if let Some(offer) = record.entry().to_app_option::<TradeOffer>().ok().flatten() {
             if offer.id == input.offer_id && offer.status == OfferStatus::Active {
@@ -96,20 +113,44 @@ pub fn execute_trade(input: ExecuteTradeInput) -> ExternResult<Record> {
                 };
 
                 let trade_hash = create_entry(&EntryTypes::Trade(trade))?;
-                create_link(anchor_hash(&input.offer_id)?, trade_hash.clone(), LinkTypes::OfferToTrades, ())?;
-                create_link(anchor_hash(&input.buyer_did)?, trade_hash.clone(), LinkTypes::BuyerToTrades, ())?;
+                create_link(
+                    anchor_hash(&input.offer_id)?,
+                    trade_hash.clone(),
+                    LinkTypes::OfferToTrades,
+                    (),
+                )?;
+                create_link(
+                    anchor_hash(&input.buyer_did)?,
+                    trade_hash.clone(),
+                    LinkTypes::BuyerToTrades,
+                    (),
+                )?;
 
                 // Update offer status
                 let remaining = offer.amount_kwh - input.amount_kwh;
-                let new_status = if remaining <= 0.0 { OfferStatus::Filled } else { OfferStatus::PartiallyFilled };
-                let updated_offer = TradeOffer { amount_kwh: remaining.max(0.0), status: new_status, ..offer };
-                update_entry(record.action_address().clone(), &EntryTypes::TradeOffer(updated_offer))?;
+                let new_status = if remaining <= 0.0 {
+                    OfferStatus::Filled
+                } else {
+                    OfferStatus::PartiallyFilled
+                };
+                let updated_offer = TradeOffer {
+                    amount_kwh: remaining.max(0.0),
+                    status: new_status,
+                    ..offer
+                };
+                update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::TradeOffer(updated_offer),
+                )?;
 
-                return get(trade_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get(trade_hash, GetOptions::default())?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Offer not found or not active".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Offer not found or not active".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -125,7 +166,10 @@ pub struct ExecuteTradeInput {
 #[hdk_extern]
 pub fn get_active_offers(_: ()) -> ExternResult<Vec<Record>> {
     let anchor = anchor_hash("active_energy_offers")?;
-    let links = get_links(LinkQuery::try_new(anchor, LinkTypes::ActiveOffers)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(anchor, LinkTypes::ActiveOffers)?,
+        GetStrategy::default(),
+    )?;
     // FIXED N+1: Batch fetch all records, then filter
     let all_records = links_to_records(links)?;
     Ok(filter_records_by::<TradeOffer, _>(&all_records, |offer| {
@@ -135,13 +179,25 @@ pub fn get_active_offers(_: ()) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn settle_trade(input: SettleTradeInput) -> ExternResult<Record> {
-    let filter = ChainQueryFilter::new().entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Trade)?)).include_entries(true);
+    let filter = ChainQueryFilter::new()
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Trade,
+        )?))
+        .include_entries(true);
     for record in query(filter)? {
         if let Some(trade) = record.entry().to_app_option::<Trade>().ok().flatten() {
             if trade.id == input.trade_id {
-                let settled_trade = Trade { settled: true, payment_reference: Some(input.payment_reference), ..trade };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Trade(settled_trade))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let settled_trade = Trade {
+                    settled: true,
+                    payment_reference: Some(input.payment_reference),
+                    ..trade
+                };
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::Trade(settled_trade),
+                )?;
+                return get(action_hash, GetOptions::default())?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -159,7 +215,10 @@ pub struct SettleTradeInput {
 /// OPTIMIZED: Uses batch query to avoid N+1 pattern
 #[hdk_extern]
 pub fn get_producer_production(producer_did: String) -> ExternResult<Vec<Record>> {
-    let links = get_links(LinkQuery::try_new(anchor_hash(&producer_did)?, LinkTypes::ProducerToProduction)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&producer_did)?, LinkTypes::ProducerToProduction)?,
+        GetStrategy::default(),
+    )?;
     // FIXED N+1: Use batch fetch instead of individual get() calls
     links_to_records(links)
 }
@@ -169,7 +228,10 @@ pub fn get_producer_production(producer_did: String) -> ExternResult<Vec<Record>
 /// OPTIMIZED: Uses batch query to avoid N+1 pattern
 #[hdk_extern]
 pub fn get_seller_offers(seller_did: String) -> ExternResult<Vec<Record>> {
-    let links = get_links(LinkQuery::try_new(anchor_hash(&seller_did)?, LinkTypes::SellerToOffers)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&seller_did)?, LinkTypes::SellerToOffers)?,
+        GetStrategy::default(),
+    )?;
     // FIXED N+1: Use batch fetch instead of individual get() calls
     links_to_records(links)
 }
@@ -179,7 +241,10 @@ pub fn get_seller_offers(seller_did: String) -> ExternResult<Vec<Record>> {
 /// OPTIMIZED: Uses batch query to avoid N+1 pattern
 #[hdk_extern]
 pub fn get_buyer_trades(buyer_did: String) -> ExternResult<Vec<Record>> {
-    let links = get_links(LinkQuery::try_new(anchor_hash(&buyer_did)?, LinkTypes::BuyerToTrades)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&buyer_did)?, LinkTypes::BuyerToTrades)?,
+        GetStrategy::default(),
+    )?;
     // FIXED N+1: Use batch fetch instead of individual get() calls
     links_to_records(links)
 }
@@ -189,7 +254,10 @@ pub fn get_buyer_trades(buyer_did: String) -> ExternResult<Vec<Record>> {
 /// OPTIMIZED: Uses batch query to avoid N+1 pattern
 #[hdk_extern]
 pub fn get_offer_trades(offer_id: String) -> ExternResult<Vec<Record>> {
-    let links = get_links(LinkQuery::try_new(anchor_hash(&offer_id)?, LinkTypes::OfferToTrades)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&offer_id)?, LinkTypes::OfferToTrades)?,
+        GetStrategy::default(),
+    )?;
     // FIXED N+1: Use batch fetch instead of individual get() calls
     links_to_records(links)
 }
@@ -198,22 +266,35 @@ pub fn get_offer_trades(offer_id: String) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn verify_production(input: VerifyProductionInput) -> ExternResult<Record> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::EnergyProduction)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::EnergyProduction,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(production) = record.entry().to_app_option::<EnergyProduction>().ok().flatten() {
+        if let Some(production) = record
+            .entry()
+            .to_app_option::<EnergyProduction>()
+            .ok()
+            .flatten()
+        {
             if production.id == input.production_id {
                 let verified = EnergyProduction {
                     verified: true,
                     ..production
                 };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::EnergyProduction(verified))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::EnergyProduction(verified),
+                )?;
+                return get(action_hash, GetOptions::default())?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Production record not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Production record not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -226,7 +307,9 @@ pub struct VerifyProductionInput {
 #[hdk_extern]
 pub fn cancel_offer(input: CancelOfferInput) -> ExternResult<Record> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::TradeOffer)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::TradeOffer,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
@@ -234,20 +317,28 @@ pub fn cancel_offer(input: CancelOfferInput) -> ExternResult<Record> {
             if offer.id == input.offer_id {
                 // Only seller can cancel
                 if offer.seller_did != input.requester_did {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Only seller can cancel offer".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only seller can cancel offer".into()
+                    )));
                 }
 
                 // Can only cancel active offers
                 if offer.status != OfferStatus::Active {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Can only cancel active offers".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Can only cancel active offers".into()
+                    )));
                 }
 
                 let cancelled = TradeOffer {
                     status: OfferStatus::Cancelled,
                     ..offer
                 };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::TradeOffer(cancelled))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::TradeOffer(cancelled),
+                )?;
+                return get(action_hash, GetOptions::default())?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -264,7 +355,9 @@ pub struct CancelOfferInput {
 #[hdk_extern]
 pub fn get_trade(trade_id: String) -> ExternResult<Option<Record>> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Trade)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Trade,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
@@ -281,7 +374,9 @@ pub fn get_trade(trade_id: String) -> ExternResult<Option<Record>> {
 #[hdk_extern]
 pub fn get_offer(offer_id: String) -> ExternResult<Option<Record>> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::TradeOffer)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::TradeOffer,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
@@ -298,7 +393,9 @@ pub fn get_offer(offer_id: String) -> ExternResult<Option<Record>> {
 #[hdk_extern]
 pub fn get_unsettled_trades(_: ()) -> ExternResult<Vec<Record>> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Trade)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Trade,
+        )?))
         .include_entries(true);
 
     let mut trades = Vec::new();
@@ -316,7 +413,9 @@ pub fn get_unsettled_trades(_: ()) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn get_producer_total_production(producer_did: String) -> ExternResult<ProducerStats> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::EnergyProduction)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::EnergyProduction,
+        )?))
         .include_entries(true);
 
     let mut total_kwh = 0.0;
@@ -324,7 +423,12 @@ pub fn get_producer_total_production(producer_did: String) -> ExternResult<Produ
     let mut record_count = 0;
 
     for record in query(filter)? {
-        if let Some(production) = record.entry().to_app_option::<EnergyProduction>().ok().flatten() {
+        if let Some(production) = record
+            .entry()
+            .to_app_option::<EnergyProduction>()
+            .ok()
+            .flatten()
+        {
             if production.producer_did == producer_did {
                 total_kwh += production.amount_kwh;
                 if production.verified {
@@ -376,7 +480,9 @@ pub fn get_agent_thermodynamic_score(producer_did: String) -> ExternResult<f64> 
 #[hdk_extern]
 pub fn update_offer_price(input: UpdateOfferPriceInput) -> ExternResult<Record> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::TradeOffer)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::TradeOffer,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
@@ -384,20 +490,30 @@ pub fn update_offer_price(input: UpdateOfferPriceInput) -> ExternResult<Record> 
             if offer.id == input.offer_id {
                 // Only seller can update
                 if offer.seller_did != input.requester_did {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Only seller can update price".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only seller can update price".into()
+                    )));
                 }
 
                 // Can only update active offers
-                if offer.status != OfferStatus::Active && offer.status != OfferStatus::PartiallyFilled {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Can only update active offers".into())));
+                if offer.status != OfferStatus::Active
+                    && offer.status != OfferStatus::PartiallyFilled
+                {
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Can only update active offers".into()
+                    )));
                 }
 
                 let updated = TradeOffer {
                     price_per_kwh: input.new_price_per_kwh,
                     ..offer
                 };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::TradeOffer(updated))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::TradeOffer(updated),
+                )?;
+                return get(action_hash, GetOptions::default())?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -415,7 +531,9 @@ pub struct UpdateOfferPriceInput {
 #[hdk_extern]
 pub fn get_grid_summary(_: ()) -> ExternResult<GridSummary> {
     let offer_filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::TradeOffer)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::TradeOffer,
+        )?))
         .include_entries(true);
 
     let mut active_offers = 0;
@@ -431,7 +549,9 @@ pub fn get_grid_summary(_: ()) -> ExternResult<GridSummary> {
     }
 
     let trade_filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Trade)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Trade,
+        )?))
         .include_entries(true);
 
     let mut total_trades = 0;

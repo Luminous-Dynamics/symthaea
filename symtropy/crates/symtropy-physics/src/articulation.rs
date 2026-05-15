@@ -106,7 +106,7 @@ impl ChainBuilder {
         // Static base (small sphere)
         let base = world.add_body(RigidBody::static_body(
             BodyHandle(0), // overwritten by add_body
-            self.base_pos.clone(),
+            self.base_pos,
             Box::new(symtropy_math::Sphere::new(Point::origin(), 0.05)),
         ));
 
@@ -141,7 +141,7 @@ impl ChainBuilder {
             if let Some(max_force) = spec.motor_max_force {
                 let mut motor = MotorDrive::new(0.0, max_force);
                 if let Some(d) = spec.motor_damping {
-                    motor.damping = d;
+                    motor.kd = d;
                 }
                 hinge = hinge.with_motor(motor);
             }

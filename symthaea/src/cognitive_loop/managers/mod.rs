@@ -21,6 +21,7 @@
 //! | [`VisionManager`] | visual surprise, habituation, saccade urgency | 17 | Itti & Koch (2001), Rankin (2009) | `vision-manifold` |
 //! | [`LanguageManager`] | Broca quality, coherence gating, consciousness cadence | 61 | Clark (2013), Hagoort (2005) | `ssm_language` |
 //! | [`ReasoningManager`] | reasoning reliability, epistemic gating, prediction trend | 73 | Stanovich (2011), Koriat (2007) | `reasoning_engine` |
+//! | [`MultimodalManager`] | multimodal generation gating, MCE gating, thermo throttle | 31 | Baars (1988), Friston (2010) | |
 //!
 //! ## Architecture
 //!
@@ -39,6 +40,7 @@ pub mod drive_manager;
 pub mod embodiment_transfer;
 pub mod learning_manager;
 pub mod memory_manager;
+pub mod multimodal_manager;
 pub mod network_service_bridge;
 pub mod perception_manager;
 pub mod soul_manager;
@@ -55,6 +57,7 @@ pub mod radio_dispatcher;
 pub use drive_manager::DriveManager;
 pub use learning_manager::LearningManager;
 pub use memory_manager::MemoryManager;
+pub use multimodal_manager::{MultimodalManager, MultimodalTelemetry};
 pub use network_service_bridge::{
     forward_affective_state, forward_federated_round, NetworkServiceBridge,
     NetworkServiceBridgeHandle,

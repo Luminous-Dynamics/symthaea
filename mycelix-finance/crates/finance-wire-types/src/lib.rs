@@ -7,6 +7,7 @@
 //! All hashes/keys are `String`, timestamps are `u64` (microseconds), opaque data is `Vec<u8>`.
 
 use serde::{Deserialize, Serialize};
+use sovereign_profile::SovereignProfile;
 
 // =============================================================================
 // ASSET & COLLATERAL
@@ -504,6 +505,8 @@ pub struct FeeTierResponse {
     pub member_did: String,
     /// 8D Sovereign Profile (replaces legacy composite 1D mycel_score).
     pub sovereign_profile: SovereignProfile,
+    /// Legacy 1D reputation score (mapped from epistemic_integrity).
+    pub mycel_score: f64,
     /// Human-readable tier name (Bronze/Silver/Gold/...).
     pub tier_name: String,
     /// Fee rate applied to this tier, as a fraction (0.0–1.0).

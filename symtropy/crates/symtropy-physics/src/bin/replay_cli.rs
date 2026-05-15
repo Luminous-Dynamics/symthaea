@@ -58,7 +58,7 @@ fn cmd_record(args: &[String]) -> Result<(), String> {
                 dims = v
                     .parse::<u32>()
                     .map_err(|_| format!("--dims expects 2/3/4, got {v:?}"))?;
-                if !matches!(dims, 2 | 3 | 4) {
+                if !matches!(dims, 2..=4) {
                     return Err(format!("--dims must be 2, 3, or 4 (got {dims})"));
                 }
                 i += 2;
@@ -310,63 +310,60 @@ fn demo_tape<const D: usize>(ticks: u32) -> TapeFile<D> {
         }
     });
 
-    let mut bodies = Vec::<BodyDef<D>>::new();
-
-    bodies.push(BodyDef {
-        net_id: 1,
-        body_type: BodyTypeDef::Static,
-        radius_bits: 64.0f64.to_bits(),
-        mass_bits: f64::INFINITY.to_bits(),
-        restitution_bits: 0.5f64.to_bits(),
-        friction_bits: 0.5f64.to_bits(),
-        linear_damping_bits: 0.0f64.to_bits(),
-        angular_damping_bits: 0.0f64.to_bits(),
-        translation_bits: point_bits::<D>(&Point::new(axis_array::<D>([0.0, -64.0, 0.0]))),
-        linear_velocity_bits: vec_bits::<D>(&SVector::zeros()),
-        angular_velocity_bits: bivector_bits::<D>(&Bivector::<D>::zero()),
-    });
-
-    bodies.push(BodyDef {
-        net_id: 2,
-        body_type: BodyTypeDef::Dynamic,
-        radius_bits: 0.5f64.to_bits(),
-        mass_bits: 1.0f64.to_bits(),
-        restitution_bits: 0.5f64.to_bits(),
-        friction_bits: 0.3f64.to_bits(),
-        linear_damping_bits: 0.01f64.to_bits(),
-        angular_damping_bits: 0.05f64.to_bits(),
-        translation_bits: point_bits::<D>(&Point::new(axis_array::<D>([-1.5, 6.0, 0.0]))),
-        linear_velocity_bits: vec_bits::<D>(&axis_vec::<D>([2.0, 0.0, 0.0])),
-        angular_velocity_bits: bivector_bits::<D>(&Bivector::<D>::zero()),
-    });
-
-    bodies.push(BodyDef {
-        net_id: 3,
-        body_type: BodyTypeDef::Dynamic,
-        radius_bits: 0.5f64.to_bits(),
-        mass_bits: 1.0f64.to_bits(),
-        restitution_bits: 0.5f64.to_bits(),
-        friction_bits: 0.3f64.to_bits(),
-        linear_damping_bits: 0.01f64.to_bits(),
-        angular_damping_bits: 0.05f64.to_bits(),
-        translation_bits: point_bits::<D>(&Point::new(axis_array::<D>([1.5, 6.0, 0.0]))),
-        linear_velocity_bits: vec_bits::<D>(&axis_vec::<D>([-2.0, 0.0, 0.0])),
-        angular_velocity_bits: bivector_bits::<D>(&Bivector::<D>::zero()),
-    });
-
-    bodies.push(BodyDef {
-        net_id: 4,
-        body_type: BodyTypeDef::Dynamic,
-        radius_bits: 0.5f64.to_bits(),
-        mass_bits: 2.0f64.to_bits(),
-        restitution_bits: 0.5f64.to_bits(),
-        friction_bits: 0.3f64.to_bits(),
-        linear_damping_bits: 0.01f64.to_bits(),
-        angular_damping_bits: 0.05f64.to_bits(),
-        translation_bits: point_bits::<D>(&Point::new(axis_array::<D>([0.0, 9.0, 0.0]))),
-        linear_velocity_bits: vec_bits::<D>(&SVector::zeros()),
-        angular_velocity_bits: bivector_bits::<D>(&Bivector::<D>::zero()),
-    });
+    let bodies = vec![
+        BodyDef {
+            net_id: 1,
+            body_type: BodyTypeDef::Static,
+            radius_bits: 64.0f64.to_bits(),
+            mass_bits: f64::INFINITY.to_bits(),
+            restitution_bits: 0.5f64.to_bits(),
+            friction_bits: 0.5f64.to_bits(),
+            linear_damping_bits: 0.0f64.to_bits(),
+            angular_damping_bits: 0.0f64.to_bits(),
+            translation_bits: point_bits::<D>(&Point::new(axis_array::<D>([0.0, -64.0, 0.0]))),
+            linear_velocity_bits: vec_bits::<D>(&SVector::zeros()),
+            angular_velocity_bits: bivector_bits::<D>(&Bivector::<D>::zero()),
+        },
+        BodyDef {
+            net_id: 2,
+            body_type: BodyTypeDef::Dynamic,
+            radius_bits: 0.5f64.to_bits(),
+            mass_bits: 1.0f64.to_bits(),
+            restitution_bits: 0.5f64.to_bits(),
+            friction_bits: 0.3f64.to_bits(),
+            linear_damping_bits: 0.01f64.to_bits(),
+            angular_damping_bits: 0.05f64.to_bits(),
+            translation_bits: point_bits::<D>(&Point::new(axis_array::<D>([-1.5, 6.0, 0.0]))),
+            linear_velocity_bits: vec_bits::<D>(&axis_vec::<D>([2.0, 0.0, 0.0])),
+            angular_velocity_bits: bivector_bits::<D>(&Bivector::<D>::zero()),
+        },
+        BodyDef {
+            net_id: 3,
+            body_type: BodyTypeDef::Dynamic,
+            radius_bits: 0.5f64.to_bits(),
+            mass_bits: 1.0f64.to_bits(),
+            restitution_bits: 0.5f64.to_bits(),
+            friction_bits: 0.3f64.to_bits(),
+            linear_damping_bits: 0.01f64.to_bits(),
+            angular_damping_bits: 0.05f64.to_bits(),
+            translation_bits: point_bits::<D>(&Point::new(axis_array::<D>([1.5, 6.0, 0.0]))),
+            linear_velocity_bits: vec_bits::<D>(&axis_vec::<D>([-2.0, 0.0, 0.0])),
+            angular_velocity_bits: bivector_bits::<D>(&Bivector::<D>::zero()),
+        },
+        BodyDef {
+            net_id: 4,
+            body_type: BodyTypeDef::Dynamic,
+            radius_bits: 0.5f64.to_bits(),
+            mass_bits: 2.0f64.to_bits(),
+            restitution_bits: 0.5f64.to_bits(),
+            friction_bits: 0.3f64.to_bits(),
+            linear_damping_bits: 0.01f64.to_bits(),
+            angular_damping_bits: 0.05f64.to_bits(),
+            translation_bits: point_bits::<D>(&Point::new(axis_array::<D>([0.0, 9.0, 0.0]))),
+            linear_velocity_bits: vec_bits::<D>(&SVector::zeros()),
+            angular_velocity_bits: bivector_bits::<D>(&Bivector::<D>::zero()),
+        },
+    ];
 
     let world = WorldDef {
         gravity_bits: gravity,
@@ -589,7 +586,7 @@ fn hash_tape<const D: usize>(
         let hash = snapshot_hash::<D>(&snapshot);
 
         final_hasher.update_u64(hash);
-        if !summary_only && (tick as u32) % every == 0 {
+        if !summary_only && (tick as u32).is_multiple_of(every) {
             println!("tick {tick:06} {hash:016x}");
         }
     }

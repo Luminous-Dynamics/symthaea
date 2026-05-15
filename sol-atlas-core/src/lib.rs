@@ -9,7 +9,7 @@
 //! between rendering backends (web-sys, glam/nalgebra).
 
 pub mod aesthetics;
-// pub mod cluster_layers;
+pub mod cluster_layers;
 pub mod conductor_bridge;
 pub mod constants;
 pub mod data;

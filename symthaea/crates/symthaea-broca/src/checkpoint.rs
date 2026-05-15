@@ -3,9 +3,9 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! BrocaCheckpoint: save/load trained Broca models with integrity verification.
 //!
-//! Uses rmp-serde (MessagePack) for self-describing serialization and blake3
-//! for checksum integrity. Legacy bincode checkpoints are supported for loading
-//! via automatic fallback (new saves always use MessagePack).
+//! Uses rmp-serde (MessagePack) payloads with a small blake3 envelope for
+//! checksum integrity. Legacy raw MessagePack and bincode checkpoints are
+//! supported for loading via automatic fallback.
 //!
 //! Pattern follows `swarm/checkpoint.rs`.
 
@@ -16,6 +16,7 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::{ContinuousHV, HdcLtcUnifiedNetwork};
 
+use crate::encoder::NUM_CHANNELS;
 use crate::generator::{BrocaConfig, BrocaGenerator};
 use crate::tokenizer::{MergePair, VocabFile};
 
@@ -23,6 +24,29 @@ use crate::tokenizer::{MergePair, VocabFile};
 /// v1: original schema
 /// v2: added `liquid_mamba_config: Option<LiquidMambaConfig>`
 const CHECKPOINT_VERSION: u32 = 2;
+const CHECKPOINT_ENVELOPE_MAGIC: &[u8; 8] = b"SBROCA3\0";
+const CHECKPOINT_ENVELOPE_HEADER_LEN: usize = 40;
+
+/// Current thought-channel schema encoded by Broca.
+const CHANNEL_SCHEMA_VERSION: u32 = 7;
+
+fn current_feature_set() -> Vec<String> {
+    #[allow(unused_mut)]
+    let mut features = Vec::new();
+    #[cfg(feature = "gpu")]
+    features.push("gpu".to_string());
+    #[cfg(feature = "gpu-logits")]
+    features.push("gpu-logits".to_string());
+    #[cfg(feature = "mamba-cpu")]
+    features.push("mamba-cpu".to_string());
+    #[cfg(feature = "mamba")]
+    features.push("mamba".to_string());
+    #[cfg(feature = "therapeutic")]
+    features.push("therapeutic".to_string());
+    #[cfg(feature = "simd")]
+    features.push("simd".to_string());
+    features
+}
 
 /// Current ProjectionCheckpoint schema version.
 /// v1: 4 weight matrices (w_down, w_up, w_back_down, w_back_up).
@@ -99,6 +123,32 @@ impl AdamState {
     }
 }
 
+/// Compatibility metadata for refusing accidental cross-schema checkpoint loads.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct BrocaCheckpointMetadata {
+    /// Vocab size at save time.
+    #[serde(default)]
+    pub vocab_size: usize,
+    /// Blake3 hash of the serialized vocabulary file.
+    #[serde(default)]
+    pub vocab_hash: [u8; 32],
+    /// Embedding dimensionality at save time.
+    #[serde(default)]
+    pub embedding_dim: usize,
+    /// Thought-channel count at save time.
+    #[serde(default)]
+    pub channel_count: usize,
+    /// Channel schema version at save time.
+    #[serde(default)]
+    pub channel_schema_version: u32,
+    /// Feature set that affects runtime compatibility.
+    #[serde(default)]
+    pub feature_set: Vec<String>,
+    /// Backend/projection descriptor for diagnostics.
+    #[serde(default)]
+    pub backend: String,
+}
+
 /// A complete Broca checkpoint: model weights, config, and training state.
 #[derive(Serialize, Deserialize)]
 pub struct BrocaCheckpoint {
@@ -128,11 +178,40 @@ pub struct BrocaCheckpoint {
     /// regardless of enabled features. Bincode can't round-trip `serde_json::Value` (untagged enum).
     #[serde(default)]
     pub liquid_mamba_config: Option<String>,
+    /// Compatibility metadata. Legacy checkpoints deserialize with defaults.
+    #[serde(default)]
+    pub metadata: BrocaCheckpointMetadata,
     /// Blake3 integrity checksum (set to zeros before hashing).
     pub checksum: [u8; 32],
 }
 
 impl BrocaCheckpoint {
+    fn metadata_for(
+        token_embeddings: &[ContinuousHV],
+        vocab: &VocabFile,
+        projection_weights: &Option<Vec<f32>>,
+        liquid_mamba_config: &Option<String>,
+    ) -> BrocaCheckpointMetadata {
+        let vocab_bytes = serde_json::to_vec(vocab)
+            .expect("VocabFile serialization must succeed for compatibility metadata");
+        BrocaCheckpointMetadata {
+            vocab_size: vocab.tokens.len(),
+            vocab_hash: *blake3::hash(&vocab_bytes).as_bytes(),
+            embedding_dim: token_embeddings
+                .first()
+                .map(ContinuousHV::dim)
+                .unwrap_or(symthaea_core::hdc::HDC_DIMENSION),
+            channel_count: NUM_CHANNELS,
+            channel_schema_version: CHANNEL_SCHEMA_VERSION,
+            feature_set: current_feature_set(),
+            backend: if liquid_mamba_config.is_some() || projection_weights.is_some() {
+                "cfc-hdc+liquid-mamba".to_string()
+            } else {
+                "cfc-hdc".to_string()
+            },
+        }
+    }
+
     /// Compute the blake3 checksum of the checkpoint (with checksum field zeroed).
     fn compute_checksum(&self) -> [u8; 32] {
         // Serialize with zeroed checksum
@@ -147,6 +226,7 @@ impl BrocaCheckpoint {
             adam_state: self.adam_state.clone(),
             projection_weights: self.projection_weights.clone(),
             liquid_mamba_config: self.liquid_mamba_config.clone(),
+            metadata: self.metadata.clone(),
             checksum: [0u8; 32],
         };
 
@@ -161,12 +241,18 @@ impl BrocaCheckpoint {
         self.checksum == expected
     }
 
-    /// Save checkpoint to a file (MessagePack format).
+    /// Save checkpoint to a file (enveloped MessagePack format).
     pub fn save_to_file<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
-        // Compute and set checksum before serialization
-        self.checksum = self.compute_checksum();
+        // New saves hash the serialized payload bytes directly. This avoids
+        // reserializing ~256MiB+ checkpoints on load just to verify integrity.
+        self.checksum = [0u8; 32];
+        let payload = rmp_serde::to_vec(self).context("Failed to serialize BrocaCheckpoint")?;
+        self.checksum = *blake3::hash(&payload).as_bytes();
 
-        let serialized = rmp_serde::to_vec(self).context("Failed to serialize BrocaCheckpoint")?;
+        let mut serialized = Vec::with_capacity(CHECKPOINT_ENVELOPE_HEADER_LEN + payload.len());
+        serialized.extend_from_slice(CHECKPOINT_ENVELOPE_MAGIC);
+        serialized.extend_from_slice(&self.checksum);
+        serialized.extend_from_slice(&payload);
 
         let mut file = std::fs::File::create(path.as_ref())
             .with_context(|| format!("creating checkpoint file: {}", path.as_ref().display()))?;
@@ -190,10 +276,51 @@ impl BrocaCheckpoint {
     /// for legacy checkpoints. Legacy bincode checkpoints skip integrity
     /// verification (the hash was computed from bincode bytes).
     pub fn load_from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
+        Self::load_from_file_inner(path, false)
+    }
+
+    /// Load checkpoint while explicitly allowing a MessagePack checksum mismatch.
+    ///
+    /// Use only for schema-migration recovery of known-good artifacts. Normal
+    /// callers should use [`Self::load_from_file`], which fails closed.
+    pub fn load_from_file_allow_checksum_mismatch<P: AsRef<Path>>(path: P) -> Result<Self> {
+        Self::load_from_file_inner(path, true)
+    }
+
+    fn load_from_file_inner<P: AsRef<Path>>(
+        path: P,
+        allow_checksum_mismatch: bool,
+    ) -> Result<Self> {
         let mut file = std::fs::File::open(path.as_ref())
             .with_context(|| format!("opening checkpoint file: {}", path.as_ref().display()))?;
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer)?;
+
+        if buffer.starts_with(CHECKPOINT_ENVELOPE_MAGIC) {
+            if buffer.len() < CHECKPOINT_ENVELOPE_HEADER_LEN {
+                anyhow::bail!("Broca checkpoint envelope is truncated");
+            }
+            let mut expected = [0u8; 32];
+            expected.copy_from_slice(&buffer[8..CHECKPOINT_ENVELOPE_HEADER_LEN]);
+            let payload = &buffer[CHECKPOINT_ENVELOPE_HEADER_LEN..];
+            let observed = *blake3::hash(payload).as_bytes();
+            if expected != observed {
+                if allow_checksum_mismatch {
+                    tracing::warn!(
+                        "Checkpoint envelope checksum mismatch — proceeding because explicit recovery mode is enabled"
+                    );
+                } else {
+                    anyhow::bail!(
+                        "Broca checkpoint checksum mismatch: refusing to load without explicit recovery mode"
+                    );
+                }
+            }
+
+            let mut checkpoint = rmp_serde::from_slice::<Self>(payload)
+                .context("Failed to deserialize enveloped BrocaCheckpoint payload")?;
+            checkpoint.checksum = expected;
+            return Self::finalize_loaded(checkpoint, path.as_ref());
+        }
 
         // Try MessagePack (current format) first. On failure, keep the error so
         // we can surface BOTH msgpack and bincode failure reasons if bincode
@@ -204,9 +331,15 @@ impl BrocaCheckpoint {
         let msgpack_err = match rmp_serde::from_slice::<Self>(&buffer) {
             Ok(ckpt) => {
                 if !ckpt.verify() {
-                    tracing::warn!(
-                        "Checkpoint checksum mismatch (schema evolution) — proceeding with loaded data"
-                    );
+                    if allow_checksum_mismatch {
+                        tracing::warn!(
+                            "Checkpoint checksum mismatch — proceeding because explicit recovery mode is enabled"
+                        );
+                    } else {
+                        anyhow::bail!(
+                            "Broca checkpoint checksum mismatch: refusing to load without explicit recovery mode"
+                        );
+                    }
                 }
                 return Self::finalize_loaded(ckpt, path.as_ref());
             }
@@ -295,6 +428,13 @@ impl BrocaGenerator {
                 .collect(),
         };
 
+        let metadata = BrocaCheckpoint::metadata_for(
+            self.controller().token_embeddings(),
+            &vocab,
+            &projection_weights,
+            &liquid_mamba_config,
+        );
+
         let mut checkpoint = BrocaCheckpoint {
             version: CHECKPOINT_VERSION,
             token_embeddings: self.controller().token_embeddings().to_vec(),
@@ -306,6 +446,7 @@ impl BrocaGenerator {
             adam_state,
             projection_weights,
             liquid_mamba_config,
+            metadata,
             checksum: [0u8; 32],
         };
 
@@ -329,13 +470,103 @@ impl BrocaGenerator {
         path: P,
         genesis: &symthaea_core::genesis::GenesisSeed,
     ) -> Result<(Self, Option<AdamState>, Option<Vec<f32>>, Option<String>)> {
-        let checkpoint = BrocaCheckpoint::load_from_file(path)?;
+        Self::from_checkpoint_inner(path, genesis, false)
+    }
+
+    /// Load a generator while explicitly allowing a checkpoint checksum mismatch.
+    ///
+    /// Use only for migration/recovery of known-good legacy artifacts.
+    #[allow(clippy::type_complexity)]
+    pub fn from_checkpoint_allow_checksum_mismatch<P: AsRef<Path>>(
+        path: P,
+        genesis: &symthaea_core::genesis::GenesisSeed,
+    ) -> Result<(Self, Option<AdamState>, Option<Vec<f32>>, Option<String>)> {
+        Self::from_checkpoint_inner(path, genesis, true)
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn from_checkpoint_inner<P: AsRef<Path>>(
+        path: P,
+        genesis: &symthaea_core::genesis::GenesisSeed,
+        allow_checksum_mismatch: bool,
+    ) -> Result<(Self, Option<AdamState>, Option<Vec<f32>>, Option<String>)> {
+        let checkpoint = if allow_checksum_mismatch {
+            BrocaCheckpoint::load_from_file_allow_checksum_mismatch(path)?
+        } else {
+            BrocaCheckpoint::load_from_file(path)?
+        };
 
         let tokenizer = crate::tokenizer::BpeTokenizer::from_vocab_file(&checkpoint.vocab);
         let mut gen = BrocaGenerator::with_tokenizer(genesis, checkpoint.config, tokenizer);
 
+        let expected_vocab_size = gen.tokenizer().vocab_size();
+        if checkpoint.token_embeddings.len() != expected_vocab_size {
+            anyhow::bail!(
+                "Broca checkpoint embedding count {} does not match vocab size {}",
+                checkpoint.token_embeddings.len(),
+                expected_vocab_size
+            );
+        }
+        if !allow_checksum_mismatch
+            && (checkpoint.metadata.vocab_size == 0
+                || checkpoint.metadata.embedding_dim == 0
+                || checkpoint.metadata.channel_count == 0
+                || checkpoint.metadata.channel_schema_version == 0)
+        {
+            anyhow::bail!(
+                "Broca checkpoint is missing required compatibility metadata; use explicit recovery mode for legacy migration"
+            );
+        }
+        if checkpoint.metadata.vocab_size != 0
+            && checkpoint.metadata.vocab_size != expected_vocab_size
+        {
+            anyhow::bail!(
+                "Broca checkpoint metadata vocab size {} does not match tokenizer vocab size {}",
+                checkpoint.metadata.vocab_size,
+                expected_vocab_size
+            );
+        }
+        if checkpoint.metadata.embedding_dim != 0
+            && checkpoint.metadata.embedding_dim != symthaea_core::hdc::HDC_DIMENSION
+        {
+            anyhow::bail!(
+                "Broca checkpoint metadata embedding dimension {} does not match runtime dimension {}",
+                checkpoint.metadata.embedding_dim,
+                symthaea_core::hdc::HDC_DIMENSION
+            );
+        }
+        if checkpoint.metadata.channel_count != 0
+            && checkpoint.metadata.channel_count != NUM_CHANNELS
+        {
+            anyhow::bail!(
+                "Broca checkpoint channel count {} does not match runtime channel count {}",
+                checkpoint.metadata.channel_count,
+                NUM_CHANNELS
+            );
+        }
+        if checkpoint.metadata.channel_schema_version != 0
+            && checkpoint.metadata.channel_schema_version != CHANNEL_SCHEMA_VERSION
+        {
+            anyhow::bail!(
+                "Broca checkpoint channel schema version {} does not match runtime schema version {}",
+                checkpoint.metadata.channel_schema_version,
+                CHANNEL_SCHEMA_VERSION
+            );
+        }
+        for (idx, emb) in checkpoint.token_embeddings.iter().enumerate() {
+            if emb.dim() != symthaea_core::hdc::HDC_DIMENSION {
+                anyhow::bail!(
+                    "Broca checkpoint embedding {idx} has dimension {}, expected {}",
+                    emb.dim(),
+                    symthaea_core::hdc::HDC_DIMENSION
+                );
+            }
+        }
+
         // Restore trained weights
         *gen.controller_mut().token_embeddings_mut() = checkpoint.token_embeddings;
+        #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+        gen.controller_mut().rebuild_gpu_cache();
         // Restore network state (weights, momentums, etc.)
         *gen.controller_mut().network_mut() = checkpoint.network_state;
 
@@ -794,6 +1025,78 @@ mod tests {
     }
 
     #[test]
+    fn test_checkpoint_checksum_mismatch_requires_explicit_recovery() {
+        let checkpoint = BrocaCheckpoint {
+            version: CHECKPOINT_VERSION,
+            token_embeddings: vec![],
+            network_state: HdcLtcUnifiedNetwork::from_genesis(
+                symthaea_core::hdc::UnifiedNetworkConfig::default(),
+                &test_genesis(),
+            ),
+            vocab: VocabFile {
+                tokens: vec![],
+                merges: vec![],
+            },
+            config: BrocaConfig::default(),
+            training_epoch: 0,
+            training_loss: 0.0,
+            adam_state: None,
+            projection_weights: None,
+            liquid_mamba_config: None,
+            metadata: BrocaCheckpointMetadata::default(),
+            checksum: [1u8; 32],
+        };
+
+        let dir = std::env::temp_dir();
+        let path = dir.join("broca_test_checksum_mismatch.bin");
+        std::fs::write(&path, rmp_serde::to_vec(&checkpoint).unwrap()).unwrap();
+
+        let strict = BrocaCheckpoint::load_from_file(&path);
+        assert!(
+            strict.is_err(),
+            "strict load should reject checksum mismatch"
+        );
+
+        let recovered = BrocaCheckpoint::load_from_file_allow_checksum_mismatch(&path);
+        assert!(
+            recovered.is_ok(),
+            "explicit recovery load should allow checksum mismatch"
+        );
+
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn test_generator_load_requires_checkpoint_metadata() {
+        let genesis = test_genesis();
+        let config = BrocaConfig::default();
+        let gen = BrocaGenerator::new(&genesis, config);
+
+        let dir = std::env::temp_dir();
+        let path = dir.join("broca_test_missing_metadata.bin");
+        gen.save_checkpoint(&path, 1, 0.5, None, None, None)
+            .unwrap();
+
+        let mut checkpoint = BrocaCheckpoint::load_from_file(&path).unwrap();
+        checkpoint.metadata = BrocaCheckpointMetadata::default();
+        checkpoint.save_to_file(&path).unwrap();
+
+        let strict = BrocaGenerator::from_checkpoint(&path, &genesis);
+        assert!(
+            strict.is_err(),
+            "strict generator load should reject missing compatibility metadata"
+        );
+
+        let recovered = BrocaGenerator::from_checkpoint_allow_checksum_mismatch(&path, &genesis);
+        assert!(
+            recovered.is_ok(),
+            "explicit recovery mode should allow legacy metadata migration"
+        );
+
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
     fn test_adam_state_step() {
         let mut adam = AdamState::new(1, 4);
         let grad = vec![0.1, -0.2, 0.3, -0.4];
@@ -823,6 +1126,7 @@ mod tests {
             adam_state: None,
             projection_weights: None,
             liquid_mamba_config: None,
+            metadata: BrocaCheckpointMetadata::default(),
             checksum: [0u8; 32],
         };
         checkpoint.checksum = checkpoint.compute_checksum();

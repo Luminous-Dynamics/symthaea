@@ -161,6 +161,33 @@ impl CognitiveSubsystem for VisionManager {
         self.visual_pe_ema =
             self.visual_pe_ema * (1.0 - Self::PE_EMA_ALPHA) + visual_surprise * Self::PE_EMA_ALPHA;
 
+        // ── 0. FEP-driven Gating ─────────────────────────────────────
+        // Science: Friston (2010). High Free Energy (F) indicates a poor world model.
+        if snapshot.vision_free_energy > 0.5 {
+            output.flags |= output_flags::VETO_ACTION;
+            output.confidence_delta -= 0.05;
+            tracing::warn!(
+                f = snapshot.vision_free_energy,
+                "Vision VETO: High Variational Free Energy"
+            );
+        }
+
+        if snapshot.vision_free_energy > 0.3 {
+            output.flags |= output_flags::REQUEST_EXPLORATION;
+        }
+
+        // REQUEST_GEODESIC: If free energy is high, request mental simulation
+        // to find a coherent path through the manifold (Active Inference).
+        if snapshot.vision_free_energy > 0.2 {
+            output.flags |= output_flags::REQUEST_GEODESIC;
+        }
+
+        // High complexity without accuracy → overfitting or noise sensitivity.
+        // Dampen learning rate to stabilize.
+        if snapshot.vision_complexity > 0.7 && snapshot.vision_accuracy < 0.5 {
+            output.lr_modulation *= 0.8;
+        }
+
         // ── 1. Habituation dynamics ─────────────────────────────────
         if visual_surprise < Self::LOW_SURPRISE_THRESHOLD {
             self.low_surprise_streak = self.low_surprise_streak.saturating_add(1);

@@ -745,6 +745,70 @@ impl ContinuousHV {
         self.permute(dim - (shift % dim))
     }
 
+    /// Perform 'Holographic Dilation' - scale dimensionality while preserving semantics.
+    ///
+    /// Scaling is performed using a fractal folding/unfolding technique
+    /// that maintains semantic alignment across different resolutions.
+    ///
+    /// * **UPSAMPLING (Unfolding)**: Expands the vector by tiling it with permutations.
+    ///   This preserves the original signal while providing more orthogonal space.
+    /// * **DOWNSAMPLING (Folding)**: Bundles constituent segments after applying
+    ///   inverse permutations. This allows near-perfect recovery of the original signal
+    ///   (similarity > 0.99 for perfectly aligned target_dim multiples).
+    pub fn dilate(&self, target_dim: usize) -> Self {
+        let current_dim = self.values.len();
+
+        if current_dim == target_dim {
+            return self.clone();
+        }
+
+        if target_dim > current_dim {
+            // UPSAMPLING (Unfolding)
+            // We expand the vector by tiling it with permutations.
+            // This maintains the original semantic signal while
+            // providing more orthogonal space for new associations.
+            let mut new_values = Vec::with_capacity(target_dim);
+            let mut current_vec = self.clone();
+
+            while new_values.len() < target_dim {
+                let chunk_size = current_vec.values.len().min(target_dim - new_values.len());
+                new_values.extend_from_slice(&current_vec.values[..chunk_size]);
+                // Permute for the next chunk to avoid trivial repetition
+                current_vec = current_vec.permute(1);
+            }
+            Self { values: new_values }
+        } else {
+            // DOWNSAMPLING (Folding)
+            // We fold the vector back by bundling its constituent segments.
+            // We apply the inverse permutation to each segment before bundling
+            // to recover the original semantic alignment.
+            let chunk_count = (self.values.len() + target_dim - 1) / target_dim;
+            let mut folded = vec![0.0f32; target_dim];
+
+            for k in 0..chunk_count {
+                let start = k * target_dim;
+                let end = (start + target_dim).min(self.values.len());
+                let mut chunk_values = self.values[start..end].to_vec();
+
+                // If chunk is smaller than target (last chunk), pad with zeros for inverse_permute
+                if chunk_values.len() < target_dim {
+                    chunk_values.resize(target_dim, 0.0);
+                }
+
+                let chunk_hv = Self {
+                    values: chunk_values,
+                };
+                // Un-rotate: Chunk k was rotated by k steps during upsampling
+                let unrotated = chunk_hv.inverse_permute(k);
+
+                for (i, &val) in unrotated.values.iter().enumerate() {
+                    folded[i] += val / chunk_count as f32;
+                }
+            }
+            Self { values: folded }
+        }
+    }
+
     /// Convert to binary representation using threshold
     pub fn to_binary(&self, threshold: f32) -> BinaryHV {
         let mut bytes = [0u8; 2048];

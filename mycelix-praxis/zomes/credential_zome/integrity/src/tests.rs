@@ -16,7 +16,10 @@ use praxis_core::CourseId;
 fn create_valid_credential() -> VerifiableCredential {
     VerifiableCredential {
         context: "https://www.w3.org/2018/credentials/v1".to_string(),
-        credential_type: vec!["VerifiableCredential".to_string(), "EducationalCredential".to_string()],
+        credential_type: vec![
+            "VerifiableCredential".to_string(),
+            "EducationalCredential".to_string(),
+        ],
         issuer: "did:example:issuer123".to_string(),
         issuance_date: "2024-01-15T12:00:00Z".to_string(),
         expiration_date: Some("2025-01-15T12:00:00Z".to_string()),
@@ -352,10 +355,9 @@ mod edge_case_tests {
     #[test]
     fn test_credential_many_types() {
         let mut cred = create_valid_credential();
-        cred.credential_type = (0..20)
-            .map(|i| format!("Type{}", i))
-            .collect();
-        cred.credential_type.insert(0, "VerifiableCredential".to_string());
+        cred.credential_type = (0..20).map(|i| format!("Type{}", i)).collect();
+        cred.credential_type
+            .insert(0, "VerifiableCredential".to_string());
 
         let result = validate_verifiable_credential(cred);
         assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));

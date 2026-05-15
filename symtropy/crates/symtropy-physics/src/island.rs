@@ -121,8 +121,8 @@ pub fn build_islands<const D: usize>(
             .filter(|(_, c)| {
                 let ia = handle_to_index.get(&c.body_a).copied();
                 let ib = handle_to_index.get(&c.body_b).copied();
-                ia.map_or(false, |i| body_set.contains(&i))
-                    || ib.map_or(false, |i| body_set.contains(&i))
+                ia.is_some_and(|i| body_set.contains(&i))
+                    || ib.is_some_and(|i| body_set.contains(&i))
             })
             .map(|(i, _)| i)
             .collect();
@@ -135,8 +135,8 @@ pub fn build_islands<const D: usize>(
                 let (ha, hb) = c.bodies();
                 let ia = handle_to_index.get(&ha).copied();
                 let ib = handle_to_index.get(&hb).copied();
-                ia.map_or(false, |i| body_set.contains(&i))
-                    || ib.map_or(false, |i| body_set.contains(&i))
+                ia.is_some_and(|i| body_set.contains(&i))
+                    || ib.is_some_and(|i| body_set.contains(&i))
             })
             .map(|(i, _)| i)
             .collect();

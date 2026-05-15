@@ -212,11 +212,16 @@ impl<const D: usize> Constraint<D> for HingeJoint<D> {
 
         // Motor drive on the hinge rotation axis
         if let Some(ref motor) = self.motor {
-            let current_angular =
+            let rel_angular_vel =
                 body_b.angular_velocity.get(pa, pb) - body_a.angular_velocity.get(pa, pb);
-            let error = motor.target - current_angular;
-            let torque = (error * motor.max_force - current_angular * motor.damping)
+
+            // Simplified hinge motor: uses velocity-level error if angle tracking is missing.
+            // For Phase 1 robotics, we'll eventually need full angle integration for the PD target_pos.
+            // For now, we use a P-velocity controller: impulse = kp*(target_vel - current_vel) * dt
+            let torque = (motor.kp * (motor.target_pos - rel_angular_vel)
+                - rel_angular_vel * motor.kd)
                 .clamp(-motor.max_force, motor.max_force);
+
             let impulse = torque * _dt;
             if body_a.is_dynamic() {
                 body_a.angular_velocity.set(

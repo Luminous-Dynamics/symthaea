@@ -959,6 +959,15 @@ pub struct CycleMetadata {
     /// Prediction coherence bias applied to urgency threshold (-1.0 to 1.0).
     pub prediction_coherence_urgency_bias: f32,
 
+    /// Multimodal director telemetry (generation gating, MCE gating).
+    #[serde(default)]
+    pub multimodal: crate::cognitive_loop::managers::MultimodalTelemetry,
+
+    /// Vision manifold telemetry (surprise, FEP, dreaming, dilation).
+    #[cfg(feature = "vision-manifold")]
+    #[serde(default)]
+    pub vision: Option<symthaea_vision_manifold::VisionTelemetry>,
+
     // ── Phase 19: Activating Dormant Pathways ────────────────────────
     /// Consciousness limiting component that was boosted (empty when none).
     pub limiting_component_boosted: String,
@@ -1164,11 +1173,6 @@ pub struct CycleMetadata {
     /// Whether ToM mismatch triggered exploration this cycle.
     #[serde(default)]
     pub tom_exploration_triggered: bool,
-
-    // ── Vision Manifold Telemetry ───────────────────────────────────────
-    /// Vision manifold telemetry (None when vision-manifold feature disabled or not active).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub vision: Option<VisionManifoldTelemetry>,
 
     // ── Foveation Bridge Telemetry ──────────────────────────────────────
     /// Foveation bridge telemetry (None when foveation feature disabled or not active).
@@ -1997,39 +2001,6 @@ fn default_one_f32() -> f32 {
 
 fn default_half_f32() -> f32 {
     0.5
-}
-
-/// Vision manifold telemetry snapshot for CycleMetadata.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct VisionManifoldTelemetry {
-    /// Whether vision processing was active this cycle.
-    pub vision_active: bool,
-    /// Per-frame prediction error from the vision manifold CfC.
-    pub prediction_error: f32,
-    /// Manifold coherence (cosine similarity between state and frame encoding).
-    pub manifold_coherence: f32,
-    /// Shannon entropy of the attention/surprise map.
-    pub attention_entropy: f32,
-    /// Number of patches exceeding the surprise threshold.
-    pub num_salient_patches: usize,
-    /// Frame sequence number.
-    pub frame_sequence: u64,
-    /// Whether a training step was triggered this cycle.
-    pub training_triggered: bool,
-    /// Cosine similarity of the scene recognition match (0.0 if no match).
-    pub scene_recognition_similarity: f32,
-    /// Cross-manifold prediction error (vision→cognitive, 0.0 if predictor disabled).
-    pub cross_manifold_prediction_error: f32,
-    /// Time spent encoding the frame into HDC (microseconds).
-    pub encode_time_us: u64,
-    /// Time spent evolving the CfC manifold state (microseconds).
-    pub evolve_time_us: u64,
-    /// Mean surprise across the visual field (Friston free energy).
-    pub vision_mean_surprise: f32,
-    /// Multi-timescale horizon prediction errors [short, mid, long].
-    pub vision_horizon_errors: Vec<f32>,
-    /// Whether a scene was recognized this cycle (Conway episodic encoding).
-    pub scene_recognized: bool,
 }
 
 /// Foveation bridge telemetry snapshot for CycleMetadata.

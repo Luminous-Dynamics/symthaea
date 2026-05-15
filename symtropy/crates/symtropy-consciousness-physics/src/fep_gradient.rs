@@ -61,6 +61,7 @@ pub fn free_energy_gradient<const D: usize>(
 /// 3. Danger sensitivity: higher phi = detect danger earlier (wider avoidance)
 ///
 /// Call with phi = None for the Φ-independent baseline.
+#[allow(clippy::too_many_arguments)]
 pub fn free_energy_gradient_phi<const D: usize>(
     position: &SVector<f64, D>,
     energy_fraction: f64,
@@ -84,7 +85,7 @@ pub fn free_energy_gradient_phi<const D: usize>(
     for (agent_pos, agent_harmony) in nearby_agents {
         let delta = agent_pos - position;
         let dist = delta.norm();
-        if dist < 1.0 || dist > 100.0 {
+        if !(1.0..=100.0).contains(&dist) {
             continue;
         }
 
@@ -114,7 +115,7 @@ pub fn free_energy_gradient_phi<const D: usize>(
         } // depleted well
         let delta = well_pos - position;
         let dist = delta.norm();
-        if dist < 1.0 || dist > 200.0 {
+        if !(1.0..=200.0).contains(&dist) {
             continue;
         }
 
@@ -269,6 +270,7 @@ impl LearnedFepWeights {
 /// Same as `free_energy_gradient_phi` but uses per-agent `LearnedFepWeights`
 /// instead of hardcoded constants. Returns both the gradient direction and
 /// the per-component contribution magnitudes (for weight update).
+#[allow(clippy::too_many_arguments)]
 pub fn free_energy_gradient_learned<const D: usize>(
     position: &SVector<f64, D>,
     energy_fraction: f64,
@@ -290,7 +292,7 @@ pub fn free_energy_gradient_learned<const D: usize>(
     for (agent_pos, agent_harmony) in nearby_agents {
         let delta = agent_pos - position;
         let dist = delta.norm();
-        if dist < 1.0 || dist > 100.0 {
+        if !(1.0..=100.0).contains(&dist) {
             continue;
         }
         let resonance = HarmonyField::<D>::resonance(harmony, agent_harmony);
@@ -316,7 +318,7 @@ pub fn free_energy_gradient_learned<const D: usize>(
         }
         let delta = well_pos - position;
         let dist = delta.norm();
-        if dist < 1.0 || dist > 200.0 {
+        if !(1.0..=200.0).contains(&dist) {
             continue;
         }
         well_grad += delta / dist * (energy_urgency * *well_remaining);

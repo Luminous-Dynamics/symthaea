@@ -483,9 +483,10 @@ pub fn validate_verifiable_credential(
     // If epistemic fields are provided, validate they're within valid range
     if let Some(e) = credential.epistemic_empirical {
         if e > 4 {
-            return Ok(ValidateCallbackResult::Invalid(
-                format!("Epistemic empirical level {} invalid (must be 0-4)", e),
-            ));
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "Epistemic empirical level {} invalid (must be 0-4)",
+                e
+            )));
         }
         // Educational credentials should be at least E1 (Testimonial)
         if e < 1 {
@@ -497,23 +498,26 @@ pub fn validate_verifiable_credential(
 
     if let Some(n) = credential.epistemic_normative {
         if n > 3 {
-            return Ok(ValidateCallbackResult::Invalid(
-                format!("Epistemic normative level {} invalid (must be 0-3)", n),
-            ));
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "Epistemic normative level {} invalid (must be 0-3)",
+                n
+            )));
         }
         // Educational credentials should be at least N1 (Communal)
         if n < 1 {
             return Ok(ValidateCallbackResult::Invalid(
-                "Educational credentials must be at least N1 (Communal) - institution recognized".to_string(),
+                "Educational credentials must be at least N1 (Communal) - institution recognized"
+                    .to_string(),
             ));
         }
     }
 
     if let Some(m) = credential.epistemic_materiality {
         if m > 3 {
-            return Ok(ValidateCallbackResult::Invalid(
-                format!("Epistemic materiality level {} invalid (must be 0-3)", m),
-            ));
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "Epistemic materiality level {} invalid (must be 0-3)",
+                m
+            )));
         }
     }
 
@@ -621,15 +625,12 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     Some(EntryTypes::VerifiableCredential(credential)) => {
                         validate_verifiable_credential(credential)
                     }
-                    Some(EntryTypes::Assessment(assessment)) => {
-                        validate_assessment(&assessment)
-                    }
-                    Some(EntryTypes::StudentResult(result)) => {
-                        validate_student_result(&result)
-                    }
-                    Some(EntryTypes::ReportCard(card)) => {
-                        validate_report_card(&card)
-                    }
+                    Some(EntryTypes::Assessment(assessment)) => validate_assessment(&assessment),
+                    Some(EntryTypes::StudentResult(result)) => validate_student_result(&result),
+                    Some(EntryTypes::ReportCard(card)) => validate_report_card(&card),
+                    Some(EntryTypes::CredentialDisclosure(_))
+                    | Some(EntryTypes::ComprehensiveLearnerRecord(_))
+                    | Some(EntryTypes::ZkClaim(_)) => Ok(ValidateCallbackResult::Valid),
                     None => Ok(ValidateCallbackResult::Valid),
                 }
             }

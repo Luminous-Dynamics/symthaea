@@ -219,9 +219,11 @@ mod tests {
     fn test_extract_summarization_entity() {
         let plugin = GeneralAssistantPlugin;
         let entities = plugin.extract_entities("Can you summarize this article?");
-        assert!(entities
-            .iter()
-            .any(|e| e.entity_type == "task_type" && e.value == "summarization"));
+        assert!(
+            entities
+                .iter()
+                .any(|e| e.entity_type == "task_type" && e.value == "summarization")
+        );
     }
 
     #[test]

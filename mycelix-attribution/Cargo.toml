@@ -22,6 +22,8 @@ thiserror = "1.0"
 holochain_serialized_bytes = "0.0.56"
 getrandom = { version = "0.2", features = ["custom"] }
 getrandom_03 = { package = "getrandom", version = "0.3" }
+mycelix-bridge-common = { path = "../crates/mycelix-bridge-common" }
+mycelix-zome-helpers = { path = "../mycelix-workspace/crates/mycelix-zome-helpers" }
 
 [profile.dev]
 opt-level = "z"

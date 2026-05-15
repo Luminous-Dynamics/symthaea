@@ -95,8 +95,15 @@ impl SymtropyScenePlugin {
     }
 }
 
+pub mod loader;
+
+pub use loader::{SymtropyScene, SymtropySceneLoader};
+
 impl Plugin for SymtropyScenePlugin {
     fn build(&self, app: &mut App) {
+        app.init_asset::<SymtropyScene>()
+            .init_asset_loader::<SymtropySceneLoader>();
+
         let cfg = self.config.clone();
         app.insert_resource(ClearColor(cfg.clear_color))
             .insert_resource(bevy::light::GlobalAmbientLight {

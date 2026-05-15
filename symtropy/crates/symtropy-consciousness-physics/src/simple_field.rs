@@ -371,6 +371,16 @@ impl<const D: usize> PhysicsCallback<D> for SimpleCoupledField<D> {
             }
         }
     }
+
+    fn apply_trauma(&mut self, _: &symtropy_physics::CollisionEvent<D>) {}
+}
+
+impl<const D: usize> SimpleCoupledField<D> {
+    /// Finalize this tick's energy balance.
+    pub fn tick_thermodynamics(&mut self) -> crate::thermodynamics::TickBalance {
+        self.drain_sanctuary_absorption();
+        self.ledger.tick_balance()
+    }
 }
 
 #[cfg(test)]

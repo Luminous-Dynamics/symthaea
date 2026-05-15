@@ -17,6 +17,7 @@ use symthaea_core::hdc::program_algebra::ProgramNode;
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// A single entry in the program memory.
+#[derive(Clone)]
 pub struct ProgramMemoryEntry {
     /// Human-readable name (e.g. "add", "factorial").
     pub name: String,
@@ -31,6 +32,7 @@ pub struct ProgramMemoryEntry {
 }
 
 /// Searchable library of ProgramNode compositions.
+#[derive(Clone)]
 pub struct ProgramMemory {
     entries: Vec<ProgramMemoryEntry>,
 }

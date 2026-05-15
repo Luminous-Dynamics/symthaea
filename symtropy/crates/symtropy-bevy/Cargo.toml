@@ -3,7 +3,7 @@ name = "symtropy-bevy"
 version = "0.2.0"
 edition = "2021"
 license = "AGPL-3.0-or-later"
-description = "Drop-in Bevy plugin for Phi-coupled N-dimensional physics. Builds on the permissive symtropy-bevy-core plugin, adding ConsciousnessField, biometric coupling, and macro-world modifiers. One line to add integrated information as a first-class physics parameter to any Bevy app."
+description = "Drop-in Bevy plugin for Phi-coupled N-dimensional physics. Builds on the permissive symtropy-bevy-core plugin, adding ConsciousnessField, biometric coupling, and macro-world modifiers."
 repository = "https://github.com/luminous-dynamics/symtropy"
 keywords = ["bevy", "physics", "n-dimensional", "phi", "game-engine"]
 categories = ["game-engines", "simulation"]
@@ -12,10 +12,15 @@ readme = "README.md"
 [dependencies]
 symtropy-math = { version = "0.2.0", path = "../symtropy-math" }
 symtropy-physics = { version = "0.2.0", path = "../symtropy-physics" }
-# Re-exports PhysicsBody + optionally the BevyPhysicsPlugin for users who
-# want no-coupling physics. No duplication.
 symtropy-bevy-core = { version = "0.1.0", path = "../symtropy-bevy-core" }
 symtropy-consciousness-physics = { version = "0.2.0", path = "../symtropy-consciousness-physics" }
+symthaea-bevy-brain = { version = "0.1.0", path = "../symthaea-bevy-brain" }
+symtropy-robotics-bridge-core = { version = "0.1.0", path = "../symtropy-robotics-bridge-core", features = ["bevy"] }
+symtropy-rapier3d-bridge = { version = "0.1.0", path = "../symtropy-rapier3d-bridge", optional = true }
+symthaea-muse = { path = "../../../symthaea/crates/symthaea-muse", features = ["bevy"] }
+rapier3d = { version = "0.22", optional = true }
+bevy_inspector_egui = { package = "bevy-inspector-egui", version = "0.36", optional = true }
+rhai = { version = "1.20", features = ["sync"] }
 bevy = { version = "0.18", default-features = false, features = [
     "bevy_core_pipeline", "bevy_render", "bevy_sprite", "bevy_sprite_render",
     "bevy_pbr",
@@ -26,27 +31,17 @@ bevy = { version = "0.18", default-features = false, features = [
 nalgebra = "0.34"
 
 [features]
-default = ["debug-gizmos"]
+default = ["debug-gizmos", "inspector"]
 debug-gizmos = []
+inspector = ["dep:bevy_inspector_egui"]
+rapier3d = ["dep:symtropy-rapier3d-bridge", "dep:rapier3d"]
 
 [dev-dependencies]
-# Tests construct ConsciousnessInputs directly. This type lives upstream of
-# symtropy-consciousness-physics; declare it here as a dev-dep so tests can
-# import it without adding a runtime dep.
 symthaea-consciousness-equation = { version = "0.1.0", path = "../../../symthaea/crates/symthaea-consciousness-equation" }
-# Used by `pendulum_swarm_3d` and `_4d` examples for opinionated camera +
-# light + clear-color scaffolding. Permissive (Apache/MIT) sibling crate.
+symthaea-fep = { path = "../../../symthaea/crates/symthaea-fep" }
 symtropy-bevy-scene = { version = "0.1.0", path = "../symtropy-bevy-scene" }
-# Drop-in dev console (F1 toggle: world inspector + scene controls + Φ panel).
-# Examples enable the `phi-panel` feature so visitors see the differentiated
-# Φ Inspector immediately. The base devconsole crate is permissive.
+symtropy-render-bridge = { version = "0.1.0", path = "../symtropy-render-bridge" }
 symtropy-devconsole = { version = "0.1.0", path = "../symtropy-devconsole", features = ["phi-panel"] }
-# Examples (e.g., pendulum_swarm in PENDULUM_CAPTURE_DIR mode) use
-# `Screenshot::primary_window()` + `save_to_disk` which needs PNG support.
-# `bevy_ui` + `bevy_text` + `default_font` are used by `pendulum_swarm_4d`
-# for the on-screen w_slice HUD. The base symtropy-bevy build omits these
-# to stay slim; Cargo merges dev-dep features so examples and tests get
-# them without affecting the published crate.
 bevy = { version = "0.18", default-features = false, features = [
     "png",
     "bevy_ui", "bevy_ui_render", "bevy_text", "default_font",

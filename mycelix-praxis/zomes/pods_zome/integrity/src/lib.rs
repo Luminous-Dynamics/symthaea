@@ -348,7 +348,7 @@ pub struct Endorsement {
 
 /// A scholarship pot to incentivize learning a specific topic
 #[hdk_entry_helper]
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq)]
 pub struct ScholarshipPot {
     /// The topic/node ID being incentivized
     pub node_id: String,
@@ -438,7 +438,9 @@ pub fn validate_create_pod(pod: &LearningPod) -> ExternResult<ValidateCallbackRe
 }
 
 /// Validate membership creation
-pub fn validate_create_membership(membership: &PodMembership) -> ExternResult<ValidateCallbackResult> {
+pub fn validate_create_membership(
+    membership: &PodMembership,
+) -> ExternResult<ValidateCallbackResult> {
     // Reputation must be valid (0-1000 permille)
     if membership.pod_reputation_permille > 1000 {
         return Ok(ValidateCallbackResult::Invalid(
@@ -450,7 +452,9 @@ pub fn validate_create_membership(membership: &PodMembership) -> ExternResult<Va
 }
 
 /// Validate peer tutoring session
-pub fn validate_tutoring_session(session: &PeerTutoringSession) -> ExternResult<ValidateCallbackResult> {
+pub fn validate_tutoring_session(
+    session: &PeerTutoringSession,
+) -> ExternResult<ValidateCallbackResult> {
     if session.tutor == session.tutee {
         return Ok(ValidateCallbackResult::Invalid(
             "Cannot tutor yourself".to_string(),

@@ -7,7 +7,7 @@
 //! abstract code plans and specifications.
 
 use super::super::code_intent::CodeSpec;
-use super::{extract_fields_from_text, CodeEmitter};
+use super::{CodeEmitter, extract_fields_from_text};
 use crate::dynamics::cfc_code_sequencer::{CodePlanStep, PlanAction};
 
 // ============================================================================

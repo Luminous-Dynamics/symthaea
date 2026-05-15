@@ -641,6 +641,8 @@ pub struct GpuTrainer {
     pub dim: usize,
     /// Logit scale
     pub logit_scale: f32,
+    /// Direct thought-logit residual blend weight.
+    pub thought_logit_residual_weight: f32,
     /// Gradient attenuation for earlier layers
     pub gradient_attenuation: f32,
     /// dt per token
@@ -705,9 +707,22 @@ impl GpuTrainer {
             device: device.clone(),
             dim,
             logit_scale: controller.config().logit_scale,
+            thought_logit_residual_weight: controller.config().thought_logit_residual_weight,
             gradient_attenuation: controller.config().gradient_attenuation,
             dt_per_token: controller.config().dt_per_token,
         })
+    }
+
+    fn renormalize_embeddings(&mut self) -> Result<()> {
+        let norms = self
+            .embeddings
+            .sqr()?
+            .sum(1)?
+            .sqrt()?
+            .clamp(1e-8, f32::MAX)?;
+        let norm_bc = norms.unsqueeze(1)?.broadcast_as(self.embeddings.shape())?;
+        self.embeddings = (&self.embeddings / &norm_bc)?;
+        Ok(())
     }
 
     /// Run one token step: forward + compute logits. Returns logits on CPU.
@@ -737,6 +752,20 @@ impl GpuTrainer {
 
         // 4. Logits: output @ embeddings^T * scale
         let logits_tensor = (output_hat.matmul(&self.embeddings.t()?)? * self.logit_scale as f64)?;
+        let logits_tensor = if self.thought_logit_residual_weight > 1e-6 {
+            let thought_query = (thought_gpu * &pos_emb)?;
+            let thought_norm = thought_query.sqr()?.sum(1)?.sqrt()?.clamp(1e-8, f32::MAX)?;
+            let thought_norm_bc = thought_norm
+                .unsqueeze(1)?
+                .broadcast_as(thought_query.shape())?;
+            let thought_hat = (&thought_query / &thought_norm_bc)?;
+            let thought_logits =
+                (thought_hat.matmul(&self.embeddings.t()?)? * self.logit_scale as f64)?;
+            let w = self.thought_logit_residual_weight.clamp(0.0, 1.0) as f64;
+            ((&logits_tensor * (1.0 - w))? + (&thought_logits * w)?)?
+        } else {
+            logits_tensor
+        };
 
         // 5. Transfer logits to CPU (only 16KB for 4096-vocab)
         logits_tensor.squeeze(0)?.to_vec1()
@@ -750,6 +779,26 @@ impl GpuTrainer {
         let output_hat = (&raw_output / &norm_bc)?;
         let values: Vec<f32> = output_hat.squeeze(0)?.to_vec1()?;
         Ok(symthaea_core::hdc::ContinuousHV::from_slice(&values))
+    }
+
+    /// Compute direct positioned thought logits without evolving the recurrent network.
+    ///
+    /// Mirrors the auxiliary binding query:
+    /// `normalize(thought_hv ⊗ position[pos]) @ normalized_embeddings^T * scale`.
+    pub fn thought_position_logits(&self, thought_gpu: &Tensor, pos: usize) -> Result<Vec<f32>> {
+        let max_pos = self.position_cache.dim(0)?;
+        let pos_emb = self
+            .position_cache
+            .get(pos.min(max_pos - 1))?
+            .unsqueeze(0)?;
+        let thought_query = (thought_gpu * &pos_emb)?;
+        let thought_norm = thought_query.sqr()?.sum(1)?.sqrt()?.clamp(1e-8, f32::MAX)?;
+        let norm_bc = thought_norm
+            .unsqueeze(1)?
+            .broadcast_as(thought_query.shape())?;
+        let thought_hat = (&thought_query / &norm_bc)?;
+        let logits_tensor = (thought_hat.matmul(&self.embeddings.t()?)? * self.logit_scale as f64)?;
+        logits_tensor.squeeze(0)?.to_vec1()
     }
 
     /// Backward step: CE gradient → BPTT on GPU.
@@ -942,6 +991,7 @@ impl GpuTrainer {
 
         // emb -= grad (in-place on GPU)
         self.embeddings = (&self.embeddings - &grad_matrix)?;
+        self.renormalize_embeddings()?;
 
         Ok(())
     }
@@ -957,6 +1007,7 @@ impl GpuTrainer {
         &mut self,
         thought_gpu: &Tensor,
         target: usize,
+        pos: usize,
         lr: f32,
         grad_clip: f32,
         weight: f32,
@@ -965,14 +1016,7 @@ impl GpuTrainer {
             return Ok(0.0);
         }
 
-        let thought_norm = thought_gpu.sqr()?.sum(1)?.sqrt()?.clamp(1e-8, f32::MAX)?;
-        let norm_bc = thought_norm
-            .unsqueeze(1)?
-            .broadcast_as(thought_gpu.shape())?;
-        let thought_hat = (thought_gpu / &norm_bc)?;
-
-        let logits_tensor = (thought_hat.matmul(&self.embeddings.t()?)? * self.logit_scale as f64)?;
-        let logits: Vec<f32> = logits_tensor.squeeze(0)?.to_vec1()?;
+        let logits = self.thought_position_logits(thought_gpu, pos)?;
         let n = logits.len();
         if target >= n {
             return Ok(0.0);
@@ -988,6 +1032,17 @@ impl GpuTrainer {
         let log_prob = logits[target] - max_logit - sum_exp.ln();
         let loss = -log_prob;
         let scaled_lr = lr * weight;
+        let max_pos = self.position_cache.dim(0)?;
+        let pos_emb = self
+            .position_cache
+            .get(pos.min(max_pos - 1))?
+            .unsqueeze(0)?;
+        let thought_query = (thought_gpu * &pos_emb)?;
+        let thought_norm = thought_query.sqr()?.sum(1)?.sqrt()?.clamp(1e-8, f32::MAX)?;
+        let norm_bc = thought_norm
+            .unsqueeze(1)?
+            .broadcast_as(thought_query.shape())?;
+        let thought_hat = (&thought_query / &norm_bc)?;
         let errors: Vec<f32> = (0..n)
             .map(|i| {
                 let prob = exps[i] / sum_exp;
@@ -999,7 +1054,112 @@ impl GpuTrainer {
         let error_tensor = Tensor::from_vec(errors, (n, 1), &self.device)?;
         let grad_matrix = error_tensor.matmul(&thought_hat)?;
         self.embeddings = (&self.embeddings - &grad_matrix)?;
+        self.renormalize_embeddings()?;
 
         Ok(weight * loss)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::controller::LanguageControllerConfig;
+    use crate::generator::BrocaConfig;
+    use symthaea_core::genesis::GenesisSeed;
+
+    fn softmax_probability(logits: &[f32], target: usize) -> f32 {
+        let max_logit = logits.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        let exps: Vec<f32> = logits.iter().map(|&l| (l - max_logit).exp()).collect();
+        let sum_exp: f32 = exps.iter().sum();
+        if target >= logits.len() || sum_exp <= 0.0 {
+            0.0
+        } else {
+            exps[target] / sum_exp
+        }
+    }
+
+    fn target_rank(logits: &[f32], target: usize) -> usize {
+        if target >= logits.len() {
+            return usize::MAX;
+        }
+        1 + logits
+            .iter()
+            .filter(|&&logit| logit > logits[target])
+            .count()
+    }
+
+    fn thought_logits(trainer: &GpuTrainer, thought_gpu: &Tensor, pos: usize) -> Result<Vec<f32>> {
+        let max_pos = trainer.position_cache.dim(0)?;
+        let pos_emb = trainer
+            .position_cache
+            .get(pos.min(max_pos - 1))?
+            .unsqueeze(0)?;
+        let thought_query = (thought_gpu * &pos_emb)?;
+        let thought_norm = thought_query.sqr()?.sum(1)?.sqrt()?.clamp(1e-8, f32::MAX)?;
+        let norm_bc = thought_norm
+            .unsqueeze(1)?
+            .broadcast_as(thought_query.shape())?;
+        let thought_hat = (&thought_query / &norm_bc)?;
+        let logits_tensor =
+            (thought_hat.matmul(&trainer.embeddings.t()?)? * trainer.logit_scale as f64)?;
+        logits_tensor.squeeze(0)?.to_vec1()
+    }
+
+    #[test]
+    #[cfg(feature = "gpu")]
+    fn gpu_thought_logit_aux_gradient_improves_target_logit() {
+        let genesis = GenesisSeed::from_phrase("test-gpu-thought-logit-aux");
+        let config = BrocaConfig {
+            controller: LanguageControllerConfig {
+                network_layers: 1,
+                neurons_per_layer: 2,
+                vocab_size: 32,
+                max_seq_len: 8,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let generator = crate::generator::BrocaGenerator::new(&genesis, config);
+        let device = Device::cuda_if_available(0).expect("device should initialize");
+        let mut trainer =
+            GpuTrainer::from_controller(generator.controller(), &device, 8).expect("gpu trainer");
+        let thought_hv = generator
+            .encoder()
+            .encode(&crate::encoder::ThoughtChannels::default());
+        let thought_gpu = Tensor::from_vec(
+            thought_hv.as_slice().to_vec(),
+            (1, thought_hv.as_slice().len()),
+            &device,
+        )
+        .expect("thought tensor");
+        let target_id = generator.tokenizer().token_id("hello") as usize;
+
+        let before_logits = thought_logits(&trainer, &thought_gpu, 0).expect("before logits");
+        let before_rank = target_rank(&before_logits, target_id);
+        let before_prob = softmax_probability(&before_logits, target_id);
+        let before_logit = before_logits[target_id];
+
+        let loss = trainer
+            .gpu_thought_logit_aux_gradient(&thought_gpu, target_id, 0, 0.05, 10.0, 1.0)
+            .expect("aux update");
+
+        let after_logits = thought_logits(&trainer, &thought_gpu, 0).expect("after logits");
+        let after_rank = target_rank(&after_logits, target_id);
+        let after_prob = softmax_probability(&after_logits, target_id);
+        let after_logit = after_logits[target_id];
+
+        assert!(loss.is_finite() && loss > 0.0);
+        assert!(
+            after_logit > before_logit,
+            "target logit should increase: before={before_logit} after={after_logit}"
+        );
+        assert!(
+            after_prob > before_prob,
+            "target probability should increase: before={before_prob} after={after_prob}"
+        );
+        assert!(
+            after_rank <= before_rank,
+            "target rank should not get worse: before={before_rank} after={after_rank}"
+        );
     }
 }

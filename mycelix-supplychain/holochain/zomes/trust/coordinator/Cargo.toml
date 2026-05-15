@@ -8,6 +8,7 @@ crate-type = ["cdylib", "rlib"]
 name = "trust_coordinator"
 
 [dependencies]
+mycelix-zome-helpers = { workspace = true }
 hdk.workspace = true
 serde.workspace = true
 serde_json.workspace = true

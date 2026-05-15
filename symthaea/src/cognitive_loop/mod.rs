@@ -157,7 +157,10 @@ pub mod feedback_state;
 pub(crate) mod fep_module;
 pub(crate) mod gwt_manager;
 mod helpers;
+mod imagination;
 pub(crate) mod language_comm_manager;
+
+pub use imagination::ImagineFutureError;
 pub(crate) mod managers;
 pub(crate) mod memory_consolidation_manager;
 pub(crate) mod memory_execution;
@@ -444,6 +447,10 @@ pub struct CognitiveLoopService {
     /// Consolidated FEP / Active Inference subsystem (10 fields -> 1).
     fep: fep_module::FepModule,
 
+    /// Latest mental simulation (imagination) result.
+    #[cfg(feature = "vision-manifold")]
+    pub(crate) last_mental_movie: Option<types::MentalMovie>,
+
     /// Decoupled feedback state: attributed proposals for prediction_confidence
     /// and fep_lr_boost (Phase 2.2 Great Refactor).
     feedback_state: feedback_state::FeedbackState,
@@ -693,6 +700,10 @@ pub struct CognitiveLoopService {
     /// Substrate independence manager: consolidates feasibility, validation overlay,
     /// speed/scale modulation, and telemetry into a single cohesive struct.
     pub(super) substrate_manager: substrate_manager::SubstrateManager,
+
+    /// Metabolic conductor for Mk0 hardware coordination.
+    pub(crate) metabolic_conductor: Option<crate::embodiment::MetabolicConductor>,
+
     pub(crate) threshold_overrides: threshold_overrides::ThresholdOverrides,
     #[cfg(feature = "jepa")]
     pub(super) jepa_engine: Option<symthaea_jepa::JepaEngine>,
@@ -745,6 +756,10 @@ pub struct CognitiveLoopService {
     /// Learning Manager: FEP plasticity, dream consolidation, error trend gating.
     /// Implements CognitiveSubsystem — proposals fed into OutputCollector.
     learning_manager: managers::LearningManager,
+
+    /// Multimodal Manager: MCE gating for external gen models, moral action gating.
+    /// Implements CognitiveSubsystem — proposals fed into OutputCollector.
+    multimodal_manager: managers::MultimodalManager,
 
     /// Perception Manager: attention budget, coherence tracking, Yerkes-Dodson regulation.
     /// Implements CognitiveSubsystem — proposals fed into OutputCollector.
@@ -1003,6 +1018,13 @@ pub struct CognitiveLoopService {
 
 // MetricsProvider impl is in metrics_provider.rs
 // MFDI identity impl is in identity_integration.rs
+
+impl CognitiveLoopService {
+    /// Inject explicit FEP priors (Passport Route).
+    pub fn inject_priors(&mut self, mean: Vec<f64>, precision: Vec<f64>) {
+        self.fep.agent.inject_priors(mean, precision);
+    }
+}
 
 #[cfg(test)]
 mod tests;

@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -7,6 +6,7 @@ use mycelix_zome_helpers as _;
 
 use hdk::prelude::*;
 use mycelix_bridge_common::civic_requirement_basic;
+use mycelix_zome_helpers as _;
 use mycelix_zome_helpers::records_from_links;
 use waste_collection_integrity::*;
 
@@ -15,7 +15,6 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     hash_entry(&EntryTypes::Anchor(anchor))
 }
 
-
 // ============================================================================
 // COLLECTION REQUESTS
 // ============================================================================
@@ -23,7 +22,11 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 /// Request a waste collection (pickup)
 #[hdk_extern]
 pub fn request_collection(request: CollectionRequest) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "request_collection")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "request_collection",
+    )?;
 
     // Validate quantity
     if !request.quantity_kg.is_finite() || request.quantity_kg <= 0.0 {
@@ -33,17 +36,12 @@ pub fn request_collection(request: CollectionRequest) -> ExternResult<Record> {
     }
 
     // Validate GPS coordinates
-    if !request.pickup_lat.is_finite()
-        || request.pickup_lat < -90.0
-        || request.pickup_lat > 90.0
-    {
+    if !request.pickup_lat.is_finite() || request.pickup_lat < -90.0 || request.pickup_lat > 90.0 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Pickup latitude must be between -90 and 90".into()
         )));
     }
-    if !request.pickup_lon.is_finite()
-        || request.pickup_lon < -180.0
-        || request.pickup_lon > 180.0
+    if !request.pickup_lon.is_finite() || request.pickup_lon < -180.0 || request.pickup_lon > 180.0
     {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Pickup longitude must be between -180 and 180".into()
@@ -97,8 +95,9 @@ pub fn request_collection(request: CollectionRequest) -> ExternResult<Record> {
         }
     }));
 
-    let record = get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get created record".into())))?;
+    let record = get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Failed to get created record".into())
+    ))?;
     Ok(record)
 }
 
@@ -136,7 +135,11 @@ pub fn get_requests_by_status(status: CollectionStatus) -> ExternResult<Vec<Reco
 /// Create a collection run from pending requests
 #[hdk_extern]
 pub fn create_collection_run(run: CollectionRun) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "create_collection_run")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "create_collection_run",
+    )?;
 
     // Validate stops
     if run.stops.is_empty() {
@@ -153,9 +156,10 @@ pub fn create_collection_run(run: CollectionRun) -> ExternResult<Record> {
     // Validate stop sequence
     for (i, stop) in run.stops.iter().enumerate() {
         if stop.sequence != i as u32 {
-            return Err(wasm_error!(WasmErrorInner::Guest(
-                format!("Stop {} has wrong sequence number", i)
-            )));
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Stop {} has wrong sequence number",
+                i
+            ))));
         }
     }
 
@@ -198,8 +202,9 @@ pub fn create_collection_run(run: CollectionRun) -> ExternResult<Record> {
         }
     }));
 
-    let record = get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get created record".into())))?;
+    let record = get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Failed to get created record".into())
+    ))?;
     Ok(record)
 }
 
@@ -303,8 +308,11 @@ fn haversine_km(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
 /// This is a O(n²) heuristic, suitable for the typical case of <50 stops.
 #[hdk_extern]
 pub fn plan_optimized_route(input: PlanOptimizedRouteInput) -> ExternResult<OptimizedRouteResult> {
-    let _eligibility =
-        mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "plan_optimized_route")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "plan_optimized_route",
+    )?;
 
     // Get all pending requests
     let status_anchor = format!("collection_status:{:?}", CollectionStatus::Requested);
@@ -463,7 +471,11 @@ pub struct ConfirmDeliveryInput {
 /// Confirm delivery of waste at a collection stop
 #[hdk_extern]
 pub fn confirm_delivery(input: ConfirmDeliveryInput) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "confirm_delivery")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "confirm_delivery",
+    )?;
 
     // Validate actual kg
     if !input.actual_kg.is_finite() || input.actual_kg < 0.0 {
@@ -473,20 +485,30 @@ pub fn confirm_delivery(input: ConfirmDeliveryInput) -> ExternResult<Record> {
     }
 
     // Get the run
-    let run_record = get(input.run_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Collection run not found".into())))?;
+    let run_record = get(input.run_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Collection run not found".into())
+    ))?;
     let mut run: CollectionRun = run_record
         .entry()
         .to_app_option()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to decode run: {}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Run entry not found".into())))?;
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode run: {}",
+                e
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Run entry not found".into()
+        )))?;
 
     // Validate stop index
     let idx = input.stop_index as usize;
     if idx >= run.stops.len() {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Stop index {} out of range (run has {} stops)", idx, run.stops.len())
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Stop index {} out of range (run has {} stops)",
+            idx,
+            run.stops.len()
+        ))));
     }
 
     // Update stop
@@ -494,11 +516,7 @@ pub fn confirm_delivery(input: ConfirmDeliveryInput) -> ExternResult<Record> {
     run.stops[idx].actual_kg = Some(input.actual_kg);
 
     // Update total
-    run.total_kg_collected = run
-        .stops
-        .iter()
-        .filter_map(|s| s.actual_kg)
-        .sum();
+    run.total_kg_collected = run.stops.iter().filter_map(|s| s.actual_kg).sum();
 
     // Check if all stops are complete
     let all_complete = run.stops.iter().all(|s| s.actual_kg.is_some());
@@ -524,8 +542,9 @@ pub fn confirm_delivery(input: ConfirmDeliveryInput) -> ExternResult<Record> {
         }
     }));
 
-    let record = get(updated_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get updated record".into())))?;
+    let record = get(updated_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Failed to get updated record".into())
+    ))?;
     Ok(record)
 }
 

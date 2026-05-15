@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -7,9 +6,9 @@ use mycelix_zome_helpers as _;
 
 use hdk::prelude::*;
 use mycelix_bridge_common::{civic_requirement_basic, civic_requirement_proposal};
+use mycelix_zome_helpers as _;
 use mycelix_zome_helpers::records_from_links;
 use transport_routes_integrity::*;
-
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -22,7 +21,11 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 pub fn register_vehicle(vehicle: Vehicle) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "register_vehicle")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "register_vehicle",
+    )?;
     let action_hash = create_entry(&EntryTypes::Vehicle(vehicle.clone()))?;
 
     create_entry(&EntryTypes::Anchor(Anchor("all_vehicles".to_string())))?;
@@ -67,7 +70,11 @@ pub struct UpdateVehicleStatusInput {
 
 #[hdk_extern]
 pub fn update_vehicle_status(input: UpdateVehicleStatusInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "update_vehicle_status")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "update_vehicle_status",
+    )?;
     let record = get(input.vehicle_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Vehicle not found".into())
     ))?;
@@ -102,7 +109,11 @@ pub fn update_vehicle_status(input: UpdateVehicleStatusInput) -> ExternResult<Re
 
 #[hdk_extern]
 pub fn create_route(route: Route) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "create_route")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "create_route",
+    )?;
     let action_hash = create_entry(&EntryTypes::Route(route.clone()))?;
 
     create_entry(&EntryTypes::Anchor(Anchor("all_routes".to_string())))?;
@@ -176,7 +187,11 @@ pub fn get_route_stops(route_hash: ActionHash) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn log_maintenance(record_entry: MaintenanceRecord) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "log_maintenance")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "log_maintenance",
+    )?;
     let action_hash = create_entry(&EntryTypes::MaintenanceRecord(record_entry.clone()))?;
 
     create_link(
@@ -202,7 +217,11 @@ pub fn get_vehicle_maintenance(vehicle_hash: ActionHash) -> ExternResult<Vec<Rec
 
 #[hdk_extern]
 pub fn set_vehicle_features(features: VehicleFeatures) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "set_vehicle_features")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "set_vehicle_features",
+    )?;
     let action_hash = create_entry(&EntryTypes::VehicleFeatures(features.clone()))?;
 
     create_link(

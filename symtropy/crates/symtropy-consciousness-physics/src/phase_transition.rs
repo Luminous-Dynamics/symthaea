@@ -269,7 +269,7 @@ fn tick_sim(
         let pos = match world.body(h) {
             Some(b) => {
                 let p = b.position();
-                Point::new([p.coord(0), p.coord(1)])
+                Point::new([p[0], p[1]])
             }
             None => Point::origin(),
         };

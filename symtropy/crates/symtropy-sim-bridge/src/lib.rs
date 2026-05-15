@@ -459,6 +459,7 @@ fn create_ship_world() -> World {
             risk_tolerance: 0.6, // Crew are risk-takers
             xenophilia: 0.5,
             traditionalism: 0.3, // Forward-looking
+            ..CulturalProfile::earth_default()
         },
         infrastructure_level: 0.3,
         max_population: 20,
@@ -487,6 +488,7 @@ fn create_ship_world() -> World {
         // Ecosystem
         ecosystem_balance: 0.5,
         reproduction_viable: true,
+        ..Default::default()
     }
 }
 

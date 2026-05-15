@@ -94,8 +94,8 @@ impl<const D: usize> HarmonyField<D> {
                 .powf(exponent / 2.0);
             let falloff = source.strength / r_soft;
 
-            for i in 0..NUM_HARMONIES {
-                total[i] += source.activations[i] * falloff;
+            for (i, t) in total.iter_mut().enumerate() {
+                *t += source.activations[i] * falloff;
             }
         }
         total
@@ -181,8 +181,8 @@ impl<const D: usize> HarmonyField<D> {
             let r_soft = (dist * dist + Self::SOFTENING_EPSILON * Self::SOFTENING_EPSILON)
                 .powf(exponent / 2.0);
             let falloff = source.strength / r_soft;
-            for i in 0..NUM_HARMONIES {
-                total[i] += source.activations[i] * falloff;
+            for (i, t) in total.iter_mut().enumerate() {
+                *t += source.activations[i] * falloff;
             }
         }
         total
@@ -269,7 +269,7 @@ pub fn contagion_update<const D: usize>(
 
     for (src_pos, src_emotion, src_phi) in sources {
         let dist = (src_pos - position).norm();
-        if dist < 1e-6 || dist > EMOTIONAL_CONTAGION_RADIUS {
+        if !(1e-6..=EMOTIONAL_CONTAGION_RADIUS).contains(&dist) {
             continue;
         }
         // Social field: sender's Φ amplifies their emotional broadcast strength.

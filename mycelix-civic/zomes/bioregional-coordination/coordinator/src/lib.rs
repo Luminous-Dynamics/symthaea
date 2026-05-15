@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Bioregional Coordination Coordinator Zome
@@ -16,8 +15,9 @@ use mycelix_zome_helpers as _;
 //! Each phase transition is recorded on Holochain DHT with credential
 //! verification (living credentials from robotics-dispatch).
 
-use hdk::prelude::*;
 use bioregional_coordination_integrity::*;
+use hdk::prelude::*;
+use mycelix_zome_helpers as _;
 
 /// Anchor for all missions.
 const MISSIONS_ANCHOR: &str = "bioregional_missions";
@@ -58,8 +58,8 @@ pub fn create_mission(input: CreateMissionInput) -> ExternResult<Record> {
     let mission_hash = create_entry(&EntryTypes::BioregionalMission(mission))?;
 
     // Link from anchor
-    let anchor_hash = hash_entry(&bioregional_coordination_integrity::EntryTypes::BioregionalMission(
-        BioregionalMission {
+    let anchor_hash = hash_entry(
+        &bioregional_coordination_integrity::EntryTypes::BioregionalMission(BioregionalMission {
             mission_id: MISSIONS_ANCHOR.to_string(),
             trigger_event: TriggerEvent::ManualDispatch {
                 description: "anchor".to_string(),
@@ -71,8 +71,8 @@ pub fn create_mission(input: CreateMissionInput) -> ExternResult<Record> {
             status: BioregionalMissionStatus::Planning,
             created_at: now,
             initiated_by: agent_info()?.agent_latest_pubkey,
-        },
-    ))?;
+        }),
+    )?;
 
     create_link(
         anchor_hash,
@@ -81,8 +81,9 @@ pub fn create_mission(input: CreateMissionInput) -> ExternResult<Record> {
         (),
     )?;
 
-    let record = get(mission_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get mission".into())))?;
+    let record = get(mission_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Failed to get mission".into())
+    ))?;
     Ok(record)
 }
 
@@ -109,14 +110,17 @@ pub fn record_handoff(input: RecordHandoffInput) -> ExternResult<Record> {
     let now = sys_time()?;
 
     // Get mission to verify it exists and extract mission_id
-    let mission_record = get(input.mission_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Mission not found".into())))?;
+    let mission_record = get(input.mission_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Mission not found".into())),
+    )?;
 
     let mission: BioregionalMission = mission_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize failed: {e}"))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not a BioregionalMission".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Not a BioregionalMission".into()
+        )))?;
 
     let handoff = PhaseHandoff {
         mission_id: mission.mission_id,
@@ -139,8 +143,9 @@ pub fn record_handoff(input: RecordHandoffInput) -> ExternResult<Record> {
         (),
     )?;
 
-    let record = get(handoff_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get handoff".into())))?;
+    let record = get(handoff_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Failed to get handoff".into())
+    ))?;
     Ok(record)
 }
 

@@ -5,8 +5,9 @@
 //!
 //! Provides CRUD operations for supply chain claims and provider profiles.
 
-use hdk::prelude::*;
 use claims_integrity::*;
+use hdk::prelude::*;
+use mycelix_zome_helpers as _;
 
 /// Input for creating a supply chain claim
 #[derive(Serialize, Deserialize, Debug)]
@@ -66,12 +67,7 @@ pub fn create_claim(input: CreateClaimInput) -> ExternResult<Record> {
 
     // Link from item_id to claim
     let item_hash = hash_identifier(&input.item_id)?;
-    create_link(
-        item_hash,
-        action_hash.clone(),
-        LinkTypes::ItemToClaims,
-        (),
-    )?;
+    create_link(item_hash, action_hash.clone(), LinkTypes::ItemToClaims, ())?;
 
     // Link to all claims anchor
     let all_anchor = all_claims_anchor()?;
@@ -213,14 +209,20 @@ pub fn get_item_provenance_chain(item_id: String) -> ExternResult<Vec<Record>> {
     // Sort claims by timestamp to build chronological chain
     let mut sorted_claims: Vec<(Record, u64)> = Vec::new();
     for claim_record in all_claims {
-        if let Some(claim) = claim_record.entry().to_app_option::<SupplyChainClaim>()
-            .map_err(|e| wasm_error!(e))? {
+        if let Some(claim) = claim_record
+            .entry()
+            .to_app_option::<SupplyChainClaim>()
+            .map_err(|e| wasm_error!(e))?
+        {
             sorted_claims.push((claim_record, claim.timestamp));
         }
     }
 
     sorted_claims.sort_by_key(|(_, timestamp)| *timestamp);
-    let chain: Vec<Record> = sorted_claims.into_iter().map(|(record, _)| record).collect();
+    let chain: Vec<Record> = sorted_claims
+        .into_iter()
+        .map(|(record, _)| record)
+        .collect();
 
     Ok(chain)
 }
@@ -230,17 +232,14 @@ pub fn get_item_provenance_chain(item_id: String) -> ExternResult<Vec<Record>> {
 pub fn verify_claim_authenticity(claim_hash: ActionHash) -> ExternResult<bool> {
     // Verify claim exists
     let record = get(claim_hash, GetOptions::default())?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
-            "Claim not found".to_string()
-        )))?;
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Claim not found".to_string())))?;
 
     // Get claim data
-    let claim: SupplyChainClaim = record.entry()
+    let claim: SupplyChainClaim = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(e))?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
-            "Invalid claim entry".to_string()
-        )))?;
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid claim entry".to_string())))?;
 
     // In production, would verify signature against issuer DID
     // For now, return true if claim has valid structure
@@ -277,9 +276,7 @@ pub fn link_verification_to_claim(input: LinkVerificationInput) -> ExternResult<
 #[hdk_extern]
 pub fn get_claim_with_verifications(claim_hash: ActionHash) -> ExternResult<(Record, Vec<Record>)> {
     let claim_record = get(claim_hash.clone(), GetOptions::default())?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
-            "Claim not found".to_string()
-        )))?;
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Claim not found".to_string())))?;
 
     // Get verification records
     let links = get_links(
@@ -306,7 +303,7 @@ pub fn get_claim_with_verifications(claim_hash: ActionHash) -> ExternResult<(Rec
 /// Create a deterministic hash from a string identifier
 fn hash_identifier(identifier: &str) -> ExternResult<EntryHash> {
     let anchor_bytes = SerializedBytes::from(UnsafeBytes::from(
-        format!("anchor:{}", identifier).into_bytes()
+        format!("anchor:{}", identifier).into_bytes(),
     ));
     hash_entry(Entry::App(AppEntryBytes(anchor_bytes)))
 }

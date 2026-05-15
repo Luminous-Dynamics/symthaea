@@ -102,12 +102,12 @@ coordinator:
         - name: did_registry_integrity
 
     - name: name_registry
-      path: "../target/wasm32-unknown-unknown/release/name_registry_coordinator.wasm"
+      path: "../target/wasm32-unknown-unknown/release/name_registry.wasm"
       dependencies:
         - name: name_registry_integrity
 
     - name: web_of_trust
-      path: "../target/wasm32-unknown-unknown/release/web_of_trust_coordinator.wasm"
+      path: "../target/wasm32-unknown-unknown/release/web_of_trust.wasm"
       dependencies:
         - name: web_of_trust_integrity
 

@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -10,6 +9,7 @@ use mycelix_zome_helpers as _;
 use did_registry_integrity::*;
 use hdk::prelude::*;
 use mycelix_crypto::{AlgorithmId, CryptoError, TaggedPublicKey};
+use mycelix_zome_helpers as _;
 
 /// API version for cross-zome compatibility detection.
 /// Increment when making breaking changes to extern signatures or types.
@@ -210,6 +210,61 @@ fn notify_bridge_of_did_event(did: &str, event_type: &str, payload: &str) -> Ext
             Ok(())
         }
     }
+}
+
+/// Resolution metadata for a Mycelix Substrate.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SubstrateMetadata {
+    pub role: String,
+    pub api_version: u16,
+    pub capabilities: Vec<String>,
+}
+
+/// Input for registering a substrate endpoint.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RegisterSubstrateInput {
+    pub metadata: SubstrateMetadata,
+}
+
+/// REGISTER SUBSTRATE: Advertise this agent as a provider of a specific substrate role.
+#[hdk_extern]
+pub fn register_substrate(input: RegisterSubstrateInput) -> ExternResult<Record> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let did_id = format!("did:mycelix:{}", agent);
+
+    // Create the service endpoint entry
+    let service = ServiceEndpoint {
+        id: format!("{}#substrate", did_id),
+        type_: SUBSTRATE_SERVICE_TYPE.to_string(),
+        service_endpoint: serde_json::to_string(&input.metadata)
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
+    };
+
+    // Add to DID document
+    let record = add_service_endpoint(service)?;
+
+    // Create a global discovery link for this role
+    let anchor = create_anchor(&format!("substrate:{}", input.metadata.role))?;
+    create_link(
+        anchor,
+        agent,
+        LinkTypes::DidToService,
+        input.metadata.role.as_bytes().to_vec(),
+    )?;
+
+    Ok(record)
+}
+
+/// RESOLVE SUBSTRATE: Find all agents providing a specific substrate role.
+#[hdk_extern]
+pub fn resolve_substrate(role: String) -> ExternResult<Vec<AgentPubKey>> {
+    let anchor = create_anchor(&format!("substrate:{}", role))?;
+    let links = get_links(
+        LinkQuery::try_new(anchor, LinkTypes::DidToService)?,
+        GetStrategy::default(),
+    )?;
+
+    Ok(links.into_iter().map(|l| l.target.into()).collect())
 }
 
 /// Create a new DID document for the calling agent

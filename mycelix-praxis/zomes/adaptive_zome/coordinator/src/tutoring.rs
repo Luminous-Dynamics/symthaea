@@ -10,8 +10,8 @@
 //!
 //! Extracted from lib.rs as a pure structural refactor — no logic changes.
 
-use hdk::prelude::*;
 use adaptive_integrity::*;
+use hdk::prelude::*;
 
 // ============== Types ==============
 
@@ -261,23 +261,29 @@ pub(crate) fn request_hint(input: HintRequestInput) -> ExternResult<HintResponse
         hint_text,
         remaining_hints: 3u8.saturating_sub(input.hints_already_used),
         xp_penalty_if_used: hint_level.xp_penalty_permille(),
-        related_concepts: vec!["Pattern Recognition".to_string(), "Problem Decomposition".to_string()],
+        related_concepts: vec![
+            "Pattern Recognition".to_string(),
+            "Problem Decomposition".to_string(),
+        ],
         try_first_suggestions: try_first,
     })
 }
 
 /// Request personalized explanation
-pub(crate) fn request_explanation(input: ExplanationRequestInput) -> ExternResult<PersonalizedExplanation> {
+pub(crate) fn request_explanation(
+    input: ExplanationRequestInput,
+) -> ExternResult<PersonalizedExplanation> {
     // Select explanation type based on preferences and learning style
-    let explanation_type = input.preferred_explanation_type.unwrap_or_else(|| {
-        match input.vark_style {
-            LearningStyle::Visual => ExplanationType::Visual,
-            LearningStyle::Auditory => ExplanationType::Analogy,
-            LearningStyle::ReadingWriting => ExplanationType::Conceptual,
-            LearningStyle::Kinesthetic => ExplanationType::ExampleBased,
-            LearningStyle::Multimodal => ExplanationType::Comparative,
-        }
-    });
+    let explanation_type =
+        input
+            .preferred_explanation_type
+            .unwrap_or_else(|| match input.vark_style {
+                LearningStyle::Visual => ExplanationType::Visual,
+                LearningStyle::Auditory => ExplanationType::Analogy,
+                LearningStyle::ReadingWriting => ExplanationType::Conceptual,
+                LearningStyle::Kinesthetic => ExplanationType::ExampleBased,
+                LearningStyle::Multimodal => ExplanationType::Comparative,
+            });
 
     // Adjust complexity based on mastery
     let complexity = input.learner_mastery;
@@ -290,17 +296,13 @@ pub(crate) fn request_explanation(input: ExplanationRequestInput) -> ExternResul
             "Example 1: Simple case".to_string(),
             "Example 2: With variation".to_string(),
         ],
-        analogies: vec![
-            "Think of it like...".to_string(),
-        ],
+        analogies: vec!["Think of it like...".to_string()],
         key_points: vec![
             "Key point 1: The fundamental principle".to_string(),
             "Key point 2: Common application".to_string(),
             "Key point 3: Edge cases to watch".to_string(),
         ],
-        common_misconceptions: vec![
-            "Many learners initially think X, but actually Y".to_string(),
-        ],
+        common_misconceptions: vec!["Many learners initially think X, but actually Y".to_string()],
         follow_up_questions: vec![
             "Can you think of another example?".to_string(),
             "How would this apply to...?".to_string(),
@@ -337,7 +339,8 @@ pub(crate) fn generate_feedback(input: FeedbackInput) -> ExternResult<Personaliz
         if partial > 700 {
             (
                 FeedbackType::PartiallyCorrect,
-                "Very close! You have the right approach, just a small adjustment needed.".to_string(),
+                "Very close! You have the right approach, just a small adjustment needed."
+                    .to_string(),
                 Some("Your reasoning is solid.".to_string()),
                 None,
             )
@@ -363,18 +366,32 @@ pub(crate) fn generate_feedback(input: FeedbackInput) -> ExternResult<Personaliz
                 FeedbackType::Incorrect,
                 "That's not it, but don't worry. Let's work through this step by step.".to_string(),
                 Some("Your effort is what counts.".to_string()),
-                Some("Mistakes are how we learn. Each one brings you closer to understanding.".to_string()),
+                Some(
+                    "Mistakes are how we learn. Each one brings you closer to understanding."
+                        .to_string(),
+                ),
             )
         }
     };
 
     let next_steps = if input.response_correct {
-        vec!["Try the next problem".to_string(), "Increase difficulty".to_string()]
+        vec![
+            "Try the next problem".to_string(),
+            "Increase difficulty".to_string(),
+        ]
     } else {
-        vec!["Review the concept".to_string(), "Try a simpler version".to_string(), "Request a hint".to_string()]
+        vec![
+            "Review the concept".to_string(),
+            "Try a simpler version".to_string(),
+            "Request a hint".to_string(),
+        ]
     };
 
-    let emotional_tone = if input.response_correct { "celebratory" } else { "supportive" };
+    let emotional_tone = if input.response_correct {
+        "celebratory"
+    } else {
+        "supportive"
+    };
 
     Ok(PersonalizedFeedback {
         feedback_type,
@@ -387,7 +404,9 @@ pub(crate) fn generate_feedback(input: FeedbackInput) -> ExternResult<Personaliz
 }
 
 /// Detect misconceptions from error patterns
-pub(crate) fn detect_misconceptions(input: MisconceptionInput) -> ExternResult<Vec<DetectedMisconception>> {
+pub(crate) fn detect_misconceptions(
+    input: MisconceptionInput,
+) -> ExternResult<Vec<DetectedMisconception>> {
     let mut misconceptions = Vec::new();
 
     // Analyze error patterns to detect common misconceptions
@@ -396,7 +415,8 @@ pub(crate) fn detect_misconceptions(input: MisconceptionInput) -> ExternResult<V
             misconception_id: "common_1".to_string(),
             description: "Appears to be applying rule incorrectly in edge cases".to_string(),
             evidence: input.error_pattern.iter().take(3).cloned().collect(),
-            correct_understanding: "The rule applies differently when conditions change".to_string(),
+            correct_understanding: "The rule applies differently when conditions change"
+                .to_string(),
             remediation_approach: "Provide explicit boundary conditions with examples".to_string(),
             common_sources: vec![
                 "Overgeneralizing from simple cases".to_string(),
@@ -409,18 +429,35 @@ pub(crate) fn detect_misconceptions(input: MisconceptionInput) -> ExternResult<V
 }
 
 /// Get recommended tutoring strategy
-pub(crate) fn get_tutoring_strategy(input: TutoringStrategyInput) -> ExternResult<TutoringStrategy> {
+pub(crate) fn get_tutoring_strategy(
+    input: TutoringStrategyInput,
+) -> ExternResult<TutoringStrategy> {
     // Select mode based on learner state
     let (mode, reasoning) = if input.recent_errors > 3 {
-        (TutoringMode::Remediation, "Recent errors indicate need for targeted remediation")
+        (
+            TutoringMode::Remediation,
+            "Recent errors indicate need for targeted remediation",
+        )
     } else if input.learner_mastery < 300 {
-        (TutoringMode::WorkedExamples, "Low mastery - start with worked examples to build foundation")
+        (
+            TutoringMode::WorkedExamples,
+            "Low mastery - start with worked examples to build foundation",
+        )
     } else if input.learner_mastery < 600 {
-        (TutoringMode::Scaffolded, "Building mastery - scaffolded practice with gradual release")
+        (
+            TutoringMode::Scaffolded,
+            "Building mastery - scaffolded practice with gradual release",
+        )
     } else if matches!(input.goal_type, GoalType::CourseCompletion) {
-        (TutoringMode::GuidedDiscovery, "Ready for discovery-based learning")
+        (
+            TutoringMode::GuidedDiscovery,
+            "Ready for discovery-based learning",
+        )
     } else {
-        (TutoringMode::Socratic, "High mastery - Socratic method to deepen understanding")
+        (
+            TutoringMode::Socratic,
+            "High mastery - Socratic method to deepen understanding",
+        )
     };
 
     Ok(TutoringStrategy {

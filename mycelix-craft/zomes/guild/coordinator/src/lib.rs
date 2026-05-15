@@ -1,5 +1,3 @@
-use mycelix_zome_helpers as _;
-#![deny(unsafe_code)]
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -13,9 +11,12 @@ use mycelix_zome_helpers as _;
 //! - Creating certification paths: Master+ (0.75+)
 //! - Establishing federations: Elder only (0.9+)
 
-use hdk::prelude::*;
+#![deny(unsafe_code)]
+
 use guild_integrity::*;
+use hdk::prelude::*;
 use mycelix_bridge_common as bridge;
+use mycelix_zome_helpers as _;
 
 // ---------------------------------------------------------------------------
 // Input types
@@ -71,19 +72,22 @@ fn anchor_hash(anchor_text: &str) -> ExternResult<EntryHash> {
     hash_entry(&anchor)
 }
 
-fn get_my_role_in_guild(guild_id: &ActionHash) -> ExternResult<Option<(ActionHash, GuildMembership)>> {
+fn get_my_role_in_guild(
+    guild_id: &ActionHash,
+) -> ExternResult<Option<(ActionHash, GuildMembership)>> {
     let agent = agent_info()?.agent_initial_pubkey;
     let links = get_links(
-        LinkQuery::try_new(agent, LinkTypes::AgentToGuildMembership)?, GetStrategy::default(),
+        LinkQuery::try_new(agent, LinkTypes::AgentToGuildMembership)?,
+        GetStrategy::default(),
     )?;
 
     for link in links {
         if let Some(hash) = link.target.into_action_hash() {
             if let Some(record) = get(hash.clone(), GetOptions::default())? {
                 if let Some(Entry::App(bytes)) = record.entry().as_option() {
-                    if let Ok(membership) = GuildMembership::try_from(
-                        SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec())),
-                    ) {
+                    if let Ok(membership) = GuildMembership::try_from(SerializedBytes::from(
+                        UnsafeBytes::from(bytes.bytes().to_vec()),
+                    )) {
                         if membership.guild_id == *guild_id {
                             return Ok(Some((hash, membership)));
                         }
@@ -129,11 +133,21 @@ pub fn create_guild(input: CreateGuildInput) -> ExternResult<ActionHash> {
 
     // Index: domain anchor
     let domain_anchor = anchor_hash(&format!("guild_domain:{}", input.professional_domain))?;
-    create_link(domain_anchor, guild_hash.clone(), LinkTypes::DomainToGuild, ())?;
+    create_link(
+        domain_anchor,
+        guild_hash.clone(),
+        LinkTypes::DomainToGuild,
+        (),
+    )?;
 
     // If this is a child guild, link from parent
     if let Some(ref parent) = input.parent_guild {
-        create_link(parent.clone(), guild_hash.clone(), LinkTypes::GuildToChildGuild, ())?;
+        create_link(
+            parent.clone(),
+            guild_hash.clone(),
+            LinkTypes::GuildToChildGuild,
+            (),
+        )?;
     }
 
     // Auto-join the creator as Elder (they founded the guild)
@@ -147,8 +161,18 @@ pub fn create_guild(input: CreateGuildInput) -> ExternResult<ActionHash> {
         consciousness_at_join_permille: 900, // Founder assumed to meet Elder threshold
     };
     let membership_hash = create_entry(EntryTypes::GuildMembership(membership))?;
-    create_link(guild_hash.clone(), membership_hash.clone(), LinkTypes::GuildToMembership, ())?;
-    create_link(agent, membership_hash, LinkTypes::AgentToGuildMembership, ())?;
+    create_link(
+        guild_hash.clone(),
+        membership_hash.clone(),
+        LinkTypes::GuildToMembership,
+        (),
+    )?;
+    create_link(
+        agent,
+        membership_hash,
+        LinkTypes::AgentToGuildMembership,
+        (),
+    )?;
 
     Ok(guild_hash)
 }
@@ -161,15 +185,18 @@ pub fn join_guild(guild_id: ActionHash) -> ExternResult<ActionHash> {
         .ok_or(wasm_error!(WasmErrorInner::Guest("Guild not found".into())))?;
 
     let guild: Guild = match record.entry().as_option() {
-        Some(Entry::App(bytes)) => Guild::try_from(
-            SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec())),
-        ).map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize: {:?}", e))))?,
+        Some(Entry::App(bytes)) => Guild::try_from(SerializedBytes::from(UnsafeBytes::from(
+            bytes.bytes().to_vec(),
+        )))
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize: {:?}", e))))?,
         _ => return Err(wasm_error!(WasmErrorInner::Guest("Not an entry".into()))),
     };
 
     // Check not already a member
     if get_my_role_in_guild(&guild_id)?.is_some() {
-        return Err(wasm_error!(WasmErrorInner::Guest("Already a member of this guild".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Already a member of this guild".into()
+        )));
     }
 
     let now = sys_time()?;
@@ -185,8 +212,18 @@ pub fn join_guild(guild_id: ActionHash) -> ExternResult<ActionHash> {
     };
 
     let membership_hash = create_entry(EntryTypes::GuildMembership(membership))?;
-    create_link(guild_id, membership_hash.clone(), LinkTypes::GuildToMembership, ())?;
-    create_link(agent, membership_hash.clone(), LinkTypes::AgentToGuildMembership, ())?;
+    create_link(
+        guild_id,
+        membership_hash.clone(),
+        LinkTypes::GuildToMembership,
+        (),
+    )?;
+    create_link(
+        agent,
+        membership_hash.clone(),
+        LinkTypes::AgentToGuildMembership,
+        (),
+    )?;
 
     Ok(membership_hash)
 }
@@ -202,8 +239,9 @@ pub fn promote_member(input: PromoteMemberInput) -> ExternResult<ActionHash> {
     )?;
 
     // Verify the caller has Master+ role in this guild
-    let my_role = get_my_role_in_guild(&input.guild_id)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("You are not a member of this guild".into())))?;
+    let my_role = get_my_role_in_guild(&input.guild_id)?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("You are not a member of this guild".into())
+    ))?;
 
     if !my_role.1.role.can_promote() {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -212,19 +250,23 @@ pub fn promote_member(input: PromoteMemberInput) -> ExternResult<ActionHash> {
     }
 
     // Fetch the existing membership
-    let record = get(input.membership_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Membership not found".into())))?;
+    let record = get(input.membership_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Membership not found".into())
+    ))?;
 
     let mut membership: GuildMembership = match record.entry().as_option() {
-        Some(Entry::App(bytes)) => GuildMembership::try_from(
-            SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec())),
-        ).map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize: {:?}", e))))?,
+        Some(Entry::App(bytes)) => GuildMembership::try_from(SerializedBytes::from(
+            UnsafeBytes::from(bytes.bytes().to_vec()),
+        ))
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize: {:?}", e))))?,
         _ => return Err(wasm_error!(WasmErrorInner::Guest("Not an entry".into()))),
     };
 
     // Verify the membership is in the same guild
     if membership.guild_id != input.guild_id {
-        return Err(wasm_error!(WasmErrorInner::Guest("Membership is not in this guild".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Membership is not in this guild".into()
+        )));
     }
 
     // Update role
@@ -246,8 +288,9 @@ pub fn create_certification_path(input: CreateCertificationPathInput) -> ExternR
     )?;
 
     // Verify caller has Master+ role
-    let my_role = get_my_role_in_guild(&input.guild_id)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("You are not a member of this guild".into())))?;
+    let my_role = get_my_role_in_guild(&input.guild_id)?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("You are not a member of this guild".into())
+    ))?;
 
     if !my_role.1.role.can_certify() {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -266,7 +309,12 @@ pub fn create_certification_path(input: CreateCertificationPathInput) -> ExternR
     };
 
     let path_hash = create_entry(EntryTypes::CertificationPath(path))?;
-    create_link(input.guild_id, path_hash.clone(), LinkTypes::GuildToCertificationPath, ())?;
+    create_link(
+        input.guild_id,
+        path_hash.clone(),
+        LinkTypes::GuildToCertificationPath,
+        (),
+    )?;
 
     Ok(path_hash)
 }
@@ -282,8 +330,9 @@ pub fn establish_federation(input: EstablishFederationInput) -> ExternResult<Act
     )?;
 
     // Verify caller has Elder role
-    let my_role = get_my_role_in_guild(&input.local_guild_id)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("You are not a member of this guild".into())))?;
+    let my_role = get_my_role_in_guild(&input.local_guild_id)?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("You are not a member of this guild".into())
+    ))?;
 
     if my_role.1.role != GuildRole::Elder {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -300,7 +349,12 @@ pub fn establish_federation(input: EstablishFederationInput) -> ExternResult<Act
     };
 
     let fed_hash = create_entry(EntryTypes::GuildFederationLink(federation))?;
-    create_link(input.local_guild_id, fed_hash.clone(), LinkTypes::GuildToFederationLink, ())?;
+    create_link(
+        input.local_guild_id,
+        fed_hash.clone(),
+        LinkTypes::GuildToFederationLink,
+        (),
+    )?;
 
     Ok(fed_hash)
 }
@@ -310,7 +364,8 @@ pub fn establish_federation(input: EstablishFederationInput) -> ExternResult<Act
 pub fn list_guilds(_: ()) -> ExternResult<Vec<(ActionHash, Guild)>> {
     let anchor = anchor_hash("all_guilds")?;
     let links = get_links(
-        LinkQuery::try_new(anchor, LinkTypes::AllGuilds)?, GetStrategy::default(),
+        LinkQuery::try_new(anchor, LinkTypes::AllGuilds)?,
+        GetStrategy::default(),
     )?;
 
     let mut guilds = Vec::new();
@@ -318,9 +373,9 @@ pub fn list_guilds(_: ()) -> ExternResult<Vec<(ActionHash, Guild)>> {
         if let Some(hash) = link.target.into_action_hash() {
             if let Some(record) = get(hash.clone(), GetOptions::default())? {
                 if let Some(Entry::App(bytes)) = record.entry().as_option() {
-                    if let Ok(guild) = Guild::try_from(
-                        SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec())),
-                    ) {
+                    if let Ok(guild) = Guild::try_from(SerializedBytes::from(UnsafeBytes::from(
+                        bytes.bytes().to_vec(),
+                    ))) {
                         guilds.push((hash, guild));
                     }
                 }
@@ -335,7 +390,8 @@ pub fn list_guilds(_: ()) -> ExternResult<Vec<(ActionHash, Guild)>> {
 pub fn list_guilds_by_domain(domain: String) -> ExternResult<Vec<(ActionHash, Guild)>> {
     let anchor = anchor_hash(&format!("guild_domain:{}", domain))?;
     let links = get_links(
-        LinkQuery::try_new(anchor, LinkTypes::DomainToGuild)?, GetStrategy::default(),
+        LinkQuery::try_new(anchor, LinkTypes::DomainToGuild)?,
+        GetStrategy::default(),
     )?;
 
     let mut guilds = Vec::new();
@@ -343,9 +399,9 @@ pub fn list_guilds_by_domain(domain: String) -> ExternResult<Vec<(ActionHash, Gu
         if let Some(hash) = link.target.into_action_hash() {
             if let Some(record) = get(hash.clone(), GetOptions::default())? {
                 if let Some(Entry::App(bytes)) = record.entry().as_option() {
-                    if let Ok(guild) = Guild::try_from(
-                        SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec())),
-                    ) {
+                    if let Ok(guild) = Guild::try_from(SerializedBytes::from(UnsafeBytes::from(
+                        bytes.bytes().to_vec(),
+                    ))) {
                         guilds.push((hash, guild));
                     }
                 }
@@ -357,9 +413,12 @@ pub fn list_guilds_by_domain(domain: String) -> ExternResult<Vec<(ActionHash, Gu
 
 /// Get all memberships for a guild.
 #[hdk_extern]
-pub fn list_guild_members(guild_id: ActionHash) -> ExternResult<Vec<(ActionHash, GuildMembership)>> {
+pub fn list_guild_members(
+    guild_id: ActionHash,
+) -> ExternResult<Vec<(ActionHash, GuildMembership)>> {
     let links = get_links(
-        LinkQuery::try_new(guild_id, LinkTypes::GuildToMembership)?, GetStrategy::default(),
+        LinkQuery::try_new(guild_id, LinkTypes::GuildToMembership)?,
+        GetStrategy::default(),
     )?;
 
     let mut members = Vec::new();
@@ -367,9 +426,9 @@ pub fn list_guild_members(guild_id: ActionHash) -> ExternResult<Vec<(ActionHash,
         if let Some(hash) = link.target.into_action_hash() {
             if let Some(record) = get(hash.clone(), GetOptions::default())? {
                 if let Some(Entry::App(bytes)) = record.entry().as_option() {
-                    if let Ok(membership) = GuildMembership::try_from(
-                        SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec())),
-                    ) {
+                    if let Ok(membership) = GuildMembership::try_from(SerializedBytes::from(
+                        UnsafeBytes::from(bytes.bytes().to_vec()),
+                    )) {
                         members.push((hash, membership));
                     }
                 }
@@ -384,7 +443,8 @@ pub fn list_guild_members(guild_id: ActionHash) -> ExternResult<Vec<(ActionHash,
 pub fn get_my_guilds(_: ()) -> ExternResult<Vec<(ActionHash, GuildMembership)>> {
     let agent = agent_info()?.agent_initial_pubkey;
     let links = get_links(
-        LinkQuery::try_new(agent, LinkTypes::AgentToGuildMembership)?, GetStrategy::default(),
+        LinkQuery::try_new(agent, LinkTypes::AgentToGuildMembership)?,
+        GetStrategy::default(),
     )?;
 
     let mut memberships = Vec::new();
@@ -392,9 +452,9 @@ pub fn get_my_guilds(_: ()) -> ExternResult<Vec<(ActionHash, GuildMembership)>> 
         if let Some(hash) = link.target.into_action_hash() {
             if let Some(record) = get(hash.clone(), GetOptions::default())? {
                 if let Some(Entry::App(bytes)) = record.entry().as_option() {
-                    if let Ok(membership) = GuildMembership::try_from(
-                        SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec())),
-                    ) {
+                    if let Ok(membership) = GuildMembership::try_from(SerializedBytes::from(
+                        UnsafeBytes::from(bytes.bytes().to_vec()),
+                    )) {
                         memberships.push((hash, membership));
                     }
                 }
@@ -406,9 +466,12 @@ pub fn get_my_guilds(_: ()) -> ExternResult<Vec<(ActionHash, GuildMembership)>> 
 
 /// Get certification paths for a guild.
 #[hdk_extern]
-pub fn get_guild_certifications(guild_id: ActionHash) -> ExternResult<Vec<(ActionHash, CertificationPath)>> {
+pub fn get_guild_certifications(
+    guild_id: ActionHash,
+) -> ExternResult<Vec<(ActionHash, CertificationPath)>> {
     let links = get_links(
-        LinkQuery::try_new(guild_id, LinkTypes::GuildToCertificationPath)?, GetStrategy::default(),
+        LinkQuery::try_new(guild_id, LinkTypes::GuildToCertificationPath)?,
+        GetStrategy::default(),
     )?;
 
     let mut paths = Vec::new();
@@ -416,9 +479,9 @@ pub fn get_guild_certifications(guild_id: ActionHash) -> ExternResult<Vec<(Actio
         if let Some(hash) = link.target.into_action_hash() {
             if let Some(record) = get(hash.clone(), GetOptions::default())? {
                 if let Some(Entry::App(bytes)) = record.entry().as_option() {
-                    if let Ok(path) = CertificationPath::try_from(
-                        SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec())),
-                    ) {
+                    if let Ok(path) = CertificationPath::try_from(SerializedBytes::from(
+                        UnsafeBytes::from(bytes.bytes().to_vec()),
+                    )) {
                         paths.push((hash, path));
                     }
                 }

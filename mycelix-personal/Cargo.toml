@@ -23,7 +23,7 @@ members = [
 
     # Unified bridge
     "zomes/personal-bridge/integrity",
-    "zomes/personal-bridge/coordinator",
+    "zomes/personal-bridge/coordinator", "crates/stress-tester",
 ]
 exclude = ["tests"]
 

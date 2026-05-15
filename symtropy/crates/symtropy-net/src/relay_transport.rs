@@ -110,8 +110,7 @@ mod implementation {
         }
 
         fn send(&mut self, to: PeerId, channel: Channel, data: &[u8]) -> Result<(), String> {
-            let signaling = self.signaling.as_ref()
-                .ok_or("Not connected")?;
+            let signaling = self.signaling.as_ref().ok_or("Not connected")?;
 
             let relayed = RelayedData {
                 channel: match channel {
@@ -121,10 +120,10 @@ mod implementation {
                 payload: data.to_vec(),
             };
 
-            let json = serde_json::to_string(&relayed)
-                .map_err(|e| format!("Serialize: {e}"))?;
+            let json = serde_json::to_string(&relayed).map_err(|e| format!("Serialize: {e}"))?;
 
-            signaling.signal(to, SignalData::Offer { sdp: json })
+            signaling
+                .signal(to, SignalData::Offer { sdp: json })
                 .map_err(|e| format!("Send: {e}"))
         }
 
@@ -202,7 +201,9 @@ mod implementation {
     /// Generate a random peer ID (used before server assigns one).
     fn rand_id() -> u64 {
         use std::time::{SystemTime, UNIX_EPOCH};
-        let t = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default();
+        let t = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default();
         t.as_nanos() as u64 ^ (t.as_secs() << 32)
     }
 }

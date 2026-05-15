@@ -21,6 +21,7 @@ praxis-core = { path = "../../../crates/praxis-core" }
 # Integrity zome (for entry types)
 dao_integrity = { path = "../integrity" }
 
+
 # Serialization
 serde.workspace = true
 serde_json.workspace = true

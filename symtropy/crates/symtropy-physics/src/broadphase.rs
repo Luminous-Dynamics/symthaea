@@ -184,7 +184,7 @@ impl<const D: usize> Lbvh<D> {
         let mut split = first;
         let mut step = last - first;
         loop {
-            step = (step + 1) / 2;
+            step = step.div_ceil(2);
             let ns = split + step;
             if ns < last && (codes[first] ^ codes[ns]).leading_zeros() > cp {
                 split = ns;

@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -7,6 +6,7 @@ use mycelix_zome_helpers as _;
 
 use hdk::prelude::*;
 use mycelix_bridge_common::{civic_requirement_basic, civic_requirement_proposal};
+use mycelix_zome_helpers as _;
 use mycelix_zome_helpers::records_from_links;
 use waste_registry_integrity::*;
 
@@ -15,7 +15,6 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     hash_entry(&EntryTypes::Anchor(anchor))
 }
 
-
 // ============================================================================
 // WASTE STREAMS
 // ============================================================================
@@ -23,7 +22,11 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 /// Register a new waste stream for tracking
 #[hdk_extern]
 pub fn register_waste_stream(stream: WasteStream) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "register_waste_stream")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "register_waste_stream",
+    )?;
 
     // Validate quantity is positive and finite
     if !stream.quantity_kg.is_finite() || stream.quantity_kg <= 0.0 {
@@ -33,9 +36,7 @@ pub fn register_waste_stream(stream: WasteStream) -> ExternResult<Record> {
     }
 
     // Validate GPS coordinates
-    if !stream.location_lat.is_finite()
-        || stream.location_lat < -90.0
-        || stream.location_lat > 90.0
+    if !stream.location_lat.is_finite() || stream.location_lat < -90.0 || stream.location_lat > 90.0
     {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Latitude must be between -90 and 90".into()
@@ -83,12 +84,7 @@ pub fn register_waste_stream(stream: WasteStream) -> ExternResult<Record> {
 
     // Link agent to stream
     let agent = agent_info()?.agent_initial_pubkey;
-    create_link(
-        agent,
-        action_hash.clone(),
-        LinkTypes::AgentToStreams,
-        (),
-    )?;
+    create_link(agent, action_hash.clone(), LinkTypes::AgentToStreams, ())?;
 
     // Emit signal for UI
     let _ = emit_signal(&serde_json::json!({
@@ -101,8 +97,9 @@ pub fn register_waste_stream(stream: WasteStream) -> ExternResult<Record> {
         }
     }));
 
-    let record = get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get created record".into())))?;
+    let record = get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Failed to get created record".into())
+    ))?;
     Ok(record)
 }
 
@@ -151,8 +148,11 @@ pub fn get_streams_by_status(status: WasteStreamStatus) -> ExternResult<Vec<Reco
 /// Classify a waste stream (human or AI)
 #[hdk_extern]
 pub fn classify_waste_stream(classification: WasteClassification) -> ExternResult<Record> {
-    let _eligibility =
-        mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "classify_waste_stream")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "classify_waste_stream",
+    )?;
 
     // Validate confidence
     if !classification.confidence.is_finite()
@@ -185,8 +185,9 @@ pub fn classify_waste_stream(classification: WasteClassification) -> ExternResul
         }
     }));
 
-    let record = get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get created record".into())))?;
+    let record = get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Failed to get created record".into())
+    ))?;
     Ok(record)
 }
 
@@ -225,12 +226,16 @@ pub struct ContaminationFeedback {
 pub fn check_contamination_feedback(
     classification_hash: ActionHash,
 ) -> ExternResult<ContaminationFeedback> {
-    let _eligibility =
-        mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "check_contamination_feedback")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "check_contamination_feedback",
+    )?;
 
     // Get the classification
-    let class_record = get(classification_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Classification not found".into())))?;
+    let class_record = get(classification_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Classification not found".into())
+    ))?;
     let classification: WasteClassification = class_record
         .entry()
         .to_app_option()
@@ -245,8 +250,9 @@ pub fn check_contamination_feedback(
         )))?;
 
     // Get the original waste stream
-    let stream_record = get(classification.stream_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Waste stream not found".into())))?;
+    let stream_record = get(classification.stream_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Waste stream not found".into())),
+    )?;
     let stream: WasteStream = stream_record
         .entry()
         .to_app_option()
@@ -316,7 +322,11 @@ pub fn check_contamination_feedback(
 /// Register a waste processing facility (requires proposal-level consciousness)
 #[hdk_extern]
 pub fn register_facility(facility: WasteFacility) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "register_facility")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "register_facility",
+    )?;
 
     // Validate capacity
     if !facility.capacity_kg_per_day.is_finite() || facility.capacity_kg_per_day <= 0.0 {
@@ -354,8 +364,9 @@ pub fn register_facility(facility: WasteFacility) -> ExternResult<Record> {
         }
     }));
 
-    let record = get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get created record".into())))?;
+    let record = get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Failed to get created record".into())
+    ))?;
     Ok(record)
 }
 
@@ -405,16 +416,28 @@ pub struct RouteWasteStreamInput {
 /// Route a waste stream to the best matching facility
 #[hdk_extern]
 pub fn route_waste_stream(input: RouteWasteStreamInput) -> ExternResult<Option<Record>> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "route_waste_stream")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "route_waste_stream",
+    )?;
 
     // Get the waste stream
-    let stream_record = get(input.stream_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Waste stream not found".into())))?;
+    let stream_record = get(input.stream_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Waste stream not found".into())),
+    )?;
     let stream: WasteStream = stream_record
         .entry()
         .to_app_option()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to decode stream: {}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Stream entry not found".into())))?;
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode stream: {}",
+                e
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Stream entry not found".into()
+        )))?;
 
     // Get all facilities
     let facility_links = get_links(
@@ -507,10 +530,12 @@ pub fn route_waste_stream(input: RouteWasteStreamInput) -> ExternResult<Option<R
         return Ok(None);
     }
 
-    let facility_hash = best_facility_hash
-        .ok_or(wasm_error!(WasmErrorInner::Guest("No matching facility found".into())))?;
-    let factors = best_factors
-        .ok_or(wasm_error!(WasmErrorInner::Guest("No matching factors found".into())))?;
+    let facility_hash = best_facility_hash.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "No matching facility found".into()
+    )))?;
+    let factors = best_factors.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "No matching factors found".into()
+    )))?;
 
     // Create route entry
     let route = WasteRoute {
@@ -548,8 +573,9 @@ pub fn route_waste_stream(input: RouteWasteStreamInput) -> ExternResult<Option<R
         }
     }));
 
-    let record = get(route_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get route record".into())))?;
+    let record = get(route_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Failed to get route record".into())
+    ))?;
     Ok(Some(record))
 }
 
@@ -729,8 +755,8 @@ pub fn get_volume_trend(input: TrendQueryInput) -> ExternResult<VolumeTrendResul
         if stream.created_at < input.window_start_us || stream.created_at >= input.window_end_us {
             continue;
         }
-        let bucket_idx =
-            ((stream.created_at - input.window_start_us) / bucket_width).min(input.num_buckets as u64 - 1) as usize;
+        let bucket_idx = ((stream.created_at - input.window_start_us) / bucket_width)
+            .min(input.num_buckets as u64 - 1) as usize;
         buckets[bucket_idx] += stream.quantity_kg;
     }
 
@@ -756,14 +782,17 @@ pub fn get_volume_trend(input: TrendQueryInput) -> ExternResult<VolumeTrendResul
 
 /// Get category distribution for a time period.
 #[hdk_extern]
-pub fn get_category_distribution(input: TrendQueryInput) -> ExternResult<CategoryDistributionResult> {
+pub fn get_category_distribution(
+    input: TrendQueryInput,
+) -> ExternResult<CategoryDistributionResult> {
     let links = get_links(
         LinkQuery::try_new(anchor_hash("all_streams")?, LinkTypes::AllStreams)?,
         GetStrategy::default(),
     )?;
     let records = records_from_links(links)?;
 
-    let mut category_totals: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
+    let mut category_totals: std::collections::HashMap<String, f64> =
+        std::collections::HashMap::new();
     let mut total_kg: f64 = 0.0;
 
     for record in &records {
@@ -826,14 +855,22 @@ mod tests {
     fn test_haversine_known_distance() {
         // Dallas to Austin ~290 km
         let d = haversine_km(32.7767, -96.7970, 30.2672, -97.7431);
-        assert!(d > 250.0 && d < 320.0, "Dallas-Austin should be ~290km, got {}", d);
+        assert!(
+            d > 250.0 && d < 320.0,
+            "Dallas-Austin should be ~290km, got {}",
+            d
+        );
     }
 
     #[test]
     fn test_haversine_antipodal() {
         // North pole to south pole ~20,000 km
         let d = haversine_km(90.0, 0.0, -90.0, 0.0);
-        assert!(d > 19_000.0 && d < 21_000.0, "Pole-to-pole should be ~20,000km, got {}", d);
+        assert!(
+            d > 19_000.0 && d < 21_000.0,
+            "Pole-to-pole should be ~20,000km, got {}",
+            d
+        );
     }
 
     #[test]
@@ -926,8 +963,16 @@ mod tests {
     fn test_volume_trend_result_averages() {
         let result = VolumeTrendResult {
             trend: vec![
-                TrendPoint { period_start_us: 0, period_end_us: 100, value: 50.0 },
-                TrendPoint { period_start_us: 100, period_end_us: 200, value: 150.0 },
+                TrendPoint {
+                    period_start_us: 0,
+                    period_end_us: 100,
+                    value: 50.0,
+                },
+                TrendPoint {
+                    period_start_us: 100,
+                    period_end_us: 200,
+                    value: 150.0,
+                },
             ],
             total_kg: 200.0,
             average_kg_per_bucket: 100.0,
@@ -940,12 +985,28 @@ mod tests {
     #[test]
     fn test_category_breakdown_percentages_sum() {
         let breakdown = vec![
-            CategoryBreakdown { category: "Organic".to_string(), quantity_kg: 60.0, percentage: 60.0 },
-            CategoryBreakdown { category: "Recyclable".to_string(), quantity_kg: 30.0, percentage: 30.0 },
-            CategoryBreakdown { category: "Mixed".to_string(), quantity_kg: 10.0, percentage: 10.0 },
+            CategoryBreakdown {
+                category: "Organic".to_string(),
+                quantity_kg: 60.0,
+                percentage: 60.0,
+            },
+            CategoryBreakdown {
+                category: "Recyclable".to_string(),
+                quantity_kg: 30.0,
+                percentage: 30.0,
+            },
+            CategoryBreakdown {
+                category: "Mixed".to_string(),
+                quantity_kg: 10.0,
+                percentage: 10.0,
+            },
         ];
         let total_pct: f64 = breakdown.iter().map(|b| b.percentage).sum();
-        assert!((total_pct - 100.0).abs() < 0.1, "Percentages should sum to ~100: {}", total_pct);
+        assert!(
+            (total_pct - 100.0).abs() < 0.1,
+            "Percentages should sum to ~100: {}",
+            total_pct
+        );
     }
 
     #[test]

@@ -23,6 +23,7 @@ use mycelix_finance_shared::{
     verify_governance_or_bootstrap_from_links, verify_participant_tier,
     DEFAULT_RATE_LIMIT_PER_MINUTE, GOVERNANCE_AGENTS_ANCHOR,
 };
+use mycelix_zome_helpers as _;
 
 // Re-export integrity types for external use
 pub use tend_integrity::*;
@@ -168,35 +169,77 @@ pub struct ResolveDisputeInput {
 /// Apprentice limit (±10) is handled separately via member tier checks.
 #[hdk_extern]
 pub fn get_current_tend_limit(tier: TendLimitTier) -> ExternResult<i32> {
+    // --- METABOLIC HIBERNATION (Loop 3) ---
+    // If the system is in hibernation (yield < threshold), expand credit limits counter-cyclically.
+    if is_in_hibernation()? {
+        return Ok(tier.limit() * 2); // Double credit limits to maintain liquidity
+    }
     Ok(tier.limit())
 }
 
 const ORACLE_STATE_ANCHOR: &str = "tend:oracle_state";
 const MAX_VITALITY: u32 = 100;
+const HIBERNATION_YIELD_THRESHOLD: f32 = 1.0; // kWh
 
-/// Update the oracle state (sets current vitality and limit tier).
-///
-/// Restricted to authorized governance agents (or any agent during bootstrap).
-/// The oracle agent monitors network health metrics and calls this periodically.
+/// Calculate the adaptive demurrage rate based on total yield (Loop 3).
 #[hdk_extern]
-pub fn update_oracle_state(vitality: u32) -> ExternResult<OracleState> {
-    verify_governance_or_bootstrap()?;
-    if vitality > MAX_VITALITY {
-        return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Vitality must be 0-{}",
-            MAX_VITALITY
-        ))));
+pub fn get_adaptive_demurrage_rate(_: ()) -> ExternResult<f64> {
+    let base_rate = 0.02; // 2% annual
+
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(ORACLE_STATE_ANCHOR)?, LinkTypes::AnchorLinks)?,
+        GetStrategy::default(),
+    )?;
+
+    if let Some(link) = links.first() {
+        if let Some(action_hash) = link.target.clone().into_action_hash() {
+            let record = follow_update_chain(action_hash)?;
+            if let Some(state) = record.entry().to_app_option::<OracleState>().ok().flatten() {
+                // If yield is low, scale down demurrage (Linear falloff to 0%)
+                if state.total_yield_kwh < HIBERNATION_YIELD_THRESHOLD {
+                    return Ok(
+                        base_rate * (state.total_yield_kwh / HIBERNATION_YIELD_THRESHOLD) as f64
+                    );
+                }
+            }
+        }
     }
 
+    Ok(base_rate)
+}
+
+/// Helper: Check if constellation is in metabolic hibernation.
+fn is_in_hibernation() -> ExternResult<bool> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(ORACLE_STATE_ANCHOR)?, LinkTypes::AnchorLinks)?,
+        GetStrategy::default(),
+    )?;
+    if let Some(link) = links.first() {
+        if let Some(action_hash) = link.target.clone().into_action_hash() {
+            let record = follow_update_chain(action_hash)?;
+            if let Some(state) = record.entry().to_app_option::<OracleState>().ok().flatten() {
+                return Ok(state.total_yield_kwh < HIBERNATION_YIELD_THRESHOLD);
+            }
+        }
+    }
+    Ok(false)
+}
+
+/// Update the oracle state with total yield (Loop 3).
+#[hdk_extern]
+pub fn update_oracle_state(input: UpdateOracleInput) -> ExternResult<OracleState> {
+    verify_governance_or_bootstrap()?;
+
     let now = sys_time()?;
-    let tier = OracleState::tier_from_vitality(vitality);
+    let tier = OracleState::tier_from_vitality(input.vitality);
     let state = OracleState {
-        vitality,
+        vitality: input.vitality,
+        total_yield_kwh: input.total_yield_kwh,
         tier,
         updated_at: now,
     };
 
-    // Check for existing state to update
+    // [Standard update-or-create logic follows...]
     let links = get_links(
         LinkQuery::try_new(anchor_hash(ORACLE_STATE_ANCHOR)?, LinkTypes::AnchorLinks)?,
         GetStrategy::default(),
@@ -213,7 +256,6 @@ pub fn update_oracle_state(vitality: u32) -> ExternResult<OracleState> {
         }
     }
 
-    // Create new oracle state
     let hash = create_entry(&EntryTypes::OracleState(state.clone()))?;
     create_link(
         anchor_hash(ORACLE_STATE_ANCHOR)?,
@@ -223,6 +265,12 @@ pub fn update_oracle_state(vitality: u32) -> ExternResult<OracleState> {
     )?;
 
     Ok(state)
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct UpdateOracleInput {
+    pub vitality: u32,
+    pub total_yield_kwh: f32,
 }
 
 /// Get the dynamic TEND limit based on current oracle state.

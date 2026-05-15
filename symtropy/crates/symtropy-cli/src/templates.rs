@@ -36,4 +36,11 @@ pub const TEMPLATES: &[Template] = &[
         main_rs: include_str!("templates/2d_game/main.rs.tpl"),
         readme_md: include_str!("templates/2d_game/README.md.tpl"),
     },
+    Template {
+        name: "permissive-3d",
+        description: "Permissive core 3D scene (no AGPL dependencies)",
+        cargo_toml: include_str!("templates/permissive_3d/Cargo.toml.tpl"),
+        main_rs: include_str!("templates/permissive_3d/main.rs.tpl"),
+        readme_md: include_str!("templates/3d_research/README.md.tpl"),
+    },
 ];

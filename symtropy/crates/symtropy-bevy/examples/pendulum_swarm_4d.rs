@@ -31,6 +31,10 @@ use symtropy_devconsole::SymtropyDevConsolePlugin;
 use symtropy_math::{Point, Sphere as PhysicsSphere};
 use symtropy_physics::constraint::DistanceConstraint;
 use symtropy_physics::{BodyHandle, RigidBody};
+use symtropy_render_bridge::material::{
+    NdSlicingExtension, NdSlicingMaterial, NdSlicingPlugin, NdSlicingSettings,
+};
+use symtropy_render_bridge::projection::Projector4D;
 
 const ARM_LENGTH: f64 = 1.0;
 const BOB_RADIUS: f32 = 0.10;
@@ -56,32 +60,13 @@ struct Pendulum {
     grid: (usize, usize, usize), // (i, j, w_layer)
 }
 
+#[derive(Component)]
+struct WSliceText;
+
 #[derive(Resource, Default)]
 struct GridHandles {
     map: HashMap<(usize, usize, usize), BodyHandle>,
 }
-
-/// 4D → display projector. Drops W coordinate for spatial position; uses W
-/// distance from `w_slice` to compute alpha (Miegakure-style slicing).
-#[derive(Resource)]
-struct Projector4D {
-    w_slice: f64,
-    slice_thickness: f64,
-}
-
-impl Projector4D {
-    fn alpha_at(&self, w: f64) -> f32 {
-        let d = (w - self.w_slice).abs();
-        if d >= self.slice_thickness {
-            0.0
-        } else {
-            (1.0 - d / self.slice_thickness) as f32
-        }
-    }
-}
-
-#[derive(Component)]
-struct WSliceText;
 
 #[derive(Resource)]
 struct CaptureSchedule {
@@ -115,15 +100,13 @@ fn main() {
         ..default()
     }))
     .insert_resource(GridHandles::default())
-    .insert_resource(Projector4D {
-        w_slice: 0.0,
-        slice_thickness: SLICE_THICKNESS,
-    })
+    .insert_resource(Projector4D::new(0.0, SLICE_THICKNESS, 1.0))
     .add_plugins(SymtropyScenePlugin::default())
     .add_plugins(SymtropyPhysicsPlugin::<4>::with_gravity([
         0.0, -9.81, 0.0, 0.0,
     ]))
     .add_plugins(SymtropyDevConsolePlugin)
+    .add_plugins(NdSlicingPlugin)
     .add_systems(Startup, (setup_camera, spawn_swarm, setup_hud))
     .add_systems(
         FixedUpdate,
@@ -133,7 +116,7 @@ fn main() {
         Update,
         (
             handle_w_slice_input,
-            update_4d_visibility,
+            projector_to_shader_system,
             color_by_phi,
             draw_arm_gizmo,
             update_hud,
@@ -179,11 +162,12 @@ fn spawn_swarm(
     mut physics: ResMut<SymtropyPhysics<4>>,
     mut grid_handles: ResMut<GridHandles>,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut materials: ResMut<Assets<NdSlicingMaterial>>,
+    mut standard_materials: ResMut<Assets<StandardMaterial>>,
 ) {
     let bob_mesh = meshes.add(Sphere::new(BOB_RADIUS).mesh().uv(16, 16));
     let pivot_mesh = meshes.add(Sphere::new(PIVOT_RADIUS).mesh().uv(8, 8));
-    let pivot_material = materials.add(StandardMaterial {
+    let pivot_material = standard_materials.add(StandardMaterial {
         base_color: Color::srgba(0.5, 0.5, 0.55, 1.0),
         perceptual_roughness: 0.9,
         alpha_mode: AlphaMode::Blend,
@@ -227,7 +211,7 @@ fn spawn_pendulum(
     bob_mesh: Handle<Mesh>,
     pivot_mesh: Handle<Mesh>,
     pivot_material: Handle<StandardMaterial>,
-    materials: &mut Assets<StandardMaterial>,
+    materials: &mut Assets<NdSlicingMaterial>,
 ) -> BodyHandle {
     let pivot_y = 0.0_f64;
     let pivot_handle = physics.world.add_body(RigidBody::<4>::static_body(
@@ -292,12 +276,23 @@ fn spawn_pendulum(
         Transform::from_translation(pivot_pos),
     ));
 
-    let bob_material = materials.add(StandardMaterial {
-        base_color: Color::srgba(0.0, 0.0, 1.0, 1.0),
-        perceptual_roughness: 0.6,
-        metallic: 0.1,
-        alpha_mode: AlphaMode::Blend,
-        ..default()
+    let bob_material = materials.add(NdSlicingMaterial {
+        base: StandardMaterial {
+            base_color: Color::srgba(0.0, 0.0, 1.0, 1.0),
+            perceptual_roughness: 0.6,
+            metallic: 0.1,
+            alpha_mode: AlphaMode::Blend,
+            ..default()
+        },
+        extension: NdSlicingExtension {
+            settings: NdSlicingSettings {
+                w_pos: bob_w as f32,
+                w_slice: 0.0,
+                slice_thickness: SLICE_THICKNESS as f32,
+                edge_fade: 1.0,
+                time: 0.0,
+            },
+        },
     });
 
     commands.spawn((
@@ -398,54 +393,38 @@ fn handle_w_slice_input(keys: Res<ButtonInput<KeyCode>>, mut projector: ResMut<P
 
 /// Read each bob's W coordinate from physics, compute alpha against the
 /// current `w_slice`, and mutate the StandardMaterial's base_color.alpha.
-/// Bobs entirely outside the slice get Visibility::Hidden so they don't
-/// render at all.
-fn update_4d_visibility(
+/// Sync the 4D projector settings to all materials using the slicing shader.
+fn projector_to_shader_system(
     physics: Res<SymtropyPhysics<4>>,
     projector: Res<Projector4D>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    mut query: Query<(
-        &Pendulum,
-        &MeshMaterial3d<StandardMaterial>,
-        &mut Visibility,
-    )>,
+    mut materials: ResMut<Assets<NdSlicingMaterial>>,
+    query: Query<(&Pendulum, &MeshMaterial3d<NdSlicingMaterial>)>,
+    time: Res<Time>,
 ) {
-    for (p, mat_handle, mut vis) in &mut query {
+    for (p, mat_handle) in &query {
         let Some(body) = physics.world.body(p.bob) else {
             continue;
         };
-        let w = body.position().coord(3);
-        let alpha = projector.alpha_at(w);
-        if alpha <= 0.001 {
-            *vis = Visibility::Hidden;
-        } else {
-            *vis = Visibility::Visible;
-            if let Some(mat) = materials.get_mut(&mat_handle.0) {
-                let c = mat.base_color.to_srgba();
-                mat.base_color = Color::srgba(c.red, c.green, c.blue, alpha);
-            }
+        if let Some(mat) = materials.get_mut(&mat_handle.0) {
+            mat.extension.settings.w_pos = body.position().coord(3) as f32;
+            mat.extension.settings.w_slice = projector.w_slice as f32;
+            mat.extension.settings.slice_thickness = projector.slice_thickness as f32;
+            mat.extension.settings.time = time.elapsed_secs();
         }
     }
 }
 
 fn color_by_phi(
     physics: Res<SymtropyPhysics<4>>,
-    projector: Res<Projector4D>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    query: Query<(&Pendulum, &MeshMaterial3d<StandardMaterial>)>,
+    mut materials: ResMut<Assets<NdSlicingMaterial>>,
+    query: Query<(&Pendulum, &MeshMaterial3d<NdSlicingMaterial>)>,
 ) {
     for (p, mat_handle) in &query {
         let phi = physics.field.phi(p.bob);
         let phi_norm = (phi / PHI_NORMALIZE).clamp(0.0, 1.0) as f32;
-        let Some(body) = physics.world.body(p.bob) else {
-            continue;
-        };
-        let w = body.position().coord(3);
-        let alpha = projector.alpha_at(w);
         if let Some(mat) = materials.get_mut(&mat_handle.0) {
             let new_color = Color::hsl(240.0 - phi_norm * 240.0, 1.0, 0.5);
-            let c = new_color.to_srgba();
-            mat.base_color = Color::srgba(c.red, c.green, c.blue, alpha);
+            mat.base.base_color = new_color;
         }
     }
 }
@@ -461,10 +440,12 @@ fn draw_arm_gizmo(
             continue;
         };
         let w = body.position().coord(3);
-        let alpha = projector.alpha_at(w);
-        if alpha <= 0.001 {
+        // Gizmos are still CPU-culled using the projector logic
+        let d = (w - projector.w_slice).abs();
+        if d >= projector.slice_thickness {
             continue;
         }
+        let alpha = (1.0 - d / projector.slice_thickness) as f32;
         gizmos.line(
             p.pivot_pos,
             t.translation,

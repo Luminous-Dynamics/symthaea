@@ -153,7 +153,7 @@ impl CodeDiscovery {
         let mut compiled_count = 0usize;
         let mut total_evaluated = 0usize;
 
-        for gen in 0..self.config.max_generations {
+        for generator in 0..self.config.max_generations {
             // Decode and evaluate each candidate
             for candidate in &mut population {
                 if candidate.code.is_none() {
@@ -184,7 +184,7 @@ impl CodeDiscovery {
                             source: None,
                             simulated_execution: true,
                             best_fitness: 0.0,
-                            generations: gen + 1,
+                            generations: generator + 1,
                             compiled_count,
                             total_evaluated,
                         };
@@ -223,7 +223,7 @@ impl CodeDiscovery {
                         source: candidate.code.clone(),
                         simulated_execution: false,
                         best_fitness: 1.0,
-                        generations: gen + 1,
+                        generations: generator + 1,
                         compiled_count,
                         total_evaluated,
                     };
@@ -400,7 +400,7 @@ impl CodeDiscovery {
             let child_hv = if frac < self.config.crossover_rate {
                 // Blend parents
                 let alpha = 0.3 + frac * 0.4; // [0.3, 0.7]
-                                              // Weighted blend: alpha * parent1 + (1-alpha) * parent2
+                // Weighted blend: alpha * parent1 + (1-alpha) * parent2
                 parent1
                     .hv
                     .scale(alpha)

@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -14,8 +13,8 @@ use mutualaid_pools_integrity::{
     PoolStatus,
 };
 use mycelix_bridge_common::{civic_requirement_proposal, civic_requirement_voting};
+use mycelix_zome_helpers as _;
 use mycelix_zome_helpers::get_latest_record;
-
 
 /// Input for creating a new pool
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -431,7 +430,11 @@ pub fn contribute(input: ContributeInput) -> ExternResult<ContributionWithHash> 
 /// Request a disbursement from a pool
 #[hdk_extern]
 pub fn request_disbursement(input: RequestDisbursementInput) -> ExternResult<DisbursementWithHash> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "request_disbursement")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "request_disbursement",
+    )?;
 
     // Validate disbursement amount is non-zero
     if input.amount == 0 {
@@ -531,7 +534,11 @@ pub fn request_disbursement(input: RequestDisbursementInput) -> ExternResult<Dis
 /// Vote on a disbursement request
 #[hdk_extern]
 pub fn vote_disbursement(input: VoteDisbursementInput) -> ExternResult<DisbursementWithHash> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_voting(), "vote_disbursement")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_voting(),
+        "vote_disbursement",
+    )?;
 
     // Get the current disbursement
     let record = get(input.disbursement_hash.clone(), GetOptions::default())?

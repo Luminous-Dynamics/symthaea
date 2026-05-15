@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-ngspice-bridge"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "ngspice circuit simulation adapter boundary for Symthaea"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["ngspice", "spice", "circuit", "electronics", "simulation"]
+categories = ["simulation", "science"]
+
+[dependencies]
+symthaea-sim-bridge = { path = "../symthaea-sim-bridge" }
+

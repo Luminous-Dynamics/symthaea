@@ -269,7 +269,12 @@ pub fn check_property_status(property_id: String) -> ExternResult<ExternIO> {
 /// check current capacity before approving development or zoning changes.
 #[hdk_extern]
 pub fn query_housing_capacity(area: String) -> ExternResult<ExternIO> {
-    governance_utils::call_role("commons", "housing_governance", "get_capacity_summary", area)
+    governance_utils::call_role(
+        "commons",
+        "housing_governance",
+        "get_capacity_summary",
+        area,
+    )
 }
 
 // =============================================================================
@@ -280,11 +285,7 @@ pub fn query_housing_capacity(area: String) -> ExternResult<ExternIO> {
 ///
 /// Used for checking active justice disputes and emergency status
 /// before treasury operations or policy proposals.
-const ALLOWED_CIVIC_ZOMES: &[&str] = &[
-    "civic_bridge",
-    "justice_cases",
-    "emergency_coordination",
-];
+const ALLOWED_CIVIC_ZOMES: &[&str] = &["civic_bridge", "justice_cases", "emergency_coordination"];
 
 /// Dispatch a call to the civic cluster via OtherRole.
 #[hdk_extern]
@@ -363,11 +364,7 @@ pub fn check_emergency_status(area: String) -> ExternResult<ExternIO> {
 ///
 /// Used for treasury operations approved by governance (budget proposals),
 /// payment settlement queries, and staking requirement checks.
-const ALLOWED_FINANCE_ZOMES: &[&str] = &[
-    "finance_bridge",
-    "treasury",
-    "payments",
-];
+const ALLOWED_FINANCE_ZOMES: &[&str] = &["finance_bridge", "treasury", "payments"];
 
 /// Dispatch a call to the finance cluster via OtherRole.
 #[hdk_extern]

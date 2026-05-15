@@ -615,18 +615,23 @@ pub fn simulated_backend() -> Arc<dyn LLMBackend> {
 /// 4. Ollama (default, works offline with local models)
 pub fn create_backend_from_env() -> Arc<dyn LLMBackend> {
     if let Ok(provider) = std::env::var("SYMTHAEA_LLM_PROVIDER") {
+        tracing::info!("Selecting LLM provider: {}", provider);
         match provider.to_lowercase().as_str() {
             "openai" => {
                 if let Some(backend) = super::openai_backend::OpenAiBackend::from_env() {
                     return Arc::new(backend);
                 }
-                tracing::warn!("SYMTHAEA_LLM_PROVIDER=openai but OPENAI_API_KEY not set, falling back to Ollama");
+                tracing::warn!(
+                    "SYMTHAEA_LLM_PROVIDER=openai but OPENAI_API_KEY not set, falling back to Ollama"
+                );
             }
             "anthropic" => {
                 if let Some(backend) = super::anthropic_backend::AnthropicBackend::from_env() {
                     return Arc::new(backend);
                 }
-                tracing::warn!("SYMTHAEA_LLM_PROVIDER=anthropic but ANTHROPIC_API_KEY not set, falling back to Ollama");
+                tracing::warn!(
+                    "SYMTHAEA_LLM_PROVIDER=anthropic but ANTHROPIC_API_KEY not set, falling back to Ollama"
+                );
             }
             "ollama" => {
                 let model =
@@ -646,7 +651,9 @@ pub fn create_backend_from_env() -> Arc<dyn LLMBackend> {
                         return Arc::new(backend);
                     }
                 }
-                tracing::warn!("SYMTHAEA_LLM_PROVIDER=candle but feature full_language not enabled or load failed, falling back to Ollama");
+                tracing::warn!(
+                    "SYMTHAEA_LLM_PROVIDER=candle but feature full_language not enabled or load failed, falling back to Ollama"
+                );
                 return Arc::new(OllamaBackend::new());
             }
             "ssm" | "broca" => {
@@ -658,7 +665,9 @@ pub fn create_backend_from_env() -> Arc<dyn LLMBackend> {
                 }
                 #[cfg(not(feature = "ssm_language"))]
                 {
-                    tracing::warn!("SYMTHAEA_LLM_PROVIDER=ssm but feature ssm_language not enabled, falling back to Ollama");
+                    tracing::warn!(
+                        "SYMTHAEA_LLM_PROVIDER=ssm but feature ssm_language not enabled, falling back to Ollama"
+                    );
                 }
             }
             "liquid-mamba" | "l-ssm" => {
@@ -677,7 +686,9 @@ pub fn create_backend_from_env() -> Arc<dyn LLMBackend> {
                 }
                 #[cfg(not(feature = "liquid-mamba"))]
                 {
-                    tracing::warn!("SYMTHAEA_LLM_PROVIDER=liquid-mamba but feature liquid-mamba not enabled, falling back to Ollama");
+                    tracing::warn!(
+                        "SYMTHAEA_LLM_PROVIDER=liquid-mamba but feature liquid-mamba not enabled, falling back to Ollama"
+                    );
                 }
             }
             "simulated" => {

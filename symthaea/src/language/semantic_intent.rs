@@ -56,11 +56,21 @@ impl IntentCategory {
     /// System prompt appropriate for this intent category
     pub fn system_prompt(&self) -> &'static str {
         match self {
-            Self::NixOS => "You are a NixOS expert assistant. Help with Nix expressions, system configuration, flakes, and package management.",
-            Self::Programming => "You are a programming assistant. Help with code, debugging, and software development.",
-            Self::Math => "You are a math assistant. Help with mathematical problems, equations, and proofs.",
-            Self::General => "You are a helpful general-purpose assistant. Answer questions clearly and concisely.",
-            Self::SystemAdmin => "You are a Linux system administration assistant. Help with shell commands, networking, and server management.",
+            Self::NixOS => {
+                "You are a NixOS expert assistant. Help with Nix expressions, system configuration, flakes, and package management."
+            }
+            Self::Programming => {
+                "You are a programming assistant. Help with code, debugging, and software development."
+            }
+            Self::Math => {
+                "You are a math assistant. Help with mathematical problems, equations, and proofs."
+            }
+            Self::General => {
+                "You are a helpful general-purpose assistant. Answer questions clearly and concisely."
+            }
+            Self::SystemAdmin => {
+                "You are a Linux system administration assistant. Help with shell commands, networking, and server management."
+            }
         }
     }
 

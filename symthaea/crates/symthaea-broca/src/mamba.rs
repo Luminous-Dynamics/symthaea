@@ -166,6 +166,14 @@ pub trait MambaBackend: Send {
     ///
     /// Default: no-op (all layers use the global delta_scale).
     fn set_per_layer_delta_modulation(&mut self, _modulation: &[f32]) {}
+
+    /// Inject a hidden state to warm-start the next generation.
+    /// Returns `Ok(())` on success.
+    fn inject_hidden_state(&mut self, hidden: &[f32]) -> Result<()>;
+
+    /// Extract the current hidden state after generation.
+    /// Used for semantic chunk carry-over in Phase 3.
+    fn extract_hidden_state(&self) -> Result<Vec<f32>>;
 }
 
 /// Wrapper around candle-transformers' Mamba model with Symthaea integration.
@@ -757,10 +765,19 @@ impl MambaBackend for MambaWrapper {
     fn set_cfc_modulation(&mut self, delta_scale: f32, b_scale: f32) {
         MambaWrapper::set_cfc_modulation(self, delta_scale, b_scale)
     }
+
+    fn inject_hidden_state(&mut self, hidden: &[f32]) -> Result<()> {
+        MambaWrapper::inject_hidden_state(self, hidden)
+    }
+
+    fn extract_hidden_state(&self) -> Result<Vec<f32>> {
+        MambaWrapper::extract_hidden_state(self)
+    }
 }
 
-#[cfg(any(test, feature = "test-helpers"))]
-pub(crate) mod tests {
+/// Mock Mamba backend for testing without network access.
+#[cfg(any(test, feature = "test-helpers", feature = "mamba-cpu"))]
+pub mod mock {
     use super::*;
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -772,17 +789,6 @@ pub(crate) mod tests {
     /// Produces repeatable, seeded outputs using xorshift64 PRNG. All operations
     /// that would require a real model (forward, embedding, encode/decode) are
     /// replaced with lightweight deterministic computations.
-    ///
-    /// # Behavior
-    ///
-    /// - `forward_one_token`: xorshift64-seeded logits (50280 vocab), deterministic per token_id
-    /// - `embedding_vector`: deterministic 768D vector seeded by token_id
-    /// - `inject_initial_context`: records context magnitude, increments injection count
-    /// - `scale_hidden_states`: tracks cumulative scale factor
-    /// - `reset`: resets all state counters
-    /// - `encode`: simple byte-to-id mapping (each UTF-8 byte becomes a token)
-    /// - `decode`: reverse byte-to-char mapping (id mod 128 → ASCII char)
-    /// - Config queries: d_model=768, n_layer=24, vocab_size=50280
     pub struct MockMamba {
         /// Number of forward passes executed.
         pub forward_count: usize,
@@ -794,6 +800,8 @@ pub(crate) mod tests {
         pub last_context_magnitude: f32,
         /// Number of resets performed.
         pub reset_count: usize,
+        /// Phase 3: Simulated last hidden state.
+        pub last_hidden: Option<Vec<f32>>,
     }
 
     impl MockMamba {
@@ -805,6 +813,7 @@ pub(crate) mod tests {
                 injection_count: 0,
                 last_context_magnitude: 0.0,
                 reset_count: 0,
+                last_hidden: None,
             }
         }
 
@@ -953,6 +962,21 @@ pub(crate) mod tests {
         fn enable_lora(&mut self, _rank: usize, _alpha: f32, _lr: f32) {
             // No-op in mock
         }
+
+        fn inject_hidden_state(&mut self, hidden: &[f32]) -> Result<()> {
+            // Store for next forward pass (simulated warm start)
+            self.last_hidden = Some(hidden.to_vec());
+            Ok(())
+        }
+
+        fn extract_hidden_state(&self) -> Result<Vec<f32>> {
+            if let Some(ref h) = self.last_hidden {
+                Ok(h.clone())
+            } else {
+                // Return a default hidden state if none exists
+                Ok(vec![0.01; 768])
+            }
+        }
     }
 
     impl std::fmt::Debug for MockMamba {
@@ -965,6 +989,12 @@ pub(crate) mod tests {
                 .finish()
         }
     }
+}
+
+#[cfg(any(test, feature = "test-helpers"))]
+pub(crate) mod tests {
+    use super::mock::MockMamba;
+    use super::*;
 
     // ═══════════════════════════════════════════════════════════════════════
     // ORIGINAL INTEGRATION TESTS (require network — kept for manual runs)

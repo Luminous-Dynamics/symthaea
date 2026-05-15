@@ -37,6 +37,7 @@ use symthaea_core::genesis::GenesisSeed;
 /// Shape of one line from the harvester output. Must stay in lockstep
 /// with `examples/harvest_nix_distillation.rs::DistillPair` in the main
 /// crate.
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct HarvestPair {
     prompt: String,
@@ -158,13 +159,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Broca should learn to emit given those channels). target_ids left
     // empty — populated by dataset.tokenize_all after vocabulary setup.
     let pairs: Vec<TrainingPair> = harvest
-        .into_iter()
+        .iter()
         .map(|hp| TrainingPair {
-            channels: hp.channels,
-            target_text: hp.code,
+            channels: hp.channels.clone(),
+            target_text: hp.code.clone(),
             target_ids: Vec::new(),
+            valence: 0.0,
+            arousal: 0.5,
         })
         .collect();
+
     let mut dataset = TrainingDataset { pairs };
 
     // ── Construct Broca with the Nix-augmented vocabulary ──

@@ -9,9 +9,9 @@
 //!
 //! Extracted from lib.rs as a pure structural refactor — no logic changes.
 
-use hdk::prelude::*;
-use adaptive_integrity::*;
 use crate::mastery::{get_skill_mastery_impl, GetSkillMasteryInput};
+use adaptive_integrity::*;
+use hdk::prelude::*;
 
 // ============== Types ==============
 
@@ -65,12 +65,16 @@ pub struct ReviewScheduleResult {
 
 /// Predict retention for a specific skill
 /// Returns detailed retention forecast based on forgetting curve
-pub(crate) fn predict_skill_retention_impl(input: RetentionPredictionInput) -> ExternResult<RetentionPrediction> {
+pub(crate) fn predict_skill_retention_impl(
+    input: RetentionPredictionInput,
+) -> ExternResult<RetentionPrediction> {
     // Get the skill mastery
-    let mastery = get_skill_mastery_impl(GetSkillMasteryInput { skill_hash: input.skill_hash })?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Skill mastery not found".to_string()
-        )))?;
+    let mastery = get_skill_mastery_impl(GetSkillMasteryInput {
+        skill_hash: input.skill_hash,
+    })?
+    .ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Skill mastery not found".to_string()
+    )))?;
 
     // Use minutes_since_practice from the mastery record directly
     let last_review_minutes_ago = mastery.minutes_since_practice;
@@ -104,7 +108,9 @@ pub(crate) fn predict_skill_retention_impl(input: RetentionPredictionInput) -> E
 
 /// Predict retention for multiple skills (batch operation)
 /// Efficient for dashboards and analytics
-pub(crate) fn predict_retention_batch_impl(input: BatchRetentionInput) -> ExternResult<BatchRetentionResult> {
+pub(crate) fn predict_retention_batch_impl(
+    input: BatchRetentionInput,
+) -> ExternResult<BatchRetentionResult> {
     let mut predictions = Vec::with_capacity(input.skill_hashes.len());
     let mut total_retention: u32 = 0;
     let mut skills_at_risk: u32 = 0;
@@ -112,7 +118,9 @@ pub(crate) fn predict_retention_batch_impl(input: BatchRetentionInput) -> Extern
 
     let mut skipped_count: u32 = 0;
     for skill_hash in input.skill_hashes {
-        match predict_skill_retention_impl(RetentionPredictionInput { skill_hash: skill_hash.clone() }) {
+        match predict_skill_retention_impl(RetentionPredictionInput {
+            skill_hash: skill_hash.clone(),
+        }) {
             Ok(prediction) => {
                 let is_at_risk = prediction.current_retention_permille < 800;
                 if is_at_risk {
@@ -145,7 +153,8 @@ pub(crate) fn predict_retention_batch_impl(input: BatchRetentionInput) -> Extern
     if skipped_count > 0 {
         warn!(
             "Batch retention prediction completed with {} skipped skills out of {} total",
-            skipped_count, predictions.len() + skipped_count as usize
+            skipped_count,
+            predictions.len() + skipped_count as usize
         );
     }
 
@@ -164,7 +173,9 @@ pub(crate) fn predict_retention_batch_impl(input: BatchRetentionInput) -> Extern
 }
 
 /// Generate optimal review schedule to maintain target retention
-pub(crate) fn get_optimal_review_schedule_impl(input: ReviewScheduleInput) -> ExternResult<ReviewScheduleResult> {
+pub(crate) fn get_optimal_review_schedule_impl(
+    input: ReviewScheduleInput,
+) -> ExternResult<ReviewScheduleResult> {
     let prediction = predict_skill_retention_impl(RetentionPredictionInput {
         skill_hash: input.skill_hash.clone(),
     })?;

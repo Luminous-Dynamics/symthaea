@@ -67,12 +67,16 @@
 pub mod collective_identity;
 pub mod epistemic_mesh;
 pub mod gis;
+#[cfg(feature = "mycelix")]
+pub mod governance_verify;
 pub mod kosmic_song;
 pub mod mapper;
 pub mod network;
 pub mod types;
 
 pub use gis::GracefulIgnoranceSystem;
+#[cfg(feature = "mycelix")]
+pub use governance_verify::{headless_test, ScenarioConfig, ScenarioReport};
 pub use kosmic_song::{HarmonicProfile, KosmicResponse, KosmicSong, KosmicSongBuilder};
 pub use mapper::*;
 pub use network::{

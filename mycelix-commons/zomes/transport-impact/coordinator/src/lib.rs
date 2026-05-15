@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -7,6 +6,7 @@ use mycelix_zome_helpers as _;
 
 use hdk::prelude::*;
 use mycelix_bridge_common::civic_requirement_basic;
+use mycelix_zome_helpers as _;
 use mycelix_zome_helpers::records_from_links;
 use transport_impact_integrity::*;
 
@@ -20,7 +20,6 @@ pub struct BridgeEventSignal {
     pub source_zome: String,
     pub payload: String,
 }
-
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -195,7 +194,11 @@ pub struct RedeemInput {
 
 #[hdk_extern]
 pub fn redeem_credits(input: RedeemInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "redeem_credits")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "redeem_credits",
+    )?;
     let agent = agent_info()?.agent_initial_pubkey;
 
     // Verify sufficient balance before redeeming

@@ -1,0 +1,23 @@
+[package]
+name = "symthaea-engineering"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Engineering reasoning facade: requirements, concepts, simulations, digital twins, and safety cases"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["engineering", "reasoning", "simulation", "safety", "digital-twin"]
+categories = ["science", "simulation"]
+
+[dependencies]
+symthaea-core = { path = "../../symthaea-core" }
+symthaea-broca = { path = "../symthaea-broca" }
+symthaea-sim-bridge = { path = "../symthaea-sim-bridge" }
+symthaea-digital-twin = { path = "../symthaea-digital-twin" }
+symthaea-formal-safety = { path = "../symthaea-formal-safety" }
+symthaea-lean-bridge = { path = "../symthaea-lean-bridge" }
+serde = { workspace = true }
+tracing = { workspace = true }
+

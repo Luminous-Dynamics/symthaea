@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -9,6 +8,7 @@ use mycelix_zome_helpers as _;
 
 use execution_integrity::*;
 use hdk::prelude::*;
+use mycelix_zome_helpers as _;
 use mycelix_zome_helpers::get_latest_record;
 
 /// Mirror type for ThresholdSignature from threshold-signing integrity zome.
@@ -642,14 +642,13 @@ impl GovernanceAction {
                 // SECURITY: Fail-closed — parameter updates MUST persist or fail explicitly.
                 // Returning Ok without actual update creates phantom governance changes.
                 let update_input = serde_json::json!({"parameter": parameter, "value": value});
-                governance_utils::call_local(
-                    "constitution",
-                    "update_parameter",
-                    update_input,
-                ).map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
-                    "UpdateParameter failed: constitution zome unavailable — {} = {}: {:?}",
-                    parameter, value, e
-                ))))?;
+                governance_utils::call_local("constitution", "update_parameter", update_input)
+                    .map_err(|e| {
+                        wasm_error!(WasmErrorInner::Guest(format!(
+                            "UpdateParameter failed: constitution zome unavailable — {} = {}: {:?}",
+                            parameter, value, e
+                        )))
+                    })?;
                 Ok(format!(
                     "UpdateParameter: {} = {} [executed]",
                     parameter, value
@@ -773,7 +772,8 @@ pub fn veto_timelock(input: VetoTimelockInput) -> ExternResult<Record> {
                         {
                             let elapsed = now_us - prior_veto.vetoed_at.as_micros() as i64;
                             if elapsed < VETO_COOLDOWN_US {
-                                let days_remaining = (VETO_COOLDOWN_US - elapsed) / (24 * 3600 * 1_000_000);
+                                let days_remaining =
+                                    (VETO_COOLDOWN_US - elapsed) / (24 * 3600 * 1_000_000);
                                 let _ = emit_signal(serde_json::json!({
                                     "type": "VetoRateLimitExceeded",
                                     "guardian_did": input.guardian_did,
@@ -830,7 +830,8 @@ pub fn veto_timelock(input: VetoTimelockInput) -> ExternResult<Record> {
                 return Err(wasm_error!(WasmErrorInner::Guest(format!(
                     "Yearly veto limit exceeded: {} vetoes in the past 12 months \
                      (max {}). Guardian enters probation (Art. III, Sec. 5.4).",
-                    vetoes_in_window, execution_integrity::VETO_YEARLY_LIMIT
+                    vetoes_in_window,
+                    execution_integrity::VETO_YEARLY_LIMIT
                 ))));
             }
         }
@@ -1111,10 +1112,7 @@ pub fn cast_override_vote(input: CastOverrideVoteInput) -> ExternResult<Record> 
     let veto_anchor = format!("veto_override:{}", input.veto_id);
     create_entry(&EntryTypes::Anchor(Anchor(veto_anchor.clone())))?;
     let existing_votes = get_links(
-        LinkQuery::try_new(
-            anchor_hash(&veto_anchor)?,
-            LinkTypes::VetoToOverrideVotes,
-        )?,
+        LinkQuery::try_new(anchor_hash(&veto_anchor)?, LinkTypes::VetoToOverrideVotes)?,
         GetStrategy::default(),
     )?;
     for link in &existing_votes {
@@ -1137,7 +1135,12 @@ pub fn cast_override_vote(input: CastOverrideVoteInput) -> ExternResult<Record> 
     }
 
     let now = sys_time()?;
-    let vote_id = format!("override_vote:{}:{}:{}", input.veto_id, input.voter_did, now.as_micros());
+    let vote_id = format!(
+        "override_vote:{}:{}:{}",
+        input.veto_id,
+        input.voter_did,
+        now.as_micros()
+    );
 
     let vote = VetoOverrideVote {
         id: vote_id,
@@ -1207,10 +1210,7 @@ pub fn resolve_override(input: ResolveOverrideInput) -> ExternResult<Record> {
     // Collect all override votes
     let veto_anchor = format!("veto_override:{}", input.veto_id);
     let vote_links = get_links(
-        LinkQuery::try_new(
-            anchor_hash(&veto_anchor)?,
-            LinkTypes::VetoToOverrideVotes,
-        )?,
+        LinkQuery::try_new(anchor_hash(&veto_anchor)?, LinkTypes::VetoToOverrideVotes)?,
         GetStrategy::default(),
     )
     .unwrap_or_default();
@@ -1317,7 +1317,8 @@ pub fn resolve_override(input: ResolveOverrideInput) -> ExternResult<Record> {
             for link in pending_links {
                 if let Ok(target_hash) = ActionHash::try_from(link.target.clone()) {
                     if let Ok(Some(record)) = get(target_hash, GetOptions::default()) {
-                        if let Some(ptl) = record.entry().to_app_option::<Timelock>().ok().flatten() {
+                        if let Some(ptl) = record.entry().to_app_option::<Timelock>().ok().flatten()
+                        {
                             if ptl.id == input.timelock_id {
                                 let _ = delete_link(link.create_link_hash, GetOptions::default());
                             }
@@ -1358,10 +1359,7 @@ pub fn get_guardian_vetoes(guardian_did: String) -> ExternResult<Vec<Record>> {
     }
     let guardian_anchor = format!("guardian:{}", guardian_did);
     let links = get_links(
-        LinkQuery::try_new(
-            anchor_hash(&guardian_anchor)?,
-            LinkTypes::GuardianToVeto,
-        )?,
+        LinkQuery::try_new(anchor_hash(&guardian_anchor)?, LinkTypes::GuardianToVeto)?,
         GetStrategy::default(),
     )?;
 

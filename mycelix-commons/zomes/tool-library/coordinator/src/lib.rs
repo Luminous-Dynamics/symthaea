@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -8,10 +7,9 @@ use mycelix_zome_helpers as _;
 //! and discover nearby tools via geohash indexing.
 
 use hdk::prelude::*;
+use mycelix_bridge_common::{civic_requirement_basic, civic_requirement_proposal};
+use mycelix_zome_helpers as _;
 use tool_library_integrity::*;
-use mycelix_bridge_common::{
-    civic_requirement_basic, civic_requirement_proposal,
-};
 
 /// Helper to get an anchor entry hash.
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -66,7 +64,11 @@ fn geohash_encode(lat: f64, lon: f64, precision: u8) -> String {
 /// Register a new tool in the community library.
 #[hdk_extern]
 pub fn register_tool(tool: Tool) -> ExternResult<ActionHash> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "register_tool")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "register_tool",
+    )?;
 
     let action_hash = create_entry(&EntryTypes::Tool(tool.clone()))?;
 
@@ -77,11 +79,21 @@ pub fn register_tool(tool: Tool) -> ExternResult<ActionHash> {
     // Link from category anchor
     let cat_str = format!("{:?}", tool.category);
     let cat_anchor = ensure_anchor(&format!("tools/category/{}", cat_str))?;
-    create_link(cat_anchor, action_hash.clone(), LinkTypes::ToolsByCategory, ())?;
+    create_link(
+        cat_anchor,
+        action_hash.clone(),
+        LinkTypes::ToolsByCategory,
+        (),
+    )?;
 
     // Link from agent (owner)
     let agent_anchor = ensure_anchor(&format!("agent/{}/tools", tool.owner_did))?;
-    create_link(agent_anchor, action_hash.clone(), LinkTypes::AgentToTool, ())?;
+    create_link(
+        agent_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentToTool,
+        (),
+    )?;
 
     // Geo-index if location provided
     if let Some(ref loc) = tool.location {
@@ -122,7 +134,11 @@ pub fn get_all_tools(_: ()) -> ExternResult<Vec<Record>> {
 /// Get tools filtered by category.
 #[hdk_extern]
 pub fn get_tools_by_category(category: String) -> ExternResult<Vec<Record>> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "get_tools_by_category")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "get_tools_by_category",
+    )?;
 
     let base = anchor_hash(&format!("tools/category/{}", category))?;
     let links = get_links(
@@ -177,7 +193,11 @@ pub struct BorrowInput {
 /// Borrow a tool from the library.
 #[hdk_extern]
 pub fn borrow_tool(input: BorrowInput) -> ExternResult<ActionHash> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "borrow_tool")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "borrow_tool",
+    )?;
 
     // Get the tool to verify it exists and is available
     let record = get(input.tool_hash.clone(), GetOptions::default())?
@@ -186,7 +206,9 @@ pub fn borrow_tool(input: BorrowInput) -> ExternResult<ActionHash> {
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid tool entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid tool entry".into()
+        )))?;
 
     if !tool.available {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -220,7 +242,12 @@ pub fn borrow_tool(input: BorrowInput) -> ExternResult<ActionHash> {
 
     // Link lending to borrower
     let borrower_anchor = ensure_anchor(&format!("agent/{}/lendings", borrower_did))?;
-    create_link(borrower_anchor, lending_hash.clone(), LinkTypes::AgentToLending, ())?;
+    create_link(
+        borrower_anchor,
+        lending_hash.clone(),
+        LinkTypes::AgentToLending,
+        (),
+    )?;
 
     // Mark tool as unavailable
     let mut updated_tool = tool;
@@ -241,16 +268,23 @@ pub struct ReturnInput {
 /// Return a borrowed tool.
 #[hdk_extern]
 pub fn return_tool(input: ReturnInput) -> ExternResult<ActionHash> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "return_tool")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "return_tool",
+    )?;
 
     // Get the lending record
-    let lending_record = get(input.lending_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Lending not found".into())))?;
+    let lending_record = get(input.lending_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Lending not found".into())),
+    )?;
     let mut lending: Lending = lending_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid lending entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid lending entry".into()
+        )))?;
 
     if lending.status != LendingStatus::Active && lending.status != LendingStatus::Overdue {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -271,7 +305,9 @@ pub fn return_tool(input: ReturnInput) -> ExternResult<ActionHash> {
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid tool entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid tool entry".into()
+        )))?;
 
     tool.available = true;
     update_entry(input.tool_hash, &tool)?;
@@ -286,7 +322,11 @@ pub fn return_tool(input: ReturnInput) -> ExternResult<ActionHash> {
 /// Get lending history for a specific tool.
 #[hdk_extern]
 pub fn get_tool_history(tool_hash: ActionHash) -> ExternResult<Vec<Record>> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "get_tool_history")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "get_tool_history",
+    )?;
 
     let links = get_links(
         LinkQuery::try_new(tool_hash, LinkTypes::ToolToLending)?,
@@ -338,7 +378,11 @@ pub struct NearbyQuery {
 /// Get tools near a geographic location.
 #[hdk_extern]
 pub fn get_nearby_tools(input: NearbyQuery) -> ExternResult<Vec<Record>> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "get_nearby_tools")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "get_nearby_tools",
+    )?;
 
     let precision = input.precision.unwrap_or(6);
     let gh = geohash_encode(input.latitude, input.longitude, precision);
@@ -366,7 +410,11 @@ pub fn get_nearby_tools(input: NearbyQuery) -> ExternResult<Vec<Record>> {
 /// Mark a tool as unavailable (owner only).
 #[hdk_extern]
 pub fn mark_unavailable(tool_hash: ActionHash) -> ExternResult<ActionHash> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "mark_unavailable")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "mark_unavailable",
+    )?;
 
     let record = get(tool_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Tool not found".into())))?;
@@ -374,7 +422,9 @@ pub fn mark_unavailable(tool_hash: ActionHash) -> ExternResult<ActionHash> {
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid tool entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid tool entry".into()
+        )))?;
 
     tool.available = false;
     let updated = update_entry(tool_hash, &tool)?;
@@ -384,7 +434,11 @@ pub fn mark_unavailable(tool_hash: ActionHash) -> ExternResult<ActionHash> {
 /// Mark a tool as available (owner only).
 #[hdk_extern]
 pub fn mark_available(tool_hash: ActionHash) -> ExternResult<ActionHash> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "mark_available")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "mark_available",
+    )?;
 
     let record = get(tool_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Tool not found".into())))?;
@@ -392,7 +446,9 @@ pub fn mark_available(tool_hash: ActionHash) -> ExternResult<ActionHash> {
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid tool entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid tool entry".into()
+        )))?;
 
     tool.available = true;
     let updated = update_entry(tool_hash, &tool)?;

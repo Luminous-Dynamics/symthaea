@@ -56,6 +56,11 @@ symtropy-net = { path = "crates/symtropy-net", optional = true }
 rand = "0.8"
 nalgebra = "0.34"
 
+[dev-dependencies]
+symtropy-bevy-core = { path = "crates/symtropy-bevy-core" }
+symtropy-physics-gpu = { path = "crates/symtropy-physics-gpu" }
+symtropy-physics = { path = "crates/symtropy-physics" }
+
 [features]
 default = []
 # Mycelix governance/economy/crypto integration — physicalized cryptography
@@ -79,9 +84,21 @@ members = [
     "crates/symtropy-consciousness-physics",
     "crates/symtropy-render-bridge",
     "crates/symtropy-robotics-bridge",
+    "crates/symtropy-mesh",
+    "crates/symtropy-terrain",
+    "crates/symtropy-soft",
+    "crates/symtropy-fluid",
+    "crates/symtropy-physics-gpu",
+    "crates/symtropy-holochain-relay",
     "crates/symtropy-bevy",
     "crates/symtropy-bevy-core",
     "crates/symtropy-bevy-scene",
+    "crates/symthaea-bevy-brain",
+    "crates/symtropy-mycelix-village",
+    "crates/symtropy-net-core",
+    "crates/symtropy-robotics-bridge-core",
+    "crates/symtropy-rapier3d-bridge",
+    "crates/symtropy-core",
     "crates/symtropy-devconsole",
     "crates/symtropy-cli",
     "crates/symtropy",
@@ -93,9 +110,11 @@ exclude = [
     "crates/symtropy-sim-bridge",
     "crates/symtropy-manipulator-demo",
     "crates/symtropy-gravcraft-demo",
-    "crates/symtropy-holochain-relay",
     "crates/symtropy-lightyear",
-    "crates/symthaea-bevy-brain",
+    "crates/symtropy-multiplayer-demo",
+    "crates/symtropy-mycelix-village",
+    "crates/symtropy-web-gallery",
+    "crates/symtropy-xr-showcase",
 ]
 
 [lints.clippy]

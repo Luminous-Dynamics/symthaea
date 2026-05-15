@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -8,6 +7,7 @@ use mycelix_zome_helpers as _;
 use care_matching_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::{civic_requirement_basic, civic_requirement_proposal};
+use mycelix_zome_helpers as _;
 use mycelix_zome_helpers::records_from_links;
 
 // holochain_serialized_bytes is a dependency needed by the SerializedBytes derive macro
@@ -77,7 +77,6 @@ pub struct ServiceRequest {
     pub open: bool,
     pub created_at: Timestamp,
 }
-
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -215,7 +214,11 @@ pub fn find_matches_for_request(input: FindMatchesInput) -> ExternResult<Vec<Rec
 /// Suggest a specific match (manual matching by an organizer or system)
 #[hdk_extern]
 pub fn suggest_match(care_match: CareMatch) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "suggest_match")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "suggest_match",
+    )?;
     let action_hash = create_entry(&EntryTypes::CareMatch(care_match.clone()))?;
 
     let req_anchor = ensure_anchor(&format!("request_matches:{}", care_match.request_hash))?;
@@ -266,14 +269,22 @@ pub fn suggest_match(care_match: CareMatch) -> ExternResult<Record> {
 /// Accept a suggested match
 #[hdk_extern]
 pub fn accept_match(match_hash: ActionHash) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "accept_match")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "accept_match",
+    )?;
     update_match_status(match_hash, MatchStatus::Accepted)
 }
 
 /// Decline a suggested match
 #[hdk_extern]
 pub fn decline_match(match_hash: ActionHash) -> ExternResult<Record> {
-    let _eligibility = mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "decline_match")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "decline_match",
+    )?;
     update_match_status(match_hash, MatchStatus::Declined)
 }
 

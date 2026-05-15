@@ -1,7 +1,7 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+
 //! Claims Coordinator Zome
 //! Business logic for managing epistemic claims
 //!
@@ -9,6 +9,7 @@ use mycelix_zome_helpers as _;
 
 use claims_integrity::*;
 use hdk::prelude::*;
+use mycelix_zome_helpers as _;
 
 const ALL_CLAIMS_ANCHOR: &str = "claims:all";
 const DEFAULT_SEARCH_LIMIT: usize = 20;
@@ -274,7 +275,11 @@ pub fn get_agent_epistemic_score(author_did: String) -> ExternResult<f64> {
         }
     }
 
-    let avg_confidence = if valid > 0 { total_confidence / valid as f64 } else { 0.5 };
+    let avg_confidence = if valid > 0 {
+        total_confidence / valid as f64
+    } else {
+        0.5
+    };
     let saturation = (count as f64 / 50.0).min(1.0);
     Ok((saturation * avg_confidence).clamp(0.0, 1.0))
 }

@@ -33,6 +33,9 @@ impl CognitiveLoopService {
         /// to report hardware thermal state. Also used by integration tests.
         pub fn thermal_sender(&self) -> Option<crate::infrastructure::ThermalSender> { self.sensorimotor.thermal_tx.clone() }
 
+        /// Get current thermodynamic load (0.0 to 1.0)
+        pub fn thermodynamic_load(&self) -> f32 { self.thermodynamic_load }
+
         /// Get the configuration used to create this service.
         pub fn config(&self) -> &super::super::CognitiveLoopConfig { &self.config }
 
@@ -88,6 +91,16 @@ impl CognitiveLoopService {
 
         /// Get the prediction dimension (CfC neurons)
         pub fn prediction_dim(&self) -> usize { self.config.cfc_config.num_neurons }
+    }
+
+    /// Mutable access to the sensorimotor group (for frame injection/testing).
+    pub(crate) fn sensorimotor_mut(&mut self) -> &mut super::super::sensorimotor_execution::SensorimotorExecution {
+        &mut self.sensorimotor
+    }
+
+    /// Mutable access to cycle carryover state (for surprise override/testing).
+    pub(crate) fn carryover_mut(&mut self) -> &mut super::super::types::carryover::CycleCarryover {
+        &mut self.carryover
     }
 
     /// Access the ethics engine for moral topology, harmony coordinates, etc.

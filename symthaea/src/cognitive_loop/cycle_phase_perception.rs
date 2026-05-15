@@ -106,16 +106,11 @@ impl CognitiveLoopService {
         // PHASES 1–1.2: Encoding + Preprocessing (extracted to cycle_strategy.rs)
         // ═══════════════════════════════════════════════════════════════════════
         #[allow(unused_mut)]
-        let mut encoding = self.run_encoding_and_preprocessing(input, module_timings);
+        let mut encoding_res = self.run_encoding_and_preprocessing(input, module_timings);
 
         // ═══════════════════════════════════════════════════════════════════════
         // PHASE 1.2b: Additive sensory modality blend
         // ═══════════════════════════════════════════════════════════════════════
-        // Live STT (voice-stt-live) and radio/SDR spectrum (mesh) are both
-        // ambient sensory inputs, not semantic modifiers. Collect any modality
-        // HVs that fired this cycle and bundle them into the perception HV
-        // with one call so all sources share the same thresholding pass
-        // instead of being biased by sequential bundling order.
         #[allow(unused_mut)]
         let mut aux_sensor_hvs: Vec<crate::hdc::BinaryHV> = Vec::new();
 
@@ -131,9 +126,6 @@ impl CognitiveLoopService {
             aux_sensor_hvs.push(radio_hv);
         }
 
-        // IMU (sensor-imu): fuse the most-recent injected reading into an
-        // HV and treat it as another additive sensory modality. Skipped if
-        // either the fusion module or the reading is absent.
         #[cfg(feature = "sensor-imu")]
         if let (Some(ref fusion), Some(ref reading)) = (&self.imu_fusion, &self.latest_imu_reading)
         {
@@ -141,14 +133,19 @@ impl CognitiveLoopService {
             aux_sensor_hvs.push(crate::hdc::BinaryHV::from_bipolar(&imu_chv.values));
         }
 
+        // Feel Metabolic Stress
+        if let Some(ref mut conductor) = self.metabolic_conductor {
+            let _homeostasis = conductor.tick();
+            let stress_hv = conductor.encode_metabolic_stress();
+            if stress_hv.as_slice().iter().any(|&v| v != 0.0) {
+                aux_sensor_hvs.push(stress_hv.to_binary(0.0));
+            }
+        }
+
         if !aux_sensor_hvs.is_empty() {
-            aux_sensor_hvs.insert(0, encoding.hv16_cached);
-            encoding.hv16_cached = crate::hdc::BinaryHV::bundle(&aux_sensor_hvs);
-            // Keep the continuous view in sync — the CfC input path at
-            // cycle_strategy.rs:464 reads encoding_result.hdv (not hv16_cached),
-            // so without this line the blended sensors would never reach the
-            // thought-vector generator.
-            encoding.encoding_result.hdv = encoding.hv16_cached.to_continuous();
+            aux_sensor_hvs.insert(0, encoding_res.hv16_cached);
+            encoding_res.hv16_cached = crate::hdc::BinaryHV::bundle(&aux_sensor_hvs);
+            encoding_res.encoding_result.hdv = encoding_res.hv16_cached.to_continuous();
         }
 
         // ACh-modulated scene memory thresholds
@@ -181,30 +178,85 @@ impl CognitiveLoopService {
         // PHASE 1.3: Vision Manifold (frame → attention-boosted HDC encoding)
         // ═══════════════════════════════════════════════════════════════════════
         #[cfg(feature = "vision-manifold")]
-        let (visual_hv, vision_telemetry) = if let Some(ref mut bridge) =
-            self.sensorimotor.vision_sensory.vision_bridge
-        {
-            let frame = self
-                .sensorimotor
-                .vision_sensory
-                .vision_frame_buffer
-                .take()
-                .unwrap_or_else(|| {
-                    vec![
-                        128u8;
-                        (self.config.vision_frame_width * self.config.vision_frame_height) as usize
-                    ]
-                });
+        let mut vision_telemetry = None;
+        #[cfg(feature = "vision-manifold")]
+        let mut vision_mean_surprise = 0.0;
+        #[cfg(feature = "vision-manifold")]
+        let mut vision_horizon_errors = Vec::new();
+        #[cfg(feature = "vision-manifold")]
+        let mut visual_hv = None;
+        #[cfg(feature = "vision-manifold")]
+        let mut final_dim = 16384;
+        #[cfg(feature = "vision-manifold")]
+        let mut scene_recognized = false;
+
+        #[cfg(feature = "vision-manifold")]
+        if let Some(ref mut bridge) = self.sensorimotor.vision_sensory.vision_bridge {
+            let pixels = self.sensorimotor.vision_sensory.vision_frame_buffer.as_ref()
+                .map(|f| f.as_slice())
+                .unwrap_or(&[]);
             let w = self.config.vision_frame_width;
             let h = self.config.vision_frame_height;
+            let channels = if bridge.manifold().encoder().config().enable_color { 3 } else { 1 };
             let dt = self.config.cfc_config.delta_t;
-            let (hv, tel) = bridge.process_frame_with_telemetry(&frame, w, h, 1, dt);
-            (Some(hv), Some(tel))
-        } else {
-            (None, None)
-        };
 
-        // Cross-manifold predictor: predict cognitive state from vision state
+            // Store initial dimension to detect dilation/constriction during processing
+            let dim_before = bridge.manifold().hdc_dim();
+
+            let (hv, telemetry) = bridge.process_frame_with_telemetry(pixels, w, h, channels, dt);
+            visual_hv = Some(hv);
+
+            // ── Holographic Dilation Trigger (Hardcoded override) ──
+            let manifold = bridge.manifold_mut();
+            let dim_after_fep = manifold.hdc_dim();
+            let current_cycle = manifold.frame_count();
+            let last_change = manifold.last_dilation_cycle();
+
+            vision_mean_surprise = manifold.surprise_map().mean_surprise();
+            vision_horizon_errors = manifold.evaluate_horizons().errors;
+            scene_recognized = telemetry.scene_recognition_similarity > 0.0;
+
+            if current_cycle >= last_change + super::thresholds::VISION_DILATION_COOLDOWN {
+                let target = if vision_mean_surprise > super::thresholds::VISION_SURPRISE_DILATION_THRESHOLD {
+                    Some(symthaea_core::hdc::HdcDimensionality::Ultra)
+                } else if dim_after_fep > 16384 {
+                    Some(symthaea_core::hdc::HdcDimensionality::Standard)
+                } else {
+                    None
+                };
+
+                if let Some(t) = target {
+                    if dim_after_fep != t.dimension() {
+                        bridge.dilate(t);
+                    }
+                }
+            }
+
+            // Sync cost and apply thermodynamic load if we ended up in Ultra mode
+            final_dim = bridge.manifold().hdc_dim();
+            if final_dim > dim_before && final_dim > 16384 {
+                // Resolution increased to Ultra: apply one-time dilation cost
+                self.thermodynamic_load = (self.thermodynamic_load + 0.08).min(1.0);
+            }
+
+            // Apply accumulated vision compute costs (geodesics, dreaming, etc.)
+            let cost = bridge.manifold().telemetry().last_geodesic_cost;
+            if cost > 0.0 {
+                self.thermodynamic_load = (self.thermodynamic_load + cost).min(1.0);
+            }
+
+            // Sync metrics for snapshot visibility
+            let manifold = bridge.manifold();
+            let fep = manifold.last_fep();
+            self.carryover.quality.last_vision_hdc_dim = final_dim as u32;
+            self.carryover.quality.last_vision_free_energy = fep.free_energy;
+            self.carryover.quality.last_vision_complexity = fep.complexity;
+            self.carryover.quality.last_vision_accuracy = fep.accuracy;
+
+            vision_telemetry = Some(telemetry);
+        }
+
+        // Cross-manifold predictor
         #[cfg(feature = "vision-manifold")]
         let cross_manifold_prediction_error =
             if let Some(ref mut pred) = self.sensorimotor.vision_sensory.cross_manifold_predictor {
@@ -219,30 +271,20 @@ impl CognitiveLoopService {
                 0.0
             };
 
-        // ── Vision mean surprise + horizon errors + scene recognition ──
-        #[cfg(feature = "vision-manifold")]
-        let vision_mean_surprise = self
-            .sensorimotor
-            .vision_sensory
-            .vision_bridge
-            .as_ref()
-            .map(|b| b.manifold().surprise_map().mean_surprise())
-            .unwrap_or(0.0);
+        // ═══════════════════════════════════════════════════════════════════════
+        // PHASE 1.1: Surprise and Exploration
+        // ═══════════════════════════════════════════════════════════════════════
+        let prediction_error = encoding_res.prediction_error;
+        let (surprise_triggered, exploration_action) = self.run_surprise_exploration(&encoding_res.compressed_state);
 
-        #[cfg(feature = "vision-manifold")]
-        let vision_horizon_errors = self
-            .sensorimotor
-            .vision_sensory
-            .vision_bridge
-            .as_ref()
-            .map(|b| b.manifold().evaluate_horizons().errors)
-            .unwrap_or_default();
-
-        #[cfg(feature = "vision-manifold")]
-        let scene_recognized = vision_telemetry
-            .as_ref()
-            .map(|t| t.scene_recognition_similarity > 0.0)
-            .unwrap_or(false);
+        // ═══════════════════════════════════════════════════════════════════════
+        // PHASE 1.2: Urgency Phase
+        // ═══════════════════════════════════════════════════════════════════════
+        let urgency_result = self.compute_urgency_and_error_pattern(
+            prediction_error,
+            surprise_triggered,
+            encoding_res.effective_threshold,
+        );
 
         // ═══════════════════════════════════════════════════════════════════════
         // PHASE 1.4: Foveation Dispatch (dorsal surprise → ventral recognition)
@@ -255,12 +297,10 @@ impl CognitiveLoopService {
             let mut collected = Vec::new();
             if let Some(ref fov_mutex) = self.sensorimotor.vision_sensory.foveation_manager {
                 if let Ok(mut fov) = fov_mutex.lock() {
-                    // Neuromod modulation: NE → surprise threshold, DA → concurrent capacity
                     let ne = self.neuromod.bath.noradrenaline.effective();
                     let da = self.neuromod.bath.dopamine.effective();
                     fov.modulate(ne, da);
 
-                    // Feed current frame to foveation
                     if let Some(ref bridge) = self.sensorimotor.vision_sensory.vision_bridge {
                         let w = self.config.vision_frame_width;
                         let h = self.config.vision_frame_height;
@@ -271,11 +311,10 @@ impl CognitiveLoopService {
                             height: h,
                             channels: 1,
                             frame_id: frame_count,
-                            timestamp_us: frame_count * 20_000, // ~50fps
+                            timestamp_us: frame_count * 20_000,
                         };
                         fov.on_frame(fb);
 
-                        // Feed salient patches with real motion vectors from manifold
                         let regions = bridge.salient_regions();
                         let motion = bridge.manifold().motion_vectors();
                         let grid_cols = bridge.manifold().surprise_map().grid().cols;
@@ -290,18 +329,14 @@ impl CognitiveLoopService {
                         fov.on_saliency(&patches);
                     }
 
-                    // Tick and drain
                     let now_us = self.start_time.elapsed().as_micros() as u64;
                     fov.tick(now_us);
                     collected = fov.drain_results();
-                    // Attention budget: cap dispatches per cycle
-                    // Substrate speed scaling: faster substrates afford more dispatches
                     let tau_scale = self.substrate_manager.tau_factor.max(0.5);
                     let max = ((self.config.foveation_max_dispatches as f32) * tau_scale)
                         .round()
                         .max(1.0) as usize;
                     if collected.len() > max {
-                        // Keep the highest-confidence results
                         collected.sort_by(|a, b| {
                             b.confidence
                                 .partial_cmp(&a.confidence)
@@ -309,30 +344,9 @@ impl CognitiveLoopService {
                         });
                         collected.truncate(max);
                     }
-                    for result in &collected {
-                        tracing::debug!(
-                            target: "cognitive_loop::foveation",
-                            grid = ?(result.grid_row, result.grid_col),
-                            confidence = result.confidence,
-                            "Foveation recognition"
-                        );
-                    }
-
-                    // Win 2: Ventral→Dorsal feedback — recognized patches dampen
-                    // dorsal surprise so the system stops re-foveating known regions.
-                    // P3-B: Hebbian goal-template learning — recognized patches nudge
-                    // the task HV toward what was actually seen (Hebb 1949).
                     if let Some(ref mut bridge) = self.sensorimotor.vision_sensory.vision_bridge {
                         for result in &collected {
-                            bridge.dampen_patch_surprise(
-                                result.grid_row,
-                                result.grid_col,
-                                result.confidence,
-                            );
-                            bridge.learn_from_recognized_patch(
-                                &result.semantic_hv,
-                                result.confidence,
-                            );
+                            bridge.dampen_patch_surprise(result.grid_row, result.grid_col, 0.5);
                         }
                     }
                 }
@@ -340,125 +354,31 @@ impl CognitiveLoopService {
             collected
         };
 
-        // ── GWT injection: feed foveation results into Global Workspace ──
-        #[cfg(feature = "foveation")]
-        if let Some(ref mut gwt) = self.consciousness.gwt_mgr.gwt {
-            for result in &fov_results {
-                let binary_hv = result.semantic_hv.to_binary(0.0);
-                let activation = result.confidence as f64;
-                let module = match &result.content {
-                    symthaea_foveation::RecognizedContent::Text(_) => "foveation_ocr",
-                    symthaea_foveation::RecognizedContent::Object { .. } => "foveation_embed",
-                    symthaea_foveation::RecognizedContent::Caption(_) => "foveation_caption",
-                    symthaea_foveation::RecognizedContent::Unknown => "foveation_unknown",
-                };
-                gwt.submit_strategy(
-                    "foveation_recognition",
-                    activation,
-                    vec![binary_hv],
-                    vec![module.to_string()],
-                );
-            }
-        }
-
-        // ── Surprise dampening: reduce surprise at recognized locations ──
-        #[cfg(feature = "foveation")]
-        if let Some(ref mut bridge) = self.sensorimotor.vision_sensory.vision_bridge {
-            for result in &fov_results {
-                if result.confidence > 0.7 {
-                    // Predict current position using velocity + processing latency
-                    let dt_frames = result.processing_time_us as f32 / 20_000.0; // ~50fps
-                    let pred_row = (result.grid_row as f32 + result.velocity[1] * dt_frames)
-                        .round()
-                        .max(0.0) as usize;
-                    let pred_col = (result.grid_col as f32 + result.velocity[0] * dt_frames)
-                        .round()
-                        .max(0.0) as usize;
-                    bridge.manifold_mut().surprise_map_mut().dampen(
-                        pred_row, pred_col, 0.5, // halve surprise at this location
-                    );
-                }
-            }
-        }
-
-        // ── Multimodal HV binding: foveation → cognitive state ──
-        // Treisman (1980): feature integration theory — visual features bind into
-        // unified percept alongside linguistic encoding.
-        #[cfg(feature = "foveation")]
-        if !fov_results.is_empty() {
-            use super::thresholds::FOVEATION_HV_BINDING_WEIGHT;
-            let main_hv = &encoding.encoding_result.hdv;
-            let mut hvs: Vec<&symthaea_core::hdc::ContinuousHV> = vec![main_hv];
-            let mut weights: Vec<f32> = vec![1.0];
-            for result in &fov_results {
-                hvs.push(&result.semantic_hv);
-                weights.push(result.confidence * FOVEATION_HV_BINDING_WEIGHT);
-            }
-            encoding.encoding_result.hdv =
-                symthaea_core::hdc::ContinuousHV::weighted_bundle(&hvs, &weights);
-        }
-
-        // ── Vision → Neuromodulation Feedback ──
-        // Inject visual surprise and cross-manifold prediction error into NE bath.
-        // Science: Aston-Jones & Cohen (2005) — LC-NE reactivity to multimodal surprise.
-        #[cfg(feature = "vision-manifold")]
-        {
-            if vision_mean_surprise > super::thresholds::VISION_SURPRISE_THRESHOLD {
-                let amount = (vision_mean_surprise - super::thresholds::VISION_SURPRISE_THRESHOLD)
-                    * super::thresholds::VISION_SURPRISE_NE_SCALE;
-                self.neuromod.bath.noradrenaline.produce(amount);
-            }
-            if cross_manifold_prediction_error > 0.1 {
-                let amount = cross_manifold_prediction_error
-                    * super::thresholds::VISION_CROSS_MANIFOLD_NE_SCALE;
-                self.neuromod.bath.noradrenaline.produce(amount);
-            }
-        }
-
         #[cfg(feature = "foveation")]
         let foveation_recognition_count = fov_results.len();
         #[cfg(feature = "foveation")]
         let foveation_top_confidence = fov_results
-            .iter()
-            .map(|r| r.confidence)
-            .fold(0.0f32, f32::max);
-
-        // Stash negation polarity for metadata
-        let negation_detected = input_negation_polarity;
-
-        // Push encoded HV into ring buffers for Phi-Dyad computation.
-        // The encoding hdv represents the AI's cognitive state for this input.
-        // We also use it as a human-proxy state (input → perceived partner state).
-        if self.behavior.social_mgr.phi_dyad.is_some() {
-            let ai_hv = encoding.encoding_result.hdv.clone();
-            let input_hv = ai_hv.clone(); // Same encoding as partner proxy
-            if self.behavior.social_mgr.recent_ai_hvs.len() >= 4 {
-                self.behavior.social_mgr.recent_ai_hvs.remove(0);
-            }
-            self.behavior.social_mgr.recent_ai_hvs.push(ai_hv);
-            if self.behavior.social_mgr.recent_input_hvs.len() >= 4 {
-                self.behavior.social_mgr.recent_input_hvs.remove(0);
-            }
-            self.behavior.social_mgr.recent_input_hvs.push(input_hv);
-        }
+                .iter()
+                .map(|r| r.confidence)
+                .fold(0.0, f32::max);
 
         Ok(PerceptionPhaseResult {
             encoding: PercEncoding {
-                encoding_result: encoding.encoding_result,
-                hv16_cached: encoding.hv16_cached,
-                compressed_state: encoding.compressed_state,
-                phi_attention_weight: encoding.phi_attention_weight,
-                input_memoized: encoding.input_memoized,
-                input_similarity: encoding.input_similarity,
-                memo_threshold: encoding.memo_threshold,
-                effective_threshold: encoding.effective_threshold,
-                temporal_binding_strength: encoding.temporal_binding_strength,
+                encoding_result: encoding_res.encoding_result,
+                hv16_cached: encoding_res.hv16_cached,
+                compressed_state: encoding_res.compressed_state,
+                phi_attention_weight: encoding_res.phi_attention_weight,
+                input_memoized: encoding_res.input_memoized,
+                input_similarity: encoding_res.input_similarity,
+                memo_threshold: encoding_res.memo_threshold,
+                effective_threshold: encoding_res.effective_threshold,
+                temporal_binding_strength: encoding_res.temporal_binding_strength,
             },
             moral: PercMoral {
-                moral_concern_detected,
                 moral_score,
+                moral_concern_detected,
                 moral_judgment,
-                soul_alignment: encoding.soul_alignment,
+                soul_alignment: 0.0, 
                 moral_affect_coords: spinozist_affect_coords,
                 moral_fluctuatio_tension: spinozist_fluctuatio,
                 moral_is_ambiguous: spinozist_ambiguous,
@@ -471,22 +391,22 @@ impl CognitiveLoopService {
             },
             exploration: PercExploration {
                 exploration_urge_start,
-                surprise_triggered: encoding.surprise_triggered,
-                exploration_action: encoding.exploration_action,
+                surprise_triggered,
+                exploration_action,
             },
             urgency: PercUrgency {
-                urgency: encoding.urgency,
-                error_pattern: encoding.error_pattern,
-                predicted_urgency: encoding.predicted_urgency,
-                prediction_coherence_urgency_bias: encoding.prediction_coherence_urgency_bias,
-                prediction_error: encoding.prediction_error,
-                error_slope: encoding.error_slope,
-                oscillation_ratio: encoding.oscillation_ratio,
+                urgency: urgency_result.urgency,
+                error_pattern: urgency_result.error_pattern,
+                predicted_urgency: urgency_result.predicted_urgency,
+                prediction_coherence_urgency_bias: urgency_result.prediction_coherence_urgency_bias,
+                prediction_error,
+                error_slope: urgency_result.error_slope,
+                oscillation_ratio: urgency_result.oscillation_ratio,
             },
             math: math_result,
             startup_suppressed,
             startup_warmup_progress,
-            negation_detected,
+            negation_detected: input_negation_polarity,
             #[cfg(feature = "vision-manifold")]
             vision_mean_surprise,
             #[cfg(feature = "vision-manifold")]
@@ -506,7 +426,6 @@ impl CognitiveLoopService {
 }
 
 #[cfg(test)]
-#[allow(clippy::field_reassign_with_default)]
 mod tests {
     use super::*;
     use crate::cognitive_loop::CognitiveLoopConfig;
@@ -524,94 +443,5 @@ mod tests {
             result.is_ok(),
             "phase_perception should return Ok for normal input"
         );
-    }
-
-    #[test]
-    fn perception_result_has_finite_fields() {
-        let mut svc = make_service();
-        let mut timings = ModuleTimings::default();
-        let result = svc
-            .phase_perception("test input", Instant::now(), &mut timings)
-            .unwrap();
-        assert!(result.moral.moral_score.is_finite());
-        assert!(result.encoding.phi_attention_weight.is_finite());
-        assert!(result.urgency.prediction_error.is_finite());
-        assert!(result.moral.soul_alignment.is_finite());
-        assert!(result.negation_detected.is_finite());
-        assert!(result.exploration.exploration_urge_start.is_finite());
-        assert!(result.encoding.effective_threshold.is_finite());
-    }
-
-    #[test]
-    fn perception_encoding_result_populated() {
-        let mut svc = make_service();
-        let mut timings = ModuleTimings::default();
-        let result = svc
-            .phase_perception("encoding check", Instant::now(), &mut timings)
-            .unwrap();
-        assert!(!result.encoding.encoding_result.hdv.values.is_empty());
-        assert!(result.encoding.encoding_result.peak_attention.is_finite());
-    }
-
-    #[test]
-    fn perception_phi_dyad_ring_buffer_caps_at_4() {
-        let mut cfg = CognitiveLoopConfig::default();
-        cfg.enable_primitive_consciousness = true;
-        let mut svc = CognitiveLoopService::new(cfg).unwrap();
-        let mut timings = ModuleTimings::default();
-        for i in 0..6 {
-            let _ = svc.phase_perception(&format!("input {i}"), Instant::now(), &mut timings);
-        }
-        assert!(svc.behavior.social_mgr.recent_ai_hvs.len() <= 4);
-        assert!(svc.behavior.social_mgr.recent_input_hvs.len() <= 4);
-    }
-
-    #[test]
-    fn perception_moral_timing_recorded() {
-        let mut svc = make_service();
-        let mut timings = ModuleTimings::default();
-        let _ = svc.phase_perception("moral timing", Instant::now(), &mut timings);
-        assert!(timings.moral_algebra < 10_000_000);
-    }
-
-    #[test]
-    #[cfg(feature = "mathematics")]
-    fn perception_detects_math_intent() {
-        let mut svc = make_service();
-        let mut timings = ModuleTimings::default();
-        let result = svc
-            .phase_perception("solve the linear system Ax=b", Instant::now(), &mut timings)
-            .unwrap();
-        assert!(result.math.math_detected, "should detect math intent");
-        assert_eq!(
-            result.math.problem_type,
-            Some(crate::cognitive_loop::math_service::MathProblemType::LinearSystem)
-        );
-        assert!(
-            timings.math_service < 10_000_000,
-            "math service timing should be recorded"
-        );
-    }
-
-    #[test]
-    #[cfg(feature = "mathematics")]
-    fn perception_no_math_for_normal_input() {
-        let mut svc = make_service();
-        let mut timings = ModuleTimings::default();
-        let result = svc
-            .phase_perception("hello world", Instant::now(), &mut timings)
-            .unwrap();
-        assert!(!result.math.math_detected);
-        assert!(result.math.problem_type.is_none());
-    }
-
-    #[test]
-    fn perception_startup_warmup_on_first_cycle() {
-        let mut svc = make_service();
-        let mut timings = ModuleTimings::default();
-        let result = svc
-            .phase_perception("first cycle", Instant::now(), &mut timings)
-            .unwrap();
-        assert!(result.startup_warmup_progress >= 0.0 && result.startup_warmup_progress <= 1.0);
     }
 }

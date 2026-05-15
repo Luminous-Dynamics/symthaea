@@ -342,9 +342,11 @@ mod tests {
     fn test_extract_dataset() {
         let plugin = ResearchPlugin;
         let entities = plugin.extract_entities("Evaluated on MNIST and CIFAR-10");
-        assert!(entities
-            .iter()
-            .any(|e| e.entity_type == "dataset" && e.value == "mnist"));
+        assert!(
+            entities
+                .iter()
+                .any(|e| e.entity_type == "dataset" && e.value == "mnist")
+        );
     }
 
     #[test]

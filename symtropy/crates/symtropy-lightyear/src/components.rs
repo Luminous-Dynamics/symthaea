@@ -6,7 +6,6 @@
 //! Lightyear handles serialization, prediction, rollback, and
 //! interpolation for these automatically.
 
-use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
 use bevy_reflect::Reflect;
 use serde::{Deserialize, Serialize};
@@ -70,4 +69,41 @@ pub struct NetAuthority {
     pub peer_id: u64,
     /// Whether authority can be transferred (e.g., proximity-based).
     pub transferable: bool,
+}
+
+/// Component identifying the spatial zone of an entity (Morton prefix).
+#[derive(Component, Clone, Debug, Serialize, Deserialize, PartialEq, Reflect)]
+pub struct SpatialZone(pub u64);
+
+/// Update spatial authority and zones based on Morton codes.
+pub fn update_spatial_authority<const D: usize>(
+    mut query: Query<(&NetPosition, &NetAuthority, Option<&mut SpatialZone>)>,
+) {
+    // 1. Define world bounds (demo-fixed for now)
+    let min = nalgebra::SVector::<f64, D>::from_element(-100.0);
+    let max = nalgebra::SVector::<f64, D>::from_element(100.0);
+
+    for (pos, _auth, zone) in query.iter_mut() {
+        let mut p = nalgebra::SVector::<f64, D>::zeros();
+        p[0] = pos.x;
+        if D >= 2 {
+            p[1] = pos.y;
+        }
+        if D >= 3 {
+            p[2] = pos.z;
+        }
+
+        // 2. Compute Morton code
+        let code = symtropy_physics::broadphase::morton_encode::<D>(&p, &min, &max);
+
+        // 3. Extract 4-bit prefix for coarse spatial partitioning
+        let prefix = symtropy_physics::broadphase::morton_prefix(code, 4);
+
+        if let Some(mut z) = zone {
+            z.0 = prefix;
+        }
+
+        // 4. In a real p2p setup, authority would follow the prefix
+        // (e.g. peer_id = prefix % num_peers)
+    }
 }

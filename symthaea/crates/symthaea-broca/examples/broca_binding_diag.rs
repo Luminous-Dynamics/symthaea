@@ -20,6 +20,7 @@ use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
 
 const TOP_K: usize = 8;
+const DEFAULT_GENESIS_PHRASE: &str = "broca-training-default";
 
 fn main() -> Result<()> {
     tracing_subscriber::fmt()
@@ -37,6 +38,12 @@ fn main() -> Result<()> {
         BrocaGenerator::from_checkpoint(&opts.checkpoint, &genesis)
     }
     .with_context(|| format!("loading checkpoint {}", opts.checkpoint.display()))?;
+    if opts.thought_logit_residual_weight > 0.0 {
+        generator
+            .controller_mut()
+            .config_mut()
+            .thought_logit_residual_weight = opts.thought_logit_residual_weight.clamp(0.0, 1.0);
+    }
 
     let dataset = CanonicalEvalDataset::from_jsonl(
         opts.canonical_eval
@@ -80,6 +87,8 @@ fn main() -> Result<()> {
             .baseline_checkpoint
             .as_ref()
             .map(|p| p.display().to_string()),
+        genesis_phrase: opts.genesis_phrase,
+        thought_logit_residual_weight: opts.thought_logit_residual_weight.clamp(0.0, 1.0),
         eval_limit: opts.eval_limit,
         max_positions: opts.max_positions,
         checkpoint_delta,
@@ -106,6 +115,7 @@ struct Opts {
     max_positions: usize,
     genesis_phrase: String,
     allow_checksum_mismatch: bool,
+    thought_logit_residual_weight: f32,
 }
 
 impl Opts {
@@ -118,8 +128,9 @@ impl Opts {
             json_out: None,
             eval_limit: 2,
             max_positions: 4,
-            genesis_phrase: "broca".to_string(),
+            genesis_phrase: DEFAULT_GENESIS_PHRASE.to_string(),
             allow_checksum_mismatch: false,
+            thought_logit_residual_weight: 0.0,
         };
 
         while let Some(arg) = args.next() {
@@ -136,6 +147,10 @@ impl Opts {
                 "--max-positions" => opts.max_positions = next_usize(&mut args, "--max-positions")?,
                 "--genesis" => opts.genesis_phrase = next_string(&mut args, "--genesis")?,
                 "--allow-checksum-mismatch" => opts.allow_checksum_mismatch = true,
+                "--thought-logit-residual" => {
+                    opts.thought_logit_residual_weight =
+                        next_f32(&mut args, "--thought-logit-residual")?
+                }
                 "-h" | "--help" => {
                     print_usage();
                     std::process::exit(0);
@@ -161,7 +176,9 @@ fn print_usage() {
     eprintln!(
         "Usage: cargo run -p symthaea-broca --example broca_binding_diag -- \\
          --checkpoint PATH --canonical-eval PATH [--baseline-checkpoint PATH] \\
-         [--json-out PATH] [--eval-limit N] [--max-positions N]"
+         [--json-out PATH] [--eval-limit N] [--max-positions N] \\
+         [--genesis PHRASE] [--thought-logit-residual F]\n\
+         Default --genesis: {DEFAULT_GENESIS_PHRASE}"
     );
 }
 
@@ -181,11 +198,20 @@ fn next_usize(args: &mut impl Iterator<Item = String>, flag: &str) -> Result<usi
         .with_context(|| format!("{flag} value {value:?} is not a usize"))
 }
 
+fn next_f32(args: &mut impl Iterator<Item = String>, flag: &str) -> Result<f32> {
+    let value = next_string(args, flag)?;
+    value
+        .parse()
+        .with_context(|| format!("{flag} value {value:?} is not an f32"))
+}
+
 #[derive(Debug, Serialize)]
 struct BindingDiagReport {
     schema_version: u32,
     checkpoint: String,
     baseline_checkpoint: Option<String>,
+    genesis_phrase: String,
+    thought_logit_residual_weight: f32,
     eval_limit: usize,
     max_positions: usize,
     checkpoint_delta: Option<CheckpointDelta>,

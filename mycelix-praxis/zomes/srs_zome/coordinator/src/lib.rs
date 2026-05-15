@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -9,8 +8,9 @@ use mycelix_zome_helpers as _;
 //! scheduling reviews, and tracking learning statistics.
 
 use hdk::prelude::*;
-use srs_integrity::*;
+use mycelix_zome_helpers as _;
 use praxis_core::errors::{srs_errors, EduNetError};
+use srs_integrity::*;
 
 /// Convert an EduNetError to a WasmError
 fn to_wasm_error(err: EduNetError) -> WasmError {
@@ -64,13 +64,19 @@ fn sm2_algorithm(
     // EF' = EF + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02))
     let current_ef = current_ease_permille as f64 / 1000.0;
     let adjustment = 0.1 - (5.0 - q) * (0.08 + (5.0 - q) * 0.02);
-    let new_ef = (current_ef + adjustment).max(MIN_EASE_PERMILLE as f64 / 1000.0)
+    let new_ef = (current_ef + adjustment)
+        .max(MIN_EASE_PERMILLE as f64 / 1000.0)
         .min(MAX_EASE_PERMILLE as f64 / 1000.0);
     let new_ease_permille = (new_ef * 1000.0) as u16;
 
     if quality < 3 {
         // Failed review - reset to learning phase
-        (new_ease_permille, config.learning_steps_minutes.first().copied().unwrap_or(1), 0, CardStatus::Learning)
+        (
+            new_ease_permille,
+            config.learning_steps_minutes.first().copied().unwrap_or(1),
+            0,
+            CardStatus::Learning,
+        )
     } else {
         // Successful review
         let new_repetitions = current_repetitions + 1;
@@ -83,14 +89,16 @@ fn sm2_algorithm(
             6 * MINUTES_PER_DAY
         } else {
             // Subsequent reviews - multiply by ease factor
-            let interval_days = (current_interval_minutes as f64 / MINUTES_PER_DAY as f64 * new_ef) as u32;
+            let interval_days =
+                (current_interval_minutes as f64 / MINUTES_PER_DAY as f64 * new_ef) as u32;
             let capped_days = interval_days.min(config.max_interval_days);
             capped_days * MINUTES_PER_DAY
         };
 
         // Apply interval modifier
         let modified_interval = (new_interval_minutes as f64
-            * (config.interval_modifier_permille as f64 / 1000.0)) as u32;
+            * (config.interval_modifier_permille as f64 / 1000.0))
+            as u32;
 
         // Determine status
         let new_status = if modified_interval >= 365 * MINUTES_PER_DAY {
@@ -99,7 +107,12 @@ fn sm2_algorithm(
             CardStatus::Review
         };
 
-        (new_ease_permille, modified_interval, new_repetitions, new_status)
+        (
+            new_ease_permille,
+            modified_interval,
+            new_repetitions,
+            new_status,
+        )
     }
 }
 
@@ -200,16 +213,12 @@ pub fn create_card(input: CreateCardInput) -> ExternResult<Record> {
 
     // Link to deck if specified
     if let Some(deck_hash) = input.deck_hash {
-        create_link(
-            deck_hash,
-            action_hash.clone(),
-            LinkTypes::DeckToCards,
-            (),
-        )?;
+        create_link(deck_hash, action_hash.clone(), LinkTypes::DeckToCards, ())?;
     }
 
-    let record = get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get created card".into())))?;
+    let record = get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Failed to get created card".into())
+    ))?;
 
     Ok(record)
 }
@@ -261,11 +270,16 @@ pub fn get_due_cards(limit: u32) -> ExternResult<Vec<Record>> {
     let mut due_cards: Vec<(Record, i64)> = all_cards
         .into_iter()
         .filter_map(|record| {
-            record.entry()
+            record
+                .entry()
                 .to_app_option::<ReviewCard>()
                 .ok()
                 .flatten()
-                .filter(|card| card.due_at <= now && card.status != CardStatus::Suspended && card.status != CardStatus::Buried)
+                .filter(|card| {
+                    card.due_at <= now
+                        && card.status != CardStatus::Suspended
+                        && card.status != CardStatus::Buried
+                })
                 .map(|card| (record, card.due_at))
         })
         .collect();
@@ -274,7 +288,11 @@ pub fn get_due_cards(limit: u32) -> ExternResult<Vec<Record>> {
     due_cards.sort_by_key(|(_, due_at)| *due_at);
 
     // Return limited number
-    Ok(due_cards.into_iter().take(limit as usize).map(|(r, _)| r).collect())
+    Ok(due_cards
+        .into_iter()
+        .take(limit as usize)
+        .map(|(r, _)| r)
+        .collect())
 }
 
 /// Suspend a card
@@ -284,22 +302,28 @@ pub fn suspend_card(action_hash: ActionHash) -> ExternResult<Record> {
     let record = get(action_hash.clone(), GetOptions::default())?
         .ok_or_else(|| to_wasm_error(srs_errors::card_not_found(&hash_str)))?;
 
-    let mut card: ReviewCard = record.entry()
+    let mut card: ReviewCard = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(e))?
-        .ok_or_else(|| to_wasm_error(
-            praxis_core::errors::errors::invalid_entry("ReviewCard", &hash_str)
-        ))?;
+        .ok_or_else(|| {
+            to_wasm_error(praxis_core::errors::errors::invalid_entry(
+                "ReviewCard",
+                &hash_str,
+            ))
+        })?;
 
     card.status = CardStatus::Suspended;
     card.modified_at = current_time()?;
 
     let new_hash = update_entry(action_hash, card)?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or_else(|| to_wasm_error(
-            praxis_core::errors::errors::update_failed("ReviewCard", "suspend")
+    get(new_hash, GetOptions::default())?.ok_or_else(|| {
+        to_wasm_error(praxis_core::errors::errors::update_failed(
+            "ReviewCard",
+            "suspend",
         ))
+    })
 }
 
 /// Unsuspend a card
@@ -309,22 +333,28 @@ pub fn unsuspend_card(action_hash: ActionHash) -> ExternResult<Record> {
     let record = get(action_hash.clone(), GetOptions::default())?
         .ok_or_else(|| to_wasm_error(srs_errors::card_not_found(&hash_str)))?;
 
-    let mut card: ReviewCard = record.entry()
+    let mut card: ReviewCard = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(e))?
-        .ok_or_else(|| to_wasm_error(
-            praxis_core::errors::errors::invalid_entry("ReviewCard", &hash_str)
-        ))?;
+        .ok_or_else(|| {
+            to_wasm_error(praxis_core::errors::errors::invalid_entry(
+                "ReviewCard",
+                &hash_str,
+            ))
+        })?;
 
     card.status = CardStatus::Review;
     card.modified_at = current_time()?;
 
     let new_hash = update_entry(action_hash, card)?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or_else(|| to_wasm_error(
-            praxis_core::errors::errors::update_failed("ReviewCard", "unsuspend")
+    get(new_hash, GetOptions::default())?.ok_or_else(|| {
+        to_wasm_error(praxis_core::errors::errors::update_failed(
+            "ReviewCard",
+            "unsuspend",
         ))
+    })
 }
 
 /// Bury a card until tomorrow
@@ -334,12 +364,16 @@ pub fn bury_card(action_hash: ActionHash) -> ExternResult<Record> {
     let record = get(action_hash.clone(), GetOptions::default())?
         .ok_or_else(|| to_wasm_error(srs_errors::card_not_found(&hash_str)))?;
 
-    let mut card: ReviewCard = record.entry()
+    let mut card: ReviewCard = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(e))?
-        .ok_or_else(|| to_wasm_error(
-            praxis_core::errors::errors::invalid_entry("ReviewCard", &hash_str)
-        ))?;
+        .ok_or_else(|| {
+            to_wasm_error(praxis_core::errors::errors::invalid_entry(
+                "ReviewCard",
+                &hash_str,
+            ))
+        })?;
 
     let now = current_time()?;
     card.status = CardStatus::Buried;
@@ -348,10 +382,12 @@ pub fn bury_card(action_hash: ActionHash) -> ExternResult<Record> {
 
     let new_hash = update_entry(action_hash, card)?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or_else(|| to_wasm_error(
-            praxis_core::errors::errors::update_failed("ReviewCard", "bury")
+    get(new_hash, GetOptions::default())?.ok_or_else(|| {
+        to_wasm_error(praxis_core::errors::errors::update_failed(
+            "ReviewCard",
+            "bury",
         ))
+    })
 }
 
 // ============== Review Processing ==============
@@ -361,7 +397,9 @@ pub fn bury_card(action_hash: ActionHash) -> ExternResult<Record> {
 pub fn submit_review(input: SubmitReviewInput) -> ExternResult<Record> {
     // Validate input quality (must be 0-5 for SM-2)
     if input.quality > 5 {
-        return Err(to_wasm_error(srs_errors::invalid_recall_quality(input.quality)));
+        return Err(to_wasm_error(srs_errors::invalid_recall_quality(
+            input.quality,
+        )));
     }
 
     let now = current_time()?;
@@ -372,12 +410,16 @@ pub fn submit_review(input: SubmitReviewInput) -> ExternResult<Record> {
     let record = get(input.card_hash.clone(), GetOptions::default())?
         .ok_or_else(|| to_wasm_error(srs_errors::card_not_found(&hash_str)))?;
 
-    let mut card: ReviewCard = record.entry()
+    let mut card: ReviewCard = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(e))?
-        .ok_or_else(|| to_wasm_error(
-            praxis_core::errors::errors::invalid_entry("ReviewCard", &hash_str)
-        ))?;
+        .ok_or_else(|| {
+            to_wasm_error(praxis_core::errors::errors::invalid_entry(
+                "ReviewCard",
+                &hash_str,
+            ))
+        })?;
 
     // Check if card is suspended (shouldn't be reviewed)
     if card.status == CardStatus::Suspended {
@@ -386,21 +428,25 @@ pub fn submit_review(input: SubmitReviewInput) -> ExternResult<Record> {
                 praxis_core::errors::ErrorCode::InvalidEntityState,
                 "ReviewCard",
                 "review",
-                "Cannot review a suspended card"
+                "Cannot review a suspended card",
             )
             .with_context(&hash_str)
-            .with_hint("Unsuspend the card first using unsuspend_card")
+            .with_hint("Unsuspend the card first using unsuspend_card"),
         ));
     }
 
     // Get learner config
     let config = get_or_create_config(())?;
-    let config_entry: SrsConfig = config.entry()
+    let config_entry: SrsConfig = config
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(e))?
-        .ok_or_else(|| to_wasm_error(
-            praxis_core::errors::errors::invalid_entry("SrsConfig", "default")
-        ))?;
+        .ok_or_else(|| {
+            to_wasm_error(praxis_core::errors::errors::invalid_entry(
+                "SrsConfig",
+                "default",
+            ))
+        })?;
 
     // Store old values for the event
     let ease_before = card.ease_factor_permille;
@@ -438,7 +484,8 @@ pub fn submit_review(input: SubmitReviewInput) -> ExternResult<Record> {
         card.avg_time_seconds = (input.response_time_ms / 1000) as u32;
     } else {
         let total_time = card.avg_time_seconds * (card.total_reviews - 1);
-        card.avg_time_seconds = (total_time + (input.response_time_ms / 1000) as u32) / card.total_reviews;
+        card.avg_time_seconds =
+            (total_time + (input.response_time_ms / 1000) as u32) / card.total_reviews;
     }
 
     // Check for leech
@@ -488,15 +535,16 @@ pub fn submit_review(input: SubmitReviewInput) -> ExternResult<Record> {
     // Update card
     let new_hash = update_entry(input.card_hash, card)?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get updated card".into())))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to get updated card".into()
+    )))
 }
 
 /// Input for submitting a review
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SubmitReviewInput {
     pub card_hash: ActionHash,
-    pub quality: u8,  // 0-5
+    pub quality: u8, // 0-5
     pub response_time_ms: u32,
 }
 
@@ -550,8 +598,9 @@ pub fn start_session(pod_hash: Option<ActionHash>) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get created session".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to get created session".into()
+    )))
 }
 
 /// End a review session
@@ -559,13 +608,17 @@ pub fn start_session(pod_hash: Option<ActionHash>) -> ExternResult<Record> {
 pub fn end_session(input: EndSessionInput) -> ExternResult<Record> {
     let now = current_time()?;
 
-    let record = get(input.session_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Session not found".into())))?;
+    let record = get(input.session_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Session not found".into())
+    ))?;
 
-    let mut session: ReviewSession = record.entry()
+    let mut session: ReviewSession = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(e))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid session entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid session entry".into()
+        )))?;
 
     session.cards_reviewed = input.cards_reviewed;
     session.correct_count = input.correct_count;
@@ -578,11 +631,32 @@ pub fn end_session(input: EndSessionInput) -> ExternResult<Record> {
 
     let new_hash = update_entry(input.session_hash, session)?;
 
+    // --- LIQUID LEARNING FEEDBACK (Vector 2) ---
+    // We report learning success (retention * duration) to the global identity substrate.
+    let retention = if input.correct_count + input.incorrect_count > 0 {
+        input.correct_count as f64 / (input.correct_count + input.incorrect_count) as f64
+    } else {
+        0.0
+    };
+
+    call(
+        CallTargetCell::OtherRole("identity".into()),
+        "reputation_aggregator".into(),
+        "report_domain_score".into(),
+        None,
+        serde_json::json!({
+            "agent_pubkey_b64": agent_info()?.agent_initial_pubkey.to_string(),
+            "cluster": "learning",
+            "score": retention.clamp(0.0, 1.0)
+        }),
+    )?;
+
     // Update daily stats
     update_daily_stats(input.correct_count, input.incorrect_count, duration)?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get updated session".into())))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to get updated session".into()
+    )))
 }
 
 /// Input for ending a session
@@ -608,7 +682,12 @@ pub fn get_my_sessions(limit: u32) -> ExternResult<Vec<Record>> {
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
             if let Some(record) = get(action_hash, GetOptions::default())? {
-                if let Some(session) = record.entry().to_app_option::<ReviewSession>().ok().flatten() {
+                if let Some(session) = record
+                    .entry()
+                    .to_app_option::<ReviewSession>()
+                    .ok()
+                    .flatten()
+                {
                     sessions.push((record, session.started_at));
                 }
             }
@@ -618,7 +697,11 @@ pub fn get_my_sessions(limit: u32) -> ExternResult<Vec<Record>> {
     // Sort by start time (newest first)
     sessions.sort_by(|a, b| b.1.cmp(&a.1));
 
-    Ok(sessions.into_iter().take(limit as usize).map(|(r, _)| r).collect())
+    Ok(sessions
+        .into_iter()
+        .take(limit as usize)
+        .map(|(r, _)| r)
+        .collect())
 }
 
 // ============== Statistics ==============
@@ -643,13 +726,17 @@ fn update_daily_stats(correct: u32, incorrect: u32, duration_seconds: u32) -> Ex
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(mut stats) = record.entry().to_app_option::<DailyStats>().ok().flatten() {
+                if let Some(mut stats) = record.entry().to_app_option::<DailyStats>().ok().flatten()
+                {
                     if stats.date == date {
                         // Update existing stats
                         stats.reviews += correct + incorrect;
                         stats.study_time_seconds += duration_seconds;
                         let total_attempts = stats.reviews;
-                        let total_correct = (stats.retention_permille as u32 * (total_attempts - correct - incorrect) / 1000) + correct;
+                        let total_correct = (stats.retention_permille as u32
+                            * (total_attempts - correct - incorrect)
+                            / 1000)
+                            + correct;
                         stats.retention_permille = if total_attempts > 0 {
                             ((total_correct * 1000) / total_attempts) as u16
                         } else {
@@ -684,12 +771,7 @@ fn update_daily_stats(correct: u32, incorrect: u32, duration_seconds: u32) -> Ex
 
     let action_hash = create_entry(EntryTypes::DailyStats(stats))?;
 
-    create_link(
-        anchor_hash,
-        action_hash,
-        LinkTypes::LearnerToStats,
-        (),
-    )?;
+    create_link(anchor_hash, action_hash, LinkTypes::LearnerToStats, ())?;
 
     Ok(())
 }
@@ -708,7 +790,9 @@ pub fn get_stats(input: GetStatsInput) -> ExternResult<Vec<Record>> {
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
             if let Some(record) = get(action_hash, GetOptions::default())? {
-                if let Some(daily_stats) = record.entry().to_app_option::<DailyStats>().ok().flatten() {
+                if let Some(daily_stats) =
+                    record.entry().to_app_option::<DailyStats>().ok().flatten()
+                {
                     if daily_stats.date >= input.from_date && daily_stats.date <= input.to_date {
                         stats.push(record);
                     }
@@ -825,39 +909,65 @@ pub fn get_or_create_config(_: ()) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get created config".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to get created config".into()
+    )))
 }
 
 /// Update SRS configuration
 #[hdk_extern]
 pub fn update_config(input: UpdateConfigInput) -> ExternResult<Record> {
-    let record = get(input.config_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Config not found".into())))?;
+    let record = get(input.config_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Config not found".into())
+    ))?;
 
-    let mut config: SrsConfig = record.entry()
+    let mut config: SrsConfig = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(e))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid config entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid config entry".into()
+        )))?;
 
     // Apply updates
-    if let Some(v) = input.new_cards_per_day { config.new_cards_per_day = v; }
-    if let Some(v) = input.learning_steps_minutes { config.learning_steps_minutes = v; }
-    if let Some(v) = input.graduating_interval_days { config.graduating_interval_days = v; }
-    if let Some(v) = input.easy_interval_days { config.easy_interval_days = v; }
-    if let Some(v) = input.max_reviews_per_day { config.max_reviews_per_day = v; }
-    if let Some(v) = input.max_interval_days { config.max_interval_days = v; }
-    if let Some(v) = input.leech_threshold { config.leech_threshold = v; }
-    if let Some(v) = input.leech_action { config.leech_action = v; }
-    if let Some(v) = input.day_start_hour { config.day_start_hour = v; }
-    if let Some(v) = input.timezone_offset_minutes { config.timezone_offset_minutes = v; }
+    if let Some(v) = input.new_cards_per_day {
+        config.new_cards_per_day = v;
+    }
+    if let Some(v) = input.learning_steps_minutes {
+        config.learning_steps_minutes = v;
+    }
+    if let Some(v) = input.graduating_interval_days {
+        config.graduating_interval_days = v;
+    }
+    if let Some(v) = input.easy_interval_days {
+        config.easy_interval_days = v;
+    }
+    if let Some(v) = input.max_reviews_per_day {
+        config.max_reviews_per_day = v;
+    }
+    if let Some(v) = input.max_interval_days {
+        config.max_interval_days = v;
+    }
+    if let Some(v) = input.leech_threshold {
+        config.leech_threshold = v;
+    }
+    if let Some(v) = input.leech_action {
+        config.leech_action = v;
+    }
+    if let Some(v) = input.day_start_hour {
+        config.day_start_hour = v;
+    }
+    if let Some(v) = input.timezone_offset_minutes {
+        config.timezone_offset_minutes = v;
+    }
 
     config.modified_at = current_time()?;
 
     let new_hash = update_entry(input.config_hash, config)?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get updated config".into())))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to get updated config".into()
+    )))
 }
 
 /// Input for updating config
@@ -920,8 +1030,9 @@ pub fn create_deck(input: CreateDeckInput) -> ExternResult<Record> {
         )?;
     }
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get created deck".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to get created deck".into()
+    )))
 }
 
 /// Input for creating a deck
@@ -1004,12 +1115,7 @@ pub fn get_deck_cards(deck_hash: ActionHash) -> ExternResult<Vec<Record>> {
 /// Add a card to a deck
 #[hdk_extern]
 pub fn add_card_to_deck(input: AddCardToDeckInput) -> ExternResult<()> {
-    create_link(
-        input.deck_hash,
-        input.card_hash,
-        LinkTypes::DeckToCards,
-        (),
-    )?;
+    create_link(input.deck_hash, input.card_hash, LinkTypes::DeckToCards, ())?;
     Ok(())
 }
 
@@ -1082,7 +1188,8 @@ mod tests {
         };
 
         // Failed response (quality = 2)
-        let (ease, interval, reps, status) = sm2_algorithm(2, 2500, 6 * MINUTES_PER_DAY, 3, &config);
+        let (ease, interval, reps, status) =
+            sm2_algorithm(2, 2500, 6 * MINUTES_PER_DAY, 3, &config);
 
         // Should reset to learning phase
         assert_eq!(reps, 0);
@@ -1119,7 +1226,8 @@ mod tests {
         assert!(ease >= MIN_EASE_PERMILLE);
 
         // Test maximum ease bound (many perfect responses)
-        let (ease, _, _, _) = sm2_algorithm(5, MAX_EASE_PERMILLE, 30 * MINUTES_PER_DAY, 10, &config);
+        let (ease, _, _, _) =
+            sm2_algorithm(5, MAX_EASE_PERMILLE, 30 * MINUTES_PER_DAY, 10, &config);
         assert!(ease <= MAX_EASE_PERMILLE);
     }
 

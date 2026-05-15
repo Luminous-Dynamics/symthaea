@@ -3,6 +3,8 @@ members = [
     "src/core",
     "src/api",
     "src/cli",
+    "zomes/desci_claim/integrity",
+    "zomes/desci_claim/coordinator",
 ]
 exclude = ["apps/leptos"]
 resolver = "2"

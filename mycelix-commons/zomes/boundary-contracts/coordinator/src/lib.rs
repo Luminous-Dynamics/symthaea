@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -13,6 +12,7 @@ use mycelix_zome_helpers as _;
 use boundary_contracts_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::{civic_requirement_basic, civic_requirement_proposal};
+use mycelix_zome_helpers as _;
 use mycelix_zome_helpers::records_from_links;
 
 // =============================================================================
@@ -205,7 +205,6 @@ fn bridge_reputation_slash(violator: &AgentPubKey, slash_factor: f32) -> bool {
 // Helpers
 // =============================================================================
 
-
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
     hash_entry(&EntryTypes::Anchor(anchor))
@@ -238,7 +237,11 @@ pub struct ProposeContractInput {
 /// Checks the other party's standing boundaries for blocks.
 #[hdk_extern]
 pub fn propose_contract(input: ProposeContractInput) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "propose_contract")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "propose_contract",
+    )?;
 
     let agent_info = agent_info()?;
     let proposer = agent_info.agent_initial_pubkey.clone();
@@ -252,11 +255,7 @@ pub fn propose_contract(input: ProposeContractInput) -> ExternResult<Record> {
     }
 
     // Generate unique contract ID
-    let id = format!(
-        "bc-{}-{}",
-        now.as_micros(),
-        &proposer.to_string()[..8]
-    );
+    let id = format!("bc-{}-{}", now.as_micros(), &proposer.to_string()[..8]);
 
     let contract = BoundaryContract {
         id,
@@ -322,28 +321,36 @@ pub fn propose_contract(input: ProposeContractInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(contract_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get created contract".into())))
+    get(contract_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to get created contract".into()
+    )))
 }
 
 /// Sign/countersign a proposed contract. Transitions Proposed -> Active.
 /// Only the non-proposing party can call this.
 #[hdk_extern]
 pub fn sign_contract(contract_hash: ActionHash) -> ExternResult<Record> {
-    mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_basic(), "sign_contract")?;
+    mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_basic(),
+        "sign_contract",
+    )?;
 
     let agent_info = agent_info()?;
     let signer = agent_info.agent_initial_pubkey;
     let now = sys_time()?;
 
-    let record = get(contract_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Contract not found".into())))?;
+    let record = get(contract_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Contract not found".into())
+    ))?;
 
     let mut contract: BoundaryContract = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize: {e}"))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not a contract entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Not a contract entry".into()
+        )))?;
 
     // Must be a party, and must be the non-signer
     if signer != contract.provider && signer != contract.receiver {
@@ -370,8 +377,9 @@ pub fn sign_contract(contract_hash: ActionHash) -> ExternResult<Record> {
 
     let new_hash = update_entry(contract_hash, &EntryTypes::BoundaryContract(contract))?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get signed contract".into())))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to get signed contract".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -387,14 +395,17 @@ pub fn revoke_contract(input: RevokeContractInput) -> ExternResult<Record> {
     let agent_info = agent_info()?;
     let now = sys_time()?;
 
-    let record = get(input.contract_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Contract not found".into())))?;
+    let record = get(input.contract_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Contract not found".into())
+    ))?;
 
     let mut contract: BoundaryContract = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize: {e}"))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not a contract entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Not a contract entry".into()
+        )))?;
 
     let revoker = agent_info.agent_initial_pubkey;
     if revoker != contract.provider && revoker != contract.receiver {
@@ -413,12 +424,17 @@ pub fn revoke_contract(input: RevokeContractInput) -> ExternResult<Record> {
     contract.status = ContractStatus::Revoked;
     contract.updated_at = now;
 
-    let new_hash = update_entry(input.contract_hash, &EntryTypes::BoundaryContract(contract.clone()))?;
+    let new_hash = update_entry(
+        input.contract_hash,
+        &EntryTypes::BoundaryContract(contract.clone()),
+    )?;
 
     // Bridge call to TEND for partial settlement based on elapsed time.
     // Best-effort: if TEND is unreachable, the revocation still succeeds.
     if contract.provider_signed_at.is_some() && contract.receiver_signed_at.is_some() {
-        let elapsed_micros = now.as_micros().saturating_sub(contract.created_at.as_micros());
+        let elapsed_micros = now
+            .as_micros()
+            .saturating_sub(contract.created_at.as_micros());
         let total_micros = (contract.duration_minutes as i64) * 60 * 1_000_000;
         let fraction = if total_micros > 0 {
             (elapsed_micros as f32 / total_micros as f32).clamp(0.0, 1.0)
@@ -439,8 +455,9 @@ pub fn revoke_contract(input: RevokeContractInput) -> ExternResult<Record> {
         }
     }
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get revoked contract".into())))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to get revoked contract".into()
+    )))
 }
 
 /// Complete a contract. Either party marks as completed.
@@ -450,14 +467,17 @@ pub fn complete_contract(contract_hash: ActionHash) -> ExternResult<Record> {
     let agent_info = agent_info()?;
     let now = sys_time()?;
 
-    let record = get(contract_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Contract not found".into())))?;
+    let record = get(contract_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Contract not found".into())
+    ))?;
 
     let mut contract: BoundaryContract = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize: {e}"))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not a contract entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Not a contract entry".into()
+        )))?;
 
     let completer = agent_info.agent_initial_pubkey;
     if completer != contract.provider && completer != contract.receiver {
@@ -466,7 +486,10 @@ pub fn complete_contract(contract_hash: ActionHash) -> ExternResult<Record> {
         )));
     }
 
-    if !contract.status.can_transition_to(&ContractStatus::Completed) {
+    if !contract
+        .status
+        .can_transition_to(&ContractStatus::Completed)
+    {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "Cannot complete from {:?} status",
             contract.status
@@ -476,7 +499,10 @@ pub fn complete_contract(contract_hash: ActionHash) -> ExternResult<Record> {
     contract.status = ContractStatus::Completed;
     contract.updated_at = now;
 
-    let new_hash = update_entry(contract_hash, &EntryTypes::BoundaryContract(contract.clone()))?;
+    let new_hash = update_entry(
+        contract_hash,
+        &EntryTypes::BoundaryContract(contract.clone()),
+    )?;
 
     // Bridge call to TEND for full settlement.
     // Best-effort: if TEND is unreachable, the completion still succeeds.
@@ -489,8 +515,9 @@ pub fn complete_contract(contract_hash: ActionHash) -> ExternResult<Record> {
         );
     }
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get completed contract".into())))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to get completed contract".into()
+    )))
 }
 
 /// Get a contract by hash (only accessible to parties).
@@ -503,9 +530,13 @@ pub fn get_contract(contract_hash: ActionHash) -> ExternResult<Option<Record>> {
 #[hdk_extern]
 pub fn get_my_contracts(_: ()) -> ExternResult<Vec<Record>> {
     let agent_info = agent_info()?;
-    let agent_anchor = anchor_hash(&format!("agent_contracts:{}", agent_info.agent_initial_pubkey))?;
+    let agent_anchor = anchor_hash(&format!(
+        "agent_contracts:{}",
+        agent_info.agent_initial_pubkey
+    ))?;
     let links = get_links(
-        LinkQuery::try_new(agent_anchor, LinkTypes::AgentToContracts)?, GetStrategy::default(),
+        LinkQuery::try_new(agent_anchor, LinkTypes::AgentToContracts)?,
+        GetStrategy::default(),
     )?;
     records_from_links(links)
 }
@@ -548,14 +579,17 @@ pub fn report_violation(input: ReportViolationInput) -> ExternResult<Record> {
     let now = sys_time()?;
 
     // Get the contract to verify party membership
-    let record = get(input.contract_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Contract not found".into())))?;
+    let record = get(input.contract_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Contract not found".into())
+    ))?;
 
     let mut contract: BoundaryContract = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize: {e}"))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not a contract entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Not a contract entry".into()
+        )))?;
 
     // Reporter must be a party
     if reporter != contract.provider && reporter != contract.receiver {
@@ -579,7 +613,10 @@ pub fn report_violation(input: ReportViolationInput) -> ExternResult<Record> {
     if contract.status.can_transition_to(&ContractStatus::Violated) {
         contract.status = ContractStatus::Violated;
         contract.updated_at = now;
-        update_entry(input.contract_hash.clone(), &EntryTypes::BoundaryContract(contract))?;
+        update_entry(
+            input.contract_hash.clone(),
+            &EntryTypes::BoundaryContract(contract),
+        )?;
     }
 
     // Create violation record
@@ -618,15 +655,17 @@ pub fn report_violation(input: ReportViolationInput) -> ExternResult<Record> {
         &input.severity,
     );
 
-    get(violation_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get violation record".into())))
+    get(violation_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to get violation record".into()
+    )))
 }
 
 /// Get violations for a contract (only accessible to parties).
 #[hdk_extern]
 pub fn get_contract_violations(contract_hash: ActionHash) -> ExternResult<Vec<Record>> {
     let links = get_links(
-        LinkQuery::try_new(contract_hash, LinkTypes::ContractToViolation)?, GetStrategy::default(),
+        LinkQuery::try_new(contract_hash, LinkTypes::ContractToViolation)?,
+        GetStrategy::default(),
     )?;
     records_from_links(links)
 }
@@ -648,8 +687,9 @@ pub fn set_standing_boundaries(input: StandingBoundaries) -> ExternResult<Record
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get boundaries".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to get boundaries".into()
+    )))
 }
 
 /// Get the calling agent's standing boundaries.
@@ -664,14 +704,13 @@ pub fn get_my_standing_boundaries(_: ()) -> ExternResult<Option<Record>> {
 pub fn get_agent_standing_boundaries(agent: AgentPubKey) -> ExternResult<Option<Record>> {
     let agent_anchor = anchor_hash(&format!("agent_boundaries:{}", agent))?;
     let links = get_links(
-        LinkQuery::try_new(agent_anchor, LinkTypes::AgentToStandingBoundaries)?, GetStrategy::default(),
+        LinkQuery::try_new(agent_anchor, LinkTypes::AgentToStandingBoundaries)?,
+        GetStrategy::default(),
     )?;
     let records = records_from_links(links)?;
 
     // Return the most recent standing boundaries
-    Ok(records
-        .into_iter()
-        .max_by_key(|r| r.action().timestamp()))
+    Ok(records.into_iter().max_by_key(|r| r.action().timestamp()))
 }
 
 /// Block an agent from proposing contracts.
@@ -713,8 +752,9 @@ pub fn block_agent(agent: AgentPubKey) -> ExternResult<Record> {
 /// Unblock a previously blocked agent.
 #[hdk_extern]
 pub fn unblock_agent(agent: AgentPubKey) -> ExternResult<Record> {
-    let current = get_my_standing_boundaries(())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("No standing boundaries set".into())))?;
+    let current = get_my_standing_boundaries(())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "No standing boundaries set".into()
+    )))?;
 
     let now = sys_time()?;
     let mut boundaries: StandingBoundaries = current
@@ -737,7 +777,13 @@ pub fn can_propose_to(provider: AgentPubKey) -> ExternResult<bool> {
     let me = agent_info.agent_initial_pubkey;
 
     // Check consciousness gate
-    if mycelix_zome_helpers::require_civic("commons_bridge", &civic_requirement_proposal(), "can_propose_to").is_err() {
+    if mycelix_zome_helpers::require_civic(
+        "commons_bridge",
+        &civic_requirement_proposal(),
+        "can_propose_to",
+    )
+    .is_err()
+    {
         return Ok(false);
     }
 

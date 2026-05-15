@@ -33,4 +33,5 @@ pub fn register(app: &mut bevy_app::App) {
     app.register_type::<NetRotation>();
     app.register_type::<NetConsciousness>();
     app.register_type::<NetAuthority>();
+    app.register_type::<SpatialZone>();
 }

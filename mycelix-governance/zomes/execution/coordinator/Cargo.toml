@@ -9,6 +9,7 @@ description = "Governance execution coordinator zome"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+mycelix-bridge-common = { workspace = true }
 hdk = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

@@ -1,4 +1,3 @@
-use mycelix_zome_helpers as _;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -14,6 +13,7 @@ use mycelix_bridge_common::{
     civic_requirement_basic, civic_requirement_proposal, civic_requirement_voting,
     GovernanceEligibility,
 };
+use mycelix_zome_helpers as _;
 
 /// Helper to get an anchor entry hash.
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -33,7 +33,11 @@ fn ensure_anchor(anchor_str: &str) -> ExternResult<EntryHash> {
 /// Request mediation for a dispute.
 #[hdk_extern]
 pub fn request_mediation(request: MediationRequest) -> ExternResult<ActionHash> {
-    let _eligibility = mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "request_mediation")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_proposal(),
+        "request_mediation",
+    )?;
 
     let action_hash = create_entry(&EntryTypes::MediationRequest(request.clone()))?;
 
@@ -43,16 +47,31 @@ pub fn request_mediation(request: MediationRequest) -> ExternResult<ActionHash> 
 
     // Link from requester
     let requester_anchor = ensure_anchor(&format!("agent/{}/mediation", request.requester_did))?;
-    create_link(requester_anchor, action_hash.clone(), LinkTypes::AgentToRequest, ())?;
+    create_link(
+        requester_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentToRequest,
+        (),
+    )?;
 
     // Link from respondent
     let respondent_anchor = ensure_anchor(&format!("agent/{}/mediation", request.respondent_did))?;
-    create_link(respondent_anchor, action_hash.clone(), LinkTypes::AgentToRequest, ())?;
+    create_link(
+        respondent_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentToRequest,
+        (),
+    )?;
 
     // Link by status
     let status_str = format!("{:?}", request.status);
     let status_anchor = ensure_anchor(&format!("mediation/status/{}", status_str))?;
-    create_link(status_anchor, action_hash.clone(), LinkTypes::RequestsByStatus, ())?;
+    create_link(
+        status_anchor,
+        action_hash.clone(),
+        LinkTypes::RequestsByStatus,
+        (),
+    )?;
 
     Ok(action_hash)
 }
@@ -88,15 +107,22 @@ pub fn get_my_requests(_: ()) -> ExternResult<Vec<Record>> {
 /// Respondent accepts a mediation request.
 #[hdk_extern]
 pub fn accept_mediation(request_hash: ActionHash) -> ExternResult<ActionHash> {
-    let _eligibility = mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "accept_mediation")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_proposal(),
+        "accept_mediation",
+    )?;
 
-    let record = get(request_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Request not found".into())))?;
+    let record = get(request_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Request not found".into())
+    ))?;
     let mut request: MediationRequest = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid request entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid request entry".into()
+        )))?;
 
     if request.status != MediationStatus::Requested {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -123,15 +149,22 @@ pub struct AssignMediatorInput {
 /// Assign a mediator to a mediation request.
 #[hdk_extern]
 pub fn assign_mediator(input: AssignMediatorInput) -> ExternResult<ActionHash> {
-    let _eligibility = mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_voting(), "assign_mediator")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_voting(),
+        "assign_mediator",
+    )?;
 
-    let record = get(input.request_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Request not found".into())))?;
+    let record = get(input.request_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Request not found".into())
+    ))?;
     let mut request: MediationRequest = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid request entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid request entry".into()
+        )))?;
 
     if request.status != MediationStatus::Accepted {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -151,17 +184,34 @@ pub fn assign_mediator(input: AssignMediatorInput) -> ExternResult<ActionHash> {
 /// Record a mediation session.
 #[hdk_extern]
 pub fn record_session(session: MediationSession) -> ExternResult<ActionHash> {
-    let _eligibility = mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "record_session")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_proposal(),
+        "record_session",
+    )?;
 
     let action_hash = create_entry(&EntryTypes::MediationSession(session.clone()))?;
 
     // Link from request
-    let request_anchor = ensure_anchor(&format!("mediation/request/{}/sessions", session.request_id))?;
-    create_link(request_anchor, action_hash.clone(), LinkTypes::RequestToSession, ())?;
+    let request_anchor = ensure_anchor(&format!(
+        "mediation/request/{}/sessions",
+        session.request_id
+    ))?;
+    create_link(
+        request_anchor,
+        action_hash.clone(),
+        LinkTypes::RequestToSession,
+        (),
+    )?;
 
     // Link from mediator
     let mediator_anchor = ensure_anchor(&format!("mediator/{}/sessions", session.mediator_did))?;
-    create_link(mediator_anchor, action_hash.clone(), LinkTypes::MediatorToSession, ())?;
+    create_link(
+        mediator_anchor,
+        action_hash.clone(),
+        LinkTypes::MediatorToSession,
+        (),
+    )?;
 
     Ok(action_hash)
 }
@@ -169,7 +219,11 @@ pub fn record_session(session: MediationSession) -> ExternResult<ActionHash> {
 /// Get all sessions for a mediation request.
 #[hdk_extern]
 pub fn get_request_sessions(request_id: String) -> ExternResult<Vec<Record>> {
-    let _eligibility = mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_basic(), "get_request_sessions")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_basic(),
+        "get_request_sessions",
+    )?;
 
     let base = anchor_hash(&format!("mediation/request/{}/sessions", request_id))?;
     let links = get_links(
@@ -195,13 +249,25 @@ pub fn get_request_sessions(request_id: String) -> ExternResult<Vec<Record>> {
 /// Propose a mediation agreement.
 #[hdk_extern]
 pub fn propose_agreement(agreement: MediationAgreement) -> ExternResult<ActionHash> {
-    let _eligibility = mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "propose_agreement")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_proposal(),
+        "propose_agreement",
+    )?;
 
     let action_hash = create_entry(&EntryTypes::MediationAgreement(agreement.clone()))?;
 
     // Link from request
-    let request_anchor = ensure_anchor(&format!("mediation/request/{}/agreements", agreement.request_id))?;
-    create_link(request_anchor, action_hash.clone(), LinkTypes::RequestToAgreement, ())?;
+    let request_anchor = ensure_anchor(&format!(
+        "mediation/request/{}/agreements",
+        agreement.request_id
+    ))?;
+    create_link(
+        request_anchor,
+        action_hash.clone(),
+        LinkTypes::RequestToAgreement,
+        (),
+    )?;
 
     Ok(action_hash)
 }
@@ -209,15 +275,22 @@ pub fn propose_agreement(agreement: MediationAgreement) -> ExternResult<ActionHa
 /// Accept an existing agreement (add the calling agent to agreed_by).
 #[hdk_extern]
 pub fn accept_agreement(agreement_hash: ActionHash) -> ExternResult<ActionHash> {
-    let _eligibility = mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "accept_agreement")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_proposal(),
+        "accept_agreement",
+    )?;
 
-    let record = get(agreement_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Agreement not found".into())))?;
+    let record = get(agreement_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Agreement not found".into())
+    ))?;
     let mut agreement: MediationAgreement = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid agreement entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid agreement entry".into()
+        )))?;
 
     let agent_info = agent_info()?;
     let agent_did = format!("{}", agent_info.agent_initial_pubkey);
@@ -237,15 +310,22 @@ pub fn accept_agreement(agreement_hash: ActionHash) -> ExternResult<ActionHash> 
 /// Mark a mediation as resolved.
 #[hdk_extern]
 pub fn resolve_mediation(request_hash: ActionHash) -> ExternResult<ActionHash> {
-    let _eligibility = mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "resolve_mediation")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_proposal(),
+        "resolve_mediation",
+    )?;
 
-    let record = get(request_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Request not found".into())))?;
+    let record = get(request_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Request not found".into())
+    ))?;
     let mut request: MediationRequest = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid request entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid request entry".into()
+        )))?;
 
     if request.status != MediationStatus::InProgress {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -263,17 +343,25 @@ pub fn resolve_mediation(request_hash: ActionHash) -> ExternResult<ActionHash> {
 /// Dispatches to the justice_cases zome via `call(CallTargetCell::Local, ...)`.
 #[hdk_extern]
 pub fn escalate_to_justice(request_hash: ActionHash) -> ExternResult<ActionHash> {
-    let _eligibility = mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_proposal(), "escalate_to_justice")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_proposal(),
+        "escalate_to_justice",
+    )?;
 
-    let record = get(request_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Request not found".into())))?;
+    let record = get(request_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Request not found".into())
+    ))?;
     let mut request: MediationRequest = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid request entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid request entry".into()
+        )))?;
 
-    if request.status != MediationStatus::InProgress && request.status != MediationStatus::Accepted {
+    if request.status != MediationStatus::InProgress && request.status != MediationStatus::Accepted
+    {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Can only escalate mediation that is Accepted or InProgress".into()
         )));
@@ -331,7 +419,11 @@ pub fn escalate_to_justice(request_hash: ActionHash) -> ExternResult<ActionHash>
 /// Get all open (non-resolved, non-withdrawn) mediation requests.
 #[hdk_extern]
 pub fn get_open_requests(_: ()) -> ExternResult<Vec<Record>> {
-    let _eligibility = mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_basic(), "get_open_requests")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_basic(),
+        "get_open_requests",
+    )?;
 
     let base = anchor_hash("all_mediation_requests")?;
     let links = get_links(
@@ -368,7 +460,11 @@ pub fn get_open_requests(_: ()) -> ExternResult<Vec<Record>> {
 /// Get all sessions for a specific mediator.
 #[hdk_extern]
 pub fn get_mediator_sessions(mediator_did: String) -> ExternResult<Vec<Record>> {
-    let _eligibility = mycelix_zome_helpers::require_civic("civic_bridge", &civic_requirement_basic(), "get_mediator_sessions")?;
+    let _eligibility = mycelix_zome_helpers::require_civic(
+        "civic_bridge",
+        &civic_requirement_basic(),
+        "get_mediator_sessions",
+    )?;
 
     let base = anchor_hash(&format!("mediator/{}/sessions", mediator_did))?;
     let links = get_links(
