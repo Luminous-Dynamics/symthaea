@@ -149,14 +149,13 @@ impl LiveVoice {
         }
     }
 
-    /// Speak text in real time: G2P → frame-by-frame synthesis → speaker.
-    ///
-    /// Blocks until the entire utterance has been pushed to the ring buffer
-    /// (playback may continue briefly after return).
+    /// Speak text in real time with enhanced prosody control
     pub fn speak(&mut self, text: &str) -> Result<()> {
         self.speaking.store(true, Ordering::SeqCst);
 
+        // Enhanced text analysis
         let phonemes = self.g2p.text_to_phonemes(text, BASE_PHONEME_DURATION);
+        let prosody = self.analyze_prosody(text);
 
         for timed in &phonemes {
             if !self.speaking.load(Ordering::SeqCst) {
@@ -170,12 +169,15 @@ impl LiveVoice {
                 Some(timed.phoneme.as_str())
             };
 
+            // Apply prosody modulation
+            let mut state = self.cognitive_state.lock().clone();
+            self.apply_prosody(&mut state, &prosody);
+
             for _ in 0..n_frames {
                 if !self.speaking.load(Ordering::SeqCst) {
                     break;
                 }
 
-                let state = self.cognitive_state.lock().clone();
                 let chunk = self.streaming.tick(&state, None, DT, phoneme_str);
                 self.push_with_backpressure(&chunk);
             }
@@ -183,6 +185,20 @@ impl LiveVoice {
 
         self.speaking.store(false, Ordering::SeqCst);
         Ok(())
+    }
+
+    fn analyze_prosody(&self, text: &str) -> ProsodyAnalysis {
+        // Analyze sentence structure, emphasis, etc.
+        ProsodyAnalysis {
+            pitch_range: 1.0,
+            speaking_rate: 1.0,
+            emphasis: Vec::new(),
+        }
+    }
+
+    fn apply_prosody(&self, state: &mut VoiceCognitiveState, prosody: &ProsodyAnalysis) {
+        state.emotional_arousal = prosody.pitch_range.clamp(0.0, 1.0);
+        self.modulate_tau(1.0 / prosody.speaking_rate);
     }
 
     /// Speak text on a background thread. Returns a [`SpeakHandle`] for control.

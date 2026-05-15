@@ -416,7 +416,14 @@ impl SemanticErrorExplainer {
                 if let Some(start) = message.find("attribute '") {
                     let rest = &message[start + 11..];
                     if let Some(end) = rest.find('\'') {
-                        causes.push(format!("Missing attribute: {}", &rest[..end]));
+                        let attr = &rest[..end];
+                        causes.push(format!("Missing attribute: {}", attr));
+                        
+                        // Suggest similar attributes
+                        let similar = self.find_similar_attributes(attr);
+                        if !similar.is_empty() {
+                            causes.push(format!("Did you mean: {}", similar.join(", ")));
+                        }
                     }
                 }
             }

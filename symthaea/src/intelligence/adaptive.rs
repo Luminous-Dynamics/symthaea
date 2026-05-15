@@ -62,30 +62,48 @@ impl UserPattern {
         self.weight = (self.weight as f64 * decay) as f32;
     }
 
-    /// Calculate relevance score for a given context
+    /// Calculate relevance score for a given context using semantic similarity
     pub fn relevance(&self, input: &str) -> f32 {
-        // Simple prefix matching with fuzzy support
-        let context_lower = self.context.to_lowercase();
-        let input_lower = input.to_lowercase();
-
-        if context_lower == input_lower {
+        use symthaea_core::hdc::semantic_decoder::SemanticSimilarity;
+        
+        // Exact match
+        if self.context == input {
             return self.weight * 2.0;
         }
 
-        if context_lower.starts_with(&input_lower) || input_lower.starts_with(&context_lower) {
-            return self.weight * 1.5;
+        // Semantic similarity using HDC vectors
+        let context_hv = SemanticSimilarity::encode(&self.context);
+        let input_hv = SemanticSimilarity::encode(input);
+        let semantic_sim = context_hv.cosine_similarity(&input_hv);
+
+        // Combine with lexical similarity
+        let lexical_sim = lexical_similarity(&self.context, input);
+        
+        // Weighted combination
+        (self.weight * 0.7 * semantic_sim) + (self.weight * 0.3 * lexical_sim)
+    }
+
+    fn lexical_similarity(a: &str, b: &str) -> f32 {
+        let a_lower = a.to_lowercase();
+        let b_lower = b.to_lowercase();
+
+        if a_lower == b_lower {
+            return 1.0;
         }
 
-        // Fuzzy matching - common prefix length
-        let common_prefix = context_lower
+        if a_lower.starts_with(&b_lower) || b_lower.starts_with(&a_lower) {
+            return 0.8;
+        }
+
+        let common_prefix = a_lower
             .chars()
-            .zip(input_lower.chars())
+            .zip(b_lower.chars())
             .take_while(|(a, b)| a == b)
             .count();
 
         if common_prefix > 0 {
-            let max_len = context_lower.len().max(input_lower.len()) as f32;
-            return self.weight * (common_prefix as f32 / max_len);
+            let max_len = a_lower.len().max(b_lower.len()) as f32;
+            return common_prefix as f32 / max_len;
         }
 
         0.0
