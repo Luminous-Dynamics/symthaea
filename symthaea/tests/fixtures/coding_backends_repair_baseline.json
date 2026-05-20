@@ -1,0 +1,23 @@
+{
+  "benchmark": "coding_backends_repair",
+  "require_feature_geodesic": true,
+  "min_task_count": 8,
+  "min_pass_rate": 0.95,
+  "min_quality_pass_rate": 0.95,
+  "max_mean_attempts_per_task": 2.2,
+  "max_certificates_sheaf_incoherent": 0,
+  "min_certificates_with_sheaf": 8,
+  "require_broca_eval_gate_passed": false,
+  "min_broca_selection_score": 0.85,
+  "min_repair_success_rate": 0.8,
+  "min_repair_attempts": 8,
+  "min_repair_successes": 8,
+  "max_repair_attempts": 8,
+  "min_repair_prior_uses": 8,
+  "min_repair_prior_label_count": 8,
+  "min_category_pass_rates": {
+    "repair": 0.95,
+    "repair_memory": 0.95
+  },
+  "notes": "Forced repair lane baseline: geodesic candidates are intentionally rejected across parse, stub, type, scope, ownership, test, and memory-sensitive categories so the benchmark proves repair hints are propagated to the next backend and recovered successfully."
+}

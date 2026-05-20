@@ -1,0 +1,59 @@
+name: Coding Backend Regression
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/symthaea-geodesic/**"
+      - "examples/benchmark_coding_backends.rs"
+      - "scripts/coding_backend_regression.sh"
+      - "scripts/coding_backend_repair_memory_ab.sh"
+      - "scripts/check_coding_backend_baseline.py"
+      - "scripts/check_repair_memory_ab.py"
+      - "scripts/merge_repair_lessons.py"
+      - "tests/fixtures/coding_backends_baseline.json"
+      - "tests/fixtures/coding_backends_*_baseline.json"
+      - "src/language/**"
+      - ".github/workflows/coding-backend-regression.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  coding-backend-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.93.0
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-coding-backend-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-coding-backend-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev libclang-dev cmake python3
+
+      - name: Run coding backend regression
+        run: scripts/coding_backend_regression.sh

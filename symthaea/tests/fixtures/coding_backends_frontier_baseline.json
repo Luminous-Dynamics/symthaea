@@ -1,0 +1,23 @@
+{
+  "benchmark": "coding_backends_frontier",
+  "require_feature_geodesic": true,
+  "min_task_count": 10,
+  "min_pass_rate": 0.95,
+  "min_quality_pass_rate": 0.95,
+  "max_mean_attempts_per_task": 1.2,
+  "max_certificates_sheaf_incoherent": 0,
+  "min_certificates_with_sheaf": 10,
+  "require_broca_eval_gate_passed": true,
+  "min_broca_selection_score": 0.95,
+  "min_repair_success_rate": 0.0,
+  "max_repair_attempts": 0,
+  "min_category_pass_rates": {
+    "async": 0.9,
+    "generic": 0.9,
+    "lifetime": 0.9,
+    "map": 0.9,
+    "ownership": 0.9,
+    "result": 0.9
+  },
+  "notes": "Frontier lane guard for harder ownership, lifetime, async, map, generic, and Result synthesis cases."
+}
