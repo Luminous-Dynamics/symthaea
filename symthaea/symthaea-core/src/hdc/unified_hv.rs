@@ -94,6 +94,22 @@ pub struct ContinuousHV {
 }
 
 impl ContinuousHV {
+    /// Applies strict L2 normalization to prevent hyperspace magnitude explosions (NaNs).
+    /// Call this immediately after generating vectors via GenesisSeed.
+    pub fn l2_normalize(&mut self) {
+        // Calculate the sum of squares
+        let sum_sq: f32 = self.values.iter().map(|&x| x * x).sum();
+        let norm = sum_sq.sqrt();
+
+        // Prevent division by zero or exploding gradients on empty vectors
+        if norm > 1e-8 {
+            let inv_norm = 1.0 / norm;
+            for v in self.values.iter_mut() {
+                *v *= inv_norm;
+            }
+        }
+    }
+
     /// Default dimension (uses HDC_DIMENSION constant)
     pub const DEFAULT_DIM: usize = HDC_DIMENSION;
 

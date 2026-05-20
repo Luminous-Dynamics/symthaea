@@ -116,6 +116,15 @@
           # D-Bus for desktop notifications (zbus)
           dbus
 
+          # --- THESE 7 LINES FOR THE GUI ---
+          wayland
+          libxkbcommon
+          libGL
+          xorg.libX11
+          xorg.libXcursor
+          xorg.libXi
+          xorg.libXrandr
+
           # SQLite (bundled in rusqlite, but system lib can help)
           sqlite
 

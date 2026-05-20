@@ -298,6 +298,8 @@ mycelix-crypto = { path = "../mycelix-identity/crates/mycelix-crypto", optional 
 
 # Symthaea STT - Speech-to-Text, Bioacoustics, EEG processing
 symthaea-stt = { path = "crates/symthaea-stt", optional = true }
+# Symthaea Swarm - P2P collective consciousness
+symthaea_swarm = { path = "crates/symthaea-swarm", optional = true, package = "symthaea-swarm" }
 
 # Symthaea Sentinel - Zero-shot temporal audio pattern recognition
 symthaea-sentinel = { path = "crates/symthaea-sentinel", optional = true }
@@ -607,6 +609,7 @@ wait-timeout = "0.2"
 default = ["default-mind"]
 parallel = []  # Rayon parallelism in cognitive loop (gate for WASM compat)
 turbo-quant = []  # PolarQuant HDC vector compression (hv_compression.rs, memory_bridge.rs)
+swarm = ["iroh", "dep:symthaea_swarm"]  # P2P collective consciousness
 
 # ── Binary build gates ──────────────────────────────────────────────
 # These enable optional dependencies for specific binaries.
@@ -691,7 +694,6 @@ lz4_compression = ["mesh", "dep:lz4_flex"]  # LZ4 packet compression for mesh ra
 holon-lz4 = ["mesh-encryption", "dep:lz4_flex"]  # Phase II.A: LZ4-before-seal for holon RDP wire
 mesh-encryption = ["mesh", "dep:chacha20poly1305", "dep:zeroize"]  # ChaCha20-Poly1305 AEAD encryption for mesh packets
 mesh-key-exchange = ["mesh-encryption", "dep:x25519-dalek", "dep:hkdf", "dep:sha2"]  # X25519 Diffie-Hellman per-peer key agreement
-swarm = ["iroh"]                            # Real-time P2P tensor streaming via Iroh 0.95+
 # REMOVED: secure-mesh (0 cfg gates; pure convenience bundle — enable identity + mesh-key-exchange + swarm directly)
 pqc-handshake = ["identity", "mesh-key-exchange", "dep:mycelix-crypto"]  # Hybrid Ed25519 + ML-KEM-768 post-quantum handshake
 mycelix = ["mycelix-fl-core", "sha3", "dep:symthaea-mycelix-conductor"]       # Mycelix FL algorithms + hashing + conductor bridge
@@ -1035,6 +1037,21 @@ required-features = ["code_generation"]
 name = "symthaea-holon"
 path = "src/bin/symthaea-holon.rs"
 required-features = ["api_module"]
+
+[[bin]]
+name = "imagination_smoke_test"
+path = "src/bin/imagination_smoke_test.rs"
+required-features = ["vision-manifold"]
+
+[[bin]]
+name = "swarm_imagination_test"
+path = "src/bin/swarm_imagination_test.rs"
+required-features = ["vision-manifold", "swarm"]
+
+[[bin]]
+name = "dump_dream"
+path = "src/bin/dump_dream.rs"
+required-features = ["vision-manifold", "swarm"]
 
 # Examples
 # Examples that need cfg-gated modules are marked with required-features

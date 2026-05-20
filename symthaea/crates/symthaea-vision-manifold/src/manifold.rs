@@ -98,6 +98,8 @@ pub struct VisionManifold {
     last_fep: crate::types::FepMetrics,
     /// Core FEP agent for rigorous active inference and action selection.
     fep_agent: symthaea_fep::ActiveInferenceAgent,
+    /// Unique node ID for P2P swarm identification.
+    pub node_id: uuid::Uuid,
     /// Velocity field/dynamics model for mental simulation.
     transition_model: Option<Box<dyn TransitionModel>>,
     /// Latest generated geodesic path on the manifold.
@@ -109,62 +111,35 @@ pub struct VisionManifold {
     last_frame_width: u32,
     last_frame_height: u32,
     last_frame_channels: usize,
+    /// Latest intent/goal vector (for swarm broadcast).
+    last_intent_hv: ContinuousHV,
 }
 
 /// Dynamic transition model for the latent manifold.
 ///
-/// Science: Friston (2010), Neural ODE (Chen 2018). Describes the vector field
-/// `ds/dt = f(s, u)` that governs latent state evolution.
+/// Science: Friston (2010), Liquid Neural Networks (Hasani 2022). Describes the
+/// analytical solution `x(t+dt) = x_inf + (x(t) - x_inf) * exp(-dt/tau)`.
 pub trait TransitionModel: Send + Sync {
-    /// Returns the velocity / derivative at `state` under optional context.
-    fn vector_field(&self, state: &ContinuousHV, context: &TransitionContext) -> ContinuousHV;
+    /// Returns the equilibrium state (x_inf) under optional context.
+    fn equilibrium(&self, state: &ContinuousHV, context: &TransitionContext) -> ContinuousHV;
 
-    /// Integrate `state` forward by `dt` using the vector field.
-    /// Science: RK4 provides 4th-order local error O(dt^5) for stable trajectories.
-    fn integrate(
-        &self,
-        state: &ContinuousHV,
-        dt: f32,
-        steps: usize,
-        context: &TransitionContext,
-    ) -> ContinuousHV {
-        let mut s = state.clone();
-        let step_dt = dt / steps as f32;
-        for _ in 0..steps {
-            s = self.rk4_step(&s, step_dt, context);
-        }
-        s
-    }
+    /// Project `state` forward by `dt` using the analytical CfC solution.
+    /// Science: O(1) complexity — no step-by-step integration required.
+    fn project(&self, state: &ContinuousHV, dt: f32, context: &TransitionContext) -> ContinuousHV {
+        let x_inf = self.equilibrium(state, context);
 
-    /// Perform one 4th-order Runge-Kutta step.
-    fn rk4_step(
-        &self,
-        s: &ContinuousHV,
-        dt: f32,
-        ctx: &TransitionContext,
-    ) -> ContinuousHV {
-        let k1 = self.vector_field(s, ctx);
-        
-        let mut s2 = s.clone();
-        s2.lerp_in_place(&k1, 1.0, dt * 0.5);
-        let k2 = self.vector_field(&s2, ctx);
+        // x(t+dt) = x_inf + (x(t) - x_inf) * exp(-dt/tau)
+        let leak = (-dt / context.tau.max(0.001)).exp();
 
-        let mut s3 = s.clone();
-        s3.lerp_in_place(&k2, 1.0, dt * 0.5);
-        let k3 = self.vector_field(&s3, ctx);
+        let mut result = state.clone();
+        // (x(t) - x_inf) * leak
+        result.lerp_in_place(&x_inf, 1.0, -1.0); // result = state - x_inf
+        result.lerp_in_place(&ContinuousHV::zero(result.values.len()), 0.0, leak); // result *= leak
 
-        let mut s4 = s.clone();
-        s4.lerp_in_place(&k3, 1.0, dt);
-        let k4 = self.vector_field(&s4, ctx);
+        // Add back x_inf
+        result.lerp_in_place(&x_inf, 1.0, 1.0);
 
-        // s_next = s + dt/6 * (k1 + 2k2 + 2k3 + k4)
-        let mut combined = k1;
-        combined.lerp_in_place(&k2, 1.0, 2.0);
-        combined.lerp_in_place(&k3, 1.0, 2.0);
-        combined.lerp_in_place(&k4, 1.0, 1.0);
-        
-        let mut result = s.clone();
-        result.lerp_in_place(&combined, 1.0, dt / 6.0);
+        // Science: Hypersphere normalization preserves semantic integrity.
         result.normalize()
     }
 }
@@ -182,24 +157,26 @@ pub struct TransitionContext {
 pub struct CfCTransitionModel;
 
 impl TransitionModel for CfCTransitionModel {
-    fn vector_field(&self, state: &ContinuousHV, ctx: &TransitionContext) -> ContinuousHV {
+    fn equilibrium(&self, state: &ContinuousHV, ctx: &TransitionContext) -> ContinuousHV {
         let weight = ctx.weight_hv.as_ref().unwrap_or(state); // fallback
         let input = ctx.input.as_ref().unwrap_or(state); // fallback
 
-        // Equilibrium x_inf = tanh(W ⊗ state + U ⊗ input)
-        let mut x_inf = weight.bind(state).tanh();
-        if let Some(ref goal) = ctx.goal {
-             x_inf.lerp_in_place(goal, 0.7, 0.3);
+        // Equilibrium x_inf = soft_tanh(W ⊗ state + U ⊗ input)
+        // REFINEMENT: Soften the tanh nonlinearity (gain=0.8) to preserve
+        // chromatic contrast in the latent representation.
+        let mut x_inf = weight.bind(state);
+        for val in x_inf.values.iter_mut() {
+            *val = (*val * 0.8).tanh();
         }
-        x_inf.lerp_in_place(input, 0.9, 0.1);
-        
-        // Derivative ds/dt = (x_inf - state) / tau
-        let mut velocity = x_inf;
-        velocity.lerp_in_place(state, 1.0, -1.0);
-        
-        let inv_tau = 1.0 / ctx.tau.max(0.001);
-        velocity.lerp_in_place(&ContinuousHV::zero(state.values.len()), 0.0, inv_tau);
-        velocity
+
+        if let Some(ref goal) = ctx.goal {
+            // Higher goal pull for smoother geodesic transition
+            x_inf.lerp_in_place(goal, 0.65, 0.35);
+        }
+
+        // Reinforce the current input to maintain object constancy
+        x_inf.lerp_in_place(input, 0.85, 0.15);
+        x_inf
     }
 }
 
@@ -244,6 +221,7 @@ impl VisionManifold {
         if let Some(ref mut hv) = self.last_imagination {
             *hv = hv.dilate(target_dim);
         }
+        self.last_intent_hv = self.last_intent_hv.dilate(target_dim);
 
         // 2. Scale internal components
         self.encoder.dilate(target_dim);
@@ -252,6 +230,9 @@ impl VisionManifold {
 
         if let Some(ref mut pred) = self.predictive {
             pred.dilate(target_dim);
+        }
+        if let Some(ref mut memory) = self.scene_memory {
+            memory.dilate(target_dim);
         }
 
         // 3. Update configuration
@@ -336,6 +317,7 @@ impl VisionManifold {
                     td_config: symthaea_fep::TemporalDifferenceLearningConfig::default(),
                 },
             ),
+            node_id: uuid::Uuid::new_v4(),
             transition_model: Some(Box::new(CfCTransitionModel)),
             last_geodesic: Vec::new(),
             geodesic_compute_cost: 0.0,
@@ -343,6 +325,7 @@ impl VisionManifold {
             last_frame_width: 0,
             last_frame_height: 0,
             last_frame_channels: 0,
+            last_intent_hv: ContinuousHV::zero(dim),
         }
     }
 
@@ -1184,11 +1167,16 @@ impl VisionManifold {
             return Vec::new();
         }
 
+        let mut final_goal = goal.clone();
+        if final_goal.values.len() != self.hdc_dim() {
+            final_goal = final_goal.dilate(self.hdc_dim());
+        }
+
         let mut best_path = Vec::new();
         let mut best_score = f64::INFINITY;
 
         for candidate_idx in 0..num_candidates {
-            let path = self.generate_candidate_path(from, goal, steps, candidate_idx);
+            let path = self.generate_candidate_path(from, &final_goal, steps, candidate_idx);
             let score = self.score_path_with_fep(&path);
 
             if score < best_score {
@@ -1211,7 +1199,25 @@ impl VisionManifold {
         self.geodesic_compute_cost += (steps * num_candidates) as f32 * 0.012;
         self.telemetry.last_geodesic_cost = self.geodesic_compute_cost;
 
+        // Store intent for swarm broadcast (Phase 5)
+        self.last_intent_hv = final_goal;
+
         best_path
+    }
+
+    /// Unique node ID for P2P swarm identification.
+    pub fn node_id(&self) -> uuid::Uuid {
+        self.node_id
+    }
+
+    /// Latest intent/goal vector (for swarm broadcast).
+    pub fn last_intent_hv(&self) -> &ContinuousHV {
+        &self.last_intent_hv
+    }
+
+    /// Set a custom node ID (e.g. from config).
+    pub fn set_node_id(&mut self, id: uuid::Uuid) {
+        self.node_id = id;
     }
 
     /// Validate and optionally repair sheaf coherence along a path.
@@ -1380,7 +1386,8 @@ impl VisionManifold {
         strategy: usize,
     ) -> Vec<ContinuousHV> {
         let mut path = Vec::with_capacity(steps);
-        let dt_total = steps as f32 * self.config.tau_base * 0.5; // estimated time horizon
+        // Total time horizon: steps * tau * scaling
+        let dt_total = steps as f32 * self.config.tau_base * 0.5;
 
         for i in 0..steps {
             let alpha = i as f32 / (steps as f32 - 1.0).max(1.0);
@@ -1388,7 +1395,7 @@ impl VisionManifold {
 
             match strategy % 3 {
                 0 => {
-                    // Strategy 1: Dynamic Integration (Physically plausible trajectory)
+                    // Strategy 1: CfC Closed-Form Projection (Instant physics)
                     if let Some(ref model) = self.transition_model {
                         let ctx = TransitionContext {
                             goal: Some(goal.clone()),
@@ -1396,8 +1403,8 @@ impl VisionManifold {
                             weight_hv: Some(self.weight_hv.clone()),
                             tau: self.config.tau_base,
                         };
-                        // Integrate from start to the current fractional time
-                        intermediate = model.integrate(from, dt_total * alpha, 4, &ctx);
+                        // Project instantly to time t = dt_total * alpha
+                        intermediate = model.project(from, dt_total * alpha, &ctx);
                     } else {
                         intermediate.lerp_in_place(goal, 1.0 - alpha, alpha);
                     }
@@ -2147,6 +2154,13 @@ impl SceneMemory {
     /// Set the recognition similarity threshold (default: 0.85).
     pub fn set_threshold(&mut self, threshold: f32) {
         self.recognition_threshold = threshold.clamp(0.0, 1.0);
+    }
+
+    /// Scale all landmarks to a new HDC dimensionality.
+    pub fn dilate(&mut self, target_dim: usize) {
+        for (hv, _) in &mut self.landmarks {
+            *hv = hv.dilate(target_dim);
+        }
     }
 
     /// Store a scene landmark. Uses ring-buffer eviction when full.

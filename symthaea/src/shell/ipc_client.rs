@@ -143,6 +143,19 @@ pub struct MetricsSnapshot {
     /// The latest mental simulation result from the cognitive loop.
     #[cfg(feature = "vision-manifold")]
     pub mental_movie: Option<MentalMovie>,
+    /// The actual raw pixels from the last observation (for comparison).
+    pub last_observed_frame: Option<Vec<u8>>,
+    /// List of connected peers and their consciousness levels.
+    pub connected_peers: Vec<PeerSnapshot>,
+}
+
+/// Simplified peer state for GUI/Shell
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PeerSnapshot {
+    pub id: String,
+    pub phi: f64,
+    pub is_trusted: bool,
+    pub latency_ms: u64,
 }
 
 impl Default for MetricsSnapshot {
@@ -164,6 +177,8 @@ impl Default for MetricsSnapshot {
             latency_ms: 0,
             #[cfg(feature = "vision-manifold")]
             mental_movie: None,
+            last_observed_frame: None,
+            connected_peers: Vec::new(),
         }
     }
 }

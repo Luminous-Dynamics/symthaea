@@ -64,6 +64,12 @@ pub struct HdcStore {
     lsh: LshIndex,
 }
 
+impl Clone for HdcStore {
+    fn clone(&self) -> Self {
+        Self::open(&self.path).expect("Failed to clone HdcStore (re-open at same path failed)")
+    }
+}
+
 impl HdcStore {
     /// Create a new store at the given path.
     pub fn create(path: impl AsRef<Path>, config: StoreConfig) -> Result<Self, HdcStoreError> {

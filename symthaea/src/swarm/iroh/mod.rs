@@ -184,6 +184,12 @@ impl IrohNode {
         &self.node_id
     }
 
+    /// Access the inner Iroh endpoint (if initialized).
+    #[cfg(feature = "swarm")]
+    pub fn endpoint(&self) -> Option<&iroh::Endpoint> {
+        self.endpoint.as_ref()
+    }
+
     /// Check if this is a stub implementation
     pub fn is_stub(&self) -> bool {
         self.is_stub

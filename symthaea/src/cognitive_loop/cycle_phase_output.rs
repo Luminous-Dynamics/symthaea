@@ -2020,14 +2020,15 @@ impl CognitiveLoopService {
                     if !path.is_empty() {
                         let frames = manifold.decode_geodesic_to_frames_improved(&path);
                         if !frames.is_empty() {
-                             feedback.mental_movie = Some(crate::cognitive_loop::types::MentalMovie {
-                                frames,
-                                width: self.config.vision_frame_width,
-                                height: self.config.vision_frame_height,
-                                channels: manifold.last_frame_channels(),
-                                path_length: path.len(),
-                                semantic_coherence: 0.0,
-                            });
+                            feedback.mental_movie =
+                                Some(crate::cognitive_loop::types::MentalMovie {
+                                    frames,
+                                    width: self.config.vision_frame_width,
+                                    height: self.config.vision_frame_height,
+                                    channels: manifold.last_frame_channels(),
+                                    path_length: path.len(),
+                                    semantic_coherence: 0.0,
+                                });
                         }
                     }
 
@@ -2041,6 +2042,33 @@ impl CognitiveLoopService {
             }
 
             metadata.subsystem_veto_active = self.carryover.quality.subsystem_veto;
+
+            // REQUEST_BROADCAST: Subsystem wants to share state with the swarm (Phase 5).
+            #[cfg(feature = "swarm")]
+            if integrated.has_flag(output_flags::REQUEST_BROADCAST) {
+                if let (Some(id), Some(phi), Some(hv), Some(intent)) = (
+                    self.node_id(),
+                    Some(feedback.consciousness.consciousness_level),
+                    self.consciousness_hv(),
+                    self.last_intent_hv(),
+                ) {
+                    let msg = symthaea_swarm::SwarmStateMsg {
+                        node_id: id,
+                        local_phi: phi,
+                        consciousness_hv: hv,
+                        intent_hv: intent,
+                        timestamp: std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_millis() as u64,
+                    };
+
+                    // Non-blocking broadcast to the telepathic socket
+                    if let Some(svc) = self.network_service() {
+                        svc.broadcast_swarm_state(msg);
+                    }
+                }
+            }
 
             tracing::trace!("Phase C integration: {}", integrated);
         }

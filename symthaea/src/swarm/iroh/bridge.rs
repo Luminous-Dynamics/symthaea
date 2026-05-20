@@ -93,6 +93,8 @@ impl IrohBridgeHandle {
             handshake,
             require_handshake: true,
             attestation: None,
+            #[cfg(feature = "swarm")]
+            telepathic_socket: None,
         };
 
         (handle, actor)
@@ -173,6 +175,9 @@ pub struct IrohBridgeActor {
     require_handshake: bool,
     /// Optional attestation manager for signing outbound and verifying inbound CVs.
     attestation: Option<Arc<parking_lot::RwLock<crate::swarm::attestation::AttestationManager>>>,
+    /// Optional telepathic socket for real-time high-dimensional broadcast (Phase 5).
+    #[cfg(feature = "swarm")]
+    telepathic_socket: Option<symthaea_swarm::networking::TelepathicSocket>,
 }
 
 impl IrohBridgeActor {
@@ -205,6 +210,12 @@ impl IrohBridgeActor {
         &self,
     ) -> &Option<Arc<parking_lot::RwLock<crate::swarm::attestation::AttestationManager>>> {
         &self.attestation
+    }
+
+    /// Set the telepathic socket for real-time high-dimensional broadcast.
+    #[cfg(feature = "swarm")]
+    pub fn set_telepathic_socket(&mut self, socket: symthaea_swarm::networking::TelepathicSocket) {
+        self.telepathic_socket = Some(socket);
     }
 
     /// Set whether handshake is required for broadcasting.
@@ -241,6 +252,17 @@ impl IrohBridgeActor {
             stub = node.is_stub(),
             "IrohBridgeActor started"
         );
+
+        // Spawn Telepathic Socket task if present (Phase 5)
+        #[cfg(feature = "swarm")]
+        if let Some(ref socket) = self.telepathic_socket {
+            let socket_clone = socket.clone();
+            tokio::spawn(async move {
+                if let Err(e) = socket_clone.run().await {
+                    tracing::warn!("Telepathic Socket task failed: {e}");
+                }
+            });
+        }
 
         loop {
             tokio::select! {
@@ -303,6 +325,18 @@ impl IrohBridgeActor {
         };
 
         let _ = stream; // Used for stats tracking in future; raw bincode for now
+
+        // 1. Telepathic Gossip Broadcast (Phase 5)
+        #[cfg(feature = "swarm")]
+        if let Some(ref swarm_state) = msg.swarm_state {
+            if let Some(ref socket) = self.telepathic_socket {
+                let socket_clone = socket.clone();
+                let state_clone = swarm_state.clone();
+                tokio::spawn(async move {
+                    let _ = socket_clone.broadcast(state_clone).await;
+                });
+            }
+        }
 
         for peer_id in &peer_ids {
             // Trust gating: skip peers that haven't completed the handshake

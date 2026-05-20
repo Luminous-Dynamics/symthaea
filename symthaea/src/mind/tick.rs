@@ -584,6 +584,8 @@ impl ContinuousMind {
                 context: self.state.current_thought.clone(),
                 interaction_outcome: None,
                 bath_state: Some(self.dream_bath.state_vector().to_vec()),
+                #[cfg(feature = "swarm")]
+                swarm_state: None,
             });
 
             // Cap outbox to prevent unbounded growth

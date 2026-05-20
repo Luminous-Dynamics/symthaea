@@ -1072,6 +1072,8 @@ impl ReplSession {
             latency_ms: 0,
             #[cfg(feature = "vision-manifold")]
             mental_movie: None,
+            last_observed_frame: None,
+            connected_peers: Vec::new(),
         }
     }
 

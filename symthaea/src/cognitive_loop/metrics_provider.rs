@@ -2,9 +2,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! MetricsProvider trait implementation for CognitiveLoopService.
-//!
-//! Bridges the cognitive loop's internal state to the IPC metrics system,
-//! enabling the shell TUI and external tools to observe consciousness state.
 
 use super::CognitiveLoopService;
 use crate::shell::ipc_client::MetricsSnapshot;
@@ -35,16 +32,20 @@ impl MetricsProvider for CognitiveLoopService {
             uptime_secs: self.start_time.elapsed().as_secs(),
             total_cycles: self.stats.total_cycles as u64,
             consciousness_level: (phi + coherence) / 2.0,
-            latency_ms: 0, // Updated by IPC layer
+            latency_ms: 0,
             #[cfg(feature = "vision-manifold")]
-            mental_movie: self.last_mental_movie.as_ref().map(|m| crate::shell::ipc_client::MentalMovie {
-                frames: m.frames.clone(),
-                width: m.width,
-                height: m.height,
-                channels: m.channels,
-                path_length: m.path_length,
-                semantic_coherence: m.semantic_coherence,
+            mental_movie: self.last_mental_movie.as_ref().map(|m| {
+                crate::shell::ipc_client::MentalMovie {
+                    frames: m.frames.clone(),
+                    width: m.width,
+                    height: m.height,
+                    channels: m.channels,
+                    path_length: m.path_length,
+                    semantic_coherence: m.semantic_coherence,
+                }
             }),
+            last_observed_frame: None,
+            connected_peers: Vec::new(),
         }
     }
 

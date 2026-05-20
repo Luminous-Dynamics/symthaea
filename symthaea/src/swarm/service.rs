@@ -199,7 +199,12 @@ pub struct NetworkService {
     #[cfg(feature = "identity")]
     attestation: Option<Arc<parking_lot::RwLock<crate::swarm::attestation::AttestationManager>>>,
 
-    /// Latest local navigation estimate, if the runtime has published one.
+    /// The "Telepathic Socket" for real-time high-dimensional state exchange.
+    #[cfg(feature = "swarm")]
+    telepathic_socket:
+        Arc<parking_lot::RwLock<Option<symthaea_swarm::networking::TelepathicSocket>>>,
+
+    /// Local navigation estimate for position fusion
     local_navigation: Arc<RwLock<Option<GaussianEstimate3D>>>,
 
     /// Latest peer navigation estimates indexed by peer ID.
@@ -271,6 +276,8 @@ impl NetworkService {
             pqc_manager: Some(Arc::new(RwLock::new(
                 super::pqc_handshake::PqcHandshakeManager::new(config),
             ))),
+            #[cfg(feature = "swarm")]
+            telepathic_socket: Arc::new(parking_lot::RwLock::new(None)),
         })
     }
 
@@ -1140,6 +1147,19 @@ impl NetworkService {
             }
 
             Ok(sent_count)
+        }
+    }
+
+    /// Broadcast a high-dimensional swarm state (Phase 5: Telepathic Socket).
+    #[cfg(feature = "swarm")]
+    pub fn broadcast_swarm_state(&self, msg: symthaea_swarm::SwarmStateMsg) {
+        if let Some(ref socket) = *self.telepathic_socket.read() {
+            let socket_clone = socket.clone();
+            tokio::spawn(async move {
+                if let Err(e) = socket_clone.broadcast(msg).await {
+                    tracing::warn!("Failed to broadcast swarm state: {e}");
+                }
+            });
         }
     }
 

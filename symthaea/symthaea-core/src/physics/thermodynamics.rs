@@ -218,6 +218,14 @@ impl ThermoEncoder {
         // Approximated by prediction error (1 - similarity)
         1.0 - prediction.similarity(observation) as f64
     }
+
+    /// Carnot efficiency: η = 1 - T_cold/T_hot
+    pub fn carnot_efficiency(&self, t_hot: f64, t_cold: f64) -> f64 {
+        if t_hot <= t_cold || t_hot <= 0.0 {
+            return 0.0;
+        }
+        1.0 - t_cold / t_hot
+    }
 }
 
 /// Maxwell's Demon
@@ -445,13 +453,58 @@ impl ThermoEncoder {
             vector,
         }
     }
+}
 
-    /// Carnot efficiency: η = 1 - T_cold/T_hot
-    pub fn carnot_efficiency(&self, t_hot: f64, t_cold: f64) -> f64 {
-        if t_hot <= t_cold || t_hot <= 0.0 {
-            return 0.0;
+/// Thermodynamic ledger for tracking physical energy costs of cognitive operations.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ThermodynamicLedger {
+    /// Available energy in Joules.
+    pub energy_j: f64,
+    /// Maximum energy capacity.
+    pub capacity_j: f64,
+    /// Total energy dissipated so far.
+    pub total_dissipated_j: f64,
+}
+
+impl ThermodynamicLedger {
+    pub fn new(capacity_j: f64) -> Self {
+        Self {
+            energy_j: capacity_j,
+            capacity_j,
+            total_dissipated_j: 0.0,
         }
-        1.0 - t_cold / t_hot
+    }
+}
+
+impl Default for ThermodynamicLedger {
+    fn default() -> Self {
+        Self::new(1000.0)
+    }
+}
+
+impl ThermodynamicLedger {
+    /// Deduct energy for a cognitive operation.
+    ///
+    /// Returns true if the operation is viable (sufficient energy).
+    pub fn deduct(&mut self, cost_j: f64) -> bool {
+        if self.energy_j >= cost_j {
+            self.energy_j -= cost_j;
+            self.total_dissipated_j += cost_j;
+            true
+        } else {
+            // Insufficient energy: operation fails
+            false
+        }
+    }
+
+    /// Add energy (e.g. from recharge or metabolic processes).
+    pub fn recharge(&mut self, amount_j: f64) {
+        self.energy_j = (self.energy_j + amount_j).min(self.capacity_j);
+    }
+
+    /// Check if the ledger is depleted (below a critical threshold).
+    pub fn is_depleted(&self) -> bool {
+        self.energy_j < self.capacity_j * 0.05
     }
 }
 
@@ -645,5 +698,21 @@ mod tests {
             enc1.entropy.similarity(&enc2.entropy) > 0.9999,
             "Thermo encoder should be deterministic"
         );
+    }
+
+    #[test]
+    fn test_ledger() {
+        let mut ledger = ThermodynamicLedger::new(10.0);
+        assert_eq!(ledger.energy_j, 10.0);
+
+        assert!(ledger.deduct(2.0));
+        assert_eq!(ledger.energy_j, 8.0);
+        assert_eq!(ledger.total_dissipated_j, 2.0);
+
+        assert!(!ledger.deduct(10.0));
+        assert_eq!(ledger.energy_j, 8.0);
+
+        ledger.recharge(5.0);
+        assert_eq!(ledger.energy_j, 10.0); // Capped at capacity
     }
 }

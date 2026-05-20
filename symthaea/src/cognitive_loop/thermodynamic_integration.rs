@@ -184,6 +184,7 @@ impl ThermodynamicIntegration {
             input.energy_per_cycle,
             input.total_energy_spent,
             input.metabolic_stress,
+            input.prediction_error,
         );
 
         // ═══════════════════════════════════════════════════════════════════

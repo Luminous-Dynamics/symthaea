@@ -156,6 +156,9 @@
 // ==================================================================================
 
 use super::binary_hv::BinaryHV;
+use super::unified_hv::ContinuousHV;
+use super::HDC_DIMENSION;
+use crate::genesis::GenesisSeed;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -743,6 +746,147 @@ impl SemanticPrime {
             "WITH" => Some(Self::With),
             _ => None,
         }
+    }
+}
+
+/// Syntactic roles for Role-Filler binding in semantic molecules.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum SyntacticRole {
+    /// Agent (The entity initiating an action)
+    Agent,
+    /// Action (The event or process)
+    Action,
+    /// Patient (The entity affected by an action)
+    Patient,
+    /// Location (Spatial context)
+    Location,
+    /// Time (Temporal context)
+    Time,
+    /// Reason (Causal context)
+    Reason,
+    /// Mental Predicate (think, know, want)
+    Predicate,
+    /// Evaluator (good, bad)
+    Evaluator,
+}
+
+impl SyntacticRole {
+    pub fn all() -> &'static [Self] {
+        &[
+            Self::Agent,
+            Self::Action,
+            Self::Patient,
+            Self::Location,
+            Self::Time,
+            Self::Reason,
+            Self::Predicate,
+            Self::Evaluator,
+        ]
+    }
+
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Agent => "AGENT",
+            Self::Action => "ACTION",
+            Self::Patient => "PATIENT",
+            Self::Location => "LOCATION",
+            Self::Time => "TIME",
+            Self::Reason => "REASON",
+            Self::Predicate => "PREDICATE",
+            Self::Evaluator => "EVALUATOR",
+        }
+    }
+}
+
+/// A structured semantic unit composed of bound Role-Filler pairs.
+///
+/// Ensures non-commutative semantic structure in the HDC manifold:
+/// T = (ROLE_AGENT ⊗ AGENT_PRIME) ⊕ (ROLE_ACTION ⊗ ACTION_PRIME) ...
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SemanticMolecule {
+    /// The final composed hypervector.
+    pub encoding: ContinuousHV,
+    /// Active roles and their filler primes.
+    pub structure: Vec<(SyntacticRole, SemanticPrime)>,
+    /// Continuous intensity/weight (LTC output).
+    pub intensity: f32,
+}
+
+impl SemanticMolecule {
+    /// Create a new semantic molecule with specified intensity.
+    pub fn new(
+        basis: &SemanticMoleculeBasis,
+        structure: Vec<(SyntacticRole, SemanticPrime)>,
+        intensity: f32,
+    ) -> Self {
+        let mut bound_vectors: Vec<ContinuousHV> = Vec::with_capacity(structure.len());
+
+        for (role, filler) in &structure {
+            if let (Some(role_hv), Some(filler_hv)) = (basis.role_hv(role), basis.prime_hv(filler))
+            {
+                // Role-Filler Binding (Multiplication)
+                bound_vectors.push(role_hv.bind(filler_hv));
+            }
+        }
+
+        let encoding = if bound_vectors.is_empty() {
+            ContinuousHV::zero(HDC_DIMENSION) // Zero vector
+        } else {
+            // Bundling (Addition) + LTC Intensity Scaling
+            let refs: Vec<&ContinuousHV> = bound_vectors.iter().collect();
+            ContinuousHV::bundle(&refs).scale(intensity).normalize()
+        };
+
+        Self {
+            encoding,
+            structure,
+            intensity,
+        }
+    }
+}
+
+/// Basis for generating semantic molecules.
+pub struct SemanticMoleculeBasis {
+    roles: HashMap<SyntacticRole, ContinuousHV>,
+    primes: HashMap<SemanticPrime, ContinuousHV>,
+}
+
+impl SemanticMoleculeBasis {
+    pub fn new(genesis: &GenesisSeed) -> Self {
+        let mut roles = HashMap::new();
+        let mut primes = HashMap::new();
+
+        for role in SyntacticRole::all() {
+            roles.insert(
+                *role,
+                ContinuousHV::from_genesis(
+                    genesis,
+                    &format!("role::{}", role.name()),
+                    HDC_DIMENSION,
+                ),
+            );
+        }
+
+        for prime in SemanticPrime::all() {
+            primes.insert(
+                prime,
+                ContinuousHV::from_genesis(
+                    genesis,
+                    &format!("prime::{}", prime.as_gate_name()),
+                    HDC_DIMENSION,
+                ),
+            );
+        }
+
+        Self { roles, primes }
+    }
+
+    pub fn role_hv(&self, role: &SyntacticRole) -> Option<&ContinuousHV> {
+        self.roles.get(role)
+    }
+
+    pub fn prime_hv(&self, prime: &SemanticPrime) -> Option<&ContinuousHV> {
+        self.primes.get(prime)
     }
 }
 

@@ -59,6 +59,7 @@ enum MainView {
     ConfigDiff,
     Services,
     Imagination,
+    Peers,
 }
 
 /// Application state
@@ -137,6 +138,7 @@ struct SymthaeaGui {
 /// Imagination / Mental Movie UI state
 struct ImaginationUiState {
     pub texture: Option<egui::TextureHandle>,
+    pub reality_texture: Option<egui::TextureHandle>,
     pub current_frame: usize,
     pub last_frame_time: Instant,
     pub play_speed: f32,
@@ -146,6 +148,7 @@ impl Default for ImaginationUiState {
     fn default() -> Self {
         Self {
             texture: None,
+            reality_texture: None,
             current_frame: 0,
             last_frame_time: Instant::now(),
             play_speed: 15.0,
@@ -163,6 +166,9 @@ struct ConsciousnessMetrics {
     uptime_secs: u64,
     /// Latest mental simulation
     mental_movie: Option<symthaea::shell::ipc_client::MentalMovie>,
+    /// Last actual observation
+    last_reality_frame: Option<Vec<u8>>,
+    connected_peers: Vec<symthaea::shell::ipc_client::PeerSnapshot>,
 }
 
 impl Default for ConsciousnessMetrics {
@@ -174,6 +180,8 @@ impl Default for ConsciousnessMetrics {
             is_conscious: false,
             uptime_secs: 0,
             mental_movie: None,
+            last_reality_frame: None,
+            connected_peers: Vec::new(), // <--- ADD THIS LINE
         }
     }
 }
@@ -307,6 +315,9 @@ impl SymthaeaGui {
                 SafetyLevel::Red
             },
             uptime_secs: 0,
+            last_reality_frame: None,
+            mental_movie: None,
+            connected_peers: Vec::new(),
         };
 
         let status_msg = match connection_state {
@@ -658,6 +669,8 @@ impl SymthaeaGui {
                 self.metrics.is_conscious = snapshot.is_conscious;
                 self.metrics.uptime_secs = snapshot.timestamp_ms / 1000;
                 self.metrics.mental_movie = snapshot.mental_movie;
+                self.metrics.last_reality_frame = snapshot.last_observed_frame;
+                self.metrics.connected_peers = snapshot.connected_peers;
                 self.connection_state = ConnectionState::Connected;
             }
         } else if matches!(self.connection_state, ConnectionState::Connected) {
@@ -723,7 +736,7 @@ impl SymthaeaGui {
             let rt = Arc::clone(&self.runtime);
 
             // Connect with retry
-            let connected = rt.block_on(async { client.connect_with_retry().await.is_ok() });
+            let connected = rt.block_on(async { client.connect_with_retry(5).await.is_ok() });
 
             if connected {
                 self.socket_path = discovered;
@@ -814,7 +827,8 @@ impl SymthaeaGui {
                 self.module_browser.selected_category = None;
                 self.module_browser.filter();
             }
-            for cat in self.module_browser.categories.iter() {
+            let categories = self.module_browser.categories.clone();
+            for cat in categories.iter() {
                 let label = format!("{} {} ({})", cat.icon, cat.name, cat.option_count);
                 if ui
                     .selectable_label(
@@ -906,52 +920,132 @@ impl SymthaeaGui {
             ui.separator();
             ui.label(format!("Horizon: {} steps", movie.path_length));
             ui.separator();
-            ui.label(format!("Resolution: {}x{} ({}ch)", movie.width, movie.height, movie.channels));
+            ui.label(format!(
+                "Resolution: {}x{} ({}ch)",
+                movie.width, movie.height, movie.channels
+            ));
         });
 
         ui.add_space(10.0);
 
-        // Frame playback logic
-        let frame_duration = Duration::from_secs_f32(1.0 / self.imagination_state.play_speed);
-        if self.imagination_state.last_frame_time.elapsed() >= frame_duration {
-            self.imagination_state.current_frame = (self.imagination_state.current_frame + 1) % movie.frames.len();
-            self.imagination_state.last_frame_time = Instant::now();
-            
-            // Update texture
-            let frame_data = &movie.frames[self.imagination_state.current_frame];
-            let size = [movie.width as usize, movie.height as usize];
-            
-            let color_image = if movie.channels == 1 {
-                // Grayscale
-                egui::ColorImage::from_gray(size, frame_data)
-            } else {
-                // RGB
-                egui::ColorImage::from_rgb(size, frame_data)
-            };
+        ui.columns(2, |cols| {
+            // Left Column: REALITY
+            cols[0].vertical_centered(|ui| {
+                ui.heading("REALITY");
+                ui.label("(Last Observation)");
 
-            if let Some(ref mut tex) = self.imagination_state.texture {
-                tex.set(color_image, egui::TextureOptions::LINEAR);
-            } else {
-                self.imagination_state.texture = Some(ui.ctx().load_texture(
-                    "imagination_frame",
-                    color_image,
-                    egui::TextureOptions::LINEAR,
-                ));
-            }
-        }
+                if let Some(ref pixels) = self.metrics.last_reality_frame {
+                    // Update reality texture
+                    let size = [movie.width as usize, movie.height as usize];
+                    let color_image = if movie.channels == 1 {
+                        egui::ColorImage::from_gray(size, pixels)
+                    } else {
+                        egui::ColorImage::from_rgb(size, pixels)
+                    };
 
-        if let Some(ref tex) = self.imagination_state.texture {
-            ui.centered_and_justified(|ui| {
-                ui.image((tex.id(), ui.available_size().min(egui::vec2(512.0, 512.0))));
+                    if let Some(ref mut tex) = self.imagination_state.reality_texture {
+                        tex.set(color_image, egui::TextureOptions::LINEAR);
+                    } else {
+                        self.imagination_state.reality_texture = Some(ui.ctx().load_texture(
+                            "reality_frame",
+                            color_image,
+                            egui::TextureOptions::LINEAR,
+                        ));
+                    }
+
+                    if let Some(ref tex) = self.imagination_state.reality_texture {
+                        ui.image((tex.id(), ui.available_size().min(egui::vec2(256.0, 256.0))));
+                    }
+                } else {
+                    ui.label("No sensory input...");
+                }
             });
-        }
+
+            // Right Column: IMAGINATION
+            cols[1].vertical_centered(|ui| {
+                ui.heading("IMAGINATION");
+                ui.label("(Geodesic Movie)");
+
+                // Frame playback logic
+                let frame_duration =
+                    Duration::from_secs_f32(1.0 / self.imagination_state.play_speed);
+                if self.imagination_state.last_frame_time.elapsed() >= frame_duration {
+                    self.imagination_state.current_frame =
+                        (self.imagination_state.current_frame + 1) % movie.frames.len();
+                    self.imagination_state.last_frame_time = Instant::now();
+
+                    // Update imagination texture
+                    let frame_data = &movie.frames[self.imagination_state.current_frame];
+                    let size = [movie.width as usize, movie.height as usize];
+
+                    let color_image = if movie.channels == 1 {
+                        egui::ColorImage::from_gray(size, frame_data)
+                    } else {
+                        egui::ColorImage::from_rgb(size, frame_data)
+                    };
+
+                    if let Some(ref mut tex) = self.imagination_state.texture {
+                        tex.set(color_image, egui::TextureOptions::LINEAR);
+                    } else {
+                        self.imagination_state.texture = Some(ui.ctx().load_texture(
+                            "imagination_frame",
+                            color_image,
+                            egui::TextureOptions::LINEAR,
+                        ));
+                    }
+                }
+
+                if let Some(ref tex) = self.imagination_state.texture {
+                    ui.image((tex.id(), ui.available_size().min(egui::vec2(256.0, 256.0))));
+                }
+            });
+        });
 
         ui.add_space(10.0);
         ui.horizontal(|ui| {
             ui.label("Play Speed:");
-            ui.add(egui::Slider::new(&mut self.imagination_state.play_speed, 1.0..=60.0).suffix(" fps"));
+            ui.add(
+                egui::Slider::new(&mut self.imagination_state.play_speed, 1.0..=60.0)
+                    .suffix(" fps"),
+            );
             if ui.button("Restart").clicked() {
                 self.imagination_state.current_frame = 0;
+            }
+        });
+    }
+
+    // ========== C6: Swarm / Peer List UI ==========
+    fn render_peers(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Swarm Collective Intelligence");
+        ui.separator();
+
+        if self.metrics.connected_peers.is_empty() {
+            ui.centered_and_justified(|ui| {
+                ui.label("Searching for peers via Iroh Gossip...");
+            });
+            return;
+        }
+
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            for peer in &self.metrics.connected_peers {
+                ui.group(|ui| {
+                    ui.horizontal(|ui| {
+                        ui.label(format!("Node ID: {}", &peer.id[..16.min(peer.id.len())]));
+                        ui.separator();
+                        ui.label(format!("Φ: {:.3}", peer.phi));
+
+                        let color = if peer.phi > 0.5 {
+                            egui::Color32::GREEN
+                        } else {
+                            egui::Color32::YELLOW
+                        };
+                        ui.add(
+                            egui::ProgressBar::new(peer.phi as f32)
+                                .fill(color)
+                                .text("Integration"),
+                        );
+                    });
+                });
             }
         });
     }
@@ -1311,6 +1405,7 @@ impl eframe::App for SymthaeaGui {
                 ui.selectable_value(&mut self.current_view, MainView::ConfigDiff, "Diff");
                 ui.selectable_value(&mut self.current_view, MainView::Services, "Services");
                 ui.selectable_value(&mut self.current_view, MainView::Imagination, "Imagination");
+                ui.selectable_value(&mut self.current_view, MainView::Peers, "Peers");
 
                 ui.separator();
 
@@ -1480,6 +1575,7 @@ impl eframe::App for SymthaeaGui {
                         egui::Color32::from_rgb(220, 180, 50)
                     }
                     ConnectionState::Disconnected => egui::Color32::GRAY,
+                    ConnectionState::Degraded => egui::Color32::from_rgb(255, 165, 0),
                 };
 
                 ui.horizontal(|ui| {
@@ -1675,6 +1771,9 @@ impl eframe::App for SymthaeaGui {
                 MainView::Imagination => {
                     self.render_imagination(ui);
                 }
+                MainView::Peers => {
+                    self.render_peers(ui);
+                }
             }
         });
 
@@ -1739,6 +1838,6 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "Symthaea GUI",
         native_options,
-        Box::new(|cc| Box::new(SymthaeaGui::new(cc))),
+        Box::new(|cc| Ok(Box::new(SymthaeaGui::new(cc)))),
     )
 }

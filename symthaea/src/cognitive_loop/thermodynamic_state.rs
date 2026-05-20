@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::consciousness::consciousness_thermodynamics::ConsciousnessPhase;
 use crate::consciousness::dissipative_consciousness::ThermodynamicRegime;
+use symthaea_core::physics::thermodynamics::ThermodynamicLedger;
 
 use super::thresholds;
 
@@ -24,6 +25,12 @@ use super::thresholds;
 /// Read from by cross-couplings and telemetry export.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UnifiedThermodynamicState {
+    // ═══════════════════════════════════════════════════════════════════════
+    // Core Ledger (Joules)
+    // ═══════════════════════════════════════════════════════════════════════
+    /// Explicit energy ledger for cognitive operations.
+    pub ledger: ThermodynamicLedger,
+
     // ═══════════════════════════════════════════════════════════════════════
     // Canonical state (reconciled from multiple sources)
     // ═══════════════════════════════════════════════════════════════════════
@@ -90,8 +97,10 @@ pub struct UnifiedThermodynamicState {
 impl Default for UnifiedThermodynamicState {
     fn default() -> Self {
         Self {
-            canonical_entropy: 0.0,
+            ledger: ThermodynamicLedger::new(6.0), // 6 Joules capacity
+            canonical_entropy: 0.5,
             canonical_free_energy: 0.0,
+
             effective_temperature: 0.3, // Warm default (Normal phase)
             entropy_production_rate: 0.0,
             order_parameter: 0.0,
@@ -179,6 +188,7 @@ impl UnifiedThermodynamicState {
         energy_per_cycle: f64,
         total_spent: f64,
         metabolic: f32,
+        cognitive_load: f32,
     ) {
         self.energy_per_cycle = energy_per_cycle;
         self.total_energy_spent = total_spent;
@@ -187,6 +197,11 @@ impl UnifiedThermodynamicState {
         } else {
             self.metabolic_stress
         };
+
+        // Deduct cognitive load from ledger (mapping load 1.0 to 1 Joule)
+        if cognitive_load > 0.0 {
+            self.ledger.deduct(cognitive_load as f64);
+        }
     }
 }
 

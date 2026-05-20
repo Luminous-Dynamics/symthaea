@@ -224,7 +224,7 @@ impl MotorBridge {
 
 #[cfg(feature = "humanoid")]
 impl EmbodimentBridge for MotorBridge {
-    fn step(&mut self, thought_hv: &ContinuousHV, _dt: f32, phi: f64) -> EmbodimentResult {
+    fn step(&mut self, thought_hv: &ContinuousHV, dt: f32, phi: f64) -> EmbodimentResult {
         let phi_level = MotorSafetyLevel::from_phi(phi);
         self.current_safety = match self.safety_override {
             Some(override_level) => phi_level.max(override_level),
@@ -273,6 +273,22 @@ impl EmbodimentBridge for MotorBridge {
             safety_level: self.current_safety,
             epistemic_grounding: GROUNDING_SENSORIMOTOR,
             observation_confidence: grounding_from_prediction_error(pred_error),
+        }
+    }
+
+    fn apply_active_inference(&mut self, error: &ContinuousHV) {
+        // Simple reflex: map high-dimensional error to reflexive torques.
+        // For humanoids, we take the first 21 dims of error and map to joint impulses.
+        let values = &error.values;
+        let gain = self.current_safety.motor_gain();
+
+        if gain > 0.1 {
+            let mut reflex_command = HumanoidCommand::zero();
+            for i in 0..21.min(values.len()) {
+                reflex_command.torques[i] = values[i] * gain * 2.0; // Scaled impulse
+            }
+            // Step the simulator with the reflex (Channel 3: Harmony → Impulse)
+            self.simulator.step(&reflex_command, self.dt);
         }
     }
 

@@ -282,6 +282,10 @@ pub struct SocialMessage {
     /// Science: Feldman (2012) — oxytocin biobehavioral synchrony.
     #[serde(default)]
     pub bath_state: Option<Vec<f32>>,
+    /// High-dimensional consciousness state for swarm integration (Phase 5).
+    #[cfg(feature = "swarm")]
+    #[serde(default)]
+    pub swarm_state: Option<symthaea_swarm::SwarmStateMsg>,
 }
 
 /// Statistics for the mind

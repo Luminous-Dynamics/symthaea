@@ -48,7 +48,7 @@ mod phase_transitions;
 #[allow(dead_code)] // Exploratory: QFT Feynman diagrams, propagators, vertices
 mod qft;
 mod quantum_gravity;
-mod thermodynamics;
+pub mod thermodynamics;
 // true_phi relocated to crate::consciousness_metrics
 
 // Phase 2: Additional physics domains (pub mod to avoid glob conflicts)

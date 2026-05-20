@@ -361,7 +361,7 @@ impl DemoRunner {
         // Populate vision telemetry from CycleMetadata (internal VisionBridge path)
         #[cfg(feature = "vision-manifold")]
         if let Some(ref vt) = m.vision {
-            data.vision_active = vt.vision_active;
+            data.vision_active = true;
             data.vision_prediction_error = vt.prediction_error;
             data.vision_coherence = vt.manifold_coherence;
             data.vision_attention_entropy = vt.attention_entropy;

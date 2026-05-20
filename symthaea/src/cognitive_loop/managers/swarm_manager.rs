@@ -95,6 +95,10 @@ pub enum SwarmEvent {
         agent_pubkey: String,
     },
 
+    /// Received a full consciousness state message from the P2P swarm.
+    #[cfg(feature = "swarm")]
+    FullStateUpdate(symthaea_swarm::SwarmStateMsg),
+
     /// A threat pattern shared by a peer sentinel.
     ///
     /// Basis: Collective immune memory — distributed threat recognition.
@@ -322,9 +326,12 @@ pub struct SwarmManager {
     /// Connectivity EMA — ratio of connected / expected.
     connectivity_ema: f64,
     /// Per-peer last known Φ. Bounded at MAX_TRACKED_PEERS.
-    peer_phi: Vec<(String, f64)>,
+    pub(crate) peer_phi: Vec<(String, f64)>,
     /// Per-peer last known navigation sigma.
     peer_navigation_sigma: Vec<(String, f64)>,
+    /// Aggregator for high-dimensional hive mind states.
+    #[cfg(feature = "swarm")]
+    pub(crate) hive_mind_aggregator: symthaea_swarm::SwarmAggregator,
 
     // ── Affective contagion ─────────────────────────────────────────────
     /// Accumulated valence shift from peer affective sync.
@@ -449,6 +456,8 @@ impl Default for SwarmManager {
             connectivity_ema: 0.0,
             peer_phi: Vec::new(),
             peer_navigation_sigma: Vec::new(),
+            #[cfg(feature = "swarm")]
+            hive_mind_aggregator: symthaea_swarm::SwarmAggregator::new(),
             affective_valence_acc: 0.0,
             affective_arousal_acc: 0.0,
             affective_count: 0,
@@ -826,6 +835,25 @@ impl SwarmManager {
                         self.peer_phi.push((peer_id, phi));
                     }
                 }
+                #[cfg(feature = "swarm")]
+                SwarmEvent::FullStateUpdate(msg) => {
+                    let peer_id = msg.node_id.to_string();
+                    let phi = msg.local_phi.clamp(0.0, 1.0);
+                    eprintln!(
+                        "DEBUG: SwarmManager handling FullStateUpdate from peer={}",
+                        peer_id
+                    );
+
+                    // Update legacy tracking
+                    if let Some(entry) = self.peer_phi.iter_mut().find(|(id, _)| id == &peer_id) {
+                        entry.1 = phi;
+                    } else if self.peer_phi.len() < Self::MAX_TRACKED_PEERS {
+                        self.peer_phi.push((peer_id, phi));
+                    }
+
+                    // Update high-dimensional aggregator
+                    self.hive_mind_aggregator.update_peer(msg);
+                }
                 SwarmEvent::PeerNavigationUpdate {
                     peer_id,
                     position_sigma_m,
@@ -1146,6 +1174,11 @@ impl SwarmManager {
                 }
                 #[cfg(feature = "hypervisor")]
                 SwarmEvent::SupervisorElection { .. } => {}
+
+                #[allow(unreachable_patterns)]
+                _ => {
+                    eprintln!("DEBUG: SwarmManager ignoring unknown or gated event variant");
+                }
             }
         }
     }
@@ -1317,6 +1350,12 @@ impl CognitiveSubsystem for SwarmManager {
 
         // ── 10. Update telemetry ────────────────────────────────────────
         self.update_telemetry(affective_mag);
+
+        // ── 11. Request P2P Broadcast (Phase 5) ─────────────────────────
+        #[cfg(feature = "swarm")]
+        {
+            output.flags |= output_flags::REQUEST_BROADCAST;
+        }
 
         output
     }

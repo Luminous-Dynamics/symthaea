@@ -367,6 +367,15 @@ pub trait EmbodimentBridge: Send + Sync {
     /// `phi` is the current consciousness level for safety gating.
     fn step(&mut self, thought_hv: &ContinuousHV, dt: f32, phi: f64) -> EmbodimentResult;
 
+    /// Apply active inference motor reflexes (Channel 1/3) based on prediction error.
+    ///
+    /// Prediction error (surprise) can trigger reflexive motor actions to
+    /// minimize that surprise by changing the physical world (active inference).
+    fn apply_active_inference(&mut self, error: &crate::hdc::unified_hv::ContinuousHV) {
+        // Default implementation is a no-op; platforms override to generate impulses.
+        let _ = error;
+    }
+
     /// Encode the current body state into a proprioceptive 16,384D HV.
     fn encode_perception(&mut self) -> ContinuousHV;
 

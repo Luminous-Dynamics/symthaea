@@ -20,6 +20,7 @@ use crate::consciousness::fep_active_inference::{ActiveInferenceAgent, EnhancedF
 use crate::dynamics::ode_solvers::{OdeConfig, OdeResult, OdeSolver, OdeSolverEngine, OdeSystem};
 use crate::exploration::SurpriseExplorationBridge;
 use std::collections::VecDeque;
+use symthaea_core::physics::thermodynamics::ThermodynamicLedger;
 
 use super::goal_world::{GoalSystemBridge, WorldModelBridge};
 use super::learning::ClosedLearningLoop;
@@ -186,6 +187,9 @@ pub struct TrajectoryRecord {
 pub struct FepModule {
     /// Active Inference Bridge for precision-weighted prediction.
     pub active_inference_bridge: ActiveInferenceBridge,
+
+    /// Thermodynamic ledger for tracking energy costs of inference.
+    pub ledger: ThermodynamicLedger,
 
     /// Closed Learning Loop for strategy-based behavioral adaptation.
     pub closed_learning_loop: ClosedLearningLoop,
@@ -478,6 +482,31 @@ impl FepModule {
         self.enhanced_bridge
             .blanket
             .apply_topology_constraints(&topo);
+    }
+
+    /// Apply active inference motor reflexes based on prediction error (Channel 1/3).
+    ///
+    /// When surprise is high, triggers reflexive motor actions to change the physical
+    /// world to match expectations, minimizing variational free energy.
+    pub fn apply_active_reflex(
+        &mut self,
+        bridge: &mut dyn symthaea_core::embodiment::EmbodimentBridge,
+        prediction: &symthaea_core::hdc::unified_hv::ContinuousHV,
+        observation: &symthaea_core::hdc::unified_hv::ContinuousHV,
+    ) {
+        // Calculate prediction error vector (difference in HDC space)
+        let error_hv = symthaea_core::core::ContinuousHV::encode_weighted(
+            &[prediction.clone(), observation.clone()],
+            &[1.0, -1.0],
+        );
+
+        // Trigger reflexive motor impulse via bridge
+        bridge.apply_active_inference(&error_hv);
+    }
+
+    /// Deduct energy from the ledger for cognitive operations.
+    pub fn deduct_cognitive_cost(&mut self, cost_j: f64) -> bool {
+        self.ledger.deduct(cost_j)
     }
 
     /// Get the current effective blanket permeability.

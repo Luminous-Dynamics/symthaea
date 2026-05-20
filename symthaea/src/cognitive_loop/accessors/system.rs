@@ -94,13 +94,75 @@ impl CognitiveLoopService {
     }
 
     /// Mutable access to the sensorimotor group (for frame injection/testing).
-    pub(crate) fn sensorimotor_mut(&mut self) -> &mut super::super::sensorimotor_execution::SensorimotorExecution {
+    pub(crate) fn sensorimotor_mut(
+        &mut self,
+    ) -> &mut super::super::sensorimotor_execution::SensoriMotorExecution {
         &mut self.sensorimotor
     }
 
     /// Mutable access to cycle carryover state (for surprise override/testing).
-    pub(crate) fn carryover_mut(&mut self) -> &mut super::super::types::carryover::CycleCarryover {
+    pub fn carryover_mut(&mut self) -> &mut super::super::types::carryover::CycleCarryover {
         &mut self.carryover
+    }
+
+    /// Mutable access to the swarm manager (for event injection/testing).
+    pub fn swarm_manager_mut(
+        &mut self,
+    ) -> &mut super::super::managers::swarm_manager::SwarmManager {
+        &mut self.swarm_manager
+    }
+
+    /// Get the current HDC dimension of the vision manifold (if enabled).
+    #[cfg(feature = "vision-manifold")]
+    pub fn vision_hdc_dim(&self) -> Option<usize> {
+        self.sensorimotor
+            .vision_sensory
+            .vision_bridge
+            .as_ref()
+            .map(|b| b.manifold().hdc_dim())
+    }
+
+    /// Get the unique node ID of this service.
+    #[cfg(feature = "vision-manifold")]
+    pub fn node_id(&self) -> Option<uuid::Uuid> {
+        self.sensorimotor
+            .vision_sensory
+            .vision_bridge
+            .as_ref()
+            .map(|b| b.manifold().node_id())
+    }
+
+    /// Set a custom node ID for this service.
+    #[cfg(feature = "vision-manifold")]
+    pub fn set_node_id(&mut self, id: uuid::Uuid) {
+        if let Some(ref mut bridge) = self.sensorimotor.vision_sensory.vision_bridge {
+            bridge.manifold_mut().set_node_id(id);
+        }
+    }
+
+    /// Get the latest consciousness hypervector from the vision manifold.
+    #[cfg(feature = "vision-manifold")]
+    pub fn consciousness_hv(&self) -> Option<symthaea_core::core::ContinuousHV> {
+        self.sensorimotor
+            .vision_sensory
+            .vision_bridge
+            .as_ref()
+            .map(|b| b.manifold().state().clone())
+    }
+
+    /// Get the latest intent hypervector from the vision manifold.
+    #[cfg(feature = "vision-manifold")]
+    pub fn last_intent_hv(&self) -> Option<symthaea_core::core::ContinuousHV> {
+        self.sensorimotor
+            .vision_sensory
+            .vision_bridge
+            .as_ref()
+            .map(|b| b.manifold().last_intent_hv().clone())
+    }
+
+    /// Set an override for vision free energy (Surprise) for the next cycle.
+    pub fn set_vision_free_energy_override(&mut self, val: f32) {
+        self.carryover.quality.last_vision_free_energy = val;
     }
 
     /// Access the ethics engine for moral topology, harmony coordinates, etc.
