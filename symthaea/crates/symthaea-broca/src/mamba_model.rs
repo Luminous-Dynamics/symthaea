@@ -127,6 +127,23 @@ pub struct State {
     pub cfc_modulation: Option<CfcModulation>,
 }
 
+impl Clone for State {
+    fn clone(&self) -> Self {
+        let hs = self.hs.iter().map(|h| h.clone()).collect();
+        let mut prev_xs = Vec::with_capacity(self.prev_xs.len());
+        for xs in &self.prev_xs {
+            prev_xs.push([xs[0].clone(), xs[1].clone(), xs[2].clone(), xs[3].clone()]);
+        }
+
+        Self {
+            hs,
+            prev_xs,
+            pos: self.pos,
+            cfc_modulation: self.cfc_modulation.clone(),
+        }
+    }
+}
+
 impl State {
     pub fn new(batch_size: usize, cfg: &Config, dtype: DType, device: &Device) -> Result<Self> {
         let mut hs = Vec::with_capacity(cfg.n_layer);
@@ -498,6 +515,10 @@ impl Model {
     /// of Mamba's embedding space for whitening adapter initialization.
     pub fn embedding_table(&self) -> &Tensor {
         self.embedding.embeddings()
+    }
+
+    pub fn device(&self) -> &Device {
+        self.embedding.embeddings().device()
     }
 
     pub fn dtype(&self) -> DType {

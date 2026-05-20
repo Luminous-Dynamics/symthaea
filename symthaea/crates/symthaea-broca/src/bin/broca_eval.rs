@@ -17,11 +17,15 @@ use std::process::{self, Command};
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
+#[cfg(feature = "mamba-cpu")]
+use symthaea_broca::checkpoint::{AdamState, ProjectionCheckpoint};
 use symthaea_broca::encoder::ThoughtChannels;
 use symthaea_broca::evaluation;
 use symthaea_broca::generator::{
     BrocaGenerator, GenerationResult, GenerationStepLogits, SamplingStrategy,
 };
+#[cfg(feature = "mamba-cpu")]
+use symthaea_broca::liquid_mamba::{LiquidMambaConfig, LiquidMambaGenerator};
 use symthaea_broca::training::{TrainingDataset, TrainingPair};
 
 use symthaea_core::genesis::GenesisSeed;
@@ -48,16 +52,79 @@ fn main() {
 
     // Load checkpoint
     eprintln!("Loading checkpoint: {}", opts.checkpoint_path);
+
     let load_result = if opts.allow_checkpoint_recovery {
         BrocaGenerator::from_checkpoint_allow_checksum_mismatch(&opts.checkpoint_path, &genesis)
     } else {
         BrocaGenerator::from_checkpoint(&opts.checkpoint_path, &genesis)
     };
-    let (mut generator, _adam, _proj, _lm) = match load_result {
+
+    let (mut generator, _adam, _proj, _lm_config) = match load_result {
         Ok(r) => r,
         Err(e) => {
-            eprintln!("Failed to load checkpoint: {e}");
-            process::exit(1);
+            // Fallback for standalone ProjectionCheckpoint (if BrocaGenerator::from_checkpoint fails)
+            #[cfg(feature = "mamba-cpu")]
+            {
+                eprintln!("Failed to load as full BrocaCheckpoint, trying ProjectionCheckpoint...");
+                let proj_ckpt = if opts.allow_checkpoint_recovery {
+                    ProjectionCheckpoint::load_from_file_allow_checksum_mismatch(
+                        &opts.checkpoint_path,
+                    )
+                } else {
+                    ProjectionCheckpoint::load_from_file(&opts.checkpoint_path)
+                };
+
+                match proj_ckpt {
+                    Ok(ckpt) => {
+                        eprintln!(
+                            "Detected ProjectionCheckpoint (v{}); instantiating Mamba-130M base",
+                            ckpt.version
+                        );
+                        let mamba_config = LiquidMambaConfig::default();
+                        let device = symthaea_broca::mamba::best_device();
+                        let mamba_backend = symthaea_broca::mamba::MambaWrapper::load(
+                            "state-spaces/mamba-130m",
+                            device,
+                        )
+                        .unwrap();
+                        let mut broca_gen = BrocaGenerator::new(
+                            &genesis,
+                            symthaea_broca::generator::BrocaConfig::default(),
+                        );
+
+                        broca_gen.controller_mut().liquid_mamba = Some(Box::new(
+                            LiquidMambaGenerator::new(&genesis, mamba_config).unwrap(),
+                        ));
+
+                        // Inject the real backend into the generator
+                        broca_gen
+                            .controller_mut()
+                            .liquid_mamba
+                            .as_mut()
+                            .unwrap()
+                            .mamba = Box::new(mamba_backend);
+
+                        broca_gen
+                            .controller_mut()
+                            .restore_projection_weights(ckpt.projection_weights.clone());
+                        (
+                            broca_gen,
+                            None::<AdamState>,
+                            Some(ckpt.projection_weights),
+                            None::<String>,
+                        )
+                    }
+                    Err(_) => {
+                        eprintln!("Failed to load checkpoint: {e}");
+                        process::exit(1);
+                    }
+                }
+            }
+            #[cfg(not(feature = "mamba-cpu"))]
+            {
+                eprintln!("Failed to load checkpoint: {e}");
+                process::exit(1);
+            }
         }
     };
     if opts.thought_logit_residual_weight > 0.0 {

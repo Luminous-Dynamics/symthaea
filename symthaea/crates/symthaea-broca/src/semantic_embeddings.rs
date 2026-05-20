@@ -28,7 +28,9 @@ use std::collections::HashMap;
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::grounded_understanding::LexicalGrounding;
-use symthaea_core::hdc::universal_semantics::SemanticPrime;
+use symthaea_core::hdc::universal_semantics::{
+    SemanticMolecule, SemanticMoleculeBasis, SemanticPrime, SyntacticRole,
+};
 use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 
 use crate::tokenizer::BpeTokenizer;
@@ -46,9 +48,7 @@ pub struct SemanticEmbeddingConfig {
 
 impl Default for SemanticEmbeddingConfig {
     fn default() -> Self {
-        Self {
-            genesis_blend: 0.3,
-        }
+        Self { genesis_blend: 0.3 }
     }
 }
 
@@ -76,6 +76,8 @@ pub struct SemanticQuarkBasis {
     role_positions: Vec<ContinuousHV>,
     /// Word→prime decomposition lexicon.
     lexicon: LexicalGrounding,
+    /// Structured molecule basis.
+    molecule_basis: SemanticMoleculeBasis,
 }
 
 impl SemanticQuarkBasis {
@@ -87,40 +89,44 @@ impl SemanticQuarkBasis {
         let mut prime_hvs: Vec<ContinuousHV> = all_primes
             .iter()
             .map(|p| {
-                ContinuousHV::from_genesis(
+                let mut hv = ContinuousHV::from_genesis(
                     genesis,
                     &format!("semantic_quark::prime::{}", p.as_gate_name()),
                     HDC_DIMENSION,
-                )
+                );
+                hv.l2_normalize();
+                hv
             })
             .collect();
 
         // Gram-Schmidt orthogonalization (65 vectors in 16,384D — trivial)
         gram_schmidt(&mut prime_hvs);
 
-        let prime_basis: HashMap<SemanticPrime, ContinuousHV> = all_primes
-            .into_iter()
-            .zip(prime_hvs)
-            .collect();
+        let prime_basis: HashMap<SemanticPrime, ContinuousHV> =
+            all_primes.clone().into_iter().zip(prime_hvs).collect();
 
         // Role-position vectors (also orthogonalized)
         let mut role_positions: Vec<ContinuousHV> = (0..MAX_ROLES)
             .map(|i| {
-                ContinuousHV::from_genesis(
+                let mut hv = ContinuousHV::from_genesis(
                     genesis,
                     &format!("semantic_quark::role::{i}"),
                     HDC_DIMENSION,
-                )
+                );
+                hv.l2_normalize();
+                hv
             })
             .collect();
         gram_schmidt(&mut role_positions);
 
         let lexicon = LexicalGrounding::new();
+        let molecule_basis = SemanticMoleculeBasis::new(genesis);
 
         Self {
             prime_basis,
             role_positions,
             lexicon,
+            molecule_basis,
         }
     }
 
@@ -175,6 +181,20 @@ impl SemanticQuarkBasis {
 
         let refs: Vec<&ContinuousHV> = bound.iter().collect();
         ContinuousHV::bundle(&refs).normalize()
+    }
+
+    /// Compose a structured semantic molecule from Role-Filler pairs.
+    pub fn compose_molecule(
+        &self,
+        structure: Vec<(SyntacticRole, SemanticPrime)>,
+        intensity: f32,
+    ) -> SemanticMolecule {
+        SemanticMolecule::new(&self.molecule_basis, structure, intensity)
+    }
+
+    /// Access the underlying molecule basis.
+    pub fn basis(&self) -> &SemanticMoleculeBasis {
+        &self.molecule_basis
     }
 
     /// Build the complete embedding table for a tokenizer's vocabulary.
@@ -384,6 +404,30 @@ fn blend_hvs(a: &ContinuousHV, b: &ContinuousHV, alpha: f32) -> ContinuousHV {
     ContinuousHV::from_values(blended).normalize()
 }
 
+/// Measurement of surprise (Prediction Error) in the HDC manifold.
+///
+/// Grounded in variational Free Energy: Error = 1.0 - cosine_similarity(Expected, Perceived).
+#[derive(Debug, Clone, Copy)]
+pub struct PredictionError {
+    pub surprise: f32,
+    pub cognitive_load: f32,
+}
+
+impl PredictionError {
+    /// Calculate prediction error between an expected thought and actual perception.
+    pub fn calculate(expected: &ContinuousHV, perceived: &ContinuousHV) -> Self {
+        let surprise = 1.0 - expected.similarity(perceived);
+
+        // Cognitive load proxy: surprise scales the thermodynamic cost of weight updates
+        let cognitive_load = surprise.powi(2);
+
+        Self {
+            surprise,
+            cognitive_load,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -480,11 +524,8 @@ mod tests {
         let genesis = test_genesis();
         let basis = SemanticQuarkBasis::new(&genesis);
         let tokenizer = BpeTokenizer::default_minimal();
-        let (_, stats) = basis.build_embeddings(
-            &tokenizer,
-            &genesis,
-            &SemanticEmbeddingConfig::default(),
-        );
+        let (_, stats) =
+            basis.build_embeddings(&tokenizer, &genesis, &SemanticEmbeddingConfig::default());
         assert_eq!(
             stats.tier1_direct + stats.tier2_morphological + stats.tier3_genesis,
             stats.total_tokens,

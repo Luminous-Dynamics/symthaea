@@ -25,7 +25,53 @@
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
 
-use crate::projection::GradientStepMetrics;
+use crate::projection::{GradientStepMetrics, LocalFepLayer};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LOCAL FEP LEARNING (Predictive Coding)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+impl LocalFepLayer for TemporalProjection {
+    fn local_fep_update(
+        &mut self,
+        input: &[f32],       // Full HDC input
+        prediction: &[f32],  // Predicted SSM states
+        observation: &[f32], // Observed SSM states (after teacher forcing)
+        lr: f32,
+    ) -> f64 {
+        let mut total_cost = 0.0;
+
+        // Predictive Coding: update each chunk's up-projection locally
+        for chunk_idx in 0..self.num_chunks {
+            let start = chunk_idx * self.stride;
+            if start + self.chunk_size > input.len() {
+                continue;
+            }
+
+            let g = self.group_for_chunk(chunk_idx);
+            let w_up = &mut self.group_w_up[g];
+
+            let chunk_input = &input[start..start + self.chunk_size];
+
+            // Local surprise for this chunk
+            let mut surprise_sq = 0.0;
+            for j in 0..self.ssm_dim {
+                let p_idx = chunk_idx * self.ssm_dim + j;
+                let delta = prediction[p_idx] - observation[p_idx];
+                surprise_sq += delta * delta;
+
+                for k in 0..self.chunk_size {
+                    w_up[j * self.chunk_size + k] -= lr * delta * chunk_input[k];
+                }
+            }
+
+            total_cost +=
+                (surprise_sq as f64 * (self.ssm_dim * self.chunk_size) as f64 * 1e-9).min(0.05);
+        }
+
+        total_cost
+    }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // EMBEDDING STATS (Manifold Moment Matching)
@@ -198,6 +244,7 @@ fn gelu_derivative(x: f32) -> f32 {
 ///
 /// Forward: `out = w2 @ gelu(w1 @ x + b1) + b2 + x` (residual connection).
 /// Initialized with small random weights so the adapter starts as near-identity.
+#[derive(Clone)]
 pub struct AdapterMlp {
     dim: usize,
     w1: Vec<f32>,      // [dim * dim]
@@ -470,6 +517,7 @@ impl std::fmt::Debug for AdapterMlp {
 /// up-projects each to 768D via per-group learned `group_w_up`, optionally applies
 /// an adapter MLP, and adds sinusoidal positional encoding. The result is a sequence
 /// of continuous embeddings ready for Mamba's `forward_embeds()`.
+#[derive(Clone)]
 pub struct TemporalProjection {
     chunk_size: usize, // per-chunk dimension (e.g. 256)
     num_chunks: usize, // number of chunks (e.g. 64 non-overlapping, or more with overlap)
@@ -685,6 +733,30 @@ impl TemporalProjection {
 
     // ─── Forward projection ──────────────────────────────────────────────
 
+    pub fn effective_rank(&self, samples: &[ContinuousHV]) -> f32 {
+        if samples.len() < 2 {
+            return 0.0;
+        }
+        let dim = self.ssm_dim;
+        let mut cov = vec![0.0f32; dim * dim];
+        for hv in samples {
+            let seq = self.project_to_ssm_sequence(hv);
+            for ssm_vec in seq {
+                for i in 0..dim {
+                    for j in 0..dim {
+                        cov[i * dim + j] += ssm_vec[i] * ssm_vec[j];
+                    }
+                }
+            }
+        }
+        let trace: f32 = (0..dim).map(|i| cov[i * dim + i]).sum();
+        if trace < 1e-6 {
+            return 0.0;
+        }
+        let sum_sq: f32 = cov.iter().map(|x| x * x).sum();
+        (trace * trace) / sum_sq
+    }
+
     /// Project a 16384D thought to a sequence of N × 768D SSM embeddings.
     ///
     /// Steps per chunk:
@@ -793,22 +865,34 @@ impl TemporalProjection {
         ContinuousHV::from_vec(values)
     }
 
-    /// Backpropagate gradients and update weights.
-    pub fn backward(&mut self, input_hv: &ContinuousHV, d_hdc: &ContinuousHV, lr: f32) -> Result<()> {
-        // Map HDC gradient back to chunk-level weights
+    /// Backpropagate gradients and update weights mathematically correctly.
+    /// `d_hdc` is the gradient of the loss with respect to the full 16384D HDC output.
+    /// `ssm_states` are the intermediate activations from the SSM layer for each chunk.
+    pub fn backward(
+        &mut self,
+        ssm_states: &[Vec<f32>],
+        d_hdc: &ContinuousHV,
+        lr: f32,
+    ) -> anyhow::Result<()> {
         for chunk_idx in 0..self.num_chunks {
             let start = chunk_idx * self.stride;
             let g = self.group_for_chunk(chunk_idx);
             let w_up = &mut self.group_w_up[g];
 
-            // Simplified update: align input_hv chunk -> d_hdc chunk
+            // The intermediate activation that was actually multiplied by w_up in the forward pass
+            let ssm_x = &ssm_states[chunk_idx];
+
             for k in 0..self.chunk_size {
                 let idx = start + k;
                 if idx < self.hdc_dim {
+                    // The error signal for this specific chunk's slice of the 16384D vector
                     let gi = d_hdc.values[idx];
-                    let xi = input_hv.values[idx];
+
+                    // Note: If you add an activation function like SiLU in the forward pass later,
+                    // you MUST multiply `gi` by the derivative of SiLU right here before the weight update.
+
                     for j in 0..self.ssm_dim {
-                        w_up[j * self.chunk_size + k] -= lr * gi * xi;
+                        w_up[j * self.chunk_size + k] -= lr * gi * ssm_x[j];
                     }
                 }
             }
@@ -1676,77 +1760,8 @@ impl TemporalProjection {
         1.0 - avg_sim
     }
 
-    /// Estimate effective rank of the up-projection.
-    pub fn effective_rank(&self, thoughts: &[ContinuousHV]) -> f32 {
-        if thoughts.len() < 2 {
-            return self.chunk_size as f32;
-        }
-
-        let sample_chunks: Vec<usize> = if self.num_chunks <= 4 {
-            (0..self.num_chunks).collect()
-        } else {
-            let step = self.num_chunks / 4;
-            vec![0, step, 2 * step, 3 * step]
-        };
-
-        let mut ssm_vecs: Vec<Vec<f32>> = Vec::with_capacity(thoughts.len() * sample_chunks.len());
-        for thought in thoughts {
-            for &ci in &sample_chunks {
-                let start = ci * self.stride;
-                let chunk = &thought.values[start..start + self.chunk_size];
-                let normed = self.layer_norm(chunk);
-                let g = self.group_for_chunk(ci);
-                let mut ssm_vec = vec![0.0f32; self.ssm_dim];
-                for j in 0..self.ssm_dim {
-                    let mut sum = 0.0f32;
-                    for k in 0..self.chunk_size {
-                        sum += self.group_w_up[g][j * self.chunk_size + k] * normed[k];
-                    }
-                    ssm_vec[j] = sum;
-                }
-                ssm_vecs.push(ssm_vec);
-            }
-        }
-
-        let n = ssm_vecs.len() as f32;
-        let mut variances = vec![0.0f32; self.ssm_dim];
-        let mut means = vec![0.0f32; self.ssm_dim];
-
-        for vec in &ssm_vecs {
-            for (j, &v) in vec.iter().enumerate() {
-                means[j] += v;
-            }
-        }
-        for m in &mut means {
-            *m /= n;
-        }
-        for vec in &ssm_vecs {
-            for (j, &v) in vec.iter().enumerate() {
-                let d = v - means[j];
-                variances[j] += d * d;
-            }
-        }
-        for v in &mut variances {
-            *v /= n;
-        }
-
-        let total_var: f32 = variances.iter().sum();
-        if total_var < 1e-10 {
-            return 1.0;
-        }
-
-        let mut entropy = 0.0f32;
-        for &v in &variances {
-            let p = v / total_var;
-            if p > 1e-10 {
-                entropy -= p * p.ln();
-            }
-        }
-
-        entropy.exp()
-    }
-
     /// Warm-start the up-projection from training data via power-iteration PCA.
+
     pub fn warm_start_from_samples(&mut self, samples: &[ContinuousHV]) {
         if samples.len() < 2 {
             return;

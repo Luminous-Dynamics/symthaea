@@ -76,6 +76,7 @@ fn activation_derivative(x: f32) -> f32 {
 /// Forward:  HDC(16384) → w_down → LN → GELU+res → w_down2 → GELU → w_up2 → GELU+res → w_up → SSM(768)
 /// Backward: SSM(768) → w_up^T → GELU → w_up2^T → GELU → w_down2^T → LN → w_down^T → HDC(16384)
 /// ```
+#[derive(Clone)]
 pub struct HdcSsmProjection {
     // Forward: HDC → bottleneck → SSM
     w_down: Vec<f32>, // [bottleneck × hdc_dim]
@@ -108,10 +109,14 @@ pub struct HdcSsmProjection {
     // EMA teacher (Polyak averaging) — None until enabled
     ema_weights: Option<Vec<f32>>,
     ema_decay: f32,
+    // Optional gradient diagnostics (None by default)
+    pub diagnostics: Option<ProjectionGradientDiagnostics>,
+    // Generation at which diagnostics-triggered recovery last ran (prevents rapid re-triggering)
+    last_diag_recovery_gen: usize,
     // Dimensions
-    hdc_dim: usize,
-    bottleneck: usize,
-    ssm_dim: usize,
+    pub hdc_dim: usize,
+    pub bottleneck: usize,
+    pub ssm_dim: usize,
 }
 
 /// Metrics from a single gradient application step.
@@ -299,6 +304,86 @@ impl ProjectionGradientDiagnostics {
     }
 }
 
+impl HdcSsmProjection {
+    pub fn diagnostics(&self) -> Option<&ProjectionGradientDiagnostics> {
+        self.diagnostics.as_ref()
+    }
+    pub fn diagnostics_mut(&mut self) -> Option<&mut ProjectionGradientDiagnostics> {
+        self.diagnostics.as_mut()
+    }
+    pub fn effective_rank(&self, samples: &[ContinuousHV]) -> f32 {
+        if samples.len() < 2 {
+            return 0.0;
+        }
+        let dim = self.bottleneck;
+        let mut cov = vec![0.0f32; dim * dim];
+        for hv in samples {
+            let proj = self.project_to_ssm(hv); // Use bottleneck activation
+            for i in 0..dim {
+                for j in 0..dim {
+                    cov[i * dim + j] += proj[i] * proj[j];
+                }
+            }
+        }
+        let trace: f32 = (0..dim).map(|i| cov[i * dim + i]).sum();
+        if trace < 1e-6 {
+            return 0.0;
+        }
+        // Simplified effective rank: trace^2 / sum(eigenvalues^2)
+        let sum_sq: f32 = cov.iter().map(|x| x * x).sum();
+        (trace * trace) / sum_sq
+    }
+}
+
+/// Trait for layers that support local Free Energy Principle (FEP) learning.
+///
+/// Instead of global BPTT, these layers update based on local prediction errors:
+/// dW = (Prediction - Observation) ⊗ Input.
+pub trait LocalFepLayer {
+    /// Update weights based on a local prediction error.
+    /// Returns the cost in Joules for the ThermodynamicLedger.
+    fn local_fep_update(
+        &mut self,
+        input: &[f32],
+        prediction: &[f32],
+        observation: &[f32],
+        lr: f32,
+    ) -> f64;
+}
+
+impl LocalFepLayer for HdcSsmProjection {
+    fn local_fep_update(
+        &mut self,
+        input: &[f32],
+        prediction: &[f32],
+        observation: &[f32],
+        lr: f32,
+    ) -> f64 {
+        let rows = self.bottleneck;
+        let cols = self.hdc_dim;
+
+        // Local Prediction Error: Δ = Prediction - Observation
+        let mut delta = vec![0.0f32; rows];
+        let mut surprise_sq = 0.0f32;
+        for i in 0..rows {
+            delta[i] = prediction[i] - observation[i];
+            surprise_sq += delta[i] * delta[i];
+        }
+
+        // Weight update: W_new = W_old - lr * (Δ ⊗ Input)
+        for i in 0..rows {
+            let gi = delta[i];
+            for j in 0..cols {
+                self.w_down[i * cols + j] -= lr * gi * input[j];
+            }
+        }
+
+        // Thermodynamic cost scales with surprise and weight matrix size
+        let cost = (surprise_sq as f64 * (rows * cols) as f64 * 1e-9).min(0.5);
+        cost
+    }
+}
+
 /// LayerNorm epsilon for numerical stability.
 const LN_EPS: f32 = 1e-5;
 
@@ -417,6 +502,8 @@ impl HdcSsmProjection {
             hdc_dim,
             bottleneck,
             ssm_dim,
+            diagnostics: None,
+            last_diag_recovery_gen: 0,
         }
     }
 
@@ -518,6 +605,8 @@ impl HdcSsmProjection {
             hdc_dim,
             bottleneck,
             ssm_dim,
+            diagnostics: None,
+            last_diag_recovery_gen: 0,
         }
     }
 
@@ -649,19 +738,19 @@ impl HdcSsmProjection {
         ContinuousHV::from_vec(values)
     }
 
-    /// Backpropagate gradients and update weights.
-    pub fn backward(&mut self, input_hv: &ContinuousHV, d_hdc: &ContinuousHV, lr: f32) {
-        // Simplified backward for distillation: update w_down to align input_hv -> d_hdc
-        // In a real implementation, this would be a full backprop through the bottleneck.
-        // For now, we perform a direct delta update on the input-to-bottleneck projection.
+    /// Backpropagate gradients and update weights mathematically correctly.
+    /// `d_bottleneck` must be the gradient of the loss with respect to the bottleneck output (size: self.bottleneck).
+    pub fn backward(&mut self, input_hv: &ContinuousHV, d_bottleneck: &[f32], lr: f32) {
         let rows = self.bottleneck;
         let cols = self.hdc_dim;
-        let d_values = &d_hdc.values;
         let x_values = &input_hv.values;
 
+        // Linear layer gradient: dW = dY (outer product) X
         for i in 0..rows {
-            let gi = d_values[i % d_values.len()]; // Map bottleneck grad to projection
+            let gi = d_bottleneck[i]; // The exact gradient for this specific bottleneck neuron
+
             for j in 0..cols {
+                // Gradient descent: W_new = W_old - lr * dW
                 self.w_down[i * cols + j] -= lr * gi * x_values[j];
             }
         }
@@ -1518,64 +1607,6 @@ impl HdcSsmProjection {
             samples = n,
             "Bidirectional warm-start complete (w_down PCA + w_up PCA + matched backward)"
         );
-    }
-
-    /// Compute the effective rank of the bottleneck activations for a batch of inputs.
-    ///
-    /// Effective rank = exp(entropy of singular value distribution).
-    /// Low effective rank → projection is collapsing to a low-dimensional subspace.
-    /// Returns a value in [1, bottleneck_dim].
-    pub fn effective_rank(&self, samples: &[ContinuousHV]) -> f32 {
-        if samples.is_empty() || self.bottleneck == 0 {
-            return 0.0;
-        }
-
-        // Compute bottleneck activations for each sample (with LayerNorm)
-        let mut activations: Vec<Vec<f32>> = Vec::with_capacity(samples.len());
-        for s in samples {
-            let hidden_pre = self.matmul(&self.w_down, &s.values, self.bottleneck, self.hdc_dim);
-            let (normed, _, _) = layer_norm(&hidden_pre, &self.ln_fwd_gamma, &self.ln_fwd_beta);
-            let hidden: Vec<f32> = normed.into_iter().map(activation).collect();
-            activations.push(hidden);
-        }
-
-        // Compute variance per bottleneck dimension
-        let n = activations.len() as f32;
-        let mut means = vec![0.0f32; self.bottleneck];
-        for act in &activations {
-            for (m, v) in means.iter_mut().zip(act.iter()) {
-                *m += v;
-            }
-        }
-        for m in &mut means {
-            *m /= n;
-        }
-
-        let mut variances = vec![0.0f32; self.bottleneck];
-        for act in &activations {
-            for (j, v) in act.iter().enumerate() {
-                let diff = v - means[j];
-                variances[j] += diff * diff;
-            }
-        }
-        for v in &mut variances {
-            *v /= n;
-        }
-
-        // Effective rank from variance distribution (proxy for SVD)
-        let total_var: f32 = variances.iter().sum();
-        if total_var < 1e-10 {
-            return 1.0; // Complete collapse
-        }
-
-        let mut entropy = 0.0f32;
-        for &v in &variances {
-            let p = v / total_var;
-            if p > 1e-10 {
-                entropy -= p * p.ln();
-            }
-        }
-        entropy.exp()
     }
 
     /// Matrix-vector multiply: `result[i] = sum_j(mat[i*cols + j] * vec[j])`

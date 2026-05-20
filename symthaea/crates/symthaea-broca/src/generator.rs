@@ -13,6 +13,9 @@ use rand::rngs::StdRng;
 use rand::SeedableRng;
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "mamba-cpu")]
+use crate::checkpoint::ProjectionCheckpoint;
+use crate::checkpoint::{AdamState, BrocaCheckpoint};
 use crate::controller::{LanguageController, LanguageControllerConfig, NetworkSnapshot};
 use crate::encoder::{ThoughtChannels, ThoughtLanguageEncoder};
 #[cfg(feature = "therapeutic")]
@@ -21,7 +24,7 @@ use crate::gating::{
     confidence_adjusted_veto_threshold, consciousness_gated_max_tokens, CoherenceFeedback,
     EmotionalModulator, EpistemicGate, GatingConfig,
 };
-use crate::tokenizer::BpeTokenizer;
+use crate::tokenizer::{BpeTokenizer, MergePair, VocabFile};
 
 use symthaea_core::genesis::GenesisSeed;
 
@@ -245,6 +248,7 @@ pub struct GenerationTopLogit {
 }
 
 /// Broca generator: autoregressive thought-to-text.
+#[derive(Clone)]
 pub struct BrocaGenerator {
     controller: LanguageController,
     tokenizer: BpeTokenizer,
@@ -369,6 +373,143 @@ impl BrocaGenerator {
             code_gate,
             config,
         }
+    }
+
+    /// Load a generator from a checkpoint file.
+    /// Supports both full BrocaCheckpoint and HdcSsmProjection checkpoints.
+    pub fn from_checkpoint<P: AsRef<std::path::Path>>(
+        path: P,
+        genesis: &GenesisSeed,
+    ) -> anyhow::Result<(Self, Option<AdamState>, Option<Vec<f32>>, Option<String>)> {
+        // Path 1: Try full BrocaCheckpoint (CfC-HDC + all state)
+        if let Ok(checkpoint) = BrocaCheckpoint::load_from_file(&path) {
+            return Ok((
+                Self::from_checkpoint_struct(checkpoint, genesis),
+                None::<AdamState>,
+                None::<Vec<f32>>,
+                None::<String>,
+            ));
+        }
+
+        // Path 2: Try ProjectionCheckpoint (Liquid-Mamba optimized)
+        #[cfg(feature = "mamba-cpu")]
+        match ProjectionCheckpoint::load_from_file(&path) {
+            Ok(proj_ckpt) => {
+                // If it has a full snapshot, restore everything
+                let (mut gen, adam, _, config_str) = if let Some(snapshot) = proj_ckpt.full_snapshot
+                {
+                    (
+                        Self::from_checkpoint_struct(*snapshot, genesis),
+                        None::<AdamState>,
+                        None::<Vec<f32>>,
+                        None::<String>,
+                    )
+                } else {
+                    (
+                        Self::new(genesis, BrocaConfig::default()),
+                        None::<AdamState>,
+                        None::<Vec<f32>>,
+                        None::<String>,
+                    )
+                };
+
+                // Restore projection weights
+                gen.controller
+                    .restore_projection_weights(proj_ckpt.projection_weights.clone());
+
+                return Ok((gen, adam, Some(proj_ckpt.projection_weights), config_str));
+            }
+            Err(e) => {
+                tracing::debug!("Failed to load as ProjectionCheckpoint: {}", e);
+            }
+        }
+
+        anyhow::bail!("Failed to load checkpoint: unknown format or corrupt file")
+    }
+
+    /// Load while allowing MessagePack checksum mismatch.
+    pub fn from_checkpoint_allow_checksum_mismatch<P: AsRef<std::path::Path>>(
+        path: P,
+        genesis: &GenesisSeed,
+    ) -> anyhow::Result<(Self, Option<AdamState>, Option<Vec<f32>>, Option<String>)> {
+        // Path 1: Try full BrocaCheckpoint
+        if let Ok(checkpoint) = BrocaCheckpoint::load_from_file_allow_checksum_mismatch(&path) {
+            return Ok((
+                Self::from_checkpoint_struct(checkpoint, genesis),
+                None::<AdamState>,
+                None::<Vec<f32>>,
+                None::<String>,
+            ));
+        }
+
+        // Path 2: Try ProjectionCheckpoint
+        #[cfg(feature = "mamba-cpu")]
+        match ProjectionCheckpoint::load_from_file_allow_checksum_mismatch(&path) {
+            Ok(proj_ckpt) => {
+                let (mut gen, adam, _, config_str) = if let Some(snapshot) = proj_ckpt.full_snapshot
+                {
+                    (
+                        Self::from_checkpoint_struct(*snapshot, genesis),
+                        None::<AdamState>,
+                        None::<Vec<f32>>,
+                        None::<String>,
+                    )
+                } else {
+                    (
+                        Self::new(genesis, BrocaConfig::default()),
+                        None::<AdamState>,
+                        None::<Vec<f32>>,
+                        None::<String>,
+                    )
+                };
+
+                // Restore projection weights
+                gen.controller
+                    .restore_projection_weights(proj_ckpt.projection_weights.clone());
+
+                return Ok((gen, adam, Some(proj_ckpt.projection_weights), config_str));
+            }
+            Err(e) => {
+                tracing::debug!("Failed to load as ProjectionCheckpoint (recovery): {}", e);
+            }
+        }
+
+        anyhow::bail!("Failed to load checkpoint (recovery mode): unknown format or corrupt file")
+    }
+
+    fn from_checkpoint_struct(checkpoint: BrocaCheckpoint, genesis: &GenesisSeed) -> Self {
+        let mut gen = Self::new(genesis, checkpoint.config);
+        gen.controller.restore_network(checkpoint.network_state);
+        gen.controller
+            .restore_token_embeddings(checkpoint.token_embeddings);
+        gen
+    }
+
+    /// Save the current generator state to a checkpoint file.
+    pub fn save_checkpoint<P: AsRef<std::path::Path>>(
+        &self,
+        path: P,
+        training_epoch: usize,
+        training_loss: f32,
+        adam_state: Option<AdamState>,
+        projection_weights: Option<Vec<f32>>,
+        liquid_mamba_config: Option<String>,
+    ) -> anyhow::Result<()> {
+        let mut checkpoint = BrocaCheckpoint {
+            version: crate::checkpoint::CHECKPOINT_VERSION,
+            token_embeddings: self.controller.token_embeddings().to_vec(),
+            network_state: self.controller.network().clone(),
+            vocab: self.tokenizer.export_vocab(),
+            config: self.config.clone(),
+            training_epoch,
+            training_loss,
+            adam_state,
+            projection_weights,
+            liquid_mamba_config,
+            metadata: crate::checkpoint::BrocaCheckpointMetadata::default(), // Will be populated in save_to_file eventually
+            checksum: [0u8; 32],
+        };
+        checkpoint.save_to_file(path)
     }
 
     /// Generate text from thought channels.

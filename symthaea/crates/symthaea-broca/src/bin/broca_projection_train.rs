@@ -18,7 +18,7 @@
 use std::io::Write;
 use std::process;
 
-use symthaea_broca::checkpoint::ProjectionCheckpoint;
+use symthaea_broca::checkpoint::{AdamState, BrocaCheckpoint, ProjectionCheckpoint};
 
 use symthaea_broca::liquid_mamba::{LiquidMambaConfig, LiquidMambaGenerator};
 use symthaea_broca::training::TrainingDataset;
@@ -297,6 +297,7 @@ fn main() {
 
         let mut epoch_semantic_pe = 0.0f32;
         let mut epoch_coherence = 0.0f32;
+        let mut epoch_effective_rank = 0.0f32;
         let mut epoch_vetos = 0usize;
         let num_samples = dataset.pairs.len();
 
@@ -306,22 +307,31 @@ fn main() {
             // Generate through full Mamba inference
             let result = gen.generate(&channels);
 
-            // Distill step: update projection from reconstruction error
-            gen.distill_step(&channels, &result);
+            // Distill step: update projection using Local FEP (Predictive Coding)
+            let lr = gen.compute_lr();
+            let thought_hv = gen.encoder().encode(&channels);
+            gen.local_fep_distill(&thought_hv, &result.token_ids, lr)
+                .unwrap();
+
+            if (i + 1) % 10 == 0 {
+                tracing::info!(epoch, sample = i + 1, "Sample processed");
+            }
 
             epoch_semantic_pe += result.semantic_pe;
             epoch_coherence += result.final_coherence;
+            let rank = if let Some(tp) = gen.temporal_proj() {
+                tp.effective_rank(&result.output_hvs)
+            } else {
+                gen.projection.effective_rank(&result.output_hvs)
+            };
+            epoch_effective_rank += rank;
+
             if result.veto_triggered {
                 epoch_vetos += 1;
             }
 
             // Periodic progress report (rank computed without injecting noise)
             if opts.diagnostics && (i + 1) % 50 == 0 && !result.output_hvs.is_empty() {
-                let rank = if let Some(tp) = gen.temporal_proj() {
-                    tp.effective_rank(&result.output_hvs)
-                } else {
-                    gen.projection().effective_rank(&result.output_hvs)
-                };
                 tracing::info!(
                     epoch = epoch,
                     sample = i + 1,
@@ -355,6 +365,11 @@ fn main() {
         } else {
             0.0
         };
+        let avg_rank = if num_samples > 0 {
+            epoch_effective_rank / num_samples as f32
+        } else {
+            0.0
+        };
 
         // Compute effective rank on a few samples
         let rank_samples: Vec<_> = dataset
@@ -363,10 +378,10 @@ fn main() {
             .take(10)
             .map(|p| gen.encoder().encode(&p.to_thought_channels()))
             .collect();
-        let avg_rank = if let Some(tp) = gen.temporal_proj() {
+        let final_rank = if let Some(tp) = gen.temporal_proj() {
             tp.effective_rank(&rank_samples)
         } else {
-            gen.projection().effective_rank(&rank_samples)
+            gen.projection.effective_rank(&rank_samples)
         };
 
         let metrics = ProjectionEpochMetrics {
@@ -412,7 +427,7 @@ fn main() {
             best_pe = avg_pe;
             patience_counter = 0;
             let best_path = format!("{}.best", opts.output_path);
-            let weights = gen.projection().flatten_weights();
+            let weights = gen.projection.flatten_weights();
             let mut ckpt = if let Some(tp) = gen.temporal_proj() {
                 let num_groups = tp.num_groups();
                 let has_adapter = tp.has_adapter();
@@ -420,9 +435,9 @@ fn main() {
                     ProjectionCheckpoint::new_temporal_with_groups(
                         weights,
                         tp.flatten_weights(),
-                        gen.config().hdc_dim,
-                        gen.config().bottleneck_dim,
-                        gen.config().ssm_dim,
+                        gen.config.hdc_dim,
+                        gen.config.bottleneck_dim,
+                        gen.config.ssm_dim,
                         epoch,
                         tp.chunk_size(),
                         tp.num_chunks(),
@@ -433,9 +448,9 @@ fn main() {
                     ProjectionCheckpoint::new_temporal(
                         weights,
                         tp.flatten_weights(),
-                        gen.config().hdc_dim,
-                        gen.config().bottleneck_dim,
-                        gen.config().ssm_dim,
+                        gen.config.hdc_dim,
+                        gen.config.bottleneck_dim,
+                        gen.config.ssm_dim,
                         epoch,
                         tp.chunk_size(),
                         tp.num_chunks(),
@@ -444,12 +459,12 @@ fn main() {
             } else {
                 ProjectionCheckpoint::new(
                     weights,
-                    gen.config().hdc_dim,
-                    gen.config().bottleneck_dim,
-                    gen.config().ssm_dim,
+                    gen.config.hdc_dim,
+                    gen.config.bottleneck_dim,
+                    gen.config.ssm_dim,
                     epoch,
-                    gen.projection().is_deep(),
-                    gen.projection().inner_dim(),
+                    gen.projection.is_deep(),
+                    gen.projection.inner_dim(),
                 )
             };
             if let Some(diag) = gen.projection_diagnostics() {
@@ -503,18 +518,18 @@ fn main() {
 
     // Save projection checkpoint
     let final_epoch = all_epoch_metrics.last().map(|m| m.epoch).unwrap_or(0);
-    let weights = gen.projection().flatten_weights();
+    let weights = gen.projection.flatten_weights();
 
     let mut checkpoint = if let Some(tp) = gen.temporal_proj() {
         let num_groups = tp.num_groups();
         let has_adapter = tp.has_adapter();
         if num_groups > 1 || has_adapter {
             ProjectionCheckpoint::new_temporal_with_groups(
-                weights,
+                weights.clone(),
                 tp.flatten_weights(),
-                gen.config().hdc_dim,
-                gen.config().bottleneck_dim,
-                gen.config().ssm_dim,
+                gen.config.hdc_dim,
+                gen.config.bottleneck_dim,
+                gen.config.ssm_dim,
                 final_epoch,
                 tp.chunk_size(),
                 tp.num_chunks(),
@@ -523,11 +538,11 @@ fn main() {
             )
         } else {
             ProjectionCheckpoint::new_temporal(
-                weights,
+                weights.clone(),
                 tp.flatten_weights(),
-                gen.config().hdc_dim,
-                gen.config().bottleneck_dim,
-                gen.config().ssm_dim,
+                gen.config.hdc_dim,
+                gen.config.bottleneck_dim,
+                gen.config.ssm_dim,
                 final_epoch,
                 tp.chunk_size(),
                 tp.num_chunks(),
@@ -535,15 +550,30 @@ fn main() {
         }
     } else {
         ProjectionCheckpoint::new(
-            weights,
-            gen.config().hdc_dim,
-            gen.config().bottleneck_dim,
-            gen.config().ssm_dim,
+            weights.clone(),
+            gen.config.hdc_dim,
+            gen.config.bottleneck_dim,
+            gen.config.ssm_dim,
             final_epoch,
-            gen.projection().is_deep(),
-            gen.projection().inner_dim(),
+            gen.projection.is_deep(),
+            gen.projection.inner_dim(),
         )
     };
+
+    // Include full Broca state in the final optimized checkpoint
+    let full_path = std::path::PathBuf::from("/tmp/broca-diag/temp-full.bin");
+    gen.save_checkpoint(
+        &full_path,
+        final_epoch,
+        0.0,
+        None::<AdamState>,
+        Some(weights.clone()),
+        None,
+    )
+    .unwrap();
+    let full_snapshot = BrocaCheckpoint::load_from_file(&full_path).unwrap();
+    checkpoint.full_snapshot = Some(Box::new(full_snapshot));
+    let _ = std::fs::remove_file(&full_path);
 
     // Persist gradient diagnostics snapshot if enabled
     if let Some(diag) = gen.projection_diagnostics() {

@@ -1731,12 +1731,17 @@ pub fn train_with_adam(
                 patience_counter = 0;
                 // Save best checkpoint if path configured
                 if !config.best_checkpoint_path.is_empty() {
+                    #[cfg(feature = "mamba-cpu")]
+                    let projection_weights = generator.controller().projection_weights();
+                    #[cfg(not(feature = "mamba-cpu"))]
+                    let projection_weights = None;
+
                     if let Err(e) = generator.save_checkpoint(
                         &config.best_checkpoint_path,
                         epoch,
                         avg_loss,
                         adam_state.as_ref().cloned(),
-                        None,
+                        projection_weights,
                         None,
                     ) {
                         tracing::warn!(error = %e, "Failed to save best checkpoint");
@@ -2200,17 +2205,21 @@ fn apply_weight_tied_gradient_adam(
             }
         }
 
-        if i < adam.m.len() {
-            let am = &mut adam.m[i];
-            let av = &mut adam.v[i];
+        let offset = i * dim;
+        if offset + dim <= adam.m.len() {
             let emb_values = &mut embeddings[i].values;
             let se = scale * error;
-            for j in 0..dim.min(am.len()) {
+            for j in 0..dim {
                 let g = (se * output_slice[j]).clamp(-grad_clip, grad_clip);
-                am[j] = adam.beta1 * am[j] + (1.0 - adam.beta1) * g;
-                av[j] = adam.beta2 * av[j] + (1.0 - adam.beta2) * g * g;
-                let m_hat = am[j] * bc1;
-                let v_hat = av[j] * bc2;
+
+                let mj = &mut adam.m[offset + j];
+                let vj = &mut adam.v[offset + j];
+
+                *mj = adam.beta1 * (*mj) + (1.0 - adam.beta1) * g;
+                *vj = adam.beta2 * (*vj) + (1.0 - adam.beta2) * g * g;
+
+                let m_hat = *mj * bc1;
+                let v_hat = *vj * bc2;
                 emb_values[j] -= lr * m_hat / (v_hat.sqrt() + adam.epsilon);
             }
         }

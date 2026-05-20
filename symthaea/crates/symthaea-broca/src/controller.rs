@@ -251,6 +251,7 @@ pub struct NetworkSnapshot {
 /// 2. `network.evolve_closed_form(dt, &input_hv)`
 /// 3. `output_hv = network.output().normalize()`
 /// 4. Weight-tied logits: `logits[i] = similarity(output_hv, token_emb[i])`
+#[derive(Clone)]
 pub struct LanguageController {
     /// The temporal dynamics engine — full 16,384D HDC-LTC.
     network: HdcLtcUnifiedNetwork,
@@ -277,6 +278,10 @@ pub struct LanguageController {
     /// Shape: [vocab_size, HDC_DIMENSION]. Pre-normalized rows.
     #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
     gpu_embeddings: Option<GpuEmbeddingCache>,
+
+    /// Optional Liquid-Mamba fusion generator.
+    #[cfg(feature = "mamba-cpu")]
+    pub liquid_mamba: Option<Box<crate::liquid_mamba::LiquidMambaGenerator>>,
 }
 
 impl LanguageController {
@@ -338,6 +343,9 @@ impl LanguageController {
             last_logit_hv: None,
             #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
             gpu_embeddings,
+
+            #[cfg(feature = "mamba-cpu")]
+            liquid_mamba: None,
         }
     }
 
@@ -724,6 +732,40 @@ impl LanguageController {
         }
     }
 
+    /// Restore the entire network state from a snapshot.
+    pub fn restore_network(&mut self, state: HdcLtcUnifiedNetwork) {
+        self.network = state;
+    }
+
+    /// Restore the token embedding table.
+    pub fn restore_token_embeddings(&mut self, embeddings: Vec<ContinuousHV>) {
+        self.token_embeddings = embeddings;
+        #[cfg(any(feature = "mamba-cpu", feature = "gpu-logits"))]
+        {
+            // Rebuild the GPU cache automatically after table swap
+            self.rebuild_gpu_cache();
+        }
+    }
+
+    /// Restore projection weights (for Liquid-Mamba fusion).
+    #[cfg(feature = "mamba-cpu")]
+    pub fn restore_projection_weights(&mut self, weights: Vec<f32>) {
+        if let Some(ref mut gen) = self.liquid_mamba {
+            let gen: &mut crate::liquid_mamba::LiquidMambaGenerator = gen;
+            gen.projection.restore_live_weights(&weights);
+        }
+    }
+
+    /// Get a copy of the current projection weights.
+    #[cfg(feature = "mamba-cpu")]
+    pub fn projection_weights(&self) -> Option<Vec<f32>> {
+        self.liquid_mamba
+            .as_ref()
+            .map(|gen: &Box<crate::liquid_mamba::LiquidMambaGenerator>| {
+                gen.projection.flatten_weights()
+            })
+    }
+
     /// Reset momentum on all CfC neurons. Call between BPTT training epochs
     /// to prevent accumulated directional bias from 67K+ gradient steps.
     pub fn reset_network_momentum(&mut self) {
@@ -1041,7 +1083,11 @@ impl LanguageController {
                     // Apply gradients to this layer
                     neuron.apply_gradients_no_decay(
                         &grads,
-                        network_lr * self.config.gradient_attenuation.powi((last_layer_idx - layer_idx) as i32),
+                        network_lr
+                            * self
+                                .config
+                                .gradient_attenuation
+                                .powi((last_layer_idx - layer_idx) as i32),
                     );
                 }
 

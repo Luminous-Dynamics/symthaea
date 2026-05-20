@@ -784,6 +784,25 @@ impl BpeTokenizer {
         self.vocab_size
     }
 
+    /// Export the current vocabulary to a serializable `VocabFile`.
+    pub fn export_vocab(&self) -> VocabFile {
+        let mut tokens = vec!["".to_string(); self.id_to_token.len()];
+        for (i, token) in self.id_to_token.iter().enumerate() {
+            tokens[i] = token.clone();
+        }
+        VocabFile {
+            tokens,
+            merges: self
+                .merges
+                .iter()
+                .map(|(l, r)| MergePair {
+                    left: l.clone(),
+                    right: r.clone(),
+                })
+                .collect(),
+        }
+    }
+
     /// Look up a token's ID, returning UNK if not found.
     pub fn token_id(&self, token: &str) -> u32 {
         *self.token_to_id.get(token).unwrap_or(&self.unk_id)

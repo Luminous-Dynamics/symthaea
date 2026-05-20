@@ -411,7 +411,7 @@ fn active_intent(channels: &[f32]) -> &'static str {
 }
 
 /// Cross-entropy loss for a single position (read-only, no weight updates).
-fn cross_entropy_loss(logits: &[f32], target: usize) -> f32 {
+pub fn cross_entropy_loss(logits: &[f32], target: usize) -> f32 {
     if target >= logits.len() {
         return f32::INFINITY;
     }
@@ -478,8 +478,8 @@ pub fn evaluate(generator: &mut BrocaGenerator, config: &EvalConfig) -> EvalResu
     };
 
     let total_pairs = pairs.len();
-    let mut all_target_token_ids = Vec::new();
-    let mut all_generated_token_ids = Vec::new();
+    let mut all_target_token_ids: Vec<u32> = Vec::new();
+    let mut all_generated_token_ids: Vec<u32> = Vec::new();
 
     for (pair_idx, pair) in pairs.iter().enumerate() {
         if pair.target_ids.is_empty() {
@@ -1715,6 +1715,7 @@ pub fn english_word_ratio_mamba(
 use crate::mamba::MambaBackend;
 
 /// Helper to calculate Jaccard-like overlap between two sets of token IDs.
+#[cfg(feature = "mamba-cpu")]
 fn evaluate_token_overlap(target: &[u32], generated: &[u32], _mamba: &dyn MambaBackend) -> f32 {
     use std::collections::HashSet;
     if target.is_empty() {
@@ -1733,6 +1734,7 @@ fn evaluate_token_overlap(target: &[u32], generated: &[u32], _mamba: &dyn MambaB
     }
 }
 
+#[cfg(feature = "mamba-cpu")]
 pub fn evaluate_liquid_mamba(
     gen: &mut crate::liquid_mamba::LiquidMambaGenerator,
     config: &LiquidMambaEvalConfig,

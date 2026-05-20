@@ -20,7 +20,7 @@
 
 use crate::mamba_model::{Config, Model, State};
 use anyhow::{Context, Result};
-use candle_core::{DType, Device, IndexOp, Tensor};
+use candle_core::{DType, Device, IndexOp, Tensor, D};
 use candle_nn::VarBuilder;
 
 /// Select the best available compute device.
@@ -64,6 +64,8 @@ pub fn best_device() -> Device {
 /// included. Methods that expose candle-specific types (`State`, `Device`,
 /// `Tokenizer`) remain as inherent methods on [`MambaWrapper`] only.
 pub trait MambaBackend: Send {
+    fn clone_box(&self) -> Box<dyn MambaBackend>;
+
     /// Single-token forward pass. Returns logits as `Vec<f32>` (vocab_size elements).
     fn forward_one_token(&mut self, token_id: u32) -> Result<Vec<f32>>;
 
@@ -80,6 +82,9 @@ pub trait MambaBackend: Send {
     fn reset(&mut self);
 
     /// Vocabulary size.
+    /// Forward pass through one token, returning (logits, intermediate_hidden_state).
+    fn forward_with_state(&mut self, token_id: u32) -> Result<(Vec<f32>, Vec<f32>)>;
+
     fn vocab_size(&self) -> usize;
 
     /// Model hidden dimension.
@@ -174,6 +179,12 @@ pub trait MambaBackend: Send {
     /// Extract the current hidden state after generation.
     /// Used for semantic chunk carry-over in Phase 3.
     fn extract_hidden_state(&self) -> Result<Vec<f32>>;
+}
+
+impl Clone for Box<dyn MambaBackend> {
+    fn clone(&self) -> Self {
+        self.clone_box()
+    }
 }
 
 /// Wrapper around candle-transformers' Mamba model with Symthaea integration.
@@ -439,6 +450,34 @@ impl MambaWrapper {
         &self.device
     }
 
+    /// Single-token forward pass returning (logits, hidden_state).
+    pub fn internal_forward_with_state(&mut self, token_id: u32) -> Result<(Vec<f32>, Vec<f32>)> {
+        let logits = self.forward_one_token(token_id)?;
+        let hidden = self.internal_extract_hidden_state()?;
+        Ok((logits, hidden))
+    }
+
+    /// Extract the current average hidden state across all layers.
+    pub fn internal_extract_hidden_state(&self) -> Result<Vec<f32>> {
+        let mut avg_h = vec![0.0f32; self.config.d_model];
+        let n = self.state.hs.len() as f32;
+
+        for h_tensor in &self.state.hs {
+            // h_tensor is [batch, d_inner, d_state]
+            // We want a [d_model] summary. Sum over d_state, then average.
+            let h_sum = h_tensor.sum(D::Minus1)?.squeeze(D::Minus1)?;
+            // h_sum is [batch, d_inner] = [1, 1536]
+            let h_vec = h_sum.squeeze(0)?.to_vec1::<f32>()?;
+
+            // Down-sample d_inner (1536) to d_model (768) via simple average of pairs
+            for i in 0..self.config.d_model {
+                avg_h[i] += (h_vec[i * 2] + h_vec[i * 2 + 1]) / (2.0 * n);
+            }
+        }
+
+        Ok(avg_h)
+    }
+
     /// Access the raw embedding table `[vocab_size, d_model]`.
     ///
     /// Used to compute per-dimension mean/variance for manifold moment matching
@@ -685,7 +724,50 @@ impl std::fmt::Debug for MambaWrapper {
     }
 }
 
+impl MambaWrapper {
+    pub fn internal_inject_hidden_state(&mut self, hidden: &[f32]) -> Result<()> {
+        let d_model = self.config.d_model;
+        let n_layers = self.config.n_layer;
+        if hidden.len() != d_model {
+            anyhow::bail!(
+                "Hidden state dimension mismatch: expected {}, got {}",
+                d_model,
+                hidden.len()
+            );
+        }
+
+        // Broadcast the 768D semantic vector to all 64 layers as a warm-start
+        let h_tensor = Tensor::from_slice(hidden, (1, d_model), self.model.device())?;
+        // Expand to [1, d_inner, d_state] = [1, 1536, 16]
+        let h_inner = h_tensor.repeat((1, 2))?; // [1, 1536]
+        let h_state = h_inner.unsqueeze(D::Minus1)?.repeat((1, 1, 16))?;
+
+        for i in 0..n_layers {
+            self.state.hs[i] = h_state.clone();
+        }
+
+        Ok(())
+    }
+}
+
+impl Clone for MambaWrapper {
+    fn clone(&self) -> Self {
+        Self {
+            model: self.model.clone(),
+            state: self.state.clone(),
+            config: self.config.clone(),
+            tokenizer: self.tokenizer.clone(),
+            device: self.device.clone(),
+            lora_lr: self.lora_lr,
+        }
+    }
+}
+
 impl MambaBackend for MambaWrapper {
+    fn clone_box(&self) -> Box<dyn MambaBackend> {
+        Box::new(self.clone())
+    }
+
     fn forward_one_token(&mut self, token_id: u32) -> Result<Vec<f32>> {
         MambaWrapper::forward_one_token(self, token_id)
     }
@@ -766,12 +848,16 @@ impl MambaBackend for MambaWrapper {
         MambaWrapper::set_cfc_modulation(self, delta_scale, b_scale)
     }
 
+    fn forward_with_state(&mut self, token_id: u32) -> Result<(Vec<f32>, Vec<f32>)> {
+        self.internal_forward_with_state(token_id)
+    }
+
     fn inject_hidden_state(&mut self, hidden: &[f32]) -> Result<()> {
-        MambaWrapper::inject_hidden_state(self, hidden)
+        self.internal_inject_hidden_state(hidden)
     }
 
     fn extract_hidden_state(&self) -> Result<Vec<f32>> {
-        MambaWrapper::extract_hidden_state(self)
+        self.internal_extract_hidden_state()
     }
 }
 
@@ -789,6 +875,7 @@ pub mod mock {
     /// Produces repeatable, seeded outputs using xorshift64 PRNG. All operations
     /// that would require a real model (forward, embedding, encode/decode) are
     /// replaced with lightweight deterministic computations.
+    #[derive(Debug, Clone)]
     pub struct MockMamba {
         /// Number of forward passes executed.
         pub forward_count: usize,
@@ -828,6 +915,10 @@ pub mod mock {
     }
 
     impl MambaBackend for MockMamba {
+        fn clone_box(&self) -> Box<dyn MambaBackend> {
+            Box::new(self.clone())
+        }
+
         fn forward_one_token(&mut self, token_id: u32) -> Result<Vec<f32>> {
             self.forward_count += 1;
             let vocab = 50280usize;
@@ -849,6 +940,12 @@ pub mod mock {
                 logits.push(val as f32 * self.scale_factor);
             }
             Ok(logits)
+        }
+
+        fn forward_with_state(&mut self, token_id: u32) -> Result<(Vec<f32>, Vec<f32>)> {
+            let logits = self.forward_one_token(token_id)?;
+            let d_model = 768;
+            Ok((logits, vec![0.001f32; d_model]))
         }
 
         fn embedding_vector(&self, token_id: u32) -> Result<Vec<f32>> {
@@ -976,17 +1073,6 @@ pub mod mock {
                 // Return a default hidden state if none exists
                 Ok(vec![0.01; 768])
             }
-        }
-    }
-
-    impl std::fmt::Debug for MockMamba {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            f.debug_struct("MockMamba")
-                .field("forward_count", &self.forward_count)
-                .field("scale_factor", &self.scale_factor)
-                .field("injection_count", &self.injection_count)
-                .field("reset_count", &self.reset_count)
-                .finish()
         }
     }
 }

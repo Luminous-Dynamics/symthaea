@@ -776,6 +776,7 @@ pub const THERAPEUTIC_CHANNEL_DEFAULTS: &[f32] = &[0.0, 0.5, 0.0, 0.0];
 /// 2. Level encoding (thermometer coding via bundled levels 0..k)
 /// 3. Binding with genesis-seeded channel base vectors
 /// 4. Bundling all bound channel HVs
+#[derive(Clone)]
 pub struct ThoughtLanguageEncoder {
     /// Base vectors for each of 20 channels.
     base_vectors: Vec<ContinuousHV>,

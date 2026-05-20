@@ -12,8 +12,8 @@
 #![allow(clippy::manual_is_multiple_of)]
 #![allow(clippy::unnecessary_map_or)]
 
-pub mod architect;
 pub mod affective_sculpting;
+pub mod architect;
 pub mod architectural_memory;
 pub mod checkpoint;
 #[cfg(feature = "code-sheaf-eval")]
@@ -88,8 +88,8 @@ pub mod projection;
 #[cfg(feature = "mamba-cpu")]
 pub mod temporal_projection;
 
-pub use architect::SimulationArchitect;
 pub use affective_sculpting::{AffectiveSculptor, AffectiveStyle};
+pub use architect::SimulationArchitect;
 pub use architectural_memory::ArchitecturalMemory;
 pub use checkpoint::{AdamState, BrocaCheckpoint, BrocaCheckpointMetadata};
 #[cfg(feature = "code-sheaf-eval")]

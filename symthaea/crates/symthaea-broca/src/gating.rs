@@ -552,6 +552,7 @@ impl SpectralCoherenceGate {
 ///
 /// The system physically *cannot* hallucinate when epistemic status is Unknown —
 /// factual token logits are suppressed before sampling.
+#[derive(Clone)]
 pub struct EpistemicGate {
     config: GatingConfig,
     /// Token IDs classified as "hedging" (maybe, perhaps, uncertain, etc.)
@@ -959,8 +960,9 @@ const M_AXIS_FOUNDATIONAL: &[&str] = &["always", "fundamentally", "essentially",
 ///
 /// - **E-axis**: Controls assertion vs hedging strength
 /// - **N-axis**: Controls personal vs universal framing
-/// - **M-axis**: Controls temporal vs permanent framing
-/// - **H-axis**: Modulates generation depth/verbosity
+/// - M-axis: Controls temporal vs permanent framing
+/// - H-axis: Modulates generation depth/verbosity
+#[derive(Clone)]
 pub struct EpistemicCubeGate {
     // E-axis token sets
     hedging_ids: Vec<u32>,
@@ -1157,6 +1159,7 @@ impl EpistemicCubeGate {
 /// - **error_likelihood > 0.3**: Boosts error handling words (Result, Option, unwrap, etc.)
 ///
 /// Opt-in via `GatingConfig::enable_code_gate`.
+#[derive(Clone)]
 pub struct CodeGate {
     config: GatingConfig,
     tokenizer: std::sync::Arc<BpeTokenizer>,
@@ -1334,6 +1337,7 @@ impl CodeGate {
 /// - High arousal → boost sentence-ending tokens (shorter sentences)
 /// - Low warmth → suppress informal vocabulary
 /// - Negative valence → boost softening language
+#[derive(Clone)]
 pub struct EmotionalModulator {
     config: GatingConfig,
     /// Sentence-ending token IDs (., !, ?)
@@ -1546,6 +1550,7 @@ impl EmotionalModulator {
 ///
 /// If `cosine_similarity(network_state, thought_hv) < threshold`, the system
 /// boosts thought_hv binding weight in the next step.
+#[derive(Clone)]
 pub struct CoherenceFeedback {
     /// Drift threshold — below this, correction is applied.
     threshold: f32,
@@ -3148,6 +3153,7 @@ use std::collections::{HashMap, HashSet};
 ///
 /// Built once from the tokenizer vocabulary, then reused per-generation.
 /// Analogous to `EpistemicGate` but for semantic content rather than epistemic status.
+#[derive(Clone)]
 pub struct NsmSemanticGate {
     /// prime name (lowercased) → set of token IDs that express this prime.
     prime_to_tokens: HashMap<String, Vec<u32>>,
